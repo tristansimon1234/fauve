@@ -41,7 +41,13 @@ export type RunFauveInput = ToolContext & {
   studio: { name: string | null; timezone: string; onboardingStep: string; firstName: string | null };
 };
 
-export type RunFauveResult = { reply: string | null; reactions: string[]; usage: TokenUsage };
+export type RunFauveResult = {
+  reply: string | null;
+  reactions: string[];
+  usage: TokenUsage;
+  /** Work started by tools that must run once the reply is sent (e.g. render then send a video). */
+  afterReply: (() => Promise<void>)[];
+};
 
 const FALLBACK_REPLY = "Je n’ai pas réussi à traiter ta demande, je regarde ça et je reviens vers toi.";
 
@@ -87,14 +93,14 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   await logClaudeCost(input.studioId, usage);
 
   if (!last || last.stop_reason === "refusal") {
-    return { reply: FALLBACK_REPLY, reactions: input.reactions, usage };
+    return { reply: FALLBACK_REPLY, reactions: input.reactions, usage, afterReply: input.afterReply };
   }
   const reply = last.content
     .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n\n")
     .trim();
-  return { reply: reply || null, reactions: input.reactions, usage };
+  return { reply: reply || null, reactions: input.reactions, usage, afterReply: input.afterReply };
 }
 
 async function logClaudeCost(studioId: string, usage: TokenUsage) {

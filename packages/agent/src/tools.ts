@@ -87,8 +87,13 @@ export const toolSpecs = {
   },
   create_edit_plan: {
     description:
-      "Enregistre une nouvelle version du plan de montage d'une publication. Règles : coupes franches, 7 à 15 s, accroche dès la 1re seconde, sous-titres, logo en fin, aucun texte en bas ni à droite, jamais de musique intégrée.",
+      "Enregistre une nouvelle version du plan de montage d'une publication. Les clip_id sont les media_id des vidéos reçues, in/out des secondes dans ces clips (appuie-toi sur analyze_clips). Règles : coupes franches, 7 à 15 s, accroche (style hook) dès la 1re seconde, textes courts, jamais de musique intégrée. Le moteur place lui-même les textes dans les zones de sécurité ; images (logo) et sous-titres mot à mot ne sont pas encore rendus : laisse images vide et subtitles à false.",
     input: z.object({ post_id: z.string().uuid(), plan: editPlanSchema }),
+  },
+  render: {
+    description:
+      "Lance le montage vidéo de la dernière version du plan de montage d'une publication. La vidéo (MP4 9:16) est envoyée automatiquement à la gérante, avec la légende, environ une minute après ta réponse. Pour une correction : crée une nouvelle version du plan (create_edit_plan) puis relance render.",
+    input: z.object({ post_id: z.string().uuid() }),
   },
   update_brand_profile: {
     description:
