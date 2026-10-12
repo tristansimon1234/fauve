@@ -80,6 +80,11 @@ export const toolSpecs = {
       due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     }),
   },
+  analyze_clips: {
+    description:
+      "Regarde les vidéos reçues (analyse Gemini) : plans horodatés, sujet, énergie, potentiel d'accroche, qualité, visages, meilleurs passages, paroles. À appeler avant tout plan de montage, avec les media_id indiqués dans la conversation. Peut prendre jusqu'à une minute par vidéo.",
+    input: z.object({ media_ids: z.array(z.string().uuid()).min(1).max(10) }),
+  },
   create_edit_plan: {
     description:
       "Enregistre une nouvelle version du plan de montage d'une publication. Règles : coupes franches, 7 à 15 s, accroche dès la 1re seconde, sous-titres, logo en fin, aucun texte en bas ni à droite, jamais de musique intégrée.",

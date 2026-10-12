@@ -20,6 +20,12 @@ const schema = {
   // Secret for the browser test chat (/essai?cle=…). Unset = test chat disabled.
   FAUVE_TEST_KEY: z.string().min(16),
   USD_TO_EUR: z.coerce.number().positive().optional(),
+  // Google AI Studio key and model for video analysis.
+  GEMINI_API_KEY: z.string().min(1),
+  GEMINI_MODEL: z.string().default("gemini-3.7-flash"),
+  // Optional prices (USD per million tokens) to log Gemini costs; tokens are logged regardless.
+  GEMINI_INPUT_USD_PER_MTOK: z.coerce.number().nonnegative().optional(),
+  GEMINI_OUTPUT_USD_PER_MTOK: z.coerce.number().nonnegative().optional(),
 } as const;
 
 type Schema = typeof schema;

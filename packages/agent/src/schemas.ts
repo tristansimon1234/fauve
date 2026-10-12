@@ -83,22 +83,34 @@ export type EditPlan = z.infer<typeof editPlanSchema>;
 // Clip analysis returned by the video model (Gemini).
 // ---------------------------------------------------------------------------
 
+const seconds = z.number().min(0).describe("Secondes depuis le début du clip, ex. 3.5");
+
 export const clipAnalysisSchema = z.object({
-  duration: z.number().positive(),
-  shots: z.array(
-    z.object({
-      start: z.number().min(0),
-      end: z.number().positive(),
-      description: z.string(),
-      quality: z.object({
-        blurry: z.boolean(),
-        dark: z.boolean(),
-        shaky: z.boolean(),
+  duration: z.number().positive().describe("Durée totale du clip en secondes"),
+  orientation: z.enum(["portrait", "landscape", "square"]),
+  summary: z.string().describe("Ce qu'on voit, en une ou deux phrases"),
+  setting: z.string().describe("Lieu et matériel : studio, reformer, tapis, barre, extérieur…"),
+  lighting: z.enum(["good", "ok", "poor"]),
+  shots: z
+    .array(
+      z.object({
+        start: seconds,
+        end: seconds,
+        description: z.string().describe("Ce qui se passe dans ce plan"),
+        subject: z.string().describe("Sujet principal : groupe, prof, élève, mains, pieds, machine, détail…"),
+        energy: z.number().int().min(1).max(5).describe("1 = calme, 5 = très dynamique"),
+        hook_score: z.number().int().min(1).max(5).describe("Potentiel comme accroche des 2 premières secondes"),
+        quality: z.object({ blurry: z.boolean(), dark: z.boolean(), shaky: z.boolean() }),
+        faces_visible: z.boolean(),
       }),
-      faces_visible: z.boolean(),
-    }),
-  ),
-  transcript: z.string().nullable(),
+    )
+    .describe("Plans successifs, sans trou ni chevauchement"),
+  best_moments: z
+    .array(z.object({ start: seconds, end: seconds, why: z.string() }))
+    .max(3)
+    .describe("Les meilleurs passages pour un Reel, du meilleur au moins bon"),
+  transcript: z.string().describe("Paroles audibles, vide s'il n'y en a pas"),
+  issues: z.array(z.string()).describe("Problèmes à signaler : flou, contre-jour, visage d'élève reconnaissable, logo d'une marque…"),
 });
 export type ClipAnalysis = z.infer<typeof clipAnalysisSchema>;
 
