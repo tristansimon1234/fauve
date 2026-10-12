@@ -85,9 +85,18 @@ export const toolSpecs = {
       "Regarde les vidéos reçues (analyse Gemini) : plans horodatés, sujet, énergie, potentiel d'accroche, qualité, visages, meilleurs passages, paroles. À appeler avant tout plan de montage, avec les media_id indiqués dans la conversation. Peut prendre jusqu'à une minute par vidéo.",
     input: z.object({ media_ids: z.array(z.string().uuid()).min(1).max(10) }),
   },
+  design_edit: {
+    description:
+      "Confie le montage au monteur de Fauve (motion design) : il regarde les analyses des clips, choisit le gabarit (doux, dynamique, chic) selon le style du studio, et écrit le plan de montage (nouvelle version). Pour une correction de la gérante (« plus doux », « enlève le texte », « commence par les mains »), rappelle-le avec la demande dans brief : il part du plan précédent. Renvoie une phrase d'explication à reprendre. Ensuite, lance render.",
+    input: z.object({
+      post_id: z.string().uuid(),
+      media_ids: z.array(z.string().uuid()).max(10).optional().describe("Clips à monter (media_id). Facultatif pour une correction : reprend ceux du plan précédent."),
+      brief: z.string().max(600).optional().describe("Intention ou correction demandée, ex. « plus doux, sans bandeau » ; « visages OK, élèves d'accord »"),
+    }),
+  },
   create_edit_plan: {
     description:
-      "Enregistre une nouvelle version du plan de montage d'une publication. Les clip_id sont les media_id des vidéos reçues, in/out des secondes dans ces clips (appuie-toi sur analyze_clips). Règles : coupes franches, 7 à 15 s, accroche (style hook) dès la 1re seconde, textes courts, jamais de musique intégrée. Le moteur place lui-même les textes dans les zones de sécurité ; images (logo) et sous-titres mot à mot ne sont pas encore rendus : laisse images vide et subtitles à false.",
+      "Plan de montage écrit à la main (à éviter : préfère design_edit, bien meilleur). Enregistre une nouvelle version du plan de montage d'une publication. Les clip_id sont les media_id des vidéos reçues, in/out des secondes dans ces clips (appuie-toi sur analyze_clips). Règles : coupes franches, 7 à 15 s, accroche (style hook) dès la 1re seconde, textes courts, jamais de musique intégrée. Le moteur place lui-même les textes dans les zones de sécurité ; images (logo) et sous-titres mot à mot ne sont pas encore rendus : laisse images vide et subtitles à false.",
     input: z.object({ post_id: z.string().uuid(), plan: editPlanSchema }),
   },
   render: {

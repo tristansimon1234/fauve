@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { editPlanSchema } from "./schemas.ts";
+import { editPlanObjectSchema, editPlanSchema } from "./schemas.ts";
 import { canTransition } from "./status.ts";
 import { claudeCostUsd, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
@@ -171,4 +171,63 @@ test("render: plan becomes ffmpeg args and a styled ASS file", async () => {
   assert.equal(renderDuration(faded), 7.1); // 1.8 + 4 + 2 - 2 × 0.35
   const fadedGraph = buildFfmpegArgs(faded, { clipFiles: { a: "clip0.mp4", b: "clip1.mov" } }).find((a) => a.includes("xfade"))!;
   assert.match(fadedGraph, /\[v0\]\[v1\]xfade=transition=fade:duration=0\.35:offset=1\.45\[x1\];\[x1\]\[v2\]xfade=transition=fade:duration=0\.35:offset=5\.1\[vc\]/);
+});
+
+test("motion: plan becomes a frame-accurate Remotion timeline", async () => {
+  const { buildReelProps } = await import("./motion.ts");
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    template: "doux",
+    transitions: "fade",
+    subtitles: true,
+    segments: [
+      { clip_id: "a", in: 1, out: 4, zoom: "light" },
+      { clip_id: "b", in: 0, out: 3 },
+    ],
+    texts: [{ text: "Le Reformer à ton rythme", from: 0, to: 2.5, style: "hook", emphasis: ["rythme"] }],
+    images: [],
+    end_card: { title: "Indar", subtitle: "Réserve ton cours" },
+  });
+  const props = buildReelProps(plan, {
+    template: "doux",
+    clipUrls: { a: "https://x/a.mp4", b: "https://x/b.mp4" },
+    words: { a: [{ w: "respire", start: 1.5, end: 2 }, { w: "hors", start: 4.5, end: 5 }] },
+    brand: { name: "Indar", accent: "#FFE9E1" },
+  });
+  assert.equal(props.fadeFrames, 11);
+  assert.deepEqual(props.segments.map((s) => [s.startAt, s.startFrom, s.durationInFrames, s.zoom]), [[0, 30, 90, true], [79, 0, 90, false]]);
+  assert.equal(props.durationInFrames, 169);
+  assert.deepEqual(props.words, [{ w: "respire", from: 15, to: 30 }]); // the word outside the kept range is dropped
+  assert.equal(props.brand.accentInk, "#1C1530"); // light accent gets dark text
+  assert.equal(props.endCard?.from, 169 - 48);
+  assert.throws(() => buildReelProps(plan, { template: "doux", clipUrls: { a: "x" }, brand: { name: "" } }), /No URL for clip b/);
+});
+
+test("editor: model plans are clamped to the clips and the timeline", async () => {
+  const { normalizeEditPlan } = await import("./editor.ts");
+  const plan = normalizeEditPlan(
+    editPlanObjectSchema.parse({
+      ...validPlan,
+      template: "dynamique",
+      duration: 30,
+      segments: [
+        { clip_id: "a", in: 2, out: 9, zoom: "none" }, // clip a is only 6 s long
+        { clip_id: "ghost", in: 0, out: 2, zoom: "none" }, // unknown clip
+        { clip_id: "b", in: 1, out: 1.2, zoom: "none" }, // too short
+        { clip_id: "b", in: 0, out: 3, zoom: "light" },
+      ],
+      texts: [
+        { text: "Ça brûle", from: 0, to: 2, style: "hook", emphasis: ["brûle", "absent"] },
+        { text: "Trop tard", from: 6, to: 9, style: "caption" },
+        { text: "Flash", from: 6.8, to: 9, style: "band" }, // 0.2 s once clamped: dropped
+      ],
+      transitions: "cut",
+    }),
+    { a: 6, b: 10 },
+  );
+  assert.deepEqual(plan.segments.map((s) => [s.clip_id, s.in, s.out]), [["a", 2, 6], ["b", 0, 3]]);
+  assert.equal(plan.duration, 7);
+  assert.deepEqual(plan.texts.map((t) => [t.text, t.to, t.emphasis]), [["Ça brûle", 2, ["brûle"]], ["Trop tard", 7, undefined]]);
+  const lonely = editPlanSchema.parse({ ...validPlan, segments: [{ clip_id: "x", in: 0, out: 2 }] });
+  assert.throws(() => normalizeEditPlan(lonely, {}), /aucun plan/);
 });

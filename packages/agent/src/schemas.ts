@@ -41,7 +41,14 @@ export const editPlanTextSchema = z.object({
   from: z.number().min(0),
   to: z.number().positive(),
   style: z.enum(["hook", "band", "caption"]),
+  /** Words of `text` to stress (accent colour / weight), at most three. */
+  emphasis: z.array(z.string().min(1)).max(3).optional(),
 });
+
+/** Motion templates rendered by Remotion (apps/render); any other template uses the ffmpeg engine. */
+export const MOTION_TEMPLATES = ["doux", "dynamique", "chic"] as const;
+export const motionTemplateSchema = z.enum(MOTION_TEMPLATES);
+export type MotionTemplate = z.infer<typeof motionTemplateSchema>;
 
 export const editPlanImageSchema = z.object({
   asset_id: z.string().min(1),
@@ -51,32 +58,34 @@ export const editPlanImageSchema = z.object({
   to: z.number().positive(),
 });
 
-export const editPlanSchema = z
-  .object({
-    format: z.enum(["9:16", "1:1", "4:5"]),
-    duration: z.number().min(3).max(90),
-    template: z.string().min(1),
-    segments: z.array(editPlanSegmentSchema).min(1),
-    texts: z.array(editPlanTextSchema),
-    images: z.array(editPlanImageSchema),
-    transitions: z.enum(["cut", "fade", "light_zoom"]),
-    subtitles: z.boolean(),
-    music: z.null(),
-  })
-  .superRefine((plan, ctx) => {
-    plan.segments.forEach((s, i) => {
-      if (s.out <= s.in) {
-        ctx.addIssue({ code: "custom", path: ["segments", i, "out"], message: "out must be after in" });
-      }
-    });
-    for (const [key, items] of [["texts", plan.texts], ["images", plan.images]] as const) {
-      items.forEach((t, i) => {
-        if (t.to <= t.from || t.to > plan.duration) {
-          ctx.addIssue({ code: "custom", path: [key, i, "to"], message: "must end after start and within duration" });
-        }
-      });
+export const editPlanObjectSchema = z.object({
+  format: z.enum(["9:16", "1:1", "4:5"]),
+  duration: z.number().min(3).max(90),
+  template: z.string().min(1),
+  segments: z.array(editPlanSegmentSchema).min(1),
+  texts: z.array(editPlanTextSchema),
+  images: z.array(editPlanImageSchema),
+  transitions: z.enum(["cut", "fade", "light_zoom"]),
+  subtitles: z.boolean(),
+  music: z.null(),
+  /** Closing card over the last ~1.6 s: studio name or logo, plus a call to action. */
+  end_card: z.object({ title: z.string().min(1).max(40), subtitle: z.string().max(60).optional() }).optional(),
+});
+
+export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {
+  plan.segments.forEach((s, i) => {
+    if (s.out <= s.in) {
+      ctx.addIssue({ code: "custom", path: ["segments", i, "out"], message: "out must be after in" });
     }
   });
+  for (const [key, items] of [["texts", plan.texts], ["images", plan.images]] as const) {
+    items.forEach((t, i) => {
+      if (t.to <= t.from || t.to > plan.duration) {
+        ctx.addIssue({ code: "custom", path: [key, i, "to"], message: "must end after start and within duration" });
+      }
+    });
+  }
+});
 export type EditPlan = z.infer<typeof editPlanSchema>;
 
 // ---------------------------------------------------------------------------
@@ -110,6 +119,11 @@ export const clipAnalysisSchema = z.object({
     .max(3)
     .describe("Les meilleurs passages pour un Reel, du meilleur au moins bon"),
   transcript: z.string().describe("Paroles audibles, vide s'il n'y en a pas"),
+  words: z
+    .array(z.object({ w: z.string(), start: seconds, end: seconds }))
+    .max(400)
+    .optional()
+    .describe("Chaque mot prononcé avec son début et sa fin, pour les sous-titres mot à mot ; vide s'il n'y a pas de voix"),
   issues: z.array(z.string()).describe("Problèmes à signaler : flou, contre-jour, visage d'élève reconnaissable, logo d'une marque…"),
 });
 export type ClipAnalysis = z.infer<typeof clipAnalysisSchema>;

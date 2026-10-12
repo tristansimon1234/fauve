@@ -1,0 +1,21 @@
+{
+  "name": "fauve-render",
+  "private": true,
+  "description": "Fauve motion templates (Remotion). Rendered in the Vercel Sandbox; see apps/web/src/lib/render.",
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "bundle": "remotion bundle src/index.ts --out-dir build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.535",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.535"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "typescript": "^5"
+  }
+}
