@@ -100,6 +100,27 @@ export const toolSpecs = {
       "Programme une publication validée sur Instagram, à son horaire (scheduled_at) ou à l'horaire donné ; si l'horaire est passé ou absent, elle part tout de suite. Nécessite une vidéo montée (render) et un compte Instagram connecté (sinon envoie le lien get_connect_link). Ne programme jamais sans l'accord explicite de la gérante.",
     input: z.object({ post_id: z.string().uuid(), scheduled_at: isoDateTime.optional() }),
   },
+  get_instagram_activity: {
+    description:
+      "Lit le compte Instagram connecté du studio : derniers posts (y compris ceux publiés sans Fauve) avec likes, nombre de commentaires, statistiques (vues, portée, enregistrements, partages) et les commentaires récents avec leurs réponses. Sert à analyser ce qui marche, repérer les questions sans réponse et préparer des réponses ou le bilan.",
+    input: z.object({
+      media_limit: z.number().int().min(1).max(20).default(8),
+      comments_per_post: z.number().int().min(0).max(30).default(15),
+    }),
+  },
+  reply_to_comment: {
+    description:
+      "Publie une réponse publique sous un commentaire Instagram, au nom du studio. Uniquement après que la gérante a validé le texte exact (montre-lui d'abord ta proposition).",
+    input: z.object({
+      comment_id: z.string().min(1),
+      message: z.string().min(1).max(1000),
+    }),
+  },
+  get_metrics: {
+    description:
+      "Statistiques mesurées des publications faites par Fauve (dernière mesure par publication) entre deux dates : vues, portée, likes, enregistrements, partages, commentaires, visites du profil.",
+    input: z.object({ from: isoDateTime, to: isoDateTime }),
+  },
   update_brand_profile: {
     description:
       "Enregistre une nouvelle version du profil de style du studio (à partir d'exemples ou d'une correction de la gérante).",
