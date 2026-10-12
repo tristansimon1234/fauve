@@ -1,10 +1,10 @@
-# Mila
+# Fauve
 
 Community manager IA pour studios de Pilates, yoga et barre, qui vit dans WhatsApp. Le cahier des charges est dans [`CLAUDE.md`](CLAUDE.md), la maquette dans [`docs/maquette/`](docs/maquette/).
 
 ```
 apps/web        Next.js 16 (landing, web app, webhook WhatsApp) → Vercel
-packages/agent  prompts, tools et schémas Zod de Mila (plan de montage, statuts, coûts)
+packages/agent  prompts, tools et schémas Zod de Fauve (plan de montage, statuts, coûts)
 supabase/       migrations SQL + seed de démo
 ```
 

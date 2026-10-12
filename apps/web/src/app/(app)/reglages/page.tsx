@@ -20,7 +20,7 @@ export default function SettingsPage() {
         </Section>
         <Section title="Rythme">
           <p className="text-sm">
-            {demoStudio.postsPerWeek} posts et {demoStudio.storiesPerWeek} stories par semaine. Demande à Mila pour le
+            {demoStudio.postsPerWeek} posts et {demoStudio.storiesPerWeek} stories par semaine. Demande à Fauve pour le
             changer.
           </p>
         </Section>

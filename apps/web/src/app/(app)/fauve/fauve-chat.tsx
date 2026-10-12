@@ -37,7 +37,7 @@ const shortcuts = [
   { label: "Ajuster le ton des légendes", icon: PenIcon, tone: "text-coral-ink" },
 ];
 
-export function MilaChat() {
+export function FauveChat() {
   const [view, setView] = useState<"home" | "thread">("home");
   const [scheduled, setScheduled] = useState(false);
   const [draft, setDraft] = useState("");
@@ -144,14 +144,14 @@ export function MilaChat() {
               <PaperclipIcon />
             </button>
             <label htmlFor="ask" className="sr-only">
-              Message à Mila
+              Message à Fauve
             </label>
             <input
               id="ask"
               type="text"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Demandez à Mila…"
+              placeholder="Demandez à Fauve…"
               className="h-11 min-w-0 flex-1 bg-transparent text-base outline-none"
             />
             <button type="button" aria-label="Dicter" className="flex size-11 items-center justify-center rounded-[14px] text-muted">

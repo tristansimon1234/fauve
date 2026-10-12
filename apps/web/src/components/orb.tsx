@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-/** Mila's gradient orb, the product's identity mark. */
+/** Fauve's gradient orb, the product's identity mark. */
 export function Orb({ size = 36, className }: { size?: number; className?: string }) {
   const id = useId();
   return (
@@ -34,7 +34,7 @@ export function Logo({ size = 36 }: { size?: number }) {
   return (
     <span className="flex items-center gap-2.5">
       <Orb size={size} />
-      <span className="text-xl font-extrabold tracking-[-0.02em]">Mila</span>
+      <span className="text-xl font-extrabold tracking-[-0.02em]">Fauve</span>
     </span>
   );
 }

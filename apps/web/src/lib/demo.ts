@@ -1,4 +1,4 @@
-import type { PostKind, PostStatus } from "@mila/agent";
+import type { PostKind, PostStatus } from "@fauve/agent";
 
 // Demo content from the mockup ("Studio Lune"), used until the screens read Supabase.
 
@@ -52,7 +52,7 @@ export const demoShots = [
 export const demoDraft = {
   id: "studio-se-reveille",
   title: "Le studio se réveille",
-  subtitle: "Reel · jeudi 15 octobre à 18 h · préparé par Mila à partir de tes 5 vidéos",
+  subtitle: "Reel · jeudi 15 octobre à 18 h · préparé par Fauve à partir de tes 5 vidéos",
   hook: ["6 h 45.", "Le studio", "se réveille."],
   band: "les premières à la barre",
   caption:
@@ -71,7 +71,7 @@ export const demoDraft = {
     ["2,5–9 s", "Sous-titres mot à mot"],
     ["9–12 s", "Logo + « 2 places jeudi 7 h »"],
   ],
-  milaNote:
+  agentNote:
     "J’ai mis les mains en premier : sur tes 6 derniers Reels, ceux qui commencent par un gros plan ont été regardés plus longtemps. J’ai écarté le plan 4, trop sombre.",
 };
 
@@ -91,7 +91,7 @@ export const demoConversations = [
   "Légende pour la nouvelle prof",
   "Réponse au message de Léa",
   "Post « places restantes »",
-  "Mise en place de Mila",
+  "Mise en place de Fauve",
 ];
 
 export const demoResults = {

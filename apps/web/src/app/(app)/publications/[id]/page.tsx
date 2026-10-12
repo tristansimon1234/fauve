@@ -41,9 +41,9 @@ export default async function PostPage({ params }: PageProps<"/publications/[id]
                 : "Cette publication n’a pas encore de brouillon à valider."}
             </p>
           </div>
-          <Link href="/mila" className="btn btn-secondary self-start">
+          <Link href="/fauve" className="btn btn-secondary self-start">
             <ChatIcon size={18} />
-            En parler à Mila
+            En parler à Fauve
           </Link>
         </div>
       )}

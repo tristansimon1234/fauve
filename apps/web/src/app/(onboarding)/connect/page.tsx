@@ -18,7 +18,7 @@ export default function ConnectPage() {
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2">
             <Orb size={28} />
-            <span className="text-[17px] font-extrabold">Mila</span>
+            <span className="text-[17px] font-extrabold">Fauve</span>
           </span>
           <span className="text-[13px] font-bold text-muted">Étape 2 sur 3</span>
         </div>
@@ -37,7 +37,7 @@ export default function ConnectPage() {
           ))}
         </ul>
         <div className="rounded-2xl bg-soft px-4 py-3.5 text-sm leading-normal">
-          <strong>Rien n’est publié sans ton accord.</strong> Tu peux déconnecter Mila à tout moment.
+          <strong>Rien n’est publié sans ton accord.</strong> Tu peux déconnecter Fauve à tout moment.
         </div>
         <ConnectActions />
       </div>

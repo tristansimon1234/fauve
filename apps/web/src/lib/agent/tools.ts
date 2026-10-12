@@ -5,7 +5,7 @@ import {
   canTransition,
   postStatusSchema,
   type ToolHandlers,
-} from "@mila/agent";
+} from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendReaction } from "@/lib/whatsapp/client";
@@ -42,7 +42,7 @@ async function nextVersion(table: "brand_profiles" | "edit_plans", column: "stud
   return ((data?.[0]?.version as number | undefined) ?? 0) + 1;
 }
 
-/** Database-backed implementations of Mila's tools, scoped to one studio. */
+/** Database-backed implementations of Fauve's tools, scoped to one studio. */
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const db = supabaseAdmin();
   const { studioId } = ctx;

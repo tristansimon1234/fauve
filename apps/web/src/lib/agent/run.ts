@@ -5,14 +5,14 @@ import {
   addUsage,
   CLAUDE_MODEL,
   claudeCostUsd,
-  MILA_SYSTEM_PROMPT,
+  FAUVE_SYSTEM_PROMPT,
   studioContextPrompt,
   toolSpecs,
   usdToEur,
   type TokenUsage,
   type ToolHandlers,
   type ToolName,
-} from "@mila/agent";
+} from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createToolHandlers, type ToolContext } from "./tools";
@@ -36,16 +36,16 @@ function buildTools(handlers: ToolHandlers) {
   });
 }
 
-export type RunMilaInput = ToolContext & {
+export type RunFauveInput = ToolContext & {
   history: Anthropic.Beta.BetaMessageParam[];
   studio: { name: string | null; timezone: string; onboardingStep: string; firstName: string | null };
 };
 
-export type RunMilaResult = { reply: string | null; reactions: string[]; usage: TokenUsage };
+export type RunFauveResult = { reply: string | null; reactions: string[]; usage: TokenUsage };
 
 const FALLBACK_REPLY = "Je n’ai pas réussi à traiter ta demande, je regarde ça et je reviens vers toi.";
 
-export async function runMila(input: RunMilaInput): Promise<RunMilaResult> {
+export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   const now = new Intl.DateTimeFormat("fr-FR", {
     dateStyle: "full",
     timeStyle: "short",
@@ -61,7 +61,7 @@ export async function runMila(input: RunMilaInput): Promise<RunMilaResult> {
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: [
-      { type: "text", text: MILA_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+      { type: "text", text: FAUVE_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
       {
         type: "text",
         text: studioContextPrompt({

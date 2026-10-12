@@ -1,4 +1,4 @@
-import { normalizePhone } from "@mila/agent";
+import { normalizePhone } from "@fauve/agent";
 import { Webhook } from "standardwebhooks";
 import { z } from "zod";
 import { env } from "@/lib/env";
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   // Only studio members can log in.
   const member = await db.from("members").select("studio_id").eq("phone_e164", phone).maybeSingle();
   if (member.error) return hookError(500, "Database error");
-  if (!member.data) return hookError(403, "Ce numéro n’est pas encore inscrit. Écris d’abord à Mila sur WhatsApp.");
+  if (!member.data) return hookError(403, "Ce numéro n’est pas encore inscrit. Écris d’abord à Fauve sur WhatsApp.");
 
   try {
     await sendLoginCode(phone.slice(1), otp);

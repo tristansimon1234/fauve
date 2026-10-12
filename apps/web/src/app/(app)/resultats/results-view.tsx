@@ -56,7 +56,7 @@ export function ResultsView() {
         <section className="flex min-w-0 flex-[1_1_380px] flex-col gap-3.5 rounded-[22px] bg-soft p-6">
           <div className="flex items-center gap-2.5">
             <Orb size={32} />
-            <h2 className="text-lg font-bold">Le bilan de Mila</h2>
+            <h2 className="text-lg font-bold">Le bilan de Fauve</h2>
           </div>
           <p className="text-[15px] leading-[1.65]">{data.bilan}</p>
           <div className="flex flex-col gap-2">
@@ -106,7 +106,7 @@ export function ResultsView() {
               ))}
             </div>
             <p className="text-[13px] text-muted">
-              Le jeudi et le dimanche soir sortent du lot : Mila programme en priorité ces créneaux.
+              Le jeudi et le dimanche soir sortent du lot : Fauve programme en priorité ces créneaux.
             </p>
           </section>
         </div>

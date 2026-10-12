@@ -1,6 +1,6 @@
 "use server";
 
-import { normalizePhone } from "@mila/agent";
+import { normalizePhone } from "@fauve/agent";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -10,7 +10,7 @@ export type LoginState =
 
 function safeNext(value: FormDataEntryValue | null): string {
   const next = typeof value === "string" ? value : "";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/mila";
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/fauve";
 }
 
 export async function sendCode(_prev: LoginState, formData: FormData): Promise<LoginState> {
@@ -26,7 +26,7 @@ export async function sendCode(_prev: LoginState, formData: FormData): Promise<L
       error:
         error.status === 429
           ? "Un code vient d’être envoyé. Attends une minute avant d’en redemander un."
-          : "Impossible d’envoyer le code. Ce numéro est-il bien celui qui écrit à Mila sur WhatsApp ?",
+          : "Impossible d’envoyer le code. Ce numéro est-il bien celui qui écrit à Fauve sur WhatsApp ?",
     };
   }
   return { step: "code", phone };

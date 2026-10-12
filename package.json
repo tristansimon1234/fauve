@@ -1,5 +1,5 @@
 {
-  "name": "mila",
+  "name": "fauve",
   "private": true,
   "workspaces": [
     "apps/*",

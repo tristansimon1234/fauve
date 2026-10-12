@@ -12,7 +12,7 @@ export function ConnectActions() {
       <div className="flex items-center gap-3 rounded-2xl border border-line px-4 py-3.5">
         <span className="flex flex-1 flex-col gap-0.5">
           <span className="text-[15px] font-bold">Ajouter TikTok aussi</span>
-          <span className="text-[13px] text-muted">Mila publiera tes Reels sur les deux</span>
+          <span className="text-[13px] text-muted">Fauve publiera tes Reels sur les deux</span>
         </span>
         <button
           type="button"

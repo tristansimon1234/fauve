@@ -16,11 +16,11 @@ const instrument = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Mila · ton community manager dans WhatsApp", template: "%s · Mila" },
+  title: { default: "Fauve · ton community manager dans WhatsApp", template: "%s · Fauve" },
   description:
-    "Mila monte tes vidéos de cours, écrit les légendes et programme tes posts Instagram et TikTok. Pour les studios de Pilates, yoga et barre.",
-  applicationName: "Mila",
-  appleWebApp: { capable: true, title: "Mila", statusBarStyle: "default" },
+    "Fauve monte tes vidéos de cours, écrit les légendes et programme tes posts Instagram et TikTok. Pour les studios de Pilates, yoga et barre.",
+  applicationName: "Fauve",
+  appleWebApp: { capable: true, title: "Fauve", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

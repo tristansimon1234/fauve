@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPhone } from "@mila/agent";
+import { formatPhone } from "@fauve/agent";
 import { useSearchParams } from "next/navigation";
 import { useActionState, useState } from "react";
 import { WhatsAppIcon } from "@/components/icons";
@@ -11,7 +11,7 @@ const inputClass =
 
 export function LoginForm() {
   const params = useSearchParams();
-  const next = params.get("next") ?? "/mila";
+  const next = params.get("next") ?? "/fauve";
   const expiredLink = params.get("lien") === "expire";
 
   // Re-mounting on "Changer de numéro" resets both actions.

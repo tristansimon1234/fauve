@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { PostStatus } from "@mila/agent";
+import type { PostStatus } from "@fauve/agent";
 import { UploadIcon } from "@/components/icons";
 import { Orb } from "@/components/orb";
 import { StatusPill } from "@/components/status-pill";

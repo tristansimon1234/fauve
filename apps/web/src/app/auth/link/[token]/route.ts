@@ -3,12 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { openSessionForPhone } from "@/lib/auth/server-login";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-// Opaque one-time links sent by Mila on WhatsApp (15 min, single use):
+// Opaque one-time links sent by Fauve on WhatsApp (15 min, single use):
 // opening one signs the manager in on that device.
 export async function GET(request: NextRequest, ctx: RouteContext<"/auth/link/[token]">) {
   const { token } = await ctx.params;
   const next = request.nextUrl.searchParams.get("next");
-  const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : "/mila";
+  const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : "/fauve";
 
   const { data } = await supabaseAdmin()
     .from("login_tokens")

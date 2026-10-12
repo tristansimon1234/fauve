@@ -27,7 +27,7 @@ export function PostEditor({ draft }: { draft: Draft }) {
           <p className="text-[15px] text-muted">{draft.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2.5">
-          <Link href="/mila" className="btn btn-secondary">
+          <Link href="/fauve" className="btn btn-secondary">
             <ChatIcon size={18} />
             Demander une modif
           </Link>
@@ -161,7 +161,7 @@ export function PostEditor({ draft }: { draft: Draft }) {
 
           <div className="flex items-start gap-3 rounded-[18px] bg-soft p-4">
             <Orb size={28} className="shrink-0" />
-            <p className="text-sm leading-normal">{draft.milaNote}</p>
+            <p className="text-sm leading-normal">{draft.agentNote}</p>
           </div>
         </div>
       </div>

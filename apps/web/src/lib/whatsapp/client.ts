@@ -1,7 +1,7 @@
 import "server-only";
 import { env } from "@/lib/env";
 
-// Thin wrapper over the WhatsApp Cloud API (Graph). Mila sends from a single number.
+// Thin wrapper over the WhatsApp Cloud API (Graph). Fauve sends from a single number.
 
 class WhatsAppError extends Error {
   constructor(
