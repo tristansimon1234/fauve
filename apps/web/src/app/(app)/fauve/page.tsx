@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { z } from "zod";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { CalendarIcon, CheckIcon, FilmIcon, WhatsAppIcon } from "@/components/icons";
-import { Orb } from "@/components/orb";
+import { Mascot } from "@/components/mascot";
 import { StatusPill } from "@/components/status-pill";
 import { localDateOf, weekOf } from "@/lib/dates";
 import { formatShortDate, formatShortDateTime, kindLabels, plural } from "@/lib/format";
@@ -102,7 +102,7 @@ async function Home() {
   return (
     <>
       <div className="flex flex-col items-center gap-4 pt-4 text-center">
-        <Orb size={88} />
+        <Mascot size={110} />
         <h1 className="text-4xl font-extrabold tracking-[-0.03em] sm:text-[48px]">
           Bonjour{member.first_name ? " " : ""}
           {member.first_name && <span className="accent">{member.first_name}</span>}

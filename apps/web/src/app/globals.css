@@ -204,3 +204,48 @@
     animation-play-state: paused;
   }
 }
+
+/* Fauve's mascot (components/mascot.tsx): sways, blinks, twitches an ear. */
+.fauve-mascot .fauve-mascot-head {
+  transform-box: view-box;
+  transform-origin: 100px 165px;
+  animation: fauve-sway 5s ease-in-out infinite;
+}
+.fauve-mascot .fauve-mascot-body {
+  transform-box: view-box;
+  transform-origin: 100px 230px;
+  animation: fauve-breathe 5s ease-in-out infinite;
+}
+.fauve-mascot .fauve-mascot-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fauve-blink 4.2s ease-in-out infinite;
+}
+.fauve-mascot .fauve-mascot-ear-r {
+  transform-box: view-box;
+  transform-origin: 124px 60px;
+  animation: fauve-ear 6s ease-in-out infinite;
+}
+@keyframes fauve-sway {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  30% { transform: rotate(-4deg) translateY(-2px); }
+  60% { transform: rotate(3deg) translateY(0); }
+}
+@keyframes fauve-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.03, 0.98); }
+}
+@keyframes fauve-blink {
+  0%, 44%, 50%, 100% { transform: scaleY(1); }
+  47% { transform: scaleY(0.1); }
+}
+@keyframes fauve-ear {
+  0%, 70%, 80%, 100% { transform: rotate(0deg); }
+  74% { transform: rotate(14deg); }
+  77% { transform: rotate(-6deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fauve-mascot * {
+    animation-play-state: paused !important;
+  }
+}
