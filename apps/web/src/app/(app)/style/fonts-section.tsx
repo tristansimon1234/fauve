@@ -35,9 +35,9 @@ export function FontsSection({
     <Section
       id="style-fonts"
       title="Polices"
-      hint="Toutes les polices viennent de Google Fonts. Choisis dans la sélection de Fauve ou tape le nom exact d’une autre."
+      hint="Laisse en automatique et Fauve choisit selon chaque vidéo, ou impose les tiennes (Google Fonts)."
     >
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <FontPicker
           label="Titres et accroches"
           value={display}
@@ -89,93 +89,97 @@ function FontPicker({
 
   return (
     <fieldset className="flex min-w-0 flex-col gap-2.5">
-      <legend className="mb-2.5 text-[13px] font-bold">{label}</legend>
-      <p className="-mt-1 text-sm text-muted">
-        Choisie :{" "}
-        <span className="font-semibold text-ink" style={{ fontFamily: fontStack(value ?? fallback) }}>
-          {value ?? `${fallback} (selon le gabarit)`}
-        </span>
-      </p>
-      {status === "error" && (
-        <p role="alert" className="text-[13px] font-semibold text-danger">
-          Cette police est introuvable sur Google Fonts. Vérifie l’orthographe exacte.
-        </p>
-      )}
-      <label htmlFor={`${id}-search`} className="sr-only">
-        Rechercher une police ({label})
-      </label>
-      <input
-        id={`${id}-search`}
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Rechercher une police"
-        className={inputClass}
-      />
-      <div className="max-h-72 overflow-y-auto rounded-[14px] border border-line p-1.5">
-        <FontOption name={id} checked={value === null} onSelect={() => onChange(null)} family={fallback}>
-          <span className="flex flex-col">
-            <span>Selon le gabarit</span>
-            <span className="text-xs font-medium text-muted">{fallback}</span>
+      <legend className="mb-2 text-[13px] font-bold">{label}</legend>
+      <details className="group flex flex-col gap-2.5">
+        <summary className="flex h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl border-[1.5px] border-line bg-white px-3.5 hover:border-lilac group-open:border-violet [&::-webkit-details-marker]:hidden">
+          <span className="truncate text-[17px]" style={{ fontFamily: fontStack(value ?? fallback) }}>
+            {value ?? "Automatique"}
           </span>
-        </FontOption>
-        {isCustom && (
-          <FontOption name={id} checked onSelect={() => undefined} family={value}>
-            <span className="flex flex-col">
-              <span>{value}</span>
-              <span className="font-sans text-xs font-medium text-muted">Ta police</span>
-            </span>
-          </FontOption>
-        )}
-        {categories.map((category) => {
-          const list = fonts.filter((f) => f.category === category);
-          if (!list.length) return null;
-          return (
-            <div key={category} role="group" aria-label={FONT_CATEGORY_LABELS[category]}>
-              <p className="px-3 pt-3 pb-1 text-[11px] font-bold tracking-[.06em] text-muted uppercase">
-                {FONT_CATEGORY_LABELS[category]}
-              </p>
-              {list.map((f) => (
-                <FontOption key={f.family} name={id} checked={value === f.family} onSelect={() => onChange(f.family)} family={f.family}>
-                  {f.family}
-                </FontOption>
-              ))}
-            </div>
-          );
-        })}
-        {!fonts.length && <p className="px-3 py-2 text-sm text-muted">Aucune police de la sélection ne correspond.</p>}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={`${id}-custom`} className="text-[13px] font-semibold text-muted">
-          Une autre police Google Fonts
-        </label>
-        <div className="flex gap-2">
+          <span className="shrink-0 text-[13px] font-bold text-violet">Changer</span>
+        </summary>
+        <div className="mt-2.5 flex flex-col gap-2.5">
+          {status === "error" && (
+            <p role="alert" className="text-[13px] font-semibold text-danger">
+              Cette police est introuvable sur Google Fonts. Vérifie l’orthographe exacte.
+            </p>
+          )}
+          <label htmlFor={`${id}-search`} className="sr-only">
+            Rechercher une police ({label})
+          </label>
           <input
-            id={`${id}-custom`}
-            value={custom}
-            onChange={(e) => setCustom(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                applyCustom();
-              }
-            }}
-            maxLength={40}
-            placeholder="Ex. Libre Baskerville"
-            aria-invalid={customError ? true : undefined}
-            aria-describedby={customError ? `${id}-custom-error` : undefined}
+            id={`${id}-search`}
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher une police"
             className={inputClass}
           />
-          <button type="button" onClick={applyCustom} className="btn btn-secondary h-11 shrink-0 px-4">
-            Utiliser
-          </button>
+          <div className="max-h-72 overflow-y-auto rounded-[14px] border border-line p-1.5">
+            <FontOption name={id} checked={value === null} onSelect={() => onChange(null)} family={fallback}>
+              <span className="flex flex-col">
+                <span>Automatique</span>
+                <span className="font-sans text-xs font-medium text-muted">Fauve choisit selon la vidéo</span>
+              </span>
+            </FontOption>
+            {isCustom && (
+              <FontOption name={id} checked onSelect={() => undefined} family={value}>
+                <span className="flex flex-col">
+                  <span>{value}</span>
+                  <span className="font-sans text-xs font-medium text-muted">Ta police</span>
+                </span>
+              </FontOption>
+            )}
+            {categories.map((category) => {
+              const list = fonts.filter((f) => f.category === category);
+              if (!list.length) return null;
+              return (
+                <div key={category} role="group" aria-label={FONT_CATEGORY_LABELS[category]}>
+                  <p className="px-3 pt-3 pb-1 text-[11px] font-bold tracking-[.06em] text-muted uppercase">
+                    {FONT_CATEGORY_LABELS[category]}
+                  </p>
+                  {list.map((f) => (
+                    <FontOption key={f.family} name={id} checked={value === f.family} onSelect={() => onChange(f.family)} family={f.family}>
+                      {f.family}
+                    </FontOption>
+                  ))}
+                </div>
+              );
+            })}
+            {!fonts.length && <p className="px-3 py-2 text-sm text-muted">Aucune police de la sélection ne correspond.</p>}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${id}-custom`} className="text-[13px] font-semibold text-muted">
+              Une autre police Google Fonts
+            </label>
+            <div className="flex gap-2">
+              <input
+                id={`${id}-custom`}
+                value={custom}
+                onChange={(e) => setCustom(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyCustom();
+                  }
+                }}
+                maxLength={40}
+                placeholder="Ex. Libre Baskerville"
+                aria-invalid={customError ? true : undefined}
+                aria-describedby={customError ? `${id}-custom-error` : undefined}
+                className={inputClass}
+              />
+              <button type="button" onClick={applyCustom} className="btn btn-secondary h-11 shrink-0 px-4">
+                Utiliser
+              </button>
+            </div>
+            {customError && (
+              <p id={`${id}-custom-error`} role="alert" className="text-[13px] font-semibold text-danger">
+                {customError}
+              </p>
+            )}
+          </div>
         </div>
-        {customError && (
-          <p id={`${id}-custom-error`} role="alert" className="text-[13px] font-semibold text-danger">
-            {customError}
-          </p>
-        )}
-      </div>
+      </details>
     </fieldset>
   );
 }

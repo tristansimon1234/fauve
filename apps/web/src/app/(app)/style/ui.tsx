@@ -32,6 +32,30 @@ export function Section({
   );
 }
 
+/** A section folded by default, for settings most studios never touch. */
+export function FoldedSection({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="card group bg-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 sm:p-6 [&::-webkit-details-marker]:hidden">
+        <span className="flex flex-col gap-1">
+          <span className="text-lg font-bold">{title}</span>
+          {hint && <span className="text-sm leading-normal text-muted">{hint}</span>}
+        </span>
+        <PlusIcon size={20} className="shrink-0 text-muted transition-transform group-open:rotate-45" />
+      </summary>
+      <div className="flex flex-col gap-4 px-5 pb-5 sm:px-6 sm:pb-6">{children}</div>
+    </details>
+  );
+}
+
 /** Pill-shaped radio group. */
 export function Segmented<T extends string>({
   legend,

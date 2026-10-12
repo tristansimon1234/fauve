@@ -9,14 +9,14 @@ export function ArtDirectionSection({ value, onChange }: { value: string; onChan
     <Section
       id="style-da"
       title="Direction artistique"
-      hint="Décris l’univers de tes vidéos avec tes mots : ambiance, couleurs, typographie, rythme, ce que tu aimes et ce que tu évites. Fauve le relit avant chaque montage."
+      hint="L’univers de tes vidéos en quelques phrases. Facultatif si ton moodboard parle déjà pour toi."
     >
       <label htmlFor="art-direction" className="sr-only">
         Direction artistique
       </label>
       <textarea
         id="art-direction"
-        rows={7}
+        rows={4}
         maxLength={ART_DIRECTION_MAX}
         value={value}
         onChange={(e) => onChange(e.target.value)}

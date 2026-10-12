@@ -1,7 +1,7 @@
 "use client";
 
 import { HASHTAG, HASHTAGS_MAX, RULE_MAX, RULES_MAX, TONE_MAX, type StyleForm } from "./style-options";
-import { HashtagInput, RuleList, Section, Segmented, inputClass } from "./ui";
+import { FoldedSection, HashtagInput, RuleList, Segmented, inputClass } from "./ui";
 
 const CAPTION_OPTIONS = [
   { value: "short", label: "Courtes" },
@@ -19,7 +19,7 @@ type ToneFields = Pick<StyleForm, "tone" | "caption_length" | "emojis" | "hashta
 
 export function ToneSection({ value, onChange }: { value: ToneFields; onChange: (patch: Partial<ToneFields>) => void }) {
   return (
-    <Section id="style-tone" title="Ton et règles" hint="Pour les légendes et les textes à l’écran.">
+    <FoldedSection title="Légendes" hint="Ton, longueur, emojis, hashtags et règles des légendes Instagram.">
       <div className="flex flex-col gap-2">
         <label htmlFor="style-tone-input" className="text-[13px] font-bold">
           Ton
@@ -75,6 +75,6 @@ export function ToneSection({ value, onChange }: { value: ToneFields; onChange: 
           onChange={(donts) => onChange({ donts })}
         />
       </div>
-    </Section>
+    </FoldedSection>
   );
 }

@@ -49,7 +49,7 @@ export function LogoSection({
     const result = await saveLogo(path);
     if (result.status === "error") return setState(result);
     onSaved(result.version, result.logoUrl ? { url: result.logoUrl, source: "upload" } : null);
-    setState({ status: "ok", message: `Logo enregistré (version ${result.version}).` });
+    setState({ status: "ok", message: "Logo enregistré." });
   };
 
   const remove = async () => {
@@ -57,7 +57,7 @@ export function LogoSection({
     const result = await saveLogo(null);
     if (result.status === "error") return setState(result);
     onSaved(result.version, null);
-    setState({ status: "ok", message: `Logo retiré (version ${result.version}). Les vidéos finiront sur le nom du studio.` });
+    setState({ status: "ok", message: "Logo retiré. Les vidéos finiront sur le nom du studio." });
   };
 
   return (
