@@ -60,7 +60,7 @@ export const toolSpecs = {
       scheduled_at: isoDateTime.optional(),
       platforms: z.array(platformSchema).min(1).optional(),
       status: postStatusSchema.optional(),
-      mila_note: z.string().max(600).optional().describe("Explication de tes choix, affichée dans la web app"),
+      agent_note: z.string().max(600).optional().describe("Explication de tes choix, affichée dans la web app"),
     }),
   },
   request_content: {

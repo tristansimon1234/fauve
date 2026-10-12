@@ -22,13 +22,13 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2.5">
-          <Link href="/mila" className="btn btn-secondary">
+          <Link href="/fauve" className="btn btn-secondary">
             <PlusIcon size={18} />
             Ajouter une idée
           </Link>
-          <Link href="/mila" className="btn btn-primary">
+          <Link href="/fauve" className="btn btn-primary">
             <ChatIcon size={18} />
-            Demander à Mila
+            Demander à Fauve
           </Link>
         </div>
       </div>
@@ -43,7 +43,7 @@ export default function CalendarPage() {
             <Progress label="Posts" value={done(posts)} total={demoStudio.postsPerWeek} color="bg-violet" />
             <Progress label="Stories" value={done(stories)} total={demoStudio.storiesPerWeek} color="bg-coral" />
             <p className="text-[13px] leading-normal text-muted">
-              Mila te relance la veille de chaque publication s’il manque un contenu.
+              Fauve te relance la veille de chaque publication s’il manque un contenu.
             </p>
           </section>
         </aside>

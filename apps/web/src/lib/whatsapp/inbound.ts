@@ -1,6 +1,6 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
-import { runMila } from "@/lib/agent/run";
+import { runFauve } from "@/lib/agent/run";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { downloadMedia, markReadAndTyping, sendText } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
@@ -160,7 +160,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   if (studio.error) throw new Error(studio.error.message);
   if (rows.error) throw new Error(rows.error.message);
 
-  const result = await runMila({
+  const result = await runFauve({
     studioId: member.studio_id,
     memberId: member.id,
     waId: message.from,

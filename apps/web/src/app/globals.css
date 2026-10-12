@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Mila design tokens (see CLAUDE.md › Design). */
+/* Fauve design tokens (see CLAUDE.md › Design). */
 @theme {
   --color-white: #ffffff;
   --color-soft: #fbf7f4;

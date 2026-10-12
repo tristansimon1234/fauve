@@ -1,4 +1,4 @@
-import { statusLabels, type PostStatus } from "@mila/agent";
+import { statusLabels, type PostStatus } from "@fauve/agent";
 
 const toneClasses = {
   done: "bg-success-soft text-success",

@@ -1,11 +1,11 @@
-# CLAUDE.md — Mila, l'agent réseaux sociaux des studios (nom provisoire)
+# CLAUDE.md — Fauve, l'agent réseaux sociaux des studios
 
 ## Produit en une phrase
-Mila est une community manager IA qui vit **dans WhatsApp**. La gérante d'un studio de Pilates, yoga ou barre envoie ses vidéos, et Mila les monte, écrit les légendes, programme sur Instagram et TikTok, relance quand il manque un contenu, et fait un bilan chaque semaine. Une petite web app (desktop + mobile) sert à voir le calendrier, valider, déposer des vidéos en pleine qualité et suivre les résultats.
+Fauve est une community manager IA qui vit **dans WhatsApp**. La gérante d'un studio de Pilates, yoga ou barre envoie ses vidéos, et Fauve les monte, écrit les légendes, programme sur Instagram et TikTok, relance quand il manque un contenu, et fait un bilan chaque semaine. Une petite web app (desktop + mobile) sert à voir le calendrier, valider, déposer des vidéos en pleine qualité et suivre les résultats.
 
 - Prix cible : **49 € / mois**. Pour l'instant on optimise la **qualité et la vitesse**, pas les coûts, mais on **journalise le coût par studio dès le jour 1**.
 - Interface en français ; code, tables et commits en anglais.
-- Maquette de référence : canvas Design « Agent studios — Maquette » (app : Mila, Calendrier, Publication, Résultats ; onboarding : Landing, WhatsApp, Connexion Instagram, Compte prêt).
+- Maquette de référence : canvas Design « Agent studios — Maquette » (app : Fauve, Calendrier, Publication, Résultats ; onboarding : Landing, WhatsApp, Connexion Instagram, Compte prêt).
 
 ---
 
@@ -38,7 +38,7 @@ supabase/       migrations, seed (gabarits, types de contenu)
 
 ## WhatsApp (Meta Cloud API en direct, sans Twilio)
 
-- **Un seul numéro, celui de Mila**. Toutes les gérantes écrivent au même numéro ; le studio est retrouvé par le numéro de l'expéditeur.
+- **Un seul numéro, celui de Fauve**. Toutes les gérantes écrivent au même numéro ; le studio est retrouvé par le numéro de l'expéditeur.
 - Webhook : `POST /api/whatsapp/webhook` (vérification de signature `X-Hub-Signature-256`, idempotence sur l'id de message).
 - **Fenêtre de 24 h** : réponse libre gratuite tant que la gérante a écrit dans les dernières 24 h. Au-delà, **uniquement des modèles validés par Meta** (payants). Prévoir dès le départ une petite liste de modèles :
   - `content_request` : « J'ai besoin de {quoi} pour le post de {jour}. Tu peux me l'envoyer ? »
@@ -48,8 +48,8 @@ supabase/       migrations, seed (gabarits, types de contenu)
 - **Naturel** :
   - marquer comme lu + indicateur « en train d'écrire » dès réception ;
   - **réactions emoji** pour les accusés de réception simples, avec un vocabulaire fixe : 👍 reçu, 🔥 super contenu, ✅ publié. Jamais sur chaque message ; une question appelle toujours une vraie réponse ;
-  - Mila est transparente sur le fait d'être une IA.
-- **Médias** : télécharger chaque média reçu vers Supabase Storage. WhatsApp compresse les vidéos : Mila invite à envoyer les clips **en tant que document**, ou à passer par le lien de dépôt de la web app pour les gros fichiers.
+  - Fauve est transparente sur le fait d'être une IA.
+- **Médias** : télécharger chaque média reçu vers Supabase Storage. WhatsApp compresse les vidéos : Fauve invite à envoyer les clips **en tant que document**, ou à passer par le lien de dépôt de la web app pour les gros fichiers.
 
 ---
 
@@ -57,7 +57,7 @@ supabase/       migrations, seed (gabarits, types de contenu)
 
 Supabase Auth en mode **téléphone + code** :
 - le code est envoyé **par WhatsApp** (modèle `login_code`) via le **Send SMS Hook** de Supabase (livraison personnalisée), SMS en secours ;
-- **lien magique** : chaque lien envoyé par Mila contient un jeton opaque, à usage unique, valable 15 min, lié au numéro. La route `/auth/link/[token]` vérifie le jeton côté serveur et ouvre la session (cookies `@supabase/ssr`) ;
+- **lien magique** : chaque lien envoyé par Fauve contient un jeton opaque, à usage unique, valable 15 min, lié au numéro. La route `/auth/link/[token]` vérifie le jeton côté serveur et ouvre la session (cookies `@supabase/ssr`) ;
 - **QR code sur ordinateur** (comme WhatsApp Web) : l'ordi affiche un QR lié à une demande de connexion ; le téléphone déjà connecté le scanne et confirme ; l'ordi reçoit la session via Realtime ;
 - liste des sessions ouvertes, déconnexion à distance ; confirmation WhatsApp pour les actions sensibles (déconnecter Instagram, changer de paiement).
 
@@ -75,13 +75,13 @@ Vérifier dans la doc Supabase à jour la meilleure façon d'ouvrir une session 
 - **Instagram** (compte professionnel requis) : API Instagram avec connexion Instagram ; publication de photos, carrousels, Reels et stories ; lecture des statistiques ; messages et commentaires. Nécessite la **revue d'app Meta** (vérification d'entreprise, démo vidéo) : la lancer tôt, elle prend des semaines.
 - **TikTok** : Content Posting API. **Tant que l'app n'est pas auditée, les publications restent privées.** Alternative : envoyer dans les **brouillons TikTok** de la gérante, qui publie elle-même.
 
-Limites à connaître : la **musique tendance** et les **stickers interactifs** (sondages, questions) ne sont pas disponibles par API. Mila les suggère, la gérante les ajoute dans l'appli au moment de publier.
+Limites à connaître : la **musique tendance** et les **stickers interactifs** (sondages, questions) ne sont pas disponibles par API. Fauve les suggère, la gérante les ajoute dans l'appli au moment de publier.
 
 ---
 
 ## IA : le meilleur modèle pour chaque rôle
 
-- **Cerveau de Mila : Claude (`claude-opus-5-5`) partout pour l'instant.** Conversation WhatsApp, planification des campagnes, légendes, profil de style, plan de montage, bilans. Tool use avec schémas Zod stricts.
+- **Cerveau de Fauve : Claude (`claude-opus-5-5`) partout pour l'instant.** Conversation WhatsApp, planification des campagnes, légendes, profil de style, plan de montage, bilans. Tool use avec schémas Zod stricts.
 - **Analyse vidéo : Gemini 3.7 Flash** (entrée vidéo native, horodatages, mode « agentic video understanding » qui choisit quoi regarder). Il reçoit les clips et renvoie, en JSON : découpage en plans, horodatages, qualité (flou, sombre, bougé), ce qui se passe, transcription si voix.
 - **Rendu : outils déterministes**, jamais le modèle directement. Le modèle **décide**, le moteur **exécute**.
 - À tester plus tard : Gemini Omni Flash (montage vidéo conversationnel), mais seulement si la qualité est constante.
@@ -157,10 +157,10 @@ RLS : tout est filtré par `studio_id` via `members`. Le webhook et les jobs pas
 ## Web app
 
 Écrans (voir maquette) :
-- **Mila** : accueil « ce qui t'attend » + conversation. Le canal principal reste WhatsApp : bouton « Continuer sur WhatsApp », et l'historique sert surtout à retrouver une demande.
+- **Fauve** : accueil « ce qui t'attend » + conversation. Le canal principal reste WhatsApp : bouton « Continuer sur WhatsApp », et l'historique sert surtout à retrouver une demande.
 - **Calendrier** : semaine, statut par post, filtres, liste « À filmer », progression du rythme.
-- **Publication** : aperçu Instagram / TikTok, légende, plateformes, horaire, plan de montage, explication de Mila, Valider.
-- **Résultats** : 7 / 30 jours, avec en premier les **réservations venues d'Instagram**, puis le bilan de Mila, les meilleurs posts et les meilleurs moments.
+- **Publication** : aperçu Instagram / TikTok, légende, plateformes, horaire, plan de montage, explication de Fauve, Valider.
+- **Résultats** : 7 / 30 jours, avec en premier les **réservations venues d'Instagram**, puis le bilan de Fauve, les meilleurs posts et les meilleurs moments.
 - **Médiathèque**, **Réglages** (comptes, rythme, style, sessions, abonnement Stripe).
 - Onboarding web : **Landing** (CTA « Commencer sur WhatsApp » + QR code), **Connexion Instagram**, **Compte prêt**.
 
@@ -172,7 +172,7 @@ Responsive : desktop d'abord pour la web app (le dépôt de vidéos et le calend
 - Violet `#5B3FD9` (actions principales), violet clair `#EFEBFF`
 - Corail `#F2694E` (décor), pêche `#FFE9E1` / texte `#9A3412`
 - Polices : **Plus Jakarta Sans** (interface), **Instrument Serif italique** (accents : prénom, accroches)
-- Boutons en pilule, cartes arrondies 16–22 px, orbe dégradé comme identité de Mila. Icônes au trait, jamais d'emoji dans l'interface.
+- Boutons en pilule, cartes arrondies 16–22 px, orbe dégradé comme identité de Fauve. Icônes au trait, jamais d'emoji dans l'interface.
 
 ---
 
@@ -182,7 +182,7 @@ Responsive : desktop d'abord pour la web app (le dépôt de vidéos et le calend
 - Le chiffre roi du produit : **réservations venues des réseaux**, chaque mois, par studio.
 
 ## Droits et conformité
-- **Droit à l'image** : `media_assets.consent_ok`. Mila rappelle d'avoir l'accord des élèves filmés, et propose des cadrages sans visage (mains, pieds, machines) ou le floutage.
+- **Droit à l'image** : `media_assets.consent_ok`. Fauve rappelle d'avoir l'accord des élèves filmés, et propose des cadrages sans visage (mains, pieds, machines) ou le floutage.
 - RGPD : données hébergées en Europe, suppression complète quand un studio part, contrat de sous-traitance avec chaque studio.
 - Musique : aucune musique protégée intégrée au rendu ; son tendance ajouté dans l'appli, ou bibliothèque libre de droits sous licence.
 
@@ -199,5 +199,7 @@ Intégration bsport (planning et données élèves), relances aux élèves (bspo
 - Commandes : `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` (à la racine).
 - Next.js 16 avec Cache Components : lire `node_modules/next/dist/docs/` avant d'utiliser une API Next ; toute lecture de cookies/session doit être sous `<Suspense>`.
 - Les écrans de la web app lisent encore `apps/web/src/lib/demo.ts` (données de la maquette) ; à brancher sur Supabase une fois l'auth en place.
+- Supabase : projet `fauve` (ref `tfxkhktofgtljlqlksba`, eu-west-3). Les noms des fichiers de migration reprennent les versions appliquées en base.
+- Connexion : téléphone + code envoyé sur WhatsApp via le Send SMS hook (`/api/auth/send-sms`). Lien magique et QR ouvrent la session côté serveur via `openSessionForPhone` (le hook capture le code dans `pending_server_logins` au lieu de l'envoyer).
 - La maquette décompressée (un HTML par écran) est dans `docs/maquette/ecrans/`.
 

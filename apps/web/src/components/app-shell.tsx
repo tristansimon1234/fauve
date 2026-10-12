@@ -16,7 +16,7 @@ import {
 import { Logo } from "./orb";
 
 const nav = [
-  { href: "/mila", label: "Mila", icon: ChatIcon },
+  { href: "/fauve", label: "Fauve", icon: ChatIcon },
   { href: "/calendrier", label: "Calendrier", icon: CalendarIcon },
   { href: "/publications", label: "Publications", icon: ImageIcon },
   { href: "/mediatheque", label: "Médiathèque", icon: FolderIcon },

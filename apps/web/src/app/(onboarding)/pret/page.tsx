@@ -24,7 +24,7 @@ export default function ReadyPage() {
             C’est prêt, <span className="accent">{demoStudio.manager}.</span>
           </h1>
           <p className="text-[15px] leading-[1.55] text-muted">
-            Mila t’envoie ton premier plan de la semaine sur WhatsApp lundi à 9 h.
+            Fauve t’envoie ton premier plan de la semaine sur WhatsApp lundi à 9 h.
           </p>
         </div>
         <div className="card px-4 py-1.5">

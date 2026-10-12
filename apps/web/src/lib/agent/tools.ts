@@ -5,8 +5,8 @@ import {
   canTransition,
   postStatusSchema,
   type ToolHandlers,
-} from "@mila/agent";
-import { serverEnv } from "@/lib/env";
+} from "@fauve/agent";
+import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendReaction } from "@/lib/whatsapp/client";
 
@@ -42,7 +42,7 @@ async function nextVersion(table: "brand_profiles" | "edit_plans", column: "stud
   return ((data?.[0]?.version as number | undefined) ?? 0) + 1;
 }
 
-/** Database-backed implementations of Mila's tools, scoped to one studio. */
+/** Database-backed implementations of Fauve's tools, scoped to one studio. */
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const db = supabaseAdmin();
   const { studioId } = ctx;
@@ -93,7 +93,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         }),
       );
-      return json({ url: `${serverEnv().APP_URL}/auth/link/${token}?next=/connect`, expires_in_minutes: 15 });
+      return json({ url: `${env("APP_URL")}/auth/link/${token}?next=/connect`, expires_in_minutes: 15 });
     },
 
     async get_calendar({ from, to }) {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { InstagramIcon, TikTokIcon } from "@/components/icons";
 import { demoStudio } from "@/lib/demo";
+import { signOut } from "../../(onboarding)/connexion/actions";
 
 export const metadata: Metadata = { title: "Réglages" };
 
@@ -19,13 +20,18 @@ export default function SettingsPage() {
         </Section>
         <Section title="Rythme">
           <p className="text-sm">
-            {demoStudio.postsPerWeek} posts et {demoStudio.storiesPerWeek} stories par semaine. Demande à Mila pour le
+            {demoStudio.postsPerWeek} posts et {demoStudio.storiesPerWeek} stories par semaine. Demande à Fauve pour le
             changer.
           </p>
         </Section>
         <Section title="Abonnement">
           <p className="text-sm">49 € / mois, sans engagement.</p>
         </Section>
+        <form action={signOut}>
+          <button type="submit" className="btn btn-secondary">
+            Me déconnecter
+          </button>
+        </form>
       </div>
     </main>
   );

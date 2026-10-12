@@ -54,3 +54,13 @@ test("whatsapp: 24 h window", () => {
   assert.equal(isInSessionWindow(new Date("2026-10-11T11:59:00Z"), now), false);
   assert.equal(isInSessionWindow(null, now), false);
 });
+
+test("phone: normalizes French and international numbers", async () => {
+  const { normalizePhone, formatPhone } = await import("./phone.ts");
+  assert.equal(normalizePhone("06 12 34 56 78"), "+33612345678");
+  assert.equal(normalizePhone("+33 6 12 34 56 78"), "+33612345678");
+  assert.equal(normalizePhone("0033612345678"), "+33612345678");
+  assert.equal(normalizePhone("+32 470 12 34 56"), "+32470123456");
+  assert.equal(normalizePhone("12"), null);
+  assert.equal(formatPhone("+33612345678"), "+33 6 12 34 56 78");
+});

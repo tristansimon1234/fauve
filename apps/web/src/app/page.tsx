@@ -5,9 +5,9 @@ import { gradients } from "@/lib/demo";
 import { whatsappLink } from "@/lib/public-env";
 
 const steps = [
-  ["Écris à Mila", "Elle te pose quelques questions sur ton studio et ton rythme de publication."],
+  ["Écris à Fauve", "Elle te pose quelques questions sur ton studio et ton rythme de publication."],
   ["Connecte ton Instagram", "Un lien sécurisé, une autorisation. TikTok aussi, si tu veux."],
-  ["Envoie tes vidéos", "Mila monte, écrit et programme. Tu valides d’un mot, ou pas du tout."],
+  ["Envoie tes vidéos", "Fauve monte, écrit et programme. Tu valides d’un mot, ou pas du tout."],
 ];
 
 export default async function LandingPage() {
@@ -45,7 +45,7 @@ export default async function LandingPage() {
             Ton community manager vit dans <span className="accent">WhatsApp.</span>
           </h1>
           <p className="max-w-[520px] text-[19px] leading-[1.55] text-muted">
-            Envoie tes vidéos de cours. Mila les monte, écrit les légendes et programme tes posts. Et quand il manque
+            Envoie tes vidéos de cours. Fauve les monte, écrit les légendes et programme tes posts. Et quand il manque
             quelque chose, c’est elle qui te relance.
           </p>
           <div className="flex flex-wrap items-center gap-3">
@@ -68,11 +68,11 @@ export default async function LandingPage() {
             <div className="flex items-center gap-2.5 border-b border-line pb-2">
               <Orb size={32} />
               <span className="flex flex-col">
-                <span className="text-[15px] font-bold">Mila</span>
+                <span className="text-[15px] font-bold">Fauve</span>
                 <span className="text-xs text-muted">en ligne</span>
               </span>
             </div>
-            <Bubble from="mila">
+            <Bubble from="fauve">
               Salut Camille ! Le Reel de jeudi est prévu. Tu peux m’envoyer 3 à 5 vidéos du cours de ce matin ?
             </Bubble>
             <div className="grid grid-cols-[repeat(4,44px)] gap-1.5 self-end">
@@ -80,7 +80,7 @@ export default async function LandingPage() {
                 <span key={bg} className="h-[72px] rounded-[10px]" style={{ background: bg }} />
               ))}
             </div>
-            <Bubble from="mila">
+            <Bubble from="fauve">
               Parfait. J’ai gardé 3 plans, ajouté les sous-titres et ton logo. Je le programme jeudi à 18 h ?
             </Bubble>
             <div className="flex gap-2 self-start">
@@ -106,7 +106,7 @@ export default async function LandingPage() {
             <span className="flex flex-col gap-1">
               <span className="text-base font-bold">Sur ordinateur ?</span>
               <span className="text-sm leading-normal text-muted">
-                Scanne avec ton téléphone pour ouvrir la conversation avec Mila.
+                Scanne avec ton téléphone pour ouvrir la conversation avec Fauve.
               </span>
             </span>
           </div>
@@ -154,8 +154,8 @@ export default async function LandingPage() {
   );
 }
 
-function Bubble({ from, children }: { from: "mila" | "me"; children: React.ReactNode }) {
-  return from === "mila" ? (
+function Bubble({ from, children }: { from: "fauve" | "me"; children: React.ReactNode }) {
+  return from === "fauve" ? (
     <div className="max-w-[78%] self-start rounded-[16px_16px_16px_4px] border border-line bg-white px-3.5 py-2.5 text-sm leading-[1.45]">
       {children}
     </div>

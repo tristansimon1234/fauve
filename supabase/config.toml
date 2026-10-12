@@ -257,7 +257,7 @@ otp_expiry = 3600
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
-# Mila: phone + code login (code delivered on WhatsApp through the Send SMS hook).
+# Fauve: phone + code login (code delivered on WhatsApp through the Send SMS hook).
 enable_signup = true
 # If enabled, users need to confirm their phone number before signing in.
 enable_confirmations = false
@@ -286,6 +286,12 @@ max_frequency = "5s"
 # [auth.hook.custom_access_token]
 # enabled = true
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
+
+# Fauve: login codes are delivered on WhatsApp by the web app.
+[auth.hook.send_sms]
+enabled = true
+uri = "http://host.docker.internal:3000/api/auth/send-sms"
+secrets = "env(SEND_SMS_HOOK_SECRET)"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
 [auth.sms.twilio]

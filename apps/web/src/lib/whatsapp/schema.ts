@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Subset of the WhatsApp Cloud API webhook payload that Mila uses.
+// Subset of the WhatsApp Cloud API webhook payload that Fauve uses.
 // Unknown fields are ignored; unknown message types fall through as "unsupported".
 
 const mediaSchema = z.object({
