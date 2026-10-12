@@ -7,6 +7,62 @@ import { graph, WhatsAppError } from "@/lib/whatsapp/client";
 //   ?action=status              phone number + subscription diagnostics
 //   ?action=register&pin=123456 register the number on the Cloud API (2-step PIN)
 //   ?action=subscribe           subscribe this app to the WABA's webhooks
+//   ?action=templates           list message templates and their review status
+//   ?action=create_templates    submit Fauve's templates (see whatsappTemplates) for review
+
+// Must match whatsappTemplates (packages/agent) and the senders in lib/whatsapp/client.ts.
+const TEMPLATE_DEFINITIONS = [
+  {
+    name: "login_code",
+    language: "fr",
+    category: "AUTHENTICATION",
+    components: [
+      { type: "BODY", add_security_recommendation: true },
+      { type: "FOOTER", code_expiration_minutes: 10 },
+      { type: "BUTTONS", buttons: [{ type: "OTP", otp_type: "COPY_CODE", text: "Copier le code" }] },
+    ],
+  },
+  {
+    name: "content_request",
+    language: "fr",
+    category: "UTILITY",
+    components: [
+      {
+        type: "BODY",
+        text: "J’ai besoin de {{1}} pour le post de {{2}}. Tu peux me l’envoyer ?",
+        example: { body_text: [["3 vidéos du cours de reformer", "jeudi"]] },
+      },
+    ],
+  },
+  {
+    name: "draft_ready",
+    language: "fr",
+    category: "UTILITY",
+    components: [
+      {
+        type: "BODY",
+        text: "Ton {{1}} pour {{2}} est prêt. Je le programme ?",
+        example: { body_text: [["Reel", "jeudi"]] },
+      },
+      {
+        type: "BUTTONS",
+        buttons: [
+          { type: "QUICK_REPLY", text: "Oui, vas-y" },
+          { type: "QUICK_REPLY", text: "Je veux le voir" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "weekly_report",
+    language: "fr",
+    category: "UTILITY",
+    components: [
+      { type: "BODY", text: "Ton bilan de la semaine est prêt." },
+      { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Voir le bilan" }] },
+    ],
+  },
+];
 
 const REQUIRED: EnvKey[] = [
   "WHATSAPP_TOKEN",
@@ -61,6 +117,25 @@ export async function GET(request: NextRequest) {
   if (action === "subscribe") {
     const result = await attempt(() => graph(`${env("WHATSAPP_WABA_ID")}/subscribed_apps`, { method: "POST" }));
     return Response.json({ action, result });
+  }
+
+  if (action === "templates") {
+    const result = await attempt(() =>
+      graph(`${env("WHATSAPP_WABA_ID")}/message_templates?fields=name,language,category,status,rejected_reason&limit=50`),
+    );
+    return Response.json({ action, result });
+  }
+
+  if (action === "create_templates") {
+    const results = await Promise.all(
+      TEMPLATE_DEFINITIONS.map(async (template) => ({
+        name: template.name,
+        result: await attempt(() =>
+          graph(`${env("WHATSAPP_WABA_ID")}/message_templates`, { method: "POST", body: JSON.stringify(template) }),
+        ),
+      })),
+    );
+    return Response.json({ action, results });
   }
 
   const [phone, subscriptions] = await Promise.all([
