@@ -58,7 +58,7 @@ async function ReadyForMember() {
   const items: Item[] = [
     instagram
       ? { icon: InstagramIcon, label: instagram.handle ? `@${instagram.handle}` : "Instagram", detail: "Instagram connecté" }
-      : { icon: InstagramIcon, label: "Instagram", detail: "Connexion bientôt disponible" },
+      : { icon: InstagramIcon, label: "Instagram", detail: "Pas encore connecté : demande le lien à Fauve" },
     ...(tiktok
       ? [{ icon: TikTokIcon, label: tiktok.handle ? `@${tiktok.handle}` : "TikTok", detail: "TikTok connecté" }]
       : []),

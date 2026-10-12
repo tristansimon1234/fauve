@@ -78,8 +78,11 @@ async function Settings() {
             ))
           ) : (
             <p className="text-sm leading-normal">
-              Aucun compte connecté pour l’instant. La connexion Instagram et TikTok arrive bientôt : en attendant,
-              Fauve prépare tes publications et tu les publies toi-même.
+              Aucun compte connecté pour l’instant.{" "}
+              <a href="/connect" className="font-bold text-violet">
+                Connecter Instagram
+              </a>{" "}
+              pour que Fauve publie tes posts validés. TikTok arrive bientôt.
             </p>
           )}
         </Section>

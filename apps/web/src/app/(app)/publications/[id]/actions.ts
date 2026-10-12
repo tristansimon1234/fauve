@@ -2,8 +2,11 @@
 
 import { assertTransition, postStatusSchema, type PostStatus } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { getStudioContext } from "@/lib/studio";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export type PostFormState = { status: "idle" } | { status: "ok" | "error"; message: string };
 
@@ -19,7 +22,8 @@ const input = z.object({
 
 /**
  * Saves the edited caption and, with intent "validate", moves the draft to
- * "validated". Never schedules: publishing is not wired yet.
+ * "validated", then schedules it on Instagram when the studio is connected and
+ * the video is rendered (published by the worker at scheduled_at, or now).
  */
 export async function updatePost(postId: string, _prev: PostFormState, formData: FormData): Promise<PostFormState> {
   const parsed = input.safeParse({
@@ -83,8 +87,37 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
   revalidatePath("/publications");
   revalidatePath("/calendrier");
   revalidatePath("/fauve");
+  if (patch.status !== "validated") return { status: "ok", message: "Légende enregistrée." };
+  const scheduled = await scheduleOnInstagram(member.studio.id, post.id);
   return {
     status: "ok",
-    message: patch.status === "validated" ? "C’est validé." : "Légende enregistrée.",
+    message:
+      scheduled === "now"
+        ? "C’est validé : Fauve le publie sur Instagram maintenant."
+        : scheduled
+          ? `C’est validé : Fauve le publie sur Instagram le ${scheduled}.`
+          : "C’est validé. Connecte Instagram (Réglages) pour que Fauve le publie.",
   };
+}
+
+const whenFormat = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+
+/** validated → scheduled when possible; returns when it goes out, or null. */
+async function scheduleOnInstagram(studioId: string, postId: string): Promise<string | null> {
+  const db = supabaseAdmin();
+  const post = await db.from("posts").select("render_id, scheduled_at").eq("id", postId).eq("studio_id", studioId).single();
+  if (!post.data?.render_id || !(await instagramAccount(studioId))) return null;
+  const planned = post.data.scheduled_at ? new Date(post.data.scheduled_at as string) : null;
+  const at = planned && planned.getTime() > Date.now() + 60_000 ? planned : new Date();
+  const { data } = await db
+    .from("posts")
+    .update({ status: "scheduled", scheduled_at: at.toISOString(), publish_started_at: null, publish_error: null })
+    .eq("id", postId)
+    .eq("status", "validated")
+    .select("id");
+  if (!data?.length) return null;
+  revalidatePath(`/publications/${postId}`);
+  if (at === planned) return whenFormat.format(at);
+  after(() => publishIfDue(postId).then(() => revalidatePath(`/publications/${postId}`)));
+  return "now";
 }

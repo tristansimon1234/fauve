@@ -157,8 +157,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           {(post.status === "draft" || post.status === "validated") && (
             <p className="rounded-2xl bg-violet-tint px-4 py-3.5 text-sm leading-normal">
               {post.status === "validated" ? <strong>Validée. </strong> : null}
-              La programmation automatique arrive bientôt : pour l’instant, Fauve ne publie rien elle-même sur Instagram
-              ou TikTok.
+              Une fois validée, Fauve la publie sur Instagram à l’horaire prévu, si ton compte est connecté. TikTok
+              arrive bientôt.
             </p>
           )}
 

@@ -29,7 +29,10 @@ export async function SidebarAccount() {
           ))
         ) : (
           <span className="text-[13px] leading-snug text-muted">
-            Aucun pour l’instant : la connexion Instagram et TikTok arrive bientôt.
+            Aucun pour l’instant.{" "}
+            <a href="/connect" className="font-bold text-violet">
+              Connecter Instagram
+            </a>
           </span>
         )}
       </div>

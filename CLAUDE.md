@@ -198,8 +198,12 @@ Intégration bsport (planning et données élèves), relances aux élèves (bspo
 ## Dans le repo
 - Commandes : `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` (à la racine).
 - Next.js 16 avec Cache Components : lire `node_modules/next/dist/docs/` avant d'utiliser une API Next ; toute lecture de cookies/session doit être sous `<Suspense>`.
-- Les écrans de la web app lisent encore `apps/web/src/lib/demo.ts` (données de la maquette) ; à brancher sur Supabase une fois l'auth en place.
+- Les écrans de la web app lisent les vraies données du studio connecté via `apps/web/src/lib/studio.ts` (`getStudioContext`).
 - Supabase : projet `fauve` (ref `tfxkhktofgtljlqlksba`, eu-west-3). Les noms des fichiers de migration reprennent les versions appliquées en base.
 - Connexion : téléphone + code envoyé sur WhatsApp via le Send SMS hook (`/api/auth/send-sms`). Lien magique et QR ouvrent la session côté serveur via `openSessionForPhone` (le hook capture le code dans `pending_server_logins` au lieu de l'envoyer).
 - La maquette décompressée (un HTML par écran) est dans `docs/maquette/ecrans/`.
 
+- Analyse vidéo : `apps/web/src/lib/video/analyze.ts` (Gemini, `GEMINI_MODEL`, un seul passage par clip via `media_assets.analysis_status`) ; outil `analyze_clips`.
+- Rendu : `packages/agent/src/render.ts` (plan → ffmpeg + sous-titres ASS, testé) exécuté dans une Vercel Sandbox persistante `fauve-render` (`apps/web/src/lib/render/`) ; outil `render`, la vidéo part sur WhatsApp après la réponse (`afterReply`).
+- Instagram en direct (sans agrégateur) : OAuth `/api/instagram/connect` → `/api/instagram/callback`, jetons dans `social_credentials` (aucun accès client), publication des Reels par `/api/cron/publish` appelé toutes les 5 min par pg_cron (secret dans Vault `fauve_cron_secret` = `CRON_SECRET`). Variables : `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET`. En mode développement Meta, seuls les comptes « testeurs Instagram » de l'app peuvent se connecter.
+- Outils d'admin (clé `FAUVE_TEST_KEY`) : `/api/admin/whatsapp`, `/api/admin/gemini`, `/api/admin/render`.
