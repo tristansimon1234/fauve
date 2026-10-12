@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* Mila design tokens (see CLAUDE.md › Design). */
+@theme {
+  --color-white: #ffffff;
+  --color-soft: #fbf7f4;
+  --color-line: #ece6ef;
+  --color-ink: #1c1530;
+  --color-muted: #5e5670;
+  --color-violet: #5b3fd9;
+  --color-violet-hover: #4528b8;
+  --color-violet-soft: #efebff;
+  --color-violet-tint: #f6f2ff;
+  --color-lilac: #d9ccf5;
+  --color-lilac-ink: #cfc6f7;
+  --color-coral: #f2694e;
+  --color-coral-ink: #c2412a;
+  --color-danger: #b5321a;
+  --color-peach: #ffe9e1;
+  --color-peach-ink: #9a3412;
+  --color-success-soft: #e7f6ee;
+  --color-success: #146c3d;
+  --color-online: #1f9d55;
+  --color-track: #e7e1ec;
+  --color-chip: #f3f1f5;
+  --color-chat: #f3eef8;
+
+  --font-sans: var(--font-jakarta), system-ui, sans-serif;
+  --font-serif: var(--font-instrument), Georgia, serif;
+
+  --radius-card: 20px;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  body {
+    background: var(--color-white);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  button {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-violet);
+    outline-offset: 2px;
+  }
+}
+
+@utility accent {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--color-violet);
+}
+
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+@utility btn-primary {
+  background: var(--color-violet);
+  color: var(--color-white);
+  &:hover {
+    background: var(--color-violet-hover);
+  }
+}
+
+@utility btn-secondary {
+  background: var(--color-white);
+  color: var(--color-ink);
+  border: 1.5px solid var(--color-line);
+  font-weight: 600;
+  &:hover {
+    border-color: var(--color-lilac);
+  }
+}
+
+@utility card {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
