@@ -21,15 +21,22 @@ export const toolSpecs = {
   },
   update_onboarding: {
     description:
-      "Enregistre une information d'onboarding (nom du studio, prénom de la gérante, rythme de publication, plateformes) et fait avancer l'étape.",
+      "Enregistre une information d'onboarding (nom du studio, prénom de la gérante, site web, lien de réservation, rythme de publication, plateformes) et fait avancer l'étape.",
     input: z.object({
       studio_name: z.string().min(1).max(80).optional(),
       first_name: z.string().min(1).max(40).optional(),
       posts_per_week: z.number().int().min(0).max(21).optional(),
       stories_per_week: z.number().int().min(0).max(50).optional(),
       platforms: z.array(platformSchema).min(1).optional(),
+      website_url: z.url().optional().describe("Site web du studio"),
+      booking_url: z.url().optional().describe("Lien de réservation (bsport, Momoyoga…), utilisé dans la bio et les stories"),
       step: z.enum(["studio_name", "rhythm", "examples", "connect", "done"]).optional(),
     }),
+  },
+  read_website: {
+    description:
+      "Lit une page web publique (le site du studio, ou une page précise comme les tarifs) : titre, description, texte, liens Instagram / TikTok, lien de réservation, pages du site, logo, couleurs dominantes et polices. À utiliser dès que la gérante donne son site, pour pré-remplir l'onboarding et le profil de style au lieu de reposer des questions.",
+    input: z.object({ url: z.string().min(4).max(500).describe("Adresse de la page, avec ou sans https://") }),
   },
   get_connect_link: {
     description:

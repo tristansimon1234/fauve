@@ -1,5 +1,6 @@
 import "server-only";
 import { timingSafeEqual } from "node:crypto";
+import { brandProfileSchema } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -53,10 +54,12 @@ export async function resetTestStudio(): Promise<void> {
 export type ChatMessage = { id: string; from: "me" | "fauve"; body: string; at: string };
 
 export type TestSnapshot = {
-  studio: { name: string | null; onboardingStep: string };
+  studio: { name: string | null; onboardingStep: string; websiteUrl: string | null; bookingUrl: string | null };
   manager: string | null;
   plan: { postsPerWeek: number; storiesPerWeek: number; platforms: string[] } | null;
   brandVersion: number | null;
+  brandColors: string[];
+  brandFonts: string[];
   posts: { id: string; kind: string; title: string; scheduledAt: string | null; status: string }[];
   shots: { id: string; label: string; hint: string | null; done: boolean }[];
   costEur: number;
@@ -74,10 +77,10 @@ export async function loadTestState(member: TestMember): Promise<TestState> {
       .eq("studio_id", studioId)
       .order("created_at", { ascending: true })
       .limit(200),
-    db.from("studios").select("name, onboarding_step").eq("id", studioId).single(),
+    db.from("studios").select("name, onboarding_step, website_url, booking_url").eq("id", studioId).single(),
     db.from("members").select("first_name").eq("id", member.memberId).single(),
     db.from("content_plans").select("posts_per_week, stories_per_week, platforms").eq("studio_id", studioId).maybeSingle(),
-    db.from("brand_profiles").select("version").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
+    db.from("brand_profiles").select("version, profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
     db
       .from("posts")
       .select("id, kind, title, scheduled_at, status")
@@ -87,6 +90,11 @@ export async function loadTestState(member: TestMember): Promise<TestState> {
     db.from("shot_requests").select("id, label, hint, done").eq("studio_id", studioId).order("created_at").limit(50),
     db.from("cost_events").select("cost_eur").eq("studio_id", studioId),
   ]);
+
+  const brandStyle = brandProfileSchema
+    .pick({ colors: true, fonts: true })
+    .catch({})
+    .parse(brand.data?.[0]?.profile ?? {});
 
   return {
     messages: (messages.data ?? [])
@@ -98,7 +106,12 @@ export async function loadTestState(member: TestMember): Promise<TestState> {
         at: m.created_at,
       })),
     snapshot: {
-      studio: { name: studio.data?.name ?? null, onboardingStep: studio.data?.onboarding_step ?? "studio_name" },
+      studio: {
+        name: studio.data?.name ?? null,
+        onboardingStep: studio.data?.onboarding_step ?? "studio_name",
+        websiteUrl: studio.data?.website_url ?? null,
+        bookingUrl: studio.data?.booking_url ?? null,
+      },
       manager: manager.data?.first_name ?? null,
       plan: plan.data
         ? {
@@ -108,6 +121,8 @@ export async function loadTestState(member: TestMember): Promise<TestState> {
           }
         : null,
       brandVersion: brand.data?.[0]?.version ?? null,
+      brandColors: brandStyle.colors ?? [],
+      brandFonts: brandStyle.fonts ?? [],
       posts: (posts.data ?? []).map((p) => ({
         id: p.id,
         kind: p.kind,

@@ -184,6 +184,8 @@ function Panel({ snapshot }: { snapshot: TestSnapshot }) {
       <Card title="Studio">
         <Row label="Nom" value={studio.name ?? "—"} />
         <Row label="Gérante" value={snapshot.manager ?? "—"} />
+        <Row label="Site web" value={studio.websiteUrl ? shortUrl(studio.websiteUrl) : "—"} />
+        <Row label="Réservation" value={studio.bookingUrl ? shortUrl(studio.bookingUrl) : "—"} />
         <Row label="Onboarding" value={onboardingLabels[studio.onboardingStep] ?? studio.onboardingStep} />
         <Row
           label="Rythme"
@@ -191,6 +193,17 @@ function Panel({ snapshot }: { snapshot: TestSnapshot }) {
         />
         <Row label="Plateformes" value={plan?.platforms.join(", ") || "—"} />
         <Row label="Profil de style" value={snapshot.brandVersion ? `version ${snapshot.brandVersion}` : "—"} />
+        {snapshot.brandColors.length > 0 && (
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted">Couleurs</span>
+            <span className="flex gap-1">
+              {snapshot.brandColors.map((c) => (
+                <span key={c} title={c} className="size-5 rounded-full border border-line" style={{ background: c }} />
+              ))}
+            </span>
+          </div>
+        )}
+        {snapshot.brandFonts.length > 0 && <Row label="Polices" value={snapshot.brandFonts.join(", ")} />}
       </Card>
 
       <Card title="Calendrier" icon={<CalendarIcon size={16} />}>
@@ -243,6 +256,15 @@ function Card({ title, icon, children }: { title: string; icon?: React.ReactNode
       {children}
     </section>
   );
+}
+
+function shortUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return (u.hostname.replace(/^www\./, "") + u.pathname.replace(/\/$/, "")).slice(0, 32);
+  } catch {
+    return url.slice(0, 32);
+  }
 }
 
 function Row({ label, value }: { label: string; value: string }) {

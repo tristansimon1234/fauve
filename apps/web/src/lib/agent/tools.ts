@@ -9,6 +9,7 @@ import {
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendReaction } from "@/lib/whatsapp/client";
+import { readWebsite, WebsiteError } from "./website";
 
 export type ToolContext = {
   studioId: string;
@@ -50,7 +51,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   return {
     async get_studio_context() {
       const [studio, member, plan, accounts, brand] = await Promise.all([
-        db.from("studios").select("name, timezone, onboarding_step, booking_url").eq("id", studioId).single(),
+        db.from("studios").select("name, timezone, onboarding_step, website_url, booking_url").eq("id", studioId).single(),
         db.from("members").select("first_name, role").eq("id", ctx.memberId).single(),
         db.from("content_plans").select("posts_per_week, stories_per_week, platforms, themes").eq("studio_id", studioId).maybeSingle(),
         db.from("social_accounts").select("platform, handle, status").eq("studio_id", studioId),
@@ -69,6 +70,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const studioUpdate: Record<string, unknown> = {};
       if (input.studio_name) studioUpdate.name = input.studio_name;
       if (input.step) studioUpdate.onboarding_step = input.step;
+      if (input.website_url) studioUpdate.website_url = input.website_url;
+      if (input.booking_url) studioUpdate.booking_url = input.booking_url;
       if (Object.keys(studioUpdate).length) check(await db.from("studios").update(studioUpdate).eq("id", studioId));
       if (input.first_name) check(await db.from("members").update({ first_name: input.first_name }).eq("id", ctx.memberId));
       if (input.posts_per_week !== undefined || input.stories_per_week !== undefined || input.platforms) {
@@ -79,6 +82,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         check(await db.from("content_plans").upsert(planUpdate, { onConflict: "studio_id" }));
       }
       return "ok";
+    },
+
+    async read_website({ url }) {
+      try {
+        return json(await readWebsite(url));
+      } catch (error) {
+        if (error instanceof WebsiteError) return json({ error: error.message });
+        throw error;
+      }
     },
 
     async get_connect_link() {
