@@ -112,6 +112,13 @@ export const brandProfileSchema = z.object({
   emojis: z.enum(["none", "few", "many"]),
   hashtags: z.array(z.string()).describe("Hashtags récurrents, sans #"),
   visual_notes: z.string().describe("Couleurs, cadrages, ambiance"),
+  colors: z
+    .array(z.string().regex(/^#[0-9a-f]{6}$/i))
+    .max(6)
+    .optional()
+    .describe("Couleurs de la charte, la principale en premier (ex. tirées du site web)"),
+  fonts: z.array(z.string().max(60)).max(3).optional().describe("Polices de la charte, la principale en premier"),
+  logo_url: z.url().optional(),
   dos: z.array(z.string()),
   donts: z.array(z.string()),
 });

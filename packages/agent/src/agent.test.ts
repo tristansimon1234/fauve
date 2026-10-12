@@ -64,3 +64,39 @@ test("phone: normalizes French and international numbers", async () => {
   assert.equal(normalizePhone("12"), null);
   assert.equal(formatPhone("+33612345678"), "+33 6 12 34 56 78");
 });
+
+test("website: extracts what onboarding needs", async () => {
+  const { extractSiteInfo } = await import("./website.ts");
+  const html = `<html><head><title>Studio Lune &ndash; Pilates Paris 11</title>
+    <meta name="description" content="Pilates machine et barre au c&oelig;ur du 11e.">
+    <meta property="og:site_name" content="Studio Lune"></head>
+    <body><script>var x = "<a href='https://evil.test'>";</script>
+    <img class="logo" src="/img/logo.png">
+    <h1>Bienvenue chez Lune</h1><p>Cours collectifs d&#39;une heure, 8 personnes max.</p>
+    <a href="https://www.instagram.com/studiolune/">Instagram</a>
+    <a href="https://backoffice.bsport.io/m/Studio-Lune/123/">Réserver</a>
+    <a href="/tarifs">Nos tarifs</a><a href="mailto:hello@lune.fr">Mail</a></body></html>`;
+  const info = extractSiteInfo(html, "https://www.studiolune.fr/");
+  assert.equal(info.title, "Studio Lune – Pilates Paris 11");
+  assert.equal(info.siteName, "Studio Lune");
+  assert.equal(info.logo, "https://www.studiolune.fr/img/logo.png");
+  assert.deepEqual(info.socials.instagram, ["https://www.instagram.com/studiolune/"]);
+  assert.deepEqual(info.bookingLinks, ["https://backoffice.bsport.io/m/Studio-Lune/123/"]);
+  assert.deepEqual(info.pages, [{ url: "https://www.studiolune.fr/tarifs", label: "Nos tarifs" }]);
+  assert.match(info.text, /Cours collectifs d'une heure/);
+  assert.doesNotMatch(info.text, /evil/);
+});
+
+test("website: extracts brand colours and fonts", async () => {
+  const { extractBrandStyle, stylesheetLinks } = await import("./website.ts");
+  const html = `<head><meta name="theme-color" content="#5B3FD9">
+    <link rel="stylesheet" href="/css/site.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&amp;family=Instrument+Serif:ital@1">
+    <style>:root{--brand-accent:#f2694e} body{background:#fff;color:#1c1530;font-family:"Plus Jakarta Sans",sans-serif}</style></head>
+    <body><div style="background-color: rgb(255, 233, 225)"></div></body>`;
+  assert.deepEqual(stylesheetLinks(html, "https://lune.fr/"), ["https://lune.fr/css/site.css"]);
+  const style = extractBrandStyle(html, [".btn{background:#5b3fd9} .wix{--color_11: 242,105,78}"]);
+  assert.deepEqual(style.colors.slice(0, 2), ["#5b3fd9", "#f2694e"]);
+  assert.ok(style.colors.includes("#ffe9e1"));
+  assert.ok(style.neutrals.includes("#ffffff"));
+  assert.deepEqual(style.fonts.slice(0, 2), ["Plus Jakarta Sans", "Instrument Serif"]);
+});
