@@ -1,5 +1,6 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
+import { orderReplies } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveResult } from "./run";
 
@@ -57,7 +58,7 @@ export async function replyInConversation(params: {
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     db
       .from("whatsapp_messages")
-      .select("direction, type, body, media_id")
+      .select("direction, type, body, media_id, wa_message_id, payload")
       .eq("studio_id", params.studioId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT),
@@ -65,13 +66,23 @@ export async function replyInConversation(params: {
   if (studio.error) throw new Error(studio.error.message);
   if (rows.error) throw new Error(rows.error.message);
 
+  const stored = rows.data.reverse().map((r) => ({
+    ...(r as StoredMessage & { wa_message_id: string | null }),
+    reply_to: (r.payload as { reply_to?: string } | null)?.reply_to ?? null,
+  }));
+  const history = toModelHistory(orderReplies(stored));
+  // Every message has already been answered (e.g. a retried delivery): nothing to say.
+  if (history.at(-1)?.role !== "user") {
+    return { reply: null, reactions: [], usage: { input_tokens: 0, output_tokens: 0 } };
+  }
+
   return runFauve({
     studioId: params.studioId,
     memberId: params.memberId,
     waId: params.waId,
     replyToMessageId: params.replyToMessageId,
     reactions: [],
-    history: toModelHistory((rows.data as StoredMessage[]).reverse()),
+    history,
     studio: {
       name: studio.data.name,
       timezone: studio.data.timezone,

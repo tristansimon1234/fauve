@@ -100,3 +100,14 @@ test("website: extracts brand colours and fonts", async () => {
   assert.ok(style.neutrals.includes("#ffffff"));
   assert.deepEqual(style.fonts.slice(0, 2), ["Plus Jakarta Sans", "Instrument Serif"]);
 });
+
+test("history: a reply goes right after the message it answers", async () => {
+  const { orderReplies } = await import("./history.ts");
+  const row = (direction: "inbound" | "outbound", id: string, reply_to?: string) => ({ direction, wa_message_id: id, reply_to });
+  // "Alors pour les postes" (B) arrived while Fauve was answering A.
+  const raced = [row("inbound", "A"), row("inbound", "B"), row("outbound", "R", "A")];
+  assert.deepEqual(orderReplies(raced).map((r) => r.wa_message_id), ["A", "R", "B"]);
+  // Normal back-and-forth is untouched, and replies without reply_to keep their place.
+  const normal = [row("inbound", "A"), row("outbound", "R", "A"), row("inbound", "B"), row("outbound", "S")];
+  assert.deepEqual(orderReplies(normal).map((r) => r.wa_message_id), ["A", "R", "B", "S"]);
+});
