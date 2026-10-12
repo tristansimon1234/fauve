@@ -1,9 +1,9 @@
-import { normalizePhone } from "@fauve/agent";
+import { isInSessionWindow, normalizePhone } from "@fauve/agent";
 import { Webhook } from "standardwebhooks";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { sendLoginCode } from "@/lib/whatsapp/client";
+import { sendLoginCode, sendText } from "@/lib/whatsapp/client";
 
 // Supabase Auth "Send SMS" hook: login codes go out on WhatsApp instead of SMS.
 // Configure in Supabase → Authentication → Hooks → Send SMS (HTTPS) with this URL.
@@ -58,19 +58,47 @@ export async function POST(request: Request) {
   if (member.error) return hookError(500, "Database error");
   if (!member.data) return hookError(403, "Ce numéro n’est pas encore inscrit. Écris d’abord à Fauve sur WhatsApp.");
 
+  const delivered = await deliverCode(phone, otp);
+  if (!delivered) return hookError(502, "Impossible d’envoyer le code sur WhatsApp. Écris d’abord « code » à Fauve, puis réessaie.");
+
+  if (delivered === "template") {
+    await db.from("cost_events").insert({
+      studio_id: member.data.studio_id,
+      kind: "whatsapp_template",
+      provider: "meta",
+      units: 1,
+      meta: { template: "login_code", category: "authentication" },
+    });
+  }
+  return Response.json({});
+}
+
+/**
+ * The login_code template first. Until Meta approves it (authentication templates
+ * need a verified business), fall back to a plain message, allowed when the
+ * manager wrote to Fauve in the last 24 h.
+ */
+async function deliverCode(phone: string, otp: string): Promise<"template" | "text" | null> {
   try {
     await sendLoginCode(phone.slice(1), otp);
+    return "template";
+  } catch (error) {
+    console.warn("login_code template failed, trying a plain message", error);
+  }
+  const last = await supabaseAdmin()
+    .from("whatsapp_messages")
+    .select("created_at")
+    .eq("phone_e164", phone)
+    .eq("direction", "inbound")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!isInSessionWindow(last.data ? new Date(last.data.created_at) : null)) return null;
+  try {
+    await sendText(phone.slice(1), `Ton code de connexion Fauve : ${otp}\n\nNe le partage avec personne.`);
+    return "text";
   } catch (error) {
     console.error("login code delivery failed", error);
-    return hookError(502, "Impossible d’envoyer le code sur WhatsApp.");
+    return null;
   }
-
-  await db.from("cost_events").insert({
-    studio_id: member.data.studio_id,
-    kind: "whatsapp_template",
-    provider: "meta",
-    units: 1,
-    meta: { template: "login_code", category: "authentication" },
-  });
-  return Response.json({});
 }
