@@ -119,3 +119,26 @@ test("network: only public addresses are fetched", async () => {
     assert.equal(isPublicAddress(ip), false, ip);
   }
 });
+
+test("clip analysis: schema converts to JSON Schema and validates a Gemini answer", async () => {
+  const { z } = await import("zod");
+  const { clipAnalysisSchema } = await import("./schemas.ts");
+  const json = z.toJSONSchema(clipAnalysisSchema) as { properties: Record<string, unknown> };
+  assert.ok(json.properties.best_moments);
+  const answer = {
+    duration: 12.4,
+    orientation: "portrait",
+    summary: "Une élève fait une planche sur le reformer.",
+    setting: "studio, reformer",
+    lighting: "good",
+    shots: [
+      { start: 0, end: 4.2, description: "Planche", subject: "élève", energy: 4, hook_score: 5,
+        quality: { blurry: false, dark: false, shaky: false }, faces_visible: false },
+    ],
+    best_moments: [{ start: 1, end: 3.5, why: "Effort visible, gros plan sur les bras qui tremblent" }],
+    transcript: "",
+    issues: [],
+  };
+  assert.equal(clipAnalysisSchema.safeParse(answer).success, true);
+  assert.equal(clipAnalysisSchema.safeParse({ ...answer, lighting: "great" }).success, false);
+});

@@ -9,6 +9,7 @@ import {
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendReaction } from "@/lib/whatsapp/client";
+import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { readWebsite, WebsiteError } from "./website";
 
 export type ToolContext = {
@@ -163,6 +164,19 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         }
       }
       return "ok";
+    },
+
+    async analyze_clips({ media_ids }) {
+      const results = await Promise.all(
+        media_ids.map((id) =>
+          ensureClipAnalysis(studioId, id).catch((error: unknown) => ({
+            media_id: id,
+            status: "failed" as const,
+            error: error instanceof Error ? error.message : String(error),
+          })),
+        ),
+      );
+      return json({ clips: results });
     },
 
     async create_edit_plan({ post_id, plan }) {

@@ -1,7 +1,8 @@
 import "server-only";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { downloadMedia, markReadAndTyping, sendText } from "./client";
+import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { downloadMedia, markReadAndTyping, sendReaction, sendText } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 
 // Several messages often arrive together (a caption + 5 clips). We wait briefly and
@@ -47,7 +48,7 @@ const extensionByMime: Record<string, string> = {
   "application/pdf": "pdf",
 };
 
-async function storeMedia(studioId: string, message: InboundMessage): Promise<string | null> {
+async function storeMedia(studioId: string, message: InboundMessage): Promise<{ id: string; isVideo: boolean } | null> {
   const ref = mediaOf(message);
   if (!ref) return null;
   const db = supabaseAdmin();
@@ -69,7 +70,7 @@ async function storeMedia(studioId: string, message: InboundMessage): Promise<st
     .select("id")
     .single();
   if (asset.error) throw new Error(asset.error.message);
-  return asset.data.id as string;
+  return { id: asset.data.id as string, isVideo: ref.kind === "video" || file.mimeType.startsWith("video/") };
 }
 
 export async function handleInboundMessage(message: InboundMessage, profileName?: string): Promise<void> {
@@ -101,11 +102,18 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
 
   await markReadAndTyping(message.id).catch((e) => console.warn("typing indicator failed", e));
 
-  const mediaId = await storeMedia(member.studio_id, message).catch((e) => {
+  const media = await storeMedia(member.studio_id, message).catch((e) => {
     console.error("media storage failed", e);
     return null;
   });
-  if (mediaId) await db.from("whatsapp_messages").update({ media_id: mediaId }).eq("wa_message_id", message.id);
+  if (media) await db.from("whatsapp_messages").update({ media_id: media.id }).eq("wa_message_id", message.id);
+
+  // Watching a clip takes up to a minute: acknowledge it now (👍 = reçu), then start
+  // the analysis right away so whoever answers finds it ready.
+  if (media?.isVideo) await sendReaction(message.from, message.id, "👍").catch((e) => console.warn("reaction failed", e));
+  const analysis = media?.isVideo
+    ? ensureClipAnalysis(member.studio_id, media.id).catch((e) => console.error("clip analysis failed", e))
+    : null;
 
   await new Promise((resolve) => setTimeout(resolve, BURST_DEBOUNCE_MS));
   const latest = await db
@@ -116,7 +124,12 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     .order("created_at", { ascending: false })
     .limit(1)
     .single();
-  if (latest.data?.wa_message_id !== message.id) return; // a newer message will answer
+  // A newer message will answer; finish the analysis so it is there for that reply.
+  if (latest.data?.wa_message_id !== message.id) {
+    await analysis;
+    return;
+  }
+  await analysis;
 
   let result: Awaited<ReturnType<typeof replyInConversation>>;
   try {
