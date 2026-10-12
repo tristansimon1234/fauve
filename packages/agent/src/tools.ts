@@ -113,8 +113,8 @@ export const toolSpecs = {
     description:
       "Lit le compte Instagram connecté du studio : derniers posts (y compris ceux publiés sans Fauve) avec likes, nombre de commentaires, statistiques (vues, portée, enregistrements, partages) et les commentaires récents avec leurs réponses. Sert à analyser ce qui marche, repérer les questions sans réponse et préparer des réponses ou le bilan.",
     input: z.object({
-      media_limit: z.number().int().min(1).max(20).default(8),
-      comments_per_post: z.number().int().min(0).max(30).default(15),
+      media_limit: z.number().int().min(1).max(20).default(6),
+      comments_per_post: z.number().int().min(0).max(30).default(8),
     }),
   },
   reply_to_comment: {

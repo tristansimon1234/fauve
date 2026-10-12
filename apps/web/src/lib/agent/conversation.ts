@@ -7,7 +7,9 @@ import { runFauve, type RunFauveResult } from "./run";
 // Shared by every channel (WhatsApp webhook, web test chat): rebuild the
 // conversation from stored messages and let Fauve answer the last one.
 
-const HISTORY_LIMIT = 40;
+const HISTORY_LIMIT = 24;
+/** Long messages (video captions, links) are cut in the history: the model rarely needs them whole. */
+const MESSAGE_MAX_CHARS = 700;
 
 export type StoredMessage = {
   direction: "inbound" | "outbound";
@@ -34,11 +36,12 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
       .filter(Boolean)
       .join(" ");
     if (!text) continue;
+    const short = text.length > MESSAGE_MAX_CHARS ? `${text.slice(0, MESSAGE_MAX_CHARS)}…` : text;
     const last = history.at(-1);
     if (last?.role === role && typeof last.content === "string") {
-      last.content = `${last.content}\n${text}`;
+      last.content = `${last.content}\n${short}`;
     } else {
-      history.push({ role, content: text });
+      history.push({ role, content: short });
     }
   }
   while (history[0]?.role === "assistant") history.shift();
@@ -53,7 +56,7 @@ export async function replyInConversation(params: {
   replyToMessageId?: string;
 }): Promise<RunFauveResult> {
   const db = supabaseAdmin();
-  const [studio, member, rows] = await Promise.all([
+  const [studio, member, rows, instagram] = await Promise.all([
     db.from("studios").select("name, timezone, onboarding_step").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     db
@@ -62,6 +65,7 @@ export async function replyInConversation(params: {
       .eq("studio_id", params.studioId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT),
+    db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
   ]);
   if (studio.error) throw new Error(studio.error.message);
   if (rows.error) throw new Error(rows.error.message);
@@ -89,6 +93,7 @@ export async function replyInConversation(params: {
       timezone: studio.data.timezone,
       onboardingStep: studio.data.onboarding_step,
       firstName: member.data?.first_name ?? null,
+      instagram: (instagram.data?.handle as string | null | undefined) ?? null,
     },
   });
 }
