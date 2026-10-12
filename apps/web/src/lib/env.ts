@@ -40,11 +40,17 @@ function raw(key: EnvKey): string | undefined {
   }
 }
 
+// Keys and IDs never contain whitespace: drop line breaks pasted into the dashboard.
+function clean(value: string | undefined): string | undefined {
+  const stripped = value?.replace(/\s+/g, "");
+  return stripped || undefined;
+}
+
 const cache = new Map<EnvKey, unknown>();
 
 export function env<K extends EnvKey>(key: K): z.infer<Schema[K]> {
   if (!cache.has(key)) {
-    const parsed = schema[key].safeParse(raw(key));
+    const parsed = schema[key].safeParse(clean(raw(key)));
     if (!parsed.success) throw new Error(`Missing or invalid environment variable ${key}`);
     cache.set(key, parsed.data);
   }

@@ -1,8 +1,11 @@
 // Values safe to ship to the browser. NEXT_PUBLIC_* are inlined at build time.
 export const publicEnv = {
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-  supabasePublishableKey:
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+  supabaseUrl: (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim(),
+  supabasePublishableKey: (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    ""
+  ).replace(/\s+/g, ""),
   // Fauve's WhatsApp number, digits only with country code (e.g. 33612345678).
   fauveWhatsAppNumber: process.env.NEXT_PUBLIC_FAUVE_WHATSAPP_NUMBER ?? "",
 };
