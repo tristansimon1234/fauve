@@ -11,3 +11,4 @@ export * from "./render.ts";
 export * from "./motion.ts";
 export * from "./editor.ts";
 export * from "./motion-scene.ts";
+export * from "./moodboard.ts";

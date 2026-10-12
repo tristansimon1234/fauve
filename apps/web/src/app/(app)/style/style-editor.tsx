@@ -7,8 +7,18 @@ import { ArtDirectionSection } from "./art-direction-section";
 import { ColorsSection } from "./colors-section";
 import { FontsSection } from "./fonts-section";
 import { LogoSection } from "./logo-section";
+import { MoodboardSection } from "./moodboard-section";
 import { StylePreview } from "./style-preview";
-import { DEFAULT_ACCENT, TEMPLATE_FONTS, TEMPLATES, fontStylesheet, type Logo, type StyleForm } from "./style-options";
+import {
+  DEFAULT_ACCENT,
+  MAX_COLORS,
+  TEMPLATE_FONTS,
+  TEMPLATES,
+  fontStylesheet,
+  type Logo,
+  type MoodboardView,
+  type StyleForm,
+} from "./style-options";
 import { TemplateSection } from "./template-section";
 import { ToneSection } from "./tone-section";
 import { useStylesheets } from "./use-stylesheet";
@@ -32,12 +42,14 @@ export function StyleEditor({
   initial,
   version: initialVersion,
   logo: initialLogo,
+  moodboard,
 }: {
   studioId: string;
   studioName: string;
   initial: StyleForm;
   version: number | null;
   logo: Logo;
+  moodboard: MoodboardView;
 }) {
   const [form, setForm] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -89,8 +101,8 @@ export function StyleEditor({
       <header className="flex flex-col gap-1.5">
         <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Style</h1>
         <p className="max-w-[640px] text-[15px] leading-normal text-muted">
-          L’identité que Fauve applique à chacun de tes Reels : direction artistique, couleurs, polices, logo et
-          gabarit.
+          L’identité que Fauve applique à chacun de tes Reels : direction artistique, moodboard, couleurs, polices,
+          logo et gabarit.
         </p>
         <p className="text-[13px] font-semibold text-muted">
           {version ? `Version ${version} en place.` : "Pas encore de style enregistré : voici des réglages de départ."}
@@ -100,6 +112,12 @@ export function StyleEditor({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-4">
           <ArtDirectionSection value={form.art_direction} onChange={(art_direction) => update({ art_direction })} />
+          <MoodboardSection
+            studioId={studioId}
+            initial={moodboard}
+            onSaved={setVersion}
+            onUsePalette={(colors) => update({ colors: colors.slice(0, MAX_COLORS) })}
+          />
           <ColorsSection value={form.colors} onChange={(colors) => update({ colors })} />
           <FontsSection
             display={form.display_font}

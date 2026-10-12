@@ -57,6 +57,7 @@ export async function designEdit(params: {
     brand: {
       tone: profile.tone,
       art_direction: profile.art_direction,
+      moodboard: profile.moodboard?.reading,
       default_template: profile.default_template,
       visual_notes: profile.visual_notes,
       colors: profile.colors,
@@ -111,7 +112,9 @@ export async function designEdit(params: {
   const designed = await designMotionScenes(
     params.studioId,
     requests,
-    profile.art_direction,
+    [profile.art_direction, profile.moodboard?.reading && `Lecture du moodboard de la gérante : ${profile.moodboard.reading}`]
+      .filter(Boolean)
+      .join("\n\n") || undefined,
     resolveReelBrand(plan, motionTemplateSchema.catch("doux").parse(plan.template), {
       name: (studio.data?.name as string | null) ?? "",
       accent: profile.colors?.[0],

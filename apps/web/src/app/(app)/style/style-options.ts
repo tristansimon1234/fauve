@@ -167,3 +167,15 @@ export function inkOn(hex: string): string {
 
 /** Colours offered when the manager adds one. */
 export const COLOR_SUGGESTIONS = ["#f2694e", "#1c1530", "#fbf7f4", "#c9a227", "#7a8b6f", "#e8c4b8", "#5b3fd9"];
+
+// ---------------------------------------------------------------------------
+// Moodboard
+// ---------------------------------------------------------------------------
+
+/** Images are resized in the browser before upload: enough for Fauve to read them, light to store. */
+export const MOODBOARD_IMAGE_EDGE = 1600;
+export const MOODBOARD_NOTE_MAX = 200;
+export const MOODBOARD_SOURCE_MAX_BYTES = 25 * 1024 * 1024;
+
+export type MoodboardItem = { path: string; url: string; note: string };
+export type MoodboardView = { items: MoodboardItem[]; reading: string | null; palette: string[] };

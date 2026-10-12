@@ -4,9 +4,11 @@ import { NoStudio, PageLoading } from "@/components/empty-state";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { sanitizeProfile, toStyleForm } from "./style-profile";
 import { StyleEditor } from "./style-editor";
-import type { Logo } from "./style-options";
+import type { Logo, MoodboardView } from "./style-options";
 
 export const metadata: Metadata = { title: "Style" };
+// Reading a moodboard (Fauve looks at every image) can take a minute.
+export const maxDuration = 120;
 
 export default function StylePage() {
   return (
@@ -49,8 +51,20 @@ async function StyleLoader() {
     logo = { url: profile.logo_url, source: "website" };
   }
 
+  const moodboardItems = profile.moodboard?.items ?? [];
+  const moodboardUrls = await signMediaUrls(db, studioId, moodboardItems.map((item) => item.path));
+  const moodboard: MoodboardView = {
+    items: moodboardItems.flatMap((item) => {
+      const url = moodboardUrls.get(item.path);
+      return url ? [{ path: item.path, url, note: item.note ?? "" }] : [];
+    }),
+    reading: profile.moodboard?.reading ?? null,
+    palette: profile.moodboard?.palette ?? [],
+  };
+
   return (
     <StyleEditor
+      moodboard={moodboard}
       studioId={studioId}
       studioName={member.studio.name ?? "Ton studio"}
       initial={toStyleForm(profile)}
