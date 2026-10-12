@@ -1,52 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
+import { z } from "zod";
 import { CalendarIcon, InstagramIcon, PenIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { Orb } from "@/components/orb";
-import { demoStudio } from "@/lib/demo";
+import { plural } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
+import { getContentPlan, getOptionalStudioContext, getSocialAccounts } from "@/lib/studio";
 
 export const metadata: Metadata = { title: "C’est prêt" };
 
-const summary = [
-  { icon: InstagramIcon, label: `@${demoStudio.instagram}`, detail: "Instagram connecté", warm: false },
-  { icon: TikTokIcon, label: `@${demoStudio.tiktok}`, detail: "TikTok connecté", warm: false },
-  { icon: CalendarIcon, label: "3 posts + 4 stories", detail: "par semaine", warm: false },
-  { icon: PenIcon, label: "Ton style", detail: "appris à partir de 3 exemples", warm: true },
-];
+type Item = { icon: typeof InstagramIcon; label: string; detail: string; warm?: boolean };
 
 export default function ReadyPage() {
   return (
     <>
       <div className="flex flex-1 flex-col gap-5.5 px-6 pt-14 pb-6">
         <Orb size={88} className="self-center" />
-        <div className="flex flex-col gap-2.5 text-center">
-          <h1 className="text-[32px] leading-[1.1] font-extrabold tracking-[-0.02em]">
-            C’est prêt, <span className="accent">{demoStudio.manager}.</span>
-          </h1>
-          <p className="text-[15px] leading-[1.55] text-muted">
-            Fauve t’envoie ton premier plan de la semaine sur WhatsApp lundi à 9 h.
-          </p>
-        </div>
-        <div className="card px-4 py-1.5">
-          {summary.map(({ icon: Icon, label, detail, warm }, i) => (
-            <div
-              key={label}
-              className={`flex items-center gap-3 py-3 ${i < summary.length - 1 ? "border-b border-line" : ""}`}
-            >
-              <span
-                className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${
-                  warm ? "bg-peach text-peach-ink" : "bg-violet-soft text-violet"
-                }`}
-              >
-                <Icon size={18} />
-              </span>
-              <span className="flex flex-col">
-                <span className="text-sm font-bold">{label}</span>
-                <span className="text-[13px] text-muted">{detail}</span>
-              </span>
-            </div>
-          ))}
-        </div>
+        <Suspense fallback={<Ready firstName={null} items={null} />}>
+          <ReadyForMember />
+        </Suspense>
       </div>
       <div className="flex flex-col gap-2.5 border-t border-line px-6 pt-3.5 pb-7.5">
         <a
@@ -63,6 +36,83 @@ export default function ReadyPage() {
           Voir mon calendrier
         </Link>
       </div>
+    </>
+  );
+}
+
+async function ReadyForMember() {
+  const { db, member } = await getOptionalStudioContext();
+  if (!member) return <Ready firstName={null} items={null} />;
+  const studioId = member.studio.id;
+
+  const [accounts, plan, brand] = await Promise.all([
+    getSocialAccounts(db, studioId),
+    getContentPlan(db, studioId),
+    db.from("brand_profiles").select("examples").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
+  ]);
+  const examples = z.array(z.unknown()).catch([]).parse(brand.data?.[0]?.examples).length;
+  const account = (platform: "instagram" | "tiktok") => accounts.find((a) => a.platform === platform && a.status === "connected");
+  const instagram = account("instagram");
+  const tiktok = account("tiktok");
+
+  const items: Item[] = [
+    instagram
+      ? { icon: InstagramIcon, label: instagram.handle ? `@${instagram.handle}` : "Instagram", detail: "Instagram connecté" }
+      : { icon: InstagramIcon, label: "Instagram", detail: "Connexion bientôt disponible" },
+    ...(tiktok
+      ? [{ icon: TikTokIcon, label: tiktok.handle ? `@${tiktok.handle}` : "TikTok", detail: "TikTok connecté" }]
+      : []),
+    plan
+      ? {
+          icon: CalendarIcon,
+          label: `${plural(plan.posts_per_week, "post", "posts")} + ${plural(plan.stories_per_week, "story", "stories")}`,
+          detail: "par semaine",
+        }
+      : { icon: CalendarIcon, label: "Ton rythme", detail: "à choisir avec Fauve sur WhatsApp" },
+    {
+      icon: PenIcon,
+      label: "Ton style",
+      detail: examples ? `appris à partir de ${plural(examples, "exemple", "exemples")}` : "Fauve l’apprend au fil de vos échanges",
+      warm: true,
+    },
+  ];
+  return <Ready firstName={member.first_name} items={items} />;
+}
+
+function Ready({ firstName, items }: { firstName: string | null; items: Item[] | null }) {
+  return (
+    <>
+      <div className="flex flex-col gap-2.5 text-center">
+        <h1 className="text-[32px] leading-[1.1] font-extrabold tracking-[-0.02em]">
+          C’est prêt{firstName ? ", " : "."}
+          {firstName && <span className="accent">{firstName}.</span>}
+        </h1>
+        <p className="text-[15px] leading-[1.55] text-muted">
+          La suite se passe sur WhatsApp : envoie tes vidéos à Fauve, elle prépare tes publications avec toi.
+        </p>
+      </div>
+      {items && (
+        <div className="card px-4 py-1.5">
+          {items.map(({ icon: Icon, label, detail, warm }, i) => (
+            <div
+              key={label}
+              className={`flex items-center gap-3 py-3 ${i < items.length - 1 ? "border-b border-line" : ""}`}
+            >
+              <span
+                className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${
+                  warm ? "bg-peach text-peach-ink" : "bg-violet-soft text-violet"
+                }`}
+              >
+                <Icon size={18} />
+              </span>
+              <span className="flex flex-col">
+                <span className="text-sm font-bold">{label}</span>
+                <span className="text-[13px] text-muted">{detail}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
