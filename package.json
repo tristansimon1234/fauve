@@ -10,7 +10,8 @@
     "build": "npm run build -w web",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "db:types": "supabase gen types typescript --project-id tfxkhktofgtljlqlksba > apps/web/src/lib/supabase/database.types.ts"
   },
   "engines": {
     "node": ">=22"

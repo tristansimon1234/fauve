@@ -199,5 +199,7 @@ Intégration bsport (planning et données élèves), relances aux élèves (bspo
 - Commandes : `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` (à la racine).
 - Next.js 16 avec Cache Components : lire `node_modules/next/dist/docs/` avant d'utiliser une API Next ; toute lecture de cookies/session doit être sous `<Suspense>`.
 - Les écrans de la web app lisent encore `apps/web/src/lib/demo.ts` (données de la maquette) ; à brancher sur Supabase une fois l'auth en place.
+- Supabase : projet `fauve` (ref `tfxkhktofgtljlqlksba`, eu-west-3). Les noms des fichiers de migration reprennent les versions appliquées en base.
+- Connexion : téléphone + code envoyé sur WhatsApp via le Send SMS hook (`/api/auth/send-sms`). Lien magique et QR ouvrent la session côté serveur via `openSessionForPhone` (le hook capture le code dans `pending_server_logins` au lieu de l'envoyer).
 - La maquette décompressée (un HTML par écran) est dans `docs/maquette/ecrans/`.
 

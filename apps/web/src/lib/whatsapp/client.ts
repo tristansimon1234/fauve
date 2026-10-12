@@ -86,3 +86,20 @@ export async function downloadMedia(mediaId: string): Promise<{ bytes: ArrayBuff
   if (!res.ok) throw new WhatsAppError(`Media download failed (${res.status})`, res.status, null);
   return { bytes: await res.arrayBuffer(), mimeType: meta.mime_type, size: meta.file_size };
 }
+
+/** Sends a login code with the Meta "authentication" template (body + copy-code button). */
+export async function sendLoginCode(toWaId: string, code: string): Promise<string | undefined> {
+  const res = await sendMessage({
+    to: toWaId,
+    type: "template",
+    template: {
+      name: "login_code",
+      language: { code: "fr" },
+      components: [
+        { type: "body", parameters: [{ type: "text", text: code }] },
+        { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: code }] },
+      ],
+    },
+  });
+  return res.messages[0]?.id;
+}
