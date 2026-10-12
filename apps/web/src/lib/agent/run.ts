@@ -3,6 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   addUsage,
+  CHAT_EFFORT,
+  CHAT_MODEL,
   CLAUDE_MODEL,
   claudeCostUsd,
   FAUVE_SYSTEM_PROMPT,
@@ -59,10 +61,10 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   }).format(new Date());
 
   const runner = anthropic().beta.messages.toolRunner({
-    model: CLAUDE_MODEL,
+    model: CHAT_MODEL,
     max_tokens: 16000,
     max_iterations: 12,
-    output_config: { effort: "medium" },
+    output_config: { effort: CHAT_EFFORT },
     // On a policy refusal the API retries on the fallback model it picks.
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
@@ -90,7 +92,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     last = message;
   }
 
-  await logClaudeCost(input.studioId, usage);
+  await logClaudeCost(input.studioId, usage, "conversation", CHAT_MODEL);
 
   if (!last || last.stop_reason === "refusal") {
     return { reply: FALLBACK_REPLY, reactions: input.reactions, usage, afterReply: input.afterReply };
@@ -103,8 +105,8 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   return { reply: reply || null, reactions: input.reactions, usage, afterReply: input.afterReply };
 }
 
-export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose = "conversation") {
-  const usd = claudeCostUsd(CLAUDE_MODEL, usage);
+export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose = "conversation", model = CLAUDE_MODEL) {
+  const usd = claudeCostUsd(model, usage);
   const { error } = await supabaseAdmin()
     .from("cost_events")
     .insert({
@@ -113,7 +115,7 @@ export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose
       provider: "anthropic",
       units: usage.input_tokens + usage.output_tokens,
       cost_eur: usdToEur(usd, env("USD_TO_EUR")),
-      meta: { model: CLAUDE_MODEL, purpose, usage, cost_usd: usd },
+      meta: { model, purpose, usage, cost_usd: usd },
     });
   if (error) console.error("cost_events insert failed", error.message);
 }

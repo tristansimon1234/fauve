@@ -250,3 +250,8 @@ test("motion scenes: generated code is checked before it runs", async () => {
   assert.deepEqual(checkMotionCode(`function Scene() { return <img src="https://x.test/a.png" />; }`), ["ressource externe"]);
   assert.deepEqual(checkMotionCode(`const Other = () => null;`), ["il faut une fonction Scene"]);
 });
+
+test("pricing: the chat model is priced", async () => {
+  const { CHAT_MODEL, claudeCostUsd } = await import("./pricing.ts");
+  assert.equal(claudeCostUsd(CHAT_MODEL, { input_tokens: 1_000_000, output_tokens: 100_000 }), 3);
+});

@@ -1,13 +1,18 @@
 // Per-call cost logging (cost_events). Prices in USD per million tokens,
 // from Anthropic's public price list; update when models or prices change.
 
+/** Montage (editor, motion designer): quality first. */
 export const CLAUDE_MODEL = "claude-opus-5-5";
+/** WhatsApp / web conversation: fast and cheap, at low effort. */
+export const CHAT_MODEL = "claude-sonnet-5-5";
+export const CHAT_EFFORT = "low" as const;
 
 type ModelPrice = { input: number; output: number; cacheRead: number; cacheWrite: number };
 
 const CLAUDE_PRICES_USD: Record<string, ModelPrice> = {
   // Cache writes (5 min TTL) are billed at 1.25x input.
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
 };
 
 /** Rough conversion used for reporting only; override with USD_TO_EUR. */
