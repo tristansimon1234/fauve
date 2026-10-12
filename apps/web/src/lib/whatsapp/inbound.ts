@@ -8,6 +8,9 @@ import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 // let only the latest message of the burst run the agent, which sees them all.
 const BURST_DEBOUNCE_MS = 4000;
 
+const TECHNICAL_ISSUE_REPLY =
+  "Petit souci technique de mon côté, je n’ai pas pu traiter ton message. Réessaie dans quelques minutes, désolée !";
+
 type Member = { id: string; studio_id: string; first_name: string | null };
 
 async function findOrCreateMember(phone: string, profileName?: string): Promise<Member> {
@@ -115,12 +118,21 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     .single();
   if (latest.data?.wa_message_id !== message.id) return; // a newer message will answer
 
-  const result = await replyInConversation({
-    studioId: member.studio_id,
-    memberId: member.id,
-    waId: message.from,
-    replyToMessageId: message.id,
-  });
+  let result: Awaited<ReturnType<typeof replyInConversation>>;
+  try {
+    result = await replyInConversation({
+      studioId: member.studio_id,
+      memberId: member.id,
+      waId: message.from,
+      replyToMessageId: message.id,
+    });
+  } catch (error) {
+    // Never leave the manager on a "typing…" that leads nowhere. Not stored, so
+    // the conversation history stays clean for the next attempt.
+    console.error("agent failed, sending fallback reply", error);
+    await sendText(message.from, TECHNICAL_ISSUE_REPLY).catch((e) => console.error("fallback reply failed", e));
+    return;
+  }
 
   if (!result.reply) return;
   const waMessageId = await sendText(message.from, result.reply);
