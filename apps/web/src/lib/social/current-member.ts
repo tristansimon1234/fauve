@@ -1,4 +1,5 @@
 import "server-only";
+import { connection } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -6,6 +7,7 @@ export type CurrentMember = { id: string; studio_id: string; phone_e164: string 
 
 /** The signed-in manager and her studio, or null when there is no session. */
 export async function currentMember(): Promise<CurrentMember | null> {
+  await connection(); // per-request: the auth client reads the clock
   const supabase = await supabaseServer();
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub;

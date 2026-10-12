@@ -1,6 +1,7 @@
 import "server-only";
 import { platformSchema, postKindSchema, postStatusSchema } from "@fauve/agent";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { cache } from "react";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -36,6 +37,8 @@ export type StudioContext = { db: Db; member: Member | null };
 type LoadedContext = StudioContext & { signedIn: boolean };
 
 const loadContext = cache(async (): Promise<LoadedContext> => {
+  // Per-request data: render at request time (the auth client reads the clock).
+  await connection();
   const db = await supabaseServer();
   const { data } = await db.auth.getClaims();
   const userId = data?.claims?.sub;

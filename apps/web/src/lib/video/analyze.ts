@@ -27,7 +27,13 @@ function toGeminiSchema(value: unknown): unknown {
       .map(([key, v]) => [key, toGeminiSchema(v)]),
   );
 }
-const responseJsonSchema = toGeminiSchema(z.toJSONSchema(clipAnalysisSchema));
+// Gemini rejects some schemas with a bare "invalid argument": ask for the full
+// analysis with word timings first (no size bound on the list), then without words.
+const wordsSchema = z.array(z.object({ w: z.string(), start: z.number(), end: z.number() }));
+const RESPONSE_SCHEMAS = [
+  toGeminiSchema(z.toJSONSchema(clipAnalysisSchema.extend({ words: wordsSchema.optional() }))),
+  toGeminiSchema(z.toJSONSchema(clipAnalysisSchema.omit({ words: true }))),
+];
 
 export type StoredAnalysis = { media_id: string; analysis: ClipAnalysis };
 
@@ -93,19 +99,35 @@ async function runAnalysis(asset: { id: string; studio_id: string; storage_path:
 
   const model = env("GEMINI_MODEL");
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: [
-        {
-          role: "user",
-          parts: [{ fileData: { fileUri: file.uri, mimeType }, videoMetadata: { fps: FPS } }, { text: CLIP_ANALYSIS_PROMPT }],
-        },
-      ],
-      config: { responseMimeType: "application/json", responseJsonSchema },
-    });
+    const generate = (responseJsonSchema: unknown) =>
+      ai.models.generateContent({
+        model,
+        contents: [
+          {
+            role: "user",
+            parts: [{ fileData: { fileUri: file.uri, mimeType }, videoMetadata: { fps: FPS } }, { text: CLIP_ANALYSIS_PROMPT }],
+          },
+        ],
+        config: { responseMimeType: "application/json", responseJsonSchema },
+      });
+    let response: Awaited<ReturnType<typeof generate>> | undefined;
+    for (const [i, schema] of RESPONSE_SCHEMAS.entries()) {
+      try {
+        response = await generate(schema);
+        break;
+      } catch (error) {
+        const status = (error as { status?: number }).status;
+        if (status !== 400 || i === RESPONSE_SCHEMAS.length - 1) throw error;
+        console.warn("gemini rejected the analysis schema, retrying with a simpler one", i, error instanceof Error ? error.message : error);
+      }
+    }
+    if (!response) throw new Error("Gemini gave no response");
     await logCost(asset.studio_id, model, response.usageMetadata as Record<string, number | undefined> | undefined);
 
-    const analysis = clipAnalysisSchema.parse(JSON.parse(response.text ?? ""));
+    const raw = JSON.parse(response.text ?? "") as { words?: unknown };
+    // Words are a bonus for subtitles: keep only a clean, bounded list.
+    const words = wordsSchema.safeParse(raw.words);
+    const analysis = clipAnalysisSchema.parse({ ...raw, words: words.success ? words.data.slice(0, 400) : undefined });
     const insert = await db
       .from("clip_analyses")
       .insert({ studio_id: asset.studio_id, media_id: asset.id, analysis, model });
