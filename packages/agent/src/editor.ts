@@ -1,6 +1,17 @@
 import { z } from "zod";
 import { renderDuration } from "./render.ts";
-import { editPlanObjectSchema, editPlanSchema, motionTemplateSchema, type EditPlan } from "./schemas.ts";
+import {
+  editPlanObjectSchema,
+  editPlanSceneSegmentSchema,
+  editPlanSchema,
+  editPlanSegmentSchema,
+  isClipSegment,
+  isMotionSegment,
+  motionTemplateSchema,
+  sceneSchema,
+  type EditPlan,
+  type PlanSegment,
+} from "./schemas.ts";
 
 // Fauve's editor: one dedicated Opus call (high effort, structured output) that
 // turns clip analyses + the studio's brand into an edit plan for the motion
@@ -24,14 +35,30 @@ Règles de montage :
 - Transitions : « fade » pour doux et chic, « cut » pour dynamique. « zoom » « light » sur les plans calmes (ou « light_zoom » partout en doux).
 - Sous-titres mot à mot (« subtitles ») seulement si quelqu'un parle et que c'est utile (prof qui explique, témoignage).
 - Jamais de musique (« music » vaut null) ; pas d'images (« images » vide).
+
+Scènes de motion design (sans vidéo, aux couleurs du studio) :
+- « motion » : une scène libre, sur mesure, que ton motion designer animera en code (typographie cinétique, formes, tracés, masques…). Dans « brief », décris précisément l'idée visuelle, les textes exacts, l'ordre des mouvements, les couleurs et l'ambiance. Donne aussi « fallback », une scène fixe équivalente au cas où. C'est ton outil principal pour une ouverture marquante, une offre, un planning, un témoignage mis en scène, une transition graphique, ou une vidéo sans clips.
+- « scene » : gabarit fixe et rapide (title, list, quote, number), si une scène libre n'apporte rien.
+- 1,5 à 6 s par scène. Avec des clips : 1 à 3 scènes au plus. Sans clips : un Reel entièrement en motion design, de 3 à 5 scènes qui s'enchaînent.
+
+Polices : « fonts » (display pour l'accroche et les titres, body pour le reste), uniquement des polices Google Fonts au nom exact, si la gérante en demande ou si la charte en a. Sinon laisse « fonts » vide : le gabarit choisit.
 - « duration » est la somme des durées de plans, moins 0,35 s par fondu enchaîné.
 
 Correction : si un plan précédent et une demande de changement sont fournis, pars du plan précédent et applique exactement ce qui est demandé, sans changer le reste.
 
 « rationale » : une seule phrase pour la gérante, en français, tutoiement, qui explique ton choix principal (ex. « J'ouvre sur la planche, c'est le moment le plus intense, puis je ralentis sur la respiration. »).`;
 
+/** Motion segment as the editor writes it: a brief and a fallback, the code comes later. */
+const editorMotionSegmentSchema = z.object({
+  motion: z.object({ brief: z.string().min(1).max(800), fallback: sceneSchema }),
+  duration: z.number().min(1).max(8),
+});
+
 export const editorOutputSchema = z.object({
-  plan: editPlanObjectSchema.extend({ template: motionTemplateSchema }),
+  plan: editPlanObjectSchema.extend({
+    template: motionTemplateSchema,
+    segments: z.array(z.union([editPlanSegmentSchema, editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
+  }),
   rationale: z.string(),
 });
 export type EditorOutput = z.infer<typeof editorOutputSchema>;
@@ -43,13 +70,14 @@ const round = (n: number) => Math.round(n * 100) / 100;
  * duration that matches the timeline, texts inside it. Throws if nothing usable is left.
  */
 export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>): EditPlan {
-  const segments = plan.segments
-    .map((s) => {
-      const max = clipDurations[s.clip_id];
-      const out = round(max ? Math.min(s.out, max) : s.out);
-      return { ...s, in: round(Math.max(0, s.in)), out };
-    })
-    .filter((s) => s.clip_id in clipDurations && s.out - s.in >= 0.5);
+  const segments = plan.segments.flatMap((s): PlanSegment[] => {
+    if (isMotionSegment(s)) return [{ ...s, duration: round(Math.min(8, Math.max(1, s.duration))) }];
+    if (!isClipSegment(s)) return [{ ...s, duration: round(Math.min(6, Math.max(1, s.duration))) }];
+    const max = clipDurations[s.clip_id];
+    const out = round(max ? Math.min(s.out, max) : s.out);
+    const clip = { ...s, in: round(Math.max(0, s.in)), out };
+    return s.clip_id in clipDurations && clip.out - clip.in >= 0.5 ? [clip] : [];
+  });
   if (!segments.length) throw new Error("Le plan de montage ne garde aucun plan utilisable");
 
   const draft = { ...plan, segments, images: [], music: null };

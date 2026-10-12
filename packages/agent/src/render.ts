@@ -1,4 +1,4 @@
-import type { EditPlan } from "./schemas.ts";
+import { isClipSegment, type ClipSegment, type EditPlan } from "./schemas.ts";
 
 // Edit plan → ffmpeg command. The model decides (the plan), this file executes:
 // deterministic, testable, no model in the loop. Texts are drawn with libass
@@ -35,7 +35,7 @@ const even = (n: number) => Math.round(n / 2) * 2;
 const FADE = 0.35; // crossfade length (transitions: "fade")
 const KEN_BURNS = 0.08; // slow push-in over a segment: 100 % → 108 %
 
-const segmentLength = (s: EditPlan["segments"][number]) => round(s.out - s.in);
+const segmentLength = (s: EditPlan["segments"][number]) => round(isClipSegment(s) ? s.out - s.in : s.duration);
 
 /** Crossfades need every segment to outlast the fade; otherwise the plan falls back to cuts. */
 function usesFades(plan: EditPlan): boolean {
@@ -120,6 +120,8 @@ export function buildAss(plan: EditPlan, accent = DEFAULT_ACCENT): string {
  * with cuts or crossfades, burn the animated texts, add a silent track.
  */
 export function buildFfmpegArgs(plan: EditPlan, options: RenderOptions): string[] {
+  if (!plan.segments.every(isClipSegment)) throw new Error("The ffmpeg engine renders clips only: remove scenes first (withoutScenes)");
+  const clips = plan.segments as ClipSegment[];
   const { w, h } = SIZES[plan.format];
   const total = renderDuration(plan);
   const ass = options.assFile ?? "texts.ass";
@@ -127,7 +129,7 @@ export function buildFfmpegArgs(plan: EditPlan, options: RenderOptions): string[
   const output = options.output ?? "out.mp4";
 
   const args = ["-hide_banner", "-loglevel", "error", "-y"];
-  plan.segments.forEach((s) => {
+  clips.forEach((s) => {
     const file = options.clipFiles[s.clip_id];
     if (!file) throw new Error(`No file for clip ${s.clip_id}`);
     args.push("-ss", String(round(s.in)), "-t", String(round(s.out - s.in)), "-i", file);
@@ -135,8 +137,8 @@ export function buildFfmpegArgs(plan: EditPlan, options: RenderOptions): string[
   const audioInput = plan.segments.length;
   args.push("-f", "lavfi", "-t", String(total), "-i", "anullsrc=r=48000:cl=stereo");
 
-  const kenBurns = (s: EditPlan["segments"][number]) => s.zoom === "light" || plan.transitions === "light_zoom";
-  const filters = plan.segments.map((s, i) => {
+  const kenBurns = (s: ClipSegment) => s.zoom === "light" || plan.transitions === "light_zoom";
+  const filters = clips.map((s, i) => {
     const frame = `[${i}:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1,fps=${FPS},setpts=PTS-STARTPTS`;
     // fps again at the end: xfade needs a constant frame rate, which per-frame scaling drops.
     // Slow push-in (Ken Burns): the frame grows a little every frame, the centre stays put.

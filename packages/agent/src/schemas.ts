@@ -36,6 +36,35 @@ export const editPlanSegmentSchema = z.object({
   zoom: z.enum(["none", "light"]).default("none"),
 });
 
+/** Full motion-design screen (animated typography in the studio's colours, no video). */
+export const sceneSchema = z.object({
+  kind: z.enum(["title", "list", "quote", "number"]),
+  title: z.string().min(1).max(60).describe("title : le titre ; list : l'intitulé ; quote : la citation ; number : le chiffre ou l'offre, ex. « -50 % », « 3 places »"),
+  kicker: z.string().max(40).optional().describe("Petit texte au-dessus (title, number) ou auteur de la citation (quote)"),
+  items: z.array(z.string().min(1).max(40)).max(5).optional().describe("Lignes de la liste (list), ex. « Lun 18h · Reformer »"),
+  background: z.enum(["accent", "ink", "cream"]).describe("accent : couleur du studio ; ink : sombre ; cream : clair"),
+});
+export type Scene = z.infer<typeof sceneSchema>;
+
+export const editPlanSceneSegmentSchema = z.object({
+  scene: sceneSchema,
+  duration: z.number().min(1).max(6),
+});
+
+/** Free motion-design scene: the editor writes the brief, the motion designer (Opus) writes the code. */
+export const editPlanMotionSegmentSchema = z.object({
+  motion: z.object({
+    brief: z.string().min(1).max(800).describe("Ce que la scène montre et comment elle s'anime, textes exacts compris"),
+    /** TSX of `function Scene(props)`, written by the motion designer. */
+    code: z.string().max(24000).optional(),
+    /** The same, transpiled to plain JS for the renderer. */
+    js: z.string().max(40000).optional(),
+    /** Fixed scene used if the generated code cannot run. */
+    fallback: sceneSchema.optional(),
+  }),
+  duration: z.number().min(1).max(8),
+});
+
 export const editPlanTextSchema = z.object({
   text: z.string().min(1).max(120),
   from: z.number().min(0),
@@ -62,19 +91,23 @@ export const editPlanObjectSchema = z.object({
   format: z.enum(["9:16", "1:1", "4:5"]),
   duration: z.number().min(3).max(90),
   template: z.string().min(1),
-  segments: z.array(editPlanSegmentSchema).min(1),
+  segments: z.array(z.union([editPlanSegmentSchema, editPlanSceneSegmentSchema, editPlanMotionSegmentSchema])).min(1),
   texts: z.array(editPlanTextSchema),
   images: z.array(editPlanImageSchema),
   transitions: z.enum(["cut", "fade", "light_zoom"]),
   subtitles: z.boolean(),
   music: z.null(),
+  /** Google Fonts families: display for hooks and titles, body for the rest (default: template or brand fonts). */
+  fonts: z
+    .object({ display: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).optional(), body: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).optional() })
+    .optional(),
   /** Closing card over the last ~1.6 s: studio name or logo, plus a call to action. */
   end_card: z.object({ title: z.string().min(1).max(40), subtitle: z.string().max(60).optional() }).optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {
   plan.segments.forEach((s, i) => {
-    if (s.out <= s.in) {
+    if ("clip_id" in s && s.out <= s.in) {
       ctx.addIssue({ code: "custom", path: ["segments", i, "out"], message: "out must be after in" });
     }
   });
@@ -87,6 +120,18 @@ export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {
   }
 });
 export type EditPlan = z.infer<typeof editPlanSchema>;
+export type ClipSegment = z.infer<typeof editPlanSegmentSchema>;
+export type PlanSegment = EditPlan["segments"][number];
+
+export const isClipSegment = (s: PlanSegment): s is ClipSegment => "clip_id" in s;
+export type MotionSegment = z.infer<typeof editPlanMotionSegmentSchema>;
+export const isMotionSegment = (s: PlanSegment): s is MotionSegment => "motion" in s;
+export const segmentSeconds = (s: PlanSegment) => (isClipSegment(s) ? s.out - s.in : s.duration);
+
+/** The plan with its motion-design scenes removed (what the ffmpeg engine can render). */
+export function withoutScenes(plan: EditPlan): EditPlan {
+  return { ...plan, segments: plan.segments.filter(isClipSegment) };
+}
 
 // ---------------------------------------------------------------------------
 // Clip analysis returned by the video model (Gemini).
