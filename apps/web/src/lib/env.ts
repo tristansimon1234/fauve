@@ -12,6 +12,8 @@ const schema = {
   WHATSAPP_APP_SECRET: z.string().min(1),
   WHATSAPP_VERIFY_TOKEN: z.string().min(1),
   WHATSAPP_GRAPH_VERSION: z.string().default("v26.0"),
+  // WhatsApp Business Account that owns Fauve's number (for setup/diagnostics).
+  WHATSAPP_WABA_ID: z.string().regex(/^\d+$/),
   // Supabase Auth → Send SMS hook secret ("v1,whsec_…"); several may be joined with "|".
   SEND_SMS_HOOK_SECRET: z.string().min(1),
   APP_URL: z.url().default("http://localhost:3000"),

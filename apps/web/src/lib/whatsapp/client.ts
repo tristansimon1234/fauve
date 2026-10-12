@@ -3,7 +3,7 @@ import { env } from "@/lib/env";
 
 // Thin wrapper over the WhatsApp Cloud API (Graph). Fauve sends from a single number.
 
-class WhatsAppError extends Error {
+export class WhatsAppError extends Error {
   constructor(
     message: string,
     readonly status: number,
@@ -13,7 +13,7 @@ class WhatsAppError extends Error {
   }
 }
 
-async function graph<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function graph<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`https://graph.facebook.com/${env("WHATSAPP_GRAPH_VERSION")}/${path}`, {
     ...init,
     headers: {
