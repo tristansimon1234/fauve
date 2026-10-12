@@ -143,5 +143,6 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     phone_e164: phone,
     type: "text",
     body: result.reply,
+    payload: { reply_to: message.id },
   });
 }

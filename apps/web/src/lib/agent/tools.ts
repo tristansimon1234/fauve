@@ -88,7 +88,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       try {
         return json(await readWebsite(url));
       } catch (error) {
-        if (error instanceof WebsiteError) return json({ error: error.message });
+        if (error instanceof WebsiteError) {
+          console.warn("read_website failed", url, error.message);
+          return json({ error: error.message });
+        }
         throw error;
       }
     },

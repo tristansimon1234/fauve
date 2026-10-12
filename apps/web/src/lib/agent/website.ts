@@ -1,34 +1,8 @@
 import "server-only";
 import { lookup } from "node:dns/promises";
-import { BlockList, isIP } from "node:net";
+import { isIP } from "node:net";
+import { isPublicAddress } from "@fauve/agent/network";
 import { extractBrandStyle, extractSiteInfo, stylesheetLinks, type BrandStyle, type SiteInfo } from "@fauve/agent";
-
-// The URL comes from a WhatsApp message: only public web pages, never our own network.
-const blocked = new BlockList();
-for (const [net, prefix] of [
-  ["0.0.0.0", 8],
-  ["10.0.0.0", 8],
-  ["100.64.0.0", 10],
-  ["127.0.0.0", 8],
-  ["169.254.0.0", 16],
-  ["172.16.0.0", 12],
-  ["192.0.0.0", 24],
-  ["192.168.0.0", 16],
-  ["198.18.0.0", 15],
-  ["224.0.0.0", 3],
-] as const) {
-  blocked.addSubnet(net, prefix, "ipv4");
-}
-for (const [net, prefix] of [
-  ["::", 127],
-  ["::ffff:0:0", 96], // IPv4-mapped: checked as IPv4 below
-  ["64:ff9b::", 96],
-  ["fc00::", 7],
-  ["fe80::", 10],
-  ["ff00::", 8],
-] as const) {
-  blocked.addSubnet(net, prefix, "ipv6");
-}
 
 const MAX_BYTES = 2_000_000;
 const MAX_REDIRECTS = 4;
@@ -53,13 +27,8 @@ async function assertPublicHost(hostname: string): Promise<void> {
   const host = hostname.replace(/^\[|\]$/g, "");
   const addresses = isIP(host) ? [{ address: host, family: isIP(host) }] : await lookup(host, { all: true }).catch(() => []);
   if (!addresses.length) throw new WebsiteError("Site introuvable");
-  for (const { address, family } of addresses) {
-    const mapped = family === 6 ? address.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i)?.[1] : undefined;
-    const isBlocked = mapped
-      ? blocked.check(mapped, "ipv4")
-      : blocked.check(address, family === 6 ? "ipv6" : "ipv4");
-    if (isBlocked) throw new WebsiteError("Adresse non autorisée");
-  }
+  // The URL comes from a WhatsApp message: only public web pages, never our own network.
+  if (!addresses.every(({ address }) => isPublicAddress(address))) throw new WebsiteError("Adresse non autorisée");
 }
 
 async function readCapped(res: Response): Promise<string> {

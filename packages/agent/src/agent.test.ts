@@ -100,3 +100,22 @@ test("website: extracts brand colours and fonts", async () => {
   assert.ok(style.neutrals.includes("#ffffff"));
   assert.deepEqual(style.fonts.slice(0, 2), ["Plus Jakarta Sans", "Instrument Serif"]);
 });
+
+test("history: a reply goes right after the message it answers", async () => {
+  const { orderReplies } = await import("./history.ts");
+  const row = (direction: "inbound" | "outbound", id: string, reply_to?: string) => ({ direction, wa_message_id: id, reply_to });
+  // "Alors pour les postes" (B) arrived while Fauve was answering A.
+  const raced = [row("inbound", "A"), row("inbound", "B"), row("outbound", "R", "A")];
+  assert.deepEqual(orderReplies(raced).map((r) => r.wa_message_id), ["A", "R", "B"]);
+  // Normal back-and-forth is untouched, and replies without reply_to keep their place.
+  const normal = [row("inbound", "A"), row("outbound", "R", "A"), row("inbound", "B"), row("outbound", "S")];
+  assert.deepEqual(orderReplies(normal).map((r) => r.wa_message_id), ["A", "R", "B", "S"]);
+});
+
+test("network: only public addresses are fetched", async () => {
+  const { isPublicAddress } = await import("./network.ts");
+  for (const ip of ["8.8.8.8", "185.230.63.107", "2a00:1450:4007:80e::2004"]) assert.equal(isPublicAddress(ip), true, ip);
+  for (const ip of ["127.0.0.1", "10.1.2.3", "172.20.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "::", "fe80::1", "fd00::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1", "nope"]) {
+    assert.equal(isPublicAddress(ip), false, ip);
+  }
+});
