@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import {
   brandProfileSchema,
   buildAss,
+  buildReelProps,
+  clipAnalysisSchema,
+  motionTemplateSchema,
+  type ClipAnalysis,
   buildFfmpegArgs,
   canTransition,
   editPlanSchema,
@@ -11,7 +15,7 @@ import {
   type PostStatus,
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { renderInSandbox } from "./sandbox";
+import { renderInSandbox, renderReelInSandbox } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm" };
 
@@ -65,6 +69,7 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
   ).data!;
   const clipFiles: Record<string, string> = {};
   const clips: Record<string, string> = {};
+  const clipUrls: Record<string, string> = {};
   for (const [i, id] of clipIds.entries()) {
     const asset = assets.find((a) => a.id === id);
     if (!asset) throw new Error(`Clip ${id} introuvable dans la médiathèque du studio`);
@@ -72,30 +77,57 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
     const file = `clip${i}.${extensionByMime[asset.mime_type ?? ""] ?? "mp4"}`;
     clipFiles[id] = file;
     clips[file] = signed.signedUrl;
+    clipUrls[id] = signed.signedUrl;
   }
 
-  const brand = await db
-    .from("brand_profiles")
-    .select("profile")
-    .eq("studio_id", studioId)
-    .order("version", { ascending: false })
-    .limit(1);
-  const accent = brandProfileSchema.pick({ colors: true }).catch({}).parse(brand.data?.[0]?.profile ?? {}).colors?.[0];
+  const [brand, studio, analyses] = await Promise.all([
+    db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
+    db.from("studios").select("name").eq("id", studioId).single(),
+    db.from("clip_analyses").select("media_id, analysis").in("media_id", clipIds).order("created_at", { ascending: false }),
+  ]);
+  const style = brandProfileSchema
+    .pick({ colors: true, logo_url: true })
+    .catch({})
+    .parse(brand.data?.[0]?.profile ?? {});
+  const accent = style.colors?.[0];
+  const words: Record<string, ClipAnalysis["words"]> = {};
+  for (const row of analyses.data ?? []) {
+    const parsed = clipAnalysisSchema.safeParse(row.analysis);
+    if (parsed.success && !(row.media_id in words)) words[row.media_id as string] = parsed.data.words;
+  }
+  const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
   check(await db.from("renders").insert({ id: renderId, studio_id: studioId, edit_plan_id: planRow.id, status: "rendering" }));
 
   const started = Date.now();
   try {
-    const mp4 = await renderInSandbox({
-      id: renderId,
-      clips,
-      ass: buildAss(plan, accent),
-      ffmpegArgs: buildFfmpegArgs(plan, { clipFiles }),
-    });
+    const ffmpegRender = () =>
+      renderInSandbox({ id: renderId, clips, ass: buildAss(plan, accent), ffmpegArgs: buildFfmpegArgs(plan, { clipFiles }) });
+    let engine: "remotion" | "ffmpeg" = "ffmpeg";
+    let mp4: Buffer;
+    let durationMs = Math.round(renderDuration(plan) * 1000);
+    if (motion.success) {
+      // Motion templates (Remotion); the ffmpeg engine is the safety net.
+      const props = buildReelProps(plan, {
+        template: motion.data,
+        clipUrls,
+        words,
+        brand: { name: (studio.data?.name as string | null) ?? "", accent, logoUrl: style.logo_url ?? null },
+      });
+      try {
+        mp4 = await renderReelInSandbox({ id: renderId, props });
+        engine = "remotion";
+        durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
+      } catch (error) {
+        console.error("remotion render failed, falling back to ffmpeg", renderId, error);
+        mp4 = await ffmpegRender();
+      }
+    } else {
+      mp4 = await ffmpegRender();
+    }
     const storagePath = `${studioId}/renders/${renderId}.mp4`;
     check(await db.storage.from("media").upload(storagePath, mp4, { contentType: "video/mp4", upsert: true }));
-    const durationMs = Math.round(renderDuration(plan) * 1000);
     check(await db.from("renders").update({ status: "done", storage_path: storagePath, duration_ms: durationMs }).eq("id", renderId));
 
     let status = postStatusSchema.parse(post.status);
@@ -107,7 +139,7 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
       kind: "render",
       provider: "vercel_sandbox",
       units: Math.round((Date.now() - started) / 1000),
-      meta: { render_id: renderId, seconds_of_video: durationMs / 1000, bytes: mp4.length },
+      meta: { render_id: renderId, engine, template: plan.template, seconds_of_video: durationMs / 1000, bytes: mp4.length },
     });
 
     const url = check(await db.storage.from("media").createSignedUrl(storagePath, 24 * 3600)).data!.signedUrl;

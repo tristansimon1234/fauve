@@ -18,7 +18,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createToolHandlers, type ToolContext } from "./tools";
 
 let client: Anthropic | undefined;
-function anthropic() {
+export function anthropic() {
   client ??= new Anthropic({ apiKey: env("ANTHROPIC_API_KEY") });
   return client;
 }
@@ -103,7 +103,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   return { reply: reply || null, reactions: input.reactions, usage, afterReply: input.afterReply };
 }
 
-async function logClaudeCost(studioId: string, usage: TokenUsage) {
+export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose = "conversation") {
   const usd = claudeCostUsd(CLAUDE_MODEL, usage);
   const { error } = await supabaseAdmin()
     .from("cost_events")
@@ -113,7 +113,7 @@ async function logClaudeCost(studioId: string, usage: TokenUsage) {
       provider: "anthropic",
       units: usage.input_tokens + usage.output_tokens,
       cost_eur: usdToEur(usd, env("USD_TO_EUR")),
-      meta: { model: CLAUDE_MODEL, usage, cost_usd: usd },
+      meta: { model: CLAUDE_MODEL, purpose, usage, cost_usd: usd },
     });
   if (error) console.error("cost_events insert failed", error.message);
 }

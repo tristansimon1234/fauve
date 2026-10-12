@@ -19,3 +19,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # Motion templates (apps/render, outside the workspaces): typed, and packed for the sandbox.
+      - run: npm ci --prefix apps/render --no-audit --no-fund
+      - run: npx --prefix apps/render tsc -p apps/render
+      - run: node scripts/pack-render.mjs --check

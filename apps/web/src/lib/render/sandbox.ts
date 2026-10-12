@@ -1,6 +1,7 @@
 import "server-only";
 import { Sandbox } from "@vercel/sandbox";
-import { RENDER_FONTS } from "@fauve/agent";
+import { RENDER_FONTS, type ReelProps } from "@fauve/agent";
+import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
 
 // The render worker: a persistent Vercel Sandbox (Firecracker microVM) holding a
 // static ffmpeg build and the fonts. Nothing heavy runs in the Vercel function
@@ -70,6 +71,69 @@ export async function renderInSandbox(job: SandboxRenderJob): Promise<Buffer> {
       ),
     );
     await bash(sandbox, `cd "$1" && shift && exec ${ROOT}/ffmpeg "$@"`, [dir, ...job.ffmpegArgs]);
+    const mp4 = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
+    if (!mp4?.length) throw new Error("render produced no file");
+    return mp4;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Remotion templates (apps/render): installed once per source version, bundled
+// ahead of time, then each render only loads the bundle with new props.
+// ---------------------------------------------------------------------------
+
+const REMOTION = `${ROOT}/remotion`;
+
+// Chrome headless shell dependencies on the Ubuntu image (names differ across releases).
+const CHROME_DEPS = [
+  "libnss3", "libdbus-1-3", "libatk1.0-0t64", "libatk1.0-0", "libgbm1", "libasound2t64", "libasound2", "libxrandr2",
+  "libxkbcommon0", "libxfixes3", "libxcomposite1", "libxdamage1", "libatk-bridge2.0-0t64", "libatk-bridge2.0-0",
+  "libpango-1.0-0", "libcairo2", "libcups2t64", "libcups2", "fonts-noto-color-emoji",
+];
+
+let remotionReady: Promise<Sandbox> | undefined;
+
+async function prepareRemotion(): Promise<Sandbox> {
+  const sandbox = await renderSandbox();
+  const current = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cat ${REMOTION}/.hash 2>/dev/null || true`] });
+  if ((await current.stdout()).trim() === REMOTION_SOURCE_HASH) return sandbox;
+
+  await bash(
+    sandbox,
+    `[ -f ${ROOT}/.chrome-deps ] || { sudo apt-get update -qq >/dev/null 2>&1; for p in ${CHROME_DEPS.join(" ")}; do sudo apt-get install -y -qq --no-install-recommends "$p" >/dev/null 2>&1 || true; done; touch ${ROOT}/.chrome-deps; }`,
+  );
+  await bash(sandbox, `mkdir -p ${REMOTION} && find ${REMOTION} -maxdepth 1 -mindepth 1 ! -name node_modules -exec rm -rf {} +`);
+  await sandbox.writeFiles(Object.entries(REMOTION_SOURCE_FILES).map(([path, content]) => ({ path: `${REMOTION}/${path}`, content })));
+  await bash(
+    sandbox,
+    `cd ${REMOTION} && npm ci --no-audit --no-fund --loglevel=error && npx remotion browser ensure >/dev/null && npx remotion bundle src/index.ts --out-dir build --log=error && echo ${REMOTION_SOURCE_HASH} > .hash`,
+  );
+  return sandbox;
+}
+
+/** Installs or updates the Remotion templates in the sandbox (idempotent; slow only the first time). */
+export function remotionSandbox(): Promise<Sandbox> {
+  remotionReady ??= prepareRemotion().catch((error: unknown) => {
+    remotionReady = undefined;
+    throw error;
+  });
+  return remotionReady;
+}
+
+/** Renders the Reel composition with the given props and returns the MP4 bytes. */
+export async function renderReelInSandbox(job: { id: string; props: ReelProps }): Promise<Buffer> {
+  const sandbox = await remotionSandbox();
+  const dir = `${ROOT}/jobs/${job.id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(job.props) }]);
+    await bash(
+      sandbox,
+      `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=4 --codec=h264 --crf=19 --pixel-format=yuv420p --enforce-audio-track --log=error`,
+      [dir],
+    );
     const mp4 = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
     if (!mp4?.length) throw new Error("render produced no file");
     return mp4;

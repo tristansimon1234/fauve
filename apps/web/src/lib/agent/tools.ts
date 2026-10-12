@@ -13,6 +13,7 @@ import { renderPost } from "@/lib/render/render-post";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { designEdit } from "./editor";
 import { readWebsite, WebsiteError } from "./website";
 
 export type ToolContext = {
@@ -182,6 +183,23 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         ),
       );
       return json({ clips: results });
+    },
+
+    async design_edit({ post_id, media_ids, brief }) {
+      try {
+        const edit = await designEdit({ studioId, postId: post_id, mediaIds: media_ids, brief });
+        return json({
+          edit_plan_id: edit.editPlanId,
+          version: edit.version,
+          template: edit.plan.template,
+          duration_s: edit.plan.duration,
+          texts: edit.plan.texts.map((t) => t.text),
+          rationale: edit.rationale,
+          next: "Lance render pour fabriquer la vidéo.",
+        });
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : String(error) });
+      }
     },
 
     async create_edit_plan({ post_id, plan }) {
