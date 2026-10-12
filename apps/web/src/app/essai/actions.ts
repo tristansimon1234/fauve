@@ -39,6 +39,7 @@ export async function sendTestMessage(key: string, text: string): Promise<SendRe
         body: result.reply,
       });
     }
+    for (const job of result.afterReply) await job().catch((e) => console.error("test chat: after-reply job failed", e));
   } catch (error) {
     console.error("test chat: agent failed", error);
     return { ok: false, error: error instanceof Error ? error.message : "Erreur inconnue" };

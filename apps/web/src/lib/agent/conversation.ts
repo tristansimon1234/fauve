@@ -29,7 +29,7 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
   const history: Anthropic.Beta.BetaMessageParam[] = [];
   for (const row of rows) {
     const role = row.direction === "inbound" ? "user" : "assistant";
-    const label = mediaLabels[row.type];
+    const label = row.direction === "inbound" ? mediaLabels[row.type] : undefined;
     const text = [label && `[${label}${row.media_id ? ` · media_id ${row.media_id}` : ""}]`, row.body]
       .filter(Boolean)
       .join(" ");
@@ -73,7 +73,7 @@ export async function replyInConversation(params: {
   const history = toModelHistory(orderReplies(stored));
   // Every message has already been answered (e.g. a retried delivery): nothing to say.
   if (history.at(-1)?.role !== "user") {
-    return { reply: null, reactions: [], usage: { input_tokens: 0, output_tokens: 0 } };
+    return { reply: null, reactions: [], usage: { input_tokens: 0, output_tokens: 0 }, afterReply: [] };
   }
 
   return runFauve({
@@ -82,6 +82,7 @@ export async function replyInConversation(params: {
     waId: params.waId,
     replyToMessageId: params.replyToMessageId,
     reactions: [],
+    afterReply: [],
     history,
     studio: {
       name: studio.data.name,

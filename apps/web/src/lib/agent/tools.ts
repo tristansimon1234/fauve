@@ -8,7 +8,8 @@ import {
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { sendReaction } from "@/lib/whatsapp/client";
+import { sendReaction, sendText, sendVideo } from "@/lib/whatsapp/client";
+import { renderPost } from "@/lib/render/render-post";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { readWebsite, WebsiteError } from "./website";
 
@@ -20,6 +21,8 @@ export type ToolContext = {
   replyToMessageId?: string;
   /** Filled by react_to_message so the caller knows an emoji was sent. */
   reactions: string[];
+  /** Jobs the caller runs after sending the reply (render, then deliver the video). */
+  afterReply: (() => Promise<void>)[];
 };
 
 const json = (value: unknown) => JSON.stringify(value);
@@ -200,6 +203,19 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({ version });
     },
 
+    async render({ post_id }) {
+      // Ownership check now, so the model gets an immediate error for a wrong id.
+      const post = unwrap(
+        await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single(),
+      );
+      if (!post.edit_plan_id) return json({ error: "Cette publication n'a pas encore de plan de montage (create_edit_plan)." });
+      ctx.afterReply.push(() => renderAndDeliver(ctx, post_id));
+      return json({
+        status: "started",
+        note: "Le montage démarre après ta réponse et la vidéo sera envoyée automatiquement (environ une minute). Annonce-le en une phrase, sans décrire la vidéo comme si elle était déjà prête.",
+      });
+    },
+
     async react_to_message({ emoji }) {
       if (!ctx.waId || !ctx.replyToMessageId) return "Pas de message WhatsApp auquel réagir.";
       await sendReaction(ctx.waId, ctx.replyToMessageId, emoji);
@@ -207,4 +223,42 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return "ok";
     },
   };
+}
+
+/** Renders the post and sends the video to the manager (WhatsApp) or into the web test chat. */
+async function renderAndDeliver(ctx: ToolContext, postId: string): Promise<void> {
+  const db = supabaseAdmin();
+  const store = (fields: { wa_message_id?: string; type: string; body: string; payload?: Record<string, unknown> }) =>
+    db.from("whatsapp_messages").insert({
+      studio_id: ctx.studioId,
+      channel: ctx.waId ? "whatsapp" : "web",
+      direction: "outbound",
+      phone_e164: ctx.waId ? `+${ctx.waId}` : null,
+      ...fields,
+      payload: { reply_to: ctx.replyToMessageId, ...fields.payload },
+    });
+
+  try {
+    const r = await renderPost(ctx.studioId, postId);
+    const seconds = Math.round(r.durationMs / 100) / 10;
+    const hashtags = r.hashtags.map((h) => `#${h}`).join(" ");
+    const caption = [
+      `Ton montage « ${r.title} » (${seconds} s).`,
+      r.caption ? `Légende :\n${r.caption}${hashtags ? `\n${hashtags}` : ""}` : null,
+      "Réponds « ok » pour le valider, ou dis-moi ce que tu veux changer.",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    if (ctx.waId) {
+      const id = await sendVideo(ctx.waId, r.url, caption);
+      await store({ wa_message_id: id, type: "video", body: `[Vidéo envoyée : montage de « ${r.title} », ${seconds} s]\n${caption}`, payload: { render_id: r.renderId } });
+    } else {
+      await store({ type: "text", body: `${caption}\n\nVoir la vidéo : ${r.url}`, payload: { render_id: r.renderId } });
+    }
+  } catch (error) {
+    console.error("render failed", postId, error);
+    const text = "Le montage n’a pas abouti cette fois, je regarde ce qui coince. Tu veux que je réessaie ?";
+    const id = ctx.waId ? await sendText(ctx.waId, text).catch(() => undefined) : undefined;
+    await store({ wa_message_id: id, type: "text", body: text, payload: { render_error: String(error).slice(0, 500) } });
+  }
 }

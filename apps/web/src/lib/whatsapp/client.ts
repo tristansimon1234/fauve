@@ -49,6 +49,17 @@ export async function sendText(toWaId: string, body: string): Promise<string | u
   return res.messages[0]?.id;
 }
 
+/** Sends a video by link (WhatsApp downloads it; max 16 MB) with a caption (max 1024 chars). */
+export async function sendVideo(toWaId: string, link: string, caption?: string): Promise<string | undefined> {
+  const res = await sendMessage({
+    recipient_type: "individual",
+    to: toWaId,
+    type: "video",
+    video: { link, ...(caption ? { caption: caption.slice(0, 1024) } : {}) },
+  });
+  return res.messages[0]?.id;
+}
+
 export async function sendReaction(toWaId: string, messageId: string, emoji: string): Promise<void> {
   await sendMessage({
     recipient_type: "individual",

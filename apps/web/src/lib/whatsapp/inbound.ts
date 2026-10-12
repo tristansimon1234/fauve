@@ -147,15 +147,18 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     return;
   }
 
-  if (!result.reply) return;
-  const waMessageId = await sendText(message.from, result.reply);
-  await db.from("whatsapp_messages").insert({
-    studio_id: member.studio_id,
-    wa_message_id: waMessageId,
-    direction: "outbound",
-    phone_e164: phone,
-    type: "text",
-    body: result.reply,
-    payload: { reply_to: message.id },
-  });
+  if (result.reply) {
+    const waMessageId = await sendText(message.from, result.reply);
+    await db.from("whatsapp_messages").insert({
+      studio_id: member.studio_id,
+      wa_message_id: waMessageId,
+      direction: "outbound",
+      phone_e164: phone,
+      type: "text",
+      body: result.reply,
+      payload: { reply_to: message.id },
+    });
+  }
+  // E.g. a render: the video follows the "je monte ta vidéo" reply.
+  for (const job of result.afterReply) await job().catch((e) => console.error("after-reply job failed", e));
 }

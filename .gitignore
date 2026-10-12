@@ -7,3 +7,4 @@ node_modules/
 .turbo
 supabase/.temp/
 supabase/.branches/
+.claude/worktrees/

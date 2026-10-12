@@ -142,3 +142,26 @@ test("clip analysis: schema converts to JSON Schema and validates a Gemini answe
   assert.equal(clipAnalysisSchema.safeParse(answer).success, true);
   assert.equal(clipAnalysisSchema.safeParse({ ...answer, lighting: "great" }).success, false);
 });
+
+test("render: plan becomes ffmpeg args and a styled ASS file", async () => {
+  const { buildAss, buildFfmpegArgs, renderDuration } = await import("./render.ts");
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    segments: [
+      { clip_id: "a", in: 1.2, out: 3, zoom: "light" },
+      { clip_id: "b", in: 0, out: 4 },
+    ],
+    texts: [{ text: "6 h 45. {Le} studio\\se réveille.", from: 0, to: 2.5, style: "hook" }],
+  });
+  assert.equal(renderDuration(plan), 5.8);
+  const args = buildFfmpegArgs(plan, { clipFiles: { a: "clip0.mp4", b: "clip1.mov" } });
+  assert.deepEqual(args.slice(args.indexOf("-ss"), args.indexOf("-ss") + 6), ["-ss", "1.2", "-t", "1.8", "-i", "clip0.mp4"]);
+  const graph = args[args.indexOf("-filter_complex") + 1]!;
+  assert.match(graph, /\[0:v\]scale=1166:2074/); // light zoom
+  assert.match(graph, /concat=n=2:v=1:a=0\[vc\];\[vc\]ass=filename=texts\.ass:fontsdir=fonts\[vout\]/);
+  assert.throws(() => buildFfmpegArgs(plan, { clipFiles: { a: "clip0.mp4" } }), /No file for clip b/);
+  const ass = buildAss(plan, "#F2694E");
+  assert.match(ass, /PlayResY: 1920/);
+  assert.match(ass, /Style: band,Poppins ExtraBold,76,&H00FFFFFF,&H00FFFFFF,&H004E69F2/);
+  assert.match(ass, /Dialogue: 0,0:00:00\.00,0:00:02\.50,hook,,0,0,0,,6 h 45\. Le studio\/se réveille\./);
+});
