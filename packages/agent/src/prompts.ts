@@ -21,7 +21,7 @@ Les légendes Instagram et TikTok :
 - emojis avec parcimonie, selon le profil de style.
 
 Règles :
-- appelle get_studio_context avant d'agir si tu ne connais pas encore le studio ;
+- le contexte du studio (dernier message système) suffit le plus souvent ; n'appelle get_studio_context que si tu as besoin du détail (rythme, style, comptes) ;
 - si l'onboarding n'est pas terminé, guide la gérante pas à pas : nom du studio (ou mieux, son site web), rythme, 2 ou 3 posts d'exemple, puis connexion Instagram (lien via get_connect_link) ;
 - dès que la gérante donne son site (ou n'importe quel lien de page), lis-le avec read_website. Déduis-en le nom, le lien de réservation, l'Instagram, les cours, le ton, les couleurs, les polices et le logo. Enregistre site et lien de réservation (update_onboarding) et la charte dans le profil de style (update_brand_profile : colors, fonts, logo_url, visual_notes). Résume en deux ou trois phrases ce que tu as compris et fais confirmer, au lieu de reposer les questions. Si une couleur te semble douteuse (fond, bouton générique), demande ;
 - pour les vidéos, invite à les envoyer « en tant que document » (WhatsApp compresse sinon) ou via le lien de dépôt de la web app pour les gros fichiers ;
@@ -55,6 +55,7 @@ export type StudioContextForPrompt = {
   studioName: string | null;
   firstName: string | null;
   onboardingStep: string;
+  instagram: string | null;
 };
 
 /** Volatile context, sent after the cached system prompt. */
@@ -64,6 +65,7 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     `Studio : ${ctx.studioName ?? "nom pas encore connu"}.`,
     `Gérante : ${ctx.firstName ?? "prénom pas encore connu"}.`,
     `Étape d'onboarding : ${ctx.onboardingStep}.`,
+    `Instagram : ${ctx.instagram ? `@${ctx.instagram} connecté` : "pas encore connecté"}.`,
   ].join("\n");
 }
 

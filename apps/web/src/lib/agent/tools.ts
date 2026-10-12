@@ -182,7 +182,21 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           })),
         ),
       );
-      return json({ clips: results });
+      // The chat only needs the gist; the editor reads the full analyses itself.
+      return json({
+        clips: results.map((r) =>
+          "analysis" in r
+            ? {
+                media_id: r.media_id,
+                duration: r.analysis.duration,
+                summary: r.analysis.summary,
+                best_moments: r.analysis.best_moments,
+                faces_visible: r.analysis.shots.some((s) => s.faces_visible),
+                issues: r.analysis.issues,
+              }
+            : r,
+        ),
+      });
     },
 
     async montage({ post_id, media_ids, brief }) {
@@ -283,18 +297,18 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             id: m.id,
             date: m.timestamp,
             type: m.media_product_type ?? m.media_type,
-            caption: m.caption?.slice(0, 300),
+            caption: m.caption?.slice(0, 160),
             permalink: m.permalink,
             likes: m.like_count,
             comments_count: m.comments_count,
             // Insights cost one call each: the most recent posts are what the analysis needs.
-            insights: i < 8 ? await mediaInsights(m.id, account.accessToken).catch(() => null) : undefined,
+            insights: i < 6 ? await mediaInsights(m.id, account.accessToken).catch(() => null) : undefined,
             comments:
               comments_per_post && m.comments_count
                 ? (await mediaComments(m.id, account.accessToken, comments_per_post).catch(() => [])).map((c) => ({
                     id: c.id,
                     from: c.username,
-                    text: c.text,
+                    text: c.text?.slice(0, 200),
                     date: c.timestamp,
                     likes: c.like_count,
                     replies: c.replies?.data?.map((r) => ({ from: r.username, text: r.text })) ?? [],

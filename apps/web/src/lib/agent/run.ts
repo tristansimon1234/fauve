@@ -3,6 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   addUsage,
+  CHAT_EFFORT,
+  CHAT_MODEL,
   CLAUDE_MODEL,
   claudeCostUsd,
   FAUVE_SYSTEM_PROMPT,
@@ -38,7 +40,7 @@ function buildTools(handlers: ToolHandlers) {
 
 export type RunFauveInput = ToolContext & {
   history: Anthropic.Beta.BetaMessageParam[];
-  studio: { name: string | null; timezone: string; onboardingStep: string; firstName: string | null };
+  studio: { name: string | null; timezone: string; onboardingStep: string; firstName: string | null; instagram: string | null };
 };
 
 export type RunFauveResult = {
@@ -51,6 +53,16 @@ export type RunFauveResult = {
 
 const FALLBACK_REPLY = "Je n’ai pas réussi à traiter ta demande, je regarde ça et je reviens vers toi.";
 
+/** Cache breakpoint on the last history message, so the next turn starts from a cached prefix. */
+function withCacheBreakpoint(history: Anthropic.Beta.BetaMessageParam[]): Anthropic.Beta.BetaMessageParam[] {
+  const last = history.at(-1);
+  if (!last || typeof last.content !== "string") return history;
+  return [
+    ...history.slice(0, -1),
+    { ...last, content: [{ type: "text", text: last.content, cache_control: { type: "ephemeral" } }] },
+  ];
+}
+
 export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   const now = new Intl.DateTimeFormat("fr-FR", {
     dateStyle: "full",
@@ -59,28 +71,34 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   }).format(new Date());
 
   const runner = anthropic().beta.messages.toolRunner({
-    model: CLAUDE_MODEL,
+    model: CHAT_MODEL,
     max_tokens: 16000,
-    max_iterations: 12,
-    output_config: { effort: "medium" },
+    max_iterations: 8,
+    output_config: { effort: CHAT_EFFORT },
     // On a policy refusal the API retries on the fallback model it picks.
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
-    system: [
-      { type: "text", text: FAUVE_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+    // Stable prefix first (tools, system prompt, history), cached; the volatile
+    // studio context (date, step) goes last as a system message so it never
+    // invalidates the cached history.
+    system: [{ type: "text", text: FAUVE_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+    // Each step of the tool loop re-reads everything before it from the cache.
+    cache_control: { type: "ephemeral" },
+    tools: buildTools(createToolHandlers(input)),
+    messages: [
+      ...withCacheBreakpoint(input.history),
       {
-        type: "text",
-        text: studioContextPrompt({
+        role: "system",
+        content: studioContextPrompt({
           now,
           timezone: input.studio.timezone,
           studioName: input.studio.name,
           firstName: input.studio.firstName,
           onboardingStep: input.studio.onboardingStep,
+          instagram: input.studio.instagram,
         }),
       },
     ],
-    tools: buildTools(createToolHandlers(input)),
-    messages: input.history,
   });
 
   let usage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
@@ -90,7 +108,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     last = message;
   }
 
-  await logClaudeCost(input.studioId, usage);
+  await logClaudeCost(input.studioId, usage, "conversation", CHAT_MODEL);
 
   if (!last || last.stop_reason === "refusal") {
     return { reply: FALLBACK_REPLY, reactions: input.reactions, usage, afterReply: input.afterReply };
@@ -103,8 +121,8 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   return { reply: reply || null, reactions: input.reactions, usage, afterReply: input.afterReply };
 }
 
-export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose = "conversation") {
-  const usd = claudeCostUsd(CLAUDE_MODEL, usage);
+export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose = "conversation", model = CLAUDE_MODEL) {
+  const usd = claudeCostUsd(model, usage);
   const { error } = await supabaseAdmin()
     .from("cost_events")
     .insert({
@@ -113,7 +131,7 @@ export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose
       provider: "anthropic",
       units: usage.input_tokens + usage.output_tokens,
       cost_eur: usdToEur(usd, env("USD_TO_EUR")),
-      meta: { model: CLAUDE_MODEL, purpose, usage, cost_usd: usd },
+      meta: { model, purpose, usage, cost_usd: usd },
     });
   if (error) console.error("cost_events insert failed", error.message);
 }
