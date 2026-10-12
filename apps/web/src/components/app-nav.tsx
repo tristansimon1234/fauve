@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarIcon, ChartIcon, ChatIcon, FolderIcon, ImageIcon, SlidersIcon } from "./icons";
+import { CalendarIcon, ChartIcon, ChatIcon, FolderIcon, ImageIcon, PaletteIcon, SlidersIcon } from "./icons";
 
 const nav = [
   { href: "/fauve", label: "Fauve", icon: ChatIcon },
@@ -10,11 +10,13 @@ const nav = [
   { href: "/publications", label: "Publications", icon: ImageIcon },
   { href: "/mediatheque", label: "Médiathèque", icon: FolderIcon },
   { href: "/resultats", label: "Résultats", icon: ChartIcon },
+  { href: "/style", label: "Style", icon: PaletteIcon },
   { href: "/reglages", label: "Réglages", icon: SlidersIcon },
 ] as const;
 
-// Shown in the bottom bar on phones.
-const mobileNav = nav.filter((item) => item.href !== "/mediatheque" && item.href !== "/reglages");
+// Shown in the bottom bar on phones. Réglages opens from the header avatar and links to Style.
+const mobileOnly = new Set<string>(["/fauve", "/calendrier", "/publications", "/resultats"]);
+const mobileNav = nav.filter((item) => mobileOnly.has(item.href));
 
 type Variant = "sidebar" | "bar";
 
