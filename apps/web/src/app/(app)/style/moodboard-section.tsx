@@ -96,7 +96,7 @@ export function MoodboardSection({
       setState(
         result.warning
           ? { status: "error", message: result.warning }
-          : { status: "ok", message: submitted.length ? `Moodboard lu et enregistré (version ${result.version}).` : "Moodboard retiré." },
+          : { status: "ok", message: submitted.length ? "Moodboard lu et enregistré." : "Moodboard retiré." },
       );
     } catch {
       setState({ status: "error", message: "L’enregistrement a échoué. Vérifie ta connexion et réessaie." });
@@ -169,23 +169,25 @@ export function MoodboardSection({
         )}
       </ul>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => read()} disabled={busy || !dirty} className="btn btn-primary disabled:opacity-50">
-          {state.status === "reading" ? "Fauve regarde tes images…" : items.length || !dirty ? "Faire lire à Fauve" : "Enregistrer"}
-        </button>
-        <p
-          role={state.status === "error" ? "alert" : "status"}
-          className={`min-w-0 flex-1 text-sm font-semibold ${state.status === "error" ? "text-danger" : state.status === "ok" ? "text-success" : "text-muted"}`}
-        >
-          {"message" in state
-            ? state.message
-            : state.status === "reading"
-              ? "Ça prend jusqu’à une minute."
-              : dirty
-                ? "Moodboard modifié : fais-le lire à Fauve pour qu’elle l’applique."
-                : ""}
-        </p>
-      </div>
+      {(items.length > 0 || dirty || "message" in state) && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={() => read()} disabled={busy || !dirty} className="btn btn-primary disabled:opacity-50">
+            {state.status === "reading" ? "Fauve regarde tes images…" : items.length || !dirty ? "Faire lire à Fauve" : "Enregistrer"}
+          </button>
+          <p
+            role={state.status === "error" ? "alert" : "status"}
+            className={`min-w-0 flex-1 text-sm font-semibold ${state.status === "error" ? "text-danger" : state.status === "ok" ? "text-success" : "text-muted"}`}
+          >
+            {"message" in state
+              ? state.message
+              : state.status === "reading"
+                ? "Ça prend jusqu’à une minute."
+                : dirty
+                  ? "Moodboard modifié : fais-le lire à Fauve pour qu’elle l’applique."
+                  : ""}
+          </p>
+        </div>
+      )}
 
       {reading && (
         <div className="flex flex-col gap-3 rounded-[16px] bg-soft p-4 sm:p-5">
