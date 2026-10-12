@@ -188,8 +188,17 @@ export const brandProfileSchema = z.object({
     .max(6)
     .optional()
     .describe("Couleurs de la charte, la principale en premier (ex. tirées du site web)"),
-  fonts: z.array(z.string().max(60)).max(3).optional().describe("Polices de la charte, la principale en premier"),
+  fonts: z.array(z.string().max(60)).max(3).optional().describe("Polices de la charte (Google Fonts) : titres d'abord, puis texte"),
   logo_url: z.url().optional(),
+  /** Logo uploaded in the web app (path in the private media bucket); wins over logo_url. */
+  logo_path: z.string().max(300).optional(),
+  /** Free-text art direction written by the manager, followed by the editor and the motion designer. */
+  art_direction: z
+    .string()
+    .max(1500)
+    .optional()
+    .describe("Direction artistique libre : ambiance, couleurs, typographie, rythme, ce qu'on aime et ce qu'on évite"),
+  default_template: motionTemplateSchema.optional().describe("Gabarit de montage préféré du studio"),
   dos: z.array(z.string()),
   donts: z.array(z.string()),
 });

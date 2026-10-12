@@ -41,7 +41,9 @@ Scènes de motion design (sans vidéo, aux couleurs du studio) :
 - « scene » : gabarit fixe et rapide (title, list, quote, number), si une scène libre n'apporte rien.
 - 1,5 à 6 s par scène. Avec des clips : 1 à 3 scènes au plus. Sans clips : un Reel entièrement en motion design, de 3 à 5 scènes qui s'enchaînent.
 
-Polices : « fonts » (display pour l'accroche et les titres, body pour le reste), uniquement des polices Google Fonts au nom exact, si la gérante en demande ou si la charte en a. Sinon laisse « fonts » vide : le gabarit choisit.
+Direction artistique du studio (« brand ») : suis son « art_direction » (ambiance, couleurs, typographie, rythme) et utilise « default_template » sauf demande contraire. Ses polices et couleurs sont appliquées automatiquement.
+
+Polices : « fonts » (display pour l'accroche et les titres, body pour le reste), uniquement des polices Google Fonts au nom exact, et seulement si la demande en cours en réclame d'autres que celles de la charte. Sinon laisse « fonts » vide.
 - « duration » est la somme des durées de plans, moins 0,35 s par fondu enchaîné.
 
 Correction : si un plan précédent et une demande de changement sont fournis, pars du plan précédent et applique exactement ce qui est demandé, sans changer le reste.

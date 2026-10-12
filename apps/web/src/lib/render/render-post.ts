@@ -88,10 +88,14 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
     db.from("clip_analyses").select("media_id, analysis").in("media_id", clipIds).order("created_at", { ascending: false }),
   ]);
   const style = brandProfileSchema
-    .pick({ colors: true, logo_url: true, fonts: true })
+    .pick({ colors: true, logo_url: true, logo_path: true, fonts: true })
     .catch({})
     .parse(brand.data?.[0]?.profile ?? {});
   const accent = style.colors?.[0];
+  // An uploaded logo (private bucket) wins over one found on the website.
+  const logoUrl = style.logo_path?.startsWith(`${studioId}/`)
+    ? ((await db.storage.from("media").createSignedUrl(style.logo_path, 3600)).data?.signedUrl ?? style.logo_url ?? null)
+    : (style.logo_url ?? null);
   const words: Record<string, ClipAnalysis["words"]> = {};
   for (const row of analyses.data ?? []) {
     const parsed = clipAnalysisSchema.safeParse(row.analysis);
@@ -119,7 +123,7 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
         template: motion.data,
         clipUrls,
         words,
-        brand: { name: (studio.data?.name as string | null) ?? "", accent, logoUrl: style.logo_url ?? null, fonts: style.fonts },
+        brand: { name: (studio.data?.name as string | null) ?? "", accent, logoUrl, fonts: style.fonts },
       });
       try {
         mp4 = await renderReelInSandbox({ id: renderId, props });

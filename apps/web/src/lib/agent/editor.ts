@@ -54,7 +54,16 @@ export async function designEdit(params: {
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
   const input = {
     studio: { name: studio.data?.name, booking: Boolean(studio.data?.booking_url) },
-    brand: { tone: profile.tone, visual_notes: profile.visual_notes, colors: profile.colors, dos: profile.dos, donts: profile.donts },
+    brand: {
+      tone: profile.tone,
+      art_direction: profile.art_direction,
+      default_template: profile.default_template,
+      visual_notes: profile.visual_notes,
+      colors: profile.colors,
+      fonts: profile.fonts,
+      dos: profile.dos,
+      donts: profile.donts,
+    },
     post: post.data,
     clips: clips.map((c) => ({ media_id: c.media_id, ...c.analysis, words: c.analysis.words?.length ? c.analysis.words : undefined })),
     // Motion code stays out of the editor's context: it only needs the briefs.
@@ -102,10 +111,12 @@ export async function designEdit(params: {
   const designed = await designMotionScenes(
     params.studioId,
     requests,
+    profile.art_direction,
     resolveReelBrand(plan, motionTemplateSchema.catch("doux").parse(plan.template), {
       name: (studio.data?.name as string | null) ?? "",
       accent: profile.colors?.[0],
-      logoUrl: profile.logo_url,
+      // The real (signed) URL is set at render time; the designer only needs to know a logo exists.
+      logoUrl: profile.logo_path ? "https://logo.fauve/studio" : profile.logo_url,
       fonts: profile.fonts,
     }),
   );
