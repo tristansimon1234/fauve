@@ -136,3 +136,19 @@ export const MicIcon = make(
   </>,
 );
 export const PlayIcon = make(<polygon points="8 5 19 12 8 19 8 5" />, { fill: "currentColor", stroke: "none" });
+export const PaletteIcon = make(
+  <>
+    <path d="M12 3a9 9 0 1 0 0 18c1 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.7-1.7H16a5 5 0 0 0 5-5c0-4-4-7.2-9-7.2z" />
+    <circle cx="7.5" cy="11" r="1.2" />
+    <circle cx="10.5" cy="7" r="1.2" />
+    <circle cx="15.5" cy="7.5" r="1.2" />
+  </>,
+);
+export const ArrowDownIcon = make(<path d="M12 5v14M19 12l-7 7-7-7" />, { strokeWidth: 2.2 });
+export const XIcon = make(<path d="M18 6 6 18M6 6l12 12" />);
+export const TrashIcon = make(
+  <>
+    <path d="M4 7h16M10 11v6M14 11v6" />
+    <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+  </>,
+);

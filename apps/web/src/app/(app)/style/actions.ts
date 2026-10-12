@@ -1,0 +1,140 @@
+"use server";
+
+import { MOODBOARD_MAX_ITEMS } from "@fauve/agent";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { readMoodboard } from "@/lib/agent/moodboard";
+import { getStudioContext } from "@/lib/studio";
+import { insertProfileVersion } from "./profile";
+import { MOODBOARD_NOTE_MAX } from "./style-options";
+import { applyStyleForm, styleFormSchema } from "./style-profile";
+
+export type SaveStyleResult = { status: "ok"; version: number } | { status: "error"; message: string };
+export type SaveLogoResult = { status: "ok"; version: number; logoUrl: string | null } | { status: "error"; message: string };
+
+const NO_STUDIO = "Ton numéro n’est relié à aucun studio.";
+const FAILED = "L’enregistrement a échoué. Réessaie dans un instant.";
+
+/** Saves the Style form as a new version of the studio's brand profile (the logo has its own action). */
+export async function saveStyle(input: unknown): Promise<SaveStyleResult> {
+  const parsed = styleFormSchema.safeParse(input);
+  if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "Style invalide." };
+
+  const { member } = await getStudioContext();
+  if (!member) return { status: "error", message: NO_STUDIO };
+
+  try {
+    const { version } = await insertProfileVersion(member.studio.id, (current) => applyStyleForm(current, parsed.data));
+    revalidatePath("/style");
+    return { status: "ok", version };
+  } catch (error) {
+    console.warn("saveStyle failed", error);
+    return { status: "error", message: FAILED };
+  }
+}
+
+const SIGNED_URL_SECONDS = 60 * 60;
+
+/**
+ * Sets the logo the browser just uploaded to `media` (or removes it with null),
+ * as a new version of the brand profile. Removing also drops the logo found on
+ * the website, so the Reels end on the studio name.
+ */
+export async function saveLogo(path: string | null): Promise<SaveLogoResult> {
+  const { db, member } = await getStudioContext();
+  if (!member) return { status: "error", message: NO_STUDIO };
+  const studioId = member.studio.id;
+
+  let logoUrl: string | null = null;
+  if (path !== null) {
+    const expected = new RegExp(`^${studioId}/brand/logo-\\d{10,16}\\.(png|svg|webp|jpg)$`);
+    if (typeof path !== "string" || !expected.test(path)) return { status: "error", message: "Logo invalide." };
+    // Signed with the member's own client (storage RLS): also proves the file exists.
+    const signed = await db.storage.from("media").createSignedUrl(path, SIGNED_URL_SECONDS);
+    if (signed.error || !signed.data) {
+      return { status: "error", message: "Le logo n’a pas été trouvé. Dépose-le à nouveau." };
+    }
+    logoUrl = signed.data.signedUrl;
+  }
+
+  try {
+    const { version } = await insertProfileVersion(studioId, (current) => {
+      const next: Record<string, unknown> = { ...current };
+      if (path) {
+        next.logo_path = path;
+      } else {
+        delete next.logo_path;
+        delete next.logo_url;
+      }
+      return next;
+    });
+    revalidatePath("/style");
+    return { status: "ok", version, logoUrl };
+  } catch (error) {
+    console.warn("saveLogo failed", error);
+    return { status: "error", message: FAILED };
+  }
+}
+
+export type SaveMoodboardResult =
+  | { status: "ok"; version: number; reading: string | null; palette: string[]; warning?: string }
+  | { status: "error"; message: string };
+
+const moodboardInput = z
+  .array(z.object({ path: z.string().max(300), note: z.string().trim().max(MOODBOARD_NOTE_MAX).optional() }))
+  .max(MOODBOARD_MAX_ITEMS, `${MOODBOARD_MAX_ITEMS} images au maximum.`);
+
+/**
+ * Saves the moodboard (images the browser uploaded to `media` + notes) as a new
+ * version of the brand profile, with Fauve's reading of it. An empty list
+ * removes the moodboard.
+ */
+export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult> {
+  const parsed = moodboardInput.safeParse(input);
+  if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "Moodboard invalide." };
+  const { db, member } = await getStudioContext();
+  if (!member) return { status: "error", message: NO_STUDIO };
+  const studioId = member.studio.id;
+
+  const items = parsed.data.map((item) => ({ path: item.path, ...(item.note ? { note: item.note } : {}) }));
+  const expected = new RegExp(`^${studioId}/brand/mood-\\d{10,16}-[a-z0-9]{4,12}\\.jpg$`);
+  if (items.some((item) => !expected.test(item.path))) return { status: "error", message: "Image invalide." };
+
+  let reading: { reading: string; palette: string[] } | null = null;
+  let warning: string | undefined;
+  if (items.length) {
+    // Signed with the member's own client (storage RLS): also proves the files exist.
+    const signed = await db.storage.from("media").createSignedUrls(
+      items.map((item) => item.path),
+      SIGNED_URL_SECONDS,
+    );
+    const urls = new Map((signed.data ?? []).flatMap((s) => (s.path && s.signedUrl && !s.error ? [[s.path, s.signedUrl] as const] : [])));
+    if (signed.error || items.some((item) => !urls.has(item.path))) {
+      return { status: "error", message: "Une image n’a pas été trouvée. Dépose-la à nouveau." };
+    }
+    try {
+      reading = await readMoodboard(
+        studioId,
+        member.studio.name ?? "Ton studio",
+        items.map((item) => ({ url: urls.get(item.path)!, note: item.note })),
+      );
+    } catch (error) {
+      console.warn("moodboard reading failed", error);
+      warning = "Moodboard enregistré, mais Fauve n’a pas pu le lire. Réessaie dans un instant.";
+    }
+  }
+
+  try {
+    const { version } = await insertProfileVersion(studioId, (current) => {
+      const next: Record<string, unknown> = { ...current };
+      if (!items.length) delete next.moodboard;
+      else next.moodboard = { items, ...(reading ? { ...reading, read_at: new Date().toISOString() } : {}) };
+      return next;
+    });
+    revalidatePath("/style");
+    return { status: "ok", version, reading: reading?.reading ?? null, palette: reading?.palette ?? [], warning };
+  } catch (error) {
+    console.warn("saveMoodboard failed", error);
+    return { status: "error", message: FAILED };
+  }
+}

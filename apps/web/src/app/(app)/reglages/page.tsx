@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
@@ -85,6 +86,15 @@ async function Settings() {
               pour que Fauve publie tes posts validés. TikTok arrive bientôt.
             </p>
           )}
+        </Section>
+
+        <Section title="Style des vidéos">
+          <p className="text-sm leading-normal">
+            Direction artistique, couleurs, polices, logo et gabarit que Fauve applique à chaque Reel.{" "}
+            <Link href="/style" className="font-bold text-violet">
+              Régler mon style
+            </Link>
+          </p>
         </Section>
 
         <Section title="Rythme">

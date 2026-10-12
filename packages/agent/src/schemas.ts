@@ -177,6 +177,18 @@ export type ClipAnalysis = z.infer<typeof clipAnalysisSchema>;
 // Brand profile (versioned in brand_profiles.profile).
 // ---------------------------------------------------------------------------
 
+export const MOODBOARD_MAX_ITEMS = 12;
+export const moodboardSchema = z.object({
+  items: z
+    .array(z.object({ path: z.string().max(300), note: z.string().max(200).optional() }))
+    .max(MOODBOARD_MAX_ITEMS),
+  /** Fauve's reading of the images: the art direction they imply, in words. */
+  reading: z.string().max(2000).optional(),
+  palette: z.array(z.string().regex(/^#[0-9a-f]{6}$/i)).max(6).optional(),
+  read_at: z.string().optional(),
+});
+export type Moodboard = z.infer<typeof moodboardSchema>;
+
 export const brandProfileSchema = z.object({
   tone: z.string().describe("Ton des légendes, ex. « doux, phrases courtes, un peu d'humour »"),
   caption_length: z.enum(["short", "medium", "long"]),
@@ -199,6 +211,8 @@ export const brandProfileSchema = z.object({
     .optional()
     .describe("Direction artistique libre : ambiance, couleurs, typographie, rythme, ce qu'on aime et ce qu'on évite"),
   default_template: motionTemplateSchema.optional().describe("Gabarit de montage préféré du studio"),
+  /** Inspiration images from the Style page, and Fauve's reading of them (what the montage follows). */
+  moodboard: moodboardSchema.optional(),
   dos: z.array(z.string()),
   donts: z.array(z.string()),
 });
