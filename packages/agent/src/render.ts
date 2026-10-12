@@ -32,9 +32,20 @@ export type RenderOptions = {
 const round = (n: number) => Math.round(n * 1000) / 1000;
 const even = (n: number) => Math.round(n / 2) * 2;
 
-/** Output timeline length: the sum of the kept segments. */
+const FADE = 0.35; // crossfade length (transitions: "fade")
+const KEN_BURNS = 0.08; // slow push-in over a segment: 100 % → 108 %
+
+const segmentLength = (s: EditPlan["segments"][number]) => round(s.out - s.in);
+
+/** Crossfades need every segment to outlast the fade; otherwise the plan falls back to cuts. */
+function usesFades(plan: EditPlan): boolean {
+  return plan.transitions === "fade" && plan.segments.length > 1 && plan.segments.every((s) => segmentLength(s) > FADE + 0.15);
+}
+
+/** Output timeline length: the kept segments, minus the overlaps of crossfades. */
 export function renderDuration(plan: EditPlan): number {
-  return round(plan.segments.reduce((sum, s) => sum + (s.out - s.in), 0));
+  const sum = plan.segments.reduce((total, s) => total + segmentLength(s), 0);
+  return round(usesFades(plan) ? sum - FADE * (plan.segments.length - 1) : sum);
 }
 
 /** "#5B3FD9" → ASS colour "&H00D93F5B" (alpha, blue, green, red). */
@@ -90,14 +101,24 @@ export function buildAss(plan: EditPlan, accent = DEFAULT_ACCENT): string {
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
   ];
+  // Texts ease in and out; the hook also "pops" from 88 % to full size.
+  const motion: Record<EditPlan["texts"][number]["style"], string> = {
+    hook: "{\\fad(180,180)\\fscx88\\fscy88\\t(0,260,\\fscx100\\fscy100)}",
+    band: "{\\fad(150,150)}",
+    caption: "{\\fad(150,150)}",
+  };
   for (const t of plan.texts) {
     if (t.from >= total) continue;
-    lines.push(`Dialogue: 0,${assTime(t.from)},${assTime(Math.min(t.to, total))},${t.style},,0,0,0,,${assText(t.text)}`);
+    const text = `${motion[t.style]}${assText(t.text)}`;
+    lines.push(`Dialogue: 0,${assTime(t.from)},${assTime(Math.min(t.to, total))},${t.style},,0,0,0,,${text}`);
   }
   return `${lines.join("\n")}\n`;
 }
 
-/** ffmpeg arguments: trim and frame each segment, butt-cut them, burn the texts, add a silent track. */
+/**
+ * ffmpeg arguments: trim and frame each segment (optional slow push-in), join them
+ * with cuts or crossfades, burn the animated texts, add a silent track.
+ */
 export function buildFfmpegArgs(plan: EditPlan, options: RenderOptions): string[] {
   const { w, h } = SIZES[plan.format];
   const total = renderDuration(plan);
@@ -114,16 +135,30 @@ export function buildFfmpegArgs(plan: EditPlan, options: RenderOptions): string[
   const audioInput = plan.segments.length;
   args.push("-f", "lavfi", "-t", String(total), "-i", "anullsrc=r=48000:cl=stereo");
 
+  const kenBurns = (s: EditPlan["segments"][number]) => s.zoom === "light" || plan.transitions === "light_zoom";
   const filters = plan.segments.map((s, i) => {
-    // "light" zoom: a steady 8 % punch-in, enough to feel intentional without blur.
-    const z = s.zoom === "light" ? 1.08 : 1;
-    return (
-      `[${i}:v]scale=${even(w * z)}:${even(h * z)}:force_original_aspect_ratio=increase,` +
-      `crop=${w}:${h},setsar=1,fps=${FPS},format=yuv420p,setpts=PTS-STARTPTS[v${i}]`
-    );
+    const frame = `[${i}:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1,fps=${FPS},setpts=PTS-STARTPTS`;
+    // fps again at the end: xfade needs a constant frame rate, which per-frame scaling drops.
+    // Slow push-in (Ken Burns): the frame grows a little every frame, the centre stays put.
+    const zoom = kenBurns(s)
+      ? `,scale=w='trunc(${w}*(1+${KEN_BURNS}*t/${segmentLength(s)})/2)*2':h=-2:eval=frame,crop=${w}:${h}`
+      : "";
+    return `${frame}${zoom},fps=${FPS},format=yuv420p,setsar=1,settb=AVTB[v${i}]`;
   });
-  const inputs = plan.segments.map((_, i) => `[v${i}]`).join("");
-  filters.push(`${inputs}concat=n=${plan.segments.length}:v=1:a=0[vc]`);
+  if (usesFades(plan)) {
+    // Chain of crossfades: each one starts FADE before the end of what came before.
+    let previous = "v0";
+    let offset = 0;
+    plan.segments.slice(1).forEach((_, k) => {
+      offset = round(offset + segmentLength(plan.segments[k]!) - FADE);
+      const out = k === plan.segments.length - 2 ? "vc" : `x${k + 1}`;
+      filters.push(`[${previous}][v${k + 1}]xfade=transition=fade:duration=${FADE}:offset=${offset}[${out}]`);
+      previous = out;
+    });
+  } else {
+    const inputs = plan.segments.map((_, i) => `[v${i}]`).join("");
+    filters.push(`${inputs}concat=n=${plan.segments.length}:v=1:a=0[vc]`);
+  }
   filters.push(plan.texts.length ? `[vc]ass=filename=${ass}:fontsdir=${fonts}[vout]` : "[vc]null[vout]");
 
   args.push(
