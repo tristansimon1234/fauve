@@ -13,13 +13,13 @@ import {
   type ToolHandlers,
   type ToolName,
 } from "@mila/agent";
-import { serverEnv } from "@/lib/env";
+import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createToolHandlers, type ToolContext } from "./tools";
 
 let client: Anthropic | undefined;
 function anthropic() {
-  client ??= new Anthropic({ apiKey: serverEnv().ANTHROPIC_API_KEY });
+  client ??= new Anthropic({ apiKey: env("ANTHROPIC_API_KEY") });
   return client;
 }
 
@@ -106,7 +106,7 @@ async function logClaudeCost(studioId: string, usage: TokenUsage) {
       kind: "llm",
       provider: "anthropic",
       units: usage.input_tokens + usage.output_tokens,
-      cost_eur: usdToEur(usd, serverEnv().USD_TO_EUR),
+      cost_eur: usdToEur(usd, env("USD_TO_EUR")),
       meta: { model: CLAUDE_MODEL, usage, cost_usd: usd },
     });
   if (error) console.error("cost_events insert failed", error.message);

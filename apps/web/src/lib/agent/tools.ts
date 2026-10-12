@@ -6,7 +6,7 @@ import {
   postStatusSchema,
   type ToolHandlers,
 } from "@mila/agent";
-import { serverEnv } from "@/lib/env";
+import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendReaction } from "@/lib/whatsapp/client";
 
@@ -93,7 +93,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         }),
       );
-      return json({ url: `${serverEnv().APP_URL}/auth/link/${token}?next=/connect`, expires_in_minutes: 15 });
+      return json({ url: `${env("APP_URL")}/auth/link/${token}?next=/connect`, expires_in_minutes: 15 });
     },
 
     async get_calendar({ from, to }) {

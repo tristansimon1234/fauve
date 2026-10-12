@@ -1,5 +1,5 @@
 import "server-only";
-import { serverEnv } from "@/lib/env";
+import { env } from "@/lib/env";
 
 // Thin wrapper over the WhatsApp Cloud API (Graph). Mila sends from a single number.
 
@@ -14,11 +14,10 @@ class WhatsAppError extends Error {
 }
 
 async function graph<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const env = serverEnv();
-  const res = await fetch(`https://graph.facebook.com/${env.WHATSAPP_GRAPH_VERSION}/${path}`, {
+  const res = await fetch(`https://graph.facebook.com/${env("WHATSAPP_GRAPH_VERSION")}/${path}`, {
     ...init,
     headers: {
-      Authorization: `Bearer ${env.WHATSAPP_TOKEN}`,
+      Authorization: `Bearer ${env("WHATSAPP_TOKEN")}`,
       "Content-Type": "application/json",
       ...init.headers,
     },
@@ -29,7 +28,7 @@ async function graph<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 function sendMessage(payload: Record<string, unknown>) {
-  return graph<{ messages: { id: string }[] }>(`${serverEnv().WHATSAPP_PHONE_ID}/messages`, {
+  return graph<{ messages: { id: string }[] }>(`${env("WHATSAPP_PHONE_ID")}/messages`, {
     method: "POST",
     body: JSON.stringify({ messaging_product: "whatsapp", ...payload }),
   });
@@ -82,7 +81,7 @@ export async function sendTemplate(
 /** Downloads an inbound media file (the URL from Graph is short-lived and needs the token). */
 export async function downloadMedia(mediaId: string): Promise<{ bytes: ArrayBuffer; mimeType: string; size: number }> {
   const meta = await graph<{ url: string; mime_type: string; file_size: number }>(mediaId);
-  const res = await fetch(meta.url, { headers: { Authorization: `Bearer ${serverEnv().WHATSAPP_TOKEN}` } });
+  const res = await fetch(meta.url, { headers: { Authorization: `Bearer ${env("WHATSAPP_TOKEN")}` } });
   if (!res.ok) throw new WhatsAppError(`Media download failed (${res.status})`, res.status, null);
   return { bytes: await res.arrayBuffer(), mimeType: meta.mime_type, size: meta.file_size };
 }

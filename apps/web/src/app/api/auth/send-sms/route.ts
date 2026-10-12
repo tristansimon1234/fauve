@@ -1,7 +1,7 @@
 import { normalizePhone } from "@mila/agent";
 import { Webhook } from "standardwebhooks";
 import { z } from "zod";
-import { serverEnv } from "@/lib/env";
+import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendLoginCode } from "@/lib/whatsapp/client";
 
@@ -18,7 +18,7 @@ function hookError(httpCode: number, message: string) {
 }
 
 function verify(rawBody: string, headers: Headers): unknown {
-  const secrets = serverEnv().SEND_SMS_HOOK_SECRET.split("|");
+  const secrets = env("SEND_SMS_HOOK_SECRET").split("|");
   const webhookHeaders = Object.fromEntries(headers);
   for (const secret of secrets) {
     try {

@@ -1,5 +1,5 @@
 import { after, type NextRequest } from "next/server";
-import { serverEnv } from "@/lib/env";
+import { env } from "@/lib/env";
 import { handleInboundMessage } from "@/lib/whatsapp/inbound";
 import { webhookPayloadSchema } from "@/lib/whatsapp/schema";
 import { verifyWhatsAppSignature } from "@/lib/whatsapp/signature";
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   if (
     params.get("hub.mode") === "subscribe" &&
-    params.get("hub.verify_token") === serverEnv().WHATSAPP_VERIFY_TOKEN
+    params.get("hub.verify_token") === env("WHATSAPP_VERIFY_TOKEN")
   ) {
     return new Response(params.get("hub.challenge") ?? "", { status: 200 });
   }
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
-  if (!verifyWhatsAppSignature(rawBody, request.headers.get("x-hub-signature-256"), serverEnv().WHATSAPP_APP_SECRET)) {
+  if (!verifyWhatsAppSignature(rawBody, request.headers.get("x-hub-signature-256"), env("WHATSAPP_APP_SECRET"))) {
     return new Response("Invalid signature", { status: 401 });
   }
 
