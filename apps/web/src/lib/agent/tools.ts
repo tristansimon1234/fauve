@@ -10,6 +10,7 @@ import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendReaction, sendText, sendVideo } from "@/lib/whatsapp/client";
 import { renderPost } from "@/lib/render/render-post";
+import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { readWebsite, WebsiteError } from "./website";
@@ -246,6 +247,69 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           ? "Publication immédiate après ta réponse ; la gérante recevra le lien du Reel."
           : "Fauve publiera automatiquement à l'horaire prévu et préviendra la gérante.",
       });
+    },
+
+    async get_instagram_activity({ media_limit, comments_per_post }) {
+      const account = await instagramAccount(studioId);
+      if (!account) return json({ error: "Instagram n'est pas connecté. Envoie le lien de connexion (get_connect_link)." });
+      try {
+        const media = await recentMedia(account.userId, account.accessToken, media_limit);
+        const detailed = await Promise.all(
+          media.map(async (m, i) => ({
+            id: m.id,
+            date: m.timestamp,
+            type: m.media_product_type ?? m.media_type,
+            caption: m.caption?.slice(0, 300),
+            permalink: m.permalink,
+            likes: m.like_count,
+            comments_count: m.comments_count,
+            // Insights cost one call each: the most recent posts are what the analysis needs.
+            insights: i < 8 ? await mediaInsights(m.id, account.accessToken).catch(() => null) : undefined,
+            comments:
+              comments_per_post && m.comments_count
+                ? (await mediaComments(m.id, account.accessToken, comments_per_post).catch(() => [])).map((c) => ({
+                    id: c.id,
+                    from: c.username,
+                    text: c.text,
+                    date: c.timestamp,
+                    likes: c.like_count,
+                    replies: c.replies?.data?.map((r) => ({ from: r.username, text: r.text })) ?? [],
+                    answered_by_studio: c.replies?.data?.some((r) => r.username === account.handle) ?? false,
+                  }))
+                : [],
+          })),
+        );
+        return json({ account: `@${account.handle}`, media: detailed });
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+
+    async reply_to_comment({ comment_id, message }) {
+      const account = await instagramAccount(studioId);
+      if (!account) return json({ error: "Instagram n'est pas connecté." });
+      try {
+        const id = await replyToComment(comment_id, account.accessToken, message);
+        return json({ status: "posted", reply_id: id });
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+
+    async get_metrics({ from, to }) {
+      const rows = unwrap(
+        await db
+          .from("metrics")
+          .select("post_id, platform, captured_at, views, reach, likes, saves, shares, comments, profile_visits, posts(title, kind, scheduled_at)")
+          .eq("studio_id", studioId)
+          .gte("captured_at", from)
+          .lte("captured_at", to)
+          .order("captured_at", { ascending: false })
+          .limit(200),
+      );
+      const latest = new Map<string, (typeof rows)[number]>();
+      for (const row of rows) if (!latest.has(`${row.post_id}:${row.platform}`)) latest.set(`${row.post_id}:${row.platform}`, row);
+      return json({ metrics: [...latest.values()] });
     },
 
     async react_to_message({ emoji }) {

@@ -2,7 +2,7 @@ import "server-only";
 import { isInSessionWindow } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
-import { InstagramError, publishReel, refreshToken } from "./instagram";
+import { InstagramError, mediaInsights, publishReel, refreshToken } from "./instagram";
 
 // Publishing worker. Posts in "scheduled" whose time has come are claimed (one
 // worker per post), sent to Instagram, then moved to "published" or "failed".
@@ -112,7 +112,10 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
         .update({
           status: "published",
           publish_error: null,
-          external_ids: { ...(post.external_ids as object), instagram: { media_id: result.mediaId, permalink: result.permalink } },
+          external_ids: {
+            ...(post.external_ids as object),
+            instagram: { media_id: result.mediaId, permalink: result.permalink, published_at: new Date().toISOString() },
+          },
         })
         .eq("id", postId),
     );
@@ -155,7 +158,64 @@ async function refreshExpiringTokens(): Promise<number> {
   return refreshed;
 }
 
-/** Cron entry point: publish what is due, refresh tokens. */
+const MEASURE_EVERY_MS = 6 * 3600_000;
+const MEASURE_FOR_MS = 30 * 24 * 3600_000;
+
+/**
+ * Captures Instagram insights for Fauve's published posts: every 6 h during the
+ * first 30 days. A post becomes "measured" once a capture is at least 48 h old.
+ */
+async function captureMetrics(): Promise<number> {
+  const db = supabaseAdmin();
+  const { data: posts } = await db
+    .from("posts")
+    .select("id, studio_id, status, external_ids")
+    .in("status", ["published", "measured"])
+    .not("external_ids->instagram->>media_id", "is", null)
+    .order("updated_at", { ascending: true })
+    .limit(50);
+  let captured = 0;
+  for (const post of posts ?? []) {
+    if (captured >= 10) break;
+    const ig = (post.external_ids as { instagram?: { media_id?: string; published_at?: string } }).instagram;
+    const publishedAt = ig?.published_at ? new Date(ig.published_at).getTime() : 0;
+    if (!ig?.media_id || Date.now() - publishedAt > MEASURE_FOR_MS) continue;
+    const last = await db
+      .from("metrics")
+      .select("captured_at")
+      .eq("post_id", post.id)
+      .order("captured_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (last.data && Date.now() - new Date(last.data.captured_at as string).getTime() < MEASURE_EVERY_MS) continue;
+    const account = await instagramAccount(post.studio_id as string);
+    if (!account) continue;
+    try {
+      const m = await mediaInsights(ig.media_id, account.accessToken);
+      await db.from("metrics").insert({
+        studio_id: post.studio_id,
+        post_id: post.id,
+        platform: "instagram",
+        views: m.views ?? null,
+        reach: m.reach ?? null,
+        likes: m.likes ?? null,
+        saves: m.saved ?? null,
+        shares: m.shares ?? null,
+        comments: m.comments ?? null,
+        profile_visits: m.profile_visits ?? null,
+      });
+      if (post.status === "published" && Date.now() - publishedAt > 48 * 3600_000) {
+        await db.from("posts").update({ status: "measured" }).eq("id", post.id);
+      }
+      captured++;
+    } catch (error) {
+      console.error("insights capture failed", post.id, error instanceof InstagramError ? error.body : error);
+    }
+  }
+  return captured;
+}
+
+/** Cron entry point: publish what is due, measure, refresh tokens. */
 export async function runPublishWorker() {
   const db = supabaseAdmin();
   const due = check(
@@ -172,6 +232,7 @@ export async function runPublishWorker() {
     const outcome = await publishIfDue(id as string);
     if (outcome) published.push(outcome);
   }
+  const measured = await captureMetrics();
   const refreshed = await refreshExpiringTokens();
-  return { due: due.length, published, refreshed };
+  return { due: due.length, published, measured, refreshed };
 }

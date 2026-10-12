@@ -5,7 +5,12 @@ import { env } from "@/lib/env";
 // account (OAuth), Fauve keeps a long-lived token (60 days, refreshed) and
 // publishes Reels through a media container then media_publish.
 
-export const INSTAGRAM_SCOPES = ["instagram_business_basic", "instagram_business_content_publish"];
+export const INSTAGRAM_SCOPES = [
+  "instagram_business_basic",
+  "instagram_business_content_publish",
+  "instagram_business_manage_comments",
+  "instagram_business_manage_insights",
+];
 
 export class InstagramError extends Error {
   constructor(
@@ -138,4 +143,88 @@ export async function publishReel(params: {
     graphUrl(`${published.id}?fields=permalink&access_token=${encodeURIComponent(token)}`),
   ).catch(() => ({ permalink: undefined }));
   return { mediaId: published.id, permalink: media.permalink ?? null };
+}
+
+// ---------------------------------------------------------------------------
+// Reading the account: recent media, comments, insights; replying to comments.
+// ---------------------------------------------------------------------------
+
+export type InstagramMedia = {
+  id: string;
+  caption?: string;
+  media_type?: string;
+  media_product_type?: string;
+  permalink?: string;
+  timestamp?: string;
+  like_count?: number;
+  comments_count?: number;
+};
+
+export type InstagramComment = {
+  id: string;
+  text?: string;
+  username?: string;
+  timestamp?: string;
+  like_count?: number;
+  replies?: { data?: { id: string; text?: string; username?: string; timestamp?: string }[] };
+};
+
+const q = (params: Record<string, string>) => new URLSearchParams(params).toString();
+
+export async function recentMedia(userId: string, accessToken: string, limit = 12): Promise<InstagramMedia[]> {
+  const res = await call<{ data: InstagramMedia[] }>(
+    graphUrl(
+      `${userId}/media?${q({
+        fields: "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count",
+        limit: String(limit),
+        access_token: accessToken,
+      })}`,
+    ),
+  );
+  return res.data;
+}
+
+export async function mediaComments(mediaId: string, accessToken: string, limit = 50): Promise<InstagramComment[]> {
+  const res = await call<{ data: InstagramComment[] }>(
+    graphUrl(
+      `${mediaId}/comments?${q({
+        fields: "id,text,username,timestamp,like_count,replies{id,text,username,timestamp}",
+        limit: String(limit),
+        access_token: accessToken,
+      })}`,
+    ),
+  );
+  return res.data;
+}
+
+export type MediaInsights = Partial<Record<"views" | "reach" | "likes" | "comments" | "shares" | "saved" | "total_interactions" | "profile_visits" | "follows", number>>;
+
+// Metric names differ by media type and Meta retires some; ask for the full set
+// first and fall back to the core metrics every media type supports.
+const FULL_METRICS = ["views", "reach", "likes", "comments", "shares", "saved", "total_interactions", "profile_visits", "follows"];
+const CORE_METRICS = ["reach", "likes", "comments", "shares", "saved"];
+
+export async function mediaInsights(mediaId: string, accessToken: string): Promise<MediaInsights> {
+  for (const metrics of [FULL_METRICS, ["views", ...CORE_METRICS], CORE_METRICS]) {
+    try {
+      const res = await call<{ data: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] }>(
+        graphUrl(`${mediaId}/insights?${q({ metric: metrics.join(","), access_token: accessToken })}`),
+      );
+      return Object.fromEntries(
+        res.data.map((m) => [m.name, m.total_value?.value ?? m.values?.[0]?.value ?? 0]),
+      ) as MediaInsights;
+    } catch (error) {
+      if (!(error instanceof InstagramError) || error.status !== 400) throw error;
+    }
+  }
+  return {};
+}
+
+/** Public reply under a comment, posted as the studio's account. */
+export async function replyToComment(commentId: string, accessToken: string, message: string): Promise<string> {
+  const res = await call<{ id: string }>(graphUrl(`${commentId}/replies`), {
+    method: "POST",
+    body: new URLSearchParams({ message: message.slice(0, 2200), access_token: accessToken }),
+  });
+  return res.id;
 }
