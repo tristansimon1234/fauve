@@ -1,3 +1,4 @@
+import Link from "next/link";
 import QRCode from "qrcode";
 import { WhatsAppIcon } from "@/components/icons";
 import { Logo, Orb } from "@/components/orb";
@@ -150,6 +151,13 @@ export default async function LandingPage() {
           </a>
         </div>
       </section>
+
+      <footer className="mx-auto flex max-w-[1200px] flex-wrap gap-5 px-4 pb-10 text-sm font-semibold text-muted sm:px-8">
+        <Link href="/confidentialite">Confidentialité</Link>
+        <Link href="/conditions">Conditions d’utilisation</Link>
+        <Link href="/suppression-des-donnees">Suppression des données</Link>
+        <Link href="/connexion">Se connecter</Link>
+      </footer>
     </div>
   );
 }

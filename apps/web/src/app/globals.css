@@ -97,3 +97,27 @@
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
 }
+
+/* Long-form legal pages. */
+.legal h1 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.legal h2 {
+  margin-top: 12px;
+  font-size: 19px;
+  font-weight: 700;
+}
+.legal ul {
+  list-style: disc;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.legal a {
+  color: var(--color-violet);
+  font-weight: 600;
+}
