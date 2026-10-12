@@ -205,47 +205,90 @@
   }
 }
 
-/* Fauve's mascot (components/mascot.tsx): sways, blinks, twitches an ear. */
-.fauve-mascot .fauve-mascot-head {
-  transform-box: view-box;
-  transform-origin: 100px 165px;
-  animation: fauve-sway 5s ease-in-out infinite;
+/* Fauve's mascot (components/mascot.tsx): the orb as a face, with ears, blinking eyes and an orbit. */
+.fauve-cat {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--cat);
+  height: var(--cat);
+  perspective: calc(var(--cat) * 4);
+  animation: fauve-sway 6s ease-in-out infinite;
 }
-.fauve-mascot .fauve-mascot-body {
-  transform-box: view-box;
-  transform-origin: 100px 230px;
-  animation: fauve-breathe 5s ease-in-out infinite;
+.fauve-cat-ears,
+.fauve-cat-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
-.fauve-mascot .fauve-mascot-eyes {
+.fauve-cat-head {
+  position: absolute;
+  inset: 20% 16% 10%;
+  background: radial-gradient(circle at 36% 30%, #ffe2d6 0%, #f8a48c 26%, #f2694e 54%, #8a4ad9 84%, #5b3fd9 100%);
+  border-radius: 50%;
+  box-shadow:
+    inset calc(var(--cat) * -0.05) calc(var(--cat) * -0.07) calc(var(--cat) * 0.12) rgba(40, 20, 90, 0.32),
+    0 calc(var(--cat) * 0.05) calc(var(--cat) * 0.16) rgba(91, 63, 217, 0.22);
+  animation: fauve-morph 9s ease-in-out infinite;
+}
+.fauve-cat-ear-l,
+.fauve-cat-ear-r {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.fauve-cat-ear-l {
+  animation: fauve-ear-l 7s ease-in-out infinite;
+}
+.fauve-cat-ear-r {
+  animation: fauve-ear-r 7s ease-in-out infinite;
+}
+.fauve-cat-eyes {
   transform-box: fill-box;
   transform-origin: center;
-  animation: fauve-blink 4.2s ease-in-out infinite;
+  animation: fauve-blink 4.5s ease-in-out infinite;
 }
-.fauve-mascot .fauve-mascot-ear-r {
-  transform-box: view-box;
-  transform-origin: 124px 60px;
-  animation: fauve-ear 6s ease-in-out infinite;
+.fauve-cat-ring {
+  position: absolute;
+  inset: 18% 2% 4%;
+  border-radius: 50%;
+  border: max(1px, calc(var(--cat) * 0.016)) solid rgba(91, 63, 217, 0.5);
+  animation: fauve-orbit-a 9s linear infinite;
+}
+.fauve-cat-moon {
+  position: absolute;
+  top: calc(var(--cat) * -0.03);
+  left: 50%;
+  width: max(3px, calc(var(--cat) * 0.06));
+  height: max(3px, calc(var(--cat) * 0.06));
+  margin-left: max(-1.5px, calc(var(--cat) * -0.03));
+  border-radius: 50%;
+  background: #f2694e;
+  box-shadow: 0 0 calc(var(--cat) * 0.06) rgba(242, 105, 78, 0.6);
 }
 @keyframes fauve-sway {
   0%, 100% { transform: rotate(0deg) translateY(0); }
-  30% { transform: rotate(-4deg) translateY(-2px); }
+  30% { transform: rotate(-4deg) translateY(-2%); }
   60% { transform: rotate(3deg) translateY(0); }
-}
-@keyframes fauve-breathe {
-  0%, 100% { transform: scale(1, 1); }
-  50% { transform: scale(1.03, 0.98); }
 }
 @keyframes fauve-blink {
   0%, 44%, 50%, 100% { transform: scaleY(1); }
   47% { transform: scaleY(0.1); }
 }
-@keyframes fauve-ear {
-  0%, 70%, 80%, 100% { transform: rotate(0deg); }
-  74% { transform: rotate(14deg); }
-  77% { transform: rotate(-6deg); }
+@keyframes fauve-ear-l {
+  0%, 60%, 70%, 100% { transform: rotate(0deg); }
+  64% { transform: rotate(-12deg); }
+  67% { transform: rotate(5deg); }
+}
+@keyframes fauve-ear-r {
+  0%, 20%, 30%, 100% { transform: rotate(0deg); }
+  24% { transform: rotate(12deg); }
+  27% { transform: rotate(-5deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .fauve-mascot * {
+  .fauve-cat,
+  .fauve-cat * {
     animation-play-state: paused !important;
   }
 }
