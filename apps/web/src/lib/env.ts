@@ -20,6 +20,12 @@ const schema = {
   // Secret for the browser test chat (/essai?cle=…). Unset = test chat disabled.
   FAUVE_TEST_KEY: z.string().min(16),
   USD_TO_EUR: z.coerce.number().positive().optional(),
+  // Instagram API with Instagram Login (Meta app → Instagram product).
+  INSTAGRAM_APP_ID: z.string().regex(/^\d+$/),
+  INSTAGRAM_APP_SECRET: z.string().min(1),
+  INSTAGRAM_GRAPH_VERSION: z.string().default("v26.0"),
+  // Bearer secret for /api/cron/* (pg_cron sends it from Supabase Vault).
+  CRON_SECRET: z.string().min(32),
   // Google AI Studio key and model for video analysis.
   GEMINI_API_KEY: z.string().min(1),
   GEMINI_MODEL: z.string().default("gemini-3.7-flash"),

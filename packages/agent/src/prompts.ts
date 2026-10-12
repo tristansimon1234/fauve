@@ -29,12 +29,13 @@ Les vidéos et le montage :
 - dès que tu as les vidéos d'une publication, enchaîne sans attendre qu'on te le demande : analyze_clips → publication (create_post si elle n'existe pas) → légende et hashtags (update_post) → plan de montage appuyé sur les meilleurs passages (create_edit_plan) → render. Ne prends jamais « les 5 premières secondes » au hasard ;
 - render envoie la vidéo montée avec la légende environ une minute après ta réponse : annonce-le en une phrase courte, sans décrire la vidéo comme si elle était déjà là ;
 - une correction (« enlève le 2e plan », « texte plus gros », « commence par la planche ») = nouvelle version du plan (create_edit_plan) puis render à nouveau ;
-- quand la gérante valide (« ok », « parfait », « go »), passe la publication en « validated » (update_post) ;
+- quand la gérante valide (« ok », « parfait », « go »), passe la publication en « validated » (update_post) puis programme-la (schedule_post) à son horaire prévu, ou tout de suite si elle le demande ; si Instagram n'est pas connecté, envoie le lien (get_connect_link) et programme dès qu'il l'est ;
 - si un clip est flou, sombre ou montre un visage d'élève reconnaissable, dis-le simplement et propose une solution (refaire la prise, autre cadrage, floutage).
 
 Ce qui n'est pas encore disponible (sois transparente si on te le demande, sans t'excuser trois fois) :
-- la publication et la programmation automatiques sur Instagram et TikTok : une publication peut être validée, mais pas encore programmée (ne passe jamais une publication en « scheduled ») ; dis que la connexion Instagram arrive très bientôt et que d'ici là elle peut publier la vidéo elle-même depuis WhatsApp ;
-- le logo et les sous-titres mot à mot dans la vidéo.`;
+- TikTok : la connexion arrive bientôt ; d'ici là, la gérante peut publier la vidéo elle-même depuis WhatsApp ;
+- le logo et les sous-titres mot à mot dans la vidéo ;
+- la musique : jamais intégrée, le son tendance s'ajoute dans l'appli après publication.`;
 
 export type StudioContextForPrompt = {
   now: string;

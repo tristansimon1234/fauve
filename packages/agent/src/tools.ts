@@ -40,7 +40,7 @@ export const toolSpecs = {
   },
   get_connect_link: {
     description:
-      "Renvoie le lien sécurisé (valable 15 min) vers la page de connexion Instagram / TikTok, à envoyer à la gérante.",
+      "Renvoie le lien sécurisé (valable 15 min) vers la page où la gérante connecte son compte Instagram professionnel à Fauve (TikTok arrive bientôt). À envoyer quand Instagram n'est pas connecté.",
     input: z.object({}),
   },
   get_calendar: {
@@ -94,6 +94,11 @@ export const toolSpecs = {
     description:
       "Lance le montage vidéo de la dernière version du plan de montage d'une publication. La vidéo (MP4 9:16) est envoyée automatiquement à la gérante, avec la légende, environ une minute après ta réponse. Pour une correction : crée une nouvelle version du plan (create_edit_plan) puis relance render.",
     input: z.object({ post_id: z.string().uuid() }),
+  },
+  schedule_post: {
+    description:
+      "Programme une publication validée sur Instagram, à son horaire (scheduled_at) ou à l'horaire donné ; si l'horaire est passé ou absent, elle part tout de suite. Nécessite une vidéo montée (render) et un compte Instagram connecté (sinon envoie le lien get_connect_link). Ne programme jamais sans l'accord explicite de la gérante.",
+    input: z.object({ post_id: z.string().uuid(), scheduled_at: isoDateTime.optional() }),
   },
   update_brand_profile: {
     description:

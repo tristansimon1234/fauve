@@ -1,0 +1,141 @@
+import "server-only";
+import { env } from "@/lib/env";
+
+// Instagram API with Instagram Login: each studio connects its own professional
+// account (OAuth), Fauve keeps a long-lived token (60 days, refreshed) and
+// publishes Reels through a media container then media_publish.
+
+export const INSTAGRAM_SCOPES = ["instagram_business_basic", "instagram_business_content_publish"];
+
+export class InstagramError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly body: unknown,
+  ) {
+    super(message);
+  }
+}
+
+const graphUrl = (path: string) => `https://graph.instagram.com/${env("INSTAGRAM_GRAPH_VERSION")}/${path}`;
+
+async function call<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  const body: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message = (body as { error?: { message?: string }; error_message?: string } | null)?.error?.message
+      ?? (body as { error_message?: string } | null)?.error_message
+      ?? `HTTP ${res.status}`;
+    throw new InstagramError(`Instagram API: ${message}`, res.status, body);
+  }
+  return body as T;
+}
+
+export function redirectUri(): string {
+  return `${env("APP_URL")}/api/instagram/callback`;
+}
+
+export function authorizeUrl(state: string): string {
+  const url = new URL("https://www.instagram.com/oauth/authorize");
+  url.searchParams.set("client_id", env("INSTAGRAM_APP_ID"));
+  url.searchParams.set("redirect_uri", redirectUri());
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", INSTAGRAM_SCOPES.join(","));
+  url.searchParams.set("state", state);
+  // Always show the account picker, so a manager can switch accounts.
+  url.searchParams.set("force_reauth", "true");
+  return url.toString();
+}
+
+/** Authorization code → long-lived token (about 60 days) and the account's identity. */
+export async function connectWithCode(code: string) {
+  const short = await call<{ access_token: string; user_id: string | number; permissions?: string[] } | { data: { access_token: string; user_id: string | number; permissions?: string[] }[] }>(
+    "https://api.instagram.com/oauth/access_token",
+    {
+      method: "POST",
+      body: new URLSearchParams({
+        client_id: env("INSTAGRAM_APP_ID"),
+        client_secret: env("INSTAGRAM_APP_SECRET"),
+        grant_type: "authorization_code",
+        redirect_uri: redirectUri(),
+        code: code.replace(/#_$/, ""),
+      }),
+    },
+  );
+  const first = "data" in short ? short.data[0]! : short;
+
+  const long = await call<{ access_token: string; expires_in: number }>(
+    `https://graph.instagram.com/access_token?${new URLSearchParams({
+      grant_type: "ig_exchange_token",
+      client_secret: env("INSTAGRAM_APP_SECRET"),
+      access_token: first.access_token,
+    })}`,
+  );
+  const me = await call<{ user_id?: string; id: string; username: string; account_type?: string }>(
+    graphUrl(`me?fields=user_id,username,account_type&access_token=${encodeURIComponent(long.access_token)}`),
+  );
+  return {
+    accessToken: long.access_token,
+    expiresAt: new Date(Date.now() + long.expires_in * 1000),
+    userId: String(me.user_id ?? first.user_id),
+    username: me.username,
+    accountType: me.account_type ?? null,
+    scopes: first.permissions ?? INSTAGRAM_SCOPES,
+  };
+}
+
+/** Extends a long-lived token by another 60 days (valid tokens older than 24 h only). */
+export async function refreshToken(accessToken: string) {
+  const res = await call<{ access_token: string; expires_in: number }>(
+    `https://graph.instagram.com/refresh_access_token?${new URLSearchParams({ grant_type: "ig_refresh_token", access_token: accessToken })}`,
+  );
+  return { accessToken: res.access_token, expiresAt: new Date(Date.now() + res.expires_in * 1000) };
+}
+
+type ContainerStatus = { status_code?: "IN_PROGRESS" | "FINISHED" | "ERROR" | "EXPIRED" | "PUBLISHED"; status?: string };
+
+/**
+ * Publishes a Reel: create the container from a public video URL, wait until
+ * Instagram has fetched and processed it, then publish. Returns the media id and permalink.
+ */
+export async function publishReel(params: {
+  userId: string;
+  accessToken: string;
+  videoUrl: string;
+  caption: string;
+  timeoutMs?: number;
+}): Promise<{ mediaId: string; permalink: string | null }> {
+  const token = params.accessToken;
+  const container = await call<{ id: string }>(graphUrl(`${params.userId}/media`), {
+    method: "POST",
+    body: new URLSearchParams({
+      media_type: "REELS",
+      video_url: params.videoUrl,
+      caption: params.caption.slice(0, 2200),
+      share_to_feed: "true",
+      access_token: token,
+    }),
+  });
+
+  const deadline = Date.now() + (params.timeoutMs ?? 180_000);
+  for (;;) {
+    const state = await call<ContainerStatus>(
+      graphUrl(`${container.id}?fields=status_code,status&access_token=${encodeURIComponent(token)}`),
+    );
+    if (state.status_code === "FINISHED") break;
+    if (state.status_code === "ERROR" || state.status_code === "EXPIRED") {
+      throw new InstagramError(`Instagram n'a pas pu traiter la vidéo (${state.status ?? state.status_code})`, 422, state);
+    }
+    if (Date.now() > deadline) throw new InstagramError("Instagram met trop de temps à traiter la vidéo", 504, state);
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+  }
+
+  const published = await call<{ id: string }>(graphUrl(`${params.userId}/media_publish`), {
+    method: "POST",
+    body: new URLSearchParams({ creation_id: container.id, access_token: token }),
+  });
+  const media = await call<{ permalink?: string }>(
+    graphUrl(`${published.id}?fields=permalink&access_token=${encodeURIComponent(token)}`),
+  ).catch(() => ({ permalink: undefined }));
+  return { mediaId: published.id, permalink: media.permalink ?? null };
+}
