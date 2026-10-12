@@ -1,29 +1,204 @@
 import type { Metadata } from "next";
-import { UploadIcon } from "@/components/icons";
-import { Orb } from "@/components/orb";
+import { Suspense } from "react";
+import { z } from "zod";
+import { EmptyState, NoStudio, PageLoading } from "@/components/empty-state";
+import { FolderIcon, MicIcon, WhatsAppIcon } from "@/components/icons";
+import { formatDuration, formatShortDateTime } from "@/lib/format";
+import { whatsappLink } from "@/lib/public-env";
+import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
 
 export const metadata: Metadata = { title: "Médiathèque" };
+
+const LIMIT = 60;
+
+const assetSchema = z.object({
+  id: z.uuid(),
+  storage_path: z.string(),
+  kind: z.enum(["video", "image", "audio", "document"]),
+  source: z.enum(["whatsapp", "web_upload", "render", "library"]),
+  duration: z.coerce.number().nullable(),
+  created_at: z.string(),
+  analysis_status: z.string().nullable(),
+});
+type Asset = z.infer<typeof assetSchema>;
+
+const analysisSchema = z.object({
+  summary: z.string(),
+  lighting: z.string().optional(),
+  issues: z.array(z.string()).catch([]),
+});
+type Analysis = z.infer<typeof analysisSchema>;
+
+const sourceLabels: Record<Asset["source"], string> = {
+  whatsapp: "Reçue sur WhatsApp",
+  web_upload: "Déposée sur le site",
+  render: "Montage de Fauve",
+  library: "Bibliothèque",
+};
 
 export default function LibraryPage() {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
+      <Suspense fallback={<PageLoading title="Médiathèque" />}>
+        <Library />
+      </Suspense>
+    </main>
+  );
+}
+
+async function Library() {
+  const { db, member } = await getStudioContext();
+  if (!member) return <NoStudio />;
+  const studioId = member.studio.id;
+  const tz = member.studio.timezone;
+
+  const assets = rows(
+    assetSchema,
+    await db
+      .from("media_assets")
+      .select("id, storage_path, kind, source, duration, created_at, analysis_status")
+      .eq("studio_id", studioId)
+      .order("created_at", { ascending: false })
+      .limit(LIMIT),
+    "media_assets",
+  );
+
+  const [urls, analyses] = await Promise.all([
+    signMediaUrls(
+      db,
+      studioId,
+      assets.filter((a) => a.kind === "video" || a.kind === "image").map((a) => a.storage_path),
+    ),
+    loadAnalyses(
+      db,
+      assets.filter((a) => a.kind === "video").map((a) => a.id),
+    ),
+  ]);
+
+  return (
+    <>
       <div className="flex flex-col gap-1.5">
         <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Médiathèque</h1>
-        <p className="text-[15px] text-muted">Tes vidéos et photos, en pleine qualité.</p>
-      </div>
-      <div className="flex max-w-[760px] flex-col items-center gap-4 rounded-[22px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-6 py-14 text-center">
-        <Orb size={56} />
-        <h2 className="text-lg font-bold">Dépose tes vidéos ici</h2>
-        <p className="max-w-[420px] text-sm leading-relaxed text-muted">
-          Les fichiers déposés ici gardent leur qualité d’origine, contrairement à WhatsApp. Pense à avoir l’accord des
-          élèves filmés.
+        <p className="text-[15px] text-muted">
+          {assets.length
+            ? `Tes vidéos et photos, les plus récentes d’abord${assets.length === LIMIT ? ` (les ${LIMIT} dernières)` : ""}.`
+            : "Tes vidéos et photos, en pleine qualité."}
         </p>
-        <button type="button" className="btn btn-primary" disabled>
-          <UploadIcon size={18} />
-          Choisir des fichiers
-        </button>
-        <span className="text-xs text-muted">Bientôt disponible</span>
       </div>
-    </main>
+
+      {assets.length === 0 ? (
+        <EmptyState title="Ta médiathèque est vide" className="max-w-[760px]" cta="Envoyer mes vidéos à Fauve">
+          Envoie tes vidéos à Fauve sur WhatsApp, de préférence en tant que document pour garder leur qualité. Elles
+          apparaîtront ici, avec ce que Fauve y a vu. Pense à avoir l’accord des élèves filmés.
+        </EmptyState>
+      ) : (
+        <>
+          <div className="flex max-w-[860px] flex-wrap items-center gap-4 rounded-[20px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-5 py-4">
+            <p className="min-w-0 flex-[1_1_320px] text-sm leading-relaxed">
+              <strong>Le dépôt depuis le site arrive bientôt.</strong> En attendant, envoie tes vidéos à Fauve sur
+              WhatsApp, en tant que document pour garder leur qualité.
+            </p>
+            <a href={whatsappLink()} className="btn btn-primary h-11 text-sm">
+              <WhatsAppIcon size={18} />
+              Ouvrir WhatsApp
+            </a>
+          </div>
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
+            {assets.map((asset) => (
+              <li key={asset.id}>
+                <AssetCard
+                  asset={asset}
+                  url={urls.get(asset.storage_path)}
+                  analysis={analyses.get(asset.id)}
+                  tz={tz}
+                />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </>
+  );
+}
+
+async function loadAnalyses(db: Db, ids: string[]): Promise<Map<string, Analysis>> {
+  const byMedia = new Map<string, Analysis>();
+  if (!ids.length) return byMedia;
+  const { data, error } = await db
+    .from("clip_analyses")
+    .select("media_id, analysis, created_at")
+    .in("media_id", ids)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`clip_analyses: ${error.message}`);
+  for (const row of data ?? []) {
+    const parsed = analysisSchema.safeParse(row.analysis);
+    if (parsed.success && !byMedia.has(row.media_id)) byMedia.set(row.media_id, parsed.data);
+  }
+  return byMedia;
+}
+
+function AssetCard({
+  asset,
+  url,
+  analysis,
+  tz,
+}: {
+  asset: Asset;
+  url: string | undefined;
+  analysis: Analysis | undefined;
+  tz: string;
+}) {
+  return (
+    <article className="flex h-full flex-col overflow-hidden rounded-[18px] border border-line bg-white">
+      <div className="relative flex aspect-[4/5] items-center justify-center bg-soft text-muted">
+        {url && asset.kind === "video" ? (
+          <video
+            src={`${url}#t=0.1`}
+            controls
+            playsInline
+            preload="metadata"
+            className="size-full bg-ink object-contain"
+          />
+        ) : url && asset.kind === "image" ? (
+          // Signed Storage URLs expire, so they skip the image optimizer.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt="" loading="lazy" className="size-full object-cover" />
+        ) : asset.kind === "audio" ? (
+          <MicIcon size={32} />
+        ) : (
+          <FolderIcon size={32} />
+        )}
+        {asset.duration !== null && asset.duration > 0 && (
+          <span className="pointer-events-none absolute top-2 right-2 rounded-md bg-ink/60 px-1.5 py-0.5 text-[11px] font-bold text-white">
+            {formatDuration(asset.duration)}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-1.5 p-3.5">
+        <span className="text-xs font-semibold text-muted">
+          {sourceLabels[asset.source]} · {formatShortDateTime(asset.created_at, tz)}
+        </span>
+        {analysis ? (
+          <>
+            <p className="text-[13px] leading-snug">{analysis.summary}</p>
+            {analysis.lighting === "poor" && (
+              <span className="self-start rounded-full bg-peach px-2 py-1 text-[11px] font-bold text-peach-ink">
+                Lumière faible
+              </span>
+            )}
+            {analysis.issues.length > 0 && (
+              <p className="text-xs leading-snug text-muted">À noter : {analysis.issues.slice(0, 2).join(" · ")}</p>
+            )}
+          </>
+        ) : asset.kind === "video" && asset.analysis_status === "running" ? (
+          <p className="text-[13px] text-muted">Fauve regarde cette vidéo…</p>
+        ) : asset.kind === "video" && asset.analysis_status === "failed" ? (
+          <p className="text-[13px] text-muted">Fauve n’a pas pu analyser cette vidéo.</p>
+        ) : null}
+        {!url && (asset.kind === "video" || asset.kind === "image") && (
+          <p className="text-xs text-muted">Aperçu indisponible pour le moment.</p>
+        )}
+      </div>
+    </article>
   );
 }
