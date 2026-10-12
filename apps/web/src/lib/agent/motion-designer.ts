@@ -19,7 +19,13 @@ function transpile(code: string): string {
   return transform(code, { transforms: ["typescript", "jsx"], jsxRuntime: "classic", production: true }).code;
 }
 
-async function writeScene(studioId: string, request: SceneRequest, brand: Brand, fix?: { code: string; error: string }) {
+async function writeScene(
+  studioId: string,
+  request: SceneRequest,
+  brand: Brand,
+  artDirection: string | undefined,
+  fix?: { code: string; error: string },
+) {
   const content = fix
     ? `Ce code a échoué : ${fix.error}\nCorrige-le en gardant la même intention.\n\nBrief : ${request.brief}\n\nCode :\n${fix.code}`
     : JSON.stringify({
@@ -28,6 +34,7 @@ async function writeScene(studioId: string, request: SceneRequest, brand: Brand,
         fps: 30,
         format: "1080 × 1920",
         marque: brand,
+        direction_artistique: artDirection,
         code_precedent: request.previousCode,
       });
   const response = await anthropic().beta.messages.parse({
@@ -50,10 +57,15 @@ async function writeScene(studioId: string, request: SceneRequest, brand: Brand,
   }
 }
 
-export async function designMotionScenes(studioId: string, requests: SceneRequest[], brand: Brand): Promise<SceneResult[]> {
+export async function designMotionScenes(
+  studioId: string,
+  requests: SceneRequest[],
+  artDirection: string | undefined,
+  brand: Brand,
+): Promise<SceneResult[]> {
   if (!requests.length) return [];
   let results: SceneResult[] = await Promise.all(
-    requests.map(async (r) => ({ id: r.id, ...(await writeScene(studioId, r, brand).catch((e: unknown) => ({ code: null, js: null, error: String(e) }))) })),
+    requests.map(async (r) => ({ id: r.id, ...(await writeScene(studioId, r, brand, artDirection).catch((e: unknown) => ({ code: null, js: null, error: String(e) }))) })),
   );
 
   for (let round = 0; round < 2; round++) {
@@ -67,7 +79,7 @@ export async function designMotionScenes(studioId: string, requests: SceneReques
     const fixed = await Promise.all(
       failed.map(async (r) => ({
         id: r.id,
-        ...(await writeScene(studioId, requests.find((q) => q.id === r.id)!, brand, { code: r.code!, error: r.error ?? "erreur" }).catch(
+        ...(await writeScene(studioId, requests.find((q) => q.id === r.id)!, brand, artDirection, { code: r.code!, error: r.error ?? "erreur" }).catch(
           (e: unknown) => ({ code: r.code, js: null, error: String(e) }),
         )),
       })),

@@ -1,32 +1,27 @@
-import { useId } from "react";
+import type { CSSProperties } from "react";
 
-/** Fauve's gradient orb, the product's identity mark. */
-export function Orb({ size = 36, className }: { size?: number; className?: string }) {
-  const id = useId();
+/**
+ * Fauve's identity mark: a gradient sphere that slowly breathes into organic
+ * shapes, with three orbits turning around it in 3D, each carrying a small
+ * moon. Pure CSS (see .fauve-orb in globals.css); motion stops when the device
+ * asks for reduced motion. `still` renders the frozen mark (favicons, tiny sizes).
+ */
+export function Orb({ size = 36, className, still = false }: { size?: number; className?: string; still?: boolean }) {
   return (
-    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 120 120" className={className}>
-      <defs>
-        <radialGradient id={id} cx="35%" cy="30%" r="75%">
-          <stop offset="0%" stopColor="#FFD6C8" />
-          <stop offset="55%" stopColor="#F2694E" />
-          <stop offset="100%" stopColor="#5B3FD9" />
-        </radialGradient>
-      </defs>
-      <circle cx="60" cy="60" r="54" fill={`url(#${id})`} />
-      <ellipse cx="60" cy="60" rx="54" ry="20" fill="none" stroke="#FFFFFF" strokeOpacity=".45" strokeWidth="1.5" />
-      <ellipse cx="60" cy="60" rx="22" ry="54" fill="none" stroke="#FFFFFF" strokeOpacity=".45" strokeWidth="1.5" />
-      <ellipse
-        cx="60"
-        cy="60"
-        rx="54"
-        ry="38"
-        fill="none"
-        stroke="#FFFFFF"
-        strokeOpacity=".25"
-        strokeWidth="1.5"
-        transform="rotate(30 60 60)"
-      />
-    </svg>
+    <span
+      aria-hidden="true"
+      className={`fauve-orb${still ? " fauve-orb-still" : ""}${className ? ` ${className}` : ""}`}
+      style={{ "--orb": `${size}px` } as CSSProperties}
+    >
+      <span className="fauve-orb-sphere" />
+      <span className="fauve-orb-ring fauve-orb-ring-a">
+        <span className="fauve-orb-moon" />
+      </span>
+      <span className="fauve-orb-ring fauve-orb-ring-b">
+        <span className="fauve-orb-moon" />
+      </span>
+      <span className="fauve-orb-ring fauve-orb-ring-c" />
+    </span>
   );
 }
 

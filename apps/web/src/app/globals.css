@@ -121,3 +121,145 @@
   color: var(--color-violet);
   font-weight: 600;
 }
+
+/* Fauve's orb (components/orb.tsx): a breathing sphere with three 3D orbits. */
+.fauve-orb {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--orb);
+  height: var(--orb);
+  perspective: calc(var(--orb) * 4);
+}
+.fauve-orb-sphere {
+  position: absolute;
+  inset: 14%;
+  background: radial-gradient(circle at 34% 30%, #ffe2d6 0%, #f8a48c 24%, #f2694e 52%, #8a4ad9 82%, #5b3fd9 100%);
+  border-radius: 50%;
+  box-shadow:
+    inset calc(var(--orb) * -0.06) calc(var(--orb) * -0.08) calc(var(--orb) * 0.14) rgba(40, 20, 90, 0.35),
+    0 calc(var(--orb) * 0.06) calc(var(--orb) * 0.18) rgba(91, 63, 217, 0.25);
+  animation: fauve-morph 9s ease-in-out infinite;
+}
+.fauve-orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: max(1px, calc(var(--orb) * 0.02)) solid rgba(91, 63, 217, 0.55);
+  transform-style: preserve-3d;
+}
+.fauve-orb-ring-a {
+  animation: fauve-orbit-a 7s linear infinite;
+}
+.fauve-orb-ring-b {
+  inset: 4%;
+  border-color: rgba(242, 105, 78, 0.6);
+  animation: fauve-orbit-b 11s linear infinite;
+}
+.fauve-orb-ring-c {
+  inset: 8% -6%;
+  border-color: rgba(91, 63, 217, 0.3);
+  animation: fauve-orbit-c 15s linear infinite;
+}
+.fauve-orb-moon {
+  position: absolute;
+  top: calc(var(--orb) * -0.035);
+  left: 50%;
+  width: max(3px, calc(var(--orb) * 0.07));
+  height: max(3px, calc(var(--orb) * 0.07));
+  margin-left: max(-1.5px, calc(var(--orb) * -0.035));
+  border-radius: 50%;
+  background: #5b3fd9;
+  box-shadow: 0 0 calc(var(--orb) * 0.08) rgba(91, 63, 217, 0.6);
+}
+.fauve-orb-ring-b .fauve-orb-moon {
+  background: #f2694e;
+  box-shadow: 0 0 calc(var(--orb) * 0.08) rgba(242, 105, 78, 0.6);
+}
+@keyframes fauve-morph {
+  0%, 100% { border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%; transform: rotate(0deg) scale(1); }
+  25% { border-radius: 58% 42% 55% 45% / 47% 56% 44% 53%; transform: rotate(12deg) scale(1.03); }
+  50% { border-radius: 44% 56% 46% 54% / 57% 45% 55% 43%; transform: rotate(-6deg) scale(0.98); }
+  75% { border-radius: 53% 47% 41% 59% / 44% 54% 46% 56%; transform: rotate(8deg) scale(1.02); }
+}
+@keyframes fauve-orbit-a {
+  from { transform: rotateX(72deg) rotateY(-12deg) rotateZ(0deg); }
+  to { transform: rotateX(72deg) rotateY(-12deg) rotateZ(360deg); }
+}
+@keyframes fauve-orbit-b {
+  from { transform: rotateX(64deg) rotateY(48deg) rotateZ(360deg); }
+  to { transform: rotateX(64deg) rotateY(48deg) rotateZ(0deg); }
+}
+@keyframes fauve-orbit-c {
+  from { transform: rotateX(78deg) rotateY(-58deg) rotateZ(0deg); }
+  to { transform: rotateX(78deg) rotateY(-58deg) rotateZ(360deg); }
+}
+.fauve-orb-still .fauve-orb-sphere,
+.fauve-orb-still .fauve-orb-ring {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fauve-orb-sphere,
+  .fauve-orb-ring {
+    animation-play-state: paused;
+  }
+}
+
+/* Fauve's mascot (components/mascot.tsx): a sketchy doodle whose line boils, blinks and sways. */
+.fauve-cat {
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--cat);
+  height: var(--cat);
+  animation: fauve-sway 6s ease-in-out infinite;
+}
+.fauve-cat svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.fauve-cat-take {
+  opacity: 0;
+  animation: fauve-boil 0.6s steps(1, end) infinite;
+}
+.fauve-cat-take:nth-of-type(2) {
+  animation-delay: -0.2s;
+}
+.fauve-cat-take:nth-of-type(3) {
+  animation-delay: -0.4s;
+}
+.fauve-cat-take:first-of-type {
+  opacity: 1;
+}
+.fauve-cat-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fauve-blink 4.5s ease-in-out infinite;
+}
+.fauve-cat-orbit {
+  transform-origin: 50px 56px;
+  animation: fauve-tilt 8s ease-in-out infinite;
+}
+@keyframes fauve-boil {
+  0% { opacity: 1; }
+  33.33%, 100% { opacity: 0; }
+}
+@keyframes fauve-sway {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  30% { transform: rotate(-4deg) translateY(-2%); }
+  60% { transform: rotate(3deg) translateY(0); }
+}
+@keyframes fauve-blink {
+  0%, 44%, 50%, 100% { transform: scaleY(1); }
+  47% { transform: scaleY(0.1); }
+}
+@keyframes fauve-tilt {
+  0%, 100% { transform: rotate(-10deg); }
+  50% { transform: rotate(8deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fauve-cat,
+  .fauve-cat * {
+    animation: none !important;
+  }
+}

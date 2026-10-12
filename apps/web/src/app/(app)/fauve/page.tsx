@@ -4,32 +4,20 @@ import { Suspense } from "react";
 import { z } from "zod";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { CalendarIcon, CheckIcon, FilmIcon, WhatsAppIcon } from "@/components/icons";
-import { Orb } from "@/components/orb";
+import { Mascot } from "@/components/mascot";
 import { StatusPill } from "@/components/status-pill";
 import { localDateOf, weekOf } from "@/lib/dates";
 import { formatShortDate, formatShortDateTime, kindLabels, plural } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
+import { loadChat } from "./chat-actions";
+import { FauveChat } from "./fauve-chat";
 import { getStudioContext, POST_COLUMNS, postRowSchema, rows, SHOT_COLUMNS, shotRowSchema, type PostRow } from "@/lib/studio";
 
 export const metadata: Metadata = { title: "Fauve" };
+// The chat runs Fauve (and may queue a montage) inside a server action.
+export const maxDuration = 300;
 
 const UPCOMING = ["planned", "content_requested", "media_received", "validated", "scheduled"] as const;
-
-const messageSchema = z.object({
-  id: z.uuid(),
-  direction: z.enum(["inbound", "outbound"]),
-  type: z.string(),
-  body: z.string().nullable(),
-  created_at: z.string(),
-});
-
-const mediaLabels: Record<string, string> = {
-  video: "Vidéo",
-  image: "Photo",
-  audio: "Message vocal",
-  document: "Document",
-  sticker: "Sticker",
-};
 
 export default function FauvePage() {
   return (
@@ -92,19 +80,13 @@ async function Home() {
       .neq("status", "skipped")
       .gte("scheduled_at", week.start.toISOString())
       .lt("scheduled_at", week.end.toISOString()),
-    db
-      .from("whatsapp_messages")
-      .select("id, direction, type, body, created_at")
-      .eq("studio_id", studioId)
-      .order("created_at", { ascending: false })
-      .limit(30),
+    loadChat(),
   ]);
 
   const toValidate = rows(postRowSchema, drafts, "posts");
   const next = rows(postRowSchema, upcoming, "posts");
   const toFilm = rows(shotRowSchema, shots, "shot_requests");
   const thisWeek = rows(z.object({ status: z.string() }), weekPosts, "posts");
-  const conversation = rows(messageSchema, messages, "whatsapp_messages").reverse();
   const published = thisWeek.filter((p) => p.status === "published" || p.status === "measured").length;
 
   const summary = [
@@ -120,7 +102,7 @@ async function Home() {
   return (
     <>
       <div className="flex flex-col items-center gap-4 pt-4 text-center">
-        <Orb size={88} />
+        <Mascot size={110} />
         <h1 className="text-4xl font-extrabold tracking-[-0.03em] sm:text-[48px]">
           Bonjour{member.first_name ? " " : ""}
           {member.first_name && <span className="accent">{member.first_name}</span>}
@@ -183,19 +165,13 @@ async function Home() {
       <section aria-labelledby="conversation" className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <h2 id="conversation" className="text-lg font-bold">
-            Conversation récente
+            Parle à Fauve
           </h2>
-          <p className="text-[13px] text-muted">Tes derniers échanges avec Fauve sur WhatsApp, pour retrouver une demande.</p>
+          <p className="text-[13px] text-muted">
+            La même conversation que sur WhatsApp : demande un montage, un planning, un bilan. Les vidéos s’affichent ici.
+          </p>
         </div>
-        <div className="flex flex-col gap-2.5 rounded-[22px] border border-line bg-white p-4 sm:p-5">
-          {conversation.length ? (
-            conversation.map((m) => <Bubble key={m.id} message={m} tz={tz} />)
-          ) : (
-            <p className="py-6 text-center text-sm text-muted">
-              Pas encore de message. Écris à Fauve sur WhatsApp pour commencer.
-            </p>
-          )}
-        </div>
+        <FauveChat initial={messages} timezone={tz} />
       </section>
 
       <div className="flex flex-col items-center gap-2.5 text-center">
@@ -248,32 +224,5 @@ function PostLine({ post, tz }: { post: PostRow; tz: string }) {
       </span>
       <StatusPill status={post.status} className="shrink-0" />
     </Link>
-  );
-}
-
-function Bubble({ message, tz }: { message: z.infer<typeof messageSchema>; tz: string }) {
-  const media = mediaLabels[message.type];
-  if (!message.body && !media) return null;
-  const mine = message.direction === "inbound";
-  return (
-    <div className={`flex max-w-[85%] flex-col gap-1 ${mine ? "items-end self-end" : "items-start self-start"}`}>
-      <div
-        className={`px-3.5 py-2.5 text-[15px] leading-[1.45] whitespace-pre-wrap ${
-          mine
-            ? "rounded-[16px_16px_4px_16px] bg-violet text-white"
-            : "rounded-[16px_16px_16px_4px] border border-line bg-soft"
-        }`}
-      >
-        {media && (
-          <span className={`block text-[13px] font-bold ${mine ? "text-white/85" : "text-muted"}`}>
-            {media} envoyé{media === "Vidéo" || media === "Photo" ? "e" : ""}
-          </span>
-        )}
-        {message.body}
-      </div>
-      <span className="px-1 text-[11px] text-muted">
-        {mine ? "Toi" : "Fauve"} · {formatShortDateTime(message.created_at, tz)}
-      </span>
-    </div>
   );
 }
