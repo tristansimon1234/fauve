@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   AbsoluteFill,
   Easing,
@@ -11,6 +11,8 @@ import {
   useVideoConfig,
 } from "remotion";
 import { loadFonts } from "./fonts";
+import { MotionScene } from "./MotionScene";
+import { SceneView } from "./Scene";
 import { THEMES, type Theme } from "./theme";
 import type { ReelProps } from "./types";
 
@@ -30,17 +32,26 @@ export function Reel(props: ReelProps) {
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       {props.segments.map((segment, i) => (
         <Sequence key={i} from={segment.startAt} durationInFrames={segment.durationInFrames} layout="none">
-          <Shot segment={segment} fadeIn={i > 0 ? props.fadeFrames : 0} theme={theme} />
+          <FadeIn frames={i > 0 ? props.fadeFrames : 0}>
+            {segment.type === "clip" ? (
+              <>
+                <Shot segment={segment} theme={theme} />
+                {/* Soft gradients keep white text readable on any footage. */}
+                <AbsoluteFill
+                  style={{
+                    background:
+                      "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.12) 30%, rgba(0,0,0,0) 45%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.28) 100%)",
+                  }}
+                />
+              </>
+            ) : segment.type === "motion" ? (
+              <MotionScene js={segment.js} fallback={segment.fallback} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} />
+            ) : (
+              <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} />
+            )}
+          </FadeIn>
         </Sequence>
       ))}
-
-      {/* Soft gradients keep white text readable on any footage. */}
-      <AbsoluteFill
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.12) 30%, rgba(0,0,0,0) 45%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.28) 100%)",
-        }}
-      />
 
       {props.texts.map((t, i) => (
         <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
@@ -59,14 +70,20 @@ export function Reel(props: ReelProps) {
   );
 }
 
-function Shot({ segment, fadeIn, theme }: { segment: ReelProps["segments"][number]; fadeIn: number; theme: Theme }) {
+function FadeIn({ frames, children }: { frames: number; children: ReactNode }) {
   const frame = useCurrentFrame();
-  const opacity = fadeIn ? interpolate(frame, [0, fadeIn], [0, 1], clamp) : 1;
+  return <AbsoluteFill style={{ opacity: frames ? interpolate(frame, [0, frames], [0, 1], clamp) : 1 }}>{children}</AbsoluteFill>;
+}
+
+type ClipSegment = Extract<ReelProps["segments"][number], { type: "clip" }>;
+
+function Shot({ segment, theme }: { segment: ClipSegment; theme: Theme }) {
+  const frame = useCurrentFrame();
   const scale = segment.zoom
     ? interpolate(frame, [0, segment.durationInFrames], [1, theme.zoomTo], { ...clamp, easing: Easing.inOut(Easing.quad) })
     : 1;
   return (
-    <AbsoluteFill style={{ opacity }}>
+    <AbsoluteFill>
       <OffthreadVideo
         src={segment.src}
         trimBefore={segment.startFrom}

@@ -195,7 +195,10 @@ test("motion: plan becomes a frame-accurate Remotion timeline", async () => {
     brand: { name: "Indar", accent: "#FFE9E1" },
   });
   assert.equal(props.fadeFrames, 11);
-  assert.deepEqual(props.segments.map((s) => [s.startAt, s.startFrom, s.durationInFrames, s.zoom]), [[0, 30, 90, true], [79, 0, 90, false]]);
+  assert.deepEqual(
+    props.segments.map((s) => (s.type === "clip" ? [s.startAt, s.startFrom, s.durationInFrames, s.zoom] : s.type)),
+    [[0, 30, 90, true], [79, 0, 90, false]],
+  );
   assert.equal(props.durationInFrames, 169);
   assert.deepEqual(props.words, [{ w: "respire", from: 15, to: 30 }]); // the word outside the kept range is dropped
   assert.equal(props.brand.accentInk, "#1C1530"); // light accent gets dark text
@@ -225,9 +228,25 @@ test("editor: model plans are clamped to the clips and the timeline", async () =
     }),
     { a: 6, b: 10 },
   );
-  assert.deepEqual(plan.segments.map((s) => [s.clip_id, s.in, s.out]), [["a", 2, 6], ["b", 0, 3]]);
+  assert.deepEqual(plan.segments.map((s) => ("clip_id" in s ? [s.clip_id, s.in, s.out] : "other")), [["a", 2, 6], ["b", 0, 3]]);
   assert.equal(plan.duration, 7);
   assert.deepEqual(plan.texts.map((t) => [t.text, t.to, t.emphasis]), [["Ça brûle", 2, ["brûle"]], ["Trop tard", 7, undefined]]);
   const lonely = editPlanSchema.parse({ ...validPlan, segments: [{ clip_id: "x", in: 0, out: 2 }] });
   assert.throws(() => normalizeEditPlan(lonely, {}), /aucun plan/);
+});
+
+test("motion scenes: generated code is checked before it runs", async () => {
+  const { checkMotionCode } = await import("./motion-scene.ts");
+  const good = `function Scene({ width, brand }) {
+    const frame = useCurrentFrame();
+    const o = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: "clamp" });
+    return <AbsoluteFill style={{ background: brand.accent, opacity: o }}><svg width={width}><circle r={random("a") * 40} /></svg></AbsoluteFill>;
+  }`;
+  assert.deepEqual(checkMotionCode(good), []);
+  assert.deepEqual(checkMotionCode(`function Scene() { fetch("https://evil.test"); return null; }`), ["accès réseau"]);
+  assert.deepEqual(checkMotionCode(`import x from "y";\nfunction Scene() { return null; }`), ["import/export"]);
+  assert.deepEqual(checkMotionCode(`function Scene() { const r = Math.random(); return null; }`), ["non déterministe"]);
+  assert.deepEqual(checkMotionCode(`function Scene() { document.title = "x"; return null; }`), ["accès au navigateur"]);
+  assert.deepEqual(checkMotionCode(`function Scene() { return <img src="https://x.test/a.png" />; }`), ["ressource externe"]);
+  assert.deepEqual(checkMotionCode(`const Other = () => null;`), ["il faut une fonction Scene"]);
 });

@@ -1,4 +1,4 @@
-import type { ClipAnalysis, EditPlan, MotionTemplate } from "./schemas.ts";
+import { isClipSegment, isMotionSegment, segmentSeconds, type ClipAnalysis, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -20,7 +20,10 @@ const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> 
   chic: { display: "Cormorant Garamond", body: "Plus Jakarta Sans" },
 };
 
-export type ReelSegment = { src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean };
+export type ReelSegment =
+  | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean }
+  | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
+  | { type: "motion"; js: string; fallback: Scene; startAt: number; durationInFrames: number };
 export type ReelText = {
   text: string;
   style: "hook" | "band" | "caption";
@@ -50,8 +53,11 @@ export type ReelInputs = {
   clipUrls: Record<string, string>;
   /** Word timings from the clip analyses, by clip_id (for subtitles). */
   words?: Record<string, ClipAnalysis["words"]>;
-  brand: { name: string; accent?: string | null; logoUrl?: string | null };
+  /** fonts: the studio's brand fonts (display first); the plan's fonts win over them. */
+  brand: { name: string; accent?: string | null; logoUrl?: string | null; fonts?: string[] };
 };
+
+const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
 
 const DEFAULT_ACCENT = "#5B3FD9";
 
@@ -66,7 +72,7 @@ function inkOn(hex: string): string {
 export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const fps = REEL_FPS;
   const toFrames = (seconds: number) => Math.max(0, Math.round(seconds * fps));
-  const lengths = plan.segments.map((s) => Math.max(1, toFrames(s.out - s.in)));
+  const lengths = plan.segments.map((s) => Math.max(1, toFrames(segmentSeconds(s))));
   const fadeFrames =
     plan.transitions === "fade" && plan.segments.length > 1 && lengths.every((l) => l > toFrames(FADE_SECONDS) + 4)
       ? toFrames(FADE_SECONDS)
@@ -74,17 +80,26 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
 
   let cursor = 0;
   const segments: ReelSegment[] = plan.segments.map((s, i) => {
+    const startAt = cursor;
+    cursor += lengths[i]! - fadeFrames;
+    if (isMotionSegment(s)) {
+      const fallback = s.motion.fallback ?? { kind: "title" as const, title: inputs.brand.name || " ", background: "accent" as const };
+      // Without generated code, the motion segment is just its fixed fallback scene.
+      return s.motion.js
+        ? { type: "motion", js: s.motion.js, fallback, startAt, durationInFrames: lengths[i]! }
+        : { type: "scene", scene: fallback, startAt, durationInFrames: lengths[i]! };
+    }
+    if (!isClipSegment(s)) return { type: "scene", scene: s.scene, startAt, durationInFrames: lengths[i]! };
     const src = inputs.clipUrls[s.clip_id];
     if (!src) throw new Error(`No URL for clip ${s.clip_id}`);
-    const segment = {
+    return {
+      type: "clip",
       src,
       startFrom: toFrames(s.in),
-      startAt: cursor,
+      startAt,
       durationInFrames: lengths[i]!,
       zoom: s.zoom === "light" || plan.transitions === "light_zoom",
     };
-    cursor += lengths[i]! - fadeFrames;
-    return segment;
   });
   const durationInFrames = cursor + fadeFrames;
 
@@ -100,6 +115,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const words: ReelWord[] = [];
   if (plan.subtitles) {
     plan.segments.forEach((s, i) => {
+      if (!isClipSegment(s)) return;
       for (const word of inputs.words?.[s.clip_id] ?? []) {
         if (word.start < s.in || word.end > s.out) continue;
         const from = segments[i]!.startAt + toFrames(word.start - s.in);
@@ -110,8 +126,6 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     words.sort((a, b) => a.from - b.from);
   }
 
-  const accent = /^#[0-9a-f]{6}$/i.test(inputs.brand.accent ?? "") ? inputs.brand.accent! : DEFAULT_ACCENT;
-  const fonts = TEMPLATE_FONTS[inputs.template];
   const endCardFrames = toFrames(END_CARD_SECONDS);
 
   return {
@@ -123,16 +137,23 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     segments,
     texts,
     words,
-    brand: {
-      name: inputs.brand.name,
-      accent,
-      accentInk: inkOn(accent),
-      displayFont: fonts.display,
-      bodyFont: fonts.body,
-      logoUrl: inputs.brand.logoUrl ?? null,
-    },
+    brand: resolveReelBrand(plan, inputs.template, inputs.brand),
     endCard: plan.end_card
       ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, durationInFrames - endCardFrames) }
       : null,
+  };
+}
+
+/** Colours and fonts a Reel uses: the plan's fonts, then the studio's, then the template's. */
+export function resolveReelBrand(plan: Pick<EditPlan, "fonts">, template: MotionTemplate, brand: ReelInputs["brand"]): ReelProps["brand"] {
+  const accent = /^#[0-9a-f]{6}$/i.test(brand.accent ?? "") ? brand.accent! : DEFAULT_ACCENT;
+  const brandFonts = (brand.fonts ?? []).filter((f) => FONT_NAME.test(f));
+  return {
+    name: brand.name,
+    accent,
+    accentInk: inkOn(accent),
+    displayFont: plan.fonts?.display ?? brandFonts[0] ?? TEMPLATE_FONTS[template].display,
+    bodyFont: plan.fonts?.body ?? brandFonts[1] ?? TEMPLATE_FONTS[template].body,
+    logoUrl: brand.logoUrl ?? null,
   };
 }

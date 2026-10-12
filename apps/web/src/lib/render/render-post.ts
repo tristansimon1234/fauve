@@ -5,7 +5,9 @@ import {
   buildAss,
   buildReelProps,
   clipAnalysisSchema,
+  isClipSegment,
   motionTemplateSchema,
+  withoutScenes,
   type ClipAnalysis,
   buildFfmpegArgs,
   canTransition,
@@ -63,7 +65,7 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
 
-  const clipIds = [...new Set(plan.segments.map((s) => s.clip_id))];
+  const clipIds = [...new Set(plan.segments.filter(isClipSegment).map((s) => s.clip_id))];
   const assets = check(
     await db.from("media_assets").select("id, storage_path, mime_type").eq("studio_id", studioId).in("id", clipIds),
   ).data!;
@@ -86,7 +88,7 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
     db.from("clip_analyses").select("media_id, analysis").in("media_id", clipIds).order("created_at", { ascending: false }),
   ]);
   const style = brandProfileSchema
-    .pick({ colors: true, logo_url: true })
+    .pick({ colors: true, logo_url: true, fonts: true })
     .catch({})
     .parse(brand.data?.[0]?.profile ?? {});
   const accent = style.colors?.[0];
@@ -102,18 +104,22 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
 
   const started = Date.now();
   try {
-    const ffmpegRender = () =>
-      renderInSandbox({ id: renderId, clips, ass: buildAss(plan, accent), ffmpegArgs: buildFfmpegArgs(plan, { clipFiles }) });
+    // The ffmpeg engine has no motion-design scenes: it renders the clips only.
+    const ffmpegRender = () => {
+      const clipsOnly = withoutScenes(plan);
+      if (!clipsOnly.segments.length) throw new Error("Montage sans vidéo : le moteur de motion design est indisponible");
+      return renderInSandbox({ id: renderId, clips, ass: buildAss(clipsOnly, accent), ffmpegArgs: buildFfmpegArgs(clipsOnly, { clipFiles }) });
+    };
     let engine: "remotion" | "ffmpeg" = "ffmpeg";
     let mp4: Buffer;
-    let durationMs = Math.round(renderDuration(plan) * 1000);
+    let durationMs = Math.round(renderDuration(withoutScenes(plan)) * 1000);
     if (motion.success) {
       // Motion templates (Remotion); the ffmpeg engine is the safety net.
       const props = buildReelProps(plan, {
         template: motion.data,
         clipUrls,
         words,
-        brand: { name: (studio.data?.name as string | null) ?? "", accent, logoUrl: style.logo_url ?? null },
+        brand: { name: (studio.data?.name as string | null) ?? "", accent, logoUrl: style.logo_url ?? null, fonts: style.fonts },
       });
       try {
         mp4 = await renderReelInSandbox({ id: renderId, props });

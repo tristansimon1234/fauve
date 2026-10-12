@@ -141,3 +141,25 @@ export async function renderReelInSandbox(job: { id: string; props: ReelProps })
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }
 }
+
+/** Runs generated motion scenes once outside the video (first, middle, last frame); returns the error per scene id. */
+export async function smokeTestScenes(
+  scenes: { id: string; js: string; durationInFrames: number }[],
+): Promise<Record<string, string | null>> {
+  if (!scenes.length) return {};
+  const sandbox = await remotionSandbox();
+  const file = `${ROOT}/jobs/smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
+  try {
+    await sandbox.writeFiles([{ path: file, content: JSON.stringify(scenes) }]);
+    const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 60 node smoke.mjs "$1"`, "bash", file] });
+    const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
+    try {
+      return JSON.parse(lastLine) as Record<string, string | null>;
+    } catch {
+      const output = (await result.output("both").catch(() => "")).slice(-400);
+      return Object.fromEntries(scenes.map((s) => [s.id, `smoke test failed: ${output}`]));
+    }
+  } finally {
+    await bash(sandbox, 'rm -f "$1"', [file]).catch(() => {});
+  }
+}

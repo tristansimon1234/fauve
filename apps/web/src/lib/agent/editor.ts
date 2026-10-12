@@ -6,11 +6,16 @@ import {
   EDITOR_SYSTEM_PROMPT,
   editorOutputSchema,
   editPlanSchema,
+  isClipSegment,
+  isMotionSegment,
+  motionTemplateSchema,
   normalizeEditPlan,
+  resolveReelBrand,
   type EditPlan,
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { designMotionScenes } from "./motion-designer";
 import { anthropic, logClaudeCost } from "./run";
 
 export type DesignedEdit = { editPlanId: string; version: number; plan: EditPlan; rationale: string };
@@ -39,13 +44,12 @@ export async function designEdit(params: {
   const mediaIds = params.mediaIds?.length
     ? params.mediaIds
     : previousPlan.success
-      ? [...new Set(previousPlan.data.segments.map((s) => s.clip_id))]
+      ? [...new Set(previousPlan.data.segments.filter(isClipSegment).map((s) => s.clip_id))]
       : [];
-  if (!mediaIds.length) throw new Error("Aucune vidéo à monter : indique les media_id des clips");
-
+  // No clips is fine: the editor then builds a Reel entirely in motion design.
   const analyses = await Promise.all(mediaIds.map((id) => ensureClipAnalysis(params.studioId, id)));
   const clips = analyses.flatMap((a) => ("analysis" in a ? [{ media_id: a.media_id, analysis: a.analysis }] : []));
-  if (!clips.length) throw new Error("Les vidéos ne sont pas encore analysées, réessaie dans une minute");
+  if (mediaIds.length && !clips.length) throw new Error("Les vidéos ne sont pas encore analysées, réessaie dans une minute");
 
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
   const input = {
@@ -53,7 +57,16 @@ export async function designEdit(params: {
     brand: { tone: profile.tone, visual_notes: profile.visual_notes, colors: profile.colors, dos: profile.dos, donts: profile.donts },
     post: post.data,
     clips: clips.map((c) => ({ media_id: c.media_id, ...c.analysis, words: c.analysis.words?.length ? c.analysis.words : undefined })),
-    previous_plan: params.brief && previousPlan.success ? previousPlan.data : undefined,
+    // Motion code stays out of the editor's context: it only needs the briefs.
+    previous_plan:
+      params.brief && previousPlan.success
+        ? {
+            ...previousPlan.data,
+            segments: previousPlan.data.segments.map((s) =>
+              isMotionSegment(s) ? { motion: { brief: s.motion.brief, fallback: s.motion.fallback }, duration: s.duration } : s,
+            ),
+          }
+        : undefined,
     request: params.brief ?? "Premier montage de cette publication.",
   };
 
@@ -73,6 +86,37 @@ export async function designEdit(params: {
 
   const durations = Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.duration]));
   const plan = normalizeEditPlan(response.parsed_output.plan, durations);
+
+  // Free scenes: reuse the code of unchanged briefs, have the motion designer write the others.
+  const reusable = new Map(
+    (previousPlan.success ? previousPlan.data.segments : [])
+      .filter(isMotionSegment)
+      .filter((s) => s.motion.js)
+      .map((s) => [s.motion.brief, s.motion] as const),
+  );
+  const requests = plan.segments.flatMap((s, i) =>
+    isMotionSegment(s) && !reusable.has(s.motion.brief)
+      ? [{ id: `s${i}`, brief: s.motion.brief, durationInFrames: Math.round(s.duration * 30) }]
+      : [],
+  );
+  const designed = await designMotionScenes(
+    params.studioId,
+    requests,
+    resolveReelBrand(plan, motionTemplateSchema.catch("doux").parse(plan.template), {
+      name: (studio.data?.name as string | null) ?? "",
+      accent: profile.colors?.[0],
+      logoUrl: profile.logo_url,
+      fonts: profile.fonts,
+    }),
+  );
+  plan.segments = plan.segments.map((s, i) => {
+    if (!isMotionSegment(s)) return s;
+    const kept = reusable.get(s.motion.brief);
+    if (kept) return { ...s, motion: { ...s.motion, code: kept.code, js: kept.js } };
+    const result = designed.find((d) => d.id === `s${i}`);
+    if (result?.error) console.warn("motion scene falls back to its fixed scene", s.motion.brief.slice(0, 80), result.error);
+    return { ...s, motion: { ...s.motion, code: result?.code ?? undefined, js: result?.js ?? undefined } };
+  });
 
   const version = ((previous.data?.[0]?.version as number | undefined) ?? 0) + 1;
   const row = await db
