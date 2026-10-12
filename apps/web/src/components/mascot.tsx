@@ -1,34 +1,48 @@
 import type { CSSProperties } from "react";
 
 /**
- * Fauve's mascot, abstract: the orb becomes a face. The morphing gradient
- * sphere gets two soft ears and two minimal eyes that blink, with one orbit
- * turning around it. Pure CSS/SVG (.fauve-cat in globals.css); motion stops for
- * reduced motion. Decorative: pair it with text.
+ * Fauve's mascot: a friendly doodle of a little cat head, drawn like a sketch.
+ * The line "boils" (three hand-drawn takes of the same drawing shown in turn),
+ * the colour sits slightly off the outline like a riso print, the eyes blink and
+ * a loose scribbled orbit turns around it. Pure SVG/CSS (.fauve-cat in
+ * globals.css); motion stops for reduced motion. Decorative: pair it with text.
  */
+const HEAD =
+  "M22 54 C21 42 25 33 30 29 L27 15 Q28 11 32 13 L42 24 C47 22.5 53 22.5 58 24 L68 13 Q72 11 73 15 L70 29 C75 33 79 42 78 54 C78 71 66 82 50 82 C34 82 22 71 22 54 Z";
+
+const TAKES = [3, 7, 11];
+
 export function Mascot({ size = 120, className }: { size?: number; className?: string }) {
   return (
     <span aria-hidden="true" className={`fauve-cat${className ? ` ${className}` : ""}`} style={{ "--cat": `${size}px` } as CSSProperties}>
-      <svg className="fauve-cat-ears" viewBox="0 0 100 100">
+      <svg viewBox="0 0 100 100" overflow="visible">
         <defs>
-          <linearGradient id="fauve-cat-ear" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#F8A48C" />
-            <stop offset="1" stopColor="#F2694E" />
-          </linearGradient>
+          {TAKES.map((seed) => (
+            <filter key={seed} id={`fauve-sketch-${seed}`} x="-20%" y="-20%" width="140%" height="140%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed={seed} />
+              <feDisplacementMap in="SourceGraphic" scale="3.2" />
+            </filter>
+          ))}
         </defs>
-        <path className="fauve-cat-ear-l" d="M17 44 C14 26 18 12 26 8 C33 14 40 24 44 34 Z" fill="url(#fauve-cat-ear)" />
-        <path className="fauve-cat-ear-r" d="M83 44 C86 26 82 12 74 8 C67 14 60 24 56 34 Z" fill="url(#fauve-cat-ear)" />
+        {TAKES.map((seed) => (
+          <g key={seed} className="fauve-cat-take" filter={`url(#fauve-sketch-${seed})`}>
+            <g className="fauve-cat-orbit">
+              <ellipse cx="50" cy="56" rx="44" ry="13" fill="none" stroke="#5B3FD9" strokeWidth="1.6" strokeDasharray="200 30" opacity="0.55" />
+              <circle cx="93" cy="53" r="2.6" fill="#F2694E" />
+            </g>
+            <path d={HEAD} transform="translate(4 3)" fill="#FFD9CC" />
+            <path d={HEAD} fill="none" stroke="#1C1530" strokeWidth="2.4" strokeLinejoin="round" />
+            <path d="M29 22 L32 27 M71 22 L68 27" stroke="#F2694E" strokeWidth="2" strokeLinecap="round" />
+            <ellipse cx="34" cy="64" rx="5" ry="3" fill="#F8A48C" opacity="0.7" />
+            <ellipse cx="66" cy="64" rx="5" ry="3" fill="#F8A48C" opacity="0.7" />
+            <g className="fauve-cat-eyes">
+              <circle cx="40" cy="55" r="2.8" fill="#1C1530" />
+              <circle cx="60" cy="55" r="2.8" fill="#1C1530" />
+            </g>
+            <path d="M45 63 Q47.5 66 50 63 Q52.5 66 55 63" fill="none" stroke="#1C1530" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+        ))}
       </svg>
-      <span className="fauve-cat-head" />
-      <svg className="fauve-cat-face" viewBox="0 0 100 100">
-        <g className="fauve-cat-eyes">
-          <ellipse cx="40" cy="60" rx="3.6" ry="5" fill="#1C1530" />
-          <ellipse cx="60" cy="60" rx="3.6" ry="5" fill="#1C1530" />
-        </g>
-      </svg>
-      <span className="fauve-cat-ring">
-        <span className="fauve-cat-moon" />
-      </span>
     </span>
   );
 }
