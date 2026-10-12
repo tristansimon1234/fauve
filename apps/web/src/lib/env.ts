@@ -15,6 +15,8 @@ const schema = {
   // Supabase Auth → Send SMS hook secret ("v1,whsec_…"); several may be joined with "|".
   SEND_SMS_HOOK_SECRET: z.string().min(1),
   APP_URL: z.url().default("http://localhost:3000"),
+  // Secret for the browser test chat (/essai?cle=…). Unset = test chat disabled.
+  FAUVE_TEST_KEY: z.string().min(16),
   USD_TO_EUR: z.coerce.number().positive().optional(),
 } as const;
 
