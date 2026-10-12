@@ -1,32 +1,23 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { currentMember } from "@/lib/social/current-member";
 import { connectWithCode, InstagramError } from "@/lib/social/instagram";
+import { readOAuthState } from "@/lib/social/oauth-state";
 import { sendText } from "@/lib/whatsapp/client";
 
-// Instagram redirects here after the manager authorised Fauve.
+// Instagram redirects here after the manager authorised Fauve. The studio comes
+// from the signed state, not from a session: this page often opens in another
+// browser than the one that started the flow.
 function back(request: NextRequest, path: string, error?: string) {
   const url = new URL(path, request.url);
   if (error) url.searchParams.set("erreur", error);
-  const response = NextResponse.redirect(url);
-  response.cookies.delete({ name: "ig_oauth_state", path: "/api/instagram" });
-  return response;
-}
-
-function sameState(a: string | undefined, b: string | null): boolean {
-  if (!a || !b || a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  return NextResponse.redirect(url);
 }
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   if (params.get("error")) return back(request, "/connect", "refus");
-  if (!sameState(request.cookies.get("ig_oauth_state")?.value, params.get("state"))) {
-    return back(request, "/connect", "lien-expire");
-  }
-  const member = await currentMember();
-  if (!member) return back(request, "/connexion");
+  const state = readOAuthState(params.get("state"));
+  if (!state) return back(request, "/connect", "lien-expire");
   const code = params.get("code");
   if (!code) return back(request, "/connect", "refus");
 
@@ -42,6 +33,15 @@ export async function GET(request: NextRequest) {
   }
 
   const db = supabaseAdmin();
+  const memberRow = await db
+    .from("members")
+    .select("studio_id, phone_e164")
+    .eq("id", state.memberId)
+    .eq("studio_id", state.studioId)
+    .maybeSingle();
+  if (!memberRow.data) return back(request, "/connect", "lien-expire");
+  const member = memberRow.data as { studio_id: string; phone_e164: string | null };
+
   const social = await db
     .from("social_accounts")
     .upsert(
