@@ -1,78 +1,46 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
 import { z } from "zod";
 import { NoStudio, PageLoading } from "@/components/empty-state";
-import { CalendarIcon, CheckIcon, FilmIcon, WhatsAppIcon } from "@/components/icons";
-import { Mascot } from "@/components/mascot";
-import { StatusPill } from "@/components/status-pill";
 import { localDateOf, weekOf } from "@/lib/dates";
-import { formatShortDate, formatShortDateTime, kindLabels, plural } from "@/lib/format";
+import { plural } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
-import { loadChat } from "./chat-actions";
-import { FauveChat } from "./fauve-chat";
-import { getStudioContext, POST_COLUMNS, postRowSchema, rows, SHOT_COLUMNS, shotRowSchema, type PostRow } from "@/lib/studio";
+import { getStudioContext, rows } from "@/lib/studio";
+import { listConversations, loadConversation } from "./chat-actions";
+import { FauveWorkspace, type Suggestion } from "./fauve-workspace";
 
 export const metadata: Metadata = { title: "Fauve" };
 // The chat runs Fauve (and may queue a montage) inside a server action.
 export const maxDuration = 300;
 
-const UPCOMING = ["planned", "content_requested", "media_received", "validated", "scheduled"] as const;
-
-export default function FauvePage() {
+export default function FauvePage({ searchParams }: PageProps<"/fauve">) {
   return (
-    <main className="flex min-h-full flex-1 flex-col bg-soft">
-      <div className="flex justify-end px-4 py-4 sm:px-7 sm:py-5">
-        <a
-          href={whatsappLink()}
-          className="inline-flex h-9 items-center gap-2 rounded-full border border-line bg-white px-3.5 text-[13px] font-bold"
-        >
-          <WhatsAppIcon size={16} />
-          Continuer sur WhatsApp
-        </a>
-      </div>
-      <div className="flex flex-1 flex-col items-center px-4 pb-10 sm:px-7">
-        <div className="flex w-full max-w-[920px] flex-col gap-8">
-          <Suspense fallback={<PageLoading title="Bonjour" />}>
-            <Home />
-          </Suspense>
-        </div>
-      </div>
+    // Full height: the composer stays at the bottom (phone: minus the header and the tab bar).
+    <main className="flex h-[calc(100dvh-134px)] min-h-[480px] flex-col lg:h-dvh">
+      <Suspense fallback={<PageLoading title="Bonjour" />}>
+        <Home searchParams={searchParams} />
+      </Suspense>
     </main>
   );
 }
 
-async function Home() {
+async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searchParams"] }) {
   const { db, member } = await getStudioContext();
-  if (!member) return <NoStudio />;
+  if (!member) {
+    return (
+      <div className="px-4 pt-6 sm:px-10">
+        <NoStudio />
+      </div>
+    );
+  }
   const studioId = member.studio.id;
   const tz = member.studio.timezone;
-  const now = new Date();
-  const week = weekOf(localDateOf(now, tz), tz);
+  const week = weekOf(localDateOf(new Date(), tz), tz);
+  const requested = (await searchParams).c;
 
-  const [drafts, upcoming, shots, weekPosts, messages] = await Promise.all([
-    db
-      .from("posts")
-      .select(POST_COLUMNS)
-      .eq("studio_id", studioId)
-      .eq("status", "draft")
-      .order("scheduled_at", { ascending: true, nullsFirst: false })
-      .limit(5),
-    db
-      .from("posts")
-      .select(POST_COLUMNS)
-      .eq("studio_id", studioId)
-      .in("status", [...UPCOMING])
-      .gte("scheduled_at", now.toISOString())
-      .order("scheduled_at", { ascending: true })
-      .limit(5),
-    db
-      .from("shot_requests")
-      .select(SHOT_COLUMNS)
-      .eq("studio_id", studioId)
-      .eq("done", false)
-      .order("due_date", { ascending: true, nullsFirst: false })
-      .limit(5),
+  const [drafts, shots, weekPosts, conversations] = await Promise.all([
+    db.from("posts").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("status", "draft"),
+    db.from("shot_requests").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("done", false),
     db
       .from("posts")
       .select("status")
@@ -80,149 +48,48 @@ async function Home() {
       .neq("status", "skipped")
       .gte("scheduled_at", week.start.toISOString())
       .lt("scheduled_at", week.end.toISOString()),
-    loadChat(),
+    listConversations(),
   ]);
+  const active = typeof requested === "string" && conversations.some((c) => c.id === requested) ? requested : null;
+  const messages = active ? ((await loadConversation(active)) ?? []) : [];
 
-  const toValidate = rows(postRowSchema, drafts, "posts");
-  const next = rows(postRowSchema, upcoming, "posts");
-  const toFilm = rows(shotRowSchema, shots, "shot_requests");
+  const toValidate = drafts.count ?? 0;
+  const toFilm = shots.count ?? 0;
   const thisWeek = rows(z.object({ status: z.string() }), weekPosts, "posts");
   const published = thisWeek.filter((p) => p.status === "published" || p.status === "measured").length;
-
   const summary = [
     thisWeek.length
       ? `Cette semaine : ${plural(thisWeek.length, "publication prévue", "publications prévues")}, ${plural(published, "publiée", "publiées")}.`
       : "Rien n’est encore prévu cette semaine.",
-    toValidate.length ? `${plural(toValidate.length, "brouillon attend", "brouillons attendent")} ta validation.` : "",
-    toFilm.length ? `${plural(toFilm.length, "plan", "plans")} à filmer.` : "",
+    toValidate ? `${plural(toValidate, "brouillon attend", "brouillons attendent")} ta validation.` : "",
+    toFilm ? `${plural(toFilm, "plan", "plans")} à filmer.` : "",
   ]
     .filter(Boolean)
     .join(" ");
 
+  const suggestions: Suggestion[] = [
+    { icon: "film", label: "Monter une vidéo", prompt: "Je veux faire un Reel : comment je t’envoie mes vidéos ?" },
+    { icon: "calendar", label: "Planifier ma semaine", prompt: "Prépare le planning de mes publications de la semaine." },
+    toValidate
+      ? { icon: "check", label: `Valider mes brouillons (${toValidate})`, prompt: "Montre-moi les brouillons qui attendent ma validation." }
+      : { icon: "check", label: "Mes prochaines publications", prompt: "Qu’est-ce qui est prévu dans les prochains jours ?" },
+    { icon: "film", label: "Ce que je dois filmer", prompt: "Qu’est-ce que je dois filmer cette semaine ? Donne-moi les angles." },
+    { icon: "bulb", label: "Des idées de posts", prompt: "Donne-moi 3 idées de posts pour cette semaine." },
+    { icon: "pen", label: "Écrire une légende", prompt: "Aide-moi à écrire la légende de mon prochain post." },
+    { icon: "reply", label: "Répondre aux commentaires", prompt: "Y a-t-il des commentaires Instagram auxquels répondre ?" },
+    { icon: "chart", label: "Bilan de la semaine", prompt: "Fais-moi le bilan de la semaine sur Instagram." },
+  ];
+
   return (
-    <>
-      <div className="flex flex-col items-center gap-4 pt-4 text-center">
-        <Mascot size={110} />
-        <h1 className="text-4xl font-extrabold tracking-[-0.03em] sm:text-[48px]">
-          Bonjour{member.first_name ? " " : ""}
-          {member.first_name && <span className="accent">{member.first_name}</span>}
-        </h1>
-        <p className="max-w-[560px] text-[17px] text-muted">{summary}</p>
-      </div>
-
-      <section aria-labelledby="attente" className="flex flex-col gap-3">
-        <h2 id="attente" className="text-lg font-bold">
-          Ce qui t’attend
-        </h2>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3.5">
-          <Card title="À valider" icon={<CheckIcon size={18} />} empty="Aucun brouillon à valider.">
-            {toValidate.map((p) => (
-              <PostLine key={p.id} post={p} tz={tz} />
-            ))}
-          </Card>
-          <Card
-            title="À filmer"
-            icon={<FilmIcon size={18} />}
-            empty="Rien à filmer pour l’instant."
-            footer={
-              toFilm.length > 0 && (
-                <Link href="/calendrier" className="text-[13px] font-bold text-violet">
-                  Voir la liste de tournage
-                </Link>
-              )
-            }
-          >
-            {toFilm.map((s) => (
-              <div key={s.id} className="flex flex-col gap-0.5">
-                <span className="text-sm font-semibold">{s.label}</span>
-                {(s.hint || s.due_date) && (
-                  <span className="text-xs text-muted">
-                    {[s.due_date && `Pour le ${formatShortDate(`${s.due_date}T12:00:00Z`, "UTC")}`, s.hint]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                )}
-              </div>
-            ))}
-          </Card>
-          <Card
-            title="Prochaines publications"
-            icon={<CalendarIcon size={18} />}
-            empty="Aucune publication programmée."
-            footer={
-              <Link href="/calendrier" className="text-[13px] font-bold text-violet">
-                Ouvrir le calendrier
-              </Link>
-            }
-          >
-            {next.map((p) => (
-              <PostLine key={p.id} post={p} tz={tz} />
-            ))}
-          </Card>
-        </div>
-      </section>
-
-      <section aria-labelledby="conversation" className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h2 id="conversation" className="text-lg font-bold">
-            Parle à Fauve
-          </h2>
-          <p className="text-[13px] text-muted">
-            La même conversation que sur WhatsApp : demande un montage, un planning, un bilan. Les vidéos s’affichent ici.
-          </p>
-        </div>
-        <FauveChat initial={messages} timezone={tz} />
-      </section>
-
-      <div className="flex flex-col items-center gap-2.5 text-center">
-        <a href={whatsappLink()} className="btn btn-primary h-[52px] px-6.5">
-          <WhatsAppIcon />
-          Continuer sur WhatsApp
-        </a>
-        <p className="max-w-[460px] text-[13px] leading-normal text-muted">
-          Envoie tes vidéos à Fauve sur WhatsApp, de préférence en tant que document pour garder toute leur qualité.
-        </p>
-      </div>
-    </>
-  );
-}
-
-function Card({
-  title,
-  icon,
-  empty,
-  footer,
-  children,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  empty: string;
-  footer?: React.ReactNode;
-  children: React.ReactNode[];
-}) {
-  return (
-    <div className="flex flex-col gap-3 rounded-[20px] border border-line bg-white p-5">
-      <h3 className="flex items-center gap-2 text-[15px] font-bold">
-        <span className="text-violet">{icon}</span>
-        {title}
-      </h3>
-      {children.length ? children : <p className="text-sm text-muted">{empty}</p>}
-      {footer && <div className="mt-auto pt-1">{footer}</div>}
-    </div>
-  );
-}
-
-function PostLine({ post, tz }: { post: PostRow; tz: string }) {
-  return (
-    <Link href={`/publications/${post.id}`} className="flex items-start justify-between gap-3 hover:text-violet">
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate text-sm font-semibold">{post.title}</span>
-        <span className="text-xs text-muted">
-          {kindLabels[post.kind]}
-          {post.scheduled_at ? ` · ${formatShortDateTime(post.scheduled_at, tz)}` : " · date à définir"}
-        </span>
-      </span>
-      <StatusPill status={post.status} className="shrink-0" />
-    </Link>
+    <FauveWorkspace
+      firstName={member.first_name ?? null}
+      summary={summary}
+      suggestions={suggestions}
+      whatsappHref={whatsappLink()}
+      timezone={tz}
+      initialConversations={conversations}
+      initialActive={active}
+      initialMessages={messages}
+    />
   );
 }

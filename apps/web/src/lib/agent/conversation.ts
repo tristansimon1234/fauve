@@ -51,20 +51,36 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
 export async function replyInConversation(params: {
   studioId: string;
   memberId: string;
+  /** Web chat: the conversation being answered. Default: the studio's latest one. */
+  conversationId?: string;
   /** WhatsApp only: lets Fauve react to the manager's last message. */
   waId?: string;
   replyToMessageId?: string;
 }): Promise<RunFauveResult> {
   const db = supabaseAdmin();
+  // A chat the manager started fresh in the web app is its own context (and
+  // costs fewer tokens); otherwise Fauve keeps the studio's recent history.
+  let conversations = db
+    .from("conversations")
+    .select("id, started_by")
+    .eq("studio_id", params.studioId)
+    .is("archived_at", null)
+    .order("last_message_at", { ascending: false })
+    .limit(1);
+  if (params.conversationId) conversations = conversations.eq("id", params.conversationId);
+  const conversation = (await conversations).data?.[0];
+  let messages = db
+    .from("whatsapp_messages")
+    .select("direction, type, body, media_id, wa_message_id, payload")
+    .eq("studio_id", params.studioId)
+    .order("created_at", { ascending: false })
+    .limit(HISTORY_LIMIT);
+  if (conversation?.started_by === "web") messages = messages.eq("conversation_id", conversation.id);
+
   const [studio, member, rows, instagram] = await Promise.all([
     db.from("studios").select("name, timezone, onboarding_step").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
-    db
-      .from("whatsapp_messages")
-      .select("direction, type, body, media_id, wa_message_id, payload")
-      .eq("studio_id", params.studioId)
-      .order("created_at", { ascending: false })
-      .limit(HISTORY_LIMIT),
+    messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
   ]);
   if (studio.error) throw new Error(studio.error.message);
