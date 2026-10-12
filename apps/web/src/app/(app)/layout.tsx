@@ -1,5 +1,22 @@
+import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
+import { AvatarPlaceholder, HeaderAvatar, SidebarAccount } from "@/components/studio-account";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  return (
+    <AppShell
+      account={
+        <Suspense fallback={<div className="h-[140px] rounded-[14px] bg-soft" />}>
+          <SidebarAccount />
+        </Suspense>
+      }
+      avatar={
+        <Suspense fallback={<AvatarPlaceholder />}>
+          <HeaderAvatar />
+        </Suspense>
+      }
+    >
+      {children}
+    </AppShell>
+  );
 }

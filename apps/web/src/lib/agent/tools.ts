@@ -10,6 +10,7 @@ import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendReaction, sendText, sendVideo } from "@/lib/whatsapp/client";
 import { renderPost } from "@/lib/render/render-post";
+import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { readWebsite, WebsiteError } from "./website";
 
@@ -213,6 +214,37 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         status: "started",
         note: "Le montage démarre après ta réponse et la vidéo sera envoyée automatiquement (environ une minute). Annonce-le en une phrase, sans décrire la vidéo comme si elle était déjà prête.",
+      });
+    },
+
+    async schedule_post({ post_id, scheduled_at }) {
+      const post = unwrap(
+        await db.from("posts").select("id, status, render_id, scheduled_at").eq("id", post_id).eq("studio_id", studioId).single(),
+      );
+      if (!post.render_id) return json({ error: "Pas encore de vidéo montée : lance render d'abord." });
+      if (!(await instagramAccount(studioId))) {
+        return json({ error: "Instagram n'est pas connecté pour ce studio. Envoie le lien de connexion (get_connect_link)." });
+      }
+      const current = postStatusSchema.parse(post.status);
+      if (current !== "validated" && current !== "failed" && current !== "scheduled") {
+        return json({ error: `La publication est au statut « ${current} » : elle doit d'abord être validée par la gérante (update_post status validated).` });
+      }
+      const when = new Date(scheduled_at ?? (post.scheduled_at as string | null) ?? Date.now());
+      const at = when.getTime() < Date.now() + 60_000 ? new Date() : when;
+      check(
+        await db
+          .from("posts")
+          .update({ status: "scheduled", scheduled_at: at.toISOString(), publish_started_at: null, publish_error: null })
+          .eq("id", post_id),
+      );
+      const now = at.getTime() <= Date.now() + 1000;
+      if (now) ctx.afterReply.push(async () => void (await publishIfDue(post_id)));
+      return json({
+        status: "scheduled",
+        scheduled_at: at.toISOString(),
+        note: now
+          ? "Publication immédiate après ta réponse ; la gérante recevra le lien du Reel."
+          : "Fauve publiera automatiquement à l'horaire prévu et préviendra la gérante.",
       });
     },
 

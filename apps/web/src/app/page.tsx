@@ -2,8 +2,15 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { WhatsAppIcon } from "@/components/icons";
 import { Logo, Orb } from "@/components/orb";
-import { gradients } from "@/lib/demo";
 import { whatsappLink } from "@/lib/public-env";
+
+// Illustrative video thumbnails in the example conversation (marketing, not data).
+const exampleClips = [
+  "linear-gradient(160deg,#F6C9B8,#C86B5A)",
+  "linear-gradient(160deg,#D9CCF5,#7A5FD6)",
+  "linear-gradient(160deg,#F7DEC4,#D9905A)",
+  "linear-gradient(160deg,#E9C6D6,#A0577A)",
+];
 
 const steps = [
   ["Écris à Fauve", "Elle te pose quelques questions sur ton studio et ton rythme de publication."],
@@ -77,7 +84,7 @@ export default async function LandingPage() {
               Salut Camille ! Le Reel de jeudi est prévu. Tu peux m’envoyer 3 à 5 vidéos du cours de ce matin ?
             </Bubble>
             <div className="grid grid-cols-[repeat(4,44px)] gap-1.5 self-end">
-              {[gradients.peach, gradients.lilac, gradients.apricot, gradients.rose].map((bg) => (
+              {exampleClips.map((bg) => (
                 <span key={bg} className="h-[72px] rounded-[10px]" style={{ background: bg }} />
               ))}
             </div>
