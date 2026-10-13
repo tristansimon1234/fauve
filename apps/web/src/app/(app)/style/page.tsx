@@ -5,7 +5,6 @@ import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { sanitizeProfile, toStyleForm } from "./style-profile";
 import { fauveAccount } from "@/lib/instagram-dm";
 import { InspirationsSection, type Inspiration } from "./inspirations-section";
-import type { SceneTemplate } from "./scenes-section";
 import { StyleEditor } from "./style-editor";
 import type { Logo, MoodboardView } from "./style-options";
 import { SettingsTabs } from "@/components/settings-tabs";
@@ -67,20 +66,6 @@ async function StyleLoader() {
     palette: profile.moodboard?.palette ?? [],
   };
 
-  const { data: sceneRows } = await db
-    .from("motion_templates")
-    .select("id, name, description, uses")
-    .eq("studio_id", studioId)
-    .is("archived_at", null)
-    .order("uses", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(50);
-  const scenes: SceneTemplate[] = (sceneRows ?? []).map((s) => ({
-    id: s.id as string,
-    name: s.name as string,
-    description: s.description as string,
-    uses: s.uses as number,
-  }));
 
   const [{ data: shared }, fauve] = await Promise.all([
     db.from("inspirations").select("id, title, url, analysis, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(12),
@@ -97,7 +82,6 @@ async function StyleLoader() {
   return (
     <StyleEditor
       inspirations={<InspirationsSection items={inspirations} fauveHandle={fauve?.username ?? null} />}
-      scenes={scenes}
       moodboard={moodboard}
       studioId={studioId}
       studioName={member.studio.name ?? "Ton studio"}

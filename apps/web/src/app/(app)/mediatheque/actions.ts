@@ -35,3 +35,18 @@ export async function deleteMedia(mediaId: string): Promise<DeleteResult> {
   revalidatePath("/mediatheque");
   return { ok: true };
 }
+
+/** Takes a scene or a text layer out of the studio's library (Fauve's own ones stay). */
+export async function archiveCreation(id: string): Promise<DeleteResult> {
+  if (!z.uuid().safeParse(id).success) return { ok: false, error: "Création introuvable." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  const { error } = await supabaseAdmin()
+    .from("motion_templates")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("studio_id", member.studio.id);
+  if (error) return { ok: false, error: "Le retrait n’a pas abouti. Réessaie dans un instant." };
+  revalidatePath("/mediatheque");
+  return { ok: true };
+}

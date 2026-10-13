@@ -12,7 +12,8 @@ import {
   type ChatAbout,
   type ChatMessage,
 } from "@/app/(app)/fauve/chat-actions";
-import { ArrowUpIcon, XIcon } from "./icons";
+import { FileStrip, useChatUploads } from "@/app/(app)/fauve/chat-uploads";
+import { ArrowUpIcon, PaperclipIcon, XIcon } from "./icons";
 import { Orb } from "./orb";
 
 // Fauve's chat as a side panel, over any page of the app, about one
@@ -73,6 +74,11 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
   const [pending, start] = useTransition();
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [studioId, setStudioId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  // Photos and videos, like on the Fauve page: uploaded at once, sent with the message.
+  const uploads = useChatUploads(studioId, setError);
   const timeFormat = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone });
 
   useEffect(() => {
@@ -83,6 +89,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         setConversationId(chat.conversationId);
         setMessages(chat.messages);
         setTimezone(chat.timezone);
+        setStudioId(chat.studioId);
       })
       .catch(() => alive && setError("La conversation n’a pas pu être chargée."))
       .finally(() => {
@@ -128,31 +135,38 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
   }, [conversationId, pending, router]);
 
   const send = useCallback(
-    (raw: string) => {
+    (raw: string, withFiles = false) => {
       const text = raw.trim();
-      if (!text || pending) return;
+      const files = withFiles ? uploads.ready : [];
+      if ((!text && !files.length) || pending || (withFiles && uploads.uploading)) return;
+      const attachments = withFiles ? uploads.attachments() : [];
+      if (withFiles) uploads.clear();
       setDraft("");
       setError(null);
+      const at = new Date().toISOString();
+      const local = (part: Partial<ChatMessage>, i: number): ChatMessage => ({
+        id: `local-${Date.now()}-${i}`,
+        from: "me",
+        channel: "web",
+        type: "text",
+        body: null,
+        at,
+        videoUrl: null,
+        media: null,
+        reactions: {},
+        options: [],
+        cards: [],
+        openPost: null,
+        ...part,
+      });
       setMessages((m) => [
         ...m,
-        {
-          id: `local-${Date.now()}`,
-          from: "me",
-          channel: "web",
-          type: "text",
-          body: text,
-          at: new Date().toISOString(),
-          videoUrl: null,
-          media: null,
-          reactions: {},
-          options: [],
-          cards: [],
-          openPost: null,
-        },
+        ...files.map((f, i) => local({ type: f.video ? "video" : "image", media: { url: f.preview, video: f.video } }, i)),
+        ...(text ? [local({ body: text }, files.length)] : []),
       ]);
       start(async () => {
         try {
-          const res = await sendToFauve(text, conversationId, [], { postId: topic.postId, scene: topic.scene });
+          const res = await sendToFauve(text, conversationId, attachments, { postId: topic.postId, scene: topic.scene });
           if (res.ok) {
             setConversationId(res.conversationId);
             setMessages(res.messages);
@@ -165,7 +179,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         }
       });
     },
-    [conversationId, pending, topic.postId, topic.scene],
+    [conversationId, pending, topic.postId, topic.scene, uploads],
   );
 
   const launch = (quoteId: string) => {
@@ -191,7 +205,28 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         aria-modal="true"
         aria-label="Fauve"
         className="absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-white bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%)] shadow-[-12px_0_40px_rgba(28,21,48,0.14)]"
+        // Drop zone: photos and videos dropped anywhere on the panel.
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={(e) => {
+          if (!e.dataTransfer.files.length) return;
+          e.preventDefault();
+          setDragging(false);
+          uploads.addFiles(e.dataTransfer.files);
+        }}
       >
+        {dragging && (
+          <div className="pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/90 text-center">
+            <PaperclipIcon size={28} className="text-violet" />
+            <p className="text-[16px] font-bold text-violet">Dépose tes photos et vidéos</p>
+          </div>
+        )}
         <header className="flex items-center gap-3 border-b border-line px-5 py-3.5">
           <Orb size={30} />
           <div className="min-w-0 flex-1">
@@ -263,11 +298,32 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
           className="flex flex-col gap-2 border-t border-line px-4 pt-3 pb-4"
           onSubmit={(e) => {
             e.preventDefault();
-            send(draft);
+            send(draft, true);
           }}
         >
           {error && <p role="alert" className="rounded-xl bg-peach px-3 py-2 text-sm font-semibold text-danger">{error}</p>}
-          <div className="flex items-end gap-1 rounded-[26px] border border-line bg-white p-1.5 pl-4 focus-within:border-lilac">
+          <FileStrip files={uploads.files} onRemove={uploads.removeFile} />
+          <div className="flex items-end gap-1 rounded-[26px] border border-line bg-white p-1.5 pl-1.5 focus-within:border-lilac">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                if (e.target.files) uploads.addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              aria-label="Ajouter des photos ou des vidéos"
+              title="Photos et vidéos"
+              onClick={() => fileRef.current?.click()}
+              className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-soft hover:text-ink"
+            >
+              <PaperclipIcon size={20} />
+            </button>
             <label htmlFor="drawer-message" className="sr-only">
               Message à Fauve
             </label>
@@ -284,16 +340,16 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
-                  send(draft);
+                  send(draft, true);
                 }
               }}
-              placeholder={topic.scene !== undefined ? "Ce que tu veux pour cette scène…" : "Ce que tu veux changer…"}
+              placeholder={topic.scene !== undefined ? "Ce que tu veux pour cette scène…" : "Ce que tu veux changer, ou glisse une photo…"}
               className="max-h-[160px] min-h-10 flex-1 resize-none bg-transparent py-2 text-[15px] outline-none placeholder:text-muted/70"
             />
             <button
               type="submit"
               aria-label="Envoyer"
-              disabled={pending || !draft.trim()}
+              disabled={pending || uploads.uploading || (!draft.trim() && !uploads.ready.length)}
               className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet text-white disabled:bg-chip disabled:text-muted"
             >
               <ArrowUpIcon />

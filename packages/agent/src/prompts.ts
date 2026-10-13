@@ -38,7 +38,7 @@ Règles :
 - le contexte du studio (dernier message système) suffit le plus souvent ; n'appelle get_studio_context que si tu as besoin du détail (rythme, style, comptes) ;
 - si l'onboarding n'est pas terminé, guide la gérante pas à pas : nom et activité (ou mieux, son site web), rythme, 2 ou 3 posts d'exemple, puis connexion Instagram (lien via get_connect_link) ;
 - dès que la gérante donne son site (ou n'importe quel lien de page), lis-le avec read_website. Déduis-en le nom, l'activité, le lien de réservation, l'Instagram, l'offre (cours, prestations, carte, produits), le ton, les couleurs, les polices et le logo. Enregistre activité, site et lien de réservation (update_onboarding) et la charte dans le profil de style (update_brand_profile : colors, fonts, logo_url, visual_notes). Résume en deux ou trois phrases ce que tu as compris et fais confirmer, au lieu de reposer les questions. Si une couleur te semble douteuse (fond, bouton générique), demande ;
-- pour les vidéos, invite à les envoyer « en tant que document » (WhatsApp compresse sinon) ou via le lien de dépôt de la web app pour les gros fichiers ;
+- pour les vidéos et les photos, suis la ligne « Canal » du contexte : sur WhatsApp, « en tant que document » (WhatsApp compresse sinon) ou le lien de dépôt de la web app pour les gros fichiers ; dans l'application, on les glisse dans la conversation ou on clique sur le trombone ;
 - rappelle d'avoir l'accord des personnes filmées (clients, élèves, équipe) ; propose des cadrages sans visage (mains, gestes, produits, outils, plats) si besoin ;
 - la musique tendance et les stickers interactifs (sondages, questions) ne passent pas par l'API : suggère-les, la gérante les ajoute au moment de publier ;
 - n'invente jamais de chiffres de résultats : utilise uniquement les données des outils ;
@@ -81,6 +81,14 @@ export type StudioContextForPrompt = {
   firstName: string | null;
   onboardingStep: string;
   instagram: string | null;
+  /** Where the manager is writing from: the advice on sending files depends on it. */
+  channel?: "whatsapp" | "web" | "instagram";
+};
+
+const channelLines: Record<NonNullable<StudioContextForPrompt["channel"]>, string> = {
+  whatsapp: "Canal : WhatsApp. Pour des vidéos, invite à les envoyer « en tant que document » (trombone, puis Document) sinon WhatsApp les compresse, ou par le lien de dépôt de la web app pour les gros fichiers.",
+  web: "Canal : l'application Fauve (web), pas WhatsApp. Pour envoyer des photos ou des vidéos, la gérante les glisse dans la conversation ou clique sur le trombone à gauche du champ de message : elles arrivent en pleine qualité. Ne parle pas de « document » ni de WhatsApp pour les fichiers.",
+  instagram: "Canal : messages Instagram. Pour des vidéos de montage, invite à les envoyer sur WhatsApp en tant que document ou à les déposer dans l'application ; un Reel partagé ici sert d'inspiration.",
 };
 
 /** Volatile context, sent after the cached system prompt. */
@@ -93,6 +101,7 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     `Gérante : ${ctx.firstName ?? "prénom pas encore connu"}.`,
     `Étape d'onboarding : ${ctx.onboardingStep}.`,
     `Instagram : ${ctx.instagram ? `@${ctx.instagram} connecté` : "pas encore connecté"}.`,
+    ...(ctx.channel ? [channelLines[ctx.channel]] : []),
   ].join("\n");
 }
 

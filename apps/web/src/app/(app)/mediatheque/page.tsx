@@ -3,11 +3,14 @@ import { Suspense } from "react";
 import { z } from "zod";
 import { DeleteButton } from "@/components/delete-button";
 import { EmptyState, NoStudio, PageLoading } from "@/components/empty-state";
-import { FolderIcon, MicIcon, WhatsAppIcon } from "@/components/icons";
+import { FolderIcon, MicIcon } from "@/components/icons";
+import { resolveReelBrand } from "@fauve/agent";
+import Link from "next/link";
 import { formatDuration, formatShortDateTime } from "@/lib/format";
-import { whatsappLink } from "@/lib/public-env";
+import { loadMontageInputs } from "@/lib/render/render-post";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
 import { deleteMedia } from "./actions";
+import { CreationsSection, type Creation } from "./creations-section";
 import { SettingsTabs } from "@/components/settings-tabs";
 
 export const metadata: Metadata = { title: "Médiathèque" };
@@ -67,7 +70,7 @@ async function Library() {
     "media_assets",
   );
 
-  const [urls, analyses] = await Promise.all([
+  const [urls, analyses, creations, inputs] = await Promise.all([
     signMediaUrls(
       db,
       studioId,
@@ -77,7 +80,29 @@ async function Library() {
       db,
       assets.filter((a) => a.kind === "video").map((a) => a.id),
     ),
+    // The studio's scenes and layers, and Fauve's house layers.
+    db
+      .from("motion_templates")
+      .select("id, studio_id, kind, name, js, uses")
+      .or(`studio_id.eq.${studioId},and(studio_id.is.null,kind.eq.layer)`)
+      .is("archived_at", null)
+      .order("uses", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(48),
+    loadMontageInputs(studioId, { segments: [] }),
   ]);
+  const toCreation = (t: { id: unknown; studio_id: unknown; name: unknown; js: unknown; uses: unknown }): Creation => ({
+    id: t.id as string,
+    name: t.name as string,
+    js: t.js as string,
+    uses: (t.uses as number) ?? 0,
+    house: t.studio_id === null,
+  });
+  const templates = creations.data ?? [];
+  // House layers last: the studio's own work first.
+  const layers = templates.filter((t) => t.kind === "layer").map(toCreation).sort((a, b) => Number(a.house) - Number(b.house));
+  const scenes = templates.filter((t) => t.kind === "scene").map(toCreation);
+  const brand = resolveReelBrand({}, "doux", { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts });
 
   return (
     <>
@@ -85,27 +110,26 @@ async function Library() {
         <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Médiathèque</h1>
         <p className="text-[15px] text-muted">
           {assets.length
-            ? `Tes vidéos et photos, les plus récentes d’abord${assets.length === LIMIT ? ` (les ${LIMIT} dernières)` : ""}.`
-            : "Tes vidéos et photos, en pleine qualité."}
+            ? `Tes vidéos et photos, les plus récentes d’abord${assets.length === LIMIT ? ` (les ${LIMIT} dernières)` : ""}, et ce que Fauve a créé pour toi.`
+            : "Tes vidéos et photos, en pleine qualité, et ce que Fauve a créé pour toi."}
         </p>
       </div>
 
       {assets.length === 0 ? (
-        <EmptyState title="Ta médiathèque est vide" className="max-w-[760px]" cta="Envoyer mes vidéos à Fauve">
-          Envoie tes vidéos à Fauve sur WhatsApp, de préférence en tant que document pour garder leur qualité. Elles
-          apparaîtront ici, avec ce que Fauve y a vu. Pense à avoir l’accord des personnes filmées.
+        <EmptyState title="Pas encore de photo ni de vidéo" className="max-w-[760px]" cta="Envoyer mes vidéos à Fauve">
+          Glisse tes photos et vidéos dans la conversation avec Fauve (en pleine qualité), ou envoie-les sur WhatsApp en
+          tant que document. Elles apparaîtront ici, avec ce que Fauve y a vu. Pense à avoir l’accord des personnes filmées.
         </EmptyState>
       ) : (
         <>
           <div className="flex max-w-[860px] flex-wrap items-center gap-4 rounded-[20px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-5 py-4">
             <p className="min-w-0 flex-[1_1_320px] text-sm leading-relaxed">
-              <strong>Le dépôt depuis le site arrive bientôt.</strong> En attendant, envoie tes vidéos à Fauve sur
-              WhatsApp, en tant que document pour garder leur qualité.
+              <strong>Ajoute des photos et des vidéos</strong> en les glissant dans la conversation avec Fauve : elles
+              arrivent en pleine qualité. Sur WhatsApp, envoie-les en tant que document.
             </p>
-            <a href={whatsappLink()} className="btn btn-primary h-11 text-sm">
-              <WhatsAppIcon size={18} />
-              Ouvrir WhatsApp
-            </a>
+            <Link href="/fauve" className="btn btn-primary h-11 text-sm">
+              Ouvrir Fauve
+            </Link>
           </div>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
             {assets.map((asset) => (
@@ -121,6 +145,8 @@ async function Library() {
           </ul>
         </>
       )}
+
+      <CreationsSection scenes={scenes} layers={layers} brand={brand} />
     </>
   );
 }

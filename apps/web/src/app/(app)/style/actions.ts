@@ -6,7 +6,6 @@ import { z } from "zod";
 import { readMoodboard } from "@/lib/agent/moodboard";
 import { chargeCredits, creditBalance } from "@/lib/credits";
 import { getStudioContext } from "@/lib/studio";
-import { supabaseAdmin } from "@/lib/supabase/admin";
 import { insertProfileVersion } from "./profile";
 import { MOODBOARD_NOTE_MAX } from "./style-options";
 import { applyStyleForm, styleFormSchema } from "./style-profile";
@@ -145,17 +144,3 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
   }
 }
 
-/** Removes a scene from the studio's library (the Reels that used it keep their copy). */
-export async function archiveMotionTemplate(id: unknown): Promise<{ status: "ok" } | { status: "error"; message: string }> {
-  if (typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id)) return { status: "error", message: "Scène invalide." };
-  const { member } = await getStudioContext();
-  if (!member) return { status: "error", message: NO_STUDIO };
-  const { error } = await supabaseAdmin()
-    .from("motion_templates")
-    .update({ archived_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("studio_id", member.studio.id);
-  if (error) return { status: "error", message: FAILED };
-  revalidatePath("/style");
-  return { status: "ok" };
-}
