@@ -23,7 +23,7 @@ const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> 
 export type ReelSegment =
   | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean }
   | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
-  | { type: "motion"; js: string; fallback: Scene; startAt: number; durationInFrames: number };
+  | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number };
 export type ReelText = {
   text: string;
   style: "hook" | "band" | "caption";
@@ -86,7 +86,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       const fallback = s.motion.fallback ?? { kind: "title" as const, title: inputs.brand.name || " ", background: "accent" as const };
       // Without generated code, the motion segment is just its fixed fallback scene.
       return s.motion.js
-        ? { type: "motion", js: s.motion.js, fallback, startAt, durationInFrames: lengths[i]! }
+        ? { type: "motion", js: s.motion.js, fallback, texts: s.motion.texts ?? {}, startAt, durationInFrames: lengths[i]! }
         : { type: "scene", scene: fallback, startAt, durationInFrames: lengths[i]! };
     }
     if (!isClipSegment(s)) return { type: "scene", scene: s.scene, startAt, durationInFrames: lengths[i]! };

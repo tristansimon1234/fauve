@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SLOT_NAME } from "./schemas.ts";
 
 // Free motion-design scenes. The motion designer (a dedicated Opus call) writes
 // a React component for one scene; it runs inside the Remotion render with a
@@ -23,7 +24,8 @@ export const MOTION_SCOPE = [
 export const MOTION_DESIGNER_PROMPT = `Tu es un motion designer senior. Tu écris le code d'UNE scène de motion design pour un Reel Instagram de studio de Pilates, yoga ou barre, rendue par Remotion (React, 30 images/s). Le résultat doit avoir le niveau d'un studio de motion design : typographie cinétique, formes et tracés SVG animés, masques, dégradés, profondeur, rythme maîtrisé.
 
 Contrat du code (strict) :
-- Écris uniquement une fonction : function Scene({ width, height, fps, durationInFrames, brand }) { ... return (<AbsoluteFill ...>...</AbsoluteFill>); }
+- Écris uniquement une fonction : function Scene({ width, height, fps, durationInFrames, brand, texts }) { ... return (<AbsoluteFill ...>...</AbsoluteFill>); }
+- La scène sera réutilisée dans d'autres Reels avec d'autres textes : aucun texte en dur. Chaque texte vient d'un « slot » : texts.nom_du_slot (minuscules, chiffres, _), avec le texte du brief en valeur par défaut (texts.title ?? "…"). texts est toujours un objet, peut-être vide. Déclare chaque slot dans "slots" avec sa longueur maximale, et adapte la taille du texte à sa longueur réelle pour que tout tienne.
 - Pas d'import, pas d'export. Seuls ces identifiants existent : ${MOTION_SCOPE.join(", ")} (API Remotion habituelle : useCurrentFrame() renvoie l'image courante de la scène, à partir de 0 ; interpolate(frame, [a, b], [x, y], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing }) ; spring({ frame, fps, config }) ; random("graine") pour un hasard déterministe).
 - Interdits : fetch et tout accès réseau, Math.random, Date, setTimeout, eval, window, document, localStorage, balises <script>, images externes (seul brand.logoUrl peut être affiché avec <Img>, s'il existe).
 - Styles en ligne (objets style) et SVG en ligne. TypeScript ou JavaScript.
@@ -38,9 +40,21 @@ Direction artistique :
 - Les 10 dernières images : sortie propre (fondu, glissement ou masque), sauf si le brief dit d'enchaîner sans sortie.
 - Textes en français, exactement ceux du brief.
 
-Réponds avec le code dans "code" et une phrase sur ton intention dans "notes".`;
+Réponds avec le code dans "code", une phrase sur ton intention dans "notes", un nom court et parlant dans "name" (ex. « Titre serif qui se dessine ») et la liste des slots dans "slots".`;
 
-export const motionSceneOutputSchema = z.object({ code: z.string(), notes: z.string() });
+export const motionSlotSchema = z.object({
+  name: z.string().regex(SLOT_NAME),
+  role: z.string().max(120).describe("Ce que contient ce texte, ex. « accroche principale »"),
+  max_chars: z.number().int().min(1).max(200),
+});
+export type MotionSlot = z.infer<typeof motionSlotSchema>;
+
+export const motionSceneOutputSchema = z.object({
+  code: z.string(),
+  notes: z.string(),
+  name: z.string().max(80),
+  slots: z.array(motionSlotSchema).max(8),
+});
 
 const FORBIDDEN: [RegExp, string][] = [
   [/\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts|\bWorker\b/, "accès réseau"],
