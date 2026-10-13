@@ -35,9 +35,27 @@ export type ToolContext = {
   afterReply: (() => Promise<void>)[];
   /** Filled by reply_with: buttons and cards the caller shows under the reply. */
   extras: ReplyExtras;
+  /** The studio's time zone, for the local dates in tool results. */
+  timezone?: string;
 };
 
-const json = (value: unknown) => JSON.stringify(value);
+/**
+ * Tool results as JSON. Every object with a scheduled_at also gets « quand », the
+ * local day and time (« mardi 13 octobre à 18:00 »): the model must never work
+ * out a weekday or a time zone itself.
+ */
+function jsonIn(timeZone: string) {
+  const day = new Intl.DateTimeFormat("fr-FR", { timeZone, weekday: "long", day: "numeric", month: "long" });
+  const time = new Intl.DateTimeFormat("fr-FR", { timeZone, hour: "2-digit", minute: "2-digit" });
+  return (value: unknown) =>
+    JSON.stringify(value, (_key, v: unknown) => {
+      if (v && typeof v === "object" && !Array.isArray(v) && "scheduled_at" in v && typeof v.scheduled_at === "string") {
+        const at = new Date(v.scheduled_at);
+        if (!Number.isNaN(at.getTime())) return { ...v, quand: `${day.format(at)} à ${time.format(at)}` };
+      }
+      return v;
+    });
+}
 
 type DbResult = { data: unknown; error: { message: string } | null };
 
@@ -71,6 +89,7 @@ function missingContent(kind: PostKind, hasRender: boolean, media: number): stri
 
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const db = supabaseAdmin();
+  const json = jsonIn(ctx.timezone ?? "Europe/Paris");
   const { studioId } = ctx;
   // A quote made during this turn cannot be started in it: the manager must see the price first.
   const turnStartedAt = new Date();

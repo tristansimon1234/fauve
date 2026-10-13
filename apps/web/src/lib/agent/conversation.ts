@@ -104,6 +104,7 @@ export async function replyInConversation(params: {
     waId: params.waId,
     replyToMessageId: params.replyToMessageId,
     reactToRowId: params.reactToRowId,
+    timezone: studio.data.timezone,
     reactions: [],
     extras: {},
     afterReply: [],

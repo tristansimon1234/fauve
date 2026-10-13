@@ -177,7 +177,7 @@ export const toolSpecs = {
   },
   react_to_message: {
     description:
-      "Réagit au dernier message de la gérante avec un emoji. Seulement pour les accusés de réception simples : 👍 reçu, 🔥 super contenu, ✅ publié. Jamais à la place d'une réponse à une question.",
+      "Réagit au dernier message de la gérante avec un emoji. Par défaut pour les accusés de réception : 👍 reçu, 🔥 super contenu, ✅ publié ; les autres (😊 ❤️ 😂 🙏 🎉 👀) quand le moment s'y prête ou quand elle te le demande. Jamais à la place d'une réponse à une question.",
     input: z.object({ emoji: reactionSchema }),
   },
 } as const;

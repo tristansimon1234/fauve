@@ -22,7 +22,8 @@ export const platformSchema = z.enum(["instagram", "tiktok"]);
 export type Platform = z.infer<typeof platformSchema>;
 
 /** Fixed reaction vocabulary: 👍 received, 🔥 great content, ✅ published. */
-export const reactionSchema = z.enum(["👍", "🔥", "✅"]);
+/** Fauve's reactions: 👍 reçu, 🔥 super contenu, ✅ publié by default; the others when the moment (or the manager) asks for it. */
+export const reactionSchema = z.enum(["👍", "🔥", "✅", "😊", "❤️", "😂", "🙏", "🎉", "👀"]);
 
 /** Buttons and cards under one of Fauve's messages (reply_with). */
 export const replyExtrasSchema = z.object({
