@@ -42,7 +42,7 @@ Scènes de motion design (sans vidéo, aux couleurs du studio) :
 - Bibliothèque (« templates ») : des scènes libres déjà créées, réutilisables avec d'autres textes, gratuites et instantanées. Si l'une convient (même idée, même rôle), réutilise-la : motion { template_id, template_texts: un texte par slot (respecte max_chars), brief: une phrase sur ce que la scène montre ici, fallback }. Ne commande une nouvelle scène libre (brief détaillé, sans template_id) que si aucune ne convient.
 - « scene » : gabarit fixe et rapide (title, list, quote, number), si une scène libre n'apporte rien.
 - 1,5 à 6 s par scène. Avec des clips : 1 à 3 scènes au plus. Sans clips : un Reel entièrement en motion design, de 3 à 5 scènes qui s'enchaînent.
-- Au plus 2 nouvelles scènes « motion » (sans template_id) par Reel ; les réutilisations de la bibliothèque ne comptent pas. Sinon des « scene » fixes (un titre, une liste, une citation, un chiffre bien animés suffisent souvent).
+- Au plus « max_new_scenes » nouvelles scènes « motion » (sans template_id) dans ce Reel (2 d'habitude, 0 si la gérante veut économiser) ; les réutilisations de la bibliothèque ne comptent pas. Sinon des « scene » fixes (un titre, une liste, une citation, un chiffre bien animés suffisent souvent).
 
 Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (lecture des images d'inspiration de la gérante : ambiance, couleurs, typographie, composition, rythme ; en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. Ses polices et couleurs sont appliquées automatiquement.
 
@@ -98,11 +98,11 @@ export const MAX_FREE_SCENES = 2;
  * Makes a model-written plan safe to render: segments inside their clips, a
  * duration that matches the timeline, texts inside it. Throws if nothing usable is left.
  */
-export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>): EditPlan {
+export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>, maxFreeScenes = MAX_FREE_SCENES): EditPlan {
   let freeScenes = 0;
   const segments = plan.segments.flatMap((s): PlanSegment[] => {
     // Free scenes are the costly part of a montage: past the cap, the fixed fallback plays instead.
-    if (isMotionSegment(s) && !s.motion.template_id && freeScenes++ >= MAX_FREE_SCENES && s.motion.fallback) {
+    if (isMotionSegment(s) && !s.motion.template_id && freeScenes++ >= maxFreeScenes && s.motion.fallback) {
       return [{ scene: s.motion.fallback, duration: round(Math.min(6, Math.max(1, s.duration))) }];
     }
     if (isMotionSegment(s)) return [{ ...s, duration: round(Math.min(8, Math.max(1, s.duration))) }];

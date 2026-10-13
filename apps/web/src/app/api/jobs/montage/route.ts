@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { z } from "zod";
 import { designEdit } from "@/lib/agent/editor";
+import { chargeQuote } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
 import { notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
@@ -20,6 +21,11 @@ const bodySchema = z.object({
   waId: z.string().regex(/^\d{6,16}$/).optional(),
   replyTo: z.string().max(200).optional(),
   rationale: z.string().max(400).optional(),
+  /** Credits: the accepted quote, the new scenes it allows, and (render step) the new scenes made. */
+  quoteId: z.uuid().optional(),
+  maxNewScenes: z.number().int().min(0).max(2).optional(),
+  newScenes: z.number().int().min(0).max(10).optional(),
+  title: z.string().max(200).optional(),
 });
 
 function authorized(request: Request): boolean {
@@ -37,12 +43,20 @@ export async function POST(request: Request) {
 
   after(async () => {
     if (job.step === "render") {
-      await renderAndDeliver({ ...target, rationale: job.rationale });
+      const delivered = await renderAndDeliver({ ...target, rationale: job.rationale });
+      // Charged only once the video is out, for the scenes really made (never above the quote).
+      if (delivered && job.quoteId) await chargeQuote(job.quoteId, job.newScenes ?? 0, delivered.title);
       return;
     }
     try {
-      const edit = await designEdit({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief });
-      await queueJob("montage", { ...target, step: "render", rationale: edit.rationale });
+      const edit = await designEdit({
+        studioId: job.studioId,
+        postId: job.postId,
+        mediaIds: job.mediaIds,
+        brief: job.brief,
+        maxNewScenes: job.maxNewScenes,
+      });
+      await queueJob("montage", { ...target, step: "render", rationale: edit.rationale, quoteId: job.quoteId, newScenes: edit.newScenes });
     } catch (error) {
       console.error("montage design failed", job.postId, error);
       const message = error instanceof Error ? error.message : String(error);

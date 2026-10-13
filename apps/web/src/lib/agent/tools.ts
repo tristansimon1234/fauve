@@ -8,6 +8,7 @@ import {
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { acceptQuote, createMontageQuote } from "@/lib/credits";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
 import { queueJob } from "@/lib/jobs";
@@ -57,6 +58,8 @@ async function nextVersion(table: "brand_profiles" | "edit_plans", column: "stud
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const db = supabaseAdmin();
   const { studioId } = ctx;
+  // A quote made during this turn cannot be started in it: the manager must see the price first.
+  const turnStartedAt = new Date();
 
   return {
     async get_studio_context() {
@@ -202,16 +205,39 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async montage({ post_id, media_ids, brief }) {
-      const post = unwrap(await db.from("posts").select("id, title").eq("id", post_id).eq("studio_id", studioId).single());
+    async quote_montage({ post_id, media_ids, brief, correction, max_new_scenes }) {
+      const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
+      if (correction && !post.edit_plan_id) return "Pas encore de montage pour cette publication : fais un devis de montage (correction: false).";
+      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: max_new_scenes });
+      if ("error" in quote) {
+        return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });
+      }
+      return json({
+        quote_id: quote.id,
+        publication: post.title,
+        lignes: quote.lines,
+        credits: quote.base,
+        credits_max: quote.max,
+        nouvelles_scenes_max: quote.maxNewScenes,
+        solde: quote.balance,
+        note: "Présente le plan et le coût (credits, ou jusqu'à credits_max s'il crée de nouvelles scènes), puis attends son accord avant montage.",
+      });
+    },
+
+    async montage({ quote_id }) {
+      const quote = await acceptQuote(studioId, quote_id, turnStartedAt);
+      if ("error" in quote) return quote.error;
+      const post = unwrap(await db.from("posts").select("id, title").eq("id", quote.postId).eq("studio_id", studioId).single());
       // The montage outlives this reply: it runs as a background job and sends the video itself.
       ctx.afterReply.push(() =>
         queueJob("montage", {
           step: "design",
           studioId,
-          postId: post_id,
-          mediaIds: media_ids,
-          brief,
+          postId: quote.postId,
+          mediaIds: quote.mediaIds.length ? quote.mediaIds : undefined,
+          brief: quote.brief ?? (quote.kind === "correction" ? "Correction demandée par la gérante." : undefined),
+          maxNewScenes: quote.maxNewScenes,
+          quoteId: quote.id,
           waId: ctx.waId,
           replyTo: ctx.replyToMessageId,
         }),
@@ -250,9 +276,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single(),
       );
       if (!post.edit_plan_id) return json({ error: "Cette publication n'a pas encore de plan de montage (create_edit_plan)." });
-      ctx.afterReply.push(() =>
-        renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId }),
-      );
+      // A re-render of an unchanged plan: free (no AI work).
+      ctx.afterReply.push(async () => {
+        await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
+      });
       return json({
         status: "started",
         note: "Le montage démarre après ta réponse et la vidéo sera envoyée automatiquement (environ une minute). Annonce-le en une phrase, sans décrire la vidéo comme si elle était déjà prête.",

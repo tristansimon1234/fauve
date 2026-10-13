@@ -9,6 +9,7 @@ import {
   fromEditorPlan,
   isClipSegment,
   isMotionSegment,
+  MAX_FREE_SCENES,
   motionTemplateSchema,
   normalizeEditPlan,
   resolveReelBrand,
@@ -40,6 +41,8 @@ export async function designEdit(params: {
   postId: string;
   mediaIds?: string[];
   brief?: string;
+  /** New animated scenes allowed by the quote (default: the usual cap). */
+  maxNewScenes?: number;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, library] = await Promise.all([
@@ -101,6 +104,8 @@ export async function designEdit(params: {
           }
         : undefined,
     request: params.brief ?? "Premier montage de cette publication.",
+    // Credits: past this, the editor must reuse library scenes or use fixed ones.
+    max_new_scenes: params.maxNewScenes ?? MAX_FREE_SCENES,
   };
 
   const response = await anthropic().beta.messages.parse({
@@ -118,7 +123,7 @@ export async function designEdit(params: {
   }
 
   const durations = Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.duration]));
-  const plan = normalizeEditPlan(fromEditorPlan(response.parsed_output.plan), durations);
+  const plan = normalizeEditPlan(fromEditorPlan(response.parsed_output.plan), durations, params.maxNewScenes ?? MAX_FREE_SCENES);
 
   // Library scenes: their saved code, with the new texts. An unknown id becomes a new scene.
   const reused = await templateCode(

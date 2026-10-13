@@ -34,7 +34,8 @@ export async function notifyFailure(target: DeliveryTarget, text: string, detail
 }
 
 /** Renders the post and sends the video to the manager (WhatsApp) or into the web test chat. */
-export async function renderAndDeliver(target: DeliveryTarget): Promise<void> {
+/** Renders the post and sends it; returns what was delivered, or null if it failed (the manager is told). */
+export async function renderAndDeliver(target: DeliveryTarget): Promise<{ title: string } | null> {
   try {
     const r = await renderPost(target.studioId, target.postId);
     const seconds = Math.round(r.durationMs / 100) / 10;
@@ -57,8 +58,10 @@ export async function renderAndDeliver(target: DeliveryTarget): Promise<void> {
     } else {
       await store(target, { type: "text", body: `${caption}\n\nVoir la vidéo : ${r.url}`, payload: { render_id: r.renderId } });
     }
+    return { title: r.title };
   } catch (error) {
     console.error("render failed", target.postId, error);
-    await notifyFailure(target, "Le montage n’a pas abouti cette fois, je regarde ce qui coince. Tu veux que je réessaie ?", error);
+    await notifyFailure(target, "Le montage n’a pas abouti cette fois, je regarde ce qui coince. Tu veux que je réessaie ? Aucun crédit n’a été débité.", error);
+    return null;
   }
 }
