@@ -7,7 +7,7 @@ import type { ReelProps, Scene } from "./types";
 // studio's colours (the drifting orbs echo Fauve's identity). No video needed.
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
-const SAFE = { left: 90, right: 170 };
+const SAFE = { left: 140, right: 140 }; // symmetric: centred titles sit on the centre line
 
 function palette(background: Scene["background"], brand: ReelProps["brand"]) {
   if (background === "ink") {

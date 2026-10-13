@@ -76,8 +76,9 @@ export function buildAss(plan: EditPlan, accent = DEFAULT_ACCENT): string {
   const { w, h } = SIZES[plan.format];
   const total = renderDuration(plan);
   const k = w / 1080; // sizes below are designed for a 1080-wide frame
-  const left = Math.round(90 * k);
-  const right = Math.round(170 * k);
+  // Symmetric, so centred texts sit on the centre line (140 px clears Instagram's buttons).
+  const left = Math.round(140 * k);
+  const right = Math.round(140 * k);
   const style = (name: string, font: string, size: number, rest: string) =>
     `Style: ${name},${font},${Math.round(size * k)},${rest}`;
 

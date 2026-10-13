@@ -19,7 +19,9 @@ import type { ReelProps } from "./types";
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 /** Safe zones: Instagram and TikTok cover the bottom quarter and the right edge. */
-const SAFE = { left: 90, right: 170 };
+// Same margin on both sides, so centred texts sit on the frame's centre line; 140 px keeps
+// them clear of Instagram's buttons on the right.
+const SAFE = { left: 140, right: 140 };
 
 const normalize = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 

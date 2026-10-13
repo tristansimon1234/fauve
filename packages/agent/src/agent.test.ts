@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { editPlanObjectSchema, editPlanSchema } from "./schemas.ts";
+import { editPlanObjectSchema, editPlanSchema, segmentSeconds } from "./schemas.ts";
 import { canTransition } from "./status.ts";
 import { claudeCostUsd, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
@@ -233,6 +233,22 @@ test("editor: model plans are clamped to the clips and the timeline", async () =
   assert.deepEqual(plan.texts.map((t) => [t.text, t.to, t.emphasis]), [["Ça brûle", 2, ["brûle"]], ["Trop tard", 7, undefined]]);
   const lonely = editPlanSchema.parse({ ...validPlan, segments: [{ clip_id: "x", in: 0, out: 2 }] });
   assert.throws(() => normalizeEditPlan(lonely, {}), /aucun plan/);
+});
+
+test("editor: free motion scenes past the cap play their fixed fallback", async () => {
+  const { normalizeEditPlan, MAX_FREE_SCENES } = await import("./editor.ts");
+  const motion = (n: number) => ({
+    motion: { brief: `Scène ${n}`, fallback: { kind: "title" as const, title: `Titre ${n}`, background: "accent" as const } },
+    duration: 7,
+  });
+  const plan = normalizeEditPlan(
+    editPlanObjectSchema.parse({ ...validPlan, segments: [motion(1), motion(2), motion(3), motion(4)], texts: [] }),
+    {},
+  );
+  const kinds = plan.segments.map((s) => ("motion" in s ? "motion" : "scene" in s ? `scene:${s.scene.title}` : "clip"));
+  assert.equal(MAX_FREE_SCENES, 2);
+  assert.deepEqual(kinds, ["motion", "motion", "scene:Titre 3", "scene:Titre 4"]);
+  assert.equal(segmentSeconds(plan.segments[2]!), 6); // fixed scenes last 6 s at most
 });
 
 test("motion scenes: generated code is checked before it runs", async () => {

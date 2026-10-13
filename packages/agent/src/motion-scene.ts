@@ -33,7 +33,7 @@ Contrat du code (strict) :
 Direction artistique :
 - Si « direction_artistique » est fournie, c'est la référence : respecte-la (ambiance, typographie, rythme, formes).
 - Couleurs de la marque uniquement (accent, accentInk, ink, cream et leurs nuances en rgba), sauf indication du brief.
-- Lisible sur téléphone : textes de 44 px minimum, accroches de 110 à 200 px. Zones de sécurité : aucun texte dans le quart inférieur ni à moins de 170 px du bord droit et 90 px du bord gauche.
+- Lisible sur téléphone : textes de 44 px minimum, accroches de 110 à 200 px. Zones de sécurité : aucun texte dans le quart inférieur, au moins 140 px de marge à gauche comme à droite. Un texte centré l'est sur toute la largeur (axe x = 540).
 - Mouvements doux et précis : easing (Easing.bezier, Easing.out(Easing.cubic)…) ou spring, entrées décalées (stagger), une idée visuelle forte plutôt que dix effets. Les textes restent à l'écran assez longtemps pour être lus.
 - Les 10 dernières images : sortie propre (fondu, glissement ou masque), sauf si le brief dit d'enchaîner sans sortie.
 - Textes en français, exactement ceux du brief.
