@@ -91,7 +91,7 @@ async function Library() {
       {assets.length === 0 ? (
         <EmptyState title="Ta médiathèque est vide" className="max-w-[760px]" cta="Envoyer mes vidéos à Fauve">
           Envoie tes vidéos à Fauve sur WhatsApp, de préférence en tant que document pour garder leur qualité. Elles
-          apparaîtront ici, avec ce que Fauve y a vu. Pense à avoir l’accord des élèves filmés.
+          apparaîtront ici, avec ce que Fauve y a vu. Pense à avoir l’accord des personnes filmées.
         </EmptyState>
       ) : (
         <>

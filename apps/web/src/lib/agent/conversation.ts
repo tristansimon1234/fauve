@@ -83,7 +83,7 @@ export async function replyInConversation(params: {
   if (conversation?.started_by === "web") messages = messages.eq("conversation_id", conversation.id);
 
   const [studio, member, rows, instagram] = await Promise.all([
-    db.from("studios").select("name, timezone, onboarding_step").eq("id", params.studioId).single(),
+    db.from("studios").select("name, business_type, timezone, onboarding_step").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
@@ -116,6 +116,7 @@ export async function replyInConversation(params: {
     history,
     studio: {
       name: studio.data.name,
+      businessType: (studio.data.business_type as string | null) ?? null,
       timezone: studio.data.timezone,
       onboardingStep: studio.data.onboarding_step,
       firstName: member.data?.first_name ?? null,

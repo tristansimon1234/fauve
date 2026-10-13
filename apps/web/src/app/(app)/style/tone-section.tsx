@@ -68,7 +68,7 @@ export function ToneSection({ value, onChange }: { value: ToneFields; onChange: 
         <RuleList
           label="À éviter"
           addLabel="Ajouter une règle"
-          placeholder="Les visages des élèves sans accord"
+          placeholder="Les visages des clients sans accord"
           value={value.donts}
           max={RULES_MAX}
           maxLength={RULE_MAX}

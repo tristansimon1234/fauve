@@ -4,7 +4,7 @@ import { z } from "zod";
 // turns them into a written art direction. The montage (editor and motion
 // designer) only ever gets this text, never the images, to keep each montage cheap.
 
-export const MOODBOARD_PROMPT = `Tu es la directrice artistique de Fauve, qui monte les Reels Instagram d'un studio de Pilates, yoga ou barre.
+export const MOODBOARD_PROMPT = `Tu es la directrice artistique de Fauve, qui monte les Reels Instagram d'un commerce de quartier (studio de sport, salon de coiffure ou de beauté, restaurant, boutique…).
 La gérante t'envoie son moodboard : des images qui l'inspirent (captures de Reels, affiches, photos, marques qu'elle aime), parfois avec une note.
 
 Écris ce que ce moodboard dit de l'identité visuelle à donner à ses Reels, pour un monteur et un motion designer qui ne verront jamais les images :
