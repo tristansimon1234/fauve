@@ -5,6 +5,7 @@ import {
   canTransition,
   postStatusSchema,
   type PostKind,
+  type ReplyExtras,
   type ToolHandlers,
 } from "@fauve/agent";
 import { env } from "@/lib/env";
@@ -32,6 +33,8 @@ export type ToolContext = {
   reactions: string[];
   /** Jobs the caller runs after sending the reply (render, then deliver the video). */
   afterReply: (() => Promise<void>)[];
+  /** Filled by reply_with: buttons and cards the caller shows under the reply. */
+  extras: ReplyExtras;
 };
 
 const json = (value: unknown) => JSON.stringify(value);
@@ -450,6 +453,20 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       ctx.reactions.push(emoji);
       return "ok";
+    },
+
+    async reply_with({ options, posts, grid }) {
+      let own: string[] = [];
+      if (posts?.length) {
+        const { data } = await db.from("posts").select("id").eq("studio_id", studioId).in("id", posts);
+        const found = new Set((data ?? []).map((p) => p.id as string));
+        own = posts.filter((id) => found.has(id));
+        if (own.length < posts.length) return "Publication introuvable : vérifie les id avec get_calendar.";
+      }
+      ctx.extras.options = options;
+      ctx.extras.posts = own.length ? own : undefined;
+      ctx.extras.grid = grid || undefined;
+      return "ok : affiché sous ton message.";
     },
   };
 }

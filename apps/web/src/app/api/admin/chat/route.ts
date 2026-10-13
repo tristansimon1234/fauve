@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
 
   const result = await replyInConversation({ studioId: member.studioId, memberId: member.memberId, reactToRowId: inserted.data.id as string });
   if (result.reply) {
-    await db.from("whatsapp_messages").insert({ studio_id: member.studioId, channel: "web", direction: "outbound", type: "text", body: result.reply });
+    await db.from("whatsapp_messages").insert({ studio_id: member.studioId, channel: "web", direction: "outbound", type: "text", body: result.reply, payload: result.extras });
   }
   for (const job of result.afterReply) await job().catch((e) => console.error("admin chat: after-reply job failed", e));
-  return Response.json({ studio: member.studioId, reply: result.reply, reactions: result.reactions, usage: result.usage, jobs: result.afterReply.length });
+  return Response.json({ studio: member.studioId, reply: result.reply, reactions: result.reactions, extras: result.extras, usage: result.usage, jobs: result.afterReply.length });
 }

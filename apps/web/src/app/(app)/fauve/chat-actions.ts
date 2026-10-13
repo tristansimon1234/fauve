@@ -1,6 +1,7 @@
 "use server";
 
 import { replyInConversation } from "@/lib/agent/conversation";
+import { extrasOf, resolveCards, type ChatCard } from "@/lib/chat-cards";
 import { setReaction, type Reactions } from "@/lib/reactions";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -18,6 +19,10 @@ export type ChatMessage = {
   at: string;
   videoUrl: string | null;
   reactions: Reactions;
+  /** Answer buttons Fauve offered (reply_with). */
+  options: string[];
+  /** Post and grid cards under the message. */
+  cards: ChatCard[];
 };
 
 export type ConversationSummary = { id: string; title: string | null; lastAt: string };
@@ -83,7 +88,9 @@ async function messagesOf(studioId: string, conversationId: string): Promise<Cha
     }
   }
 
-  return rows.map((r) => {
+  const cards = await resolveCards(studioId, rows.map((r) => r.payload));
+
+  return rows.map((r, i) => {
     const renderId = (r.payload as { render_id?: string } | null)?.render_id;
     const videoUrl = renderId ? (videos.get(renderId) ?? null) : null;
     const body = (r.body as string | null)
@@ -99,6 +106,8 @@ async function messagesOf(studioId: string, conversationId: string): Promise<Cha
       at: r.created_at as string,
       videoUrl,
       reactions: (r.reactions as Reactions | null) ?? {},
+      options: r.direction === "outbound" ? (extrasOf(r.payload).options ?? []) : [],
+      cards: cards[i] ?? [],
     };
   });
 }
@@ -177,6 +186,7 @@ export async function sendToFauve(text: string, conversationId: string | null): 
         direction: "outbound",
         type: "text",
         body: result.reply,
+        payload: result.extras,
       });
     }
     // E.g. a montage: queued now, the video shows up in the chat when it is ready.

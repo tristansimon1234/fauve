@@ -95,7 +95,7 @@ export async function replyInConversation(params: {
   const history = toModelHistory(orderReplies(stored));
   // Every message has already been answered (e.g. a retried delivery): nothing to say.
   if (history.at(-1)?.role !== "user") {
-    return { reply: null, reactions: [], usage: { input_tokens: 0, output_tokens: 0 }, afterReply: [] };
+    return { reply: null, reactions: [], extras: {}, usage: { input_tokens: 0, output_tokens: 0 }, afterReply: [] };
   }
 
   return runFauve({
@@ -105,6 +105,7 @@ export async function replyInConversation(params: {
     replyToMessageId: params.replyToMessageId,
     reactToRowId: params.reactToRowId,
     reactions: [],
+    extras: {},
     afterReply: [],
     history,
     studio: {
