@@ -3,6 +3,7 @@
 import {
   buildReelProps,
   editPlanSchema,
+  insertSegment,
   moveSegment,
   removeSegment,
   segmentKind,
@@ -16,7 +17,7 @@ import type { PlayerRef } from "@remotion/player";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FilmIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { DEFAULT_Y, places, TextBoxes, Y_MAX, Y_MIN } from "@/components/montage/text-boxes";
-import { AskFauveButton } from "@/components/fauve-drawer";
+import { AskFauveButton, useFauveDrawer } from "@/components/fauve-drawer";
 import { ReelPlayer } from "@/components/reel-player";
 import { saveEditPlan } from "./actions";
 
@@ -26,8 +27,14 @@ import { saveEditPlan } from "./actions";
 
 type Text = EditPlan["texts"][number];
 
-const kindLabels = { clip: "Vidéo", scene: "Écran", motion: "Animation" } as const;
+const kindLabels = { clip: "Vidéo", scene: "Texte", motion: "Animation" } as const;
 const styleLabels: Record<Text["style"], string> = { hook: "Accroche", band: "Bandeau", caption: "Sous-titre" };
+const sceneKinds = [
+  { value: "title", label: "Titre" },
+  { value: "list", label: "Liste" },
+  { value: "quote", label: "Citation" },
+  { value: "number", label: "Chiffre" },
+] as const;
 const backgrounds = [
   { value: "accent", label: "Couleur" },
   { value: "ink", label: "Sombre" },
@@ -117,6 +124,13 @@ export function MontageEditor({
     edit(moveSegment(plan, from, to));
     setSelected(to);
   };
+  // A new scene goes right after the selected one.
+  const insert = (next: Segment) => {
+    edit(insertSegment(plan, index + 1, next));
+    setSelected(index + 1);
+  };
+  const openFauve = useFauveDrawer();
+  const videos = Object.keys(inputs.clipUrls).map((id) => ({ id, label: clipLabels[id] ?? "Ta vidéo", duration: clipDurations[id] ?? null }));
 
   // Two grid items: the stage (preview and timeline) and the inspector (the selected scene).
   return (
@@ -182,6 +196,17 @@ export function MontageEditor({
           labels={plan.segments.map((s) => sceneLabel(s, clipLabels))}
           onSelect={select}
           onMove={move}
+          addButton={
+            <AddScene
+              videos={videos}
+              canAskFauve={!dirty}
+              onVideo={(v) => insert({ clip_id: v.id, in: 0, out: round(Math.min(3, v.duration ?? 3)), zoom: "none" })}
+              onText={() => insert({ scene: { kind: "title", title: "Ton titre", background: "accent" }, duration: 2.5 })}
+              onAnimation={() =>
+                openFauve({ postId, title: postTitle, scene: index, sceneLabel: `Nouvelle animation après la scène ${index + 1}` })
+              }
+            />
+          }
           onPickText={(i) => {
             setActiveText(i);
             const at = plan.texts[i]!;
@@ -457,6 +482,19 @@ function SegmentFields({ segment, onChange, clipDuration }: { segment: Segment; 
     const set = (patch: Partial<typeof scene>) => onChange({ ...segment, scene: { ...scene, ...patch } });
     return (
       <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[12px] font-semibold text-muted">Type</span>
+          {sceneKinds.map((k) => (
+            <button
+              key={k.value}
+              type="button"
+              onClick={() => set({ kind: k.value, items: k.value === "list" ? (scene.items?.length ? scene.items : ["Première ligne"]) : scene.items })}
+              className={`h-8 rounded-full px-3 text-[12px] font-semibold ${scene.kind === k.value ? "bg-violet text-white" : "bg-soft text-muted"}`}
+            >
+              {k.label}
+            </button>
+          ))}
+        </div>
         <Field label={scene.kind === "quote" ? "Citation" : scene.kind === "number" ? "Chiffre ou offre" : "Titre"} value={scene.title} max={60} onChange={(title) => set({ title })} />
         <Field label={scene.kind === "quote" ? "Auteur" : "Petit texte au-dessus"} value={scene.kicker ?? ""} max={40} onChange={(kicker) => set({ kicker: kicker || undefined })} />
         {scene.kind === "list" && (
@@ -524,6 +562,107 @@ function segmentAtIndex(spans: { start: number; end: number }[], seconds: number
   return i === -1 ? Math.max(0, spans.length - 1) : i;
 }
 
+/**
+ * « + » at the end of the timeline: a passage of one of the post's videos, a
+ * text screen (both added at once, free), or an animation, which Fauve creates.
+ */
+function AddScene({
+  videos,
+  canAskFauve,
+  onVideo,
+  onText,
+  onAnimation,
+}: {
+  videos: { id: string; label: string; duration: number | null }[];
+  canAskFauve: boolean;
+  onVideo: (video: { id: string; duration: number | null }) => void;
+  onText: () => void;
+  onAnimation: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pickVideo, setPickVideo] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", esc);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const done = (fn: () => void) => () => {
+    fn();
+    setOpen(false);
+    setPickVideo(false);
+  };
+  const item = "flex w-full flex-col items-start gap-0.5 rounded-[10px] px-3 py-2 text-left hover:bg-soft disabled:opacity-40 disabled:hover:bg-transparent";
+
+  return (
+    <div ref={box} className="relative shrink-0">
+      <button
+        type="button"
+        aria-label="Ajouter une scène"
+        title="Ajouter une scène"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((o) => !o);
+          setPickVideo(false);
+        }}
+        className="flex h-full w-11 items-center justify-center rounded-[10px] border-[1.5px] border-dashed border-lilac text-violet hover:bg-violet-tint"
+      >
+        <PlusIcon size={18} />
+      </button>
+      {open && (
+        <div className="absolute right-0 bottom-full z-20 mb-2 flex w-[260px] flex-col rounded-[16px] border border-line bg-white p-1.5 shadow-[0_12px_32px_rgba(28,21,48,0.16)]">
+          {pickVideo ? (
+            <>
+              <button type="button" onClick={() => setPickVideo(false)} className="px-3 py-1.5 text-left text-[12px] font-bold text-violet">
+                ← Quelle vidéo ?
+              </button>
+              <div className="flex max-h-[220px] flex-col overflow-y-auto">
+                {videos.map((v) => (
+                  <button key={v.id} type="button" onClick={done(() => onVideo(v))} className={item}>
+                    <span className="line-clamp-2 text-[13px] font-semibold">{v.label}</span>
+                    {v.duration !== null && <span className="text-[11px] text-muted">{round(v.duration)} s</span>}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="px-3 pt-1.5 pb-1 text-[11px] font-bold tracking-wide text-muted uppercase">Après la scène choisie</span>
+              <button type="button" disabled={!videos.length} onClick={() => setPickVideo(true)} className={item}>
+                <span className="flex items-center gap-2 text-[14px] font-bold">
+                  <span className="size-2.5 rounded-full bg-[#f6b8a3]" />
+                  Vidéo
+                </span>
+                <span className="text-[12px] text-muted">{videos.length ? "Un passage de tes vidéos" : "Aucune vidéo sur cette publication"}</span>
+              </button>
+              <button type="button" disabled={!canAskFauve} onClick={done(onAnimation)} className={item}>
+                <span className="flex items-center gap-2 text-[14px] font-bold">
+                  <span className="size-2.5 rounded-full bg-violet" />
+                  Animation
+                </span>
+                <span className="text-[12px] text-muted">{canAskFauve ? "Fauve la crée selon ta demande" : "Enregistre d’abord tes modifications"}</span>
+              </button>
+              <button type="button" onClick={done(onText)} className={item}>
+                <span className="flex items-center gap-2 text-[14px] font-bold">
+                  <span className="size-2.5 rounded-full bg-[#c9bfd3]" />
+                  Autre : écran de texte
+                </span>
+                <span className="text-[12px] text-muted">Un titre, une liste, une citation ou un chiffre</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const blockColors = { clip: "bg-[#fde3d9] text-peach-ink", scene: "bg-[#ece6ef] text-ink", motion: "bg-[#e4dcff] text-violet" } as const;
 
 /**
@@ -533,6 +672,7 @@ const blockColors = { clip: "bg-[#fde3d9] text-peach-ink", scene: "bg-[#ece6ef] 
  */
 function Timeline({
   header,
+  addButton,
   plan,
   spans,
   selected,
@@ -545,6 +685,7 @@ function Timeline({
   onPickText,
 }: {
   header: React.ReactNode;
+  addButton: React.ReactNode;
   plan: EditPlan;
   spans: { start: number; end: number }[];
   selected: number;
@@ -630,12 +771,14 @@ function Timeline({
                   <span className="opacity-60">{i + 1}. </span>
                   {labels[i]}
                 </span>
-                <span className="truncate text-[10px] font-semibold opacity-60">
-                  {kindLabels[kind]} · {round(length)} s
+                <span className="flex items-center gap-1 truncate text-[10px] font-semibold">
+                  <span className="rounded-[4px] bg-white/75 px-1 py-px text-[9px] font-bold tracking-wide uppercase">{kindLabels[kind]}</span>
+                  <span className="opacity-60">{round(length)} s</span>
                 </span>
               </button>
             );
           })}
+          {addButton}
         </div>
         {/* Texts over the montage, at their time. */}
         <div className="relative h-7 rounded-[8px] bg-soft" onClick={(e) => e.target === e.currentTarget && seekTo(e.clientX)}>

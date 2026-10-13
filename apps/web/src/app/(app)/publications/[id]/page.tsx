@@ -96,14 +96,14 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
     render?.status === "done" && render.storage_path
       ? signMediaUrls(db, studioId, [render.storage_path])
       : Promise.resolve(new Map<string, string>()),
-    plan ? loadClipLabels(db, plan.view) : Promise.resolve(new Map<string, string>()),
+    plan ? loadClipLabels(db, [...plan.view.segments.map((s) => s.clip_id), ...post.media_ids]) : Promise.resolve(new Map<string, string>()),
   ]);
   const videoUrl = render?.storage_path ? videoUrls.get(render.storage_path) : undefined;
   // Photo post, carousel or story without a montage: the post's own photos and videos, in order.
   const media = videoUrl ? [] : await loadPostMedia(db, studioId, post.media_ids);
 
   const canEdit = !LOCKED.includes(post.status);
-  const editor = canEdit && plan ? await loadEditorData(studioId, plan.id).catch(() => null) : null;
+  const editor = canEdit && plan ? await loadEditorData(studioId, plan.id, post.media_ids).catch(() => null) : null;
   const isVideo = post.kind === "reel" || post.kind === "story";
   // Text over the photos of a carousel or photo post, editable by hand.
   const photos = Object.fromEntries(media.filter((m) => !m.video).map((m) => [m.id, m.url]));
@@ -317,9 +317,9 @@ async function loadRender(db: Db, editPlanId: string | null, preferredId: string
   );
 }
 
-/** Short labels for the clips used by the plan, from Fauve's video analysis. */
-async function loadClipLabels(db: Db, plan: PlanView): Promise<Map<string, string>> {
-  const ids = [...new Set(plan.segments.map((s) => s.clip_id))].filter((id) => z.uuid().safeParse(id).success);
+/** Short labels for the clips (the plan's and the post's), from Fauve's video analysis. */
+async function loadClipLabels(db: Db, clipIds: string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(clipIds)].filter((id) => z.uuid().safeParse(id).success);
   const labels = new Map<string, string>();
   if (!ids.length) return labels;
   const { data } = await db

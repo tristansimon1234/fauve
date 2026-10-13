@@ -373,7 +373,7 @@ test("montage plan: shown on the quote and read by the editor", async () => {
 });
 
 test("plan edit: texts follow their scene when scenes move, change or go", async () => {
-  const { moveSegment, removeSegment, updateSegment, timeline } = await import("./plan-edit.ts");
+  const { insertSegment, moveSegment, removeSegment, updateSegment, timeline } = await import("./plan-edit.ts");
   const plan = editPlanSchema.parse({
     ...validPlan,
     duration: 9,
@@ -399,6 +399,12 @@ test("plan edit: texts follow their scene when scenes move, change or go", async
   const trimmed = updateSegment(plan, 0, { scene: { kind: "title", title: "A", background: "accent" }, duration: 2 });
   assert.deepEqual(trimmed.texts.map((t) => [t.from, t.to]), [[0.5, 2], [2.5, 4.5]]);
   assert.equal(editPlanSchema.safeParse(moved).success, true);
+
+  const inserted = insertSegment(plan, 1, { scene: { kind: "title", title: "Nouveau", background: "cream" }, duration: 2 });
+  assert.deepEqual(timeline(inserted).map((s) => s.start), [0, 3, 5, 8]);
+  assert.deepEqual(inserted.texts.map((t) => [t.text, t.from, t.to]), [["sur A", 0.5, 2.5], ["sur B", 5.5, 7.5]]);
+  assert.equal(inserted.duration, 11);
+  assert.equal(editPlanSchema.safeParse(inserted).success, true);
 });
 
 test("carousel slides: aligned with the photos, built as a 4:5 still of the Reel", async () => {
