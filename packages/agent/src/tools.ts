@@ -69,6 +69,15 @@ export const toolSpecs = {
       "Renvoie le lien sécurisé (valable 15 min, à usage unique) vers la page mobile d'une publication : la gérante y regarde la vidéo, lit la légende, valide, ou déplace et corrige un texte du doigt. À envoyer quand elle veut revoir ou modifier une publication depuis son téléphone (« renvoie-moi le lien », « je veux changer le texte »).",
     input: z.object({ post_id: z.string().uuid() }),
   },
+  list_media: {
+    description:
+      "La médiathèque du studio : les photos et vidéos déjà reçues (WhatsApp, app, médiathèque), les plus récentes d'abord, avec leur media_id, leur date, leur format et ce qu'on y voit quand c'est connu. À regarder dès que la gérante parle de photos ou de vidéos déjà envoyées (« celles de ce matin », « regarde dans la médiathèque », « les 4 photos que j'ai prises ») : ne lui demande jamais de les renvoyer.",
+    input: z.object({
+      kind: z.enum(["image", "video", "all"]).default("all").describe("image pour les photos, video pour les vidéos"),
+      days: z.number().int().min(1).max(90).default(14).describe("Jusqu'à combien de jours en arrière"),
+      limit: z.number().int().min(1).max(30).default(20),
+    }),
+  },
   get_calendar: {
     description: "Liste les publications du studio entre deux dates, avec leur statut.",
     input: z.object({ from: isoDateTime, to: isoDateTime }),

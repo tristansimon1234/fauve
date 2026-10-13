@@ -185,6 +185,52 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({ url, expires_in_minutes: 15 });
     },
 
+    async list_media({ kind, days, limit }) {
+      let query = db
+        .from("media_assets")
+        .select("id, kind, source, mime_type, duration, width, height, created_at, regions")
+        .eq("studio_id", studioId)
+        .neq("source", "render")
+        .gt("created_at", new Date(Date.now() - days * 24 * 3600_000).toISOString())
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (kind !== "all") query = query.eq("kind", kind);
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      const rows = data ?? [];
+      // What is in a video, as Gemini watched it (when it did).
+      const videos = rows.filter((r) => r.kind === "video").map((r) => r.id as string);
+      const { data: analyses } = videos.length
+        ? await db.from("clip_analyses").select("media_id, analysis").in("media_id", videos).order("created_at", { ascending: false })
+        : { data: [] };
+      const summaries = new Map<string, string>();
+      for (const a of analyses ?? []) {
+        const summary = (a.analysis as { summary?: string } | null)?.summary;
+        if (summary && !summaries.has(a.media_id as string)) summaries.set(a.media_id as string, summary);
+      }
+      const when = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: ctx.timezone ?? "Europe/Paris" });
+      const sources: Record<string, string> = { whatsapp: "WhatsApp", web_upload: "app", library: "médiathèque" };
+      return json({
+        medias: rows.map((r) => {
+          const w = r.width as number | null;
+          const h = r.height as number | null;
+          return {
+            media_id: r.id,
+            type: r.kind === "video" ? "vidéo" : "photo",
+            recue: when.format(new Date(r.created_at as string)),
+            par: sources[r.source as string] ?? r.source,
+            ...(w && h ? { format: w > h ? "paysage" : w < h ? "portrait" : "carré" } : {}),
+            ...(r.duration ? { duree_s: Number(r.duration) } : {}),
+            ...(summaries.get(r.id as string) ? { contenu: summaries.get(r.id as string) } : {}),
+            ...((r.regions as { notes?: string } | null)?.notes ? { contenu: (r.regions as { notes: string }).notes } : {}),
+          };
+        }),
+        note: rows.length
+          ? "Prends celles dont elle parle (souvent les plus récentes, envoyées ensemble) et enchaîne sans lui redemander : create_post avec ces media_ids, puis le texte (write_on_photos) ou le montage."
+          : "Rien dans la médiathèque sur cette période : dis-le simplement et propose de les glisser ici.",
+      });
+    },
+
     async get_calendar({ from, to }) {
       const posts = unwrap(
         await db
