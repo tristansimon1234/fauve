@@ -52,7 +52,7 @@ export const sceneSchema = z.object({
   kind: z.enum(["title", "list", "quote", "number"]),
   title: z.string().min(1).max(60).describe("title : le titre ; list : l'intitulé ; quote : la citation ; number : le chiffre ou l'offre, ex. « -50 % », « 3 places »"),
   kicker: z.string().max(40).optional().describe("Petit texte au-dessus (title, number) ou auteur de la citation (quote)"),
-  items: z.array(z.string().min(1).max(40)).max(5).optional().describe("Lignes de la liste (list), ex. « Lun 18h · Reformer »"),
+  items: z.array(z.string().min(1).max(40)).max(5).optional().describe("Lignes de la liste (list), ex. « Lun 18h · Atelier »"),
   background: z.enum(["accent", "ink", "cream"]).describe("accent : couleur du studio ; ink : sombre ; cream : clair"),
 });
 export type Scene = z.infer<typeof sceneSchema>;
@@ -68,7 +68,7 @@ export const SLOT_NAME = /^[a-z][a-z0-9_]{0,23}$/;
 /** Free motion-design scene: the editor writes the brief, the motion designer (Opus) writes the code. */
 export const editPlanMotionSegmentSchema = z.object({
   motion: z.object({
-    brief: z.string().min(1).max(800).describe("Ce que la scène montre et comment elle s'anime, textes exacts compris"),
+    brief: z.string().min(1).max(4000).describe("Ce que la scène montre et comment elle s'anime, textes exacts compris"),
     /** TSX of `function Scene(props)`, written by the motion designer. */
     code: z.string().max(24000).optional(),
     /** The same, transpiled to plain JS for the renderer. */
@@ -161,7 +161,7 @@ export const clipAnalysisSchema = z.object({
   duration: z.number().positive().describe("Durée totale du clip en secondes"),
   orientation: z.enum(["portrait", "landscape", "square"]),
   summary: z.string().describe("Ce qu'on voit, en une ou deux phrases"),
-  setting: z.string().describe("Lieu et matériel : studio, reformer, tapis, barre, extérieur…"),
+  setting: z.string().describe("Lieu et matériel : salle, machine, fauteuil, cuisine, comptoir, vitrine, extérieur…"),
   lighting: z.enum(["good", "ok", "poor"]),
   shots: z
     .array(
@@ -169,7 +169,7 @@ export const clipAnalysisSchema = z.object({
         start: seconds,
         end: seconds,
         description: z.string().describe("Ce qui se passe dans ce plan"),
-        subject: z.string().describe("Sujet principal : groupe, prof, élève, mains, pieds, machine, détail…"),
+        subject: z.string().describe("Sujet principal : groupe, équipe, client, mains, produit, plat, outil, détail…"),
         energy: z.number().int().min(1).max(5).describe("1 = calme, 5 = très dynamique"),
         hook_score: z.number().int().min(1).max(5).describe("Potentiel comme accroche des 2 premières secondes"),
         quality: z.object({ blurry: z.boolean(), dark: z.boolean(), shaky: z.boolean() }),
@@ -187,7 +187,7 @@ export const clipAnalysisSchema = z.object({
     .max(400)
     .optional()
     .describe("Chaque mot prononcé avec son début et sa fin, pour les sous-titres mot à mot ; vide s'il n'y a pas de voix"),
-  issues: z.array(z.string()).describe("Problèmes à signaler : flou, contre-jour, visage d'élève reconnaissable, logo d'une marque…"),
+  issues: z.array(z.string()).describe("Problèmes à signaler : flou, contre-jour, visage reconnaissable d'un client, logo d'une marque…"),
 });
 export type ClipAnalysis = z.infer<typeof clipAnalysisSchema>;
 

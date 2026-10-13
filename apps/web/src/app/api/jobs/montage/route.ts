@@ -67,6 +67,7 @@ export async function POST(request: Request) {
       const delivered = await renderAndDeliver({ ...target, rationale: job.rationale });
       // Charged only once the video is out, for the scenes really made (never above the quote).
       if (delivered && job.quoteId) await chargeQuote(job.quoteId, job.newScenes ?? 0, delivered.title);
+      else await reopenQuote(job.quoteId);
       return;
     }
     if (job.step === "variant") {
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
         await queueJob("montage", { ...target, step: "render", rationale, quoteId: job.quoteId, newScenes: 0 });
       } catch (error) {
         console.error("variant failed", job.postId, error);
+        await reopenQuote(job.quoteId);
         await notifyFailure(target, "Je n’ai pas réussi à préparer la variante. Aucun crédit n’a été débité. Tu veux que je réessaie ?", error);
       }
       return;
@@ -91,9 +93,15 @@ export async function POST(request: Request) {
       await queueJob("montage", { ...target, step: "render", rationale: edit.rationale, quoteId: job.quoteId, newScenes: edit.newScenes });
     } catch (error) {
       console.error("montage design failed", job.postId, error);
-      const message = error instanceof Error ? error.message : String(error);
-      await notifyFailure(target, `Je n’ai pas réussi à préparer le montage (${message}). Tu veux que je réessaie ?`, error);
+      await reopenQuote(job.quoteId);
+      await notifyFailure(target, "Je n’ai pas réussi à préparer le montage. Aucun crédit n’a été débité. Tu veux que je réessaie ?", error);
     }
   });
   return Response.json({ queued: job.step }, { status: 202 });
+}
+
+/** The work failed before anything was charged: the same quote can be launched again. */
+async function reopenQuote(quoteId: string | undefined) {
+  if (!quoteId) return;
+  await supabaseAdmin().from("credit_quotes").update({ used_at: null }).eq("id", quoteId).is("charged_at", null);
 }
