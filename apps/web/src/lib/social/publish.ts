@@ -19,7 +19,39 @@ function check<T extends { error: { message: string } | null }>(result: T): T {
   return result;
 }
 
+/**
+ * Whether the video to publish is the latest montage. A manager can change the
+ * montage and validate before the new video is rendered (about a minute): the
+ * post then waits for it instead of going out with the old video.
+ */
+async function montageState(postId: string): Promise<"ready" | "rendering" | "failed"> {
+  const db = supabaseAdmin();
+  const post = check(await db.from("posts").select("edit_plan_id, render_id").eq("id", postId).single()).data!;
+  if (!post.edit_plan_id) return "ready";
+  if (post.render_id) {
+    const current = await db.from("renders").select("edit_plan_id").eq("id", post.render_id).maybeSingle();
+    if (current.data?.edit_plan_id === post.edit_plan_id) return "ready";
+  }
+  const latest = await db
+    .from("renders")
+    .select("status, created_at")
+    .eq("edit_plan_id", post.edit_plan_id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const recent = (iso: string) => Date.now() - new Date(iso).getTime() < 15 * 60_000;
+  if (!latest.data) {
+    // The render starts right after the plan is saved.
+    const plan = await db.from("edit_plans").select("created_at").eq("id", post.edit_plan_id).maybeSingle();
+    return plan.data && Date.now() - new Date(plan.data.created_at as string).getTime() < 2 * 60_000 ? "rendering" : "ready";
+  }
+  if (latest.data.status === "failed") return "failed";
+  return latest.data.status === "rendering" && recent(latest.data.created_at as string) ? "rendering" : "ready";
+}
+
 async function claim(postId: string): Promise<boolean> {
+  // A newer montage still rendering: the next run (every 5 min) publishes it.
+  if ((await montageState(postId)) === "rendering") return false;
   const staleBefore = new Date(Date.now() - CLAIM_TTL_MS).toISOString();
   const { data, error } = await supabaseAdmin()
     .from("posts")
@@ -129,6 +161,7 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
   try {
     const account = await instagramAccount(studioId);
     if (!account) throw new Error("Instagram n'est pas connecté");
+    if ((await montageState(postId)) === "failed") throw new Error("la dernière version du montage n'a pas pu être rendue");
     const hashtags = ((post.hashtags as string[] | null) ?? []).map((h) => `#${h}`).join(" ");
     const caption = [post.caption ?? "", hashtags].filter(Boolean).join("\n\n");
     const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption);

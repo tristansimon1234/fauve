@@ -54,6 +54,11 @@ export const toolSpecs = {
       "Renvoie le lien sécurisé (valable 15 min) vers la page où la gérante connecte son compte Instagram professionnel à Fauve (TikTok arrive bientôt). À envoyer quand Instagram n'est pas connecté.",
     input: z.object({}),
   },
+  get_post_link: {
+    description:
+      "Renvoie le lien sécurisé (valable 15 min, à usage unique) vers la page mobile d'une publication : la gérante y regarde la vidéo, lit la légende, valide, ou déplace et corrige un texte du doigt. À envoyer quand elle veut revoir ou modifier une publication depuis son téléphone (« renvoie-moi le lien », « je veux changer le texte »).",
+    input: z.object({ post_id: z.string().uuid() }),
+  },
   get_calendar: {
     description: "Liste les publications du studio entre deux dates, avec leur statut.",
     input: z.object({ from: isoDateTime, to: isoDateTime }),
