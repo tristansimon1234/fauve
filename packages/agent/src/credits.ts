@@ -20,6 +20,8 @@ export const CREDIT_PRICES = {
   render: 1,
   /** Fauve reading the moodboard. */
   moodboard: 1,
+  /** A variant of a delivered montage: same cut, another style and hook (render only). */
+  variant: 1,
 } as const;
 
 /** Each month the balance goes back up to this (unused credits do not pile up beyond it). */
@@ -46,6 +48,12 @@ export function quoteMontage(input: { clips: number; correction: boolean; maxNew
   lines.push({ label: "Rendu vidéo", credits: CREDIT_PRICES.render });
   const base = lines.reduce((sum, l) => sum + l.credits, 0);
   return { lines, base, max: base + maxNewScenes * CREDIT_PRICES.newScene, maxNewScenes };
+}
+
+/** Price of a variant: no AI work, only the render. */
+export function quoteVariant(): MontageQuote {
+  const lines = [{ label: "Variante (autre style, autre accroche)", credits: CREDIT_PRICES.variant }];
+  return { lines, base: CREDIT_PRICES.variant, max: CREDIT_PRICES.variant, maxNewScenes: 0 };
 }
 
 /** What is actually charged once the montage is delivered: the real scenes, never above the quote. */

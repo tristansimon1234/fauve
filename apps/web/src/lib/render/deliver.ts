@@ -43,7 +43,7 @@ export async function renderAndDeliver(target: DeliveryTarget): Promise<{ title:
     const caption = [
       `Ton montage « ${r.title} » (${seconds} s).${target.rationale ? ` ${target.rationale}` : ""}`,
       r.caption ? `Légende :\n${r.caption}${hashtags ? `\n${hashtags}` : ""}` : null,
-      "Réponds « ok » pour le valider, ou dis-moi ce que tu veux changer.",
+      "Réponds « ok » pour le valider, ou dis-moi ce que tu veux changer. Je peux aussi te faire une variante (autre style, autre accroche) pour 1 crédit.",
     ]
       .filter(Boolean)
       .join("\n\n");

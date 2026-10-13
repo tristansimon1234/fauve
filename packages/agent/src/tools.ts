@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   brandProfileSchema,
+  motionTemplateSchema,
   editPlanSchema,
   platformSchema,
   postKindSchema,
@@ -103,7 +104,19 @@ export const toolSpecs = {
       brief: z.string().max(600).optional().describe("Intention ou correction, avec les textes exacts si besoin. Ex. « ouverture en motion design avec RENTRÉE en grand », « police Montserrat », « visages OK »"),
       correction: z.boolean().default(false).describe("true pour modifier le montage existant de cette publication"),
       max_new_scenes: z.number().int().min(0).max(2).optional().describe("Nouvelles scènes animées permises (3 crédits chacune). 0 si la gérante veut faire simple ou économiser : le monteur réutilise alors la bibliothèque et les scènes fixes."),
+      variant: z
+        .object({
+          template: motionTemplateSchema.optional().describe("Style de la variante ; par défaut le suivant (doux → dynamique → chic)"),
+          hook: z.string().max(80).optional().describe("Nouvelle accroche, courte et différente de l'actuelle"),
+        })
+        .optional()
+        .describe("Variante du montage livré (1 crédit, sans nouveau montage) : même découpage, autre style et autre accroche"),
     }),
+  },
+  choose_version: {
+    description:
+      "Remet une version précédente du montage d'une publication (par ex. la gérante préfère l'original à la variante). Gratuit. Les versions sont numérotées dans l'ordre (la plus récente est la dernière).",
+    input: z.object({ post_id: z.string().uuid(), version: z.number().int().min(1) }),
   },
   montage: {
     description:

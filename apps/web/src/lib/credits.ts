@@ -1,5 +1,5 @@
 import "server-only";
-import { CREDIT_PRICES, montageCharge, MONTHLY_CREDITS, quoteMontage, type QuoteLine } from "@fauve/agent";
+import { CREDIT_PRICES, montageCharge, MONTHLY_CREDITS, quoteMontage, quoteVariant, type MotionTemplate, type QuoteLine } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Credits (see packages/agent/src/credits.ts for the price list). The balance is
@@ -8,7 +8,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const QUOTE_TTL_MS = 24 * 3600_000;
 
-export type Reason = "montage" | "correction" | "moodboard" | "adjustment";
+export type Reason = "montage" | "correction" | "variant" | "moodboard" | "adjustment";
+export type VariantChange = { template?: MotionTemplate; hook?: string };
 
 /** The studio's balance, after this month's top-up. */
 export async function creditBalance(studioId: string): Promise<number> {
@@ -43,11 +44,15 @@ export async function createMontageQuote(input: {
   brief?: string;
   correction: boolean;
   maxNewScenes?: number;
+  /** A variant of the delivered montage (render only) instead of a montage. */
+  variant?: VariantChange;
 }): Promise<Quote | { error: string; balance: number; needed: number }> {
   const balance = await creditBalance(input.studioId);
-  let quote = quoteMontage({ clips: input.mediaIds.length, correction: input.correction, maxNewScenes: input.maxNewScenes });
+  let quote = input.variant
+    ? quoteVariant()
+    : quoteMontage({ clips: input.mediaIds.length, correction: input.correction, maxNewScenes: input.maxNewScenes });
   if (balance < quote.base) return { error: "solde insuffisant", balance, needed: quote.base };
-  if (balance < quote.max) {
+  if (balance < quote.max && !input.variant) {
     const affordable = Math.floor((balance - quote.base) / CREDIT_PRICES.newScene);
     quote = quoteMontage({ clips: input.mediaIds.length, correction: input.correction, maxNewScenes: affordable });
   }
@@ -56,11 +61,11 @@ export async function createMontageQuote(input: {
     .insert({
       studio_id: input.studioId,
       post_id: input.postId,
-      kind: input.correction ? "correction" : "montage",
+      kind: input.variant ? "variant" : input.correction ? "correction" : "montage",
       base: quote.base,
       max: quote.max,
       lines: quote.lines,
-      params: { media_ids: input.mediaIds, brief: input.brief ?? null, max_new_scenes: quote.maxNewScenes },
+      params: { media_ids: input.mediaIds, brief: input.brief ?? null, max_new_scenes: quote.maxNewScenes, variant: input.variant ?? null },
       expires_at: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),
     })
     .select("id")
@@ -72,10 +77,11 @@ export async function createMontageQuote(input: {
 export type AcceptedQuote = {
   id: string;
   postId: string;
-  kind: "montage" | "correction";
+  kind: "montage" | "correction" | "variant";
   mediaIds: string[];
   brief: string | null;
   maxNewScenes: number;
+  variant: VariantChange | null;
 };
 
 /**
@@ -99,14 +105,15 @@ export async function acceptQuote(studioId: string, quoteId: string, turnStarted
   if ((await creditBalance(studioId)) < (q.base as number)) return { error: "Solde de crédits insuffisant pour ce devis." };
   const claimed = await db.from("credit_quotes").update({ used_at: new Date().toISOString() }).eq("id", quoteId).is("used_at", null).select("id");
   if (!claimed.data?.length) return { error: "Ce devis a déjà été utilisé." };
-  const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number };
+  const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number; variant?: VariantChange | null };
   return {
     id: q.id as string,
     postId: q.post_id as string,
-    kind: q.kind as "montage" | "correction",
+    kind: q.kind as AcceptedQuote["kind"],
     mediaIds: params.media_ids ?? [],
     brief: params.brief ?? null,
     maxNewScenes: params.max_new_scenes ?? 0,
+    variant: params.variant ?? null,
   };
 }
 
@@ -123,8 +130,9 @@ export async function chargeQuote(quoteId: string, newScenes: number, title: str
   const q = claimed.data;
   if (!q) return;
   const credits = montageCharge({ base: q.base as number, max: q.max as number }, newScenes);
-  const correction = q.kind === "correction";
-  await chargeCredits(q.studio_id as string, credits, correction ? "correction" : "montage", `${correction ? "Correction" : "Montage"} « ${title} »`, {
+  const kind = q.kind as AcceptedQuote["kind"];
+  const label = { montage: "Montage", correction: "Correction", variant: "Variante" }[kind];
+  await chargeCredits(q.studio_id as string, credits, kind, `${label} « ${title} »`, {
     quote_id: quoteId,
     post_id: q.post_id,
     new_scenes: newScenes,

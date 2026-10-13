@@ -1,11 +1,13 @@
 import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { z } from "zod";
+import { editPlanSchema, motionTemplateSchema, variantPlan, type MotionTemplate } from "@fauve/agent";
 import { designEdit } from "@/lib/agent/editor";
 import { chargeQuote } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
 import { notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Montage pipeline in two invocations, each with its own time budget:
 //   design: the editor (Opus) writes the plan and the motion designer the free scenes;
@@ -13,7 +15,7 @@ import { notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
 export const maxDuration = 300;
 
 const bodySchema = z.object({
-  step: z.enum(["design", "render"]),
+  step: z.enum(["design", "variant", "render"]),
   studioId: z.uuid(),
   postId: z.uuid(),
   mediaIds: z.array(z.uuid()).max(10).optional(),
@@ -26,7 +28,26 @@ const bodySchema = z.object({
   maxNewScenes: z.number().int().min(0).max(2).optional(),
   newScenes: z.number().int().min(0).max(10).optional(),
   title: z.string().max(200).optional(),
+  /** Variant step: the template and hook to change. */
+  variant: z.object({ template: motionTemplateSchema.optional(), hook: z.string().max(120).optional() }).optional(),
 });
+
+/** A new version of the post's plan: same cut, another template and hook (no editor call). */
+async function createVariant(studioId: string, postId: string, change: { template?: MotionTemplate; hook?: string }) {
+  const db = supabaseAdmin();
+  const latest = await db.from("edit_plans").select("plan, version").eq("post_id", postId).order("version", { ascending: false }).limit(1).maybeSingle();
+  const current = editPlanSchema.safeParse(latest.data?.plan);
+  if (!current.success) throw new Error("Pas de montage à décliner pour cette publication");
+  const plan = variantPlan(current.data, change);
+  const row = await db
+    .from("edit_plans")
+    .insert({ studio_id: studioId, post_id: postId, version: (latest.data!.version as number) + 1, plan })
+    .select("id")
+    .single();
+  if (row.error) throw new Error(row.error.message);
+  await db.from("posts").update({ edit_plan_id: row.data.id }).eq("id", postId);
+  return plan;
+}
 
 function authorized(request: Request): boolean {
   const given = Buffer.from(request.headers.get("authorization") ?? "");
@@ -46,6 +67,17 @@ export async function POST(request: Request) {
       const delivered = await renderAndDeliver({ ...target, rationale: job.rationale });
       // Charged only once the video is out, for the scenes really made (never above the quote).
       if (delivered && job.quoteId) await chargeQuote(job.quoteId, job.newScenes ?? 0, delivered.title);
+      return;
+    }
+    if (job.step === "variant") {
+      try {
+        const plan = await createVariant(job.studioId, job.postId, job.variant ?? {});
+        const rationale = `Variante en style « ${plan.template} »${job.variant?.hook ? ", avec une autre accroche" : ""} : dis-moi laquelle tu préfères.`;
+        await queueJob("montage", { ...target, step: "render", rationale, quoteId: job.quoteId, newScenes: 0 });
+      } catch (error) {
+        console.error("variant failed", job.postId, error);
+        await notifyFailure(target, "Je n’ai pas réussi à préparer la variante. Aucun crédit n’a été débité. Tu veux que je réessaie ?", error);
+      }
       return;
     }
     try {
