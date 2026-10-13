@@ -13,6 +13,7 @@ import {
   DEFAULT_EFFORT,
   EFFORTS,
   effortSchema,
+  editPlanSchema,
   effortPitch,
   otherEffort,
   type Effort,
@@ -115,6 +116,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const { studioId } = ctx;
   // A quote made during this turn cannot be started in it: the manager must see the price first.
   const turnStartedAt = new Date();
+  /** Posts whose render already waits for the end of this turn. */
+  const rendering = new Set<string>();
 
   /** Media ids given by the model must be this studio's. */
   async function assertOwnMedia(ids: string[]) {
@@ -724,7 +727,58 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async style_texts({ post_id, target, look_name, look, reset, save_as }) {
+    async read_post({ post_id }) {
+      const post = unwrap(
+        await db
+          .from("posts")
+          .select("id, title, kind, status, scheduled_at, caption, hashtags, media_ids, slides, edit_plan_id, render_id")
+          .eq("id", post_id)
+          .eq("studio_id", studioId)
+          .single(),
+      );
+      const lookOf = (l: TextLook | undefined) =>
+        l ? { police: l.font, couleur: l.color, ...(l.fill ? { fond: `${l.fill.kind} ${l.fill.color}` } : {}), ...(l.stroke ? { contour: l.stroke.color } : {}) } : { style: "gabarit" };
+      const slides = slidesPlanSchema.safeParse(post.slides);
+      let montage: unknown;
+      if (post.edit_plan_id) {
+        const { data: row } = await db.from("edit_plans").select("version, plan").eq("id", post.edit_plan_id as string).maybeSingle();
+        const plan = editPlanSchema.safeParse(row?.plan);
+        if (plan.success) {
+          montage = {
+            version: row?.version,
+            gabarit: plan.data.template,
+            duree_s: plan.data.duration,
+            scenes: plan.data.segments.length,
+            textes: plan.data.texts.map((t) => ({ texte: t.text, de: t.from, a: t.to, role: t.style, ...lookOf(t.look) })),
+            video: post.render_id ? "rendue" : "pas encore rendue",
+          };
+        }
+      }
+      return json({
+        post_id: post.id,
+        titre: post.title,
+        format: post.kind,
+        statut: post.status,
+        scheduled_at: post.scheduled_at,
+        legende: post.caption,
+        hashtags: post.hashtags,
+        media_ids: post.media_ids,
+        ...(slides.success
+          ? {
+              photos: slides.data.slides.map((s, i) => ({
+                photo: i + 1,
+                media_id: s.media_id,
+                ...(s.layer ? { calque: s.layer.name, textes_du_calque: s.layer.texts } : {}),
+                textes: s.texts.map((t) => ({ texte: t.text, role: t.style, ...(t.items?.length ? { liste: t.items.map((it) => it.title) } : {}), ...lookOf(t.look) })),
+              })),
+              gabarit_photos: slides.data.template,
+            }
+          : {}),
+        ...(montage ? { montage } : {}),
+      });
+    },
+
+    async style_texts({ post_id, target, photos, look_name, look, reset, save_as }) {
       const saved = look_name ? await loadTextLooks(studioId) : [];
       const named = look_name ? saved.find((l) => l.name.toLowerCase() === look_name.toLowerCase()) : undefined;
       if (look_name && !named) return json({ error: `Aucun style enregistré « ${look_name} ». Styles du studio : ${saved.map((l) => l.name).join(", ") || "aucun"}` });
@@ -743,8 +797,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       let invalid: string | undefined;
       let last: TextLook | undefined;
       try {
-        const result = await restyleTexts(studioId, post_id, (t) => {
+        const result = await restyleTexts(studioId, post_id, (t, photo) => {
           if (target !== "all" && t.style !== target) return undefined;
+          if (photos?.length && (photo === undefined || !photos.includes(photo))) return undefined;
           if (reset) return { look: null };
           const base = named?.look ?? t.look ?? starts.get(t.style)!;
           const merged: Record<string, unknown> = { ...base, ...(look ?? {}) };
@@ -760,10 +815,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (invalid && !last) return json({ error: `Style invalide : ${invalid}` });
         if (save_as && last && target !== "all") await keepTextLooks(studioId, [{ name: save_as, role: target, look: last }]);
         else if (save_as && last) await keepTextLooks(studioId, [{ name: save_as, role: "hook", look: last }]);
-        ctx.afterReply.push(async () => {
-          const to = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId };
-          await (result.kind === "slides" ? renderSlidesAndDeliver(to) : renderAndDeliver(to));
-        });
+        // One render per post and turn, after every change (a style per photo is several calls).
+        if (!rendering.has(post_id)) {
+          rendering.add(post_id);
+          ctx.afterReply.push(async () => {
+            const to = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId };
+            await (result.kind === "slides" ? renderSlidesAndDeliver(to) : renderAndDeliver(to));
+          });
+        }
         return json({
           status: "started",
           texts: result.changed,

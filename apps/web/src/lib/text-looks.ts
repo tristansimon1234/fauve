@@ -83,7 +83,8 @@ export async function lookDefaults(studioId: string, template: string | undefine
 }
 
 /** What to do with one text: a new look, null for the template's style again, undefined to leave it. */
-export type LookChange = (text: { style: Role; look?: TextLook }) => { look?: TextLook | null; y?: number; x?: number } | undefined;
+/** A change for one text; `photo` is the number of its photo (1 = first) on a carousel or photo post, undefined in a montage. */
+export type LookChange = (text: { style: Role; look?: TextLook }, photo?: number) => { look?: TextLook | null; y?: number; x?: number } | undefined;
 
 export type StyledResult = { kind: "slides" | "montage"; changed: number; template?: string };
 
@@ -103,8 +104,8 @@ export async function restyleTexts(studioId: string, postId: string, change: Loo
   if (post.status === "published" || post.status === "measured") throw new Error("Cette publication est déjà en ligne");
 
   let changed = 0;
-  const apply = <T extends { style: Role; look?: TextLook; y?: number; x?: number }>(text: T, yRange: { min: number; max: number }): T => {
-    const next = change(text);
+  const apply = <T extends { style: Role; look?: TextLook; y?: number; x?: number }>(text: T, yRange: { min: number; max: number }, photo?: number): T => {
+    const next = change(text, photo);
     if (!next) return text;
     changed++;
     const out: T = { ...text };
@@ -117,7 +118,7 @@ export async function restyleTexts(studioId: string, postId: string, change: Loo
 
   const slides = slidesPlanSchema.safeParse(post.slides);
   if ((post.kind === "carousel" || post.kind === "post") && slides.success) {
-    const plan = { ...slides.data, slides: slides.data.slides.map((s) => ({ ...s, texts: s.texts.map((t) => apply(t, SLIDE_Y)) })) };
+    const plan = { ...slides.data, slides: slides.data.slides.map((s, i) => ({ ...s, texts: s.texts.map((t) => apply(t, SLIDE_Y, i + 1)) })) };
     if (!changed) throw new Error("Il n'y a pas encore de texte sur les photos : écris-le d'abord (write_on_photos)");
     await saveSlides(studioId, postId, plan);
     return { kind: "slides", changed, template: plan.template };

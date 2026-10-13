@@ -261,12 +261,22 @@ export const toolSpecs = {
       copy_places: z.boolean().default(true).describe("Reprendre aussi la place des textes de l'exemple"),
     }),
   },
+  read_post: {
+    description:
+      "Relit une publication telle qu'elle est maintenant : format, statut, date, légende, médias, et les textes déjà posés (photo par photo pour un carrousel ou un post photo, avec leur style ; scène par scène pour un montage). À appeler avant de modifier ou de reprendre des textes (« mêmes textes », « change la couleur de la 2e photo ») : ne demande jamais à la gérante de te redonner des textes que tu as posés.",
+    input: z.object({ post_id: z.string().uuid() }),
+  },
   style_texts: {
     description:
       "Change le style des textes d'une publication (texte sur photos ou montage), gratuit, puis refait le rendu (le lien part tout seul). Tout est possible : police Google Fonts, graisse, italique, majuscules, taille, interlettrage, couleur, fond derrière (box : bloc, pill : pilule, line : surlignage ligne à ligne) avec couleur et transparence, contour, ombre (soft, strong, hard), mots en valeur (autre couleur, police, surlignage), inclinaison, apparition (fade, rise, pop, typewriter, slide), alignement. Prends un style enregistré (look_name), et/ou donne seulement ce qui change (look). reset remet le style du gabarit. save_as enregistre le résultat dans les styles du studio.",
     input: z.object({
       post_id: z.string().uuid(),
       target: z.enum(["all", "hook", "band", "caption"]).default("all").describe("Quels textes : tous, ou seulement l'accroche (hook), les bandeaux (band), les petites lignes (caption)"),
+      photos: z
+        .array(z.number().int().min(1).max(10))
+        .max(10)
+        .optional()
+        .describe("Carrousel ou post photo : seulement les textes de ces photos (1 = la première). Pour un style différent par photo (ex. une couleur de fond par photo), appelle style_texts une fois par photo ; le rendu ne part qu'une fois"),
       look_name: z.string().max(40).optional().describe("Un style enregistré du studio comme point de départ"),
       look: lookPatchSchema.optional().describe("Seulement ce qui change, ex. { color: \"#FFD400\", stroke: { color: \"#000000\", width: 4 } }"),
       reset: z.boolean().default(false).describe("Revenir au style du gabarit"),
