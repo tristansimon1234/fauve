@@ -7,6 +7,7 @@ import {
   type ReplyExtras,
   type ToolHandlers,
   slidesPlanSchema,
+  AUTO_START_MAX_CREDITS,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -260,6 +261,23 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: max_new_scenes, variant, plan });
       if ("error" in quote) {
         return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });
+      }
+      // A small montage starts at once: Fauve tells the plan and the price, no yes needed.
+      if (quote.max <= AUTO_START_MAX_CREDITS && quote.balance >= quote.max) {
+        const accepted = await acceptQuote(studioId, quote.id, turnStartedAt, { immediate: true });
+        if (!("error" in accepted)) {
+          ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
+          ctx.extras.posts = [post_id];
+          ctx.notes.push(`montage lancé directement quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id} (${quote.base} à ${quote.max} crédits)`);
+          return json({
+            status: "started",
+            publication: post.title,
+            credits: quote.base,
+            credits_max: quote.max,
+            solde: quote.balance,
+            note: "Petit montage : il est déjà lancé, sans attendre d'accord. Décris le plan en 2 ou 3 phrases (durée, scènes) avec son coût (credits, jusqu'à credits_max s'il crée des animations), et dis que la vidéo arrive dans 2 à 4 minutes ; elle pourra demander une correction ensuite. Ne demande pas « je lance ? ».",
+          });
+        }
       }
       // Shown as a card with a « Lancer » button under the reply (WhatsApp: yes / no buttons).
       ctx.extras.quote = quote.id;
