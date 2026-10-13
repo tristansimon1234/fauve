@@ -7,10 +7,12 @@ import { z } from "zod";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { ArrowLeftIcon, ChatIcon, ClockIcon, InstagramIcon, TikTokIcon } from "@/components/icons";
 import { Orb } from "@/components/orb";
+import { DeleteButton } from "@/components/delete-button";
 import { StatusPill } from "@/components/status-pill";
 import { formatDateTime, formatSeconds, kindLabels, platformLabels } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
+import { deletePost } from "./actions";
 import { PostEditor } from "./post-editor";
 
 export const metadata: Metadata = { title: "Publication" };
@@ -111,10 +113,21 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
             {post.scheduled_at ? `prévu ${formatDateTime(post.scheduled_at, tz)}` : "date à définir"}
           </p>
         </div>
-        <a href={whatsappLink(`Pour « ${post.title} » : `)} className="btn btn-secondary">
-          <ChatIcon size={18} />
-          Demander une modif
-        </a>
+        <div className="flex flex-wrap items-start gap-2">
+          <a href={whatsappLink(`Pour « ${post.title} » : `)} className="btn btn-secondary">
+            <ChatIcon size={18} />
+            Demander une modif
+          </a>
+          <DeleteButton
+            action={deletePost.bind(null, post.id)}
+            redirectTo="/calendrier"
+            confirmText={
+              LOCKED.includes(post.status)
+                ? "Supprimer cette publication de Fauve ? Elle reste en ligne sur Instagram."
+                : "Supprimer cette publication, son montage et ses versions ?"
+            }
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-start gap-8">

@@ -19,6 +19,7 @@ import { Mascot } from "@/components/mascot";
 import { ChatCards } from "./chat-cards";
 import {
   deleteConversation,
+  launchQuote,
   listConversations,
   loadConversation,
   reactToMessage,
@@ -191,6 +192,24 @@ export function FauveWorkspace({
     });
   };
 
+  // « Lancer » on a quote card: the montage starts at once, no round trip through Fauve.
+  const launch = (quoteId: string) => {
+    if (!active || pending) return;
+    setError(null);
+    const conversationId = active;
+    startTransition(async () => {
+      try {
+        const res = await launchQuote(quoteId, conversationId);
+        if (res.ok) {
+          setMessages(res.messages);
+          setConversations(res.conversations);
+        } else setError(res.error);
+      } catch {
+        setError("Le montage n’a pas pu démarrer. Vérifie ta connexion et réessaie.");
+      }
+    });
+  };
+
   // Emoji picker: inserted where the cursor is.
   const [emojiOpen, setEmojiOpen] = useState(false);
   const insertEmoji = (emoji: string) => {
@@ -306,6 +325,8 @@ export function FauveWorkspace({
                   onReact={react}
                   // Answer buttons only on Fauve's latest message, while it is still the question.
                   onChoose={i === messages.length - 1 && !pending ? send : undefined}
+                  onLaunch={launch}
+                  busy={pending}
                 />
               ))}
               {pending && (
@@ -475,18 +496,24 @@ function Bubble({
   timezone,
   onReact,
   onChoose,
+  onLaunch,
+  busy,
 }: {
   message: ChatMessage;
   time: string;
   timezone: string;
   onReact: (id: string, emoji: string) => void;
   onChoose?: (answer: string) => void;
+  onLaunch: (quoteId: string) => void;
+  busy: boolean;
 }) {
   const [picking, setPicking] = useState(false);
   const mine = message.from === "me";
   const media = mediaLabels[message.type];
   if (!message.body && !message.videoUrl && !media && !message.cards.length) return null;
-  const options = onChoose && !mine ? message.options : [];
+  // A quote card carries its own buttons.
+  const hasQuote = message.cards.some((c) => c.type === "quote");
+  const options = onChoose && !mine && !hasQuote ? message.options : [];
   const reactions = [message.reactions.fauve, message.reactions.me].filter((e): e is string => Boolean(e));
   // Reacting is for Fauve's messages (the manager's own messages get Fauve's reactions).
   const canReact = !mine && !message.id.startsWith("local-");
@@ -555,7 +582,7 @@ function Bubble({
           </div>
         )}
       </div>
-      <ChatCards cards={message.cards} timezone={timezone} />
+      <ChatCards cards={message.cards} timezone={timezone} onLaunch={onLaunch} onAnswer={onChoose} busy={busy} />
       {options.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-0.5" role="group" aria-label="Réponses proposées">
           {options.map((option) => (

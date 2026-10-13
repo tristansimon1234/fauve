@@ -2,6 +2,8 @@
 
 import { replyInConversation } from "@/lib/agent/conversation";
 import { extrasOf, resolveCards, type ChatCard } from "@/lib/chat-cards";
+import { acceptQuote } from "@/lib/credits";
+import { startMontage } from "@/lib/montage-start";
 import { setReaction, type Reactions } from "@/lib/reactions";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -197,6 +199,48 @@ export async function sendToFauve(text: string, conversationId: string | null): 
   }
   const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, id), list(ctx.studioId)]);
   return { ok: true, conversationId: id, messages, conversations };
+}
+
+/**
+ * « Lancer » on a quote card: starts the montage at once, without asking Fauve
+ * again. The manager's yes and Fauve's « c'est parti » are written to the
+ * conversation so the history (and Fauve's memory) stays coherent.
+ */
+export async function launchQuote(quoteId: string, conversationId: string): Promise<SendResult> {
+  const ctx = await current();
+  if (!ctx) return { ok: false, error: "Ton numéro n’est relié à aucun studio.", conversationId };
+  if (!UUID.test(quoteId) || !(await owns(ctx.studioId, conversationId))) {
+    return { ok: false, error: "Ce devis n’est plus disponible.", conversationId };
+  }
+  const quote = await acceptQuote(ctx.studioId, quoteId, new Date());
+  if ("error" in quote) return { ok: false, error: quote.error, conversationId };
+
+  const db = supabaseAdmin();
+  try {
+    await startMontage(ctx.studioId, quote);
+  } catch (error) {
+    console.error("launchQuote: montage not queued", error);
+    // Not started: the quote can be launched again.
+    await db.from("credit_quotes").update({ used_at: null }).eq("id", quote.id);
+    return { ok: false, error: "Le montage n’a pas pu démarrer. Réessaie dans un instant.", conversationId };
+  }
+  // One after the other, so they keep their order in the conversation.
+  await db
+    .from("whatsapp_messages")
+    .insert({ studio_id: ctx.studioId, conversation_id: conversationId, channel: "web", direction: "inbound", phone_e164: ctx.phone, type: "text", body: "Oui, lance" });
+  await db.from("whatsapp_messages").insert(
+    {
+      studio_id: ctx.studioId,
+      conversation_id: conversationId,
+      channel: "web",
+      direction: "outbound",
+      type: "text",
+      body: "C’est parti ! Je monte ta vidéo, elle arrive ici dans 2 à 4 minutes.",
+      payload: { notes: [`montage lancé (quote_id=${quote.id})`] },
+    },
+  );
+  const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, conversationId), list(ctx.studioId)]);
+  return { ok: true, conversationId, messages, conversations };
 }
 
 /** Emojis the manager can react with in the app (one per message; the same one again removes it). */

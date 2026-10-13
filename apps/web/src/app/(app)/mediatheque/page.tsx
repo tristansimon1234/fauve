@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { z } from "zod";
+import { DeleteButton } from "@/components/delete-button";
 import { EmptyState, NoStudio, PageLoading } from "@/components/empty-state";
 import { FolderIcon, MicIcon, WhatsAppIcon } from "@/components/icons";
 import { formatDuration, formatShortDateTime } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
+import { deleteMedia } from "./actions";
 
 export const metadata: Metadata = { title: "Médiathèque" };
 
@@ -168,6 +170,13 @@ function AssetCard({
         ) : (
           <FolderIcon size={32} />
         )}
+        <div className="absolute top-2 left-2 z-10">
+          <DeleteButton
+            compact
+            action={deleteMedia.bind(null, asset.id)}
+            confirmText={asset.kind === "video" ? "Supprimer cette vidéo ? Elle sera retirée des publications qui l’utilisent." : "Supprimer ce fichier ? Il sera retiré des publications qui l’utilisent."}
+          />
+        </div>
         {asset.duration !== null && asset.duration > 0 && (
           <span className="pointer-events-none absolute top-2 right-2 rounded-md bg-ink/60 px-1.5 py-0.5 text-[11px] font-bold text-white">
             {formatDuration(asset.duration)}
