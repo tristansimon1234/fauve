@@ -66,7 +66,7 @@ export const toolSpecs = {
   },
   get_post_link: {
     description:
-      "Renvoie le lien sécurisé (valable 15 min, à usage unique) vers la page mobile d'une publication : la gérante y regarde la vidéo, lit la légende, valide, ou déplace et corrige un texte du doigt. À envoyer quand elle veut revoir ou modifier une publication depuis son téléphone (« renvoie-moi le lien », « je veux changer le texte »).",
+      "Renvoie le lien sécurisé (valable 15 min, à usage unique) vers la page mobile d'une publication : la gérante y regarde la vidéo, lit la légende, valide, ou déplace et corrige un texte du doigt. À envoyer quand elle veut revoir ou modifier une publication (« renvoie-moi le lien », « je veux voir le rendu »). Dans l'application, pas de lien : la carte de la publication s'affiche sous ton message.",
     input: z.object({ post_id: z.string().uuid() }),
   },
   list_media: {

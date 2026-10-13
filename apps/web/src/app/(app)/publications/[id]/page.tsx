@@ -19,7 +19,7 @@ import { loadTextLooks } from "@/lib/text-looks";
 import { deletePost } from "./actions";
 import { MontageEditor } from "./montage-editor";
 import { PostEditor } from "./post-editor";
-import { SlidesSection } from "./slides-section";
+import { CarouselEditor } from "./carousel-editor";
 
 export const metadata: Metadata = { title: "Publication" };
 
@@ -224,7 +224,15 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         </div>
       </div>
 
-      {editor ? (
+      {slides ? (
+        // Text over the photos, laid out like the montage editor: the publication, the photo, the selected photo's texts.
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(250px,290px)_minmax(0,1fr)_minmax(300px,360px)]">
+          <div className="order-3 flex min-w-0 flex-col gap-4 xl:order-none">
+            {details}
+          </div>
+          <CarouselEditor postId={post.id} postTitle={post.title} initialPlan={slides.plan} photos={photos} brand={slides.brand} looks={looks} />
+        </div>
+      ) : editor ? (
         // A video editor: the publication on the left, the montage in the middle, the selected scene on the right.
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(250px,290px)_minmax(0,1fr)_minmax(300px,340px)]">
           <div className="order-3 flex min-w-0 flex-col gap-4 xl:order-none">
@@ -270,19 +278,6 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         </div>
       )}
 
-      {slides && (
-        <section aria-labelledby="slides-editor" className="flex flex-col gap-4 border-t border-line pt-8">
-          <div className="flex flex-col gap-1">
-            <h2 id="slides-editor" className="text-[24px] font-extrabold tracking-[-0.02em]">
-              Texte sur les photos
-            </h2>
-            <p className="text-[15px] text-muted">
-              Une accroche, un message par photo : glisse chaque texte où tu veux, change ses mots, sa taille, son fond. Gratuit.
-            </p>
-          </div>
-          <SlidesSection postId={post.id} initialPlan={slides.plan} photos={photos} brand={slides.brand} looks={looks} />
-        </section>
-      )}
 
     </>
   );
