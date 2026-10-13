@@ -4,6 +4,7 @@ import { assertTransition, postStatusSchema, type PostStatus } from "@fauve/agen
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
+import type { DeleteResult } from "@/components/delete-button";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -120,4 +121,41 @@ async function scheduleOnInstagram(studioId: string, postId: string): Promise<st
   if (at === planned) return whenFormat.format(at);
   after(() => publishIfDue(postId).then(() => revalidatePath(`/publications/${postId}`)));
   return "now";
+}
+
+/**
+ * Deletes a post from Fauve, with its montage plans, renders (and their video
+ * files) and quotes. A post already on Instagram stays there.
+ */
+export async function deletePost(postId: string): Promise<DeleteResult> {
+  if (!z.uuid().safeParse(postId).success) return { ok: false, error: "Publication introuvable." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  const studioId = member.studio.id;
+  const db = supabaseAdmin();
+
+  const { data: post } = await db.from("posts").select("id, status, publish_started_at").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  if (!post) return { ok: false, error: "Publication introuvable." };
+  if (post.status === "scheduled" && post.publish_started_at) {
+    return { ok: false, error: "Elle est en train de partir sur Instagram : réessaie dans une minute." };
+  }
+
+  // The renders go with their plans (cascade); their files must be removed by hand.
+  const { data: plans } = await db.from("edit_plans").select("id").eq("post_id", postId);
+  const planIds = (plans ?? []).map((p) => p.id as string);
+  const { data: renders } = planIds.length ? await db.from("renders").select("storage_path").in("edit_plan_id", planIds) : { data: [] };
+  const files = (renders ?? []).map((r) => r.storage_path as string | null).filter((p): p is string => Boolean(p?.startsWith(`${studioId}/`)));
+
+  const { error } = await db.from("posts").delete().eq("id", postId).eq("studio_id", studioId);
+  if (error) {
+    console.warn("deletePost failed", error.message);
+    return { ok: false, error: "La suppression n’a pas abouti. Réessaie dans un instant." };
+  }
+  if (files.length) await db.storage.from("media").remove(files).catch(() => {});
+
+  revalidatePath("/publications");
+  revalidatePath("/calendrier");
+  revalidatePath("/grille");
+  revalidatePath("/fauve");
+  return { ok: true };
 }
