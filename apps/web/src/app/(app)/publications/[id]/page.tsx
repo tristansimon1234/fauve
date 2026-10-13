@@ -1,4 +1,4 @@
-import { platformSchema, postKindSchema, postStatusSchema, type PostStatus } from "@fauve/agent";
+import { platformSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -27,6 +27,7 @@ const postSchema = z.object({
   agent_note: z.string().nullable(),
   edit_plan_id: z.uuid().nullable(),
   render_id: z.uuid().nullable(),
+  media_ids: z.array(z.uuid()).catch([]),
 });
 
 // Read leniently: an older or partial plan still shows what it can.
@@ -76,7 +77,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const { data, error } = await db
     .from("posts")
-    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, agent_note, edit_plan_id, render_id")
+    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, agent_note, edit_plan_id, render_id, media_ids")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -93,6 +94,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
     plan ? loadClipLabels(db, plan.view) : Promise.resolve(new Map<string, string>()),
   ]);
   const videoUrl = render?.storage_path ? videoUrls.get(render.storage_path) : undefined;
+  // Photo post, carousel or story without a montage: the post's own photos and videos, in order.
+  const media = videoUrl ? [] : await loadPostMedia(db, studioId, post.media_ids);
 
   const canEdit = !LOCKED.includes(post.status);
   const isVideo = post.kind === "reel" || post.kind === "story";
@@ -116,7 +119,9 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
       <div className="flex flex-wrap items-start gap-8">
         <div className="flex min-w-0 flex-[0_1_340px] flex-col items-center gap-3.5">
-          {videoUrl ? (
+          {!videoUrl && media.length > 0 ? (
+            <MediaPreview media={media} kind={post.kind} />
+          ) : videoUrl ? (
             <video
               src={videoUrl}
               controls
@@ -321,5 +326,46 @@ function PlanSection({ plan, clipLabels }: { plan: PlanView; clipLabels: Map<str
         </ul>
       )}
     </section>
+  );
+}
+
+type PostMedia = { id: string; url: string; video: boolean };
+
+async function loadPostMedia(db: Db, studioId: string, ids: string[]): Promise<PostMedia[]> {
+  if (!ids.length) return [];
+  const { data } = await db.from("media_assets").select("id, storage_path, kind, mime_type").eq("studio_id", studioId).in("id", ids);
+  const byId = new Map((data ?? []).map((m) => [m.id as string, m]));
+  const urls = await signMediaUrls(db, studioId, (data ?? []).map((m) => m.storage_path as string));
+  return ids.flatMap((id) => {
+    const m = byId.get(id);
+    const url = m ? urls.get(m.storage_path as string) : undefined;
+    if (!m || !url) return [];
+    return [{ id, url, video: m.kind === "video" || String(m.mime_type ?? "").startsWith("video/") }];
+  });
+}
+
+/** Photos as they will appear: 4:5 in the feed (a carousel swipes), 9:16 for a story. */
+function MediaPreview({ media, kind }: { media: PostMedia[]; kind: PostKind }) {
+  const ratio = kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]";
+  const shown = kind === "carousel" ? media.slice(0, 10) : media.slice(0, 1);
+  return (
+    <div className="flex w-full max-w-[320px] flex-col gap-2">
+      <ul
+        className={`flex snap-x snap-mandatory overflow-x-auto rounded-[22px] bg-ink shadow-[0_18px_40px_rgba(28,21,48,.18)] ${ratio}`}
+        aria-label={kind === "carousel" ? `Carrousel de ${shown.length} éléments` : "Aperçu"}
+      >
+        {shown.map((m) => (
+          <li key={m.id} className="h-full w-full shrink-0 snap-center">
+            {m.video ? (
+              <video src={m.url} controls playsInline preload="metadata" className="size-full object-cover" />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={m.url} alt="" className="size-full object-cover" />
+            )}
+          </li>
+        ))}
+      </ul>
+      {kind === "carousel" && <p className="text-center text-[13px] text-muted">{shown.length} éléments · fais défiler</p>}
+    </div>
   );
 }

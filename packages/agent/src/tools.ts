@@ -13,6 +13,13 @@ import {
 
 const isoDateTime = z.string().describe("Date et heure ISO 8601 avec fuseau, ex. 2026-10-15T18:00:00+02:00");
 
+/** Photos and videos of a post that is not a montage (media_id of the received files), in order. */
+const postMediaIds = z
+  .array(z.string().uuid())
+  .max(10)
+  .optional()
+  .describe("Photos ou vidéos reçues (media_id) : 1 pour un post photo, 2 à 10 dans l'ordre pour un carrousel, 1 pour une story sans montage");
+
 export const toolSpecs = {
   get_studio_context: {
     description:
@@ -55,6 +62,7 @@ export const toolSpecs = {
       scheduled_at: isoDateTime,
       platforms: z.array(platformSchema).min(1),
       theme: z.string().max(60).optional(),
+      media_ids: postMediaIds,
     }),
   },
   update_post: {
@@ -68,6 +76,7 @@ export const toolSpecs = {
       platforms: z.array(platformSchema).min(1).optional(),
       status: postStatusSchema.optional(),
       agent_note: z.string().max(600).optional().describe("Explication de tes choix, affichée dans la web app"),
+      media_ids: postMediaIds,
     }),
   },
   request_content: {
@@ -113,7 +122,7 @@ export const toolSpecs = {
   },
   schedule_post: {
     description:
-      "Programme une publication validée sur Instagram, à son horaire (scheduled_at) ou à l'horaire donné ; si l'horaire est passé ou absent, elle part tout de suite. Nécessite une vidéo montée (render) et un compte Instagram connecté (sinon envoie le lien get_connect_link). Ne programme jamais sans l'accord explicite de la gérante.",
+      "Programme une publication validée sur Instagram, à son horaire (scheduled_at) ou à l'horaire donné ; si l'horaire est passé ou absent, elle part tout de suite. Il faut un compte Instagram connecté (sinon envoie le lien get_connect_link) et le contenu du format : un Reel a besoin de sa vidéo montée ; un post d'une photo (media_ids) ; un carrousel de 2 à 10 photos ou vidéos (media_ids, dans l'ordre) ; une story de sa vidéo montée ou d'une photo/vidéo (pas de légende sur une story). Ne programme jamais sans l'accord explicite de la gérante.",
     input: z.object({ post_id: z.string().uuid(), scheduled_at: isoDateTime.optional() }),
   },
   get_instagram_activity: {

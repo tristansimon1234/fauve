@@ -1,8 +1,9 @@
 import "server-only";
-import { isInSessionWindow } from "@fauve/agent";
+import { isInSessionWindow, type PostKind } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
-import { InstagramError, mediaInsights, publishReel, refreshToken } from "./instagram";
+import { InstagramError, mediaInsights, publishMedia, refreshToken, type PublishRequest } from "./instagram";
+import { publishItems } from "./media-urls";
 
 // Publishing worker. Posts in "scheduled" whose time has come are claimed (one
 // worker per post), sent to Instagram, then moved to "published" or "failed".
@@ -82,29 +83,56 @@ export async function instagramAccount(studioId: string) {
   };
 }
 
+const kindNames: Record<PostKind, string> = { reel: "Ton Reel", post: "Ton post", carousel: "Ton carrousel", story: "Ta story" };
+
+/** The montage video of a post, as a URL Instagram can fetch. */
+async function renderUrl(renderId: string | null): Promise<string> {
+  if (!renderId) throw new Error("Aucune vidéo montée pour cette publication");
+  const db = supabaseAdmin();
+  const render = check(await db.from("renders").select("storage_path, status").eq("id", renderId).single()).data!;
+  if (render.status !== "done" || !render.storage_path) throw new Error("La vidéo montée n'est pas prête");
+  return check(await db.storage.from("media").createSignedUrl(render.storage_path as string, 3600)).data!.signedUrl;
+}
+
+/** What to publish for each kind: a Reel is the montage; posts, carousels and stories use the post's media. */
+async function publishRequest(studioId: string, kind: PostKind, renderId: string | null, mediaIds: string[], caption: string): Promise<PublishRequest> {
+  if (kind === "reel") return { kind: "reel", videoUrl: await renderUrl(renderId), caption };
+  if (kind === "story") {
+    const [item] = renderId ? [{ type: "video" as const, url: await renderUrl(renderId) }] : await publishItems(studioId, mediaIds.slice(0, 1));
+    if (!item) throw new Error("Aucune photo ni vidéo pour cette story");
+    return { kind: "story", item };
+  }
+  const items = await publishItems(studioId, mediaIds);
+  if (kind === "carousel") {
+    if (items.length < 2) throw new Error("Un carrousel demande au moins 2 photos ou vidéos");
+    return { kind: "carousel", items: items.slice(0, 10), caption };
+  }
+  const [first] = items;
+  if (!first) throw new Error("Aucune photo pour ce post");
+  // A video in the feed is a Reel on Instagram.
+  return first.type === "video" ? { kind: "reel", videoUrl: first.url, caption } : { kind: "image", imageUrl: first.url, caption };
+}
+
 /** Publishes one claimed post now. */
 async function publishPost(postId: string): Promise<PublishOutcome> {
   const db = supabaseAdmin();
   const post = check(
     await db
       .from("posts")
-      .select("id, studio_id, title, caption, hashtags, render_id, external_ids")
+      .select("id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids")
       .eq("id", postId)
       .single(),
   ).data!;
   const studioId = post.studio_id as string;
 
+  const kind = post.kind as PostKind;
   try {
-    if (!post.render_id) throw new Error("Aucune vidéo montée pour cette publication");
-    const render = check(await db.from("renders").select("storage_path, status").eq("id", post.render_id).single()).data!;
-    if (render.status !== "done" || !render.storage_path) throw new Error("La vidéo montée n'est pas prête");
     const account = await instagramAccount(studioId);
     if (!account) throw new Error("Instagram n'est pas connecté");
-
-    const signed = check(await db.storage.from("media").createSignedUrl(render.storage_path, 3600)).data!;
     const hashtags = ((post.hashtags as string[] | null) ?? []).map((h) => `#${h}`).join(" ");
     const caption = [post.caption ?? "", hashtags].filter(Boolean).join("\n\n");
-    const result = await publishReel({ userId: account.userId, accessToken: account.accessToken, videoUrl: signed.signedUrl, caption });
+    const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption);
+    const result = await publishMedia({ userId: account.userId, accessToken: account.accessToken, request });
 
     check(
       await db
@@ -119,7 +147,7 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
         })
         .eq("id", postId),
     );
-    await notify(studioId, `Ton Reel « ${post.title} » est en ligne sur Instagram ✅${result.permalink ? `\n${result.permalink}` : ""}`);
+    await notify(studioId, `${kindNames[kind]} « ${post.title} » est en ligne sur Instagram ✅${result.permalink ? `\n${result.permalink}` : ""}`);
     return { postId, ok: true, permalink: result.permalink };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
