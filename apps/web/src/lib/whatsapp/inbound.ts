@@ -171,7 +171,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
       phone_e164: phone,
       type: "text",
       body: result.reply,
-      payload: { reply_to: message.id, ...result.extras },
+      payload: { reply_to: message.id, ...result.extras, notes: result.notes },
     });
   }
   // E.g. a render: the video follows the "je monte ta vidéo" reply.

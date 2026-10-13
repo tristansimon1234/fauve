@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
   if (result.reply) {
     await db
       .from("whatsapp_messages")
-      .insert({ studio_id: member.studioId, conversation_id: conversationId, channel: "web", direction: "outbound", type: "text", body: result.reply, payload: result.extras });
+      .insert({ studio_id: member.studioId, conversation_id: conversationId, channel: "web", direction: "outbound", type: "text", body: result.reply, payload: { ...result.extras, notes: result.notes } });
   }
   for (const job of result.afterReply) await job().catch((e) => console.error("admin chat: after-reply job failed", e));
   return Response.json({ studio: member.studioId, conversation: conversationId, reply: result.reply, reactions: result.reactions, extras: result.extras, usage: result.usage, jobs: result.afterReply.length });

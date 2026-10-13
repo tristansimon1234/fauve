@@ -10,7 +10,7 @@ import {
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { acceptQuote, createMontageQuote } from "@/lib/credits";
+import { acceptQuote, createMontageQuote, lastPresentedQuote } from "@/lib/credits";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
@@ -35,6 +35,11 @@ export type ToolContext = {
   afterReply: (() => Promise<void>)[];
   /** Filled by reply_with: buttons and cards the caller shows under the reply. */
   extras: ReplyExtras;
+  /**
+   * Ids made during this turn (quote, post), stored with the reply and shown to the
+   * model on the next turns: the history keeps only text, not tool results.
+   */
+  notes: string[];
   /** The studio's time zone, for the local dates in tool results. */
   timezone?: string;
 };
@@ -185,6 +190,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           .select("id, kind, title, scheduled_at, status")
           .single(),
       );
+      ctx.notes.push(`publication créée « ${post.title as string} » post_id=${post.id as string}`);
       return json({ post });
     },
 
@@ -253,6 +259,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if ("error" in quote) {
         return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });
       }
+      ctx.notes.push(`devis présenté quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id} (${quote.base} à ${quote.max} crédits)`);
       return json({
         quote_id: quote.id,
         publication: post.title,
@@ -304,7 +311,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async montage({ quote_id }) {
       const quote = await acceptQuote(studioId, quote_id, turnStartedAt);
-      if ("error" in quote) return quote.error;
+      if ("error" in quote) {
+        // The model lost the id of the quote the manager said yes to: point it back to it.
+        const shown = await lastPresentedQuote(studioId, turnStartedAt);
+        return shown && shown.id !== quote_id
+          ? `${quote.error} Le devis présenté à la gérante est quote_id=${shown.id} (« ${shown.title} ») : lance montage avec celui-ci, sans refaire de devis ni de publication.`
+          : quote.error;
+      }
       const post = unwrap(await db.from("posts").select("id, title").eq("id", quote.postId).eq("studio_id", studioId).single());
       // The montage outlives this reply: it runs as a background job and sends the video itself.
       ctx.afterReply.push(() =>

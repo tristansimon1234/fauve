@@ -50,6 +50,8 @@ export type RunFauveResult = {
   reactions: string[];
   /** Buttons and cards under the reply (reply_with). */
   extras: ReplyExtras;
+  /** Ids made this turn, stored with the reply for the next turns (see ToolContext.notes). */
+  notes: string[];
   usage: TokenUsage;
   /** Work started by tools that must run once the reply is sent (e.g. render then send a video). */
   afterReply: (() => Promise<void>)[];
@@ -119,14 +121,14 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   await logClaudeCost(input.studioId, usage, "conversation", CHAT_MODEL);
 
   if (!last || last.stop_reason === "refusal") {
-    return { reply: FALLBACK_REPLY, reactions: input.reactions, extras: {}, usage, afterReply: input.afterReply };
+    return { reply: FALLBACK_REPLY, reactions: input.reactions, extras: {}, notes: input.notes, usage, afterReply: input.afterReply };
   }
   const reply = last.content
     .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n\n")
     .trim();
-  return { reply: reply || null, reactions: input.reactions, extras: reply ? input.extras : {}, usage, afterReply: input.afterReply };
+  return { reply: reply || null, reactions: input.reactions, extras: reply ? input.extras : {}, notes: input.notes, usage, afterReply: input.afterReply };
 }
 
 export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose = "conversation", model = CLAUDE_MODEL) {
