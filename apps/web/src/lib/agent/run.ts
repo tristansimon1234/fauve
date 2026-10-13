@@ -42,7 +42,7 @@ function buildTools(handlers: ToolHandlers) {
 
 export type RunFauveInput = ToolContext & {
   history: Anthropic.Beta.BetaMessageParam[];
-  studio: { name: string | null; timezone: string; onboardingStep: string; firstName: string | null; instagram: string | null };
+  studio: { name: string | null; businessType: string | null; timezone: string; onboardingStep: string; firstName: string | null; instagram: string | null };
 };
 
 export type RunFauveResult = {
@@ -103,6 +103,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           nextDays,
           timezone: input.studio.timezone,
           studioName: input.studio.name,
+          businessType: input.studio.businessType,
           firstName: input.studio.firstName,
           onboardingStep: input.studio.onboardingStep,
           instagram: input.studio.instagram,

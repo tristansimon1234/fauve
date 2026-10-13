@@ -28,7 +28,7 @@ export default function TermsPage() {
       <h2>Contenus et droit à l’image</h2>
       <ul>
         <li>Le studio garantit disposer des droits sur les vidéos, photos et textes qu’il transmet.</li>
-        <li>Il recueille l’accord des personnes filmées (élèves, professeurs) avant tout envoi.</li>
+        <li>Il recueille l’accord des personnes filmées (clients, élèves, équipe) avant tout envoi.</li>
         <li>Aucune musique protégée n’est intégrée aux vidéos ; le son tendance s’ajoute dans l’application du réseau social.</li>
         <li>Le studio conserve la propriété de ses contenus et nous accorde le droit de les traiter pour fournir le service.</li>
       </ul>

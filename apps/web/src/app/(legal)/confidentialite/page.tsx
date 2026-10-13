@@ -8,7 +8,7 @@ export default function PrivacyPage() {
     <>
       <h1>Politique de confidentialité</h1>
       <p>
-        Fauve est une assistante IA qui gère les réseaux sociaux des studios de Pilates, yoga et barre, principalement
+        Fauve est une assistante IA qui gère les réseaux sociaux des commerces de quartier (studios, salons, restaurants, boutiques), principalement
         depuis WhatsApp. Cette page explique quelles données nous traitons, pourquoi, et quels sont tes droits.
       </p>
 
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
         <li>Données techniques : journaux de connexion, sessions, coûts de traitement.</li>
       </ul>
       <p>
-        Les vidéos peuvent montrer des élèves du studio. Le studio s’engage à recueillir leur accord avant de nous les
+        Les vidéos peuvent montrer des clients ou l’équipe du commerce. Le commerce s’engage à recueillir leur accord avant de nous les
         transmettre ; Fauve propose des cadrages sans visage et peut flouter les visages.
       </p>
 

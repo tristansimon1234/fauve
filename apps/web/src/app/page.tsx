@@ -47,13 +47,13 @@ export default async function LandingPage() {
       <section className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-12 px-4 pt-8 pb-18 sm:px-8 sm:pt-12">
         <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-5.5">
           <span className="self-start rounded-full bg-peach px-3 py-1.5 text-[13px] font-bold text-peach-ink">
-            Pour les studios de Pilates, yoga et barre
+            Pour les studios, salons, restaurants et boutiques
           </span>
           <h1 className="text-[clamp(40px,5vw,68px)] leading-[1.02] font-extrabold tracking-[-0.035em]">
             Ton community manager vit dans <span className="accent">WhatsApp.</span>
           </h1>
           <p className="max-w-[520px] text-[19px] leading-[1.55] text-muted">
-            Envoie tes vidéos de cours. Fauve les monte, écrit les légendes et programme tes posts. Et quand il manque
+            Envoie tes vidéos. Fauve les monte, écrit les légendes et programme tes posts. Et quand il manque
             quelque chose, c’est elle qui te relance.
           </p>
           <div className="flex flex-wrap items-center gap-3">
@@ -81,7 +81,7 @@ export default async function LandingPage() {
               </span>
             </div>
             <Bubble from="fauve">
-              Salut Camille ! Le Reel de jeudi est prévu. Tu peux m’envoyer 3 à 5 vidéos du cours de ce matin ?
+              Salut Camille ! Le Reel de jeudi est prévu. Tu peux m’envoyer 3 à 5 vidéos de ce matin ?
             </Bubble>
             <div className="grid grid-cols-[repeat(4,44px)] gap-1.5 self-end">
               {exampleClips.map((bg) => (

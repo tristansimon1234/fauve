@@ -48,7 +48,7 @@ export async function designEdit(params: {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, library, report, inspirations] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms").eq("id", params.postId).eq("studio_id", params.studioId).single(),
-    db.from("studios").select("name, booking_url").eq("id", params.studioId).single(),
+    db.from("studios").select("name, business_type, booking_url").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
     templatesForEditor(params.studioId),
@@ -70,7 +70,7 @@ export async function designEdit(params: {
 
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
   const input = {
-    studio: { name: studio.data?.name, booking: Boolean(studio.data?.booking_url) },
+    studio: { name: studio.data?.name, business: studio.data?.business_type ?? undefined, booking: Boolean(studio.data?.booking_url) },
     brand: {
       tone: profile.tone,
       art_direction: profile.art_direction,

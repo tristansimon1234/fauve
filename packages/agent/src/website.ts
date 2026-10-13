@@ -13,7 +13,8 @@ export type SiteInfo = {
   text: string;
 };
 
-// Booking platforms used by French studios. bsport first: it is the market leader.
+// Booking platforms used by French local businesses: studios (bsport first, the
+// market leader), hair and beauty salons, restaurants.
 const BOOKING_HOSTS = [
   "bsport.io",
   "momoyoga.com",
@@ -28,6 +29,17 @@ const BOOKING_HOSTS = [
   "calendly.com",
   "acuityscheduling.com",
   "wix.com/booking",
+  "treatwell.",
+  "fresha.com",
+  "booksy.com",
+  "salonkee.",
+  "kiute.com",
+  "thefork.",
+  "lafourchette.",
+  "zenchef.",
+  "guestonline.",
+  "sevenrooms.com",
+  "opentable.",
 ];
 
 const ENTITIES: Record<string, string> = {

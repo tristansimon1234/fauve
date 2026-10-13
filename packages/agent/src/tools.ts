@@ -30,15 +30,16 @@ export const toolSpecs = {
   },
   update_onboarding: {
     description:
-      "Enregistre une information d'onboarding (nom du studio, prénom de la gérante, site web, lien de réservation, rythme de publication, plateformes) et fait avancer l'étape.",
+      "Enregistre une information d'onboarding (nom et activité du commerce, prénom de la gérante, site web, lien de réservation, rythme de publication, plateformes) et fait avancer l'étape.",
     input: z.object({
       studio_name: z.string().min(1).max(80).optional(),
+      business_type: z.string().min(2).max(80).optional().describe("Activité, en quelques mots : « studio de Pilates », « salon de coiffure », « restaurant italien »…"),
       first_name: z.string().min(1).max(40).optional(),
       posts_per_week: z.number().int().min(0).max(21).optional(),
       stories_per_week: z.number().int().min(0).max(50).optional(),
       platforms: z.array(platformSchema).min(1).optional(),
       website_url: z.url().optional().describe("Site web du studio"),
-      booking_url: z.url().optional().describe("Lien de réservation (bsport, Momoyoga…), utilisé dans la bio et les stories"),
+      booking_url: z.url().optional().describe("Lien de réservation ou de prise de rendez-vous (bsport, Planity, TheFork, Momoyoga…), utilisé dans la bio et les stories"),
       step: z.enum(["studio_name", "rhythm", "examples", "connect", "done"]).optional(),
     }),
   },
@@ -86,7 +87,7 @@ export const toolSpecs = {
       "Ajoute un élément à la liste « À filmer » et passe la publication liée en « content_requested ».",
     input: z.object({
       post_id: z.string().uuid().optional(),
-      label: z.string().min(1).max(120).describe("Quoi filmer, ex. « Les mains sur la barre, en gros plan »"),
+      label: z.string().min(1).max(120).describe("Quoi filmer, ex. « Les mains en gros plan sur le geste »"),
       hint: z.string().max(160).optional().describe("Angle, lumière, durée"),
       due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     }),

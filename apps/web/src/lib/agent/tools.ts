@@ -126,6 +126,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     async update_onboarding(input) {
       const studioUpdate: Record<string, unknown> = {};
       if (input.studio_name) studioUpdate.name = input.studio_name;
+      if (input.business_type) studioUpdate.business_type = input.business_type;
       if (input.step) studioUpdate.onboarding_step = input.step;
       if (input.website_url) studioUpdate.website_url = input.website_url;
       if (input.booking_url) studioUpdate.booking_url = input.booking_url;
