@@ -126,7 +126,7 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  const { clipIds, clipFiles, clips, clipUrls, words, accent, logoUrl, studioName, fonts } = await loadMontageInputs(studioId, plan);
+  const { clipFiles, clips, clipUrls, words, accent, logoUrl, studioName, fonts } = await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
