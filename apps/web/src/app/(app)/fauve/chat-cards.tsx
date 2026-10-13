@@ -1,20 +1,114 @@
 import Link from "next/link";
-import { LayersIcon, PlayIcon } from "@/components/icons";
+import { CheckIcon, LayersIcon, PlayIcon } from "@/components/icons";
 import { StatusPill } from "@/components/status-pill";
 import { formatShortDateTime, kindLabels } from "@/lib/format";
-import type { CardPost, ChatCard } from "@/lib/chat-cards";
+import type { CardPost, CardQuote, ChatCard } from "@/lib/chat-cards";
 
 // Cards under Fauve's messages: a post with its render or photo, or the
 // coming posts laid out as on the Instagram grid.
 
-export function ChatCards({ cards, timezone }: { cards: ChatCard[]; timezone: string }) {
+export function ChatCards({
+  cards,
+  timezone,
+  onLaunch,
+  onAnswer,
+  busy = false,
+}: {
+  cards: ChatCard[];
+  timezone: string;
+  /** Starts the quoted montage at once (no round trip through Fauve). */
+  onLaunch?: (quoteId: string) => void;
+  /** Sends a short answer to Fauve, as if typed. */
+  onAnswer?: (text: string) => void;
+  busy?: boolean;
+}) {
   if (!cards.length) return null;
   return (
     <div className="flex max-w-full flex-wrap items-start gap-3">
       {cards.map((card, i) =>
-        card.type === "post" ? <PostCard key={card.post.id} post={card.post} timezone={timezone} /> : <GridCard key={`grid-${i}`} posts={card.posts} />,
+        card.type === "post" ? (
+          <PostCard key={card.post.id} post={card.post} timezone={timezone} />
+        ) : card.type === "quote" ? (
+          <QuoteCard key={card.quote.id} quote={card.quote} onLaunch={onLaunch} onAnswer={onAnswer} busy={busy} />
+        ) : (
+          <GridCard key={`grid-${i}`} posts={card.posts} />
+        ),
       )}
     </div>
+  );
+}
+
+const credits = (n: number) => `${n} crédit${n > 1 ? "s" : ""}`;
+
+/** The plan and its price, before anything runs: one tap to launch. */
+function QuoteCard({
+  quote,
+  onLaunch,
+  onAnswer,
+  busy,
+}: {
+  quote: CardQuote;
+  onLaunch?: (quoteId: string) => void;
+  onAnswer?: (text: string) => void;
+  busy: boolean;
+}) {
+  const scenes = quote.max > quote.base;
+  return (
+    <article className="flex w-[300px] max-w-full flex-col gap-3 rounded-[18px] border border-line bg-white p-4 shadow-[0_2px_10px_rgba(28,21,48,0.05)]">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[11px] font-bold tracking-[0.06em] text-muted uppercase">Devis</span>
+        <span className="text-[15px] font-bold leading-snug">{quote.title}</span>
+      </div>
+      <ul className="flex flex-col gap-1.5 text-[13px]">
+        {quote.lines.map((line) => (
+          <li key={line.label} className="flex justify-between gap-3">
+            <span className="text-ink/80">{line.label}</span>
+            <span className="shrink-0 font-semibold">{line.credits}</span>
+          </li>
+        ))}
+        <li className="flex justify-between gap-3 border-t border-line pt-1.5 text-[14px] font-bold">
+          <span>Total</span>
+          <span>{credits(quote.base)}</span>
+        </li>
+      </ul>
+      {scenes && (
+        <p className="text-[12px] leading-snug text-muted">
+          Jusqu’à {credits(quote.max)} si Fauve crée de nouvelles scènes animées. Tu ne paies que ce qui est vraiment fait.
+        </p>
+      )}
+      <p className="text-[12px] text-muted">
+        Solde : {credits(quote.balance)} · il t’en restera au moins {Math.max(0, quote.balance - quote.max)}
+      </p>
+      {quote.state === "open" && onLaunch ? (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onLaunch(quote.id)}
+            className="h-10 flex-1 rounded-full bg-violet px-4 text-[14px] font-bold whitespace-nowrap text-white disabled:opacity-60"
+          >
+            Lancer · {credits(quote.base)}
+          </button>
+          {onAnswer && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onAnswer("Pas maintenant")}
+              className="h-10 rounded-full px-3 text-[14px] font-semibold text-muted hover:bg-soft disabled:opacity-60"
+            >
+              Pas maintenant
+            </button>
+          )}
+        </div>
+      ) : quote.state === "launched" ? (
+        <span className="flex items-center gap-1.5 text-[13px] font-bold text-success">
+          <CheckIcon size={16} />
+          Montage lancé
+        </span>
+      ) : quote.state === "expired" ? (
+        <span className="text-[13px] text-muted">Devis expiré : demande-en un nouveau à Fauve.</span>
+      ) : null}
+    </article>
   );
 }
 

@@ -11,10 +11,10 @@ import {
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { acceptQuote, createMontageQuote, lastPresentedQuote } from "@/lib/credits";
+import { startMontage } from "@/lib/montage-start";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
-import { queueJob } from "@/lib/jobs";
 import { renderAndDeliver } from "@/lib/render/deliver";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
@@ -259,6 +259,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if ("error" in quote) {
         return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });
       }
+      // Shown as a card with a « Lancer » button under the reply (WhatsApp: yes / no buttons).
+      ctx.extras.quote = quote.id;
       ctx.notes.push(`devis présenté quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id} (${quote.base} à ${quote.max} crédits)`);
       return json({
         quote_id: quote.id,
@@ -320,21 +322,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       const post = unwrap(await db.from("posts").select("id, title").eq("id", quote.postId).eq("studio_id", studioId).single());
       // The montage outlives this reply: it runs as a background job and sends the video itself.
-      ctx.afterReply.push(() =>
-        queueJob("montage", {
-          // A variant skips the editor: same cut, another style and hook, then the render.
-          step: quote.kind === "variant" ? "variant" : "design",
-          variant: quote.variant ?? undefined,
-          studioId,
-          postId: quote.postId,
-          mediaIds: quote.mediaIds.length ? quote.mediaIds : undefined,
-          brief: quote.brief ?? (quote.kind === "correction" ? "Correction demandée par la gérante." : undefined),
-          maxNewScenes: quote.maxNewScenes,
-          quoteId: quote.id,
-          waId: ctx.waId,
-          replyTo: ctx.replyToMessageId,
-        }),
-      );
+      ctx.afterReply.push(() => startMontage(studioId, quote, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
+      ctx.notes.push(`montage lancé (quote_id=${quote.id})`);
       return json({
         status: "started",
         post: post.title,

@@ -1,5 +1,6 @@
 import "server-only";
 import { replyExtrasSchema, type PostKind, type PostStatus } from "@fauve/agent";
+import { creditBalance } from "@/lib/credits";
 import { signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -16,7 +17,18 @@ export type CardPost = {
   media: { url: string; video: boolean } | null;
 };
 
-export type ChatCard = { type: "post"; post: CardPost } | { type: "grid"; posts: CardPost[] };
+export type CardQuote = {
+  id: string;
+  title: string;
+  lines: { label: string; credits: number }[];
+  base: number;
+  max: number;
+  /** open: can be launched; launched: montage started; expired: too old, ask for a new one. */
+  state: "open" | "launched" | "expired";
+  balance: number;
+};
+
+export type ChatCard = { type: "post"; post: CardPost } | { type: "grid"; posts: CardPost[] } | { type: "quote"; quote: CardQuote };
 
 /** Parsed extras of one message; anything malformed is dropped. */
 export function extrasOf(payload: unknown) {
@@ -27,8 +39,8 @@ export function extrasOf(payload: unknown) {
 const GRID_POSTS = 6;
 const UPCOMING = ["draft", "validated", "scheduled"];
 
-/** Cards for every message of a page, in one pass (posts, renders, photos). */
-export async function resolveCards(studioId: string, payloads: unknown[]): Promise<ChatCard[][]> {
+/** Post and grid cards for every message of a page, in one pass (posts, renders, photos). */
+async function postAndGridCards(studioId: string, payloads: unknown[]): Promise<ChatCard[][]> {
   const extras = payloads.map(extrasOf);
   const wanted = new Set(extras.flatMap((e) => e.posts ?? []));
   const withGrid = extras.some((e) => e.grid);
@@ -96,4 +108,34 @@ export async function resolveCards(studioId: string, payloads: unknown[]): Promi
     }),
     ...(e.grid ? [{ type: "grid" as const, posts: grid }] : []),
   ]);
+}
+
+/** Quote cards: the quoted work, its price and whether it can still be launched. */
+async function quoteCards(studioId: string, payloads: unknown[]): Promise<(ChatCard | null)[]> {
+  const ids = payloads.map((p) => extrasOf(p).quote ?? null);
+  const wanted = [...new Set(ids.filter((id): id is string => Boolean(id)))];
+  if (!wanted.length) return ids.map(() => null);
+  const db = supabaseAdmin();
+  const [{ data }, balance] = await Promise.all([
+    db.from("credit_quotes").select("id, base, max, lines, used_at, expires_at, posts(title)").eq("studio_id", studioId).in("id", wanted),
+    creditBalance(studioId).catch(() => 0),
+  ]);
+  const byId = new Map(
+    (data ?? []).map((q): [string, CardQuote] => {
+      const post = q.posts as { title?: string | null } | { title?: string | null }[] | null;
+      const title = (Array.isArray(post) ? post[0]?.title : post?.title) ?? "Montage";
+      const state = q.used_at ? "launched" : new Date(q.expires_at as string).getTime() < Date.now() ? "expired" : "open";
+      return [q.id as string, { id: q.id as string, title, lines: (q.lines as CardQuote["lines"]) ?? [], base: q.base as number, max: q.max as number, state, balance }];
+    }),
+  );
+  return ids.map((id) => {
+    const quote = id ? byId.get(id) : undefined;
+    return quote ? { type: "quote", quote } : null;
+  });
+}
+
+/** Every card of every message of a page: quote first, then posts and grid. */
+export async function resolveCards(studioId: string, payloads: unknown[]): Promise<ChatCard[][]> {
+  const [quotes, others] = await Promise.all([quoteCards(studioId, payloads), postAndGridCards(studioId, payloads)]);
+  return others.map((cards, i) => (quotes[i] ? [quotes[i]!, ...cards] : cards));
 }
