@@ -1,4 +1,4 @@
-import { EFFORT_LATE_MINUTES, EFFORTS, type Effort } from "@fauve/agent";
+import { effortPitch, EFFORTS, montageLate, type Effort } from "@fauve/agent";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { CheckIcon, ClockIcon, LayersIcon, PlayIcon } from "@/components/icons";
@@ -264,7 +264,7 @@ function QuoteCard({
                       </div>
                     )}
                     <p id={pitchId} key={shown} className={`text-[12px] leading-snug text-muted ${touched ? "fauve-fade" : ""}`}>
-                      {level.pitch} · {level.minutes} min
+                      {effortPitch(shown!, quote.kind === "correction")} · {level.minutes} min
                     </p>
                     {quote.effort && levels.length > 0 && levels.length < LEVELS.length && (
                       <p className="text-[12px] leading-snug text-muted">
@@ -276,7 +276,7 @@ function QuoteCard({
                     )}
                     {/* Heard once per change: the level and its price. */}
                     <p className="sr-only" aria-live="polite">
-                      {touched ? `${level.label} : ${level.pitch}, ${credits(price.base)}` : ""}
+                      {touched ? `${level.label} : ${effortPitch(shown!, quote.kind === "correction")}, ${credits(price.base)}` : ""}
                     </p>
                   </div>
                 )}
@@ -480,7 +480,10 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
   const now = useNow(30_000);
   const minutes = now !== null && quote.startedAt ? Math.max(0, Math.floor((now - Date.parse(quote.startedAt)) / 60_000)) : null;
   const level = EFFORTS[quote.effort ?? "rapide"];
-  const late = minutes !== null && minutes >= EFFORT_LATE_MINUTES[quote.effort ?? "rapide"];
+  const late =
+    now !== null &&
+    quote.startedAt !== null &&
+    montageLate({ startedAt: Date.parse(quote.startedAt), stageAt: quote.stageAt ? Date.parse(quote.stageAt) : null, effort: quote.effort, now });
 
   // Launched from this card: the keyboard focus lands on the progress (the button it was on is gone).
   const ref = useRef<HTMLDivElement>(null);

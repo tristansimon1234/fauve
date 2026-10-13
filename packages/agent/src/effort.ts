@@ -70,3 +70,21 @@ export function otherEffort(current: Effort, available: Effort[]): Effort | null
   const down = ORDER[i - 1];
   return down && available.includes(down) ? down : null;
 }
+
+/** What a level does, in one line: a correction is one version, so Max only corrects more. */
+export function effortPitch(effort: Effort, correction = false): string {
+  return correction && effort === "max" ? "Fauve regarde la vidéo et la corrige jusqu’à deux fois" : EFFORTS[effort].pitch;
+}
+
+/** One step of the chain runs in one invocation (5 min at most, plus queueing). */
+export const STEP_LATE_MINUTES = 8;
+
+/**
+ * A launched montage with no news for too long has most likely failed: measured
+ * from its last step when the chain records them (a Max montage can run long
+ * while every step moves), else from its launch.
+ */
+export function montageLate(input: { startedAt: number; stageAt: number | null; effort: Effort | null; now: number }): boolean {
+  const minutes = (since: number) => (input.now - since) / 60_000;
+  return input.stageAt !== null ? minutes(input.stageAt) >= STEP_LATE_MINUTES : minutes(input.startedAt) >= EFFORT_LATE_MINUTES[input.effort ?? "rapide"];
+}

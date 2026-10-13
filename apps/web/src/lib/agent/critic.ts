@@ -6,6 +6,9 @@ import {
   editPlanSchema,
   MONTAGE_CRITIC_PROMPT,
   montageReviewSchema,
+  normalizeReview,
+  planTimeline,
+  withoutScenes,
   planDigest,
   reviewMoments,
   type EditPlan,
@@ -28,19 +31,26 @@ export type CriticVerdict = {
   /** Index of the kept version in the list given. */
   best: number;
   review: MontageReview;
+  /** The kept version was rendered by the fallback engine (no animations): not the editor's to fix. */
+  fallback: boolean;
 };
 
 async function loadVersion(studioId: string, version: ReviewedVersion) {
   const db = supabaseAdmin();
   const [plan, render] = await Promise.all([
     db.from("edit_plans").select("plan").eq("id", version.planId).eq("studio_id", studioId).single(),
-    db.from("renders").select("storage_path, status").eq("id", version.renderId).eq("studio_id", studioId).single(),
+    db.from("renders").select("storage_path, status, duration_ms").eq("id", version.renderId).eq("studio_id", studioId).single(),
   ]);
   const parsed = editPlanSchema.safeParse(plan.data?.plan);
   if (!parsed.success || render.data?.status !== "done" || !render.data.storage_path) return null;
   const signed = await db.storage.from("media").createSignedUrl(render.data.storage_path as string, 900);
   if (!signed.data) return null;
-  const moments = reviewMoments(parsed.data);
+  // A video shorter than its plan came from the ffmpeg fallback, which keeps only the clips:
+  // the frames are taken on what was really rendered.
+  const planned = planTimeline(parsed.data).duration * 1000;
+  const fallback = typeof render.data.duration_ms === "number" && render.data.duration_ms < planned - 100;
+  const shown = fallback ? withoutScenes(parsed.data) : parsed.data;
+  const moments = shown.segments.length ? reviewMoments(shown) : [];
   const frames = await videoFramesInSandbox(
     `review-${version.renderId.slice(0, 8)}-${Date.now()}`,
     signed.data.signedUrl,
@@ -49,7 +59,7 @@ async function loadVersion(studioId: string, version: ReviewedVersion) {
     console.warn("critic: no frames for", version.renderId, error);
     return [];
   });
-  return { plan: parsed.data, moments, frames };
+  return { plan: shown, moments, frames, fallback };
 }
 
 const quote = (texts: string[]) => texts.map((t) => `« ${t.slice(0, 120)} »`).join(", ");
@@ -92,11 +102,15 @@ export async function reviewMontage(input: {
   loaded.forEach((version, i) => {
     const last = i === loaded.length - 1;
     const correction = last && i > 0 && input.asked?.length;
+    if (!version?.frames.length) {
+      content.push({ type: "text", text: `Version ${i + 1} : images indisponibles, ne la retiens pas.` });
+      return;
+    }
     content.push({
       type: "text",
-      text: version
-        ? `Version ${i + 1}${correction ? ` (correction de la version ${i})` : ""} : ${planDigest(version.plan as EditPlan)}`
-        : `Version ${i + 1} : images indisponibles, ne la retiens pas.`,
+      text: `Version ${i + 1}${correction ? ` (correction de la version ${i})` : ""} : ${planDigest(version.plan as EditPlan)}${
+        version.fallback ? " Rendue par le moteur de secours, sans les animations : leur absence n'est pas un défaut à corriger." : ""
+      }`,
     });
     if (correction) {
       content.push({ type: "text", text: `Corrections demandées : ${input.asked!.map((a) => `${a.scene ? `scène ${a.scene} : ` : ""}${a.fix}`).join(" ; ")}` });
@@ -122,12 +136,15 @@ export async function reviewMontage(input: {
       messages: [{ role: "user", content }],
     });
     await logClaudeCost(input.studioId, response.usage, "montage_critic");
-    const review = response.parsed_output;
-    if (!review) return null;
-    // A version without frames is never kept.
-    let best = Math.min(Math.max(1, review.best), input.versions.length) - 1;
-    if (!loaded[best]?.frames.length) best = loaded.findLastIndex((v) => v?.frames.length);
-    return { best, review };
+    if (!response.parsed_output) return null;
+    const review = normalizeReview(response.parsed_output, input.versions.length);
+    const best = review.best - 1;
+    // A version without frames is never kept, and the verdict about it is not reused for another one.
+    if (!loaded[best]?.frames.length) {
+      const seen = loaded.findLastIndex((v) => v?.frames.length);
+      return { best: seen, review: { ...review, ok: true, issues: [], summary: "", why: "" }, fallback: Boolean(loaded[seen]?.fallback) };
+    }
+    return { best, review, fallback: Boolean(loaded[best]?.fallback) };
   } catch (error) {
     console.warn("critic unavailable", input.postId, error);
     return null;

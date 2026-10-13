@@ -37,8 +37,10 @@ const versionSchema = z.object({
   planId: z.uuid(),
   renderId: z.uuid().optional(),
   rationale: z.string().max(600).optional(),
-  /** Made from the critic's corrections (charged as a correction once rendered). */
+  /** Made from the critic's corrections (charged as a correction once rendered)… */
   fix: z.boolean().optional(),
+  /** …and what those corrections change, told to the manager if this version is kept. */
+  summary: z.string().max(300).optional(),
 });
 type Version = z.infer<typeof versionSchema>;
 
@@ -73,21 +75,30 @@ const bodySchema = z.object({
   issues: z.array(montageIssueSchema).max(4).optional(),
   score: z.number().int().min(1).max(10).optional(),
   summary: z.string().max(300).optional(),
-  /** Two takes were compared (Max). */
+  /** Two takes were compared by the critic (Max). */
   compared: z.boolean().optional(),
+  /** The critic gave a verdict at least once. */
+  reviewed: z.boolean().optional(),
 });
 type Job = z.infer<typeof bodySchema>;
 
 /** A new version of the post's plan: same cut, another template and hook (no editor call). */
 async function createVariant(studioId: string, postId: string, change: { template?: MotionTemplate; hook?: string }) {
   const db = supabaseAdmin();
-  const latest = await db.from("edit_plans").select("plan, version").eq("post_id", postId).order("version", { ascending: false }).limit(1).maybeSingle();
-  const current = editPlanSchema.safeParse(latest.data?.plan);
-  if (!current.success) throw new Error("Pas de montage à décliner pour cette publication");
+  const [post, latest] = await Promise.all([
+    db.from("posts").select("edit_plan_id").eq("id", postId).eq("studio_id", studioId).single(),
+    db.from("edit_plans").select("plan, version").eq("post_id", postId).order("version", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  // The version the manager has (after a review, often not the highest number).
+  const base = post.data?.edit_plan_id
+    ? (await db.from("edit_plans").select("plan").eq("id", post.data.edit_plan_id as string).maybeSingle()).data
+    : latest.data;
+  const current = editPlanSchema.safeParse(base?.plan);
+  if (!current.success || !latest.data) throw new Error("Pas de montage à décliner pour cette publication");
   const plan = variantPlan(current.data, change);
   const row = await db
     .from("edit_plans")
-    .insert({ studio_id: studioId, post_id: postId, version: (latest.data!.version as number) + 1, plan })
+    .insert({ studio_id: studioId, post_id: postId, version: (latest.data.version as number) + 1, plan })
     .select("id")
     .single();
   if (row.error) throw new Error(row.error.message);
@@ -165,7 +176,7 @@ async function run(job: Job) {
     // A rendered version is never lost: it goes out as it is.
     const kept = (job.versions ?? []).filter((v) => v.renderId);
     // Claims a review only when one was made (the critic's notes are on the job).
-    const outcome: Care | null = job.issues?.length ? { reviewed: true, left: job.issues[0]?.problem } : null;
+    const outcome: Care | null = job.reviewed ? { reviewed: true, left: job.issues?.[0]?.problem } : null;
     if (kept.length && (await deliver(job, kept[kept.length - 1]!, outcome).catch(() => false))) return;
     await reopenQuote(job.quoteId);
     await notifyFailure(target, FAILED, error);
@@ -235,7 +246,15 @@ async function render(job: Job) {
     }
   }
   if (!versions.length) throw new Error("Aucune version du montage n'a pu être rendue");
-  await next(job, { step: versions.some((v) => !v.renderId) ? "render" : "review", versions, fixes });
+  try {
+    await next(job, { step: versions.some((v) => !v.renderId) ? "render" : "review", versions, fixes });
+  } catch (error) {
+    // The chain cannot go on: the latest rendered version goes out as it is.
+    const done = versions.filter((v) => v.renderId);
+    if (!done.length) throw error;
+    console.warn("montage chain interrupted after a render, delivering", job.postId, error);
+    await deliver({ ...job, versions, fixes }, done[done.length - 1]!, job.reviewed ? { reviewed: true } : null);
+  }
 }
 
 async function review(job: Job) {
@@ -250,30 +269,38 @@ async function review(job: Job) {
     request: job.brief,
     asked: round > 0 ? job.issues : undefined,
   });
-  // Without a verdict the latest version goes out (after a correction, the corrected one).
-  const best = rendered[verdict?.best ?? rendered.length - 1]!;
-  const compared = job.compared || (round === 0 && rendered.length > 1);
-  if (!verdict || verdict.review.ok || !verdict.review.issues.length || round >= EFFORTS[job.effort!].fixRounds) {
+  // Without a verdict: the first take on Max (it follows the plan the manager saw), the correction afterwards.
+  const best = rendered[verdict?.best ?? (round === 0 ? 0 : rendered.length - 1)]!;
+  const compared = job.compared || (Boolean(verdict) && round === 0 && rendered.length > 1);
+  const reviewed = job.reviewed || Boolean(verdict);
+  // An engine fallback (no animations) is not the editor's to fix: it goes out as it is.
+  if (!verdict || verdict.review.ok || !verdict.review.issues.length || verdict.fallback || round >= EFFORTS[job.effort!].fixRounds) {
     // What the manager is told: what the kept correction improved, or what was checked when it can go out
     // as it is; never a fix that was not made, and what is left when the last round still found something.
     const corrected = rendered.find((v) => v.fix);
-    await deliver({ ...job, compared }, best, {
-      reviewed: Boolean(verdict),
+    await deliver({ ...job, compared, reviewed }, best, {
+      reviewed,
       fixed: Boolean(best.fix),
       keptFirst: Boolean(corrected && !best.fix),
-      line: best.fix ? job.summary : verdict?.review.ok ? verdict.review.summary : undefined,
+      line: best.fix ? best.summary : verdict?.review.ok ? verdict.review.summary : undefined,
       left: verdict && !verdict.review.ok ? verdict.review.issues[0]?.problem : undefined,
     });
     return;
   }
-  await next(job, {
-    step: "fix",
-    versions: [best],
-    issues: verdict.review.issues,
-    score: verdict.review.score,
-    summary: verdict.review.summary.slice(0, 300),
-    compared,
-  });
+  try {
+    await next(job, {
+      step: "fix",
+      versions: [best],
+      issues: verdict.review.issues,
+      score: verdict.review.score,
+      summary: verdict.review.summary.slice(0, 300),
+      compared,
+      reviewed,
+    });
+  } catch (error) {
+    console.warn("montage chain interrupted before the correction, delivering", job.postId, error);
+    await deliver({ ...job, compared, reviewed }, best, { reviewed, left: verdict.review.issues[0]?.problem });
+  }
 }
 
 /** The editor corrects the kept version from the critic's notes; the kept version stays in play. */
@@ -291,7 +318,7 @@ async function fix(job: Job) {
     });
     await next(job, {
       step: "render",
-      versions: [best, { planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600), fix: true }],
+      versions: [best, { planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600), fix: true, summary: job.summary }],
       newScenes: (job.newScenes ?? 0) + edit.newScenes,
       round: (job.round ?? 0) + 1,
     });
@@ -370,7 +397,9 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
     await setQuoteStage(job.quoteId, "delivered");
     // The review the quote priced is not charged when the critic could not watch the video.
     const skipReview = !outcome?.reviewed && Boolean(job.effort && EFFORTS[job.effort].review);
-    await chargeQuote(job.quoteId, job.newScenes ?? 0, title, job.fixes ?? 0, { skipReview });
+    // Nor a second take that was never compared.
+    const skipAlternative = Boolean(job.effort && effortVersions(job.effort, Boolean(job.correction)) > 1 && !job.compared);
+    await chargeQuote(job.quoteId, job.newScenes ?? 0, title, job.fixes ?? 0, { skipReview, skipAlternative });
   }
   return true;
 }

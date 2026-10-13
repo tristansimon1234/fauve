@@ -57,6 +57,26 @@ export type Quote = {
 /** Where a launched montage is in the chain (montage_status, the quote card). */
 export type QuoteStage = "design" | "alternative" | "render" | "review" | "fix" | "delivered";
 
+/**
+ * What can still be spent: the balance minus the most each montage in flight
+ * (launched, not yet charged, recent) may cost, so two launches cannot both
+ * count on the same credits.
+ */
+export async function availableCredits(studioId: string, exceptQuoteId?: string): Promise<number> {
+  const [balance, inFlight] = await Promise.all([
+    creditBalance(studioId),
+    supabaseAdmin()
+      .from("credit_quotes")
+      .select("id, max")
+      .eq("studio_id", studioId)
+      .not("used_at", "is", null)
+      .is("charged_at", null)
+      .gt("used_at", new Date(Date.now() - 2 * 3600_000).toISOString()),
+  ]);
+  const held = (inFlight.data ?? []).filter((q) => q.id !== exceptQuoteId).reduce((sum, q) => sum + ((q.max as number) ?? 0), 0);
+  return Math.max(0, balance - held);
+}
+
 /** Lower levels first when the chosen one is out of reach. */
 const LEVELS: Effort[] = ["max", "soigne", "rapide"];
 
@@ -93,7 +113,7 @@ export async function createMontageQuote(input: {
   /** Level of care (a variant has none); a lower one is quoted when the balance is short. */
   effort?: Effort;
 }): Promise<Quote | { error: string; balance: number; needed: number }> {
-  const balance = await creditBalance(input.studioId);
+  const balance = await availableCredits(input.studioId);
   if (input.plan && input.maxNewScenes === undefined) {
     input = { ...input, maxNewScenes: input.plan.scenes.filter((s) => s.kind === "animation").length };
   }
@@ -109,6 +129,8 @@ export async function createMontageQuote(input: {
   // The level asked for, or the best one below it that the balance allows.
   const effort = input.variant ? null : (LEVELS.slice(LEVELS.indexOf(wanted)).find((l) => efforts[l]) ?? null);
   const quote = input.variant ? quoteVariant() : effort ? efforts[effort]! : null;
+  // Another level is offered only if it keeps the quoted level's new animations (it would silently drop them).
+  for (const level of LEVELS) if (level !== effort && efforts[level] && quote && efforts[level]!.maxNewScenes < quote.maxNewScenes) delete efforts[level];
   if (!quote || balance < quote.base) {
     const needed = input.variant ? quoteVariant().base : quoteMontage({ ...work, effort: "rapide", maxNewScenes: 0 }).base;
     return { error: "solde insuffisant", balance, needed };
@@ -203,14 +225,28 @@ export async function acceptQuote(
   if (effort && effort !== current && q.kind !== "variant" && !level) {
     return { error: `Le niveau ${EFFORTS[effort].label} n'est pas possible pour ce devis (solde insuffisant) : garde le niveau du devis ou refais un devis.` };
   }
-  const price = level ?? { base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[] };
-  if ((await creditBalance(studioId)) < price.base) return { error: "Solde de crédits insuffisant pour ce devis." };
   const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number; variant?: VariantChange | null; plan?: unknown };
+  const available = await availableCredits(studioId, quoteId);
+  const chosen = level ? effort! : current;
+  // The level's price again, against what can be spent now (other montages may have run since the quote):
+  // its corrections must fit, and fewer new scenes are allowed when they no longer all fit.
+  const price =
+    q.kind === "variant" || !chosen
+      ? { base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[], maxNewScenes: params.max_new_scenes ?? 0 }
+      : priceAt(
+          { clips: (params.media_ids ?? []).length, correction: q.kind === "correction", maxNewScenes: level ? level.maxNewScenes : (params.max_new_scenes ?? 0) },
+          chosen,
+          available,
+        );
+  if (!price || available < price.base) {
+    return { error: "Solde de crédits insuffisant pour ce devis : propose un niveau plus simple ou refais un devis." };
+  }
+  const repriced = q.kind !== "variant" && chosen && (level || price.max !== q.max);
   const claimed = await db
     .from("credit_quotes")
     .update({
       used_at: new Date().toISOString(),
-      ...(level ? { effort, base: level.base, max: level.max, lines: level.lines, params: { ...params, max_new_scenes: level.maxNewScenes } } : {}),
+      ...(repriced ? { effort: chosen, base: price.base, max: price.max, lines: price.lines, params: { ...params, max_new_scenes: price.maxNewScenes } } : {}),
     })
     .eq("id", quoteId)
     .is("used_at", null)
@@ -225,7 +261,7 @@ export async function acceptQuote(
     kind: q.kind as AcceptedQuote["kind"],
     mediaIds: params.media_ids ?? [],
     brief,
-    maxNewScenes: level ? level.maxNewScenes : (params.max_new_scenes ?? 0),
+    maxNewScenes: price.maxNewScenes,
     variant: params.variant ?? null,
     effort: q.kind === "variant" ? null : level ? effort! : current,
   };
@@ -269,7 +305,14 @@ export async function lastPresentedQuote(studioId: string, turnStartedAt: Date):
  * Charges a delivered montage: its real new scenes and corrections, never above the quote. Once per quote.
  * skipReview: the quote priced Fauve watching the video but the critic could not (it is not charged).
  */
-export async function chargeQuote(quoteId: string, newScenes: number, title: string, fixRounds = 0, { skipReview = false } = {}): Promise<void> {
+export async function chargeQuote(
+  quoteId: string,
+  newScenes: number,
+  title: string,
+  fixRounds = 0,
+  /** Work the quote priced that did not happen: the review, the second take. */
+  { skipReview = false, skipAlternative = false } = {},
+): Promise<void> {
   const db = supabaseAdmin();
   const claimed = await db
     .from("credit_quotes")
@@ -280,7 +323,8 @@ export async function chargeQuote(quoteId: string, newScenes: number, title: str
     .maybeSingle();
   const q = claimed.data;
   if (!q) return;
-  const credits = Math.max(0, montageCharge({ base: q.base as number, max: q.max as number }, newScenes, fixRounds) - (skipReview ? CREDIT_PRICES.review : 0));
+  const skipped = (skipReview ? CREDIT_PRICES.review : 0) + (skipAlternative ? CREDIT_PRICES.alternative : 0);
+  const credits = Math.max(0, montageCharge({ base: q.base as number, max: q.max as number }, newScenes, fixRounds) - skipped);
   const kind = q.kind as AcceptedQuote["kind"];
   const level = effortSchema.nullable().catch(null).parse(q.effort);
   const label = `${{ montage: "Montage", correction: "Correction", variant: "Variante" }[kind]}${level && level !== "rapide" ? ` ${EFFORTS[level].label}` : ""}`;

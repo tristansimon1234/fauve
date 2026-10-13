@@ -8,27 +8,58 @@ import { isClipSegment, isMotionSegment, type EditPlan } from "./schemas.ts";
 // corrections the editor must make. The model judges, the editor fixes, the
 // engine renders again: no code from the critic ever reaches the video.
 
+// Structured outputs do not enforce lengths and counts: the critic's answer is
+// read leniently, then clamped by normalizeReview (one overlong line must not
+// throw the whole review away).
+
+/** An issue as the job carries it (clamped). */
 export const montageIssueSchema = z.object({
-  scene: z.number().int().min(1).max(30).nullable().describe("Numéro de la scène concernée (dès 1), ou null pour l'ensemble"),
-  problem: z.string().max(200).describe("Ce qui ne va pas, tel qu'on le voit"),
-  fix: z.string().max(240).describe("La correction précise à demander au monteur"),
+  scene: z.number().int().min(1).max(30).nullable(),
+  problem: z.string().max(200),
+  fix: z.string().max(240),
 });
 export type MontageIssue = z.infer<typeof montageIssueSchema>;
 
+/** What the critic answers. */
 export const montageReviewSchema = z.object({
-  best: z.number().int().min(1).max(3).describe("Numéro de la version retenue (1 s'il n'y en a qu'une)"),
-  why: z.string().max(300).describe("Pourquoi celle-ci plutôt que l'autre, en une phrase (vide s'il n'y a qu'une version)"),
-  score: z.number().int().min(1).max(10).describe("Note de la version retenue"),
+  best: z.number().int().describe("Numéro de la version retenue (1 s'il n'y en a qu'une)"),
+  why: z.string().describe("Pourquoi celle-ci plutôt que l'autre, en une phrase (vide s'il n'y a qu'une version)"),
+  score: z.number().int().describe("Note de la version retenue, de 1 à 10"),
   ok: z.boolean().describe("true si la version retenue peut partir telle quelle"),
-  issues: z.array(montageIssueSchema).max(4).describe("Les défauts de la version retenue, les plus importants d'abord (vide si ok)"),
+  issues: z
+    .array(
+      z.object({
+        scene: z.number().int().nullable().describe("Numéro de la scène concernée (dès 1), ou null pour l'ensemble"),
+        problem: z.string().describe("Ce qui ne va pas, tel qu'on le voit, en une phrase courte"),
+        fix: z.string().describe("La correction précise à demander au monteur, en une phrase"),
+      }),
+    )
+    .describe("Les défauts de la version retenue, 4 au plus, les plus importants d'abord (vide si ok)"),
   summary: z
     .string()
-    .max(240)
     .describe(
       "Pour la gérante, une phrase simple au passé, lue avec la vidéo finie : ce que tu as vérifié si elle peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. »)",
     ),
 });
-export type MontageReview = z.infer<typeof montageReviewSchema>;
+export type MontageReviewAnswer = z.infer<typeof montageReviewSchema>;
+export type MontageReview = Omit<MontageReviewAnswer, "issues"> & { issues: MontageIssue[] };
+
+/** The critic's answer within bounds: at most 4 issues, short lines, score 1–10, best within the versions shown. */
+export function normalizeReview(answer: MontageReviewAnswer, versions: number): MontageReview {
+  const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(n)));
+  return {
+    best: clamp(answer.best, 1, Math.max(1, versions)),
+    why: answer.why.slice(0, 300),
+    score: clamp(answer.score, 1, 10),
+    ok: answer.ok,
+    issues: answer.issues.slice(0, 4).map((i) => ({
+      scene: i.scene === null ? null : clamp(i.scene, 1, 30),
+      problem: i.problem.slice(0, 200),
+      fix: i.fix.slice(0, 240),
+    })),
+    summary: answer.summary.slice(0, 240),
+  };
+}
 
 export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Fauve, une community manager IA pour les commerces de quartier (studio, salon, restaurant, boutique…). Avant qu'un Reel parte chez la gérante, tu le regardes à travers des images clés de la vidéo rendue (1080 × 1920), chacune avec son instant, sa scène et les textes prévus à l'écran. Tu juges comme une pro d'Instagram, exigeante mais juste :
 - l'accroche : la 1re seconde donne envie de rester ; le texte d'accroche est court, gros, lisible ;

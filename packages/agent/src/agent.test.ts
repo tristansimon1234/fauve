@@ -644,3 +644,31 @@ test("critic: key frames at the hook, every scene and the end, with the texts on
   assert.match(alternativeBrief(plan, null), /Deuxième version/);
   assert.match(planDigest(plan), /Accroche : « Le cours du matin »/);
 });
+
+test("critic: an overlong answer is clamped, not thrown away; lateness is measured from the last step", async () => {
+  const { normalizeReview } = await import("./critic.ts");
+  const { effortPitch, montageLate } = await import("./effort.ts");
+  const long = "x".repeat(500);
+  const review = normalizeReview(
+    { best: 5, why: long, score: 14, ok: false, summary: long, issues: Array.from({ length: 6 }, () => ({ scene: 99, problem: long, fix: long })) },
+    2,
+  );
+  assert.equal(review.best, 2); // within the versions shown
+  assert.equal(review.score, 10);
+  assert.equal(review.issues.length, 4);
+  assert.equal(review.issues[0]!.scene, 30);
+  assert.equal(review.issues[0]!.problem.length, 200);
+  assert.equal(review.summary.length, 240);
+
+  const t0 = 0;
+  const min = 60_000;
+  // A Max montage running for 30 min whose last step moved 2 min ago is not late; one stuck for 9 min is.
+  assert.equal(montageLate({ startedAt: t0, stageAt: 28 * min, effort: "max", now: 30 * min }), false);
+  assert.equal(montageLate({ startedAt: t0, stageAt: 21 * min, effort: "max", now: 30 * min }), true);
+  // Older quotes without steps: from the launch.
+  assert.equal(montageLate({ startedAt: t0, stageAt: null, effort: null, now: 11 * min }), true);
+
+  // A Max correction makes one version: it is not sold as two.
+  assert.doesNotMatch(effortPitch("max", true), /Deux versions/);
+  assert.match(effortPitch("max", false), /Deux versions/);
+});

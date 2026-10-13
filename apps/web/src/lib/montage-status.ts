@@ -1,5 +1,5 @@
 import "server-only";
-import { EFFORT_LATE_MINUTES, effortSchema } from "@fauve/agent";
+import { effortSchema, montageLate } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Where launched montages are: the step the chain recorded on the quote (design,
@@ -23,7 +23,7 @@ export async function montageStatus(studioId: string, postId?: string): Promise<
   const db = supabaseAdmin();
   let query = db
     .from("credit_quotes")
-    .select("post_id, used_at, charged_at, effort, stage, posts(title)")
+    .select("post_id, used_at, charged_at, effort, stage, stage_at, posts(title)")
     .eq("studio_id", studioId)
     .not("used_at", "is", null)
     .gt("used_at", new Date(Date.now() - RECENT_MS).toISOString())
@@ -49,7 +49,9 @@ export async function montageStatus(studioId: string, postId?: string): Promise<
       title: (Array.isArray(post) ? post[0]?.title : post?.title) ?? "Publication",
       step,
       minutes,
-      late: step !== "livré" && minutes >= EFFORT_LATE_MINUTES[effort],
+      late:
+        step !== "livré" &&
+        montageLate({ startedAt, stageAt: q.stage_at ? new Date(q.stage_at as string).getTime() : null, effort, now: Date.now() }),
     };
   });
 }
