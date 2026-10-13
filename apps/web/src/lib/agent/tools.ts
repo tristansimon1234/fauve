@@ -1,5 +1,4 @@
 import "server-only";
-import { createHash, randomBytes } from "node:crypto";
 import {
   assertTransition,
   canTransition,
@@ -8,7 +7,7 @@ import {
   type ReplyExtras,
   type ToolHandlers,
 } from "@fauve/agent";
-import { env } from "@/lib/env";
+import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { acceptQuote, createMontageQuote, lastPresentedQuote } from "@/lib/credits";
 import { startMontage } from "@/lib/montage-start";
@@ -156,18 +155,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async get_connect_link() {
-      const token = randomBytes(24).toString("base64url");
-      const { data: member } = await db.from("members").select("phone_e164, user_id").eq("id", ctx.memberId).single();
-      check(
-        await db.from("login_tokens").insert({
-          user_id: member?.user_id ?? null,
-          phone_e164: member?.phone_e164,
-          token_hash: createHash("sha256").update(token).digest("hex"),
-          purpose: "connect_social",
-          expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        }),
-      );
-      return json({ url: `${env("APP_URL")}/auth/link/${token}?next=/connect`, expires_in_minutes: 15 });
+      const { data: member } = await db.from("members").select("phone_e164").eq("id", ctx.memberId).single();
+      const url = await createLoginLink(member?.phone_e164 as string, "/connect", "connect_social");
+      return json({ url, expires_in_minutes: 15 });
     },
 
     async get_calendar({ from, to }) {

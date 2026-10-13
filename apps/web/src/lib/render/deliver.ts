@@ -1,6 +1,7 @@
 import "server-only";
+import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { sendText, sendVideo } from "@/lib/whatsapp/client";
+import { sendText } from "@/lib/whatsapp/client";
 import { renderPost } from "./render-post";
 
 export type DeliveryTarget = {
@@ -33,30 +34,28 @@ export async function notifyFailure(target: DeliveryTarget, text: string, detail
   await store(target, { wa_message_id: id, type: "text", body: text, payload: { error: String(detail).slice(0, 500) } });
 }
 
-/** Renders the post and sends the video to the manager (WhatsApp) or into the web test chat. */
-/** Renders the post and sends it; returns what was delivered, or null if it failed (the manager is told). */
+/**
+ * Renders the post and points the manager to its page, where she watches the
+ * video, reads the caption and validates. On WhatsApp: a sign-in link to that
+ * page; in the app: the post's card (and the app opens the page).
+ * Returns what was delivered, or null if it failed (the manager is told).
+ */
 export async function renderAndDeliver(target: DeliveryTarget): Promise<{ title: string } | null> {
   try {
     const r = await renderPost(target.studioId, target.postId);
     const seconds = Math.round(r.durationMs / 100) / 10;
-    const hashtags = r.hashtags.map((h) => `#${h}`).join(" ");
-    const caption = [
-      `Ton montage « ${r.title} » (${seconds} s).${target.rationale ? ` ${target.rationale}` : ""}`,
-      r.caption ? `Légende :\n${r.caption}${hashtags ? `\n${hashtags}` : ""}` : null,
-      "Réponds « ok » pour le valider, ou dis-moi ce que tu veux changer. Je peux aussi te faire une variante (autre style, autre accroche) pour 1 crédit.",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    const page = `/publications/${target.postId}`;
+    const intro = `Ton montage « ${r.title} » est prêt 🎬 (${seconds} s).${target.rationale ? ` ${target.rationale}` : ""}`;
+    const after = "Valide-le sur sa page, ou dis-moi ce que tu veux changer. Je peux aussi te faire une variante (autre style, autre accroche) pour 1 crédit.";
+    const payload = { posts: [target.postId], open_post: target.postId };
     if (target.waId) {
-      const id = await sendVideo(target.waId, r.url, caption);
-      await store(target, {
-        wa_message_id: id,
-        type: "video",
-        body: `[Vidéo envoyée : montage de « ${r.title} », ${seconds} s]\n${caption}`,
-        payload: { render_id: r.renderId },
-      });
+      const link = await createLoginLink(`+${target.waId}`, page, "open_post");
+      const body = `${intro}\n\nRegarde-le ici : ${link}\n\n${after}`;
+      const id = await sendText(target.waId, body);
+      // Stored without the one-time link (Fauve's history must not reuse it).
+      await store(target, { wa_message_id: id, type: "text", body: `${intro}\n\n${after}`, payload });
     } else {
-      await store(target, { type: "text", body: `${caption}\n\nVoir la vidéo : ${r.url}`, payload: { render_id: r.renderId } });
+      await store(target, { type: "text", body: `${intro}\n\n${after}`, payload });
     }
     return { title: r.title };
   } catch (error) {

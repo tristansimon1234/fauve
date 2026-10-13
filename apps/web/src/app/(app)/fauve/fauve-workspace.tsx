@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   ArrowUpIcon,
@@ -8,7 +9,9 @@ import {
   ChartIcon,
   CheckIcon,
   FilmIcon,
+  PaperclipIcon,
   PenIcon,
+  PlayIcon,
   ReplyIcon,
   SmileIcon,
   TrashIcon,
@@ -16,6 +19,7 @@ import {
   XIcon,
 } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
+import { supabaseBrowser } from "@/lib/supabase/client";
 import { ChatCards } from "./chat-cards";
 import {
   deleteConversation,
@@ -24,9 +28,17 @@ import {
   loadConversation,
   reactToMessage,
   sendToFauve,
+  type Attachment,
   type ChatMessage,
   type ConversationSummary,
 } from "./chat-actions";
+
+/** A photo or video added to the composer: uploaded at once, sent with the next message. */
+type DraftFile = { id: string; file: File; preview: string; video: boolean; status: "uploading" | "ready" | "error"; path?: string };
+
+const MAX_FILES = 10;
+// Supabase's default per-file limit; WhatsApp-quality phone clips fit well under it.
+const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Suggestion = { icon: keyof typeof icons; label: string; prompt: string };
 
@@ -63,6 +75,7 @@ const LIST_POLL_MS = 30000;
  * start with suggestions) in the middle, the composer pinned at the bottom.
  */
 export function FauveWorkspace({
+  studioId,
   firstName,
   summary,
   suggestions,
@@ -72,6 +85,7 @@ export function FauveWorkspace({
   initialActive,
   initialMessages,
 }: {
+  studioId: string;
   firstName: string | null;
   summary: string;
   suggestions: Suggestion[];
@@ -91,7 +105,47 @@ export function FauveWorkspace({
   const [pending, startTransition] = useTransition();
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<DraftFile[]>([]);
+  const [dragging, setDragging] = useState(false);
   const timeFormat = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone });
+
+  // Photos and videos: uploaded to Storage as soon as they are added, sent with the message.
+  const addFiles = (list: FileList | File[]) => {
+    const picked = [...list].filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    if (!picked.length) return setError("Ajoute des photos ou des vidéos.");
+    if (picked.some((f) => f.size > MAX_FILE_BYTES)) setError("Un fichier dépasse 50 Mo : envoie-le plutôt sur WhatsApp en tant que document.");
+    const room = MAX_FILES - files.length;
+    const added = picked
+      .filter((f) => f.size <= MAX_FILE_BYTES)
+      .slice(0, room)
+      .map((file): DraftFile => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        preview: URL.createObjectURL(file),
+        video: file.type.startsWith("video/"),
+        status: "uploading",
+      }));
+    if (!added.length) return;
+    setFiles((current) => [...current, ...added]);
+    const storage = supabaseBrowser().storage.from("media");
+    for (const draft of added) {
+      const ext = draft.file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || (draft.video ? "mp4" : "jpg");
+      const path = `${studioId}/chat/${draft.id}.${ext}`;
+      storage
+        .upload(path, draft.file, { contentType: draft.file.type })
+        .then(({ error: uploadError }) =>
+          setFiles((current) => current.map((f) => (f.id === draft.id ? { ...f, status: uploadError ? "error" : "ready", path } : f))),
+        );
+    }
+  };
+  const removeFile = (id: string) =>
+    setFiles((current) => {
+      const gone = current.find((f) => f.id === id);
+      if (gone) URL.revokeObjectURL(gone.preview);
+      return current.filter((f) => f.id !== id);
+    });
+  const uploading = files.some((f) => f.status === "uploading");
 
   // Keep the open conversation in the URL, so a reload lands on it.
   useEffect(() => {
@@ -103,16 +157,29 @@ export function FauveWorkspace({
   }, [messages.length, pending]);
 
   // Montage videos and WhatsApp messages arrive on their own: refresh while visible.
+  // A montage that just got delivered opens its publication page.
+  const router = useRouter();
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(() => {
       if (document.visibilityState !== "visible" || pending) return;
       loadConversation(active)
-        .then((fresh) => fresh && setMessages((current) => (fresh.at(-1)?.id !== current.at(-1)?.id ? fresh : current)))
+        .then((fresh) => {
+          const current = messagesRef.current;
+          if (!fresh || fresh.at(-1)?.id === current.at(-1)?.id) return;
+          const known = new Set(current.map((m) => m.id));
+          const delivered = fresh.find((m) => !known.has(m.id) && m.openPost);
+          setMessages(fresh);
+          if (delivered?.openPost) router.push(`/publications/${delivered.openPost}`);
+        })
         .catch(() => {});
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [active, pending]);
+  }, [active, pending, router]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -154,30 +221,40 @@ export function FauveWorkspace({
     deleteConversation(id).catch(() => {});
   };
 
-  const send = (raw: string) => {
+  /** `withFiles`: the composer's send, which carries the photos and videos added to it. */
+  const send = (raw: string, withFiles = false) => {
     const text = raw.trim();
-    if (!text || pending) return;
+    const ready = withFiles ? files.filter((f) => f.status === "ready" && f.path) : [];
+    if ((!text && !ready.length) || pending || (withFiles && uploading)) return;
     setDraft("");
     setError(null);
+    const at = new Date().toISOString();
+    const local = (part: Partial<ChatMessage>, i: number): ChatMessage => ({
+      id: `local-${Date.now()}-${i}`,
+      from: "me",
+      channel: "web",
+      type: "text",
+      body: null,
+      at,
+      videoUrl: null,
+      media: null,
+      reactions: {},
+      options: [],
+      cards: [],
+      openPost: null,
+      ...part,
+    });
     setMessages((m) => [
       ...m,
-      {
-        id: `local-${Date.now()}`,
-        from: "me",
-        channel: "web",
-        type: "text",
-        body: text,
-        at: new Date().toISOString(),
-        videoUrl: null,
-        reactions: {},
-        options: [],
-        cards: [],
-      },
+      ...ready.map((f, i) => local({ type: f.video ? "video" : "image", media: { url: f.preview, video: f.video } }, i)),
+      ...(text ? [local({ body: text }, ready.length)] : []),
     ]);
+    const attachments: Attachment[] = ready.map((f) => ({ path: f.path!, mime: f.file.type, size: f.file.size }));
+    if (withFiles) setFiles([]);
     const conversationId = active;
     startTransition(async () => {
       try {
-        const res = await sendToFauve(text, conversationId);
+        const res = await sendToFauve(text, conversationId, attachments);
         if (res.ok) {
           setActive(res.conversationId);
           setMessages(res.messages);
@@ -254,7 +331,32 @@ export function FauveWorkspace({
         </div>
       )}
 
-      <section className="relative flex min-w-0 flex-1 flex-col bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%),radial-gradient(ellipse_at_bottom_left,#fff1ec_0%,rgba(255,241,236,0)_50%)]">
+      <section
+        className="relative flex min-w-0 flex-1 flex-col bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%),radial-gradient(ellipse_at_bottom_left,#fff1ec_0%,rgba(255,241,236,0)_50%)]"
+        // Drop zone: photos and videos dropped anywhere on the conversation.
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={(e) => {
+          if (!e.dataTransfer.files.length) return;
+          e.preventDefault();
+          setDragging(false);
+          addFiles(e.dataTransfer.files);
+          inputRef.current?.focus();
+        }}
+      >
+        {dragging && (
+          <div className="pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/85 text-center">
+            <PaperclipIcon size={28} className="text-violet" />
+            <p className="text-[17px] font-bold text-violet">Dépose tes photos et vidéos</p>
+            <p className="text-[14px] text-violet/80">Fauve en fait un Reel, un carrousel ou un post</p>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-2 px-4 pt-3 sm:px-6 sm:pt-5">
           <div className="flex items-center gap-1 md:invisible">
             <button type="button" onClick={() => setShowList(true)} className="h-9 rounded-full px-3 text-[13px] font-bold hover:bg-white">
@@ -348,7 +450,7 @@ export function FauveWorkspace({
           className="px-4 pt-2 pb-4 sm:px-6 sm:pb-6"
           onSubmit={(e) => {
             e.preventDefault();
-            send(draft);
+            send(draft, true);
           }}
         >
           <div className="mx-auto flex w-full max-w-[820px] flex-col gap-2">
@@ -357,7 +459,55 @@ export function FauveWorkspace({
                 {error}
               </p>
             )}
+            {files.length > 0 && (
+              <ul className="flex flex-wrap gap-2 px-2" aria-label="Fichiers à envoyer">
+                {files.map((f) => (
+                  <li key={f.id} className="relative size-16 overflow-hidden rounded-[12px] border border-line bg-soft">
+                    {f.video ? (
+                      <video src={`${f.preview}#t=0.1`} muted playsInline preload="metadata" className="size-full object-cover" />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={f.preview} alt="" className="size-full object-cover" />
+                    )}
+                    {f.video && <PlayIcon size={12} className="absolute bottom-1 left-1 text-white drop-shadow" />}
+                    {f.status !== "ready" && (
+                      <span className={`absolute inset-0 flex items-center justify-center text-[10px] font-bold ${f.status === "error" ? "bg-peach/90 text-danger" : "bg-white/70 text-muted"}`}>
+                        {f.status === "error" ? "Échec" : "Envoi…"}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Retirer"
+                      onClick={() => removeFile(f.id)}
+                      className="absolute top-0.5 right-0.5 flex size-5 items-center justify-center rounded-full bg-ink/70 text-white"
+                    >
+                      <XIcon size={12} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             <div className="relative flex items-end gap-1 rounded-[30px] border border-line bg-white p-2 pl-2 shadow-[0_8px_30px_rgba(28,21,48,0.08)] focus-within:border-lilac">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  if (e.target.files) addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                aria-label="Ajouter des photos ou des vidéos"
+                title="Photos et vidéos"
+                onClick={() => fileRef.current?.click()}
+                className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-soft hover:text-ink"
+              >
+                <PaperclipIcon size={21} />
+              </button>
               <button
                 type="button"
                 aria-label="Ajouter un emoji"
@@ -407,16 +557,16 @@ export function FauveWorkspace({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                     e.preventDefault();
-                    send(draft);
+                    send(draft, true);
                   }
                 }}
-                placeholder="Demande à Fauve…"
+                placeholder={files.length ? "Dis à Fauve ce que tu veux en faire : un Reel, un carrousel…" : "Demande à Fauve…"}
                 className="max-h-[180px] min-h-11 flex-1 resize-none bg-transparent py-2.5 text-[16px] outline-none placeholder:text-muted/70"
               />
               <button
                 type="submit"
                 aria-label="Envoyer"
-                disabled={pending || !draft.trim()}
+                disabled={pending || uploading || (!draft.trim() && !files.some((f) => f.status === "ready"))}
                 className="flex size-11 shrink-0 items-center justify-center rounded-full bg-violet text-white transition-colors disabled:bg-chip disabled:text-muted"
               >
                 <ArrowUpIcon />
@@ -521,12 +671,19 @@ function Bubble({
     <div className={`group flex max-w-[85%] flex-col ${reactions.length ? "gap-4" : "gap-1"} ${mine ? "items-end self-end" : "items-start self-start"}`}>
       <div className={`relative flex items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
         <div
-          className={`relative flex flex-col gap-2 px-4 py-2.5 text-[15px] leading-[1.5] whitespace-pre-wrap ${
+          className={`relative flex flex-col gap-2 text-[15px] leading-[1.5] whitespace-pre-wrap ${message.media && !message.body ? "p-1" : "px-4 py-2.5"} ${
             mine ? "rounded-[18px_18px_6px_18px] bg-violet text-white" : "rounded-[18px_18px_18px_6px] border border-line bg-white"
           }`}
         >
           {message.videoUrl ? (
             <video src={message.videoUrl} controls playsInline preload="metadata" className="aspect-[9/16] w-[240px] max-w-full rounded-xl bg-ink" />
+          ) : message.media ? (
+            message.media.video ? (
+              <video src={message.media.url} controls playsInline preload="metadata" className="max-h-[320px] w-[220px] max-w-full rounded-xl bg-ink object-contain" />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={message.media.url} alt="" className="max-h-[320px] w-[220px] max-w-full rounded-xl object-cover" />
+            )
           ) : (
             media && (
               <span className={`text-[13px] font-bold ${mine ? "text-white/85" : "text-muted"}`}>
