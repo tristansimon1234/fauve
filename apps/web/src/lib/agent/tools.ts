@@ -4,6 +4,7 @@ import {
   assertTransition,
   canTransition,
   postStatusSchema,
+  type PostKind,
   type ToolHandlers,
 } from "@fauve/agent";
 import { env } from "@/lib/env";
@@ -56,11 +57,26 @@ async function nextVersion(table: "brand_profiles" | "edit_plans", column: "stud
 }
 
 /** Database-backed implementations of Fauve's tools, scoped to one studio. */
+/** What a post still needs before it can go out, per format (null when ready). */
+function missingContent(kind: PostKind, hasRender: boolean, media: number): string | null {
+  if (kind === "reel" && !hasRender) return "Pas encore de vidéo montée : fais d'abord le montage.";
+  if (kind === "post" && media < 1) return "Il faut une photo pour ce post : ajoute son media_id (update_post media_ids).";
+  if (kind === "carousel" && media < 2) return "Un carrousel demande 2 à 10 photos ou vidéos (update_post media_ids, dans l'ordre).";
+  if (kind === "story" && !hasRender && media < 1) return "Il faut une photo, une vidéo ou un montage pour cette story.";
+  return null;
+}
+
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const db = supabaseAdmin();
   const { studioId } = ctx;
   // A quote made during this turn cannot be started in it: the manager must see the price first.
   const turnStartedAt = new Date();
+
+  /** Media ids given by the model must be this studio's. */
+  async function assertOwnMedia(ids: string[]) {
+    const { data } = await db.from("media_assets").select("id").eq("studio_id", studioId).in("id", ids);
+    if ((data?.length ?? 0) !== new Set(ids).size) throw new Error("Un des media_id n'appartient pas à ce studio.");
+  }
 
   return {
     async get_studio_context() {
@@ -139,6 +155,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async create_post(input) {
+      if (input.media_ids?.length) await assertOwnMedia(input.media_ids);
       const post = unwrap(
         await db
           .from("posts")
@@ -150,6 +167,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async update_post({ post_id, status, ...fields }) {
+      if (fields.media_ids?.length) await assertOwnMedia(fields.media_ids);
       const current = unwrap(
         await db.from("posts").select("status").eq("id", post_id).eq("studio_id", studioId).single(),
       );
@@ -304,9 +322,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async schedule_post({ post_id, scheduled_at }) {
       const post = unwrap(
-        await db.from("posts").select("id, status, render_id, scheduled_at").eq("id", post_id).eq("studio_id", studioId).single(),
+        await db.from("posts").select("id, kind, status, render_id, media_ids, scheduled_at").eq("id", post_id).eq("studio_id", studioId).single(),
       );
-      if (!post.render_id) return json({ error: "Pas encore de vidéo montée : lance render d'abord." });
+      const missing = missingContent(post.kind as PostKind, Boolean(post.render_id), ((post.media_ids as string[] | null) ?? []).length);
+      if (missing) return json({ error: missing });
       if (!(await instagramAccount(studioId))) {
         return json({ error: "Instagram n'est pas connecté pour ce studio. Envoie le lien de connexion (get_connect_link)." });
       }

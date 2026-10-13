@@ -99,50 +99,106 @@ export async function refreshToken(accessToken: string) {
 
 type ContainerStatus = { status_code?: "IN_PROGRESS" | "FINISHED" | "ERROR" | "EXPIRED" | "PUBLISHED"; status?: string };
 
-/**
- * Publishes a Reel: create the container from a public video URL, wait until
- * Instagram has fetched and processed it, then publish. Returns the media id and permalink.
- */
-export async function publishReel(params: {
-  userId: string;
-  accessToken: string;
-  videoUrl: string;
-  caption: string;
-  timeoutMs?: number;
-}): Promise<{ mediaId: string; permalink: string | null }> {
-  const token = params.accessToken;
-  const container = await call<{ id: string }>(graphUrl(`${params.userId}/media`), {
+/** Creates a media container (any format) and returns its id. */
+async function createContainer(userId: string, token: string, fields: Record<string, string>): Promise<string> {
+  const container = await call<{ id: string }>(graphUrl(`${userId}/media`), {
     method: "POST",
-    body: new URLSearchParams({
-      media_type: "REELS",
-      video_url: params.videoUrl,
-      caption: params.caption.slice(0, 2200),
-      share_to_feed: "true",
-      access_token: token,
-    }),
+    body: new URLSearchParams({ ...fields, access_token: token }),
   });
+  return container.id;
+}
 
-  const deadline = Date.now() + (params.timeoutMs ?? 180_000);
+/** Waits until Instagram has fetched and processed a container (videos take a while). */
+async function waitUntilReady(containerId: string, token: string, timeoutMs: number) {
+  const deadline = Date.now() + timeoutMs;
   for (;;) {
     const state = await call<ContainerStatus>(
-      graphUrl(`${container.id}?fields=status_code,status&access_token=${encodeURIComponent(token)}`),
+      graphUrl(`${containerId}?fields=status_code,status&access_token=${encodeURIComponent(token)}`),
     );
-    if (state.status_code === "FINISHED") break;
+    if (state.status_code === "FINISHED") return;
     if (state.status_code === "ERROR" || state.status_code === "EXPIRED") {
-      throw new InstagramError(`Instagram n'a pas pu traiter la vidéo (${state.status ?? state.status_code})`, 422, state);
+      throw new InstagramError(`Instagram n'a pas pu traiter le média (${state.status ?? state.status_code})`, 422, state);
     }
-    if (Date.now() > deadline) throw new InstagramError("Instagram met trop de temps à traiter la vidéo", 504, state);
+    if (Date.now() > deadline) throw new InstagramError("Instagram met trop de temps à traiter le média", 504, state);
     await new Promise((resolve) => setTimeout(resolve, 4000));
   }
+}
 
-  const published = await call<{ id: string }>(graphUrl(`${params.userId}/media_publish`), {
+async function publishContainer(userId: string, token: string, containerId: string): Promise<{ mediaId: string; permalink: string | null }> {
+  const published = await call<{ id: string }>(graphUrl(`${userId}/media_publish`), {
     method: "POST",
-    body: new URLSearchParams({ creation_id: container.id, access_token: token }),
+    body: new URLSearchParams({ creation_id: containerId, access_token: token }),
   });
   const media = await call<{ permalink?: string }>(
     graphUrl(`${published.id}?fields=permalink&access_token=${encodeURIComponent(token)}`),
   ).catch(() => ({ permalink: undefined }));
   return { mediaId: published.id, permalink: media.permalink ?? null };
+}
+
+/** One photo or video of a post, as a public URL (images must be JPEG). */
+export type PublishItem = { type: "image" | "video"; url: string };
+
+/**
+ * What can be published: a Reel, a photo post, a carousel (2 to 10 photos or
+ * videos), a story (one photo or video; Instagram takes no caption on stories).
+ */
+export type PublishRequest =
+  | { kind: "reel"; videoUrl: string; caption: string }
+  | { kind: "image"; imageUrl: string; caption: string }
+  | { kind: "carousel"; items: PublishItem[]; caption: string }
+  | { kind: "story"; item: PublishItem };
+
+/** Publishes on Instagram: containers, wait for processing, publish. Returns the media id and permalink. */
+export async function publishMedia(params: {
+  userId: string;
+  accessToken: string;
+  request: PublishRequest;
+  timeoutMs?: number;
+}): Promise<{ mediaId: string; permalink: string | null }> {
+  const { userId, accessToken: token, request } = params;
+  const timeout = params.timeoutMs ?? 180_000;
+  const caption = (text: string) => text.slice(0, 2200);
+  let containerId: string;
+  switch (request.kind) {
+    case "reel":
+      containerId = await createContainer(userId, token, {
+        media_type: "REELS",
+        video_url: request.videoUrl,
+        caption: caption(request.caption),
+        share_to_feed: "true",
+      });
+      break;
+    case "image":
+      containerId = await createContainer(userId, token, { image_url: request.imageUrl, caption: caption(request.caption) });
+      break;
+    case "story":
+      containerId = await createContainer(userId, token, {
+        media_type: "STORIES",
+        ...(request.item.type === "video" ? { video_url: request.item.url } : { image_url: request.item.url }),
+      });
+      break;
+    case "carousel": {
+      if (request.items.length < 2 || request.items.length > 10) throw new InstagramError("Un carrousel compte de 2 à 10 photos ou vidéos", 400, null);
+      const children = [];
+      for (const item of request.items) {
+        const child = await createContainer(userId, token, {
+          is_carousel_item: "true",
+          ...(item.type === "video" ? { media_type: "VIDEO", video_url: item.url } : { image_url: item.url }),
+        });
+        if (item.type === "video") await waitUntilReady(child, token, timeout);
+        children.push(child);
+      }
+      containerId = await createContainer(userId, token, { media_type: "CAROUSEL", children: children.join(","), caption: caption(request.caption) });
+      break;
+    }
+  }
+  await waitUntilReady(containerId, token, timeout);
+  return publishContainer(userId, token, containerId);
+}
+
+/** A Reel from a public video URL (kept for callers that only publish Reels). */
+export async function publishReel(params: { userId: string; accessToken: string; videoUrl: string; caption: string; timeoutMs?: number }) {
+  return publishMedia({ ...params, request: { kind: "reel", videoUrl: params.videoUrl, caption: params.caption } });
 }
 
 // ---------------------------------------------------------------------------
