@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
-import { EyeIcon, InstagramIcon, LayersIcon, PlayIcon } from "@/components/icons";
+import { EyeIcon, InstagramIcon, PlayIcon } from "@/components/icons";
+import { FormatBadge } from "@/components/format-badge";
 import { formatCompact, formatNumber, formatShortDateTime } from "@/lib/format";
 import type { InstagramMedia, InstagramProfile } from "@/lib/social/instagram";
 
@@ -131,8 +132,7 @@ function UpcomingTile({ tile, tz }: { tile: Extract<Tile, { kind: "upcoming" }>;
         {statusLabels[tile.status] ?? tile.status}
         {tile.at ? ` · ${formatShortDateTime(tile.at, tz)}` : ""}
       </span>
-      {tile.format === "reel" && <PlayIcon size={16} className="absolute top-2 right-2 text-white drop-shadow" />}
-      {tile.format === "carousel" && <LayersIcon size={16} className="absolute top-2 right-2 text-white drop-shadow" />}
+      <FormatBadge format={tile.format} />
     </Link>
   );
 }
@@ -148,8 +148,7 @@ function InstagramTile({ media, views }: { media: InstagramMedia; views?: number
       ) : (
         <span className="flex size-full items-center justify-center p-2 text-center text-xs text-muted">{media.caption?.slice(0, 60)}</span>
       )}
-      {reel && <PlayIcon size={16} className="absolute top-2 right-2 text-white drop-shadow" />}
-      {media.media_type === "CAROUSEL_ALBUM" && <LayersIcon size={16} className="absolute top-2 right-2 text-white drop-shadow" />}
+      <FormatBadge format={reel ? "reel" : media.media_type === "CAROUSEL_ALBUM" ? "carousel" : null} />
       {views !== undefined && (
         // Views at the bottom left, like the play count Instagram shows on Reels.
         <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/55 to-transparent px-2 pt-5 pb-1.5 text-[12px] font-bold text-white">

@@ -17,3 +17,4 @@ export * from "./performance.ts";
 export * from "./plan-edit.ts";
 export * from "./slides.ts";
 export * from "./text-look.ts";
+export * from "./text-layer.ts";

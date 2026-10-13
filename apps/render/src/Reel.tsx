@@ -14,6 +14,7 @@ import { Fit } from "./Fit";
 import { loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
 import { SceneView } from "./Scene";
+import { TextLayer } from "./TextLayer";
 import { THEMES, type Theme } from "./theme";
 import type { ReelProps, TextLook } from "./types";
 
@@ -32,6 +33,7 @@ export function Reel(props: ReelProps) {
     props.brand.displayFont,
     props.brand.bodyFont,
     ...props.texts.flatMap((t) => [t.look, t.detail_look].flatMap((l) => (l ? [l.font, ...(l.emphasis?.font ? [l.emphasis.font] : [])] : []))),
+    ...(props.layer?.fonts ?? []),
   ]);
   const k = props.width / 1080;
 
@@ -79,6 +81,7 @@ export function Reel(props: ReelProps) {
       ))}
 
       {props.words.length > 0 && <Subtitles props={props} theme={theme} k={k} />}
+      {props.layer ? <TextLayer props={props} /> : null}
       <Logo props={props} k={k} />
 
       {props.endCard && (

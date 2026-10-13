@@ -7,7 +7,7 @@ import { z } from "zod";
 import type { DeleteResult } from "@/components/delete-button";
 import { scheduleValidated } from "@/lib/posts";
 import { renderPost } from "@/lib/render/render-post";
-import { renderSlides, saveSlides } from "@/lib/render/slides";
+import { knownLayerCode, renderSlides, saveSlides } from "@/lib/render/slides";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -210,6 +210,12 @@ export async function saveSlidesPlan(postId: string, input: unknown): Promise<Sa
   const { data: post } = await supabaseAdmin().from("posts").select("id, status").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   if (!post) return { ok: false, error: "Publication introuvable." };
   if (LOCKED.includes(postStatusSchema.parse(post.status))) return { ok: false, error: "Cette publication est déjà en ligne." };
+  // A text layer's code comes from Fauve (this post or the library), never from the browser.
+  const layers = parsed.data.slides.flatMap((s) => (s.layer ? [s.layer.js] : []));
+  if (layers.length) {
+    const known = await knownLayerCode(studioId, postId);
+    if (layers.some((js) => !known.has(js))) return { ok: false, error: "Un calque de texte a été modifié d’une façon que l’éditeur ne permet pas." };
+  }
   try {
     await saveSlides(studioId, postId, parsed.data);
   } catch (error) {

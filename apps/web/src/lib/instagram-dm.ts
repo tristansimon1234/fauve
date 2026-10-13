@@ -129,7 +129,7 @@ export async function handleDm(event: DmEvent): Promise<void> {
   if (!inserted.data?.length) return; // retried delivery
   const { data: owner } = await db.from("members").select("id").eq("studio_id", studioId).eq("role", "owner").limit(1).maybeSingle();
   if (!owner) return;
-  const result = await replyInConversation({ studioId, memberId: owner.id as string, reactToRowId: inserted.data[0]!.id as string });
+  const result = await replyInConversation({ studioId, memberId: owner.id as string, reactToRowId: inserted.data[0]!.id as string, channel: "instagram" });
   if (result.reply) {
     await reply(result.reply);
     await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "instagram", direction: "outbound", type: "text", body: result.reply, payload: { ...result.extras, notes: result.notes } });

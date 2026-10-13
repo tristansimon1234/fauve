@@ -16,7 +16,8 @@ import {
 } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
 import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
-import { CheckIcon, LayersIcon, PenIcon, PlayIcon, PlusIcon, WhatsAppIcon } from "@/components/icons";
+import { CheckIcon, PenIcon, PlusIcon, WhatsAppIcon } from "@/components/icons";
+import { FormatBadge } from "@/components/format-badge";
 import { SlidePreview } from "@/components/montage/slide-preview";
 import { SlidesEditor } from "@/components/montage/slides-editor";
 import { TextBoxes } from "@/components/montage/text-boxes";
@@ -542,15 +543,13 @@ function GridPreview({
           ) : null}
           <span className="pointer-events-none absolute inset-0 border-2 border-violet" />
           <span className="absolute top-1.5 left-1.5 rounded-full bg-violet px-2 py-0.5 text-[10px] font-bold">Nouveau</span>
-          {kind === "reel" && <PlayIcon size={14} className="absolute top-2 right-2 drop-shadow" />}
-          {kind === "carousel" && <LayersIcon size={14} className="absolute top-2 right-2 drop-shadow" />}
+          <FormatBadge format={kind} small />
         </li>
         {tiles.map((t, i) => (
           <li key={i} className="relative aspect-[3/4] bg-white/10">
             {/* eslint-disable-next-line @next/next/no-img-element -- Instagram CDN */}
             <img src={t.url} alt="" loading="lazy" className="size-full object-cover" />
-            {t.reel && <PlayIcon size={14} className="absolute top-2 right-2 drop-shadow" />}
-            {t.carousel && <LayersIcon size={14} className="absolute top-2 right-2 drop-shadow" />}
+            <FormatBadge format={t.reel ? "reel" : t.carousel ? "carousel" : null} small />
           </li>
         ))}
       </ul>

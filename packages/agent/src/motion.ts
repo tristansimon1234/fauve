@@ -61,6 +61,8 @@ export type ReelProps = {
   endCard: { title: string; subtitle: string | null; from: number } | null;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
+  /** A text layer designed as code (carousel slides); `check` makes the render fail when a text leaves the frame. */
+  layer?: { js: string; texts: Record<string, string>; fonts: string[]; check?: boolean } | null;
 };
 
 export type ReelInputs = {

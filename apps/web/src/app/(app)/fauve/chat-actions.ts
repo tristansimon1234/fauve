@@ -187,7 +187,7 @@ async function aboutMemo(studioId: string, about: ChatAbout): Promise<string | n
 }
 
 /** The drawer's conversation about a publication: the latest one, if any. */
-export async function openPostChat(postId: string): Promise<{ conversationId: string | null; messages: ChatMessage[]; timezone: string } | null> {
+export async function openPostChat(postId: string): Promise<{ conversationId: string | null; messages: ChatMessage[]; timezone: string; studioId: string } | null> {
   if (!UUID.test(postId)) return null;
   const { member } = await getStudioContext();
   if (!member) return null;
@@ -202,7 +202,7 @@ export async function openPostChat(postId: string): Promise<{ conversationId: st
     .limit(1)
     .maybeSingle();
   const conversationId = (data?.id as string | undefined) ?? null;
-  return { conversationId, messages: conversationId ? await messagesOf(studioId, conversationId) : [], timezone: member.studio.timezone };
+  return { conversationId, messages: conversationId ? await messagesOf(studioId, conversationId) : [], timezone: member.studio.timezone, studioId };
 }
 
 export type SendResult =

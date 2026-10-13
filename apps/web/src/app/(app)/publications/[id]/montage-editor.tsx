@@ -311,21 +311,6 @@ export function MontageEditor({
                   />
                 )}
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    aria-pressed={Boolean(t.items)}
-                    onClick={() =>
-                      setText(
-                        i,
-                        t.items
-                          ? { items: undefined, bullet: undefined, detail_look: undefined, text: t.items.map((x) => x.title).join(" · ").slice(0, 120) }
-                          : { items: [{ title: t.text }], bullet: { kind: "check", color: "#ffffff" } },
-                      )
-                    }
-                    className={`h-8 rounded-full px-3 text-[12px] font-semibold ${t.items ? "bg-violet text-white" : "bg-white text-muted"}`}
-                  >
-                    Liste
-                  </button>
                   {(Object.keys(styleLabels) as Text["style"][]).map((style) => (
                     <button
                       key={style}

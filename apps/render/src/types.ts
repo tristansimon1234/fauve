@@ -63,4 +63,5 @@ export type ReelProps = {
   brand: { name: string; accent: string; accentInk: string; displayFont: string; bodyFont: string; logoUrl: string | null };
   endCard: { title: string; subtitle: string | null; from: number } | null;
   logo?: "top" | "bottom" | null;
+  layer?: { js: string; texts: Record<string, string>; fonts: string[]; check?: boolean } | null;
 };

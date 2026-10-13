@@ -11,7 +11,6 @@ import {
   FilmIcon,
   PaperclipIcon,
   PenIcon,
-  PlayIcon,
   ReplyIcon,
   SmileIcon,
   TrashIcon,
@@ -19,8 +18,8 @@ import {
   XIcon,
 } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
-import { supabaseBrowser } from "@/lib/supabase/client";
 import { Bubble } from "./chat-bubble";
+import { FileStrip, useChatUploads } from "./chat-uploads";
 import {
   deleteConversation,
   launchQuote,
@@ -34,11 +33,6 @@ import {
 } from "./chat-actions";
 
 /** A photo or video added to the composer: uploaded at once, sent with the next message. */
-type DraftFile = { id: string; file: File; preview: string; video: boolean; status: "uploading" | "ready" | "error"; path?: string };
-
-const MAX_FILES = 10;
-// Supabase's default per-file limit; WhatsApp-quality phone clips fit well under it.
-const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Suggestion = { icon: keyof typeof icons; label: string; prompt: string };
 
@@ -98,46 +92,12 @@ export function FauveWorkspace({
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [files, setFiles] = useState<DraftFile[]>([]);
   const [dragging, setDragging] = useState(false);
   const timeFormat = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone });
 
   // Photos and videos: uploaded to Storage as soon as they are added, sent with the message.
-  const addFiles = (list: FileList | File[]) => {
-    const picked = [...list].filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
-    if (!picked.length) return setError("Ajoute des photos ou des vidéos.");
-    if (picked.some((f) => f.size > MAX_FILE_BYTES)) setError("Un fichier dépasse 50 Mo : envoie-le plutôt sur WhatsApp en tant que document.");
-    const room = MAX_FILES - files.length;
-    const added = picked
-      .filter((f) => f.size <= MAX_FILE_BYTES)
-      .slice(0, room)
-      .map((file): DraftFile => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        file,
-        preview: URL.createObjectURL(file),
-        video: file.type.startsWith("video/"),
-        status: "uploading",
-      }));
-    if (!added.length) return;
-    setFiles((current) => [...current, ...added]);
-    const storage = supabaseBrowser().storage.from("media");
-    for (const draft of added) {
-      const ext = draft.file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || (draft.video ? "mp4" : "jpg");
-      const path = `${studioId}/chat/${draft.id}.${ext}`;
-      storage
-        .upload(path, draft.file, { contentType: draft.file.type })
-        .then(({ error: uploadError }) =>
-          setFiles((current) => current.map((f) => (f.id === draft.id ? { ...f, status: uploadError ? "error" : "ready", path } : f))),
-        );
-    }
-  };
-  const removeFile = (id: string) =>
-    setFiles((current) => {
-      const gone = current.find((f) => f.id === id);
-      if (gone) URL.revokeObjectURL(gone.preview);
-      return current.filter((f) => f.id !== id);
-    });
-  const uploading = files.some((f) => f.status === "uploading");
+  const uploads = useChatUploads(studioId, setError);
+  const { files, addFiles, removeFile, uploading } = uploads;
 
   // Keep the open conversation in the URL, so a reload lands on it.
   useEffect(() => {
@@ -242,7 +202,7 @@ export function FauveWorkspace({
       ...(text ? [local({ body: text }, ready.length)] : []),
     ]);
     const attachments: Attachment[] = ready.map((f) => ({ path: f.path!, mime: f.file.type, size: f.file.size }));
-    if (withFiles) setFiles([]);
+    if (withFiles) uploads.clear();
     const conversationId = active;
     startTransition(async () => {
       try {
@@ -451,34 +411,7 @@ export function FauveWorkspace({
                 {error}
               </p>
             )}
-            {files.length > 0 && (
-              <ul className="flex flex-wrap gap-2 px-2" aria-label="Fichiers à envoyer">
-                {files.map((f) => (
-                  <li key={f.id} className="relative size-16 overflow-hidden rounded-[12px] border border-line bg-soft">
-                    {f.video ? (
-                      <video src={`${f.preview}#t=0.1`} muted playsInline preload="metadata" className="size-full object-cover" />
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={f.preview} alt="" className="size-full object-cover" />
-                    )}
-                    {f.video && <PlayIcon size={12} className="absolute bottom-1 left-1 text-white drop-shadow" />}
-                    {f.status !== "ready" && (
-                      <span className={`absolute inset-0 flex items-center justify-center text-[10px] font-bold ${f.status === "error" ? "bg-peach/90 text-danger" : "bg-white/70 text-muted"}`}>
-                        {f.status === "error" ? "Échec" : "Envoi…"}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      aria-label="Retirer"
-                      onClick={() => removeFile(f.id)}
-                      className="absolute top-0.5 right-0.5 flex size-5 items-center justify-center rounded-full bg-ink/70 text-white"
-                    >
-                      <XIcon size={12} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <FileStrip files={files} onRemove={removeFile} />
             <div className="relative flex items-end gap-1 rounded-[30px] border border-line bg-white p-2 pl-2 shadow-[0_8px_30px_rgba(28,21,48,0.08)] focus-within:border-lilac">
               <input
                 ref={fileRef}
@@ -552,7 +485,7 @@ export function FauveWorkspace({
                     send(draft, true);
                   }
                 }}
-                placeholder={files.length ? "Dis à Fauve ce que tu veux en faire : un Reel, un carrousel…" : "Demande à Fauve…"}
+                placeholder={files.length ? "Dis à Fauve ce que tu veux en faire : un Reel, un carrousel…" : "Demande à Fauve, ou glisse tes photos et vidéos ici…"}
                 className="max-h-[180px] min-h-11 flex-1 resize-none bg-transparent py-2.5 text-[16px] outline-none placeholder:text-muted/70"
               />
               <button

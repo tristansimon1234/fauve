@@ -22,6 +22,8 @@ export const CREDIT_PRICES = {
   moodboard: 1,
   /** A variant of a delivered montage: same cut, another style and hook (render only). */
   variant: 1,
+  /** A new text layer for photos, designed as code from an example (Opus, checks and a critic). Reusing one is free. */
+  textLayer: 3,
 } as const;
 
 /**

@@ -60,7 +60,8 @@ export const motionSceneOutputSchema = z.object({
   slots: z.array(motionSlotSchema).max(8),
 });
 
-const FORBIDDEN: [RegExp, string][] = [
+/** Patterns generated code may not contain (shared with the text layers). */
+export const FORBIDDEN_CODE: [RegExp, string][] = [
   [/\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts|\bWorker\b/, "accès réseau"],
   [/^\s*(import|export)\s/m, "import/export"],
   [/\b(require|import)\s*\(/, "chargement de module"],
@@ -76,6 +77,6 @@ export function checkMotionCode(code: string): string[] {
   const problems: string[] = [];
   if (code.length > 24000) problems.push("code trop long");
   if (!/\bfunction\s+Scene\s*\(/.test(code)) problems.push("il faut une fonction Scene");
-  for (const [pattern, label] of FORBIDDEN) if (pattern.test(code)) problems.push(label);
+  for (const [pattern, label] of FORBIDDEN_CODE) if (pattern.test(code)) problems.push(label);
   return problems;
 }

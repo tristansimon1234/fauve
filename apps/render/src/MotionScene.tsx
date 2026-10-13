@@ -33,23 +33,29 @@ export type SceneComponent = (props: {
   texts: Record<string, string>;
 }) => ReactNode;
 
-export function compileScene(js: string, scope: typeof SCOPE = SCOPE): SceneComponent | null {
+/** The component a generated code defines (`Scene` for a motion scene, `Layer` for a text layer), or null. */
+export function compileComponent<C>(js: string, name: "Scene" | "Layer", scope: typeof SCOPE = SCOPE): C | null {
   try {
     const factory = new Function(
       "React",
       "scope",
-      `"use strict";\nconst { ${Object.keys(scope).join(", ")} } = scope;\n${js}\nreturn typeof Scene === "function" ? Scene : null;`,
+      `"use strict";\nconst { ${Object.keys(scope).join(", ")} } = scope;\n${js}\nreturn typeof ${name} === "function" ? ${name} : null;`,
     );
-    return factory(React, scope) as SceneComponent | null;
+    return factory(React, scope) as C | null;
   } catch {
     return null;
   }
 }
 
-class Fallback extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+export const compileScene = (js: string, scope: typeof SCOPE = SCOPE) => compileComponent<SceneComponent>(js, "Scene", scope);
+
+export class Fallback extends Component<{ fallback: ReactNode; children: ReactNode; onError?: (error: unknown) => void }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    this.props.onError?.(error);
   }
   render() {
     return this.state.failed ? this.props.fallback : this.props.children;

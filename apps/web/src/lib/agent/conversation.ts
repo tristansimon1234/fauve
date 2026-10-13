@@ -61,6 +61,8 @@ export async function replyInConversation(params: {
   /** WhatsApp only: lets Fauve react to the manager's last message. */
   waId?: string;
   replyToMessageId?: string;
+  /** Where the manager writes from (default: WhatsApp when there is a waId, else the app). */
+  channel?: "whatsapp" | "web" | "instagram";
 }): Promise<RunFauveResult> {
   const db = supabaseAdmin();
   // A chat the manager started fresh in the web app is its own context (and
@@ -75,13 +77,15 @@ export async function replyInConversation(params: {
   // WhatsApp answers the studio's general conversation, never one about a single publication.
   conversations = params.conversationId ? conversations.eq("id", params.conversationId) : conversations.is("post_id", null);
   const conversation = (await conversations).data?.[0];
+  const ownThread = conversation?.started_by === "web";
   let messages = db
     .from("whatsapp_messages")
-    .select("direction, type, body, media_id, wa_message_id, payload")
+    .select("direction, type, body, media_id, wa_message_id, payload, conversation_id")
     .eq("studio_id", params.studioId)
     .order("created_at", { ascending: false })
-    .limit(HISTORY_LIMIT);
-  if (conversation?.started_by === "web") messages = messages.eq("conversation_id", conversation.id);
+    // WhatsApp keeps the studio's recent thread across conversations, minus the ones opened in the app: read a little more, then filter.
+    .limit(ownThread ? HISTORY_LIMIT : HISTORY_LIMIT * 3);
+  if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
   const [studio, member, rows, instagram] = await Promise.all([
     db.from("studios").select("name, business_type, timezone, onboarding_step").eq("id", params.studioId).single(),
@@ -92,7 +96,17 @@ export async function replyInConversation(params: {
   if (studio.error) throw new Error(studio.error.message);
   if (rows.error) throw new Error(rows.error.message);
 
-  const stored = rows.data.reverse().map((r) => ({
+  // Outside an app conversation, leave out the conversations opened in the app (their own thread, or one publication).
+  let kept = rows.data;
+  if (!ownThread) {
+    const ids = [...new Set(kept.map((r) => r.conversation_id as string | null).filter((id): id is string => Boolean(id)))];
+    const { data: separate } = ids.length
+      ? await db.from("conversations").select("id").in("id", ids).or("started_by.eq.web,post_id.not.is.null")
+      : { data: [] };
+    const skip = new Set((separate ?? []).map((c) => c.id as string));
+    kept = kept.filter((r) => !skip.has(r.conversation_id as string)).slice(0, HISTORY_LIMIT);
+  }
+  const stored = kept.reverse().map((r) => ({
     ...(r as StoredMessage & { wa_message_id: string | null }),
     reply_to: (r.payload as { reply_to?: string } | null)?.reply_to ?? null,
     notes: (r.payload as { notes?: string[] } | null)?.notes,
@@ -122,6 +136,7 @@ export async function replyInConversation(params: {
       onboardingStep: studio.data.onboarding_step,
       firstName: member.data?.first_name ?? null,
       instagram: (instagram.data?.handle as string | null | undefined) ?? null,
+      channel: params.channel ?? (params.waId ? "whatsapp" : "web"),
     },
   });
 }
