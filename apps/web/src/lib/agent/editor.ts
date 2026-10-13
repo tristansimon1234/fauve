@@ -46,13 +46,14 @@ export async function designEdit(params: {
   maxNewScenes?: number;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
-  const [post, studio, brand, previous, library, report] = await Promise.all([
+  const [post, studio, brand, previous, library, report, inspirations] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms").eq("id", params.postId).eq("studio_id", params.studioId).single(),
     db.from("studios").select("name, booking_url").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
     templatesForEditor(params.studioId),
     latestReport(params.studioId).catch(() => null),
+    db.from("inspirations").select("analysis").eq("studio_id", params.studioId).not("analysis", "is", null).order("created_at", { ascending: false }).limit(6),
   ]);
   if (post.error) throw new Error("Publication introuvable");
 
@@ -76,6 +77,8 @@ export async function designEdit(params: {
       moodboard: profile.moodboard?.reading,
       // What worked on this studio's Instagram (weekly analysis): follow it when it applies.
       lessons: report?.lessons.map((l) => l.lesson),
+      // Reels the manager shared with Fauve on Instagram, as read by Gemini.
+      inspirations: (inspirations.data ?? []).map((i) => i.analysis as string),
       default_template: profile.default_template,
       visual_notes: profile.visual_notes,
       colors: profile.colors,
