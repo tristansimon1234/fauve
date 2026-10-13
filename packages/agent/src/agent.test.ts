@@ -359,3 +359,32 @@ test("montage plan: shown on the quote and read by the editor", async () => {
   assert.match(brief, /3\. fin : Logo/);
   assert.equal(montagePlanSchema.safeParse({ duration: 15, scenes: [] }).success, false);
 });
+
+test("plan edit: texts follow their scene when scenes move, change or go", async () => {
+  const { moveSegment, removeSegment, updateSegment, timeline } = await import("./plan-edit.ts");
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 9,
+    segments: [
+      { scene: { kind: "title", title: "A", background: "accent" }, duration: 3 },
+      { clip_id: "c", in: 1, out: 4 },
+      { scene: { kind: "title", title: "C", background: "ink" }, duration: 3 },
+    ],
+    texts: [
+      { text: "sur A", from: 0.5, to: 2.5, style: "hook" },
+      { text: "sur B", from: 3.5, to: 5.5, style: "band" },
+    ],
+    images: [],
+  });
+  const moved = moveSegment(plan, 0, 2);
+  assert.deepEqual(timeline(moved).map((s) => s.start), [0, 3, 6]);
+  assert.deepEqual(moved.texts.map((t) => [t.text, t.from, t.to]), [["sur A", 6.5, 8.5], ["sur B", 0.5, 2.5]]);
+
+  const removed = removeSegment(plan, 1);
+  assert.deepEqual(removed.texts.map((t) => t.text), ["sur A"]);
+  assert.equal(removed.duration, 6);
+
+  const trimmed = updateSegment(plan, 0, { scene: { kind: "title", title: "A", background: "accent" }, duration: 2 });
+  assert.deepEqual(trimmed.texts.map((t) => [t.from, t.to]), [[0.5, 2], [2.5, 4.5]]);
+  assert.equal(editPlanSchema.safeParse(moved).success, true);
+});
