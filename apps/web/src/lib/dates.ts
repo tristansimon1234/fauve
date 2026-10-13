@@ -47,6 +47,20 @@ export function startOfLocalDay(date: LocalDate, timeZone: string): Date {
   return new Date(instant);
 }
 
+/** The instant of `hours:minutes` local time on `date` in `timeZone`. */
+export function localInstant(date: LocalDate, hours: number, minutes: number, timeZone: string): Date {
+  const wall = Date.UTC(date.year, date.month - 1, date.day, hours, minutes);
+  let instant = wall - offsetAt(wall, timeZone);
+  instant = wall - offsetAt(instant, timeZone);
+  return new Date(instant);
+}
+
+/** Local hours and minutes of an instant in `timeZone`. */
+export function localTimeOf(date: Date, timeZone: string): { hours: number; minutes: number } {
+  const { hour, minute } = partsIn(date, timeZone);
+  return { hours: hour, minutes: minute };
+}
+
 /** The instant `days` × 24 h before `from`. */
 export function daysBefore(from: Date, days: number): Date {
   return new Date(from.getTime() - days * 24 * 60 * 60 * 1000);

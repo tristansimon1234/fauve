@@ -63,9 +63,9 @@ const LOCKED: readonly PostStatus[] = ["published", "measured"];
 export default function PostPage({ params }: PageProps<"/publications/[id]">) {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-8">
-      <Link href="/publications" className="inline-flex items-center gap-2 self-start text-sm font-bold text-violet">
+      <Link href="/calendrier" className="inline-flex items-center gap-2 self-start text-sm font-bold text-violet">
         <ArrowLeftIcon size={18} />
-        Publications
+        Calendrier
       </Link>
       <Suspense fallback={<PageLoading title="Publication" />}>
         <PostDetail params={params} />

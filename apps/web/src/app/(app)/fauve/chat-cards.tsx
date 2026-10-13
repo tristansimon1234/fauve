@@ -226,7 +226,7 @@ function GridCard({ posts }: { posts: CardPost[] }) {
       ) : (
         <p className="border-t border-line px-3 py-4 text-[13px] text-muted">Aucune publication prévue pour l’instant.</p>
       )}
-      <Link href="/grille" className="border-t border-line px-3 py-2.5 text-[13px] font-bold text-violet">
+      <Link href="/calendrier?vue=grille" className="border-t border-line px-3 py-2.5 text-[13px] font-bold text-violet">
         Voir toute la grille
       </Link>
     </article>

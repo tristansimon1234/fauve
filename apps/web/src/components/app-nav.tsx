@@ -2,22 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarIcon, ChartIcon, ChatIcon, FolderIcon, GridIcon, ImageIcon, PaletteIcon, SlidersIcon } from "./icons";
+import { CalendarIcon, ChartIcon, ChatIcon, SlidersIcon } from "./icons";
 
+// Four places: talk to Fauve, the calendar (week and grid, every publication),
+// the results, and the settings (accounts, style, media library). `also`: the
+// pages that belong to a section, to highlight it.
 const nav = [
-  { href: "/fauve", label: "Fauve", icon: ChatIcon },
-  { href: "/calendrier", label: "Calendrier", icon: CalendarIcon },
-  { href: "/publications", label: "Publications", icon: ImageIcon },
-  { href: "/grille", label: "Grille", icon: GridIcon },
-  { href: "/mediatheque", label: "Médiathèque", icon: FolderIcon },
-  { href: "/resultats", label: "Résultats", icon: ChartIcon },
-  { href: "/style", label: "Style", icon: PaletteIcon },
-  { href: "/reglages", label: "Réglages", icon: SlidersIcon },
+  { href: "/fauve", label: "Fauve", icon: ChatIcon, also: [] },
+  { href: "/calendrier", label: "Calendrier", icon: CalendarIcon, also: ["/publications", "/grille"] },
+  { href: "/resultats", label: "Résultats", icon: ChartIcon, also: [] },
+  { href: "/reglages", label: "Réglages", icon: SlidersIcon, also: ["/style", "/mediatheque"] },
 ] as const;
-
-// Shown in the bottom bar on phones. Réglages opens from the header avatar and links to Style.
-const mobileOnly = new Set<string>(["/fauve", "/calendrier", "/publications", "/resultats"]);
-const mobileNav = nav.filter((item) => mobileOnly.has(item.href));
 
 type Variant = "sidebar" | "bar";
 
@@ -28,7 +23,10 @@ export function NavLinks({ variant }: { variant: Variant }) {
 
 /** Same links; `pathname` null renders them without highlight (prerendered fallback). */
 export function NavList({ variant, pathname }: { variant: Variant; pathname: string | null }) {
-  const isActive = (href: string) => pathname !== null && (pathname === href || pathname.startsWith(`${href}/`));
+  const isActive = (href: string) => {
+    const item = nav.find((n) => n.href === href)!;
+    return pathname !== null && [href, ...item.also].some((h) => pathname === h || pathname.startsWith(`${h}/`));
+  };
 
   if (variant === "sidebar") {
     return nav.map(({ href, label, icon: Icon }) => {
@@ -49,7 +47,7 @@ export function NavList({ variant, pathname }: { variant: Variant; pathname: str
     });
   }
 
-  return mobileNav.map(({ href, label, icon: Icon }) => {
+  return nav.map(({ href, label, icon: Icon }) => {
     const active = isActive(href);
     return (
       <Link
