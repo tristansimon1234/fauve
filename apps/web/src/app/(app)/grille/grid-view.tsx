@@ -8,7 +8,7 @@ import type { InstagramMedia, InstagramProfile } from "@/lib/social/instagram";
 // Instagram), Fauve's coming posts first with a dashed frame and their status.
 
 export type Tile =
-  | { kind: "upcoming"; id: string; title: string; status: string; at: string | null; videoUrl: string | null; format: string }
+  | { kind: "upcoming"; id: string; title: string; status: string; at: string | null; videoUrl: string | null; imageUrl: string | null; format: string }
   | { kind: "instagram"; media: InstagramMedia; views?: number };
 
 export function GridView({
@@ -104,6 +104,9 @@ function UpcomingTile({ tile, tz }: { tile: Extract<Tile, { kind: "upcoming" }>;
     <Link href={`/publications/${tile.id}`} className="group absolute inset-0 block outline-offset-[-3px]">
       {tile.videoUrl ? (
         <video src={`${tile.videoUrl}#t=0.5`} muted playsInline preload="metadata" className="size-full object-cover" />
+      ) : tile.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
+        <img src={tile.imageUrl} alt="" className="size-full object-cover" />
       ) : (
         <span className="flex size-full items-center justify-center bg-violet-soft p-3 text-center text-[13px] font-semibold text-violet">
           {tile.title}

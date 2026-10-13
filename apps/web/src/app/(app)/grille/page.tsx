@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { mediaViews, profile, recentMedia, type InstagramProfile } from "@/lib/social/instagram";
 import { instagramAccount } from "@/lib/social/publish";
+import { slidesToPublish } from "@/lib/render/slides";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { GridView, type Tile } from "./grid-view";
 
@@ -34,7 +35,7 @@ async function Grid() {
   const [upcoming, feed, info] = await Promise.all([
     db
       .from("posts")
-      .select("id, title, kind, status, scheduled_at, render_id")
+      .select("id, title, kind, status, scheduled_at, render_id, media_ids, slides, slides_render")
       .eq("studio_id", studioId)
       .in("status", [...UPCOMING])
       .neq("kind", "story")
@@ -50,18 +51,43 @@ async function Grid() {
   const renderIds = (upcoming.data ?? []).flatMap((p) => (p.render_id ? [p.render_id as string] : []));
   const { data: renders } = renderIds.length ? await db.from("renders").select("id, storage_path").in("id", renderIds) : { data: [] };
   const paths = new Map((renders ?? []).map((r) => [r.id as string, r.storage_path as string | null]));
-  const signed = await signMediaUrls(db, studioId, [...paths.values()].filter((p): p is string => Boolean(p)));
+  // Photo posts and carousels: the first photo, with its text when it is rendered.
+  const firstIds = (upcoming.data ?? []).flatMap((p) => ((p.media_ids as string[] | null)?.[0] ? [(p.media_ids as string[])[0]!] : []));
+  const { data: firstAssets } = firstIds.length
+    ? await db.from("media_assets").select("id, storage_path, kind, mime_type").eq("studio_id", studioId).in("id", firstIds)
+    : { data: [] };
+  const assets = new Map((firstAssets ?? []).map((a) => [a.id as string, a]));
+  const covers = new Map<string, { path: string; video: boolean }>();
+  for (const p of upcoming.data ?? []) {
+    const slide = slidesToPublish(p as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
+    const first = (p.media_ids as string[] | null)?.[0];
+    const asset = first ? assets.get(first) : undefined;
+    const rendered = first ? slide.rendered[first] : undefined;
+    if (rendered) covers.set(p.id as string, { path: rendered, video: false });
+    else if (asset) {
+      covers.set(p.id as string, {
+        path: asset.storage_path as string,
+        video: asset.kind === "video" || String(asset.mime_type ?? "").startsWith("video/"),
+      });
+    }
+  }
+  const signed = await signMediaUrls(db, studioId, [
+    ...[...paths.values()].filter((p): p is string => Boolean(p)),
+    ...[...covers.values()].map((c) => c.path),
+  ]);
 
   const tiles: Tile[] = [
     ...(upcoming.data ?? []).map((p): Tile => {
       const path = p.render_id ? paths.get(p.render_id as string) : null;
+      const cover = covers.get(p.id as string);
       return {
         kind: "upcoming",
         id: p.id as string,
         title: p.title as string,
         status: p.status as string,
         at: (p.scheduled_at as string | null) ?? null,
-        videoUrl: path ? (signed.get(path) ?? null) : null,
+        videoUrl: path ? (signed.get(path) ?? null) : cover?.video ? (signed.get(cover.path) ?? null) : null,
+        imageUrl: !path && cover && !cover.video ? (signed.get(cover.path) ?? null) : null,
         format: p.kind as string,
       };
     }),

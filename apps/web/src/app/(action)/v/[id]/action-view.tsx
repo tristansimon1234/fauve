@@ -259,7 +259,7 @@ export function ActionView({
         </div>
       )}
 
-      {showGrid && <GridPreview cover={videoUrl ? { url: videoUrl, video: true } : (media[0] ?? null)} kind={post.kind} tiles={grid} />}
+      {showGrid && <GridPreview cover={videoUrl ? { url: videoUrl, video: true } : (media[0] ?? null)} coverNode={slideNodes?.[0]} kind={post.kind} tiles={grid} />}
 
       {editingSlides && (
         <section aria-label="Texte sur les photos" className="mt-3">
@@ -509,12 +509,26 @@ function MediaSlides({ media, nodes, ratio }: { media: ActionMedia[]; nodes?: Re
 }
 
 /** The post at the top of the Instagram grid, before the latest ones: how the feed will look. */
-function GridPreview({ cover, kind, tiles }: { cover: ActionMedia | null; kind: PostKind; tiles: GridTile[] }) {
+function GridPreview({
+  cover,
+  coverNode,
+  kind,
+  tiles,
+}: {
+  cover: ActionMedia | null;
+  /** The first slide with its text, when it has some. */
+  coverNode?: ReactNode;
+  kind: PostKind;
+  tiles: GridTile[];
+}) {
   return (
     <section aria-label="Dans ta grille" className="mt-3 flex flex-col gap-2">
       <ul className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-[18px] bg-white/5">
-        <li className="relative aspect-[3/4] bg-white/10">
-          {cover?.video ? (
+        <li className="relative aspect-[3/4] overflow-hidden bg-white/10">
+          {coverNode ? (
+            // A 4:5 slide in a 3:4 tile: centred, cropped at the sides like Instagram does.
+            <div className="absolute inset-y-0 left-1/2 aspect-[4/5] h-full -translate-x-1/2">{coverNode}</div>
+          ) : cover?.video ? (
             <video src={`${cover.url}#t=0.5`} muted playsInline preload="metadata" className="size-full object-cover" />
           ) : cover ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
