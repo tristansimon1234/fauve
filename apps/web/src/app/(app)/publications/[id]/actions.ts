@@ -1,10 +1,11 @@
 "use server";
 
-import { assertTransition, postStatusSchema, type PostStatus } from "@fauve/agent";
+import { assertTransition, editPlanSchema, isClipSegment, postStatusSchema, type PostStatus } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import type { DeleteResult } from "@/components/delete-button";
+import { renderPost } from "@/lib/render/render-post";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -158,4 +159,60 @@ export async function deletePost(postId: string): Promise<DeleteResult> {
   revalidatePath("/grille");
   revalidatePath("/fauve");
   return { ok: true };
+}
+
+export type SavePlanResult = { ok: true; version: number } | { ok: false; error: string };
+
+/**
+ * Saves a montage edited by hand (scene editor) as a new version of its plan,
+ * then renders it in the background. Free: no AI involved. Animation code
+ * cannot be changed here, only reused from this post's versions.
+ */
+export async function saveEditPlan(postId: string, input: unknown): Promise<SavePlanResult> {
+  if (!z.uuid().safeParse(postId).success) return { ok: false, error: "Publication introuvable." };
+  const parsed = editPlanSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Ce montage n’est pas valide : vérifie les durées et les textes." };
+  const plan = parsed.data;
+
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  const studioId = member.studio.id;
+  const db = supabaseAdmin();
+
+  const { data: post } = await db.from("posts").select("id, status").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  if (!post) return { ok: false, error: "Publication introuvable." };
+  if (LOCKED.includes(postStatusSchema.parse(post.status))) return { ok: false, error: "Cette publication est déjà en ligne." };
+
+  // Clips: the studio's own media only.
+  const clipIds = [...new Set(plan.segments.filter(isClipSegment).map((s) => s.clip_id))];
+  if (clipIds.length) {
+    const { data } = await db.from("media_assets").select("id").eq("studio_id", studioId).in("id", clipIds);
+    if ((data?.length ?? 0) !== clipIds.length) return { ok: false, error: "Une des vidéos n’est plus dans ta médiathèque." };
+  }
+  // Animations: code already made for this post (by Fauve), never new code from the browser.
+  const { data: versions } = await db.from("edit_plans").select("version, plan").eq("post_id", postId);
+  const knownCode = new Set(
+    (versions ?? []).flatMap((v) =>
+      ((v.plan as { segments?: { motion?: { js?: string } }[] } | null)?.segments ?? []).flatMap((s) => (s.motion?.js ? [s.motion.js] : [])),
+    ),
+  );
+  const unknown = plan.segments.some((s) => "motion" in s && s.motion.js && !knownCode.has(s.motion.js));
+  if (unknown) return { ok: false, error: "Une animation a été modifiée d’une façon que l’éditeur ne permet pas." };
+
+  const version = Math.max(0, ...(versions ?? []).map((v) => v.version as number)) + 1;
+  const { data: row, error } = await db.from("edit_plans").insert({ studio_id: studioId, post_id: postId, version, plan }).select("id").single();
+  if (error) {
+    console.warn("saveEditPlan failed", error.message);
+    return { ok: false, error: "L’enregistrement a échoué. Réessaie dans un instant." };
+  }
+  await db.from("posts").update({ edit_plan_id: row.id }).eq("id", postId);
+  // The final video follows in about a minute; the editor already shows it live.
+  after(() =>
+    renderPost(studioId, postId).then(
+      () => revalidatePath(`/publications/${postId}`),
+      (e) => console.error("saveEditPlan: render failed", postId, e),
+    ),
+  );
+  revalidatePath(`/publications/${postId}`);
+  return { ok: true, version };
 }

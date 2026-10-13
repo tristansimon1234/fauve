@@ -327,6 +327,18 @@ test("motion scenes: generated code is checked before it runs", async () => {
   assert.deepEqual(checkMotionCode(`const Other = () => null;`), ["il faut une fonction Scene"]);
 });
 
+test("motion scenes: the renderer, the smoke test and the prompt share one scope", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { MOTION_SCOPE } = await import("./motion-scene.ts");
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+  const renderer = /export const SCOPE = \{([^}]*)\}/.exec(read("../../../apps/render/src/MotionScene.tsx"))![1]!;
+  const smoke = /const scope = \{([\s\S]*?)\n\};/.exec(read("../../../apps/render/smoke.mjs"))![1]!;
+  for (const name of MOTION_SCOPE.filter((n) => n !== "React")) {
+    assert.match(renderer, new RegExp(`\\b${name}\\b`), `${name} missing from MotionScene.tsx`);
+    assert.match(smoke, new RegExp(`\\b${name}\\b`), `${name} missing from smoke.mjs`);
+  }
+});
+
 test("pricing: the chat model is priced", async () => {
   const { CHAT_MODEL, claudeCostUsd } = await import("./pricing.ts");
   assert.ok(claudeCostUsd(CHAT_MODEL, { input_tokens: 1_000_000, output_tokens: 100_000 }) > 0);
@@ -358,4 +370,33 @@ test("montage plan: shown on the quote and read by the editor", async () => {
   assert.match(brief, /1\. animation : Ouverture/);
   assert.match(brief, /3\. fin : Logo/);
   assert.equal(montagePlanSchema.safeParse({ duration: 15, scenes: [] }).success, false);
+});
+
+test("plan edit: texts follow their scene when scenes move, change or go", async () => {
+  const { moveSegment, removeSegment, updateSegment, timeline } = await import("./plan-edit.ts");
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 9,
+    segments: [
+      { scene: { kind: "title", title: "A", background: "accent" }, duration: 3 },
+      { clip_id: "c", in: 1, out: 4 },
+      { scene: { kind: "title", title: "C", background: "ink" }, duration: 3 },
+    ],
+    texts: [
+      { text: "sur A", from: 0.5, to: 2.5, style: "hook" },
+      { text: "sur B", from: 3.5, to: 5.5, style: "band" },
+    ],
+    images: [],
+  });
+  const moved = moveSegment(plan, 0, 2);
+  assert.deepEqual(timeline(moved).map((s) => s.start), [0, 3, 6]);
+  assert.deepEqual(moved.texts.map((t) => [t.text, t.from, t.to]), [["sur A", 6.5, 8.5], ["sur B", 0.5, 2.5]]);
+
+  const removed = removeSegment(plan, 1);
+  assert.deepEqual(removed.texts.map((t) => t.text), ["sur A"]);
+  assert.equal(removed.duration, 6);
+
+  const trimmed = updateSegment(plan, 0, { scene: { kind: "title", title: "A", background: "accent" }, duration: 2 });
+  assert.deepEqual(trimmed.texts.map((t) => [t.from, t.to]), [[0.5, 2], [2.5, 4.5]]);
+  assert.equal(editPlanSchema.safeParse(moved).success, true);
 });

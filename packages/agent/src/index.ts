@@ -14,3 +14,4 @@ export * from "./motion-scene.ts";
 export * from "./moodboard.ts";
 export * from "./credits.ts";
 export * from "./performance.ts";
+export * from "./plan-edit.ts";

@@ -14,10 +14,11 @@ import {
   editPlanSchema,
   postStatusSchema,
   renderDuration,
+  type EditPlan,
   type PostStatus,
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { renderInSandbox, renderReelInSandbox } from "./sandbox";
+import { renderInSandbox, renderReelInSandbox, smokeTestScenes } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm" };
 
@@ -45,6 +46,67 @@ function towardsDraft(status: PostStatus): PostStatus[] {
   return [];
 }
 
+/**
+ * What a montage needs besides its plan: signed clip links (1 h), word timings
+ * for subtitles, the brand (accent, logo, fonts, name) and each clip's length.
+ * Shared by the render and the live editor.
+ */
+export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "segments">) {
+  const db = supabaseAdmin();
+  const clipIds = [...new Set(plan.segments.filter(isClipSegment).map((s) => s.clip_id))];
+  const assets = clipIds.length
+    ? check(await db.from("media_assets").select("id, storage_path, mime_type, duration").eq("studio_id", studioId).in("id", clipIds)).data!
+    : [];
+  const clipFiles: Record<string, string> = {};
+  const clips: Record<string, string> = {};
+  const clipUrls: Record<string, string> = {};
+  const clipDurations: Record<string, number | null> = {};
+  for (const [i, id] of clipIds.entries()) {
+    const asset = assets.find((a) => a.id === id);
+    if (!asset) throw new Error(`Clip ${id} introuvable dans la médiathèque du studio`);
+    const signed = check(await db.storage.from("media").createSignedUrl(asset.storage_path, 3600)).data!;
+    const file = `clip${i}.${extensionByMime[asset.mime_type ?? ""] ?? "mp4"}`;
+    clipFiles[id] = file;
+    clips[file] = signed.signedUrl;
+    clipUrls[id] = signed.signedUrl;
+    clipDurations[id] = asset.duration === null ? null : Number(asset.duration);
+  }
+
+  const [brand, studio, analyses] = await Promise.all([
+    db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
+    db.from("studios").select("name").eq("id", studioId).single(),
+    clipIds.length
+      ? db.from("clip_analyses").select("media_id, analysis").in("media_id", clipIds).order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as { media_id: string; analysis: unknown }[] }),
+  ]);
+  const style = brandProfileSchema
+    .pick({ colors: true, logo_url: true, logo_path: true, fonts: true })
+    .catch({})
+    .parse(brand.data?.[0]?.profile ?? {});
+  const accent = style.colors?.[0];
+  // An uploaded logo (private bucket) wins over one found on the website.
+  const logoUrl = style.logo_path?.startsWith(`${studioId}/`)
+    ? ((await db.storage.from("media").createSignedUrl(style.logo_path, 3600)).data?.signedUrl ?? style.logo_url ?? null)
+    : (style.logo_url ?? null);
+  const words: Record<string, ClipAnalysis["words"]> = {};
+  for (const row of analyses.data ?? []) {
+    const parsed = clipAnalysisSchema.safeParse(row.analysis);
+    if (parsed.success && !(row.media_id in words)) words[row.media_id as string] = parsed.data.words;
+  }
+  return {
+    clipIds,
+    clipFiles,
+    clips,
+    clipUrls,
+    clipDurations,
+    words,
+    accent,
+    logoUrl,
+    fonts: style.fonts,
+    studioName: (studio.data?.name as string | null) ?? "",
+  };
+}
+
 /** Renders the latest edit plan of a post to MP4, stores it and links it to the post. */
 export async function renderPost(studioId: string, postId: string): Promise<RenderResult> {
   const db = supabaseAdmin();
@@ -64,43 +126,7 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-
-  const clipIds = [...new Set(plan.segments.filter(isClipSegment).map((s) => s.clip_id))];
-  const assets = check(
-    await db.from("media_assets").select("id, storage_path, mime_type").eq("studio_id", studioId).in("id", clipIds),
-  ).data!;
-  const clipFiles: Record<string, string> = {};
-  const clips: Record<string, string> = {};
-  const clipUrls: Record<string, string> = {};
-  for (const [i, id] of clipIds.entries()) {
-    const asset = assets.find((a) => a.id === id);
-    if (!asset) throw new Error(`Clip ${id} introuvable dans la médiathèque du studio`);
-    const signed = check(await db.storage.from("media").createSignedUrl(asset.storage_path, 3600)).data!;
-    const file = `clip${i}.${extensionByMime[asset.mime_type ?? ""] ?? "mp4"}`;
-    clipFiles[id] = file;
-    clips[file] = signed.signedUrl;
-    clipUrls[id] = signed.signedUrl;
-  }
-
-  const [brand, studio, analyses] = await Promise.all([
-    db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
-    db.from("studios").select("name").eq("id", studioId).single(),
-    db.from("clip_analyses").select("media_id, analysis").in("media_id", clipIds).order("created_at", { ascending: false }),
-  ]);
-  const style = brandProfileSchema
-    .pick({ colors: true, logo_url: true, logo_path: true, fonts: true })
-    .catch({})
-    .parse(brand.data?.[0]?.profile ?? {});
-  const accent = style.colors?.[0];
-  // An uploaded logo (private bucket) wins over one found on the website.
-  const logoUrl = style.logo_path?.startsWith(`${studioId}/`)
-    ? ((await db.storage.from("media").createSignedUrl(style.logo_path, 3600)).data?.signedUrl ?? style.logo_url ?? null)
-    : (style.logo_url ?? null);
-  const words: Record<string, ClipAnalysis["words"]> = {};
-  for (const row of analyses.data ?? []) {
-    const parsed = clipAnalysisSchema.safeParse(row.analysis);
-    if (parsed.success && !(row.media_id in words)) words[row.media_id as string] = parsed.data.words;
-  }
+  const { clipFiles, clips, clipUrls, words, accent, logoUrl, studioName, fonts } = await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
@@ -123,7 +149,22 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
         template: motion.data,
         clipUrls,
         words,
-        brand: { name: (studio.data?.name as string | null) ?? "", accent, logoUrl, fonts: style.fonts },
+        brand: { name: studioName, accent, logoUrl, fonts },
+      });
+      // Library scenes play with new texts, older plans predate the layout check: every
+      // scene is checked before the render, and one whose text leaves the frame plays its
+      // fixed scene. If the check is unavailable, the scenes stay.
+      const checks = await smokeTestScenes(
+        props.segments.flatMap((s, i) => (s.type === "motion" ? [{ id: `m${i}`, js: s.js, durationInFrames: s.durationInFrames, texts: s.texts }] : [])),
+        props.brand,
+      ).catch((e: unknown): Record<string, string | null> => {
+        console.warn("motion scenes: check unavailable", e);
+        return {};
+      });
+      props.segments = props.segments.map((s, i) => {
+        if (s.type !== "motion" || !checks[`m${i}`]) return s;
+        console.warn("motion scene falls back to its fixed scene", renderId, checks[`m${i}`]);
+        return { type: "scene", scene: s.fallback, startAt: s.startAt, durationInFrames: s.durationInFrames };
       });
       try {
         mp4 = await renderReelInSandbox({ id: renderId, props });

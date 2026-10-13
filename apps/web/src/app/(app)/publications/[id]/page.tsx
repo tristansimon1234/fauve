@@ -1,4 +1,13 @@
-import { platformSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
+import {
+  editPlanSchema,
+  motionTemplateSchema,
+  platformSchema,
+  postKindSchema,
+  postStatusSchema,
+  type PostKind,
+  type PostStatus,
+  type ReelInputs,
+} from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,8 +20,11 @@ import { DeleteButton } from "@/components/delete-button";
 import { StatusPill } from "@/components/status-pill";
 import { formatDateTime, formatSeconds, kindLabels, platformLabels } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
+import { loadMontageInputs } from "@/lib/render/render-post";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { deletePost } from "./actions";
+import { MontageEditor } from "./montage-editor";
 import { PostEditor } from "./post-editor";
 
 export const metadata: Metadata = { title: "Publication" };
@@ -100,6 +112,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   const media = videoUrl ? [] : await loadPostMedia(db, studioId, post.media_ids);
 
   const canEdit = !LOCKED.includes(post.status);
+  const editor = canEdit && plan ? await loadEditor(studioId, plan.id).catch(() => null) : null;
   const isVideo = post.kind === "reel" || post.kind === "story";
 
   return (
@@ -208,7 +221,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
             </div>
           </div>
 
-          {plan && <PlanSection plan={plan.view} clipLabels={clipLabels} />}
+          {plan && !editor && <PlanSection plan={plan.view} clipLabels={clipLabels} />}
 
           {post.agent_note && (
             <div className="flex items-start gap-3 rounded-[18px] bg-soft p-4">
@@ -218,8 +231,46 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           )}
         </div>
       </div>
+
+      {editor && (
+        <section aria-labelledby="montage-editor" className="flex flex-col gap-4 border-t border-line pt-8">
+          <div className="flex flex-col gap-1">
+            <h2 id="montage-editor" className="text-[24px] font-extrabold tracking-[-0.02em]">
+              Modifier le montage
+            </h2>
+            <p className="text-[15px] text-muted">Change les textes, l’ordre et la durée des scènes, coupe tes vidéos. Gratuit.</p>
+          </div>
+          <MontageEditor
+            postId={post.id}
+            initialPlan={editor.plan}
+            inputs={editor.inputs}
+            clipDurations={editor.clipDurations}
+            clipLabels={Object.fromEntries(clipLabels)}
+          />
+        </section>
+      )}
     </>
   );
+}
+
+/** What the scene editor needs: the full plan and its inputs (Remotion montages only). */
+async function loadEditor(studioId: string, planId: string) {
+  const { data } = await supabaseAdmin().from("edit_plans").select("plan").eq("id", planId).maybeSingle();
+  const plan = editPlanSchema.safeParse(data?.plan);
+  if (!plan.success) return null;
+  const template = motionTemplateSchema.safeParse(plan.data.template);
+  if (!template.success) return null;
+  const inputs = await loadMontageInputs(studioId, plan.data);
+  return {
+    plan: plan.data,
+    clipDurations: inputs.clipDurations,
+    inputs: {
+      template: template.data,
+      clipUrls: inputs.clipUrls,
+      words: inputs.words,
+      brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts },
+    } satisfies ReelInputs,
+  };
 }
 
 async function loadPlan(db: Db, post: z.infer<typeof postSchema>): Promise<{ id: string; view: PlanView } | null> {

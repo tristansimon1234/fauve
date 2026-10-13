@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@render/*": [
+        "../render/src/*"
       ]
     },
     "allowImportingTsExtensions": true,

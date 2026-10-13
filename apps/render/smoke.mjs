@@ -1,10 +1,16 @@
 // Smoke test for generated motion scenes, run in the render sandbox (never in the
-// web app). Usage: node smoke.mjs scenes.json → prints {"<id>": null | "error"}.
-// Each scene is rendered at its first, middle and last frame with React's server
-// renderer and minimal Remotion shims, which catches crashes and bad output early.
-import { readFileSync } from "node:fs";
+// web app). Usage: node smoke.mjs scenes.json [bundle-dir] → prints {"<id>": null | "error"}.
+// scenes.json: [{ id, js, durationInFrames, texts?, brand? }].
+// 1. Each scene is rendered at its first, middle and last frame with React's server
+//    renderer and minimal Remotion shims, which catches crashes and bad output early.
+// 2. The scenes that pass are laid out in Chrome (the SceneCheck composition of the
+//    bundle, default ./build) at many frames, with the studio's fonts: a text that
+//    leaves the frame or the safe zone fails the scene.
+// BROWSER_EXECUTABLE overrides Remotion's own Chrome (local runs).
+import { existsSync, readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { openBrowser, renderStill, selectComposition } from "@remotion/renderer";
 import { Easing, interpolate, interpolateColors, random, spring } from "remotion";
 
 let frame = 0;
@@ -20,9 +26,10 @@ const scope = {
   spring,
   Easing,
   random,
+  FitText: ({ style, innerStyle, children }) => React.createElement("div", { style }, React.createElement("div", { style: innerStyle }, children)),
 };
 
-const brand = {
+const defaultBrand = {
   name: "Studio",
   accent: "#F2694E",
   accentInk: "#FFFFFF",
@@ -45,6 +52,7 @@ for (const scene of scenes) {
     const Scene = factory(React, scope);
     if (!Scene) throw new Error("Scene is not defined");
     config = { ...config, durationInFrames: scene.durationInFrames };
+    const brand = { ...defaultBrand, ...scene.brand };
     for (const f of [0, Math.floor(scene.durationInFrames / 2), scene.durationInFrames - 1]) {
       frame = f;
       const html = renderToStaticMarkup(
@@ -56,6 +64,49 @@ for (const scene of scenes) {
     results[scene.id] = null;
   } catch (error) {
     results[scene.id] = String(error instanceof Error ? error.message : error).slice(0, 600);
+  }
+}
+
+// Layout check in Chrome, for the scenes that run.
+const bundle = new URL(process.argv[3] ?? "./build", new URL(`file://${process.cwd()}/`)).pathname;
+const passing = scenes.filter((s) => results[s.id] === null);
+const browserExecutable = process.env.BROWSER_EXECUTABLE ?? null;
+const browser =
+  passing.length && existsSync(bundle)
+    ? await openBrowser("chrome", { browserExecutable, logLevel: "error" }).catch((error) => {
+        // A broken browser must not reject every scene: the server-side checks stand.
+        console.error("layout check unavailable:", error);
+        return null;
+      })
+    : null;
+if (browser) {
+  try {
+    for (const scene of passing) {
+      const inputProps = { js: scene.js, texts: scene.texts ?? {}, durationInFrames: scene.durationInFrames, brand: { ...defaultBrand, ...scene.brand } };
+      try {
+        const composition = await selectComposition({ serveUrl: bundle, id: "SceneCheck", inputProps, puppeteerInstance: browser, browserExecutable, logLevel: "error" });
+        await renderStill({
+          serveUrl: bundle,
+          composition,
+          inputProps,
+          frame: 0,
+          imageFormat: "jpeg",
+          scale: 0.1,
+          puppeteerInstance: browser,
+          browserExecutable,
+          logLevel: "error",
+          timeoutInMilliseconds: 60000,
+        });
+      } catch (error) {
+        const message = String(error instanceof Error ? error.message : error);
+        // The scene's own failures (cancelRender), without Remotion's wrapping; anything else is the tooling's.
+        const failure = /(texte hors du cadre[^\n]*|erreur à l'image[^\n]*|Scene introuvable[^\n]*)/.exec(message)?.[1];
+        if (failure) results[scene.id] = failure.slice(0, 600);
+        else console.error("layout check failed for", scene.id, message.slice(0, 400));
+      }
+    }
+  } finally {
+    await browser.close({ silent: true });
   }
 }
 console.log(JSON.stringify(results));

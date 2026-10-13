@@ -90,6 +90,14 @@ export const editPlanTextSchema = z.object({
   style: z.enum(["hook", "band", "caption"]),
   /** Words of `text` to stress (accent colour / weight), at most three. */
   emphasis: z.array(z.string().min(1)).max(3).optional(),
+  /** Set by hand in the scene editor: where the text sits (top edge, share of the height, inside the safe zone)… */
+  y: z.number().min(0.05).max(0.66).optional(),
+  /** …its horizontal centre (share of the width; the box narrows to stay in the safe zone)… */
+  x: z.number().min(0.3).max(0.7).optional(),
+  /** …its size (1 = the style's size)… */
+  scale: z.number().min(0.6).max(1.6).optional(),
+  /** …and a dark background behind it, to read it on a busy image. */
+  backdrop: z.boolean().optional(),
 });
 
 /** Motion templates rendered by Remotion (apps/render); any other template uses the ffmpeg engine. */

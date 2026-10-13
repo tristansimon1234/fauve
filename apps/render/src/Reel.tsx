@@ -10,6 +10,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import { Fit } from "./Fit";
 import { loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
 import { SceneView } from "./Scene";
@@ -65,7 +66,7 @@ export function Reel(props: ReelProps) {
 
       {props.texts.map((t, i) => (
         <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
-          <TextBeat text={t} props={props} theme={theme} k={k} />
+          <TextBeat text={t} index={i} props={props} theme={theme} k={k} />
         </Sequence>
       ))}
 
@@ -110,13 +111,35 @@ function useExit(durationInFrames: number, theme: Theme) {
   return { opacity: out, translate: (1 - out) * -12 };
 }
 
-function TextBeat({ text, props, theme, k }: { text: ReelProps["texts"][number]; props: ReelProps; theme: Theme; k: number }) {
-  if (text.style === "hook") return <Hook text={text} props={props} theme={theme} k={k} />;
-  if (text.style === "band") return <Band text={text} props={props} theme={theme} k={k} />;
-  return <Caption text={text} props={props} theme={theme} k={k} />;
+/** A dark rounded background behind a text, set by hand to read it on a busy image. */
+function backdrop(text: ReelProps["texts"][number], k: number): CSSProperties {
+  return text.backdrop
+    ? { background: "rgba(20,14,36,0.62)", borderRadius: 18 * k, padding: `${14 * k}px ${24 * k}px`, boxDecorationBreak: "clone", WebkitBoxDecorationBreak: "clone" }
+    : {};
 }
 
-function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; props: ReelProps; theme: Theme; k: number }) {
+/**
+ * Left and right edges of a text's box: the safe margins, or narrower around a
+ * centre moved by hand (`x`), so the text stays inside the safe zone.
+ */
+function sides(text: ReelProps["texts"][number], props: ReelProps, k: number): { left: number; right: number } {
+  const left = SAFE.left * k;
+  const right = SAFE.right * k;
+  if (text.x === undefined) return { left, right };
+  const centre = text.x * props.width;
+  const half = Math.max(80 * k, Math.min(centre - left, props.width - right - centre));
+  return { left: centre - half, right: props.width - centre - half };
+}
+
+function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
+  // Remount when edited, so the fit is measured again (scene editor).
+  const key = `${text.text}|${text.style}|${text.scale ?? 1}|${text.x ?? ""}|${text.backdrop ?? false}`;
+  if (text.style === "hook") return <Hook key={key} text={text} index={index} props={props} theme={theme} k={k} />;
+  if (text.style === "band") return <Band key={key} text={text} index={index} props={props} theme={theme} k={k} />;
+  return <Caption key={key} text={text} index={index} props={props} theme={theme} k={k} />;
+}
+
+function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const exit = useExit(text.durationInFrames, theme);
@@ -124,27 +147,31 @@ function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
   const h = theme.hook;
   const words = text.text.split(/\s+/).filter(Boolean);
 
-  const style: CSSProperties = {
+  const box: CSSProperties = {
     position: "absolute",
-    top: props.height * 0.12,
-    left: SAFE.left * k,
-    right: SAFE.right * k,
-    textAlign: "center",
+    top: props.height * (text.y ?? 0.12),
+    height: props.height * 0.26 * (text.scale ?? 1),
+    ...sides(text, props, k),
+    opacity: exit.opacity,
+    transform: `translateY(${exit.translate * k}px)`,
+  };
+  const style: CSSProperties = {
+    display: "block",
     fontFamily: `"${h.family === "display" ? props.brand.displayFont : props.brand.bodyFont}", serif`,
     fontWeight: h.weight,
     fontStyle: h.italic ? "italic" : "normal",
-    fontSize: h.size * k,
+    fontSize: h.size * k * (text.scale ?? 1),
     lineHeight: h.lineHeight,
     letterSpacing: h.letterSpacing * k,
     textTransform: h.uppercase ? "uppercase" : "none",
     color: "#fff",
     textShadow: "0 4px 28px rgba(0,0,0,0.35)",
-    opacity: exit.opacity,
-    transform: `translateY(${exit.translate * k}px)`,
+    ...backdrop(text, k),
   };
 
+  // A long hook shrinks to its box (top of the frame, inside the side margins).
   return (
-    <div style={style}>
+    <Fit style={box} innerStyle={style} marker={String(index)}>
       {words.map((word, i) => {
         const p = spring({ frame: frame - i * h.stagger, fps, config: theme.spring });
         const enter: CSSProperties =
@@ -161,11 +188,11 @@ function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
           </span>
         );
       })}
-    </div>
+    </Fit>
   );
 }
 
-function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; props: ReelProps; theme: Theme; k: number }) {
+function Band({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const exit = useExit(text.durationInFrames, theme);
@@ -178,9 +205,8 @@ function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
     <div
       style={{
         position: "absolute",
-        top: props.height * 0.37,
-        left: SAFE.left * k,
-        right: SAFE.right * k,
+        top: props.height * (text.y ?? 0.37),
+        ...sides(text, props, k),
         display: "flex",
         justifyContent: "center",
         opacity: exit.opacity,
@@ -188,6 +214,7 @@ function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
       }}
     >
       <div
+        data-fauve-text={index}
         style={{
           clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0 round ${b.radius * k}px)`,
           background: b.outline ? "rgba(0,0,0,0.18)" : props.brand.accent,
@@ -197,7 +224,7 @@ function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
           color: b.outline ? "#fff" : props.brand.accentInk,
           fontFamily: `"${props.brand.bodyFont}", sans-serif`,
           fontWeight: b.weight,
-          fontSize: b.size * k,
+          fontSize: b.size * k * (text.scale ?? 1),
           letterSpacing: b.letterSpacing * k,
           textTransform: b.uppercase ? "uppercase" : "none",
           textAlign: "center",
@@ -218,25 +245,26 @@ function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
   );
 }
 
-function Caption({ text, props, theme, k }: { text: ReelProps["texts"][number]; props: ReelProps; theme: Theme; k: number }) {
+function Caption({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const exit = useExit(text.durationInFrames, theme);
   const p = spring({ frame, fps, config: { damping: 200, stiffness: 100 } });
   return (
     <div
+      data-fauve-text={index}
       style={{
         position: "absolute",
-        top: props.height * 0.63,
-        left: SAFE.left * k,
-        right: SAFE.right * k,
+        top: props.height * (text.y ?? 0.63),
+        ...sides(text, props, k),
         textAlign: "center",
         color: "#fff",
         fontFamily: `"${props.brand.bodyFont}", sans-serif`,
         fontWeight: theme.caption.weight,
-        fontSize: theme.caption.size * k,
+        fontSize: theme.caption.size * k * (text.scale ?? 1),
         lineHeight: 1.25,
         textShadow: "0 2px 18px rgba(0,0,0,0.45)",
+        ...backdrop(text, k),
         opacity: Math.min(p, exit.opacity),
         transform: `translateY(${(1 - p) * 18 * k + exit.translate * k}px)`,
       }}
@@ -305,35 +333,36 @@ function EndCard({ props, k }: { props: ReelProps; k: number }) {
       style={{
         backgroundColor: `rgba(20,14,32,${0.55 * shade})`,
         backdropFilter: `blur(${10 * shade}px)`,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: `0 ${SAFE.right * k}px 0 ${SAFE.left * k}px`,
-        textAlign: "center",
         color: "#fff",
       }}
     >
-      <div style={{ opacity: p, transform: `translateY(${(1 - p) * 24 * k}px)`, marginTop: -props.height * 0.08 }}>
-        {props.brand.logoUrl ? (
-          <Img src={props.brand.logoUrl} style={{ maxWidth: 520 * k, maxHeight: 220 * k, objectFit: "contain", marginBottom: 28 * k }} />
-        ) : null}
-        <div style={{ fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontSize: 96 * k, lineHeight: 1.05 }}>
-          {card.title}
-        </div>
-        {card.subtitle ? (
-          <div
-            style={{
-              marginTop: 22 * k,
-              fontFamily: `"${props.brand.bodyFont}", sans-serif`,
-              fontWeight: 600,
-              fontSize: 38 * k,
-              opacity: 0.92,
-            }}
-          >
-            {card.subtitle}
+      {/* A long studio name shrinks instead of leaving the frame. */}
+      <Fit style={{ position: "absolute", top: props.height * 0.12, bottom: props.height * 0.2, left: SAFE.left * k, right: SAFE.right * k }}>
+        {(fit) => (
+          <div style={{ opacity: p, transform: `translateY(${(1 - p) * 24 * k}px)` }}>
+            {props.brand.logoUrl ? (
+              <Img src={props.brand.logoUrl} style={{ maxWidth: 520 * k, maxHeight: 220 * k, objectFit: "contain", marginBottom: 28 * k }} />
+            ) : null}
+            <div style={{ fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontSize: 96 * k, lineHeight: 1.05 }}>
+              {card.title}
+            </div>
+            {card.subtitle ? (
+              <div
+                style={{
+                  marginTop: 22 * k,
+                  fontFamily: `"${props.brand.bodyFont}", sans-serif`,
+                  fontWeight: 600,
+                  fontSize: Math.max(38, 28 / fit) * k, // stays readable when a long name shrinks
+                  opacity: 0.92,
+                }}
+              >
+                {card.subtitle}
+              </div>
+            ) : null}
+            <div style={{ margin: `${30 * k}px auto 0`, width: 64 * k, height: 4 * k, borderRadius: 4 * k, background: props.brand.accent }} />
           </div>
-        ) : null}
-        <div style={{ margin: `${30 * k}px auto 0`, width: 64 * k, height: 4 * k, borderRadius: 4 * k, background: props.brand.accent }} />
-      </div>
+        )}
+      </Fit>
     </AbsoluteFill>
   );
 }
