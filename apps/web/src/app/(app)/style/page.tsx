@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { sanitizeProfile, toStyleForm } from "./style-profile";
+import type { SceneTemplate } from "./scenes-section";
 import { StyleEditor } from "./style-editor";
 import type { Logo, MoodboardView } from "./style-options";
 
@@ -62,8 +63,24 @@ async function StyleLoader() {
     palette: profile.moodboard?.palette ?? [],
   };
 
+  const { data: sceneRows } = await db
+    .from("motion_templates")
+    .select("id, name, description, uses")
+    .eq("studio_id", studioId)
+    .is("archived_at", null)
+    .order("uses", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(50);
+  const scenes: SceneTemplate[] = (sceneRows ?? []).map((s) => ({
+    id: s.id as string,
+    name: s.name as string,
+    description: s.description as string,
+    uses: s.uses as number,
+  }));
+
   return (
     <StyleEditor
+      scenes={scenes}
       moodboard={moodboard}
       studioId={studioId}
       studioName={member.studio.name ?? "Ton studio"}

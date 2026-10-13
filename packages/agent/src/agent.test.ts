@@ -261,6 +261,29 @@ test("editor: free motion scenes past the cap play their fixed fallback", async 
   assert.equal(segmentSeconds(plan.segments[2]!), 6); // fixed scenes last 6 s at most
 });
 
+test("editor: library scenes keep their id and get their texts as a record", async () => {
+  const { fromEditorPlan, normalizeEditPlan } = await import("./editor.ts");
+  const fallback = { kind: "title" as const, title: "Atelier", background: "accent" as const };
+  const id = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b";
+  const plan = fromEditorPlan({
+    ...editPlanObjectSchema.parse({ ...validPlan, segments: [{ clip_id: "a", in: 0, out: 2, zoom: "none" }], texts: [] }),
+    template: "doux",
+    segments: [
+      { motion: { brief: "Titre qui se dessine", fallback, template_id: id, template_texts: [{ slot: "title", text: "Atelier respiration" }, { slot: "Bad Slot", text: "x" }] }, duration: 3 },
+      { motion: { brief: "Nouvelle scène", fallback }, duration: 3 },
+      { motion: { brief: "Nouvelle scène 2", fallback }, duration: 3 },
+      { motion: { brief: "Nouvelle scène 3", fallback }, duration: 3 },
+    ],
+  });
+  const first = plan.segments[0]!;
+  assert.ok("motion" in first);
+  assert.equal(first.motion.template_id, id);
+  assert.deepEqual(first.motion.texts, { title: "Atelier respiration" }); // invalid slot names are dropped
+  // Reused scenes do not count toward the cap: the two new ones stay free scenes, the third falls back.
+  const kinds = normalizeEditPlan(plan, {}).segments.map((s) => ("motion" in s ? "motion" : "scene"));
+  assert.deepEqual(kinds, ["motion", "motion", "motion", "scene"]);
+});
+
 test("motion scenes: generated code is checked before it runs", async () => {
   const { checkMotionCode } = await import("./motion-scene.ts");
   const good = `function Scene({ width, brand }) {

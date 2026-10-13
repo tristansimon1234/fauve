@@ -8,6 +8,7 @@ import { ColorsSection } from "./colors-section";
 import { FontsSection } from "./fonts-section";
 import { LogoSection } from "./logo-section";
 import { MoodboardSection } from "./moodboard-section";
+import { ScenesSection, type SceneTemplate } from "./scenes-section";
 import { MAX_COLORS, TEMPLATE_FONTS, fontStylesheet, type Logo, type MoodboardView, type StyleForm } from "./style-options";
 import { ToneSection } from "./tone-section";
 import { useStylesheets } from "./use-stylesheet";
@@ -29,6 +30,7 @@ export function StyleEditor({
   version: initialVersion,
   logo: initialLogo,
   moodboard,
+  scenes,
 }: {
   studioId: string;
   studioName: string;
@@ -36,6 +38,7 @@ export function StyleEditor({
   version: number | null;
   logo: Logo;
   moodboard: MoodboardView;
+  scenes: SceneTemplate[];
 }) {
   const [form, setForm] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -109,6 +112,7 @@ export function StyleEditor({
       />
       <ColorsSection value={form.colors} onChange={(colors) => update({ colors })} />
       <FontsSection display={form.display_font} body={form.body_font} templateFonts={TEMPLATE_FONTS[template]} onChange={update} />
+      <ScenesSection initial={scenes} />
       <ToneSection value={form} onChange={update} />
 
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[18px] border border-line bg-white/95 px-4 py-3 shadow-[0_8px_30px_rgba(28,21,48,0.08)] backdrop-blur lg:bottom-4">

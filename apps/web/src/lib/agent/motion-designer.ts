@@ -1,6 +1,6 @@
 import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { CLAUDE_MODEL, checkMotionCode, MOTION_DESIGNER_PROMPT, motionSceneOutputSchema, type ReelProps } from "@fauve/agent";
+import { CLAUDE_MODEL, checkMotionCode, MOTION_DESIGNER_PROMPT, motionSceneOutputSchema, type MotionSlot, type ReelProps } from "@fauve/agent";
 import { transform } from "sucrase";
 import { smokeTestScenes } from "@/lib/render/sandbox";
 import { anthropic, logClaudeCost } from "./run";
@@ -11,7 +11,15 @@ import { anthropic, logClaudeCost } from "./run";
 // still fails the renderer uses the scene's fixed fallback.
 
 export type SceneRequest = { id: string; brief: string; durationInFrames: number; previousCode?: string };
-export type SceneResult = { id: string; code: string | null; js: string | null; error: string | null };
+export type SceneResult = {
+  id: string;
+  code: string | null;
+  js: string | null;
+  error: string | null;
+  /** For the template library: a short name and the scene's text slots. */
+  name?: string;
+  slots?: MotionSlot[];
+};
 
 type Brand = Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl">;
 
@@ -49,12 +57,13 @@ async function writeScene(
   });
   await logClaudeCost(studioId, response.usage, "motion_designer");
   const code = response.parsed_output?.code ?? "";
+  const meta = { name: response.parsed_output?.name ?? "", slots: response.parsed_output?.slots ?? [] };
   const problems = checkMotionCode(code);
-  if (problems.length) return { code, js: null, error: `code refusé : ${problems.join(", ")}` };
+  if (problems.length) return { code, js: null, error: `code refusé : ${problems.join(", ")}`, ...meta };
   try {
-    return { code, js: transpile(code), error: null };
+    return { code, js: transpile(code), error: null, ...meta };
   } catch (error) {
-    return { code, js: null, error: `syntaxe : ${error instanceof Error ? error.message : String(error)}` };
+    return { code, js: null, error: `syntaxe : ${error instanceof Error ? error.message : String(error)}`, ...meta };
   }
 }
 
