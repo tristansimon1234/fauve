@@ -118,6 +118,75 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         }
       : null;
 
+  // The publication itself: caption, platforms, date, Fauve's note.
+  const details = (
+    <>
+      <div className="flex flex-col gap-2">
+        <PostEditor
+          postId={post.id}
+          caption={post.caption ?? ""}
+          canEdit={canEdit}
+          canValidate={post.status === "draft"}
+        />
+        {post.hashtags.length > 0 && (
+          <span className="flex flex-wrap gap-1.5">
+            {post.hashtags.map((h) => (
+              <span key={h} className="rounded-full bg-soft px-2.5 py-1.5 text-[13px] font-semibold">
+                #{h.replace(/^#/, "")}
+              </span>
+            ))}
+          </span>
+        )}
+      </div>
+
+      {(post.status === "draft" || post.status === "validated") && (
+        <p className="rounded-2xl bg-violet-tint px-4 py-3.5 text-sm leading-normal">
+          {post.status === "validated" ? <strong>Validée. </strong> : null}
+          Une fois validée, Fauve la publie sur Instagram à l’horaire prévu, si ton compte est connecté. TikTok
+          arrive bientôt.
+        </p>
+      )}
+
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <span className="text-[13px] font-bold">Publier sur</span>
+          <div className="flex flex-wrap gap-2">
+            {post.platforms.length ? (
+              post.platforms.map((p) => (
+                <span
+                  key={p}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border-[1.5px] border-violet bg-violet-soft px-3.5 text-sm font-bold text-violet"
+                >
+                  {p === "tiktok" ? <TikTokIcon size={16} /> : <InstagramIcon size={16} />}
+                  {platformLabels[p]}
+                </span>
+              ))
+            ) : (
+              <span className="text-sm text-muted">Aucune plateforme choisie</span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-[13px] font-bold">Quand</span>
+          <span className="inline-flex h-10 items-center gap-2 text-sm">
+            <ClockIcon size={16} className="text-violet" />
+            {post.scheduled_at ? formatDateTime(post.scheduled_at, tz) : "Date à définir avec Fauve"}
+          </span>
+        </div>
+      </div>
+
+      {plan && !editor && <PlanSection plan={plan.view} clipLabels={clipLabels} />}
+
+      {post.agent_note && (
+        <div className="flex items-start gap-3 rounded-[18px] bg-soft p-4">
+          <Orb size={28} className="shrink-0" />
+          <p className="text-sm leading-normal">{post.agent_note}</p>
+        </div>
+      )}
+    
+    </>
+  );
+
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -143,7 +212,23 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         </div>
       </div>
 
-      <div className="flex flex-wrap items-start gap-8">
+      {editor ? (
+        // A video editor: the publication on the left, the montage in the middle, the selected scene on the right.
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(250px,290px)_minmax(0,1fr)_minmax(300px,350px)]">
+          <div className="order-3 flex min-w-0 flex-col gap-5 xl:order-none">
+            {details}
+          </div>
+          <MontageEditor
+            postId={post.id}
+            postTitle={post.title}
+            initialPlan={editor.plan}
+            inputs={editor.inputs}
+            clipDurations={editor.clipDurations}
+            clipLabels={Object.fromEntries(clipLabels)}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-start gap-8">
         <div className="flex min-w-0 flex-[0_1_340px] flex-col items-center gap-3.5">
           {!videoUrl && media.length > 0 ? (
             <MediaPreview media={media} kind={post.kind} />
@@ -166,71 +251,11 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           )}
         </div>
 
-        <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-5.5">
-          <div className="flex flex-col gap-2">
-            <PostEditor
-              postId={post.id}
-              caption={post.caption ?? ""}
-              canEdit={canEdit}
-              canValidate={post.status === "draft"}
-            />
-            {post.hashtags.length > 0 && (
-              <span className="flex flex-wrap gap-1.5">
-                {post.hashtags.map((h) => (
-                  <span key={h} className="rounded-full bg-soft px-2.5 py-1.5 text-[13px] font-semibold">
-                    #{h.replace(/^#/, "")}
-                  </span>
-                ))}
-              </span>
-            )}
+          <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-5.5">
+            {details}
           </div>
-
-          {(post.status === "draft" || post.status === "validated") && (
-            <p className="rounded-2xl bg-violet-tint px-4 py-3.5 text-sm leading-normal">
-              {post.status === "validated" ? <strong>Validée. </strong> : null}
-              Une fois validée, Fauve la publie sur Instagram à l’horaire prévu, si ton compte est connecté. TikTok
-              arrive bientôt.
-            </p>
-          )}
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <span className="text-[13px] font-bold">Publier sur</span>
-              <div className="flex flex-wrap gap-2">
-                {post.platforms.length ? (
-                  post.platforms.map((p) => (
-                    <span
-                      key={p}
-                      className="inline-flex h-10 items-center gap-2 rounded-xl border-[1.5px] border-violet bg-violet-soft px-3.5 text-sm font-bold text-violet"
-                    >
-                      {p === "tiktok" ? <TikTokIcon size={16} /> : <InstagramIcon size={16} />}
-                      {platformLabels[p]}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-sm text-muted">Aucune plateforme choisie</span>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <span className="text-[13px] font-bold">Quand</span>
-              <span className="inline-flex h-10 items-center gap-2 text-sm">
-                <ClockIcon size={16} className="text-violet" />
-                {post.scheduled_at ? formatDateTime(post.scheduled_at, tz) : "Date à définir avec Fauve"}
-              </span>
-            </div>
-          </div>
-
-          {plan && !editor && <PlanSection plan={plan.view} clipLabels={clipLabels} />}
-
-          {post.agent_note && (
-            <div className="flex items-start gap-3 rounded-[18px] bg-soft p-4">
-              <Orb size={28} className="shrink-0" />
-              <p className="text-sm leading-normal">{post.agent_note}</p>
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
       {slides && (
         <section aria-labelledby="slides-editor" className="flex flex-col gap-4 border-t border-line pt-8">
@@ -246,24 +271,6 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         </section>
       )}
 
-      {editor && (
-        <section aria-labelledby="montage-editor" className="flex flex-col gap-4 border-t border-line pt-8">
-          <div className="flex flex-col gap-1">
-            <h2 id="montage-editor" className="text-[24px] font-extrabold tracking-[-0.02em]">
-              Modifier le montage
-            </h2>
-            <p className="text-[15px] text-muted">Change les textes, l’ordre et la durée des scènes, coupe tes vidéos. Gratuit.</p>
-          </div>
-          <MontageEditor
-            postId={post.id}
-            postTitle={post.title}
-            initialPlan={editor.plan}
-            inputs={editor.inputs}
-            clipDurations={editor.clipDurations}
-            clipLabels={Object.fromEntries(clipLabels)}
-          />
-        </section>
-      )}
     </>
   );
 }

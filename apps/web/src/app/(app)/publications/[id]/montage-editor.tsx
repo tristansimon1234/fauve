@@ -13,8 +13,8 @@ import {
   type Segment,
 } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
-import { useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FilmIcon, PenIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FilmIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { DEFAULT_Y, places, TextBoxes, Y_MAX, Y_MIN } from "@/components/montage/text-boxes";
 import { AskFauveButton } from "@/components/fauve-drawer";
 import { ReelPlayer } from "@/components/reel-player";
@@ -109,111 +109,132 @@ export function MontageEditor({
       } else setMessage({ ok: false, text: res.error });
     });
 
+  const remove = (i: number) => {
+    edit(removeSegment(plan, i));
+    setSelected(Math.max(0, i - 1));
+  };
+  const move = (from: number, to: number) => {
+    edit(moveSegment(plan, from, to));
+    setSelected(to);
+  };
+
+  // Two grid items: the stage (preview and timeline) and the inspector (the selected scene).
   return (
-    <div className="flex flex-wrap items-start gap-8">
-      <div className="flex w-full max-w-[320px] flex-col gap-3 md:sticky md:top-6">
-        <div ref={previewRef} className="relative overflow-hidden rounded-[22px] shadow-[0_18px_40px_rgba(28,21,48,.18)]">
-          <ReelPlayer props={props} playerRef={playerRef} />
-          <TextBoxes
-            container={previewRef}
-            player={playerRef}
-            texts={plan.texts}
-            active={activeText}
-            onMove={(i, place) => setText(i, place)}
-            onPick={(i) => {
-              setActiveText(i);
-              document.getElementById(`fauve-text-${i}`)?.focus();
-            }}
-          />
+    <>
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex justify-center rounded-[24px] bg-[radial-gradient(ellipse_at_top,#2a2145_0%,#16112a_70%)] px-6 py-7">
+          <div ref={previewRef} className="relative overflow-hidden rounded-[18px] shadow-[0_24px_60px_rgba(0,0,0,.45)]" style={{ width: "min(100%, 340px)" }}>
+            <ReelPlayer props={props} playerRef={playerRef} />
+            <TextBoxes
+              container={previewRef}
+              player={playerRef}
+              texts={plan.texts}
+              active={activeText}
+              onMove={(i, place) => setText(i, place)}
+              onPick={(i) => {
+                setActiveText(i);
+                const at = plan.texts[i];
+                if (at) setSelected(segmentAtIndex(spans, at.from));
+                requestAnimationFrame(() => document.getElementById(`fauve-text-${i}`)?.focus());
+              }}
+            />
+          </div>
         </div>
-        <p className="text-center text-[13px] text-muted">L’aperçu change en direct. Rien n’est rendu tant que tu n’enregistres pas.</p>
+
+        <Timeline
+          plan={plan}
+          spans={spans}
+          selected={index}
+          activeText={activeText}
+          fps={props.fps}
+          player={playerRef}
+          labels={plan.segments.map((s) => sceneLabel(s, clipLabels))}
+          onSelect={select}
+          onMove={move}
+          onPickText={(i) => {
+            setActiveText(i);
+            const at = plan.texts[i]!;
+            setSelected(segmentAtIndex(spans, at.from));
+            seek(at.from + 0.05);
+          }}
+        />
+
+        <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-line bg-white p-3">
+          <button type="button" onClick={save} disabled={!dirty || !valid || saving} className="btn btn-primary h-11 disabled:opacity-50">
+            <CheckIcon size={18} />
+            {saving ? "Enregistrement…" : "Enregistrer"}
+          </button>
+          <button
+            type="button"
+            onClick={() => edit(saved)}
+            disabled={!dirty || saving}
+            className="h-11 rounded-full px-4 text-[14px] font-semibold text-muted hover:bg-soft disabled:opacity-40"
+          >
+            Annuler mes modifications
+          </button>
+          {!valid && <span className="text-[13px] font-semibold text-danger">Un texte est vide ou une durée est hors limites.</span>}
+          {message && (
+            <span role="status" className={`text-[13px] font-semibold ${message.ok ? "text-success" : "text-danger"}`}>
+              {message.text}
+            </span>
+          )}
+          <span className="ml-auto flex items-center gap-1.5 text-[12px] text-muted">
+            <FilmIcon size={14} />
+            {dirty ? "Pas encore enregistré · gratuit" : "Aperçu en direct · gratuit"}
+          </span>
+        </div>
       </div>
 
-      <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-5">
-        <section aria-label="Scènes" className="flex flex-col gap-2">
-          <h2 className="text-[17px] font-bold">Scènes</h2>
-          <ol className="flex flex-col gap-1.5">
-            {plan.segments.map((s, i) => {
-              const kind = segmentKind(s);
-              return (
-                <li key={i}>
-                  <div
-                    className={`flex items-center gap-2 rounded-[14px] border px-3 py-2 ${
-                      i === index ? "border-violet bg-violet-soft" : "border-line bg-white hover:border-lilac"
-                    }`}
-                  >
-                    <button type="button" onClick={() => select(i)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                      <span className="w-5 shrink-0 text-center text-[12px] font-bold text-muted">{i + 1}</span>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                          kind === "motion" ? "bg-violet text-white" : kind === "scene" ? "bg-chip text-muted" : "bg-peach text-peach-ink"
-                        }`}
-                      >
-                        {kindLabels[kind]}
-                      </span>
-                      <span className="truncate text-[14px]">{sceneLabel(s, clipLabels)}</span>
-                      <span className="ml-auto shrink-0 text-[12px] text-muted">{round(spans[i]!.end - spans[i]!.start)} s</span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Monter"
-                      disabled={i === 0}
-                      onClick={() => {
-                        edit(moveSegment(plan, i, i - 1));
-                        setSelected(i - 1);
-                      }}
-                      className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-white disabled:opacity-30"
-                    >
-                      <ArrowUpIcon size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Descendre"
-                      disabled={i === plan.segments.length - 1}
-                      onClick={() => {
-                        edit(moveSegment(plan, i, i + 1));
-                        setSelected(i + 1);
-                      }}
-                      className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-white disabled:opacity-30"
-                    >
-                      <ArrowDownIcon size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Supprimer la scène"
-                      disabled={plan.segments.length <= 1}
-                      onClick={() => {
-                        edit(removeSegment(plan, i));
-                        setSelected(Math.max(0, i - 1));
-                      }}
-                      className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-white hover:text-danger disabled:opacity-30"
-                    >
-                      <TrashIcon size={16} />
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-
-        <section aria-label="Scène sélectionnée" className="flex flex-col gap-4 rounded-[20px] border border-line bg-white p-5">
+      <aside aria-label="Scène sélectionnée" className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-6">
+        <section className="flex flex-col gap-4 rounded-[20px] border border-line bg-white p-5">
           <div className="flex items-center gap-2">
-            <PenIcon size={18} className="text-violet" />
-            <h2 className="text-[16px] font-bold">
-              Scène {index + 1} · {kindLabels[segmentKind(segment)]}
-            </h2>
-            {/* Fauve reads the saved montage: ask about a scene once the changes are saved. */}
-            {!dirty && (
-              <AskFauveButton
-                topic={{ postId, title: postTitle, scene: index, sceneLabel: `Scène ${index + 1} · ${kindLabels[segmentKind(segment)]}` }}
-                label="Demander à Fauve"
-                className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-violet-soft px-3 py-1.5 text-[13px] font-bold text-violet hover:bg-violet hover:text-white"
-              />
-            )}
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${kindChip(segmentKind(segment))}`}
+            >
+              {kindLabels[segmentKind(segment)]}
+            </span>
+            <h2 className="min-w-0 flex-1 truncate text-[16px] font-bold">Scène {index + 1}</h2>
+            <button
+              type="button"
+              aria-label="Avancer la scène"
+              title="Plus tôt"
+              disabled={index === 0}
+              onClick={() => move(index, index - 1)}
+              className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-soft disabled:opacity-30"
+            >
+              <ArrowUpIcon size={16} className="-rotate-90" />
+            </button>
+            <button
+              type="button"
+              aria-label="Reculer la scène"
+              title="Plus tard"
+              disabled={index === plan.segments.length - 1}
+              onClick={() => move(index, index + 1)}
+              className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-soft disabled:opacity-30"
+            >
+              <ArrowDownIcon size={16} className="-rotate-90" />
+            </button>
+            <button
+              type="button"
+              aria-label="Supprimer la scène"
+              title="Supprimer la scène"
+              disabled={plan.segments.length <= 1}
+              onClick={() => remove(index)}
+              className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-soft hover:text-danger disabled:opacity-30"
+            >
+              <TrashIcon size={16} />
+            </button>
           </div>
+          <p className="-mt-2 truncate text-[13px] text-muted">{sceneLabel(segment, clipLabels)}</p>
+          {/* Fauve reads the saved montage: ask about a scene once the changes are saved. */}
+          {!dirty && (
+            <AskFauveButton
+              topic={{ postId, title: postTitle, scene: index, sceneLabel: `Scène ${index + 1} · ${kindLabels[segmentKind(segment)]}` }}
+              label={segmentKind(segment) === "motion" ? "Demander à Fauve de refaire l’animation" : "Demander à Fauve pour cette scène"}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-soft px-3 py-2 text-[13px] font-bold text-violet hover:bg-violet hover:text-white"
+            />
+          )}
           <SegmentFields segment={segment} onChange={setSegment} clipDuration={"clip_id" in segment ? clipDurations[segment.clip_id] : null} />
-
           <div className="flex flex-col gap-3 border-t border-line pt-4">
             <div className="flex items-center justify-between">
               <h3 className="text-[14px] font-bold">Textes sur cette scène</h3>
@@ -316,12 +337,6 @@ export function MontageEditor({
               </div>
             ))}
           </div>
-
-          {segmentKind(segment) === "motion" && (
-            <p className="rounded-[14px] bg-violet-soft p-3 text-[13px] leading-snug text-violet">
-              Pour changer l’animation elle-même (mouvement, couleurs), demande-le à Fauve : elle la refait sur devis.
-            </p>
-          )}
         </section>
 
         {plan.end_card && (
@@ -336,38 +351,8 @@ export function MontageEditor({
             />
           </section>
         )}
-
-        <div className="sticky bottom-3 flex flex-wrap items-center gap-3 rounded-[20px] border border-line bg-white/95 p-3 shadow-[0_8px_30px_rgba(28,21,48,0.1)] backdrop-blur">
-          <button
-            type="button"
-            onClick={save}
-            disabled={!dirty || !valid || saving}
-            className="btn btn-primary h-11 disabled:opacity-50"
-          >
-            <CheckIcon size={18} />
-            {saving ? "Enregistrement…" : "Enregistrer"}
-          </button>
-          <button
-            type="button"
-            onClick={() => edit(saved)}
-            disabled={!dirty || saving}
-            className="h-11 rounded-full px-4 text-[14px] font-semibold text-muted hover:bg-soft disabled:opacity-40"
-          >
-            Annuler mes modifications
-          </button>
-          {!valid && <span className="text-[13px] font-semibold text-danger">Un texte est vide ou une durée est hors limites.</span>}
-          {message && (
-            <span role="status" className={`text-[13px] font-semibold ${message.ok ? "text-success" : "text-danger"}`}>
-              {message.text}
-            </span>
-          )}
-          <span className="ml-auto flex items-center gap-1.5 text-[12px] text-muted">
-            <FilmIcon size={14} />
-            Modifications gratuites
-          </span>
-        </div>
-      </div>
-    </div>
+      </aside>
+    </>
   );
 }
 
@@ -514,5 +499,164 @@ function Duration({ value, max, onChange }: { value: number; max: number; onChan
       <span>Durée : {round(value)} s</span>
       <input type="range" min={1} max={max} step={0.1} value={value} onChange={(e) => onChange(round(Number(e.target.value)))} className="accent-violet" />
     </label>
+  );
+}
+
+function kindChip(kind: ReturnType<typeof segmentKind>) {
+  return kind === "motion" ? "bg-violet text-white" : kind === "scene" ? "bg-chip text-muted" : "bg-peach text-peach-ink";
+}
+
+/** The scene a moment falls in (the last one for the very end). */
+function segmentAtIndex(spans: { start: number; end: number }[], seconds: number): number {
+  const i = spans.findIndex((s) => seconds >= s.start && seconds < s.end);
+  return i === -1 ? Math.max(0, spans.length - 1) : i;
+}
+
+const blockColors = { clip: "bg-[#fde3d9] text-peach-ink", scene: "bg-[#ece6ef] text-ink", motion: "bg-[#e4dcff] text-violet" } as const;
+
+/**
+ * The montage over time, like a video editor: one block per scene (its width
+ * is its length; drag a block to reorder), the texts on a track below, and the
+ * playhead. Click anywhere on the tracks to jump there.
+ */
+function Timeline({
+  plan,
+  spans,
+  selected,
+  activeText,
+  fps,
+  player,
+  labels,
+  onSelect,
+  onMove,
+  onPickText,
+}: {
+  plan: EditPlan;
+  spans: { start: number; end: number }[];
+  selected: number;
+  activeText: number | null;
+  fps: number;
+  player: React.RefObject<PlayerRef | null>;
+  labels: string[];
+  onSelect: (i: number) => void;
+  onMove: (from: number, to: number) => void;
+  onPickText: (i: number) => void;
+}) {
+  const total = Math.max(0.1, spans.at(-1)?.end ?? plan.duration);
+  const [time, setTime] = useState(0);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dropAt, setDropAt] = useState<number | null>(null);
+  const tracks = useRef<HTMLDivElement>(null);
+
+  // The playhead follows the player.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const frame = player.current?.getCurrentFrame();
+      if (frame !== undefined) setTime(frame / fps);
+    }, 80);
+    return () => clearInterval(timer);
+  }, [player, fps]);
+
+  const seekTo = (clientX: number) => {
+    const rect = tracks.current?.getBoundingClientRect();
+    if (!rect) return;
+    const at = Math.min(total, Math.max(0, ((clientX - rect.left) / rect.width) * total));
+    player.current?.pause();
+    player.current?.seekTo(Math.round(at * fps));
+  };
+  const pct = (seconds: number) => `${(Math.min(total, Math.max(0, seconds)) / total) * 100}%`;
+
+  return (
+    <section aria-label="Timeline" className="flex flex-col gap-2 rounded-[18px] border border-line bg-white p-3">
+      <div className="flex items-center justify-between px-1 text-[12px] font-semibold text-muted">
+        <span>
+          {plan.segments.length} scènes · {round(total)} s
+        </span>
+        <span>Glisse une scène pour changer l’ordre</span>
+      </div>
+      <div ref={tracks} className="relative flex flex-col gap-1.5" onDoubleClick={(e) => seekTo(e.clientX)}>
+        <div className="flex h-[68px] gap-1">
+          {plan.segments.map((s, i) => {
+            const kind = segmentKind(s);
+            const length = spans[i]!.end - spans[i]!.start;
+            return (
+              <button
+                key={i}
+                type="button"
+                draggable
+                onDragStart={(e) => {
+                  setDragFrom(i);
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", String(i));
+                }}
+                onDragOver={(e) => {
+                  if (dragFrom === null) return;
+                  e.preventDefault();
+                  setDropAt(i);
+                }}
+                onDragEnd={() => {
+                  setDragFrom(null);
+                  setDropAt(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragFrom !== null && dragFrom !== i) onMove(dragFrom, i);
+                  setDragFrom(null);
+                  setDropAt(null);
+                }}
+                onClick={() => onSelect(i)}
+                title={labels[i]}
+                style={{ flexGrow: Math.max(0.4, length), flexBasis: 0 }}
+                className={`relative flex min-w-[38px] cursor-grab flex-col justify-between overflow-hidden rounded-[10px] px-2 py-1.5 text-left active:cursor-grabbing ${blockColors[kind]} ${
+                  i === selected ? "ring-2 ring-violet ring-offset-1" : "opacity-90 hover:opacity-100"
+                } ${dropAt === i && dragFrom !== i ? "outline-2 outline-dashed outline-violet" : ""} ${dragFrom === i ? "opacity-40" : ""}`}
+              >
+                <span className="flex items-center gap-1 text-[11px] font-bold">
+                  {i + 1}
+                  <span className="truncate font-semibold opacity-80">{kindLabels[kind]}</span>
+                </span>
+                <span className="truncate text-[11px] leading-tight opacity-80">{labels[i]}</span>
+                <span className="text-[10px] font-semibold opacity-60">{round(length)} s</span>
+              </button>
+            );
+          })}
+        </div>
+        {/* Texts over the montage, at their time. */}
+        <div className="relative h-7 rounded-[8px] bg-soft" onClick={(e) => e.target === e.currentTarget && seekTo(e.clientX)}>
+          {plan.texts.map((t, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onPickText(i)}
+              title={t.text}
+              style={{ left: pct(t.from), width: `calc(${pct(t.to)} - ${pct(t.from)})` }}
+              className={`absolute top-1 bottom-1 truncate rounded-[6px] px-1.5 text-left text-[11px] font-semibold ${
+                activeText === i ? "bg-violet text-white" : "bg-white text-ink ring-1 ring-line hover:ring-lilac"
+              }`}
+            >
+              {t.text}
+            </button>
+          ))}
+          {plan.texts.length === 0 && <span className="absolute inset-0 flex items-center px-2 text-[11px] text-muted">Pas de texte</span>}
+        </div>
+        {/* The playhead. */}
+        <div className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 rounded bg-coral" style={{ left: pct(time) }}>
+          <span className="absolute -top-1.5 left-1/2 size-2.5 -translate-x-1/2 rounded-full bg-coral" />
+        </div>
+      </div>
+      <input
+        type="range"
+        aria-label="Position dans la vidéo"
+        min={0}
+        max={total}
+        step={0.05}
+        value={Math.min(total, time)}
+        onChange={(e) => {
+          player.current?.pause();
+          player.current?.seekTo(Math.round(Number(e.target.value) * fps));
+        }}
+        className="accent-coral"
+      />
+    </section>
   );
 }
