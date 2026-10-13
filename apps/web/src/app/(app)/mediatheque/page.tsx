@@ -8,6 +8,7 @@ import { formatDuration, formatShortDateTime } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
 import { deleteMedia } from "./actions";
+import { SettingsTabs } from "@/components/settings-tabs";
 
 export const metadata: Metadata = { title: "Médiathèque" };
 
@@ -41,6 +42,7 @@ const sourceLabels: Record<Asset["source"], string> = {
 export default function LibraryPage() {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
+      <SettingsTabs current="/mediatheque" />
       <Suspense fallback={<PageLoading title="Médiathèque" />}>
         <Library />
       </Suspense>

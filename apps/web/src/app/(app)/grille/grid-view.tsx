@@ -17,7 +17,10 @@ export function GridView({
   info,
   tiles,
   timezone: tz,
+  heading = true,
 }: {
+  /** The page title and intro (false inside the calendar). */
+  heading?: boolean;
   connected: boolean;
   handle: string | null;
   info: InstagramProfile | null;
@@ -26,13 +29,19 @@ export function GridView({
 }) {
   return (
     <>
-      <div className="flex flex-col items-center gap-1.5 text-center">
-        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Grille</h1>
-        <p className="max-w-[620px] text-[15px] text-muted">
-          Ton profil Instagram comme le voient tes abonnés, avec les publications prévues par Fauve à l’endroit où elles
-          vont arriver.
+      {heading ? (
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Grille</h1>
+          <p className="max-w-[620px] text-[15px] text-muted">
+            Ton profil Instagram comme le voient tes abonnés, avec les publications prévues par Fauve à l’endroit où elles
+            vont arriver.
+          </p>
+        </div>
+      ) : (
+        <p className="mx-auto max-w-[520px] text-center text-[14px] text-muted">
+          Ton profil comme le voient tes abonnés, avec les publications prévues à l’endroit où elles vont arriver.
         </p>
-      </div>
+      )}
 
       {!connected && (
         <EmptyState title="Connecte Instagram pour voir ta vraie grille" cta={null} className="mx-auto w-full max-w-[520px]">

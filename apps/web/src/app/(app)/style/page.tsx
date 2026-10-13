@@ -8,6 +8,7 @@ import { InspirationsSection, type Inspiration } from "./inspirations-section";
 import type { SceneTemplate } from "./scenes-section";
 import { StyleEditor } from "./style-editor";
 import type { Logo, MoodboardView } from "./style-options";
+import { SettingsTabs } from "@/components/settings-tabs";
 
 export const metadata: Metadata = { title: "Style" };
 // Reading a moodboard (Fauve looks at every image) can take a minute.
@@ -16,6 +17,7 @@ export const maxDuration = 120;
 export default function StylePage() {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 sm:px-10 sm:pt-9">
+      <SettingsTabs current="/style" />
       <Suspense fallback={<PageLoading title="Style" />}>
         <StyleLoader />
       </Suspense>

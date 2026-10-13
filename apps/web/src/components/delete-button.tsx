@@ -16,6 +16,7 @@ export function DeleteButton({
   confirmText,
   redirectTo,
   compact = false,
+  onDone,
 }: {
   action: () => Promise<DeleteResult>;
   label?: string;
@@ -23,6 +24,8 @@ export function DeleteButton({
   redirectTo?: string;
   /** Icon only (on a card); the confirmation still shows its text. */
   compact?: boolean;
+  /** Called once deleted (e.g. to close a side panel). */
+  onDone?: () => void;
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -38,6 +41,7 @@ export function DeleteButton({
         return;
       }
       setConfirming(false);
+      onDone?.();
       if (redirectTo) router.push(redirectTo);
       else router.refresh();
     });

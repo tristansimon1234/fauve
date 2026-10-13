@@ -11,6 +11,7 @@ import { whatsappLink } from "@/lib/public-env";
 import { getContentPlan, getSocialAccounts, getStudioContext, type SocialAccount } from "@/lib/studio";
 import { signOut } from "../../(onboarding)/connexion/actions";
 import { InstagramLinkCode } from "./instagram-link";
+import { SettingsTabs } from "@/components/settings-tabs";
 
 export const metadata: Metadata = { title: "Réglages" };
 
@@ -36,6 +37,7 @@ const accountStatusLabels: Record<SocialAccount["status"], string> = {
 export default function SettingsPage() {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
+      <SettingsTabs current="/reglages" />
       <Suspense fallback={<PageLoading title="Réglages" />}>
         <Settings />
       </Suspense>
