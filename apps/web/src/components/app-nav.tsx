@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarIcon, ChartIcon, ChatIcon, FolderIcon, ImageIcon, PaletteIcon, SlidersIcon } from "./icons";
+import { CalendarIcon, ChartIcon, ChatIcon, FolderIcon, GridIcon, ImageIcon, PaletteIcon, SlidersIcon } from "./icons";
 
 const nav = [
   { href: "/fauve", label: "Fauve", icon: ChatIcon },
   { href: "/calendrier", label: "Calendrier", icon: CalendarIcon },
   { href: "/publications", label: "Publications", icon: ImageIcon },
+  { href: "/grille", label: "Grille", icon: GridIcon },
   { href: "/mediatheque", label: "Médiathèque", icon: FolderIcon },
   { href: "/resultats", label: "Résultats", icon: ChartIcon },
   { href: "/style", label: "Style", icon: PaletteIcon },
