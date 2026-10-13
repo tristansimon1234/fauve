@@ -92,5 +92,5 @@ export async function ConnectActions({ searchParams }: { searchParams: Promise<R
 }
 
 export function ConnectActionsFallback() {
-  return <div className="mt-auto h-[54px] animate-pulse rounded-full bg-soft" aria-hidden="true" />;
+  return <div className="mt-auto h-[54px] animate-pulse rounded-full bg-soft motion-reduce:animate-none" aria-hidden="true" />;
 }

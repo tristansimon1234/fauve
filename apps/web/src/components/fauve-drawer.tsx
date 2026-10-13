@@ -4,6 +4,8 @@ import type { Effort } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from "react";
 import { Bubble } from "@/app/(app)/fauve/chat-bubble";
+import { montageStep } from "@/app/(app)/fauve/chat-cards";
+import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "@/app/(app)/fauve/chat-sync";
 import {
   launchQuote,
   loadConversation,
@@ -32,10 +34,21 @@ const POLL_MS = 8000;
 
 export function FauveDrawerProvider({ children }: { children: React.ReactNode }) {
   const [topic, setTopic] = useState<DrawerTopic | null>(null);
+  // Closing gives the focus back to what opened the panel (« Demander à Fauve »).
+  const opener = useRef<HTMLElement | null>(null);
+  const open = useCallback((next: DrawerTopic) => {
+    if (document.activeElement instanceof HTMLElement) opener.current = document.activeElement;
+    setTopic(next);
+  }, []);
+  const close = useCallback(() => {
+    setTopic(null);
+    opener.current?.focus({ preventScroll: true });
+    opener.current = null;
+  }, []);
   return (
-    <DrawerContext.Provider value={setTopic}>
+    <DrawerContext.Provider value={open}>
       {children}
-      {topic && <FauveDrawer key={`${topic.postId}-${topic.scene ?? ""}`} topic={topic} onClose={() => setTopic(null)} />}
+      {topic && <FauveDrawer key={`${topic.postId}-${topic.scene ?? ""}`} topic={topic} onClose={close} />}
     </DrawerContext.Provider>
   );
 }
@@ -73,6 +86,10 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // Messages that just arrived rise in; the history that loads with the panel does not.
+  const [arrived, setArrived] = useState<Set<string>>(() => new Set());
+  const [launching, setLaunching] = useState(false);
+  const [closing, setClosing] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -103,37 +120,66 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
     };
   }, [topic.postId]);
 
+  // The history lands at the end at once; a new reply glides into view (CSS, off under reduced motion).
+  // After a launch, the card's progress rather than the end.
+  const jump = useRef(true);
+  const focusQuote = useRef<string | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const typing = pending && !launching;
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, pending]);
+    const quote = focusQuote.current;
+    focusQuote.current = null;
+    const progress = quote ? scrollerRef.current?.querySelector<HTMLElement>(`[data-quote="${quote}"] [data-progress]`) : null;
+    if (progress) progress.scrollIntoView({ block: "nearest", behavior: "auto" });
+    else endRef.current?.scrollIntoView({ block: "end", behavior: jump.current ? "instant" : "auto" });
+    if (messages.length) jump.current = false;
+  }, [messages.length, typing]);
 
+  // Slides out before unmounting; at once when the manager asked for less motion.
+  const close = useCallback(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return onClose();
+    setClosing(true);
+    window.setTimeout(onClose, 180);
+  }, [onClose]);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [close]);
 
-  // A montage or a correction finishes on its own: refresh, and the page shows the new version.
+  // A montage or a correction finishes on its own: refresh (keeping what did not change, so no
+  // video reloads), and the page behind shows the new version.
   const messagesRef = useRef(messages);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+  const refresh = useCallback(
+    (id: string) => {
+      loadConversation(id)
+        .then((fresh) => {
+          const current = messagesRef.current;
+          if (!fresh || chatSignature(fresh) === chatSignature(current)) return;
+          const known = new Set(current.map((m) => m.id));
+          setArrived(arrivals(current, fresh));
+          setMessages(mergeMessages(current, fresh));
+          if (fresh.some((m) => !known.has(m.id) && m.openPost)) router.refresh();
+        })
+        .catch(() => {});
+    },
+    [router],
+  );
   useEffect(() => {
     if (!conversationId) return;
     const timer = setInterval(() => {
       if (document.visibilityState !== "visible" || pending) return;
-      loadConversation(conversationId)
-        .then((fresh) => {
-          const current = messagesRef.current;
-          if (!fresh || fresh.at(-1)?.id === current.at(-1)?.id) return;
-          const known = new Set(current.map((m) => m.id));
-          setMessages(fresh);
-          if (fresh.some((m) => !known.has(m.id) && m.openPost)) router.refresh();
-        })
-        .catch(() => {});
+      refresh(conversationId);
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [conversationId, pending, router]);
+  }, [conversationId, pending, refresh]);
+  useQuoteProgress(messages, setMessages, () => {
+    if (conversationId) refresh(conversationId);
+  });
+  const running = runningQuote(messages);
 
   const send = useCallback(
     (raw: string, withFiles = false) => {
@@ -144,6 +190,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
       if (withFiles) uploads.clear();
       setDraft("");
       setError(null);
+      setLaunching(false);
       const at = new Date().toISOString();
       const local = (part: Partial<ChatMessage>, i: number): ChatMessage => ({
         id: `local-${Date.now()}-${i}`,
@@ -160,17 +207,19 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         openPost: null,
         ...part,
       });
-      setMessages((m) => [
-        ...m,
+      const locals = [
         ...files.map((f, i) => local({ type: f.video ? "video" : "image", media: { url: f.preview, video: f.video } }, i)),
         ...(text ? [local({ body: text }, files.length)] : []),
-      ]);
+      ];
+      setArrived(new Set(locals.map((m) => m.id)));
+      setMessages((m) => [...m, ...locals]);
       start(async () => {
         try {
           const res = await sendToFauve(text, conversationId, attachments, { postId: topic.postId, scene: topic.scene });
           if (res.ok) {
             setConversationId(res.conversationId);
-            setMessages(res.messages);
+            setArrived(arrivals(messagesRef.current, res.messages));
+            setMessages(mergeMessages(messagesRef.current, res.messages));
           } else {
             setError(res.error);
             if (res.conversationId) setConversationId(res.conversationId);
@@ -183,13 +232,23 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
     [conversationId, pending, topic.postId, topic.scene, uploads],
   );
 
-  const launch = (quoteId: string, effort?: Effort) => {
-    if (!conversationId || pending) return;
-    start(async () => {
-      const res = await launchQuote(quoteId, conversationId, effort).catch(() => null);
-      if (res?.ok) setMessages(res.messages);
-      else setError(res && !res.ok ? res.error : "Le montage n’a pas pu démarrer.");
+  // « Lancer » on a quote card: the card shows its own progress and error (the answer: the error, or null).
+  const launch = (quoteId: string, effort?: Effort) =>
+    new Promise<string | null>((resolve) => {
+      if (!conversationId || pending) return resolve("Attends la fin du message en cours, puis relance.");
+      setLaunching(true);
+      start(async () => {
+        const res = await launchQuote(quoteId, conversationId, effort).catch(() => null);
+        if (res?.ok) {
+          focusQuote.current = quoteId;
+          setArrived(arrivals(messagesRef.current, res.messages));
+          setMessages(mergeMessages(messagesRef.current, res.messages));
+          resolve(null);
+        } else resolve(res && !res.ok ? res.error : "Le montage n’a pas pu démarrer. Vérifie ta connexion et réessaie.");
+      });
     });
+  const ask = (text: string) => {
+    if (!pending) send(text);
   };
 
   const react = (id: string, emoji: string) => {
@@ -200,12 +259,13 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
 
   return (
     <div className="fixed inset-0 z-50">
-      <button type="button" aria-label="Fermer" onClick={onClose} className="absolute inset-0 bg-ink/20" />
+      <button type="button" aria-label="Fermer" onClick={close} data-closing={closing || undefined} className="fauve-fade absolute inset-0 bg-ink/20" />
       <aside
         role="dialog"
         aria-modal="true"
         aria-label="Fauve"
-        className="absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-white bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%)] shadow-[-12px_0_40px_rgba(28,21,48,0.14)]"
+        data-closing={closing || undefined}
+        className="fauve-sheet absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-white bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%)] shadow-[-12px_0_40px_rgba(28,21,48,0.14)]"
         // Drop zone: photos and videos dropped anywhere on the panel.
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes("Files")) return;
@@ -223,7 +283,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         }}
       >
         {dragging && (
-          <div className="pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/90 text-center">
+          <div className="fauve-fade pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/90 text-center">
             <PaperclipIcon size={28} className="text-violet" />
             <p className="text-[16px] font-bold text-violet">Dépose tes photos et vidéos</p>
           </div>
@@ -236,18 +296,23 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
               {topic.title}
               {topic.sceneLabel ? ` · ${topic.sceneLabel}` : ""}
             </p>
+            {running && (
+              <p key={montageStep(running)} className="fauve-fade truncate text-[12px] font-semibold text-violet">
+                {montageStep(running)}
+              </p>
+            )}
           </div>
           {conversationId && (
             <a href={`/fauve?c=${conversationId}`} className="text-[12px] font-bold text-violet hover:underline">
               Tout l’historique
             </a>
           )}
-          <button type="button" aria-label="Fermer" onClick={onClose} className="flex size-9 items-center justify-center rounded-full hover:bg-soft">
+          <button type="button" aria-label="Fermer" onClick={close} className="flex size-9 items-center justify-center rounded-full hover:bg-soft">
             <XIcon size={18} />
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div ref={scrollerRef} className="fauve-scroll min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-3 px-4 py-5">
             {loading && <p className="self-center text-sm text-muted">Chargement…</p>}
             {!loading && messages.length === 0 && (
@@ -261,7 +326,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
                       key={s}
                       type="button"
                       onClick={() => send(s)}
-                      className="rounded-full border border-lilac bg-white px-3.5 py-2 text-[13px] font-semibold text-violet hover:bg-violet hover:text-white"
+                      className="fauve-press rounded-full border border-lilac bg-white px-3.5 py-2 text-[13px] font-semibold text-violet hover:bg-violet hover:text-white"
                     >
                       {s}
                     </button>
@@ -277,16 +342,21 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
                 timezone={timezone}
                 onReact={react}
                 onChoose={i === messages.length - 1 && !pending ? send : undefined}
+                onAsk={ask}
                 onLaunch={launch}
                 busy={pending}
+                enter={arrived.has(m.id)}
               />
             ))}
-            {pending && (
-              <div className="flex items-center gap-2 self-start rounded-[18px_18px_18px_6px] border border-line bg-white px-4 py-3 text-sm text-muted">
-                <span className="flex gap-1" aria-hidden="true">
-                  <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
-                  <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
-                  <span className="size-1.5 animate-bounce rounded-full bg-muted" />
+            {typing && (
+              <div
+                role="status"
+                className="fauve-enter flex items-center gap-2 self-start rounded-[18px_18px_18px_6px] border border-line bg-white px-4 py-3 text-sm text-muted [--fauve-delay:120ms]"
+              >
+                <span className="fauve-dots" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
                 </span>
                 Fauve écrit…
               </div>
@@ -302,7 +372,11 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
             send(draft, true);
           }}
         >
-          {error && <p role="alert" className="rounded-xl bg-peach px-3 py-2 text-sm font-semibold text-danger">{error}</p>}
+          {error && (
+            <p role="alert" className="fauve-enter rounded-xl bg-peach px-3 py-2 text-sm font-semibold text-danger">
+              {error}
+            </p>
+          )}
           <FileStrip files={uploads.files} onRemove={uploads.removeFile} />
           <div className="flex items-end gap-1 rounded-[26px] border border-line bg-white p-1.5 pl-1.5 focus-within:border-lilac">
             <input
@@ -345,13 +419,14 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
                 }
               }}
               placeholder={topic.scene !== undefined ? "Ce que tu veux pour cette scène…" : "Ce que tu veux changer, ou glisse une photo…"}
-              className="max-h-[160px] min-h-10 flex-1 resize-none bg-transparent py-2 text-[15px] outline-none placeholder:text-muted/70"
+              // 16 px: iOS Safari does not zoom the page on focus.
+              className="max-h-[160px] min-h-10 flex-1 resize-none bg-transparent py-2 text-[16px] outline-none placeholder:text-muted/70"
             />
             <button
               type="submit"
               aria-label="Envoyer"
               disabled={pending || uploads.uploading || (!draft.trim() && !uploads.ready.length)}
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet text-white disabled:bg-chip disabled:text-muted"
+              className="fauve-press flex size-10 shrink-0 items-center justify-center rounded-full bg-violet text-white hover:bg-violet-hover disabled:bg-chip disabled:text-muted"
             >
               <ArrowUpIcon />
             </button>

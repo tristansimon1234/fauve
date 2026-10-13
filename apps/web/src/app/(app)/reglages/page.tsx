@@ -147,7 +147,7 @@ async function Settings() {
 
         <Section title="Soin des montages">
           <p className="text-sm leading-normal">
-            Le niveau que Fauve propose pour chaque Reel. Tu peux en choisir un autre sur chaque devis, ou le lui dire.
+            Le niveau que Fauve utilise par défaut pour tes Reels. Pour un Reel en particulier, choisis-en un autre sur le devis, ou dis-le-lui.
           </p>
           <EffortSetting initial={effortSchema.catch(DEFAULT_EFFORT).parse(care.data?.montage_effort)} />
         </Section>

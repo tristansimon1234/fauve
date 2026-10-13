@@ -54,7 +54,7 @@ export function PageLoading({ title }: { title: string }) {
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-4">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-40 animate-pulse rounded-[20px] bg-soft" />
+          <div key={i} className="h-40 animate-pulse rounded-[20px] bg-soft motion-reduce:animate-none" />
         ))}
       </div>
     </div>

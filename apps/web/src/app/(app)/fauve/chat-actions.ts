@@ -342,13 +342,13 @@ export async function launchQuote(quoteId: string, conversationId: string, effor
     return { ok: false, error: "Le montage n’a pas pu démarrer. Réessaie dans un instant.", conversationId };
   }
   // What Fauve says depends on the level: it matches the card's steps and time.
-  const level = EFFORTS[quote.effort ?? "rapide"];
+  const { minutes } = EFFORTS[quote.effort ?? "rapide"];
   const started =
     quote.effort === "max"
-      ? `C’est parti ! Je prépare deux versions, je garde la meilleure et je la peaufine, puis je t’ouvre sa page (${level.minutes} minutes).`
+      ? `C’est parti ! Je prépare deux versions, je garde la meilleure et je la peaufine, puis je t’ouvre sa page (${minutes} minutes).`
       : quote.effort === "soigne"
-        ? `C’est parti ! Je monte ta vidéo, je la regarde et la corrige si besoin, puis je t’ouvre sa page (${level.minutes} minutes).`
-        : `C’est parti ! Je monte ta vidéo et je t’ouvre sa page dès qu’elle est prête (${level.minutes} minutes).`;
+        ? `C’est parti ! Je monte ta vidéo, je la regarde et la corrige si besoin, puis je t’ouvre sa page (${minutes} minutes).`
+        : `C’est parti ! Je monte ta vidéo et je t’ouvre sa page dès qu’elle est prête (${minutes} minutes).`;
   // One after the other, so they keep their order in the conversation.
   await db
     .from("whatsapp_messages")

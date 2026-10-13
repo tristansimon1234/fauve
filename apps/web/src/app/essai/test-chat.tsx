@@ -97,11 +97,14 @@ export function TestChat({ testKey, initial }: { testKey: string; initial: TestS
               <Bubble key={m.id} message={m} />
             ))}
             {pending && (
-              <div className="flex items-center gap-2 self-start rounded-[16px_16px_16px_4px] border border-line bg-white px-4 py-3 text-sm text-muted">
-                <span className="flex gap-1" aria-hidden="true">
-                  <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
-                  <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
-                  <span className="size-1.5 animate-bounce rounded-full bg-muted" />
+              <div
+                role="status"
+                className="fauve-enter flex items-center gap-2 self-start rounded-[16px_16px_16px_4px] border border-line bg-white px-4 py-3 text-sm text-muted [--fauve-delay:120ms]"
+              >
+                <span className="fauve-dots" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
                 </span>
                 Fauve écrit…
               </div>
