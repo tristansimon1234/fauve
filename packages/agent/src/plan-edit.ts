@@ -84,3 +84,13 @@ export function updateSegment(plan: EditPlan, index: number, segment: Segment): 
     segments.map((_, i) => i),
   );
 }
+
+/** Adds a segment at position `index` (0 = first), the following ones moving later with their texts. */
+export function insertSegment(plan: EditPlan, index: number, segment: Segment): EditPlan {
+  const at = Math.max(0, Math.min(index, plan.segments.length));
+  const origin: (number | null)[] = plan.segments.map((_, i) => i);
+  origin.splice(at, 0, null);
+  const segments = [...plan.segments];
+  segments.splice(at, 0, segment);
+  return withSegments(plan, segments, origin);
+}
