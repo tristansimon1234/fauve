@@ -18,6 +18,7 @@ import {
 import { COVER_COLUMNS, postCovers, type CoverPost } from "@/lib/covers";
 import { loadGrid } from "@/lib/grid";
 import { GridView } from "../grille/grid-view";
+import { NewPostButton } from "@/components/new-post-sheet";
 import { CalendarBoard, ShotList, type BoardPost } from "./calendar-board";
 
 export const metadata: Metadata = { title: "Calendrier" };
@@ -143,10 +144,11 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
               </Link>
             ))}
           </div>
-          <Link href="/fauve" className="btn btn-primary">
+          <Link href="/fauve" className="btn btn-secondary">
             <ChatIcon size={18} />
             Demander à Fauve
           </Link>
+          <NewPostButton timezone={tz} />
         </div>
       </div>
 
@@ -211,6 +213,7 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
             prevHref={navLink(-7)}
             nextHref={navLink(7)}
             todayHref={isCurrentWeek ? null : "/calendrier"}
+            timezone={tz}
           />
           {posts.length === 0 && (
             <p className="rounded-2xl bg-soft px-5 py-4 text-sm leading-relaxed text-muted">

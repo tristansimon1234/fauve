@@ -100,6 +100,39 @@ export async function addPost(date: string, kind: PostKind, title: string): Prom
   return { ok: true, id: data.id as string };
 }
 
+const kindTitles: Record<PostKind, string> = { reel: "Reel", carousel: "Carrousel", post: "Photo", story: "Story" };
+
+/**
+ * A publication from the « Nouvelle publication » panel: its format, day, time
+ * and, in a line, what it should say (also its title). Fauve does the rest.
+ */
+export async function createPost(input: {
+  kind: PostKind;
+  date: string;
+  time: string;
+  intention: string;
+}): Promise<{ ok: true; id: string; title: string } | { ok: false; error: string }> {
+  const kind = postKindSchema.safeParse(input.kind);
+  const day = parseIsoDate(input.date);
+  const time = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(input.time);
+  if (!kind.success || !day || !time) return { ok: false, error: "Choisis un format, un jour et une heure." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  const intention = input.intention.trim().replace(/\s+/g, " ").slice(0, 300);
+  // The title: the intention, cut at a word; else the format and the day.
+  const cut = intention.length > 60 ? `${intention.slice(0, 60).replace(/\s+\S*$/, "")}…` : intention;
+  const title = cut || `${kindTitles[kind.data]} du ${new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(day.year, day.month - 1, day.day)))}`;
+  const at = localInstant(day, Number(time[1]), Number(time[2]), member.studio.timezone);
+  const { data, error } = await supabaseAdmin()
+    .from("posts")
+    .insert({ studio_id: member.studio.id, kind: kind.data, title, status: "planned", platforms: ["instagram"], scheduled_at: at.toISOString() })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: "La publication n’a pas été créée. Réessaie." };
+  revalidateCalendar();
+  return { ok: true, id: data.id as string, title };
+}
+
 export type PostSheet = {
   id: string;
   title: string;

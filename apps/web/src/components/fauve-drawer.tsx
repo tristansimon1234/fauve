@@ -24,7 +24,12 @@ import { Orb } from "./orb";
 // publication (and maybe one scene of its montage): the manager asks for a
 // change without leaving what she is looking at, and Fauve knows what it is about.
 
-export type DrawerTopic = ChatAbout & { title: string; sceneLabel?: string };
+export type DrawerTopic = ChatAbout & {
+  title: string;
+  sceneLabel?: string;
+  /** A new publication (« Nouvelle publication »): the first message, sent with its photos and videos once they are uploaded. */
+  start?: { text: string; files: File[] };
+};
 
 const DrawerContext = createContext<(topic: DrawerTopic) => void>(() => {});
 
@@ -239,6 +244,23 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
     },
     [conversationId, pending, topic.postId, topic.scene, uploads],
   );
+
+  // A new publication: its files go up with the panel's own uploads, then the first message leaves on its own.
+  // (The panel that opens it keeps to the files the uploads accept: photos and videos under 50 Mo.)
+  const first = useRef(topic.start ?? null);
+  const queued = useRef(false);
+  useEffect(() => {
+    if (loading || !studioId || !first.current || queued.current) return;
+    queued.current = true;
+    if (first.current.files.length) uploads.addFiles(first.current.files);
+  }, [loading, studioId, uploads]);
+  useEffect(() => {
+    const opening = first.current;
+    if (!opening || !queued.current || pending) return;
+    if (opening.files.length && (!uploads.files.length || uploads.uploading)) return;
+    first.current = null;
+    send(opening.text, opening.files.length > 0);
+  }, [loading, pending, uploads.uploading, uploads.files.length, send]);
 
   // « Lancer » on a quote card: the card shows its own progress and error (the answer: the error, or null).
   const launch = (quoteId: string, effort?: Effort) =>

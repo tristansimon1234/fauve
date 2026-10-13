@@ -8,7 +8,8 @@ import { ArrowLeftIcon, CheckIcon, LayersIcon, PlayIcon, PlusIcon, TrashIcon, Wh
 import { Orb } from "@/components/orb";
 import { StatusPill } from "@/components/status-pill";
 import { whatsappLink } from "@/lib/public-env";
-import { addPost, deletePosts, movePost, movePosts, setShotDone, validatePosts } from "./actions";
+import { NewPostSheet } from "@/components/new-post-sheet";
+import { deletePosts, movePost, movePosts, setShotDone, validatePosts } from "./actions";
 import { PostDrawer } from "./post-drawer";
 
 const dayNames = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"];
@@ -67,6 +68,7 @@ export function CalendarBoard({
   prevHref,
   nextHref,
   todayHref,
+  timezone,
 }: {
   posts: BoardPost[];
   undated: BoardPost[];
@@ -76,6 +78,7 @@ export function CalendarBoard({
   nextHref: string;
   /** Null on the current week. */
   todayHref: string | null;
+  timezone: string;
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -310,24 +313,13 @@ export function CalendarBoard({
                   over === day ? "bg-violet-soft outline-2 outline-dashed outline-violet" : today ? "bg-violet-tint" : "bg-soft"
                 }`}
               >
-                {adding === day && (
-                  <AddIdea
-                    date={days[day]!.iso}
-                    onClose={() => setAdding(null)}
-                    onAdded={(id) => {
-                      setAdding(null);
-                      setOpen(id);
-                      router.refresh();
-                    }}
-                  />
-                )}
                 {visible.filter((p) => p.day === day).map(card)}
-                {adding !== day && (
+                {(
                   <button
                     type="button"
                     onClick={() => setAdding(day)}
                     className="mt-auto flex h-9 items-center justify-center rounded-xl text-muted opacity-0 group-hover/day:opacity-100 hover:bg-white hover:text-violet"
-                    aria-label={`Ajouter une idée le ${dayNames[day]} ${date}`}
+                    aria-label={`Nouvelle publication le ${dayNames[day]} ${date}`}
                   >
                     <PlusIcon size={16} />
                   </button>
@@ -371,6 +363,7 @@ export function CalendarBoard({
           setOpen(null);
         }}
       />
+      {adding !== null && days[adding] && <NewPostSheet date={days[adding]!.iso} timezone={timezone} onClose={() => setAdding(null)} />}
     </div>
   );
 }
@@ -441,68 +434,6 @@ function SelectionBar({
   );
 }
 
-const kindChoices: { value: PostKind; label: string }[] = [
-  { value: "reel", label: "Reel" },
-  { value: "carousel", label: "Carrousel" },
-  { value: "post", label: "Photo" },
-  { value: "story", label: "Story" },
-];
-
-/** A new idea on a day: a title and a format, the rest is Fauve's job. */
-function AddIdea({ date, onClose, onAdded }: { date: string; onClose: () => void; onAdded: (id: string) => void }) {
-  const [title, setTitle] = useState("");
-  const [kind, setKind] = useState<PostKind>("reel");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const submit = () =>
-    start(async () => {
-      const res = await addPost(date, kind, title).catch(() => ({ ok: false as const, error: "L’idée n’a pas été ajoutée." }));
-      if (res.ok) onAdded(res.id);
-      else setError(res.error);
-    });
-  return (
-    <form
-      className="flex flex-col gap-2 rounded-xl border-[1.5px] border-violet bg-white p-2.5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit();
-      }}
-      onKeyDown={(e) => e.key === "Escape" && onClose()}
-    >
-      <input
-        autoFocus
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Ton idée…"
-        maxLength={120}
-        aria-label="Titre de l’idée"
-        className="w-full rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-violet"
-      />
-      <div className="flex flex-wrap gap-1">
-        {kindChoices.map((k) => (
-          <button
-            key={k.value}
-            type="button"
-            aria-pressed={kind === k.value}
-            onClick={() => setKind(k.value)}
-            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${kind === k.value ? "bg-violet text-white" : "bg-soft text-muted"}`}
-          >
-            {k.label}
-          </button>
-        ))}
-      </div>
-      {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
-      <div className="flex gap-1.5">
-        <button type="submit" disabled={pending || !title.trim()} className="flex-1 rounded-full bg-violet py-1.5 text-[12px] font-bold text-white disabled:opacity-50">
-          {pending ? "…" : "Ajouter"}
-        </button>
-        <button type="button" onClick={onClose} className="rounded-full px-2 text-[12px] font-semibold text-muted hover:text-ink">
-          Annuler
-        </button>
-      </div>
-    </form>
-  );
-}
 
 type Shot = { id: string; label: string; hint: string | null; done: boolean };
 
