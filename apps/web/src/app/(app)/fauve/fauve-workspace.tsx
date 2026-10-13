@@ -475,10 +475,10 @@ function Bubble({
   // Reacting is for Fauve's messages (the manager's own messages get Fauve's reactions).
   const canReact = !mine && !message.id.startsWith("local-");
   return (
-    <div className={`group flex max-w-[85%] flex-col gap-1 ${mine ? "items-end self-end" : "items-start self-start"}`}>
+    <div className={`group flex max-w-[85%] flex-col ${reactions.length ? "gap-4" : "gap-1"} ${mine ? "items-end self-end" : "items-start self-start"}`}>
       <div className={`relative flex items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
         <div
-          className={`flex flex-col gap-2 px-4 py-2.5 text-[15px] leading-[1.5] whitespace-pre-wrap ${
+          className={`relative flex flex-col gap-2 px-4 py-2.5 text-[15px] leading-[1.5] whitespace-pre-wrap ${
             mine ? "rounded-[18px_18px_6px_18px] bg-violet text-white" : "rounded-[18px_18px_18px_6px] border border-line bg-white"
           }`}
         >
@@ -492,6 +492,19 @@ function Bubble({
             )
           )}
           {message.body}
+          {reactions.length > 0 && (
+            // On the bubble's bottom corner, like WhatsApp.
+            <span
+              className={`absolute -bottom-3.5 flex items-center gap-0.5 rounded-full border border-line bg-white px-1.5 py-0.5 text-[14px] leading-none text-ink shadow-sm ${
+                mine ? "left-2.5" : "right-2.5"
+              }`}
+              aria-label={`Réactions : ${reactions.join(" ")}`}
+            >
+              {reactions.map((emoji, i) => (
+                <span key={i}>{emoji}</span>
+              ))}
+            </span>
+          )}
         </div>
         {canReact && (
           <button
@@ -526,18 +539,6 @@ function Bubble({
           </div>
         )}
       </div>
-      {reactions.length > 0 && (
-        <span
-          className={`-mt-2.5 flex items-center gap-0.5 rounded-full border border-line bg-white px-1.5 py-0.5 text-[14px] leading-none shadow-sm ${
-            mine ? "mr-2" : "ml-2"
-          }`}
-          aria-label={`Réactions : ${reactions.join(" ")}`}
-        >
-          {reactions.map((emoji, i) => (
-            <span key={i}>{emoji}</span>
-          ))}
-        </span>
-      )}
       <span className="flex items-center gap-1 px-1 text-[11px] text-muted">
         {message.channel === "whatsapp" && <WhatsAppIcon size={11} />}
         {mine ? "Toi" : "Fauve"} · {time}
