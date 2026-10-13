@@ -83,6 +83,8 @@ export async function designEdit(params: {
       visual_notes: profile.visual_notes,
       colors: profile.colors,
       fonts: profile.fonts,
+      // Text looks the manager keeps (copied from examples): the editor reuses them.
+      text_looks: profile.text_looks?.length ? profile.text_looks : undefined,
       dos: profile.dos,
       donts: profile.donts,
     },

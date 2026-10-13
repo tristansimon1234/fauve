@@ -11,11 +11,13 @@ import {
   updateSegment,
   type EditPlan,
   type ReelInputs,
+  type SavedLook,
   type Segment,
 } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FilmIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { LookPanel } from "@/components/montage/look-panel";
 import { DEFAULT_Y, places, TextBoxes, Y_MAX, Y_MIN } from "@/components/montage/text-boxes";
 import { AskFauveButton, useFauveDrawer } from "@/components/fauve-drawer";
 import { ReelPlayer } from "@/components/reel-player";
@@ -57,6 +59,7 @@ export function MontageEditor({
   inputs,
   clipDurations,
   clipLabels,
+  looks,
 }: {
   postId: string;
   postTitle: string;
@@ -64,6 +67,8 @@ export function MontageEditor({
   inputs: ReelInputs;
   clipDurations: Record<string, number | null>;
   clipLabels: Record<string, string>;
+  /** The studio's saved text looks. */
+  looks: SavedLook[];
 }) {
   const [saved, setSaved] = useState(initialPlan);
   const [plan, setPlan] = useState(initialPlan);
@@ -359,6 +364,7 @@ export function MontageEditor({
                     className="accent-violet"
                   />
                 </label>
+                <LookPanel role={t.style} look={t.look} saved={looks} brand={props.brand} onChange={(look) => setText(i, { look })} />
                 <Range
                   label="Apparaît"
                   min={span.start}

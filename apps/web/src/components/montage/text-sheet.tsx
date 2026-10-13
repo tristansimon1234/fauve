@@ -1,6 +1,8 @@
 "use client";
 
+import type { SavedLook, TextLook } from "@fauve/agent";
 import { TrashIcon, XIcon } from "@/components/icons";
+import { LookPanel } from "./look-panel";
 import { DEFAULT_Y } from "./text-boxes";
 
 // The selected text of a montage or a carousel slide: its words, style, size and
@@ -12,6 +14,7 @@ export type SheetText = {
   y?: number;
   scale?: number;
   backdrop?: boolean;
+  look?: TextLook;
 };
 
 const styleLabels: Record<SheetText["style"], string> = { hook: "Accroche", band: "Bandeau", caption: "Sous-titre" };
@@ -23,11 +26,16 @@ export function TextSheet<T extends SheetText>({
   onChange,
   onRemove,
   onClose,
+  looks,
+  video,
 }: {
   text: T;
   onChange: (patch: Partial<SheetText>) => void;
   onRemove: () => void;
   onClose: () => void;
+  /** With the studio's colours and fonts: the look controls (fonts, colours, fill…) and its saved looks. */
+  looks?: { saved: SavedLook[]; brand: { accent: string; accentInk: string; displayFont: string; bodyFont: string } };
+  video?: boolean;
 }) {
   const scale = text.scale ?? 1;
   return (
@@ -87,6 +95,9 @@ export function TextSheet<T extends SheetText>({
           <TrashIcon size={17} />
         </button>
       </div>
+      {looks && (
+        <LookPanel role={text.style} look={text.look} saved={looks.saved} brand={looks.brand} video={video} onChange={(look) => onChange({ look })} />
+      )}
     </div>
   );
 }

@@ -11,6 +11,25 @@ export type Scene = {
   background: "accent" | "ink" | "cream";
 };
 
+/** Mirror of TextLook in packages/agent/src/text-look.ts. Colours: #rrggbb, « accent » or « accent_ink ». */
+export type TextLook = {
+  font: string;
+  weight: number;
+  italic: boolean;
+  uppercase: boolean;
+  size: number;
+  letter_spacing: number;
+  line_height: number;
+  color: string;
+  align: "left" | "center" | "right";
+  fill?: { kind: "box" | "pill" | "line"; color: string; opacity: number; radius?: number };
+  stroke?: { color: string; width: number };
+  shadow: "none" | "soft" | "strong" | "hard";
+  emphasis?: { color?: string; font?: string; italic?: boolean; fill?: string };
+  rotate: number;
+  enter: "none" | "fade" | "rise" | "pop" | "typewriter" | "slide";
+};
+
 export type ReelProps = {
   template: MotionTemplate;
   width: number;
@@ -35,6 +54,7 @@ export type ReelProps = {
     x?: number;
     scale?: number;
     backdrop?: boolean;
+    look?: TextLook;
   }[];
   words: { w: string; from: number; to: number }[];
   brand: { name: string; accent: string; accentInk: string; displayFont: string; bodyFont: string; logoUrl: string | null };

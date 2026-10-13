@@ -11,6 +11,14 @@ import {
   replyExtrasSchema,
 } from "./schemas.ts";
 import { slideTextSchema } from "./slides.ts";
+import { textLookSchema } from "./text-look.ts";
+
+/** Changes to a text look: only the fields given change; null removes a fill, an outline or an emphasis style. */
+const lookPatchSchema = textLookSchema.partial().extend({
+  fill: textLookSchema.shape.fill.unwrap().nullable().optional(),
+  stroke: textLookSchema.shape.stroke.unwrap().nullable().optional(),
+  emphasis: textLookSchema.shape.emphasis.unwrap().nullable().optional(),
+});
 
 // Tool contracts shared by every runtime (webhook, web chat, jobs).
 // Implementations live next to the database code in apps/web.
@@ -155,9 +163,41 @@ export const toolSpecs = {
       post_id: z.string().uuid(),
       template: motionTemplateSchema.optional().describe("doux, dynamique ou chic ; par défaut celui déjà choisi, sinon doux"),
       slides: z
-        .array(z.object({ texts: z.array(slideTextSchema.pick({ text: true, style: true, emphasis: true })).max(3) }))
+        .array(
+          z.object({
+            texts: z
+              .array(
+                slideTextSchema.pick({ text: true, style: true, emphasis: true }).extend({
+                  look_name: z.string().max(40).optional().describe("Nom d'un style de texte enregistré du studio (text_looks), sinon le style du gabarit"),
+                }),
+              )
+              .max(3),
+          }),
+        )
         .min(1)
         .max(10),
+    }),
+  },
+  copy_text_style: {
+    description:
+      "Copie le style des textes d'un exemple que la gérante a envoyé (une photo ou une capture d'un post qu'elle aime) : Fauve lit chaque texte de l'image (police la plus proche, graisse, couleurs, fond en bloc, pilule ou surlignage, contour, ombre, inclinaison, place) et l'enregistre dans les styles de texte du studio. Avec post_id, l'applique aussitôt aux textes de cette publication (texte sur photos ou montage) et refait le rendu, gratuit ; le lien part tout seul. Renvoie les styles lus avec leur nom.",
+    input: z.object({
+      media_id: z.string().uuid().describe("media_id de l'image d'exemple reçue"),
+      post_id: z.string().uuid().optional().describe("La publication à laquelle appliquer ce style"),
+      note: z.string().max(300).optional().describe("Ce que la gérante a dit de l'exemple, ex. « le titre jaune »"),
+      copy_places: z.boolean().default(true).describe("Reprendre aussi la place des textes de l'exemple"),
+    }),
+  },
+  style_texts: {
+    description:
+      "Change le style des textes d'une publication (texte sur photos ou montage), gratuit, puis refait le rendu (le lien part tout seul). Tout est possible : police Google Fonts, graisse, italique, majuscules, taille, interlettrage, couleur, fond derrière (box : bloc, pill : pilule, line : surlignage ligne à ligne) avec couleur et transparence, contour, ombre (soft, strong, hard), mots en valeur (autre couleur, police, surlignage), inclinaison, apparition (fade, rise, pop, typewriter, slide), alignement. Prends un style enregistré (look_name), et/ou donne seulement ce qui change (look). reset remet le style du gabarit. save_as enregistre le résultat dans les styles du studio.",
+    input: z.object({
+      post_id: z.string().uuid(),
+      target: z.enum(["all", "hook", "band", "caption"]).default("all").describe("Quels textes : tous, ou seulement l'accroche (hook), les bandeaux (band), les petites lignes (caption)"),
+      look_name: z.string().max(40).optional().describe("Un style enregistré du studio comme point de départ"),
+      look: lookPatchSchema.optional().describe("Seulement ce qui change, ex. { color: \"#FFD400\", stroke: { color: \"#000000\", width: 4 } }"),
+      reset: z.boolean().default(false).describe("Revenir au style du gabarit"),
+      save_as: z.string().min(1).max(40).optional().describe("Enregistrer le style obtenu sous ce nom"),
     }),
   },
   schedule_post: {

@@ -430,3 +430,29 @@ test("carousel slides: aligned with the photos, built as a 4:5 still of the Reel
   // A text may sit lower on a slide than on a Reel, but not off the photo.
   assert.equal(slidesPlanSchema.safeParse({ template: "doux", slides: [{ media_id: a, texts: [{ text: "x", style: "caption", y: 0.95 }] }] }).success, false);
 });
+
+test("text looks: defaults are valid, travel to the render props, and tools accept partial changes", async () => {
+  const { defaultLook, textLookSchema, textExampleSchema, lookFonts } = await import("./text-look.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  const { buildSlideProps, slidesPlanSchema } = await import("./slides.ts");
+  const { toolSpecs } = await import("./tools.ts");
+  for (const role of ["hook", "band", "caption"] as const) {
+    assert.equal(textLookSchema.safeParse(defaultLook(role, { display: "Anton", body: "Inter" })).success, true);
+  }
+  const look = { ...defaultLook("hook", { display: "Anton", body: "Inter" }), color: "#FFD400", stroke: { color: "#000000", width: 4 }, emphasis: { font: "Caveat" } };
+  assert.deepEqual(lookFonts([look, undefined]), ["Anton", "Caveat"]);
+  assert.equal(textLookSchema.safeParse({ ...look, color: "jaune" }).success, false);
+
+  const plan = editPlanSchema.parse({ ...validPlan, texts: [{ text: "Hello", from: 0, to: 2, style: "hook", look }] });
+  const props = buildReelProps(plan, { template: "doux", clipUrls: { a: "https://example.com/a.mp4" }, brand: { name: "Studio" } });
+  assert.equal(props.texts[0]?.look?.color, "#FFD400");
+
+  const slides = slidesPlanSchema.parse({ template: "chic", slides: [{ media_id: "00000000-0000-4000-8000-00000000000a", texts: [{ text: "Hi", style: "band", look }] }] });
+  const still = buildSlideProps(slides.slides[0]!, { template: "chic", imageUrl: "https://example.com/a.jpg", brand: { name: "Studio" } });
+  assert.equal(still.texts[0]?.look?.font, "Anton");
+
+  // style_texts: only what changes, and null removes a fill.
+  assert.equal(toolSpecs.style_texts.input.safeParse({ post_id: "00000000-0000-4000-8000-00000000000a", look: { color: "#000000", fill: null } }).success, true);
+  assert.equal(toolSpecs.copy_text_style.input.parse({ media_id: "00000000-0000-4000-8000-00000000000a" }).copy_places, true);
+  assert.equal(textExampleSchema.safeParse({ summary: "Gros titre jaune", blocks: [{ name: "Titre", role: "hook", text: "SOLDES", y: 0.1, x: 0.5, look }] }).success, true);
+});

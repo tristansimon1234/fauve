@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { REEL_FPS, resolveReelBrand, type ReelInputs, type ReelProps } from "./motion.ts";
 import { motionTemplateSchema, type MotionTemplate } from "./schemas.ts";
+import { textLookSchema } from "./text-look.ts";
 
 // Carousels and photo posts with text over the photos. Each slide is a still of
 // the Reel composition (apps/render): the same fonts, styles and fit as the
@@ -24,6 +25,7 @@ export const slideTextSchema = z.object({
   x: z.number().min(0.3).max(0.7).optional(),
   scale: z.number().min(0.6).max(1.6).optional(),
   backdrop: z.boolean().optional(),
+  look: textLookSchema.optional().describe("Un style à part (copié d'un exemple ou un des styles enregistrés du studio) ; sinon le style du gabarit"),
 });
 export type SlideText = z.infer<typeof slideTextSchema>;
 
@@ -61,6 +63,7 @@ export function buildSlideProps(
       x: t.x,
       scale: t.scale,
       backdrop: t.backdrop,
+      look: t.look,
     })),
     words: [],
     brand: resolveReelBrand({}, inputs.template, inputs.brand),

@@ -15,7 +15,7 @@ import { loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
 import { SceneView } from "./Scene";
 import { THEMES, type Theme } from "./theme";
-import type { ReelProps } from "./types";
+import type { ReelProps, TextLook } from "./types";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -28,7 +28,11 @@ const normalize = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu
 
 export function Reel(props: ReelProps) {
   const theme = THEMES[props.template];
-  loadFonts([props.brand.displayFont, props.brand.bodyFont]);
+  loadFonts([
+    props.brand.displayFont,
+    props.brand.bodyFont,
+    ...props.texts.flatMap((t) => (t.look ? [t.look.font, ...(t.look.emphasis?.font ? [t.look.emphasis.font] : [])] : [])),
+  ]);
   const k = props.width / 1080;
 
   return (
@@ -137,7 +141,8 @@ function sides(text: ReelProps["texts"][number], props: ReelProps, k: number): {
 
 function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   // Remount when edited, so the fit is measured again (scene editor).
-  const key = `${text.text}|${text.style}|${text.scale ?? 1}|${text.x ?? ""}|${text.backdrop ?? false}`;
+  const key = `${text.text}|${text.style}|${text.scale ?? 1}|${text.x ?? ""}|${text.backdrop ?? false}|${text.look ? JSON.stringify(text.look) : ""}`;
+  if (text.look) return <LookText key={key} text={text} look={text.look} index={index} props={props} theme={theme} k={k} />;
   if (text.style === "hook") return <Hook key={key} text={text} index={index} props={props} theme={theme} k={k} />;
   if (text.style === "band") return <Band key={key} text={text} index={index} props={props} theme={theme} k={k} />;
   return <Caption key={key} text={text} index={index} props={props} theme={theme} k={k} />;
@@ -277,6 +282,149 @@ function Caption({ text, index, props, theme, k }: { text: ReelProps["texts"][nu
     >
       {text.text}
     </div>
+  );
+}
+
+/** A look's colour: hex, or the studio's own. */
+function lookColor(color: string, props: ReelProps, alpha = 1): string {
+  const hex = color === "accent" ? props.brand.accent : color === "accent_ink" ? props.brand.accentInk : color;
+  if (alpha >= 1 || !/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+
+const lookShadows = (k: number) => ({
+  none: "none",
+  soft: "0 4px 28px rgba(0,0,0,0.35)",
+  strong: "0 2px 10px rgba(0,0,0,0.75)",
+  hard: `${5 * k}px ${5 * k}px 0 rgba(0,0,0,0.9)`,
+});
+
+/** Default place of a text by role (top edge, share of the height), like the template styles. */
+const LOOK_Y = { hook: 0.12, band: 0.37, caption: 0.63 } as const;
+
+/**
+ * A text with a look of its own (copied from an example, or set by hand): any
+ * Google font, colours, a box, pill or line highlight behind it, an outline, a
+ * shadow, a tilt and an entrance. It shrinks to fit its box, like a hook.
+ */
+function LookText({
+  text,
+  look,
+  index,
+  props,
+  theme,
+  k,
+}: {
+  text: ReelProps["texts"][number];
+  look: TextLook;
+  index: number;
+  props: ReelProps;
+  theme: Theme;
+  k: number;
+}) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const exit = useExit(text.durationInFrames, theme);
+  const scale = text.scale ?? 1;
+  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(/\s+/)).map(normalize));
+  const words = text.text.split(/\s+/).filter(Boolean);
+  const fill = look.fill;
+  const pad = { y: 14 * k, x: 26 * k };
+
+  const box: CSSProperties = {
+    position: "absolute",
+    top: props.height * (text.y ?? LOOK_Y[text.style]),
+    height: props.height * (text.style === "hook" ? 0.3 : 0.2) * Math.max(1, scale),
+    ...sides(text, props, k),
+    opacity: exit.opacity,
+    transform: `translateY(${exit.translate * k}px)`,
+  };
+  const inner: CSSProperties = {
+    justifyContent: "flex-start",
+    alignItems: look.align === "left" ? "flex-start" : look.align === "right" ? "flex-end" : "center",
+    textAlign: look.align,
+  };
+  const type: CSSProperties = {
+    fontFamily: `"${look.font}", "${props.brand.bodyFont}", sans-serif`,
+    fontWeight: look.weight,
+    fontStyle: look.italic ? "italic" : "normal",
+    fontSize: look.size * k * scale,
+    lineHeight: look.line_height,
+    letterSpacing: `${look.letter_spacing}em`,
+    textTransform: look.uppercase ? "uppercase" : "none",
+    color: lookColor(look.color, props),
+    textShadow: lookShadows(k)[look.shadow],
+    ...(look.stroke ? { WebkitTextStroke: `${look.stroke.width * k}px ${lookColor(look.stroke.color, props)}`, paintOrder: "stroke fill" } : {}),
+  };
+  // Box and pill: one block behind the whole text. Line: a highlight that hugs each line.
+  const block: CSSProperties =
+    fill && fill.kind !== "line"
+      ? {
+          display: "inline-block",
+          background: lookColor(fill.color, props, fill.opacity),
+          borderRadius: fill.kind === "pill" ? 999 : (fill.radius ?? 8) * k,
+          padding: fill.kind === "pill" ? `${pad.y}px ${pad.x * 1.4}px` : `${pad.y}px ${pad.x}px`,
+        }
+      : { display: "inline-block" };
+  const line: CSSProperties | undefined =
+    fill?.kind === "line"
+      ? {
+          background: lookColor(fill.color, props, fill.opacity),
+          borderRadius: (fill.radius ?? 6) * k,
+          padding: `${4 * k}px ${14 * k}px`,
+          boxDecorationBreak: "clone",
+          WebkitBoxDecorationBreak: "clone",
+        }
+      : undefined;
+
+  // Entrances play in a video; a still (carousel) is captured once they are over.
+  const typed = look.enter === "typewriter" ? Math.floor(Math.max(0, frame) / 1.4) : Infinity;
+  let shown = 0;
+  const enterOf = (i: number): CSSProperties => {
+    const p = spring({ frame: frame - i * 3, fps, config: theme.spring });
+    if (look.enter === "pop") return { transform: `scale(${interpolate(p, [0, 1], [0.55, 1])})`, opacity: interpolate(p, [0, 0.4], [0, 1], clamp) };
+    if (look.enter === "rise") return { transform: `translateY(${interpolate(p, [0, 1], [30 * k, 0])}px)`, opacity: p };
+    if (look.enter === "slide") return { transform: `translateX(${interpolate(p, [0, 1], [-40 * k, 0])}px)`, opacity: p };
+    if (look.enter === "fade") return { opacity: interpolate(frame, [i * 2, i * 2 + 10], [0, 1], clamp) };
+    return {};
+  };
+
+  return (
+    <Fit style={box} innerStyle={inner} marker={String(index)}>
+      <div style={{ ...block, transform: look.rotate ? `rotate(${look.rotate}deg)` : undefined }}>
+        <span style={{ ...type, ...(line ?? {}), lineHeight: line ? look.line_height + 0.25 : look.line_height }}>
+          {words.map((word, i) => {
+            const start = shown;
+            shown += word.length + 1;
+            const visible = look.enter === "typewriter" ? word.slice(0, Math.max(0, typed - start)) : word;
+            const stressed = emphasis.has(normalize(word));
+            const e = look.emphasis;
+            const stress: CSSProperties | undefined =
+              stressed && e
+                ? {
+                    color: e.color ? lookColor(e.color, props) : undefined,
+                    fontFamily: e.font ? `"${e.font}", "${look.font}", sans-serif` : undefined,
+                    fontStyle: e.italic ? "italic" : undefined,
+                    background: e.fill ? lookColor(e.fill, props) : undefined,
+                    borderRadius: e.fill ? 6 * k : undefined,
+                    padding: e.fill ? `0 ${8 * k}px` : undefined,
+                  }
+                : undefined;
+            return (
+              <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...enterOf(i) }}>
+                {/* Typewriter: the letters not typed yet keep their room, so lines never jump. */}
+                <span style={stress}>
+                  {visible}
+                  {visible.length < word.length ? <span style={{ opacity: 0 }}>{word.slice(visible.length)}</span> : null}
+                </span>
+                {i < words.length - 1 ? " " : ""}
+              </span>
+            );
+          })}
+        </span>
+      </div>
+    </Fit>
   );
 }
 

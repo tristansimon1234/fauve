@@ -7,7 +7,9 @@ import {
   type ReplyExtras,
   type ToolHandlers,
   slidesPlanSchema,
+  textLookSchema,
   AUTO_START_MAX_CREDITS,
+  type TextLook,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -22,6 +24,7 @@ import { saveSlides } from "@/lib/render/slides";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { readWebsite, WebsiteError } from "./website";
 
 export type ToolContext = {
@@ -408,9 +411,25 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const mediaIds = (post.media_ids as string[] | null) ?? [];
       if (!mediaIds.length) return json({ error: "Cette publication n'a pas encore de photos : ajoute-les d'abord (update_post media_ids)." });
       const previous = slidesPlanSchema.safeParse(post.slides);
+      // A saved look by name (the studio's text styles), else the template's style.
+      const wanted = slides.some((s) => s.texts.some((t) => t.look_name));
+      const looks = wanted ? await loadTextLooks(studioId) : [];
+      const unknownLooks = new Set<string>();
+      const lookNamed = (name?: string) => {
+        if (!name) return undefined;
+        const found = looks.find((l) => l.name.toLowerCase() === name.toLowerCase());
+        if (!found) unknownLooks.add(name);
+        return found?.look;
+      };
       const plan = {
         template: template ?? (previous.success ? previous.data.template : "doux"),
-        slides: mediaIds.slice(0, 10).map((media_id, i) => ({ media_id, texts: slides[i]?.texts ?? [] })),
+        slides: mediaIds.slice(0, 10).map((media_id, i) => ({
+          media_id,
+          texts: (slides[i]?.texts ?? []).map(({ look_name, ...t }) => {
+            const look = lookNamed(look_name);
+            return look ? { ...t, look } : t;
+          }),
+        })),
       };
       try {
         await saveSlides(studioId, post_id, plan);
@@ -424,8 +443,104 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         status: "started",
         photos: mediaIds.length,
         ignored: slides.length > mediaIds.length ? `${slides.length - mediaIds.length} entrée(s) en trop ignorée(s)` : undefined,
+        unknown_looks: unknownLooks.size ? `Styles inconnus, remplacés par celui du gabarit : ${[...unknownLooks].join(", ")}` : undefined,
         note: "Le texte est posé après ta réponse (environ une minute) et le lien part automatiquement. Annonce-le en une phrase, sans envoyer de lien toi-même.",
       });
+    },
+
+    async copy_text_style({ media_id, post_id, note, copy_places }) {
+      const asset = unwrap(await db.from("media_assets").select("id, kind, storage_path").eq("id", media_id).eq("studio_id", studioId).single());
+      if (asset.kind !== "image") {
+        return json({ error: "L'exemple doit être une image (photo ou capture d'écran du post). Pour un Reel, une capture du moment où le texte est à l'écran suffit." });
+      }
+      const signed = await db.storage.from("media").createSignedUrl(asset.storage_path as string, 600);
+      if (!signed.data) return json({ error: "Image d'exemple introuvable" });
+      let example;
+      try {
+        example = await readTextExample(studioId, signed.data.signedUrl, note);
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "Lecture de l'exemple impossible" });
+      }
+      await keepTextLooks(
+        studioId,
+        example.blocks.map((b) => ({ name: b.name, role: b.role, look: b.look })),
+      );
+      let applied: Record<string, unknown> | undefined;
+      if (post_id) {
+        try {
+          const result = await restyleTexts(studioId, post_id, (t) => {
+            const block = blockFor(example, t.style);
+            return { look: block.look, ...(copy_places ? { y: block.y, x: block.x } : {}) };
+          });
+          ctx.afterReply.push(async () => {
+            const target = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId };
+            await (result.kind === "slides" ? renderSlidesAndDeliver(target) : renderAndDeliver(target));
+          });
+          applied = { post_id, texts: result.changed, on: result.kind === "slides" ? "photos" : "montage" };
+        } catch (error) {
+          applied = { error: error instanceof Error ? error.message : "Style non appliqué" };
+        }
+      }
+      return json({
+        summary: example.summary,
+        saved_looks: example.blocks.map((b) => ({ name: b.name, role: b.role, example_text: b.text, font: b.look.font })),
+        applied,
+        note: applied && !("error" in applied)
+          ? "Les styles sont enregistrés et appliqués ; le rendu part après ta réponse et le lien est envoyé tout seul. Dis en une phrase ce que tu as repris de l'exemple."
+          : "Les styles sont enregistrés dans le style du studio. Propose de les appliquer à une publication (copy_text_style avec post_id, ou write_on_photos avec look_name).",
+      });
+    },
+
+    async style_texts({ post_id, target, look_name, look, reset, save_as }) {
+      const saved = look_name ? await loadTextLooks(studioId) : [];
+      const named = look_name ? saved.find((l) => l.name.toLowerCase() === look_name.toLowerCase()) : undefined;
+      if (look_name && !named) return json({ error: `Aucun style enregistré « ${look_name} ». Styles du studio : ${saved.map((l) => l.name).join(", ") || "aucun"}` });
+      if (!reset && !named && !look) return json({ error: "Donne un style enregistré (look_name), des changements (look) ou reset." });
+
+      const { data: post } = await db.from("posts").select("slides").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
+      const slidesTemplate = slidesPlanSchema.safeParse(post?.slides);
+      const starts = new Map<string, TextLook>();
+      const startFor = async (role: "hook" | "band" | "caption") => {
+        if (!starts.has(role)) starts.set(role, await lookDefaults(studioId, slidesTemplate.success ? slidesTemplate.data.template : undefined, role));
+        return starts.get(role)!;
+      };
+      // Starting looks are needed inside a synchronous change: load them first.
+      for (const role of ["hook", "band", "caption"] as const) await startFor(role);
+
+      let invalid: string | undefined;
+      let last: TextLook | undefined;
+      try {
+        const result = await restyleTexts(studioId, post_id, (t) => {
+          if (target !== "all" && t.style !== target) return undefined;
+          if (reset) return { look: null };
+          const base = named?.look ?? t.look ?? starts.get(t.style)!;
+          const merged: Record<string, unknown> = { ...base, ...(look ?? {}) };
+          for (const key of ["fill", "stroke", "emphasis"]) if (merged[key] === null) delete merged[key];
+          const parsed = textLookSchema.safeParse(merged);
+          if (!parsed.success) {
+            invalid = parsed.error.issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ; ");
+            return undefined;
+          }
+          last = parsed.data;
+          return { look: parsed.data };
+        });
+        if (invalid && !last) return json({ error: `Style invalide : ${invalid}` });
+        if (save_as && last && target !== "all") await keepTextLooks(studioId, [{ name: save_as, role: target, look: last }]);
+        else if (save_as && last) await keepTextLooks(studioId, [{ name: save_as, role: "hook", look: last }]);
+        ctx.afterReply.push(async () => {
+          const to = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId };
+          await (result.kind === "slides" ? renderSlidesAndDeliver(to) : renderAndDeliver(to));
+        });
+        return json({
+          status: "started",
+          texts: result.changed,
+          on: result.kind === "slides" ? "photos" : "montage",
+          saved_as: save_as && last ? save_as : undefined,
+          note: "Le rendu part après ta réponse et le lien est envoyé tout seul. Annonce le changement en une phrase.",
+        });
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "Style non appliqué" });
+      }
     },
 
     async schedule_post({ post_id, scheduled_at }) {

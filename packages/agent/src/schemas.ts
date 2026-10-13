@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { savedLookSchema, textLookSchema } from "./text-look.ts";
 
 // Mirrors the Postgres enums in supabase/migrations.
 export const postStatusSchema = z.enum([
@@ -98,6 +99,8 @@ export const editPlanTextSchema = z.object({
   scale: z.number().min(0.6).max(1.6).optional(),
   /** …and a dark background behind it, to read it on a busy image. */
   backdrop: z.boolean().optional(),
+  /** A look of its own (copied from an example, or one of brand.text_looks), instead of the template's style. */
+  look: textLookSchema.optional(),
 });
 
 /** Motion templates rendered by Remotion (apps/render); any other template uses the ffmpeg engine. */
@@ -264,6 +267,8 @@ export const brandProfileSchema = z.object({
   default_template: motionTemplateSchema.optional().describe("Gabarit de montage préféré du studio"),
   /** Inspiration images from the Style page, and Fauve's reading of them (what the montage follows). */
   moodboard: moodboardSchema.optional(),
+  /** Text looks the manager keeps (copied from examples she sent, or set by hand). */
+  text_looks: z.array(savedLookSchema).max(12).optional(),
   dos: z.array(z.string()),
   donts: z.array(z.string()),
 });

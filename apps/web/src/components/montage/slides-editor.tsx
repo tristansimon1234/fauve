@@ -1,6 +1,6 @@
 "use client";
 
-import { buildSlideProps, SLIDE_Y, type ReelInputs, type SlidesPlan, type SlideText } from "@fauve/agent";
+import { buildSlideProps, SLIDE_Y, type ReelInputs, type SavedLook, type SlidesPlan, type SlideText } from "@fauve/agent";
 import { useMemo, useRef, useState } from "react";
 import { PenIcon, PlusIcon } from "@/components/icons";
 import { SlidePreview } from "./slide-preview";
@@ -24,6 +24,7 @@ export function SlidesEditor({
   brand,
   dark = false,
   previewWidth = "100%",
+  looks,
 }: {
   plan: SlidesPlan;
   onChange: (plan: SlidesPlan) => void;
@@ -33,6 +34,8 @@ export function SlidesEditor({
   /** The mobile page is dark; the app is light. */
   dark?: boolean;
   previewWidth?: string;
+  /** The studio's saved text looks: with them, each text can take any look. */
+  looks?: SavedLook[];
 }) {
   const first = Math.max(0, plan.slides.findIndex((s) => photos[s.media_id]));
   const [index, setIndex] = useState(first);
@@ -124,6 +127,8 @@ export function SlidesEditor({
               setActive(null);
             }}
             onClose={() => setActive(null)}
+            looks={looks ? { saved: looks, brand: props.brand } : undefined}
+            video={false}
           />
         ) : (
           <div className="flex flex-wrap gap-2">
