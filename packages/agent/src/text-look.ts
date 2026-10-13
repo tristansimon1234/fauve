@@ -49,11 +49,35 @@ export const textLookSchema = z.object({
 });
 export type TextLook = z.infer<typeof textLookSchema>;
 
-/** A look kept in the studio's style, with a name the manager and Fauve use. */
+/** The mark before each item of a list. */
+export const bulletSchema = z.object({
+  kind: z.enum(["check", "box", "dot", "dash", "number", "arrow"]).describe("check : case cochée ; box : case vide ; dot : puce ; dash : tiret ; number : 1, 2, 3 ; arrow : flèche"),
+  color: lookColorSchema,
+});
+export type Bullet = z.infer<typeof bulletSchema>;
+
+/** A list in one text (checklist, planning, steps, prices): a title per item and an optional line below it. */
+export const listItemsSchema = z
+  .array(z.object({ title: z.string().min(1).max(80), detail: z.string().max(160).optional() }))
+  .min(1)
+  .max(8);
+export type ListItem = z.infer<typeof listItemsSchema>[number];
+
+/** The list fields a text may carry (on a montage or a photo): its items, the look of the lines below the titles, the bullets. */
+export const listFields = {
+  items: listItemsSchema.optional().describe("Pour une liste (checklist, planning, étapes, tarifs) : un titre par élément et une ligne de détail facultative ; le texte sert alors de nom à la liste et n'est pas affiché"),
+  detail_look: textLookSchema.optional().describe("Style des lignes de détail d'une liste (sinon une version plus petite du look)"),
+  bullet: bulletSchema.optional().describe("Puce avant chaque élément d'une liste"),
+};
+
+/** A look kept in the studio's style, with a name the manager and Fauve use (a list keeps its details and bullets, and a place). */
 export const savedLookSchema = z.object({
   name: z.string().min(1).max(40),
   role: z.enum(["hook", "band", "caption"]).describe("Le rôle où ce style sert d'habitude"),
   look: textLookSchema,
+  list: z.object({ detail_look: textLookSchema.optional(), bullet: bulletSchema.optional() }).optional().describe("Présent si ce style est celui d'une liste"),
+  y: z.number().min(0).max(1).optional(),
+  x: z.number().min(0).max(1).optional(),
 });
 export type SavedLook = z.infer<typeof savedLookSchema>;
 
@@ -90,16 +114,23 @@ export const textExampleSchema = z.object({
         y: z.number().min(0).max(1).describe("Haut du bloc, en part de la hauteur de l'image (0 = tout en haut)"),
         x: z.number().min(0).max(1).describe("Centre horizontal du bloc, en part de la largeur"),
         look: textLookSchema,
+        list: z
+          .object({ items: listItemsSchema, detail_look: textLookSchema.optional(), bullet: bulletSchema.optional() })
+          .optional()
+          .describe("Si ce bloc est une liste : ses éléments, le style des lignes de détail, la puce"),
       }),
     )
     .min(1)
-    .max(4),
+    .max(5),
+  logo: z.enum(["none", "top", "bottom"]).describe("Logo du commerce posé sur l'image, et où"),
 });
 export type TextExample = z.infer<typeof textExampleSchema>;
 
 export const TEXT_EXAMPLE_PROMPT = `Tu es le typographe de Fauve, une community manager IA pour les commerces de quartier. La gérante t'envoie l'image d'un post (souvent une capture d'Instagram) dont elle aime les textes : elle veut le même rendu sur ses publications. Décris chaque bloc de texte posé sur l'image, assez précisément pour le refaire à l'identique.
 
-Pour chaque bloc distinct (3-4 au plus, les plus visibles ; ignore l'interface d'Instagram, les pseudos, les compteurs, les sous-titres automatiques) :
+Une liste (checklist, planning, étapes, tarifs, « 3 raisons de… ») est UN seul bloc, role band, avec list : ses éléments (title, et detail pour la ligne plus petite dessous), detail_look pour le style de ces lignes, bullet pour la puce (case cochée, puce, numéro…) ; look décrit alors les titres des éléments. Un titre au-dessus de la liste est un bloc à part (hook).
+
+Pour chaque bloc distinct (5 au plus, les plus visibles ; ignore l'interface d'Instagram, les pseudos, les compteurs, les sous-titres automatiques) :
 - name : un nom court et parlant, que la gérante reconnaîtra ;
 - role : hook pour le grand titre, band pour un texte posé sur un fond (bandeau, étiquette), caption pour une petite ligne ;
 - text, y, x : le texte et sa place sur l'image ;
@@ -111,4 +142,5 @@ Pour chaque bloc distinct (3-4 au plus, les plus visibles ; ignore l'interface d
   - emphasis : si certains mots ressortent (autre couleur, autre police, surlignés), comment ;
   - rotate : l'inclinaison s'il y en a une ;
   - enter : l'apparition qui irait avec ce style dans une vidéo (pop pour un style punchy, rise ou fade pour un style doux, typewriter pour un style machine à écrire, slide pour un bandeau).
-summary : le style en une ou deux phrases simples, sans jargon, comme tu l'expliquerais à la gérante.`;
+logo : où le logo du commerce est posé, s'il y en a un.
+summary : le style et la mise en page en une ou deux phrases simples, sans jargon, comme tu l'expliquerais à la gérante.`;

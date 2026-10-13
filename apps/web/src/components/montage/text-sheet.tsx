@@ -1,6 +1,7 @@
 "use client";
 
-import type { SavedLook, TextLook } from "@fauve/agent";
+import type { Bullet, ListItem, SavedLook, TextLook } from "@fauve/agent";
+import { ListItems } from "./list-items";
 import { TrashIcon, XIcon } from "@/components/icons";
 import { LookPanel } from "./look-panel";
 import { DEFAULT_Y } from "./text-boxes";
@@ -15,6 +16,9 @@ export type SheetText = {
   scale?: number;
   backdrop?: boolean;
   look?: TextLook;
+  items?: ListItem[];
+  detail_look?: TextLook;
+  bullet?: Bullet;
 };
 
 const styleLabels: Record<SheetText["style"], string> = { hook: "Accroche", band: "Bandeau", caption: "Sous-titre" };
@@ -41,6 +45,9 @@ export function TextSheet<T extends SheetText>({
   return (
     <div className="flex flex-col gap-3 rounded-[18px] bg-white p-3.5 text-ink">
       <div className="flex items-center gap-2">
+        {text.items ? (
+          <span className="min-w-0 flex-1 text-[14px] font-bold">Liste · {text.items.length} élément{text.items.length > 1 ? "s" : ""}</span>
+        ) : (
         <input
           value={text.text}
           onChange={(e) => onChange({ text: e.target.value })}
@@ -48,11 +55,27 @@ export function TextSheet<T extends SheetText>({
           aria-label="Texte"
           className="min-w-0 flex-1 rounded-[12px] border border-line px-3 py-2.5 text-[16px] outline-none focus:border-violet"
         />
+        )}
         <button type="button" aria-label="Fermer" onClick={onClose} className="flex size-10 shrink-0 items-center justify-center rounded-full bg-chip text-muted">
           <XIcon size={16} />
         </button>
       </div>
+      {text.items && <ListItems items={text.items} bullet={text.bullet} onChange={(patch) => onChange({ ...patch, ...(patch.items ? { text: patch.items[0]?.title ?? text.text } : {}) })} />}
       <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          aria-pressed={Boolean(text.items)}
+          onClick={() =>
+            onChange(
+              text.items
+                ? { items: undefined, bullet: undefined, detail_look: undefined, text: text.items.map((i) => i.title).join(" · ").slice(0, 120) }
+                : { items: [{ title: text.text }], bullet: { kind: "check", color: "#ffffff" } },
+            )
+          }
+          className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${text.items ? "bg-violet text-white" : "bg-violet-soft text-violet"}`}
+        >
+          Liste
+        </button>
         {(Object.keys(styleLabels) as SheetText["style"][]).map((style) => (
           <button
             key={style}

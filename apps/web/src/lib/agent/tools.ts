@@ -419,15 +419,19 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (!name) return undefined;
         const found = looks.find((l) => l.name.toLowerCase() === name.toLowerCase());
         if (!found) unknownLooks.add(name);
-        return found?.look;
+        return found;
       };
       const plan = {
         template: template ?? (previous.success ? previous.data.template : "doux"),
         slides: mediaIds.slice(0, 10).map((media_id, i) => ({
           media_id,
+          ...(slides[i]?.logo ? { logo: slides[i].logo } : {}),
           texts: (slides[i]?.texts ?? []).map(({ look_name, ...t }) => {
-            const look = lookNamed(look_name);
-            return look ? { ...t, look } : t;
+            const saved = lookNamed(look_name);
+            if (!saved) return t;
+            // A saved look brings its place, and for a list its detail lines and bullets.
+            const list = t.items ? { detail_look: saved.list?.detail_look, bullet: saved.list?.bullet } : {};
+            return { ...t, look: saved.look, ...list, ...(saved.y !== undefined ? { y: saved.y } : {}), ...(saved.x !== undefined ? { x: saved.x } : {}) };
           }),
         })),
       };
@@ -463,7 +467,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       await keepTextLooks(
         studioId,
-        example.blocks.map((b) => ({ name: b.name, role: b.role, look: b.look })),
+        example.blocks.map((b) => ({
+          name: b.name,
+          role: b.role,
+          look: b.look,
+          ...(b.list ? { list: { detail_look: b.list.detail_look, bullet: b.list.bullet } } : {}),
+          y: b.y,
+          x: b.x,
+        })),
       );
       let applied: Record<string, unknown> | undefined;
       if (post_id) {
@@ -483,11 +494,21 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       return json({
         summary: example.summary,
-        saved_looks: example.blocks.map((b) => ({ name: b.name, role: b.role, example_text: b.text, font: b.look.font })),
+        // The example's layout, block by block: what to write again with the studio's own words.
+        layout: example.blocks.map((b) => ({
+          look_name: b.name,
+          role: b.role,
+          example_text: b.text,
+          list: b.list ? { items: b.list.items.length, bullet: b.list.bullet?.kind, example: b.list.items.slice(0, 2) } : undefined,
+          font: b.look.font,
+        })),
+        logo: example.logo,
         applied,
-        note: applied && !("error" in applied)
-          ? "Les styles sont enregistrés et appliqués ; le rendu part après ta réponse et le lien est envoyé tout seul. Dis en une phrase ce que tu as repris de l'exemple."
-          : "Les styles sont enregistrés dans le style du studio. Propose de les appliquer à une publication (copy_text_style avec post_id, ou write_on_photos avec look_name).",
+        note:
+          (applied && !("error" in applied)
+            ? "Les styles sont enregistrés et appliqués aux textes existants ; le rendu part après ta réponse et le lien est envoyé tout seul. "
+            : "Les styles sont enregistrés dans le style du studio. ") +
+          "Pour refaire la même chose (même mise en page : titre, liste à puces, logo…), appelle write_on_photos sur la publication avec un texte par bloc de layout, son look_name, les mots du commerce (pour une liste : items avec title et detail), et logo si l'exemple en a un. Dis en une phrase ce que tu as repris de l'exemple.",
       });
     },
 

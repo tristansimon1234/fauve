@@ -31,7 +31,7 @@ export function Reel(props: ReelProps) {
   loadFonts([
     props.brand.displayFont,
     props.brand.bodyFont,
-    ...props.texts.flatMap((t) => (t.look ? [t.look.font, ...(t.look.emphasis?.font ? [t.look.emphasis.font] : [])] : [])),
+    ...props.texts.flatMap((t) => [t.look, t.detail_look].flatMap((l) => (l ? [l.font, ...(l.emphasis?.font ? [l.emphasis.font] : [])] : []))),
   ]);
   const k = props.width / 1080;
 
@@ -79,6 +79,7 @@ export function Reel(props: ReelProps) {
       ))}
 
       {props.words.length > 0 && <Subtitles props={props} theme={theme} k={k} />}
+      <Logo props={props} k={k} />
 
       {props.endCard && (
         <Sequence from={props.endCard.from} layout="none">
@@ -131,8 +132,10 @@ function backdrop(text: ReelProps["texts"][number], k: number): CSSProperties {
  * centre moved by hand (`x`), so the text stays inside the safe zone.
  */
 function sides(text: ReelProps["texts"][number], props: ReelProps, k: number): { left: number; right: number } {
-  const left = SAFE.left * k;
-  const right = SAFE.right * k;
+  // A feed photo (4:5) has no app buttons over it: narrower margins than a Reel's.
+  const still = props.height / props.width < 1.5;
+  const left = (still ? 72 : SAFE.left) * k;
+  const right = (still ? 72 : SAFE.right) * k;
   if (text.x === undefined) return { left, right };
   const centre = text.x * props.width;
   const half = Math.max(80 * k, Math.min(centre - left, props.width - right - centre));
@@ -142,7 +145,7 @@ function sides(text: ReelProps["texts"][number], props: ReelProps, k: number): {
 function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   // Remount when edited, so the fit is measured again (scene editor).
   const key = `${text.text}|${text.style}|${text.scale ?? 1}|${text.x ?? ""}|${text.backdrop ?? false}|${text.look ? JSON.stringify(text.look) : ""}`;
-  if (text.look) return <LookText key={key} text={text} look={text.look} index={index} props={props} theme={theme} k={k} />;
+  if (text.look || text.items) return <LookText key={`${key}|${JSON.stringify([text.items, text.detail_look, text.bullet])}`} text={text} index={index} props={props} theme={theme} k={k} />;
   if (text.style === "hook") return <Hook key={key} text={text} index={index} props={props} theme={theme} k={k} />;
   if (text.style === "band") return <Band key={key} text={text} index={index} props={props} theme={theme} k={k} />;
   return <Caption key={key} text={text} index={index} props={props} theme={theme} k={k} />;
@@ -303,49 +306,14 @@ const lookShadows = (k: number) => ({
 /** Default place of a text by role (top edge, share of the height), like the template styles. */
 const LOOK_Y = { hook: 0.12, band: 0.37, caption: 0.63 } as const;
 
-/**
- * A text with a look of its own (copied from an example, or set by hand): any
- * Google font, colours, a box, pill or line highlight behind it, an outline, a
- * shadow, a tilt and an entrance. It shrinks to fit its box, like a hook.
- */
-function LookText({
-  text,
-  look,
-  index,
-  props,
-  theme,
-  k,
-}: {
-  text: ReelProps["texts"][number];
-  look: TextLook;
-  index: number;
-  props: ReelProps;
-  theme: Theme;
-  k: number;
-}) {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const exit = useExit(text.durationInFrames, theme);
-  const scale = text.scale ?? 1;
-  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(/\s+/)).map(normalize));
-  const words = text.text.split(/\s+/).filter(Boolean);
-  const fill = look.fill;
-  const pad = { y: 14 * k, x: 26 * k };
+/** The look a list without one of its own gets: the template's body font, white, a soft shadow. */
+function listFallback(props: ReelProps): TextLook {
+  return { font: props.brand.bodyFont, weight: 700, italic: false, uppercase: false, size: 48, letter_spacing: 0, line_height: 1.2, color: "#ffffff", align: "left", shadow: "strong", rotate: 0, enter: "rise" };
+}
 
-  const box: CSSProperties = {
-    position: "absolute",
-    top: props.height * (text.y ?? LOOK_Y[text.style]),
-    height: props.height * (text.style === "hook" ? 0.3 : 0.2) * Math.max(1, scale),
-    ...sides(text, props, k),
-    opacity: exit.opacity,
-    transform: `translateY(${exit.translate * k}px)`,
-  };
-  const inner: CSSProperties = {
-    justifyContent: "flex-start",
-    alignItems: look.align === "left" ? "flex-start" : look.align === "right" ? "flex-end" : "center",
-    textAlign: look.align,
-  };
-  const type: CSSProperties = {
+/** Typography of a look, at the frame's scale. */
+function lookType(look: TextLook, props: ReelProps, k: number, scale: number): CSSProperties {
+  return {
     fontFamily: `"${look.font}", "${props.brand.bodyFont}", sans-serif`,
     fontWeight: look.weight,
     fontStyle: look.italic ? "italic" : "normal",
@@ -357,62 +325,152 @@ function LookText({
     textShadow: lookShadows(k)[look.shadow],
     ...(look.stroke ? { WebkitTextStroke: `${look.stroke.width * k}px ${lookColor(look.stroke.color, props)}`, paintOrder: "stroke fill" } : {}),
   };
-  // Box and pill: one block behind the whole text. Line: a highlight that hugs each line.
-  const block: CSSProperties =
-    fill && fill.kind !== "line"
-      ? {
-          display: "inline-block",
-          background: lookColor(fill.color, props, fill.opacity),
-          borderRadius: fill.kind === "pill" ? 999 : (fill.radius ?? 8) * k,
-          padding: fill.kind === "pill" ? `${pad.y}px ${pad.x * 1.4}px` : `${pad.y}px ${pad.x}px`,
-        }
-      : { display: "inline-block" };
-  const line: CSSProperties | undefined =
-    fill?.kind === "line"
-      ? {
-          background: lookColor(fill.color, props, fill.opacity),
-          borderRadius: (fill.radius ?? 6) * k,
-          padding: `${4 * k}px ${14 * k}px`,
-          boxDecorationBreak: "clone",
-          WebkitBoxDecorationBreak: "clone",
-        }
-      : undefined;
+}
+
+/** Box and pill: one block behind the whole text. */
+function lookBlock(look: TextLook, props: ReelProps, k: number): CSSProperties {
+  const fill = look.fill;
+  if (!fill || fill.kind === "line") return { display: "inline-block" };
+  return {
+    display: "inline-block",
+    background: lookColor(fill.color, props, fill.opacity),
+    borderRadius: fill.kind === "pill" ? 999 : (fill.radius ?? 8) * k,
+    padding: fill.kind === "pill" ? `${14 * k}px ${36 * k}px` : `${14 * k}px ${26 * k}px`,
+  };
+}
+
+/** Line: a highlight that hugs each line of text. */
+function lookLine(look: TextLook, props: ReelProps, k: number): CSSProperties | undefined {
+  const fill = look.fill;
+  if (fill?.kind !== "line") return undefined;
+  return {
+    background: lookColor(fill.color, props, fill.opacity),
+    borderRadius: (fill.radius ?? 6) * k,
+    padding: `${2 * k}px ${10 * k}px`,
+    boxDecorationBreak: "clone",
+    WebkitBoxDecorationBreak: "clone",
+    lineHeight: look.line_height + 0.22,
+  };
+}
+
+/** The mark before an item of a list. */
+function BulletMark({ bullet, n, size, props }: { bullet: NonNullable<ReelProps["texts"][number]["bullet"]>; n: number; size: number; props: ReelProps }) {
+  const color = lookColor(bullet.color, props);
+  const box: CSSProperties = { width: size, height: size, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" };
+  if (bullet.kind === "check" || bullet.kind === "box") {
+    return (
+      <span style={{ ...box, border: `${Math.max(2, size * 0.09)}px solid ${color}`, boxSizing: "border-box" }}>
+        {bullet.kind === "check" ? (
+          <svg viewBox="0 0 24 24" width={size * 1.05} height={size * 1.05} style={{ marginTop: -size * 0.28, marginRight: -size * 0.3 }}>
+            <path d="M3 13l6 6L22 4" fill="none" stroke={color} strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : null}
+      </span>
+    );
+  }
+  if (bullet.kind === "dot") return <span style={box}><span style={{ width: size * 0.36, height: size * 0.36, borderRadius: 999, background: color }} /></span>;
+  if (bullet.kind === "dash") return <span style={box}><span style={{ width: size * 0.6, height: Math.max(2, size * 0.1), background: color }} /></span>;
+  return <span style={{ ...box, width: "auto", minWidth: size, color, fontSize: size * 0.9, fontWeight: 700 }}>{bullet.kind === "number" ? `${n + 1}.` : "→"}</span>;
+}
+
+/**
+ * A text with a look of its own (copied from an example, or set by hand): any
+ * Google font, colours, a box, pill or line highlight behind it, an outline, a
+ * shadow, a tilt and an entrance; or a list (checklist, planning, steps) with a
+ * bullet, a title and a smaller line per item. It shrinks to fit its box.
+ */
+function LookText({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const exit = useExit(text.durationInFrames, theme);
+  const look = text.look ?? listFallback(props);
+  const scale = text.scale ?? 1;
+  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(/\s+/)).map(normalize));
+  const top = text.y ?? LOOK_Y[text.style];
+
+  const box: CSSProperties = {
+    position: "absolute",
+    top: props.height * top,
+    height: text.items
+      ? props.height * Math.max(0.2, 0.94 - top)
+      : props.height * (text.style === "hook" ? 0.3 : 0.2) * Math.max(1, scale),
+    ...sides(text, props, k),
+    opacity: exit.opacity,
+    transform: `translateY(${exit.translate * k}px)`,
+  };
+  const inner: CSSProperties = {
+    justifyContent: "flex-start",
+    alignItems: look.align === "left" ? "flex-start" : look.align === "right" ? "flex-end" : "center",
+    textAlign: look.align,
+  };
 
   // Entrances play in a video; a still (carousel) is captured once they are over.
-  const typed = look.enter === "typewriter" ? Math.floor(Math.max(0, frame) / 1.4) : Infinity;
-  let shown = 0;
   const enterOf = (i: number): CSSProperties => {
     const p = spring({ frame: frame - i * 3, fps, config: theme.spring });
     if (look.enter === "pop") return { transform: `scale(${interpolate(p, [0, 1], [0.55, 1])})`, opacity: interpolate(p, [0, 0.4], [0, 1], clamp) };
     if (look.enter === "rise") return { transform: `translateY(${interpolate(p, [0, 1], [30 * k, 0])}px)`, opacity: p };
     if (look.enter === "slide") return { transform: `translateX(${interpolate(p, [0, 1], [-40 * k, 0])}px)`, opacity: p };
-    if (look.enter === "fade") return { opacity: interpolate(frame, [i * 2, i * 2 + 10], [0, 1], clamp) };
+    if (look.enter === "fade" || look.enter === "typewriter") return { opacity: interpolate(frame, [i * 2, i * 2 + 10], [0, 1], clamp) };
     return {};
   };
 
+  if (text.items) {
+    const detail: TextLook = text.detail_look ?? {
+      ...look,
+      size: look.size * 0.62,
+      weight: 400,
+      uppercase: false,
+      letter_spacing: 0,
+      fill: undefined,
+      stroke: undefined,
+      emphasis: undefined,
+    };
+    const size = look.size * k * scale;
+    return (
+      <Fit style={box} innerStyle={inner} marker={String(index)}>
+        <div style={{ display: "flex", flexDirection: "column", gap: size * 0.85, alignItems: inner.alignItems, transform: look.rotate ? `rotate(${look.rotate}deg)` : undefined }}>
+          {text.items.map((item, n) => (
+            <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: size * 0.42, textAlign: look.align, ...enterOf(n * 2) }}>
+              {text.bullet ? <BulletMark bullet={text.bullet} n={n} size={size * 0.95} props={props} /> : null}
+              <div style={{ display: "flex", flexDirection: "column", gap: size * 0.22, alignItems: inner.alignItems }}>
+                <span style={lookBlock(look, props, k)}>
+                  <span style={{ ...lookType(look, props, k, scale), ...lookLine(look, props, k) }}>{item.title}</span>
+                </span>
+                {item.detail ? (
+                  <span style={{ ...lookType(detail, props, k, scale), ...lookLine(detail, props, k) }}>{item.detail}</span>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Fit>
+    );
+  }
+
+  const words = text.text.split(/\s+/).filter(Boolean);
+  const typed = look.enter === "typewriter" ? Math.floor(Math.max(0, frame) / 1.4) : Infinity;
+  let shown = 0;
   return (
     <Fit style={box} innerStyle={inner} marker={String(index)}>
-      <div style={{ ...block, transform: look.rotate ? `rotate(${look.rotate}deg)` : undefined }}>
-        <span style={{ ...type, ...(line ?? {}), lineHeight: line ? look.line_height + 0.25 : look.line_height }}>
+      <div style={{ ...lookBlock(look, props, k), transform: look.rotate ? `rotate(${look.rotate}deg)` : undefined }}>
+        <span style={{ ...lookType(look, props, k, scale), ...lookLine(look, props, k) }}>
           {words.map((word, i) => {
             const start = shown;
             shown += word.length + 1;
             const visible = look.enter === "typewriter" ? word.slice(0, Math.max(0, typed - start)) : word;
-            const stressed = emphasis.has(normalize(word));
-            const e = look.emphasis;
-            const stress: CSSProperties | undefined =
-              stressed && e
-                ? {
-                    color: e.color ? lookColor(e.color, props) : undefined,
-                    fontFamily: e.font ? `"${e.font}", "${look.font}", sans-serif` : undefined,
-                    fontStyle: e.italic ? "italic" : undefined,
-                    background: e.fill ? lookColor(e.fill, props) : undefined,
-                    borderRadius: e.fill ? 6 * k : undefined,
-                    padding: e.fill ? `0 ${8 * k}px` : undefined,
-                  }
-                : undefined;
+            const e = emphasis.has(normalize(word)) ? look.emphasis : undefined;
+            const stress: CSSProperties | undefined = e
+              ? {
+                  color: e.color ? lookColor(e.color, props) : undefined,
+                  fontFamily: e.font ? `"${e.font}", "${look.font}", sans-serif` : undefined,
+                  fontStyle: e.italic ? "italic" : undefined,
+                  background: e.fill ? lookColor(e.fill, props) : undefined,
+                  borderRadius: e.fill ? 6 * k : undefined,
+                  padding: e.fill ? `0 ${8 * k}px` : undefined,
+                }
+              : undefined;
             return (
-              <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...enterOf(i) }}>
+              <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...(look.enter === "typewriter" ? {} : enterOf(i)) }}>
                 {/* Typewriter: the letters not typed yet keep their room, so lines never jump. */}
                 <span style={stress}>
                   {visible}
@@ -425,6 +483,17 @@ function LookText({
         </span>
       </div>
     </Fit>
+  );
+}
+
+/** The studio's logo over a still or a video, centred at the top or the bottom. */
+function Logo({ props, k }: { props: ReelProps; k: number }) {
+  if (!props.logo || !props.brand.logoUrl) return null;
+  const edge = props.height * 0.035;
+  return (
+    <div style={{ position: "absolute", left: 0, right: 0, display: "flex", justifyContent: "center", ...(props.logo === "top" ? { top: edge } : { bottom: edge }) }}>
+      <Img src={props.brand.logoUrl} style={{ maxWidth: 240 * k, maxHeight: 130 * k, objectFit: "contain" }} />
+    </div>
   );
 }
 

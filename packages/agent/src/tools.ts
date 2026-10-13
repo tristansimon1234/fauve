@@ -158,7 +158,7 @@ export const toolSpecs = {
   },
   write_on_photos: {
     description:
-      "Écrit du texte par-dessus les photos d'un carrousel ou d'un post photo, à la charte du studio (mêmes polices et styles que les montages). Rendu en images en une minute environ, gratuit ; le lien vers le résultat est envoyé automatiquement à la gérante quand c'est prêt. Une entrée par photo, dans l'ordre des photos de la publication (texts vide = photo sans texte). Court et lisible : une accroche sur la 1re photo (hook), puis un message par photo (band ou caption), 3 textes au plus par photo. Remplace le texte déjà posé ; la gérante peut ensuite déplacer ou corriger chaque texte elle-même.",
+      "Écrit du texte par-dessus les photos d'un carrousel ou d'un post photo, à la charte du studio (mêmes polices et styles que les montages). Rendu en images en une minute environ, gratuit ; le lien vers le résultat est envoyé automatiquement à la gérante quand c'est prêt. Une entrée par photo, dans l'ordre des photos de la publication (texts vide = photo sans texte). Court et lisible : une accroche sur la 1re photo (hook), puis un message par photo (band ou caption), 6 textes au plus par photo. Une liste (checklist, planning, étapes, tarifs) est un seul texte avec items (titre + détail facultatif par élément). Pour refaire la mise en page d'un exemple copié (copy_text_style), reprends un texte par bloc avec son look_name. Remplace le texte déjà posé ; la gérante peut ensuite déplacer ou corriger chaque texte elle-même.",
     input: z.object({
       post_id: z.string().uuid(),
       template: motionTemplateSchema.optional().describe("doux, dynamique ou chic ; par défaut celui déjà choisi, sinon doux"),
@@ -167,11 +167,16 @@ export const toolSpecs = {
           z.object({
             texts: z
               .array(
-                slideTextSchema.pick({ text: true, style: true, emphasis: true }).extend({
-                  look_name: z.string().max(40).optional().describe("Nom d'un style de texte enregistré du studio (text_looks), sinon le style du gabarit"),
+                slideTextSchema.pick({ text: true, style: true, emphasis: true, items: true }).extend({
+                  look_name: z
+                    .string()
+                    .max(40)
+                    .optional()
+                    .describe("Nom d'un style de texte enregistré du studio (text_looks) : il apporte police, couleurs, fond, puces d'une liste et place ; sinon le style du gabarit"),
                 }),
               )
-              .max(3),
+              .max(6),
+            logo: z.enum(["top", "bottom"]).optional().describe("Poser le logo du studio sur cette photo"),
           }),
         )
         .min(1)

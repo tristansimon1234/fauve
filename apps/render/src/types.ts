@@ -55,8 +55,12 @@ export type ReelProps = {
     scale?: number;
     backdrop?: boolean;
     look?: TextLook;
+    items?: { title: string; detail?: string }[];
+    detail_look?: TextLook;
+    bullet?: { kind: "check" | "box" | "dot" | "dash" | "number" | "arrow"; color: string };
   }[];
   words: { w: string; from: number; to: number }[];
   brand: { name: string; accent: string; accentInk: string; displayFont: string; bodyFont: string; logoUrl: string | null };
   endCard: { title: string; subtitle: string | null; from: number } | null;
+  logo?: "top" | "bottom" | null;
 };

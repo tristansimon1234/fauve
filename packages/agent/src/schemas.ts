@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { savedLookSchema, textLookSchema } from "./text-look.ts";
+import { listFields, savedLookSchema, textLookSchema } from "./text-look.ts";
 
 // Mirrors the Postgres enums in supabase/migrations.
 export const postStatusSchema = z.enum([
@@ -101,6 +101,7 @@ export const editPlanTextSchema = z.object({
   backdrop: z.boolean().optional(),
   /** A look of its own (copied from an example, or one of brand.text_looks), instead of the template's style. */
   look: textLookSchema.optional(),
+  ...listFields,
 });
 
 /** Motion templates rendered by Remotion (apps/render); any other template uses the ffmpeg engine. */

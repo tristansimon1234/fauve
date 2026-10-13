@@ -454,5 +454,29 @@ test("text looks: defaults are valid, travel to the render props, and tools acce
   // style_texts: only what changes, and null removes a fill.
   assert.equal(toolSpecs.style_texts.input.safeParse({ post_id: "00000000-0000-4000-8000-00000000000a", look: { color: "#000000", fill: null } }).success, true);
   assert.equal(toolSpecs.copy_text_style.input.parse({ media_id: "00000000-0000-4000-8000-00000000000a" }).copy_places, true);
-  assert.equal(textExampleSchema.safeParse({ summary: "Gros titre jaune", blocks: [{ name: "Titre", role: "hook", text: "SOLDES", y: 0.1, x: 0.5, look }] }).success, true);
+  assert.equal(textExampleSchema.safeParse({ summary: "Gros titre jaune", blocks: [{ name: "Titre", role: "hook", text: "SOLDES", y: 0.1, x: 0.5, look }], logo: "none" }).success, true);
+});
+
+test("lists: a checklist text with items, details and bullets reaches the render props; saved looks keep them", async () => {
+  const { buildSlideProps, slidesPlanSchema } = await import("./slides.ts");
+  const { defaultLook, savedLookSchema } = await import("./text-look.ts");
+  const look = defaultLook("band", { display: "Playfair Display", body: "Inter" });
+  const plan = slidesPlanSchema.parse({
+    template: "chic",
+    slides: [
+      {
+        media_id: "00000000-0000-4000-8000-00000000000a",
+        logo: "bottom",
+        texts: [
+          { text: "Checklist", style: "hook" },
+          { text: "Liste", style: "band", look, bullet: { kind: "check", color: "#ffffff" }, items: [{ title: "Arriver 10 minutes avant", detail: "Pour s'installer." }, { title: "Une gourde" }] },
+        ],
+      },
+    ],
+  });
+  const props = buildSlideProps(plan.slides[0]!, { template: "chic", imageUrl: "https://example.com/a.jpg", brand: { name: "Studio" } });
+  assert.equal(props.logo, "bottom");
+  assert.deepEqual(props.texts[1]?.items?.map((i) => i.title), ["Arriver 10 minutes avant", "Une gourde"]);
+  assert.equal(props.texts[1]?.bullet?.kind, "check");
+  assert.equal(savedLookSchema.safeParse({ name: "Checklist", role: "band", look, list: { bullet: { kind: "check", color: "#ffffff" } }, y: 0.3 }).success, true);
 });

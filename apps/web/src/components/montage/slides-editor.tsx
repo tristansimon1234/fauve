@@ -11,6 +11,12 @@ import { TextSheet } from "./text-sheet";
 // will be published, its texts grabbable on it, a strip to move between photos.
 // Controlled: the page keeps the plan and saves it.
 
+const logoPlaces = [
+  { value: null, label: "Aucun" },
+  { value: "top", label: "En haut" },
+  { value: "bottom", label: "En bas" },
+] as const;
+
 const templates = [
   { value: "doux", label: "Doux" },
   { value: "dynamique", label: "Dynamique" },
@@ -169,6 +175,22 @@ export function SlidesEditor({
           </button>
         ))}
       </div>
+      {brand.logoUrl && (
+        <div className="flex items-center gap-2">
+          <span className={`text-[12px] font-bold ${muted}`}>Logo</span>
+          {logoPlaces.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              aria-pressed={(slide.logo ?? null) === p.value}
+              onClick={() => onChange({ ...plan, slides: plan.slides.map((s, i) => (i === index ? { ...s, logo: p.value ?? undefined } : s)) })}
+              className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${chip((slide.logo ?? null) === p.value)}`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
