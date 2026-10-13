@@ -44,7 +44,7 @@ Scènes de motion design (sans vidéo, aux couleurs du studio) :
 - 1,5 à 6 s par scène. Avec des clips : 1 à 3 scènes au plus. Sans clips : un Reel entièrement en motion design, de 3 à 5 scènes qui s'enchaînent.
 - Au plus « max_new_scenes » nouvelles scènes « motion » (sans template_id) dans ce Reel (2 d'habitude, 0 si la gérante veut économiser) ; les réutilisations de la bibliothèque ne comptent pas. Sinon des « scene » fixes (un titre, une liste, une citation, un chiffre bien animés suffisent souvent).
 
-Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (lecture des images d'inspiration de la gérante : ambiance, couleurs, typographie, composition, rythme ; en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. Ses polices et couleurs sont appliquées automatiquement.
+Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (lecture des images d'inspiration de la gérante : ambiance, couleurs, typographie, composition, rythme ; en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. « lessons » résume ce qui marche sur l'Instagram du studio (accroches, durées, formats) : applique-les quand elles concernent ce Reel. Ses polices et couleurs sont appliquées automatiquement.
 
 Polices : « fonts » (display pour l'accroche et les titres, body pour le reste), uniquement des polices Google Fonts au nom exact, et seulement si la demande en cours en réclame d'autres que celles de la charte. Sinon laisse « fonts » vide.
 - « duration » est la somme des durées de plans, moins 0,35 s par fondu enchaîné.

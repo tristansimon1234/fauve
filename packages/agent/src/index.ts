@@ -13,3 +13,4 @@ export * from "./editor.ts";
 export * from "./motion-scene.ts";
 export * from "./moodboard.ts";
 export * from "./credits.ts";
+export * from "./performance.ts";

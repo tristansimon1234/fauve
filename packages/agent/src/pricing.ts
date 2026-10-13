@@ -10,6 +10,8 @@ export const CLAUDE_MODEL = "claude-opus-5-5";
  */
 export const CHAT_MODEL = "claude-haiku-5-5";
 export const CHAT_EFFORT = "medium" as const;
+/** Weekly "what works" analysis: a small table of numbers, reasoning matters more than volume. */
+export const ANALYST_MODEL = "claude-sonnet-5-5";
 /** Haiku 5.5 rejects server-side fallbacks (400): only send them to models that take them. */
 export const supportsServerFallback = (model: string) => !model.startsWith("claude-haiku");
 

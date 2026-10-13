@@ -9,6 +9,7 @@ import {
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { acceptQuote, createMontageQuote } from "@/lib/credits";
+import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
 import { queueJob } from "@/lib/jobs";
@@ -221,6 +222,21 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         nouvelles_scenes_max: quote.maxNewScenes,
         solde: quote.balance,
         note: "Présente le plan et le coût (credits, ou jusqu'à credits_max s'il crée de nouvelles scènes), puis attends son accord avant montage.",
+      });
+    },
+
+    async analyze_performance({ refresh }) {
+      const latest = await latestReport(studioId);
+      const fresh = latest && Date.now() - new Date(latest.createdAt).getTime() < 3 * 24 * 3600_000;
+      const report = fresh && !refresh ? latest : await analyzePerformance(studioId);
+      if ("error" in report) return json({ error: report.error });
+      return json({
+        bilan: report.summary,
+        lecons: report.lessons,
+        idees: report.ideas,
+        posts_analyses: report.posts,
+        date: report.createdAt,
+        note: "Partage le bilan en 2-3 phrases (la tendance et la leçon la plus utile) ; le détail est dans l'app, page Résultats.",
       });
     },
 
