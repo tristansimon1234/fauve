@@ -25,13 +25,14 @@ import { Bubble } from "./chat-bubble";
 import { montageStep } from "./chat-cards";
 import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "./chat-sync";
 import { FileStrip, useChatUploads } from "./chat-uploads";
+import { applyLive, liveTurn, type LiveState } from "./live-turn";
+import { LiveTyping } from "./live-typing";
 import {
   deleteConversation,
   launchQuote,
   listConversations,
   loadConversation,
   reactToMessage,
-  sendToFauve,
   type Attachment,
   type ChatMessage,
   type ConversationSummary,
@@ -96,6 +97,8 @@ export function FauveWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
   const [pending, startTransition] = useTransition();
+  // While Fauve answers: the line of what she is doing, then her words as she writes them.
+  const [live, setLive] = useState<LiveState | null>(null);
   // Messages that just arrived (they rise in); a conversation that loads whole does not animate.
   const [arrived, setArrived] = useState<Set<string>>(() => new Set());
   // The quote launched from its card: no « Fauve écrit… » meanwhile (nobody is writing), and its progress is scrolled to.
@@ -270,7 +273,8 @@ export function FauveWorkspace({
     const conversationId = active;
     startTransition(async () => {
       try {
-        const res = await sendToFauve(text, conversationId, attachments);
+        setLive({ status: null, text: "", step: -1 });
+        const res = await liveTurn({ text, conversationId, attachments }, (event) => setLive((state) => applyLive(state ?? { status: null, text: "", step: -1 }, event)));
         if (res.ok) {
           setActive(res.conversationId);
           setArrived(arrivals(messagesRef.current, res.messages));
@@ -282,6 +286,8 @@ export function FauveWorkspace({
         }
       } catch {
         setError("Ton message n’est pas parti. Vérifie ta connexion et réessaie.");
+      } finally {
+        setLive(null);
       }
     });
   };
@@ -470,19 +476,7 @@ export function FauveWorkspace({
                   enter={arrived.has(m.id)}
                 />
               ))}
-              {typing && (
-                <div
-                  role="status"
-                  className="fauve-enter flex items-center gap-2 self-start rounded-[18px_18px_18px_6px] border border-line bg-white px-4 py-3 text-sm text-muted [--fauve-delay:120ms]"
-                >
-                  <span className="fauve-dots" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                  </span>
-                  Fauve écrit…
-                </div>
-              )}
+              {typing && <LiveTyping live={live} />}
               <div ref={endRef} />
             </div>
           )}

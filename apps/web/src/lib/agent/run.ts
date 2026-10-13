@@ -12,6 +12,7 @@ import {
   studioContextPrompt,
   toolSpecs,
   usdToEur,
+  TOOL_STATUS,
   type Effort,
   type TokenUsage,
   type ToolHandlers,
@@ -54,7 +55,12 @@ export type RunFauveInput = ToolContext & {
     /** Default level of care for montages (Réglages). */
     montageEffort?: Effort;
   };
+  /** Live: what Fauve is doing, and her words as she writes them (the app's chat). */
+  onEvent?: (event: ChatEvent) => void;
 };
+
+/** A live event of a turn: a line for a tool she calls, or a piece of her text (`step`: the loop step it belongs to). */
+export type ChatEvent = { type: "status"; label: string } | { type: "text"; step: number; delta: string };
 
 export type RunFauveResult = {
   reply: string | null;
@@ -91,7 +97,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: input.studio.timezone }).format(new Date()).split("-").map(Number);
   const nextDays = Array.from({ length: 7 }, (_, i) => dayName.format(new Date(Date.UTC(y!, m! - 1, d! + i + 1, 12))));
 
-  const runner = anthropic().beta.messages.toolRunner({
+  const params = {
     model: CHAT_MODEL,
     max_tokens: 16000,
     max_iterations: 8,
@@ -123,18 +129,35 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
         }),
       },
     ],
-  });
+  } satisfies Parameters<ReturnType<typeof anthropic>["beta"]["messages"]["toolRunner"]>[0];
 
   let usage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
   let last: Anthropic.Beta.BetaMessage | undefined;
   // The text of the last step that wrote some: Fauve often writes her answer with
   // reply_with in the same step, and the loop's final step is then empty.
   let spoken = "";
-  for await (const message of runner) {
+  const take = (message: Anthropic.Beta.BetaMessage) => {
     usage = addUsage(usage, message.usage);
     last = message;
     const text = textOf(message);
     if (text) spoken = text;
+  };
+  const onEvent = input.onEvent;
+  if (onEvent) {
+    // Live (the app): her words as she writes them, then a line for each tool she calls, before it runs.
+    let step = 0;
+    for await (const stream of anthropic().beta.messages.toolRunner({ ...params, stream: true })) {
+      const current = step++;
+      stream.on("text", (delta) => onEvent({ type: "text", step: current, delta }));
+      const message = await stream.finalMessage();
+      take(message);
+      for (const block of message.content) {
+        const label = block.type === "tool_use" ? TOOL_STATUS[block.name as ToolName] : null;
+        if (label) onEvent({ type: "status", label });
+      }
+    }
+  } else {
+    for await (const message of anthropic().beta.messages.toolRunner(params)) take(message);
   }
 
   await logClaudeCost(input.studioId, usage, "conversation", CHAT_MODEL);
