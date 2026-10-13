@@ -1,10 +1,12 @@
-import { postStatusSchema, type PostKind } from "@fauve/agent";
+import { alignSlides, postStatusSchema, type PostKind } from "@fauve/agent";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { z } from "zod";
 import { formatDateTime } from "@/lib/format";
 import { loadEditorData } from "@/lib/montage-editor-data";
+import { loadMontageInputs } from "@/lib/render/render-post";
+import { postSlides } from "@/lib/render/slides";
 import { whatsappLink } from "@/lib/public-env";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { instagramAccount } from "@/lib/social/publish";
@@ -33,7 +35,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
 
   const { data: post } = await db
     .from("posts")
-    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids")
+    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -63,6 +65,21 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
   const signed = await signMediaUrls(db, studioId, [...(path ? [path] : []), ...(assets.data ?? []).map((a) => a.storage_path as string)]);
   const videoUrl = path ? (signed.get(path) ?? null) : null;
   const byId = new Map((assets.data ?? []).map((a) => [a.id as string, a]));
+  // Text over the photos (carousel, photo post): the plan, or an empty one to start from by hand.
+  const photos: Record<string, string> = {};
+  for (const mid of ids) {
+    const a = byId.get(mid);
+    const url = a ? signed.get(a.storage_path as string) : undefined;
+    if (a && url && a.kind !== "video" && !String(a.mime_type ?? "").startsWith("video/")) photos[mid] = url;
+  }
+  const slides =
+    (post.kind === "carousel" || post.kind === "post") && Object.keys(photos).length
+      ? {
+          plan: postSlides({ slides: post.slides, media_ids: ids }) ?? alignSlides({ template: "doux", slides: [] }, ids),
+          photos,
+          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, fonts: i.fonts })),
+        }
+      : null;
   const media: ActionMedia[] = ids.flatMap((mid) => {
     const a = byId.get(mid);
     const url = a ? signed.get(a.storage_path as string) : undefined;
@@ -90,6 +107,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
       videoUrl={videoUrl}
       media={media}
       grid={post.kind === "story" ? null : grid}
+      slides={slides}
       changeHref={whatsappLink(`Pour « ${post.title as string} » : `)}
       backHref={whatsappLink("")}
     />

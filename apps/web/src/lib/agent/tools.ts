@@ -6,6 +6,7 @@ import {
   type PostKind,
   type ReplyExtras,
   type ToolHandlers,
+  slidesPlanSchema,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -15,7 +16,8 @@ import { montageStatus } from "@/lib/montage-status";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
-import { renderAndDeliver } from "@/lib/render/deliver";
+import { renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
+import { saveSlides } from "@/lib/render/slides";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
@@ -374,6 +376,37 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         status: "started",
         note: "Le montage démarre après ta réponse et la vidéo sera envoyée automatiquement (environ une minute). Annonce-le en une phrase, sans décrire la vidéo comme si elle était déjà prête.",
+      });
+    },
+
+    async write_on_photos({ post_id, template, slides }) {
+      const post = unwrap(
+        await db.from("posts").select("id, kind, status, media_ids, slides").eq("id", post_id).eq("studio_id", studioId).single(),
+      );
+      if (post.kind !== "carousel" && post.kind !== "post") {
+        return json({ error: "Le texte sur photos est pour un carrousel ou un post photo. Pour un Reel, les textes font partie du montage." });
+      }
+      if (post.status === "published" || post.status === "measured") return json({ error: "Cette publication est déjà en ligne." });
+      const mediaIds = (post.media_ids as string[] | null) ?? [];
+      if (!mediaIds.length) return json({ error: "Cette publication n'a pas encore de photos : ajoute-les d'abord (update_post media_ids)." });
+      const previous = slidesPlanSchema.safeParse(post.slides);
+      const plan = {
+        template: template ?? (previous.success ? previous.data.template : "doux"),
+        slides: mediaIds.slice(0, 10).map((media_id, i) => ({ media_id, texts: slides[i]?.texts ?? [] })),
+      };
+      try {
+        await saveSlides(studioId, post_id, plan);
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "Texte non enregistré" });
+      }
+      ctx.afterReply.push(async () => {
+        await renderSlidesAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
+      });
+      return json({
+        status: "started",
+        photos: mediaIds.length,
+        ignored: slides.length > mediaIds.length ? `${slides.length - mediaIds.length} entrée(s) en trop ignorée(s)` : undefined,
+        note: "Le texte est posé après ta réponse (environ une minute) et le lien part automatiquement. Annonce-le en une phrase, sans envoyer de lien toi-même.",
       });
     },
 

@@ -2,6 +2,7 @@
 
 import {
   buildReelProps,
+  buildSlideProps,
   editPlanSchema,
   segmentKind,
   statusLabels,
@@ -10,14 +11,18 @@ import {
   type PostKind,
   type PostStatus,
   type ReelInputs,
+  type SlidesPlan,
 } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
-import { useMemo, useRef, useState, useTransition } from "react";
-import { CheckIcon, LayersIcon, PenIcon, PlayIcon, PlusIcon, TrashIcon, WhatsAppIcon, XIcon } from "@/components/icons";
-import { DEFAULT_Y, TextBoxes } from "@/components/montage/text-boxes";
+import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { CheckIcon, LayersIcon, PenIcon, PlayIcon, PlusIcon, WhatsAppIcon } from "@/components/icons";
+import { SlidePreview } from "@/components/montage/slide-preview";
+import { SlidesEditor } from "@/components/montage/slides-editor";
+import { TextBoxes } from "@/components/montage/text-boxes";
+import { TextSheet } from "@/components/montage/text-sheet";
 import { Orb } from "@/components/orb";
 import { ReelPlayer } from "@/components/reel-player";
-import { saveEditPlan, updatePost } from "@/app/(app)/publications/[id]/actions";
+import { saveEditPlan, saveSlidesPlan, updatePost } from "@/app/(app)/publications/[id]/actions";
 
 // The page a WhatsApp link opens, made for a phone: watch the montage, then one
 // thumb away from validating it, moving a text, or asking Fauve for a change.
@@ -25,7 +30,6 @@ import { saveEditPlan, updatePost } from "@/app/(app)/publications/[id]/actions"
 type Text = EditPlan["texts"][number];
 type Mode = "view" | "edit" | "done";
 
-const styleLabels: Record<Text["style"], string> = { hook: "Accroche", band: "Bandeau", caption: "Sous-titre" };
 const kindLabels: Record<PostKind, string> = { reel: "Reel", post: "Post", carousel: "Carrousel", story: "Story" };
 const sceneLabels = { clip: "Vidéo", scene: "Écran", motion: "Animation" } as const;
 const round = (n: number) => Math.round(n * 10) / 10;
@@ -49,6 +53,7 @@ export function ActionView({
   videoUrl,
   media,
   grid,
+  slides,
   changeHref,
   backHref,
 }: {
@@ -59,6 +64,8 @@ export function ActionView({
   media: ActionMedia[];
   /** The latest Instagram posts, for the grid preview; null when it does not apply (story). */
   grid: GridTile[] | null;
+  /** Text over the photos (carousel or photo post): the plan, the photos by media id, the brand. */
+  slides: { plan: SlidesPlan; photos: Record<string, string>; brand: ReelInputs["brand"] } | null;
   changeHref: string;
   backHref: string;
 }) {
@@ -67,6 +74,8 @@ export function ActionView({
   const [status, setStatus] = useState(post.status);
   const [saved, setSaved] = useState(editor?.plan ?? null);
   const [plan, setPlan] = useState(editor?.plan ?? null);
+  const [savedSlides, setSavedSlides] = useState(slides?.plan ?? null);
+  const [slidePlan, setSlidePlan] = useState(slides?.plan ?? null);
   const [caption, setCaption] = useState(post.caption);
   const [savedCaption, setSavedCaption] = useState(post.caption);
   const [editingCaption, setEditingCaption] = useState(false);
@@ -83,7 +92,8 @@ export function ActionView({
   const dirty = plan !== null && JSON.stringify(plan) !== JSON.stringify(saved);
   const valid = plan === null || editPlanSchema.safeParse(plan).success;
   const canValidate = status === "draft";
-  const editable = editor !== null && status !== "published" && status !== "measured";
+  const editable = (editor !== null || slides !== null) && status !== "published" && status !== "measured";
+  const slidesDirty = slidePlan !== null && JSON.stringify(slidePlan) !== JSON.stringify(savedSlides);
 
   const seek = (seconds: number) => props && playerRef.current?.seekTo(Math.round(seconds * props.fps));
   const setText = (i: number, patch: Partial<Text>) => {
@@ -118,11 +128,20 @@ export function ActionView({
 
   const cancelEdit = () => {
     setPlan(saved);
+    setSlidePlan(savedSlides);
     setActive(null);
     setMode("view");
   };
   const saveEdit = () =>
     start(async () => {
+      if (slides && slidePlan) {
+        const res = await saveSlidesPlan(post.id, slidePlan).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
+        if (!res.ok) return setToast({ ok: false, text: res.error });
+        setSavedSlides(slidePlan);
+        setMode("view");
+        setToast({ ok: true, text: "C’est enregistré. Les images finales se mettent à jour en une minute environ." });
+        return;
+      }
       if (!plan) return;
       const res = await saveEditPlan(post.id, plan).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
       if (!res.ok) return setToast({ ok: false, text: res.error });
@@ -170,7 +189,20 @@ export function ActionView({
     );
   }
 
-  const editing = mode === "edit" && plan !== null;
+  const editingSlides = mode === "edit" && slides !== null && slidePlan !== null;
+  const editing = mode === "edit" && !editingSlides && plan !== null;
+  // The photos as published: with their texts when there are some (drawn live).
+  const slideNodes =
+    slides && slidePlan?.slides.some((s) => s.texts.length)
+      ? slidePlan.slides.map((s, i): ReactNode => {
+          const url = slides.photos[s.media_id];
+          return url ? (
+            <SlidePreview props={buildSlideProps(s, { template: slidePlan.template, imageUrl: url, brand: slides.brand })} />
+          ) : media[i]?.video ? (
+            <video src={media[i]!.url} controls playsInline preload="metadata" className="size-full object-cover" />
+          ) : null;
+        })
+      : undefined;
   const activeText = editing && active !== null ? plan.texts[active] : undefined;
   const sceneIndex = Math.min(scene, Math.max(0, spans.length - 1));
   const span = spans[sceneIndex];
@@ -182,7 +214,7 @@ export function ActionView({
   const mediaWidth = editing
     ? "min(100%, max(190px, calc((100dvh - 440px) * 9 / 16)))"
     : `min(100%, calc((100dvh - ${grid ? 390 : 340}px) * ${ratio}))`;
-  const showGrid = inGrid && !editing && grid !== null;
+  const showGrid = inGrid && !editing && !editingSlides && grid !== null;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-[480px] flex-col px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+132px)]">
@@ -204,7 +236,7 @@ export function ActionView({
         </p>
       )}
 
-      {grid && !editing && (
+      {grid && !editing && !editingSlides && (
         <div role="tablist" aria-label="Aperçu" className="mt-3 flex self-center rounded-full bg-white/10 p-1">
           {[
             { on: !inGrid, label: "Publication", set: false },
@@ -229,7 +261,23 @@ export function ActionView({
 
       {showGrid && <GridPreview cover={videoUrl ? { url: videoUrl, video: true } : (media[0] ?? null)} kind={post.kind} tiles={grid} />}
 
-      <div className={`mt-3 justify-center ${showGrid ? "hidden" : "flex"}`}>
+      {editingSlides && (
+        <section aria-label="Texte sur les photos" className="mt-3">
+          <SlidesEditor
+            plan={slidePlan}
+            onChange={(next) => {
+              setSlidePlan(next);
+              setToast(null);
+            }}
+            photos={slides.photos}
+            brand={slides.brand}
+            dark
+            previewWidth="min(100%, max(200px, calc((100dvh - 470px) * 4 / 5)))"
+          />
+        </section>
+      )}
+
+      <div className={`mt-3 justify-center ${showGrid || editingSlides ? "hidden" : "flex"}`}>
         <div ref={previewRef} className="relative overflow-hidden rounded-[22px] bg-black" style={{ width: mediaWidth }}>
           {props ? (
             <>
@@ -249,7 +297,7 @@ export function ActionView({
           ) : videoUrl ? (
             <video src={videoUrl} controls playsInline loop className="aspect-[9/16] w-full object-cover" />
           ) : media.length > 0 ? (
-            <MediaSlides media={media} ratio={post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]"} />
+            <MediaSlides media={media} nodes={slideNodes} ratio={post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]"} />
           ) : (
             <div className="flex aspect-[9/16] w-full items-center justify-center p-6 text-center text-[14px] text-white/60">
               Fauve prépare encore cette publication.
@@ -258,7 +306,7 @@ export function ActionView({
         </div>
       </div>
 
-      {editing ? (
+      {editingSlides ? null : editing ? (
         <section aria-label="Modifier" className="mt-4 flex flex-col gap-3">
           {plan.segments.length > 1 && (
             <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
@@ -345,14 +393,14 @@ export function ActionView({
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ink/95 backdrop-blur">
         <div className="mx-auto flex max-w-[480px] flex-col gap-2 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
-          {editing ? (
+          {editing || editingSlides ? (
             <div className="flex gap-2">
               <button type="button" onClick={cancelEdit} className="flex-1 rounded-full border border-white/25 py-3.5 text-[15px] font-bold">
                 Annuler
               </button>
               <button
                 type="button"
-                disabled={!dirty || !valid || pending}
+                disabled={(editingSlides ? !slidesDirty : !dirty || !valid) || pending}
                 onClick={saveEdit}
                 className="flex-[2] rounded-full bg-violet py-3.5 text-[15px] font-bold disabled:opacity-40"
               >
@@ -411,82 +459,9 @@ export function ActionView({
   );
 }
 
-/** The selected text: its words, style, size and background, big enough for a thumb. */
-function TextSheet({
-  text,
-  onChange,
-  onRemove,
-  onClose,
-}: {
-  text: Text;
-  onChange: (patch: Partial<Text>) => void;
-  onRemove: () => void;
-  onClose: () => void;
-}) {
-  const scale = text.scale ?? 1;
-  return (
-    <div className="flex flex-col gap-3 rounded-[18px] bg-white p-3.5 text-ink">
-      <div className="flex items-center gap-2">
-        <input
-          value={text.text}
-          onChange={(e) => onChange({ text: e.target.value })}
-          maxLength={120}
-          aria-label="Texte"
-          className="min-w-0 flex-1 rounded-[12px] border border-line px-3 py-2.5 text-[16px] outline-none focus:border-violet"
-        />
-        <button type="button" aria-label="Fermer" onClick={onClose} className="flex size-10 shrink-0 items-center justify-center rounded-full bg-chip text-muted">
-          <XIcon size={16} />
-        </button>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {(Object.keys(styleLabels) as Text["style"][]).map((style) => (
-          <button
-            key={style}
-            type="button"
-            onClick={() => onChange({ style, y: text.y ?? DEFAULT_Y[text.style] })}
-            className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${text.style === style ? "bg-violet text-white" : "bg-violet-soft text-violet"}`}
-          >
-            {styleLabels[style]}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          aria-label="Plus petit"
-          disabled={scale <= 0.6}
-          onClick={() => onChange({ scale: Math.max(0.6, round(scale - 0.1)) })}
-          className="size-10 rounded-full border border-line text-[15px] font-bold disabled:opacity-30"
-        >
-          A−
-        </button>
-        <button
-          type="button"
-          aria-label="Plus grand"
-          disabled={scale >= 1.6}
-          onClick={() => onChange({ scale: Math.min(1.6, round(scale + 0.1)) })}
-          className="size-10 rounded-full border border-line text-[18px] font-bold disabled:opacity-30"
-        >
-          A+
-        </button>
-        <button
-          type="button"
-          aria-pressed={text.backdrop ?? false}
-          onClick={() => onChange({ backdrop: text.backdrop ? undefined : true })}
-          className={`rounded-full px-3.5 py-2.5 text-[13px] font-semibold ${text.backdrop ? "bg-ink text-white" : "border border-line"}`}
-        >
-          Fond derrière
-        </button>
-        <button type="button" aria-label="Supprimer le texte" onClick={onRemove} className="ml-auto flex size-10 items-center justify-center rounded-full text-danger">
-          <TrashIcon size={17} />
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /** The photos of a post, swiped one by one like on Instagram, with a counter and dots. */
-function MediaSlides({ media, ratio }: { media: ActionMedia[]; ratio: string }) {
+function MediaSlides({ media, nodes, ratio }: { media: ActionMedia[]; nodes?: ReactNode[]; ratio: string }) {
   const [index, setIndex] = useState(0);
   const track = useRef<HTMLUListElement>(null);
   const go = (i: number) => track.current?.scrollTo({ left: i * track.current.clientWidth, behavior: "smooth" });
@@ -500,7 +475,9 @@ function MediaSlides({ media, ratio }: { media: ActionMedia[]; ratio: string }) 
       >
         {media.map((m, i) => (
           <li key={i} className="h-full w-full shrink-0 snap-center">
-            {m.video ? (
+            {nodes?.[i] ? (
+              nodes[i]
+            ) : m.video ? (
               <video src={m.url} controls playsInline preload="metadata" className="size-full object-cover" />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL

@@ -3,6 +3,7 @@ import { isInSessionWindow, type PostKind } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
 import { InstagramError, mediaInsights, publishMedia, refreshToken, type PublishRequest } from "./instagram";
+import { slidesToPublish } from "@/lib/render/slides";
 import { publishItems } from "./media-urls";
 
 // Publishing worker. Posts in "scheduled" whose time has come are claimed (one
@@ -26,7 +27,12 @@ function check<T extends { error: { message: string } | null }>(result: T): T {
  */
 async function montageState(postId: string): Promise<"ready" | "rendering" | "failed"> {
   const db = supabaseAdmin();
-  const post = check(await db.from("posts").select("edit_plan_id, render_id").eq("id", postId).single()).data!;
+  const post = check(await db.from("posts").select("kind, edit_plan_id, render_id, slides, slides_render, media_ids").eq("id", postId).single()).data!;
+  // Photos with text over them: the images of the current texts.
+  if (post.kind === "carousel" || post.kind === "post") {
+    const slides = slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null }).state;
+    if (slides !== "ready") return slides;
+  }
   if (!post.edit_plan_id) return "ready";
   if (post.render_id) {
     const current = await db.from("renders").select("edit_plan_id").eq("id", post.render_id).maybeSingle();
@@ -127,14 +133,21 @@ async function renderUrl(renderId: string | null): Promise<string> {
 }
 
 /** What to publish for each kind: a Reel is the montage; posts, carousels and stories use the post's media. */
-async function publishRequest(studioId: string, kind: PostKind, renderId: string | null, mediaIds: string[], caption: string): Promise<PublishRequest> {
+async function publishRequest(
+  studioId: string,
+  kind: PostKind,
+  renderId: string | null,
+  mediaIds: string[],
+  caption: string,
+  rendered: Record<string, string> = {},
+): Promise<PublishRequest> {
   if (kind === "reel") return { kind: "reel", videoUrl: await renderUrl(renderId), caption };
   if (kind === "story") {
     const [item] = renderId ? [{ type: "video" as const, url: await renderUrl(renderId) }] : await publishItems(studioId, mediaIds.slice(0, 1));
     if (!item) throw new Error("Aucune photo ni vidéo pour cette story");
     return { kind: "story", item };
   }
-  const items = await publishItems(studioId, mediaIds);
+  const items = await publishItems(studioId, mediaIds, rendered);
   if (kind === "carousel") {
     if (items.length < 2) throw new Error("Un carrousel demande au moins 2 photos ou vidéos");
     return { kind: "carousel", items: items.slice(0, 10), caption };
@@ -151,7 +164,7 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
   const post = check(
     await db
       .from("posts")
-      .select("id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids")
+      .select("id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids, slides, slides_render")
       .eq("id", postId)
       .single(),
   ).data!;
@@ -161,10 +174,11 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
   try {
     const account = await instagramAccount(studioId);
     if (!account) throw new Error("Instagram n'est pas connecté");
-    if ((await montageState(postId)) === "failed") throw new Error("la dernière version du montage n'a pas pu être rendue");
+    if ((await montageState(postId)) === "failed") throw new Error("la dernière version du montage ou du texte sur les photos n'a pas pu être rendue");
+    const { rendered } = slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
     const hashtags = ((post.hashtags as string[] | null) ?? []).map((h) => `#${h}`).join(" ");
     const caption = [post.caption ?? "", hashtags].filter(Boolean).join("\n\n");
-    const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption);
+    const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption, rendered);
     const result = await publishMedia({ userId: account.userId, accessToken: account.accessToken, request });
 
     check(
