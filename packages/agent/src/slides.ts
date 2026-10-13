@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { REEL_FPS, resolveReelBrand, type ReelInputs, type ReelProps } from "./motion.ts";
 import { motionTemplateSchema, type MotionTemplate } from "./schemas.ts";
+import { textLayerSchema } from "./text-layer.ts";
 import { listFields, textLookSchema } from "./text-look.ts";
 
 // Carousels and photo posts with text over the photos. Each slide is a still of
@@ -35,6 +36,8 @@ export const slideSchema = z.object({
   texts: z.array(slideTextSchema).max(6),
   /** The studio's logo on the photo. */
   logo: z.enum(["top", "bottom"]).optional(),
+  /** A text layer designed as code (text designer): drawn instead of `texts`. */
+  layer: textLayerSchema.optional(),
 });
 export type Slide = z.infer<typeof slideSchema>;
 
@@ -56,7 +59,8 @@ export function buildSlideProps(
     durationInFrames: SLIDE_FRAMES,
     fadeFrames: 0,
     segments: [{ type: "image", src: inputs.imageUrl, startAt: 0, durationInFrames: SLIDE_FRAMES }],
-    texts: slide.texts.map((t) => ({
+    // A designed text layer replaces the slide's own texts.
+    texts: (slide.layer ? [] : slide.texts).map((t) => ({
       text: t.text,
       style: t.style,
       emphasis: t.emphasis ?? [],
@@ -75,6 +79,7 @@ export function buildSlideProps(
     brand: resolveReelBrand({}, inputs.template, inputs.brand),
     endCard: null,
     logo: slide.logo ?? null,
+    layer: slide.layer ? { js: slide.layer.js, texts: slide.layer.texts, fonts: slide.layer.fonts } : null,
   };
 }
 

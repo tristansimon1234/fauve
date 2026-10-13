@@ -62,20 +62,6 @@ export function TextSheet<T extends SheetText>({
       </div>
       {text.items && <ListItems items={text.items} bullet={text.bullet} onChange={(patch) => onChange({ ...patch, ...(patch.items ? { text: patch.items[0]?.title ?? text.text } : {}) })} />}
       <div className="flex flex-wrap gap-1.5">
-        <button
-          type="button"
-          aria-pressed={Boolean(text.items)}
-          onClick={() =>
-            onChange(
-              text.items
-                ? { items: undefined, bullet: undefined, detail_look: undefined, text: text.items.map((i) => i.title).join(" · ").slice(0, 120) }
-                : { items: [{ title: text.text }], bullet: { kind: "check", color: "#ffffff" } },
-            )
-          }
-          className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${text.items ? "bg-violet text-white" : "bg-violet-soft text-violet"}`}
-        >
-          Liste
-        </button>
         {(Object.keys(styleLabels) as SheetText["style"][]).map((style) => (
           <button
             key={style}

@@ -1,0 +1,292 @@
+[
+  {
+    "id": "5d6f0a1e-0c1b-4c8e-9a01-000000000008",
+    "name": "Carte du bas",
+    "description": "Une carte claire arrondie en bas de la photo : un petit libellé coloré, un titre et un texte court. Discret, la photo reste au premier plan. Pour une info, une nouveauté, un message.",
+    "fonts": [],
+    "slots": [
+      {
+        "name": "tag",
+        "role": "libellé",
+        "max_chars": 24,
+        "multiline": false
+      },
+      {
+        "name": "title",
+        "role": "titre",
+        "max_chars": 60,
+        "multiline": false
+      },
+      {
+        "name": "text",
+        "role": "texte",
+        "max_chars": 160,
+        "multiline": false
+      }
+    ],
+    "sample": {
+      "tag": "Nouveau",
+      "title": "Ouvert le dimanche",
+      "text": "Dès ce week-end, de 10h à 13h, tout le mois de décembre."
+    },
+    "code": "function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    <AbsoluteFill>\n      <div style={{ position: \"absolute\", left: 60, top: 880, width: 960, height: 410, background: \"rgba(255,255,255,0.95)\", borderRadius: 34, boxShadow: \"0 20px 50px rgba(0,0,0,0.22)\" }} />\n      <FitText style={{ position: \"absolute\", left: 120, top: 930, width: 840, height: 60 }} innerStyle={{ alignItems: \"flex-start\" }}>\n        <span style={{ background: brand.accent, color: brand.accentInk, borderRadius: 999, padding: \"8px 22px\", fontFamily: sans, fontWeight: 800, fontSize: 26, letterSpacing: \"0.08em\", textTransform: \"uppercase\" }}>\n          {texts.tag ?? \"Info\"}\n        </span>\n      </FitText>\n      <FitText style={{ position: \"absolute\", left: 120, top: 1010, width: 840, height: 130 }} innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontSize: 70, lineHeight: 1.05, color: brand.ink }}>\n        {texts.title ?? \"Ton titre\"}\n      </FitText>\n      <FitText style={{ position: \"absolute\", left: 120, top: 1150, width: 840, height: 100 }} innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\", fontFamily: sans, fontSize: 32, lineHeight: 1.32, color: \"rgba(28,21,48,0.75)\" }}>\n        {texts.text ?? \"\"}\n      </FitText>\n    </AbsoluteFill>\n  );\n}",
+    "js": " function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } }function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    React.createElement(AbsoluteFill, null\n      , React.createElement('div', { style: { position: \"absolute\", left: 60, top: 880, width: 960, height: 410, background: \"rgba(255,255,255,0.95)\", borderRadius: 34, boxShadow: \"0 20px 50px rgba(0,0,0,0.22)\" },} )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 120, top: 930, width: 840, height: 60 }, innerStyle: { alignItems: \"flex-start\" },}\n        , React.createElement('span', { style: { background: brand.accent, color: brand.accentInk, borderRadius: 999, padding: \"8px 22px\", fontFamily: sans, fontWeight: 800, fontSize: 26, letterSpacing: \"0.08em\", textTransform: \"uppercase\" },}\n          , _nullishCoalesce(texts.tag, () => ( \"Info\"))\n        )\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 120, top: 1010, width: 840, height: 130 }, innerStyle: { alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontSize: 70, lineHeight: 1.05, color: brand.ink },}\n        , _nullishCoalesce(texts.title, () => ( \"Ton titre\"))\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 120, top: 1150, width: 840, height: 100 }, innerStyle: { alignItems: \"flex-start\", textAlign: \"left\", fontFamily: sans, fontSize: 32, lineHeight: 1.32, color: \"rgba(28,21,48,0.75)\" },}\n        , _nullishCoalesce(texts.text, () => ( \"\"))\n      )\n    )\n  );\n}"
+  },
+  {
+    "id": "5d6f0a1e-0c1b-4c8e-9a01-000000000009",
+    "name": "Avant / après",
+    "description": "Deux étiquettes « Avant » et « Après » en haut de la photo (pour une photo partagée en deux, ou deux photos du carrousel) et une phrase en bas. Pour une transformation : coiffure, rénovation, posture.",
+    "fonts": [],
+    "slots": [
+      {
+        "name": "left",
+        "role": "étiquette de gauche",
+        "max_chars": 16,
+        "multiline": false
+      },
+      {
+        "name": "right",
+        "role": "étiquette de droite",
+        "max_chars": 16,
+        "multiline": false
+      },
+      {
+        "name": "caption",
+        "role": "phrase du bas",
+        "max_chars": 100,
+        "multiline": false
+      }
+    ],
+    "sample": {
+      "left": "Avant",
+      "right": "Après",
+      "caption": "Balayage miel et coupe dégradée, 2 h 30 de soin."
+    },
+    "code": "function Layer({ width, height, brand, texts }) {\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  const serif = `\"${brand.displayFont}\", serif`;\n  const tag = (text, left) => (\n    <FitText style={{ position: \"absolute\", left, top: 70, width: 380, height: 90 }} innerStyle={{}}>\n      <span style={{ background: \"rgba(20,14,36,0.78)\", color: \"#fff\", borderRadius: 999, padding: \"14px 34px\", fontFamily: sans, fontWeight: 800, fontSize: 36, letterSpacing: \"0.12em\", textTransform: \"uppercase\" }}>{text}</span>\n    </FitText>\n  );\n  return (\n    <AbsoluteFill style={{ background: \"linear-gradient(180deg, rgba(0,0,0,0) 65%, rgba(0,0,0,0.6) 100%)\" }}>\n      <div style={{ position: \"absolute\", left: 539, top: 0, width: 2, height: 1350, background: \"rgba(255,255,255,0.7)\" }} />\n      {tag(texts.left ?? \"Avant\", 80)}\n      {tag(texts.right ?? \"Après\", 620)}\n      <FitText style={{ position: \"absolute\", left: 84, top: 1150, width: 912, height: 130 }} innerStyle={{ fontFamily: serif, fontStyle: \"italic\", fontSize: 54, lineHeight: 1.15, color: \"#fff\" }}>\n        {texts.caption ?? \"\"}\n      </FitText>\n    </AbsoluteFill>\n  );\n}",
+    "js": " function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } }function Layer({ width, height, brand, texts }) {\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  const serif = `\"${brand.displayFont}\", serif`;\n  const tag = (text, left) => (\n    React.createElement(FitText, { style: { position: \"absolute\", left, top: 70, width: 380, height: 90 }, innerStyle: {},}\n      , React.createElement('span', { style: { background: \"rgba(20,14,36,0.78)\", color: \"#fff\", borderRadius: 999, padding: \"14px 34px\", fontFamily: sans, fontWeight: 800, fontSize: 36, letterSpacing: \"0.12em\", textTransform: \"uppercase\" },}, text)\n    )\n  );\n  return (\n    React.createElement(AbsoluteFill, { style: { background: \"linear-gradient(180deg, rgba(0,0,0,0) 65%, rgba(0,0,0,0.6) 100%)\" },}\n      , React.createElement('div', { style: { position: \"absolute\", left: 539, top: 0, width: 2, height: 1350, background: \"rgba(255,255,255,0.7)\" },} )\n      , tag(_nullishCoalesce(texts.left, () => ( \"Avant\")), 80)\n      , tag(_nullishCoalesce(texts.right, () => ( \"Après\")), 620)\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 84, top: 1150, width: 912, height: 130 }, innerStyle: { fontFamily: serif, fontStyle: \"italic\", fontSize: 54, lineHeight: 1.15, color: \"#fff\" },}\n        , _nullishCoalesce(texts.caption, () => ( \"\"))\n      )\n    )\n  );\n}"
+  },
+  {
+    "id": "5d6f0a1e-0c1b-4c8e-9a01-000000000001",
+    "name": "Checklist surlignée",
+    "description": "Titre en capitales en haut, puis une liste à cases cochées : chaque élément a un titre surligné et une ligne de détail. Pour une checklist, « ce qu'il faut apporter », des conseils.",
+    "fonts": [],
+    "slots": [
+      {
+        "name": "title",
+        "role": "titre",
+        "max_chars": 40,
+        "multiline": false
+      },
+      {
+        "name": "items",
+        "role": "éléments (titre | détail)",
+        "max_chars": 400,
+        "multiline": true
+      }
+    ],
+    "sample": {
+      "title": "Avant votre rendez-vous",
+      "items": "Arrivez 5 minutes avant | Pour prendre le temps de vous installer.\nVenez cheveux secs | Le diagnostic est plus précis.\nApportez une photo | De la coupe ou de la couleur qui vous inspire.\nPrévenez-nous en cas d'empêchement | 24 h avant, pour libérer le créneau."
+    },
+    "code": "function Layer({ width, height, brand, texts }) {\n  const title = texts.title ?? \"Checklist\";\n  const items = (texts.items ?? \"Premier point | Un détail\")\n    .split(\"\\n\")\n    .map((line) => line.trim())\n    .filter(Boolean)\n    .slice(0, 8)\n    .map((line) => {\n      const [head, ...rest] = line.split(\"|\");\n      return { head: head.trim(), detail: rest.join(\"|\").trim() };\n    });\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    <AbsoluteFill style={{ background: \"linear-gradient(180deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.18) 40%, rgba(0,0,0,0.42) 100%)\" }}>\n      <FitText\n        style={{ position: \"absolute\", left: 84, top: 110, width: 912, height: 150 }}\n        innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontSize: 104, lineHeight: 1, color: \"#fff\", textTransform: \"uppercase\", textShadow: \"0 2px 18px rgba(0,0,0,0.35)\" }}\n      >\n        {title}\n      </FitText>\n      <FitText style={{ position: \"absolute\", left: 84, top: 310, width: 912, height: 950 }} innerStyle={{ alignItems: \"flex-start\", justifyContent: \"flex-start\", textAlign: \"left\" }}>\n        <div style={{ display: \"flex\", flexDirection: \"column\", gap: 46 }}>\n          {items.map((item, i) => (\n            <div key={i} style={{ display: \"flex\", gap: 30, alignItems: \"flex-start\" }}>\n              <svg width=\"58\" height=\"58\" viewBox=\"0 0 24 24\" style={{ flexShrink: 0, marginTop: 2 }}>\n                <rect x=\"2.2\" y=\"2.2\" width=\"19.6\" height=\"19.6\" fill=\"none\" stroke=\"#fff\" strokeWidth=\"1.5\" />\n                <path d=\"M6.2 12.4l3.9 3.9L19.6 5.6\" fill=\"none\" stroke=\"#fff\" strokeWidth=\"2.2\" strokeLinecap=\"round\" strokeLinejoin=\"round\" />\n              </svg>\n              <div style={{ display: \"flex\", flexDirection: \"column\", alignItems: \"flex-start\", gap: 14 }}>\n                <div style={{ fontFamily: serif, fontSize: 46, lineHeight: 1.32, textTransform: \"uppercase\" }}>\n                  <span style={{ background: brand.cream, color: brand.ink, padding: \"2px 12px\", boxDecorationBreak: \"clone\", WebkitBoxDecorationBreak: \"clone\" }}>{item.head}</span>\n                </div>\n                {item.detail ? (\n                  <span style={{ color: \"#fff\", fontFamily: sans, fontSize: 31, lineHeight: 1.32, textShadow: \"0 1px 10px rgba(0,0,0,0.45)\" }}>{item.detail}</span>\n                ) : null}\n              </div>\n            </div>\n          ))}\n        </div>\n      </FitText>\n    </AbsoluteFill>\n  );\n}",
+    "js": " function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } }function Layer({ width, height, brand, texts }) {\n  const title = _nullishCoalesce(texts.title, () => ( \"Checklist\"));\n  const items = (_nullishCoalesce(texts.items, () => ( \"Premier point | Un détail\")))\n    .split(\"\\n\")\n    .map((line) => line.trim())\n    .filter(Boolean)\n    .slice(0, 8)\n    .map((line) => {\n      const [head, ...rest] = line.split(\"|\");\n      return { head: head.trim(), detail: rest.join(\"|\").trim() };\n    });\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    React.createElement(AbsoluteFill, { style: { background: \"linear-gradient(180deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.18) 40%, rgba(0,0,0,0.42) 100%)\" },}\n      , React.createElement(FitText, {\n        style: { position: \"absolute\", left: 84, top: 110, width: 912, height: 150 },\n        innerStyle: { alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontSize: 104, lineHeight: 1, color: \"#fff\", textTransform: \"uppercase\", textShadow: \"0 2px 18px rgba(0,0,0,0.35)\" },}\n\n        , title\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 84, top: 310, width: 912, height: 950 }, innerStyle: { alignItems: \"flex-start\", justifyContent: \"flex-start\", textAlign: \"left\" },}\n        , React.createElement('div', { style: { display: \"flex\", flexDirection: \"column\", gap: 46 },}\n          , items.map((item, i) => (\n            React.createElement('div', { key: i, style: { display: \"flex\", gap: 30, alignItems: \"flex-start\" },}\n              , React.createElement('svg', { width: \"58\", height: \"58\", viewBox: \"0 0 24 24\"   , style: { flexShrink: 0, marginTop: 2 },}\n                , React.createElement('rect', { x: \"2.2\", y: \"2.2\", width: \"19.6\", height: \"19.6\", fill: \"none\", stroke: \"#fff\", strokeWidth: \"1.5\",} )\n                , React.createElement('path', { d: \"M6.2 12.4l3.9 3.9L19.6 5.6\"   , fill: \"none\", stroke: \"#fff\", strokeWidth: \"2.2\", strokeLinecap: \"round\", strokeLinejoin: \"round\",} )\n              )\n              , React.createElement('div', { style: { display: \"flex\", flexDirection: \"column\", alignItems: \"flex-start\", gap: 14 },}\n                , React.createElement('div', { style: { fontFamily: serif, fontSize: 46, lineHeight: 1.32, textTransform: \"uppercase\" },}\n                  , React.createElement('span', { style: { background: brand.cream, color: brand.ink, padding: \"2px 12px\", boxDecorationBreak: \"clone\", WebkitBoxDecorationBreak: \"clone\" },}, item.head)\n                )\n                , item.detail ? (\n                  React.createElement('span', { style: { color: \"#fff\", fontFamily: sans, fontSize: 31, lineHeight: 1.32, textShadow: \"0 1px 10px rgba(0,0,0,0.45)\" },}, item.detail)\n                ) : null\n              )\n            )\n          ))\n        )\n      )\n    )\n  );\n}"
+  },
+  {
+    "id": "5d6f0a1e-0c1b-4c8e-9a01-000000000002",
+    "name": "Couverture éditoriale",
+    "description": "Couverture de carrousel : un petit surtitre entre deux filets, un grand titre élégant en bas de la photo sur un dégradé sombre, une ligne d'appel. Pour la 1re photo d'un carrousel.",
+    "fonts": [],
+    "slots": [
+      {
+        "name": "kicker",
+        "role": "surtitre",
+        "max_chars": 30,
+        "multiline": false
+      },
+      {
+        "name": "title",
+        "role": "grand titre",
+        "max_chars": 60,
+        "multiline": false
+      },
+      {
+        "name": "subtitle",
+        "role": "ligne d'appel",
+        "max_chars": 70,
+        "multiline": false
+      }
+    ],
+    "sample": {
+      "kicker": "Nouveauté",
+      "title": "La collection d'automne est là",
+      "subtitle": "Glisse pour tout voir →"
+    },
+    "code": "function Layer({ width, height, brand, texts }) {\n  const kicker = texts.kicker ?? \"Nouveau\";\n  const title = texts.title ?? \"Ton titre\";\n  const subtitle = texts.subtitle ?? \"\";\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    <AbsoluteFill style={{ background: \"linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.72) 100%)\" }}>\n      <FitText style={{ position: \"absolute\", left: 90, top: 760, width: 900, height: 70 }} innerStyle={{ flexDirection: \"row\", gap: 22 }}>\n        <span style={{ width: 70, height: 2, background: \"rgba(255,255,255,0.85)\" }} />\n        <span style={{ color: \"#fff\", fontFamily: sans, fontWeight: 700, fontSize: 30, letterSpacing: \"0.22em\", textTransform: \"uppercase\" }}>{kicker}</span>\n        <span style={{ width: 70, height: 2, background: \"rgba(255,255,255,0.85)\" }} />\n      </FitText>\n      <FitText style={{ position: \"absolute\", left: 90, top: 850, width: 900, height: 280 }} innerStyle={{ fontFamily: serif, fontStyle: \"italic\", fontSize: 120, lineHeight: 1.02, color: \"#fff\", textShadow: \"0 4px 30px rgba(0,0,0,0.35)\" }}>\n        {title}\n      </FitText>\n      {subtitle ? (\n        <FitText style={{ position: \"absolute\", left: 90, top: 1160, width: 900, height: 70 }} innerStyle={{ color: \"rgba(255,255,255,0.92)\", fontFamily: sans, fontWeight: 600, fontSize: 34 }}>\n          {subtitle}\n        </FitText>\n      ) : null}\n    </AbsoluteFill>\n  );\n}",
+    "js": " function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } }function Layer({ width, height, brand, texts }) {\n  const kicker = _nullishCoalesce(texts.kicker, () => ( \"Nouveau\"));\n  const title = _nullishCoalesce(texts.title, () => ( \"Ton titre\"));\n  const subtitle = _nullishCoalesce(texts.subtitle, () => ( \"\"));\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    React.createElement(AbsoluteFill, { style: { background: \"linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.72) 100%)\" },}\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 90, top: 760, width: 900, height: 70 }, innerStyle: { flexDirection: \"row\", gap: 22 },}\n        , React.createElement('span', { style: { width: 70, height: 2, background: \"rgba(255,255,255,0.85)\" },} )\n        , React.createElement('span', { style: { color: \"#fff\", fontFamily: sans, fontWeight: 700, fontSize: 30, letterSpacing: \"0.22em\", textTransform: \"uppercase\" },}, kicker)\n        , React.createElement('span', { style: { width: 70, height: 2, background: \"rgba(255,255,255,0.85)\" },} )\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 90, top: 850, width: 900, height: 280 }, innerStyle: { fontFamily: serif, fontStyle: \"italic\", fontSize: 120, lineHeight: 1.02, color: \"#fff\", textShadow: \"0 4px 30px rgba(0,0,0,0.35)\" },}\n        , title\n      )\n      , subtitle ? (\n        React.createElement(FitText, { style: { position: \"absolute\", left: 90, top: 1160, width: 900, height: 70 }, innerStyle: { color: \"rgba(255,255,255,0.92)\", fontFamily: sans, fontWeight: 600, fontSize: 34 },}\n          , subtitle\n        )\n      ) : null\n    )\n  );\n}"
+  },
+  {
+    "id": "5d6f0a1e-0c1b-4c8e-9a01-000000000007",
+    "name": "Chiffre clé",
+    "description": "Un chiffre énorme qui frappe (« 3 places », « 500 clients », « 10 ans »), un intitulé dessous et une petite phrase. Pour une annonce, un anniversaire, des places restantes.",
+    "fonts": [],
+    "slots": [
+      {
+        "name": "number",
+        "role": "chiffre",
+        "max_chars": 10,
+        "multiline": false
+      },
+      {
+        "name": "label",
+        "role": "intitulé",
+        "max_chars": 40,
+        "multiline": false
+      },
+      {
+        "name": "caption",
+        "role": "petite phrase",
+        "max_chars": 100,
+        "multiline": false
+      }
+    ],
+    "sample": {
+      "number": "10",
+      "label": "ans ce mois-ci",
+      "caption": "Merci à vous ! Une surprise vous attend en boutique toute la semaine."
+    },
+    "code": "function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    <AbsoluteFill style={{ background: \"linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)\" }}>\n      <FitText style={{ position: \"absolute\", left: 84, top: 420, width: 912, height: 420 }} innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontSize: 400, lineHeight: 0.9, color: \"#fff\", textShadow: \"0 10px 40px rgba(0,0,0,0.3)\" }}>\n        {texts.number ?? \"3\"}\n      </FitText>\n      <FitText style={{ position: \"absolute\", left: 84, top: 860, width: 912, height: 130 }} innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\" }}>\n        <div style={{ fontFamily: sans, fontWeight: 800, fontSize: 64, lineHeight: 1.35, textTransform: \"uppercase\" }}>\n          <span style={{ background: brand.accent, color: brand.accentInk, padding: \"4px 18px\", boxDecorationBreak: \"clone\", WebkitBoxDecorationBreak: \"clone\" }}>{texts.label ?? \"places\"}</span>\n        </div>\n      </FitText>\n      <FitText style={{ position: \"absolute\", left: 84, top: 1030, width: 912, height: 150 }} innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\", fontFamily: sans, fontSize: 38, lineHeight: 1.3, color: \"#fff\" }}>\n        {texts.caption ?? \"\"}\n      </FitText>\n    </AbsoluteFill>\n  );\n}",
+    "js": " function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } }function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    React.createElement(AbsoluteFill, { style: { background: \"linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)\" },}\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 84, top: 420, width: 912, height: 420 }, innerStyle: { alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontSize: 400, lineHeight: 0.9, color: \"#fff\", textShadow: \"0 10px 40px rgba(0,0,0,0.3)\" },}\n        , _nullishCoalesce(texts.number, () => ( \"3\"))\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 84, top: 860, width: 912, height: 130 }, innerStyle: { alignItems: \"flex-start\", textAlign: \"left\" },}\n        , React.createElement('div', { style: { fontFamily: sans, fontWeight: 800, fontSize: 64, lineHeight: 1.35, textTransform: \"uppercase\" },}\n          , React.createElement('span', { style: { background: brand.accent, color: brand.accentInk, padding: \"4px 18px\", boxDecorationBreak: \"clone\", WebkitBoxDecorationBreak: \"clone\" },}, _nullishCoalesce(texts.label, () => ( \"places\")))\n        )\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 84, top: 1030, width: 912, height: 150 }, innerStyle: { alignItems: \"flex-start\", textAlign: \"left\", fontFamily: sans, fontSize: 38, lineHeight: 1.3, color: \"#fff\" },}\n        , _nullishCoalesce(texts.caption, () => ( \"\"))\n      )\n    )\n  );\n}"
+  },
+  {
+    "id": "5d6f0a1e-0c1b-4c8e-9a01-000000000003",
+    "name": "Offre dans un rond",
+    "description": "Une offre mise en avant : un grand rond aux couleurs du studio avec le prix ou la remise, un titre, une ligne de détail et un bouton d'appel. Pour une promotion, des places restantes, un tarif.",
+    "fonts": [],
+    "slots": [
+      {
+        "name": "badge",
+        "role": "prix ou remise",
+        "max_chars": 10,
+        "multiline": false
+      },
+      {
+        "name": "badge_note",
+        "role": "petit texte sous le prix",
+        "max_chars": 24,
+        "multiline": false
+      },
+      {
+        "name": "title",
+        "role": "titre de l'offre",
+        "max_chars": 60,
+        "multiline": false
+      },
+      {
+        "name": "detail",
+        "role": "détail",
+        "max_chars": 120,
+        "multiline": false
+      },
+      {
+        "name": "cta",
+        "role": "appel à l'action",
+        "max_chars": 30,
+        "multiline": false
+      }
+    ],
+    "sample": {
+      "badge": "-20 %",
+      "badge_note": "jusqu'à dimanche",
+      "title": "Le menu du midi",
+      "detail": "Entrée, plat et dessert, du mardi au vendredi.",
+      "cta": "Réservez en bio"
+    },
+    "code": "function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    <AbsoluteFill style={{ background: \"linear-gradient(180deg, rgba(0,0,0,0.05) 30%, rgba(0,0,0,0.6) 100%)\" }}>\n      <div style={{ position: \"absolute\", left: 650, top: 90, width: 340, height: 340, borderRadius: 999, background: brand.accent, boxShadow: \"0 18px 50px rgba(0,0,0,0.3)\", transform: \"rotate(-8deg)\" }}>\n        <FitText style={{ position: \"absolute\", left: 40, top: 70, width: 260, height: 140 }} innerStyle={{ color: brand.accentInk, fontFamily: sans, fontWeight: 800, fontSize: 110, lineHeight: 1, whiteSpace: \"nowrap\" }}>\n          {texts.badge ?? \"-20 %\"}\n        </FitText>\n        <FitText style={{ position: \"absolute\", left: 60, top: 215, width: 220, height: 46 }} innerStyle={{ color: brand.accentInk, fontFamily: sans, fontWeight: 600, fontSize: 28, whiteSpace: \"nowrap\" }}>\n          {texts.badge_note ?? \"\"}\n        </FitText>\n      </div>\n      <FitText style={{ position: \"absolute\", left: 84, top: 860, width: 912, height: 190 }} innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontSize: 96, lineHeight: 1.02, color: \"#fff\" }}>\n        {texts.title ?? \"Ton offre\"}\n      </FitText>\n      <FitText style={{ position: \"absolute\", left: 84, top: 1060, width: 912, height: 90 }} innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\", fontFamily: sans, fontSize: 34, lineHeight: 1.3, color: \"rgba(255,255,255,0.92)\" }}>\n        {texts.detail ?? \"\"}\n      </FitText>\n      {texts.cta ? (\n        <FitText style={{ position: \"absolute\", left: 84, top: 1175, width: 600, height: 96 }} innerStyle={{ alignItems: \"flex-start\" }}>\n          <span style={{ background: \"#fff\", color: brand.ink, borderRadius: 999, padding: \"18px 36px\", fontFamily: sans, fontWeight: 700, fontSize: 32 }}>{texts.cta}</span>\n        </FitText>\n      ) : null}\n    </AbsoluteFill>\n  );\n}",
+    "js": " function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } }function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    React.createElement(AbsoluteFill, { style: { background: \"linear-gradient(180deg, rgba(0,0,0,0.05) 30%, rgba(0,0,0,0.6) 100%)\" },}\n      , React.createElement('div', { style: { position: \"absolute\", left: 650, top: 90, width: 340, height: 340, borderRadius: 999, background: brand.accent, boxShadow: \"0 18px 50px rgba(0,0,0,0.3)\", transform: \"rotate(-8deg)\" },}\n        , React.createElement(FitText, { style: { position: \"absolute\", left: 40, top: 70, width: 260, height: 140 }, innerStyle: { color: brand.accentInk, fontFamily: sans, fontWeight: 800, fontSize: 110, lineHeight: 1, whiteSpace: \"nowrap\" },}\n          , _nullishCoalesce(texts.badge, () => ( \"-20 %\"))\n        )\n        , React.createElement(FitText, { style: { position: \"absolute\", left: 60, top: 215, width: 220, height: 46 }, innerStyle: { color: brand.accentInk, fontFamily: sans, fontWeight: 600, fontSize: 28, whiteSpace: \"nowrap\" },}\n          , _nullishCoalesce(texts.badge_note, () => ( \"\"))\n        )\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 84, top: 860, width: 912, height: 190 }, innerStyle: { alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontSize: 96, lineHeight: 1.02, color: \"#fff\" },}\n        , _nullishCoalesce(texts.title, () => ( \"Ton offre\"))\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 84, top: 1060, width: 912, height: 90 }, innerStyle: { alignItems: \"flex-start\", textAlign: \"left\", fontFamily: sans, fontSize: 34, lineHeight: 1.3, color: \"rgba(255,255,255,0.92)\" },}\n        , _nullishCoalesce(texts.detail, () => ( \"\"))\n      )\n      , texts.cta ? (\n        React.createElement(FitText, { style: { position: \"absolute\", left: 84, top: 1175, width: 600, height: 96 }, innerStyle: { alignItems: \"flex-start\" },}\n          , React.createElement('span', { style: { background: \"#fff\", color: brand.ink, borderRadius: 999, padding: \"18px 36px\", fontFamily: sans, fontWeight: 700, fontSize: 32 },}, texts.cta)\n        )\n      ) : null\n    )\n  );\n}"
+  },
+  {
+    "id": "5d6f0a1e-0c1b-4c8e-9a01-000000000004",
+    "name": "Planning en carte",
+    "description": "Un planning lisible dans une carte claire : un titre, puis une ligne par créneau (jour | heure | quoi), séparées par de fins filets. Pour un planning, des horaires d'ouverture, un menu de la semaine, des dates d'événements.",
+    "fonts": [],
+    "slots": [
+      {
+        "name": "title",
+        "role": "titre",
+        "max_chars": 40,
+        "multiline": false
+      },
+      {
+        "name": "rows",
+        "role": "créneaux (jour | heure | quoi)",
+        "max_chars": 400,
+        "multiline": true
+      },
+      {
+        "name": "note",
+        "role": "petite note en bas",
+        "max_chars": 60,
+        "multiline": false
+      }
+    ],
+    "sample": {
+      "title": "Nos horaires",
+      "rows": "Mar | 9h – 19h | Sur rendez-vous\nMer | 9h – 19h | Sans rendez-vous\nJeu | 10h – 20h | Nocturne\nVen | 9h – 19h | \nSam | 9h – 17h | ",
+      "note": "Réservation en ligne, lien en bio"
+    },
+    "code": "function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  const rows = (texts.rows ?? \"Lun | 18h | Cours\")\n    .split(\"\\n\")\n    .map((r) => r.trim())\n    .filter(Boolean)\n    .slice(0, 8)\n    .map((r) => r.split(\"|\").map((c) => c.trim()));\n  return (\n    <AbsoluteFill style={{ background: \"rgba(0,0,0,0.12)\" }}>\n      <div style={{ position: \"absolute\", left: 70, top: 150, width: 940, height: 1050, background: \"rgba(251,247,244,0.94)\", borderRadius: 36, boxShadow: \"0 24px 60px rgba(0,0,0,0.25)\" }} />\n      <FitText style={{ position: \"absolute\", left: 130, top: 210, width: 820, height: 140 }} innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontStyle: \"italic\", fontSize: 92, lineHeight: 1, color: brand.ink }}>\n        {texts.title ?? \"Cette semaine\"}\n      </FitText>\n      <FitText style={{ position: \"absolute\", left: 130, top: 380, width: 820, height: 700 }} innerStyle={{ alignItems: \"stretch\", justifyContent: \"flex-start\", textAlign: \"left\" }}>\n        <div style={{ display: \"flex\", flexDirection: \"column\" }}>\n          {rows.map((cells, i) => (\n            <div key={i} style={{ display: \"flex\", alignItems: \"baseline\", gap: 28, padding: \"22px 0\", borderTop: i ? \"1.5px solid rgba(28,21,48,0.12)\" : \"none\" }}>\n              <span style={{ width: 110, fontFamily: sans, fontWeight: 800, fontSize: 34, color: brand.accent, textTransform: \"uppercase\" }}>{cells[0] ?? \"\"}</span>\n              <span style={{ width: 130, fontFamily: sans, fontWeight: 600, fontSize: 34, color: brand.ink }}>{cells[1] ?? \"\"}</span>\n              <span style={{ flex: 1, fontFamily: sans, fontSize: 34, color: brand.ink }}>{cells.slice(2).join(\" \")}</span>\n            </div>\n          ))}\n        </div>\n      </FitText>\n      {texts.note ? (\n        <FitText style={{ position: \"absolute\", left: 130, top: 1100, width: 820, height: 60 }} innerStyle={{ alignItems: \"flex-start\", fontFamily: sans, fontSize: 28, color: \"rgba(28,21,48,0.6)\" }}>\n          {texts.note}\n        </FitText>\n      ) : null}\n    </AbsoluteFill>\n  );\n}",
+    "js": " function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } }function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  const rows = (_nullishCoalesce(texts.rows, () => ( \"Lun | 18h | Cours\")))\n    .split(\"\\n\")\n    .map((r) => r.trim())\n    .filter(Boolean)\n    .slice(0, 8)\n    .map((r) => r.split(\"|\").map((c) => c.trim()));\n  return (\n    React.createElement(AbsoluteFill, { style: { background: \"rgba(0,0,0,0.12)\" },}\n      , React.createElement('div', { style: { position: \"absolute\", left: 70, top: 150, width: 940, height: 1050, background: \"rgba(251,247,244,0.94)\", borderRadius: 36, boxShadow: \"0 24px 60px rgba(0,0,0,0.25)\" },} )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 130, top: 210, width: 820, height: 140 }, innerStyle: { alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontStyle: \"italic\", fontSize: 92, lineHeight: 1, color: brand.ink },}\n        , _nullishCoalesce(texts.title, () => ( \"Cette semaine\"))\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 130, top: 380, width: 820, height: 700 }, innerStyle: { alignItems: \"stretch\", justifyContent: \"flex-start\", textAlign: \"left\" },}\n        , React.createElement('div', { style: { display: \"flex\", flexDirection: \"column\" },}\n          , rows.map((cells, i) => (\n            React.createElement('div', { key: i, style: { display: \"flex\", alignItems: \"baseline\", gap: 28, padding: \"22px 0\", borderTop: i ? \"1.5px solid rgba(28,21,48,0.12)\" : \"none\" },}\n              , React.createElement('span', { style: { width: 110, fontFamily: sans, fontWeight: 800, fontSize: 34, color: brand.accent, textTransform: \"uppercase\" },}, _nullishCoalesce(cells[0], () => ( \"\")))\n              , React.createElement('span', { style: { width: 130, fontFamily: sans, fontWeight: 600, fontSize: 34, color: brand.ink },}, _nullishCoalesce(cells[1], () => ( \"\")))\n              , React.createElement('span', { style: { flex: 1, fontFamily: sans, fontSize: 34, color: brand.ink },}, cells.slice(2).join(\" \"))\n            )\n          ))\n        )\n      )\n      , texts.note ? (\n        React.createElement(FitText, { style: { position: \"absolute\", left: 130, top: 1100, width: 820, height: 60 }, innerStyle: { alignItems: \"flex-start\", fontFamily: sans, fontSize: 28, color: \"rgba(28,21,48,0.6)\" },}\n          , texts.note\n        )\n      ) : null\n    )\n  );\n}"
+  },
+  {
+    "id": "5d6f0a1e-0c1b-4c8e-9a01-000000000005",
+    "name": "Citation",
+    "description": "Une citation ou un témoignage : de grands guillemets aux couleurs du studio, la phrase en italique élégant, le nom de la personne dessous. Sur un voile sombre pour se lire sur n'importe quelle photo.",
+    "fonts": [],
+    "slots": [
+      {
+        "name": "quote",
+        "role": "citation",
+        "max_chars": 180,
+        "multiline": false
+      },
+      {
+        "name": "author",
+        "role": "auteur",
+        "max_chars": 40,
+        "multiline": false
+      }
+    ],
+    "sample": {
+      "quote": "Le meilleur accueil du quartier, on s'y sent comme à la maison.",
+      "author": "Camille, cliente depuis 2 ans"
+    },
+    "code": "function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    <AbsoluteFill style={{ background: \"rgba(20,14,36,0.5)\" }}>\n      <svg width=\"150\" height=\"120\" viewBox=\"0 0 150 120\" style={{ position: \"absolute\", left: 90, top: 300 }}>\n        <path d=\"M10 110V70C10 35 30 12 62 6l6 14C48 28 40 42 40 60h28v50zm76 0V70c0-35 20-58 52-64l6 14c-20 8-28 22-28 40h28v50z\" fill={brand.accent} />\n      </svg>\n      <FitText style={{ position: \"absolute\", left: 90, top: 460, width: 900, height: 470 }} innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontStyle: \"italic\", fontSize: 84, lineHeight: 1.12, color: \"#fff\" }}>\n        {texts.quote ?? \"Ta citation\"}\n      </FitText>\n      <FitText style={{ position: \"absolute\", left: 90, top: 980, width: 900, height: 70 }} innerStyle={{ flexDirection: \"row\", justifyContent: \"flex-start\", gap: 20 }}>\n        <span style={{ width: 54, height: 3, background: brand.accent }} />\n        <span style={{ color: \"#fff\", fontFamily: sans, fontWeight: 700, fontSize: 32, letterSpacing: \"0.04em\" }}>{texts.author ?? \"\"}</span>\n      </FitText>\n    </AbsoluteFill>\n  );\n}",
+    "js": " function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } }function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  return (\n    React.createElement(AbsoluteFill, { style: { background: \"rgba(20,14,36,0.5)\" },}\n      , React.createElement('svg', { width: \"150\", height: \"120\", viewBox: \"0 0 150 120\"   , style: { position: \"absolute\", left: 90, top: 300 },}\n        , React.createElement('path', { d: \"M10 110V70C10 35 30 12 62 6l6 14C48 28 40 42 40 60h28v50zm76 0V70c0-35 20-58 52-64l6 14c-20 8-28 22-28 40h28v50z\"                   , fill: brand.accent,} )\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 90, top: 460, width: 900, height: 470 }, innerStyle: { alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontStyle: \"italic\", fontSize: 84, lineHeight: 1.12, color: \"#fff\" },}\n        , _nullishCoalesce(texts.quote, () => ( \"Ta citation\"))\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 90, top: 980, width: 900, height: 70 }, innerStyle: { flexDirection: \"row\", justifyContent: \"flex-start\", gap: 20 },}\n        , React.createElement('span', { style: { width: 54, height: 3, background: brand.accent },} )\n        , React.createElement('span', { style: { color: \"#fff\", fontFamily: sans, fontWeight: 700, fontSize: 32, letterSpacing: \"0.04em\" },}, _nullishCoalesce(texts.author, () => ( \"\")))\n      )\n    )\n  );\n}"
+  },
+  {
+    "id": "5d6f0a1e-0c1b-4c8e-9a01-000000000006",
+    "name": "Étapes numérotées",
+    "description": "Des étapes ou des conseils numérotés : un titre, puis chaque étape avec son numéro dans un rond aux couleurs du studio et une courte explication. Pour un tutoriel, une routine, « 3 raisons de… ».",
+    "fonts": [],
+    "slots": [
+      {
+        "name": "title",
+        "role": "titre",
+        "max_chars": 60,
+        "multiline": false
+      },
+      {
+        "name": "steps",
+        "role": "étapes (titre | explication)",
+        "max_chars": 400,
+        "multiline": true
+      }
+    ],
+    "sample": {
+      "title": "Comment commander",
+      "steps": "Choisissez | Sur notre site ou en boutique.\nOn prépare | Votre commande est prête en 2 h.\nVous récupérez | Ou on vous livre dans le quartier."
+    },
+    "code": "function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  const steps = (texts.steps ?? \"Première étape | Une explication\")\n    .split(\"\\n\")\n    .map((l) => l.trim())\n    .filter(Boolean)\n    .slice(0, 6)\n    .map((l) => {\n      const [head, ...rest] = l.split(\"|\");\n      return { head: head.trim(), detail: rest.join(\"|\").trim() };\n    });\n  return (\n    <AbsoluteFill style={{ background: \"linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.55) 100%)\" }}>\n      <FitText style={{ position: \"absolute\", left: 84, top: 100, width: 912, height: 220 }} innerStyle={{ alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontSize: 96, lineHeight: 1.02, color: \"#fff\" }}>\n        {texts.title ?? \"Ton titre\"}\n      </FitText>\n      <FitText style={{ position: \"absolute\", left: 84, top: 370, width: 912, height: 900 }} innerStyle={{ alignItems: \"flex-start\", justifyContent: \"flex-start\", textAlign: \"left\" }}>\n        <div style={{ display: \"flex\", flexDirection: \"column\", gap: 50 }}>\n          {steps.map((s, i) => (\n            <div key={i} style={{ display: \"flex\", gap: 34, alignItems: \"flex-start\" }}>\n              <span style={{ flexShrink: 0, width: 84, height: 84, borderRadius: 999, background: brand.accent, color: brand.accentInk, display: \"flex\", alignItems: \"center\", justifyContent: \"center\", fontFamily: sans, fontWeight: 800, fontSize: 42 }}>\n                {i + 1}\n              </span>\n              <div style={{ display: \"flex\", flexDirection: \"column\", gap: 10, paddingTop: 6 }}>\n                <span style={{ color: \"#fff\", fontFamily: sans, fontWeight: 800, fontSize: 44, lineHeight: 1.15 }}>{s.head}</span>\n                {s.detail ? <span style={{ color: \"rgba(255,255,255,0.9)\", fontFamily: sans, fontSize: 32, lineHeight: 1.3 }}>{s.detail}</span> : null}\n              </div>\n            </div>\n          ))}\n        </div>\n      </FitText>\n    </AbsoluteFill>\n  );\n}",
+    "js": " function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } }function Layer({ width, height, brand, texts }) {\n  const serif = `\"${brand.displayFont}\", serif`;\n  const sans = `\"${brand.bodyFont}\", sans-serif`;\n  const steps = (_nullishCoalesce(texts.steps, () => ( \"Première étape | Une explication\")))\n    .split(\"\\n\")\n    .map((l) => l.trim())\n    .filter(Boolean)\n    .slice(0, 6)\n    .map((l) => {\n      const [head, ...rest] = l.split(\"|\");\n      return { head: head.trim(), detail: rest.join(\"|\").trim() };\n    });\n  return (\n    React.createElement(AbsoluteFill, { style: { background: \"linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.55) 100%)\" },}\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 84, top: 100, width: 912, height: 220 }, innerStyle: { alignItems: \"flex-start\", textAlign: \"left\", fontFamily: serif, fontSize: 96, lineHeight: 1.02, color: \"#fff\" },}\n        , _nullishCoalesce(texts.title, () => ( \"Ton titre\"))\n      )\n      , React.createElement(FitText, { style: { position: \"absolute\", left: 84, top: 370, width: 912, height: 900 }, innerStyle: { alignItems: \"flex-start\", justifyContent: \"flex-start\", textAlign: \"left\" },}\n        , React.createElement('div', { style: { display: \"flex\", flexDirection: \"column\", gap: 50 },}\n          , steps.map((s, i) => (\n            React.createElement('div', { key: i, style: { display: \"flex\", gap: 34, alignItems: \"flex-start\" },}\n              , React.createElement('span', { style: { flexShrink: 0, width: 84, height: 84, borderRadius: 999, background: brand.accent, color: brand.accentInk, display: \"flex\", alignItems: \"center\", justifyContent: \"center\", fontFamily: sans, fontWeight: 800, fontSize: 42 },}\n                , i + 1\n              )\n              , React.createElement('div', { style: { display: \"flex\", flexDirection: \"column\", gap: 10, paddingTop: 6 },}\n                , React.createElement('span', { style: { color: \"#fff\", fontFamily: sans, fontWeight: 800, fontSize: 44, lineHeight: 1.15 },}, s.head)\n                , s.detail ? React.createElement('span', { style: { color: \"rgba(255,255,255,0.9)\", fontFamily: sans, fontSize: 32, lineHeight: 1.3 },}, s.detail) : null\n              )\n            )\n          ))\n        )\n      )\n    )\n  );\n}"
+  }
+]

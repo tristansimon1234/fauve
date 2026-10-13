@@ -72,6 +72,7 @@ export function LookPanel({
   saved,
   brand,
   video = true,
+  advanced = false,
   onChange,
 }: {
   role: Role;
@@ -81,6 +82,8 @@ export function LookPanel({
   brand: { accent: string; accentInk: string; displayFont: string; bodyFont: string };
   /** Entrances only matter in a video. */
   video?: boolean;
+  /** Every setting (font, colours, fill…) by hand; off by default: the manager picks a saved style or asks Fauve. */
+  advanced?: boolean;
   onChange: (look: TextLook | undefined) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -105,6 +108,7 @@ export function LookPanel({
     });
   };
 
+  if (!advanced && !looks.length && !look) return null;
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center gap-2">
@@ -129,6 +133,7 @@ export function LookPanel({
         </div>
       </div>
 
+      {advanced && (
       <button
         type="button"
         aria-expanded={open}
@@ -137,8 +142,9 @@ export function LookPanel({
       >
         {open ? "Masquer les réglages" : look ? "Régler la police, les couleurs, le fond…" : "Personnaliser (police, couleurs, fond…)"}
       </button>
+      )}
 
-      {open && (
+      {advanced && open && (
         <div className="flex flex-col gap-3 rounded-[14px] border border-line bg-white p-3">
           <Row label="Police">
             <select

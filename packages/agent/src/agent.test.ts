@@ -480,3 +480,34 @@ test("lists: a checklist text with items, details and bullets reaches the render
   assert.equal(props.texts[1]?.bullet?.kind, "check");
   assert.equal(savedLookSchema.safeParse({ name: "Checklist", role: "band", look, list: { bullet: { kind: "check", color: "#ffffff" } }, y: 0.3 }).success, true);
 });
+
+test("text layers: code checks, slot texts, and a layer replaces the slide's own texts", async () => {
+  const { checkLayerCode, slotTexts, layerDesignOutputSchema } = await import("./text-layer.ts");
+  const { buildSlideProps, slidesPlanSchema } = await import("./slides.ts");
+  assert.deepEqual(checkLayerCode("function Layer({ texts }) { return null; }"), []);
+  assert.ok(checkLayerCode("function Scene() { return null; }").includes("il faut une fonction Layer"));
+  assert.ok(checkLayerCode("function Layer() { fetch('https://x'); return null; }").includes("accès réseau"));
+  assert.deepEqual(slotTexts([{ slot: "title", text: "Bonjour" }, { slot: "Bad Slot", text: "x" }]), { title: "Bonjour" });
+  assert.equal(
+    layerDesignOutputSchema.safeParse({ code: "function Layer() {}", name: "Test", notes: "", slots: [{ name: "title", role: "titre", max_chars: 40, multiline: false }], fonts: ["Anton"], slides: [{ photo: 1, texts: [{ slot: "title", text: "Hi" }] }] }).success,
+    true,
+  );
+
+  const layer = { name: "Test", js: "function Layer(){return null}", slots: [{ name: "title", role: "titre", max_chars: 40, multiline: false }], texts: { title: "Hi" }, fonts: ["Anton"] };
+  const plan = slidesPlanSchema.parse({ template: "doux", slides: [{ media_id: "00000000-0000-4000-8000-00000000000a", texts: [{ text: "Ignoré", style: "hook" }], layer }] });
+  const props = buildSlideProps(plan.slides[0]!, { template: "doux", imageUrl: "https://example.com/a.jpg", brand: { name: "Studio" } });
+  assert.equal(props.texts.length, 0);
+  assert.deepEqual(props.layer, { js: layer.js, texts: { title: "Hi" }, fonts: ["Anton"] });
+});
+
+test("house text layers pass the same checks as generated ones", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { checkLayerCode, layerSlotSchema } = await import("./text-layer.ts");
+  const layers = JSON.parse(readFileSync(new URL("../../../supabase/seed/text-layers.json", import.meta.url), "utf8")) as { name: string; code: string; js: string; slots: unknown[] }[];
+  assert.ok(layers.length >= 9);
+  for (const l of layers) {
+    assert.deepEqual(checkLayerCode(l.code), [], l.name);
+    for (const slot of l.slots) layerSlotSchema.parse(slot);
+    assert.match(l.js, /function Layer\(/);
+  }
+});

@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { PenIcon, PlusIcon } from "@/components/icons";
 import { SlidePreview } from "./slide-preview";
 import { TextBoxes } from "./text-boxes";
+import { LayerFields } from "./layer-fields";
 import { TextSheet } from "./text-sheet";
 
 // Text over the photos of a carousel or photo post, by hand: the slide as it
@@ -80,6 +81,7 @@ export function SlidesEditor({
           {props ? (
             <>
               <SlidePreview props={props} />
+              {!slide.layer && (
               <TextBoxes
                 container={previewRef}
                 texts={slide.texts}
@@ -88,6 +90,7 @@ export function SlidesEditor({
                 onMove={(t, place) => patchText(t, place)}
                 onPick={setActive}
               />
+              )}
             </>
           ) : (
             <div className={`flex aspect-[4/5] items-center justify-center p-6 text-center text-sm ${muted}`}>
@@ -116,13 +119,20 @@ export function SlidesEditor({
                 <span className={`flex size-full items-center justify-center text-[10px] font-bold ${dark ? "bg-white/10" : "bg-soft"}`}>Vidéo</span>
               )}
               <span className="absolute bottom-0.5 left-0.5 rounded-full bg-black/60 px-1.5 text-[10px] font-bold text-white">{i + 1}</span>
-              {s.texts.length > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-violet" aria-label="Avec texte" />}
+              {(s.texts.length > 0 || s.layer) && <span className="absolute top-1 right-1 size-2 rounded-full bg-violet" aria-label="Avec texte" />}
             </button>
           ))}
         </div>
       )}
 
-      {props &&
+      {props && slide.layer ? (
+        <LayerFields
+          layer={slide.layer}
+          dark={dark}
+          onChange={(texts) => onChange({ ...plan, slides: plan.slides.map((s, i) => (i === index ? { ...s, layer: { ...s.layer!, texts } } : s)) })}
+          onRemove={() => onChange({ ...plan, slides: plan.slides.map((s, i) => (i === index ? { ...s, layer: undefined } : s)) })}
+        />
+      ) : props &&
         (activeText && active !== null ? (
           <TextSheet
             key={`${index}-${active}`}

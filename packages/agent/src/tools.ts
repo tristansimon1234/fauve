@@ -183,6 +183,37 @@ export const toolSpecs = {
         .max(10),
     }),
   },
+  list_text_layers: {
+    description:
+      "La bibliothèque des calques de texte pour les photos (carrousel, post photo) : ceux de Fauve (house) et ceux déjà dessinés pour le studio, avec leurs slots (les textes à remplir). Réutiliser un calque est gratuit et immédiat : regarde-la avant d'en dessiner un nouveau.",
+    input: z.object({}),
+  },
+  apply_text_layer: {
+    description:
+      "Pose un calque de la bibliothèque sur des photos d'un carrousel ou d'un post photo, avec les textes du commerce pour chaque slot (un slot multiline prend plusieurs lignes séparées par \n). Gratuit ; le rendu part après ta réponse et le lien est envoyé tout seul.",
+    input: z.object({
+      post_id: z.string().uuid(),
+      layer_id: z.string().uuid(),
+      photos: z
+        .array(z.object({ photo: z.number().int().min(1).max(10).describe("Numéro de la photo, à partir de 1"), texts: z.array(z.object({ slot: z.string(), text: z.string().max(400) })) }))
+        .min(1)
+        .max(10),
+    }),
+  },
+  design_text_layer: {
+    description:
+      "Fauve dessine un nouveau calque de texte pour les photos d'un carrousel ou d'un post photo, comme un graphiste : n'importe quelle mise en page (liste, cases, prix dans un rond, flèches, colonnes, tampon, texte en arc…), polices, couleurs, formes. Avec example_media_id, il refait la même chose que l'exemple envoyé par la gérante (une capture d'un post qu'elle aime), avec les mots du commerce. Testé et relu avant envoi ; prend 2 à 4 minutes et coûte 3 crédits, débités une fois les photos livrées ; le lien est envoyé tout seul. Le calque rejoint la bibliothèque et se réutilise ensuite gratuitement.",
+    input: z.object({
+      post_id: z.string().uuid(),
+      request: z
+        .string()
+        .min(1)
+        .max(4000)
+        .describe("Ce qu'il faut écrire, photo par photo, avec les mots exacts du commerce (titre, éléments d'une liste, prix…), et ce que la gérante a dit du style"),
+      example_media_id: z.string().uuid().optional().describe("media_id de l'image d'exemple à reproduire"),
+      photos: z.array(z.number().int().min(1).max(10)).max(10).optional().describe("Photos à couvrir (à partir de 1) ; par défaut toutes"),
+    }),
+  },
   copy_text_style: {
     description:
       "Copie le style des textes d'un exemple que la gérante a envoyé (une photo ou une capture d'un post qu'elle aime) : Fauve lit chaque texte de l'image (police la plus proche, graisse, couleurs, fond en bloc, pilule ou surlignage, contour, ombre, inclinaison, place) et l'enregistre dans les styles de texte du studio. Avec post_id, l'applique aussitôt aux textes de cette publication (texte sur photos ou montage) et refait le rendu, gratuit ; le lien part tout seul. Renvoie les styles lus avec leur nom.",

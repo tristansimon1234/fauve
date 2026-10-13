@@ -21,6 +21,7 @@ export async function templatesForEditor(studioId: string): Promise<TemplateSumm
   const { data, error } = await supabaseAdmin()
     .from("motion_templates")
     .select("id, name, description, slots, duration_seconds")
+    .eq("kind", "scene")
     .or(`studio_id.eq.${studioId},studio_id.is.null`)
     .is("archived_at", null)
     .order("uses", { ascending: false })
@@ -47,6 +48,7 @@ export async function templateCode(studioId: string, ids: string[]): Promise<Map
   const { data, error } = await supabaseAdmin()
     .from("motion_templates")
     .select("id, code, js")
+    .eq("kind", "scene")
     .in("id", unique)
     .or(`studio_id.eq.${studioId},studio_id.is.null`)
     .is("archived_at", null);
