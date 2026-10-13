@@ -53,6 +53,8 @@ export async function replyInConversation(params: {
   memberId: string;
   /** Web chat: the conversation being answered. Default: the studio's latest one. */
   conversationId?: string;
+  /** Web chat: the manager's message, so Fauve can react to it. */
+  reactToRowId?: string;
   /** WhatsApp only: lets Fauve react to the manager's last message. */
   waId?: string;
   replyToMessageId?: string;
@@ -101,6 +103,7 @@ export async function replyInConversation(params: {
     memberId: params.memberId,
     waId: params.waId,
     replyToMessageId: params.replyToMessageId,
+    reactToRowId: params.reactToRowId,
     reactions: [],
     afterReply: [],
     history,

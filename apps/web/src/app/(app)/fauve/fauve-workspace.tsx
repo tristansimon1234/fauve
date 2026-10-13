@@ -10,6 +10,7 @@ import {
   FilmIcon,
   PenIcon,
   ReplyIcon,
+  SmileIcon,
   TrashIcon,
   WhatsAppIcon,
   XIcon,
@@ -19,6 +20,7 @@ import {
   deleteConversation,
   listConversations,
   loadConversation,
+  reactToMessage,
   sendToFauve,
   type ChatMessage,
   type ConversationSummary,
@@ -45,6 +47,13 @@ const mediaLabels: Record<string, string> = {
 };
 
 const POLL_MS = 8000;
+
+const EMOJIS = [
+  "😊", "😂", "🥰", "😍", "🤩", "😎", "🙏", "👍",
+  "👏", "🙌", "💪", "🔥", "✨", "💜", "❤️", "🧡",
+  "🌿", "🌸", "☀️", "🌙", "🧘‍♀️", "🤸‍♀️", "💃", "🎉",
+  "📅", "📸", "🎬", "✅", "👀", "🤔", "😮", "😅",
+];
 const LIST_POLL_MS = 30000;
 
 /**
@@ -150,7 +159,16 @@ export function FauveWorkspace({
     setError(null);
     setMessages((m) => [
       ...m,
-      { id: `local-${Date.now()}`, from: "me", channel: "web", type: "text", body: text, at: new Date().toISOString(), videoUrl: null },
+      {
+        id: `local-${Date.now()}`,
+        from: "me",
+        channel: "web",
+        type: "text",
+        body: text,
+        at: new Date().toISOString(),
+        videoUrl: null,
+        reactions: {},
+      },
     ]);
     const conversationId = active;
     startTransition(async () => {
@@ -168,6 +186,27 @@ export function FauveWorkspace({
         setError("Ton message n’est pas parti. Vérifie ta connexion et réessaie.");
       }
     });
+  };
+
+  // Emoji picker: inserted where the cursor is.
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const insertEmoji = (emoji: string) => {
+    const input = inputRef.current;
+    const start = input?.selectionStart ?? draft.length;
+    const end = input?.selectionEnd ?? draft.length;
+    setDraft(draft.slice(0, start) + emoji + draft.slice(end));
+    setEmojiOpen(false);
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  };
+
+  // Same emoji again removes it. Shown at once, saved in the background.
+  const react = (id: string, emoji: string) => {
+    const next = messages.find((m) => m.id === id)?.reactions.me === emoji ? null : emoji;
+    setMessages((list) => list.map((m) => (m.id === id ? { ...m, reactions: { ...m.reactions, me: next ?? undefined } } : m)));
+    reactToMessage(id, next).catch(() => {});
   };
 
   const fresh = !active && messages.length === 0;
@@ -256,7 +295,7 @@ export function FauveWorkspace({
             <div className="mx-auto flex w-full max-w-[780px] flex-col gap-3 px-4 py-6">
               {loading && <p className="self-center text-sm text-muted">Chargement…</p>}
               {messages.map((m) => (
-                <Bubble key={m.id} message={m} time={timeFormat.format(new Date(m.at))} />
+                <Bubble key={m.id} message={m} time={timeFormat.format(new Date(m.at))} onReact={react} />
               ))}
               {pending && (
                 <div className="flex items-center gap-2 self-start rounded-[18px_18px_18px_6px] border border-line bg-white px-4 py-3 text-sm text-muted">
@@ -286,7 +325,40 @@ export function FauveWorkspace({
                 {error}
               </p>
             )}
-            <div className="flex items-end gap-2 rounded-[30px] border border-line bg-white p-2 pl-5 shadow-[0_8px_30px_rgba(28,21,48,0.08)] focus-within:border-lilac">
+            <div className="relative flex items-end gap-1 rounded-[30px] border border-line bg-white p-2 pl-2 shadow-[0_8px_30px_rgba(28,21,48,0.08)] focus-within:border-lilac">
+              <button
+                type="button"
+                aria-label="Ajouter un emoji"
+                aria-expanded={emojiOpen}
+                onClick={() => setEmojiOpen((o) => !o)}
+                className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-soft hover:text-ink"
+              >
+                <SmileIcon size={22} />
+              </button>
+              {emojiOpen && (
+                <>
+                  <button type="button" aria-label="Fermer" tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setEmojiOpen(false)} />
+                  <div
+                    role="listbox"
+                    aria-label="Emojis"
+                    className="absolute bottom-full left-0 z-20 mb-2 grid w-[296px] grid-cols-8 gap-0.5 rounded-[18px] border border-line bg-white p-2 shadow-[0_12px_36px_rgba(28,21,48,0.14)]"
+                  >
+                    {EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        role="option"
+                        aria-selected={false}
+                        aria-label={emoji}
+                        onClick={() => insertEmoji(emoji)}
+                        className="flex size-9 items-center justify-center rounded-lg text-[20px] hover:bg-soft"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
               <label htmlFor="message-fauve" className="sr-only">
                 Message à Fauve
               </label>
@@ -384,28 +456,88 @@ function ConversationList({
   );
 }
 
-function Bubble({ message, time }: { message: ChatMessage; time: string }) {
+const REACTIONS = ["👍", "❤️", "🔥", "😂", "😮", "🙏"];
+
+function Bubble({
+  message,
+  time,
+  onReact,
+}: {
+  message: ChatMessage;
+  time: string;
+  onReact: (id: string, emoji: string) => void;
+}) {
+  const [picking, setPicking] = useState(false);
   const mine = message.from === "me";
   const media = mediaLabels[message.type];
   if (!message.body && !message.videoUrl && !media) return null;
+  const reactions = [message.reactions.fauve, message.reactions.me].filter((e): e is string => Boolean(e));
+  // Reacting is for Fauve's messages (the manager's own messages get Fauve's reactions).
+  const canReact = !mine && !message.id.startsWith("local-");
   return (
-    <div className={`flex max-w-[85%] flex-col gap-1 ${mine ? "items-end self-end" : "items-start self-start"}`}>
-      <div
-        className={`flex flex-col gap-2 px-4 py-2.5 text-[15px] leading-[1.5] whitespace-pre-wrap ${
-          mine ? "rounded-[18px_18px_6px_18px] bg-violet text-white" : "rounded-[18px_18px_18px_6px] border border-line bg-white"
-        }`}
-      >
-        {message.videoUrl ? (
-          <video src={message.videoUrl} controls playsInline preload="metadata" className="aspect-[9/16] w-[240px] max-w-full rounded-xl bg-ink" />
-        ) : (
-          media && (
-            <span className={`text-[13px] font-bold ${mine ? "text-white/85" : "text-muted"}`}>
-              {media} envoyé{media === "Vidéo" || media === "Photo" ? "e" : ""}
-            </span>
-          )
+    <div className={`group flex max-w-[85%] flex-col gap-1 ${mine ? "items-end self-end" : "items-start self-start"}`}>
+      <div className={`relative flex items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+        <div
+          className={`flex flex-col gap-2 px-4 py-2.5 text-[15px] leading-[1.5] whitespace-pre-wrap ${
+            mine ? "rounded-[18px_18px_6px_18px] bg-violet text-white" : "rounded-[18px_18px_18px_6px] border border-line bg-white"
+          }`}
+        >
+          {message.videoUrl ? (
+            <video src={message.videoUrl} controls playsInline preload="metadata" className="aspect-[9/16] w-[240px] max-w-full rounded-xl bg-ink" />
+          ) : (
+            media && (
+              <span className={`text-[13px] font-bold ${mine ? "text-white/85" : "text-muted"}`}>
+                {media} envoyé{media === "Vidéo" || media === "Photo" ? "e" : ""}
+              </span>
+            )
+          )}
+          {message.body}
+        </div>
+        {canReact && (
+          <button
+            type="button"
+            aria-label="Réagir"
+            aria-expanded={picking}
+            onClick={() => setPicking((p) => !p)}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted opacity-60 hover:bg-white hover:text-ink focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+          >
+            <SmileIcon size={18} />
+          </button>
         )}
-        {message.body}
+        {picking && (
+          <div className="absolute bottom-full left-0 z-10 mb-1.5 flex gap-0.5 rounded-full border border-line bg-white p-1 shadow-[0_8px_24px_rgba(28,21,48,0.12)]">
+            {REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                aria-label={`Réagir avec ${emoji}`}
+                aria-pressed={message.reactions.me === emoji}
+                onClick={() => {
+                  setPicking(false);
+                  onReact(message.id, emoji);
+                }}
+                className={`flex size-9 items-center justify-center rounded-full text-[20px] transition-transform hover:scale-110 hover:bg-soft ${
+                  message.reactions.me === emoji ? "bg-violet-soft" : ""
+                }`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+      {reactions.length > 0 && (
+        <span
+          className={`-mt-2.5 flex items-center gap-0.5 rounded-full border border-line bg-white px-1.5 py-0.5 text-[14px] leading-none shadow-sm ${
+            mine ? "mr-2" : "ml-2"
+          }`}
+          aria-label={`Réactions : ${reactions.join(" ")}`}
+        >
+          {reactions.map((emoji, i) => (
+            <span key={i}>{emoji}</span>
+          ))}
+        </span>
+      )}
       <span className="flex items-center gap-1 px-1 text-[11px] text-muted">
         {message.channel === "whatsapp" && <WhatsAppIcon size={11} />}
         {mine ? "Toi" : "Fauve"} · {time}
