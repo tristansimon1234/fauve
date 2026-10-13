@@ -284,6 +284,20 @@ test("editor: library scenes keep their id and get their texts as a record", asy
   assert.deepEqual(kinds, ["motion", "motion", "motion", "scene"]);
 });
 
+test("credits: a montage is quoted before it runs and never charged above the quote", async () => {
+  const { quoteMontage, montageCharge, CREDIT_PRICES } = await import("./credits.ts");
+  const quote = quoteMontage({ clips: 4, correction: false });
+  assert.deepEqual(quote.lines.map((l) => l.credits), [CREDIT_PRICES.montage, 4, CREDIT_PRICES.render]);
+  assert.equal(quote.base, 7);
+  assert.equal(quote.max, 13); // two new animated scenes at most
+  assert.equal(montageCharge(quote, 0), 7); // library scenes only
+  assert.equal(montageCharge(quote, 1), 10);
+  assert.equal(montageCharge(quote, 5), 13); // capped at the quote
+  const simple = quoteMontage({ clips: 2, correction: true, maxNewScenes: 0 });
+  assert.equal(simple.base, 3); // a correction does not re-watch the clips
+  assert.equal(simple.max, 3);
+});
+
 test("motion scenes: generated code is checked before it runs", async () => {
   const { checkMotionCode } = await import("./motion-scene.ts");
   const good = `function Scene({ width, brand }) {

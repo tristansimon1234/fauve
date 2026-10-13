@@ -1,9 +1,10 @@
 "use server";
 
-import { MOODBOARD_MAX_ITEMS } from "@fauve/agent";
+import { CREDIT_PRICES, MOODBOARD_MAX_ITEMS } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { readMoodboard } from "@/lib/agent/moodboard";
+import { chargeCredits, creditBalance } from "@/lib/credits";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { insertProfileVersion } from "./profile";
@@ -113,12 +114,16 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
     if (signed.error || items.some((item) => !urls.has(item.path))) {
       return { status: "error", message: "Une image n’a pas été trouvée. Dépose-la à nouveau." };
     }
+    if ((await creditBalance(studioId)) < CREDIT_PRICES.moodboard) {
+      return { status: "error", message: "Plus assez de crédits pour la lecture du moodboard (1 crédit). Ton solde remonte le 1er du mois." };
+    }
     try {
       reading = await readMoodboard(
         studioId,
         member.studio.name ?? "Ton studio",
         items.map((item) => ({ url: urls.get(item.path)!, note: item.note })),
       );
+      await chargeCredits(studioId, CREDIT_PRICES.moodboard, "moodboard", "Lecture du moodboard", { images: items.length });
     } catch (error) {
       console.warn("moodboard reading failed", error);
       warning = "Moodboard enregistré, mais Fauve n’a pas pu le lire. Réessaie dans un instant.";

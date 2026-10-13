@@ -1,14 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { CREDIT_PRICES, MONTHLY_CREDITS } from "@fauve/agent";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
+import { creditBalance } from "@/lib/credits";
 import { formatPhone, platformLabels, plural, shortUrl } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
 import { getContentPlan, getSocialAccounts, getStudioContext, type SocialAccount } from "@/lib/studio";
 import { signOut } from "../../(onboarding)/connexion/actions";
 
 export const metadata: Metadata = { title: "Réglages" };
+
+/** The price list, as the manager reads it. */
+const CREDIT_LINES: [string, string][] = [
+  ["Montage", `${CREDIT_PRICES.montage} + ${CREDIT_PRICES.clip} par clip`],
+  ["Nouvelle scène animée", `${CREDIT_PRICES.newScene}`],
+  ["Scène de ta bibliothèque", "gratuit"],
+  ["Correction d’un montage", `${CREDIT_PRICES.correction}`],
+  ["Rendu vidéo", `${CREDIT_PRICES.render}`],
+  ["Lecture du moodboard", `${CREDIT_PRICES.moodboard}`],
+  ["Messages à Fauve", "gratuit"],
+];
 
 const accountStatusLabels: Record<SocialAccount["status"], string> = {
   connected: "connecté",
@@ -43,7 +56,13 @@ async function Settings() {
     );
   }
   const { studio } = member;
-  const [accounts, plan] = await Promise.all([getSocialAccounts(db, studio.id), getContentPlan(db, studio.id)]);
+  const [accounts, plan, balance, ledger] = await Promise.all([
+    getSocialAccounts(db, studio.id),
+    getContentPlan(db, studio.id),
+    creditBalance(studio.id),
+    db.from("credit_ledger").select("id, delta, label, created_at").eq("studio_id", studio.id).order("created_at", { ascending: false }).limit(10),
+  ]);
+  const dateFormat = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: studio.timezone });
 
   return (
     <>
@@ -118,6 +137,44 @@ async function Settings() {
               ? "Période d’essai en cours. Ensuite : 49 € / mois, sans engagement."
               : "49 € / mois, sans engagement."}
           </p>
+        </Section>
+
+        <Section title="Crédits">
+          <p className="flex items-baseline gap-2">
+            <span className="text-[34px] font-extrabold tracking-[-0.02em] tabular-nums">{balance}</span>
+            <span className="text-sm font-semibold text-muted">crédits disponibles</span>
+          </p>
+          <p className="text-sm leading-normal text-muted">
+            Ton solde remonte à {MONTHLY_CREDITS} crédits le 1er de chaque mois. Avant chaque montage, Fauve t’annonce ce
+            qu’elle va faire et ce que ça coûte ; tu ne paies jamais plus que l’annonce, et rien si le montage échoue.
+          </p>
+          <ul className="grid gap-x-6 gap-y-1 text-[13px] sm:grid-cols-2">
+            {CREDIT_LINES.map(([label, credits]) => (
+              <li key={label} className="flex justify-between gap-3 border-b border-line py-1.5">
+                <span>{label}</span>
+                <span className="font-semibold tabular-nums">{credits}</span>
+              </li>
+            ))}
+          </ul>
+          {(ledger.data ?? []).length > 0 && (
+            <div className="flex flex-col gap-1 pt-1">
+              <h3 className="text-[13px] font-bold">Derniers mouvements</h3>
+              <ul className="flex flex-col">
+                {(ledger.data ?? []).map((row) => (
+                  <li key={row.id as string} className="flex items-center justify-between gap-3 py-1.5 text-[13px]">
+                    <span className="min-w-0 truncate">
+                      <span className="text-muted">{dateFormat.format(new Date(row.created_at as string))} · </span>
+                      {row.label as string}
+                    </span>
+                    <span className={`shrink-0 font-semibold tabular-nums ${(row.delta as number) > 0 ? "text-success" : ""}`}>
+                      {(row.delta as number) > 0 ? "+" : ""}
+                      {row.delta as number}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Section>
 
         <a href={whatsappLink()} className="btn btn-secondary self-start">

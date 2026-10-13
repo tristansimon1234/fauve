@@ -172,7 +172,7 @@ export function MoodboardSection({
       {(items.length > 0 || dirty || "message" in state) && (
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" onClick={() => read()} disabled={busy || !dirty} className="btn btn-primary disabled:opacity-50">
-            {state.status === "reading" ? "Fauve regarde tes images…" : items.length || !dirty ? "Faire lire à Fauve" : "Enregistrer"}
+            {state.status === "reading" ? "Fauve regarde tes images…" : items.length || !dirty ? "Faire lire à Fauve · 1 crédit" : "Enregistrer"}
           </button>
           <p
             role={state.status === "error" ? "alert" : "status"}

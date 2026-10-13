@@ -85,14 +85,21 @@ export const toolSpecs = {
       "Regarde les vidéos reçues (analyse Gemini) : plans horodatés, sujet, énergie, potentiel d'accroche, qualité, visages, meilleurs passages, paroles. À appeler avant tout plan de montage, avec les media_id indiqués dans la conversation. Peut prendre jusqu'à une minute par vidéo.",
     input: z.object({ media_ids: z.array(z.string().uuid()).min(1).max(10) }),
   },
-  montage: {
+  quote_montage: {
     description:
-      "Lance le montage complet d'une publication, en tâche de fond : ton monteur regarde les clips, choisit le gabarit (doux, dynamique, chic), écrit les textes, crée des scènes de motion design sur mesure si utile, puis la vidéo est rendue et envoyée automatiquement à la gérante avec la légende (2 à 4 minutes). Sans media_ids et sans plan précédent, il fait une vidéo entièrement en motion design (planning, offre, annonce…). Pour une correction (« plus doux », « enlève le texte », « change la police », « plus de motion design »), rappelle montage avec la demande dans brief : il part du montage précédent.",
+      "Devis d'un montage ou d'une correction, en crédits, AVANT de le lancer (obligatoire). Renvoie le coût de base, le maximum si le monteur crée de nouvelles scènes animées, et le solde. Montre ensuite à la gérante, en 2 phrases, ce que tu vas faire et ce que ça coûte, puis attends son accord : montage ne part qu'au tour suivant, avec ce quote_id. Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent.",
     input: z.object({
       post_id: z.string().uuid(),
       media_ids: z.array(z.string().uuid()).max(10).optional().describe("Clips à monter (media_id). Facultatif pour une correction ou une vidéo 100 % motion design."),
       brief: z.string().max(600).optional().describe("Intention ou correction, avec les textes exacts si besoin. Ex. « ouverture en motion design avec RENTRÉE en grand », « police Montserrat », « visages OK »"),
+      correction: z.boolean().default(false).describe("true pour modifier le montage existant de cette publication"),
+      max_new_scenes: z.number().int().min(0).max(2).optional().describe("Nouvelles scènes animées permises (3 crédits chacune). 0 si la gérante veut faire simple ou économiser : le monteur réutilise alors la bibliothèque et les scènes fixes."),
     }),
+  },
+  montage: {
+    description:
+      "Lance le montage (ou la correction) devisé par quote_montage, une fois que la gérante a dit oui. En tâche de fond : ton monteur regarde les clips, choisit le gabarit, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue et envoyée automatiquement avec la légende (2 à 4 minutes). Les crédits sont débités à la livraison, jamais plus que le devis.",
+    input: z.object({ quote_id: z.string().uuid() }),
   },
   create_edit_plan: {
     description:

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { localDateOf, weekOf } from "@/lib/dates";
 import { plural } from "@/lib/format";
+import { creditBalance } from "@/lib/credits";
 import { whatsappLink } from "@/lib/public-env";
 import { getStudioContext, rows } from "@/lib/studio";
 import { listConversations, loadConversation } from "./chat-actions";
@@ -38,7 +39,7 @@ async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searc
   const week = weekOf(localDateOf(new Date(), tz), tz);
   const requested = (await searchParams).c;
 
-  const [drafts, shots, weekPosts, conversations] = await Promise.all([
+  const [drafts, shots, weekPosts, conversations, credits] = await Promise.all([
     db.from("posts").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("status", "draft"),
     db.from("shot_requests").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("done", false),
     db
@@ -49,6 +50,7 @@ async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searc
       .gte("scheduled_at", week.start.toISOString())
       .lt("scheduled_at", week.end.toISOString()),
     listConversations(),
+    creditBalance(studioId),
   ]);
   const active = typeof requested === "string" && conversations.some((c) => c.id === requested) ? requested : null;
   const messages = active ? ((await loadConversation(active)) ?? []) : [];
@@ -63,6 +65,7 @@ async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searc
       : "Rien n’est encore prévu cette semaine.",
     toValidate ? `${plural(toValidate, "brouillon attend", "brouillons attendent")} ta validation.` : "",
     toFilm ? `${plural(toFilm, "plan", "plans")} à filmer.` : "",
+    `Il te reste ${plural(credits, "crédit", "crédits")}.`,
   ]
     .filter(Boolean)
     .join(" ");
