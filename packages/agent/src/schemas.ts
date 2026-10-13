@@ -97,6 +97,31 @@ export const MOTION_TEMPLATES = ["doux", "dynamique", "chic"] as const;
 export const motionTemplateSchema = z.enum(MOTION_TEMPLATES);
 export type MotionTemplate = z.infer<typeof motionTemplateSchema>;
 
+/** What Fauve proposes before a montage, shown on the quote and followed by the editor. */
+export const montagePlanSchema = z.object({
+  duration: z.number().min(5).max(60).describe("Durée visée, en secondes"),
+  style: motionTemplateSchema.optional().describe("Gabarit visé : doux (élégant), dynamique (qui claque), chic (minimal)"),
+  scenes: z
+    .array(
+      z.object({
+        kind: z.enum(["clip", "animation", "end"]).describe("clip : un passage de ses vidéos ; animation : une scène de motion design ; end : l'écran de fin"),
+        what: z.string().min(1).max(140).describe("Ce que montre la scène, en une ligne, textes exacts compris"),
+      }),
+    )
+    .min(1)
+    .max(10),
+});
+export type MontagePlan = z.infer<typeof montagePlanSchema>;
+
+/** The plan as the editor reads it, inside its brief. */
+export function planBrief(plan: MontagePlan): string {
+  const kinds = { clip: "vidéo", animation: "animation", end: "fin" } as const;
+  return [
+    `Plan validé par la gérante (respecte l'ordre, le nombre de scènes et les textes) : ~${Math.round(plan.duration)} s${plan.style ? `, gabarit ${plan.style}` : ""}.`,
+    ...plan.scenes.map((s, i) => `${i + 1}. ${kinds[s.kind]} : ${s.what}`),
+  ].join("\n");
+}
+
 export const editPlanImageSchema = z.object({
   asset_id: z.string().min(1),
   // Safe zones: never bottom or right edge for text; the logo sits bottom-left or top.

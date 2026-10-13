@@ -1,5 +1,5 @@
 import "server-only";
-import { replyExtrasSchema, type PostKind, type PostStatus } from "@fauve/agent";
+import { montagePlanSchema, replyExtrasSchema, type MontagePlan, type PostKind, type PostStatus } from "@fauve/agent";
 import { creditBalance } from "@/lib/credits";
 import { signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -26,6 +26,8 @@ export type CardQuote = {
   /** open: can be launched; launched: montage started; expired: too old, ask for a new one. */
   state: "open" | "launched" | "expired";
   balance: number;
+  /** What Fauve will make: duration, style, scenes in order. */
+  plan: MontagePlan | null;
 };
 
 export type ChatCard = { type: "post"; post: CardPost } | { type: "grid"; posts: CardPost[] } | { type: "quote"; quote: CardQuote };
@@ -117,7 +119,7 @@ async function quoteCards(studioId: string, payloads: unknown[]): Promise<(ChatC
   if (!wanted.length) return ids.map(() => null);
   const db = supabaseAdmin();
   const [{ data }, balance] = await Promise.all([
-    db.from("credit_quotes").select("id, base, max, lines, used_at, expires_at, posts(title)").eq("studio_id", studioId).in("id", wanted),
+    db.from("credit_quotes").select("id, base, max, lines, params, used_at, expires_at, posts(title)").eq("studio_id", studioId).in("id", wanted),
     creditBalance(studioId).catch(() => 0),
   ]);
   const byId = new Map(
@@ -125,7 +127,11 @@ async function quoteCards(studioId: string, payloads: unknown[]): Promise<(ChatC
       const post = q.posts as { title?: string | null } | { title?: string | null }[] | null;
       const title = (Array.isArray(post) ? post[0]?.title : post?.title) ?? "Montage";
       const state = q.used_at ? "launched" : new Date(q.expires_at as string).getTime() < Date.now() ? "expired" : "open";
-      return [q.id as string, { id: q.id as string, title, lines: (q.lines as CardQuote["lines"]) ?? [], base: q.base as number, max: q.max as number, state, balance }];
+      const plan = montagePlanSchema.safeParse((q.params as { plan?: unknown } | null)?.plan);
+      return [
+        q.id as string,
+        { id: q.id as string, title, lines: (q.lines as CardQuote["lines"]) ?? [], base: q.base as number, max: q.max as number, state, balance, plan: plan.success ? plan.data : null },
+      ];
     }),
   );
   return ids.map((id) => {

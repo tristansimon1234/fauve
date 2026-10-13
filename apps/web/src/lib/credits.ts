@@ -1,5 +1,16 @@
 import "server-only";
-import { CREDIT_PRICES, montageCharge, MONTHLY_CREDITS, quoteMontage, quoteVariant, type MotionTemplate, type QuoteLine } from "@fauve/agent";
+import {
+  CREDIT_PRICES,
+  montageCharge,
+  montagePlanSchema,
+  MONTHLY_CREDITS,
+  planBrief,
+  quoteMontage,
+  quoteVariant,
+  type MontagePlan,
+  type MotionTemplate,
+  type QuoteLine,
+} from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Credits (see packages/agent/src/credits.ts for the price list). The balance is
@@ -46,8 +57,13 @@ export async function createMontageQuote(input: {
   maxNewScenes?: number;
   /** A variant of the delivered montage (render only) instead of a montage. */
   variant?: VariantChange;
+  /** Fauve's proposed plan: shown on the quote, its animations set the new scenes allowed. */
+  plan?: MontagePlan;
 }): Promise<Quote | { error: string; balance: number; needed: number }> {
   const balance = await creditBalance(input.studioId);
+  if (input.plan && input.maxNewScenes === undefined) {
+    input = { ...input, maxNewScenes: input.plan.scenes.filter((s) => s.kind === "animation").length };
+  }
   let quote = input.variant
     ? quoteVariant()
     : quoteMontage({ clips: input.mediaIds.length, correction: input.correction, maxNewScenes: input.maxNewScenes });
@@ -65,7 +81,7 @@ export async function createMontageQuote(input: {
       base: quote.base,
       max: quote.max,
       lines: quote.lines,
-      params: { media_ids: input.mediaIds, brief: input.brief ?? null, max_new_scenes: quote.maxNewScenes, variant: input.variant ?? null },
+      params: { media_ids: input.mediaIds, brief: input.brief ?? null, max_new_scenes: quote.maxNewScenes, variant: input.variant ?? null, plan: input.plan ?? null },
       expires_at: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),
     })
     .select("id")
@@ -105,13 +121,16 @@ export async function acceptQuote(studioId: string, quoteId: string, turnStarted
   if ((await creditBalance(studioId)) < (q.base as number)) return { error: "Solde de crédits insuffisant pour ce devis." };
   const claimed = await db.from("credit_quotes").update({ used_at: new Date().toISOString() }).eq("id", quoteId).is("used_at", null).select("id");
   if (!claimed.data?.length) return { error: "Ce devis a déjà été utilisé." };
-  const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number; variant?: VariantChange | null };
+  const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number; variant?: VariantChange | null; plan?: unknown };
+  // The plan the manager said yes to goes to the editor with the brief.
+  const plan = montagePlanSchema.safeParse(params.plan);
+  const brief = [params.brief, plan.success ? planBrief(plan.data) : null].filter(Boolean).join("\n\n") || null;
   return {
     id: q.id as string,
     postId: q.post_id as string,
     kind: q.kind as AcceptedQuote["kind"],
     mediaIds: params.media_ids ?? [],
-    brief: params.brief ?? null,
+    brief,
     maxNewScenes: params.max_new_scenes ?? 0,
     variant: params.variant ?? null,
   };

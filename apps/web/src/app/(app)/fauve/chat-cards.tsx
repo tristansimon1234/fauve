@@ -38,6 +38,35 @@ export function ChatCards({
   );
 }
 
+const sceneLabels = { clip: "Vidéo", animation: "Animation", end: "Fin" } as const;
+const styleLabels = { doux: "style doux", dynamique: "style dynamique", chic: "style chic" } as const;
+
+/** The montage Fauve proposes, scene by scene. */
+function PlanList({ plan }: { plan: NonNullable<CardQuote["plan"]> }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-[14px] bg-soft p-3">
+      <span className="text-[12px] font-semibold text-muted">
+        ~{Math.round(plan.duration)} s · {plan.scenes.length} scène{plan.scenes.length > 1 ? "s" : ""}
+        {plan.style ? ` · ${styleLabels[plan.style]}` : ""}
+      </span>
+      <ol className="flex flex-col gap-1.5 text-[13px] leading-snug">
+        {plan.scenes.map((scene, i) => (
+          <li key={i} className="flex gap-2">
+            <span
+              className={`h-fit shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                scene.kind === "animation" ? "bg-violet-soft text-violet" : scene.kind === "end" ? "bg-chip text-muted" : "bg-peach text-peach-ink"
+              }`}
+            >
+              {sceneLabels[scene.kind]}
+            </span>
+            <span>{scene.what}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 const credits = (n: number) => `${n} crédit${n > 1 ? "s" : ""}`;
 
 /** The plan and its price, before anything runs: one tap to launch. */
@@ -54,11 +83,12 @@ function QuoteCard({
 }) {
   const scenes = quote.max > quote.base;
   return (
-    <article className="flex w-[300px] max-w-full flex-col gap-3 rounded-[18px] border border-line bg-white p-4 shadow-[0_2px_10px_rgba(28,21,48,0.05)]">
+    <article className="flex w-[340px] max-w-full flex-col gap-3 rounded-[18px] border border-line bg-white p-4 shadow-[0_2px_10px_rgba(28,21,48,0.05)]">
       <div className="flex flex-col gap-0.5">
         <span className="text-[11px] font-bold tracking-[0.06em] text-muted uppercase">Devis</span>
         <span className="text-[15px] font-bold leading-snug">{quote.title}</span>
       </div>
+      {quote.plan && <PlanList plan={quote.plan} />}
       <ul className="flex flex-col gap-1.5 text-[13px]">
         {quote.lines.map((line) => (
           <li key={line.label} className="flex justify-between gap-3">
