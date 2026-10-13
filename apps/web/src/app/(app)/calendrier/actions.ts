@@ -3,11 +3,13 @@
 import { postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { localDateOf, localInstant, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
+import { addDays, localDateOf, localInstant, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
+import { scheduleValidated } from "@/lib/posts";
 import { slidesToPublish } from "@/lib/render/slides";
 import { instagramAccount } from "@/lib/social/publish";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { deletePost } from "../publications/[id]/actions";
 
 const input = z.object({ id: z.uuid(), done: z.boolean() });
 
@@ -193,4 +195,80 @@ export async function getPostSheet(postId: string): Promise<PostSheet | null> {
     instagramConnected: Boolean(instagram),
     locked: status === "published" || status === "measured",
   };
+}
+
+// Grouped actions: several posts selected in the calendar at once.
+
+const ids = z.array(z.uuid()).min(1).max(100);
+export type BulkResult = { ok: true; done: number; skipped: number } | { ok: false; error: string };
+
+/** Validates the selected drafts (the others are left as they are), then schedules them when possible. */
+export async function validatePosts(postIds: string[]): Promise<BulkResult> {
+  const parsed = ids.safeParse(postIds);
+  if (!parsed.success) return { ok: false, error: "Sélection invalide." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  const studioId = member.studio.id;
+  const { data, error } = await supabaseAdmin()
+    .from("posts")
+    .update({ status: "validated" })
+    .eq("studio_id", studioId)
+    .eq("status", "draft")
+    .in("id", parsed.data)
+    .select("id");
+  if (error) return { ok: false, error: "La validation n’a pas abouti. Réessaie." };
+  for (const row of data ?? []) await scheduleValidated(studioId, row.id as string);
+  revalidateCalendar();
+  return { ok: true, done: data?.length ?? 0, skipped: parsed.data.length - (data?.length ?? 0) };
+}
+
+/**
+ * Moves the selected posts: all to one day (`date`, each keeps its time) or
+ * by a number of days (`days`, a drag of the selection). Posts already
+ * online or leaving now stay where they are.
+ */
+export async function movePosts(postIds: string[], to: { date: string } | { days: number }): Promise<BulkResult> {
+  const parsed = ids.safeParse(postIds);
+  const target = z.union([z.object({ date: isoDate }), z.object({ days: z.number().int().min(-60).max(60) })]).safeParse(to);
+  if (!parsed.success || !target.success) return { ok: false, error: "Déplacement invalide." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  const tz = member.studio.timezone;
+  const db = supabaseAdmin();
+  const { data: posts } = await db
+    .from("posts")
+    .select("id, status, scheduled_at, publish_started_at")
+    .eq("studio_id", member.studio.id)
+    .in("id", parsed.data);
+  let done = 0;
+  for (const post of posts ?? []) {
+    const leaving = post.publish_started_at && Date.now() - new Date(post.publish_started_at as string).getTime() < 10 * 60_000;
+    if (LOCKED.has(post.status as string) || leaving) continue;
+    const current = post.scheduled_at ? new Date(post.scheduled_at as string) : null;
+    const time = current ? localTimeOf(current, tz) : DEFAULT_TIME;
+    const day =
+      "date" in target.data
+        ? parseIsoDate(target.data.date)!
+        : current
+          ? addDays(localDateOf(current, tz), target.data.days)
+          : null;
+    if (!day) continue;
+    const { error } = await db
+      .from("posts")
+      .update({ scheduled_at: localInstant(day, time.hours, time.minutes, tz).toISOString() })
+      .eq("id", post.id)
+      .eq("studio_id", member.studio.id);
+    if (!error) done++;
+  }
+  revalidateCalendar();
+  return { ok: true, done, skipped: parsed.data.length - done };
+}
+
+/** Deletes the selected posts (with their montages); posts leaving for Instagram right now are kept. */
+export async function deletePosts(postIds: string[]): Promise<BulkResult> {
+  const parsed = ids.safeParse(postIds);
+  if (!parsed.success) return { ok: false, error: "Sélection invalide." };
+  let done = 0;
+  for (const id of parsed.data) if ((await deletePost(id)).ok) done++;
+  return { ok: true, done, skipped: parsed.data.length - done };
 }

@@ -1,8 +1,8 @@
 import "server-only";
-import { slidesToPublish } from "@/lib/render/slides";
+import { postCovers, type CoverPost } from "@/lib/covers";
 import { mediaViews, profile, recentMedia, type InstagramProfile } from "@/lib/social/instagram";
 import { instagramAccount } from "@/lib/social/publish";
-import { signMediaUrls, type Db } from "@/lib/studio";
+import type { Db } from "@/lib/studio";
 import type { Tile } from "@/app/(app)/grille/grid-view";
 
 // The studio's Instagram grid as followers see it, with Fauve's coming posts
@@ -28,38 +28,15 @@ export async function loadGrid(db: Db, studioId: string) {
   // Views per media, as Instagram shows them on Reels (one insights call each, in parallel).
   const views = account ? await Promise.all(feed.map((m) => mediaViews(m.id, account.accessToken))) : [];
 
-  // Fauve's montages: the rendered video, its first frame stands in for the cover.
-  const renderIds = (upcoming.data ?? []).flatMap((p) => (p.render_id ? [p.render_id as string] : []));
-  const { data: renders } = renderIds.length ? await db.from("renders").select("id, storage_path").in("id", renderIds) : { data: [] };
-  const paths = new Map((renders ?? []).map((r) => [r.id as string, r.storage_path as string | null]));
-  // Photo posts and carousels: the first photo, with its text when it is rendered.
-  const firstIds = (upcoming.data ?? []).flatMap((p) => ((p.media_ids as string[] | null)?.[0] ? [(p.media_ids as string[])[0]!] : []));
-  const { data: firstAssets } = firstIds.length
-    ? await db.from("media_assets").select("id, storage_path, kind, mime_type").eq("studio_id", studioId).in("id", firstIds)
-    : { data: [] };
-  const assets = new Map((firstAssets ?? []).map((a) => [a.id as string, a]));
-  const covers = new Map<string, { path: string; video: boolean }>();
-  for (const p of upcoming.data ?? []) {
-    const slide = slidesToPublish(p as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
-    const first = (p.media_ids as string[] | null)?.[0];
-    const asset = first ? assets.get(first) : undefined;
-    const rendered = first ? slide.rendered[first] : undefined;
-    if (rendered) covers.set(p.id as string, { path: rendered, video: false });
-    else if (asset) {
-      covers.set(p.id as string, {
-        path: asset.storage_path as string,
-        video: asset.kind === "video" || String(asset.mime_type ?? "").startsWith("video/"),
-      });
-    }
-  }
-  const signed = await signMediaUrls(db, studioId, [
-    ...[...paths.values()].filter((p): p is string => Boolean(p)),
-    ...[...covers.values()].map((c) => c.path),
-  ]);
+  // Each coming post's cover: its montage, or its first photo (with its text once rendered).
+  const covers = await postCovers(
+    db,
+    studioId,
+    (upcoming.data ?? []).map((p) => ({ ...(p as CoverPost), id: p.id as string })),
+  );
 
   const tiles: Tile[] = [
     ...(upcoming.data ?? []).map((p): Tile => {
-      const path = p.render_id ? paths.get(p.render_id as string) : null;
       const cover = covers.get(p.id as string);
       return {
         kind: "upcoming",
@@ -67,8 +44,8 @@ export async function loadGrid(db: Db, studioId: string) {
         title: p.title as string,
         status: p.status as string,
         at: (p.scheduled_at as string | null) ?? null,
-        videoUrl: path ? (signed.get(path) ?? null) : cover?.video ? (signed.get(cover.path) ?? null) : null,
-        imageUrl: !path && cover && !cover.video ? (signed.get(cover.path) ?? null) : null,
+        videoUrl: cover?.video ? cover.url : null,
+        imageUrl: cover && !cover.video ? cover.url : null,
         format: p.kind as string,
       };
     }),
