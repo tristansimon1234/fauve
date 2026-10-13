@@ -13,7 +13,7 @@ import {
 } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
 import { useMemo, useRef, useState, useTransition } from "react";
-import { CheckIcon, PenIcon, PlusIcon, TrashIcon, WhatsAppIcon, XIcon } from "@/components/icons";
+import { CheckIcon, LayersIcon, PenIcon, PlayIcon, PlusIcon, TrashIcon, WhatsAppIcon, XIcon } from "@/components/icons";
 import { DEFAULT_Y, TextBoxes } from "@/components/montage/text-boxes";
 import { Orb } from "@/components/orb";
 import { ReelPlayer } from "@/components/reel-player";
@@ -30,6 +30,9 @@ const kindLabels: Record<PostKind, string> = { reel: "Reel", post: "Post", carou
 const sceneLabels = { clip: "Vidéo", scene: "Écran", motion: "Animation" } as const;
 const round = (n: number) => Math.round(n * 10) / 10;
 
+export type ActionMedia = { url: string; video: boolean };
+export type GridTile = { url: string; reel: boolean; carousel: boolean };
+
 export type ActionPost = {
   id: string;
   title: string;
@@ -44,18 +47,23 @@ export function ActionView({
   post,
   editor,
   videoUrl,
-  photoUrl,
+  media,
+  grid,
   changeHref,
   backHref,
 }: {
   post: ActionPost;
   editor: { plan: EditPlan; inputs: ReelInputs } | null;
   videoUrl: string | null;
-  photoUrl: string | null;
+  /** The post's own photos and videos, in order (a carousel has several). */
+  media: ActionMedia[];
+  /** The latest Instagram posts, for the grid preview; null when it does not apply (story). */
+  grid: GridTile[] | null;
   changeHref: string;
   backHref: string;
 }) {
   const [mode, setMode] = useState<Mode>("view");
+  const [inGrid, setInGrid] = useState(false);
   const [status, setStatus] = useState(post.status);
   const [saved, setSaved] = useState(editor?.plan ?? null);
   const [plan, setPlan] = useState(editor?.plan ?? null);
@@ -168,7 +176,13 @@ export function ActionView({
   const span = spans[sceneIndex];
   const sceneTexts = editing && span ? plan.texts.map((t, i) => ({ t, i })).filter(({ t }) => t.from >= span.start && t.from < span.end) : [];
   // The preview leaves room for the controls under it, so everything fits one screen.
-  const mediaWidth = editing ? "min(100%, max(190px, calc((100dvh - 440px) * 9 / 16)))" : "min(100%, calc((100dvh - 340px) * 9 / 16))";
+  // Photos keep the feed's 4:5, a montage or a story is 9:16.
+  const photos = !props && !videoUrl && media.length > 0 && post.kind !== "story";
+  const ratio = photos ? 4 / 5 : 9 / 16;
+  const mediaWidth = editing
+    ? "min(100%, max(190px, calc((100dvh - 440px) * 9 / 16)))"
+    : `min(100%, calc((100dvh - ${grid ? 390 : 340}px) * ${ratio}))`;
+  const showGrid = inGrid && !editing && grid !== null;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-[480px] flex-col px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+132px)]">
@@ -190,7 +204,32 @@ export function ActionView({
         </p>
       )}
 
-      <div className="mt-3 flex justify-center">
+      {grid && !editing && (
+        <div role="tablist" aria-label="Aperçu" className="mt-3 flex self-center rounded-full bg-white/10 p-1">
+          {[
+            { on: !inGrid, label: "Publication", set: false },
+            { on: inGrid, label: "Dans ta grille", set: true },
+          ].map((tab) => (
+            <button
+              key={tab.label}
+              type="button"
+              role="tab"
+              aria-selected={tab.on}
+              onClick={() => {
+                setInGrid(tab.set);
+                playerRef.current?.pause();
+              }}
+              className={`rounded-full px-4 py-1.5 text-[13px] font-bold ${tab.on ? "bg-white text-ink" : "text-white/70"}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {showGrid && <GridPreview cover={videoUrl ? { url: videoUrl, video: true } : (media[0] ?? null)} kind={post.kind} tiles={grid} />}
+
+      <div className={`mt-3 justify-center ${showGrid ? "hidden" : "flex"}`}>
         <div ref={previewRef} className="relative overflow-hidden rounded-[22px] bg-black" style={{ width: mediaWidth }}>
           {props ? (
             <>
@@ -209,9 +248,8 @@ export function ActionView({
             </>
           ) : videoUrl ? (
             <video src={videoUrl} controls playsInline loop className="aspect-[9/16] w-full object-cover" />
-          ) : photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
-            <img src={photoUrl} alt="" className="w-full" />
+          ) : media.length > 0 ? (
+            <MediaSlides media={media} ratio={post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]"} />
           ) : (
             <div className="flex aspect-[9/16] w-full items-center justify-center p-6 text-center text-[14px] text-white/60">
               Fauve prépare encore cette publication.
@@ -444,5 +482,82 @@ function TextSheet({
         </button>
       </div>
     </div>
+  );
+}
+
+/** The photos of a post, swiped one by one like on Instagram, with a counter and dots. */
+function MediaSlides({ media, ratio }: { media: ActionMedia[]; ratio: string }) {
+  const [index, setIndex] = useState(0);
+  const track = useRef<HTMLUListElement>(null);
+  const go = (i: number) => track.current?.scrollTo({ left: i * track.current.clientWidth, behavior: "smooth" });
+  return (
+    <div className="relative">
+      <ul
+        ref={track}
+        onScroll={(e) => setIndex(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth)))}
+        className={`flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] ${ratio}`}
+        aria-label={media.length > 1 ? `Carrousel de ${media.length} éléments` : "Aperçu"}
+      >
+        {media.map((m, i) => (
+          <li key={i} className="h-full w-full shrink-0 snap-center">
+            {m.video ? (
+              <video src={m.url} controls playsInline preload="metadata" className="size-full object-cover" />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
+              <img src={m.url} alt="" className="size-full object-cover" />
+            )}
+          </li>
+        ))}
+      </ul>
+      {media.length > 1 && (
+        <>
+          <span className="absolute top-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-[12px] font-bold">
+            {index + 1}/{media.length}
+          </span>
+          <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
+            {media.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                aria-label={`Photo ${i + 1}`}
+                onClick={() => go(i)}
+                className={`size-2 rounded-full ${i === index ? "bg-white" : "bg-white/45"}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** The post at the top of the Instagram grid, before the latest ones: how the feed will look. */
+function GridPreview({ cover, kind, tiles }: { cover: ActionMedia | null; kind: PostKind; tiles: GridTile[] }) {
+  return (
+    <section aria-label="Dans ta grille" className="mt-3 flex flex-col gap-2">
+      <ul className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-[18px] bg-white/5">
+        <li className="relative aspect-[3/4] bg-white/10">
+          {cover?.video ? (
+            <video src={`${cover.url}#t=0.5`} muted playsInline preload="metadata" className="size-full object-cover" />
+          ) : cover ? (
+            // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
+            <img src={cover.url} alt="" className="size-full object-cover" />
+          ) : null}
+          <span className="pointer-events-none absolute inset-0 border-2 border-violet" />
+          <span className="absolute top-1.5 left-1.5 rounded-full bg-violet px-2 py-0.5 text-[10px] font-bold">Nouveau</span>
+          {kind === "reel" && <PlayIcon size={14} className="absolute top-2 right-2 drop-shadow" />}
+          {kind === "carousel" && <LayersIcon size={14} className="absolute top-2 right-2 drop-shadow" />}
+        </li>
+        {tiles.map((t, i) => (
+          <li key={i} className="relative aspect-[3/4] bg-white/10">
+            {/* eslint-disable-next-line @next/next/no-img-element -- Instagram CDN */}
+            <img src={t.url} alt="" loading="lazy" className="size-full object-cover" />
+            {t.reel && <PlayIcon size={14} className="absolute top-2 right-2 drop-shadow" />}
+            {t.carousel && <LayersIcon size={14} className="absolute top-2 right-2 drop-shadow" />}
+          </li>
+        ))}
+      </ul>
+      {tiles.length === 0 && <p className="text-center text-[13px] text-white/60">Connecte Instagram pour voir tes dernières publications autour.</p>}
+    </section>
   );
 }
