@@ -66,7 +66,7 @@ export function Reel(props: ReelProps) {
 
       {props.texts.map((t, i) => (
         <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
-          <TextBeat text={t} props={props} theme={theme} k={k} />
+          <TextBeat text={t} index={i} props={props} theme={theme} k={k} />
         </Sequence>
       ))}
 
@@ -118,13 +118,28 @@ function backdrop(text: ReelProps["texts"][number], k: number): CSSProperties {
     : {};
 }
 
-function TextBeat({ text, props, theme, k }: { text: ReelProps["texts"][number]; props: ReelProps; theme: Theme; k: number }) {
-  if (text.style === "hook") return <Hook text={text} props={props} theme={theme} k={k} />;
-  if (text.style === "band") return <Band text={text} props={props} theme={theme} k={k} />;
-  return <Caption text={text} props={props} theme={theme} k={k} />;
+/**
+ * Left and right edges of a text's box: the safe margins, or narrower around a
+ * centre moved by hand (`x`), so the text stays inside the safe zone.
+ */
+function sides(text: ReelProps["texts"][number], props: ReelProps, k: number): { left: number; right: number } {
+  const left = SAFE.left * k;
+  const right = SAFE.right * k;
+  if (text.x === undefined) return { left, right };
+  const centre = text.x * props.width;
+  const half = Math.max(80 * k, Math.min(centre - left, props.width - right - centre));
+  return { left: centre - half, right: props.width - centre - half };
 }
 
-function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; props: ReelProps; theme: Theme; k: number }) {
+function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
+  // Remount when edited, so the fit is measured again (scene editor).
+  const key = `${text.text}|${text.style}|${text.scale ?? 1}|${text.x ?? ""}|${text.backdrop ?? false}`;
+  if (text.style === "hook") return <Hook key={key} text={text} index={index} props={props} theme={theme} k={k} />;
+  if (text.style === "band") return <Band key={key} text={text} index={index} props={props} theme={theme} k={k} />;
+  return <Caption key={key} text={text} index={index} props={props} theme={theme} k={k} />;
+}
+
+function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const exit = useExit(text.durationInFrames, theme);
@@ -136,8 +151,7 @@ function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
     position: "absolute",
     top: props.height * (text.y ?? 0.12),
     height: props.height * 0.26 * (text.scale ?? 1),
-    left: SAFE.left * k,
-    right: SAFE.right * k,
+    ...sides(text, props, k),
     opacity: exit.opacity,
     transform: `translateY(${exit.translate * k}px)`,
   };
@@ -157,7 +171,7 @@ function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
 
   // A long hook shrinks to its box (top of the frame, inside the side margins).
   return (
-    <Fit style={box} innerStyle={style}>
+    <Fit style={box} innerStyle={style} marker={String(index)}>
       {words.map((word, i) => {
         const p = spring({ frame: frame - i * h.stagger, fps, config: theme.spring });
         const enter: CSSProperties =
@@ -178,7 +192,7 @@ function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
   );
 }
 
-function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; props: ReelProps; theme: Theme; k: number }) {
+function Band({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const exit = useExit(text.durationInFrames, theme);
@@ -192,8 +206,7 @@ function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
       style={{
         position: "absolute",
         top: props.height * (text.y ?? 0.37),
-        left: SAFE.left * k,
-        right: SAFE.right * k,
+        ...sides(text, props, k),
         display: "flex",
         justifyContent: "center",
         opacity: exit.opacity,
@@ -201,6 +214,7 @@ function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
       }}
     >
       <div
+        data-fauve-text={index}
         style={{
           clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0 round ${b.radius * k}px)`,
           background: b.outline ? "rgba(0,0,0,0.18)" : props.brand.accent,
@@ -231,18 +245,18 @@ function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
   );
 }
 
-function Caption({ text, props, theme, k }: { text: ReelProps["texts"][number]; props: ReelProps; theme: Theme; k: number }) {
+function Caption({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const exit = useExit(text.durationInFrames, theme);
   const p = spring({ frame, fps, config: { damping: 200, stiffness: 100 } });
   return (
     <div
+      data-fauve-text={index}
       style={{
         position: "absolute",
         top: props.height * (text.y ?? 0.63),
-        left: SAFE.left * k,
-        right: SAFE.right * k,
+        ...sides(text, props, k),
         textAlign: "center",
         color: "#fff",
         fontFamily: `"${props.brand.bodyFont}", sans-serif`,

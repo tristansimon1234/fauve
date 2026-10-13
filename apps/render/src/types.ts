@@ -31,6 +31,7 @@ export type ReelProps = {
     durationInFrames: number;
     /** Manual placement (scene editor): top edge as a share of the height, size factor, dark background. */
     y?: number;
+    x?: number;
     scale?: number;
     backdrop?: boolean;
   }[];

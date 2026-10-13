@@ -13,7 +13,7 @@ import {
   type Segment,
 } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FilmIcon, PenIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { ReelPlayer } from "@/components/reel-player";
 import { saveEditPlan } from "./actions";
@@ -38,6 +38,8 @@ const round = (n: number) => Math.round(n * 10) / 10;
 const DEFAULT_Y: Record<Text["style"], number> = { hook: 0.12, band: 0.37, caption: 0.63 };
 const Y_MIN = 0.05;
 const Y_MAX = 0.66;
+const X_MIN = 0.3;
+const X_MAX = 0.7;
 const places = [
   { label: "Haut", y: 0.12 },
   { label: "Milieu", y: 0.37 },
@@ -120,14 +122,17 @@ export function MontageEditor({
       <div className="flex w-full max-w-[320px] flex-col gap-3 md:sticky md:top-6">
         <div ref={previewRef} className="relative overflow-hidden rounded-[22px] shadow-[0_18px_40px_rgba(28,21,48,.18)]">
           <ReelPlayer props={props} playerRef={playerRef} />
-          {activeText !== null && plan.texts[activeText] && (
-            <TextHandle
-              y={plan.texts[activeText]!.y ?? DEFAULT_Y[plan.texts[activeText]!.style]}
-              label={plan.texts[activeText]!.text}
-              container={previewRef}
-              onMove={(y) => setText(activeText, { y })}
-            />
-          )}
+          <TextBoxes
+            container={previewRef}
+            player={playerRef}
+            texts={plan.texts}
+            active={activeText}
+            onMove={(i, place) => setText(i, place)}
+            onPick={(i) => {
+              setActiveText(i);
+              document.getElementById(`fauve-text-${i}`)?.focus();
+            }}
+          />
         </div>
         <p className="text-center text-[13px] text-muted">L’aperçu change en direct. Rien n’est rendu tant que tu n’enregistres pas.</p>
       </div>
@@ -226,6 +231,7 @@ export function MontageEditor({
                 className={`flex flex-col gap-2 rounded-[14px] p-3 ${activeText === i ? "bg-violet-tint ring-1 ring-lilac" : "bg-soft"}`}
               >
                 <input
+                  id={`fauve-text-${i}`}
                   value={t.text}
                   maxLength={120}
                   onChange={(e) => setText(i, { text: e.target.value })}
@@ -284,7 +290,7 @@ export function MontageEditor({
                   </label>
                 </div>
                 <label className="flex flex-col gap-1 text-[12px] text-muted">
-                  <span>Hauteur (ou glisse le repère sur l’aperçu)</span>
+                  <span>Hauteur (ou attrape le texte sur l’aperçu)</span>
                   <input
                     type="range"
                     min={Y_MIN}
@@ -365,55 +371,116 @@ export function MontageEditor({
   );
 }
 
+type Box = { index: number; left: number; top: number; width: number; height: number };
+
 /**
- * A guide on the preview at the text's height: drag it to move the text,
- * within the safe zone (never in the bottom quarter, under Instagram's buttons).
+ * The texts on the preview, grabbable: drag one to place it (inside the safe
+ * zone, with a pull to the centre line), tap it to edit it. Boxes come from the
+ * composition itself (`data-fauve-text`), measured on every frame.
  */
-function TextHandle({
-  y,
-  label,
+function TextBoxes({
   container,
+  player,
+  texts,
+  active,
   onMove,
+  onPick,
 }: {
-  y: number;
-  label: string;
   container: React.RefObject<HTMLDivElement | null>;
-  onMove: (y: number) => void;
+  player: React.RefObject<PlayerRef | null>;
+  texts: Text[];
+  active: number | null;
+  onMove: (index: number, place: { x: number; y: number }) => void;
+  onPick: (index: number) => void;
 }) {
-  const place = (clientY: number) => {
+  const [boxes, setBoxes] = useState<Box[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef<{ index: number; px: number; py: number; x0: number; y0: number; moved: boolean } | null>(null);
+
+  useEffect(() => {
+    let frame = 0;
+    let last = "";
+    const measure = () => {
+      const root = container.current;
+      if (root) {
+        const base = root.getBoundingClientRect();
+        const found = [...root.querySelectorAll<HTMLElement>("[data-fauve-text]")].map((el): Box => {
+          const r = el.getBoundingClientRect();
+          return {
+            index: Number(el.dataset.fauveText),
+            left: (r.left - base.left) / base.width,
+            top: (r.top - base.top) / base.height,
+            width: r.width / base.width,
+            height: r.height / base.height,
+          };
+        });
+        const key = JSON.stringify(found.map((b) => [b.index, b.left.toFixed(3), b.top.toFixed(3), b.width.toFixed(3), b.height.toFixed(3)]));
+        if (key !== last) {
+          last = key;
+          setBoxes(found);
+        }
+      }
+      frame = requestAnimationFrame(measure);
+    };
+    frame = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(frame);
+  }, [container]);
+
+  const move = (clientX: number, clientY: number) => {
+    const d = drag.current;
     const rect = container.current?.getBoundingClientRect();
-    if (!rect) return;
-    onMove(Math.round(Math.min(Y_MAX, Math.max(Y_MIN, (clientY - rect.top) / rect.height)) * 100) / 100);
+    if (!d || !rect) return;
+    const dx = (clientX - d.px) / rect.width;
+    const dy = (clientY - d.py) / rect.height;
+    if (Math.abs(clientX - d.px) + Math.abs(clientY - d.py) > 3) d.moved = true;
+    if (!d.moved) return;
+    let x = Math.min(X_MAX, Math.max(X_MIN, d.x0 + dx));
+    if (Math.abs(x - 0.5) < 0.025) x = 0.5;
+    const y = Math.min(Y_MAX, Math.max(Y_MIN, d.y0 + dy));
+    onMove(d.index, { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
   };
+
   return (
     <>
-      {/* The bottom quarter Instagram covers. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.08)_0_8px,transparent_8px_16px)]" />
-      <div
-        role="slider"
-        aria-label={`Hauteur de « ${label} »`}
-        aria-valuemin={Y_MIN}
-        aria-valuemax={Y_MAX}
-        aria-valuenow={y}
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowUp") onMove(Math.max(Y_MIN, Math.round((y - 0.01) * 100) / 100));
-          if (e.key === "ArrowDown") onMove(Math.min(Y_MAX, Math.round((y + 0.01) * 100) / 100));
-        }}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          place(e.clientY);
-        }}
-        onPointerMove={(e) => {
-          if (e.currentTarget.hasPointerCapture(e.pointerId)) place(e.clientY);
-        }}
-        className="absolute inset-x-0 z-10 flex h-7 -translate-y-1/2 cursor-ns-resize touch-none items-center"
-        style={{ top: `${y * 100}%` }}
-      >
-        <div className="h-0 flex-1 border-t-2 border-dashed border-white/90" />
-        <span className="mx-2 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-violet shadow">Glisse pour déplacer</span>
-        <div className="h-0 flex-1 border-t-2 border-dashed border-white/90" />
-      </div>
+      {dragging && (
+        <>
+          {/* The bottom quarter Instagram covers, and the centre line. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-1/4 bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.12)_0_8px,transparent_8px_16px)]" />
+          <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 border-l border-dashed border-white/60" />
+        </>
+      )}
+      {boxes.map((box) => {
+        const text = texts[box.index];
+        if (!text) return null;
+        return (
+          <button
+            key={box.index}
+            type="button"
+            aria-label={`Déplacer « ${text.text} »`}
+            className={`absolute z-20 cursor-grab touch-none rounded-[8px] border-2 active:cursor-grabbing ${
+              active === box.index ? "border-white shadow-[0_0_0_2px_rgba(91,63,217,0.9)]" : "border-dashed border-white/70 hover:border-white"
+            }`}
+            style={{ left: `${box.left * 100}%`, top: `${box.top * 100}%`, width: `${box.width * 100}%`, height: `${box.height * 100}%` }}
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              player.current?.pause();
+              drag.current = { index: box.index, px: e.clientX, py: e.clientY, x0: text.x ?? 0.5, y0: text.y ?? DEFAULT_Y[text.style], moved: false };
+              setDragging(true);
+            }}
+            onPointerMove={(e) => move(e.clientX, e.clientY)}
+            onPointerUp={() => {
+              const d = drag.current;
+              drag.current = null;
+              setDragging(false);
+              if (d && !d.moved) onPick(d.index);
+            }}
+            onPointerCancel={() => {
+              drag.current = null;
+              setDragging(false);
+            }}
+          />
+        );
+      })}
     </>
   );
 }

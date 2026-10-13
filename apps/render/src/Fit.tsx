@@ -68,8 +68,11 @@ const size = (scale: number) => `${(100 / scale).toFixed(3)}%`;
 export function Fit({
   style,
   innerStyle,
+  marker,
   children,
 }: {
+  /** Lets the scene editor find this box on the preview (`data-fauve-text`). */
+  marker?: string;
   /** The box: position and size (it must be positioned). */
   style: CSSProperties;
   /** Layout and typography of the content; centred by default. */
@@ -118,7 +121,7 @@ export function Fit({
   }, [ready, scale]);
 
   return (
-    <div ref={outer} style={style}>
+    <div ref={outer} style={style} data-fauve-text={marker}>
       <div
         ref={inner}
         style={{
