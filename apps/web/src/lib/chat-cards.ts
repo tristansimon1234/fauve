@@ -23,8 +23,8 @@ export type CardQuote = {
   lines: { label: string; credits: number }[];
   base: number;
   max: number;
-  /** open: can be launched; launched: montage started; expired: too old, ask for a new one. */
-  state: "open" | "launched" | "expired";
+  /** open: can be launched; launched: being made; delivered: video sent; expired: ask for a new one. */
+  state: "open" | "launched" | "delivered" | "expired";
   balance: number;
   /** What Fauve will make: duration, style, scenes in order. */
   plan: MontagePlan | null;
@@ -119,14 +119,14 @@ async function quoteCards(studioId: string, payloads: unknown[]): Promise<(ChatC
   if (!wanted.length) return ids.map(() => null);
   const db = supabaseAdmin();
   const [{ data }, balance] = await Promise.all([
-    db.from("credit_quotes").select("id, base, max, lines, params, used_at, expires_at, posts(title)").eq("studio_id", studioId).in("id", wanted),
+    db.from("credit_quotes").select("id, base, max, lines, params, used_at, charged_at, expires_at, posts(title)").eq("studio_id", studioId).in("id", wanted),
     creditBalance(studioId).catch(() => 0),
   ]);
   const byId = new Map(
     (data ?? []).map((q): [string, CardQuote] => {
       const post = q.posts as { title?: string | null } | { title?: string | null }[] | null;
       const title = (Array.isArray(post) ? post[0]?.title : post?.title) ?? "Montage";
-      const state = q.used_at ? "launched" : new Date(q.expires_at as string).getTime() < Date.now() ? "expired" : "open";
+      const state = q.charged_at ? "delivered" : q.used_at ? "launched" : new Date(q.expires_at as string).getTime() < Date.now() ? "expired" : "open";
       const plan = montagePlanSchema.safeParse((q.params as { plan?: unknown } | null)?.plan);
       return [
         q.id as string,

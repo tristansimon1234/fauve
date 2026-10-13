@@ -117,6 +117,11 @@ export const toolSpecs = {
         .describe("Variante du montage livré (1 crédit, sans nouveau montage) : même découpage, autre style et autre accroche"),
     }),
   },
+  montage_status: {
+    description:
+      "Où en sont les montages lancés ces 3 dernières heures (ou celui d'une publication) : en montage (le monteur écrit le plan), en rendu, ou livré, et depuis combien de minutes. Un montage prend 2 à 5 minutes ; « late » signifie qu'il a sans doute échoué.",
+    input: z.object({ post_id: z.string().uuid().optional() }),
+  },
   choose_version: {
     description:
       "Remet une version précédente du montage d'une publication (par ex. la gérante préfère l'original à la variante). Gratuit. Les versions sont numérotées dans l'ordre (la plus récente est la dernière).",

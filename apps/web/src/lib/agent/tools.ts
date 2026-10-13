@@ -12,6 +12,7 @@ import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { acceptQuote, createMontageQuote, lastPresentedQuote } from "@/lib/credits";
 import { startMontage } from "@/lib/montage-start";
+import { montageStatus } from "@/lib/montage-status";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
@@ -287,6 +288,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         posts_analyses: report.posts,
         date: report.createdAt,
         note: "Partage le bilan en 2-3 phrases (la tendance et la leçon la plus utile) ; le détail est dans l'app, page Résultats.",
+      });
+    },
+
+    async montage_status({ post_id }) {
+      const montages = await montageStatus(studioId, post_id);
+      if (!montages.length) return json({ montages: [], note: "Aucun montage lancé récemment." });
+      return json({
+        montages: montages.map((m) => ({ post_id: m.postId, publication: m.title, etape: m.step, depuis_minutes: m.minutes, late: m.late })),
+        note: "En montage puis en rendu : tout va bien, la vidéo arrive toute seule. late : propose de relancer (quote_montage puis montage).",
       });
     },
 
