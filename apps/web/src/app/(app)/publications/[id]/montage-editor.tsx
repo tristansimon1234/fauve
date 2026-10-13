@@ -19,6 +19,8 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FilmIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { ListItems } from "@/components/montage/list-items";
 import { LookPanel } from "@/components/montage/look-panel";
+import { clipFaceBlur } from "@/components/montage/retouch-actions";
+import { RetouchSwitches } from "@/components/montage/retouch-switches";
 import { DEFAULT_Y, places, TextBoxes, Y_MAX, Y_MIN } from "@/components/montage/text-boxes";
 import { AskFauveButton, useFauveDrawer } from "@/components/fauve-drawer";
 import { ReelPlayer } from "@/components/reel-player";
@@ -489,6 +491,23 @@ function SegmentFields({ segment, onChange, clipDuration }: { segment: Segment; 
           <input type="checkbox" checked={segment.zoom === "light"} onChange={(e) => onChange({ ...segment, zoom: e.target.checked ? "light" : "none" })} />
           Léger zoom
         </label>
+        {/* Faces are tracked over the whole clip, so the blur follows this clip wherever it is used. */}
+        <RetouchSwitches
+          key={segment.clip_id}
+          showLight={false}
+          light={false}
+          faces={Boolean(segment.blur?.tracks.length)}
+          onChange={async (next) => {
+            if (!next.faces) {
+              onChange({ ...segment, blur: undefined });
+              return { ok: true };
+            }
+            const res = await clipFaceBlur(segment.clip_id).catch(() => ({ ok: false as const, error: "Fauve n’a pas pu regarder cette vidéo." }));
+            if (!res.ok) return { ok: false, message: res.error };
+            if (res.value) onChange({ ...segment, blur: res.value });
+            return { ok: true, message: res.note };
+          }}
+        />
       </div>
     );
   }

@@ -511,3 +511,55 @@ test("house text layers pass the same checks as generated ones", async () => {
     assert.match(l.js, /function Layer\(/);
   }
 });
+
+test("retouch: boxes, tracking, cover layout without empty corners, edits from Gemini, blur kept across versions", async () => {
+  const { boxFrom2d, boxAt, coverLayout, photoEditFrom, clipBlurFrom, cssFilter } = await import("./retouch.ts");
+  const { carryRetouch, editorOutputSchema } = await import("./editor.ts");
+
+  // A Gemini box [ymin, xmin, ymax, xmax] on 0–1000 becomes shares of the image, with a margin.
+  const b = boxFrom2d([200, 400, 400, 600], 0);
+  assert.deepEqual([b.x, b.y, b.w, b.h].map((v) => Math.round(v * 100) / 100), [0.4, 0.2, 0.2, 0.2]);
+  assert.ok(boxFrom2d([0, 0, 100, 100]).x === 0);
+
+  // Tracking: interpolated between keys, gone well after the last one.
+  const keys = [
+    { t: 0, x: 0, y: 0, w: 0.2, h: 0.2 },
+    { t: 1, x: 0.4, y: 0, w: 0.2, h: 0.2 },
+  ];
+  assert.equal(Math.round(boxAt(keys, 0.5)!.x * 100) / 100, 0.2);
+  assert.equal(boxAt(keys, 3), null);
+
+  // Straightened and pushed to a side, the picture still covers the whole frame.
+  const frame = { width: 1080, height: 1350 };
+  const l = coverLayout(frame, { width: 1200, height: 1600 }, { straighten: 5, focus: { x: 0.5, y: 0.1 } });
+  const angle = (5 * Math.PI) / 180;
+  const needW = frame.width * Math.cos(angle) + frame.height * Math.sin(angle);
+  const needH = frame.width * Math.sin(angle) + frame.height * Math.cos(angle);
+  assert.ok(l.left <= (frame.width - needW) / 2 + 0.01 && l.left + l.width >= (frame.width + needW) / 2 - 0.01);
+  assert.ok(l.top <= (frame.height - needH) / 2 + 0.01 && l.top + l.height >= (frame.height + needH) / 2 - 0.01);
+  assert.equal(cssFilter({}), undefined);
+
+  const detection = {
+    regions: [
+      { kind: "face" as const, label: "cliente", box_2d: [100, 100, 300, 300], recognizable: true },
+      { kind: "face" as const, label: "de dos", box_2d: [500, 500, 600, 600], recognizable: false },
+      { kind: "plate" as const, label: "plaque", box_2d: [800, 100, 850, 400], recognizable: false },
+    ],
+    adjust: { exposure: 0.2, contrast: 0.1, saturation: 0, warmth: 0.1, straighten: -2 },
+    subject: { x: 500, y: 300 },
+    notes: "un peu sombre",
+  };
+  const edit = photoEditFrom(detection, { width: 1200, height: 1600 }, { retouch: true, blur: ["face"], onlyRecognizable: true });
+  assert.equal(edit.blur?.length, 1);
+  assert.equal(edit.adjust?.focus?.y, 0.3);
+  assert.equal(photoEditFrom(detection, { width: 1200, height: 1600 }, { retouch: false, blur: ["plate"] }).adjust, undefined);
+
+  const blur = clipBlurFrom({ tracks: [{ kind: "face", label: "x", recognizable: true, keys: [{ t: 1, box_2d: [0, 0, 100, 100] }, { t: 0, box_2d: [0, 0, 100, 100] }] }] }, 9 / 16, ["face"]);
+  assert.deepEqual(blur?.tracks[0]?.keys.map((k) => k.t), [0, 1]);
+
+  // The editor never writes a blur; the previous version's blur stays on its clip.
+  assert.equal("blur" in (editorOutputSchema.shape.plan.shape.segments.element.options[0] as { shape: object }).shape, false);
+  const previous = editPlanSchema.parse({ ...validPlan, segments: [{ clip_id: "a", in: 1, out: 3, zoom: "none", blur }] });
+  const next = carryRetouch(editPlanSchema.parse({ ...validPlan, segments: [{ clip_id: "a", in: 0, out: 2 }] }), previous);
+  assert.equal(next.segments[0] && "blur" in next.segments[0] ? next.segments[0].blur?.tracks.length : 0, 1);
+});

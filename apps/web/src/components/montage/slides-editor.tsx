@@ -6,6 +6,8 @@ import { PenIcon, PlusIcon } from "@/components/icons";
 import { SlidePreview } from "./slide-preview";
 import { TextBoxes } from "./text-boxes";
 import { LayerFields } from "./layer-fields";
+import { photoRetouch } from "./retouch-actions";
+import { RetouchSwitches } from "./retouch-switches";
 import { TextSheet } from "./text-sheet";
 
 // Text over the photos of a carousel or photo post, by hand: the slide as it
@@ -185,6 +187,20 @@ export function SlidesEditor({
           </button>
         ))}
       </div>
+      {url && (
+        <RetouchSwitches
+          key={slide.media_id}
+          dark={dark}
+          light={Boolean(slide.edit?.adjust)}
+          faces={Boolean(slide.edit?.blur?.some((b) => b.kind === "face"))}
+          onChange={async (next) => {
+            const res = await photoRetouch(slide.media_id, next).catch(() => ({ ok: false as const, error: "Fauve n’a pas pu regarder cette photo." }));
+            if (!res.ok) return { ok: false, message: res.error };
+            onChange({ ...plan, slides: plan.slides.map((s, i) => (i === index ? { ...s, edit: res.value ?? undefined } : s)) });
+            return { ok: true, message: res.note };
+          }}
+        />
+      )}
       {brand.logoUrl && (
         <div className="flex items-center gap-2">
           <span className={`text-[12px] font-bold ${muted}`}>Logo</span>

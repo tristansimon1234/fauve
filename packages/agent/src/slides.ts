@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { REEL_FPS, resolveReelBrand, type ReelInputs, type ReelProps } from "./motion.ts";
 import { motionTemplateSchema, type MotionTemplate } from "./schemas.ts";
+import { photoEditSchema } from "./retouch.ts";
 import { textLayerSchema } from "./text-layer.ts";
 import { listFields, textLookSchema } from "./text-look.ts";
 
@@ -38,6 +39,8 @@ export const slideSchema = z.object({
   logo: z.enum(["top", "bottom"]).optional(),
   /** A text layer designed as code (text designer): drawn instead of `texts`. */
   layer: textLayerSchema.optional(),
+  /** Retouch and blurred zones of the photo. */
+  edit: photoEditSchema.optional(),
 });
 export type Slide = z.infer<typeof slideSchema>;
 
@@ -58,7 +61,7 @@ export function buildSlideProps(
     fps: REEL_FPS,
     durationInFrames: SLIDE_FRAMES,
     fadeFrames: 0,
-    segments: [{ type: "image", src: inputs.imageUrl, startAt: 0, durationInFrames: SLIDE_FRAMES }],
+    segments: [{ type: "image", src: inputs.imageUrl, startAt: 0, durationInFrames: SLIDE_FRAMES, ...(slide.edit ? { edit: slide.edit } : {}) }],
     // A designed text layer replaces the slide's own texts.
     texts: (slide.layer ? [] : slide.texts).map((t) => ({
       text: t.text,

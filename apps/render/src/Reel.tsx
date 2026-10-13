@@ -14,6 +14,7 @@ import { Fit } from "./Fit";
 import { loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
 import { SceneView } from "./Scene";
+import { ClipBlurLayer, cssFilter, Photo } from "./Retouch";
 import { TextLayer } from "./TextLayer";
 import { THEMES, type Theme } from "./theme";
 import type { ReelProps, TextLook } from "./types";
@@ -47,7 +48,7 @@ export function Reel(props: ReelProps) {
                 {segment.type === "clip" ? (
                   <Shot segment={segment} theme={theme} />
                 ) : (
-                  <Img src={segment.src} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <Photo src={segment.src} edit={segment.edit} />
                 )}
                 {/* Soft gradients keep white text readable on any footage. */}
                 <AbsoluteFill
@@ -106,13 +107,14 @@ function Shot({ segment, theme }: { segment: ClipSegment; theme: Theme }) {
     ? interpolate(frame, [0, segment.durationInFrames], [1, theme.zoomTo], { ...clamp, easing: Easing.inOut(Easing.quad) })
     : 1;
   return (
-    <AbsoluteFill>
+    <AbsoluteFill style={{ transform: `scale(${scale})` }}>
       <OffthreadVideo
         src={segment.src}
         trimBefore={segment.startFrom}
         muted
-        style={{ width: "100%", height: "100%", objectFit: "cover", transform: `scale(${scale})` }}
+        style={{ width: "100%", height: "100%", objectFit: "cover", filter: cssFilter(segment.adjust) }}
       />
+      {segment.blur?.tracks.length ? <ClipBlurLayer blur={segment.blur} startFrom={segment.startFrom} /> : null}
     </AbsoluteFill>
   );
 }

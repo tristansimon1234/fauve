@@ -135,7 +135,10 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
   const started = Date.now();
   try {
     // The ffmpeg engine has no motion-design scenes: it renders the clips only.
+    // Blurred zones (faces, plates) only exist in the Remotion composition: never fall back without them.
+    const needsBlur = plan.segments.some((s) => isClipSegment(s) && s.blur?.tracks.length);
     const ffmpegRender = () => {
+      if (needsBlur) throw new Error("Ce montage floute des zones : le moteur de secours ne sait pas le faire, réessaie dans un instant");
       const clipsOnly = withoutScenes(plan);
       if (!clipsOnly.segments.length) throw new Error("Montage sans vidéo : le moteur de motion design est indisponible");
       return renderInSandbox({ id: renderId, clips, ass: buildAss(clipsOnly, accent), ffmpegArgs: buildFfmpegArgs(clipsOnly, { clipFiles }) });

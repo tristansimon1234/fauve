@@ -20,13 +20,14 @@ import { montageStatus } from "@/lib/montage-status";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
-import { renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
+import { notifyFailure, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
 import { saveSlides } from "@/lib/render/slides";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { applyLayers, listLayers, loadLayer, markLayerUsed } from "@/lib/text-layers";
+import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
 import { creditBalance } from "@/lib/credits";
 import { queueJob } from "@/lib/jobs";
 import { readWebsite, WebsiteError } from "./website";
@@ -453,6 +454,44 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         ignored: slides.length > mediaIds.length ? `${slides.length - mediaIds.length} entrée(s) en trop ignorée(s)` : undefined,
         unknown_looks: unknownLooks.size ? `Styles inconnus, remplacés par celui du gabarit : ${[...unknownLooks].join(", ")}` : undefined,
         note: "Le texte est posé après ta réponse (environ une minute) et le lien part automatiquement. Annonce-le en une phrase, sans envoyer de lien toi-même.",
+      });
+    },
+
+    async retouch_photos({ post_id, photos, light, blur, only_recognizable }) {
+      const post = unwrap(await db.from("posts").select("kind, status").eq("id", post_id).eq("studio_id", studioId).single());
+      if (post.kind !== "carousel" && post.kind !== "post") {
+        return json({ error: "La retouche photo est pour un carrousel ou un post photo. Pour flouter un Reel : blur_video." });
+      }
+      if (post.status === "published" || post.status === "measured") return json({ error: "Cette publication est déjà en ligne." });
+      // Gemini reads each photo (a few seconds each), then the photos are rendered: after the reply.
+      ctx.afterReply.push(async () => {
+        try {
+          await retouchPostPhotos(studioId, post_id, { photos, light, blur, onlyRecognizable: only_recognizable });
+          await renderSlidesAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
+        } catch (error) {
+          await notifyFailure({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId }, "Je n’ai pas réussi à retoucher tes photos cette fois. Tu veux que je réessaie ?", error);
+        }
+      });
+      return json({
+        status: "started",
+        note: "Fauve regarde les photos puis les retouche (une à deux minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase, en disant ce que tu fais (lumière, flou des visages…).",
+      });
+    },
+
+    async blur_video({ post_id, what }) {
+      ctx.afterReply.push(async () => {
+        try {
+          await blurMontage(studioId, post_id, what);
+          await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
+        } catch (error) {
+          await notifyFailure({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId }, "Je n’ai pas réussi à flouter la vidéo cette fois. Tu veux que je réessaie ?", error);
+        }
+      });
+      return json({
+        status: "started",
+        note: what.length
+          ? "Fauve repère les zones dans chaque vidéo puis refait le rendu avec le flou (deux à trois minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase."
+          : "Le flou est retiré et le rendu refait ; le lien est envoyé tout seul.",
       });
     },
 
