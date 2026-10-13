@@ -1,4 +1,5 @@
 import "server-only";
+import { awaitsAnswer, echoFor, emojiOnly, replyExtrasSchema } from "@fauve/agent";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { quoteButtons } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -131,6 +132,8 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     .select("wa_message_id")
     .eq("studio_id", member.studio_id)
     .eq("direction", "inbound")
+    // A reaction (stored as a row) never stands for the latest message to answer.
+    .neq("type", "reaction")
     .order("created_at", { ascending: false })
     .limit(1)
     .single();
@@ -140,6 +143,27 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     return;
   }
   await analysis;
+
+  // Only emojis (« 🔥 », « ❤️ ») that answer nothing: a reaction back at once, no turn needed.
+  const text = textOf(message);
+  if (message.type === "text" && emojiOnly(text)) {
+    const echo = echoFor(text ?? "");
+    const { data: last } = await db
+      .from("whatsapp_messages")
+      .select("body, payload")
+      .eq("studio_id", member.studio_id)
+      .eq("direction", "outbound")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const extras = replyExtrasSchema.catch({}).parse(last?.payload ?? {});
+    if (echo && !awaitsAnswer(last ? { body: last.body as string | null, options: extras.options, quote: Boolean(extras.quote) } : null)) {
+      await sendReaction(message.from, message.id, echo)
+        .then(() => setReaction({ waMessageId: message.id }, "fauve", echo))
+        .catch((e) => console.warn("reaction failed", e));
+      return;
+    }
+  }
 
   let result: Awaited<ReturnType<typeof replyInConversation>>;
   try {

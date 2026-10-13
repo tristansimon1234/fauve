@@ -18,6 +18,8 @@ export type StoredMessage = {
   media_id: string | null;
   /** Ids Fauve made in that turn (quote, post): her memory of what the text refers to. */
   notes?: string[];
+  /** Emoji reactions on the message: the manager's on Fauve's messages, Fauve's on hers. */
+  reactions?: { fauve?: string; me?: string } | null;
 };
 
 const mediaLabels: Record<string, string> = {
@@ -39,7 +41,9 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
       .join(" ");
     if (!text) continue;
     const cut = text.length > MESSAGE_MAX_CHARS ? `${text.slice(0, MESSAGE_MAX_CHARS)}…` : text;
-    const short = row.notes?.length ? `${cut}\n[mémo : ${row.notes.join(" ; ")}]` : cut;
+    // A reaction is part of the conversation: she liked a message, Fauve already answered one with an emoji.
+    const reacted = row.direction === "outbound" ? row.reactions?.me && `[elle a réagi ${row.reactions.me}]` : row.reactions?.fauve && `[tu as réagi ${row.reactions.fauve}]`;
+    const short = [row.notes?.length ? `${cut}\n[mémo : ${row.notes.join(" ; ")}]` : cut, reacted].filter(Boolean).join("\n");
     const last = history.at(-1);
     if (last?.role === role && typeof last.content === "string") {
       last.content = `${last.content}\n${short}`;
@@ -80,7 +84,7 @@ export async function replyInConversation(params: {
   const ownThread = conversation?.started_by === "web";
   let messages = db
     .from("whatsapp_messages")
-    .select("direction, type, body, media_id, wa_message_id, payload, conversation_id")
+    .select("direction, type, body, media_id, wa_message_id, payload, conversation_id, reactions")
     .eq("studio_id", params.studioId)
     .order("created_at", { ascending: false })
     // WhatsApp keeps the studio's recent thread across conversations, minus the ones opened in the app: read a little more, then filter.

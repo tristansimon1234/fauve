@@ -2,6 +2,10 @@ import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
 import { AvatarPlaceholder, HeaderAvatar, SidebarAccount } from "@/components/studio-account";
 
+// The Fauve drawer opens on every page: its Server Actions (a chat turn, then the work
+// it starts after the answer) run under the host page's route.
+export const maxDuration = 300;
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShell

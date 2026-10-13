@@ -1,6 +1,6 @@
 "use server";
 
-import { editPlanSchema, EFFORTS, effortSchema, segmentKind, type Effort } from "@fauve/agent";
+import { awaitsAnswer, echoFor, editPlanSchema, EFFORTS, effortSchema, emojiOnly, segmentKind, type Effort } from "@fauve/agent";
 import { after } from "next/server";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { extrasOf, quoteCharges, quoteFailed, quoteState, resolveCards, type CardQuote, type ChatCard } from "@/lib/chat-cards";
@@ -288,6 +288,25 @@ export async function sendToFauve(
     lastRowId = inserted.data.id as string;
   }
 
+  // Only emojis (« 🔥 », « ❤️ ») that answer nothing: Fauve reacts back at once, no turn needed.
+  if (!files.length && lastRowId && emojiOnly(body)) {
+    const echo = echoFor(body);
+    const { data: last } = await db
+      .from("whatsapp_messages")
+      .select("body, payload")
+      .eq("conversation_id", id)
+      .eq("direction", "outbound")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const extras = extrasOf(last?.payload);
+    if (echo && !awaitsAnswer(last ? { body: last.body as string | null, options: extras.options, quote: Boolean(extras.quote) } : null)) {
+      await setReaction({ id: lastRowId }, "fauve", echo);
+      const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, id), list(ctx.studioId)]);
+      return { ok: true, conversationId: id, messages, conversations };
+    }
+  }
+
   try {
     const result = await replyInConversation({
       studioId: ctx.studioId,
@@ -306,8 +325,10 @@ export async function sendToFauve(
         payload: { ...result.extras, notes: result.notes },
       });
     }
-    // E.g. a montage: queued now, the video shows up in the chat when it is ready.
-    for (const job of result.afterReply) await job().catch((e) => console.error("chat: after-reply job failed", e));
+    // E.g. a montage or a retouch: run after the answer is back on screen; the result shows up in the chat when it is ready.
+    after(async () => {
+      for (const job of result.afterReply) await job().catch((e) => console.error("chat: after-reply job failed", e));
+    });
   } catch (error) {
     console.error("chat: agent failed", error);
     return { ok: false, error: "Fauve n’a pas pu répondre. Réessaie dans un instant.", conversationId: id };

@@ -672,3 +672,20 @@ test("critic: an overlong answer is clamped, not thrown away; lateness is measur
   assert.doesNotMatch(effortPitch("max", true), /Deux versions/);
   assert.match(effortPitch("max", false), /Deux versions/);
 });
+
+test("emoji: only emojis get an instant reaction, unless they may answer a question", async () => {
+  const { emojiOnly, echoFor, awaitsAnswer } = await import("./emoji.ts");
+  for (const t of ["👍", "👍🏽", "❤️❤️", "🔥 🔥", "🇫🇷", "🙏✨"]) assert.equal(emojiOnly(t), true, t);
+  for (const t of ["1", "ok 👍", "top", "", "  ", "#"]) assert.equal(emojiOnly(t), false, t);
+  assert.equal(emojiOnly("🔥🔥🔥🔥🔥🔥🔥"), false); // a burst is a message, not a reaction
+  assert.equal(echoFor("❤️"), "❤️");
+  assert.equal(echoFor("😍😍"), "❤️");
+  assert.equal(echoFor("👍🏽"), "😊");
+  assert.equal(echoFor("🔥"), "🔥");
+  assert.equal(echoFor("🤔"), null); // a doubt needs a real answer
+  assert.equal(awaitsAnswer({ body: "Je lance ?" }), true);
+  assert.equal(awaitsAnswer({ body: "Je lance ? 🎬" }), true);
+  assert.equal(awaitsAnswer({ body: "C'est parti !", options: ["Oui", "Non"] }), true);
+  assert.equal(awaitsAnswer({ body: "Ta vidéo est prête 🎬", quote: false }), false);
+  assert.equal(awaitsAnswer(null), false);
+});

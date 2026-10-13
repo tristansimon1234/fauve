@@ -127,9 +127,14 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
 
   let usage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
   let last: Anthropic.Beta.BetaMessage | undefined;
+  // The text of the last step that wrote some: Fauve often writes her answer with
+  // reply_with in the same step, and the loop's final step is then empty.
+  let spoken = "";
   for await (const message of runner) {
     usage = addUsage(usage, message.usage);
     last = message;
+    const text = textOf(message);
+    if (text) spoken = text;
   }
 
   await logClaudeCost(input.studioId, usage, "conversation", CHAT_MODEL);
@@ -137,12 +142,27 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   if (!last || last.stop_reason === "refusal") {
     return { reply: FALLBACK_REPLY, reactions: input.reactions, extras: {}, notes: input.notes, usage, afterReply: input.afterReply };
   }
-  const reply = last.content
+  const reply = textOf(last) || spoken;
+  // Never silent: a turn that only reacted keeps its reaction; one that did nothing at all says so.
+  const silent = !reply && !input.reactions.length;
+  return {
+    reply: silent ? (input.afterReply.length ? "C'est parti, je m'en occupe 👍" : SILENT_REPLY) : reply || null,
+    reactions: input.reactions,
+    extras: reply ? input.extras : {},
+    notes: input.notes,
+    usage,
+    afterReply: input.afterReply,
+  };
+}
+
+const SILENT_REPLY = "Je suis là 🙂 Dis-moi ce que tu veux qu'on fasse.";
+
+function textOf(message: Anthropic.Beta.BetaMessage): string {
+  return message.content
     .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n\n")
     .trim();
-  return { reply: reply || null, reactions: input.reactions, extras: reply ? input.extras : {}, notes: input.notes, usage, afterReply: input.afterReply };
 }
 
 export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose = "conversation", model = CLAUDE_MODEL) {
