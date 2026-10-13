@@ -12,25 +12,31 @@ export function PostEditor({
   caption: savedCaption,
   canEdit,
   canValidate,
+  formId,
+  compact = false,
 }: {
   postId: string;
   caption: string;
   canEdit: boolean;
   canValidate: boolean;
+  /** Lets a « Valider » button elsewhere on the page submit this form (with the caption). */
+  formId?: string;
+  /** Next to the montage editor: validation lives in the page header, saving shows only once the caption changed. */
+  compact?: boolean;
 }) {
   const [state, action, pending] = useActionState(updatePost.bind(null, postId), initial);
   const [caption, setCaption] = useState(savedCaption);
   const dirty = caption.trim() !== savedCaption.trim();
 
   return (
-    <form action={action} className="flex flex-col gap-3">
+    <form id={formId} action={action} className="flex flex-col gap-3">
       <label htmlFor="legende" className="text-[13px] font-bold">
         Légende
       </label>
       <textarea
         id="legende"
         name="caption"
-        rows={5}
+        rows={compact ? 7 : 5}
         maxLength={2200}
         value={caption}
         readOnly={!canEdit}
@@ -38,9 +44,9 @@ export function PostEditor({
         placeholder={canEdit ? "Fauve n’a pas encore écrit de légende. Tu peux en écrire une ici." : undefined}
         className="w-full resize-y rounded-[14px] border-[1.5px] border-line bg-white px-4 py-3.5 text-[15px] leading-normal read-only:bg-soft"
       />
-      {canEdit && (
+      {canEdit && (!compact || dirty || pending) && (
         <div className="flex flex-wrap items-center gap-2.5">
-          {canValidate && (
+          {canValidate && !compact && (
             <button type="submit" name="intent" value="validate" disabled={pending} className="btn btn-primary">
               <CheckIcon size={18} />
               {dirty ? "Enregistrer et valider" : "Valider"}

@@ -121,9 +121,14 @@ export function MontageEditor({
   // Two grid items: the stage (preview and timeline) and the inspector (the selected scene).
   return (
     <>
-      <div className="flex min-w-0 flex-col gap-4">
-        <div className="flex justify-center rounded-[24px] bg-[radial-gradient(ellipse_at_top,#2a2145_0%,#16112a_70%)] px-6 py-7">
-          <div ref={previewRef} className="relative overflow-hidden rounded-[18px] shadow-[0_24px_60px_rgba(0,0,0,.45)]" style={{ width: "min(100%, 340px)" }}>
+      <div className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-4">
+        {/* Sized to the screen's height, so the timeline stays in view under the preview. */}
+        <div className="flex justify-center rounded-[24px] bg-[radial-gradient(ellipse_at_top,#2a2145_0%,#16112a_70%)] px-5 py-5">
+          <div
+            ref={previewRef}
+            className="relative overflow-hidden rounded-[16px] shadow-[0_24px_60px_rgba(0,0,0,.45)]"
+            style={{ width: "max(210px, min(100%, 340px, calc((100dvh - 360px) * 9 / 16)))" }}
+          >
             <ReelPlayer props={props} playerRef={playerRef} />
             <TextBoxes
               container={previewRef}
@@ -142,6 +147,32 @@ export function MontageEditor({
         </div>
 
         <Timeline
+          header={
+            <div className="flex flex-wrap items-center gap-2">
+              {dirty ? (
+                <>
+                  <span className="text-[12px] font-semibold text-peach-ink">Modifié · pas encore enregistré</span>
+                  <button
+                    type="button"
+                    onClick={() => edit(saved)}
+                    disabled={saving}
+                    className="h-8 rounded-full px-3 text-[13px] font-semibold text-muted hover:bg-soft disabled:opacity-40"
+                  >
+                    Annuler
+                  </button>
+                  <button type="button" onClick={save} disabled={!valid || saving} className="btn btn-primary h-8 px-3.5 text-[13px] disabled:opacity-50">
+                    <CheckIcon size={15} />
+                    {saving ? "Enregistrement…" : "Enregistrer"}
+                  </button>
+                </>
+              ) : (
+                <span className="flex items-center gap-1.5 text-[12px] text-muted">
+                  <FilmIcon size={14} />
+                  {message?.ok ? message.text : "Aperçu en direct · modifications gratuites"}
+                </span>
+              )}
+            </div>
+          }
           plan={plan}
           spans={spans}
           selected={index}
@@ -159,30 +190,11 @@ export function MontageEditor({
           }}
         />
 
-        <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-line bg-white p-3">
-          <button type="button" onClick={save} disabled={!dirty || !valid || saving} className="btn btn-primary h-11 disabled:opacity-50">
-            <CheckIcon size={18} />
-            {saving ? "Enregistrement…" : "Enregistrer"}
-          </button>
-          <button
-            type="button"
-            onClick={() => edit(saved)}
-            disabled={!dirty || saving}
-            className="h-11 rounded-full px-4 text-[14px] font-semibold text-muted hover:bg-soft disabled:opacity-40"
-          >
-            Annuler mes modifications
-          </button>
-          {!valid && <span className="text-[13px] font-semibold text-danger">Un texte est vide ou une durée est hors limites.</span>}
-          {message && (
-            <span role="status" className={`text-[13px] font-semibold ${message.ok ? "text-success" : "text-danger"}`}>
-              {message.text}
-            </span>
-          )}
-          <span className="ml-auto flex items-center gap-1.5 text-[12px] text-muted">
-            <FilmIcon size={14} />
-            {dirty ? "Pas encore enregistré · gratuit" : "Aperçu en direct · gratuit"}
-          </span>
-        </div>
+        {(!valid || (message && !message.ok)) && (
+          <p role="alert" className="rounded-xl bg-peach px-3 py-2 text-[13px] font-semibold text-danger">
+            {!valid ? "Un texte est vide ou une durée est hors limites." : message?.text}
+          </p>
+        )}
       </div>
 
       <aside aria-label="Scène sélectionnée" className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-6">
@@ -520,6 +532,7 @@ const blockColors = { clip: "bg-[#fde3d9] text-peach-ink", scene: "bg-[#ece6ef] 
  * playhead. Click anywhere on the tracks to jump there.
  */
 function Timeline({
+  header,
   plan,
   spans,
   selected,
@@ -531,6 +544,7 @@ function Timeline({
   onMove,
   onPickText,
 }: {
+  header: React.ReactNode;
   plan: EditPlan;
   spans: { start: number; end: number }[];
   selected: number;
@@ -568,14 +582,14 @@ function Timeline({
 
   return (
     <section aria-label="Timeline" className="flex flex-col gap-2 rounded-[18px] border border-line bg-white p-3">
-      <div className="flex items-center justify-between px-1 text-[12px] font-semibold text-muted">
-        <span>
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-2 px-1">
+        <span className="text-[12px] font-semibold text-muted" title="Glisse une scène pour changer l’ordre">
           {plan.segments.length} scènes · {round(total)} s
         </span>
-        <span>Glisse une scène pour changer l’ordre</span>
+        {header}
       </div>
       <div ref={tracks} className="relative flex flex-col gap-1.5" onDoubleClick={(e) => seekTo(e.clientX)}>
-        <div className="flex h-[68px] gap-1">
+        <div className="flex h-[64px] gap-1">
           {plan.segments.map((s, i) => {
             const kind = segmentKind(s);
             const length = spans[i]!.end - spans[i]!.start;
@@ -611,12 +625,14 @@ function Timeline({
                   i === selected ? "ring-2 ring-violet ring-offset-1" : "opacity-90 hover:opacity-100"
                 } ${dropAt === i && dragFrom !== i ? "outline-2 outline-dashed outline-violet" : ""} ${dragFrom === i ? "opacity-40" : ""}`}
               >
-                <span className="flex items-center gap-1 text-[11px] font-bold">
-                  {i + 1}
-                  <span className="truncate font-semibold opacity-80">{kindLabels[kind]}</span>
+                {/* What the scene shows first; its kind and length below. */}
+                <span className="line-clamp-2 text-[11px] leading-tight font-bold">
+                  <span className="opacity-60">{i + 1}. </span>
+                  {labels[i]}
                 </span>
-                <span className="truncate text-[11px] leading-tight opacity-80">{labels[i]}</span>
-                <span className="text-[10px] font-semibold opacity-60">{round(length)} s</span>
+                <span className="truncate text-[10px] font-semibold opacity-60">
+                  {kindLabels[kind]} · {round(length)} s
+                </span>
               </button>
             );
           })}

@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { z } from "zod";
 import { NoStudio, PageLoading } from "@/components/empty-state";
-import { ArrowLeftIcon, ClockIcon, InstagramIcon, TikTokIcon } from "@/components/icons";
+import { ArrowLeftIcon, CheckIcon, ClockIcon, InstagramIcon, TikTokIcon } from "@/components/icons";
 import { Orb } from "@/components/orb";
 import { DeleteButton } from "@/components/delete-button";
 import { AskFauveButton } from "@/components/fauve-drawer";
@@ -59,14 +59,11 @@ type Render = z.infer<typeof renderSchema>;
 const textStyleLabels: Record<string, string> = { hook: "Accroche", band: "Bandeau", caption: "Sous-titre" };
 const segmentColors = ["bg-violet", "bg-coral", "bg-lilac", "bg-peach-ink", "bg-violet-hover"];
 const LOCKED: readonly PostStatus[] = ["published", "measured"];
+const POST_FORM = "post-form";
 
 export default function PostPage({ params }: PageProps<"/publications/[id]">) {
   return (
-    <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-8">
-      <Link href="/calendrier" className="inline-flex items-center gap-2 self-start text-sm font-bold text-violet">
-        <ArrowLeftIcon size={18} />
-        Calendrier
-      </Link>
+    <main className="flex min-w-0 flex-col gap-5 px-4 pt-5 pb-14 sm:px-8 sm:pt-6">
       <Suspense fallback={<PageLoading title="Publication" />}>
         <PostDetail params={params} />
       </Suspense>
@@ -127,6 +124,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           caption={post.caption ?? ""}
           canEdit={canEdit}
           canValidate={post.status === "draft"}
+          formId={POST_FORM}
+          compact
         />
         {post.hashtags.length > 0 && (
           <span className="flex flex-wrap gap-1.5">
@@ -139,70 +138,80 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         )}
       </div>
 
-      {(post.status === "draft" || post.status === "validated") && (
-        <p className="rounded-2xl bg-violet-tint px-4 py-3.5 text-sm leading-normal">
-          {post.status === "validated" ? <strong>Validée. </strong> : null}
-          Une fois validée, Fauve la publie sur Instagram à l’horaire prévu, si ton compte est connecté. TikTok
-          arrive bientôt.
-        </p>
-      )}
-
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <span className="text-[13px] font-bold">Publier sur</span>
-          <div className="flex flex-wrap gap-2">
+      {/* Where and when, in two quiet lines. */}
+      <dl className="flex flex-col gap-2 rounded-[16px] bg-soft px-4 py-3 text-[14px]">
+        <div className="flex items-center gap-2.5">
+          <dt className="sr-only">Publier sur</dt>
+          <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {post.platforms.length ? (
               post.platforms.map((p) => (
-                <span
-                  key={p}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl border-[1.5px] border-violet bg-violet-soft px-3.5 text-sm font-bold text-violet"
-                >
-                  {p === "tiktok" ? <TikTokIcon size={16} /> : <InstagramIcon size={16} />}
+                <span key={p} className="inline-flex items-center gap-1.5 font-semibold">
+                  {p === "tiktok" ? <TikTokIcon size={16} className="text-violet" /> : <InstagramIcon size={16} className="text-violet" />}
                   {platformLabels[p]}
                 </span>
               ))
             ) : (
-              <span className="text-sm text-muted">Aucune plateforme choisie</span>
+              <span className="text-muted">Aucune plateforme choisie</span>
             )}
-          </div>
+          </dd>
         </div>
-        <div className="flex flex-col gap-2">
-          <span className="text-[13px] font-bold">Quand</span>
-          <span className="inline-flex h-10 items-center gap-2 text-sm">
+        <div className="flex items-center gap-2.5">
+          <dt className="sr-only">Quand</dt>
+          <dd className="inline-flex items-center gap-1.5">
             <ClockIcon size={16} className="text-violet" />
             {post.scheduled_at ? formatDateTime(post.scheduled_at, tz) : "Date à définir avec Fauve"}
-          </span>
+          </dd>
         </div>
-      </div>
+      </dl>
+      {(post.status === "draft" || post.status === "validated") && (
+        <p className="-mt-2 text-[12px] leading-snug text-muted">
+          {post.status === "validated" ? "Validée : " : "Une fois validée, "}Fauve la publie sur Instagram à l’horaire prévu, si ton compte est connecté.
+        </p>
+      )}
 
       {plan && !editor && <PlanSection plan={plan.view} clipLabels={clipLabels} />}
 
       {post.agent_note && (
-        <div className="flex items-start gap-3 rounded-[18px] bg-soft p-4">
-          <Orb size={28} className="shrink-0" />
-          <p className="text-sm leading-normal">{post.agent_note}</p>
+        <div className="flex items-start gap-3 rounded-[18px] border border-line p-4">
+          <Orb size={24} className="shrink-0" />
+          <p className="text-[13px] leading-normal text-muted">{post.agent_note}</p>
         </div>
       )}
-    
     </>
   );
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <StatusPill status={post.status} className="px-2.5 text-xs" />
-          <h1 className="text-[32px] font-extrabold tracking-[-0.02em]">{post.title}</h1>
-          <p className="text-[15px] text-muted">
-            {kindLabels[post.kind]} ·{" "}
-            {post.scheduled_at ? `prévu ${formatDateTime(post.scheduled_at, tz)}` : "date à définir"}
+      {/* One bar: back, what it is, and the actions (validating first). */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <Link
+          href="/calendrier"
+          aria-label="Retour au calendrier"
+          title="Calendrier"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full border border-line text-ink hover:bg-soft"
+        >
+          <ArrowLeftIcon size={18} />
+        </Link>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <h1 className="truncate text-[24px] leading-tight font-extrabold tracking-[-0.02em]">{post.title}</h1>
+          <p className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
+            <StatusPill status={post.status} />
+            {kindLabels[post.kind]} · {post.scheduled_at ? `prévu ${formatDateTime(post.scheduled_at, tz)}` : "date à définir"}
           </p>
         </div>
-        <div className="flex flex-wrap items-start gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <AskFauveButton topic={{ postId: post.id, title: post.title }} label="Demander une modif" />
+          {canEdit && post.status === "draft" && (
+            // Submits the caption form, so a caption being edited is saved with the validation.
+            <button type="submit" form={POST_FORM} name="intent" value="validate" className="btn btn-primary">
+              <CheckIcon size={18} />
+              Valider
+            </button>
+          )}
           <DeleteButton
             action={deletePost.bind(null, post.id)}
             redirectTo="/calendrier"
+            compact
             confirmText={
               LOCKED.includes(post.status)
                 ? "Supprimer cette publication de Fauve ? Elle reste en ligne sur Instagram."
@@ -214,8 +223,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
       {editor ? (
         // A video editor: the publication on the left, the montage in the middle, the selected scene on the right.
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(250px,290px)_minmax(0,1fr)_minmax(300px,350px)]">
-          <div className="order-3 flex min-w-0 flex-col gap-5 xl:order-none">
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(250px,290px)_minmax(0,1fr)_minmax(300px,340px)]">
+          <div className="order-3 flex min-w-0 flex-col gap-4 xl:order-none">
             {details}
           </div>
           <MontageEditor
