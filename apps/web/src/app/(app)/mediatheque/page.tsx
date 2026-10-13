@@ -113,6 +113,9 @@ async function Library() {
             ? `Tes vidéos et photos, les plus récentes d’abord${assets.length === LIMIT ? ` (les ${LIMIT} dernières)` : ""}, et ce que Fauve a créé pour toi.`
             : "Tes vidéos et photos, en pleine qualité, et ce que Fauve a créé pour toi."}
         </p>
+        <p className="text-[13px] text-muted">
+          Chaque fichier est gardé tant qu’une publication en a besoin, puis supprimé 24 h après sa mise en ligne (7 jours s’il ne sert à aucune publication). Tes vidéos finales restent.
+        </p>
       </div>
 
       {assets.length === 0 ? (
