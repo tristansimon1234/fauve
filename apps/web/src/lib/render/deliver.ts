@@ -35,16 +35,17 @@ export async function notifyFailure(target: DeliveryTarget, text: string, detail
 }
 
 /**
- * Renders the post and points the manager to its page, where she watches the
- * video, reads the caption and validates. On WhatsApp: a sign-in link to that
- * page; in the app: the post's card (and the app opens the page).
+ * Renders the post and points the manager to it, to watch the video, read the
+ * caption and validate. On WhatsApp: a sign-in link to the mobile page `/v/{id}`;
+ * in the app: the post's card (and the app opens the publication page).
  * Returns what was delivered, or null if it failed (the manager is told).
  */
 export async function renderAndDeliver(target: DeliveryTarget): Promise<{ title: string } | null> {
   try {
     const r = await renderPost(target.studioId, target.postId);
     const seconds = Math.round(r.durationMs / 100) / 10;
-    const page = `/publications/${target.postId}`;
+    // On a phone: the one-action page (watch, validate, move a text).
+    const page = `/v/${target.postId}`;
     const intro = `Ton montage « ${r.title} » est prêt 🎬 (${seconds} s).${target.rationale ? ` ${target.rationale}` : ""}`;
     const after = "Valide-le sur sa page, ou dis-moi ce que tu veux changer. Je peux aussi te faire une variante (autre style, autre accroche) pour 1 crédit.";
     const payload = { posts: [target.postId], open_post: target.postId };

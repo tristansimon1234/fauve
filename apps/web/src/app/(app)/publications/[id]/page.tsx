@@ -1,13 +1,4 @@
-import {
-  editPlanSchema,
-  motionTemplateSchema,
-  platformSchema,
-  postKindSchema,
-  postStatusSchema,
-  type PostKind,
-  type PostStatus,
-  type ReelInputs,
-} from "@fauve/agent";
+import { platformSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,9 +11,8 @@ import { DeleteButton } from "@/components/delete-button";
 import { StatusPill } from "@/components/status-pill";
 import { formatDateTime, formatSeconds, kindLabels, platformLabels } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
-import { loadMontageInputs } from "@/lib/render/render-post";
+import { loadEditorData } from "@/lib/montage-editor-data";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
-import { supabaseAdmin } from "@/lib/supabase/admin";
 import { deletePost } from "./actions";
 import { MontageEditor } from "./montage-editor";
 import { PostEditor } from "./post-editor";
@@ -112,7 +102,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   const media = videoUrl ? [] : await loadPostMedia(db, studioId, post.media_ids);
 
   const canEdit = !LOCKED.includes(post.status);
-  const editor = canEdit && plan ? await loadEditor(studioId, plan.id).catch(() => null) : null;
+  const editor = canEdit && plan ? await loadEditorData(studioId, plan.id).catch(() => null) : null;
   const isVideo = post.kind === "reel" || post.kind === "story";
 
   return (
@@ -251,26 +241,6 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
       )}
     </>
   );
-}
-
-/** What the scene editor needs: the full plan and its inputs (Remotion montages only). */
-async function loadEditor(studioId: string, planId: string) {
-  const { data } = await supabaseAdmin().from("edit_plans").select("plan").eq("id", planId).maybeSingle();
-  const plan = editPlanSchema.safeParse(data?.plan);
-  if (!plan.success) return null;
-  const template = motionTemplateSchema.safeParse(plan.data.template);
-  if (!template.success) return null;
-  const inputs = await loadMontageInputs(studioId, plan.data);
-  return {
-    plan: plan.data,
-    clipDurations: inputs.clipDurations,
-    inputs: {
-      template: template.data,
-      clipUrls: inputs.clipUrls,
-      words: inputs.words,
-      brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts },
-    } satisfies ReelInputs,
-  };
 }
 
 async function loadPlan(db: Db, post: z.infer<typeof postSchema>): Promise<{ id: string; view: PlanView } | null> {

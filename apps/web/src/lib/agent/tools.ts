@@ -160,6 +160,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({ url, expires_in_minutes: 15 });
     },
 
+    async get_post_link({ post_id }) {
+      const { data: post } = await db.from("posts").select("id").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
+      if (!post) return json({ error: "Publication introuvable dans ce studio." });
+      const { data: member } = await db.from("members").select("phone_e164").eq("id", ctx.memberId).single();
+      const url = await createLoginLink(member?.phone_e164 as string, `/v/${post_id}`, "open_post");
+      return json({ url, expires_in_minutes: 15 });
+    },
+
     async get_calendar({ from, to }) {
       const posts = unwrap(
         await db
