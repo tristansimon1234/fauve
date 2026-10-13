@@ -107,8 +107,11 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   };
 }
 
-/** Renders the latest edit plan of a post to MP4, stores it and links it to the post. */
-export async function renderPost(studioId: string, postId: string): Promise<RenderResult> {
+/**
+ * Renders the post's current edit plan (or the version given, which becomes the
+ * current one) to MP4, stores it and links it to the post.
+ */
+export async function renderPost(studioId: string, postId: string, options: { editPlanId?: string } = {}): Promise<RenderResult> {
   const db = supabaseAdmin();
   const post = check(
     await db
@@ -120,8 +123,9 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
   ).data!;
 
   const planQuery = db.from("edit_plans").select("id, version, plan").eq("post_id", postId);
+  const planId = options.editPlanId ?? post.edit_plan_id;
   const planRow = check(
-    await (post.edit_plan_id ? planQuery.eq("id", post.edit_plan_id) : planQuery.order("version", { ascending: false }))
+    await (planId ? planQuery.eq("id", planId) : planQuery.order("version", { ascending: false }))
       .limit(1)
       .single(),
   ).data!;
@@ -186,7 +190,7 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
 
     let status = postStatusSchema.parse(post.status);
     for (const next of towardsDraft(status)) status = next;
-    check(await db.from("posts").update({ render_id: renderId, status }).eq("id", postId));
+    check(await db.from("posts").update({ render_id: renderId, status, ...(options.editPlanId ? { edit_plan_id: planRow.id } : {}) }).eq("id", postId));
 
     await db.from("cost_events").insert({
       studio_id: studioId,

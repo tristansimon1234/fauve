@@ -36,7 +36,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
 
   const { data: post } = await db
     .from("posts")
-    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides")
+    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides, agent_note")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -110,6 +110,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
       grid={post.kind === "story" ? null : grid}
       slides={slides}
       looks={locked ? [] : await loadTextLooks(studioId).catch(() => [])}
+      note={(post.agent_note as string | null) ?? null}
       changeHref={whatsappLink(`Pour « ${post.title as string} » : `)}
       backHref={whatsappLink("")}
     />

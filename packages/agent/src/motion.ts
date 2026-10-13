@@ -88,14 +88,33 @@ function inkOn(hex: string): string {
   return luminance > 0.45 ? "#1C1530" : "#FFFFFF";
 }
 
-export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
-  const fps = REEL_FPS;
-  const toFrames = (seconds: number) => Math.max(0, Math.round(seconds * fps));
+const toFrames = (seconds: number) => Math.max(0, Math.round(seconds * REEL_FPS));
+
+/** Each segment's length in frames, and the overlap of the fades between them. */
+function frameLengths(plan: Pick<EditPlan, "segments" | "transitions">) {
   const lengths = plan.segments.map((s) => Math.max(1, toFrames(segmentSeconds(s))));
   const fadeFrames =
     plan.transitions === "fade" && plan.segments.length > 1 && lengths.every((l) => l > toFrames(FADE_SECONDS) + 4)
       ? toFrames(FADE_SECONDS)
       : 0;
+  return { lengths, fadeFrames };
+}
+
+/** When each segment starts in the video and how long it lasts (seconds), fades included, and the video's length. */
+export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): { segments: { start: number; length: number }[]; duration: number } {
+  const { lengths, fadeFrames } = frameLengths(plan);
+  let cursor = 0;
+  const segments = lengths.map((length) => {
+    const start = cursor;
+    cursor += length - fadeFrames;
+    return { start: start / REEL_FPS, length: length / REEL_FPS };
+  });
+  return { segments, duration: (cursor + fadeFrames) / REEL_FPS };
+}
+
+export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
+  const fps = REEL_FPS;
+  const { lengths, fadeFrames } = frameLengths(plan);
 
   let cursor = 0;
   const segments: ReelSegment[] = plan.segments.map((s, i) => {

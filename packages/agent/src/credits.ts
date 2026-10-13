@@ -1,3 +1,4 @@
+import { EFFORTS, type Effort } from "./effort.ts";
 import { MAX_FREE_SCENES } from "./editor.ts";
 
 // Credits: what a studio is charged for the costly work, shown to the manager
@@ -24,6 +25,12 @@ export const CREDIT_PRICES = {
   variant: 1,
   /** A new text layer for photos, designed as code from an example (Opus, checks and a critic). Reusing one is free. */
   textLayer: 3,
+  /** Fauve watching the rendered video before it goes out (Soigné, Max). */
+  review: 1,
+  /** A correction the critic asks for: the editor again, a render, a new look. */
+  fixRound: 3,
+  /** A second version to compare (Max): the editor again and a render. */
+  alternative: 3,
 } as const;
 
 /**
@@ -31,7 +38,7 @@ export const CREDIT_PRICES = {
  * manager sees the plan and the price in Fauve's message. Above it (many
  * clips and new animated scenes), Fauve shows the quote and waits for a yes.
  */
-export const AUTO_START_MAX_CREDITS = 15;
+export const AUTO_START_MAX_CREDITS = 20;
 
 /** Each month the balance goes back up to this (unused credits do not pile up beyond it). */
 export const MONTHLY_CREDITS = 150;
@@ -44,28 +51,45 @@ export type MontageQuote = {
   /** The most it can cost: every allowed new scene created. */
   max: number;
   maxNewScenes: number;
+  /** Corrections the critic may ask for (each one charged only if made). */
+  fixRounds: number;
 };
 
-/** Price of a montage or a correction, before it runs. */
-export function quoteMontage(input: { clips: number; correction: boolean; maxNewScenes?: number }): MontageQuote {
+/** Versions made at a level: a correction is always one. */
+export function effortVersions(effort: Effort, correction: boolean): 1 | 2 {
+  return correction ? 1 : EFFORTS[effort].versions;
+}
+
+/** Price of a montage or a correction at a level of care (Rapide by default), before it runs. */
+export function quoteMontage(input: { clips: number; correction: boolean; maxNewScenes?: number; effort?: Effort }): MontageQuote {
   const clips = Math.max(0, Math.min(10, Math.round(input.clips)));
   const maxNewScenes = Math.max(0, Math.min(MAX_FREE_SCENES, input.maxNewScenes ?? MAX_FREE_SCENES));
+  const level = EFFORTS[input.effort ?? "rapide"];
   const lines: QuoteLine[] = input.correction
     ? [{ label: "Correction du montage", credits: CREDIT_PRICES.correction }]
     : [{ label: "Montage", credits: CREDIT_PRICES.montage }];
   if (!input.correction && clips) lines.push({ label: `${clips} clip${clips > 1 ? "s" : ""} analysé${clips > 1 ? "s" : ""}`, credits: clips * CREDIT_PRICES.clip });
   lines.push({ label: "Rendu vidéo", credits: CREDIT_PRICES.render });
+  const versions = effortVersions(input.effort ?? "rapide", input.correction);
+  if (versions > 1) lines.push({ label: "2e version à comparer", credits: CREDIT_PRICES.alternative });
+  if (level.review) lines.push({ label: versions > 1 ? "Fauve regarde et choisit" : "Fauve regarde la vidéo", credits: CREDIT_PRICES.review });
   const base = lines.reduce((sum, l) => sum + l.credits, 0);
-  return { lines, base, max: base + maxNewScenes * CREDIT_PRICES.newScene, maxNewScenes };
+  return {
+    lines,
+    base,
+    max: base + maxNewScenes * CREDIT_PRICES.newScene + level.fixRounds * CREDIT_PRICES.fixRound,
+    maxNewScenes,
+    fixRounds: level.fixRounds,
+  };
 }
 
 /** Price of a variant: no AI work, only the render. */
 export function quoteVariant(): MontageQuote {
   const lines = [{ label: "Variante (autre style, autre accroche)", credits: CREDIT_PRICES.variant }];
-  return { lines, base: CREDIT_PRICES.variant, max: CREDIT_PRICES.variant, maxNewScenes: 0 };
+  return { lines, base: CREDIT_PRICES.variant, max: CREDIT_PRICES.variant, maxNewScenes: 0, fixRounds: 0 };
 }
 
-/** What is actually charged once the montage is delivered: the real scenes, never above the quote. */
-export function montageCharge(quote: Pick<MontageQuote, "base" | "max">, newScenes: number): number {
-  return Math.min(quote.max, quote.base + Math.max(0, newScenes) * CREDIT_PRICES.newScene);
+/** What is actually charged once the montage is delivered: the real scenes and corrections, never above the quote. */
+export function montageCharge(quote: Pick<MontageQuote, "base" | "max">, newScenes: number, fixRounds = 0): number {
+  return Math.min(quote.max, quote.base + Math.max(0, newScenes) * CREDIT_PRICES.newScene + Math.max(0, fixRounds) * CREDIT_PRICES.fixRound);
 }

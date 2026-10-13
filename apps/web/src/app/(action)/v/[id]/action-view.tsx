@@ -59,6 +59,7 @@ export function ActionView({
   changeHref,
   backHref,
   looks = [],
+  note = null,
 }: {
   post: ActionPost;
   editor: { plan: EditPlan; inputs: ReelInputs } | null;
@@ -73,6 +74,8 @@ export function ActionView({
   backHref: string;
   /** The studio's saved text looks (copied by Fauve from examples, or kept by hand). */
   looks?: SavedLook[];
+  /** What Fauve did and checked for this version (posts.agent_note), under the caption. */
+  note?: string | null;
 }) {
   const [mode, setMode] = useState<Mode>("view");
   const [inGrid, setInGrid] = useState(false);
@@ -392,8 +395,19 @@ export function ActionView({
         </section>
       )}
 
+      {note && !editing && !editingSlides && !showGrid && (
+        <div className="mt-3 flex items-start gap-2.5 rounded-[16px] border border-white/10 p-3">
+          <Orb size={20} className="mt-0.5" />
+          <p className="text-[13px] leading-snug text-white/70">{note}</p>
+        </div>
+      )}
+
       {toast && (
-        <p role="status" className={`mt-3 rounded-[14px] px-3.5 py-2.5 text-[14px] ${toast.ok ? "bg-white/10 text-white" : "bg-peach text-peach-ink"}`}>
+        <p
+          key={toast.text}
+          role="status"
+          className={`fauve-enter mt-3 rounded-[14px] px-3.5 py-2.5 text-[14px] ${toast.ok ? "bg-white/10 text-white" : "bg-peach text-peach-ink"}`}
+        >
           {toast.text}
         </p>
       )}

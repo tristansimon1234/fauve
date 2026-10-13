@@ -1,5 +1,6 @@
 import "server-only";
 import { replyInConversation } from "@/lib/agent/conversation";
+import { quoteButtons } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { setReaction } from "@/lib/reactions";
@@ -158,8 +159,11 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
 
   if (result.reply) {
     const { posts, grid, quote } = result.extras;
-    // A quote gets its yes / no buttons, unless Fauve chose others.
-    const options = result.extras.options ?? (quote ? ["Oui, lance", "Pas maintenant"] : undefined);
+    // A quote gets its yes / other level / no buttons, unless Fauve chose others.
+    // The quote's own buttons win over the model's (they carry the other level).
+    // (none for a montage already launched).
+    const buttons = quote ? await quoteButtons(member.studio_id, quote).catch(() => []) : [];
+    const options = buttons.length ? buttons : result.extras.options;
     // Cards are app-only: on WhatsApp they become links to the app.
     const links = [
       ...(posts ?? []).map((id) => `${env("APP_URL")}/publications/${id}`),

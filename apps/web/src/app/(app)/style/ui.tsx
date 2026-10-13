@@ -49,7 +49,7 @@ export function FoldedSection({
           <span className="text-lg font-bold">{title}</span>
           {hint && <span className="text-sm leading-normal text-muted">{hint}</span>}
         </span>
-        <PlusIcon size={20} className="shrink-0 text-muted transition-transform group-open:rotate-45" />
+        <PlusIcon size={20} className="shrink-0 text-muted transition-transform duration-200 ease-fauve group-open:rotate-45 motion-reduce:transition-none" />
       </summary>
       <div className="flex flex-col gap-4 px-5 pb-5 sm:px-6 sm:pb-6">{children}</div>
     </details>
@@ -77,7 +77,7 @@ export function Segmented<T extends string>({
         {options.map((option) => (
           <label
             key={option.value}
-            className="relative cursor-pointer rounded-full px-4 py-2 text-sm font-semibold text-muted has-checked:bg-white has-checked:text-ink has-checked:shadow-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-violet"
+            className="relative cursor-pointer rounded-full px-4 py-2 text-sm font-semibold text-muted transition-[background-color,color,box-shadow] duration-200 ease-fauve has-checked:bg-white has-checked:text-ink has-checked:shadow-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-violet motion-reduce:transition-none"
           >
             <input
               type="radio"

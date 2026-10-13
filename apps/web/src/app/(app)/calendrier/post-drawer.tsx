@@ -85,7 +85,8 @@ export function PostDrawer({
       }
     });
 
-  const shown = postId !== null && loadedId === postId ? sheet : null;
+  // Closing keeps the last post in the panel while it slides out.
+  const shown = postId === null ? sheet : loadedId === postId ? sheet : null;
   const loading = postId !== null && loadedId !== postId;
 
   return (
@@ -95,14 +96,15 @@ export function PostDrawer({
         aria-label="Fermer"
         tabIndex={postId ? 0 : -1}
         onClick={onClose}
-        className={`absolute inset-0 bg-ink/20 transition-opacity ${postId ? "opacity-100" : "opacity-0"}`}
+        className={`absolute inset-0 bg-ink/20 transition-opacity duration-240 ease-fauve motion-reduce:transition-none ${postId ? "opacity-100" : "opacity-0"}`}
       />
       <aside
         role="dialog"
         aria-modal="true"
         aria-label="Publication"
-        className={`absolute inset-y-0 right-0 flex w-full max-w-[420px] flex-col bg-white transition-transform duration-200 ${
-          postId ? "translate-x-0 shadow-[-12px_0_40px_rgba(28,21,48,0.12)]" : "invisible translate-x-full"
+        // Slides in and out (visibility waits for the slide to end); translate-x sets `translate`.
+        className={`absolute inset-y-0 right-0 flex w-full max-w-[420px] flex-col bg-white shadow-[-12px_0_40px_rgba(28,21,48,0.12)] transition-[translate,visibility] duration-240 ease-fauve motion-reduce:transition-none ${
+          postId ? "translate-x-0" : "invisible translate-x-full"
         }`}
       >
         <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-3.5">
@@ -116,7 +118,7 @@ export function PostDrawer({
           {loading && <p className="text-sm text-muted">Chargement…</p>}
           {!loading && postId && !shown && <p className="text-sm text-muted">Cette publication n’existe plus.</p>}
           {shown && (
-            <>
+            <div key={shown.id} className="fauve-fade flex flex-col gap-5">
               <div className="flex flex-col gap-2">
                 <StatusPill status={shown.status} className="px-2.5 text-xs" />
                 <h2 className="text-[22px] leading-tight font-extrabold tracking-[-0.01em]">{shown.title}</h2>
@@ -170,25 +172,25 @@ export function PostDrawer({
                       defaultValue={shown.date ?? ""}
                       key={`d-${shown.date}`}
                       onChange={(e) => e.target.value && reschedule(e.target.value, shown.time ?? "18:00")}
-                      className="h-11 flex-1 rounded-xl border border-line px-3 text-[14px] outline-none focus:border-violet"
+                      className="h-11 flex-1 rounded-xl border border-line px-3 text-[16px] outline-none focus:border-violet sm:text-[14px]"
                     />
                     <input
                       type="time"
                       defaultValue={shown.time ?? "18:00"}
                       key={`t-${shown.time}`}
                       onBlur={(e) => shown.date && e.target.value && e.target.value !== shown.time && reschedule(shown.date, e.target.value)}
-                      className="h-11 w-[110px] rounded-xl border border-line px-3 text-[14px] outline-none focus:border-violet"
+                      className="h-11 w-[110px] rounded-xl border border-line px-3 text-[16px] outline-none focus:border-violet sm:text-[14px]"
                     />
                   </div>
                 </section>
               )}
 
               {message && (
-                <p role="status" className={`text-[13px] ${message.ok ? "text-muted" : "font-semibold text-danger"}`}>
+                <p key={message.text} role="status" className={`fauve-enter text-[13px] ${message.ok ? "text-muted" : "font-semibold text-danger"}`}>
                   {message.text}
                 </p>
               )}
-            </>
+            </div>
           )}
         </div>
 

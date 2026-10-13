@@ -1,7 +1,8 @@
 "use client";
 
+import type { Effort } from "@fauve/agent";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type RefObject } from "react";
 import {
   ArrowUpIcon,
   BulbIcon,
@@ -18,7 +19,11 @@ import {
   XIcon,
 } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
+import { Orb } from "@/components/orb";
+import type { CardQuote } from "@/lib/chat-cards";
 import { Bubble } from "./chat-bubble";
+import { montageStep } from "./chat-cards";
+import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "./chat-sync";
 import { FileStrip, useChatUploads } from "./chat-uploads";
 import {
   deleteConversation,
@@ -55,6 +60,8 @@ const EMOJIS = [
   "📅", "📸", "🎬", "✅", "👀", "🤔", "😮", "😅",
 ];
 const LIST_POLL_MS = 30000;
+/** A delivered montage opens its page after this, once its card has said « Ta vidéo est prête ». */
+const OPEN_DELAY_MS = 700;
 
 /**
  * Fauve's home: conversations on the left, the open conversation (or a fresh
@@ -89,6 +96,13 @@ export function FauveWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
   const [pending, startTransition] = useTransition();
+  // Messages that just arrived (they rise in); a conversation that loads whole does not animate.
+  const [arrived, setArrived] = useState<Set<string>>(() => new Set());
+  // The quote launched from its card: no « Fauve écrit… » meanwhile (nobody is writing), and its progress is scrolled to.
+  const [launching, setLaunching] = useState<string | null>(null);
+  // The post about to open (a montage just delivered): its card says so.
+  const [opening, setOpening] = useState<string | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -104,34 +118,78 @@ export function FauveWorkspace({
     window.history.replaceState(null, "", active ? `?c=${active}` : window.location.pathname);
   }, [active]);
 
+  // Scroll: at once to the end when a conversation opens, smoothly (CSS, off under reduced motion)
+  // when something arrives, and only if she is near the end or just wrote. After a launch, to the
+  // card's progress instead of the end.
+  const jump = useRef(true);
+  const follow = useRef(true);
+  const focusQuote = useRef<string | null>(null);
+  const lastId = messages.at(-1)?.id;
+  const mineLast = messages.at(-1)?.from === "me";
+  const typing = pending && !launching;
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length, pending]);
+    const quote = focusQuote.current;
+    focusQuote.current = null;
+    const progress = quote ? scrollerRef.current?.querySelector<HTMLElement>(`[data-quote="${quote}"] [data-progress]`) : null;
+    if (progress) progress.scrollIntoView({ block: "nearest", behavior: "auto" });
+    else if (jump.current || follow.current || mineLast || typing) endRef.current?.scrollIntoView({ block: "end", behavior: jump.current ? "instant" : "auto" });
+    jump.current = false;
+  }, [lastId, mineLast, typing]);
 
-  // Montage videos and WhatsApp messages arrive on their own: refresh while visible.
-  // A montage that just got delivered opens its publication page.
+  // Montage videos and WhatsApp messages arrive on their own: refresh while visible, keeping
+  // what did not change (no video reloads). A montage just delivered opens its publication page,
+  // once its card shows it is ready, and only if the composer is empty (nothing she is writing is lost).
   const router = useRouter();
   const messagesRef = useRef(messages);
+  const activeRef = useRef(active);
+  const composing = useRef(false);
   useEffect(() => {
     messagesRef.current = messages;
-  }, [messages]);
+    activeRef.current = active;
+    composing.current = Boolean(draft.trim() || files.length);
+  }, [messages, active, draft, files.length]);
+  const openWhenReady = useRef<string | null>(null);
+  const openTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(openTimer.current), []);
+  const refresh = useCallback(
+    (id: string) => {
+      loadConversation(id)
+        .then((fresh) => {
+          if (!fresh || activeRef.current !== id) return;
+          const current = messagesRef.current;
+          const known = new Set(current.map((m) => m.id));
+          const delivered = fresh.find((m) => !known.has(m.id) && m.openPost)?.openPost;
+          if (delivered) openWhenReady.current = delivered;
+          if (chatSignature(fresh) !== chatSignature(current)) {
+            setArrived(arrivals(current, fresh));
+            setMessages(mergeMessages(current, fresh));
+          }
+          const target = openWhenReady.current;
+          const stillRunning = fresh.some((m) =>
+            m.cards.some((c) => c.type === "quote" && c.quote.postId === target && c.quote.state === "launched" && c.quote.stage !== "delivered"),
+          );
+          if (!target || stillRunning) return;
+          openWhenReady.current = null;
+          if (composing.current) return;
+          setOpening(target);
+          openTimer.current = window.setTimeout(() => router.push(`/publications/${target}`), OPEN_DELAY_MS);
+        })
+        .catch(() => {});
+    },
+    [router],
+  );
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(() => {
       if (document.visibilityState !== "visible" || pending) return;
-      loadConversation(active)
-        .then((fresh) => {
-          const current = messagesRef.current;
-          if (!fresh || fresh.at(-1)?.id === current.at(-1)?.id) return;
-          const known = new Set(current.map((m) => m.id));
-          const delivered = fresh.find((m) => !known.has(m.id) && m.openPost);
-          setMessages(fresh);
-          if (delivered?.openPost) router.push(`/publications/${delivered.openPost}`);
-        })
-        .catch(() => {});
+      refresh(active);
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [active, pending, router]);
+  }, [active, pending, refresh]);
+  // A launched montage's card moves every few seconds; when it is done, the conversation reloads at once.
+  useQuoteProgress(messages, setMessages, () => {
+    if (activeRef.current) refresh(activeRef.current);
+  });
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -143,6 +201,7 @@ export function FauveWorkspace({
   const startNew = useCallback(() => {
     setActive(null);
     setMessages([]);
+    setArrived(new Set());
     setError(null);
     setShowList(false);
     inputRef.current?.focus();
@@ -153,12 +212,15 @@ export function FauveWorkspace({
     if (id === active) return;
     setActive(id);
     setMessages([]);
+    setArrived(new Set());
     setError(null);
     setLoading(true);
     loadConversation(id)
       .then((loaded) => {
-        if (loaded) setMessages(loaded);
-        else {
+        if (loaded) {
+          jump.current = true;
+          setMessages(loaded);
+        } else {
           setConversations((list) => list.filter((c) => c.id !== id));
           startNew();
         }
@@ -180,6 +242,7 @@ export function FauveWorkspace({
     if ((!text && !ready.length) || pending || (withFiles && uploading)) return;
     setDraft("");
     setError(null);
+    setLaunching(null);
     const at = new Date().toISOString();
     const local = (part: Partial<ChatMessage>, i: number): ChatMessage => ({
       id: `local-${Date.now()}-${i}`,
@@ -196,11 +259,12 @@ export function FauveWorkspace({
       openPost: null,
       ...part,
     });
-    setMessages((m) => [
-      ...m,
+    const locals = [
       ...ready.map((f, i) => local({ type: f.video ? "video" : "image", media: { url: f.preview, video: f.video } }, i)),
       ...(text ? [local({ body: text }, ready.length)] : []),
-    ]);
+    ];
+    setArrived(new Set(locals.map((m) => m.id)));
+    setMessages((m) => [...m, ...locals]);
     const attachments: Attachment[] = ready.map((f) => ({ path: f.path!, mime: f.file.type, size: f.file.size }));
     if (withFiles) uploads.clear();
     const conversationId = active;
@@ -209,7 +273,8 @@ export function FauveWorkspace({
         const res = await sendToFauve(text, conversationId, attachments);
         if (res.ok) {
           setActive(res.conversationId);
-          setMessages(res.messages);
+          setArrived(arrivals(messagesRef.current, res.messages));
+          setMessages(mergeMessages(messagesRef.current, res.messages));
           setConversations(res.conversations);
         } else {
           setError(res.error);
@@ -222,21 +287,31 @@ export function FauveWorkspace({
   };
 
   // « Lancer » on a quote card: the montage starts at once, no round trip through Fauve.
-  const launch = (quoteId: string) => {
-    if (!active || pending) return;
-    setError(null);
-    const conversationId = active;
-    startTransition(async () => {
-      try {
-        const res = await launchQuote(quoteId, conversationId);
-        if (res.ok) {
-          setMessages(res.messages);
-          setConversations(res.conversations);
-        } else setError(res.error);
-      } catch {
-        setError("Le montage n’a pas pu démarrer. Vérifie ta connexion et réessaie.");
-      }
+  // The card shows its own progress and error; the answer is the error, or null.
+  const launch = (quoteId: string, effort?: Effort) =>
+    new Promise<string | null>((resolve) => {
+      if (!active || pending) return resolve("Attends la fin du message en cours, puis relance.");
+      setError(null);
+      setLaunching(quoteId);
+      const conversationId = active;
+      startTransition(async () => {
+        try {
+          const res = await launchQuote(quoteId, conversationId, effort);
+          if (res.ok) {
+            focusQuote.current = quoteId;
+            setArrived(arrivals(messagesRef.current, res.messages));
+            setMessages(mergeMessages(messagesRef.current, res.messages));
+            setConversations(res.conversations);
+            resolve(null);
+          } else resolve(res.error);
+        } catch {
+          resolve("Le montage n’a pas pu démarrer. Vérifie ta connexion et réessaie.");
+        }
+      });
     });
+  // From a card, whichever message it is on (an expired quote, a late montage).
+  const ask = (text: string) => {
+    if (!pending) send(text);
   };
 
   // Emoji picker: inserted where the cursor is.
@@ -261,6 +336,7 @@ export function FauveWorkspace({
   };
 
   const fresh = !active && messages.length === 0;
+  const running = runningQuote(messages);
   const list = (
     <ConversationList conversations={conversations} active={active} onOpen={open} onNew={startNew} onDelete={remove} />
   );
@@ -271,8 +347,8 @@ export function FauveWorkspace({
 
       {showList && (
         <div className="fixed inset-0 z-30 md:hidden" role="dialog" aria-modal="true" aria-label="Conversations">
-          <button type="button" aria-label="Fermer" className="absolute inset-0 bg-ink/30" onClick={() => setShowList(false)} />
-          <div className="absolute inset-y-0 left-0 flex w-[86%] max-w-[320px] flex-col bg-white shadow-xl">
+          <button type="button" aria-label="Fermer" className="fauve-fade absolute inset-0 bg-ink/30" onClick={() => setShowList(false)} />
+          <div className="fauve-sheet absolute inset-y-0 left-0 flex w-[86%] max-w-[320px] flex-col bg-white shadow-xl [--fauve-from:-100%]">
             <div className="flex justify-end px-3 pt-3">
               <button type="button" aria-label="Fermer" onClick={() => setShowList(false)} className="flex size-9 items-center justify-center rounded-full hover:bg-soft">
                 <XIcon size={18} />
@@ -303,7 +379,7 @@ export function FauveWorkspace({
         }}
       >
         {dragging && (
-          <div className="pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/85 text-center">
+          <div className="fauve-fade pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/85 text-center">
             <PaperclipIcon size={28} className="text-violet" />
             <p className="text-[17px] font-bold text-violet">Dépose tes photos et vidéos</p>
             <p className="text-[14px] text-violet/80">Fauve en fait un Reel, un carrousel ou un post</p>
@@ -328,7 +404,14 @@ export function FauveWorkspace({
           </a>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div
+          ref={scrollerRef}
+          className="fauve-scroll min-h-0 flex-1 overflow-y-auto"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+          }}
+        >
           {fresh ? (
             <div className="mx-auto flex min-h-full w-full max-w-[820px] flex-col items-center justify-center gap-6 px-4 py-8 text-center">
               <Mascot size={104} />
@@ -369,6 +452,7 @@ export function FauveWorkspace({
             </div>
           ) : (
             <div className="mx-auto flex w-full max-w-[780px] flex-col gap-3 px-4 py-6">
+              {running && <MontageReminder quote={running} scroller={scrollerRef} />}
               {loading && <p className="self-center text-sm text-muted">Chargement…</p>}
               {messages.map((m, i) => (
                 <Bubble
@@ -379,16 +463,22 @@ export function FauveWorkspace({
                   onReact={react}
                   // Answer buttons only on Fauve's latest message, while it is still the question.
                   onChoose={i === messages.length - 1 && !pending ? send : undefined}
+                  onAsk={ask}
                   onLaunch={launch}
+                  opening={opening}
                   busy={pending}
+                  enter={arrived.has(m.id)}
                 />
               ))}
-              {pending && (
-                <div className="flex items-center gap-2 self-start rounded-[18px_18px_18px_6px] border border-line bg-white px-4 py-3 text-sm text-muted">
-                  <span className="flex gap-1" aria-hidden="true">
-                    <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
-                    <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
-                    <span className="size-1.5 animate-bounce rounded-full bg-muted" />
+              {typing && (
+                <div
+                  role="status"
+                  className="fauve-enter flex items-center gap-2 self-start rounded-[18px_18px_18px_6px] border border-line bg-white px-4 py-3 text-sm text-muted [--fauve-delay:120ms]"
+                >
+                  <span className="fauve-dots" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
                   </span>
                   Fauve écrit…
                 </div>
@@ -407,7 +497,7 @@ export function FauveWorkspace({
         >
           <div className="mx-auto flex w-full max-w-[820px] flex-col gap-2">
             {error && (
-              <p role="alert" className="self-center rounded-xl bg-peach px-3 py-2 text-sm font-semibold text-danger">
+              <p role="alert" className="fauve-enter self-center rounded-xl bg-peach px-3 py-2 text-sm font-semibold text-danger">
                 {error}
               </p>
             )}
@@ -448,7 +538,7 @@ export function FauveWorkspace({
                   <div
                     role="listbox"
                     aria-label="Emojis"
-                    className="absolute bottom-full left-0 z-20 mb-2 grid w-[296px] grid-cols-8 gap-0.5 rounded-[18px] border border-line bg-white p-2 shadow-[0_12px_36px_rgba(28,21,48,0.14)]"
+                    className="fauve-pop absolute bottom-full left-0 z-20 mb-2 grid w-[296px] grid-cols-8 gap-0.5 rounded-[18px] border border-line bg-white p-2 shadow-[0_12px_36px_rgba(28,21,48,0.14)] [--fauve-origin:bottom_left]"
                   >
                     {EMOJIS.map((emoji) => (
                       <button
@@ -492,7 +582,7 @@ export function FauveWorkspace({
                 type="submit"
                 aria-label="Envoyer"
                 disabled={pending || uploading || (!draft.trim() && !files.some((f) => f.status === "ready"))}
-                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-violet text-white transition-colors disabled:bg-chip disabled:text-muted"
+                className="fauve-press flex size-11 shrink-0 items-center justify-center rounded-full bg-violet text-white hover:bg-violet-hover disabled:bg-chip disabled:text-muted"
               >
                 <ArrowUpIcon />
               </button>
@@ -500,6 +590,36 @@ export function FauveWorkspace({
           </div>
         </form>
       </section>
+    </div>
+  );
+}
+
+/**
+ * Where the running montage is, pinned above the thread while its card is out of
+ * sight (a long conversation, a phone); a tap scrolls back to the card.
+ */
+function MontageReminder({ quote, scroller }: { quote: CardQuote; scroller: RefObject<HTMLDivElement | null> }) {
+  const [away, setAway] = useState(false);
+  useEffect(() => {
+    const card = scroller.current?.querySelector(`[data-quote="${quote.id}"] [data-progress]`);
+    if (!card) return;
+    const observer = new IntersectionObserver(([entry]) => setAway(!entry!.isIntersecting), { root: scroller.current });
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [quote.id, scroller]);
+  return (
+    // No height (and no gap): the thread does not move when it appears.
+    <div className="sticky top-1 z-10 -mb-3 flex h-0 justify-center">
+      {away && (
+        <button
+          type="button"
+          onClick={() => scroller.current?.querySelector(`[data-quote="${quote.id}"] [data-progress]`)?.scrollIntoView({ block: "center", behavior: "auto" })}
+          className="fauve-enter fauve-press flex h-9 shrink-0 items-center gap-2 rounded-full border border-line bg-white/95 px-3.5 text-[13px] font-semibold shadow-[0_4px_14px_rgba(28,21,48,0.08)] backdrop-blur [--fauve-y:-6px]"
+        >
+          <Orb size={16} />
+          {montageStep(quote)}
+        </button>
+      )}
     </div>
   );
 }

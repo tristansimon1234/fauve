@@ -70,7 +70,7 @@ export function FileStrip({ files, onRemove }: { files: DraftFile[]; onRemove: (
   return (
     <ul className="flex flex-wrap gap-2 px-2" aria-label="Fichiers à envoyer">
       {files.map((f) => (
-        <li key={f.id} className="relative size-16 overflow-hidden rounded-[12px] border border-line bg-soft">
+        <li key={f.id} className="fauve-pop relative size-16 overflow-hidden rounded-[12px] border border-line bg-soft">
           {f.video ? (
             <video src={`${f.preview}#t=0.1`} muted playsInline preload="metadata" className="size-full object-cover" />
           ) : (

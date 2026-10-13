@@ -216,3 +216,29 @@ export async function renderStillsInSandbox(
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }
 }
+
+/**
+ * Key frames of a rendered video, for the critic: one JPEG (540 px wide) per
+ * instant, cut by ffmpeg from the MP4 at `url`. An instant past the end gives no frame.
+ */
+export async function videoFramesInSandbox(id: string, url: string, times: number[]): Promise<{ t: number; jpeg: Buffer }[]> {
+  if (!times.length) return [];
+  const sandbox = await renderSandbox();
+  const dir = `${ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1" && curl -fsSL --retry 2 -o "$1/in.mp4" "$2"', [dir, url]);
+    await bash(
+      sandbox,
+      `cd "$1" && shift && i=0; for t in "$@"; do ${ROOT}/ffmpeg -loglevel error -y -ss "$t" -i in.mp4 -frames:v 1 -vf scale=540:-2 -q:v 4 "f$i.jpg" || true; i=$((i+1)); done`,
+      [dir, ...times.map((t) => Math.max(0, t).toFixed(2))],
+    );
+    const frames: { t: number; jpeg: Buffer }[] = [];
+    for (const [i, t] of times.entries()) {
+      const jpeg = await sandbox.readFileToBuffer({ path: `${dir}/f${i}.jpg` }).catch(() => null);
+      if (jpeg?.length) frames.push({ t, jpeg });
+    }
+    return frames;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}

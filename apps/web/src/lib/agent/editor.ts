@@ -45,10 +45,16 @@ export async function designEdit(params: {
   brief?: string;
   /** New animated scenes allowed by the quote (default: the usual cap). */
   maxNewScenes?: number;
+  /** The editor's reasoning effort (level of care of the montage). */
+  effort?: "medium" | "high";
+  /** The version to correct (default: the post's current one, the one the manager has). */
+  fromPlanId?: string;
+  /** A new take, not a correction: the brief is the request, the previous plan is not shown. */
+  fresh?: boolean;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, library, report, inspirations] = await Promise.all([
-    db.from("posts").select("id, title, kind, caption, platforms").eq("id", params.postId).eq("studio_id", params.studioId).single(),
+    db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
     db.from("studios").select("name, business_type, booking_url").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
@@ -58,7 +64,11 @@ export async function designEdit(params: {
   ]);
   if (post.error) throw new Error("Publication introuvable");
 
-  const previousPlan = editPlanSchema.safeParse(previous.data?.[0]?.plan);
+  // The version to correct: the one asked for, else the post's current one (a reviewed
+  // montage keeps the version the critic chose, often not the highest number), else the latest.
+  const baseId = params.fromPlanId ?? (post.data.edit_plan_id as string | null);
+  const from = baseId ? await db.from("edit_plans").select("plan").eq("id", baseId).eq("post_id", params.postId).maybeSingle() : { data: null };
+  const previousPlan = editPlanSchema.safeParse(from.data?.plan ?? previous.data?.[0]?.plan);
   const mediaIds = params.mediaIds?.length
     ? params.mediaIds
     : previousPlan.success
@@ -89,13 +99,13 @@ export async function designEdit(params: {
       dos: profile.dos,
       donts: profile.donts,
     },
-    post: post.data,
+    post: { ...post.data, edit_plan_id: undefined },
     clips: clips.map((c) => ({ media_id: c.media_id, ...c.analysis, words: c.analysis.words?.length ? c.analysis.words : undefined })),
     // Scenes already made: reusing one costs nothing.
     templates: library,
     // Motion code stays out of the editor's context: it only needs the briefs.
     previous_plan:
-      params.brief && previousPlan.success
+      params.brief && !params.fresh && previousPlan.success
         ? {
             ...previousPlan.data,
             segments: previousPlan.data.segments.map((s) =>
@@ -121,7 +131,7 @@ export async function designEdit(params: {
   const response = await anthropic().beta.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: 16000,
-    output_config: { effort: "high", format: betaZodOutputFormat(editorOutputSchema) },
+    output_config: { effort: params.effort ?? "high", format: betaZodOutputFormat(editorOutputSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: [{ type: "text", text: EDITOR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],

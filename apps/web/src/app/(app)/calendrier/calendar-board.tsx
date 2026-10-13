@@ -266,7 +266,11 @@ export function CalendarBoard({
       </div>
 
       {message && (
-        <p role="status" className={`self-start rounded-xl px-3 py-2 text-sm font-semibold ${message.ok ? "bg-violet-tint text-ink" : "bg-peach text-danger"}`}>
+        <p
+          key={message.text}
+          role="status"
+          className={`fauve-enter self-start rounded-xl px-3 py-2 text-sm font-semibold ${message.ok ? "bg-violet-tint text-ink" : "bg-peach text-danger"}`}
+        >
           {message.text}
         </p>
       )}
@@ -394,7 +398,8 @@ function SelectionBar({
     <div
       role="toolbar"
       aria-label="Actions groupées"
-      className="fixed bottom-24 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded-full bg-ink py-2 pr-2 pl-5 text-white shadow-[0_18px_40px_rgba(28,21,48,0.3)] lg:bottom-6"
+      // Rises in when a first post is checked (the keyframe animates `transform`, so it composes with -translate-x-1/2).
+      className="fauve-enter fixed bottom-24 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded-full bg-ink py-2 pr-2 pl-5 text-white shadow-[0_18px_40px_rgba(28,21,48,0.3)] [--fauve-y:12px] lg:bottom-6"
     >
       <span className="text-[14px] font-bold">
         {count} sélectionnée{count > 1 ? "s" : ""}
