@@ -1,4 +1,5 @@
 import "server-only";
+import { CREDIT_PRICES } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
@@ -14,6 +15,12 @@ export type DeliveryTarget = {
   replyTo?: string;
   /** The editor's one-line explanation, shown with the video. */
   rationale?: string;
+  /** What the review did (Soigné, Max): its own paragraph under the explanation. */
+  care?: string;
+  /** What Fauve says about this version, kept on the post for the Publication page and /v. */
+  note?: string;
+  /** Offers a variant at the end (not after Max, which already compared two versions). */
+  offerVariant?: boolean;
 };
 
 function store(target: DeliveryTarget, fields: { wa_message_id?: string; type: string; body: string; payload?: Record<string, unknown> }) {
@@ -55,20 +62,34 @@ export async function renderAndDeliver(target: DeliveryTarget): Promise<{ title:
 
 /** Points the manager to a rendered montage: a sign-in link to its page on WhatsApp, its card in the app. */
 export async function deliverMontage(target: DeliveryTarget, r: { title: string; durationMs: number }): Promise<void> {
-  const seconds = Math.round(r.durationMs / 100) / 10;
+  // Reels last 7 to 15 s: whole seconds, and nothing when the render did not say.
+  const seconds = Math.round(r.durationMs / 1000);
   // On a phone: the one-action page (watch, validate, move a text).
   const page = `/v/${target.postId}`;
-  const intro = `Ton montage « ${r.title} » est prêt 🎬 (${seconds} s).${target.rationale ? ` ${target.rationale}` : ""}`;
-  const after = "Valide-le sur sa page, ou dis-moi ce que tu veux changer. Je peux aussi te faire une variante (autre style, autre accroche) pour 1 crédit.";
+  // Short paragraphs, the link right under the first line: it is the one action.
+  const intro = `Ton montage « ${r.title} » est prêt 🎬${seconds ? ` (${seconds} s)` : ""}.`;
+  const notes = [target.rationale, target.care].filter(Boolean).join("\n\n");
+  const after = [
+    "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
+    target.offerVariant === false
+      ? ""
+      : `Je peux aussi te faire une variante (autre style, autre accroche) pour ${CREDIT_PRICES.variant} crédit${CREDIT_PRICES.variant > 1 ? "s" : ""}.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
   const payload = { posts: [target.postId], open_post: target.postId };
+  if (target.note) {
+    const { error } = await supabaseAdmin().from("posts").update({ agent_note: target.note.slice(0, 600) }).eq("id", target.postId).eq("studio_id", target.studioId);
+    if (error) console.warn("delivery: note not kept", error.message);
+  }
+  // Stored without the one-time link (Fauve's history must not reuse it).
+  const stored = [intro, notes, after].filter(Boolean).join("\n\n");
   if (target.waId) {
     const link = await createLoginLink(`+${target.waId}`, page, "open_post");
-    const body = `${intro}\n\nRegarde-le ici : ${link}\n\n${after}`;
-    const id = await sendText(target.waId, body);
-    // Stored without the one-time link (Fauve's history must not reuse it).
-    await store(target, { wa_message_id: id, type: "text", body: `${intro}\n\n${after}`, payload });
+    const id = await sendText(target.waId, [`${intro}\nRegarde-le ici : ${link}`, notes, after].filter(Boolean).join("\n\n"));
+    await store(target, { wa_message_id: id, type: "text", body: stored, payload });
   } else {
-    await store(target, { type: "text", body: `${intro}\n\n${after}`, payload });
+    await store(target, { type: "text", body: stored, payload });
   }
 }
 

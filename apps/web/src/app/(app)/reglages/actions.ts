@@ -1,7 +1,6 @@
 "use server";
 
 import { effortSchema, type Effort } from "@fauve/agent";
-import { revalidatePath } from "next/cache";
 import { createLinkCode } from "@/lib/instagram-dm";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -28,6 +27,7 @@ export async function setMontageEffort(effort: Effort): Promise<{ ok: true } | {
     console.warn("setMontageEffort failed", error.message);
     return { ok: false, error: "Le réglage n’a pas été enregistré. Réessaie dans un instant." };
   }
-  revalidatePath("/reglages");
+  // No revalidation: nothing else on Réglages reads it, the setting holds the value, and
+  // « Enregistré » shows without waiting for the whole page (balance, ledger…) to render again.
   return { ok: true };
 }

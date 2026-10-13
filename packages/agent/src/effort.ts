@@ -30,7 +30,7 @@ export type EffortLevel = {
 export const EFFORTS: Record<Effort, EffortLevel> = {
   rapide: {
     label: "Rapide",
-    pitch: "Une version, sans relecture",
+    pitch: "Une version, envoyée telle quelle",
     versions: 1,
     review: false,
     fixRounds: 0,

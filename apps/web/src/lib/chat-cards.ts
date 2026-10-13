@@ -17,14 +17,19 @@ export type CardPost = {
   media: { url: string; video: boolean } | null;
 };
 
+export type QuoteState = "open" | "launched" | "delivered" | "expired";
+
 export type CardQuote = {
   id: string;
   title: string;
+  /** What is quoted: a new montage, a correction of one, or a variant (render only). */
+  kind: "montage" | "correction" | "variant";
+  postId: string;
   lines: { label: string; credits: number }[];
   base: number;
   max: number;
   /** open: can be launched; launched: being made; delivered: video sent; expired: ask for a new one. */
-  state: "open" | "launched" | "delivered" | "expired";
+  state: QuoteState;
   balance: number;
   /** What Fauve will make: duration, style, scenes in order. */
   plan: MontagePlan | null;
@@ -32,9 +37,38 @@ export type CardQuote = {
   effort: Effort | null;
   /** The price at each level the balance allows, for the manager to pick another one. */
   efforts: Partial<Record<Effort, { base: number; max: number; lines: { label: string; credits: number }[] }>>;
-  /** Where the launched montage is. */
+  /** Where the launched montage is, and since when. */
   stage: QuoteStage | null;
+  stageAt: string | null;
+  /** When it was launched (null before). */
+  startedAt: string | null;
+  /** Launched once, failed, and open again (nothing was charged). */
+  failed: boolean;
+  /** What the delivered montage really cost (null before delivery). */
+  charged: number | null;
 };
+
+/** What a quote card can show of a quote, from its row. */
+export function quoteState(row: { used_at?: unknown; charged_at?: unknown; expires_at?: unknown }): QuoteState {
+  if (row.charged_at) return "delivered";
+  if (row.used_at) return "launched";
+  return new Date(row.expires_at as string).getTime() < Date.now() ? "expired" : "open";
+}
+
+/** A montage that failed reopens its quote but keeps the time of its last step (api/jobs/montage, reopenQuote). */
+export const quoteFailed = (row: { used_at?: unknown; charged_at?: unknown; stage_at?: unknown }) => !row.used_at && !row.charged_at && Boolean(row.stage_at);
+
+/** What each delivered quote really cost: its charge in the ledger. */
+export async function quoteCharges(studioId: string, ids: string[]): Promise<Map<string, number>> {
+  if (!ids.length) return new Map();
+  const { data } = await supabaseAdmin().from("credit_ledger").select("delta, ref").eq("studio_id", studioId).in("ref->>quote_id", ids);
+  const out = new Map<string, number>();
+  for (const row of data ?? []) {
+    const id = (row.ref as { quote_id?: string } | null)?.quote_id;
+    if (id) out.set(id, (out.get(id) ?? 0) - (row.delta as number));
+  }
+  return out;
+}
 
 export type ChatCard = { type: "post"; post: CardPost } | { type: "grid"; posts: CardPost[] } | { type: "quote"; quote: CardQuote };
 
@@ -127,31 +161,40 @@ async function quoteCards(studioId: string, payloads: unknown[]): Promise<(ChatC
   const [{ data }, balance] = await Promise.all([
     db
       .from("credit_quotes")
-      .select("id, base, max, lines, params, effort, stage, used_at, charged_at, expires_at, posts(title)")
+      .select("id, kind, post_id, base, max, lines, params, effort, stage, stage_at, used_at, charged_at, expires_at, posts(title)")
       .eq("studio_id", studioId)
       .in("id", wanted),
     creditBalance(studioId).catch(() => 0),
   ]);
+  const charges = await quoteCharges(
+    studioId,
+    (data ?? []).filter((q) => q.charged_at).map((q) => q.id as string),
+  ).catch(() => new Map<string, number>());
   const byId = new Map(
     (data ?? []).map((q): [string, CardQuote] => {
       const post = q.posts as { title?: string | null } | { title?: string | null }[] | null;
       const title = (Array.isArray(post) ? post[0]?.title : post?.title) ?? "Montage";
-      const state = q.charged_at ? "delivered" : q.used_at ? "launched" : new Date(q.expires_at as string).getTime() < Date.now() ? "expired" : "open";
       const plan = montagePlanSchema.safeParse((q.params as { plan?: unknown } | null)?.plan);
       return [
         q.id as string,
         {
           id: q.id as string,
           title,
+          kind: (q.kind as CardQuote["kind"] | null) ?? "montage",
+          postId: q.post_id as string,
           lines: (q.lines as CardQuote["lines"]) ?? [],
           base: q.base as number,
           max: q.max as number,
-          state,
+          state: quoteState(q),
           balance,
           plan: plan.success ? plan.data : null,
           effort: effortSchema.nullable().catch(null).parse(q.effort ?? null),
           efforts: Object.fromEntries(Object.entries(quoteEfforts(q.params)).map(([e, p]) => [e, { base: p.base, max: p.max, lines: p.lines }])),
           stage: (q.stage as QuoteStage | null) ?? null,
+          stageAt: (q.stage_at as string | null) ?? null,
+          startedAt: (q.used_at as string | null) ?? null,
+          failed: quoteFailed(q),
+          charged: charges.get(q.id as string) ?? null,
         },
       ];
     }),

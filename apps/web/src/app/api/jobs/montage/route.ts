@@ -52,6 +52,8 @@ const bodySchema = z.object({
   waId: z.string().regex(/^\d{6,16}$/).optional(),
   replyTo: z.string().max(200).optional(),
   rationale: z.string().max(600).optional(),
+  /** What Fauve says about the delivered version, kept on the post (else the rationale). */
+  note: z.string().max(600).optional(),
   /** Credits: the accepted quote, the new scenes it allows, and the new scenes made so far. */
   quoteId: z.uuid().optional(),
   maxNewScenes: z.number().int().min(0).max(2).optional(),
@@ -119,8 +121,8 @@ async function run(job: Job) {
   if (job.step === "variant") {
     try {
       const plan = await createVariant(job.studioId, job.postId, job.variant ?? {});
-      const rationale = `Variante en style « ${plan.template} »${job.variant?.hook ? ", avec une autre accroche" : ""} : dis-moi laquelle tu préfères.`;
-      await queueJob("montage", { ...target, step: "render", rationale, quoteId: job.quoteId, newScenes: 0 });
+      const what = `Variante en style « ${plan.template} »${job.variant?.hook ? ", avec une autre accroche" : ""}`;
+      await queueJob("montage", { ...target, step: "render", rationale: `${what} : dis-moi laquelle tu préfères.`, note: `${what}.`, quoteId: job.quoteId, newScenes: 0 });
     } catch (error) {
       console.error("variant failed", job.postId, error);
       await reopenQuote(job.quoteId);
@@ -132,7 +134,7 @@ async function run(job: Job) {
   if (!reviewed) {
     if (job.step === "render") {
       await setQuoteStage(job.quoteId, "render");
-      const delivered = await renderAndDeliver({ ...target, rationale: job.rationale });
+      const delivered = await renderAndDeliver({ ...target, rationale: job.rationale, note: job.note ?? job.rationale, offerVariant: true });
       // Charged only once the video is out, for the scenes really made (never above the quote).
       if (delivered && job.quoteId) {
         await setQuoteStage(job.quoteId, "delivered");
@@ -162,7 +164,9 @@ async function run(job: Job) {
     console.error(`montage ${job.step} failed`, job.postId, error);
     // A rendered version is never lost: it goes out as it is.
     const kept = (job.versions ?? []).filter((v) => v.renderId);
-    if (kept.length && (await deliver(job, kept[kept.length - 1]!, null).catch(() => false))) return;
+    // Claims a review only when one was made (the critic's notes are on the job).
+    const outcome: Care | null = job.issues?.length ? { reviewed: true, left: job.issues[0]?.problem } : null;
+    if (kept.length && (await deliver(job, kept[kept.length - 1]!, outcome).catch(() => false))) return;
     await reopenQuote(job.quoteId);
     await notifyFailure(target, FAILED, error);
   }
@@ -225,7 +229,7 @@ async function render(job: Job) {
       versions = versions.filter((v) => v !== todo);
       // The correction did not render: the version already reviewed goes out.
       if (todo.fix && versions.some((v) => v.renderId)) {
-        await deliver({ ...job, versions, fixes, summary: undefined }, versions.find((v) => v.renderId)!, null);
+        await deliver({ ...job, versions, fixes, summary: undefined }, versions.find((v) => v.renderId)!, { reviewed: true, left: job.issues?.[0]?.problem });
         return;
       }
     }
@@ -250,9 +254,16 @@ async function review(job: Job) {
   const best = rendered[verdict?.best ?? rendered.length - 1]!;
   const compared = job.compared || (round === 0 && rendered.length > 1);
   if (!verdict || verdict.review.ok || !verdict.review.issues.length || round >= EFFORTS[job.effort!].fixRounds) {
-    // The critic's line: what the correction improved when the corrected version is kept, else what it checked.
-    const line = best.fix && job.summary ? job.summary : verdict?.review.summary;
-    await deliver({ ...job, compared }, best, line ?? null);
+    // What the manager is told: what the kept correction improved, or what was checked when it can go out
+    // as it is; never a fix that was not made, and what is left when the last round still found something.
+    const corrected = rendered.find((v) => v.fix);
+    await deliver({ ...job, compared }, best, {
+      reviewed: Boolean(verdict),
+      fixed: Boolean(best.fix),
+      keptFirst: Boolean(corrected && !best.fix),
+      line: best.fix ? job.summary : verdict?.review.ok ? verdict.review.summary : undefined,
+      left: verdict && !verdict.review.ok ? verdict.review.issues[0]?.problem : undefined,
+    });
     return;
   }
   await next(job, {
@@ -286,15 +297,48 @@ async function fix(job: Job) {
     });
   } catch (error) {
     console.warn("correction failed, the reviewed version goes out", job.postId, error);
-    await deliver({ ...job, summary: undefined }, best, null);
+    await deliver({ ...job, summary: undefined }, best, { reviewed: true, left: job.issues?.[0]?.problem });
   }
+}
+
+/** What the review did, for the delivery message and the charge. */
+type Care = {
+  /** The critic watched the video. */
+  reviewed: boolean;
+  /** The kept version is a correction it asked for. */
+  fixed?: boolean;
+  /** A correction was tried, and the version before it was better. */
+  keptFirst?: boolean;
+  /** The critic's sentence for the manager, about the version that goes out. */
+  line?: string;
+  /** What the critic would still correct (the last round allowed found something). */
+  left?: string;
+};
+
+/** The care sentence of the delivery message, from what really happened. */
+function careLine(compared: boolean, outcome: Care | null): string {
+  const left = outcome?.left?.trim().replace(/[\s.]+$/, "");
+  return [
+    compared ? "J’ai préparé deux versions et gardé la meilleure." : "",
+    outcome?.reviewed
+      ? outcome.fixed
+        ? "Avant de te l’envoyer, j’ai regardé la vidéo et fait corriger quelques détails."
+        : outcome.keptFirst
+          ? "J’ai regardé la vidéo et essayé une correction, mais la version d’avant était meilleure : c’est celle-ci."
+          : "J’ai regardé la vidéo avant de te l’envoyer."
+      : "",
+    outcome?.line?.trim() ?? "",
+    left ? `Si tu veux, je peux encore corriger ceci : ${left}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /**
  * The kept version becomes the post's current one and goes to the manager,
- * with the critic's line; the quote is charged for what was really made.
+ * with what the review did; the quote is charged for what was really made.
  */
-async function deliver(job: Job, best: Version, line: string | null): Promise<boolean> {
+async function deliver(job: Job, best: Version, outcome: Care | null): Promise<boolean> {
   const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo };
   const db = supabaseAdmin();
   await db.from("posts").update({ edit_plan_id: best.planId, render_id: best.renderId }).eq("id", job.postId).eq("studio_id", job.studioId);
@@ -303,14 +347,19 @@ async function deliver(job: Job, best: Version, line: string | null): Promise<bo
     db.from("renders").select("duration_ms").eq("id", best.renderId!).single(),
   ]);
   const title = (post.data?.title as string | null) ?? "";
-  const care = [
-    job.compared ? "J’en ai préparé deux versions et gardé la meilleure." : "",
-    line ? `Je l’ai regardée avant de te l’envoyer : ${line.replace(/^\s*[A-ZÀ-Ý]/, (c) => c.toLowerCase())}` : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const care = careLine(Boolean(job.compared), outcome);
   try {
-    await deliverMontage({ ...target, rationale: [best.rationale, care].filter(Boolean).join(" ") || undefined }, { title, durationMs: (render.data?.duration_ms as number | null) ?? 0 });
+    await deliverMontage(
+      {
+        ...target,
+        rationale: best.rationale,
+        care: care || undefined,
+        note: [best.rationale, care].filter(Boolean).join(" ").slice(0, 600) || undefined,
+        // Two versions were already compared: no variant offered on top.
+        offerVariant: !job.compared,
+      },
+      { title, durationMs: (render.data?.duration_ms as number | null) ?? 0 },
+    );
   } catch (error) {
     console.error("montage delivery failed", job.postId, error);
     await reopenQuote(job.quoteId);
@@ -319,13 +368,18 @@ async function deliver(job: Job, best: Version, line: string | null): Promise<bo
   }
   if (job.quoteId) {
     await setQuoteStage(job.quoteId, "delivered");
-    await chargeQuote(job.quoteId, job.newScenes ?? 0, title, job.fixes ?? 0);
+    // The review the quote priced is not charged when the critic could not watch the video.
+    const skipReview = !outcome?.reviewed && Boolean(job.effort && EFFORTS[job.effort].review);
+    await chargeQuote(job.quoteId, job.newScenes ?? 0, title, job.fixes ?? 0, { skipReview });
   }
   return true;
 }
 
-/** The work failed before anything was charged: the same quote can be launched again. */
+/**
+ * The work failed before anything was charged: the same quote can be launched again. Its stage_at
+ * stays, so the quote card can say the last try did not work (lib/chat-cards.ts, quoteFailed).
+ */
 async function reopenQuote(quoteId: string | undefined) {
   if (!quoteId) return;
-  await supabaseAdmin().from("credit_quotes").update({ used_at: null, stage: null, stage_at: null }).eq("id", quoteId).is("charged_at", null);
+  await supabaseAdmin().from("credit_quotes").update({ used_at: null, stage: null }).eq("id", quoteId).is("charged_at", null);
 }

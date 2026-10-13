@@ -296,7 +296,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         const accepted = await acceptQuote(studioId, quote.id, turnStartedAt, { immediate: true });
         if (!("error" in accepted)) {
           ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
-          ctx.extras.posts = [post_id];
+          // In the app, the quote card follows the montage step by step (already launched, no button);
+          // on WhatsApp, cards become links, so the post's link stays.
+          ctx.extras.quote = quote.id;
+          if (ctx.waId) ctx.extras.posts = [post_id];
           ctx.notes.push(`montage lancé directement quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id} (${quote.base} à ${quote.max} crédits${level ? `, ${level.label}` : ""})`);
           return json({
             status: "started",

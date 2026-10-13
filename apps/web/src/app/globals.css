@@ -29,6 +29,9 @@
   --font-serif: var(--font-instrument), Georgia, serif;
 
   --radius-card: 20px;
+
+  /* Motion: quick ease-out, for feedback and continuity (see « Motion » at the end). */
+  --ease-fauve: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @layer base {
@@ -72,7 +75,14 @@
   font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
-  transition: background-color 0.15s, border-color 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    scale 0.15s var(--ease-fauve);
+  /* A tap answers: the pill dips while pressed. */
+  &:active:not(:disabled) {
+    scale: 0.97;
+  }
 }
 
 @utility btn-primary {
@@ -261,5 +271,146 @@
   .fauve-cat,
   .fauve-cat * {
     animation: none !important;
+  }
+}
+
+/* Motion (shared): quick ease-out entrances and feedback, 150–300 ms. In the components
+   layer so utilities can tune them through --fauve-delay, --fauve-y, --fauve-scale,
+   --fauve-origin and --fauve-from. They animate `transform`, never `translate`, so they
+   compose with Tailwind's translate-* utilities. Entrances fill backwards only: nothing
+   lingers once they end. All off under prefers-reduced-motion (below). */
+@layer components {
+  /* Something new arrives (a message, a card, a status line): fades in and rises. */
+  .fauve-enter {
+    animation: fauve-enter 220ms var(--ease-fauve) var(--fauve-delay, 0ms) backwards;
+  }
+  /* Something small appears where the eye already is (a check, a popover, a thumbnail). */
+  .fauve-pop {
+    transform-origin: var(--fauve-origin, center);
+    animation: fauve-pop 180ms var(--ease-fauve) var(--fauve-delay, 0ms) backwards;
+  }
+  /* A label or a backdrop changes: opacity only. */
+  .fauve-fade {
+    animation: fauve-fade 160ms var(--ease-fauve) backwards;
+  }
+  .fauve-fade[data-closing] {
+    animation: fauve-fade-out 180ms var(--ease-fauve) forwards;
+  }
+  /* A side panel slides in from its edge (--fauve-from: -100% for a left one) and leaves the same way. */
+  .fauve-sheet {
+    animation: fauve-sheet 240ms var(--ease-fauve) backwards;
+  }
+  .fauve-sheet[data-closing] {
+    animation: fauve-sheet-out 180ms var(--ease-fauve) forwards;
+  }
+  /* « Enregistré »: shows, stays a moment, fades away (the component removes it after 2.2 s). */
+  .fauve-flash {
+    animation: fauve-flash 2.2s var(--ease-fauve) forwards;
+  }
+  /* Fauve is writing: three dots in the current text color. */
+  .fauve-dots {
+    display: inline-flex;
+    gap: 4px;
+  }
+  .fauve-dots > span {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.35;
+    animation: fauve-dot 1.2s ease-in-out infinite;
+  }
+  .fauve-dots > span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .fauve-dots > span:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+  /* Segmented choice: a pill slides under the chosen option. Equal columns, no gap;
+     set --n (options) and --i (chosen index) on the group. */
+  .fauve-pill {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    padding: 4px;
+    border-radius: 999px;
+  }
+  .fauve-pill-indicator {
+    position: absolute;
+    z-index: -1;
+    inset-block: 4px;
+    left: 4px;
+    width: calc((100% - 8px) / var(--n, 3));
+    border-radius: 999px;
+    background: var(--color-violet);
+    box-shadow: 0 2px 8px rgba(91, 63, 217, 0.3);
+    transform: translateX(calc(var(--i, 0) * 100%));
+    transition: transform 220ms var(--ease-fauve);
+  }
+  /* A tap answers: the button dips while pressed (built into .btn). Use instead of transition-colors. */
+  .fauve-press {
+    transition-property: color, background-color, border-color, opacity, scale;
+    transition-duration: 150ms;
+    transition-timing-function: var(--ease-fauve);
+  }
+  .fauve-press:active:not(:disabled) {
+    scale: 0.97;
+  }
+  /* Chat scroll: smooth when a message arrives (scrollIntoView with behavior "auto" follows it). */
+  .fauve-scroll {
+    scroll-behavior: smooth;
+  }
+}
+@keyframes fauve-enter {
+  from { opacity: 0; transform: translateY(var(--fauve-y, 6px)); }
+}
+@keyframes fauve-pop {
+  from { opacity: 0; transform: scale(var(--fauve-scale, 0.92)); }
+}
+@keyframes fauve-fade {
+  from { opacity: 0; }
+}
+@keyframes fauve-fade-out {
+  to { opacity: 0; }
+}
+@keyframes fauve-sheet {
+  from { transform: translateX(var(--fauve-from, 100%)); }
+}
+@keyframes fauve-sheet-out {
+  to { transform: translateX(var(--fauve-from, 100%)); }
+}
+@keyframes fauve-flash {
+  0% { opacity: 0; transform: translateY(2px); }
+  8%, 88% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+@keyframes fauve-dot {
+  0%, 60%, 100% { opacity: 0.35; transform: none; }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fauve-enter,
+  .fauve-pop,
+  .fauve-fade,
+  .fauve-sheet,
+  .fauve-flash,
+  .fauve-dots > span {
+    animation: none;
+  }
+  .fauve-dots > span {
+    opacity: 0.6;
+  }
+  .fauve-pill-indicator,
+  .fauve-press {
+    transition: none;
+  }
+  .fauve-press:active:not(:disabled),
+  .btn:active:not(:disabled) {
+    scale: none;
+  }
+  .fauve-scroll {
+    scroll-behavior: auto;
   }
 }

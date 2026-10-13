@@ -231,9 +231,10 @@ export async function acceptQuote(
   };
 }
 
-/** WhatsApp buttons under a quote: yes, the other level worth offering, not now. */
+/** WhatsApp buttons under a quote: yes, the other level worth offering, not now. None once it is launched (a small montage starts at once). */
 export async function quoteButtons(studioId: string, quoteId: string): Promise<string[]> {
-  const { data } = await supabaseAdmin().from("credit_quotes").select("effort, params").eq("id", quoteId).eq("studio_id", studioId).maybeSingle();
+  const { data } = await supabaseAdmin().from("credit_quotes").select("effort, params, used_at").eq("id", quoteId).eq("studio_id", studioId).maybeSingle();
+  if (data?.used_at) return [];
   const effort = effortSchema.nullable().catch(null).parse(data?.effort ?? null);
   const other = effort ? otherEffort(effort, Object.keys(quoteEfforts(data?.params)) as Effort[]) : null;
   return ["Oui, lance", ...(other ? [`Version ${EFFORTS[other].label}`] : []), "Pas maintenant"];
@@ -264,8 +265,11 @@ export async function lastPresentedQuote(studioId: string, turnStartedAt: Date):
   return { id: data.id as string, title };
 }
 
-/** Charges a delivered montage: its real new scenes and corrections, never above the quote. Once per quote. */
-export async function chargeQuote(quoteId: string, newScenes: number, title: string, fixRounds = 0): Promise<void> {
+/**
+ * Charges a delivered montage: its real new scenes and corrections, never above the quote. Once per quote.
+ * skipReview: the quote priced Fauve watching the video but the critic could not (it is not charged).
+ */
+export async function chargeQuote(quoteId: string, newScenes: number, title: string, fixRounds = 0, { skipReview = false } = {}): Promise<void> {
   const db = supabaseAdmin();
   const claimed = await db
     .from("credit_quotes")
@@ -276,7 +280,7 @@ export async function chargeQuote(quoteId: string, newScenes: number, title: str
     .maybeSingle();
   const q = claimed.data;
   if (!q) return;
-  const credits = montageCharge({ base: q.base as number, max: q.max as number }, newScenes, fixRounds);
+  const credits = Math.max(0, montageCharge({ base: q.base as number, max: q.max as number }, newScenes, fixRounds) - (skipReview ? CREDIT_PRICES.review : 0));
   const kind = q.kind as AcceptedQuote["kind"];
   const level = effortSchema.nullable().catch(null).parse(q.effort);
   const label = `${{ montage: "Montage", correction: "Correction", variant: "Variante" }[kind]}${level && level !== "rapide" ? ` ${EFFORTS[level].label}` : ""}`;

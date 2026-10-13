@@ -21,7 +21,12 @@ export const montageReviewSchema = z.object({
   score: z.number().int().min(1).max(10).describe("Note de la version retenue"),
   ok: z.boolean().describe("true si la version retenue peut partir telle quelle"),
   issues: z.array(montageIssueSchema).max(4).describe("Les défauts de la version retenue, les plus importants d'abord (vide si ok)"),
-  summary: z.string().max(240).describe("Pour la gérante, en une phrase simple : ce que tu as vérifié ou ce que la correction va améliorer"),
+  summary: z
+    .string()
+    .max(240)
+    .describe(
+      "Pour la gérante, une phrase simple au passé, lue avec la vidéo finie : ce que tu as vérifié si elle peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. »)",
+    ),
 });
 export type MontageReview = z.infer<typeof montageReviewSchema>;
 
@@ -40,7 +45,7 @@ Pour la version retenue :
 - score de 1 à 10 ;
 - ok = true si elle peut partir telle quelle (8 ou plus, aucun défaut gênant) ;
 - issues : chaque défaut, avec la scène, le problème et la correction précise à demander au monteur, qui connaît les clips et les gabarits (ex. « accroche trop longue : la réduire à 3 mots », « scène 3 sombre et floue : la remplacer par un meilleur passage du même clip », « texte de la scène 2 collé au bord droit : le recentrer ») ; 4 au plus, les plus importants d'abord ;
-- summary : une phrase pour la gérante, au tutoiement, sans jargon (ex. « J'ai raccourci l'accroche et retiré un plan flou. »).`;
+- summary : une phrase pour la gérante, au tutoiement, sans jargon, au passé, car elle la lit avec la vidéo finie : ce que tu as vérifié si la version peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. »).`;
 
 export type ReviewMoment = { t: number; scene: number | null; label: string; texts: string[] };
 
