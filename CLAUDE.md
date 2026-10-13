@@ -200,7 +200,7 @@ Intégration bsport (planning et données élèves), relances aux élèves (bspo
 - Next.js 16 avec Cache Components : lire `node_modules/next/dist/docs/` avant d'utiliser une API Next ; toute lecture de cookies/session doit être sous `<Suspense>`.
 - Les écrans de la web app lisent les vraies données du studio connecté via `apps/web/src/lib/studio.ts` (`getStudioContext`).
 - Supabase : projet `fauve` (ref `tfxkhktofgtljlqlksba`, eu-west-3). Les noms des fichiers de migration reprennent les versions appliquées en base.
-- Connexion : téléphone + code envoyé sur WhatsApp via le Send SMS hook (`/api/auth/send-sms`). Lien magique et QR ouvrent la session côté serveur via `openSessionForPhone` (le hook capture le code dans `pending_server_logins` au lieu de l'envoyer).
+- Connexion : téléphone + code envoyé sur WhatsApp via le Send SMS hook (`/api/auth/send-sms`). Lien magique et QR ouvrent la session côté serveur via `openSessionForPhone` (le hook capture le code dans `pending_server_logins` au lieu de l'envoyer). Les liens d'une publication (`open_post`) valent 24 h au lieu de 15 min, toujours à usage unique ; les robots d'aperçu de lien (WhatsApp, Facebook…) reçoivent une page vide sans consommer le lien ; un lien déjà utilisé ou expiré mène directement à la page si la session est encore ouverte.
 - La maquette décompressée (un HTML par écran) est dans `docs/maquette/ecrans/`.
 
 - Analyse vidéo : `apps/web/src/lib/video/analyze.ts` (Gemini, `GEMINI_MODEL`, un seul passage par clip via `media_assets.analysis_status`) ; outil `analyze_clips`.
