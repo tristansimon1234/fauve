@@ -73,6 +73,10 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     timeStyle: "short",
     timeZone: input.studio.timezone,
   }).format(new Date());
+  const dayName = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: input.studio.timezone });
+  // Noon UTC of each coming day keeps the right calendar date in any European zone, DST included.
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: input.studio.timezone }).format(new Date()).split("-").map(Number);
+  const nextDays = Array.from({ length: 7 }, (_, i) => dayName.format(new Date(Date.UTC(y!, m! - 1, d! + i + 1, 12))));
 
   const runner = anthropic().beta.messages.toolRunner({
     model: CHAT_MODEL,
@@ -94,6 +98,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
         role: "system",
         content: studioContextPrompt({
           now,
+          nextDays,
           timezone: input.studio.timezone,
           studioName: input.studio.name,
           firstName: input.studio.firstName,
