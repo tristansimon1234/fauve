@@ -23,7 +23,17 @@ export type ReelProps = {
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
     | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number }
   )[];
-  texts: { text: string; style: "hook" | "band" | "caption"; emphasis: string[]; from: number; durationInFrames: number }[];
+  texts: {
+    text: string;
+    style: "hook" | "band" | "caption";
+    emphasis: string[];
+    from: number;
+    durationInFrames: number;
+    /** Manual placement (scene editor): top edge as a share of the height, size factor, dark background. */
+    y?: number;
+    scale?: number;
+    backdrop?: boolean;
+  }[];
   words: { w: string; from: number; to: number }[];
   brand: { name: string; accent: string; accentInk: string; displayFont: string; bodyFont: string; logoUrl: string | null };
   endCard: { title: string; subtitle: string | null; from: number } | null;

@@ -111,6 +111,13 @@ function useExit(durationInFrames: number, theme: Theme) {
   return { opacity: out, translate: (1 - out) * -12 };
 }
 
+/** A dark rounded background behind a text, set by hand to read it on a busy image. */
+function backdrop(text: ReelProps["texts"][number], k: number): CSSProperties {
+  return text.backdrop
+    ? { background: "rgba(20,14,36,0.62)", borderRadius: 18 * k, padding: `${14 * k}px ${24 * k}px`, boxDecorationBreak: "clone", WebkitBoxDecorationBreak: "clone" }
+    : {};
+}
+
 function TextBeat({ text, props, theme, k }: { text: ReelProps["texts"][number]; props: ReelProps; theme: Theme; k: number }) {
   if (text.style === "hook") return <Hook text={text} props={props} theme={theme} k={k} />;
   if (text.style === "band") return <Band text={text} props={props} theme={theme} k={k} />;
@@ -127,8 +134,8 @@ function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
 
   const box: CSSProperties = {
     position: "absolute",
-    top: props.height * 0.12,
-    height: props.height * 0.26,
+    top: props.height * (text.y ?? 0.12),
+    height: props.height * 0.26 * (text.scale ?? 1),
     left: SAFE.left * k,
     right: SAFE.right * k,
     opacity: exit.opacity,
@@ -139,12 +146,13 @@ function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
     fontFamily: `"${h.family === "display" ? props.brand.displayFont : props.brand.bodyFont}", serif`,
     fontWeight: h.weight,
     fontStyle: h.italic ? "italic" : "normal",
-    fontSize: h.size * k,
+    fontSize: h.size * k * (text.scale ?? 1),
     lineHeight: h.lineHeight,
     letterSpacing: h.letterSpacing * k,
     textTransform: h.uppercase ? "uppercase" : "none",
     color: "#fff",
     textShadow: "0 4px 28px rgba(0,0,0,0.35)",
+    ...backdrop(text, k),
   };
 
   // A long hook shrinks to its box (top of the frame, inside the side margins).
@@ -183,7 +191,7 @@ function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
     <div
       style={{
         position: "absolute",
-        top: props.height * 0.37,
+        top: props.height * (text.y ?? 0.37),
         left: SAFE.left * k,
         right: SAFE.right * k,
         display: "flex",
@@ -202,7 +210,7 @@ function Band({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
           color: b.outline ? "#fff" : props.brand.accentInk,
           fontFamily: `"${props.brand.bodyFont}", sans-serif`,
           fontWeight: b.weight,
-          fontSize: b.size * k,
+          fontSize: b.size * k * (text.scale ?? 1),
           letterSpacing: b.letterSpacing * k,
           textTransform: b.uppercase ? "uppercase" : "none",
           textAlign: "center",
@@ -232,16 +240,17 @@ function Caption({ text, props, theme, k }: { text: ReelProps["texts"][number]; 
     <div
       style={{
         position: "absolute",
-        top: props.height * 0.63,
+        top: props.height * (text.y ?? 0.63),
         left: SAFE.left * k,
         right: SAFE.right * k,
         textAlign: "center",
         color: "#fff",
         fontFamily: `"${props.brand.bodyFont}", sans-serif`,
         fontWeight: theme.caption.weight,
-        fontSize: theme.caption.size * k,
+        fontSize: theme.caption.size * k * (text.scale ?? 1),
         lineHeight: 1.25,
         textShadow: "0 2px 18px rgba(0,0,0,0.45)",
+        ...backdrop(text, k),
         opacity: Math.min(p, exit.opacity),
         transform: `translateY(${(1 - p) * 18 * k + exit.translate * k}px)`,
       }}

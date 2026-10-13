@@ -30,6 +30,10 @@ export type ReelText = {
   emphasis: string[];
   from: number;
   durationInFrames: number;
+  /** Manual placement from the scene editor (default: the style's place and size). */
+  y?: number;
+  scale?: number;
+  backdrop?: boolean;
 };
 export type ReelWord = { w: string; from: number; to: number };
 
@@ -107,7 +111,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     .map((t) => {
       const from = toFrames(t.from);
       const to = Math.min(toFrames(t.to), durationInFrames);
-      return { text: t.text, style: t.style, emphasis: t.emphasis ?? [], from, durationInFrames: to - from };
+      return { text: t.text, style: t.style, emphasis: t.emphasis ?? [], from, durationInFrames: to - from, y: t.y, scale: t.scale, backdrop: t.backdrop };
     })
     .filter((t) => t.durationInFrames > 0);
 
