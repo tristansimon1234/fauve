@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { Fit } from "./Fit";
 import type { Theme } from "./theme";
 import type { ReelProps, Scene } from "./types";
 
@@ -52,12 +53,16 @@ function CountUp({ value, frame }: { value: string; frame: number }) {
   const m = /^(\D*)(\d+)(.*)$/.exec(value);
   if (!m) return <>{value}</>;
   const progress = interpolate(frame, [4, 28], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
+  // The final value holds the room (hidden), so the size never depends on the frame.
   return (
-    <>
-      {m[1]}
-      {Math.round(Number(m[2]) * progress)}
-      {m[3]}
-    </>
+    <span style={{ position: "relative", display: "inline-block" }}>
+      <span style={{ visibility: "hidden" }}>{value}</span>
+      <span style={{ position: "absolute", left: 0, right: 0, top: 0, textAlign: "center" }}>
+        {m[1]}
+        {Math.round(Number(m[2]) * progress)}
+        {m[3]}
+      </span>
+    </span>
   );
 }
 
@@ -86,22 +91,27 @@ export function SceneView({
   const titleSize = scene.title.length <= 14 ? 150 : scene.title.length <= 28 ? 118 : 92;
   const italic = theme.hook.italic;
 
-  const kicker = scene.kicker && scene.kind !== "quote" && (
-    <div
-      style={{
-        fontFamily: body,
-        fontWeight: 700,
-        fontSize: 32 * k,
-        letterSpacing: 6 * k,
-        textTransform: "uppercase",
-        opacity: 0.85 * kickerIn,
-        transform: `translateY(${(1 - kickerIn) * 14 * k}px)`,
-        marginBottom: 28 * k,
-      }}
-    >
-      {scene.kicker}
-    </div>
-  );
+  // When the content shrinks to fit, secondary texts keep at least 75 % of their size.
+  const readable = (size: number, fit: number) => Math.max(size, (size * 0.75) / fit) * k;
+
+  const kicker = (fit: number) =>
+    scene.kicker &&
+    scene.kind !== "quote" && (
+      <div
+        style={{
+          fontFamily: body,
+          fontWeight: 700,
+          fontSize: readable(32, fit),
+          letterSpacing: 6 * k,
+          textTransform: "uppercase",
+          opacity: 0.85 * kickerIn,
+          transform: `translateY(${(1 - kickerIn) * 14 * k}px)`,
+          marginBottom: 28 * k,
+        }}
+      >
+        {scene.kicker}
+      </div>
+    );
 
   return (
     <AbsoluteFill style={{ backgroundColor: c.bg, overflow: "hidden" }}>
@@ -131,118 +141,122 @@ export function SceneView({
         }}
       />
 
-      <div
+      {/* Sizes below are the ideal ones: a long title, word or list shrinks to stay in the safe zone. */}
+      <Fit
         style={{
           position: "absolute",
           top: props.height * 0.14,
           bottom: props.height * 0.3,
           left: SAFE.left * k,
           right: SAFE.right * k,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: scene.kind === "list" ? "flex-start" : "center",
-          textAlign: scene.kind === "list" ? "left" : "center",
           color: c.fg,
           opacity: exit,
         }}
+        innerStyle={{
+          alignItems: scene.kind === "list" ? "flex-start" : "center",
+          textAlign: scene.kind === "list" ? "left" : "center",
+        }}
       >
-        {scene.kind === "title" && (
+        {(fit) => (
           <>
-            {kicker}
-            <Words
-              text={scene.title}
-              delay={3}
-              theme={theme}
-              k={k}
-              style={{ fontFamily: display, fontStyle: italic ? "italic" : "normal", fontWeight: theme.hook.weight, fontSize: titleSize * k, lineHeight: 1.02, textTransform: theme.hook.uppercase ? "uppercase" : "none" }}
-            />
-            <div style={{ marginTop: 40 * k, width: 140 * k * line, height: 6 * k, borderRadius: 6 * k, background: c.mark }} />
-          </>
-        )}
+            {scene.kind === "title" && (
+              <>
+                {kicker(fit)}
+                <Words
+                  text={scene.title}
+                  delay={3}
+                  theme={theme}
+                  k={k}
+                  style={{ fontFamily: display, fontStyle: italic ? "italic" : "normal", fontWeight: theme.hook.weight, fontSize: titleSize * k, lineHeight: 1.02, textTransform: theme.hook.uppercase ? "uppercase" : "none" }}
+                />
+                <div style={{ marginTop: 40 * k, width: 140 * k * line, height: 6 * k, borderRadius: 6 * k, background: c.mark }} />
+              </>
+            )}
 
-        {scene.kind === "number" && (
-          <>
-            {kicker}
-            <div
-              style={{
-                fontFamily: body,
-                fontWeight: 800,
-                fontSize: (scene.title.length <= 6 ? 240 : 170) * k,
-                lineHeight: 1,
-                letterSpacing: -4 * k,
-                transform: `scale(${interpolate(spring({ frame, fps, config: { damping: 14, stiffness: 140 } }), [0, 1], [0.7, 1])})`,
-              }}
-            >
-              <CountUp value={scene.title} frame={frame} />
-            </div>
-            {scene.items?.[0] ? (
-              <div style={{ marginTop: 30 * k, fontFamily: body, fontWeight: 600, fontSize: 44 * k, opacity: line }}>{scene.items[0]}</div>
-            ) : null}
-          </>
-        )}
-
-        {scene.kind === "quote" && (
-          <>
-            <div
-              style={{
-                fontFamily: display,
-                fontSize: 280 * k,
-                lineHeight: 0.6,
-                height: 150 * k,
-                color: c.mark,
-                transform: `scale(${spring({ frame, fps, config: { damping: 12, stiffness: 120 } })})`,
-              }}
-            >
-              “
-            </div>
-            <Words
-              text={scene.title}
-              delay={6}
-              theme={theme}
-              k={k}
-              style={{ fontFamily: display, fontStyle: "italic", fontWeight: 400, fontSize: (scene.title.length <= 40 ? 84 : 66) * k, lineHeight: 1.12 }}
-            />
-            {scene.kicker ? (
-              <div style={{ marginTop: 36 * k, fontFamily: body, fontWeight: 600, fontSize: 36 * k, opacity: line }}>— {scene.kicker}</div>
-            ) : null}
-          </>
-        )}
-
-        {scene.kind === "list" && (
-          <>
-            <Words
-              text={scene.title}
-              delay={0}
-              theme={theme}
-              k={k}
-              style={{ fontFamily: display, fontStyle: italic ? "italic" : "normal", fontWeight: theme.hook.weight, fontSize: 92 * k, lineHeight: 1.05, marginBottom: 44 * k, textTransform: theme.hook.uppercase ? "uppercase" : "none" }}
-            />
-            {(scene.items ?? []).map((item, i) => {
-              const p = spring({ frame: frame - 10 - i * 5, fps, config: { damping: 200, stiffness: 120 } });
-              return (
+            {scene.kind === "number" && (
+              <>
+                {kicker(fit)}
                 <div
-                  key={i}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 24 * k,
-                    marginBottom: 22 * k,
                     fontFamily: body,
-                    fontWeight: 600,
-                    fontSize: 48 * k,
-                    opacity: p,
-                    transform: `translateX(${(1 - p) * -40 * k}px)`,
+                    fontWeight: 800,
+                    fontSize: (scene.title.length <= 6 ? 240 : 170) * k,
+                    lineHeight: 1,
+                    letterSpacing: -4 * k,
+                    transform: `scale(${interpolate(spring({ frame, fps, config: { damping: 14, stiffness: 140 } }), [0, 1], [0.7, 1])})`,
                   }}
                 >
-                  <span style={{ width: 14 * k, height: 14 * k, borderRadius: "50%", background: c.mark, flexShrink: 0 }} />
-                  {item}
+                  <CountUp value={scene.title} frame={frame} />
                 </div>
-              );
-            })}
+                {scene.items?.[0] ? (
+                  <div style={{ marginTop: 30 * k, fontFamily: body, fontWeight: 600, fontSize: readable(44, fit), opacity: line }}>{scene.items[0]}</div>
+                ) : null}
+              </>
+            )}
+
+            {scene.kind === "quote" && (
+              <>
+                <div
+                  style={{
+                    fontFamily: display,
+                    fontSize: 280 * k,
+                    lineHeight: 0.6,
+                    height: 150 * k,
+                    color: c.mark,
+                    transform: `scale(${spring({ frame, fps, config: { damping: 12, stiffness: 120 } })})`,
+                  }}
+                >
+                  “
+                </div>
+                <Words
+                  text={scene.title}
+                  delay={6}
+                  theme={theme}
+                  k={k}
+                  style={{ fontFamily: display, fontStyle: "italic", fontWeight: 400, fontSize: (scene.title.length <= 40 ? 84 : 66) * k, lineHeight: 1.12 }}
+                />
+                {scene.kicker ? (
+                  <div style={{ marginTop: 36 * k, fontFamily: body, fontWeight: 600, fontSize: readable(36, fit), opacity: line }}>— {scene.kicker}</div>
+                ) : null}
+              </>
+            )}
+
+            {scene.kind === "list" && (
+              <>
+                <Words
+                  text={scene.title}
+                  delay={0}
+                  theme={theme}
+                  k={k}
+                  style={{ fontFamily: display, fontStyle: italic ? "italic" : "normal", fontWeight: theme.hook.weight, fontSize: 92 * k, lineHeight: 1.05, marginBottom: 44 * k, textTransform: theme.hook.uppercase ? "uppercase" : "none" }}
+                />
+                {(scene.items ?? []).map((item, i) => {
+                  const p = spring({ frame: frame - 10 - i * 5, fps, config: { damping: 200, stiffness: 120 } });
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 24 * k,
+                        marginBottom: 22 * k,
+                        fontFamily: body,
+                        fontWeight: 600,
+                        fontSize: readable(48, fit),
+                        opacity: p,
+                        transform: `translateX(${(1 - p) * -40 * k}px)`,
+                      }}
+                    >
+                      <span style={{ width: 14 * k, height: 14 * k, borderRadius: "50%", background: c.mark, flexShrink: 0 }} />
+                      {item}
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </>
         )}
-      </div>
+      </Fit>
     </AbsoluteFill>
   );
 }

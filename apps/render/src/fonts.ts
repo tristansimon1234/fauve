@@ -6,6 +6,8 @@ import { continueRender, delayRender } from "remotion";
 // waits for the fonts, with a timeout so a network hiccup only means fallbacks.
 
 const loaded = new Set<string>();
+// Settles when every family asked so far is loaded or given up on (text is measured after it).
+let settled: Promise<void> = Promise.resolve();
 
 const variants = (family: string) => {
   const name = family.trim().replace(/ +/g, "+");
@@ -47,11 +49,21 @@ export function loadFonts(families: string[]): void {
 
   const handle = delayRender(`fonts: ${wanted.join(", ")}`, { timeoutInMilliseconds: 25000 });
   let done = false;
+  let resolve = () => {};
+  const finished = new Promise<void>((r) => (resolve = r));
   const finish = () => {
     if (done) return;
     done = true;
     continueRender(handle);
+    resolve();
   };
+  settled = Promise.all([settled, finished]).then(() => undefined);
   Promise.all(wanted.map(loadFamily)).finally(finish);
   setTimeout(finish, 15000);
+}
+
+/** Resolves once the fonts are ready, so text sizes can be measured. */
+export function fontsLoaded(): Promise<void> {
+  if (typeof document === "undefined") return Promise.resolve();
+  return settled.then(() => document.fonts.ready).then(() => undefined);
 }

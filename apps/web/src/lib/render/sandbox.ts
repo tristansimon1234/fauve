@@ -142,16 +142,29 @@ export async function renderReelInSandbox(job: { id: string; props: ReelProps })
   }
 }
 
-/** Runs generated motion scenes once outside the video (first, middle, last frame); returns the error per scene id. */
+export type SmokeScene = {
+  id: string;
+  js: string;
+  durationInFrames: number;
+  /** Slot texts (a reused library scene is checked with its new texts). */
+  texts?: Record<string, string>;
+};
+
+/**
+ * Runs generated motion scenes outside the video: a server render (first, middle,
+ * last frame), then a layout check in Chrome with the studio's fonts, which
+ * rejects a scene whose text leaves the frame or the safe zone. Returns the error per scene id.
+ */
 export async function smokeTestScenes(
-  scenes: { id: string; js: string; durationInFrames: number }[],
+  scenes: SmokeScene[],
+  brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl">,
 ): Promise<Record<string, string | null>> {
   if (!scenes.length) return {};
   const sandbox = await remotionSandbox();
   const file = `${ROOT}/jobs/smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
   try {
-    await sandbox.writeFiles([{ path: file, content: JSON.stringify(scenes) }]);
-    const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 60 node smoke.mjs "$1"`, "bash", file] });
+    await sandbox.writeFiles([{ path: file, content: JSON.stringify(scenes.map((s) => ({ ...s, brand }))) }]);
+    const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 150 node smoke.mjs "$1"`, "bash", file] });
     const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
     try {
       return JSON.parse(lastLine) as Record<string, string | null>;

@@ -327,6 +327,18 @@ test("motion scenes: generated code is checked before it runs", async () => {
   assert.deepEqual(checkMotionCode(`const Other = () => null;`), ["il faut une fonction Scene"]);
 });
 
+test("motion scenes: the renderer, the smoke test and the prompt share one scope", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { MOTION_SCOPE } = await import("./motion-scene.ts");
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+  const renderer = /export const SCOPE = \{([^}]*)\}/.exec(read("../../../apps/render/src/MotionScene.tsx"))![1]!;
+  const smoke = /const scope = \{([\s\S]*?)\n\};/.exec(read("../../../apps/render/smoke.mjs"))![1]!;
+  for (const name of MOTION_SCOPE.filter((n) => n !== "React")) {
+    assert.match(renderer, new RegExp(`\\b${name}\\b`), `${name} missing from MotionScene.tsx`);
+    assert.match(smoke, new RegExp(`\\b${name}\\b`), `${name} missing from smoke.mjs`);
+  }
+});
+
 test("pricing: the chat model is priced", async () => {
   const { CHAT_MODEL, claudeCostUsd } = await import("./pricing.ts");
   assert.ok(claudeCostUsd(CHAT_MODEL, { input_tokens: 1_000_000, output_tokens: 100_000 }) > 0);

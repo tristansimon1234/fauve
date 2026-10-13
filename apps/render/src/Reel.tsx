@@ -10,6 +10,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import { Fit } from "./Fit";
 import { loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
 import { SceneView } from "./Scene";
@@ -124,12 +125,17 @@ function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
   const h = theme.hook;
   const words = text.text.split(/\s+/).filter(Boolean);
 
-  const style: CSSProperties = {
+  const box: CSSProperties = {
     position: "absolute",
     top: props.height * 0.12,
+    height: props.height * 0.26,
     left: SAFE.left * k,
     right: SAFE.right * k,
-    textAlign: "center",
+    opacity: exit.opacity,
+    transform: `translateY(${exit.translate * k}px)`,
+  };
+  const style: CSSProperties = {
+    display: "block",
     fontFamily: `"${h.family === "display" ? props.brand.displayFont : props.brand.bodyFont}", serif`,
     fontWeight: h.weight,
     fontStyle: h.italic ? "italic" : "normal",
@@ -139,12 +145,11 @@ function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
     textTransform: h.uppercase ? "uppercase" : "none",
     color: "#fff",
     textShadow: "0 4px 28px rgba(0,0,0,0.35)",
-    opacity: exit.opacity,
-    transform: `translateY(${exit.translate * k}px)`,
   };
 
+  // A long hook shrinks to its box (top of the frame, inside the side margins).
   return (
-    <div style={style}>
+    <Fit style={box} innerStyle={style}>
       {words.map((word, i) => {
         const p = spring({ frame: frame - i * h.stagger, fps, config: theme.spring });
         const enter: CSSProperties =
@@ -161,7 +166,7 @@ function Hook({ text, props, theme, k }: { text: ReelProps["texts"][number]; pro
           </span>
         );
       })}
-    </div>
+    </Fit>
   );
 }
 
@@ -305,35 +310,36 @@ function EndCard({ props, k }: { props: ReelProps; k: number }) {
       style={{
         backgroundColor: `rgba(20,14,32,${0.55 * shade})`,
         backdropFilter: `blur(${10 * shade}px)`,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: `0 ${SAFE.right * k}px 0 ${SAFE.left * k}px`,
-        textAlign: "center",
         color: "#fff",
       }}
     >
-      <div style={{ opacity: p, transform: `translateY(${(1 - p) * 24 * k}px)`, marginTop: -props.height * 0.08 }}>
-        {props.brand.logoUrl ? (
-          <Img src={props.brand.logoUrl} style={{ maxWidth: 520 * k, maxHeight: 220 * k, objectFit: "contain", marginBottom: 28 * k }} />
-        ) : null}
-        <div style={{ fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontSize: 96 * k, lineHeight: 1.05 }}>
-          {card.title}
-        </div>
-        {card.subtitle ? (
-          <div
-            style={{
-              marginTop: 22 * k,
-              fontFamily: `"${props.brand.bodyFont}", sans-serif`,
-              fontWeight: 600,
-              fontSize: 38 * k,
-              opacity: 0.92,
-            }}
-          >
-            {card.subtitle}
+      {/* A long studio name shrinks instead of leaving the frame. */}
+      <Fit style={{ position: "absolute", top: props.height * 0.12, bottom: props.height * 0.2, left: SAFE.left * k, right: SAFE.right * k }}>
+        {(fit) => (
+          <div style={{ opacity: p, transform: `translateY(${(1 - p) * 24 * k}px)` }}>
+            {props.brand.logoUrl ? (
+              <Img src={props.brand.logoUrl} style={{ maxWidth: 520 * k, maxHeight: 220 * k, objectFit: "contain", marginBottom: 28 * k }} />
+            ) : null}
+            <div style={{ fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontSize: 96 * k, lineHeight: 1.05 }}>
+              {card.title}
+            </div>
+            {card.subtitle ? (
+              <div
+                style={{
+                  marginTop: 22 * k,
+                  fontFamily: `"${props.brand.bodyFont}", sans-serif`,
+                  fontWeight: 600,
+                  fontSize: Math.max(38, 28 / fit) * k, // stays readable when a long name shrinks
+                  opacity: 0.92,
+                }}
+              >
+                {card.subtitle}
+              </div>
+            ) : null}
+            <div style={{ margin: `${30 * k}px auto 0`, width: 64 * k, height: 4 * k, borderRadius: 4 * k, background: props.brand.accent }} />
           </div>
-        ) : null}
-        <div style={{ margin: `${30 * k}px auto 0`, width: 64 * k, height: 4 * k, borderRadius: 4 * k, background: props.brand.accent }} />
-      </div>
+        )}
+      </Fit>
     </AbsoluteFill>
   );
 }
