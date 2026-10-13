@@ -7,6 +7,7 @@ import {
   postKindSchema,
   postStatusSchema,
   reactionSchema,
+  replyExtrasSchema,
 } from "./schemas.ts";
 
 // Tool contracts shared by every runtime (webhook, web chat, jobs).
@@ -168,6 +169,11 @@ export const toolSpecs = {
     description:
       "Enregistre une nouvelle version du profil de style du studio (à partir d'exemples ou d'une correction de la gérante).",
     input: z.object({ profile: brandProfileSchema }),
+  },
+  reply_with: {
+    description:
+      "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. Appelle-le au plus une fois par réponse, avec ton message.",
+    input: replyExtrasSchema,
   },
   react_to_message: {
     description:

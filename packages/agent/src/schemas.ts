@@ -23,6 +23,14 @@ export type Platform = z.infer<typeof platformSchema>;
 
 /** Fixed reaction vocabulary: 👍 received, 🔥 great content, ✅ published. */
 export const reactionSchema = z.enum(["👍", "🔥", "✅"]);
+
+/** Buttons and cards under one of Fauve's messages (reply_with). */
+export const replyExtrasSchema = z.object({
+  options: z.array(z.string().trim().min(1).max(24)).min(2).max(6).optional(),
+  posts: z.array(z.uuid()).max(4).optional(),
+  grid: z.boolean().optional(),
+});
+export type ReplyExtras = z.infer<typeof replyExtrasSchema>;
 export type Reaction = z.infer<typeof reactionSchema>;
 
 // ---------------------------------------------------------------------------

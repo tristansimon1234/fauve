@@ -3,7 +3,8 @@ import { replyInConversation } from "@/lib/agent/conversation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { setReaction } from "@/lib/reactions";
-import { downloadMedia, markReadAndTyping, sendReaction, sendText } from "./client";
+import { env } from "@/lib/env";
+import { downloadMedia, markReadAndTyping, sendReaction, sendReply, sendText } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 
 // Several messages often arrive together (a caption + 5 clips). We wait briefly and
@@ -156,7 +157,13 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   }
 
   if (result.reply) {
-    const waMessageId = await sendText(message.from, result.reply);
+    const { options, posts, grid } = result.extras;
+    // Cards are app-only: on WhatsApp they become links to the app.
+    const links = [
+      ...(posts ?? []).map((id) => `${env("APP_URL")}/publications/${id}`),
+      ...(grid ? [`Ta grille : ${env("APP_URL")}/grille`] : []),
+    ];
+    const waMessageId = await sendReply(message.from, result.reply, options, links);
     await db.from("whatsapp_messages").insert({
       studio_id: member.studio_id,
       wa_message_id: waMessageId,
@@ -164,7 +171,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
       phone_e164: phone,
       type: "text",
       body: result.reply,
-      payload: { reply_to: message.id },
+      payload: { reply_to: message.id, ...result.extras },
     });
   }
   // E.g. a render: the video follows the "je monte ta vidéo" reply.

@@ -331,3 +331,13 @@ test("pricing: the chat model is priced", async () => {
   const { CHAT_MODEL, claudeCostUsd } = await import("./pricing.ts");
   assert.ok(claudeCostUsd(CHAT_MODEL, { input_tokens: 1_000_000, output_tokens: 100_000 }) > 0);
 });
+
+test("reply_with: answer buttons and cards", async () => {
+  const { replyExtrasSchema } = await import("./schemas.ts");
+  const { toolSpecs } = await import("./tools.ts");
+  assert.ok(toolSpecs.reply_with);
+  assert.equal(replyExtrasSchema.safeParse({ options: ["Oui, lance", "Non"], grid: true }).success, true);
+  assert.equal(replyExtrasSchema.safeParse({ options: ["Oui"] }).success, false, "a single button is not a choice");
+  assert.equal(replyExtrasSchema.safeParse({ options: ["Une option beaucoup trop longue pour un bouton", "Non"] }).success, false);
+  assert.equal(replyExtrasSchema.safeParse({ posts: ["pas-un-id"] }).success, false);
+});

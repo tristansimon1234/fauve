@@ -16,6 +16,7 @@ import {
   XIcon,
 } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
+import { ChatCards } from "./chat-cards";
 import {
   deleteConversation,
   listConversations,
@@ -168,6 +169,8 @@ export function FauveWorkspace({
         at: new Date().toISOString(),
         videoUrl: null,
         reactions: {},
+        options: [],
+        cards: [],
       },
     ]);
     const conversationId = active;
@@ -294,8 +297,16 @@ export function FauveWorkspace({
           ) : (
             <div className="mx-auto flex w-full max-w-[780px] flex-col gap-3 px-4 py-6">
               {loading && <p className="self-center text-sm text-muted">Chargement…</p>}
-              {messages.map((m) => (
-                <Bubble key={m.id} message={m} time={timeFormat.format(new Date(m.at))} onReact={react} />
+              {messages.map((m, i) => (
+                <Bubble
+                  key={m.id}
+                  message={m}
+                  time={timeFormat.format(new Date(m.at))}
+                  timezone={timezone}
+                  onReact={react}
+                  // Answer buttons only on Fauve's latest message, while it is still the question.
+                  onChoose={i === messages.length - 1 && !pending ? send : undefined}
+                />
               ))}
               {pending && (
                 <div className="flex items-center gap-2 self-start rounded-[18px_18px_18px_6px] border border-line bg-white px-4 py-3 text-sm text-muted">
@@ -461,16 +472,21 @@ const REACTIONS = ["👍", "❤️", "🔥", "😂", "😮", "🙏"];
 function Bubble({
   message,
   time,
+  timezone,
   onReact,
+  onChoose,
 }: {
   message: ChatMessage;
   time: string;
+  timezone: string;
   onReact: (id: string, emoji: string) => void;
+  onChoose?: (answer: string) => void;
 }) {
   const [picking, setPicking] = useState(false);
   const mine = message.from === "me";
   const media = mediaLabels[message.type];
-  if (!message.body && !message.videoUrl && !media) return null;
+  if (!message.body && !message.videoUrl && !media && !message.cards.length) return null;
+  const options = onChoose && !mine ? message.options : [];
   const reactions = [message.reactions.fauve, message.reactions.me].filter((e): e is string => Boolean(e));
   // Reacting is for Fauve's messages (the manager's own messages get Fauve's reactions).
   const canReact = !mine && !message.id.startsWith("local-");
@@ -539,6 +555,21 @@ function Bubble({
           </div>
         )}
       </div>
+      <ChatCards cards={message.cards} timezone={timezone} />
+      {options.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-0.5" role="group" aria-label="Réponses proposées">
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onChoose?.(option)}
+              className="h-10 rounded-full border border-lilac bg-white px-4 text-[14px] font-semibold text-violet shadow-[0_2px_8px_rgba(28,21,48,0.05)] transition-colors hover:bg-violet hover:text-white"
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
       <span className="flex items-center gap-1 px-1 text-[11px] text-muted">
         {message.channel === "whatsapp" && <WhatsAppIcon size={11} />}
         {mine ? "Toi" : "Fauve"} · {time}

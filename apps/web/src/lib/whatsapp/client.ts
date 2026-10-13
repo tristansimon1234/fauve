@@ -49,6 +49,41 @@ export async function sendText(toWaId: string, body: string): Promise<string | u
   return res.messages[0]?.id;
 }
 
+/**
+ * Fauve's reply with answer buttons: up to 3 short options as WhatsApp reply
+ * buttons, up to 10 as a list; otherwise (or for a long reply) plain text.
+ * The manager's tap comes back as a message whose text is the option.
+ */
+export async function sendReply(toWaId: string, body: string, options?: string[], links: string[] = []): Promise<string | undefined> {
+  const text = [body, ...links].join("\n\n");
+  if (!options?.length || text.length > 1024) {
+    return sendText(toWaId, options?.length ? `${text}\n\n${options.join(" · ")}` : text);
+  }
+  const interactive =
+    options.length <= 3 && options.every((o) => o.length <= 20)
+      ? {
+          type: "button",
+          body: { text },
+          action: { buttons: options.map((title, i) => ({ type: "reply", reply: { id: `opt_${i}`, title } })) },
+        }
+      : {
+          type: "list",
+          body: { text },
+          action: {
+            button: "Choisir",
+            sections: [{ title: "Réponses", rows: options.slice(0, 10).map((title, i) => ({ id: `opt_${i}`, title: title.slice(0, 24) })) }],
+          },
+        };
+  try {
+    const res = await sendMessage({ recipient_type: "individual", to: toWaId, type: "interactive", interactive });
+    return res.messages[0]?.id;
+  } catch (error) {
+    // Never lose the reply over the buttons.
+    console.warn("interactive reply refused, sending text", error instanceof WhatsAppError ? error.body : error);
+    return sendText(toWaId, `${text}\n\n${options.join(" · ")}`);
+  }
+}
+
 /** Sends a video by link (WhatsApp downloads it; max 16 MB) with a caption (max 1024 chars). */
 export async function sendVideo(toWaId: string, link: string, caption?: string): Promise<string | undefined> {
   const res = await sendMessage({
