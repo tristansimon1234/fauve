@@ -214,6 +214,25 @@ export const toolSpecs = {
       photos: z.array(z.number().int().min(1).max(10)).max(10).optional().describe("Photos à couvrir (à partir de 1) ; par défaut toutes"),
     }),
   },
+  retouch_photos: {
+    description:
+      "Retouche et/ou floute les photos d'un carrousel ou d'un post photo, gratuit. Fauve regarde chaque photo (visages, plaques, écrans, lumière, horizon, sujet) : light = retouche légère et naturelle (lumière, contraste, couleurs, horizon redressé, recadrage qui garde le sujet) ; blur = les zones à flouter (face : visages, plate : plaques, screen : écrans, document : papiers). L'original n'est jamais modifié ; light false et blur vide retirent la retouche. Le rendu part après ta réponse et le lien est envoyé tout seul.",
+    input: z.object({
+      post_id: z.string().uuid(),
+      photos: z.array(z.number().int().min(1).max(10)).max(10).optional().describe("Numéros des photos (à partir de 1) ; par défaut toutes"),
+      light: z.boolean().default(true),
+      blur: z.array(z.enum(["face", "plate", "screen", "document", "other"])).default([]),
+      only_recognizable: z.boolean().default(false).describe("Ne flouter que les visages reconnaissables (pas les silhouettes de dos ou floues)"),
+    }),
+  },
+  blur_video: {
+    description:
+      "Floute des zones sur toutes les vidéos du montage d'une publication (par défaut les visages), en les suivant dans le temps, gratuit. Pour les personnes filmées sans leur accord. what vide retire le flou. Refait le rendu après ta réponse (une à deux minutes) ; le lien est envoyé tout seul.",
+    input: z.object({
+      post_id: z.string().uuid(),
+      what: z.array(z.enum(["face", "plate", "screen", "document", "other"])).default(["face"]),
+    }),
+  },
   copy_text_style: {
     description:
       "Copie le style des textes d'un exemple que la gérante a envoyé (une photo ou une capture d'un post qu'elle aime) : Fauve lit chaque texte de l'image (police la plus proche, graisse, couleurs, fond en bloc, pilule ou surlignage, contour, ombre, inclinaison, place) et l'enregistre dans les styles de texte du studio. Avec post_id, l'applique aussitôt aux textes de cette publication (texte sur photos ou montage) et refait le rendu, gratuit ; le lien part tout seul. Renvoie les styles lus avec leur nom.",

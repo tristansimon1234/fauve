@@ -29,7 +29,7 @@ export type SlidesRender = {
 };
 
 export const slidesKey = (plan: SlidesPlan) => createHash("sha256").update(JSON.stringify(plan)).digest("hex").slice(0, 16);
-export const hasTexts = (plan: SlidesPlan) => plan.slides.some((s) => s.texts.length > 0 || s.layer || s.logo);
+export const hasTexts = (plan: SlidesPlan) => plan.slides.some((s) => s.texts.length > 0 || s.layer || s.logo || s.edit);
 
 /** A post's slides plan, one slide per photo in order; null without one. */
 export function postSlides(post: { slides: unknown; media_ids: string[] | null }): SlidesPlan | null {

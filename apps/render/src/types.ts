@@ -3,6 +3,21 @@
 
 export type MotionTemplate = "doux" | "dynamique" | "chic";
 
+/** Mirror of the retouch types in packages/agent/src/retouch.ts. */
+export type Adjust = {
+  exposure?: number;
+  contrast?: number;
+  saturation?: number;
+  warmth?: number;
+  straighten?: number;
+  focus?: { x: number; y: number };
+  zoom?: number;
+};
+export type Box = { x: number; y: number; w: number; h: number };
+export type RegionKind = "face" | "plate" | "screen" | "document" | "other";
+export type PhotoEdit = { source: { width: number; height: number }; adjust?: Adjust; blur?: (Box & { kind: RegionKind; shape: "ellipse" | "rect" })[] };
+export type ClipBlur = { aspect: number; tracks: { kind: RegionKind; keys: (Box & { t: number })[] }[] };
+
 export type Scene = {
   kind: "title" | "list" | "quote" | "number";
   title: string;
@@ -38,8 +53,8 @@ export type ReelProps = {
   durationInFrames: number;
   fadeFrames: number;
   segments: (
-    | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean }
-    | { type: "image"; src: string; startAt: number; durationInFrames: number }
+    | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean; adjust?: Adjust; blur?: ClipBlur }
+    | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit }
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
     | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number }
   )[];

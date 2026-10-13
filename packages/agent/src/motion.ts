@@ -1,4 +1,5 @@
 import { isClipSegment, isMotionSegment, segmentSeconds, type ClipAnalysis, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
+import type { Adjust, ClipBlur, PhotoEdit } from "./retouch.ts";
 import type { Bullet, ListItem, TextLook } from "./text-look.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
@@ -22,9 +23,9 @@ const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> 
 };
 
 export type ReelSegment =
-  | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean }
-  /** A photo (a carousel slide). */
-  | { type: "image"; src: string; startAt: number; durationInFrames: number }
+  | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean; adjust?: Adjust; blur?: ClipBlur }
+  /** A photo (a carousel slide), with its retouch and blurred zones. */
+  | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit }
   | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
   | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number };
 export type ReelText = {
@@ -117,6 +118,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       startAt,
       durationInFrames: lengths[i]!,
       zoom: s.zoom === "light" || plan.transitions === "light_zoom",
+      ...(s.adjust ? { adjust: s.adjust } : {}),
+      ...(s.blur ? { blur: s.blur } : {}),
     };
   });
   const durationInFrames = cursor + fadeFrames;

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { adjustSchema, clipBlurSchema } from "./retouch.ts";
 import { listFields, savedLookSchema, textLookSchema } from "./text-look.ts";
 
 // Mirrors the Postgres enums in supabase/migrations.
@@ -46,6 +47,10 @@ export const editPlanSegmentSchema = z.object({
   in: z.number().min(0),
   out: z.number().positive(),
   zoom: z.enum(["none", "light"]).default("none"),
+  /** Light and colour of the clip (retouch). */
+  adjust: adjustSchema.optional(),
+  /** Zones blurred over the clip (faces, plates…), tracked in time. */
+  blur: clipBlurSchema.optional(),
 });
 
 /** Full motion-design screen (animated typography in the studio's colours, no video). */
