@@ -158,6 +158,19 @@ export type InstagramMedia = {
   timestamp?: string;
   like_count?: number;
   comments_count?: number;
+  /** Image (or video file) and, for videos, the cover image: only when asked for. */
+  media_url?: string;
+  thumbnail_url?: string;
+};
+
+export type InstagramProfile = {
+  username?: string;
+  name?: string;
+  biography?: string;
+  profile_picture_url?: string;
+  followers_count?: number;
+  follows_count?: number;
+  media_count?: number;
 };
 
 export type InstagramComment = {
@@ -171,17 +184,34 @@ export type InstagramComment = {
 
 const q = (params: Record<string, string>) => new URLSearchParams(params).toString();
 
-export async function recentMedia(userId: string, accessToken: string, limit = 12): Promise<InstagramMedia[]> {
+export async function recentMedia(
+  userId: string,
+  accessToken: string,
+  limit = 12,
+  { images = false }: { images?: boolean } = {},
+): Promise<InstagramMedia[]> {
   const res = await call<{ data: InstagramMedia[] }>(
     graphUrl(
       `${userId}/media?${q({
-        fields: "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count",
+        fields: `id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count${images ? ",media_url,thumbnail_url" : ""}`,
         limit: String(limit),
         access_token: accessToken,
       })}`,
     ),
   );
   return res.data;
+}
+
+/** The account's public profile, for the grid preview. */
+export async function profile(userId: string, accessToken: string): Promise<InstagramProfile> {
+  return call<InstagramProfile>(
+    graphUrl(
+      `${userId}?${q({
+        fields: "username,name,biography,profile_picture_url,followers_count,follows_count,media_count",
+        access_token: accessToken,
+      })}`,
+    ),
+  );
 }
 
 export async function mediaComments(mediaId: string, accessToken: string, limit = 50): Promise<InstagramComment[]> {

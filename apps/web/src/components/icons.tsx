@@ -159,3 +159,15 @@ export const SmileIcon = make(
     <path d="M9 9.5h.01M15 9.5h.01" strokeWidth={2.6} />
   </>,
 );
+export const GridIcon = make(
+  <>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
+    <path d="M9.2 3.5v17M14.8 3.5v17M3.5 9.2h17M3.5 14.8h17" />
+  </>,
+);
+export const LayersIcon = make(
+  <>
+    <rect x="7" y="7" width="13" height="13" rx="2.5" />
+    <path d="M4 15.5V6.5A2.5 2.5 0 0 1 6.5 4h9" />
+  </>,
+);
