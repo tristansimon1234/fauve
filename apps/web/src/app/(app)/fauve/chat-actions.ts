@@ -1,6 +1,7 @@
 "use server";
 
 import { replyInConversation } from "@/lib/agent/conversation";
+import { setReaction, type Reactions } from "@/lib/reactions";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -16,6 +17,7 @@ export type ChatMessage = {
   body: string | null;
   at: string;
   videoUrl: string | null;
+  reactions: Reactions;
 };
 
 export type ConversationSummary = { id: string; title: string | null; lastAt: string };
@@ -56,9 +58,11 @@ async function messagesOf(studioId: string, conversationId: string): Promise<Cha
   const db = supabaseAdmin();
   const { data } = await db
     .from("whatsapp_messages")
-    .select("id, direction, channel, type, body, created_at, payload")
+    .select("id, direction, channel, type, body, created_at, payload, reactions")
     .eq("studio_id", studioId)
     .eq("conversation_id", conversationId)
+    // A WhatsApp reaction is shown on the message it reacts to, not as a message.
+    .neq("type", "reaction")
     .order("created_at", { ascending: false })
     .limit(MESSAGES_PER_CONVERSATION);
   const rows = (data ?? []).reverse();
@@ -94,6 +98,7 @@ async function messagesOf(studioId: string, conversationId: string): Promise<Cha
       body: body || null,
       at: r.created_at as string,
       videoUrl,
+      reactions: (r.reactions as Reactions | null) ?? {},
     };
   });
 }
@@ -142,19 +147,28 @@ export async function sendToFauve(text: string, conversationId: string | null): 
     id = created.data.id as string;
   }
 
-  const inserted = await db.from("whatsapp_messages").insert({
-    studio_id: ctx.studioId,
-    conversation_id: id,
-    channel: "web",
-    direction: "inbound",
-    phone_e164: ctx.phone,
-    type: "text",
-    body,
-  });
+  const inserted = await db
+    .from("whatsapp_messages")
+    .insert({
+      studio_id: ctx.studioId,
+      conversation_id: id,
+      channel: "web",
+      direction: "inbound",
+      phone_e164: ctx.phone,
+      type: "text",
+      body,
+    })
+    .select("id")
+    .single();
   if (inserted.error) return { ok: false, error: "Ton message n’est pas parti. Réessaie.", conversationId: id };
 
   try {
-    const result = await replyInConversation({ studioId: ctx.studioId, memberId: ctx.memberId, conversationId: id });
+    const result = await replyInConversation({
+      studioId: ctx.studioId,
+      memberId: ctx.memberId,
+      conversationId: id,
+      reactToRowId: inserted.data.id as string,
+    });
     if (result.reply) {
       await db.from("whatsapp_messages").insert({
         studio_id: ctx.studioId,
@@ -173,4 +187,16 @@ export async function sendToFauve(text: string, conversationId: string | null): 
   }
   const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, id), list(ctx.studioId)]);
   return { ok: true, conversationId: id, messages, conversations };
+}
+
+/** Emojis the manager can react with in the app (one per message; the same one again removes it). */
+const ALLOWED_REACTIONS = new Set(["👍", "❤️", "🔥", "😂", "😮", "🙏"]);
+
+export async function reactToMessage(messageId: string, emoji: string | null): Promise<boolean> {
+  const ctx = await current();
+  if (!ctx || !UUID.test(messageId) || (emoji !== null && !ALLOWED_REACTIONS.has(emoji))) return false;
+  const { data } = await supabaseAdmin().from("whatsapp_messages").select("id").eq("id", messageId).eq("studio_id", ctx.studioId).maybeSingle();
+  if (!data) return false;
+  await setReaction({ id: messageId }, "me", emoji);
+  return true;
 }

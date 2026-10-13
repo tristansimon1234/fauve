@@ -8,6 +8,7 @@ import {
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
 import { queueJob } from "@/lib/jobs";
 import { renderAndDeliver } from "@/lib/render/deliver";
@@ -22,6 +23,8 @@ export type ToolContext = {
   /** WhatsApp id of the manager, and the inbound message to react to (WhatsApp channel only). */
   waId?: string;
   replyToMessageId?: string;
+  /** Web chat: the stored message Fauve can react to. */
+  reactToRowId?: string;
   /** Filled by react_to_message so the caller knows an emoji was sent. */
   reactions: string[];
   /** Jobs the caller runs after sending the reply (render, then deliver the video). */
@@ -351,8 +354,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async react_to_message({ emoji }) {
-      if (!ctx.waId || !ctx.replyToMessageId) return "Pas de message WhatsApp auquel réagir.";
-      await sendReaction(ctx.waId, ctx.replyToMessageId, emoji);
+      if (ctx.waId && ctx.replyToMessageId) {
+        await sendReaction(ctx.waId, ctx.replyToMessageId, emoji);
+        await setReaction({ waMessageId: ctx.replyToMessageId }, "fauve", emoji);
+      } else if (ctx.reactToRowId) {
+        await setReaction({ id: ctx.reactToRowId }, "fauve", emoji);
+      } else {
+        return "Pas de message auquel réagir.";
+      }
       ctx.reactions.push(emoji);
       return "ok";
     },

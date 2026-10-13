@@ -2,6 +2,7 @@ import "server-only";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { setReaction } from "@/lib/reactions";
 import { downloadMedia, markReadAndTyping, sendReaction, sendText } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 
@@ -97,8 +98,11 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   if (inserted.error) throw new Error(inserted.error.message);
   if (!inserted.data.length) return; // duplicate delivery
 
-  // A reaction from the manager needs no answer.
-  if (message.type === "reaction") return;
+  // A reaction from the manager needs no answer: it is shown on the message in the web chat.
+  if (message.type === "reaction") {
+    if (message.reaction?.message_id) await setReaction({ waMessageId: message.reaction.message_id }, "me", message.reaction.emoji || null);
+    return;
+  }
 
   await markReadAndTyping(message.id).catch((e) => console.warn("typing indicator failed", e));
 
@@ -110,7 +114,11 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
 
   // Watching a clip takes up to a minute: acknowledge it now (👍 = reçu), then start
   // the analysis right away so whoever answers finds it ready.
-  if (media?.isVideo) await sendReaction(message.from, message.id, "👍").catch((e) => console.warn("reaction failed", e));
+  if (media?.isVideo) {
+    await sendReaction(message.from, message.id, "👍")
+      .then(() => setReaction({ waMessageId: message.id }, "fauve", "👍"))
+      .catch((e) => console.warn("reaction failed", e));
+  }
   const analysis = media?.isVideo
     ? ensureClipAnalysis(member.studio_id, media.id).catch((e) => console.error("clip analysis failed", e))
     : null;

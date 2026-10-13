@@ -152,3 +152,10 @@ export const TrashIcon = make(
     <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
   </>,
 );
+export const SmileIcon = make(
+  <>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
+    <path d="M9 9.5h.01M15 9.5h.01" strokeWidth={2.6} />
+  </>,
+);
