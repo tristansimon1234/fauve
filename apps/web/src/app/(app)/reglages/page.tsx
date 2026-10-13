@@ -18,6 +18,7 @@ const CREDIT_LINES: [string, string][] = [
   ["Nouvelle scène animée", `${CREDIT_PRICES.newScene}`],
   ["Scène de ta bibliothèque", "gratuit"],
   ["Correction d’un montage", `${CREDIT_PRICES.correction}`],
+  ["Variante d’un montage", `${CREDIT_PRICES.variant}`],
   ["Rendu vidéo", `${CREDIT_PRICES.render}`],
   ["Lecture du moodboard", `${CREDIT_PRICES.moodboard}`],
   ["Messages à Fauve", "gratuit"],

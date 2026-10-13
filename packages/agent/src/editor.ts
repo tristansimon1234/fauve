@@ -7,10 +7,12 @@ import {
   editPlanSegmentSchema,
   isClipSegment,
   isMotionSegment,
+  MOTION_TEMPLATES,
   motionTemplateSchema,
   sceneSchema,
   SLOT_NAME,
   type EditPlan,
+  type MotionTemplate,
   type PlanSegment,
 } from "./schemas.ts";
 
@@ -122,4 +124,21 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
     .map((t) => ({ ...t, emphasis: t.emphasis?.filter((e) => t.text.toLowerCase().includes(e.toLowerCase())) }));
 
   return editPlanSchema.parse({ ...draft, duration, texts });
+}
+
+/**
+ * A variant of a delivered montage, without the editor: the same cut with
+ * another template (the next one by default) and, if given, another hook.
+ */
+export function variantPlan(plan: EditPlan, change: { template?: MotionTemplate; hook?: string }): EditPlan {
+  const current = motionTemplateSchema.safeParse(plan.template);
+  const next = change.template ?? MOTION_TEMPLATES[((current.success ? MOTION_TEMPLATES.indexOf(current.data) : -1) + 1) % MOTION_TEMPLATES.length]!;
+  const hook = change.hook?.trim();
+  let replaced = false;
+  const texts = plan.texts.map((t) => {
+    if (!hook || replaced || t.style !== "hook") return t;
+    replaced = true;
+    return { ...t, text: hook.slice(0, 120), emphasis: [] };
+  });
+  return editPlanSchema.parse({ ...plan, template: next, texts });
 }

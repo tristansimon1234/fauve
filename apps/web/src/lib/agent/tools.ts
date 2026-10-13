@@ -224,10 +224,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async quote_montage({ post_id, media_ids, brief, correction, max_new_scenes }) {
+    async quote_montage({ post_id, media_ids, brief, correction, max_new_scenes, variant }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
-      if (correction && !post.edit_plan_id) return "Pas encore de montage pour cette publication : fais un devis de montage (correction: false).";
-      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: max_new_scenes });
+      if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : fais un devis de montage (correction: false).";
+      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: max_new_scenes, variant });
       if ("error" in quote) {
         return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });
       }
@@ -258,6 +258,28 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
+    async choose_version({ post_id, version }) {
+      unwrap(await db.from("posts").select("id").eq("id", post_id).eq("studio_id", studioId).single());
+      const plan = (await db.from("edit_plans").select("id").eq("post_id", post_id).eq("version", version).maybeSingle()).data;
+      if (!plan) return json({ error: `Pas de version ${version} pour cette publication.` });
+      const render = (
+        await db
+          .from("renders")
+          .select("id")
+          .eq("edit_plan_id", plan.id)
+          .eq("status", "done")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ).data;
+      check(await db.from("posts").update({ edit_plan_id: plan.id, ...(render ? { render_id: render.id } : {}) }).eq("id", post_id));
+      return json({
+        version,
+        video: render ? "prête" : "pas encore rendue : lance render",
+        note: "C'est cette version qui sera publiée. Confirme-le en une phrase.",
+      });
+    },
+
     async montage({ quote_id }) {
       const quote = await acceptQuote(studioId, quote_id, turnStartedAt);
       if ("error" in quote) return quote.error;
@@ -265,7 +287,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // The montage outlives this reply: it runs as a background job and sends the video itself.
       ctx.afterReply.push(() =>
         queueJob("montage", {
-          step: "design",
+          // A variant skips the editor: same cut, another style and hook, then the render.
+          step: quote.kind === "variant" ? "variant" : "design",
+          variant: quote.variant ?? undefined,
           studioId,
           postId: quote.postId,
           mediaIds: quote.mediaIds.length ? quote.mediaIds : undefined,

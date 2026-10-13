@@ -298,6 +298,19 @@ test("credits: a montage is quoted before it runs and never charged above the qu
   assert.equal(simple.max, 3);
 });
 
+test("variants: same cut, next template and a new hook, priced as a render", async () => {
+  const { variantPlan } = await import("./editor.ts");
+  const { quoteVariant, CREDIT_PRICES } = await import("./credits.ts");
+  const plan = editPlanSchema.parse({ ...validPlan, template: "doux" });
+  const variant = variantPlan(plan, { hook: "Respire. Tout part de là." });
+  assert.equal(variant.template, "dynamique"); // next template by default
+  assert.deepEqual(variant.segments, plan.segments); // same cut
+  assert.equal(variant.texts[0]!.text, "Respire. Tout part de là.");
+  assert.equal(variantPlan(plan, { template: "chic" }).texts[0]!.text, plan.texts[0]!.text); // hook kept when not given
+  assert.equal(variantPlan(editPlanSchema.parse({ ...validPlan, template: "chic" }), {}).template, "doux"); // wraps around
+  assert.equal(quoteVariant().max, CREDIT_PRICES.variant);
+});
+
 test("motion scenes: generated code is checked before it runs", async () => {
   const { checkMotionCode } = await import("./motion-scene.ts");
   const good = `function Scene({ width, brand }) {
