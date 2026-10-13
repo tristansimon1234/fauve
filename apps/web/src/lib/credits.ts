@@ -104,7 +104,13 @@ export type AcceptedQuote = {
  * Starts the quoted work. The quote must come from an earlier turn (the manager
  * has seen the price and answered), be unused and unexpired, and still be affordable.
  */
-export async function acceptQuote(studioId: string, quoteId: string, turnStartedAt: Date): Promise<AcceptedQuote | { error: string }> {
+export async function acceptQuote(
+  studioId: string,
+  quoteId: string,
+  turnStartedAt: Date,
+  /** A small montage started in the same turn as its quote (no yes needed). */
+  { immediate = false }: { immediate?: boolean } = {},
+): Promise<AcceptedQuote | { error: string }> {
   const db = supabaseAdmin();
   const { data: q } = await db
     .from("credit_quotes")
@@ -115,7 +121,7 @@ export async function acceptQuote(studioId: string, quoteId: string, turnStarted
   if (!q) return { error: "Devis introuvable : refais un devis avec quote_montage." };
   if (q.used_at) return { error: "Ce devis a déjà été utilisé : refais un devis pour un nouveau montage." };
   if (new Date(q.expires_at as string).getTime() < Date.now()) return { error: "Ce devis a expiré : refais un devis." };
-  if (new Date(q.created_at as string).getTime() >= turnStartedAt.getTime()) {
+  if (!immediate && new Date(q.created_at as string).getTime() >= turnStartedAt.getTime()) {
     return { error: "Montre d'abord le plan et le coût à la gérante, et attends son accord avant de lancer." };
   }
   if ((await creditBalance(studioId)) < (q.base as number)) return { error: "Solde de crédits insuffisant pour ce devis." };

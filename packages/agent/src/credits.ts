@@ -24,6 +24,13 @@ export const CREDIT_PRICES = {
   variant: 1,
 } as const;
 
+/**
+ * A montage that costs at most this starts at once, without asking: the
+ * manager sees the plan and the price in Fauve's message. Above it (many
+ * clips and new animated scenes), Fauve shows the quote and waits for a yes.
+ */
+export const AUTO_START_MAX_CREDITS = 15;
+
 /** Each month the balance goes back up to this (unused credits do not pile up beyond it). */
 export const MONTHLY_CREDITS = 150;
 
