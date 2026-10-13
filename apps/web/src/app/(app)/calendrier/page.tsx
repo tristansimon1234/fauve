@@ -2,10 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { NoStudio, PageLoading } from "@/components/empty-state";
-import { ArrowLeftIcon, ChatIcon } from "@/components/icons";
+import { ChatIcon } from "@/components/icons";
 import { addDays, localDateOf, parseIsoDate, sameDay, toIsoDate, weekdayIndex, weekLabel, weekOf } from "@/lib/dates";
-import { formatShortDateTime, formatTime, kindLabels, plural } from "@/lib/format";
-import { whatsappLink } from "@/lib/public-env";
+import { formatShortDateTime, formatTime } from "@/lib/format";
 import {
   getContentPlan,
   getStudioContext,
@@ -16,6 +15,7 @@ import {
   shotRowSchema,
   type PostRow,
 } from "@/lib/studio";
+import { COVER_COLUMNS, postCovers, type CoverPost } from "@/lib/covers";
 import { loadGrid } from "@/lib/grid";
 import { GridView } from "../grille/grid-view";
 import { CalendarBoard, ShotList, type BoardPost } from "./calendar-board";
@@ -51,14 +51,14 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
   const [postsResult, undatedResult, shotsResult, plan, draftsResult, grid] = await Promise.all([
     db
       .from("posts")
-      .select(POST_COLUMNS)
+      .select(`${POST_COLUMNS}, ${COVER_COLUMNS}`)
       .eq("studio_id", studioId)
       .gte("scheduled_at", week.start.toISOString())
       .lt("scheduled_at", week.end.toISOString())
       .order("scheduled_at", { ascending: true }),
     db
       .from("posts")
-      .select(POST_COLUMNS)
+      .select(`${POST_COLUMNS}, ${COVER_COLUMNS}`)
       .eq("studio_id", studioId)
       .is("scheduled_at", null)
       .not("status", "in", "(skipped,published,measured)")
@@ -83,8 +83,20 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
   const undated = rows(postRowSchema, undatedResult, "posts");
   const shots = rows(shotRowSchema, shotsResult, "shot_requests");
   const drafts = rows(postRowSchema, draftsResult, "posts");
+  // A thumbnail per post: its montage, or its first photo.
+  const covers = gridView
+    ? new Map()
+    : await postCovers(db, studioId, [...(postsResult.data ?? []), ...(undatedResult.data ?? [])] as unknown as CoverPost[]);
 
-  const undatedPosts: BoardPost[] = undated.map((p) => ({ id: p.id, kind: p.kind, title: p.title, status: p.status, day: null, time: "" }));
+  const undatedPosts: BoardPost[] = undated.map((p) => ({
+    id: p.id,
+    kind: p.kind,
+    title: p.title,
+    status: p.status,
+    day: null,
+    time: "",
+    cover: covers.get(p.id) ?? null,
+  }));
   const boardPosts: BoardPost[] = posts.flatMap((p) =>
     p.scheduled_at
       ? [
@@ -95,6 +107,7 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
             status: p.status,
             day: weekdayIndex(localDateOf(new Date(p.scheduled_at), tz)),
             time: formatTime(p.scheduled_at, tz),
+            cover: covers.get(p.id) ?? null,
           },
         ]
       : [],
@@ -111,16 +124,8 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Calendrier</h1>
-          <p className="text-[15px] text-muted">
-            {weekLabel(week)}
-            {plan
-              ? ` · ${plural(plan.posts_per_week, "post", "posts")} et ${plural(plan.stories_per_week, "story", "stories")} prévus par semaine`
-              : ""}
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-[30px] font-extrabold tracking-[-0.02em]">Calendrier</h1>
         <div className="flex flex-wrap items-center gap-2.5">
           <div role="tablist" aria-label="Vue" className="flex rounded-full bg-soft p-1">
             {[
@@ -138,10 +143,10 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
               </Link>
             ))}
           </div>
-          <a href={whatsappLink()} className="btn btn-primary">
+          <Link href="/fauve" className="btn btn-primary">
             <ChatIcon size={18} />
             Demander à Fauve
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -149,71 +154,70 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
         <GridView heading={false} connected={grid.connected} handle={grid.handle} info={grid.info} tiles={grid.tiles} timezone={tz} />
       ) : (
         <>
-          <nav aria-label="Changer de semaine" className="flex flex-wrap items-center gap-2">
-            <Link href={navLink(-7)} className="btn btn-secondary h-10 px-4 text-sm">
-              <ArrowLeftIcon size={16} />
-              Semaine précédente
-            </Link>
-            {!isCurrentWeek && (
-              <Link href="/calendrier" className="btn btn-secondary h-10 px-4 text-sm">
-                Cette semaine
-              </Link>
-            )}
-            <Link href={navLink(7)} className="btn btn-secondary h-10 px-4 text-sm">
-              Semaine suivante
-              <ArrowLeftIcon size={16} className="rotate-180" />
-            </Link>
-          </nav>
-
-          <div className="flex flex-wrap items-start gap-6">
-            <div className="flex min-w-0 flex-[3_1_700px] flex-col gap-6">
-              <CalendarBoard key={toIsoDate(week.monday)} posts={boardPosts} undated={undatedPosts} days={days} />
-              {posts.length === 0 && (
-                <p className="rounded-2xl bg-soft px-5 py-4 text-sm leading-relaxed text-muted">
-                  Aucune publication cette semaine. Ajoute une idée avec le + d’un jour, ou dis à Fauve ce que tu veux publier :
-                  elle prépare le calendrier avec toi.
-                </p>
+          {/* What needs her, at a glance: drafts to validate, shots to film, the rhythm of the week. */}
+          <div className="grid gap-3 md:grid-cols-3">
+            <section className="card flex flex-col gap-2 p-4">
+              <h2 className="flex items-center justify-between text-[14px] font-bold">
+                À valider
+                <span className={`rounded-full px-2 py-0.5 text-[12px] ${drafts.length ? "bg-peach text-peach-ink" : "bg-soft text-muted"}`}>{drafts.length}</span>
+              </h2>
+              {drafts.length ? (
+                <ul className="flex flex-col">
+                  {drafts.slice(0, 3).map((p) => (
+                    <li key={p.id}>
+                      <Link href={`/publications/${p.id}`} className="-mx-2 flex items-baseline gap-2 rounded-lg px-2 py-1 hover:bg-soft">
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{p.title}</span>
+                        <span className="shrink-0 text-[12px] text-muted">{p.scheduled_at ? formatShortDateTime(p.scheduled_at, tz) : "sans date"}</span>
+                      </Link>
+                    </li>
+                  ))}
+                  {drafts.length > 3 && <li className="px-0 pt-0.5 text-[12px] text-muted">et {drafts.length - 3} autres</li>}
+                </ul>
+              ) : (
+                <p className="text-[13px] text-muted">Rien à valider pour l’instant.</p>
               )}
-            </div>
-
-            <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
-              {drafts.length > 0 && (
-                <section className="card flex flex-col gap-2 p-5">
-                  <h2 className="text-base font-bold">À valider</h2>
-                  <ul className="flex flex-col">
-                    {drafts.map((p) => (
-                      <li key={p.id}>
-                        <Link href={`/publications/${p.id}`} className="-mx-2 flex flex-col rounded-xl px-2 py-2 hover:bg-soft">
-                          <span className="truncate text-sm font-bold">{p.title}</span>
-                          <span className="text-xs text-muted">
-                            {kindLabels[p.kind]} · {p.scheduled_at ? formatShortDateTime(p.scheduled_at, tz) : "date à définir"}
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
+            </section>
+            <details className="card group/shots flex flex-col p-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between text-[14px] font-bold">
+                À filmer
+                <span className="rounded-full bg-soft px-2 py-0.5 text-[12px] text-muted">{shots.filter((s) => !s.done).length}</span>
+              </summary>
+              <p className="mt-2 text-[13px] text-muted group-open/shots:hidden">
+                {shots.find((s) => !s.done)?.label ?? "Rien à filmer pour l’instant."}
+              </p>
+              <div className="mt-3 hidden group-open/shots:block">
+                <ShotList bare shots={shots.map(({ id, label, hint, done }) => ({ id, label, hint, done }))} />
+              </div>
+            </details>
+            <section className="card flex flex-col gap-2.5 p-4">
+              <h2 className="text-[14px] font-bold">Rythme de la semaine</h2>
+              {plan ? (
+                <>
+                  <Progress label="Posts" value={done(feedPosts)} total={plan.posts_per_week} color="bg-violet" />
+                  <Progress label="Stories" value={done(stories)} total={plan.stories_per_week} color="bg-coral" />
+                </>
+              ) : (
+                <p className="text-[13px] text-muted">Pas encore de rythme : dis à Fauve combien de posts et de stories tu veux par semaine.</p>
               )}
-              <ShotList shots={shots.map(({ id, label, hint, done }) => ({ id, label, hint, done }))} />
-              <section className="card flex flex-col gap-3 bg-soft p-5">
-                <h2 className="text-base font-bold">Rythme choisi</h2>
-                {plan ? (
-                  <>
-                    <Progress label="Posts" value={done(feedPosts)} total={plan.posts_per_week} color="bg-violet" />
-                    <Progress label="Stories" value={done(stories)} total={plan.stories_per_week} color="bg-coral" />
-                    <p className="text-[13px] leading-normal text-muted">
-                      Une publication compte dès que tu l’as validée.
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-sm leading-normal text-muted">
-                    Pas encore de rythme choisi. Dis à Fauve sur WhatsApp combien de posts et de stories tu veux par
-                    semaine.
-                  </p>
-                )}
-              </section>
-            </aside>
+            </section>
           </div>
+
+          <CalendarBoard
+            key={toIsoDate(week.monday)}
+            posts={boardPosts}
+            undated={undatedPosts}
+            days={days}
+            weekLabel={weekLabel(week)}
+            prevHref={navLink(-7)}
+            nextHref={navLink(7)}
+            todayHref={isCurrentWeek ? null : "/calendrier"}
+          />
+          {posts.length === 0 && (
+            <p className="rounded-2xl bg-soft px-5 py-4 text-sm leading-relaxed text-muted">
+              Aucune publication cette semaine. Ajoute une idée avec le + d’un jour, ou dis à Fauve ce que tu veux publier : elle prépare
+              le calendrier avec toi.
+            </p>
+          )}
         </>
       )}
     </>

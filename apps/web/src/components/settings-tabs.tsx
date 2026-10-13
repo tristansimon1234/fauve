@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-// Réglages groups the studio's settings: accounts and plan, style, media library.
+// On a phone, Réglages groups the studio's settings: accounts and plan, style, media library.
 const tabs = [
   { href: "/reglages", label: "Compte" },
   { href: "/style", label: "Style" },
@@ -9,7 +9,8 @@ const tabs = [
 
 export function SettingsTabs({ current }: { current: (typeof tabs)[number]["href"] }) {
   return (
-    <nav aria-label="Réglages" className="-mb-2 flex gap-1 self-start rounded-full bg-soft p-1">
+    // On a phone only: on a computer, Médiathèque and Style are in the side menu.
+    <nav aria-label="Réglages" className="-mb-2 flex gap-1 self-start rounded-full bg-soft p-1 lg:hidden">
       {tabs.map((tab) => {
         const on = tab.href === current;
         return (
