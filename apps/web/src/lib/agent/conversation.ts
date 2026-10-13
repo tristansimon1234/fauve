@@ -72,7 +72,8 @@ export async function replyInConversation(params: {
     .is("archived_at", null)
     .order("last_message_at", { ascending: false })
     .limit(1);
-  if (params.conversationId) conversations = conversations.eq("id", params.conversationId);
+  // WhatsApp answers the studio's general conversation, never one about a single publication.
+  conversations = params.conversationId ? conversations.eq("id", params.conversationId) : conversations.is("post_id", null);
   const conversation = (await conversations).data?.[0];
   let messages = db
     .from("whatsapp_messages")

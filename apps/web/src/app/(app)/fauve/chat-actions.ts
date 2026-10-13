@@ -1,5 +1,6 @@
 "use server";
 
+import { editPlanSchema, segmentKind } from "@fauve/agent";
 import { after } from "next/server";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { extrasOf, resolveCards, type ChatCard } from "@/lib/chat-cards";
@@ -158,6 +159,52 @@ export async function deleteConversation(conversationId: string): Promise<boolea
   return !error;
 }
 
+/** What the chat drawer is about: a publication, and maybe one scene of its montage. */
+export type ChatAbout = { postId: string; scene?: number };
+
+/** A memo for Fauve on the manager's message: the publication (and scene) she is talking about. */
+async function aboutMemo(studioId: string, about: ChatAbout): Promise<string | null> {
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("id, title, kind, status, edit_plan_id").eq("id", about.postId).eq("studio_id", studioId).maybeSingle();
+  if (!post) return null;
+  let memo = `à propos de la publication « ${post.title as string} » (${post.kind as string}, statut ${post.status as string}) post_id=${post.id as string}`;
+  if (about.scene !== undefined && post.edit_plan_id) {
+    const { data: plan } = await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).maybeSingle();
+    const parsed = editPlanSchema.safeParse(plan?.plan);
+    const segment = parsed.success ? parsed.data.segments[about.scene] : undefined;
+    if (parsed.success && segment) {
+      const kind = segmentKind(segment);
+      const what =
+        "scene" in segment
+          ? `écran « ${segment.scene.title} »`
+          : "motion" in segment
+            ? `animation (${Object.values(segment.motion.texts ?? {}).join(" / ") || segment.motion.brief.slice(0, 80)})`
+            : `passage vidéo media_id=${(segment as { clip_id: string }).clip_id}`;
+      memo += `, scène ${about.scene + 1} sur ${parsed.data.segments.length} (${kind}) : ${what}. Une demande sur cette scène est une correction du montage (quote_montage avec correction: true)`;
+    }
+  }
+  return memo;
+}
+
+/** The drawer's conversation about a publication: the latest one, if any. */
+export async function openPostChat(postId: string): Promise<{ conversationId: string | null; messages: ChatMessage[]; timezone: string } | null> {
+  if (!UUID.test(postId)) return null;
+  const { member } = await getStudioContext();
+  if (!member) return null;
+  const studioId = member.studio.id;
+  const { data } = await supabaseAdmin()
+    .from("conversations")
+    .select("id")
+    .eq("studio_id", studioId)
+    .eq("post_id", postId)
+    .is("archived_at", null)
+    .order("last_message_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const conversationId = (data?.id as string | undefined) ?? null;
+  return { conversationId, messages: conversationId ? await messagesOf(studioId, conversationId) : [], timezone: member.studio.timezone };
+}
+
 export type SendResult =
   | { ok: true; conversationId: string; messages: ChatMessage[]; conversations: ConversationSummary[] }
   | { ok: false; error: string; conversationId: string | null };
@@ -172,7 +219,13 @@ const MAX_ATTACHMENTS = 10;
  * null. Attachments become media of the studio (Médiathèque) and messages of
  * the conversation, like photos and videos sent on WhatsApp; videos are analysed.
  */
-export async function sendToFauve(text: string, conversationId: string | null, attachments: Attachment[] = []): Promise<SendResult> {
+export async function sendToFauve(
+  text: string,
+  conversationId: string | null,
+  attachments: Attachment[] = [],
+  /** From the drawer of a publication: the conversation is about it, and Fauve is told which one. */
+  about?: ChatAbout,
+): Promise<SendResult> {
   const ctx = await current();
   if (!ctx) return { ok: false, error: "Ton numéro n’est relié à aucun studio.", conversationId };
   const body = text.trim().slice(0, 4000);
@@ -188,7 +241,8 @@ export async function sendToFauve(text: string, conversationId: string | null, a
   if (id) {
     if (!(await owns(ctx.studioId, id))) return { ok: false, error: "Cette conversation n’existe plus.", conversationId: null };
   } else {
-    const created = await db.from("conversations").insert({ studio_id: ctx.studioId, started_by: "web" }).select("id").single();
+    const forPost = about && UUID.test(about.postId) ? about.postId : null;
+    const created = await db.from("conversations").insert({ studio_id: ctx.studioId, started_by: "web", post_id: forPost }).select("id").single();
     if (created.error) return { ok: false, error: "Ton message n’est pas parti. Réessaie.", conversationId: null };
     id = created.data.id as string;
   }
@@ -215,9 +269,19 @@ export async function sendToFauve(text: string, conversationId: string | null, a
     if (video) after(() => ensureClipAnalysis(ctx.studioId, mediaId).then(() => undefined, (e) => console.error("chat: clip analysis failed", e)));
   }
   if (body) {
+    const memo = about && UUID.test(about.postId) ? await aboutMemo(ctx.studioId, about) : null;
     const inserted = await db
       .from("whatsapp_messages")
-      .insert({ studio_id: ctx.studioId, conversation_id: id, channel: "web", direction: "inbound", phone_e164: ctx.phone, type: "text", body })
+      .insert({
+        studio_id: ctx.studioId,
+        conversation_id: id,
+        channel: "web",
+        direction: "inbound",
+        phone_e164: ctx.phone,
+        type: "text",
+        body,
+        ...(memo ? { payload: { notes: [memo] } } : {}),
+      })
       .select("id")
       .single();
     if (inserted.error) return { ok: false, error: "Ton message n’est pas parti. Réessaie.", conversationId: id };

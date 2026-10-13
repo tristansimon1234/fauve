@@ -16,6 +16,7 @@ import type { PlayerRef } from "@remotion/player";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FilmIcon, PenIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { DEFAULT_Y, places, TextBoxes, Y_MAX, Y_MIN } from "@/components/montage/text-boxes";
+import { AskFauveButton } from "@/components/fauve-drawer";
 import { ReelPlayer } from "@/components/reel-player";
 import { saveEditPlan } from "./actions";
 
@@ -44,12 +45,14 @@ function sceneLabel(segment: Segment, clipLabels: Record<string, string>): strin
 
 export function MontageEditor({
   postId,
+  postTitle,
   initialPlan,
   inputs,
   clipDurations,
   clipLabels,
 }: {
   postId: string;
+  postTitle: string;
   initialPlan: EditPlan;
   inputs: ReelInputs;
   clipDurations: Record<string, number | null>;
@@ -200,6 +203,14 @@ export function MontageEditor({
             <h2 className="text-[16px] font-bold">
               Scène {index + 1} · {kindLabels[segmentKind(segment)]}
             </h2>
+            {/* Fauve reads the saved montage: ask about a scene once the changes are saved. */}
+            {!dirty && (
+              <AskFauveButton
+                topic={{ postId, title: postTitle, scene: index, sceneLabel: `Scène ${index + 1} · ${kindLabels[segmentKind(segment)]}` }}
+                label="Demander à Fauve"
+                className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-violet-soft px-3 py-1.5 text-[13px] font-bold text-violet hover:bg-violet hover:text-white"
+              />
+            )}
           </div>
           <SegmentFields segment={segment} onChange={setSegment} clipDuration={"clip_id" in segment ? clipDurations[segment.clip_id] : null} />
 
