@@ -16,3 +16,4 @@ export * from "./credits.ts";
 export * from "./performance.ts";
 export * from "./plan-edit.ts";
 export * from "./slides.ts";
+export * from "./text-look.ts";

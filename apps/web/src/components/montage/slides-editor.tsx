@@ -1,6 +1,6 @@
 "use client";
 
-import { buildSlideProps, SLIDE_Y, type ReelInputs, type SlidesPlan, type SlideText } from "@fauve/agent";
+import { buildSlideProps, SLIDE_Y, type ReelInputs, type SavedLook, type SlidesPlan, type SlideText } from "@fauve/agent";
 import { useMemo, useRef, useState } from "react";
 import { PenIcon, PlusIcon } from "@/components/icons";
 import { SlidePreview } from "./slide-preview";
@@ -10,6 +10,12 @@ import { TextSheet } from "./text-sheet";
 // Text over the photos of a carousel or photo post, by hand: the slide as it
 // will be published, its texts grabbable on it, a strip to move between photos.
 // Controlled: the page keeps the plan and saves it.
+
+const logoPlaces = [
+  { value: null, label: "Aucun" },
+  { value: "top", label: "En haut" },
+  { value: "bottom", label: "En bas" },
+] as const;
 
 const templates = [
   { value: "doux", label: "Doux" },
@@ -24,6 +30,7 @@ export function SlidesEditor({
   brand,
   dark = false,
   previewWidth = "100%",
+  looks,
 }: {
   plan: SlidesPlan;
   onChange: (plan: SlidesPlan) => void;
@@ -33,6 +40,8 @@ export function SlidesEditor({
   /** The mobile page is dark; the app is light. */
   dark?: boolean;
   previewWidth?: string;
+  /** The studio's saved text looks: with them, each text can take any look. */
+  looks?: SavedLook[];
 }) {
   const first = Math.max(0, plan.slides.findIndex((s) => photos[s.media_id]));
   const [index, setIndex] = useState(first);
@@ -124,6 +133,8 @@ export function SlidesEditor({
               setActive(null);
             }}
             onClose={() => setActive(null)}
+            looks={looks ? { saved: looks, brand: props.brand } : undefined}
+            video={false}
           />
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -164,6 +175,22 @@ export function SlidesEditor({
           </button>
         ))}
       </div>
+      {brand.logoUrl && (
+        <div className="flex items-center gap-2">
+          <span className={`text-[12px] font-bold ${muted}`}>Logo</span>
+          {logoPlaces.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              aria-pressed={(slide.logo ?? null) === p.value}
+              onClick={() => onChange({ ...plan, slides: plan.slides.map((s, i) => (i === index ? { ...s, logo: p.value ?? undefined } : s)) })}
+              className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${chip((slide.logo ?? null) === p.value)}`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

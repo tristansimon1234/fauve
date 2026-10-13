@@ -9,6 +9,7 @@ import { loadMontageInputs } from "@/lib/render/render-post";
 import { postSlides } from "@/lib/render/slides";
 import { whatsappLink } from "@/lib/public-env";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
+import { loadTextLooks } from "@/lib/text-looks";
 import { instagramAccount } from "@/lib/social/publish";
 import { recentMedia } from "@/lib/social/instagram";
 import { ActionView, type ActionMedia } from "./action-view";
@@ -108,6 +109,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
       media={media}
       grid={post.kind === "story" ? null : grid}
       slides={slides}
+      looks={locked ? [] : await loadTextLooks(studioId).catch(() => [])}
       changeHref={whatsappLink(`Pour « ${post.title as string} » : `)}
       backHref={whatsappLink("")}
     />

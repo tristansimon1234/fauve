@@ -15,6 +15,7 @@ import { loadEditorData } from "@/lib/montage-editor-data";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { postSlides } from "@/lib/render/slides";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
+import { loadTextLooks } from "@/lib/text-looks";
 import { deletePost } from "./actions";
 import { MontageEditor } from "./montage-editor";
 import { PostEditor } from "./post-editor";
@@ -105,6 +106,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   const canEdit = !LOCKED.includes(post.status);
   const editor = canEdit && plan ? await loadEditorData(studioId, plan.id, post.media_ids).catch(() => null) : null;
   const isVideo = post.kind === "reel" || post.kind === "story";
+  // The studio's text looks (copied by Fauve from examples, or kept by hand), offered on every text.
+  const looks = canEdit ? await loadTextLooks(studioId).catch(() => []) : [];
   // Text over the photos of a carousel or photo post, editable by hand.
   const photos = Object.fromEntries(media.filter((m) => !m.video).map((m) => [m.id, m.url]));
   const slides =
@@ -234,6 +237,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
             inputs={editor.inputs}
             clipDurations={editor.clipDurations}
             clipLabels={Object.fromEntries(clipLabels)}
+            looks={looks}
           />
         </div>
       ) : (
@@ -276,7 +280,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
               Une accroche, un message par photo : glisse chaque texte où tu veux, change ses mots, sa taille, son fond. Gratuit.
             </p>
           </div>
-          <SlidesSection postId={post.id} initialPlan={slides.plan} photos={photos} brand={slides.brand} />
+          <SlidesSection postId={post.id} initialPlan={slides.plan} photos={photos} brand={slides.brand} looks={looks} />
         </section>
       )}
 

@@ -11,6 +11,7 @@ import {
   type PostKind,
   type PostStatus,
   type ReelInputs,
+  type SavedLook,
   type SlidesPlan,
 } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
@@ -56,6 +57,7 @@ export function ActionView({
   slides,
   changeHref,
   backHref,
+  looks = [],
 }: {
   post: ActionPost;
   editor: { plan: EditPlan; inputs: ReelInputs } | null;
@@ -68,6 +70,8 @@ export function ActionView({
   slides: { plan: SlidesPlan; photos: Record<string, string>; brand: ReelInputs["brand"] } | null;
   changeHref: string;
   backHref: string;
+  /** The studio's saved text looks (copied by Fauve from examples, or kept by hand). */
+  looks?: SavedLook[];
 }) {
   const [mode, setMode] = useState<Mode>("view");
   const [inGrid, setInGrid] = useState(false);
@@ -271,6 +275,7 @@ export function ActionView({
             }}
             photos={slides.photos}
             brand={slides.brand}
+            looks={looks}
             dark
             previewWidth="min(100%, max(200px, calc((100dvh - 470px) * 4 / 5)))"
           />
@@ -332,6 +337,7 @@ export function ActionView({
               onChange={(patch) => setText(active, patch)}
               onRemove={() => removeText(active)}
               onClose={() => setActive(null)}
+              looks={props ? { saved: looks, brand: props.brand } : undefined}
             />
           ) : (
             <div className="flex flex-wrap gap-2">

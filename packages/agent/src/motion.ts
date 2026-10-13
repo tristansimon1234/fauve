@@ -1,4 +1,5 @@
 import { isClipSegment, isMotionSegment, segmentSeconds, type ClipAnalysis, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
+import type { Bullet, ListItem, TextLook } from "./text-look.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -37,6 +38,12 @@ export type ReelText = {
   x?: number;
   scale?: number;
   backdrop?: boolean;
+  /** A look of its own (font, colours, fill…), instead of the template's style. */
+  look?: TextLook;
+  /** A list: its items (the text is then only its name), the look of the detail lines, the bullets. */
+  items?: ListItem[];
+  detail_look?: TextLook;
+  bullet?: Bullet;
 };
 export type ReelWord = { w: string; from: number; to: number };
 
@@ -52,6 +59,8 @@ export type ReelProps = {
   words: ReelWord[];
   brand: { name: string; accent: string; accentInk: string; displayFont: string; bodyFont: string; logoUrl: string | null };
   endCard: { title: string; subtitle: string | null; from: number } | null;
+  /** The studio's logo over the whole video or still (carousel slides). */
+  logo?: "top" | "bottom" | null;
 };
 
 export type ReelInputs = {
@@ -114,7 +123,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     .map((t) => {
       const from = toFrames(t.from);
       const to = Math.min(toFrames(t.to), durationInFrames);
-      return { text: t.text, style: t.style, emphasis: t.emphasis ?? [], from, durationInFrames: to - from, y: t.y, x: t.x, scale: t.scale, backdrop: t.backdrop };
+      return { text: t.text, style: t.style, emphasis: t.emphasis ?? [], from, durationInFrames: to - from, y: t.y, x: t.x, scale: t.scale, backdrop: t.backdrop, look: t.look, items: t.items, detail_look: t.detail_look, bullet: t.bullet };
     })
     .filter((t) => t.durationInFrames > 0);
 

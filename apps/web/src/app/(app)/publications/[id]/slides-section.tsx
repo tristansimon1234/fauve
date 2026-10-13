@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReelInputs, SlidesPlan } from "@fauve/agent";
+import type { ReelInputs, SavedLook, SlidesPlan } from "@fauve/agent";
 import { useState, useTransition } from "react";
 import { SlidesEditor } from "@/components/montage/slides-editor";
 import { saveSlidesPlan } from "./actions";
@@ -11,11 +11,13 @@ export function SlidesSection({
   initialPlan,
   photos,
   brand,
+  looks,
 }: {
   postId: string;
   initialPlan: SlidesPlan;
   photos: Record<string, string>;
   brand: ReelInputs["brand"];
+  looks: SavedLook[];
 }) {
   const [saved, setSaved] = useState(initialPlan);
   const [plan, setPlan] = useState(initialPlan);
@@ -42,6 +44,7 @@ export function SlidesSection({
         }}
         photos={photos}
         brand={brand}
+        looks={looks}
         previewWidth="min(100%, 400px)"
       />
       <div className="flex flex-wrap items-center gap-3">

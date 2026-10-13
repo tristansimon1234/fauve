@@ -11,11 +11,14 @@ import {
   updateSegment,
   type EditPlan,
   type ReelInputs,
+  type SavedLook,
   type Segment,
 } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FilmIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { ListItems } from "@/components/montage/list-items";
+import { LookPanel } from "@/components/montage/look-panel";
 import { DEFAULT_Y, places, TextBoxes, Y_MAX, Y_MIN } from "@/components/montage/text-boxes";
 import { AskFauveButton, useFauveDrawer } from "@/components/fauve-drawer";
 import { ReelPlayer } from "@/components/reel-player";
@@ -57,6 +60,7 @@ export function MontageEditor({
   inputs,
   clipDurations,
   clipLabels,
+  looks,
 }: {
   postId: string;
   postTitle: string;
@@ -64,6 +68,8 @@ export function MontageEditor({
   inputs: ReelInputs;
   clipDurations: Record<string, number | null>;
   clipLabels: Record<string, string>;
+  /** The studio's saved text looks. */
+  looks: SavedLook[];
 }) {
   const [saved, setSaved] = useState(initialPlan);
   const [plan, setPlan] = useState(initialPlan);
@@ -294,9 +300,32 @@ export function MontageEditor({
                   maxLength={120}
                   onChange={(e) => setText(i, { text: e.target.value })}
                   aria-label="Texte"
+                  hidden={Boolean(t.items)}
                   className="h-10 rounded-[10px] border border-line bg-white px-3 text-[14px] outline-none focus:border-lilac"
                 />
+                {t.items && (
+                  <ListItems
+                    items={t.items}
+                    bullet={t.bullet}
+                    onChange={(patch) => setText(i, { ...patch, ...(patch.items ? { text: patch.items[0]?.title.slice(0, 120) ?? t.text } : {}) })}
+                  />
+                )}
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    aria-pressed={Boolean(t.items)}
+                    onClick={() =>
+                      setText(
+                        i,
+                        t.items
+                          ? { items: undefined, bullet: undefined, detail_look: undefined, text: t.items.map((x) => x.title).join(" · ").slice(0, 120) }
+                          : { items: [{ title: t.text }], bullet: { kind: "check", color: "#ffffff" } },
+                      )
+                    }
+                    className={`h-8 rounded-full px-3 text-[12px] font-semibold ${t.items ? "bg-violet text-white" : "bg-white text-muted"}`}
+                  >
+                    Liste
+                  </button>
                   {(Object.keys(styleLabels) as Text["style"][]).map((style) => (
                     <button
                       key={style}
@@ -359,6 +388,7 @@ export function MontageEditor({
                     className="accent-violet"
                   />
                 </label>
+                <LookPanel role={t.style} look={t.look} saved={looks} brand={props.brand} onChange={(look) => setText(i, { look })} />
                 <Range
                   label="Apparaît"
                   min={span.start}
