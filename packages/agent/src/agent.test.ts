@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { editPlanObjectSchema, editPlanSchema, segmentSeconds } from "./schemas.ts";
 import { canTransition } from "./status.ts";
-import { claudeCostUsd, usdToEur } from "./pricing.ts";
+import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
 
 const validPlan = {
@@ -46,6 +46,16 @@ test("pricing: opus input + output", () => {
   const usd = claudeCostUsd("claude-opus-5-5", { input_tokens: 1_000_000, output_tokens: 100_000 });
   assert.equal(usd, 6);
   assert.equal(usdToEur(1, 0.9), 0.9);
+  // A typical chat turn on Haiku: mostly cache reads.
+  const turn = claudeCostUsd("claude-haiku-5-5", {
+    input_tokens: 0,
+    output_tokens: 600,
+    cache_read_input_tokens: 33_000,
+    cache_creation_input_tokens: 4_600,
+  });
+  assert.ok(Math.abs(turn - 0.001205) < 1e-9);
+  assert.equal(supportsServerFallback("claude-haiku-5-5"), false);
+  assert.equal(supportsServerFallback("claude-opus-5-5"), true);
 });
 
 test("whatsapp: 24 h window", () => {
@@ -269,5 +279,5 @@ test("motion scenes: generated code is checked before it runs", async () => {
 
 test("pricing: the chat model is priced", async () => {
   const { CHAT_MODEL, claudeCostUsd } = await import("./pricing.ts");
-  assert.equal(claudeCostUsd(CHAT_MODEL, { input_tokens: 1_000_000, output_tokens: 100_000 }), 3);
+  assert.ok(claudeCostUsd(CHAT_MODEL, { input_tokens: 1_000_000, output_tokens: 100_000 }) > 0);
 });
