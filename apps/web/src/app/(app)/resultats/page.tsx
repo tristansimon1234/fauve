@@ -9,6 +9,7 @@ import { Orb } from "@/components/orb";
 import { daysBefore } from "@/lib/dates";
 import { formatNumber, formatShortDate, kindLabels } from "@/lib/format";
 import { getStudioContext, rows } from "@/lib/studio";
+import { RefreshReportButton } from "./refresh-button";
 
 export const metadata: Metadata = { title: "Résultats" };
 
@@ -38,7 +39,14 @@ const reportSchema = z.object({
   period_start: z.string(),
   period_end: z.string(),
   summary: z.string(),
-  suggestions: z.array(z.string()).catch([]),
+  // Written by lib/performance.ts: lessons with their evidence, and ideas for the week.
+  suggestions: z
+    .object({
+      lessons: z.array(z.object({ lesson: z.string(), evidence: z.string() })).catch([]),
+      ideas: z.array(z.string()).catch([]),
+      posts: z.number().optional(),
+    })
+    .catch({ lessons: [], ideas: [] }),
 });
 
 export default function ResultsPage({ searchParams }: PageProps<"/resultats">) {
@@ -132,8 +140,10 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         {header}
         <EmptyState title="Tes résultats arrivent après tes premières publications" className="max-w-[760px]">
           Dès que tes posts seront en ligne sur Instagram ou TikTok, tu verras ici ce qu’ils ont donné : les réservations
-          venues des réseaux d’abord, puis les vues, les comptes touchés et le bilan de Fauve.
+          venues des réseaux d’abord, puis les vues, les comptes touchés et le bilan de Fauve. Tu peux déjà demander à
+          Fauve d’analyser tes posts Instagram existants.
         </EmptyState>
+        <RefreshReportButton label="Analyser mes posts Instagram" />
       </>
     );
   }
@@ -190,21 +200,35 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         <section className="flex min-w-0 flex-[1_1_380px] flex-col gap-3.5 rounded-[22px] bg-soft p-6">
           <div className="flex items-center gap-2.5">
             <Orb size={32} />
-            <h2 className="text-lg font-bold">Le bilan de Fauve</h2>
+            <h2 className="text-lg font-bold">Ce qui marche chez toi</h2>
           </div>
           {report ? (
             <>
               <span className="text-xs font-bold text-muted">
-                Du {formatShortDate(`${report.period_start}T12:00:00Z`, "UTC")} au{" "}
+                Tes posts du {formatShortDate(`${report.period_start}T12:00:00Z`, "UTC")} au{" "}
                 {formatShortDate(`${report.period_end}T12:00:00Z`, "UTC")}
+                {report.suggestions.posts ? ` · ${report.suggestions.posts} posts analysés` : ""}
               </span>
               <p className="text-[15px] leading-[1.65] whitespace-pre-line">{report.summary}</p>
-              {report.suggestions.length > 0 && (
+              {report.suggestions.lessons.length > 0 && (
+                <ol className="flex flex-col gap-3">
+                  {report.suggestions.lessons.map((l, i) => (
+                    <li key={l.lesson} className="flex gap-3">
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-violet text-xs font-bold text-white">
+                        {i + 1}
+                      </span>
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-sm font-bold">{l.lesson}</span>
+                        <span className="text-[13px] text-muted">{l.evidence}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {report.suggestions.ideas.length > 0 && (
                 <div className="flex flex-col gap-2">
-                  <span className="text-xs font-extrabold tracking-[.06em] text-muted">
-                    LA SEMAINE PROCHAINE, JE PROPOSE
-                  </span>
-                  {report.suggestions.map((s) => (
+                  <span className="text-xs font-extrabold tracking-[.06em] text-muted">CETTE SEMAINE, JE PROPOSE</span>
+                  {report.suggestions.ideas.map((s) => (
                     <span key={s} className="flex gap-2.5 text-sm font-semibold">
                       <CheckIcon size={18} className="shrink-0 text-violet" />
                       {s}
@@ -212,9 +236,17 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
                   ))}
                 </div>
               )}
+              <p className="text-[13px] text-muted">Fauve applique ces leçons à tes prochains montages. Le bilan se met à jour chaque dimanche.</p>
+              <RefreshReportButton label="Refaire l’analyse" />
             </>
           ) : (
-            <p className="text-[15px] leading-relaxed text-muted">Pas encore de bilan : il arrivera ici chaque semaine.</p>
+            <>
+              <p className="text-[15px] leading-relaxed text-muted">
+                Fauve compare tes derniers posts Instagram (formats, accroches, heures, chiffres) pour te dire ce qui marche,
+                avec les preuves. Le bilan arrive chaque dimanche.
+              </p>
+              <RefreshReportButton />
+            </>
           )}
         </section>
 

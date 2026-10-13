@@ -124,6 +124,11 @@ export const toolSpecs = {
       comments_per_post: z.number().int().min(0).max(30).default(8),
     }),
   },
+  analyze_performance: {
+    description:
+      "« Ce qui marche » : compare les derniers posts Instagram du studio (chiffres, formats, heures, légendes, recette des Reels de Fauve) et en tire 2 à 5 leçons avec leurs preuves, plus des idées pour la semaine. Gratuit. Renvoie le dernier bilan s'il a moins de 3 jours, sauf refresh. Les leçons guident aussi les prochains montages.",
+    input: z.object({ refresh: z.boolean().default(false).describe("true pour refaire l'analyse même si le dernier bilan est récent") }),
+  },
   reply_to_comment: {
     description:
       "Publie une réponse publique sous un commentaire Instagram, au nom du studio. Uniquement après que la gérante a validé le texte exact (montre-lui d'abord ta proposition).",

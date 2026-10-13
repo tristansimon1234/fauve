@@ -17,6 +17,7 @@ import {
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { latestReport } from "@/lib/performance";
 import { designMotionScenes } from "./motion-designer";
 import { markTemplatesUsed, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { anthropic, logClaudeCost } from "./run";
@@ -45,12 +46,13 @@ export async function designEdit(params: {
   maxNewScenes?: number;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
-  const [post, studio, brand, previous, library] = await Promise.all([
+  const [post, studio, brand, previous, library, report] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms").eq("id", params.postId).eq("studio_id", params.studioId).single(),
     db.from("studios").select("name, booking_url").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
     templatesForEditor(params.studioId),
+    latestReport(params.studioId).catch(() => null),
   ]);
   if (post.error) throw new Error("Publication introuvable");
 
@@ -72,6 +74,8 @@ export async function designEdit(params: {
       tone: profile.tone,
       art_direction: profile.art_direction,
       moodboard: profile.moodboard?.reading,
+      // What worked on this studio's Instagram (weekly analysis): follow it when it applies.
+      lessons: report?.lessons.map((l) => l.lesson),
       default_template: profile.default_template,
       visual_notes: profile.visual_notes,
       colors: profile.colors,
