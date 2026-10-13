@@ -183,6 +183,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     async get_post_link({ post_id }) {
       const { data: post } = await db.from("posts").select("id").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
       if (!post) return json({ error: "Publication introuvable dans ce studio." });
+      // In the app she is already signed in: the post's card opens its page, no link to paste.
+      if (!ctx.waId) {
+        ctx.extras.posts = [post_id];
+        return json({
+          carte: "affichée sous ton message",
+          note: "Elle est dans l'application : la carte de la publication s'affiche sous ton message et ouvre sa page en un clic. N'écris aucun lien.",
+        });
+      }
       const { data: member } = await db.from("members").select("phone_e164").eq("id", ctx.memberId).single();
       const url = await createLoginLink(member?.phone_e164 as string, `/v/${post_id}`, "open_post");
       return json({ url, expires_in_minutes: 15 });

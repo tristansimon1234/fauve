@@ -1,0 +1,466 @@
+"use client";
+
+import {
+  buildSlideProps,
+  defaultLook,
+  SLIDE_Y,
+  type ReelInputs,
+  type SavedLook,
+  type SlidesPlan,
+  type SlideText,
+  type TextLook,
+} from "@fauve/agent";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { AskFauveButton } from "@/components/fauve-drawer";
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ImageIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { LayerFields } from "@/components/montage/layer-fields";
+import { ListItems } from "@/components/montage/list-items";
+import { LookPanel } from "@/components/montage/look-panel";
+import { photoRetouch } from "@/components/montage/retouch-actions";
+import { RetouchSwitches } from "@/components/montage/retouch-switches";
+import { SlidePreview } from "@/components/montage/slide-preview";
+import { TextBoxes } from "@/components/montage/text-boxes";
+import { saveSlidesPlan } from "./actions";
+
+// The carousel (or photo post) editor of the publication page, laid out like the
+// montage editor: the photo as it will be published on a dark stage with its
+// texts grabbable, the strip of photos under it, and on the right the selected
+// photo: its texts with quick colours, size and place, retouch, logo, and what
+// applies to the whole carousel.
+
+const styleLabels: Record<SlideText["style"], string> = { hook: "Accroche", band: "Bandeau", caption: "Petite ligne" };
+const DEFAULT_Y: Record<SlideText["style"], number> = { hook: 0.1, band: 0.42, caption: 0.7 };
+const places = [
+  { label: "Haut", y: 0.1 },
+  { label: "Milieu", y: 0.42 },
+  { label: "Bas", y: 0.7 },
+] as const;
+const templates = [
+  { value: "doux", label: "Doux" },
+  { value: "dynamique", label: "Dynamique" },
+  { value: "chic", label: "Chic" },
+] as const;
+const logoPlaces = [
+  { value: null, label: "Aucun" },
+  { value: "top", label: "En haut" },
+  { value: "bottom", label: "En bas" },
+] as const;
+
+/** Background swatches: the studio's colour, then a few soft ones that go with most photos. */
+const FILLS = ["accent", "#FFFFFF", "#1C1530", "#F2694E", "#FFD65A", "#F7B6C8", "#A8E6CF", "#BFD7FF"] as const;
+const INKS = ["#FFFFFF", "#1C1530", "accent"] as const;
+
+const round = (n: number) => Math.round(n * 10) / 10;
+const clampY = (y: number) => Math.min(SLIDE_Y.max, Math.max(SLIDE_Y.min, y));
+
+/** Dark ink on a light background, white on a dark one. */
+function inkOn(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.45 ? "#1C1530" : "#FFFFFF";
+}
+
+export function CarouselEditor({
+  postId,
+  postTitle,
+  initialPlan,
+  photos,
+  brand,
+  looks,
+}: {
+  postId: string;
+  postTitle: string;
+  initialPlan: SlidesPlan;
+  /** Signed URL of each photo, by media id (videos have none and keep no text). */
+  photos: Record<string, string>;
+  brand: ReelInputs["brand"];
+  looks: SavedLook[];
+}) {
+  const [saved, setSaved] = useState(initialPlan);
+  const [plan, setPlan] = useState(initialPlan);
+  const [index, setIndex] = useState(() => Math.max(0, initialPlan.slides.findIndex((s) => photos[s.media_id])));
+  const [active, setActive] = useState<number | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [saving, start] = useTransition();
+  const previewRef = useRef<HTMLDivElement>(null);
+  const dirty = JSON.stringify(plan) !== JSON.stringify(saved);
+
+  const slide = plan.slides[Math.min(index, plan.slides.length - 1)]!;
+  const url = photos[slide.media_id];
+  const props = useMemo(() => (url ? buildSlideProps(slide, { template: plan.template, imageUrl: url, brand }) : null), [slide, plan.template, url, brand]);
+  const brandLook = props?.brand ?? { accent: brand.accent ?? "#5B3FD9", accentInk: "#FFFFFF", displayFont: "Playfair Display", bodyFont: "Plus Jakarta Sans" };
+  const hex = (c: string) => (c === "accent" ? brandLook.accent : c === "accent_ink" ? brandLook.accentInk : c);
+
+  const edit = (next: SlidesPlan) => {
+    setPlan(next);
+    setMessage(null);
+  };
+  const setSlide = (patch: Partial<(typeof plan.slides)[number]>) => edit({ ...plan, slides: plan.slides.map((s, i) => (i === index ? { ...s, ...patch } : s)) });
+  const setText = (t: number, patch: Partial<SlideText>) => setSlide({ texts: slide.texts.map((x, j) => (j === t ? { ...x, ...patch } : x)) });
+  const lookOf = (t: SlideText): TextLook => t.look ?? defaultLook(t.style, { display: brandLook.displayFont, body: brandLook.bodyFont });
+  const go = (i: number) => {
+    if (i < 0 || i >= plan.slides.length) return;
+    setIndex(i);
+    setActive(null);
+  };
+
+  // ← → move between photos (not while typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable]")) return;
+      if (e.key === "ArrowLeft") go(index - 1);
+      if (e.key === "ArrowRight") go(index + 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const addText = () => {
+    const text: SlideText = slide.texts.length === 0 && index === 0 ? { text: "Ton accroche", style: "hook" } : { text: "Ton texte", style: "band" };
+    setSlide({ texts: [...slide.texts, text] });
+    setActive(slide.texts.length);
+    requestAnimationFrame(() => document.getElementById(`fauve-slide-text-${slide.texts.length}`)?.focus());
+  };
+
+  /** The selected text's look, size and background, on every text of the same kind in the carousel. */
+  const applyToAll = (t: SlideText) =>
+    edit({
+      ...plan,
+      slides: plan.slides.map((s) => ({
+        ...s,
+        texts: s.texts.map((x) => (x.style === t.style ? { ...x, look: t.look, scale: t.scale, backdrop: t.backdrop } : x)),
+      })),
+    });
+
+  const save = () =>
+    start(async () => {
+      const res = await saveSlidesPlan(postId, plan).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
+      if (res.ok) {
+        setSaved(plan);
+        setMessage({ ok: true, text: "Enregistré · les images finales suivent dans une minute" });
+      } else setMessage({ ok: false, text: res.error });
+    });
+
+  const chip = (on: boolean) => `h-8 rounded-full px-3 text-[12px] font-semibold ${on ? "bg-violet text-white" : "bg-white text-muted hover:text-ink"}`;
+  const swatch = (on: boolean) => `size-7 shrink-0 rounded-full border transition-transform hover:scale-110 motion-reduce:hover:scale-100 ${on ? "ring-2 ring-violet ring-offset-2" : "border-line"}`;
+
+  return (
+    <>
+      <div className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-4">
+        {/* The photo as it will be published, on a dark stage; arrows and ← → to move along the carousel. */}
+        <div className="relative flex items-center justify-center rounded-[24px] bg-[radial-gradient(ellipse_at_top,#2a2145_0%,#16112a_70%)] px-12 py-5">
+          <button
+            type="button"
+            aria-label="Photo précédente"
+            disabled={index === 0}
+            onClick={() => go(index - 1)}
+            className="absolute left-3 flex size-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-25"
+          >
+            <ArrowUpIcon size={18} className="-rotate-90" />
+          </button>
+          <div
+            ref={previewRef}
+            className="relative overflow-hidden rounded-[16px] bg-black shadow-[0_24px_60px_rgba(0,0,0,.45)]"
+            style={{ width: "max(220px, min(100%, 420px, calc((100dvh - 330px) * 4 / 5)))" }}
+          >
+            {props ? (
+              <>
+                <SlidePreview key={`${index}`} props={props} className="fauve-fade" />
+                {!slide.layer && (
+                  <TextBoxes
+                    container={previewRef}
+                    texts={slide.texts}
+                    active={active}
+                    yRange={[SLIDE_Y.min, SLIDE_Y.max]}
+                    onMove={(t, place) => setText(t, place)}
+                    onPick={(t) => {
+                      setActive(t);
+                      requestAnimationFrame(() => document.getElementById(`fauve-slide-text-${t}`)?.focus());
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="flex aspect-[4/5] items-center justify-center p-6 text-center text-sm text-white/60">
+                Une vidéo du carrousel : elle reste telle quelle, sans texte par-dessus.
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            aria-label="Photo suivante"
+            disabled={index === plan.slides.length - 1}
+            onClick={() => go(index + 1)}
+            className="absolute right-3 flex size-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-25"
+          >
+            <ArrowDownIcon size={18} className="-rotate-90" />
+          </button>
+        </div>
+
+        {/* The strip of photos, as published (with their texts): the carousel's timeline. */}
+        <section aria-label="Photos du carrousel" className="flex flex-col gap-2 rounded-[18px] border border-line bg-white p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[13px] font-bold">
+              {plan.slides.length} photo{plan.slides.length > 1 ? "s" : ""}
+            </span>
+            {dirty ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-semibold text-peach-ink">Modifié · pas encore enregistré</span>
+                <button type="button" onClick={() => edit(saved)} disabled={saving} className="h-8 rounded-full px-3 text-[13px] font-semibold text-muted hover:bg-soft disabled:opacity-40">
+                  Annuler
+                </button>
+                <button type="button" onClick={save} disabled={saving} className="btn btn-primary h-8 px-3.5 text-[13px] disabled:opacity-50">
+                  <CheckIcon size={15} />
+                  {saving ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
+            ) : (
+              <span className="flex items-center gap-1.5 text-[12px] text-muted">
+                <ImageIcon size={14} />
+                {message?.ok ? message.text : "Aperçu en direct · modifications gratuites"}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:thin]" role="tablist" aria-label="Photos">
+            {plan.slides.map((s, i) => {
+              const photo = photos[s.media_id];
+              const thumb = photo ? buildSlideProps(s, { template: plan.template, imageUrl: photo, brand }) : null;
+              return (
+                <button
+                  key={s.media_id}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === index}
+                  aria-label={`Photo ${i + 1}`}
+                  onClick={() => go(i)}
+                  className={`relative w-[92px] shrink-0 overflow-hidden rounded-[12px] bg-ink transition-shadow ${i === index ? "ring-2 ring-violet ring-offset-2" : "opacity-85 hover:opacity-100"}`}
+                >
+                  {thumb ? (
+                    <SlidePreview props={thumb} />
+                  ) : (
+                    <span className="flex aspect-[4/5] items-center justify-center text-[11px] font-bold text-white/70">Vidéo</span>
+                  )}
+                  <span className="absolute bottom-1 left-1 rounded-full bg-black/60 px-1.5 text-[10px] font-bold text-white">{i + 1}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {message && !message.ok && (
+          <p role="alert" className="rounded-xl bg-peach px-3 py-2 text-[13px] font-semibold text-danger">
+            {message.text}
+          </p>
+        )}
+      </div>
+
+      <aside aria-label="Photo sélectionnée" className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-6">
+        <section className="flex flex-col gap-4 rounded-[20px] border border-line bg-white p-5">
+          <div className="flex items-center gap-2">
+            <h2 className="min-w-0 flex-1 truncate text-[16px] font-bold">
+              Photo {index + 1} <span className="font-semibold text-muted">sur {plan.slides.length}</span>
+            </h2>
+          </div>
+          {!dirty && (
+            <AskFauveButton
+              topic={{ postId, title: postTitle, sceneLabel: `Photo ${index + 1}` }}
+              label="Demander à Fauve pour cette photo"
+              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-soft px-3 py-2 text-[13px] font-bold text-violet hover:bg-violet hover:text-white"
+            />
+          )}
+
+          {props && slide.layer ? (
+            <LayerFields layer={slide.layer} onChange={(texts) => setSlide({ layer: { ...slide.layer!, texts } })} onRemove={() => setSlide({ layer: undefined })} />
+          ) : (
+            props && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[14px] font-bold">Textes sur cette photo</h3>
+                  {slide.texts.length < 6 && (
+                    <button type="button" onClick={addText} className="inline-flex items-center gap-1 text-[13px] font-bold text-violet">
+                      <PlusIcon size={15} />
+                      Ajouter un texte
+                    </button>
+                  )}
+                </div>
+                {slide.texts.length === 0 && <p className="text-[13px] text-muted">Pas de texte : la photo parle d’elle-même.</p>}
+                {slide.texts.map((t, i) => {
+                  const look = t.look;
+                  return (
+                    <div
+                      key={i}
+                      onFocusCapture={() => setActive(i)}
+                      onPointerDownCapture={() => setActive(i)}
+                      className={`flex flex-col gap-2.5 rounded-[14px] p-3 transition-colors ${active === i ? "bg-violet-tint ring-1 ring-lilac" : "bg-soft"}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          id={`fauve-slide-text-${i}`}
+                          value={t.text}
+                          maxLength={120}
+                          hidden={Boolean(t.items)}
+                          onChange={(e) => setText(i, { text: e.target.value })}
+                          aria-label="Texte"
+                          className="h-10 min-w-0 flex-1 rounded-[10px] border border-line bg-white px-3 text-[14px] outline-none focus:border-lilac"
+                        />
+                        {t.items && <span className="min-w-0 flex-1 text-[13px] font-bold">Liste · {t.items.length} éléments</span>}
+                        <button type="button" aria-label="Supprimer ce texte" onClick={() => setSlide({ texts: slide.texts.filter((_, j) => j !== i) })} className="text-muted hover:text-danger">
+                          <TrashIcon size={16} />
+                        </button>
+                      </div>
+                      {t.items && (
+                        <ListItems
+                          items={t.items}
+                          bullet={t.bullet}
+                          onChange={(patch) => setText(i, { ...patch, ...(patch.items ? { text: patch.items[0]?.title.slice(0, 120) ?? t.text } : {}) })}
+                        />
+                      )}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {(Object.keys(styleLabels) as SlideText["style"][]).map((style) => (
+                          <button key={style} type="button" onClick={() => setText(i, { style })} className={chip(t.style === style)}>
+                            {styleLabels[style]}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Quick looks: a highlight colour, the letters' colour, the size, the place. */}
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[12px] font-semibold text-muted">Fond</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            aria-label="Sans fond"
+                            aria-pressed={!look?.fill && !t.backdrop}
+                            onClick={() => setText(i, { backdrop: undefined, look: look ? { ...look, fill: undefined } : undefined })}
+                            className={`${swatch(!look?.fill && !t.backdrop)} bg-[linear-gradient(135deg,#fff_45%,#E5484D_45%,#E5484D_55%,#fff_55%)]`}
+                          />
+                          {FILLS.filter((c) => c === "accent" || c.toLowerCase() !== brandLook.accent.toLowerCase()).map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              aria-label={c === "accent" ? "Fond couleur du studio" : `Fond ${c}`}
+                              aria-pressed={look?.fill?.color === c}
+                              onClick={() => {
+                                const base = lookOf(t);
+                                setText(i, { backdrop: undefined, look: { ...base, fill: { kind: base.fill?.kind ?? "line", color: c, opacity: 1, radius: base.fill?.radius }, color: inkOn(hex(c)), shadow: "none" } });
+                              }}
+                              className={swatch(look?.fill?.color === c)}
+                              style={{ background: hex(c) }}
+                            />
+                          ))}
+                        </div>
+                        {look?.fill && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {(["line", "box", "pill"] as const).map((kind) => (
+                              <button key={kind} type="button" onClick={() => setText(i, { look: { ...look, fill: { ...look.fill!, kind } } })} className={chip(look.fill!.kind === kind)}>
+                                {{ line: "Surligné", box: "Bloc", pill: "Pilule" }[kind]}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[12px] font-semibold text-muted">Lettres</span>
+                        {INKS.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            aria-label={c === "accent" ? "Lettres couleur du studio" : `Lettres ${c}`}
+                            aria-pressed={look?.color === c}
+                            onClick={() => setText(i, { look: { ...lookOf(t), color: c } })}
+                            className={swatch(look?.color === c)}
+                            style={{ background: hex(c) }}
+                          />
+                        ))}
+                        <span className="ml-2 text-[12px] font-semibold text-muted">Taille</span>
+                        <button
+                          type="button"
+                          aria-label="Plus petit"
+                          disabled={(t.scale ?? 1) <= 0.6}
+                          onClick={() => setText(i, { scale: Math.max(0.6, round((t.scale ?? 1) - 0.1)) })}
+                          className="h-8 w-9 rounded-full bg-white text-[12px] font-bold text-muted disabled:opacity-30"
+                        >
+                          A−
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Plus grand"
+                          disabled={(t.scale ?? 1) >= 1.6}
+                          onClick={() => setText(i, { scale: Math.min(1.6, round((t.scale ?? 1) + 0.1)) })}
+                          className="h-8 w-9 rounded-full bg-white text-[14px] font-bold text-muted disabled:opacity-30"
+                        >
+                          A+
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="mr-1 text-[12px] font-semibold text-muted">Place</span>
+                        {places.map((place) => (
+                          <button
+                            key={place.label}
+                            type="button"
+                            onClick={() => setText(i, { y: clampY(place.y) })}
+                            className={chip(Math.abs((t.y ?? DEFAULT_Y[t.style]) - place.y) < 0.05)}
+                          >
+                            {place.label}
+                          </button>
+                        ))}
+                        <span className="text-[11px] text-muted">ou attrape-le sur la photo</span>
+                      </div>
+                      <LookPanel role={t.style} look={t.look} saved={looks} brand={brandLook} video={false} onChange={(next) => setText(i, { look: next })} />
+                      {plan.slides.length > 1 && (
+                        <button type="button" onClick={() => applyToAll(t)} className="self-start text-[12px] font-bold text-violet hover:underline">
+                          Même style sur toutes les photos ({styleLabels[t.style].toLowerCase()})
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          {url && (
+            <div className="flex flex-col gap-3 border-t border-line pt-4">
+              <h3 className="text-[14px] font-bold">La photo</h3>
+              <RetouchSwitches
+                key={slide.media_id}
+                light={Boolean(slide.edit?.adjust)}
+                faces={Boolean(slide.edit?.blur?.some((b) => b.kind === "face"))}
+                onChange={async (next) => {
+                  const res = await photoRetouch(slide.media_id, next).catch(() => ({ ok: false as const, error: "Fauve n’a pas pu regarder cette photo." }));
+                  if (!res.ok) return { ok: false, message: res.error };
+                  setSlide({ edit: res.value ?? undefined });
+                  return { ok: true, message: res.note };
+                }}
+              />
+              {brand.logoUrl && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-[12px] font-semibold text-muted">Logo</span>
+                  {logoPlaces.map((p) => (
+                    <button key={p.label} type="button" onClick={() => setSlide({ logo: p.value ?? undefined })} className={chip((slide.logo ?? null) === p.value)}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section aria-label="Tout le carrousel" className="flex flex-col gap-3 rounded-[20px] border border-line bg-white p-5">
+          <h2 className="text-[16px] font-bold">Tout le carrousel</h2>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[12px] font-semibold text-muted">Gabarit</span>
+            {templates.map((t) => (
+              <button key={t.value} type="button" aria-pressed={plan.template === t.value} onClick={() => edit({ ...plan, template: t.value })} className={chip(plan.template === t.value)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[12px] leading-snug text-muted">Le gabarit donne les polices et les couleurs des textes qui n’ont pas de style à eux.</p>
+        </section>
+      </aside>
+    </>
+  );
+}
