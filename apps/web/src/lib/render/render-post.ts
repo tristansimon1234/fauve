@@ -18,7 +18,7 @@ import {
   type PostStatus,
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { renderInSandbox, renderReelInSandbox } from "./sandbox";
+import { renderInSandbox, renderReelInSandbox, smokeTestScenes } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm" };
 
@@ -150,6 +150,21 @@ export async function renderPost(studioId: string, postId: string): Promise<Rend
         clipUrls,
         words,
         brand: { name: studioName, accent, logoUrl, fonts },
+      });
+      // Library scenes play with new texts, older plans predate the layout check: every
+      // scene is checked before the render, and one whose text leaves the frame plays its
+      // fixed scene. If the check is unavailable, the scenes stay.
+      const checks = await smokeTestScenes(
+        props.segments.flatMap((s, i) => (s.type === "motion" ? [{ id: `m${i}`, js: s.js, durationInFrames: s.durationInFrames, texts: s.texts }] : [])),
+        props.brand,
+      ).catch((e: unknown): Record<string, string | null> => {
+        console.warn("motion scenes: check unavailable", e);
+        return {};
+      });
+      props.segments = props.segments.map((s, i) => {
+        if (s.type !== "motion" || !checks[`m${i}`]) return s;
+        console.warn("motion scene falls back to its fixed scene", renderId, checks[`m${i}`]);
+        return { type: "scene", scene: s.fallback, startAt: s.startAt, durationInFrames: s.durationInFrames };
       });
       try {
         mp4 = await renderReelInSandbox({ id: renderId, props });

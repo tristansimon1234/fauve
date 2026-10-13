@@ -11,6 +11,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import { Fit } from "./Fit";
 import { SceneView } from "./Scene";
 import type { Theme } from "./theme";
 import type { ReelProps, Scene } from "./types";
@@ -19,9 +20,10 @@ import type { ReelProps, Scene } from "./types";
 // smoke-rendered before reaching here). It only sees this scope; any error at
 // render time falls back to the fixed scene, so a video always goes out.
 
-const SCOPE = { AbsoluteFill, Sequence, Img, useCurrentFrame, useVideoConfig, interpolate, interpolateColors, spring, Easing, random };
+// FitText: a box whose text shrinks until it fits (see Fit.tsx), so a long text never leaves the frame.
+export const SCOPE = { AbsoluteFill, Sequence, Img, useCurrentFrame, useVideoConfig, interpolate, interpolateColors, spring, Easing, random, FitText: Fit };
 
-type SceneComponent = (props: {
+export type SceneComponent = (props: {
   width: number;
   height: number;
   fps: number;
@@ -31,14 +33,14 @@ type SceneComponent = (props: {
   texts: Record<string, string>;
 }) => ReactNode;
 
-export function compileScene(js: string): SceneComponent | null {
+export function compileScene(js: string, scope: typeof SCOPE = SCOPE): SceneComponent | null {
   try {
     const factory = new Function(
       "React",
       "scope",
-      `"use strict";\nconst { ${Object.keys(SCOPE).join(", ")} } = scope;\n${js}\nreturn typeof Scene === "function" ? Scene : null;`,
+      `"use strict";\nconst { ${Object.keys(scope).join(", ")} } = scope;\n${js}\nreturn typeof Scene === "function" ? Scene : null;`,
     );
-    return factory(React, SCOPE) as SceneComponent | null;
+    return factory(React, scope) as SceneComponent | null;
   } catch {
     return null;
   }

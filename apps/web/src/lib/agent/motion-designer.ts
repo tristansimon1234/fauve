@@ -81,6 +81,7 @@ export async function designMotionScenes(
   for (let round = 0; round < 2; round++) {
     const smoke = await smokeTestScenes(
       results.filter((r) => r.js).map((r) => ({ id: r.id, js: r.js!, durationInFrames: requests.find((q) => q.id === r.id)!.durationInFrames })),
+      brand,
     ).catch((e: unknown) => Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])));
     results = results.map((r) => (r.js && smoke[r.id] ? { ...r, js: null, error: smoke[r.id]! } : r));
     const failed = results.filter((r) => !r.js && r.code);
