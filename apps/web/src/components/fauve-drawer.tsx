@@ -190,7 +190,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         role="dialog"
         aria-modal="true"
         aria-label="Fauve"
-        className="absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%),#fff] shadow-[-12px_0_40px_rgba(28,21,48,0.14)]"
+        className="absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-white bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%)] shadow-[-12px_0_40px_rgba(28,21,48,0.14)]"
       >
         <header className="flex items-center gap-3 border-b border-line px-5 py-3.5">
           <Orb size={30} />
