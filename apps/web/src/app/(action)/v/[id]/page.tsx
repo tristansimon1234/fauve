@@ -7,7 +7,9 @@ import { formatDateTime } from "@/lib/format";
 import { loadEditorData } from "@/lib/montage-editor-data";
 import { whatsappLink } from "@/lib/public-env";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
-import { ActionView } from "./action-view";
+import { instagramAccount } from "@/lib/social/publish";
+import { recentMedia } from "@/lib/social/instagram";
+import { ActionView, type ActionMedia } from "./action-view";
 
 export const metadata: Metadata = { title: "Ta publication" };
 
@@ -49,19 +51,29 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
     planId && !locked ? loadEditorData(studioId, planId).catch(() => null) : Promise.resolve(null),
     post.render_id ? db.from("renders").select("storage_path").eq("id", post.render_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  // Without a live montage (photos, older montages): the rendered video or the first photo.
-  let videoUrl: string | null = null;
-  let photoUrl: string | null = null;
-  if (!editor) {
-    const path = (render.data?.storage_path as string | null) ?? null;
-    if (path) videoUrl = (await signMediaUrls(db, studioId, [path])).get(path) ?? null;
-    const first = (post.media_ids as string[] | null)?.[0];
-    if (!videoUrl && first) {
-      const { data: asset } = await db.from("media_assets").select("storage_path").eq("id", first).eq("studio_id", studioId).maybeSingle();
-      const p = asset?.storage_path as string | undefined;
-      if (p) photoUrl = (await signMediaUrls(db, studioId, [p])).get(p) ?? null;
-    }
-  }
+  // The montage video (also the grid cover), and the post's own photos and videos, in order.
+  const path = (render.data?.storage_path as string | null) ?? null;
+  const ids = (post.media_ids as string[] | null) ?? [];
+  const [assets, account] = await Promise.all([
+    ids.length
+      ? db.from("media_assets").select("id, storage_path, kind, mime_type").eq("studio_id", studioId).in("id", ids)
+      : Promise.resolve({ data: [] as { id: string; storage_path: string; kind: string; mime_type: string | null }[] }),
+    post.kind === "story" ? Promise.resolve(null) : instagramAccount(studioId),
+  ]);
+  const signed = await signMediaUrls(db, studioId, [...(path ? [path] : []), ...(assets.data ?? []).map((a) => a.storage_path as string)]);
+  const videoUrl = path ? (signed.get(path) ?? null) : null;
+  const byId = new Map((assets.data ?? []).map((a) => [a.id as string, a]));
+  const media: ActionMedia[] = ids.flatMap((mid) => {
+    const a = byId.get(mid);
+    const url = a ? signed.get(a.storage_path as string) : undefined;
+    return a && url ? [{ url, video: a.kind === "video" || String(a.mime_type ?? "").startsWith("video/") }] : [];
+  });
+  // The grid as followers will see it: this post first, then the latest ones on Instagram.
+  const feed = account ? await recentMedia(account.userId, account.accessToken, 8, { images: true }).catch(() => []) : [];
+  const grid = feed.flatMap((m) => {
+    const src = m.media_type === "VIDEO" ? m.thumbnail_url : m.media_url;
+    return src ? [{ url: src, reel: m.media_product_type === "REELS", carousel: m.media_type === "CAROUSEL_ALBUM" }] : [];
+  });
 
   return (
     <ActionView
@@ -76,7 +88,8 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
       }}
       editor={editor}
       videoUrl={videoUrl}
-      photoUrl={photoUrl}
+      media={media}
+      grid={post.kind === "story" ? null : grid}
       changeHref={whatsappLink(`Pour « ${post.title as string} » : `)}
       backHref={whatsappLink("")}
     />
