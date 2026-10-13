@@ -5,12 +5,12 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { z } from "zod";
 import { NoStudio, PageLoading } from "@/components/empty-state";
-import { ArrowLeftIcon, ChatIcon, ClockIcon, InstagramIcon, TikTokIcon } from "@/components/icons";
+import { ArrowLeftIcon, ClockIcon, InstagramIcon, TikTokIcon } from "@/components/icons";
 import { Orb } from "@/components/orb";
 import { DeleteButton } from "@/components/delete-button";
+import { AskFauveButton } from "@/components/fauve-drawer";
 import { StatusPill } from "@/components/status-pill";
 import { formatDateTime, formatSeconds, kindLabels, platformLabels } from "@/lib/format";
-import { whatsappLink } from "@/lib/public-env";
 import { loadEditorData } from "@/lib/montage-editor-data";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { postSlides } from "@/lib/render/slides";
@@ -130,10 +130,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           </p>
         </div>
         <div className="flex flex-wrap items-start gap-2">
-          <a href={whatsappLink(`Pour « ${post.title} » : `)} className="btn btn-secondary">
-            <ChatIcon size={18} />
-            Demander une modif
-          </a>
+          <AskFauveButton topic={{ postId: post.id, title: post.title }} label="Demander une modif" />
           <DeleteButton
             action={deletePost.bind(null, post.id)}
             redirectTo="/calendrier"
@@ -259,6 +256,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           </div>
           <MontageEditor
             postId={post.id}
+            postTitle={post.title}
             initialPlan={editor.plan}
             inputs={editor.inputs}
             clipDurations={editor.clipDurations}

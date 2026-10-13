@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { DeleteButton } from "@/components/delete-button";
-import { CheckIcon, InstagramIcon, WhatsAppIcon, XIcon } from "@/components/icons";
+import { AskFauveButton } from "@/components/fauve-drawer";
+import { CheckIcon, InstagramIcon, XIcon } from "@/components/icons";
 import { StatusPill } from "@/components/status-pill";
 import { kindLabels } from "@/lib/format";
-import { whatsappLink } from "@/lib/public-env";
 import { deletePost, updatePost } from "../publications/[id]/actions";
 import { getPostSheet, movePost, type PostSheet } from "./actions";
 
@@ -210,10 +210,7 @@ export function PostDrawer({
               <Link href={`/publications/${shown.id}`} className="btn btn-secondary flex-1">
                 {shown.locked ? "Voir" : "Ouvrir et modifier"}
               </Link>
-              <a href={whatsappLink(`Pour « ${shown.title} » : `)} className="btn btn-secondary flex-1">
-                <WhatsAppIcon size={17} />
-                Demander à Fauve
-              </a>
+              <AskFauveButton topic={{ postId: shown.id, title: shown.title }} className="btn btn-secondary flex-1" />
             </div>
             <div className="flex items-center justify-between gap-2">
               {shown.permalink ? (
