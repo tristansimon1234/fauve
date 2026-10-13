@@ -1,6 +1,6 @@
 import "server-only";
-import { montagePlanSchema, replyExtrasSchema, type MontagePlan, type PostKind, type PostStatus } from "@fauve/agent";
-import { creditBalance } from "@/lib/credits";
+import { effortSchema, montagePlanSchema, replyExtrasSchema, type Effort, type MontagePlan, type PostKind, type PostStatus } from "@fauve/agent";
+import { creditBalance, quoteEfforts, type QuoteStage } from "@/lib/credits";
 import { signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -28,6 +28,12 @@ export type CardQuote = {
   balance: number;
   /** What Fauve will make: duration, style, scenes in order. */
   plan: MontagePlan | null;
+  /** Level of care (null: a variant, or an older quote). */
+  effort: Effort | null;
+  /** The price at each level the balance allows, for the manager to pick another one. */
+  efforts: Partial<Record<Effort, { base: number; max: number; lines: { label: string; credits: number }[] }>>;
+  /** Where the launched montage is. */
+  stage: QuoteStage | null;
 };
 
 export type ChatCard = { type: "post"; post: CardPost } | { type: "grid"; posts: CardPost[] } | { type: "quote"; quote: CardQuote };
@@ -119,7 +125,11 @@ async function quoteCards(studioId: string, payloads: unknown[]): Promise<(ChatC
   if (!wanted.length) return ids.map(() => null);
   const db = supabaseAdmin();
   const [{ data }, balance] = await Promise.all([
-    db.from("credit_quotes").select("id, base, max, lines, params, used_at, charged_at, expires_at, posts(title)").eq("studio_id", studioId).in("id", wanted),
+    db
+      .from("credit_quotes")
+      .select("id, base, max, lines, params, effort, stage, used_at, charged_at, expires_at, posts(title)")
+      .eq("studio_id", studioId)
+      .in("id", wanted),
     creditBalance(studioId).catch(() => 0),
   ]);
   const byId = new Map(
@@ -130,7 +140,19 @@ async function quoteCards(studioId: string, payloads: unknown[]): Promise<(ChatC
       const plan = montagePlanSchema.safeParse((q.params as { plan?: unknown } | null)?.plan);
       return [
         q.id as string,
-        { id: q.id as string, title, lines: (q.lines as CardQuote["lines"]) ?? [], base: q.base as number, max: q.max as number, state, balance, plan: plan.success ? plan.data : null },
+        {
+          id: q.id as string,
+          title,
+          lines: (q.lines as CardQuote["lines"]) ?? [],
+          base: q.base as number,
+          max: q.max as number,
+          state,
+          balance,
+          plan: plan.success ? plan.data : null,
+          effort: effortSchema.nullable().catch(null).parse(q.effort ?? null),
+          efforts: Object.fromEntries(Object.entries(quoteEfforts(q.params)).map(([e, p]) => [e, { base: p.base, max: p.max, lines: p.lines }])),
+          stage: (q.stage as QuoteStage | null) ?? null,
+        },
       ];
     }),
   );

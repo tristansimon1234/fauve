@@ -10,6 +10,7 @@ import {
   reactionSchema,
   replyExtrasSchema,
 } from "./schemas.ts";
+import { effortSchema } from "./effort.ts";
 import { slideTextSchema } from "./slides.ts";
 import { textLookSchema } from "./text-look.ts";
 
@@ -114,7 +115,7 @@ export const toolSpecs = {
   },
   quote_montage: {
     description:
-      "Prépare un montage ou une correction et son prix en crédits (obligatoire avant tout montage). Un petit montage (15 crédits au plus, le cas courant) part aussitôt, sans attendre d'accord : la réponse dit status started. Au-delà, c'est un devis à présenter. Pour un nouveau montage, donne toujours « plan » : la durée, le style et chaque scène dans l'ordre (vidéo, animation, fin) ; il s'affiche sur le devis, fixe le nombre de scènes animées facturables et guide le monteur. Renvoie le coût de base, le maximum si le monteur crée de nouvelles scènes animées, et le solde. Décris ensuite le plan à la gérante (durée, nombre de scènes, ce qu'elles montrent) et le coût ; pour un devis (pas started), attends son accord : montage ne part qu'au tour suivant, avec ce quote_id. Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent.",
+      "Prépare un montage ou une correction et son prix en crédits (obligatoire avant tout montage). Un petit montage (20 crédits au plus, le cas courant) part aussitôt, sans attendre d'accord : la réponse dit status started. Au-delà, c'est un devis à présenter. Pour un nouveau montage, donne toujours « plan » : la durée, le style et chaque scène dans l'ordre (vidéo, animation, fin) ; il s'affiche sur le devis, fixe le nombre de scènes animées facturables et guide le monteur. Renvoie le coût de base, le maximum si le monteur crée de nouvelles scènes animées, et le solde. Décris ensuite le plan à la gérante (durée, nombre de scènes, ce qu'elles montrent) et le coût ; pour un devis (pas started), attends son accord : montage ne part qu'au tour suivant, avec ce quote_id. Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent.",
     input: z.object({
       post_id: z.string().uuid(),
       media_ids: z.array(z.string().uuid()).max(10).optional().describe("Clips à monter (media_id). Facultatif pour une correction ou une vidéo 100 % motion design."),
@@ -122,6 +123,11 @@ export const toolSpecs = {
       correction: z.boolean().default(false).describe("true pour modifier le montage existant de cette publication"),
       plan: montagePlanSchema.optional().describe("Le plan proposé (obligatoire pour un nouveau montage, facultatif pour une correction)"),
       max_new_scenes: z.number().int().min(0).max(2).optional().describe("Nouvelles scènes animées permises (3 crédits chacune). 0 si la gérante veut faire simple ou économiser : le monteur réutilise alors la bibliothèque et les scènes fixes."),
+      effort: effortSchema
+        .optional()
+        .describe(
+          "Niveau de soin : rapide (une version, sans relecture), soigne (Fauve regarde la vidéo rendue et la fait corriger si besoin), max (deux versions, Fauve garde la meilleure et la peaufine). Par défaut celui du studio (contexte). rapide si elle est pressée ou pour un essai ; max pour un post important (lancement, offre, temps fort) ou si elle le demande.",
+        ),
       variant: z
         .object({
           template: motionTemplateSchema.optional().describe("Style de la variante ; par défaut le suivant (doux → dynamique → chic)"),
@@ -133,7 +139,7 @@ export const toolSpecs = {
   },
   montage_status: {
     description:
-      "Où en sont les montages lancés ces 3 dernières heures (ou celui d'une publication) : en montage (le monteur écrit le plan), en rendu, ou livré, et depuis combien de minutes. Un montage prend 2 à 5 minutes ; « late » signifie qu'il a sans doute échoué.",
+      "Où en sont les montages lancés ces 3 dernières heures (ou celui d'une publication) : en montage (le monteur écrit le plan), 2e version (Max), en rendu, en relecture (tu regardes la vidéo), en correction, ou livré, et depuis combien de minutes. Un montage prend 2 à 15 minutes selon son niveau ; « late » signifie qu'il a sans doute échoué.",
     input: z.object({ post_id: z.string().uuid().optional() }),
   },
   choose_version: {
@@ -143,8 +149,11 @@ export const toolSpecs = {
   },
   montage: {
     description:
-      "Lance le montage (ou la correction) devisé par quote_montage, une fois que la gérante a dit oui. En tâche de fond : ton monteur regarde les clips, choisit le gabarit, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue et envoyée automatiquement avec la légende (2 à 4 minutes). Les crédits sont débités à la livraison, jamais plus que le devis.",
-    input: z.object({ quote_id: z.string().uuid() }),
+      "Lance le montage (ou la correction) devisé par quote_montage, une fois que la gérante a dit oui. En tâche de fond : ton monteur regarde les clips, choisit le gabarit, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Fauve la regarde et la fait corriger avant de l'envoyer automatiquement (Rapide 2 à 4 min, Soigné 4 à 8, Max 8 à 15). Les crédits sont débités à la livraison, jamais plus que le devis.",
+    input: z.object({
+      quote_id: z.string().uuid(),
+      effort: effortSchema.optional().describe("Seulement si la gérante a choisi un autre niveau que celui du devis (ex. « Version Max ») : le prix est celui de ce niveau, déjà annoncé"),
+    }),
   },
   create_edit_plan: {
     description:

@@ -563,3 +563,84 @@ test("retouch: boxes, tracking, cover layout without empty corners, edits from G
   const next = carryRetouch(editPlanSchema.parse({ ...validPlan, segments: [{ clip_id: "a", in: 0, out: 2 }] }), previous);
   assert.equal(next.segments[0] && "blur" in next.segments[0] ? next.segments[0].blur?.tracks.length : 0, 1);
 });
+
+test("effort: each level adds its review, second version and corrections to the quote", async () => {
+  const { quoteMontage, montageCharge, effortVersions, CREDIT_PRICES, AUTO_START_MAX_CREDITS } = await import("./credits.ts");
+  const { otherEffort } = await import("./effort.ts");
+  const rapide = quoteMontage({ clips: 3, correction: false });
+  assert.deepEqual(quoteMontage({ clips: 3, correction: false, effort: "rapide" }), rapide); // no level = Rapide, as before
+  assert.equal(rapide.fixRounds, 0);
+
+  const soigne = quoteMontage({ clips: 3, correction: false, effort: "soigne" });
+  assert.equal(soigne.base, rapide.base + CREDIT_PRICES.review);
+  assert.equal(soigne.max, soigne.base + 2 * CREDIT_PRICES.newScene + CREDIT_PRICES.fixRound);
+  assert.ok(soigne.max <= AUTO_START_MAX_CREDITS); // the usual montage still starts at once
+
+  const max = quoteMontage({ clips: 3, correction: false, effort: "max" });
+  assert.equal(max.base, rapide.base + CREDIT_PRICES.alternative + CREDIT_PRICES.review);
+  assert.equal(max.fixRounds, 2);
+  assert.ok(max.max > AUTO_START_MAX_CREDITS); // Max waits for a yes
+
+  // Charged: base, scenes and corrections really made, never above the quote.
+  assert.equal(montageCharge(soigne, 0, 0), soigne.base);
+  assert.equal(montageCharge(soigne, 1, 1), soigne.base + CREDIT_PRICES.newScene + CREDIT_PRICES.fixRound);
+  assert.equal(montageCharge(soigne, 5, 5), soigne.max);
+
+  // A correction is one version, even at Max.
+  assert.equal(effortVersions("max", true), 1);
+  assert.equal(effortVersions("max", false), 2);
+  assert.equal(quoteMontage({ clips: 0, correction: true, effort: "max" }).lines.some((l) => l.credits === CREDIT_PRICES.alternative), false);
+
+  // The level offered next to the quoted one: up when allowed, else down.
+  assert.equal(otherEffort("soigne", ["rapide", "soigne", "max"]), "max");
+  assert.equal(otherEffort("soigne", ["rapide", "soigne"]), "rapide");
+  assert.equal(otherEffort("max", ["rapide", "soigne", "max"]), "soigne");
+  assert.equal(otherEffort("rapide", ["rapide"]), null);
+});
+
+test("critic: key frames at the hook, every scene and the end, with the texts on screen", async () => {
+  const { reviewMoments, fixBrief, alternativeBrief, planDigest } = await import("./critic.ts");
+  const { planTimeline } = await import("./motion.ts");
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 10,
+    template: "doux",
+    segments: [
+      { clip_id: "a", in: 0, out: 3 },
+      { motion: { brief: "Titre animé RENTRÉE", texts: { title: "RENTRÉE" } }, duration: 3 },
+      { clip_id: "b", in: 1, out: 5 },
+    ],
+    texts: [{ text: "Le cours du matin", from: 0, to: 2, style: "hook" }],
+    images: [],
+  });
+  const timeline = planTimeline(plan);
+  assert.deepEqual(timeline.segments.map((s) => s.start), [0, 3, 6]);
+  assert.equal(timeline.duration, 10);
+  // Fades overlap the scenes.
+  assert.ok(planTimeline({ ...plan, transitions: "fade" }).duration < 10);
+
+  const moments = reviewMoments(plan);
+  assert.equal(moments[0]!.t, 1);
+  assert.deepEqual(moments[0]!.texts, ["Le cours du matin"]);
+  assert.equal(moments.at(-1)!.t, 9.5);
+  assert.ok(moments.some((m) => m.scene === 2 && m.texts.includes("RENTRÉE"))); // the animation's slot text
+  assert.ok(moments.every((m, i) => i === 0 || m.t > moments[i - 1]!.t));
+
+  // Many scenes: at most `max` frames, hook and end kept.
+  const long = editPlanSchema.parse({
+    ...plan,
+    duration: 30,
+    segments: Array.from({ length: 15 }, (_, i) => ({ clip_id: `c${i}`, in: 0, out: 2 })),
+  });
+  const few = reviewMoments(long, 6);
+  assert.equal(few.length, 6);
+  assert.equal(few[0]!.t, 1);
+  assert.equal(few.at(-1)!.t, 29.5);
+
+  const brief = fixBrief({ score: 6, issues: [{ scene: 1, problem: "accroche trop longue", fix: "la réduire à 3 mots" }] }, "Ouverture dynamique");
+  assert.match(brief, /6\/10/);
+  assert.match(brief, /Scène 1 : accroche trop longue → la réduire à 3 mots/);
+  assert.match(brief, /Ouverture dynamique/);
+  assert.match(alternativeBrief(plan, null), /Deuxième version/);
+  assert.match(planDigest(plan), /Accroche : « Le cours du matin »/);
+});

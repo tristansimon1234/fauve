@@ -1,5 +1,6 @@
 "use client";
 
+import type { Effort } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
@@ -222,13 +223,13 @@ export function FauveWorkspace({
   };
 
   // « Lancer » on a quote card: the montage starts at once, no round trip through Fauve.
-  const launch = (quoteId: string) => {
+  const launch = (quoteId: string, effort?: Effort) => {
     if (!active || pending) return;
     setError(null);
     const conversationId = active;
     startTransition(async () => {
       try {
-        const res = await launchQuote(quoteId, conversationId);
+        const res = await launchQuote(quoteId, conversationId, effort);
         if (res.ok) {
           setMessages(res.messages);
           setConversations(res.conversations);

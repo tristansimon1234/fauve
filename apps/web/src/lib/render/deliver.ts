@@ -44,26 +44,31 @@ export async function notifyFailure(target: DeliveryTarget, text: string, detail
 export async function renderAndDeliver(target: DeliveryTarget): Promise<{ title: string } | null> {
   try {
     const r = await renderPost(target.studioId, target.postId);
-    const seconds = Math.round(r.durationMs / 100) / 10;
-    // On a phone: the one-action page (watch, validate, move a text).
-    const page = `/v/${target.postId}`;
-    const intro = `Ton montage « ${r.title} » est prêt 🎬 (${seconds} s).${target.rationale ? ` ${target.rationale}` : ""}`;
-    const after = "Valide-le sur sa page, ou dis-moi ce que tu veux changer. Je peux aussi te faire une variante (autre style, autre accroche) pour 1 crédit.";
-    const payload = { posts: [target.postId], open_post: target.postId };
-    if (target.waId) {
-      const link = await createLoginLink(`+${target.waId}`, page, "open_post");
-      const body = `${intro}\n\nRegarde-le ici : ${link}\n\n${after}`;
-      const id = await sendText(target.waId, body);
-      // Stored without the one-time link (Fauve's history must not reuse it).
-      await store(target, { wa_message_id: id, type: "text", body: `${intro}\n\n${after}`, payload });
-    } else {
-      await store(target, { type: "text", body: `${intro}\n\n${after}`, payload });
-    }
+    await deliverMontage(target, r);
     return { title: r.title };
   } catch (error) {
     console.error("render failed", target.postId, error);
     await notifyFailure(target, "Le montage n’a pas abouti cette fois, je regarde ce qui coince. Tu veux que je réessaie ? Aucun crédit n’a été débité.", error);
     return null;
+  }
+}
+
+/** Points the manager to a rendered montage: a sign-in link to its page on WhatsApp, its card in the app. */
+export async function deliverMontage(target: DeliveryTarget, r: { title: string; durationMs: number }): Promise<void> {
+  const seconds = Math.round(r.durationMs / 100) / 10;
+  // On a phone: the one-action page (watch, validate, move a text).
+  const page = `/v/${target.postId}`;
+  const intro = `Ton montage « ${r.title} » est prêt 🎬 (${seconds} s).${target.rationale ? ` ${target.rationale}` : ""}`;
+  const after = "Valide-le sur sa page, ou dis-moi ce que tu veux changer. Je peux aussi te faire une variante (autre style, autre accroche) pour 1 crédit.";
+  const payload = { posts: [target.postId], open_post: target.postId };
+  if (target.waId) {
+    const link = await createLoginLink(`+${target.waId}`, page, "open_post");
+    const body = `${intro}\n\nRegarde-le ici : ${link}\n\n${after}`;
+    const id = await sendText(target.waId, body);
+    // Stored without the one-time link (Fauve's history must not reuse it).
+    await store(target, { wa_message_id: id, type: "text", body: `${intro}\n\n${after}`, payload });
+  } else {
+    await store(target, { type: "text", body: `${intro}\n\n${after}`, payload });
   }
 }
 

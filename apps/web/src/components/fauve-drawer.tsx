@@ -1,5 +1,6 @@
 "use client";
 
+import type { Effort } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from "react";
 import { Bubble } from "@/app/(app)/fauve/chat-bubble";
@@ -182,10 +183,10 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
     [conversationId, pending, topic.postId, topic.scene, uploads],
   );
 
-  const launch = (quoteId: string) => {
+  const launch = (quoteId: string, effort?: Effort) => {
     if (!conversationId || pending) return;
     start(async () => {
-      const res = await launchQuote(quoteId, conversationId).catch(() => null);
+      const res = await launchQuote(quoteId, conversationId, effort).catch(() => null);
       if (res?.ok) setMessages(res.messages);
       else setError(res && !res.ok ? res.error : "Le montage n’a pas pu démarrer.");
     });

@@ -12,6 +12,7 @@ import {
   studioContextPrompt,
   toolSpecs,
   usdToEur,
+  type Effort,
   type TokenUsage,
   type ToolHandlers,
   type ReplyExtras,
@@ -50,6 +51,8 @@ export type RunFauveInput = ToolContext & {
     firstName: string | null;
     instagram: string | null;
     channel?: "whatsapp" | "web" | "instagram";
+    /** Default level of care for montages (Réglages). */
+    montageEffort?: Effort;
   };
 };
 
@@ -116,6 +119,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           onboardingStep: input.studio.onboardingStep,
           instagram: input.studio.instagram,
           channel: input.studio.channel,
+          montageEffort: input.studio.montageEffort,
         }),
       },
     ],

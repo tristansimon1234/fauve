@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { CREDIT_PRICES, MONTHLY_CREDITS } from "@fauve/agent";
+import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTHLY_CREDITS } from "@fauve/agent";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
@@ -10,6 +10,7 @@ import { formatPhone, platformLabels, plural, shortUrl } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
 import { getContentPlan, getSocialAccounts, getStudioContext, type SocialAccount } from "@/lib/studio";
 import { signOut } from "../../(onboarding)/connexion/actions";
+import { EffortSetting } from "./effort-setting";
 import { InstagramLinkCode } from "./instagram-link";
 import { SettingsTabs } from "@/components/settings-tabs";
 
@@ -22,6 +23,9 @@ const CREDIT_LINES: [string, string][] = [
   ["Scène de ta bibliothèque", "gratuit"],
   ["Correction d’un montage", `${CREDIT_PRICES.correction}`],
   ["Variante d’un montage", `${CREDIT_PRICES.variant}`],
+  ["Fauve regarde la vidéo (Soigné, Max)", `${CREDIT_PRICES.review}`],
+  ["Correction après l’avoir regardée", `${CREDIT_PRICES.fixRound}`],
+  ["2e version à comparer (Max)", `${CREDIT_PRICES.alternative}`],
   ["Rendu vidéo", `${CREDIT_PRICES.render}`],
   ["Lecture du moodboard", `${CREDIT_PRICES.moodboard}`],
   ["Messages à Fauve", "gratuit"],
@@ -61,13 +65,14 @@ async function Settings() {
     );
   }
   const { studio } = member;
-  const [accounts, plan, balance, ledger, fauveInstagram, dmContact] = await Promise.all([
+  const [accounts, plan, balance, ledger, fauveInstagram, dmContact, care] = await Promise.all([
     getSocialAccounts(db, studio.id),
     getContentPlan(db, studio.id),
     creditBalance(studio.id),
     db.from("credit_ledger").select("id, delta, label, created_at").eq("studio_id", studio.id).order("created_at", { ascending: false }).limit(10),
     fauveAccount(),
     db.from("instagram_contacts").select("igsid").eq("studio_id", studio.id).limit(1).maybeSingle(),
+    db.from("studios").select("montage_effort").eq("id", studio.id).maybeSingle(),
   ]);
   const dateFormat = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: studio.timezone });
 
@@ -138,6 +143,13 @@ async function Settings() {
               Régler mon style
             </Link>
           </p>
+        </Section>
+
+        <Section title="Soin des montages">
+          <p className="text-sm leading-normal">
+            Le niveau que Fauve propose pour chaque Reel. Tu peux en choisir un autre sur chaque devis, ou le lui dire.
+          </p>
+          <EffortSetting initial={effortSchema.catch(DEFAULT_EFFORT).parse(care.data?.montage_effort)} />
         </Section>
 
         <Section title="Rythme">

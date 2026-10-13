@@ -1,6 +1,6 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
-import { orderReplies } from "@fauve/agent";
+import { DEFAULT_EFFORT, effortSchema, orderReplies } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveResult } from "./run";
 
@@ -88,7 +88,7 @@ export async function replyInConversation(params: {
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
   const [studio, member, rows, instagram] = await Promise.all([
-    db.from("studios").select("name, business_type, timezone, onboarding_step").eq("id", params.studioId).single(),
+    db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
@@ -137,6 +137,7 @@ export async function replyInConversation(params: {
       firstName: member.data?.first_name ?? null,
       instagram: (instagram.data?.handle as string | null | undefined) ?? null,
       channel: params.channel ?? (params.waId ? "whatsapp" : "web"),
+      montageEffort: effortSchema.catch(DEFAULT_EFFORT).parse(studio.data.montage_effort),
     },
   });
 }

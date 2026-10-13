@@ -17,6 +17,9 @@ export function startMontage(studioId: string, quote: AcceptedQuote, target: { w
     brief: quote.brief ?? (quote.kind === "correction" ? "Correction demandée par la gérante." : undefined),
     maxNewScenes: quote.maxNewScenes,
     quoteId: quote.id,
+    // Soigné and Max: reviewed by the critic before delivery (montage job).
+    effort: quote.effort ?? undefined,
+    correction: quote.kind === "correction",
     waId: target.waId,
     replyTo: target.replyTo,
   });

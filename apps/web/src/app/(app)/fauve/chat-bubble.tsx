@@ -1,5 +1,6 @@
 "use client";
 
+import type { Effort } from "@fauve/agent";
 import { useState } from "react";
 import { SmileIcon, WhatsAppIcon } from "@/components/icons";
 import type { ChatMessage } from "./chat-actions";
@@ -32,7 +33,7 @@ export function Bubble({
   timezone: string;
   onReact: (id: string, emoji: string) => void;
   onChoose?: (answer: string) => void;
-  onLaunch: (quoteId: string) => void;
+  onLaunch: (quoteId: string, effort?: Effort) => void;
   busy: boolean;
 }) {
   const [picking, setPicking] = useState(false);

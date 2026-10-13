@@ -1,4 +1,6 @@
+import { EFFORTS, type Effort } from "@fauve/agent";
 import Link from "next/link";
+import { useState } from "react";
 import { CheckIcon, LayersIcon, PlayIcon } from "@/components/icons";
 import { StatusPill } from "@/components/status-pill";
 import { formatShortDateTime, kindLabels } from "@/lib/format";
@@ -16,8 +18,8 @@ export function ChatCards({
 }: {
   cards: ChatCard[];
   timezone: string;
-  /** Starts the quoted montage at once (no round trip through Fauve). */
-  onLaunch?: (quoteId: string) => void;
+  /** Starts the quoted montage at once (no round trip through Fauve), at the level picked on the card. */
+  onLaunch?: (quoteId: string, effort?: Effort) => void;
   /** Sends a short answer to Fauve, as if typed. */
   onAnswer?: (text: string) => void;
   busy?: boolean;
@@ -72,6 +74,18 @@ function PlanList({ plan }: { plan: NonNullable<CardQuote["plan"]> }) {
 
 const credits = (n: number) => `${n} crédit${n > 1 ? "s" : ""}`;
 
+const LEVELS: Effort[] = ["rapide", "soigne", "max"];
+
+/** What the launched montage is doing, as the card says it. */
+const stageLabels: Record<NonNullable<CardQuote["stage"]>, string> = {
+  design: "Montage en cours",
+  alternative: "2e version en cours",
+  render: "Rendu en cours",
+  review: "Fauve regarde la vidéo",
+  fix: "Fauve corrige le montage",
+  delivered: "Vidéo livrée",
+};
+
 /**
  * The plan and its price, before anything runs: one tap to launch. Wide, plan
  * on the left and price on the right on a computer; stacked on a phone.
@@ -83,11 +97,16 @@ function QuoteCard({
   busy,
 }: {
   quote: CardQuote;
-  onLaunch?: (quoteId: string) => void;
+  onLaunch?: (quoteId: string, effort?: Effort) => void;
   onAnswer?: (text: string) => void;
   busy: boolean;
 }) {
-  const scenes = quote.max > quote.base;
+  // The level of care, and its price: the quoted one, or another the balance allows.
+  const levels = LEVELS.filter((e) => quote.efforts[e]);
+  const [effort, setEffort] = useState<Effort | null>(quote.effort);
+  const price = (effort && effort !== quote.effort && quote.efforts[effort]) || quote;
+  const level = effort ? EFFORTS[effort] : null;
+  const extra = price.max > price.base;
   return (
     <article className="flex w-[min(640px,calc(100vw-2rem))] max-w-full flex-col overflow-hidden rounded-[20px] border border-line bg-white shadow-[0_4px_18px_rgba(28,21,48,0.07)]">
       <div className="flex flex-col gap-0.5 border-b border-line px-5 pt-4 pb-3">
@@ -97,8 +116,34 @@ function QuoteCard({
       <div className={`grid gap-5 p-5 ${quote.plan ? "sm:grid-cols-[1fr_230px]" : ""}`}>
         {quote.plan && <PlanList plan={quote.plan} />}
         <div className="flex flex-col gap-3 sm:rounded-[16px] sm:bg-soft sm:p-4">
+          {level && (
+            <div className="flex flex-col gap-1.5">
+              {quote.state === "open" && levels.length > 1 ? (
+                <div role="radiogroup" aria-label="Niveau de soin" className="grid grid-cols-3 gap-1 rounded-full bg-soft p-1 sm:bg-white">
+                  {levels.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      role="radio"
+                      aria-checked={effort === e}
+                      disabled={busy}
+                      onClick={() => setEffort(e)}
+                      className={`h-8 rounded-full text-[13px] font-bold transition-colors ${effort === e ? "bg-violet text-white" : "text-muted hover:text-ink"}`}
+                    >
+                      {EFFORTS[e].label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className="self-start rounded-full bg-violet-soft px-2.5 py-1 text-[12px] font-bold text-violet">{level.label}</span>
+              )}
+              <p className="text-[12px] leading-snug text-muted">
+                {level.pitch} · {level.minutes} min
+              </p>
+            </div>
+          )}
           <ul className="flex flex-col gap-1.5 text-[13px]">
-            {quote.lines.map((line) => (
+            {price.lines.map((line) => (
               <li key={line.label} className="flex justify-between gap-3">
                 <span className="text-ink/80">{line.label}</span>
                 <span className="shrink-0 font-semibold">{line.credits}</span>
@@ -106,26 +151,27 @@ function QuoteCard({
             ))}
             <li className="flex justify-between gap-3 border-t border-line pt-2 text-[15px] font-bold">
               <span>Total</span>
-              <span>{credits(quote.base)}</span>
+              <span>{credits(price.base)}</span>
             </li>
           </ul>
-          {scenes && (
+          {extra && (
             <p className="text-[12px] leading-snug text-muted">
-              Jusqu’à {credits(quote.max)} si Fauve crée de nouvelles animations. Tu ne paies que ce qui est vraiment fait.
+              Jusqu’à {credits(price.max)} si Fauve crée de nouvelles animations
+              {level?.review ? " ou corrige la vidéo après l’avoir regardée" : ""}. Tu ne paies que ce qui est vraiment fait.
             </p>
           )}
           <p className="text-[12px] text-muted">
-            Solde {credits(quote.balance)} · il t’en restera au moins {Math.max(0, quote.balance - quote.max)}
+            Solde {credits(quote.balance)} · il t’en restera au moins {Math.max(0, quote.balance - price.max)}
           </p>
           {quote.state === "open" && onLaunch ? (
             <div className="flex flex-col gap-1.5 pt-1">
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => onLaunch(quote.id)}
+                onClick={() => onLaunch(quote.id, effort && effort !== quote.effort ? effort : undefined)}
                 className="h-11 rounded-full bg-violet px-4 text-[15px] font-bold whitespace-nowrap text-white disabled:opacity-60"
               >
-                Lancer · {credits(quote.base)}
+                Lancer · {credits(price.base)}
               </button>
               {onAnswer && (
                 <button
@@ -145,7 +191,7 @@ function QuoteCard({
                 <span className="size-1.5 animate-bounce rounded-full bg-violet [animation-delay:-0.15s]" />
                 <span className="size-1.5 animate-bounce rounded-full bg-violet" />
               </span>
-              Montage en cours · 2 à 5 min
+              {quote.stage ? stageLabels[quote.stage] : "Montage en cours"} · {level?.minutes ?? "2 à 5"} min
             </span>
           ) : quote.state === "delivered" ? (
             <span className="flex items-center gap-1.5 text-[14px] font-bold text-success">

@@ -1,36 +1,80 @@
 import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { z } from "zod";
-import { editPlanSchema, motionTemplateSchema, variantPlan, type MotionTemplate } from "@fauve/agent";
+import {
+  alternativeBrief,
+  EFFORTS,
+  effortSchema,
+  effortVersions,
+  editPlanSchema,
+  fixBrief,
+  montageIssueSchema,
+  motionTemplateSchema,
+  variantPlan,
+  type MotionTemplate,
+} from "@fauve/agent";
+import { reviewMontage } from "@/lib/agent/critic";
 import { designEdit } from "@/lib/agent/editor";
-import { chargeQuote } from "@/lib/credits";
+import { chargeQuote, setQuoteStage } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
-import { notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
+import { deliverMontage, notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
+import { renderPost } from "@/lib/render/render-post";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-// Montage pipeline in two invocations, each with its own time budget:
-//   design: the editor (Opus) writes the plan and the motion designer the free scenes;
-//   render: Remotion renders it in the sandbox and the video goes to the manager.
+// Montage pipeline, one step per invocation (each with its own time budget).
+// Rapide (and older quotes): design → render, delivered at once.
+// Soigné and Max, a fixed chain of specialists: the editor (Opus) writes the
+// plan and the motion designer the free scenes (design; Max adds a second take,
+// alternative) → each version is rendered (render) → the critic watches key
+// frames, keeps the best version and lets it go or asks for corrections
+// (review) → the editor corrects it (fix) → render → review again, as many
+// rounds as the level allows. The best rendered version is always kept, so a
+// correction that fails never loses the montage.
 export const maxDuration = 300;
 
+const versionSchema = z.object({
+  planId: z.uuid(),
+  renderId: z.uuid().optional(),
+  rationale: z.string().max(600).optional(),
+  /** Made from the critic's corrections (charged as a correction once rendered). */
+  fix: z.boolean().optional(),
+});
+type Version = z.infer<typeof versionSchema>;
+
 const bodySchema = z.object({
-  step: z.enum(["design", "variant", "render"]),
+  step: z.enum(["design", "alternative", "variant", "render", "review", "fix"]),
   studioId: z.uuid(),
   postId: z.uuid(),
   mediaIds: z.array(z.uuid()).max(10).optional(),
-  brief: z.string().max(600).optional(),
+  /** The manager's request, with the plan she said yes to. */
+  brief: z.string().max(4000).optional(),
   waId: z.string().regex(/^\d{6,16}$/).optional(),
   replyTo: z.string().max(200).optional(),
-  rationale: z.string().max(400).optional(),
-  /** Credits: the accepted quote, the new scenes it allows, and (render step) the new scenes made. */
+  rationale: z.string().max(600).optional(),
+  /** Credits: the accepted quote, the new scenes it allows, and the new scenes made so far. */
   quoteId: z.uuid().optional(),
   maxNewScenes: z.number().int().min(0).max(2).optional(),
   newScenes: z.number().int().min(0).max(10).optional(),
   title: z.string().max(200).optional(),
   /** Variant step: the template and hook to change. */
   variant: z.object({ template: motionTemplateSchema.optional(), hook: z.string().max(120).optional() }).optional(),
+  /** Level of care; absent: one version, no review (older quotes). */
+  effort: effortSchema.optional(),
+  correction: z.boolean().optional(),
+  /** The versions in play: rendered ones carry their render. */
+  versions: z.array(versionSchema).max(3).optional(),
+  /** Corrections asked so far, and those rendered (charged). */
+  round: z.number().int().min(0).max(3).optional(),
+  fixes: z.number().int().min(0).max(3).optional(),
+  /** The critic's last word: what to correct, its score, its line for the manager. */
+  issues: z.array(montageIssueSchema).max(4).optional(),
+  score: z.number().int().min(1).max(10).optional(),
+  summary: z.string().max(300).optional(),
+  /** Two takes were compared (Max). */
+  compared: z.boolean().optional(),
 });
+type Job = z.infer<typeof bodySchema>;
 
 /** A new version of the post's plan: same cut, another template and hook (no editor call). */
 async function createVariant(studioId: string, postId: string, change: { template?: MotionTemplate; hook?: string }) {
@@ -60,48 +104,228 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid job" }, { status: 400 });
   const job = parsed.data;
-  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo };
+  after(() => run(job));
+  return Response.json({ queued: job.step }, { status: 202 });
+}
 
-  after(async () => {
+const FAILED = "Je n’ai pas réussi à préparer le montage. Aucun crédit n’a été débité. Tu veux que je réessaie ?";
+
+async function run(job: Job) {
+  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo };
+  const level = job.effort ? EFFORTS[job.effort] : null;
+  // Rapide and older quotes: one version, delivered as soon as it is rendered.
+  const reviewed = Boolean(level?.review && job.step !== "variant");
+
+  if (job.step === "variant") {
+    try {
+      const plan = await createVariant(job.studioId, job.postId, job.variant ?? {});
+      const rationale = `Variante en style « ${plan.template} »${job.variant?.hook ? ", avec une autre accroche" : ""} : dis-moi laquelle tu préfères.`;
+      await queueJob("montage", { ...target, step: "render", rationale, quoteId: job.quoteId, newScenes: 0 });
+    } catch (error) {
+      console.error("variant failed", job.postId, error);
+      await reopenQuote(job.quoteId);
+      await notifyFailure(target, "Je n’ai pas réussi à préparer la variante. Aucun crédit n’a été débité. Tu veux que je réessaie ?", error);
+    }
+    return;
+  }
+
+  if (!reviewed) {
     if (job.step === "render") {
+      await setQuoteStage(job.quoteId, "render");
       const delivered = await renderAndDeliver({ ...target, rationale: job.rationale });
       // Charged only once the video is out, for the scenes really made (never above the quote).
-      if (delivered && job.quoteId) await chargeQuote(job.quoteId, job.newScenes ?? 0, delivered.title);
-      else await reopenQuote(job.quoteId);
-      return;
-    }
-    if (job.step === "variant") {
-      try {
-        const plan = await createVariant(job.studioId, job.postId, job.variant ?? {});
-        const rationale = `Variante en style « ${plan.template} »${job.variant?.hook ? ", avec une autre accroche" : ""} : dis-moi laquelle tu préfères.`;
-        await queueJob("montage", { ...target, step: "render", rationale, quoteId: job.quoteId, newScenes: 0 });
-      } catch (error) {
-        console.error("variant failed", job.postId, error);
-        await reopenQuote(job.quoteId);
-        await notifyFailure(target, "Je n’ai pas réussi à préparer la variante. Aucun crédit n’a été débité. Tu veux que je réessaie ?", error);
-      }
+      if (delivered && job.quoteId) {
+        await setQuoteStage(job.quoteId, "delivered");
+        await chargeQuote(job.quoteId, job.newScenes ?? 0, delivered.title);
+      } else await reopenQuote(job.quoteId);
       return;
     }
     try {
-      const edit = await designEdit({
-        studioId: job.studioId,
-        postId: job.postId,
-        mediaIds: job.mediaIds,
-        brief: job.brief,
-        maxNewScenes: job.maxNewScenes,
-      });
-      await queueJob("montage", { ...target, step: "render", rationale: edit.rationale, quoteId: job.quoteId, newScenes: edit.newScenes });
+      await setQuoteStage(job.quoteId, "design");
+      const edit = await designEdit({ ...designInput(job), effort: level?.editorEffort });
+      await queueJob("montage", { ...target, step: "render", rationale: edit.rationale, quoteId: job.quoteId, newScenes: edit.newScenes, effort: job.effort });
     } catch (error) {
       console.error("montage design failed", job.postId, error);
       await reopenQuote(job.quoteId);
-      await notifyFailure(target, "Je n’ai pas réussi à préparer le montage. Aucun crédit n’a été débité. Tu veux que je réessaie ?", error);
+      await notifyFailure(target, FAILED, error);
     }
+    return;
+  }
+
+  try {
+    if (job.step === "design") await design(job);
+    else if (job.step === "alternative") await alternative(job);
+    else if (job.step === "render") await render(job);
+    else if (job.step === "review") await review(job);
+    else if (job.step === "fix") await fix(job);
+  } catch (error) {
+    console.error(`montage ${job.step} failed`, job.postId, error);
+    // A rendered version is never lost: it goes out as it is.
+    const kept = (job.versions ?? []).filter((v) => v.renderId);
+    if (kept.length && (await deliver(job, kept[kept.length - 1]!, null).catch(() => false))) return;
+    await reopenQuote(job.quoteId);
+    await notifyFailure(target, FAILED, error);
+  }
+}
+
+const next = (job: Job, patch: Partial<Job>) => queueJob("montage", { ...job, ...patch });
+
+/** What the editor is asked for: the clips, the request with the validated plan, the scenes allowed. */
+function designInput(job: Job) {
+  return { studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, maxNewScenes: job.maxNewScenes };
+}
+
+/** New animated scenes still allowed by the quote for the next version. */
+const scenesLeft = (job: Job) => Math.max(0, (job.maxNewScenes ?? 2) - (job.newScenes ?? 0));
+
+async function design(job: Job) {
+  await setQuoteStage(job.quoteId, "design");
+  const edit = await designEdit({ ...designInput(job), effort: EFFORTS[job.effort!].editorEffort });
+  const versions: Version[] = [{ planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) }];
+  const two = effortVersions(job.effort!, Boolean(job.correction)) > 1;
+  await next(job, { step: two ? "alternative" : "render", versions, newScenes: edit.newScenes, round: 0, fixes: 0 });
+}
+
+/** Max: a second take, to compare. If it fails, the first one goes on alone. */
+async function alternative(job: Job) {
+  await setQuoteStage(job.quoteId, "alternative");
+  const versions = [...(job.versions ?? [])];
+  let newScenes = job.newScenes ?? 0;
+  try {
+    const first = await supabaseAdmin().from("edit_plans").select("plan").eq("id", versions[0]!.planId).single();
+    const plan = editPlanSchema.parse(first.data?.plan);
+    const edit = await designEdit({
+      ...designInput(job),
+      brief: alternativeBrief(plan, job.brief),
+      maxNewScenes: scenesLeft(job),
+      effort: EFFORTS[job.effort!].editorEffort,
+      fresh: true,
+    });
+    versions.push({ planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) });
+    newScenes += edit.newScenes;
+  } catch (error) {
+    console.warn("second version failed, going on with one", job.postId, error);
+  }
+  await next(job, { step: "render", versions, newScenes });
+}
+
+/** Renders one version per invocation; a version that fails to render is dropped. */
+async function render(job: Job) {
+  await setQuoteStage(job.quoteId, "render");
+  let versions = [...(job.versions ?? [])];
+  let fixes = job.fixes ?? 0;
+  const todo = versions.find((v) => !v.renderId);
+  if (todo) {
+    try {
+      const r = await renderPost(job.studioId, job.postId, { editPlanId: todo.planId });
+      versions = versions.map((v) => (v === todo ? { ...v, renderId: r.renderId } : v));
+      if (todo.fix) fixes += 1;
+    } catch (error) {
+      console.error("version render failed", job.postId, todo.planId, error);
+      versions = versions.filter((v) => v !== todo);
+      // The correction did not render: the version already reviewed goes out.
+      if (todo.fix && versions.some((v) => v.renderId)) {
+        await deliver({ ...job, versions, fixes, summary: undefined }, versions.find((v) => v.renderId)!, null);
+        return;
+      }
+    }
+  }
+  if (!versions.length) throw new Error("Aucune version du montage n'a pu être rendue");
+  await next(job, { step: versions.some((v) => !v.renderId) ? "render" : "review", versions, fixes });
+}
+
+async function review(job: Job) {
+  await setQuoteStage(job.quoteId, "review");
+  const rendered = (job.versions ?? []).filter((v): v is Version & { renderId: string } => Boolean(v.renderId));
+  if (!rendered.length) throw new Error("Rien à relire");
+  const round = job.round ?? 0;
+  const verdict = await reviewMontage({
+    studioId: job.studioId,
+    postId: job.postId,
+    versions: rendered,
+    request: job.brief,
+    asked: round > 0 ? job.issues : undefined,
   });
-  return Response.json({ queued: job.step }, { status: 202 });
+  // Without a verdict the latest version goes out (after a correction, the corrected one).
+  const best = rendered[verdict?.best ?? rendered.length - 1]!;
+  const compared = job.compared || (round === 0 && rendered.length > 1);
+  if (!verdict || verdict.review.ok || !verdict.review.issues.length || round >= EFFORTS[job.effort!].fixRounds) {
+    // The critic's line: what the correction improved when the corrected version is kept, else what it checked.
+    const line = best.fix && job.summary ? job.summary : verdict?.review.summary;
+    await deliver({ ...job, compared }, best, line ?? null);
+    return;
+  }
+  await next(job, {
+    step: "fix",
+    versions: [best],
+    issues: verdict.review.issues,
+    score: verdict.review.score,
+    summary: verdict.review.summary.slice(0, 300),
+    compared,
+  });
+}
+
+/** The editor corrects the kept version from the critic's notes; the kept version stays in play. */
+async function fix(job: Job) {
+  await setQuoteStage(job.quoteId, "fix");
+  const best = job.versions?.[0];
+  if (!best?.renderId) throw new Error("Pas de version à corriger");
+  try {
+    const edit = await designEdit({
+      ...designInput(job),
+      brief: fixBrief({ score: job.score ?? 5, issues: job.issues ?? [] }, job.brief),
+      fromPlanId: best.planId,
+      maxNewScenes: scenesLeft(job),
+      effort: EFFORTS[job.effort!].editorEffort,
+    });
+    await next(job, {
+      step: "render",
+      versions: [best, { planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600), fix: true }],
+      newScenes: (job.newScenes ?? 0) + edit.newScenes,
+      round: (job.round ?? 0) + 1,
+    });
+  } catch (error) {
+    console.warn("correction failed, the reviewed version goes out", job.postId, error);
+    await deliver({ ...job, summary: undefined }, best, null);
+  }
+}
+
+/**
+ * The kept version becomes the post's current one and goes to the manager,
+ * with the critic's line; the quote is charged for what was really made.
+ */
+async function deliver(job: Job, best: Version, line: string | null): Promise<boolean> {
+  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo };
+  const db = supabaseAdmin();
+  await db.from("posts").update({ edit_plan_id: best.planId, render_id: best.renderId }).eq("id", job.postId).eq("studio_id", job.studioId);
+  const [post, render] = await Promise.all([
+    db.from("posts").select("title").eq("id", job.postId).single(),
+    db.from("renders").select("duration_ms").eq("id", best.renderId!).single(),
+  ]);
+  const title = (post.data?.title as string | null) ?? "";
+  const care = [
+    job.compared ? "J’en ai préparé deux versions et gardé la meilleure." : "",
+    line ? `Je l’ai regardée avant de te l’envoyer : ${line.replace(/^\s*[A-ZÀ-Ý]/, (c) => c.toLowerCase())}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  try {
+    await deliverMontage({ ...target, rationale: [best.rationale, care].filter(Boolean).join(" ") || undefined }, { title, durationMs: (render.data?.duration_ms as number | null) ?? 0 });
+  } catch (error) {
+    console.error("montage delivery failed", job.postId, error);
+    await reopenQuote(job.quoteId);
+    await notifyFailure(target, "Le montage est prêt mais je n’ai pas pu te l’envoyer. Tu le trouves dans l’app, page de la publication. Aucun crédit n’a été débité.", error);
+    return true;
+  }
+  if (job.quoteId) {
+    await setQuoteStage(job.quoteId, "delivered");
+    await chargeQuote(job.quoteId, job.newScenes ?? 0, title, job.fixes ?? 0);
+  }
+  return true;
 }
 
 /** The work failed before anything was charged: the same quote can be launched again. */
 async function reopenQuote(quoteId: string | undefined) {
   if (!quoteId) return;
-  await supabaseAdmin().from("credit_quotes").update({ used_at: null }).eq("id", quoteId).is("charged_at", null);
+  await supabaseAdmin().from("credit_quotes").update({ used_at: null, stage: null, stage_at: null }).eq("id", quoteId).is("charged_at", null);
 }

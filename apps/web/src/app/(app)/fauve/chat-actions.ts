@@ -1,6 +1,6 @@
 "use server";
 
-import { editPlanSchema, segmentKind } from "@fauve/agent";
+import { editPlanSchema, EFFORTS, effortSchema, segmentKind, type Effort } from "@fauve/agent";
 import { after } from "next/server";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { extrasOf, resolveCards, type ChatCard } from "@/lib/chat-cards";
@@ -321,13 +321,15 @@ export async function sendToFauve(
  * again. The manager's yes and Fauve's « c'est parti » are written to the
  * conversation so the history (and Fauve's memory) stays coherent.
  */
-export async function launchQuote(quoteId: string, conversationId: string): Promise<SendResult> {
+export async function launchQuote(quoteId: string, conversationId: string, effort?: Effort): Promise<SendResult> {
   const ctx = await current();
   if (!ctx) return { ok: false, error: "Ton numéro n’est relié à aucun studio.", conversationId };
-  if (!UUID.test(quoteId) || !(await owns(ctx.studioId, conversationId))) {
+  const level = effortSchema.optional().safeParse(effort);
+  if (!UUID.test(quoteId) || !level.success || !(await owns(ctx.studioId, conversationId))) {
     return { ok: false, error: "Ce devis n’est plus disponible.", conversationId };
   }
-  const quote = await acceptQuote(ctx.studioId, quoteId, new Date());
+  // The level picked on the card, at the price it showed.
+  const quote = await acceptQuote(ctx.studioId, quoteId, new Date(), { effort: level.data });
   if ("error" in quote) return { ok: false, error: quote.error, conversationId };
 
   const db = supabaseAdmin();
@@ -342,7 +344,15 @@ export async function launchQuote(quoteId: string, conversationId: string): Prom
   // One after the other, so they keep their order in the conversation.
   await db
     .from("whatsapp_messages")
-    .insert({ studio_id: ctx.studioId, conversation_id: conversationId, channel: "web", direction: "inbound", phone_e164: ctx.phone, type: "text", body: "Oui, lance" });
+    .insert({
+      studio_id: ctx.studioId,
+      conversation_id: conversationId,
+      channel: "web",
+      direction: "inbound",
+      phone_e164: ctx.phone,
+      type: "text",
+      body: quote.effort ? `Oui, lance (${EFFORTS[quote.effort].label})` : "Oui, lance",
+    });
   await db.from("whatsapp_messages").insert(
     {
       studio_id: ctx.studioId,
@@ -350,8 +360,10 @@ export async function launchQuote(quoteId: string, conversationId: string): Prom
       channel: "web",
       direction: "outbound",
       type: "text",
-      body: "C’est parti ! Je monte ta vidéo, je t’ouvre sa page dès qu’elle est prête (2 à 5 minutes).",
-      payload: { notes: [`montage lancé (quote_id=${quote.id})`] },
+      body: quote.effort && EFFORTS[quote.effort].review
+        ? `C’est parti ! Je monte ta vidéo, je la regarde et la corrige si besoin, puis je t’ouvre sa page (${EFFORTS[quote.effort].minutes} minutes).`
+        : "C’est parti ! Je monte ta vidéo, je t’ouvre sa page dès qu’elle est prête (2 à 5 minutes).",
+      payload: { notes: [`montage lancé (quote_id=${quote.id}${quote.effort ? `, ${EFFORTS[quote.effort].label}` : ""})`] },
     },
   );
   const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, conversationId), list(ctx.studioId)]);
