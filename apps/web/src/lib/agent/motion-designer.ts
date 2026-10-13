@@ -40,7 +40,8 @@ async function writeScene(
   const response = await anthropic().beta.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: 16000,
-    output_config: { effort: "high", format: betaZodOutputFormat(motionSceneOutputSchema) },
+    // Medium: the code needs care, not long deliberation; most of the cost was thinking tokens.
+    output_config: { effort: "medium", format: betaZodOutputFormat(motionSceneOutputSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: [{ type: "text", text: MOTION_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],

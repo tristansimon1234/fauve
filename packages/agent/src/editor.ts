@@ -37,9 +37,10 @@ Règles de montage :
 - Jamais de musique (« music » vaut null) ; pas d'images (« images » vide).
 
 Scènes de motion design (sans vidéo, aux couleurs du studio) :
-- « motion » : une scène libre, sur mesure, que ton motion designer animera en code (typographie cinétique, formes, tracés, masques…). Dans « brief », décris précisément l'idée visuelle, les textes exacts, l'ordre des mouvements, les couleurs et l'ambiance. Donne aussi « fallback », une scène fixe équivalente au cas où. C'est ton outil principal pour une ouverture marquante, une offre, un planning, un témoignage mis en scène, une transition graphique, ou une vidéo sans clips.
+- « motion » : une scène libre, sur mesure, que ton motion designer animera en code (typographie cinétique, formes, tracés, masques…). Dans « brief », décris précisément l'idée visuelle, les textes exacts, l'ordre des mouvements, les couleurs et l'ambiance. Donne aussi « fallback », une scène fixe équivalente au cas où. Réserve-la aux moments forts : une ouverture marquante, une offre, un témoignage mis en scène. Chaque scène libre coûte cher à produire : 2 au plus par Reel.
 - « scene » : gabarit fixe et rapide (title, list, quote, number), si une scène libre n'apporte rien.
 - 1,5 à 6 s par scène. Avec des clips : 1 à 3 scènes au plus. Sans clips : un Reel entièrement en motion design, de 3 à 5 scènes qui s'enchaînent.
+- Au plus 2 scènes « motion » par Reel ; les autres sont des « scene » fixes (un titre, une liste, une citation, un chiffre bien animés suffisent souvent).
 
 Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (lecture des images d'inspiration de la gérante : ambiance, couleurs, typographie, composition, rythme ; en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. Ses polices et couleurs sont appliquées automatiquement.
 
@@ -67,12 +68,20 @@ export type EditorOutput = z.infer<typeof editorOutputSchema>;
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
+/** Free motion-design scenes per Reel (each one is an Opus call): the rest use fixed scenes. */
+export const MAX_FREE_SCENES = 2;
+
 /**
  * Makes a model-written plan safe to render: segments inside their clips, a
  * duration that matches the timeline, texts inside it. Throws if nothing usable is left.
  */
 export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>): EditPlan {
+  let freeScenes = 0;
   const segments = plan.segments.flatMap((s): PlanSegment[] => {
+    // Free scenes are the costly part of a montage: past the cap, the fixed fallback plays instead.
+    if (isMotionSegment(s) && freeScenes++ >= MAX_FREE_SCENES && s.motion.fallback) {
+      return [{ scene: s.motion.fallback, duration: round(Math.min(6, Math.max(1, s.duration))) }];
+    }
     if (isMotionSegment(s)) return [{ ...s, duration: round(Math.min(8, Math.max(1, s.duration))) }];
     if (!isClipSegment(s)) return [{ ...s, duration: round(Math.min(6, Math.max(1, s.duration))) }];
     const max = clipDurations[s.clip_id];
