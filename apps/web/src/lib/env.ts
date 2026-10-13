@@ -24,6 +24,8 @@ const schema = {
   INSTAGRAM_APP_ID: z.string().regex(/^\d+$/),
   INSTAGRAM_APP_SECRET: z.string().min(1),
   INSTAGRAM_GRAPH_VERSION: z.string().default("v26.0"),
+  // Instagram webhooks (DMs to Fauve's account): the "verify token" entered in the Meta dashboard.
+  INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().min(16),
   // Bearer secret for /api/cron/* (pg_cron sends it from Supabase Vault).
   CRON_SECRET: z.string().min(32),
   // Google AI Studio key and model for video analysis.

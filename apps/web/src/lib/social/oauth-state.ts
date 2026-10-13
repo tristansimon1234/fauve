@@ -9,6 +9,9 @@ import { env } from "@/lib/env";
 
 const TTL_MS = 15 * 60_000;
 
+/** State of the admin flow that connects Fauve's own Instagram account (not a studio). */
+export const FAUVE_ACCOUNT_STATE = "fauve";
+
 type StatePayload = { studioId: string; memberId: string; exp: number; nonce: string };
 
 const sign = (data: string) =>

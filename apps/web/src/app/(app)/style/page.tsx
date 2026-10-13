@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { sanitizeProfile, toStyleForm } from "./style-profile";
+import { fauveAccount } from "@/lib/instagram-dm";
+import { InspirationsSection, type Inspiration } from "./inspirations-section";
 import type { SceneTemplate } from "./scenes-section";
 import { StyleEditor } from "./style-editor";
 import type { Logo, MoodboardView } from "./style-options";
@@ -78,8 +80,21 @@ async function StyleLoader() {
     uses: s.uses as number,
   }));
 
+  const [{ data: shared }, fauve] = await Promise.all([
+    db.from("inspirations").select("id, title, url, analysis, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(12),
+    fauveAccount(),
+  ]);
+  const inspirations: Inspiration[] = (shared ?? []).map((i) => ({
+    id: i.id as string,
+    title: (i.title as string | null) ?? null,
+    url: (i.url as string | null) ?? null,
+    analysis: (i.analysis as string | null) ?? null,
+    at: i.created_at as string,
+  }));
+
   return (
     <StyleEditor
+      inspirations={<InspirationsSection items={inspirations} fauveHandle={fauve?.username ?? null} />}
       scenes={scenes}
       moodboard={moodboard}
       studioId={studioId}

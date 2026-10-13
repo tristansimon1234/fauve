@@ -31,6 +31,7 @@ export function StyleEditor({
   logo: initialLogo,
   moodboard,
   scenes,
+  inspirations,
 }: {
   studioId: string;
   studioName: string;
@@ -39,6 +40,8 @@ export function StyleEditor({
   logo: Logo;
   moodboard: MoodboardView;
   scenes: SceneTemplate[];
+  /** Server-rendered list of the Reels shared on Instagram. */
+  inspirations: React.ReactNode;
 }) {
   const [form, setForm] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -100,6 +103,7 @@ export function StyleEditor({
         onSaved={setVersion}
         onUsePalette={(colors) => update({ colors: colors.slice(0, MAX_COLORS) })}
       />
+      {inspirations}
       <ArtDirectionSection value={form.art_direction} onChange={(art_direction) => update({ art_direction })} />
       <LogoSection
         studioId={studioId}

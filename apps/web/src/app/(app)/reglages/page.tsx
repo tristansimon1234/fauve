@@ -5,10 +5,12 @@ import { CREDIT_PRICES, MONTHLY_CREDITS } from "@fauve/agent";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
+import { fauveAccount } from "@/lib/instagram-dm";
 import { formatPhone, platformLabels, plural, shortUrl } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
 import { getContentPlan, getSocialAccounts, getStudioContext, type SocialAccount } from "@/lib/studio";
 import { signOut } from "../../(onboarding)/connexion/actions";
+import { InstagramLinkCode } from "./instagram-link";
 
 export const metadata: Metadata = { title: "Réglages" };
 
@@ -57,11 +59,13 @@ async function Settings() {
     );
   }
   const { studio } = member;
-  const [accounts, plan, balance, ledger] = await Promise.all([
+  const [accounts, plan, balance, ledger, fauveInstagram, dmContact] = await Promise.all([
     getSocialAccounts(db, studio.id),
     getContentPlan(db, studio.id),
     creditBalance(studio.id),
     db.from("credit_ledger").select("id, delta, label, created_at").eq("studio_id", studio.id).order("created_at", { ascending: false }).limit(10),
+    fauveAccount(),
+    db.from("instagram_contacts").select("igsid").eq("studio_id", studio.id).limit(1).maybeSingle(),
   ]);
   const dateFormat = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: studio.timezone });
 
@@ -107,6 +111,23 @@ async function Settings() {
             </p>
           )}
         </Section>
+
+        {fauveInstagram?.username && (
+          <Section title="Fauve sur Instagram">
+            <p className="text-sm leading-normal">
+              Quand un Reel t’inspire, partage-le à{" "}
+              <a href={`https://ig.me/m/${fauveInstagram.username}`} target="_blank" rel="noreferrer" className="font-bold text-violet">
+                @{fauveInstagram.username}
+              </a>{" "}
+              (bouton Partager) : Fauve en tire des idées pour ton style. Tu peux aussi lui écrire là-bas comme sur WhatsApp.
+            </p>
+            {dmContact.data ? (
+              <p className="text-sm font-semibold text-success">Ton compte Instagram est relié.</p>
+            ) : (
+              <InstagramLinkCode fauveHandle={fauveInstagram.username} />
+            )}
+          </Section>
+        )}
 
         <Section title="Style des vidéos">
           <p className="text-sm leading-normal">
