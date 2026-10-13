@@ -1,12 +1,14 @@
 "use server";
 
+import { after } from "next/server";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { extrasOf, resolveCards, type ChatCard } from "@/lib/chat-cards";
 import { acceptQuote } from "@/lib/credits";
 import { startMontage } from "@/lib/montage-start";
 import { setReaction, type Reactions } from "@/lib/reactions";
-import { getStudioContext } from "@/lib/studio";
+import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { ensureClipAnalysis } from "@/lib/video/analyze";
 
 // The in-app chat: the same Fauve as on WhatsApp. Messages from both channels
 // are grouped into conversations (see the conversations migration): the web app
@@ -20,11 +22,15 @@ export type ChatMessage = {
   body: string | null;
   at: string;
   videoUrl: string | null;
+  /** A photo or video the manager sent (app or WhatsApp), with a fresh signed link. */
+  media: { url: string; video: boolean } | null;
   reactions: Reactions;
   /** Answer buttons Fauve offered (reply_with). */
   options: string[];
   /** Post and grid cards under the message. */
   cards: ChatCard[];
+  /** A delivered montage: the app opens this post's page when the message arrives. */
+  openPost: string | null;
 };
 
 export type ConversationSummary = { id: string; title: string | null; lastAt: string };
@@ -65,7 +71,7 @@ async function messagesOf(studioId: string, conversationId: string): Promise<Cha
   const db = supabaseAdmin();
   const { data } = await db
     .from("whatsapp_messages")
-    .select("id, direction, channel, type, body, created_at, payload, reactions")
+    .select("id, direction, channel, type, body, created_at, payload, reactions, media_id")
     .eq("studio_id", studioId)
     .eq("conversation_id", conversationId)
     // A WhatsApp reaction is shown on the message it reacts to, not as a message.
@@ -90,11 +96,24 @@ async function messagesOf(studioId: string, conversationId: string): Promise<Cha
     }
   }
 
+  // Photos and videos the manager sent: thumbnails in the conversation.
+  const mediaIds = rows.flatMap((r) => (r.media_id ? [r.media_id as string] : []));
+  const sent = new Map<string, { url: string; video: boolean }>();
+  if (mediaIds.length) {
+    const { data: assets } = await db.from("media_assets").select("id, storage_path, kind, mime_type").eq("studio_id", studioId).in("id", mediaIds);
+    const urls = await signMediaUrls(db, studioId, (assets ?? []).map((a) => a.storage_path as string));
+    for (const a of assets ?? []) {
+      const url = urls.get(a.storage_path as string);
+      if (url) sent.set(a.id as string, { url, video: a.kind === "video" || String(a.mime_type ?? "").startsWith("video/") });
+    }
+  }
+
   const cards = await resolveCards(studioId, rows.map((r) => r.payload));
 
   return rows.map((r, i) => {
     const renderId = (r.payload as { render_id?: string } | null)?.render_id;
     const videoUrl = renderId ? (videos.get(renderId) ?? null) : null;
+    const media = r.media_id ? (sent.get(r.media_id as string) ?? null) : null;
     const body = (r.body as string | null)
       ?.replace(/\n*Voir la vidéo : \S+/u, "")
       .replace(/^\[Vidéo envoyée[^\]]*\]\n?/u, "")
@@ -107,9 +126,11 @@ async function messagesOf(studioId: string, conversationId: string): Promise<Cha
       body: body || null,
       at: r.created_at as string,
       videoUrl,
+      media,
       reactions: (r.reactions as Reactions | null) ?? {},
       options: r.direction === "outbound" ? (extrasOf(r.payload).options ?? []) : [],
       cards: cards[i] ?? [],
+      openPost: r.direction === "outbound" ? ((r.payload as { open_post?: string } | null)?.open_post ?? null) : null,
     };
   });
 }
@@ -141,12 +162,26 @@ export type SendResult =
   | { ok: true; conversationId: string; messages: ChatMessage[]; conversations: ConversationSummary[] }
   | { ok: false; error: string; conversationId: string | null };
 
-/** Sends a message to Fauve: in `conversationId`, or in a new conversation when null. */
-export async function sendToFauve(text: string, conversationId: string | null): Promise<SendResult> {
+/** A photo or video the browser already uploaded to Storage under `<studio>/chat/`. */
+export type Attachment = { path: string; mime: string; size: number };
+
+const MAX_ATTACHMENTS = 10;
+
+/**
+ * Sends a message to Fauve: in `conversationId`, or in a new conversation when
+ * null. Attachments become media of the studio (Médiathèque) and messages of
+ * the conversation, like photos and videos sent on WhatsApp; videos are analysed.
+ */
+export async function sendToFauve(text: string, conversationId: string | null, attachments: Attachment[] = []): Promise<SendResult> {
   const ctx = await current();
   if (!ctx) return { ok: false, error: "Ton numéro n’est relié à aucun studio.", conversationId };
   const body = text.trim().slice(0, 4000);
-  if (!body) return { ok: false, error: "Message vide.", conversationId };
+  const files = attachments.slice(0, MAX_ATTACHMENTS);
+  if (!body && !files.length) return { ok: false, error: "Message vide.", conversationId };
+  const valid = files.every(
+    (f) => f.path.startsWith(`${ctx.studioId}/chat/`) && !f.path.includes("..") && /^(image|video)\//.test(f.mime) && f.size > 0,
+  );
+  if (!valid) return { ok: false, error: "Un des fichiers n’est pas une photo ou une vidéo.", conversationId };
 
   const db = supabaseAdmin();
   let id = conversationId;
@@ -158,27 +193,43 @@ export async function sendToFauve(text: string, conversationId: string | null): 
     id = created.data.id as string;
   }
 
-  const inserted = await db
-    .from("whatsapp_messages")
-    .insert({
-      studio_id: ctx.studioId,
-      conversation_id: id,
-      channel: "web",
-      direction: "inbound",
-      phone_e164: ctx.phone,
-      type: "text",
-      body,
-    })
-    .select("id")
-    .single();
-  if (inserted.error) return { ok: false, error: "Ton message n’est pas parti. Réessaie.", conversationId: id };
+  // One message per file (with its media_id, as on WhatsApp), then the text.
+  let lastRowId: string | null = null;
+  for (const file of files) {
+    const video = file.mime.startsWith("video/");
+    const asset = await db
+      .from("media_assets")
+      .insert({ studio_id: ctx.studioId, storage_path: file.path, kind: video ? "video" : "image", source: "web_upload", mime_type: file.mime, size_bytes: file.size })
+      .select("id")
+      .single();
+    if (asset.error) return { ok: false, error: "Un fichier n’a pas pu être ajouté. Réessaie.", conversationId: id };
+    const mediaId = asset.data.id as string;
+    const row = await db
+      .from("whatsapp_messages")
+      .insert({ studio_id: ctx.studioId, conversation_id: id, channel: "web", direction: "inbound", phone_e164: ctx.phone, type: video ? "video" : "image", media_id: mediaId })
+      .select("id")
+      .single();
+    if (row.error) return { ok: false, error: "Un fichier n’a pas pu être ajouté. Réessaie.", conversationId: id };
+    lastRowId = row.data.id as string;
+    // Watched once by Gemini, in the background: ready for the montage.
+    if (video) after(() => ensureClipAnalysis(ctx.studioId, mediaId).then(() => undefined, (e) => console.error("chat: clip analysis failed", e)));
+  }
+  if (body) {
+    const inserted = await db
+      .from("whatsapp_messages")
+      .insert({ studio_id: ctx.studioId, conversation_id: id, channel: "web", direction: "inbound", phone_e164: ctx.phone, type: "text", body })
+      .select("id")
+      .single();
+    if (inserted.error) return { ok: false, error: "Ton message n’est pas parti. Réessaie.", conversationId: id };
+    lastRowId = inserted.data.id as string;
+  }
 
   try {
     const result = await replyInConversation({
       studioId: ctx.studioId,
       memberId: ctx.memberId,
       conversationId: id,
-      reactToRowId: inserted.data.id as string,
+      reactToRowId: lastRowId ?? undefined,
     });
     if (result.reply) {
       await db.from("whatsapp_messages").insert({
@@ -235,7 +286,7 @@ export async function launchQuote(quoteId: string, conversationId: string): Prom
       channel: "web",
       direction: "outbound",
       type: "text",
-      body: "C’est parti ! Je monte ta vidéo, elle arrive ici dans 2 à 4 minutes.",
+      body: "C’est parti ! Je monte ta vidéo, je t’ouvre sa page dès qu’elle est prête (2 à 5 minutes).",
       payload: { notes: [`montage lancé (quote_id=${quote.id})`] },
     },
   );

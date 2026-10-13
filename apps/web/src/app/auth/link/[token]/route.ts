@@ -19,7 +19,12 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/auth/link/[t
     .select("phone_e164")
     .maybeSingle();
 
-  if (!data) return NextResponse.redirect(new URL("/connexion?lien=expire", request.url));
+  if (!data) {
+    // Expired or used: sign in with a code, then go where the link pointed.
+    const login = new URL("/connexion?lien=expire", request.url);
+    login.searchParams.set("next", safeNext);
+    return NextResponse.redirect(login);
+  }
 
   const ok = await openSessionForPhone(data.phone_e164);
   if (!ok) {

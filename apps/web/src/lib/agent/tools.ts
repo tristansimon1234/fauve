@@ -1,5 +1,4 @@
 import "server-only";
-import { createHash, randomBytes } from "node:crypto";
 import {
   assertTransition,
   canTransition,
@@ -8,10 +7,11 @@ import {
   type ReplyExtras,
   type ToolHandlers,
 } from "@fauve/agent";
-import { env } from "@/lib/env";
+import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { acceptQuote, createMontageQuote, lastPresentedQuote } from "@/lib/credits";
 import { startMontage } from "@/lib/montage-start";
+import { montageStatus } from "@/lib/montage-status";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
@@ -155,18 +155,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async get_connect_link() {
-      const token = randomBytes(24).toString("base64url");
-      const { data: member } = await db.from("members").select("phone_e164, user_id").eq("id", ctx.memberId).single();
-      check(
-        await db.from("login_tokens").insert({
-          user_id: member?.user_id ?? null,
-          phone_e164: member?.phone_e164,
-          token_hash: createHash("sha256").update(token).digest("hex"),
-          purpose: "connect_social",
-          expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        }),
-      );
-      return json({ url: `${env("APP_URL")}/auth/link/${token}?next=/connect`, expires_in_minutes: 15 });
+      const { data: member } = await db.from("members").select("phone_e164").eq("id", ctx.memberId).single();
+      const url = await createLoginLink(member?.phone_e164 as string, "/connect", "connect_social");
+      return json({ url, expires_in_minutes: 15 });
     },
 
     async get_calendar({ from, to }) {
@@ -253,10 +244,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async quote_montage({ post_id, media_ids, brief, correction, max_new_scenes, variant }) {
+    async quote_montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
       if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : fais un devis de montage (correction: false).";
-      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: max_new_scenes, variant });
+      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: max_new_scenes, variant, plan });
       if ("error" in quote) {
         return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });
       }
@@ -287,6 +278,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         posts_analyses: report.posts,
         date: report.createdAt,
         note: "Partage le bilan en 2-3 phrases (la tendance et la leçon la plus utile) ; le détail est dans l'app, page Résultats.",
+      });
+    },
+
+    async montage_status({ post_id }) {
+      const montages = await montageStatus(studioId, post_id);
+      if (!montages.length) return json({ montages: [], note: "Aucun montage lancé récemment." });
+      return json({
+        montages: montages.map((m) => ({ post_id: m.postId, publication: m.title, etape: m.step, depuis_minutes: m.minutes, late: m.late })),
+        note: "En montage puis en rendu : tout va bien, la vidéo arrive toute seule. late : propose de relancer (quote_montage puis montage).",
       });
     },
 

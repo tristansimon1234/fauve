@@ -6,6 +6,7 @@ import {
   platformSchema,
   postKindSchema,
   postStatusSchema,
+  montagePlanSchema,
   reactionSchema,
   replyExtrasSchema,
 } from "./schemas.ts";
@@ -99,12 +100,13 @@ export const toolSpecs = {
   },
   quote_montage: {
     description:
-      "Devis d'un montage ou d'une correction, en crédits, AVANT de le lancer (obligatoire). Renvoie le coût de base, le maximum si le monteur crée de nouvelles scènes animées, et le solde. Montre ensuite à la gérante, en 2 phrases, ce que tu vas faire et ce que ça coûte, puis attends son accord : montage ne part qu'au tour suivant, avec ce quote_id. Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent.",
+      "Devis d'un montage ou d'une correction, en crédits, AVANT de le lancer (obligatoire). Pour un nouveau montage, donne toujours « plan » : la durée, le style et chaque scène dans l'ordre (vidéo, animation, fin) ; il s'affiche sur le devis, fixe le nombre de scènes animées facturables et guide le monteur. Renvoie le coût de base, le maximum si le monteur crée de nouvelles scènes animées, et le solde. Décris ensuite le plan à la gérante (durée, nombre de scènes, ce qu'elles montrent) et le coût, puis attends son accord : montage ne part qu'au tour suivant, avec ce quote_id. Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent.",
     input: z.object({
       post_id: z.string().uuid(),
       media_ids: z.array(z.string().uuid()).max(10).optional().describe("Clips à monter (media_id). Facultatif pour une correction ou une vidéo 100 % motion design."),
       brief: z.string().max(600).optional().describe("Intention ou correction, avec les textes exacts si besoin. Ex. « ouverture en motion design avec RENTRÉE en grand », « police Montserrat », « visages OK »"),
       correction: z.boolean().default(false).describe("true pour modifier le montage existant de cette publication"),
+      plan: montagePlanSchema.optional().describe("Le plan proposé (obligatoire pour un nouveau montage, facultatif pour une correction)"),
       max_new_scenes: z.number().int().min(0).max(2).optional().describe("Nouvelles scènes animées permises (3 crédits chacune). 0 si la gérante veut faire simple ou économiser : le monteur réutilise alors la bibliothèque et les scènes fixes."),
       variant: z
         .object({
@@ -114,6 +116,11 @@ export const toolSpecs = {
         .optional()
         .describe("Variante du montage livré (1 crédit, sans nouveau montage) : même découpage, autre style et autre accroche"),
     }),
+  },
+  montage_status: {
+    description:
+      "Où en sont les montages lancés ces 3 dernières heures (ou celui d'une publication) : en montage (le monteur écrit le plan), en rendu, ou livré, et depuis combien de minutes. Un montage prend 2 à 5 minutes ; « late » signifie qu'il a sans doute échoué.",
+    input: z.object({ post_id: z.string().uuid().optional() }),
   },
   choose_version: {
     description:

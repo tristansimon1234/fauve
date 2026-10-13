@@ -85,6 +85,7 @@ async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searc
 
   return (
     <FauveWorkspace
+      studioId={studioId}
       firstName={member.first_name ?? null}
       summary={summary}
       suggestions={suggestions}

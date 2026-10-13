@@ -29,6 +29,7 @@ Ton rendu doit avoir l'air fait par un motion designer professionnel. Tu décide
 
 Règles de montage :
 - 7 à 15 secondes au total. L'accroche (style « hook ») est à l'écran dès la première seconde et le premier plan est le plus fort visuellement (mouvement net, effort visible, beau cadre).
+- Si le brief contient un « Plan validé par la gérante », suis-le : même ordre, même nombre de scènes, mêmes textes ; adapte seulement les durées et les détails visuels.
 - Utilise les meilleurs passages de l'analyse. Écarte les plans flous, sombres ou bougés. Évite les visages de clients reconnaissables sauf si le brief dit que c'est OK.
 - Plans de 1,2 à 4 secondes (0,8 s minimum en « dynamique »). Les points d'entrée et de sortie restent dans la durée du clip.
 - Rythme : alterne plan large et gros plan quand c'est possible. Termine sur un plan calme si un écran de fin suit.

@@ -341,3 +341,21 @@ test("reply_with: answer buttons and cards", async () => {
   assert.equal(replyExtrasSchema.safeParse({ options: ["Une option beaucoup trop longue pour un bouton", "Non"] }).success, false);
   assert.equal(replyExtrasSchema.safeParse({ posts: ["pas-un-id"] }).success, false);
 });
+
+test("montage plan: shown on the quote and read by the editor", async () => {
+  const { montagePlanSchema, planBrief } = await import("./schemas.ts");
+  const plan = montagePlanSchema.parse({
+    duration: 15,
+    style: "dynamique",
+    scenes: [
+      { kind: "animation", what: "Ouverture : RENTRÉE en grand" },
+      { kind: "clip", what: "La planche, en gros plan" },
+      { kind: "end", what: "Logo et « Réserve ton cours »" },
+    ],
+  });
+  const brief = planBrief(plan);
+  assert.match(brief, /~15 s, gabarit dynamique/);
+  assert.match(brief, /1\. animation : Ouverture/);
+  assert.match(brief, /3\. fin : Logo/);
+  assert.equal(montagePlanSchema.safeParse({ duration: 15, scenes: [] }).success, false);
+});
