@@ -132,7 +132,7 @@ export async function handleDm(event: DmEvent): Promise<void> {
   const result = await replyInConversation({ studioId, memberId: owner.id as string, reactToRowId: inserted.data[0]!.id as string });
   if (result.reply) {
     await reply(result.reply);
-    await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "instagram", direction: "outbound", type: "text", body: result.reply, payload: result.extras });
+    await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "instagram", direction: "outbound", type: "text", body: result.reply, payload: { ...result.extras, notes: result.notes } });
   }
   for (const job of result.afterReply) await job().catch((e) => console.error("DM after-reply job failed", e));
 }

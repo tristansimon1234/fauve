@@ -16,6 +16,8 @@ export type StoredMessage = {
   type: string;
   body: string | null;
   media_id: string | null;
+  /** Ids Fauve made in that turn (quote, post): her memory of what the text refers to. */
+  notes?: string[];
 };
 
 const mediaLabels: Record<string, string> = {
@@ -36,7 +38,8 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
       .filter(Boolean)
       .join(" ");
     if (!text) continue;
-    const short = text.length > MESSAGE_MAX_CHARS ? `${text.slice(0, MESSAGE_MAX_CHARS)}…` : text;
+    const cut = text.length > MESSAGE_MAX_CHARS ? `${text.slice(0, MESSAGE_MAX_CHARS)}…` : text;
+    const short = row.notes?.length ? `${cut}\n[mémo : ${row.notes.join(" ; ")}]` : cut;
     const last = history.at(-1);
     if (last?.role === role && typeof last.content === "string") {
       last.content = `${last.content}\n${short}`;
@@ -91,11 +94,12 @@ export async function replyInConversation(params: {
   const stored = rows.data.reverse().map((r) => ({
     ...(r as StoredMessage & { wa_message_id: string | null }),
     reply_to: (r.payload as { reply_to?: string } | null)?.reply_to ?? null,
+    notes: (r.payload as { notes?: string[] } | null)?.notes,
   }));
   const history = toModelHistory(orderReplies(stored));
   // Every message has already been answered (e.g. a retried delivery): nothing to say.
   if (history.at(-1)?.role !== "user") {
-    return { reply: null, reactions: [], extras: {}, usage: { input_tokens: 0, output_tokens: 0 }, afterReply: [] };
+    return { reply: null, reactions: [], extras: {}, notes: [], usage: { input_tokens: 0, output_tokens: 0 }, afterReply: [] };
   }
 
   return runFauve({
@@ -107,6 +111,7 @@ export async function replyInConversation(params: {
     timezone: studio.data.timezone,
     reactions: [],
     extras: {},
+    notes: [],
     afterReply: [],
     history,
     studio: {

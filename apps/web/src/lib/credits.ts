@@ -117,6 +117,24 @@ export async function acceptQuote(studioId: string, quoteId: string, turnStarted
   };
 }
 
+/** The latest unused quote made before this turn (the one the manager has seen), if any. */
+export async function lastPresentedQuote(studioId: string, turnStartedAt: Date): Promise<{ id: string; title: string } | null> {
+  const { data } = await supabaseAdmin()
+    .from("credit_quotes")
+    .select("id, posts(title)")
+    .eq("studio_id", studioId)
+    .is("used_at", null)
+    .lt("created_at", turnStartedAt.toISOString())
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+  const post = data.posts as { title?: string | null } | { title?: string | null }[] | null;
+  const title = (Array.isArray(post) ? post[0]?.title : post?.title) ?? "publication";
+  return { id: data.id as string, title };
+}
+
 /** Charges a delivered montage: its real new scenes, never above the quote. Once per quote. */
 export async function chargeQuote(quoteId: string, newScenes: number, title: string): Promise<void> {
   const db = supabaseAdmin();

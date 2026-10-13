@@ -186,7 +186,7 @@ export async function sendToFauve(text: string, conversationId: string | null): 
         direction: "outbound",
         type: "text",
         body: result.reply,
-        payload: result.extras,
+        payload: { ...result.extras, notes: result.notes },
       });
     }
     // E.g. a montage: queued now, the video shows up in the chat when it is ready.
