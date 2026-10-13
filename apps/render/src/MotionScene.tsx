@@ -27,6 +27,8 @@ type SceneComponent = (props: {
   fps: number;
   durationInFrames: number;
   brand: ReelProps["brand"] & { ink: string; cream: string };
+  /** Texts for the scene's slots (a reused template gets new ones). */
+  texts: Record<string, string>;
 }) => ReactNode;
 
 export function compileScene(js: string): SceneComponent | null {
@@ -54,6 +56,7 @@ class Fallback extends Component<{ fallback: ReactNode; children: ReactNode }, {
 
 export function MotionScene(p: {
   js: string;
+  texts: Record<string, string>;
   fallback: Scene;
   durationInFrames: number;
   props: ReelProps;
@@ -73,6 +76,7 @@ export function MotionScene(p: {
           fps={fps}
           durationInFrames={p.durationInFrames}
           brand={{ ...p.props.brand, ink: "#1C1530", cream: "#FBF7F4" }}
+          texts={p.texts}
         />
       </AbsoluteFill>
     </Fallback>

@@ -5,6 +5,7 @@ import {
   addUsage,
   CHAT_EFFORT,
   CHAT_MODEL,
+  supportsServerFallback,
   CLAUDE_MODEL,
   claudeCostUsd,
   FAUVE_SYSTEM_PROMPT,
@@ -75,9 +76,8 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     max_tokens: 16000,
     max_iterations: 8,
     output_config: { effort: CHAT_EFFORT },
-    // On a policy refusal the API retries on the fallback model it picks.
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
+    // On a policy refusal the API retries on the fallback model it picks (not offered on Haiku).
+    ...(supportsServerFallback(CHAT_MODEL) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
     // Stable prefix first (tools, system prompt, history), cached; the volatile
     // studio context (date, step) goes last as a system message so it never
     // invalidates the cached history.

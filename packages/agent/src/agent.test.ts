@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { editPlanObjectSchema, editPlanSchema, segmentSeconds } from "./schemas.ts";
 import { canTransition } from "./status.ts";
-import { claudeCostUsd, usdToEur } from "./pricing.ts";
+import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
 
 const validPlan = {
@@ -46,6 +46,16 @@ test("pricing: opus input + output", () => {
   const usd = claudeCostUsd("claude-opus-5-5", { input_tokens: 1_000_000, output_tokens: 100_000 });
   assert.equal(usd, 6);
   assert.equal(usdToEur(1, 0.9), 0.9);
+  // A typical chat turn on Haiku: mostly cache reads.
+  const turn = claudeCostUsd("claude-haiku-5-5", {
+    input_tokens: 0,
+    output_tokens: 600,
+    cache_read_input_tokens: 33_000,
+    cache_creation_input_tokens: 4_600,
+  });
+  assert.ok(Math.abs(turn - 0.001205) < 1e-9);
+  assert.equal(supportsServerFallback("claude-haiku-5-5"), false);
+  assert.equal(supportsServerFallback("claude-opus-5-5"), true);
 });
 
 test("whatsapp: 24 h window", () => {
@@ -251,6 +261,29 @@ test("editor: free motion scenes past the cap play their fixed fallback", async 
   assert.equal(segmentSeconds(plan.segments[2]!), 6); // fixed scenes last 6 s at most
 });
 
+test("editor: library scenes keep their id and get their texts as a record", async () => {
+  const { fromEditorPlan, normalizeEditPlan } = await import("./editor.ts");
+  const fallback = { kind: "title" as const, title: "Atelier", background: "accent" as const };
+  const id = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b";
+  const plan = fromEditorPlan({
+    ...editPlanObjectSchema.parse({ ...validPlan, segments: [{ clip_id: "a", in: 0, out: 2, zoom: "none" }], texts: [] }),
+    template: "doux",
+    segments: [
+      { motion: { brief: "Titre qui se dessine", fallback, template_id: id, template_texts: [{ slot: "title", text: "Atelier respiration" }, { slot: "Bad Slot", text: "x" }] }, duration: 3 },
+      { motion: { brief: "Nouvelle scène", fallback }, duration: 3 },
+      { motion: { brief: "Nouvelle scène 2", fallback }, duration: 3 },
+      { motion: { brief: "Nouvelle scène 3", fallback }, duration: 3 },
+    ],
+  });
+  const first = plan.segments[0]!;
+  assert.ok("motion" in first);
+  assert.equal(first.motion.template_id, id);
+  assert.deepEqual(first.motion.texts, { title: "Atelier respiration" }); // invalid slot names are dropped
+  // Reused scenes do not count toward the cap: the two new ones stay free scenes, the third falls back.
+  const kinds = normalizeEditPlan(plan, {}).segments.map((s) => ("motion" in s ? "motion" : "scene"));
+  assert.deepEqual(kinds, ["motion", "motion", "motion", "scene"]);
+});
+
 test("motion scenes: generated code is checked before it runs", async () => {
   const { checkMotionCode } = await import("./motion-scene.ts");
   const good = `function Scene({ width, brand }) {
@@ -269,5 +302,5 @@ test("motion scenes: generated code is checked before it runs", async () => {
 
 test("pricing: the chat model is priced", async () => {
   const { CHAT_MODEL, claudeCostUsd } = await import("./pricing.ts");
-  assert.equal(claudeCostUsd(CHAT_MODEL, { input_tokens: 1_000_000, output_tokens: 100_000 }), 3);
+  assert.ok(claudeCostUsd(CHAT_MODEL, { input_tokens: 1_000_000, output_tokens: 100_000 }) > 0);
 });

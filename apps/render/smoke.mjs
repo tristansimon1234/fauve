@@ -48,7 +48,7 @@ for (const scene of scenes) {
     for (const f of [0, Math.floor(scene.durationInFrames / 2), scene.durationInFrames - 1]) {
       frame = f;
       const html = renderToStaticMarkup(
-        React.createElement(Scene, { width: 1080, height: 1920, fps: 30, durationInFrames: scene.durationInFrames, brand }),
+        React.createElement(Scene, { width: 1080, height: 1920, fps: 30, durationInFrames: scene.durationInFrames, brand, texts: scene.texts ?? {} }),
       );
       if (html.length < 20) throw new Error(`empty output at frame ${f}`);
       if (/NaN/.test(html)) throw new Error(`NaN in styles at frame ${f}`);

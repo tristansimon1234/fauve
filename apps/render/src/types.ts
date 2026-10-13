@@ -21,7 +21,7 @@ export type ReelProps = {
   segments: (
     | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean }
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
-    | { type: "motion"; js: string; fallback: Scene; startAt: number; durationInFrames: number }
+    | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number }
   )[];
   texts: { text: string; style: "hook" | "band" | "caption"; emphasis: string[]; from: number; durationInFrames: number }[];
   words: { w: string; from: number; to: number }[];

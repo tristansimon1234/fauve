@@ -47,7 +47,15 @@ export function Reel(props: ReelProps) {
                 />
               </>
             ) : segment.type === "motion" ? (
-              <MotionScene js={segment.js} fallback={segment.fallback} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} />
+              <MotionScene
+                js={segment.js}
+                texts={segment.texts ?? {}}
+                fallback={segment.fallback}
+                durationInFrames={segment.durationInFrames}
+                props={props}
+                theme={theme}
+                k={k}
+              />
             ) : (
               <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} />
             )}

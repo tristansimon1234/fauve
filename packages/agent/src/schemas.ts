@@ -51,6 +51,9 @@ export const editPlanSceneSegmentSchema = z.object({
   duration: z.number().min(1).max(6),
 });
 
+/** Name of a text slot in a motion template, e.g. "title" or "price". */
+export const SLOT_NAME = /^[a-z][a-z0-9_]{0,23}$/;
+
 /** Free motion-design scene: the editor writes the brief, the motion designer (Opus) writes the code. */
 export const editPlanMotionSegmentSchema = z.object({
   motion: z.object({
@@ -61,6 +64,10 @@ export const editPlanMotionSegmentSchema = z.object({
     js: z.string().max(40000).optional(),
     /** Fixed scene used if the generated code cannot run. */
     fallback: sceneSchema.optional(),
+    /** Scene reused from the motion template library (no motion designer call). */
+    template_id: z.uuid().optional(),
+    /** Texts for the template's slots (the scene reads them from its `texts` prop). */
+    texts: z.record(z.string().regex(SLOT_NAME), z.string().max(200)).optional(),
   }),
   duration: z.number().min(1).max(8),
 });

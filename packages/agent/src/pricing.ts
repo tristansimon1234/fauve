@@ -3,9 +3,15 @@
 
 /** Montage (editor, motion designer): quality first. */
 export const CLAUDE_MODEL = "claude-opus-5-5";
-/** WhatsApp / web conversation: fast and cheap, at low effort. */
-export const CHAT_MODEL = "claude-sonnet-5-5";
-export const CHAT_EFFORT = "low" as const;
+/**
+ * WhatsApp / web conversation: Haiku, about 20x cheaper than Sonnet. The creative
+ * work (cuts, motion design) runs on Opus; the chat routes requests and writes
+ * short messages and captions. Medium effort keeps its tool calls reliable.
+ */
+export const CHAT_MODEL = "claude-haiku-5-5";
+export const CHAT_EFFORT = "medium" as const;
+/** Haiku 5.5 rejects server-side fallbacks (400): only send them to models that take them. */
+export const supportsServerFallback = (model: string) => !model.startsWith("claude-haiku");
 
 type ModelPrice = { input: number; output: number; cacheRead: number; cacheWrite: number };
 
@@ -13,6 +19,8 @@ const CLAUDE_PRICES_USD: Record<string, ModelPrice> = {
   // Cache writes (5 min TTL) are billed at 1.25x input.
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
   "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  // Prompts up to 100K tokens (ours are far below); cache read 0.1x and write 1.25x input.
+  "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
 };
 
 /** Rough conversion used for reporting only; override with USD_TO_EUR. */
