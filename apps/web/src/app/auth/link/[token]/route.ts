@@ -6,22 +6,58 @@ import { supabaseServer } from "@/lib/supabase/server";
 
 // Opaque one-time links sent by Fauve on WhatsApp (15 min, a day for a
 // publication; single use): opening one signs the manager in on that device.
+//
+// Link previews and scanners fetch the URL seconds after it is sent, before
+// anyone taps it. So opening the link (GET) uses nothing up: it shows a tiny
+// page whose script sends the form (POST), and only that signs in. Robots read
+// pages, they do not run them.
 
-// Link previews (WhatsApp, Facebook…) fetch the URL before anyone taps it: they
-// get a plain page and must not use up the link.
-// The WhatsApp fetcher's agent is "WhatsApp/2.x"; its in-app browser looks like a normal browser.
-const PREVIEW_AGENTS = /^WhatsApp\/|facebookexternalhit|facebot|meta-externalagent|twitterbot|slackbot|telegrambot|discordbot|linkedinbot|skypeuripreview|googlebot|bingbot|embedly/i;
-
-const previewPage = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Fauve</title>
-<meta property="og:title" content="Fauve"><meta property="og:description" content="Ouvre le lien pour voir ta publication."></head><body></body></html>`;
-
-export async function GET(request: NextRequest, ctx: RouteContext<"/auth/link/[token]">) {
-  const { token } = await ctx.params;
+function safeNext(request: NextRequest): string {
   const next = request.nextUrl.searchParams.get("next");
-  const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : "/fauve";
-  if (PREVIEW_AGENTS.test(request.headers.get("user-agent") ?? "")) {
-    return new NextResponse(previewPage, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
-  }
+  return next?.startsWith("/") && !next.startsWith("//") ? next : "/fauve";
+}
+
+const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+export async function GET(request: NextRequest) {
+  const action = escape(`${request.nextUrl.pathname}?next=${encodeURIComponent(safeNext(request))}`);
+  const page = `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Fauve</title>
+<meta property="og:title" content="Fauve">
+<meta property="og:description" content="Ouvre le lien pour voir ta publication.">
+<style>
+  body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; background: #1c1530; color: #fff;
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif; }
+  main { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px; text-align: center; }
+  .orb { width: 56px; height: 56px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffd2c4, #f2694e 45%, #5b3fd9 100%);
+    animation: breathe 1.6s ease-in-out infinite; }
+  @keyframes breathe { 50% { transform: scale(1.08); } }
+  p { margin: 0; color: rgba(255,255,255,.75); font-size: 15px; }
+  button { border: 0; border-radius: 999px; background: #5b3fd9; color: #fff; font: inherit; font-weight: 700; font-size: 15px; padding: 14px 26px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="orb"></div>
+  <p>J’ouvre ta page…</p>
+  <form method="post" action="${action}"><button type="submit">Ouvrir</button></form>
+</main>
+<script>document.forms[0].submit();</script>
+</body>
+</html>`;
+  return new NextResponse(page, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+}
+
+export async function POST(request: NextRequest, ctx: RouteContext<"/auth/link/[token]">) {
+  const { token } = await ctx.params;
+  const next = safeNext(request);
+  // 303: the browser follows with a GET.
+  const go = (path: string) => NextResponse.redirect(new URL(path, request.url), 303);
 
   const { data } = await supabaseAdmin()
     .from("login_tokens")
@@ -36,17 +72,11 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/auth/link/[t
     // Used or expired (a second tap, an old message): still signed in, go there;
     // otherwise sign in with a code, then go where the link pointed.
     const { data: session } = await (await supabaseServer()).auth.getClaims();
-    if (session?.claims) return NextResponse.redirect(new URL(safeNext, request.url));
-    const login = new URL("/connexion?lien=expire", request.url);
-    login.searchParams.set("next", safeNext);
-    return NextResponse.redirect(login);
+    if (session?.claims) return go(next);
+    return go(`/connexion?lien=expire&next=${encodeURIComponent(next)}`);
   }
 
   const ok = await openSessionForPhone(data.phone_e164);
-  if (!ok) {
-    const fallback = new URL("/connexion", request.url);
-    fallback.searchParams.set("next", safeNext);
-    return NextResponse.redirect(fallback);
-  }
-  return NextResponse.redirect(new URL(safeNext, request.url));
+  if (!ok) return go(`/connexion?next=${encodeURIComponent(next)}`);
+  return go(next);
 }
