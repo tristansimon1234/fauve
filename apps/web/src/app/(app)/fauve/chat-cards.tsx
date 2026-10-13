@@ -185,15 +185,18 @@ function QuoteCard({
             on.has(label) ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
           }`}
         >
-          <span className="flex min-h-0 justify-between gap-3 overflow-hidden pb-1.5">
-            <span className="text-ink/80">{label}</span>
-            <span className="shrink-0 font-semibold tabular-nums">{creditsOf(label)}</span>
+          {/* The padding sits inside the clipped row: a folded line takes no space at all. */}
+          <span className="min-h-0 overflow-hidden">
+            <span className="flex justify-between gap-3 pb-1.5">
+              <span className="text-ink/80">{label}</span>
+              <span className="shrink-0 font-semibold tabular-nums">{creditsOf(label)}</span>
+            </span>
           </span>
         </li>
       ))}
       <li className="mt-0.5 flex justify-between gap-3 border-t border-line pt-2 text-[15px] font-bold">
         <span>Total</span>
-        <span key={price.base} className={`tabular-nums ${touched ? "fauve-enter [--fauve-y:4px]" : ""}`}>
+        <span key={price.base} className={`inline-block tabular-nums ${touched ? "fauve-enter [--fauve-y:4px]" : ""}`}>
           {credits(price.base)}
         </span>
       </li>
@@ -316,12 +319,12 @@ function QuoteCard({
                           Lancement…
                         </>
                       ) : (
-                        <>
+                        <span>
                           {quote.failed ? "Relancer" : "Lancer"} ·{" "}
-                          <span key={price.base} className={`tabular-nums ${touched ? "fauve-enter [--fauve-y:4px]" : ""}`}>
+                          <span key={price.base} className={`inline-block tabular-nums ${touched ? "fauve-enter [--fauve-y:4px]" : ""}`}>
                             {credits(price.base)}
                           </span>
-                        </>
+                        </span>
                       )}
                     </button>
                     {error && (
@@ -540,8 +543,8 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
           )}
         </div>
       ) : (
-        <p className="flex items-center gap-1.5 text-[12px] text-muted tabular-nums">
-          <ClockIcon size={14} className="shrink-0" />
+        <p className="flex items-start gap-1.5 text-[12px] leading-[16px] text-muted tabular-nums">
+          <ClockIcon size={14} className="mt-px shrink-0" />
           {minutes === null ? "" : minutes < 1 ? "À l’instant · " : `Depuis ${minutes} min · `}
           {level.minutes} min en tout
         </p>

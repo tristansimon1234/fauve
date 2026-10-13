@@ -81,6 +81,8 @@ function patchQuotes(list: ChatMessage[], rows: QuoteProgress[]): ChatMessage[] 
 }
 
 const PROGRESS_MS = 4000;
+/** A montage launched longer ago than this is not polled any more (it failed without a word; its card says it is late). */
+const STALE_MS = 3 * 3600_000;
 
 /**
  * While a quote card shows a launched montage, reads where it is every few
@@ -89,7 +91,10 @@ const PROGRESS_MS = 4000;
  * `onSettled` reloads the conversation: the delivery message comes in.
  */
 export function useQuoteProgress(messages: ChatMessage[], setMessages: Dispatch<SetStateAction<ChatMessage[]>>, onSettled: () => void) {
-  const ids = [...new Set(messages.flatMap((m) => m.cards.flatMap((c) => (c.type === "quote" && c.quote.state === "launched" ? [c.quote.id] : []))))]
+  // Each launched quote as « id@launch time », so the list only changes when a montage starts or ends.
+  const launched = [
+    ...new Set(messages.flatMap((m) => m.cards.flatMap((c) => (c.type === "quote" && c.quote.state === "launched" ? [`${c.quote.id}@${c.quote.startedAt ?? ""}`] : [])))),
+  ]
     .sort()
     .join(",");
   const settled = useRef(onSettled);
@@ -97,11 +102,15 @@ export function useQuoteProgress(messages: ChatMessage[], setMessages: Dispatch<
     settled.current = onSettled;
   });
   useEffect(() => {
-    if (!ids) return;
+    if (!launched) return;
     let alive = true;
     const timer = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      quoteProgress(ids.split(","))
+      const ids = launched.split(",").flatMap((entry) => {
+        const [id, at] = entry.split("@");
+        return id && (!at || Date.now() - Date.parse(at) < STALE_MS) ? [id] : [];
+      });
+      if (document.visibilityState !== "visible" || !ids.length) return;
+      quoteProgress(ids)
         .then((rows) => {
           if (!alive || !rows.length) return;
           setMessages((list) => patchQuotes(list, rows));
@@ -113,7 +122,7 @@ export function useQuoteProgress(messages: ChatMessage[], setMessages: Dispatch<
       alive = false;
       window.clearInterval(timer);
     };
-  }, [ids, setMessages]);
+  }, [launched, setMessages]);
 }
 
 /** The first launched montage of a conversation, if any (the reminder above the thread). */

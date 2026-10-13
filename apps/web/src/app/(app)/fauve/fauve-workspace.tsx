@@ -165,7 +165,9 @@ export function FauveWorkspace({
             setMessages(mergeMessages(current, fresh));
           }
           const target = openWhenReady.current;
-          const stillRunning = fresh.some((m) => m.cards.some((c) => c.type === "quote" && c.quote.postId === target && c.quote.state === "launched"));
+          const stillRunning = fresh.some((m) =>
+            m.cards.some((c) => c.type === "quote" && c.quote.postId === target && c.quote.state === "launched" && c.quote.stage !== "delivered"),
+          );
           if (!target || stillRunning) return;
           openWhenReady.current = null;
           if (composing.current) return;
