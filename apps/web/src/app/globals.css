@@ -326,6 +326,17 @@
   .fauve-dots > span:nth-child(3) {
     animation-delay: 0.3s;
   }
+  /* Fauve's words as she writes them: a soft blinking caret after the text. */
+  .fauve-caret {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 2px;
+    vertical-align: -0.15em;
+    border-radius: 1px;
+    background: var(--color-violet);
+    animation: fauve-caret 1s steps(2, start) infinite;
+  }
   /* Segmented choice: a pill slides under the chosen option. Equal columns, no gap;
      set --n (options) and --i (chosen index) on the group. */
   .fauve-pill {
@@ -386,6 +397,9 @@
   8%, 88% { opacity: 1; transform: none; }
   100% { opacity: 0; }
 }
+@keyframes fauve-caret {
+  to { visibility: hidden; }
+}
 @keyframes fauve-dot {
   0%, 60%, 100% { opacity: 0.35; transform: none; }
   30% { opacity: 1; transform: translateY(-2px); }
@@ -396,6 +410,7 @@
   .fauve-fade,
   .fauve-sheet,
   .fauve-flash,
+  .fauve-caret,
   .fauve-dots > span {
     animation: none;
   }

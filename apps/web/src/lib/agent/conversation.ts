@@ -2,7 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_EFFORT, effortSchema, orderReplies } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { runFauve, type RunFauveResult } from "./run";
+import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 
 // Shared by every channel (WhatsApp webhook, web test chat): rebuild the
 // conversation from stored messages and let Fauve answer the last one.
@@ -67,6 +67,8 @@ export async function replyInConversation(params: {
   replyToMessageId?: string;
   /** Where the manager writes from (default: WhatsApp when there is a waId, else the app). */
   channel?: "whatsapp" | "web" | "instagram";
+  /** Live events of the turn (the app's chat). */
+  onEvent?: RunFauveInput["onEvent"];
 }): Promise<RunFauveResult> {
   const db = supabaseAdmin();
   // A chat the manager started fresh in the web app is its own context (and
@@ -133,6 +135,7 @@ export async function replyInConversation(params: {
     notes: [],
     afterReply: [],
     history,
+    onEvent: params.onEvent,
     studio: {
       name: studio.data.name,
       businessType: (studio.data.business_type as string | null) ?? null,

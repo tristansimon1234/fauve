@@ -4,6 +4,8 @@ import type { Effort } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from "react";
 import { Bubble } from "@/app/(app)/fauve/chat-bubble";
+import { applyLive, liveTurn, type LiveState } from "@/app/(app)/fauve/live-turn";
+import { LiveTyping } from "@/app/(app)/fauve/live-typing";
 import { montageStep } from "@/app/(app)/fauve/chat-cards";
 import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "@/app/(app)/fauve/chat-sync";
 import {
@@ -11,7 +13,6 @@ import {
   loadConversation,
   openPostChat,
   reactToMessage,
-  sendToFauve,
   type ChatAbout,
   type ChatMessage,
 } from "@/app/(app)/fauve/chat-actions";
@@ -86,6 +87,8 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // While Fauve answers: the line of what she is doing, then her words as she writes them.
+  const [live, setLive] = useState<LiveState | null>(null);
   // Messages that just arrived rise in; the history that loads with the panel does not.
   const [arrived, setArrived] = useState<Set<string>>(() => new Set());
   const [launching, setLaunching] = useState(false);
@@ -215,7 +218,10 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
       setMessages((m) => [...m, ...locals]);
       start(async () => {
         try {
-          const res = await sendToFauve(text, conversationId, attachments, { postId: topic.postId, scene: topic.scene });
+          setLive({ status: null, text: "", step: -1 });
+          const res = await liveTurn({ text, conversationId, attachments, about: { postId: topic.postId, scene: topic.scene } }, (event) =>
+            setLive((state) => applyLive(state ?? { status: null, text: "", step: -1 }, event)),
+          );
           if (res.ok) {
             setConversationId(res.conversationId);
             setArrived(arrivals(messagesRef.current, res.messages));
@@ -226,6 +232,8 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
           }
         } catch {
           setError("Ton message n’est pas parti. Vérifie ta connexion et réessaie.");
+        } finally {
+          setLive(null);
         }
       });
     },
@@ -348,19 +356,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
                 enter={arrived.has(m.id)}
               />
             ))}
-            {typing && (
-              <div
-                role="status"
-                className="fauve-enter flex items-center gap-2 self-start rounded-[18px_18px_18px_6px] border border-line bg-white px-4 py-3 text-sm text-muted [--fauve-delay:120ms]"
-              >
-                <span className="fauve-dots" aria-hidden="true">
-                  <span />
-                  <span />
-                  <span />
-                </span>
-                Fauve écrit…
-              </div>
-            )}
+            {typing && <LiveTyping live={live} />}
             <div ref={endRef} />
           </div>
         </div>
