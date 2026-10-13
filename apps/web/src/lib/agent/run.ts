@@ -54,6 +54,8 @@ export type RunFauveInput = ToolContext & {
     channel?: "whatsapp" | "web" | "instagram";
     /** Default level of care for montages (Réglages). */
     montageEffort?: Effort;
+    /** What Fauve knows about the business (site, tone, memory). */
+    known?: { website: string | null; booking: string | null; tone: string | null; memory: string[] };
   };
   /** Live: what Fauve is doing, and her words as she writes them (the app's chat). */
   onEvent?: (event: ChatEvent) => void;
@@ -126,6 +128,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           instagram: input.studio.instagram,
           channel: input.studio.channel,
           montageEffort: input.studio.montageEffort,
+          known: input.studio.known,
         }),
       },
     ],

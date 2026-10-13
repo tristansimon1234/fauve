@@ -5,6 +5,7 @@ import { useState, type CSSProperties } from "react";
 import { SmileIcon, WhatsAppIcon } from "@/components/icons";
 import type { ChatMessage } from "./chat-actions";
 import { ChatCards } from "./chat-cards";
+import { DropCard } from "./drop-card";
 
 // One message of the conversation with Fauve: text, media, cards, answer
 // buttons and reactions. Shared by the Fauve page and the chat drawer.
@@ -56,6 +57,7 @@ export function Bubble({
   timezone,
   onReact,
   onChoose,
+  onFiles,
   onAsk,
   onLaunch,
   opening = null,
@@ -67,6 +69,8 @@ export function Bubble({
   timezone: string;
   onReact: (id: string, emoji: string) => void;
   onChoose?: (answer: string) => void;
+  /** Files dropped on the drop zone Fauve offered (only on her latest message). */
+  onFiles?: (files: FileList | File[]) => void;
   /** Asks Fauve something from a card, on any message (an expired quote, a late montage). */
   onAsk?: (text: string) => void;
   onLaunch: (quoteId: string, effort?: Effort) => Promise<string | null>;
@@ -195,6 +199,7 @@ export function Bubble({
         busy={busy}
         className={enter ? "fauve-enter [--fauve-delay:80ms]" : ""}
       />
+      {onFiles && !mine && message.upload && <DropCard kind={message.upload} onFiles={onFiles} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />}
       {options.length > 0 && (
         <div className={`flex flex-wrap gap-2 pt-0.5 ${enter ? "fauve-enter [--fauve-delay:140ms]" : ""}`} role="group" aria-label="Réponses proposées">
           {options.map((option) => (

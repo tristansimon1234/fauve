@@ -258,6 +258,7 @@ export function FauveWorkspace({
       media: null,
       reactions: {},
       options: [],
+        upload: null,
       cards: [],
       openPost: null,
       ...part,
@@ -469,6 +470,7 @@ export function FauveWorkspace({
                   onReact={react}
                   // Answer buttons only on Fauve's latest message, while it is still the question.
                   onChoose={i === messages.length - 1 && !pending ? send : undefined}
+                  onFiles={i === messages.length - 1 ? addFiles : undefined}
                   onAsk={ask}
                   onLaunch={launch}
                   opening={opening}

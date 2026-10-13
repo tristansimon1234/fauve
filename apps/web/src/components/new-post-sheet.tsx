@@ -4,7 +4,9 @@ import type { PostKind } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, useTransition, type ComponentType } from "react";
 import { createPost } from "@/app/(app)/calendrier/actions";
+import type { InspirationItem } from "@/lib/inspirations";
 import { useFauveDrawer } from "./fauve-drawer";
+import { InspirationPicker } from "./inspiration-picker";
 import { FilmIcon, ImageIcon, LayersIcon, PlayIcon, PlusIcon, UploadIcon, XIcon } from "./icons";
 import { Orb } from "./orb";
 
@@ -29,6 +31,20 @@ const placeholders: Record<PostKind, string> = {
   story: "Ex. il reste 2 places ce soir",
 };
 
+/** The montage styles (Remotion templates), for a Reel or a story. */
+const styles = [
+  { value: null, label: "Fauve choisit" },
+  { value: "doux", label: "Doux" },
+  { value: "dynamique", label: "Dynamique" },
+  { value: "chic", label: "Chic" },
+] as const;
+type Style = (typeof styles)[number]["value"];
+const styleHints: Record<NonNullable<Style>, string> = {
+  doux: "élégant, des textes qui glissent",
+  dynamique: "rythmé, des textes qui claquent",
+  chic: "minimal, beaucoup d’espace",
+};
+
 const phrases: Record<PostKind, string> = { reel: "un Reel", carousel: "un carrousel", post: "un post photo", story: "une story" };
 
 type Picked = { id: string; file: File; preview: string; video: boolean };
@@ -48,6 +64,9 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
   const [intention, setIntention] = useState("");
   const [day, setDay] = useState(date ?? tomorrow(timezone));
   const [time, setTime] = useState("18:00");
+  const [style, setStyle] = useState<Style>(null);
+  const [inspiration, setInspiration] = useState<InspirationItem | null>(null);
+  const video = kind === "reel" || kind === "story";
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
@@ -88,7 +107,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
   const submit = (toFauve: boolean) =>
     start(async () => {
       setError(null);
-      const res = await createPost({ kind, date: day, time, intention }).catch(() => ({ ok: false as const, error: "La publication n’a pas été créée. Réessaie." }));
+      const res = await createPost({ kind, date: day, time, intention, template: video ? style : null, inspirationId: video ? (inspiration?.id ?? null) : null }).catch(() => ({ ok: false as const, error: "La publication n’a pas été créée. Réessaie." }));
       if (!res.ok) return setError(res.error);
       router.refresh();
       if (toFauve) {
@@ -96,6 +115,9 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
         const text = [
           `Nouvelle publication : ${phrases[kind]} pour ${when} à ${time.replace(":", " h ")}.`,
           intention.trim() ? `L’idée : ${intention.trim()}` : "",
+          video && (style || inspiration)
+            ? [style ? `Style : ${styles.find((s) => s.value === style)!.label}.` : "", inspiration ? `Inspiration : « ${inspiration.title} ».` : ""].filter(Boolean).join(" ")
+            : "",
           files.length ? "Voici mes fichiers." : "Je n’ai pas encore de photos ni de vidéos : dis-moi quoi filmer.",
         ]
           .filter(Boolean)
@@ -209,6 +231,38 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
             />
           </div>
         </div>
+
+        {video && (
+          <div className="flex flex-col gap-3">
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 text-[13px] font-bold">Style du montage</legend>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Style du montage">
+                {styles.map((s) => {
+                  const on = style === s.value;
+                  return (
+                    <button
+                      key={s.label}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => setStyle(s.value)}
+                      className={`fauve-press h-9 rounded-full border px-3.5 text-[13px] font-semibold transition-colors ${on ? "border-violet bg-violet text-white" : "border-line bg-white text-ink hover:border-violet/40"}`}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[12px] text-muted">{style ? `${styles.find((s) => s.value === style)!.label} : ${styleHints[style]}.` : "Fauve prend ton style habituel, ou celui de ton inspiration."}</p>
+            </fieldset>
+            <div className="flex flex-col gap-2">
+              <span className="text-[13px] font-bold">
+                Inspiration <span className="font-semibold text-muted">· facultatif</span>
+              </span>
+              <InspirationPicker value={inspiration?.id ?? null} onChange={setInspiration} />
+            </div>
+          </div>
+        )}
 
         <label className="flex flex-col gap-2">
           <span className="text-[13px] font-bold">

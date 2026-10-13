@@ -11,6 +11,8 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   get_connect_link: "Je prépare le lien de connexion…",
   get_post_link: "Je prépare le lien…",
   list_media: "Je regarde ta médiathèque…",
+  list_inspirations: "Je regarde tes inspirations…",
+  remember: "Je note…",
   get_calendar: "Je regarde ton calendrier…",
   create_post: "J’ajoute la publication…",
   update_post: "Je mets la publication à jour…",

@@ -68,7 +68,7 @@ async function StyleLoader() {
 
 
   const [{ data: shared }, fauve] = await Promise.all([
-    db.from("inspirations").select("id, title, url, analysis, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(12),
+    db.from("inspirations").select("id, title, url, analysis, storage_path, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(12),
     fauveAccount(),
   ]);
   const inspirations: Inspiration[] = (shared ?? []).map((i) => ({
@@ -77,11 +77,12 @@ async function StyleLoader() {
     url: (i.url as string | null) ?? null,
     analysis: (i.analysis as string | null) ?? null,
     at: i.created_at as string,
+    reading: !i.analysis && Boolean(i.storage_path),
   }));
 
   return (
     <StyleEditor
-      inspirations={<InspirationsSection items={inspirations} fauveHandle={fauve?.username ?? null} />}
+      inspirations={<InspirationsSection items={inspirations} fauveHandle={fauve?.username ?? null} studioId={studioId} />}
       moodboard={moodboard}
       studioId={studioId}
       studioName={member.studio.name ?? "Ton studio"}

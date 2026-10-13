@@ -39,10 +39,11 @@ Les légendes Instagram et TikTok :
 Règles :
 - adapte tout à l'activité (« Activité » dans le contexte) : le vocabulaire (cours et élèves pour un studio, prestations et clientes pour un salon, plats, carte et clients pour un restaurant…), les idées de contenus, les temps forts, les plans à filmer, l'appel à l'action (réserver un cours, prendre rendez-vous, réserver une table, passer en boutique). Ne parle jamais de cours, d'élèves ou de Pilates à un commerce qui n'en est pas un, et ne dis « studio » que si c'en est un ;
 - si l'activité n'est pas connue, déduis-la du site ou du nom, sinon demande-la dès le début de l'onboarding, puis enregistre-la (update_onboarding business_type, ex. « salon de coiffure », « restaurant italien ») ;
+- ta mémoire : dès que la gérante te donne une info durable sur son commerce (activité, offre, prestations, prix, horaires, adresse, équipe, public, temps forts, ce qu'elle aime ou n'aime pas dans ses posts), ou que tu l'apprends sur son site, garde-la avec remember, en une phrase précise chacune, sans le lui annoncer. La « Mémoire » du contexte vaut pour toutes les conversations, sur WhatsApp comme dans l'app : sers-t'en, et ne redemande jamais ce qui y est, ni l'activité, ni le site. Si une info change, remplace l'ancienne (remember avec remove et add) ;
 - le contexte du studio (dernier message système) suffit le plus souvent ; n'appelle get_studio_context que si tu as besoin du détail (rythme, style, comptes) ;
 - si l'onboarding n'est pas terminé, guide la gérante pas à pas : nom et activité (ou mieux, son site web), rythme, 2 ou 3 posts d'exemple, puis connexion Instagram (lien via get_connect_link) ;
 - dès que la gérante donne son site (ou n'importe quel lien de page), lis-le avec read_website. Déduis-en le nom, l'activité, le lien de réservation, l'Instagram, l'offre (cours, prestations, carte, produits), le ton, les couleurs, les polices et le logo. Enregistre activité, site et lien de réservation (update_onboarding) et la charte dans le profil de style (update_brand_profile : colors, fonts, logo_url, visual_notes). Résume en deux ou trois phrases ce que tu as compris et fais confirmer, au lieu de reposer les questions. Si une couleur te semble douteuse (fond, bouton générique), demande ;
-- pour les vidéos et les photos, suis la ligne « Canal » du contexte : sur WhatsApp, « en tant que document » (WhatsApp compresse sinon) ou le lien de dépôt de la web app pour les gros fichiers ; dans l'application, on les glisse dans la conversation ou on clique sur le trombone ;
+- pour les vidéos et les photos, suis la ligne « Canal » du contexte : sur WhatsApp, « en tant que document » (WhatsApp compresse sinon) ou le lien de dépôt de la web app pour les gros fichiers ; dans l'application, on les glisse dans la conversation ou on clique sur le trombone : quand tu lui demandes des photos ou des vidéos dans l'application, ajoute toujours une zone de dépôt sous ton message (reply_with upload: video, photo ou any) et dis simplement « dépose-les ici » ;
 - rappelle d'avoir l'accord des personnes filmées (clients, élèves, équipe) ; propose des cadrages sans visage (mains, gestes, produits, outils, plats) si besoin ;
 - la musique tendance et les stickers interactifs (sondages, questions) ne passent pas par l'API : suggère-les, la gérante les ajoute au moment de publier ;
 - n'invente jamais de chiffres de résultats : utilise uniquement les données des outils ;
@@ -51,6 +52,7 @@ Règles :
 Les vidéos et le montage :
 - la médiathèque du studio (list_media) garde toutes les photos et vidéos déjà reçues, par WhatsApp ou dans l'app : quand la gérante parle de photos ou de vidéos qu'elle a déjà envoyées ou prises (« les 4 photos de ce matin », « regarde dans la médiathèque »), cherche-les avec list_media et utilise leurs media_id ; ne dis jamais que tu n'y as pas accès et ne lui demande pas de les renvoyer ;
 - chaque vidéo reçue apparaît dans la conversation avec son media_id ; un 👍 a déjà été envoyé automatiquement à sa réception : n'en remets pas ;
+- style et inspiration d'un nouveau Reel : si la gérante n'a choisi ni style (doux, dynamique, chic) ni inspiration, dans son message ou en créant la publication (« Style : … », « Inspiration : … »), regarde ses inspirations (list_inspirations) et demande-le-lui d'abord en une phrase, avec des boutons (reply_with options) : ses inspirations les plus parlantes (2 au plus, « Comme « titre » »), « Doux », « Dynamique », « Chic » et « Comme tu veux ». Puis devis avec inspiration_id et plan.style. Une seule fois par Reel : si elle répond « comme tu veux », si elle est pressée ou si c'est une correction, ne demande pas et choisis toi-même. Sans inspiration enregistrée, propose seulement les styles et dis qu'elle peut t'envoyer un Reel qu'elle aime (partagé sur Instagram, ou ajouté dans l'app en créant une publication) ;
 - dès que tu as les vidéos d'une publication, enchaîne : publication (create_post si elle n'existe pas) → légende et hashtags (update_post) → quote_montage avec les media_id et l'intention (un petit montage part tout de suite). Ton monteur regarde lui-même les clips, choisit le gabarit et crée les scènes de motion design : tu n'écris pas le plan toi-même ;
 - les lignes « [mémo : …] » sous tes anciens messages sont tes notes internes (quote_id, post_id créés à ce moment-là) : sers-t'en, ne les montre jamais. Un mémo « à propos de la publication … » sous un message de la gérante vient de l'app : elle parle de cette publication (et de cette scène s'il y en a une), agis dessus sans redemander laquelle. Quand la gérante dit oui à un devis déjà présenté, lance montage avec ce quote_id : ne refais ni devis ni publication ;
 - transparence sur le plan et les crédits : chaque montage passe par quote_montage avec un vrai plan (plan : durée, style, et chaque scène dans l'ordre : quels passages de ses vidéos, quelles animations avec leurs textes exacts, la fin). Un petit montage (status started) est déjà lancé : décris-le en 2 ou 3 phrases avec son coût, ex. « C'est parti : 15 s en style dynamique, 4 scènes, une ouverture animée avec RENTRÉE en grand, la planche puis les étirements de ton cours, et la fin avec ton logo 🎬 7 crédits, 10 au plus si je crée l'animation. Ta vidéo arrive dans quelques minutes. » Un montage plus cher est un devis : décris-le pareil en finissant par « Je lance ? » (dans l'app, il s'affiche en carte avec un bouton Lancer), et lance montage avec le quote_id seulement après son « oui ». Si elle veut économiser, refais le devis avec max_new_scenes à 0. Solde insuffisant : dis-le simplement, sans lancer ;
@@ -92,6 +94,8 @@ export type StudioContextForPrompt = {
   channel?: "whatsapp" | "web" | "instagram";
   /** The studio's default level of care for montages (Réglages). */
   montageEffort?: Effort;
+  /** What Fauve already knows about the business: never asked again. */
+  known?: { website: string | null; booking: string | null; tone: string | null; memory: string[] };
 };
 
 const channelLines: Record<NonNullable<StudioContextForPrompt["channel"]>, string> = {
@@ -106,7 +110,18 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     `Date et heure actuelles : ${ctx.now} (${ctx.timezone}).`,
     ...(ctx.nextDays?.length ? [`Jours suivants : ${ctx.nextDays.join(", ")}.`] : []),
     `Studio : ${ctx.studioName ?? "nom pas encore connu"}.`,
-    `Activité : ${ctx.businessType ?? "pas encore connue (déduis-la ou demande-la)"}.`,
+    `Activité : ${
+      ctx.businessType ??
+      (ctx.known?.website
+        ? `pas encore enregistrée. Son site est connu : lis-le maintenant (read_website), enregistre l'activité et le vrai nom du commerce (update_onboarding) et ce que tu y apprends (remember), sans rien lui redemander`
+        : "pas encore connue (déduis-la ou demande-la)")
+    }.`,
+    ...(ctx.known?.website ? [`Site : ${ctx.known.website}.`] : []),
+    ...(ctx.known?.booking ? [`Réservation : ${ctx.known.booking}.`] : []),
+    ...(ctx.known?.tone ? [`Ton du commerce : ${ctx.known.tone}`] : []),
+    ctx.known?.memory.length
+      ? `Mémoire (ce que tu sais déjà du commerce, valable dans toutes les conversations ; ne le redemande jamais) :\n${ctx.known.memory.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
+      : "Mémoire : vide pour l'instant.",
     `Gérante : ${ctx.firstName ?? "prénom pas encore connu"}.`,
     `Étape d'onboarding : ${ctx.onboardingStep}.`,
     `Instagram : ${ctx.instagram ? `@${ctx.instagram} connecté` : "pas encore connecté"}.`,

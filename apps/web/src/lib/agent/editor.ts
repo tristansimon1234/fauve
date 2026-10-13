@@ -20,6 +20,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { latestReport } from "@/lib/performance";
 import { designMotionScenes } from "./motion-designer";
+import { ensureInspirationRead } from "@/lib/inspirations";
 import { markTemplatesUsed, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { anthropic, logClaudeCost } from "./run";
 
@@ -54,7 +55,7 @@ export async function designEdit(params: {
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, library, report, inspirations] = await Promise.all([
-    db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
+    db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
     db.from("studios").select("name, business_type, booking_url").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
@@ -79,6 +80,10 @@ export async function designEdit(params: {
   const clips = analyses.flatMap((a) => ("analysis" in a ? [{ media_id: a.media_id, analysis: a.analysis }] : []));
   if (mediaIds.length && !clips.length) throw new Error("Les vidéos ne sont pas encore analysées, réessaie dans une minute");
 
+  // The inspiration she picked for this post (read now if it was just added in the app).
+  const inspirationId = post.data.inspiration_id as string | null;
+  const chosenInspiration = inspirationId ? await ensureInspirationRead(params.studioId, inspirationId).catch(() => null) : null;
+  const chosenTemplate = motionTemplateSchema.safeParse(post.data.template);
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
   const input = {
     studio: { name: studio.data?.name, business: studio.data?.business_type ?? undefined, booking: Boolean(studio.data?.booking_url) },
@@ -89,7 +94,7 @@ export async function designEdit(params: {
       // What worked on this studio's Instagram (weekly analysis): follow it when it applies.
       lessons: report?.lessons.map((l) => l.lesson),
       // Reels the manager shared with Fauve on Instagram, as read by Gemini.
-      inspirations: (inspirations.data ?? []).map((i) => i.analysis as string),
+      inspirations: (inspirations.data ?? []).map((i) => i.analysis as string).filter((a) => a !== chosenInspiration),
       default_template: profile.default_template,
       visual_notes: profile.visual_notes,
       colors: profile.colors,
@@ -99,7 +104,14 @@ export async function designEdit(params: {
       dos: profile.dos,
       donts: profile.donts,
     },
-    post: { ...post.data, edit_plan_id: undefined },
+    post: {
+      ...post.data,
+      edit_plan_id: undefined,
+      template: undefined,
+      inspiration_id: undefined,
+      chosen_template: chosenTemplate.success ? chosenTemplate.data : undefined,
+      chosen_inspiration: chosenInspiration ?? undefined,
+    },
     clips: clips.map((c) => ({ media_id: c.media_id, ...c.analysis, words: c.analysis.words?.length ? c.analysis.words : undefined })),
     // Scenes already made: reusing one costs nothing.
     templates: library,

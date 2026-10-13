@@ -211,6 +211,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         media: null,
         reactions: {},
         options: [],
+        upload: null,
         cards: [],
         openPost: null,
         ...part,
@@ -372,6 +373,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
                 timezone={timezone}
                 onReact={react}
                 onChoose={i === messages.length - 1 && !pending ? send : undefined}
+                onFiles={i === messages.length - 1 ? uploads.addFiles : undefined}
                 onAsk={ask}
                 onLaunch={launch}
                 busy={pending}

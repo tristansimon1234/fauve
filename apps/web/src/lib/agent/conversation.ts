@@ -1,6 +1,6 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_EFFORT, effortSchema, orderReplies } from "@fauve/agent";
+import { DEFAULT_EFFORT, effortSchema, orderReplies, readMemory } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 
@@ -93,11 +93,12 @@ export async function replyInConversation(params: {
     .limit(ownThread ? HISTORY_LIMIT : HISTORY_LIMIT * 3);
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
-  const [studio, member, rows, instagram] = await Promise.all([
-    db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort").eq("id", params.studioId).single(),
+  const [studio, member, rows, instagram, brand] = await Promise.all([
+    db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
+    db.from("brand_profiles").select("profile->>tone").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (studio.error) throw new Error(studio.error.message);
   if (rows.error) throw new Error(rows.error.message);
@@ -145,6 +146,12 @@ export async function replyInConversation(params: {
       instagram: (instagram.data?.handle as string | null | undefined) ?? null,
       channel: params.channel ?? (params.waId ? "whatsapp" : "web"),
       montageEffort: effortSchema.catch(DEFAULT_EFFORT).parse(studio.data.montage_effort),
+      known: {
+        website: (studio.data.website_url as string | null) ?? null,
+        booking: (studio.data.booking_url as string | null) ?? null,
+        tone: ((brand.data as { tone?: string | null } | null)?.tone ?? null)?.slice(0, 300) ?? null,
+        memory: readMemory(studio.data.memory).map((f) => f.fact),
+      },
     },
   });
 }
