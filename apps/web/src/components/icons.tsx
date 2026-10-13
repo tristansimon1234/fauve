@@ -171,3 +171,9 @@ export const LayersIcon = make(
     <path d="M4 15.5V6.5A2.5 2.5 0 0 1 6.5 4h9" />
   </>,
 );
+export const EyeIcon = make(
+  <>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+    <circle cx="12" cy="12" r="2.8" />
+  </>,
+);

@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
-import { InstagramIcon, LayersIcon, PlayIcon } from "@/components/icons";
-import { formatNumber, formatShortDateTime } from "@/lib/format";
+import { EyeIcon, InstagramIcon, LayersIcon, PlayIcon } from "@/components/icons";
+import { formatCompact, formatNumber, formatShortDateTime } from "@/lib/format";
 import type { InstagramMedia, InstagramProfile } from "@/lib/social/instagram";
 
-// The Instagram profile preview: header and 3-column grid (4:5 tiles, as on
+// The Instagram profile preview: header and 3-column grid (3:4 tiles, as on
 // Instagram), Fauve's coming posts first with a dashed frame and their status.
 
 export type Tile =
   | { kind: "upcoming"; id: string; title: string; status: string; at: string | null; videoUrl: string | null; format: string }
-  | { kind: "instagram"; media: InstagramMedia };
+  | { kind: "instagram"; media: InstagramMedia; views?: number };
 
 export function GridView({
   connected,
@@ -26,7 +26,7 @@ export function GridView({
 }) {
   return (
     <>
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col items-center gap-1.5 text-center">
         <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Grille</h1>
         <p className="max-w-[620px] text-[15px] text-muted">
           Ton profil Instagram comme le voient tes abonnés, avec les publications prévues par Fauve à l’endroit où elles
@@ -35,7 +35,7 @@ export function GridView({
       </div>
 
       {!connected && (
-        <EmptyState title="Connecte Instagram pour voir ta vraie grille" cta={null} className="max-w-[760px]">
+        <EmptyState title="Connecte Instagram pour voir ta vraie grille" cta={null} className="mx-auto w-full max-w-[520px]">
           En attendant, voici les publications prévues par Fauve.{" "}
           <a href="/connect" className="font-bold text-violet">
             Connecter Instagram
@@ -43,7 +43,7 @@ export function GridView({
         </EmptyState>
       )}
 
-      <section aria-label="Aperçu du profil Instagram" className="w-full max-w-[520px] rounded-[22px] border border-line bg-white">
+      <section aria-label="Aperçu du profil Instagram" className="mx-auto w-full max-w-[520px] rounded-[22px] border border-line bg-white">
         {connected && (
           <header className="flex items-center gap-5 px-5 pt-5 pb-4">
             {info?.profile_picture_url ? (
@@ -74,8 +74,8 @@ export function GridView({
         {tiles.length ? (
           <ul className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-b-[22px] border-t border-line">
             {tiles.map((tile) => (
-              <li key={tile.kind === "upcoming" ? `p-${tile.id}` : `ig-${tile.media.id}`} className="relative aspect-[4/5] bg-soft">
-                {tile.kind === "upcoming" ? <UpcomingTile tile={tile} tz={tz} /> : <InstagramTile media={tile.media} />}
+              <li key={tile.kind === "upcoming" ? `p-${tile.id}` : `ig-${tile.media.id}`} className="relative aspect-[3/4] bg-soft">
+                {tile.kind === "upcoming" ? <UpcomingTile tile={tile} tz={tz} /> : <InstagramTile media={tile.media} views={tile.views} />}
               </li>
             ))}
           </ul>
@@ -120,11 +120,13 @@ function UpcomingTile({ tile, tz }: { tile: Extract<Tile, { kind: "upcoming" }>;
         {tile.at ? ` · ${formatShortDateTime(tile.at, tz)}` : ""}
       </span>
       {tile.format === "reel" && <PlayIcon size={16} className="absolute top-2 right-2 text-white drop-shadow" />}
+      {tile.format === "carousel" && <LayersIcon size={16} className="absolute top-2 right-2 text-white drop-shadow" />}
     </Link>
   );
 }
 
-function InstagramTile({ media }: { media: InstagramMedia }) {
+function InstagramTile({ media, views }: { media: InstagramMedia; views?: number }) {
+  const reel = media.media_product_type === "REELS";
   const src = media.media_type === "VIDEO" ? media.thumbnail_url : media.media_url;
   return (
     <a href={media.permalink} target="_blank" rel="noreferrer" className="absolute inset-0 block" aria-label={media.caption?.slice(0, 80) ?? "Publication Instagram"}>
@@ -134,8 +136,16 @@ function InstagramTile({ media }: { media: InstagramMedia }) {
       ) : (
         <span className="flex size-full items-center justify-center p-2 text-center text-xs text-muted">{media.caption?.slice(0, 60)}</span>
       )}
-      {media.media_product_type === "REELS" && <PlayIcon size={16} className="absolute top-2 right-2 text-white drop-shadow" />}
+      {reel && <PlayIcon size={16} className="absolute top-2 right-2 text-white drop-shadow" />}
       {media.media_type === "CAROUSEL_ALBUM" && <LayersIcon size={16} className="absolute top-2 right-2 text-white drop-shadow" />}
+      {views !== undefined && (
+        // Views at the bottom left, like the play count Instagram shows on Reels.
+        <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/55 to-transparent px-2 pt-5 pb-1.5 text-[12px] font-bold text-white">
+          {reel ? <PlayIcon size={12} /> : <EyeIcon size={13} />}
+          {formatCompact(views)}
+          <span className="sr-only"> vues</span>
+        </span>
+      )}
     </a>
   );
 }

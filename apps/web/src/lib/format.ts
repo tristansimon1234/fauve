@@ -54,6 +54,11 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("fr-FR").format(value);
 }
 
+/** « 1,2 k », « 3,4 M » for counts on small tiles. */
+export function formatCompact(value: number): string {
+  return new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
 /** « +33 6 12 34 56 78 » for French numbers, unchanged otherwise. */
 export function formatPhone(e164: string): string {
   const fr = /^\+33(\d)(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(e164);

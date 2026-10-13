@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { NoStudio, PageLoading } from "@/components/empty-state";
-import { profile, recentMedia, type InstagramProfile } from "@/lib/social/instagram";
+import { mediaViews, profile, recentMedia, type InstagramProfile } from "@/lib/social/instagram";
 import { instagramAccount } from "@/lib/social/publish";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { GridView, type Tile } from "./grid-view";
@@ -13,7 +13,6 @@ export const metadata: Metadata = { title: "Grille" };
 
 const GRID_POSTS = 24;
 const UPCOMING = ["draft", "validated", "scheduled"] as const;
-
 
 export default function GridPage() {
   return (
@@ -44,6 +43,8 @@ async function Grid() {
     account ? recentMedia(account.userId, account.accessToken, GRID_POSTS, { images: true }).catch(() => []) : Promise.resolve([]),
     account ? profile(account.userId, account.accessToken).catch((): InstagramProfile => ({})) : Promise.resolve(null),
   ]);
+  // Views per media, as Instagram shows them on Reels (one insights call each, in parallel).
+  const views = account ? await Promise.all(feed.map((m) => mediaViews(m.id, account.accessToken))) : [];
 
   // Fauve's montages: the rendered video, its first frame stands in for the cover.
   const renderIds = (upcoming.data ?? []).flatMap((p) => (p.render_id ? [p.render_id as string] : []));
@@ -64,7 +65,7 @@ async function Grid() {
         format: p.kind as string,
       };
     }),
-    ...feed.map((media): Tile => ({ kind: "instagram", media })),
+    ...feed.map((media, i): Tile => ({ kind: "instagram", media, views: views[i] })),
   ];
 
   return (

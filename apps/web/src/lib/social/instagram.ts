@@ -309,6 +309,20 @@ export async function mediaInsights(mediaId: string, accessToken: string): Promi
   return {};
 }
 
+/** Views of one media (Reel, post or carousel), or undefined when Meta has none (e.g. posted before the account went pro). */
+export async function mediaViews(mediaId: string, accessToken: string): Promise<number | undefined> {
+  try {
+    const res = await call<{ data: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] }>(
+      graphUrl(`${mediaId}/insights?${q({ metric: "views", access_token: accessToken })}`),
+    );
+    const m = res.data[0];
+    return m ? (m.total_value?.value ?? m.values?.[0]?.value) : undefined;
+  } catch (error) {
+    if (error instanceof InstagramError) return undefined;
+    throw error;
+  }
+}
+
 /** Public reply under a comment, posted as the studio's account. */
 export async function replyToComment(commentId: string, accessToken: string, message: string): Promise<string> {
   const res = await call<{ id: string }>(graphUrl(`${commentId}/replies`), {
