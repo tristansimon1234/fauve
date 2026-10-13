@@ -1,4 +1,4 @@
-import { platformSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
+import { alignSlides, platformSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -12,10 +12,13 @@ import { StatusPill } from "@/components/status-pill";
 import { formatDateTime, formatSeconds, kindLabels, platformLabels } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
 import { loadEditorData } from "@/lib/montage-editor-data";
+import { loadMontageInputs } from "@/lib/render/render-post";
+import { postSlides } from "@/lib/render/slides";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
 import { deletePost } from "./actions";
 import { MontageEditor } from "./montage-editor";
 import { PostEditor } from "./post-editor";
+import { SlidesSection } from "./slides-section";
 
 export const metadata: Metadata = { title: "Publication" };
 
@@ -32,6 +35,7 @@ const postSchema = z.object({
   edit_plan_id: z.uuid().nullable(),
   render_id: z.uuid().nullable(),
   media_ids: z.array(z.uuid()).catch([]),
+  slides: z.unknown(),
 });
 
 // Read leniently: an older or partial plan still shows what it can.
@@ -81,7 +85,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const { data, error } = await db
     .from("posts")
-    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, agent_note, edit_plan_id, render_id, media_ids")
+    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, agent_note, edit_plan_id, render_id, media_ids, slides")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -104,6 +108,15 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   const canEdit = !LOCKED.includes(post.status);
   const editor = canEdit && plan ? await loadEditorData(studioId, plan.id).catch(() => null) : null;
   const isVideo = post.kind === "reel" || post.kind === "story";
+  // Text over the photos of a carousel or photo post, editable by hand.
+  const photos = Object.fromEntries(media.filter((m) => !m.video).map((m) => [m.id, m.url]));
+  const slides =
+    canEdit && (post.kind === "carousel" || post.kind === "post") && Object.keys(photos).length
+      ? {
+          plan: postSlides({ slides: post.slides, media_ids: post.media_ids }) ?? alignSlides({ template: "doux", slides: [] }, post.media_ids),
+          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, fonts: i.fonts })),
+        }
+      : null;
 
   return (
     <>
@@ -221,6 +234,20 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           )}
         </div>
       </div>
+
+      {slides && (
+        <section aria-labelledby="slides-editor" className="flex flex-col gap-4 border-t border-line pt-8">
+          <div className="flex flex-col gap-1">
+            <h2 id="slides-editor" className="text-[24px] font-extrabold tracking-[-0.02em]">
+              Texte sur les photos
+            </h2>
+            <p className="text-[15px] text-muted">
+              Une accroche, un message par photo : glisse chaque texte où tu veux, change ses mots, sa taille, son fond. Gratuit.
+            </p>
+          </div>
+          <SlidesSection postId={post.id} initialPlan={slides.plan} photos={photos} brand={slides.brand} />
+        </section>
+      )}
 
       {editor && (
         <section aria-labelledby="montage-editor" className="flex flex-col gap-4 border-t border-line pt-8">

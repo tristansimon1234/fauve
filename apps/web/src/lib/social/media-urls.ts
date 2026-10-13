@@ -18,7 +18,7 @@ async function sign(path: string): Promise<string> {
 }
 
 /** A JPEG copy of an image in storage (the original path if it already is one). */
-async function jpegPath(studioId: string, path: string, mimeType: string | null): Promise<string> {
+export async function jpegPath(studioId: string, path: string, mimeType: string | null): Promise<string> {
   if (mimeType === "image/jpeg" || /\.jpe?g$/i.test(path)) return path;
   const db = supabaseAdmin();
   const download = await db.storage.from("media").download(path);
@@ -35,8 +35,11 @@ async function jpegPath(studioId: string, path: string, mimeType: string | null)
   return target;
 }
 
-/** The post's media, in order, as items Instagram can fetch. */
-export async function publishItems(studioId: string, mediaIds: string[]): Promise<PublishItem[]> {
+/**
+ * The post's media, in order, as items Instagram can fetch. `rendered`: a photo
+ * with text over it (carousel slides) replaces the raw photo.
+ */
+export async function publishItems(studioId: string, mediaIds: string[], rendered: Record<string, string> = {}): Promise<PublishItem[]> {
   if (!mediaIds.length) return [];
   const { data, error } = await supabaseAdmin()
     .from("media_assets")
@@ -47,6 +50,11 @@ export async function publishItems(studioId: string, mediaIds: string[]): Promis
   const byId = new Map(data.map((m) => [m.id as string, m]));
   const items: PublishItem[] = [];
   for (const id of mediaIds) {
+    const slide = rendered[id];
+    if (slide?.startsWith(`${studioId}/`)) {
+      items.push({ type: "image", url: await sign(slide) });
+      continue;
+    }
     const asset = byId.get(id);
     if (!asset) throw new Error(`Média ${id} introuvable`);
     const mime = asset.mime_type as string | null;

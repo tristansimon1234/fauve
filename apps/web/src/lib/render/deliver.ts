@@ -3,6 +3,7 @@ import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
 import { renderPost } from "./render-post";
+import { renderSlides } from "./slides";
 
 export type DeliveryTarget = {
   studioId: string;
@@ -63,5 +64,29 @@ export async function renderAndDeliver(target: DeliveryTarget): Promise<{ title:
     console.error("render failed", target.postId, error);
     await notifyFailure(target, "Le montage n’a pas abouti cette fois, je regarde ce qui coince. Tu veux que je réessaie ? Aucun crédit n’a été débité.", error);
     return null;
+  }
+}
+
+/** Renders the text over a carousel's photos, then points the manager to the post, like a montage. */
+export async function renderSlidesAndDeliver(target: DeliveryTarget): Promise<boolean> {
+  try {
+    await renderSlides(target.studioId, target.postId);
+    const { data: post } = await supabaseAdmin().from("posts").select("title, kind").eq("id", target.postId).single();
+    const what = post?.kind === "carousel" ? "ton carrousel" : "ta photo";
+    const intro = `Le texte est posé sur ${what} « ${(post?.title as string | null) ?? ""} » ✨`;
+    const after = "Fais défiler pour tout voir. Tu peux déplacer ou corriger chaque texte du doigt, puis valider.";
+    const payload = { posts: [target.postId], open_post: target.postId };
+    if (target.waId) {
+      const link = await createLoginLink(`+${target.waId}`, `/v/${target.postId}`, "open_post");
+      const id = await sendText(target.waId, `${intro}\n\nRegarde ici : ${link}\n\n${after}`);
+      await store(target, { wa_message_id: id, type: "text", body: `${intro}\n\n${after}`, payload });
+    } else {
+      await store(target, { type: "text", body: `${intro}\n\n${after}`, payload });
+    }
+    return true;
+  } catch (error) {
+    console.error("slides render failed", target.postId, error);
+    await notifyFailure(target, "Le texte sur tes photos n’a pas pu être posé cette fois. Tu veux que je réessaie ?", error);
+    return false;
   }
 }

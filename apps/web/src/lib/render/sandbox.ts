@@ -176,3 +176,43 @@ export async function smokeTestScenes(
     await bash(sandbox, 'rm -f "$1"', [file]).catch(() => {});
   }
 }
+
+/**
+ * Carousel slides: one JPEG per job, a still of the Reel composition at `frame`
+ * (stills.mjs, one browser for all). Returns the image of each job id, or its error.
+ */
+export async function renderStillsInSandbox(
+  id: string,
+  jobs: { id: string; frame: number; props: ReelProps }[],
+): Promise<Record<string, Buffer | Error>> {
+  if (!jobs.length) return {};
+  const sandbox = await remotionSandbox();
+  const dir = `${ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    const list = jobs.map((j) => ({ id: j.id, frame: j.frame, props: j.props, out: `${dir}/${j.id}.jpg` }));
+    await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(list) }]);
+    const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 240 node stills.mjs "$1/jobs.json"`, "bash", dir] });
+    const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
+    let errors: Record<string, string | null>;
+    try {
+      errors = JSON.parse(lastLine) as Record<string, string | null>;
+    } catch {
+      const output = (await result.output("both").catch(() => "")).slice(-600);
+      throw new Error(`stills failed: ${output}`);
+    }
+    const images: Record<string, Buffer | Error> = {};
+    for (const job of list) {
+      const error = errors[job.id];
+      if (error) {
+        images[job.id] = new Error(error);
+        continue;
+      }
+      const jpeg = await sandbox.readFileToBuffer({ path: job.out });
+      images[job.id] = jpeg?.length ? jpeg : new Error("still produced no file");
+    }
+    return images;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}

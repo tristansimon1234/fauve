@@ -1,11 +1,12 @@
 "use server";
 
-import { assertTransition, editPlanSchema, isClipSegment, postStatusSchema, type PostStatus } from "@fauve/agent";
+import { assertTransition, editPlanSchema, isClipSegment, postStatusSchema, slidesPlanSchema, type PostStatus } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import type { DeleteResult } from "@/components/delete-button";
 import { renderPost } from "@/lib/render/render-post";
+import { renderSlides, saveSlides } from "@/lib/render/slides";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -215,4 +216,34 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   );
   revalidatePath(`/publications/${postId}`);
   return { ok: true, version };
+}
+
+/**
+ * Text over the photos (carousel or photo post), set by hand: saved, then the
+ * images are rendered in the background (about a minute), free.
+ */
+export async function saveSlidesPlan(postId: string, input: unknown): Promise<SavePlanResult> {
+  if (!z.uuid().safeParse(postId).success) return { ok: false, error: "Publication introuvable." };
+  const parsed = slidesPlanSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Un des textes n’est pas valide : vérifie qu’il n’est pas vide." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  const studioId = member.studio.id;
+  const { data: post } = await supabaseAdmin().from("posts").select("id, status").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  if (!post) return { ok: false, error: "Publication introuvable." };
+  if (LOCKED.includes(postStatusSchema.parse(post.status))) return { ok: false, error: "Cette publication est déjà en ligne." };
+  try {
+    await saveSlides(studioId, postId, parsed.data);
+  } catch (error) {
+    console.warn("saveSlidesPlan failed", error);
+    return { ok: false, error: "L’enregistrement a échoué. Réessaie dans un instant." };
+  }
+  after(() =>
+    renderSlides(studioId, postId).then(
+      () => revalidatePath(`/publications/${postId}`),
+      (e) => console.error("saveSlidesPlan: render failed", postId, e),
+    ),
+  );
+  revalidatePath(`/publications/${postId}`);
+  return { ok: true, version: 0 };
 }

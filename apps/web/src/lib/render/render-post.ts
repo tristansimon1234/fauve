@@ -40,7 +40,7 @@ function check<T extends { error: { message: string } | null }>(result: T): T {
 }
 
 /** Moves the post forward to "draft" (to validate) when the state machine allows it. */
-function towardsDraft(status: PostStatus): PostStatus[] {
+export function towardsDraft(status: PostStatus): PostStatus[] {
   if (canTransition(status, "draft")) return ["draft"];
   if (canTransition(status, "media_received") && canTransition("media_received", "draft")) return ["media_received", "draft"];
   return [];

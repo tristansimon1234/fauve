@@ -35,10 +35,14 @@ export function TextBoxes({
   active,
   onMove,
   onPick,
+  yRange = [Y_MIN, Y_MAX],
 }: {
   container: React.RefObject<HTMLDivElement | null>;
-  player: React.RefObject<PlayerRef | null>;
-  texts: Text[];
+  /** The live player, paused while a text is dragged (none on a still slide). */
+  player?: React.RefObject<PlayerRef | null>;
+  texts: Pick<Text, "style" | "text" | "x" | "y">[];
+  /** Where the top of a text may go (a carousel slide has no app buttons at the bottom). */
+  yRange?: [number, number];
   active: number | null;
   onMove: (index: number, place: { x: number; y: number }) => void;
   onPick: (index: number) => void;
@@ -86,7 +90,7 @@ export function TextBoxes({
     if (!d.moved) return;
     let x = Math.min(X_MAX, Math.max(X_MIN, d.x0 + dx));
     if (Math.abs(x - 0.5) < 0.025) x = 0.5;
-    const y = Math.min(Y_MAX, Math.max(Y_MIN, d.y0 + dy));
+    const y = Math.min(yRange[1], Math.max(yRange[0], d.y0 + dy));
     onMove(d.index, { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
   };
 
@@ -94,8 +98,10 @@ export function TextBoxes({
     <>
       {dragging && (
         <>
-          {/* The bottom quarter Instagram covers, and the centre line. */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-1/4 bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.12)_0_8px,transparent_8px_16px)]" />
+          {/* The bottom quarter Instagram covers on a Reel, and the centre line. */}
+          {yRange[1] <= Y_MAX && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-1/4 bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.12)_0_8px,transparent_8px_16px)]" />
+          )}
           <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 border-l border-dashed border-white/60" />
         </>
       )}
@@ -113,7 +119,7 @@ export function TextBoxes({
             style={{ left: `${box.left * 100}%`, top: `${box.top * 100}%`, width: `${box.width * 100}%`, height: `${box.height * 100}%` }}
             onPointerDown={(e) => {
               e.currentTarget.setPointerCapture(e.pointerId);
-              player.current?.pause();
+              player?.current?.pause();
               drag.current = { index: box.index, px: e.clientX, py: e.clientY, x0: text.x ?? 0.5, y0: text.y ?? DEFAULT_Y[text.style], moved: false };
               setDragging(true);
             }}

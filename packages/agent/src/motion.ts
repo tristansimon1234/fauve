@@ -22,6 +22,8 @@ const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> 
 
 export type ReelSegment =
   | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean }
+  /** A photo (a carousel slide). */
+  | { type: "image"; src: string; startAt: number; durationInFrames: number }
   | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
   | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number };
 export type ReelText = {

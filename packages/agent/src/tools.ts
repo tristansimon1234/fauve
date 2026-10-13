@@ -10,6 +10,7 @@ import {
   reactionSchema,
   replyExtrasSchema,
 } from "./schemas.ts";
+import { slideTextSchema } from "./slides.ts";
 
 // Tool contracts shared by every runtime (webhook, web chat, jobs).
 // Implementations live next to the database code in apps/web.
@@ -146,6 +147,18 @@ export const toolSpecs = {
     description:
       "Refait seulement le rendu vidéo de la dernière version du plan (sans le modifier), puis l'envoie à la gérante. Normalement inutile : montage fait déjà tout.",
     input: z.object({ post_id: z.string().uuid() }),
+  },
+  write_on_photos: {
+    description:
+      "Écrit du texte par-dessus les photos d'un carrousel ou d'un post photo, à la charte du studio (mêmes polices et styles que les montages). Rendu en images en une minute environ, gratuit ; le lien vers le résultat est envoyé automatiquement à la gérante quand c'est prêt. Une entrée par photo, dans l'ordre des photos de la publication (texts vide = photo sans texte). Court et lisible : une accroche sur la 1re photo (hook), puis un message par photo (band ou caption), 3 textes au plus par photo. Remplace le texte déjà posé ; la gérante peut ensuite déplacer ou corriger chaque texte elle-même.",
+    input: z.object({
+      post_id: z.string().uuid(),
+      template: motionTemplateSchema.optional().describe("doux, dynamique ou chic ; par défaut celui déjà choisi, sinon doux"),
+      slides: z
+        .array(z.object({ texts: z.array(slideTextSchema.pick({ text: true, style: true, emphasis: true })).max(3) }))
+        .min(1)
+        .max(10),
+    }),
   },
   schedule_post: {
     description:

@@ -400,3 +400,27 @@ test("plan edit: texts follow their scene when scenes move, change or go", async
   assert.deepEqual(trimmed.texts.map((t) => [t.from, t.to]), [[0.5, 2], [2.5, 4.5]]);
   assert.equal(editPlanSchema.safeParse(moved).success, true);
 });
+
+test("carousel slides: aligned with the photos, built as a 4:5 still of the Reel", async () => {
+  const { alignSlides, buildSlideProps, slidesPlanSchema, SLIDE_FRAME } = await import("./slides.ts");
+  const [a, b, c] = ["00000000-0000-4000-8000-00000000000a", "00000000-0000-4000-8000-00000000000b", "00000000-0000-4000-8000-00000000000c"];
+  const plan = slidesPlanSchema.parse({
+    template: "doux",
+    slides: [
+      { media_id: b, texts: [{ text: "Sur B", style: "band" }] },
+      { media_id: a, texts: [{ text: "Accroche", style: "hook", y: 0.8 }] },
+    ],
+  });
+  // Follows the post's order, drops removed photos, adds new ones without text.
+  const aligned = alignSlides(plan, [a, c]);
+  assert.deepEqual(aligned.slides.map((s) => [s.media_id, s.texts.map((t) => t.text)]), [[a, ["Accroche"]], [c, []]]);
+
+  const props = buildSlideProps(aligned.slides[0]!, { template: "doux", imageUrl: "https://example.com/a.jpg", brand: { name: "Studio" } });
+  assert.deepEqual([props.width, props.height], [1080, 1350]);
+  assert.equal(props.segments[0]?.type, "image");
+  // Captured once every text is in, before any leaves.
+  assert.ok(props.texts.every((t) => t.from <= SLIDE_FRAME && t.from + t.durationInFrames > SLIDE_FRAME + 20));
+  assert.equal(props.texts[0]?.y, 0.8);
+  // A text may sit lower on a slide than on a Reel, but not off the photo.
+  assert.equal(slidesPlanSchema.safeParse({ template: "doux", slides: [{ media_id: a, texts: [{ text: "x", style: "caption", y: 0.95 }] }] }).success, false);
+});
