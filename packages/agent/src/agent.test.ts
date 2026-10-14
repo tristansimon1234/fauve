@@ -769,3 +769,17 @@ test("memory keeps each fact once, drops removed ones and ignores junk", async (
   assert.equal(readMemory(null).length, 0);
   assert.equal(awaitsAnswer({ body: "Dépose-les ici", upload: "video" }), true);
 });
+
+test("Brigitte's instant reaction reads Jev's answers safely", async () => {
+  const { moodOf, emojiOf } = await import("./mood.ts");
+  assert.equal(moodOf({ choice: "laugh", confidence: 0.9 }), "laugh");
+  assert.equal(moodOf({ choice: "laugh", confidence: 0.3 }), "neutral");
+  assert.equal(moodOf({ choice: "angry", confidence: 0.99 }), "neutral");
+  assert.equal(moodOf(null), "neutral");
+  assert.equal(emojiOf({ choice: "🔥", confidence: 0.8 }, "happy"), "🔥");
+  assert.equal(emojiOf({ choice: "none", confidence: 0.9 }, "happy"), null);
+  assert.equal(emojiOf({ choice: "❤️", confidence: 0.4 }, "happy"), null);
+  // No emoji on a manager who is upset, whatever the second answer says.
+  assert.equal(emojiOf({ choice: "👍", confidence: 0.9 }, "cry"), null);
+  assert.equal(emojiOf({ choice: "💩", confidence: 0.9 }, "happy"), null);
+});

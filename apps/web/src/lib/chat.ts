@@ -2,6 +2,7 @@ import "server-only";
 import { awaitsAnswer, echoFor, emojiOnly, segmentKind, editPlanSchema } from "@fauve/agent";
 import { after } from "next/server";
 import { replyInConversation } from "@/lib/agent/conversation";
+import { reactTo } from "@/lib/agent/mood";
 import type { ChatEvent } from "@/lib/agent/run";
 import { extrasOf, resolveCards, type ChatCard } from "@/lib/chat-cards";
 import { setReaction, type Reactions } from "@/lib/reactions";
@@ -277,6 +278,9 @@ export async function chatTurn(
     }
   }
 
+  // Her face and an emoji on the message, in a fraction of a second (Jev), while the chat model writes.
+  const reacting = body && lastRowId ? instantReaction(ctx.studioId, id, body, lastRowId, onEvent) : null;
+
   try {
     const result = await replyInConversation({
       studioId: ctx.studioId,
@@ -304,7 +308,23 @@ export async function chatTurn(
     console.error("chat: agent failed", error);
     return { ok: false, error: "Brigitte n’a pas pu répondre. Réessaie dans un instant.", conversationId: id };
   }
+  await reacting;
   const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, id), list(ctx.studioId)]);
   return { ok: true, conversationId: id, messages, conversations };
+}
+
+/** Brigitte's reaction to the manager's message, sent to the page as soon as it is known and kept on the message. */
+async function instantReaction(studioId: string, conversationId: string, body: string, rowId: string, onEvent?: (event: ChatEvent) => void) {
+  const { data: previous } = await supabaseAdmin()
+    .from("whatsapp_messages")
+    .select("body")
+    .eq("conversation_id", conversationId)
+    .eq("direction", "outbound")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const reaction = await reactTo(studioId, body, (previous?.body as string | null) ?? null);
+  onEvent?.({ type: "mood", mood: reaction.mood, emoji: reaction.emoji });
+  if (reaction.emoji) await setReaction({ id: rowId }, "fauve", reaction.emoji);
 }
 
