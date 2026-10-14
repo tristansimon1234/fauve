@@ -181,15 +181,18 @@ async function design(input: ElementsRequest, ctx: Context, fix?: { draft: KitDr
         : JSON.stringify(brief),
     },
   ];
-  const response = await anthropic().beta.messages.parse({
-    model: CLAUDE_MODEL,
-    max_tokens: 32000,
-    output_config: { effort: "high", format: betaZodOutputFormat(kitDesignOutputSchema) },
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system: [{ type: "text", text: input.mode === "edit" ? ELEMENT_EDIT_PROMPT : ELEMENTS_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content }],
-  });
+  // Streamed: a kit can be long to write, and the SDK refuses a request this size without a stream.
+  const response = await anthropic()
+    .beta.messages.stream({
+      model: CLAUDE_MODEL,
+      max_tokens: 32000,
+      output_config: { effort: "high", format: betaZodOutputFormat(kitDesignOutputSchema) },
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      system: [{ type: "text", text: input.mode === "edit" ? ELEMENT_EDIT_PROMPT : ELEMENTS_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content }],
+    })
+    .finalMessage();
   await logClaudeCost(input.studioId, response.usage, "element_designer");
   if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error(`Les composants n'ont pas pu être dessinés (${response.stop_reason})`);
   const draft = response.parsed_output;

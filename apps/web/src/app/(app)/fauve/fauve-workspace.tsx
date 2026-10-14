@@ -1,5 +1,6 @@
 "use client";
 
+import { nudgeWork } from "@/components/work-pill";
 import type { Effort } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition, type RefObject } from "react";
@@ -312,6 +313,9 @@ export function FauveWorkspace({
           setLive(liveRef.current);
         });
         if (res.ok) {
+          // What she started after her answer shows in the pill now, and once more when it has begun.
+          nudgeWork();
+          setTimeout(nudgeWork, 4000);
           setActive(res.conversationId);
           setArrived(enteringAfterLive(arrivals(messagesRef.current, res.messages), res.messages, liveRef.current));
           setMessages(mergeMessages(messagesRef.current, res.messages));
@@ -342,6 +346,9 @@ export function FauveWorkspace({
         try {
           const res = await launchQuote(quoteId, conversationId, effort);
           if (res.ok) {
+            // What she started after her answer shows in the pill now, and once more when it has begun.
+            nudgeWork();
+            setTimeout(nudgeWork, 4000);
             focusQuote.current = quoteId;
             setArrived(arrivals(messagesRef.current, res.messages));
             setMessages(mergeMessages(messagesRef.current, res.messages));
