@@ -2,7 +2,7 @@ import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   brandProfileSchema,
-  CLAUDE_MODEL,
+  CRITIC_MODEL,
   editPlanSchema,
   MONTAGE_CRITIC_PROMPT,
   montageReviewSchema,
@@ -127,7 +127,7 @@ export async function reviewMontage(input: {
 
   try {
     const response = await anthropic().beta.messages.parse({
-      model: CLAUDE_MODEL,
+      model: CRITIC_MODEL,
       max_tokens: 6000,
       output_config: { effort: "medium", format: betaZodOutputFormat(montageReviewSchema) },
       betas: ["server-side-fallback-2026-07-01"],
@@ -135,7 +135,7 @@ export async function reviewMontage(input: {
       system: [{ type: "text", text: MONTAGE_CRITIC_PROMPT, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content }],
     });
-    await logClaudeCost(input.studioId, response.usage, "montage_critic");
+    await logClaudeCost(input.studioId, response.usage, "montage_critic", CRITIC_MODEL);
     if (!response.parsed_output) return null;
     const review = normalizeReview(response.parsed_output, input.versions.length);
     const best = review.best - 1;

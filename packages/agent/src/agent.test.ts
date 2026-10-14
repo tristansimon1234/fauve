@@ -5,6 +5,8 @@ import { editPlanObjectSchema, editPlanSchema, segmentSeconds } from "./schemas.
 import { canTransition } from "./status.ts";
 import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
+import { CREDIT_PRICES } from "./credits.ts";
+import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 
 const validPlan = {
   format: "9:16",
@@ -843,4 +845,25 @@ test("brand colours from the site's look: signature first, neutrals after", asyn
   const { brandColorsFromLook } = await import("./website.ts");
   assert.deepEqual(brandColorsFromLook(["#0A0A0A", "#ff3b1f", "#f4a6c0", "#f5f0ea", "#c9c9c9"]), ["#ff3b1f", "#f4a6c0", "#0a0a0a", "#f5f0ea", "#c9c9c9"]);
   assert.deepEqual(brandColorsFromLook(["#fff", "nope", "#111111"]), ["#111111"]);
+});
+
+test("every priced job keeps at least the target margin on what its credits are worth", () => {
+  for (const item of Object.keys(CREDIT_PRICES) as (keyof typeof CREDIT_PRICES)[]) {
+    const margin = jobMargin(item);
+    if (margin === null) continue;
+    assert.ok(margin >= TARGET_MARGIN, `${item}: ${Math.round(margin * 100)} % de marge`);
+  }
+});
+
+test("a studio's month splits the chat from the work and says what is left", () => {
+  const month = studioMonth([
+    { purpose: "conversation", eur: 10 },
+    { purpose: "editor", eur: 2 },
+    { purpose: "editor", eur: 1.5 },
+  ]);
+  assert.equal(month.chat, 10);
+  assert.equal(month.work, 3.5);
+  assert.equal(month.byPurpose.editor, 3.5);
+  assert.equal(month.budgetLeft, 24.5 - 13.5);
+  assert.equal(month.margin, Math.round((1 - 13.5 / 49) * 1000) / 1000);
 });

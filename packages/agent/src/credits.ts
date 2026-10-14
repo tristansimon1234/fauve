@@ -4,7 +4,8 @@ import { MAX_FREE_SCENES } from "./editor.ts";
 // Credits: what a studio is charged for the costly work, shown to the manager
 // before it runs. A fixed price list (not metered tokens) keeps the quote
 // predictable; the charge after the work is the real one, never above the quote.
-// 1 credit ≈ €0.04 of AI and render cost.
+// A credit is worth the plan spread over the month's credits (margin.ts): each
+// job's price keeps at least half of that as margin, checked by the tests.
 
 export const CREDIT_PRICES = {
   /** The editor (Opus) writing the edit plan of a new montage. */
@@ -25,8 +26,8 @@ export const CREDIT_PRICES = {
   variant: 1,
   /** A new text layer for photos, designed as code from an example (Opus, checks and a critic). Reusing one is free. */
   textLayer: 3,
-  /** A change to one component of the studio's bank (a new version). */
-  elementEdit: 1,
+  /** A change to one component of the studio's bank (a new version): a round of Opus. */
+  elementEdit: 2,
   /** Fauve watching the rendered video before it goes out (Soigné, Max). */
   review: 1,
   /** A correction the critic asks for: the editor again, a render, a new look. */

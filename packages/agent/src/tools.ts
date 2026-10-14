@@ -282,7 +282,7 @@ export const toolSpecs = {
   },
   edit_element: {
     description:
-      "Fait évoluer UN composant de la banque (« l'étiquette plus arrondie », « le titre en serif fin », « des cases plus grandes ») : une nouvelle version, l'ancienne est gardée. Avec post_id, la publication passe aussitôt à la nouvelle version et ses photos sont refaites. 1 crédit, une à deux minutes ; un message part tout seul à la fin. Pour changer seulement des mots ou une place sur une photo, utilise place_elements (gratuit).",
+      "Fait évoluer UN composant de la banque (« l'étiquette plus arrondie », « le titre en serif fin », « des cases plus grandes ») : une nouvelle version, l'ancienne est gardée. Avec post_id, la publication passe aussitôt à la nouvelle version et ses photos sont refaites. 2 crédits, une à deux minutes ; un message part tout seul à la fin. Pour changer seulement des mots ou une place sur une photo, utilise place_elements (gratuit).",
     input: z.object({
       element_id: z.string().uuid(),
       change: z.string().min(1).max(2000).describe("Le changement demandé, précis"),
