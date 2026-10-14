@@ -84,7 +84,7 @@ export function Bubble({
   /** Just arrived: rises in, its cards and buttons a beat later. */
   enter?: boolean;
   /** Brigitte's face by her latest message; `funny` makes her laugh when it arrives. */
-  avatar?: { funny: boolean } | null;
+  avatar?: { funny: boolean; upset: "sad" | "cry" | null } | null;
 }) {
   const [picking, setPicking] = useState(false);
   // The manager's own reaction pops when she changes it, not when the conversation loads.
@@ -226,7 +226,7 @@ export function Bubble({
       )}
       <span className="flex items-center gap-1 px-1 text-[11px] text-muted">
         {message.channel === "whatsapp" && <WhatsAppIcon size={11} />}
-        {!mine && avatar && <BrigitteAvatar funny={avatar.funny} fresh={enter} />}
+        {!mine && avatar && <BrigitteAvatar funny={avatar.funny} upset={avatar.upset} fresh={enter} />}
         {mine ? "Toi" : "Brigitte"} · {time}
       </span>
     </div>

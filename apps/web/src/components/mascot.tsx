@@ -25,8 +25,8 @@ const FRINGE = ring(50, 45.5, 15, 5.5, 195, 345, 6, 5.4);
 /** A potato of a face: lumpy, wider and lower on one side. */
 const FACE = "M33.5 51 C35 43.5 42.5 41.5 50.5 42.5 C59 43.5 66.5 46 67.5 54.5 C69 61.5 71 69.5 66.5 76 C61.5 82.5 52.5 84.5 45 83.5 C37 82.5 30.5 77.5 30.8 69.5 C31 63 32 57 33.5 51 Z";
 
-/** What Brigitte feels: at rest, writing (thinking), laughing, pleased, surprised. */
-export type MascotMood = "idle" | "thinking" | "laugh" | "happy" | "surprised";
+/** What Brigitte feels: at rest, writing (thinking), laughing, pleased, surprised, sad, in tears. */
+export type MascotMood = "idle" | "thinking" | "laugh" | "happy" | "surprised" | "sad" | "cry";
 
 const INK = "#1C1530";
 
@@ -36,6 +36,9 @@ const BROWS: Record<MascotMood, string> = {
   thinking: "M39.4 54.2 Q42.6 53.2 45.8 54.6 M54.2 53.6 Q57.6 52.2 60.8 53.4",
   laugh: "M39 51.6 Q42.6 49.4 45.8 50.8 M54.2 50.2 Q57.8 47.6 61.2 49.4",
   surprised: "M39 51 Q42.6 48.6 45.8 50.2 M54.2 49.6 Q57.8 47 61.2 48.8",
+  // Worried: the inner ends up.
+  sad: "M39.4 54.6 Q42.4 54.2 45.6 52.2 M54.4 51.8 Q57.6 53.6 60.8 54.2",
+  cry: "M39.4 54.4 Q42.4 54 45.6 51.6 M54.4 51.2 Q57.6 53.2 60.8 53.8",
 };
 
 const MOUTHS: Record<MascotMood, ReactNode> = {
@@ -49,6 +52,8 @@ const MOUTHS: Record<MascotMood, ReactNode> = {
     </>
   ),
   surprised: <ellipse cx="50.4" cy="76.4" rx="2.2" ry="2.8" fill={INK} />,
+  sad: <path d="M46.4 77.4 Q50.4 74.6 54.4 77.2" fill="none" stroke={INK} strokeWidth="1.4" strokeLinecap="round" />,
+  cry: <path d="M45.6 78 Q50.4 73.8 55.2 77.8" fill="none" stroke={INK} strokeWidth="1.5" strokeLinecap="round" />,
 };
 
 /**
@@ -58,7 +63,7 @@ const MOUTHS: Record<MascotMood, ReactNode> = {
 function Face({ mood }: { mood: MascotMood }) {
   const fade = (on: boolean) => ({ opacity: on ? 1 : 0, transition: "opacity 220ms ease" });
   // Thinking: she looks up and aside. Surprised: eyes wide open.
-  const look = mood === "thinking" ? "translate(-0.9px, -1.1px)" : mood === "surprised" ? "scale(1.18)" : "none";
+  const look = mood === "thinking" ? "translate(-0.9px, -1.1px)" : mood === "surprised" ? "scale(1.18)" : mood === "sad" || mood === "cry" ? "translate(0, 0.9px)" : "none";
   return (
     <>
       <path
@@ -80,6 +85,11 @@ function Face({ mood }: { mood: MascotMood }) {
       </g>
       {/* Shut tight with laughter: two happy arcs. */}
       <path d="M39.8 60 Q42.6 56.6 45.4 60 M54.8 59.4 Q57.6 56 60.4 59.4" fill="none" stroke={INK} strokeWidth="1.6" strokeLinecap="round" style={fade(mood === "laugh")} />
+      {/* Tears: they run from under the glasses and fall again and again. */}
+      <g style={fade(mood === "cry")} fill="#5BA8F0">
+        <path className="fauve-cat-tear" d="M38.6 66.6 Q35.8 71.4 38.6 73.4 Q41.4 71.4 38.6 66.6 Z" />
+        <path className="fauve-cat-tear fauve-cat-tear-b" d="M61.8 66 Q59 70.8 61.8 72.8 Q64.6 70.8 61.8 66 Z" />
+      </g>
       {(Object.keys(MOUTHS) as MascotMood[]).map((m) => (
         <g key={m} style={fade(m === mood)}>
           {MOUTHS[m]}

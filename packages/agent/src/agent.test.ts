@@ -556,6 +556,18 @@ test("funny messages make Brigitte laugh", async () => {
   for (const t of ["Bonjour", "le programme de la semaine", "", null, "chaha"]) assert.equal(isFunny(t), false, String(t));
 });
 
+test("an upset manager makes Brigitte sad, or cry when it is strong", async () => {
+  const { upsetLevel } = await import("./emoji.ts");
+  assert.equal(upsetLevel("franchement c'est nul"), "sad");
+  assert.equal(upsetLevel("je suis déçue 😞"), "sad");
+  assert.equal(upsetLevel("j'en ai marre !!"), "cry");
+  assert.equal(upsetLevel("ça ne marche toujours pas !!!"), "cry");
+  assert.equal(upsetLevel("😡"), "cry");
+  assert.equal(upsetLevel("C'EST PAS CE QUE JE VEUX"), "cry");
+  assert.equal(upsetLevel("super, merci !"), null);
+  assert.equal(upsetLevel("OK"), null);
+});
+
 test("house text layers pass the same checks as generated ones", async () => {
   const { readFileSync } = await import("node:fs");
   const { checkLayerCode, layerSlotSchema } = await import("./text-layer.ts");

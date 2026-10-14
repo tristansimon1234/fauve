@@ -275,6 +275,30 @@
   40% { transform: translateY(-8%) scale(1.04); }
   100% { transform: translateY(0) scale(1); }
 }
+/* Sad: she sinks a little. In tears: a small tremble, and the tears fall. */
+.fauve-cat-sad .fauve-cat-mood {
+  transform: translateY(2%) rotate(-2deg);
+  transition: transform 300ms ease;
+}
+.fauve-cat-cry .fauve-cat-mood {
+  animation: fauve-sob 0.5s ease-in-out infinite;
+}
+@keyframes fauve-sob {
+  0%, 100% { transform: translateY(2%) rotate(-1.5deg); }
+  50% { transform: translateY(3%) rotate(1.5deg); }
+}
+.fauve-cat-tear {
+  transform-box: fill-box;
+  animation: fauve-tear 1.3s ease-in infinite;
+}
+.fauve-cat-tear-b {
+  animation-delay: -0.6s;
+}
+@keyframes fauve-tear {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(160%); opacity: 0; }
+}
 .fauve-cat-still * {
   animation: none !important;
 }
