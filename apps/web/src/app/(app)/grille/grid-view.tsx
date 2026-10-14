@@ -11,7 +11,7 @@ import type { InstagramMedia, InstagramProfile } from "@/lib/social/instagram";
 // posts first with a dashed frame and their status.
 
 export type Tile =
-  | { kind: "upcoming"; id: string; title: string; status: string; at: string | null; videoUrl: string | null; imageUrl: string | null; format: string }
+  | { kind: "upcoming"; id: string; title: string; status: string; at: string | null; videoUrl: string | null; imageUrl: string | null; format: string; inGrid?: boolean }
   | { kind: "instagram"; media: InstagramMedia; views?: number };
 
 export function GridView({
@@ -86,7 +86,7 @@ export function GridView({
 
         {tiles.length ? (
           <GridTabs
-            all={<TileGrid tiles={tiles} tz={tz} />}
+            all={<TileGrid tiles={tiles.filter((t) => t.kind !== "upcoming" || t.inGrid !== false)} tz={tz} />}
             reels={
               reelTiles.length ? (
                 <TileGrid tiles={reelTiles} tz={tz} tall />

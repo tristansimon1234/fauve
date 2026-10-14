@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  APP_GUIDES,
   assertTransition,
   canTransition,
   postStatusSchema,
@@ -139,6 +140,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   }
 
   return {
+    async app_guide({ topic }) {
+      return APP_GUIDES[topic];
+    },
+
     async get_studio_context() {
       const [studio, member, plan, accounts, brand] = await Promise.all([
         db.from("studios").select("name, timezone, onboarding_step, website_url, booking_url").eq("id", studioId).single(),

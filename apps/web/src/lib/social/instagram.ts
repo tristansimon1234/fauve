@@ -147,7 +147,7 @@ export type PublishItem = { type: "image" | "video"; url: string };
  */
 export type PublishRequest =
   /** cover: a frame of the video (seconds) or an image (public JPEG URL) for the grid. */
-  | { kind: "reel"; videoUrl: string; caption: string; cover?: { at: number } | { url: string } }
+  | { kind: "reel"; videoUrl: string; caption: string; cover?: { at: number } | { url: string }; shareToFeed?: boolean }
   | { kind: "image"; imageUrl: string; caption: string }
   | { kind: "carousel"; items: PublishItem[]; caption: string }
   | { kind: "story"; item: PublishItem };
@@ -169,7 +169,8 @@ export async function publishMedia(params: {
         media_type: "REELS",
         video_url: request.videoUrl,
         caption: caption(request.caption),
-        share_to_feed: "true",
+        // In the profile grid too, unless it is meant for the Reels tab only.
+        share_to_feed: request.shareToFeed === false ? "false" : "true",
         // The cover in the grid: a photo, or a frame of the video (in milliseconds).
         ...(request.cover && "url" in request.cover ? { cover_url: request.cover.url } : {}),
         ...(request.cover && "at" in request.cover ? { thumb_offset: String(Math.round(request.cover.at * 1000)) } : {}),

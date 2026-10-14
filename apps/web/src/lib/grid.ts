@@ -17,7 +17,7 @@ export async function loadGrid(db: Db, studioId: string) {
   const [upcoming, feed, info] = await Promise.all([
     db
       .from("posts")
-      .select("id, title, kind, status, scheduled_at, render_id, media_ids, slides, slides_render, cover")
+      .select("id, title, kind, status, scheduled_at, render_id, media_ids, slides, slides_render, cover, share_to_feed")
       .eq("studio_id", studioId)
       .in("status", [...UPCOMING])
       .neq("kind", "story")
@@ -48,6 +48,7 @@ export async function loadGrid(db: Db, studioId: string) {
         videoUrl: cover?.video ? coverSrc(cover) : null,
         imageUrl: cover && !cover.video ? cover.url : null,
         format: p.kind as string,
+        inGrid: p.share_to_feed !== false,
       };
     }),
     ...feed.map((media, i): Tile => ({ kind: "instagram", media, views: views[i] })),

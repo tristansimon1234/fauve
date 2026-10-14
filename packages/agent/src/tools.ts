@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { APP_GUIDE_TOPICS, type AppGuideTopic } from "./app-guide.ts";
 import { RESTYLES } from "./restyle.ts";
 import {
   brandProfileSchema,
@@ -36,6 +37,11 @@ const postMediaIds = z
   .describe("Photos ou vidéos reçues (media_id) : 1 pour un post photo, 2 à 10 dans l'ordre pour un carrousel, 1 pour une story sans montage");
 
 export const toolSpecs = {
+  app_guide: {
+    description:
+      "Le mode d'emploi de l'application, par sujet : où se trouve chaque chose et comment faire (menus, boutons, étapes), les crédits et les offres. À lire avant de répondre à toute question sur l'app (« où je vois… », « comment je change… », « c'est combien… », « tu peux faire… ? »).",
+    input: z.object({ topic: z.enum(APP_GUIDE_TOPICS as [AppGuideTopic, ...AppGuideTopic[]]) }),
+  },
   get_studio_context: {
     description:
       "Lit le contexte du studio : nom, étape d'onboarding, rythme, plateformes, comptes connectés, profil de style. À appeler au début d'une conversation si tu ne l'as pas déjà.",

@@ -151,8 +151,9 @@ async function publishRequest(
   caption: string,
   rendered: Record<string, string> = {},
   chosenCover: unknown = null,
+  shareToFeed = true,
 ): Promise<PublishRequest> {
-  if (kind === "reel") return { kind: "reel", videoUrl: await renderUrl(renderId), caption, cover: await reelCover(studioId, chosenCover) };
+  if (kind === "reel") return { kind: "reel", videoUrl: await renderUrl(renderId), caption, cover: await reelCover(studioId, chosenCover), shareToFeed };
   if (kind === "story") {
     const [item] = renderId ? [{ type: "video" as const, url: await renderUrl(renderId) }] : await publishItems(studioId, mediaIds.slice(0, 1));
     if (!item) throw new Error("Aucune photo ni vidéo pour cette story");
@@ -175,7 +176,7 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
   const post = check(
     await db
       .from("posts")
-      .select("id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids, slides, slides_render, cover")
+      .select("id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids, slides, slides_render, cover, share_to_feed")
       .eq("id", postId)
       .single(),
   ).data!;
@@ -189,7 +190,7 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
     const { rendered } = slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
     const hashtags = ((post.hashtags as string[] | null) ?? []).map((h) => `#${h}`).join(" ");
     const caption = [post.caption ?? "", hashtags].filter(Boolean).join("\n\n");
-    const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption, rendered, post.cover);
+    const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption, rendered, post.cover, post.share_to_feed !== false);
     const result = await publishMedia({ userId: account.userId, accessToken: account.accessToken, request });
 
     check(
