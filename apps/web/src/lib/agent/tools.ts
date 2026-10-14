@@ -1078,7 +1078,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return "ok";
     },
 
-    async reply_with({ options, posts, grid, upload, pick_media }) {
+    async reply_with({ options, posts, grid, upload, pick_media, step_card }) {
       let own: string[] = [];
       if (posts?.length) {
         const { data } = await db.from("posts").select("id").eq("studio_id", studioId).in("id", posts);
@@ -1086,7 +1086,20 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         own = posts.filter((id) => found.has(id));
         if (own.length < posts.length) return "Publication introuvable : vérifie les id avec get_calendar.";
       }
-      ctx.extras.options = options;
+      // In the app, a step with its own card (site, style, rhythm) is answered on the card:
+      // never answer buttons beside it, which would show the same choice twice.
+      let card = ctx.waId ? undefined : step_card;
+      let answers = options;
+      if (!ctx.waId && (answers?.length || card)) {
+        const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
+        const step = onboardingStepOf(studio?.onboarding_step);
+        if (step === "website" || step === "style" || step === "rhythm") {
+          card = step;
+          answers = undefined;
+        }
+      }
+      ctx.extras.step_card = card;
+      ctx.extras.options = answers;
       ctx.extras.posts = own.length ? own : undefined;
       ctx.extras.grid = grid || undefined;
       // The drop zone is the app's: WhatsApp has its own paperclip.
