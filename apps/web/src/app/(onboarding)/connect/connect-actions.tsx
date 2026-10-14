@@ -8,6 +8,8 @@ const errors: Record<string, string> = {
   "lien-expire": "Le lien a expiré. Recommence la connexion.",
   "compte-perso": "Ce compte Instagram est personnel. Passe-le en compte professionnel (gratuit), puis réessaie.",
   instagram: "Instagram n’a pas répondu comme prévu. Réessaie dans un instant.",
+  "sans-page":
+    "Aucune de tes Pages Facebook n’est reliée à un compte Instagram professionnel. Relie ton Instagram à une Page (Instagram › Modifier le profil › Page), ou connecte-toi sans Facebook, sans la musique.",
 };
 
 // Server component: reads the session and the studio's Instagram status.
@@ -45,7 +47,7 @@ export async function ConnectActions({ searchParams }: { searchParams: Promise<R
       </div>
 
       <p className="text-[13px] leading-normal text-muted">
-        Il faut un compte Instagram professionnel.{" "}
+        Il faut un compte Instagram professionnel, relié à une Page Facebook pour avoir la musique d’Instagram dans tes Reels.{" "}
         <a
           href="https://help.instagram.com/502981923235522"
           className="font-bold text-violet"
@@ -73,16 +75,22 @@ export async function ConnectActions({ searchParams }: { searchParams: Promise<R
           </Link>
         ) : (
           // Plain link: the OAuth start is a route handler, not a page.
-          <a
-            href="/api/instagram/connect"
-            className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-ink text-base font-bold text-white"
-          >
-            <InstagramIcon />
-            Continuer avec Instagram
-          </a>
+          <>
+            {/* Through Facebook: everything, and Instagram's music on the Reels. */}
+            <a
+              href="/api/facebook/connect"
+              className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-ink text-base font-bold text-white"
+            >
+              <InstagramIcon />
+              Connecter Instagram
+            </a>
+            <a href="/api/instagram/connect" className="mt-3 block text-center text-[13px] font-semibold text-muted hover:text-ink">
+              Sans Facebook (sans la musique d’Instagram)
+            </a>
+          </>
         )}
         {account && (
-          <a href="/api/instagram/connect" className="mt-3 block text-center text-sm font-bold text-violet">
+          <a href="/api/facebook/connect" className="mt-3 block text-center text-sm font-bold text-violet">
             Connecter un autre compte
           </a>
         )}

@@ -22,6 +22,17 @@ export const postKindSchema = z.enum(["reel", "post", "carousel", "story"]);
 /** A Reel's cover, in the grid and on Instagram: a frame of the video (seconds) or a photo of the library. */
 export const postCoverSchema = z.union([z.object({ at: z.number().min(0).max(180) }), z.object({ media_id: z.string().uuid() })]);
 export type PostCover = z.infer<typeof postCoverSchema>;
+/** Instagram music on a Reel (Instagram API with Facebook Login): attached when it is published. */
+export const postAudioSchema = z.object({
+  audio_id: z.string().regex(/^\d+$/),
+  title: z.string().max(200).nullable().optional(),
+  artist: z.string().max(200).nullable().optional(),
+  duration_ms: z.number().int().nonnegative().nullable().optional(),
+  type: z.string().max(40).nullable().optional(),
+  cover: z.string().url().nullable().optional(),
+});
+export type PostAudio = z.infer<typeof postAudioSchema>;
+
 /** The frame shown when none was chosen: past the first animation's empty start, on the hook. */
 export const DEFAULT_COVER_SECONDS = 1.2;
 export type PostKind = z.infer<typeof postKindSchema>;

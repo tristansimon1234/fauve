@@ -453,7 +453,7 @@ function ConnectStep({ handle, onNext, pending }: { handle: string | null; onNex
     <>
       <p className="text-[14px] leading-relaxed text-muted">Dernière étape : branche ton Instagram pour que ta publication parte à l’heure prévue et que je lise tes résultats. Il faut un compte professionnel ou créateur ; rien ne part sans ta validation.</p>
       <div className="flex flex-wrap items-center gap-3">
-        <a href="/api/instagram/connect" className="btn btn-primary h-11 px-5">
+        <a href="/api/facebook/connect" className="btn btn-primary h-11 px-5">
           <InstagramIcon size={18} />
           Connecter Instagram
         </a>

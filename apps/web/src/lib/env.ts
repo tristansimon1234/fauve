@@ -24,6 +24,11 @@ const schema = {
   INSTAGRAM_APP_ID: z.string().regex(/^\d+$/),
   INSTAGRAM_APP_SECRET: z.string().min(1),
   INSTAGRAM_GRAPH_VERSION: z.string().default("v26.0"),
+  // Instagram API with Facebook Login (Meta app → Facebook Login for Business): the
+  // same Meta app's ID and secret (not the Instagram app's), and its login configuration.
+  FACEBOOK_APP_ID: z.string().regex(/^\d+$/),
+  FACEBOOK_APP_SECRET: z.string().min(1),
+  FACEBOOK_LOGIN_CONFIG_ID: z.string().regex(/^\d+$/),
   // Instagram webhooks (DMs to Fauve's account): the "verify token" entered in the Meta dashboard.
   INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().min(16),
   // Bearer secret for /api/cron/* (pg_cron sends it from Supabase Vault).

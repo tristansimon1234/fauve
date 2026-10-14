@@ -21,6 +21,8 @@ import { loadTextLooks } from "@/lib/text-looks";
 import { versionKey } from "@/lib/version-key";
 import { deletePost } from "./actions";
 import { CoverPicker } from "@/components/montage/cover-picker";
+import { MusicPicker } from "@/components/montage/music-picker";
+import { musicFor } from "@/lib/music";
 import { MontageEditor } from "./montage-editor";
 import { PostEditor } from "./post-editor";
 import { CarouselEditor } from "./carousel-editor";
@@ -42,6 +44,7 @@ const postSchema = z.object({
   slides: z.unknown(),
   cover: postCoverSchema.nullable().catch(null),
   share_to_feed: z.boolean().catch(true),
+  audio: z.unknown(),
 });
 
 // Read leniently: an older or partial plan still shows what it can.
@@ -88,7 +91,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const { data, error } = await db
     .from("posts")
-    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed")
+    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed, audio")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -97,6 +100,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   const post = postSchema.parse(data);
 
   const plan = await loadPlan(db, post);
+  // Instagram's music, on a Reel that can still change.
+  const music = post.kind === "reel" && !LOCKED.includes(post.status) ? await musicFor(studioId, post.audio) : null;
   const render = await loadRender(db, plan?.id ?? null, post.render_id);
   const [videoUrls, clipLabels] = await Promise.all([
     render?.status === "done" && render.storage_path
@@ -139,6 +144,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           photos={(editor?.inputs.photoIds ?? []).flatMap((id) => (editor?.inputs.clipUrls[id] ? [{ id, url: editor.inputs.clipUrls[id]! }] : []))}
         />
       )}
+
+      {music && <MusicPicker key={versionKey(post.audio)} postId={post.id} available={music.available} initial={music.track} />}
 
       <div className="flex flex-col gap-2">
         <PostEditor
