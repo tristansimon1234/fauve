@@ -273,3 +273,48 @@ export function extractBrandStyle(rawHtml: string, cssTexts: string[] = []): Bra
     fonts: [...fontScores.entries()].sort((a, b) => b[1] - a[1]).map(([f]) => f).slice(0, 3),
   };
 }
+
+// ---------------------------------------------------------------------------
+// The site's photos: the best candidates for the studio's moodboard.
+// ---------------------------------------------------------------------------
+
+/** Not photos: logos, icons, flags, payment badges, tracking pixels, placeholders. */
+const NOT_A_PHOTO = /logo|icon|favicon|sprite|avatar|badge|flag|payment|visa|mastercard|paypal|pixel|placeholder|blank|spinner|loader|emoji|arrow|\.svg(\?|$)|\.gif(\?|$)|data:/i;
+
+/** The largest candidate of a srcset (« a.jpg 480w, b.jpg 1200w »). */
+function largestOfSrcset(srcset: string): string | null {
+  let best: { url: string; size: number } | null = null;
+  for (const part of srcset.split(",")) {
+    const [url, size] = part.trim().split(/\s+/);
+    if (!url) continue;
+    const n = parseFloat(size ?? "1") || 1;
+    if (!best || n > best.size) best = { url, size: n };
+  }
+  return best?.url ?? null;
+}
+
+/**
+ * The page's photos, most telling first: the share image, then the big images
+ * of the page and its CSS backgrounds (hero banners), without logos, icons or
+ * images declared small. Absolute URLs, deduplicated.
+ */
+export function extractSiteImages(rawHtml: string, pageUrl: string, max = 10): string[] {
+  const html = stripCode(rawHtml);
+  const found: string[] = [];
+  const add = (src: string | null | undefined) => {
+    const url = src ? absolute(src, pageUrl) : null;
+    if (url && !NOT_A_PHOTO.test(url) && !found.includes(url)) found.push(url);
+  };
+  add(meta(html, "og:image"));
+  for (const tag of html.match(/<img\b[^>]*>/gi) ?? []) {
+    if (NOT_A_PHOTO.test(tag.replace(/\s(src|srcset|data-src|data-srcset)\s*=\s*("[^"]*"|'[^']*')/gi, ""))) continue;
+    const width = Number(attr(tag, "width") ?? NaN);
+    const height = Number(attr(tag, "height") ?? NaN);
+    if ((Number.isFinite(width) && width < 300) || (Number.isFinite(height) && height < 200)) continue;
+    const srcset = attr(tag, "srcset") ?? attr(tag, "data-srcset");
+    add((srcset ? largestOfSrcset(srcset) : null) ?? attr(tag, "data-src") ?? attr(tag, "src"));
+  }
+  // Hero banners are often CSS backgrounds (inline styles, Wix/Squarespace data attributes).
+  for (const m of rawHtml.matchAll(/background(?:-image)?\s*:\s*url\(\s*["']?([^"')]+)["']?\s*\)/gi)) add(m[1]);
+  return found.slice(0, max);
+}
