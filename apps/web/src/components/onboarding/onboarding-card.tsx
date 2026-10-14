@@ -90,7 +90,13 @@ export function OnboardingCard({
 
   // A step already passed shows as done (an older card in the conversation).
   const passed = view ? ONBOARDING_STEPS.indexOf(view.step) > ONBOARDING_STEPS.indexOf(step) : false;
-  const next = () => start(async () => void (await finishStep(step), await reload()));
+  // Moving on from the card also says so in the conversation: Brigitte answers and opens the next step.
+  const next = (message: string) =>
+    start(async () => {
+      await finishStep(step);
+      await reload();
+      onSend(message);
+    });
 
   const card = `flex w-full max-w-[560px] flex-col gap-4 rounded-[22px] border border-line bg-white p-5 text-left shadow-[0_8px_30px_rgba(28,21,48,0.06)] ${className}`;
   if (passed) {
@@ -111,7 +117,7 @@ export function OnboardingCard({
         <h3 className="text-[16px] font-bold">{ONBOARDING_LABELS[step]}</h3>
       </div>
       {step === "website" && <WebsiteStep onSend={onSend} pending={pending} />}
-      {step === "style" && view && <StyleStep studioId={view.studioId} view={view} onChange={reload} onNext={next} onSend={onSend} pending={pending} setError={setError} />}
+      {step === "style" && view && <StyleStep studioId={view.studioId} view={view} onChange={reload} onNext={() => next(view.moodboard.items.length ? "C’est mon style, on continue." : "On continue sans moodboard.")} onSend={onSend} pending={pending} setError={setError} />}
       {step === "rhythm" && view && (
         <RhythmStep
           initial={view.rhythm}
@@ -119,14 +125,15 @@ export function OnboardingCard({
           onSave={(posts, stories) =>
             start(async () => {
               const res = await saveRhythm(posts, stories);
-              if (!res.ok) setError("Le rythme n’a pas pu être enregistré.");
+              if (!res.ok) return setError("Le rythme n’a pas pu être enregistré.");
               await reload();
+              onSend(`Mon rythme : ${posts} post${posts > 1 ? "s" : ""} et ${stories} stor${stories > 1 ? "ies" : "y"} par semaine.`);
             })
           }
         />
       )}
-      {step === "connect" && view && <ConnectStep handle={view.instagram} onNext={next} pending={pending} />}
-      {step === "first_post" && <FirstPostStep timezone={timezone} onLater={next} pending={pending} />}
+      {step === "connect" && view && <ConnectStep handle={view.instagram} onNext={() => next(view.instagram ? "Mon Instagram est connecté." : "Je brancherai Instagram plus tard.")} pending={pending} />}
+      {step === "first_post" && <FirstPostStep timezone={timezone} onLater={() => next("Je ferai ma première publication plus tard.")} pending={pending} />}
       {!view && step !== "website" && step !== "first_post" && <Orb size={28} />}
       {error && (
         <p role="alert" className="text-[13px] font-semibold text-danger">
