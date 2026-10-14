@@ -1,7 +1,7 @@
+import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { resolveReelBrand } from "@fauve/agent";
-import { NoStudio, PageLoading } from "@/components/empty-state";
+import { NoStudio } from "@/components/empty-state";
 import { SettingsTabs } from "@/components/settings-tabs";
 import { listElements } from "@/lib/elements";
 import { loadMontageInputs } from "@/lib/render/render-post";
@@ -13,6 +13,7 @@ import { CreationsSection, type Creation } from "../mediatheque/creations-sectio
 import { loadTextLooks } from "@/lib/text-looks";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import Link from "next/link";
+import { ViewTransition } from "react";
 
 export const metadata: Metadata = { title: "Tes créations" };
 
@@ -30,9 +31,9 @@ export default function CreationsPage({ searchParams }: { searchParams: Promise<
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
       <SettingsTabs current="/composants" />
-      <Suspense fallback={<PageLoading title="Tes créations" />}>
+      <PageSuspense title="Tes créations">
         <Creations searchParams={searchParams} />
-      </Suspense>
+      </PageSuspense>
     </main>
   );
 }
@@ -65,6 +66,7 @@ async function Creations({ searchParams }: { searchParams: Promise<{ kit?: strin
           </Link>
         ))}
       </nav>
+      <ViewTransition key={tab} enter="fauve-fade-swap" exit="fauve-fade-swap" default="none">
       {tab === "styles" ? (
         <TextStyles brand={brand} colors={inputs.colors ?? []} saved={await loadTextLooks(studioId)} />
       ) : tab === "animations" ? (
@@ -72,6 +74,7 @@ async function Creations({ searchParams }: { searchParams: Promise<{ kit?: strin
       ) : (
         <Bank studioId={studioId} brand={brand} kit={kit} />
       )}
+      </ViewTransition>
     </>
   );
 }

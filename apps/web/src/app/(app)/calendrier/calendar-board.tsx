@@ -3,7 +3,7 @@
 import { coverSrc, type Cover } from "@/lib/cover-src";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useOptimistic, useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition, ViewTransition } from "react";
 import type { PostKind, PostStatus } from "@fauve/agent";
 import { ArrowLeftIcon, CheckIcon, LayersIcon, PlayIcon, PlusIcon, TrashIcon, WhatsAppIcon, XIcon } from "@/components/icons";
 import { Orb } from "@/components/orb";
@@ -234,15 +234,15 @@ export function CalendarBoard({
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <nav aria-label="Changer de semaine" className="flex items-center gap-1">
-          <Link href={prevHref} aria-label="Semaine précédente" className="flex size-9 items-center justify-center rounded-full border border-line hover:bg-soft">
+          <Link href={prevHref} transitionTypes={["week-prev"]} aria-label="Semaine précédente" className="flex size-9 items-center justify-center rounded-full border border-line hover:bg-soft">
             <ArrowLeftIcon size={16} />
           </Link>
           <span className="min-w-[150px] text-center text-[15px] font-bold">{weekLabel}</span>
-          <Link href={nextHref} aria-label="Semaine suivante" className="flex size-9 items-center justify-center rounded-full border border-line hover:bg-soft">
+          <Link href={nextHref} transitionTypes={["week-next"]} aria-label="Semaine suivante" className="flex size-9 items-center justify-center rounded-full border border-line hover:bg-soft">
             <ArrowLeftIcon size={16} className="rotate-180" />
           </Link>
           {todayHref && (
-            <Link href={todayHref} className="ml-1 rounded-full px-3 py-1.5 text-[13px] font-bold text-violet hover:bg-violet-soft">
+            <Link href={todayHref} transitionTypes={["week-today"]} className="ml-1 rounded-full px-3 py-1.5 text-[13px] font-bold text-violet hover:bg-violet-soft">
               Aujourd’hui
             </Link>
           )}
@@ -286,6 +286,13 @@ export function CalendarBoard({
         </p>
       )}
 
+      {/* Changing week slides the days in from the side they come from. */}
+      <ViewTransition
+        key={days[0]?.iso}
+        enter={{ "week-next": "fauve-week-next", "week-prev": "fauve-week-prev", "week-today": "fauve-fade-swap", default: "none" }}
+        exit={{ "week-next": "fauve-week-next", "week-prev": "fauve-week-prev", "week-today": "fauve-fade-swap", default: "none" }}
+        default="none"
+      >
       <div className="overflow-x-auto pb-1">
         <div className="grid min-w-[840px] grid-cols-7 gap-2">
           {days.map(({ date, today }, day) => (
@@ -337,6 +344,7 @@ export function CalendarBoard({
           ))}
         </div>
       </div>
+      </ViewTransition>
 
       {visible.some((p) => p.day === null) && (
         <section className="flex flex-col gap-2.5">

@@ -1,10 +1,10 @@
+import { PageSuspense } from "@/components/page-suspense";
 import { alignSlides, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 import { z } from "zod";
-import { NoStudio, PageLoading } from "@/components/empty-state";
+import { NoStudio } from "@/components/empty-state";
 import { ArrowLeftIcon, CheckIcon, ClockIcon, InstagramIcon, TikTokIcon } from "@/components/icons";
 import { Orb } from "@/components/orb";
 import { DeleteButton } from "@/components/delete-button";
@@ -73,9 +73,9 @@ const POST_FORM = "post-form";
 export default function PostPage({ params }: PageProps<"/publications/[id]">) {
   return (
     <main className="flex min-w-0 flex-col gap-5 px-4 pt-5 pb-14 sm:px-8 sm:pt-6">
-      <Suspense fallback={<PageLoading title="Publication" />}>
+      <PageSuspense title="Publication">
         <PostDetail params={params} />
-      </Suspense>
+      </PageSuspense>
     </main>
   );
 }

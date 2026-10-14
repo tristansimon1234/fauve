@@ -1,10 +1,10 @@
+import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 import { jobStepLabel, resolveReelBrand } from "@fauve/agent";
 import { ArrowLeftIcon } from "@/components/icons";
-import { NoStudio, PageLoading } from "@/components/empty-state";
+import { NoStudio } from "@/components/empty-state";
 import { loadElement, postsUsingElement } from "@/lib/elements";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { getStudioContext } from "@/lib/studio";
@@ -21,9 +21,9 @@ export default function ComponentPage({ params }: { params: Promise<{ id: string
         <ArrowLeftIcon size={16} />
         Éléments pour photos
       </Link>
-      <Suspense fallback={<PageLoading title="Composant" />}>
+      <PageSuspense title="Composant">
         <Component params={params} />
-      </Suspense>
+      </PageSuspense>
     </main>
   );
 }

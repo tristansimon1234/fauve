@@ -1,7 +1,8 @@
+import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
-import { NoStudio, PageLoading } from "@/components/empty-state";
+import { ViewTransition } from "react";
+import { NoStudio } from "@/components/empty-state";
 import { ChatIcon } from "@/components/icons";
 import { addDays, localDateOf, parseIsoDate, sameDay, toIsoDate, weekdayIndex, weekLabel, weekOf } from "@/lib/dates";
 import { formatShortDateTime, formatTime } from "@/lib/format";
@@ -29,9 +30,9 @@ const DONE = new Set(["validated", "scheduled", "published", "measured"]);
 export default function CalendarPage({ searchParams }: PageProps<"/calendrier">) {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
-      <Suspense fallback={<PageLoading title="Calendrier" />}>
+      <PageSuspense title="Calendrier">
         <Calendar searchParams={searchParams} />
-      </Suspense>
+      </PageSuspense>
     </main>
   );
 }
@@ -152,6 +153,8 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
         </div>
       </div>
 
+      {/* Semaine ⇄ Grille: the same place, other content: a crossfade. */}
+      <ViewTransition key={grid ? "grille" : "semaine"} enter="fauve-fade-swap" exit="fauve-fade-swap" default="none">
       {grid ? (
         <GridView heading={false} connected={grid.connected} handle={grid.handle} info={grid.info} tiles={grid.tiles} timezone={tz} />
       ) : (
@@ -223,6 +226,7 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
           )}
         </>
       )}
+      </ViewTransition>
     </>
   );
 }

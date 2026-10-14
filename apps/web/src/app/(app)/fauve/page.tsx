@@ -1,7 +1,7 @@
+import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { z } from "zod";
-import { NoStudio, PageLoading } from "@/components/empty-state";
+import { NoStudio } from "@/components/empty-state";
 import { localDateOf, weekOf } from "@/lib/dates";
 import { plural } from "@/lib/format";
 import { creditBalance } from "@/lib/credits";
@@ -19,9 +19,9 @@ export default function FauvePage({ searchParams }: PageProps<"/fauve">) {
   return (
     // Full height: the composer stays at the bottom (phone: minus the header and the tab bar).
     <main className="flex h-[calc(100dvh-134px)] min-h-[480px] flex-col lg:h-dvh">
-      <Suspense fallback={<PageLoading title="Bonjour" />}>
+      <PageSuspense title="Bonjour">
         <Home searchParams={searchParams} />
-      </Suspense>
+      </PageSuspense>
     </main>
   );
 }

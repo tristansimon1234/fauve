@@ -638,3 +638,76 @@
     animation-name: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   View transitions (React <ViewTransition>, browser View Transitions API).
+   Pages: the old one leaves fast, the new one rises in a beat later. Loading:
+   the skeleton fades, the content rises. Calendar weeks slide from their side.
+   The rest of the page (menu, header) stays put: the root does not crossfade.
+   --------------------------------------------------------------------------- */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(root) {
+  display: none;
+}
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(.fauve-page-out) {
+  animation: 120ms var(--ease-fauve) both fauve-vt-fade-out;
+}
+::view-transition-new(.fauve-page-in) {
+  animation: 260ms var(--ease-fauve) 60ms both fauve-vt-rise;
+}
+::view-transition-old(.fauve-loading-out) {
+  animation: 140ms ease-out both fauve-vt-fade-out;
+}
+::view-transition-new(.fauve-reveal) {
+  animation: 280ms var(--ease-fauve) 80ms both fauve-vt-rise;
+}
+::view-transition-old(.fauve-fade-swap) {
+  animation: 140ms ease-out both fauve-vt-fade-out;
+}
+::view-transition-new(.fauve-fade-swap) {
+  animation: 220ms var(--ease-fauve) 60ms both fauve-vt-fade-in;
+}
+::view-transition-old(.fauve-week-next) {
+  --fauve-vt-x: -48px;
+  animation: 220ms var(--ease-fauve) both fauve-vt-slide-out;
+}
+::view-transition-new(.fauve-week-next) {
+  --fauve-vt-x: 48px;
+  animation: 320ms var(--ease-fauve) 40ms both fauve-vt-slide-in;
+}
+::view-transition-old(.fauve-week-prev) {
+  --fauve-vt-x: 48px;
+  animation: 220ms var(--ease-fauve) both fauve-vt-slide-out;
+}
+::view-transition-new(.fauve-week-prev) {
+  --fauve-vt-x: -48px;
+  animation: 320ms var(--ease-fauve) 40ms both fauve-vt-slide-in;
+}
+@keyframes fauve-vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes fauve-vt-fade-in {
+  from { opacity: 0; }
+}
+@keyframes fauve-vt-rise {
+  from { opacity: 0; transform: translateY(10px); }
+}
+@keyframes fauve-vt-slide-out {
+  to { opacity: 0; transform: translateX(var(--fauve-vt-x)); }
+}
+@keyframes fauve-vt-slide-in {
+  from { opacity: 0; transform: translateX(var(--fauve-vt-x)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}

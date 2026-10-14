@@ -1,9 +1,9 @@
+import { PageSuspense } from "@/components/page-suspense";
 import { platformSchema, postKindSchema } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
 import { z } from "zod";
-import { EmptyState, NoStudio, PageLoading } from "@/components/empty-state";
+import { EmptyState, NoStudio } from "@/components/empty-state";
 import { CheckIcon } from "@/components/icons";
 import { Orb } from "@/components/orb";
 import { daysBefore } from "@/lib/dates";
@@ -52,9 +52,9 @@ const reportSchema = z.object({
 export default function ResultsPage({ searchParams }: PageProps<"/resultats">) {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
-      <Suspense fallback={<PageLoading title="Résultats" />}>
+      <PageSuspense title="Résultats">
         <Results searchParams={searchParams} />
-      </Suspense>
+      </PageSuspense>
     </main>
   );
 }

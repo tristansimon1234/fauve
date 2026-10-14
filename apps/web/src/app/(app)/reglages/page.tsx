@@ -1,8 +1,8 @@
+import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
 import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, PLANS, planOf, readMemory } from "@fauve/agent";
-import { NoStudio, PageLoading } from "@/components/empty-state";
+import { NoStudio } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
 import { fauveAccount } from "@/lib/instagram-dm";
@@ -43,9 +43,9 @@ export default function SettingsPage() {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
       <SettingsTabs current="/reglages" />
-      <Suspense fallback={<PageLoading title="Réglages" />}>
+      <PageSuspense title="Réglages">
         <Settings />
-      </Suspense>
+      </PageSuspense>
       <form action={signOut}>
         <button type="submit" className="btn btn-secondary">
           Me déconnecter
