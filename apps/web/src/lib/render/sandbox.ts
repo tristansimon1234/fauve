@@ -272,3 +272,31 @@ export async function videoFramesInSandbox(id: string, url: string, times: numbe
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }
 }
+
+/**
+ * A capture of a public web page as a visitor sees it (1280 × 1600, the top of
+ * the page), with the headless Chrome the Remotion templates already installed.
+ * The URL was checked to be public before; null when the capture fails.
+ */
+export async function screenshotInSandbox(id: string, url: string): Promise<Buffer | null> {
+  const sandbox = await remotionSandbox();
+  const dir = `${ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await bash(
+      sandbox,
+      `chrome=$(find ${REMOTION}/node_modules/.remotion -type f -name chrome-headless-shell 2>/dev/null | head -1)
+[ -n "$chrome" ] || { echo "no chrome"; exit 3; }
+timeout 60 "$chrome" --headless --no-sandbox --disable-gpu --hide-scrollbars --mute-audio --lang=fr-FR --window-size=1280,1600 --virtual-time-budget=12000 --screenshot="$1/page.png" "$2" >/dev/null 2>&1 || true
+[ -s "$1/page.png" ]`,
+      [dir, url],
+    );
+    const png = await sandbox.readFileToBuffer({ path: `${dir}/page.png` });
+    return png?.length ? png : null;
+  } catch (error) {
+    console.warn("site screenshot failed", url, error instanceof Error ? error.message.slice(0, 300) : error);
+    return null;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}

@@ -805,3 +805,20 @@ test("style buttons add one adjustment per kind to the art direction", async () 
   const custom = withAdjustment(once, { wish: "  plus de couleurs   de ma charte " });
   assert.ok(custom.endsWith("Ajustement de la gérante — plus de couleurs de ma charte."));
 });
+
+test("the site's photos: share image first, big images, no logos or icons", async () => {
+  const { extractSiteImages } = await import("./website.ts");
+  const html = `<html><head><meta property="og:image" content="/og.jpg"></head><body>
+    <img src="/logo.png" alt="logo"><img class="site-logo" src="/brand.png">
+    <img src="/icons/arrow.svg"><img src="/tiny.jpg" width="40" height="40">
+    <img srcset="/hero-480.jpg 480w, /hero-1600.jpg 1600w" src="/hero-480.jpg">
+    <img data-src="/salle.webp" src="data:image/gif;base64,R0lGOD">
+    <div style="background-image: url('https://cdn.example.com/banner.jpg')"></div>
+    <img src="/og.jpg"></body></html>`;
+  assert.deepEqual(extractSiteImages(html, "https://studio.fr/fr"), [
+    "https://studio.fr/og.jpg",
+    "https://studio.fr/hero-1600.jpg",
+    "https://studio.fr/salle.webp",
+    "https://cdn.example.com/banner.jpg",
+  ]);
+});

@@ -15,7 +15,8 @@ export type OnboardingView = {
   website: string | null;
   businessType: string | null;
   brand: { colors: string[]; fonts: string[]; logoUrl: string | null };
-  moodboard: { items: { path: string; url: string }[]; reading: string | null };
+  /** fromSite: Brigitte took these photos from her website (she has not made her own moodboard yet). */
+  moodboard: { items: { path: string; url: string }[]; reading: string | null; fromSite: boolean };
   rhythm: { posts: number; stories: number };
   instagram: string | null;
 };
@@ -45,7 +46,7 @@ export async function onboardingView(): Promise<OnboardingView | null> {
       fonts: (profile.fonts ?? []).slice(0, 2),
       logoUrl: (profile.logo_path ? urls.get(profile.logo_path) : null) ?? profile.logo_url ?? null,
     },
-    moodboard: { items: items.flatMap((i) => (urls.get(i.path) ? [{ path: i.path, url: urls.get(i.path)! }] : [])), reading: profile.moodboard?.reading ?? null },
+    moodboard: { items: items.flatMap((i) => (urls.get(i.path) ? [{ path: i.path, url: urls.get(i.path)! }] : [])), reading: profile.moodboard?.reading ?? null, fromSite: items.some((i) => i.note === "Photo de ton site") },
     rhythm: { posts: (plan.data?.posts_per_week as number | null) ?? 3, stories: (plan.data?.stories_per_week as number | null) ?? 4 },
     instagram: (account.data?.handle as string | null) ?? null,
   };

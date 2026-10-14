@@ -10,10 +10,13 @@ import { anthropic, logClaudeCost } from "./run";
 export async function readMoodboard(
   studioId: string,
   studioName: string,
-  images: { url: string; note?: string }[],
+  /** By signed URL, or as bytes (a JPEG, e.g. a capture that is not kept). */
+  images: ({ url: string; note?: string } | { jpeg: Buffer; note?: string })[],
+  /** The site's look (onboarding) is read by Sonnet: half the price, plenty for describing images. */
+  { model = CLAUDE_MODEL, intro }: { model?: string; intro?: string } = {},
 ): Promise<MoodboardReading> {
   const response = await anthropic().beta.messages.parse({
-    model: CLAUDE_MODEL,
+    model,
     max_tokens: 8000,
     output_config: { effort: "medium", format: betaZodOutputFormat(moodboardReadingSchema) },
     betas: ["server-side-fallback-2026-07-01"],
@@ -23,16 +26,18 @@ export async function readMoodboard(
       {
         role: "user",
         content: [
-          { type: "text", text: `Moodboard du studio « ${studioName} » (${images.length} image${images.length > 1 ? "s" : ""}).` },
+          { type: "text", text: intro ?? `Moodboard du studio « ${studioName} » (${images.length} image${images.length > 1 ? "s" : ""}).` },
           ...images.flatMap((image, i) => [
-            { type: "text" as const, text: `Image ${i + 1}${image.note ? ` — note de la gérante : ${image.note}` : ""}` },
-            { type: "image" as const, source: { type: "url" as const, url: image.url } },
+            { type: "text" as const, text: `Image ${i + 1}${image.note ? ` — ${intro ? "" : "note de la gérante : "}${image.note}` : ""}` },
+            "url" in image
+              ? { type: "image" as const, source: { type: "url" as const, url: image.url } }
+              : { type: "image" as const, source: { type: "base64" as const, media_type: "image/jpeg" as const, data: image.jpeg.toString("base64") } },
           ]),
         ],
       },
     ],
   });
-  await logClaudeCost(studioId, response.usage, "moodboard");
+  await logClaudeCost(studioId, response.usage, intro ? "site_look" : "moodboard", model);
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`moodboard reading failed (${response.stop_reason})`);
   }

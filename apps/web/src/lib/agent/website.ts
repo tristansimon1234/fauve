@@ -2,7 +2,7 @@ import "server-only";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { isPublicAddress } from "@fauve/agent/network";
-import { extractBrandStyle, extractSiteInfo, stylesheetLinks, type BrandStyle, type SiteInfo } from "@fauve/agent";
+import { extractBrandStyle, extractSiteImages, extractSiteInfo, stylesheetLinks, type BrandStyle, type SiteInfo } from "@fauve/agent";
 
 const MAX_BYTES = 2_000_000;
 const MAX_REDIRECTS = 4;
@@ -31,22 +31,25 @@ async function assertPublicHost(hostname: string): Promise<void> {
   if (!addresses.every(({ address }) => isPublicAddress(address))) throw new WebsiteError("Adresse non autorisée");
 }
 
-async function readCapped(res: Response): Promise<string> {
+async function readCappedBytes(res: Response, max: number): Promise<Buffer> {
   const reader = res.body?.getReader();
-  if (!reader) return "";
+  if (!reader) return Buffer.alloc(0);
   const chunks: Uint8Array[] = [];
   let size = 0;
-  while (size < MAX_BYTES) {
+  while (size < max) {
     const { done, value } = await reader.read();
     if (done) break;
     chunks.push(value);
     size += value.byteLength;
   }
   await reader.cancel().catch(() => {});
-  return new TextDecoder().decode(Buffer.concat(chunks).subarray(0, MAX_BYTES));
+  return Buffer.concat(chunks).subarray(0, max);
 }
 
-async function fetchPublic(input: string, accept: RegExp, signal: AbortSignal): Promise<{ url: string; body: string }> {
+const readCapped = async (res: Response) => new TextDecoder().decode(await readCappedBytes(res, MAX_BYTES));
+
+/** A public URL, redirects followed by hand: every hop is checked to be on the public web. */
+async function openPublic(input: string, accept: RegExp, signal: AbortSignal, acceptHeader: string): Promise<{ url: string; res: Response }> {
   let url = parseUrl(input);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     await assertPublicHost(url.hostname);
@@ -55,7 +58,7 @@ async function fetchPublic(input: string, accept: RegExp, signal: AbortSignal): 
       signal,
       headers: {
         "user-agent": "Mozilla/5.0 (compatible; FauveBot/1.0; +https://fauve-one.vercel.app)",
-        accept: "text/html,application/xhtml+xml,text/css;q=0.9",
+        accept: acceptHeader,
         "accept-language": "fr-FR,fr;q=0.9",
       },
     }).catch((e: unknown) => {
@@ -71,14 +74,25 @@ async function fetchPublic(input: string, accept: RegExp, signal: AbortSignal): 
     }
     if (!res.ok) throw new WebsiteError(`Le site répond ${res.status}`);
     if (!accept.test(res.headers.get("content-type") ?? "")) throw new WebsiteError("Ce lien n'est pas une page web");
-    return { url: url.toString(), body: await readCapped(res) };
+    return { url: url.toString(), res };
   }
   throw new WebsiteError("Trop de redirections");
 }
 
-export type WebsiteReading = SiteInfo & { style: BrandStyle };
+async function fetchPublic(input: string, accept: RegExp, signal: AbortSignal): Promise<{ url: string; body: string }> {
+  const { url, res } = await openPublic(input, accept, signal, "text/html,application/xhtml+xml,text/css;q=0.9");
+  return { url, body: await readCapped(res) };
+}
 
-/** Fetches a public web page and extracts what Fauve needs from it: content, links, colours and fonts. */
+/** An image of a public site (8 MB at most), with the same safety checks as its pages. */
+export async function fetchPublicImage(input: string, signal: AbortSignal): Promise<Buffer> {
+  const { res } = await openPublic(input, /^image\/(jpeg|png|webp|avif)/i, signal, "image/avif,image/webp,image/jpeg,image/png;q=0.9");
+  return readCappedBytes(res, 8_000_000);
+}
+
+export type WebsiteReading = SiteInfo & { style: BrandStyle; images: string[] };
+
+/** Fetches a public web page and extracts what Fauve needs from it: content, links, colours, fonts and its photos. */
 export async function readWebsite(input: string): Promise<WebsiteReading> {
   const signal = AbortSignal.timeout(15_000);
   const page = await fetchPublic(input, /text\/html|application\/xhtml/i, signal);
@@ -89,5 +103,5 @@ export async function readWebsite(input: string): Promise<WebsiteReading> {
         .catch(() => ""),
     ),
   );
-  return { ...extractSiteInfo(page.body, page.url), style: extractBrandStyle(page.body, css) };
+  return { ...extractSiteInfo(page.body, page.url), style: extractBrandStyle(page.body, css), images: extractSiteImages(page.body, page.url) };
 }

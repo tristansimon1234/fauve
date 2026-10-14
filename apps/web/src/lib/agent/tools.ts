@@ -48,6 +48,7 @@ import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
+import { readSiteLook } from "@/lib/site-look";
 import { readWebsite, WebsiteError } from "./website";
 
 export type ToolContext = {
@@ -175,7 +176,20 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async read_website({ url }) {
       try {
-        return json(await readWebsite(url));
+        const { images, ...site } = await readWebsite(url);
+        // Getting started: the site's photos and look become her moodboard (after the reply, never over hers).
+        const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
+        const step = onboardingStepOf(studio?.onboarding_step);
+        if ((step === "website" || step === "style") && (images.length || site.url)) {
+          ctx.afterReply.push(() =>
+            readSiteLook(studioId, site.url, images).then(
+              (r) => console.info("site look", studioId, r),
+              (e: unknown) => console.warn("site look failed", e),
+            ),
+          );
+          return json({ ...site, photos_du_site: `${images.length} trouvées : je les mets dans son moodboard et je lis le style de son site juste après ta réponse (elles apparaissent dans quelques secondes à l'étape Style).` });
+        }
+        return json(site);
       } catch (error) {
         if (error instanceof WebsiteError) {
           console.warn("read_website failed", url, error.message);

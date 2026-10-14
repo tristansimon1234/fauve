@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { finishStep, onboardingView, saveRhythm, type OnboardingView } from "@/app/(app)/fauve/onboarding-actions";
 import { saveMoodboard } from "@/app/(app)/style/actions";
 import { CheckIcon, InstagramIcon, PlusIcon } from "@/components/icons";
+import { Mascot } from "@/components/mascot";
 import { NewPostSheet } from "@/components/new-post-sheet";
 import { Orb } from "@/components/orb";
 import { supabaseBrowser } from "@/lib/supabase/client";
@@ -209,6 +210,17 @@ function StyleStep({
   const fileRef = useRef<HTMLInputElement>(null);
   const items = view.moodboard.items;
   const room = MOODBOARD_MAX_ITEMS - items.length;
+  // Brigitte reads her site's photos and look right after its step: they land here in a few seconds.
+  const [waited, setWaited] = useState(0);
+  const lookingAtSite = Boolean(view.website) && !items.length && waited < 24;
+  useEffect(() => {
+    if (!lookingAtSite) return;
+    const timer = setTimeout(() => {
+      onChange();
+      setWaited((n) => n + 1);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [lookingAtSite, waited, onChange]);
 
   const add = async (files: File[]) => {
     const picked = files.filter((f) => f.type.startsWith("image/")).slice(0, room);
@@ -257,7 +269,17 @@ function StyleStep({
       )}
       <div className="flex flex-col gap-2">
         <span className="text-[14px] font-bold">Ton moodboard</span>
-        <p className="-mt-1 text-[13px] leading-snug text-muted">Des images de ce que tu aimes : des posts, des ambiances, des couleurs. Je m’en sers pour tous tes visuels.</p>
+        <p className="-mt-1 text-[13px] leading-snug text-muted">
+          {items.length && view.moodboard.fromSite
+            ? "J’ai pris les photos de ton site pour commencer. Ajoute ou retire ce que tu veux : je m’en sers pour tous tes visuels."
+            : "Des images de ce que tu aimes : des posts, des ambiances, des couleurs. Je m’en sers pour tous tes visuels."}
+        </p>
+        {lookingAtSite && (
+          <p className="fauve-fade flex items-center gap-2 rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[13px] font-semibold text-violet">
+            <Mascot size={24} mood="thinking" />
+            Je regarde les photos et le style de ton site…
+          </p>
+        )}
         <div
           className="grid grid-cols-4 gap-2 sm:grid-cols-6"
           onDragOver={(e) => e.preventDefault()}
@@ -285,7 +307,7 @@ function StyleStep({
         {view.moodboard.reading && <p className="rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[13px] leading-relaxed text-violet">{view.moodboard.reading}</p>}
         <input ref={fileRef} type="file" accept="image/*" multiple className="sr-only" onChange={(e) => (void add([...(e.target.files ?? [])]), (e.target.value = ""))} />
       </div>
-      {!items.length && (
+      {!items.length && !lookingAtSite && (
         <div className="flex flex-col gap-2">
           <span className="text-[14px] font-bold">Pas d’images sous la main ? Choisis une ambiance</span>
           <div className="flex flex-wrap gap-2">
