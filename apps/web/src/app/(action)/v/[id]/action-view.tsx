@@ -1,5 +1,6 @@
 "use client";
 
+import { useSoundtrack } from "@/components/montage/use-soundtrack";
 import { coverSrc } from "@/lib/cover-src";
 import { CoverPicker } from "@/components/montage/cover-picker";
 import {
@@ -108,7 +109,7 @@ export function ActionView({
   const playerRef = useRef<PlayerRef>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  const props = useMemo(() => (plan && editor ? buildReelProps(plan, editor.inputs) : null), [plan, editor]);
+  const props = useSoundtrack(useMemo(() => (plan && editor ? buildReelProps(plan, editor.inputs) : null), [plan, editor]));
   const spans = useMemo(() => (plan ? timeline(plan) : []), [plan]);
   const dirty = plan !== null && JSON.stringify(plan) !== JSON.stringify(saved);
   const valid = plan === null || editPlanSchema.safeParse(plan).success;

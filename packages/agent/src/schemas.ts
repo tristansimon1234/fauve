@@ -154,6 +154,28 @@ export function planBrief(plan: MontagePlan): string {
   ].join("\n");
 }
 
+/**
+ * Simone's own soundtrack, synthesized at render time (never a file: no rights to
+ * clear): a short piece in one of three moods at a tempo whose beat is a whole
+ * number of frames, plus sound effects on cuts, texts and the end card.
+ * `chosen`: set by hand (or asked for), kept when the template changes. null:
+ * never set (older plans), the template's soundtrack comes with the next version.
+ */
+export const MUSIC_STYLES = ["douce", "pechue", "chic"] as const;
+export const musicStyleSchema = z.enum(MUSIC_STYLES);
+export type MusicStyle = z.infer<typeof musicStyleSchema>;
+export const musicSpecSchema = z.object({
+  style: musicStyleSchema,
+  bpm: z.number().int().min(60).max(140),
+  key: z.number().int().min(0).max(11),
+  seed: z.number().int().min(0),
+  sfx: z.boolean(),
+  chosen: z.boolean().optional(),
+  /** Turned off by hand: a silent Reel (the spec stays, to turn it back on as it was). */
+  muted: z.boolean().optional(),
+});
+export type MusicSpec = z.infer<typeof musicSpecSchema>;
+
 export const editPlanImageSchema = z.object({
   asset_id: z.string().min(1),
   // Safe zones: never bottom or right edge for text; the logo sits bottom-left or top.
@@ -171,7 +193,7 @@ export const editPlanObjectSchema = z.object({
   images: z.array(editPlanImageSchema),
   transitions: z.enum(["cut", "fade", "light_zoom"]),
   subtitles: z.boolean(),
-  music: z.null(),
+  music: musicSpecSchema.nullable(),
   /** Google Fonts families: display for hooks and titles, body for the rest (default: template or brand fonts). */
   fonts: z
     .object({ display: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).optional(), body: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).optional() })

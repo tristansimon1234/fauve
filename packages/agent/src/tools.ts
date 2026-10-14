@@ -344,6 +344,11 @@ export const toolSpecs = {
       save_as: z.string().min(1).max(40).optional().describe("Enregistrer le style obtenu sous ce nom"),
     }),
   },
+  set_soundtrack: {
+    description:
+      "Bande-son d'un Reel (musique faite par Simone pour ce montage, coupes sur le rythme, effets sonores) : style douce, pechue ou chic (gardé ensuite), off pour un Reel sans musique, sfx pour les whoosh et pop. Refait la vidéo, gratuit.",
+    input: z.object({ post_id: z.string().uuid(), style: z.enum(["douce", "pechue", "chic", "off"]), sfx: z.boolean().default(true) }),
+  },
   schedule_post: {
     description:
       "Programme une publication validée sur Instagram, à son horaire (scheduled_at) ou à l'horaire donné ; si l'horaire est passé ou absent, elle part tout de suite. Il faut un compte Instagram connecté (sinon envoie le lien get_connect_link) et le contenu du format : un Reel a besoin de sa vidéo montée ; un post d'une photo (media_ids) ; un carrousel de 2 à 10 photos ou vidéos (media_ids, dans l'ordre) ; une story de sa vidéo montée ou d'une photo/vidéo (pas de légende sur une story). Ne programme jamais sans l'accord explicite de la gérante.",

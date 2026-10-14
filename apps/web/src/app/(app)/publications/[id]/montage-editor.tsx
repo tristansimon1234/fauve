@@ -1,5 +1,6 @@
 "use client";
 
+import { useSoundtrack } from "@/components/montage/use-soundtrack";
 import {
   buildReelProps,
   editPlanSchema,
@@ -70,7 +71,7 @@ export function MontageEditor({
   const [saving, startSaving] = useTransition();
   const playerRef = useRef<PlayerRef>(null);
 
-  const props = useMemo(() => buildReelProps(plan, inputs), [plan, inputs]);
+  const props = useSoundtrack(useMemo(() => buildReelProps(plan, inputs), [plan, inputs]));
   const spans = useMemo(() => timeline(plan), [plan]);
   const dirty = JSON.stringify(plan) !== JSON.stringify(saved);
   const valid = editPlanSchema.safeParse(plan).success;
