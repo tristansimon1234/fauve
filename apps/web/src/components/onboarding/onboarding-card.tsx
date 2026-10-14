@@ -252,7 +252,7 @@ function StyleStep({
         <div className="flex flex-wrap items-center gap-4 rounded-[16px] bg-soft p-3.5">
           {view.brand.logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={view.brand.logoUrl} alt="Ton logo" className="h-10 max-w-[96px] object-contain" />
+            <img src={view.brand.logoUrl} alt="Ton logo" className="h-10 max-w-[96px] object-contain [filter:drop-shadow(0_0_1px_rgba(28,21,48,0.55))_drop-shadow(0_1px_2px_rgba(28,21,48,0.25))]" />
           )}
           {view.brand.colors.length > 0 && (
             <div className="flex -space-x-1.5" aria-label="Tes couleurs">
@@ -290,9 +290,12 @@ function StyleStep({
         >
           {items.map((i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={i.path} src={i.url} alt="" className="aspect-square w-full rounded-[12px] object-cover" />
+            <img key={i.path} src={i.url} alt="" className="fauve-enter aspect-square w-full rounded-[12px] object-cover" />
           ))}
-          {room > 0 && (
+          {/* The site's photos on their way: their places are already there. */}
+          {lookingAtSite &&
+            [0, 1, 2, 3].map((n) => <span key={n} aria-hidden="true" className="aspect-square w-full animate-pulse rounded-[12px] bg-line" style={{ animationDelay: `${n * 150}ms` }} />)}
+          {room > 0 && !lookingAtSite && (
             <button
               type="button"
               disabled={busy !== null}
@@ -340,9 +343,14 @@ function StyleStep({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={pending || busy !== null} onClick={onNext} className="btn btn-primary h-11 px-5 disabled:opacity-40">
-          {items.length ? "C’est mon style, on continue" : "Continuer sans moodboard"}
-        </button>
+        {lookingAtSite ? (
+          // Not the moment to skip: what she is waiting for arrives in a few seconds.
+          <span className="text-[13px] font-semibold text-muted">Encore quelques secondes…</span>
+        ) : (
+          <button type="button" disabled={pending || busy !== null} onClick={onNext} className="btn btn-primary h-11 px-5 disabled:opacity-40">
+            {items.length ? "C’est mon style, on continue" : "Continuer sans moodboard"}
+          </button>
+        )}
       </div>
     </>
   );
