@@ -84,5 +84,5 @@ export async function saveRhythm(posts: number, stories: number): Promise<{ ok: 
     .from("content_plans")
     .upsert({ studio_id: studioId, posts_per_week: parsed.data.posts, stories_per_week: parsed.data.stories }, { onConflict: "studio_id" });
   if (error) return { ok: false };
-  return goToStep("connect");
+  return goToStep(nextOnboardingStep("rhythm"));
 }

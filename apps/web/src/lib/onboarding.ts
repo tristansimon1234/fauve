@@ -1,9 +1,9 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-/** Her first publication is the last step of getting started: once one exists, she is all set. */
+/** Once her first publication exists, getting started moves on to its last step: Instagram, to publish it. */
 export async function completeFirstPost(studioId: string): Promise<void> {
-  const { error } = await supabaseAdmin().from("studios").update({ onboarding_step: "done" }).eq("id", studioId).eq("onboarding_step", "first_post");
+  const { error } = await supabaseAdmin().from("studios").update({ onboarding_step: "connect" }).eq("id", studioId).eq("onboarding_step", "first_post");
   if (error) console.warn("onboarding: first post not recorded", error.message);
 }
 
