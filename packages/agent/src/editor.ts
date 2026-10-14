@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { defaultMusic, onBeat } from "./soundtrack.ts";
 import { renderDuration } from "./render.ts";
 import {
   editPlanObjectSchema,
@@ -42,7 +41,7 @@ Règles de montage :
 - Écran de fin (« end_card ») : le nom du studio en titre et un appel à l'action court en sous-titre, adapté à l'activité (« Réserve ton cours », « Prends rendez-vous », « Réserve ta table », « Passe nous voir »), pour les 1,6 dernières secondes. Prévois la durée en conséquence.
 - Transitions : « fade » pour doux et chic, « cut » pour dynamique. « zoom » « light » sur les plans calmes (ou « light_zoom » partout en doux).
 - Sous-titres mot à mot (« subtitles ») seulement si quelqu'un parle et que c'est utile (prof qui explique, témoignage).
-- « music » vaut null : Simone ajoute ensuite sa bande-son et cale tes coupes sur son rythme (durées arrondies au temps près) ; pas d'images (« images » vide).
+- Jamais de musique (« music » vaut null) ; pas d'images (« images » vide).
 
 Scènes de motion design (sans vidéo, aux couleurs du studio) :
 - « motion » : une scène libre, sur mesure, que ton motion designer animera en code (typographie cinétique, formes, tracés, masques…). Dans « brief » (600 caractères au plus), décris précisément l'idée visuelle, les textes exacts, l'ordre des mouvements, les couleurs et l'ambiance. Donne aussi « fallback », une scène fixe équivalente au cas où. Les textes restent toujours entiers et lisibles dans le cadre (marges de sécurité) : ne demande jamais qu'un texte « déborde du cadre », soit « coupé par le bord » ou « sorte de l'écran » ; seuls les formes et les décors peuvent dépasser. Une scène dont un texte sort du cadre est refusée et remplacée par sa scène fixe. Réserve-la aux moments forts : une ouverture marquante, une offre, un témoignage mis en scène. Chaque scène libre coûte cher à produire : 2 au plus par Reel.
@@ -88,8 +87,6 @@ const editorTextSchema = editPlanTextSchema.omit({ look: true, detail_look: true
 export const editorOutputSchema = z.object({
   plan: editPlanObjectSchema.extend({
     template: motionTemplateSchema,
-    // The soundtrack is Simone's, set after the editor (carrySoundtrack), never written by it.
-    music: z.null(),
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
     segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
@@ -215,7 +212,7 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
   });
   if (!segments.length) throw new Error("Le plan de montage ne garde aucun plan utilisable");
 
-  const draft = { ...plan, segments, images: [], music: plan.music ?? null };
+  const draft = { ...plan, segments, images: [], music: null };
   const duration = Math.max(3, renderDuration(draft));
   const texts = plan.texts
     .map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, duration)) }))
@@ -239,7 +236,5 @@ export function variantPlan(plan: EditPlan, change: { template?: MotionTemplate;
     replaced = true;
     return { ...t, text: hook.slice(0, 120), emphasis: [] };
   });
-  // The music follows the new template, unless she chose it or turned it off.
-  const music = plan.music && !plan.music.chosen && !plan.music.muted ? { ...defaultMusic(next, plan.music.seed), sfx: plan.music.sfx } : plan.music;
-  return onBeat(editPlanSchema.parse({ ...plan, template: next, texts, music }));
+  return editPlanSchema.parse({ ...plan, template: next, texts });
 }

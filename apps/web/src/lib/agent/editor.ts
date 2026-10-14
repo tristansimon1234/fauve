@@ -1,10 +1,8 @@
 import "server-only";
+import { insertPlanVersion } from "@/lib/edit-plans";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   carryRetouch,
-  carrySoundtrack,
-  onBeat,
-  seedOf,
   carryTextStyle,
   brandProfileSchema,
   CLAUDE_MODEL,
@@ -197,19 +195,12 @@ export async function designEdit(params: {
   // Retouch and blur stay on their clips from one version to the next.
   // A correction also keeps the texts' styles and places (the editor names looks, it does not copy them).
   const base = previousPlan.success ? previousPlan.data : null;
-  // Simone's soundtrack (kept if she chose it, else the template's), and the cuts moved onto its beat.
-  const plan = onBeat(
-    carrySoundtrack(
-      carryRetouch(
-        carryTextStyle(
-          normalizeEditPlan(fromEditorPlan(response.parsed_output.plan, profile.text_looks ?? []), durations, params.maxNewScenes ?? MAX_FREE_SCENES),
-          params.fresh ? null : base,
-        ),
-        base,
-      ),
-      base,
-      seedOf(params.postId),
+  const plan = carryRetouch(
+    carryTextStyle(
+      normalizeEditPlan(fromEditorPlan(response.parsed_output.plan, profile.text_looks ?? []), durations, params.maxNewScenes ?? MAX_FREE_SCENES),
+      params.fresh ? null : base,
     ),
+    base,
   );
 
   // Library scenes: their saved code, with the new texts. An unknown id becomes a new scene.
@@ -275,16 +266,11 @@ export async function designEdit(params: {
   });
   await markTemplatesUsed([...reused.keys()]).catch((e: unknown) => console.warn("motion_templates: usage count failed", e));
 
-  const version = ((previous.data?.[0]?.version as number | undefined) ?? 0) + 1;
-  const row = await db
-    .from("edit_plans")
-    .insert({ studio_id: params.studioId, post_id: params.postId, version, plan })
-    .select("id")
-    .single();
-  if (row.error) throw new Error(row.error.message);
-  await db.from("posts").update({ edit_plan_id: row.data.id }).eq("id", params.postId);
+  const row = await insertPlanVersion(params.studioId, params.postId, plan);
+  const version = row.version;
+  await db.from("posts").update({ edit_plan_id: row.id }).eq("id", params.postId);
   return {
-    editPlanId: row.data.id as string,
+    editPlanId: row.id,
     version,
     plan,
     rationale: response.parsed_output.rationale,

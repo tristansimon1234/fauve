@@ -88,10 +88,6 @@ export type ReelProps = {
     customFonts?: { family: string; url: string }[];
   };
   endCard: { title: string; subtitle: string | null; from: number } | null;
-  /** Simone's soundtrack (mirror of MusicSpec; only `soundtrack` is played here). */
-  music?: { style: string; bpm: number; key: number; seed: number; sfx: boolean; chosen?: boolean; muted?: boolean } | null;
-  /** The sound file made from it: a link for the render, a blob in the editor. */
-  soundtrack?: { src: string } | null;
   logo?: "top" | "bottom" | null;
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
