@@ -5,7 +5,6 @@ import { useState, type CSSProperties } from "react";
 import { SmileIcon, WhatsAppIcon } from "@/components/icons";
 import type { ChatMessage } from "./chat-actions";
 import { ChatCards } from "./chat-cards";
-import { BrigitteAvatar } from "./brigitte-avatar";
 import { DropCard } from "./drop-card";
 import { OnboardingCard } from "@/components/onboarding/onboarding-card";
 import { MediaPickCard } from "./media-pick-card";
@@ -66,7 +65,6 @@ export function Bubble({
   opening = null,
   busy,
   enter = false,
-  avatar = null,
 }: {
   message: ChatMessage;
   time: string;
@@ -83,8 +81,6 @@ export function Bubble({
   busy: boolean;
   /** Just arrived: rises in, its cards and buttons a beat later. */
   enter?: boolean;
-  /** Brigitte's face by her latest message; `funny` makes her laugh when it arrives. */
-  avatar?: { funny: boolean; upset: "sad" | "cry" | null } | null;
 }) {
   const [picking, setPicking] = useState(false);
   // The manager's own reaction pops when she changes it, not when the conversation loads.
@@ -226,7 +222,6 @@ export function Bubble({
       )}
       <span className="flex items-center gap-1 px-1 text-[11px] text-muted">
         {message.channel === "whatsapp" && <WhatsAppIcon size={11} />}
-        {!mine && avatar && <BrigitteAvatar funny={avatar.funny} upset={avatar.upset} fresh={enter} />}
         {mine ? "Toi" : "Brigitte"} · {time}
       </span>
     </div>

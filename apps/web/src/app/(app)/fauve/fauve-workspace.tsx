@@ -31,6 +31,7 @@ import { FileStrip, useChatUploads } from "./chat-uploads";
 import type { OnboardingView } from "./onboarding-actions";
 import { OnboardingCard, OnboardingStepper } from "@/components/onboarding/onboarding-card";
 import { applyLive, liveTurn, type LiveState } from "./live-turn";
+import { BrigitteLive, type BrigitteCue } from "./brigitte-avatar";
 import { LiveTyping } from "./live-typing";
 import {
   deleteConversation,
@@ -363,6 +364,12 @@ export function FauveWorkspace({
   );
 
   const lastFauve = messages.findLastIndex((m) => m.from === "fauve");
+  // What Brigitte reacts to in the header: her latest message, and the manager's words before it.
+  const latest = lastFauve >= 0 ? messages[lastFauve] : null;
+  const asked = messages.slice(0, lastFauve).findLast((x) => x.from === "me")?.body;
+  const cue: BrigitteCue | null = latest
+    ? { id: latest.id, funny: isFunny(latest.body) || isFunny(asked), upset: upsetLevel(asked), fresh: arrived.has(latest.id) }
+    : null;
   // Getting started: the current step's card always sits under Brigitte's latest
   // message, even when she forgot to attach it; not when she offered answer
   // buttons instead, nor for the first post (it has its own flow).
@@ -415,23 +422,40 @@ export function FauveWorkspace({
             <p className="text-[14px] text-violet/80">Brigitte en fait un Reel, un carrousel ou un post</p>
           </div>
         )}
-        <div className="flex items-center justify-between gap-2 px-4 pt-3 sm:px-6 sm:pt-5">
-          <div className="flex items-center gap-1 md:invisible">
-            <button type="button" onClick={() => setShowList(true)} className="h-9 rounded-full px-3 text-[13px] font-bold hover:bg-white">
+        <div className="flex items-center gap-2 px-4 pt-3 sm:px-6 sm:pt-4">
+          {/* Brigitte herself, top left of the conversation: she thinks, laughs, frowns as it goes (hidden while the welcome shows her big). */}
+          {!fresh && (
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="hidden sm:block">
+                <BrigitteLive typing={typing} cue={cue} size={60} />
+              </span>
+              <span className="sm:hidden">
+                <BrigitteLive typing={typing} cue={cue} size={44} />
+              </span>
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="text-[15px] font-bold">Brigitte</span>
+                <span key={typing ? (live?.status ?? "writing") : "online"} className={`fauve-fade truncate text-[12px] ${typing ? "text-violet" : "text-muted"}`}>
+                  {typing ? (live?.status ?? "écrit…") : "ta community manager"}
+                </span>
+              </span>
+            </div>
+          )}
+          <div className="ml-auto flex items-center gap-1">
+            <button type="button" onClick={() => setShowList(true)} className="h-9 rounded-full px-3 text-[13px] font-bold hover:bg-white md:hidden">
               Conversations
             </button>
-            <button type="button" aria-label="Nouvelle conversation" onClick={startNew} className="flex size-9 items-center justify-center rounded-full hover:bg-white">
+            <button type="button" aria-label="Nouvelle conversation" onClick={startNew} className="flex size-9 items-center justify-center rounded-full hover:bg-white md:hidden">
               <PenIcon size={18} />
             </button>
+            <a
+              href={whatsappHref}
+              aria-label="Continuer sur WhatsApp"
+              title="Continuer sur WhatsApp"
+              className="flex size-10 items-center justify-center rounded-full text-muted hover:bg-white hover:text-ink"
+            >
+              <WhatsAppIcon size={20} />
+            </a>
           </div>
-          <a
-            href={whatsappHref}
-            aria-label="Continuer sur WhatsApp"
-            title="Continuer sur WhatsApp"
-            className="flex size-10 items-center justify-center rounded-full text-muted hover:bg-white hover:text-ink"
-          >
-            <WhatsAppIcon size={20} />
-          </a>
         </div>
 
         <div
@@ -523,15 +547,6 @@ export function FauveWorkspace({
                   opening={opening}
                   busy={pending}
                   enter={arrived.has(m.id)}
-                  // Brigitte's face by her latest message: she laughs when the exchange is funny, is sad or cries when the manager is upset.
-                  avatar={
-                    i === lastFauve && !typing
-                      ? {
-                          funny: isFunny(m.body) || isFunny(messages.slice(0, i).findLast((x) => x.from === "me")?.body),
-                          upset: upsetLevel(messages.slice(0, i).findLast((x) => x.from === "me")?.body),
-                        }
-                      : null
-                  }
                 />
               ))}
               {typing && <LiveTyping live={live} />}
