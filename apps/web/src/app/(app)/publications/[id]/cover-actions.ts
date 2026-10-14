@@ -28,3 +28,20 @@ export async function setCover(postId: string, cover: PostCover | null): Promise
   revalidatePath("/calendrier");
   return { ok: true };
 }
+
+/** A Reel in the profile grid too (default), or only in the Reels tab. */
+export async function setShareToFeed(postId: string, shareToFeed: boolean): Promise<{ ok: boolean }> {
+  if (!z.uuid().safeParse(postId).success) return { ok: false };
+  const { db, member } = await getStudioContext();
+  if (!member) return { ok: false };
+  const { data, error } = await db
+    .from("posts")
+    .update({ share_to_feed: Boolean(shareToFeed) })
+    .eq("id", postId)
+    .eq("studio_id", member.studio.id)
+    .not("status", "in", "(published,measured)")
+    .select("id");
+  if (error || !data.length) return { ok: false };
+  revalidatePath("/calendrier");
+  return { ok: true };
+}

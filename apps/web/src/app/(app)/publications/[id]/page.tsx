@@ -41,6 +41,7 @@ const postSchema = z.object({
   media_ids: z.array(z.uuid()).catch([]),
   slides: z.unknown(),
   cover: postCoverSchema.nullable().catch(null),
+  share_to_feed: z.boolean().catch(true),
 });
 
 // Read leniently: an older or partial plan still shows what it can.
@@ -87,7 +88,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const { data, error } = await db
     .from("posts")
-    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover")
+    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -127,6 +128,18 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   // The publication itself: caption, platforms, date, Fauve's note.
   const details = (
     <>
+      {post.kind === "reel" && videoUrl && canEdit && (
+        <CoverPicker
+          key={versionKey(post.cover, post.share_to_feed)}
+          postId={post.id}
+          videoUrl={videoUrl}
+          initial={post.cover}
+          defaultAt={DEFAULT_COVER_SECONDS}
+          initialShareToFeed={post.share_to_feed}
+          photos={(editor?.inputs.photoIds ?? []).flatMap((id) => (editor?.inputs.clipUrls[id] ? [{ id, url: editor.inputs.clipUrls[id]! }] : []))}
+        />
+      )}
+
       <div className="flex flex-col gap-2">
         <PostEditor
           key={versionKey(post.caption, post.status)}
@@ -177,17 +190,6 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         <p className="-mt-2 text-[12px] leading-snug text-muted">
           {post.status === "validated" ? "Validée : " : "Une fois validée, "}Brigitte la publie sur Instagram à l’horaire prévu, si ton compte est connecté.
         </p>
-      )}
-
-      {post.kind === "reel" && videoUrl && canEdit && (
-        <CoverPicker
-          key={versionKey(post.cover)}
-          postId={post.id}
-          videoUrl={videoUrl}
-          initial={post.cover}
-          defaultAt={DEFAULT_COVER_SECONDS}
-          photos={(editor?.inputs.photoIds ?? []).flatMap((id) => (editor?.inputs.clipUrls[id] ? [{ id, url: editor.inputs.clipUrls[id]! }] : []))}
-        />
       )}
 
       {plan && !editor && <PlanSection plan={plan.view} clipLabels={clipLabels} />}

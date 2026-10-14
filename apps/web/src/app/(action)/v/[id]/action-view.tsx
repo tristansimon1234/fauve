@@ -65,6 +65,7 @@ export function ActionView({
   looks = [],
   note = null,
   cover = null,
+  shareToFeed = true,
 }: {
   post: ActionPost;
   editor: { plan: EditPlan; inputs: ReelInputs } | null;
@@ -83,6 +84,8 @@ export function ActionView({
   note?: string | null;
   /** A Reel's chosen cover (posts.cover). */
   cover?: PostCover | null;
+  /** A Reel in the profile grid too, or only in the Reels tab. */
+  shareToFeed?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>("view");
   // The montage's photos, which can stand as the cover.
@@ -380,7 +383,7 @@ export function ActionView({
         <>
         {post.kind === "reel" && videoUrl && editor && (
           <div className="mt-4 rounded-[16px] bg-white text-ink">
-            <CoverPicker postId={post.id} videoUrl={videoUrl} initial={cover} defaultAt={DEFAULT_COVER_SECONDS} photos={coverPhotos} />
+            <CoverPicker postId={post.id} videoUrl={videoUrl} initial={cover} defaultAt={DEFAULT_COVER_SECONDS} photos={coverPhotos} initialShareToFeed={shareToFeed} />
           </div>
         )}
         <section aria-label="Légende" className="mt-4">

@@ -5,6 +5,7 @@ import type { ToolName } from "./tools.ts";
 // Record over every tool name: a new tool cannot ship without its line.
 
 export const TOOL_STATUS: Record<ToolName, string | null> = {
+  app_guide: "Je regarde le mode d’emploi…",
   get_studio_context: "Je relis ton profil…",
   update_onboarding: "Je note ça…",
   read_website: "Je lis ton site…",
