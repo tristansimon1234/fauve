@@ -28,6 +28,7 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   write_on_photos: "J’écris sur tes photos…",
   list_elements: "Je regarde tes composants…",
   add_to_moodboard: "J’ajoute tes images au moodboard…",
+  set_logo: "J’enregistre ton logo…",
   place_elements: "Je pose les composants…",
   design_elements: "Je prépare tes composants…",
   edit_element: "Je prépare la modification…",

@@ -119,6 +119,28 @@ export function htmlToText(html: string): string {
 
 const unique = <T>(items: T[]) => [...new Set(items)];
 
+/** An image's address, lazy-loaded ones included (Squarespace, Wix, WordPress plugins). */
+const imgSrc = (tag: string) => attr(tag, "src")?.replace(/^data:.*/, "") || attr(tag, "data-src") || attr(tag, "data-image") || attr(tag, "data-lazy-src") || null;
+
+/**
+ * The site's logo: an image named or classed "logo" (or in a "logo" link), else
+ * the image in the link back to the home page (header of nearly every site).
+ */
+function findLogo(html: string, pageUrl: string): string | null {
+  const named = (html.match(/<img\b[^>]*>/gi) ?? []).find((tag) => /logo/i.test(tag) && imgSrc(tag));
+  if (named) return imgSrc(named);
+  const home = new URL(pageUrl);
+  for (const m of html.matchAll(/<a\b([^>]*)>([\s\S]{0,1500}?)<\/a>/gi)) {
+    const img = m[2]?.match(/<img\b[^>]*>/i)?.[0];
+    if (!img || !imgSrc(img)) continue;
+    const href = attr(m[1] ?? "", "href");
+    const target = href ? absolute(href, pageUrl) : null;
+    const toHome = target ? new URL(target).hostname === home.hostname && /^\/?(index\.html?)?$/.test(new URL(target).pathname) : false;
+    if (/logo/i.test(m[1] ?? "") || toHome) return imgSrc(img);
+  }
+  return null;
+}
+
 export function extractSiteInfo(rawHtml: string, pageUrl: string, maxText = 6000): SiteInfo {
   const html = stripCode(rawHtml);
   const host = new URL(pageUrl).hostname.replace(/^www\./, "");
@@ -135,8 +157,7 @@ export function extractSiteInfo(rawHtml: string, pageUrl: string, maxText = 6000
     return u.hostname.replace(/^www\./, "") === host && u.pathname !== "/" && l.label;
   });
 
-  const logoTag = (html.match(/<img\b[^>]*>/gi) ?? []).find((tag) => /logo/i.test(tag));
-  const logoSrc = logoTag ? attr(logoTag, "src") : null;
+  const logoSrc = findLogo(html, pageUrl);
   const ogImage = meta(html, "og:image");
   const title = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1];
   const body = html.match(/<body\b[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? html;

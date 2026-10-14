@@ -49,6 +49,7 @@ import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
 import { readSiteLook } from "@/lib/site-look";
+import { insertProfileVersion } from "@/app/(app)/style/profile";
 import { readWebsite, WebsiteError } from "./website";
 
 export type ToolContext = {
@@ -187,7 +188,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
               (e: unknown) => console.warn("site look failed", e),
             ),
           );
-          return json({ ...site, photos_du_site: `${images.length} trouvées : je les mets dans son moodboard et je lis le style de son site juste après ta réponse (elles apparaissent dans quelques secondes à l'étape Style).` });
+          return json({ ...site, photos_du_site: `${images.length} trouvées : je les mets dans son moodboard et dans sa médiathèque juste après ta réponse (elles apparaissent dans quelques secondes à l'étape Style), puis je lis le style de son site. Elles serviront pour sa première publication (list_media).`, ...(site.logo ? {} : { logo: "aucun logo trouvé sur le site : demande-le-lui" }) });
         }
         return json(site);
       } catch (error) {
@@ -245,7 +246,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (summary && !summaries.has(a.media_id as string)) summaries.set(a.media_id as string, summary);
       }
       const when = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: ctx.timezone ?? "Europe/Paris" });
-      const sources: Record<string, string> = { whatsapp: "WhatsApp", web_upload: "app", library: "médiathèque" };
+      const sources: Record<string, string> = { whatsapp: "WhatsApp", web_upload: "app", library: "médiathèque", website: "son site" };
       return json({
         medias: rows.map((r) => {
           const w = r.width as number | null;
@@ -697,6 +698,18 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         lecture: result.reading ?? undefined,
         note: "Dis en une phrase ce que tu retiens de son moodboard (la lecture), sans la recopier.",
       });
+    },
+
+    async set_logo({ media_id }) {
+      const { data: asset } = await db.from("media_assets").select("storage_path, kind, mime_type").eq("studio_id", studioId).eq("id", media_id).maybeSingle();
+      if (!asset || asset.kind !== "image") return json({ error: "Ce fichier n'est pas une image : demande-lui son logo en image (PNG de préférence)." });
+      const ext = ({ "image/png": "png", "image/svg+xml": "svg", "image/webp": "webp", "image/jpeg": "jpg" } as Record<string, string>)[String(asset.mime_type)] ?? "jpg";
+      // Copied to brand/: the chat's files expire, the logo stays.
+      const path = `${studioId}/brand/logo-${Date.now()}.${ext}`;
+      const { error } = await db.storage.from("media").copy(asset.storage_path as string, path);
+      if (error) return json({ error: "Le logo n'a pas pu être enregistré." });
+      await insertProfileVersion(studioId, (profile) => ({ ...profile, logo_path: path }));
+      return json({ ok: true, note: "Son logo est enregistré : il finira ses Reels et peut se poser sur ses photos." });
     },
 
     async list_elements() {
