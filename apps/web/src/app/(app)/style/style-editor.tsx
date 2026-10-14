@@ -5,7 +5,9 @@ import { CheckIcon } from "@/components/icons";
 import { saveStyle } from "./actions";
 import { ArtDirectionSection } from "./art-direction-section";
 import { ColorsSection } from "./colors-section";
+import type { OwnFont } from "./actions";
 import { FontsSection } from "./fonts-section";
+import { OwnFonts } from "./own-fonts";
 import { LogoSection } from "./logo-section";
 import { MoodboardSection } from "./moodboard-section";
 import { MAX_COLORS, TEMPLATE_FONTS, fontStylesheet, type Logo, type MoodboardView, type StyleForm } from "./style-options";
@@ -30,6 +32,7 @@ export function StyleEditor({
   logo: initialLogo,
   moodboard,
   inspirations,
+  ownFonts,
 }: {
   studioId: string;
   studioName: string;
@@ -39,6 +42,8 @@ export function StyleEditor({
   moodboard: MoodboardView;
   /** Server-rendered list of the Reels shared on Instagram. */
   inspirations: React.ReactNode;
+  /** The studio's own font files, with signed links. */
+  ownFonts: OwnFont[];
 }) {
   const [form, setForm] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -112,7 +117,13 @@ export function StyleEditor({
         }}
       />
       <ColorsSection value={form.colors} onChange={(colors) => update({ colors })} />
-      <FontsSection display={form.display_font} body={form.body_font} templateFonts={TEMPLATE_FONTS[template]} onChange={update} />
+      <FontsSection
+        display={form.display_font}
+        body={form.body_font}
+        templateFonts={TEMPLATE_FONTS[template]}
+        onChange={update}
+        own={<OwnFonts studioId={studioId} initial={ownFonts} display={form.display_font} body={form.body_font} onUse={update} />}
+      />
       <ToneSection value={form} onChange={update} />
 
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[18px] border border-line bg-white/95 px-4 py-3 shadow-[0_8px_30px_rgba(28,21,48,0.08)] backdrop-blur lg:bottom-4">

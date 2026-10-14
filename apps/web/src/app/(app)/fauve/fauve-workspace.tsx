@@ -9,6 +9,7 @@ import {
   CalendarIcon,
   ChartIcon,
   CheckIcon,
+  PlusIcon,
   FilmIcon,
   PaperclipIcon,
   PenIcon,
@@ -19,6 +20,7 @@ import {
   XIcon,
 } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
+import { NewPostSheet } from "@/components/new-post-sheet";
 import { Orb } from "@/components/orb";
 import type { CardQuote } from "@/lib/chat-cards";
 import { Bubble } from "./chat-bubble";
@@ -40,7 +42,7 @@ import {
 
 /** A photo or video added to the composer: uploaded at once, sent with the next message. */
 
-export type Suggestion = { icon: keyof typeof icons; label: string; prompt: string };
+export type Suggestion = { icon: keyof typeof icons; label: string; hint?: string } & ({ prompt: string; action?: undefined } | { action: "new-post"; prompt?: undefined });
 
 const icons = {
   film: FilmIcon,
@@ -50,6 +52,7 @@ const icons = {
   chart: ChartIcon,
   reply: ReplyIcon,
   pen: PenIcon,
+  plus: PlusIcon,
 };
 
 const POLL_MS = 8000;
@@ -97,6 +100,8 @@ export function FauveWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
   const [pending, startTransition] = useTransition();
+  // « Créer une publication »: the same steps as in the calendar.
+  const [creating, setCreating] = useState(false);
   // While Fauve answers: the line of what she is doing, then her words as she writes them.
   const [live, setLive] = useState<LiveState | null>(null);
   // Messages that just arrived (they rise in); a conversation that loads whole does not animate.
@@ -437,7 +442,7 @@ export function FauveWorkspace({
                 <WhatsAppIcon size={18} />
                 Continuer sur WhatsApp
               </a>
-              <ul className="grid w-full gap-3 pt-2 sm:grid-cols-2">
+              <ul className="grid w-full gap-3 pt-2 sm:grid-cols-3">
                 {suggestions.map((s) => {
                   const Icon = icons[s.icon];
                   return (
@@ -445,18 +450,22 @@ export function FauveWorkspace({
                       <button
                         type="button"
                         disabled={pending}
-                        onClick={() => send(s.prompt)}
-                        className="flex h-[60px] w-full items-center gap-3.5 rounded-[18px] border border-line bg-white px-5 text-left text-[15px] font-medium shadow-[0_2px_10px_rgba(28,21,48,0.04)] transition-colors hover:border-lilac disabled:opacity-60"
+                        onClick={() => (s.action === "new-post" ? setCreating(true) : send(s.prompt))}
+                        className="fauve-press flex h-full w-full items-center gap-3.5 rounded-[18px] border border-line bg-white px-5 py-4 text-left shadow-[0_2px_10px_rgba(28,21,48,0.04)] transition-colors hover:border-lilac disabled:opacity-60 sm:flex-col sm:items-start sm:gap-3"
                       >
-                        <span className="text-violet">
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet">
                           <Icon size={20} />
                         </span>
-                        {s.label}
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="text-[15px] font-bold">{s.label}</span>
+                          {s.hint && <span className="text-[13px] text-muted">{s.hint}</span>}
+                        </span>
                       </button>
                     </li>
                   );
                 })}
               </ul>
+              {creating && <NewPostSheet timezone={timezone} onClose={() => setCreating(false)} />}
             </div>
           ) : (
             <div className="mx-auto flex w-full max-w-[780px] flex-col gap-3 px-4 py-6">

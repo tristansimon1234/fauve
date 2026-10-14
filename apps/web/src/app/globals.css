@@ -429,3 +429,15 @@
     scroll-behavior: auto;
   }
 }
+
+/* A step in progress (the « Fauve travaille » pill). */
+@keyframes fauve-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.fauve-pulse {
+  animation: fauve-pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fauve-pulse { animation: none; opacity: 0.8; }
+}

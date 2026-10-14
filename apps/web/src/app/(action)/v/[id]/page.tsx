@@ -79,7 +79,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
       ? {
           plan: postSlides({ slides: post.slides, media_ids: ids }) ?? alignSlides({ template: "doux", slides: [] }, ids),
           photos,
-          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, fonts: i.fonts })),
+          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, fonts: i.fonts, customFonts: i.customFonts })),
         }
       : null;
   const media: ActionMedia[] = ids.flatMap((mid) => {

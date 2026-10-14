@@ -11,7 +11,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { Fit } from "./Fit";
-import { loadFonts } from "./fonts";
+import { loadCustomFonts, loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
 import { SceneView } from "./Scene";
 import { ClipBlurLayer, cssFilter, Photo } from "./Retouch";
@@ -30,6 +30,8 @@ const normalize = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu
 
 export function Reel(props: ReelProps) {
   const theme = THEMES[props.template];
+  // The studio's own fonts first, so their families are not asked of Google.
+  loadCustomFonts(props.brand.customFonts);
   loadFonts([
     props.brand.displayFont,
     props.brand.bodyFont,

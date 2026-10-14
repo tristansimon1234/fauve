@@ -31,7 +31,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       template: template.data,
       clipUrls: inputs.clipUrls,
       words: inputs.words,
-      brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts },
+      brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, customFonts: inputs.customFonts },
     } satisfies ReelInputs,
   };
 }

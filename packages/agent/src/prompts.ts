@@ -97,6 +97,8 @@ export type StudioContextForPrompt = {
   montageEffort?: Effort;
   /** What Fauve already knows about the business: never asked again. */
   known?: { website: string | null; booking: string | null; tone: string | null; memory: string[] };
+  /** What is running in the background right now (montages, text layers), one line each. */
+  work?: string[];
 };
 
 const channelLines: Record<NonNullable<StudioContextForPrompt["channel"]>, string> = {
@@ -123,6 +125,9 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     ctx.known?.memory.length
       ? `Mémoire (ce que tu sais déjà du commerce, valable dans toutes les conversations ; ne le redemande jamais) :\n${ctx.known.memory.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
       : "Mémoire : vide pour l'instant.",
+    ctx.work?.length
+      ? `Travaux en cours (en ce moment même, ne relance jamais l'un d'eux ; si elle demande où ça en est, donne l'étape et le temps écoulé, et dis qu'elle peut suivre l'avancement dans l'app) :\n${ctx.work.map((w) => `- ${w}`).join("\n")}`
+      : "Travaux en cours : aucun. Si tu as annoncé un montage ou un texte et qu'il n'est pas ici, c'est qu'il est fini ou qu'il a échoué : vérifie (montage_status, read_post) avant d'affirmer quoi que ce soit.",
     `Gérante : ${ctx.firstName ?? "prénom pas encore connu"}.`,
     `Étape d'onboarding : ${ctx.onboardingStep}.`,
     `Instagram : ${ctx.instagram ? `@${ctx.instagram} connecté` : "pas encore connecté"}.`,

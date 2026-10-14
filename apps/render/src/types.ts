@@ -75,7 +75,16 @@ export type ReelProps = {
     bullet?: { kind: "check" | "box" | "dot" | "dash" | "number" | "arrow"; color: string };
   }[];
   words: { w: string; from: number; to: number }[];
-  brand: { name: string; accent: string; accentInk: string; displayFont: string; bodyFont: string; logoUrl: string | null };
+  brand: {
+    name: string;
+    accent: string;
+    accentInk: string;
+    displayFont: string;
+    bodyFont: string;
+    logoUrl: string | null;
+    /** The studio's own fonts (uploaded files), loaded by URL instead of from Google Fonts. */
+    customFonts?: { family: string; url: string }[];
+  };
   endCard: { title: string; subtitle: string | null; from: number } | null;
   logo?: "top" | "bottom" | null;
   layer?: {

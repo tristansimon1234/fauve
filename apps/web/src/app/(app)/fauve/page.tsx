@@ -70,17 +70,17 @@ async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searc
     .filter(Boolean)
     .join(" ");
 
+  // Three ways in: make something, see how it went, see what is waiting.
+  const tasks = [toValidate ? `${plural(toValidate, "à valider", "à valider")}` : "", toFilm ? `${plural(toFilm, "plan à filmer", "plans à filmer")}` : ""].filter(Boolean);
   const suggestions: Suggestion[] = [
-    { icon: "film", label: "Monter une vidéo", prompt: "Je veux faire un Reel : comment je t’envoie mes vidéos ?" },
-    { icon: "calendar", label: "Planifier ma semaine", prompt: "Prépare le planning de mes publications de la semaine." },
-    toValidate
-      ? { icon: "check", label: `Valider mes brouillons (${toValidate})`, prompt: "Montre-moi les brouillons qui attendent ma validation." }
-      : { icon: "check", label: "Mes prochaines publications", prompt: "Qu’est-ce qui est prévu dans les prochains jours ?" },
-    { icon: "film", label: "Ce que je dois filmer", prompt: "Qu’est-ce que je dois filmer cette semaine ? Donne-moi les angles." },
-    { icon: "bulb", label: "Des idées de posts", prompt: "Donne-moi 3 idées de posts pour cette semaine." },
-    { icon: "pen", label: "Écrire une légende", prompt: "Aide-moi à écrire la légende de mon prochain post." },
-    { icon: "reply", label: "Répondre aux commentaires", prompt: "Y a-t-il des commentaires Instagram auxquels répondre ?" },
-    { icon: "chart", label: "Bilan de la semaine", prompt: "Fais-moi le bilan de la semaine sur Instagram." },
+    { icon: "plus", label: "Créer une publication", hint: "Reel, carrousel, photo ou story", action: "new-post" },
+    { icon: "chart", label: "Voir mes derniers résultats", hint: "Ce qui a marché, et pourquoi", prompt: "Comment ont marché mes dernières publications ? Dis-moi ce qui a le mieux marché et pourquoi." },
+    {
+      icon: "check",
+      label: "Voir ce qui m’attend",
+      hint: tasks.length ? tasks.join(" · ") : "Rien d’urgent pour l’instant",
+      prompt: "Qu’est-ce qui m’attend ? Ce que je dois valider, filmer ou t’envoyer, du plus urgent au moins urgent.",
+    },
   ];
 
   return (

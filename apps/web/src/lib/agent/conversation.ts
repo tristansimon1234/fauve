@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_EFFORT, effortSchema, orderReplies, readMemory } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
+import { describeJobs, runningJobs } from "@/lib/studio-jobs";
 
 // Shared by every channel (WhatsApp webhook, web test chat): rebuild the
 // conversation from stored messages and let Fauve answer the last one.
@@ -93,13 +94,19 @@ export async function replyInConversation(params: {
     .limit(ownThread ? HISTORY_LIMIT : HISTORY_LIMIT * 3);
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
-  const [studio, member, rows, instagram, brand] = await Promise.all([
+  const [studio, member, rows, instagram, brand, jobs] = await Promise.all([
     db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
     db.from("brand_profiles").select("profile->>tone").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+    runningJobs(params.studioId).catch(() => []),
   ]);
+  const jobTitles = jobs.length
+    ? new Map(
+        ((await db.from("posts").select("id, title").in("id", jobs.flatMap((j) => (j.postId ? [j.postId] : [])))).data ?? []).map((p) => [p.id as string, p.title as string]),
+      )
+    : new Map<string, string>();
   if (studio.error) throw new Error(studio.error.message);
   if (rows.error) throw new Error(rows.error.message);
 
@@ -152,6 +159,7 @@ export async function replyInConversation(params: {
         tone: ((brand.data as { tone?: string | null } | null)?.tone ?? null)?.slice(0, 300) ?? null,
         memory: readMemory(studio.data.memory).map((f) => f.fact),
       },
+      work: describeJobs(jobs.map((j) => ({ ...j, title: j.postId ? jobTitles.get(j.postId) : undefined }))),
     },
   });
 }

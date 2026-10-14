@@ -144,3 +144,37 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
   }
 }
 
+
+export type OwnFont = { family: string; path: string; url: string };
+export type SaveFontsResult = { status: "ok"; version: number; fonts: OwnFont[] } | { status: "error"; message: string };
+
+const fontsInput = z
+  .array(z.object({ family: z.string().trim().regex(/^[A-Za-z0-9 ]{2,40}$/, "Nom de police : lettres, chiffres et espaces."), path: z.string().max(300) }))
+  .max(6, "6 polices au maximum.");
+
+/** The studio's own fonts (files the browser uploaded to `media/{studio}/fonts/`), as a new version of the brand profile. */
+export async function saveCustomFonts(input: unknown): Promise<SaveFontsResult> {
+  const parsed = fontsInput.safeParse(input);
+  if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "Police invalide." };
+  const { db, member } = await getStudioContext();
+  if (!member) return { status: "error", message: NO_STUDIO };
+  const studioId = member.studio.id;
+  const expected = new RegExp(`^${studioId}/fonts/[a-z0-9-]{1,60}\\.(ttf|otf|woff2?)$`);
+  if (parsed.data.some((f) => !expected.test(f.path))) return { status: "error", message: "Fichier de police invalide." };
+  // Two fonts cannot share a name.
+  const fonts = parsed.data.filter((f, i, all) => all.findIndex((g) => g.family.toLowerCase() === f.family.toLowerCase()) === i);
+  try {
+    const { version } = await insertProfileVersion(studioId, (current) => {
+      const next: Record<string, unknown> = { ...current };
+      if (fonts.length) next.custom_fonts = fonts;
+      else delete next.custom_fonts;
+      return next;
+    });
+    const signed = fonts.length ? ((await db.storage.from("media").createSignedUrls(fonts.map((f) => f.path), SIGNED_URL_SECONDS)).data ?? []) : [];
+    revalidatePath("/style");
+    return { status: "ok", version, fonts: fonts.flatMap((f, i) => (signed[i]?.signedUrl ? [{ ...f, url: signed[i]!.signedUrl }] : [])) };
+  } catch (error) {
+    console.warn("saveCustomFonts failed", error);
+    return { status: "error", message: FAILED };
+  }
+}
