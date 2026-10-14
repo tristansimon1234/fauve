@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { z } from "zod";
 import { CalendarIcon, InstagramIcon, PenIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
-import { Orb } from "@/components/orb";
+import { Mascot } from "@/components/mascot";
 import { plural } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
 import { getContentPlan, getOptionalStudioContext, getSocialAccounts } from "@/lib/studio";
@@ -16,22 +16,30 @@ export default function ReadyPage() {
   return (
     <>
       <div className="flex flex-1 flex-col gap-5.5 px-6 pt-14 pb-6">
-        <Orb size={88} className="self-center" />
+        <Mascot size={96} className="self-center" />
         <Suspense fallback={<Ready firstName={null} items={null} />}>
           <ReadyForMember />
         </Suspense>
       </div>
       <div className="flex flex-col gap-2.5 border-t border-line px-6 pt-3.5 pb-7.5">
+        {/* On a computer the app goes on (the next step waits on the Fauve page); on a phone, WhatsApp. */}
+        <Link
+          href="/fauve"
+          className="hidden h-[54px] items-center justify-center rounded-full bg-violet text-base font-bold text-white md:flex"
+        >
+          Continuer dans l’app
+        </Link>
         <a
           href={whatsappLink()}
-          className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-violet text-base font-bold text-white"
+          className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-violet text-base font-bold text-white md:h-12 md:border-[1.5px] md:border-line md:bg-transparent md:text-[15px] md:font-semibold md:text-ink"
         >
           <WhatsAppIcon />
-          Retourner sur WhatsApp
+          <span className="md:hidden">Retourner sur WhatsApp</span>
+          <span className="hidden md:inline">Continuer sur WhatsApp</span>
         </a>
         <Link
           href="/fauve"
-          className="flex h-12 items-center justify-center rounded-full border-[1.5px] border-line text-[15px] font-semibold"
+          className="flex h-12 items-center justify-center rounded-full border-[1.5px] border-line text-[15px] font-semibold md:hidden"
         >
           Créer ma première publication
         </Link>
@@ -68,7 +76,7 @@ async function ReadyForMember() {
           label: `${plural(plan.posts_per_week, "post", "posts")} + ${plural(plan.stories_per_week, "story", "stories")}`,
           detail: "par semaine",
         }
-      : { icon: CalendarIcon, label: "Ton rythme", detail: "à choisir avec Brigitte sur WhatsApp" },
+      : { icon: CalendarIcon, label: "Ton rythme", detail: "à choisir avec Brigitte" },
     {
       icon: PenIcon,
       label: "Ton style",
@@ -88,7 +96,8 @@ function Ready({ firstName, items }: { firstName: string | null; items: Item[] |
           {firstName && <span className="accent">{firstName}.</span>}
         </h1>
         <p className="text-[15px] leading-[1.55] text-muted">
-          La suite se passe sur WhatsApp : envoie tes vidéos à Brigitte, elle prépare tes publications avec toi.
+          <span className="md:hidden">La suite se passe sur WhatsApp : envoie tes vidéos à Brigitte, elle prépare tes publications avec toi.</span>
+          <span className="hidden md:inline">Dernière étape dans l’app : ta première publication, avec Brigitte.</span>
         </p>
       </div>
       {items && (

@@ -110,7 +110,7 @@ export function OnboardingCard({
         <h3 className="text-[16px] font-bold">{ONBOARDING_LABELS[step]}</h3>
       </div>
       {step === "website" && <WebsiteStep onSend={onSend} pending={pending} />}
-      {step === "style" && view && <StyleStep studioId={view.studioId} view={view} onChange={reload} onNext={next} pending={pending} setError={setError} />}
+      {step === "style" && view && <StyleStep studioId={view.studioId} view={view} onChange={reload} onNext={next} onSend={onSend} pending={pending} setError={setError} />}
       {step === "rhythm" && view && (
         <RhythmStep
           initial={view.rhythm}
@@ -169,11 +169,31 @@ function WebsiteStep({ onSend, pending }: { onSend: (text: string) => void; pend
   );
 }
 
+/** Ambiances to pick from when she has no images at hand: a word and a small palette. */
+const AMBIANCES = [
+  { label: "Épuré et lumineux", hint: "blanc, beige, beaucoup d’air", colors: ["#FFFFFF", "#EDE6DC", "#B8B1A8"] },
+  { label: "Chaleureux et naturel", hint: "bois, lin, terracotta, lumière douce", colors: ["#E9DCC8", "#C98B5B", "#7A4E33"] },
+  { label: "Chic et éditorial", hint: "noir et crème, grands titres, comme un magazine", colors: ["#F3EDE3", "#A88B5D", "#1C1C1C"] },
+  { label: "Doux et apaisant", hint: "pastels, rondeurs, calme", colors: ["#F6EFE6", "#E8D5E0", "#C9DCE6"] },
+  { label: "Énergique et coloré", hint: "couleurs vives, rythme, contrastes", colors: ["#FFC93C", "#FF5A36", "#2E5BFF"] },
+];
+
+function Swatches({ colors }: { colors: string[] }) {
+  return (
+    <span className="flex shrink-0 -space-x-1.5" aria-hidden="true">
+      {colors.slice(0, 3).map((c) => (
+        <span key={c} className="size-5 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(28,21,48,0.08)]" style={{ background: c }} />
+      ))}
+    </span>
+  );
+}
+
 function StyleStep({
   studioId,
   view,
   onChange,
   onNext,
+  onSend,
   pending,
   setError,
 }: {
@@ -181,6 +201,7 @@ function StyleStep({
   view: OnboardingView;
   onChange: () => void;
   onNext: () => void;
+  onSend: (text: string) => void;
   pending: boolean;
   setError: (e: string | null) => void;
 }) {
@@ -264,6 +285,38 @@ function StyleStep({
         {view.moodboard.reading && <p className="rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[13px] leading-relaxed text-violet">{view.moodboard.reading}</p>}
         <input ref={fileRef} type="file" accept="image/*" multiple className="sr-only" onChange={(e) => (void add([...(e.target.files ?? [])]), (e.target.value = ""))} />
       </div>
+      {!items.length && (
+        <div className="flex flex-col gap-2">
+          <span className="text-[14px] font-bold">Pas d’images sous la main ? Choisis une ambiance</span>
+          <div className="flex flex-wrap gap-2">
+            {view.brand.colors.length > 0 && (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => onSend("L’ambiance que je veux : fidèle à mon site, avec mes couleurs.")}
+                className="fauve-press inline-flex h-10 items-center gap-2 rounded-full border border-line bg-white pr-3.5 pl-2 text-[13px] font-semibold hover:border-lilac disabled:opacity-50"
+              >
+                <Swatches colors={view.brand.colors} />
+                Comme mon site
+              </button>
+            )}
+            {AMBIANCES.map((a) => (
+              <button
+                key={a.label}
+                type="button"
+                disabled={pending}
+                title={a.hint}
+                onClick={() => onSend(`L’ambiance que je veux : ${a.label.toLowerCase()} (${a.hint}).`)}
+                className="fauve-press inline-flex h-10 items-center gap-2 rounded-full border border-line bg-white pr-3.5 pl-2 text-[13px] font-semibold hover:border-lilac disabled:opacity-50"
+              >
+                <Swatches colors={a.colors} />
+                {a.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[12px] text-muted">Ou décris-la en une phrase en bas, à ta façon.</p>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" disabled={pending || busy !== null} onClick={onNext} className="btn btn-primary h-11 px-5 disabled:opacity-40">
           {items.length ? "C’est mon style, on continue" : "Continuer sans moodboard"}
