@@ -88,7 +88,7 @@ export function Bubble({
   // Fauve's reaction pops when it arrives (an instant answer to an emoji), not when the conversation loads.
   const [firstFauve] = useState(message.reactions.fauve);
   const mine = message.from === "me";
-  const parts = (message.body ?? "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const parts = shown(message.body ?? "", mine).split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   if (!parts.length) parts.push("");
   const media = mediaLabels[message.type];
   if (!message.body && !message.videoUrl && !media && !message.cards.length) return null;
@@ -226,4 +226,15 @@ export function Bubble({
       </span>
     </div>
   );
+}
+
+/** Her message as she reads it: the ids written for Brigitte (files, components) stay out of sight. */
+function shown(body: string, mine: boolean): string {
+  if (!mine) return body;
+  return body
+    .replace(/Fichiers choisis dans la médiathèque \(media_id, dans l’ordre\) : ([^\n]+?)\.(?=\n|$)/g, (_, ids: string) => {
+      const n = ids.split(",").length;
+      return `${n} fichier${n > 1 ? "s" : ""} choisi${n > 1 ? "s" : ""} dans ma médiathèque.`;
+    })
+    .replace(/ \((?:element_id|media_id)[^)]*\)/g, "");
 }

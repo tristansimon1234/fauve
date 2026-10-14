@@ -47,6 +47,8 @@ Scènes de motion design (sans vidéo, aux couleurs du studio) :
 - Bibliothèque (« templates ») : des scènes libres déjà créées, réutilisables avec d'autres textes, gratuites et instantanées. Si l'une convient (même idée, même rôle), réutilise-la : motion { template_id, template_texts: un texte par slot (respecte max_chars), brief: une phrase sur ce que la scène montre ici, fallback }. Ne commande une nouvelle scène libre (brief détaillé, sans template_id) que si aucune ne convient.
 - « scene » : gabarit fixe et rapide (title, list, quote, number), si une scène libre n'apporte rien.
 - 1,5 à 6 s par scène. Avec des clips : 1 à 3 scènes au plus. Sans clips : un Reel entièrement en motion design, de 3 à 5 scènes qui s'enchaînent.
+
+Photos (« photos ») : la gérante peut monter un Reel avec ses photos (souvent celles de son site), seules ou avec des vidéos. Chaque photo est un plan comme un clip : clip_id = son media_id, in = 0, out = sa durée à l'écran (1,8 à 3,5 s ; 5 au plus), zoom « none ». Le moteur l'anime tout seul avec un zoom lent et une légère dérive, d'une photo à l'autre dans un sens puis l'autre. « contenu » dit ce qu'elle montre et « format » son cadrage : un portrait remplit l'écran vertical, un paysage est recadré au centre (évite d'y compter sur les bords). Un Reel de photos vit par son rythme et ses textes : enchaîne-les vite, un texte fort sur chacune ou presque, et ouvre ou ferme sur une scène de motion design. Toutes ses photos sont utilisables, dans l'ordre qui raconte le mieux.
 - Au plus « max_new_scenes » nouvelles scènes « motion » (sans template_id) dans ce Reel (2 d'habitude, 0 si la gérante veut économiser) ; les réutilisations de la bibliothèque ne comptent pas. Sinon des « scene » fixes (un titre, une liste, une citation, un chiffre bien animés suffisent souvent).
 
 Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh ». Ouvre sur une scène libre de motion design créée sur mesure (son nom ou une promesse en typographie animée, à ses couleurs), puis ses plus beaux plans avec un texte sur chaque temps fort (accroche, ce qui rend son commerce unique, l'offre ou l'invitation), un rythme vivant même en « chic » ou « doux », et une fin de marque soignée. Utilise les 2 scènes libres permises.
@@ -160,6 +162,9 @@ export function fromEditorPlan(plan: EditorOutput["plan"], looks: SavedLook[] = 
     }),
   };
 }
+
+/** The longest a photo stays on screen in a Reel (it plays still, with a slow zoom). */
+export const PHOTO_MAX_SECONDS = 5;
 
 /** Free motion-design scenes per Reel (each one is an Opus call): the rest use fixed scenes. */
 export const MAX_FREE_SCENES = 2;

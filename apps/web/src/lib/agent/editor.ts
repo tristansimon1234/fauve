@@ -14,11 +14,13 @@ import {
   MAX_FREE_SCENES,
   motionTemplateSchema,
   normalizeEditPlan,
+  PHOTO_MAX_SECONDS,
   resolveReelBrand,
   type EditPlan,
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { designMotionScenes } from "./motion-designer";
 import { ensureInspirationRead } from "@/lib/inspirations";
@@ -77,10 +79,26 @@ export async function designEdit(params: {
     : previousPlan.success
       ? [...new Set(previousPlan.data.segments.filter(isClipSegment).map((s) => s.clip_id))]
       : [];
-  // No clips is fine: the editor then builds a Reel entirely in motion design.
-  const analyses = await Promise.all(mediaIds.map((id) => ensureClipAnalysis(params.studioId, id)));
+  // Photos play still with a slow zoom; videos are cut from their analysis. No media at all
+  // is fine too: the editor then builds a Reel entirely in motion design.
+  const kinds = mediaIds.length
+    ? new Map(((await db.from("media_assets").select("id, kind").eq("studio_id", params.studioId).in("id", mediaIds)).data ?? []).map((m) => [m.id as string, m.kind as string]))
+    : new Map<string, string>();
+  const photoIds = mediaIds.filter((id) => kinds.get(id) === "image");
+  const videoIds = mediaIds.filter((id) => kinds.get(id) !== "image");
+  const [analyses, photoReads] = await Promise.all([
+    Promise.all(videoIds.map((id) => ensureClipAnalysis(params.studioId, id))),
+    Promise.all(photoIds.map((id) => photoRegions(params.studioId, id).catch(() => null))),
+  ]);
   const clips = analyses.flatMap((a) => ("analysis" in a ? [{ media_id: a.media_id, analysis: a.analysis }] : []));
-  if (mediaIds.length && !clips.length) throw new Error("Les vidéos ne sont pas encore analysées, réessaie dans une minute");
+  if (videoIds.length && !clips.length && !photoIds.length) throw new Error("Les vidéos ne sont pas encore analysées, réessaie dans une minute");
+  const photos = photoIds.map((id, i) => {
+    const read = photoReads[i];
+    return {
+      media_id: id,
+      ...(read ? { format: read.width > read.height * 1.1 ? "paysage" : read.height > read.width * 1.1 ? "portrait" : "carré", contenu: read.detection.notes } : {}),
+    };
+  });
 
   // The inspiration she picked for this post (read now if it was just added in the app).
   const inspirationId = post.data.inspiration_id as string | null;
@@ -117,6 +135,8 @@ export async function designEdit(params: {
       chosen_inspiration: chosenInspiration ?? undefined,
     },
     clips: clips.map((c) => ({ media_id: c.media_id, ...c.analysis, words: c.analysis.words?.length ? c.analysis.words : undefined })),
+    // Her photos: each one a still shot with a slow zoom (clip_id = media_id, in 0, out = how long it shows).
+    photos: photos.length ? photos : undefined,
     // Scenes already made: reusing one costs nothing.
     templates: library,
     // Motion code stays out of the editor's context: it only needs the briefs.
@@ -160,7 +180,7 @@ export async function designEdit(params: {
     throw new Error(`Le montage n'a pas pu être préparé (${response.stop_reason})`);
   }
 
-  const durations = Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.duration]));
+  const durations = { ...Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.duration])), ...Object.fromEntries(photoIds.map((id) => [id, PHOTO_MAX_SECONDS])) };
   // Retouch and blur stay on their clips from one version to the next.
   // A correction also keeps the texts' styles and places (the editor names looks, it does not copy them).
   const base = previousPlan.success ? previousPlan.data : null;

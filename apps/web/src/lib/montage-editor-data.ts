@@ -18,7 +18,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
   const inPlan = new Set(plan.data.segments.filter(isClipSegment).map((s) => s.clip_id));
   const wanted = extraMedia.filter((id) => !inPlan.has(id));
   const extraVideos = wanted.length
-    ? ((await db.from("media_assets").select("id").eq("studio_id", studioId).eq("kind", "video").in("id", wanted)).data ?? []).map((m) => m.id as string)
+    ? ((await db.from("media_assets").select("id").eq("studio_id", studioId).in("kind", ["video", "image"]).in("id", wanted)).data ?? []).map((m) => m.id as string)
     : [];
   // Signed along with the plan's clips, so a video added by hand plays at once.
   const inputs = await loadMontageInputs(studioId, {
@@ -30,6 +30,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
     inputs: {
       template: template.data,
       clipUrls: inputs.clipUrls,
+      photoIds: inputs.photoIds,
       words: inputs.words,
       brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, customFonts: inputs.customFonts },
     } satisfies ReelInputs,

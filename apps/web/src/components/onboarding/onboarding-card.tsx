@@ -275,7 +275,7 @@ function StyleStep({
           </Link>
         </div>
       )}
-      {!view.brand.logoUrl && !lookingAtSite && <LogoAsk studioId={studioId} onSaved={onChange} setError={setError} />}
+      {!view.brand.logoUrl && <LogoAsk studioId={studioId} onSaved={onChange} setError={setError} />}
       <div className="flex flex-col gap-2">
         <span className="text-[14px] font-bold">Ton moodboard</span>
         <p className="-mt-1 text-[13px] leading-snug text-muted">

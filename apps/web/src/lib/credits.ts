@@ -85,6 +85,13 @@ const LEVELS: Effort[] = ["max", "soigne", "rapide"];
  * The price of a montage at a level, fitted to the balance: fewer new scenes
  * when they do not all fit; null when even its corrections do not fit.
  */
+/** Clips to analyse: the videos only (a photo is read for free). */
+async function videoCount(studioId: string, mediaIds: string[]): Promise<number> {
+  if (!mediaIds.length) return 0;
+  const { data } = await supabaseAdmin().from("media_assets").select("id").eq("studio_id", studioId).eq("kind", "image").in("id", mediaIds);
+  return mediaIds.length - (data?.length ?? 0);
+}
+
 function priceAt(input: { clips: number; correction: boolean; maxNewScenes?: number }, effort: Effort, balance: number): MontageQuote | null {
   let quote = quoteMontage({ ...input, effort });
   const sure = quote.base + quote.fixRounds * CREDIT_PRICES.fixRound;
@@ -118,7 +125,7 @@ export async function createMontageQuote(input: {
   if (input.plan && input.maxNewScenes === undefined) {
     input = { ...input, maxNewScenes: input.plan.scenes.filter((s) => s.kind === "animation").length };
   }
-  const work = { clips: input.mediaIds.length, correction: input.correction, maxNewScenes: input.maxNewScenes };
+  const work = { clips: await videoCount(input.studioId, input.mediaIds), correction: input.correction, maxNewScenes: input.maxNewScenes };
   const efforts: Partial<Record<Effort, MontageQuote>> = {};
   if (!input.variant) {
     for (const level of LEVELS) {
@@ -235,7 +242,7 @@ export async function acceptQuote(
     q.kind === "variant" || !chosen
       ? { base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[], maxNewScenes: params.max_new_scenes ?? 0 }
       : priceAt(
-          { clips: (params.media_ids ?? []).length, correction: q.kind === "correction", maxNewScenes: level ? level.maxNewScenes : (params.max_new_scenes ?? 0) },
+          { clips: await videoCount(studioId, params.media_ids ?? []), correction: q.kind === "correction", maxNewScenes: level ? level.maxNewScenes : (params.max_new_scenes ?? 0) },
           chosen,
           available,
         );
