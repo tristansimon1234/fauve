@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 import { Orb } from "@/components/orb";
 import { LoginForm } from "./login-form";
@@ -20,6 +21,12 @@ export default function LoginPage() {
       <Suspense>
         <LoginForm />
       </Suspense>
+      <p className="text-center text-[13px] text-muted">
+        Pas de code reçu ?{" "}
+        <Link href="/commencer?connexion" className="font-semibold text-violet hover:underline">
+          Se connecter avec un message WhatsApp
+        </Link>
+      </p>
     </div>
   );
 }

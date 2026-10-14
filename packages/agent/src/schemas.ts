@@ -36,6 +36,8 @@ export const replyExtrasSchema = z.object({
   upload: z.enum(["video", "photo", "any"]).optional(),
   /** A picker of the studio's library under the message (app only): she ticks files, they come back as media_id. */
   pick_media: z.enum(["video", "photo", "any"]).optional(),
+  /** The card of an onboarding step under the message (app only). */
+  step_card: z.enum(["website", "style", "rhythm", "connect", "first_post"]).optional(),
   /** A quote to show as a card with a « Lancer » button (set by quote_montage, not by the model). */
   quote: z.uuid().optional(),
 });

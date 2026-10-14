@@ -4,7 +4,7 @@ import { publicEnv } from "@/lib/public-env";
 
 // Refreshes the Supabase session cookie on every request and keeps the web app
 // behind login. Pages still check the user themselves; this is the fast path.
-const PROTECTED = ["/fauve", "/calendrier", "/publications", "/grille", "/mediatheque", "/resultats", "/style", "/reglages", "/v"];
+const PROTECTED = ["/fauve", "/calendrier", "/publications", "/grille", "/mediatheque", "/composants", "/resultats", "/style", "/reglages", "/v"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

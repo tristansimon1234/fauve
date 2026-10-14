@@ -8,10 +8,11 @@ import type { ChatMessage, TestSnapshot, TestState } from "@/lib/test-studio";
 import { resetTest, sendTestMessage } from "./actions";
 
 const onboardingLabels: Record<string, string> = {
-  studio_name: "Nom du studio",
+  website: "Son commerce (site)",
+  style: "Son style",
   rhythm: "Rythme",
-  examples: "Exemples de posts",
   connect: "Connexion Instagram",
+  first_post: "Première publication",
   done: "Terminé",
 };
 

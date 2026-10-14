@@ -30,10 +30,10 @@ export default function ReadyPage() {
           Retourner sur WhatsApp
         </a>
         <Link
-          href="/calendrier"
+          href="/fauve"
           className="flex h-12 items-center justify-center rounded-full border-[1.5px] border-line text-[15px] font-semibold"
         >
-          Voir mon calendrier
+          Créer ma première publication
         </Link>
       </div>
     </>

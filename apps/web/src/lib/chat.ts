@@ -31,6 +31,8 @@ export type ChatMessage = {
   upload: "video" | "photo" | "any" | null;
   /** A picker of the library Fauve offered (reply_with pick_media). */
   pickMedia: "video" | "photo" | "any" | null;
+  /** The card of an onboarding step Fauve offered (reply_with step_card). */
+  stepCard?: "website" | "style" | "rhythm" | "connect" | "first_post" | null;
   /** Post and grid cards under the message. */
   cards: ChatCard[];
   /** A delivered montage: the app opens this post's page when the message arrives. */
@@ -135,6 +137,7 @@ export async function messagesOf(studioId: string, conversationId: string): Prom
       options: r.direction === "outbound" ? (extrasOf(r.payload).options ?? []) : [],
       upload: r.direction === "outbound" ? (extrasOf(r.payload).upload ?? null) : null,
       pickMedia: r.direction === "outbound" ? (extrasOf(r.payload).pick_media ?? null) : null,
+      stepCard: r.direction === "outbound" ? (extrasOf(r.payload).step_card ?? null) : null,
       cards: cards[i] ?? [],
       openPost: r.direction === "outbound" ? ((r.payload as { open_post?: string } | null)?.open_post ?? null) : null,
     };

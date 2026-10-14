@@ -9,13 +9,15 @@ import type { InspirationItem } from "@/lib/inspirations";
 import { useFauveDrawer } from "./fauve-drawer";
 import { ArrowLeftIcon, CheckIcon, FilmIcon, ImageIcon, LayersIcon, PlayIcon, PlusIcon, UploadIcon, XIcon } from "./icons";
 import { InspirationPicker } from "./inspiration-picker";
-import { LayoutPicker, layoutOn, type Layout } from "./montage/layout-picker";
+import { buildSlideProps, placeElement } from "@fauve/agent";
+import { SlidePreview } from "./montage/slide-preview";
 import { Orb } from "./orb";
 
-// « Nouvelle publication », step by step: the format, a free day Fauve
-// suggests, photos and videos from the library (or new ones), the idea in a
-// line, and an inspiration to follow (a Reel she likes, or a text layout drawn
-// on her photo). Then Fauve takes over in her panel, or it is kept as an idea.
+// « Nouvelle publication », step by step: the format, then what matters most,
+// the inspiration (a Reel she likes; for photos, a kit of her components drawn
+// on a photo, or a post she likes that Fauve turns into components), a free day
+// Fauve suggests, photos and videos from the library (or new ones), and the
+// idea in a line. Then Fauve takes over in her panel, or it is kept as an idea.
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_FILES = 10;
@@ -63,7 +65,7 @@ const stepTitles: Record<Step, string> = {
   when: "Quand la publier ?",
   files: "Avec quelles photos ou vidéos ?",
   idea: "Qu’est-ce que tu veux dire ?",
-  inspiration: "Une inspiration ?",
+  inspiration: "Ton inspiration",
 };
 
 type Picked = { id: string; file: File; preview: string; video: boolean };
@@ -94,7 +96,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
   const [intention, setIntention] = useState("");
   const [style, setStyle] = useState<Style>(null);
   const [inspiration, setInspiration] = useState<InspirationItem | null>(null);
-  const [layout, setLayout] = useState<Layout | null>(null);
+  const [kit, setKit] = useState<NewPostOptions["kits"][number] | null>(null);
   /** A picture of a post she likes: Fauve redraws the same layout on her photos. */
   const [example, setExample] = useState<Picked | null>(null);
   const exampleRef = useRef<HTMLInputElement>(null);
@@ -135,8 +137,8 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
   useEffect(() => () => filesRef.current.forEach((f) => URL.revokeObjectURL(f.preview)), []);
 
   const video = kind === "reel" || kind === "story";
-  const hasLayouts = (kind === "carousel" || kind === "post") && (options?.layouts.length ?? 0) > 0;
-  const steps: Step[] = ["format", "when", "files", "idea", ...(video || hasLayouts ? (["inspiration"] as const) : [])];
+  // The inspiration right after the format: it is what the rest is built on.
+  const steps: Step[] = ["format", "inspiration", "when", "files", "idea"];
   const index = steps.indexOf(step);
   const last = index === steps.length - 1;
   const go = (to: number) => {
@@ -193,10 +195,10 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
           video && (style || inspiration)
             ? [style ? `Style : ${styles.find((s) => s.value === style)!.label}.` : "", inspiration ? `Inspiration : « ${inspiration.title} ».` : ""].filter(Boolean).join(" ")
             : "",
-          layout ? `Mise en page du texte : « ${layout.name} » (layer_id ${layout.id}).` : "",
+          kit ? `Composants à poser sur mes photos : le kit « ${kit.name} » (element_id ${kit.elements.map((e) => e.id).join(", ")}).` : "",
           chosen.length ? `Fichiers choisis dans la médiathèque (media_id, dans l’ordre) : ${chosen.join(", ")}.` : "",
           files.length ? "Voici mes nouveaux fichiers." : "",
-          example ? "La dernière image envoyée est un exemple de mise en page que j’aime (pas une photo à publier) : refais la même sur mes photos." : "",
+          example ? "La dernière image envoyée est une inspiration, un post que j’aime (pas une photo à publier) : crée mes composants à partir d’elle et pose-les sur mes photos." : "",
           !count ? "Je n’ai pas encore de photos ni de vidéos : dis-moi quoi filmer." : "",
         ]
           .filter(Boolean)
@@ -231,7 +233,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                 Nouvelle publication · {index + 1}/{steps.length}
               </span>
               <h2 id={titleId} className="text-[20px] leading-tight font-extrabold tracking-[-0.01em]">
-                {step === "inspiration" && !video ? "Quelle mise en page ?" : stepTitles[step]}
+                {stepTitles[step]}
               </h2>
             </div>
             <button type="button" onClick={onClose} aria-label="Fermer" className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-soft hover:text-ink">
@@ -258,7 +260,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                     aria-checked={on}
                     onClick={() => {
                       setKind(f.value);
-                      setLayout(null);
+                      setKit(null);
                       go(1);
                     }}
                     className={`${card(on)} flex flex-col items-start gap-2 rounded-[18px] p-4 text-left`}
@@ -502,35 +504,56 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
             </>
           )}
 
-          {step === "inspiration" && !video && options && (
-            <LayoutPicker
-              layouts={options.layouts}
-              slide={(() => {
-                const base = { media_id: "00000000-0000-4000-8000-000000000000", texts: [{ text: intention.trim() || "Ton titre ici", style: "hook" as const }] };
-                return layout ? { ...base, layer: layoutOn(layout, base) } : base;
-              })()}
-              template="doux"
-              imageUrl={firstPhoto}
-              brand={options.brand}
-              many={false}
-              freeLabel="Fauve choisit"
-              onPick={(l) => {
-                setLayout(l);
-                setExample(null);
-              }}
-              onPickAll={setLayout}
-              onClear={() => setLayout(null)}
-            />
+          {step === "inspiration" && !video && options && options.kits.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-[13px] font-bold">Tes composants</span>
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Kits de composants">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={kit === null && !example}
+                  onClick={() => setKit(null)}
+                  className={`${card(kit === null && !example)} relative flex aspect-[4/5] flex-col items-center justify-center gap-1.5 rounded-[14px] p-2 text-center`}
+                >
+                  <Orb size={26} still />
+                  <span className="text-[12px] font-bold">Fauve choisit</span>
+                </button>
+                {options.kits.map((k) => {
+                  const on = kit?.id === k.id;
+                  const photo = firstPhoto === PLACEHOLDER ? (options.media.find((m) => !m.video)?.url ?? PLACEHOLDER) : firstPhoto;
+                  const props = buildSlideProps({ media_id: "00000000-0000-4000-8000-000000000000", texts: [], elements: k.elements.map((e) => placeElement(e)) }, { template: "doux", imageUrl: photo, brand: options.brand });
+                  return (
+                    <button
+                      key={k.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      title={k.name}
+                      onClick={() => {
+                        setKit(k);
+                        if (example) URL.revokeObjectURL(example.preview);
+                        setExample(null);
+                      }}
+                      className={`relative overflow-hidden rounded-[14px] transition-shadow ${on ? "ring-2 ring-violet ring-offset-2" : "hover:ring-2 hover:ring-violet/40"}`}
+                    >
+                      <SlidePreview props={props} />
+                      <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 pt-4 pb-1.5 text-left text-[11px] font-bold text-white">{k.name}</span>
+                      {on && <Tick />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {step === "inspiration" && !video && options && (
             <div className="flex flex-col gap-2 rounded-[16px] bg-soft p-3">
-              <span className="text-[13px] font-bold">Ou montre un exemple qui te plaît</span>
+              <span className="text-[13px] font-bold">{options.kits.length ? "Ou une nouvelle inspiration" : "Montre un post qui te plaît"}</span>
               {example ? (
                 <div className="flex items-center gap-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={example.preview} alt="" className="h-20 w-16 rounded-lg object-cover" />
-                  <span className="min-w-0 flex-1 text-[13px] leading-snug text-muted">Fauve refera cette mise en page sur tes photos, avec tes couleurs (3 crédits).</span>
+                  <span className="min-w-0 flex-1 text-[13px] leading-snug text-muted">Fauve en tire tes composants (titre, étiquette, liste…), les garde dans ta banque et les pose sur tes photos (3 crédits).</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -549,7 +572,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                     <UploadIcon size={17} />
                     Envoyer une capture d’un post
                   </button>
-                  <span className="text-[12px] text-muted">Une capture d’écran d’un carrousel ou d’une affiche que tu aimes : Fauve en reprend la mise en page.</span>
+                  <span className="text-[12px] text-muted">Une capture d’écran d’un carrousel ou d’une affiche que tu aimes : Fauve en tire des composants réutilisables, à tes couleurs.</span>
                 </>
               )}
               <input
@@ -563,7 +586,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                   if (!file || !file.type.startsWith("image/") || file.size > MAX_FILE_BYTES) return;
                   if (example) URL.revokeObjectURL(example.preview);
                   setExample({ id: `example-${file.name}-${file.size}`, file, preview: URL.createObjectURL(file), video: false });
-                  setLayout(null);
+                  setKit(null);
                 }}
               />
             </div>
