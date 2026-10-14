@@ -11,19 +11,19 @@ export const RESTYLE: Record<Restyle, { button: string; direction: string; brief
     button: "Plus chaleureux",
     direction: "Plus chaleureux : tons chauds, lumière douce, textes proches et accueillants, rythme posé.",
     brief:
-      "La gérante veut ce Reel plus chaleureux. Garde le même sujet et les mêmes plans, mais réchauffe tout : textes plus proches et accueillants (tutoiement, une touche d'émotion), apparitions douces, rythme un peu plus posé, scènes animées aux tons chauds de sa charte.",
+      "La gérante veut ce Reel plus chaleureux. Garde le même sujet et les mêmes plans, mais réchauffe tout : mêmes messages dits de façon plus proche et accueillante (tutoiement, une touche d'émotion), apparitions douces, rythme un peu plus posé, scènes animées aux tons chauds de sa charte.",
   },
   sober: {
     button: "Plus sobre",
     direction: "Plus sobre : moins de texte et d'effets, typographie fine, beaucoup d'air, fondus lents.",
     brief:
-      "La gérante veut ce Reel plus sobre. Garde le même sujet et les mêmes plans, mais épure : moins de texte (les mots les plus forts seulement), typographie fine, plus d'espace, fondus lents, animations discrètes et élégantes.",
+      "La gérante veut ce Reel plus sobre. Garde le même sujet et les mêmes plans, mais épure : moins de texte (les mots les plus forts de ses messages seulement), typographie fine, plus d'espace, fondus lents, animations discrètes et élégantes.",
   },
   punchier: {
     button: "Plus pêchu",
     direction: "Plus pêchu : coupes rapides, textes qui claquent, accroche forte, rythme soutenu.",
     brief:
-      "La gérante veut ce Reel plus pêchu. Garde le même sujet, mais donne de l'énergie : accroche plus forte dès la première seconde, coupes plus rapides, textes courts qui claquent (capitales, mots en valeur), animations plus dynamiques.",
+      "La gérante veut ce Reel plus pêchu. Garde le même sujet, mais donne de l'énergie : accroche plus forte dès la première seconde, coupes plus rapides, ses messages en textes courts qui claquent (capitales, mots en valeur), sans en inventer d'autres, animations plus dynamiques.",
   },
 };
 
@@ -35,7 +35,7 @@ export function customRestyle(wish: string): { direction: string; brief: string 
   const words = wish.trim().replace(/\s+/g, " ").slice(0, 200);
   return {
     direction: words.endsWith(".") ? words : `${words}.`,
-    brief: `La gérante veut ce Reel autrement : « ${words} ». Garde le même sujet et les mêmes plans, et change ce qu'elle demande, franchement et dans tout le Reel (textes, animations, rythme).`,
+    brief: `La gérante veut ce Reel autrement : « ${words} ». Garde le même sujet et les mêmes plans, et change ce qu'elle demande, franchement et dans tout le Reel (textes, animations, rythme), sans inventer de messages qu'elle n'a pas donnés.`,
   };
 }
 

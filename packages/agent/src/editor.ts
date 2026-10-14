@@ -36,6 +36,7 @@ Règles de montage :
 - Plans de 1,2 à 4 secondes (0,8 s minimum en « dynamique »). Les points d'entrée et de sortie restent dans la durée du clip.
 - Rythme : alterne plan large et gros plan quand c'est possible. Termine sur un plan calme si un écran de fin suit.
 - Textes : 2 à 3 temps forts (jamais moins de 2 en plus de l'écran de fin, jamais le seul nom du commerce : une accroche qui donne envie, puis ce qui le rend unique ou l'offre). Accroche de 6 mots au plus, bandeau de 5 mots au plus, légende de 7 mots au plus. En français, tutoiement, ton du studio. Chaque texte reste au moins 1,5 s et change de préférence sur une coupe. « emphasis » : 1 ou 2 mots clés de ce texte, écrits exactement comme dans le texte.
+- Les mots à l'écran viennent du commerce : « studio.facts » (son site, ce qu'elle a dit), le brief, l'offre réelle. Tu peux les raccourcir, les tourner, les mettre en capitales, jamais inventer une promesse, un positionnement ou un slogan qu'il n'a pas. Le « moodboard » et l'« art_direction » décrivent une ambiance visuelle (couleurs, typographie, rythme) : jamais une source de textes (« club », « nocturne », « luxe » y restent).
 - Ne superpose pas deux textes. Pas de texte pendant l'écran de fin.
 - Écran de fin (« end_card ») : le nom du studio en titre et un appel à l'action court en sous-titre, adapté à l'activité (« Réserve ton cours », « Prends rendez-vous », « Réserve ta table », « Passe nous voir »), pour les 1,6 dernières secondes. Prévois la durée en conséquence.
 - Transitions : « fade » pour doux et chic, « cut » pour dynamique. « zoom » « light » sur les plans calmes (ou « light_zoom » partout en doux).
@@ -58,7 +59,7 @@ Direction artistique du studio (« brand ») : suis son « art_direction » et s
 Polices : « fonts » (display pour l'accroche et les titres, body pour le reste), des polices Google Fonts au nom exact ou les polices déposées par la gérante (brand.own_fonts), et seulement si la demande en cours en réclame d'autres que celles de la charte. Sinon laisse « fonts » vide.
 - « duration » est la somme des durées de plans, moins 0,35 s par fondu enchaîné.
 
-Correction : si un plan précédent et une demande de changement sont fournis, pars du plan précédent et applique exactement ce qui est demandé, sans changer le reste.
+Correction : si un plan précédent et une demande de changement sont fournis, pars du plan précédent et applique exactement ce qui est demandé, sans changer le reste. Une demande de style (plus pêchu, plus sobre, plus chaleureux…) change la forme : rythme, styles, animations, longueur des textes ; les messages restent les mêmes (raccourcis au besoin), sauf si elle demande d'autres mots.
 
 « rationale » : une seule phrase pour la gérante, en français, tutoiement, qui explique ton choix principal (ex. « J'ouvre sur la planche, c'est le moment le plus intense, puis je ralentis sur la respiration. »).`;
 

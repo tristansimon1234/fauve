@@ -15,6 +15,7 @@ import {
   motionTemplateSchema,
   normalizeEditPlan,
   PHOTO_MAX_SECONDS,
+  readMemory,
   resolveReelBrand,
   type EditPlan,
 } from "@fauve/agent";
@@ -60,7 +61,7 @@ export async function designEdit(params: {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, library, report, inspirations] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
-    db.from("studios").select("name, business_type, booking_url").eq("id", params.studioId).single(),
+    db.from("studios").select("name, business_type, booking_url, memory").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
     templatesForEditor(params.studioId),
@@ -106,7 +107,13 @@ export async function designEdit(params: {
   const chosenTemplate = motionTemplateSchema.safeParse(post.data.template);
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
   const input = {
-    studio: { name: studio.data?.name, business: studio.data?.business_type ?? undefined, booking: Boolean(studio.data?.booking_url) },
+    studio: {
+      name: studio.data?.name,
+      business: studio.data?.business_type ?? undefined,
+      booking: Boolean(studio.data?.booking_url),
+      // What Brigitte knows of the business (its site, what was said): where the words on screen come from.
+      facts: readMemory(studio.data?.memory).map((f) => f.fact),
+    },
     brand: {
       tone: profile.tone,
       art_direction: profile.art_direction,
