@@ -35,7 +35,7 @@ type Analysis = z.infer<typeof analysisSchema>;
 const sourceLabels: Record<Asset["source"], string> = {
   whatsapp: "Reçue sur WhatsApp",
   web_upload: "Déposée sur le site",
-  render: "Montage de Brigitte",
+  render: "Montage de Simone",
   library: "Bibliothèque",
   website: "Prise sur ton site",
 };
@@ -95,19 +95,19 @@ async function Library() {
       </div>
 
       {assets.length === 0 ? (
-        <EmptyState title="Pas encore de photo ni de vidéo" className="max-w-[760px]" cta="Envoyer mes vidéos à Brigitte">
-          Glisse tes photos et vidéos dans la conversation avec Brigitte (en pleine qualité), ou envoie-les sur WhatsApp en
-          tant que document. Elles apparaîtront ici, avec ce que Brigitte y a vu. Pense à avoir l’accord des personnes filmées.
+        <EmptyState title="Pas encore de photo ni de vidéo" className="max-w-[760px]" cta="Envoyer mes vidéos à Simone">
+          Glisse tes photos et vidéos dans la conversation avec Simone (en pleine qualité), ou envoie-les sur WhatsApp en
+          tant que document. Elles apparaîtront ici, avec ce que Simone y a vu. Pense à avoir l’accord des personnes filmées.
         </EmptyState>
       ) : (
         <>
           <div className="flex max-w-[860px] flex-wrap items-center gap-4 rounded-[20px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-5 py-4">
             <p className="min-w-0 flex-[1_1_320px] text-sm leading-relaxed">
-              <strong>Ajoute des photos et des vidéos</strong> en les glissant dans la conversation avec Brigitte : elles
+              <strong>Ajoute des photos et des vidéos</strong> en les glissant dans la conversation avec Simone : elles
               arrivent en pleine qualité. Sur WhatsApp, envoie-les en tant que document.
             </p>
             <Link href="/fauve" className="btn btn-primary h-11 text-sm">
-              Ouvrir Brigitte
+              Ouvrir Simone
             </Link>
           </div>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
@@ -215,9 +215,9 @@ function AssetCard({
             )}
           </>
         ) : asset.kind === "video" && asset.analysis_status === "running" ? (
-          <p className="text-[13px] text-muted">Brigitte regarde cette vidéo…</p>
+          <p className="text-[13px] text-muted">Simone regarde cette vidéo…</p>
         ) : asset.kind === "video" && asset.analysis_status === "failed" ? (
-          <p className="text-[13px] text-muted">Brigitte n’a pas pu analyser cette vidéo.</p>
+          <p className="text-[13px] text-muted">Simone n’a pas pu analyser cette vidéo.</p>
         ) : null}
         {!url && (asset.kind === "video" || asset.kind === "image") && (
           <p className="text-xs text-muted">Aperçu indisponible pour le moment.</p>

@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendTemplate, sendText, sendVideo } from "@/lib/whatsapp/client";
 import { recentMedia, InstagramError } from "./instagram";
 
-// « Je publie moi-même » : at the post's time, Brigitte hands the Reel over on
+// « Je publie moi-même » : at the post's time, Simone hands the Reel over on
 // WhatsApp (the video, then the caption alone to copy) instead of publishing it,
 // so the manager adds Instagram's music and picks its passage in the app. Outside
 // the 24 h window a template asks her to answer; the video follows her next

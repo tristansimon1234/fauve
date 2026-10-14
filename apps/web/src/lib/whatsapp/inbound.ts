@@ -117,7 +117,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", member.studio_id).single();
     const fresh = onboardingStepOf(studio?.onboarding_step) !== "done";
     const reply = fresh
-      ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Brigitte, ta community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment.`
+      ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Simone, ta community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment.`
       : "C’est bon, ton ordinateur est connecté ✨";
     const waMessageId = await sendText(message.from, reply).catch(() => undefined);
     await db.from("whatsapp_messages").insert({ studio_id: member.studio_id, wa_message_id: waMessageId, direction: "outbound", phone_e164: phone, type: "text", body: reply, payload: { reply_to: message.id } });

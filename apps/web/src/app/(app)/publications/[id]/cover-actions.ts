@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getStudioContext } from "@/lib/studio";
 
-/** Sets a Reel's cover (a frame of its video or one of the studio's photos); null leaves it to Brigitte. */
+/** Sets a Reel's cover (a frame of its video or one of the studio's photos); null leaves it to Simone. */
 export async function setCover(postId: string, cover: PostCover | null): Promise<{ ok: boolean }> {
   const parsed = z.object({ postId: z.uuid(), cover: postCoverSchema.nullable() }).safeParse({ postId, cover });
   if (!parsed.success) return { ok: false };

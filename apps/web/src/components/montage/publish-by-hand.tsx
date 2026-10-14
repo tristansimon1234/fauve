@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { setPublishByHand } from "@/app/(app)/publications/[id]/cover-actions";
 
-// Instagram's music can't be added by another app: either Brigitte publishes the
+// Instagram's music can't be added by another app: either Simone publishes the
 // Reel as it is, or at its time she sends it on WhatsApp with its caption and the
 // manager publishes it from Instagram with the music (and passage) she wants.
 // The Reel is then found on her account and measured like the others.
@@ -59,7 +59,7 @@ export function PublishByHand({
       </div>
       <div role="radiogroup" aria-label="Qui publie ce Reel" className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">
         {[
-          { on: false, label: "Brigitte publie", hint: "sans musique" },
+          { on: false, label: "Simone publie", hint: "sans musique" },
           { on: true, label: "Je publie moi-même", hint: "avec ma musique" },
         ].map((o) => (
           <button

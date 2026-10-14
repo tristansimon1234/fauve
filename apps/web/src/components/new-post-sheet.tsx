@@ -13,7 +13,7 @@ import { buildSlideProps, placeElement } from "@fauve/agent";
 import { SlidePreview } from "./montage/slide-preview";
 import { Orb } from "./orb";
 
-/** Where « Confier à Brigitte » goes: by default her panel; on the Brigitte page, its own conversation (no panel over the chat). */
+/** Where « Confier à Simone » goes: by default her panel; on the Simone page, its own conversation (no panel over the chat). */
 export type NewPostHandOff = (start: { postId: string; text: string; files: File[] }) => void;
 export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 
@@ -51,7 +51,7 @@ const fallbackIdeas: Record<PostKind, string[]> = {
 const phrases: Record<PostKind, string> = { reel: "un Reel", carousel: "un carrousel", post: "un post photo", story: "une story" };
 
 const styles = [
-  { value: null, label: "Brigitte choisit" },
+  { value: null, label: "Simone choisit" },
   { value: "doux", label: "Doux" },
   { value: "dynamique", label: "Dynamique" },
   { value: "chic", label: "Chic" },
@@ -341,7 +341,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                   />
                 </div>
               )}
-              {slot && !otherDate && <p className="text-[12px] text-muted">Brigitte propose tes jours libres, à ton heure habituelle.</p>}
+              {slot && !otherDate && <p className="text-[12px] text-muted">Simone propose tes jours libres, à ton heure habituelle.</p>}
             </>
           )}
 
@@ -445,7 +445,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
               ) : (
                 <p className="text-[13px] text-muted">Ta médiathèque est vide pour l’instant.</p>
               )}
-              {!count && <p className="text-[12px] text-muted">Rien sous la main ? Passe à la suite : Brigitte te dira quoi filmer.</p>}
+              {!count && <p className="text-[12px] text-muted">Rien sous la main ? Passe à la suite : Simone te dira quoi filmer.</p>}
             </>
           )}
 
@@ -473,7 +473,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                   </button>
                 ))}
               </div>
-              <p className="text-[12px] text-muted">En une ligne suffit. Brigitte connaît ton commerce et écrit la légende.</p>
+              <p className="text-[12px] text-muted">En une ligne suffit. Simone connaît ton commerce et écrit la légende.</p>
             </>
           )}
 
@@ -498,7 +498,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                     );
                   })}
                 </div>
-                <p className="text-[12px] text-muted">{style ? `${styles.find((s) => s.value === style)!.label} : ${styleHints[style]}.` : "Brigitte prend ton style habituel, ou celui de ton inspiration."}</p>
+                <p className="text-[12px] text-muted">{style ? `${styles.find((s) => s.value === style)!.label} : ${styleHints[style]}.` : "Simone prend ton style habituel, ou celui de ton inspiration."}</p>
               </fieldset>
               <div className="flex flex-col gap-2">
                 <span className="text-[13px] font-bold">Un Reel à suivre</span>
@@ -523,7 +523,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                   className={`${card(kit === null && !example)} relative flex aspect-[4/5] flex-col items-center justify-center gap-1.5 rounded-[14px] p-2 text-center`}
                 >
                   <Orb size={26} still />
-                  <span className="text-[12px] font-bold">Brigitte choisit</span>
+                  <span className="text-[12px] font-bold">Simone choisit</span>
                 </button>
                 {options.kits.map((k) => {
                   const on = kit?.id === k.id;
@@ -560,7 +560,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                 <div className="flex items-center gap-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={example.preview} alt="" className="h-20 w-16 rounded-lg object-cover" />
-                  <span className="min-w-0 flex-1 text-[13px] leading-snug text-muted">Brigitte en tire tes composants (titre, étiquette, liste…), les garde dans ta banque et les pose sur tes photos (3 crédits).</span>
+                  <span className="min-w-0 flex-1 text-[13px] leading-snug text-muted">Simone en tire tes composants (titre, étiquette, liste…), les garde dans ta banque et les pose sur tes photos (3 crédits).</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -579,7 +579,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                     <UploadIcon size={17} />
                     Envoyer une capture d’un post
                   </button>
-                  <span className="text-[12px] text-muted">Une capture d’écran d’un carrousel ou d’une affiche que tu aimes : Brigitte en tire des composants réutilisables, à tes couleurs.</span>
+                  <span className="text-[12px] text-muted">Une capture d’écran d’un carrousel ou d’une affiche que tu aimes : Simone en tire des composants réutilisables, à tes couleurs.</span>
                 </>
               )}
               <input
@@ -615,7 +615,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                 </button>
                 <button type="button" disabled={pending || !day} onClick={() => submit(true)} className="btn btn-primary">
                   <Orb size={18} still />
-                  {pending ? "Un instant…" : "Confier à Brigitte"}
+                  {pending ? "Un instant…" : "Confier à Simone"}
                 </button>
               </>
             ) : (

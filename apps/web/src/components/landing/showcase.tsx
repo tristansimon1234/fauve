@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Real work by Brigitte for the landing: three Reels and a carousel made by the
+// Real work by Simone for the landing: three Reels and a carousel made by the
 // app itself (montage, motion design, review) for demo businesses, from free
 // Unsplash photos. Files in the public `landing` bucket of Supabase Storage.
 
@@ -38,7 +38,7 @@ function ReelPhone({ reel, big }: { reel: (typeof SHOWCASE_REELS)[number]; big?:
           loop
           playsInline
           preload="metadata"
-          aria-label={`Reel de ${reel.who}, monté par Brigitte`}
+          aria-label={`Reel de ${reel.who}, monté par Simone`}
           className="size-full object-cover"
         />
         {/* Instagram's frame: the account at the bottom, the actions on the right. */}

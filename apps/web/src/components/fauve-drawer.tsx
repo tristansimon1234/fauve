@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from "react";
 import { Bubble } from "@/app/(app)/fauve/chat-bubble";
 import { applyLive, enteringAfterLive, liveTurn, type LiveState } from "@/app/(app)/fauve/live-turn";
-import { BrigitteLive } from "@/app/(app)/fauve/brigitte-avatar";
+import { SimoneLive } from "@/app/(app)/fauve/simone-avatar";
 import { LiveTyping } from "@/app/(app)/fauve/live-typing";
 import { montageStep } from "@/app/(app)/fauve/chat-cards";
 import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "@/app/(app)/fauve/chat-sync";
@@ -64,14 +64,14 @@ export function FauveDrawerProvider({ children }: { children: React.ReactNode })
 /** The button that opens the panel: « Demander à Fauve », about this publication or scene. */
 export function AskFauveButton({
   topic,
-  label = "Demander à Brigitte",
+  label = "Demander à Simone",
   className = "btn btn-secondary",
   before,
 }: {
   topic: DrawerTopic;
   label?: string;
   className?: string;
-  /** Runs first (e.g. saving the changes Brigitte must see); the drawer opens only if it succeeds. */
+  /** Runs first (e.g. saving the changes Simone must see); the drawer opens only if it succeeds. */
   before?: () => Promise<boolean>;
 }) {
   const open = useFauveDrawer();
@@ -320,7 +320,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
       <aside
         role="dialog"
         aria-modal="true"
-        aria-label="Brigitte"
+        aria-label="Simone"
         data-closing={closing || undefined}
         className="fauve-sheet absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-white bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%)] shadow-[-12px_0_40px_rgba(28,21,48,0.14)]"
         // Drop zone: photos and videos dropped anywhere on the panel.
@@ -346,9 +346,9 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
           </div>
         )}
         <header className="flex items-center gap-3 border-b border-line px-5 py-3">
-          <BrigitteLive typing={typing} cue={null} size={44} />
+          <SimoneLive typing={typing} cue={null} size={44} />
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-bold leading-tight">Brigitte</p>
+            <p className="text-[15px] font-bold leading-tight">Simone</p>
             <p className="truncate text-[12px] text-muted">
               {topic.title}
               {topic.sceneLabel ? ` · ${topic.sceneLabel}` : ""}
@@ -446,7 +446,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
               <PaperclipIcon size={20} />
             </button>
             <label htmlFor="drawer-message" className="sr-only">
-              Message à Brigitte
+              Message à Simone
             </label>
             <textarea
               id="drawer-message"

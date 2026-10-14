@@ -37,7 +37,7 @@ export function GridView({
         <div className="flex flex-col items-center gap-1.5 text-center">
           <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Grille</h1>
           <p className="max-w-[620px] text-[15px] text-muted">
-            Ton profil Instagram comme le voient tes abonnés, avec les publications prévues par Brigitte à l’endroit où elles
+            Ton profil Instagram comme le voient tes abonnés, avec les publications prévues par Simone à l’endroit où elles
             vont arriver.
           </p>
         </div>
@@ -49,7 +49,7 @@ export function GridView({
 
       {!connected && (
         <EmptyState title="Connecte Instagram pour voir ta vraie grille" cta={null} className="mx-auto w-full max-w-[520px]">
-          En attendant, voici les publications prévues par Brigitte.{" "}
+          En attendant, voici les publications prévues par Simone.{" "}
           <a href="/connect" className="font-bold text-violet">
             Connecter Instagram
           </a>
@@ -91,13 +91,13 @@ export function GridView({
               reelTiles.length ? (
                 <TileGrid tiles={reelTiles} tz={tz} tall />
               ) : (
-                <p className="px-5 py-8 text-center text-sm text-muted">Pas encore de Reel : demande-en un à Brigitte.</p>
+                <p className="px-5 py-8 text-center text-sm text-muted">Pas encore de Reel : demande-en un à Simone.</p>
               )
             }
           />
         ) : (
           <p className="border-t border-line px-5 py-8 text-center text-sm text-muted">
-            Rien à afficher pour l’instant : envoie tes vidéos à Brigitte pour remplir ta grille.
+            Rien à afficher pour l’instant : envoie tes vidéos à Simone pour remplir ta grille.
           </p>
         )}
       </section>

@@ -1,4 +1,4 @@
--- « Je publie moi-même » : at its time, Brigitte sends the Reel and its caption on
+-- « Je publie moi-même » : at its time, Simone sends the Reel and its caption on
 -- WhatsApp instead of publishing it (to add Instagram's music in the app); the
 -- published Reel is then found on the account and linked to the post.
 alter table public.posts add column publish_by_hand boolean not null default false;

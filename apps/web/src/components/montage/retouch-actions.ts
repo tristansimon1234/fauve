@@ -22,7 +22,7 @@ export async function photoRetouch(mediaId: string, options: { light: boolean; f
     const faces = edit.blur?.length ?? 0;
     return { ok: true, value: edit, note: options.faces ? (faces ? `${faces} visage${faces > 1 ? "s" : ""} flouté${faces > 1 ? "s" : ""}` : "Aucun visage repéré") : undefined };
   } catch {
-    return { ok: false, error: "Brigitte n’a pas pu regarder cette photo. Réessaie dans un instant." };
+    return { ok: false, error: "Simone n’a pas pu regarder cette photo. Réessaie dans un instant." };
   }
 }
 
@@ -35,6 +35,6 @@ export async function clipFaceBlur(mediaId: string): Promise<Result<ClipBlur | n
     const blur = clipBlurFrom(regions.detection, regions.aspect, ["face"]);
     return { ok: true, value: blur, note: blur ? undefined : "Aucun visage repéré dans cette vidéo" };
   } catch {
-    return { ok: false, error: "Brigitte n’a pas pu regarder cette vidéo. Réessaie dans un instant." };
+    return { ok: false, error: "Simone n’a pas pu regarder cette vidéo. Réessaie dans un instant." };
   }
 }

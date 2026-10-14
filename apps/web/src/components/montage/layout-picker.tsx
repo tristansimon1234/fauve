@@ -115,7 +115,7 @@ export function LayoutPicker({
         </button>
       ) : null}
       <p className="text-[12px] leading-snug text-muted">
-        Tes textes sont repris dans la mise en page choisie. Pour une mise en page sur mesure, envoie un exemple à Brigitte.
+        Tes textes sont repris dans la mise en page choisie. Pour une mise en page sur mesure, envoie un exemple à Simone.
       </p>
     </section>
   );

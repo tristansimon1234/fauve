@@ -31,7 +31,7 @@ const offers = [
     label: PLANS.essentiel.label,
     price: PLANS.essentiel.priceEur,
     pitch: "Pour être présent chaque semaine, sans y penser.",
-    points: [`${PLANS.essentiel.postsPerWeek} publications par semaine, plus les stories`, `${PLANS.essentiel.credits} crédits par mois`, "Brigitte sur WhatsApp et dans l’app"],
+    points: [`${PLANS.essentiel.postsPerWeek} publications par semaine, plus les stories`, `${PLANS.essentiel.credits} crédits par mois`, "Simone sur WhatsApp et dans l’app"],
     dark: false,
   },
   {
@@ -45,11 +45,11 @@ const offers = [
 ] as const;
 
 const faq: [string, string][] = [
-  ["Brigitte, c’est une vraie personne ?", "Non, c’est une IA, et elle le dit. Elle écrit, monte et programme comme une community manager, et tu gardes toujours la main."],
+  ["Simone, c’est une vraie personne ?", "Non, c’est une IA, et elle le dit. Elle écrit, monte et programme comme une community manager, et tu gardes toujours la main."],
   ["Est-ce qu’elle publie sans me demander ?", "Jamais. Chaque publication attend ta validation, sur WhatsApp ou dans l’app. Tu peux corriger un texte, déplacer une date ou demander une autre version."],
   ["Je n’ai pas de vidéo, ça marche quand même ?", "Oui. Elle part des photos de ton site, de celles que tu lui envoies, ou fait un Reel tout en animation à tes couleurs. Quand tu filmes, elle te dit quoi et comment."],
   ["Pour quel commerce ?", "Studios de sport ou de yoga, salons de coiffure et de beauté, restaurants, cafés, boutiques : elle parle ta langue et adapte ses idées à ton activité."],
-  ["Et la musique ?", "Instagram ne laisse pas ajouter un son tendance automatiquement : Brigitte te le suggère, tu l’ajoutes en un geste au moment de publier."],
+  ["Et la musique ?", "Instagram ne laisse pas ajouter un son tendance automatiquement : Simone te le suggère, tu l’ajoutes en un geste au moment de publier."],
   ["Où vont mes photos et mes données ?", "Elles sont hébergées en Europe. Tes fichiers sont supprimés peu après la publication, et tout disparaît si tu pars."],
 ];
 
@@ -85,7 +85,7 @@ export default function LandingPage() {
             Des réseaux qui te rapportent <span className="accent">des clients.</span>
           </h1>
           <p className="max-w-[540px] text-[18px] leading-[1.55] text-muted sm:text-[19px]">
-            Brigitte est ta community manager. Elle lit ton site, apprend ton style, monte tes Reels, écrit tes posts et les programme sur Instagram. Toi, tu valides d’un mot, sur WhatsApp ou ici.
+            Simone est ta community manager. Elle lit ton site, apprend ton style, monte tes Reels, écrit tes posts et les programme sur Instagram. Toi, tu valides d’un mot, sur WhatsApp ou ici.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Start waUrl={waUrl} size="lg" />
@@ -130,11 +130,11 @@ export default function LandingPage() {
 
       {/* Her real work */}
       <section id="ce-qu-elle-fait" className="mx-auto flex max-w-[1200px] scroll-mt-6 flex-col gap-8 px-4 pb-16 sm:px-8">
-        <SectionTitle kicker="Fait par Brigitte">
+        <SectionTitle kicker="Fait par Simone">
           De vraies publications, <span className="accent">faites par l’app.</span>
         </SectionTitle>
         <p className="-mt-4 max-w-[640px] text-[16px] leading-relaxed text-muted">
-          Ces Reels et ce carrousel sortent tels quels de Brigitte, pour trois commerces d’exemple : elle a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
+          Ces Reels et ce carrousel sortent tels quels de Simone, pour trois commerces d’exemple : elle a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
         </p>
         <div className={`grid items-center gap-10 rounded-[28px] border border-line bg-[radial-gradient(ellipse_at_top,#fff_0%,#FBF7F4_70%)] px-4 py-8 sm:px-8 ${SHOWCASE_SLIDES.length ? "lg:grid-cols-[1.6fr_1fr]" : ""}`}>
           <ReelsShowcase />
@@ -189,7 +189,7 @@ export default function LandingPage() {
               Elle apprend ton style, <span className="accent">pas un modèle.</span>
             </SectionTitle>
             <p className="max-w-[480px] text-[16px] leading-relaxed text-muted">
-              Pas de gabarit tout fait. Brigitte part de ton site et de ce que tu aimes, te montre un premier essai, et chaque retour affine ta direction artistique pour toutes les publications suivantes.
+              Pas de gabarit tout fait. Simone part de ton site et de ce que tu aimes, te montre un premier essai, et chaque retour affine ta direction artistique pour toutes les publications suivantes.
             </p>
           </div>
           <ol className="grid gap-3 sm:grid-cols-3">
@@ -233,7 +233,7 @@ export default function LandingPage() {
         </ol>
         <div className="grid gap-3 md:grid-cols-2">
           <Channel icon={WhatsAppIcon} title="Sur WhatsApp">
-            Envoie tes photos et tes vidéos, réponds d’un mot, valide d’un bouton. Brigitte t’écrit quand ta publication est prête.
+            Envoie tes photos et tes vidéos, réponds d’un mot, valide d’un bouton. Simone t’écrit quand ta publication est prête.
           </Channel>
           <Channel icon={CalendarIcon} title="Dans l’app">
             Ton calendrier, ta grille Instagram, et l’éditeur pour retoucher un texte ou une scène, sur ordinateur comme sur téléphone.
@@ -304,7 +304,7 @@ export default function LandingPage() {
         <div className="flex flex-col items-center gap-5 rounded-[28px] bg-[radial-gradient(ellipse_at_top,#efebff_0%,#fbf7f4_70%)] px-6 py-12 text-center">
           <Mascot size={96} mood="happy" />
           <h2 className="text-[clamp(30px,4vw,44px)] leading-[1.08] font-extrabold tracking-[-0.03em]">
-            Brigitte <span className="accent">t’attend.</span>
+            Simone <span className="accent">t’attend.</span>
           </h2>
           <p className="max-w-[460px] text-[16px] text-muted">Donne-lui ton site : dans cinq minutes, elle te montre ce qu’elle ferait pour toi.</p>
           <Start waUrl={waUrl} size="lg" />
@@ -312,7 +312,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-5 gap-y-2 px-4 pb-10 text-sm font-semibold text-muted sm:px-8">
-        <span>© Brigitte</span>
+        <span>© Simone</span>
         <Link href="/confidentialite">Confidentialité</Link>
         <Link href="/conditions">Conditions d’utilisation</Link>
         <Link href="/suppression-des-donnees">Suppression des données</Link>

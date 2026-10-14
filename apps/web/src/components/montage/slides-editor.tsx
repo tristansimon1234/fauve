@@ -195,7 +195,7 @@ export function SlidesEditor({
           light={Boolean(slide.edit?.adjust)}
           faces={Boolean(slide.edit?.blur?.some((b) => b.kind === "face"))}
           onChange={async (next) => {
-            const res = await photoRetouch(slide.media_id, next).catch(() => ({ ok: false as const, error: "Brigitte n’a pas pu regarder cette photo." }));
+            const res = await photoRetouch(slide.media_id, next).catch(() => ({ ok: false as const, error: "Simone n’a pas pu regarder cette photo." }));
             if (!res.ok) return { ok: false, message: res.error };
             onChange({ ...plan, slides: plan.slides.map((s, i) => (i === index ? { ...s, edit: res.value ?? undefined } : s)) });
             return { ok: true, message: res.note };

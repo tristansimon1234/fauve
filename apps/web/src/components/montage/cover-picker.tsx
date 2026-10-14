@@ -137,7 +137,7 @@ export function CoverPicker({
               }}
               className="self-start text-[12px] font-semibold text-violet"
             >
-              Laisser Brigitte choisir
+              Laisser Simone choisir
             </button>
           )}
         </div>

@@ -310,14 +310,14 @@ export async function chatTurn(
     });
   } catch (error) {
     console.error("chat: agent failed", error);
-    return { ok: false, error: "Brigitte n’a pas pu répondre. Réessaie dans un instant.", conversationId: id };
+    return { ok: false, error: "Simone n’a pas pu répondre. Réessaie dans un instant.", conversationId: id };
   }
   await reacting;
   const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, id), list(ctx.studioId)]);
   return { ok: true, conversationId: id, messages, conversations };
 }
 
-/** Brigitte's reaction to the manager's message, sent to the page the moment Jev answers. */
+/** Simone's reaction to the manager's message, sent to the page the moment Jev answers. */
 async function readReaction(studioId: string, conversationId: string | null, body: string, onEvent?: (event: ChatEvent) => void) {
   const started = Date.now();
   // Her previous message helps read a joke or a reply; only from this studio's conversation.

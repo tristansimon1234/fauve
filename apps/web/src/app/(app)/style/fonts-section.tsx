@@ -38,7 +38,7 @@ export function FontsSection({
     <Section
       id="style-fonts"
       title="Polices"
-      hint="Laisse en automatique et Brigitte choisit selon chaque vidéo, ou impose les tiennes (Google Fonts)."
+      hint="Laisse en automatique et Simone choisit selon chaque vidéo, ou impose les tiennes (Google Fonts)."
     >
       <div className="grid gap-5 sm:grid-cols-2">
         <FontPicker
@@ -122,7 +122,7 @@ function FontPicker({
             <FontOption name={id} checked={value === null} onSelect={() => onChange(null)} family={fallback}>
               <span className="flex flex-col">
                 <span>Automatique</span>
-                <span className="font-sans text-xs font-medium text-muted">Brigitte choisit selon la vidéo</span>
+                <span className="font-sans text-xs font-medium text-muted">Simone choisit selon la vidéo</span>
               </span>
             </FontOption>
             {isCustom && (

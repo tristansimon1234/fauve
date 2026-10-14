@@ -36,7 +36,7 @@ export function AppShell({
           <Logo size={30} />
           {avatar}
         </header>
-        {/* Brigitte's side panel opens over any page, about what is on it. */}
+        {/* Simone's side panel opens over any page, about what is on it. */}
         <FauveDrawerProvider>{children}</FauveDrawerProvider>
       </div>
 

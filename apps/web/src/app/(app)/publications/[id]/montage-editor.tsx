@@ -260,10 +260,10 @@ export function MontageEditor({
             </button>
           </div>
           <p className="-mt-2 truncate text-[13px] text-muted">{sceneLabel(segment, clipLabels)}</p>
-          {/* Brigitte reads the saved montage: changes not saved yet are saved first. */}
+          {/* Simone reads the saved montage: changes not saved yet are saved first. */}
           <AskFauveButton
             topic={{ postId, title: postTitle, scene: index, sceneLabel: `Scène ${index + 1} · ${kindLabels[segmentKind(segment)]}` }}
-            label={segmentKind(segment) === "motion" ? "Demander à Brigitte de refaire l’animation" : "Demander à Brigitte pour cette scène"}
+            label={segmentKind(segment) === "motion" ? "Demander à Simone de refaire l’animation" : "Demander à Simone pour cette scène"}
             before={dirty && valid ? saveNow : undefined}
             className="inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-soft px-3 py-2 text-[13px] font-bold text-violet hover:bg-violet hover:text-white disabled:opacity-60"
           />
@@ -365,7 +365,7 @@ function Field({ label, value, max, onChange }: { label: string; value: string; 
   );
 }
 
-/** The words of one scene (cuts, lengths and looks are Brigitte's: « Demander à Brigitte »). */
+/** The words of one scene (cuts, lengths and looks are Simone's: « Demander à Simone »). */
 function SegmentFields({ segment, onChange, photo }: { segment: Segment; onChange: (s: Segment) => void; photo: boolean }) {
   if ("clip_id" in segment && photo) {
     // A photo of the Reel: retouched and blurred like a carousel slide.
@@ -375,7 +375,7 @@ function SegmentFields({ segment, onChange, photo }: { segment: Segment; onChang
         light={Boolean(segment.photo?.adjust)}
         faces={Boolean(segment.photo?.blur?.some((b) => b.kind === "face"))}
         onChange={async (next) => {
-          const res = await photoRetouch(segment.clip_id, next).catch(() => ({ ok: false as const, error: "Brigitte n’a pas pu regarder cette photo." }));
+          const res = await photoRetouch(segment.clip_id, next).catch(() => ({ ok: false as const, error: "Simone n’a pas pu regarder cette photo." }));
           if (!res.ok) return { ok: false, message: res.error };
           onChange({ ...segment, photo: res.value ?? undefined });
           return { ok: true, message: res.note };
@@ -396,7 +396,7 @@ function SegmentFields({ segment, onChange, photo }: { segment: Segment; onChang
             onChange({ ...segment, blur: undefined });
             return { ok: true };
           }
-          const res = await clipFaceBlur(segment.clip_id).catch(() => ({ ok: false as const, error: "Brigitte n’a pas pu regarder cette vidéo." }));
+          const res = await clipFaceBlur(segment.clip_id).catch(() => ({ ok: false as const, error: "Simone n’a pas pu regarder cette vidéo." }));
           if (!res.ok) return { ok: false, message: res.error };
           if (res.value) onChange({ ...segment, blur: res.value });
           return { ok: true, message: res.note };
@@ -538,7 +538,7 @@ function AddScene({
                   <span className="size-2.5 rounded-full bg-violet" />
                   Animation
                 </span>
-                <span className="text-[12px] text-muted">{canAskFauve ? "Brigitte la crée selon ta demande" : "Enregistre d’abord tes modifications"}</span>
+                <span className="text-[12px] text-muted">{canAskFauve ? "Simone la crée selon ta demande" : "Enregistre d’abord tes modifications"}</span>
               </button>
               <button type="button" onClick={done(onText)} className={item}>
                 <span className="flex items-center gap-2 text-[14px] font-bold">

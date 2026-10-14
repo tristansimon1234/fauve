@@ -1,4 +1,4 @@
-// Small drawings of what Brigitte makes, for the landing (illustrations, not data).
+// Small drawings of what Simone makes, for the landing (illustrations, not data).
 
 /** Photos from Unsplash (free licence), served by its CDN at the size asked. */
 // Asked at the size shown (CSS pixels) with dpr 2, so they stay sharp on phone and retina screens.

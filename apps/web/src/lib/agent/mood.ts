@@ -28,7 +28,7 @@ function byRules(text: string, previous: string | null): Reaction {
 }
 
 /**
- * Brigitte's instant reaction to the manager's message: her face and, when it is
+ * Simone's instant reaction to the manager's message: her face and, when it is
  * natural, an emoji on the message. Asked to Jev in parallel with the chat model,
  * so it lands in a fraction of a second; never throws.
  */
@@ -37,7 +37,7 @@ export async function reactTo(studioId: string, text: string, previous: string |
   if (!api || !text.trim()) return byRules(text, previous);
   try {
     const { answers, usage, model } = await api.systemOne({
-      state: { message_de_la_gerante: text.slice(0, 2000), message_precedent_de_brigitte: previous?.slice(0, 600) ?? null },
+      state: { message_de_la_gerante: text.slice(0, 2000), message_precedent_de_simone: previous?.slice(0, 600) ?? null },
       questions: {
         mood: choice(MOOD_INSTRUCTIONS, MOOD_CRITERIA),
         emoji: choice(EMOJI_INSTRUCTIONS, EMOJI_CRITERIA),

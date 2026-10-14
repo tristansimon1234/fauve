@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Brigitte",
-    short_name: "Brigitte",
+    name: "Simone",
+    short_name: "Simone",
     description: "Ton community manager vit dans WhatsApp.",
     start_url: "/fauve",
     display: "standalone",

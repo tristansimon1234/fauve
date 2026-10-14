@@ -95,7 +95,7 @@ export function StyleEditor({
       <header className="flex flex-col gap-1.5">
         <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Style</h1>
         <p className="text-[15px] leading-normal text-muted">
-          Ce que Brigitte suit pour monter tes vidéos : tes inspirations, tes mots, ton logo, tes couleurs.
+          Ce que Simone suit pour monter tes vidéos : tes inspirations, tes mots, ton logo, tes couleurs.
         </p>
       </header>
 
@@ -141,7 +141,7 @@ export function StyleEditor({
                 ? "Enregistrement…"
                 : dirty
                   ? "Modifications non enregistrées. Le prochain montage utilisera le style enregistré."
-                  : "Le prochain montage de Brigitte utilisera ce style."}
+                  : "Le prochain montage de Simone utilisera ce style."}
         </p>
         <button
           type="button"

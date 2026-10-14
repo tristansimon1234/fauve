@@ -77,7 +77,7 @@ export function quoteMontage(input: { clips: number; correction: boolean; maxNew
   lines.push({ label: "Rendu vidéo", credits: CREDIT_PRICES.render });
   const versions = effortVersions(input.effort ?? "rapide", input.correction);
   if (versions > 1) lines.push({ label: "2e version à comparer", credits: CREDIT_PRICES.alternative });
-  if (level.review) lines.push({ label: versions > 1 ? "Brigitte regarde et choisit" : "Brigitte regarde la vidéo", credits: CREDIT_PRICES.review });
+  if (level.review) lines.push({ label: versions > 1 ? "Simone regarde et choisit" : "Simone regarde la vidéo", credits: CREDIT_PRICES.review });
   const base = lines.reduce((sum, l) => sum + l.credits, 0);
   return {
     lines,

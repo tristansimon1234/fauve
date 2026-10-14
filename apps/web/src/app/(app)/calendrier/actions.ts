@@ -217,22 +217,22 @@ export async function getPostSheet(postId: string): Promise<PostSheet | null> {
   ];
   const todo =
     status === "failed"
-      ? "La publication a échoué : demande à Brigitte de réessayer."
+      ? "La publication a échoué : demande à Simone de réessayer."
       : status === "draft"
         ? "Relis le brouillon et valide-le."
         : status === "validated" && !instagram
-          ? "Connecte Instagram pour que Brigitte la publie."
+          ? "Connecte Instagram pour que Simone la publie."
           : status === "validated" || status === "scheduled"
-            ? "Rien à faire : Brigitte la publie à l’heure prévue."
+            ? "Rien à faire : Simone la publie à l’heure prévue."
             : status === "published" || status === "measured"
-              ? "En ligne. Brigitte suit ses résultats."
+              ? "En ligne. Simone suit ses résultats."
               : status === "skipped"
                 ? "Mise de côté."
                 : hasContent
-                  ? "Brigitte a ton contenu : demande-lui de préparer le brouillon."
+                  ? "Simone a ton contenu : demande-lui de préparer le brouillon."
                   : kind === "reel" || kind === "story"
-                    ? "Filme et envoie tes vidéos à Brigitte."
-                    : "Envoie tes photos à Brigitte.";
+                    ? "Filme et envoie tes vidéos à Simone."
+                    : "Envoie tes photos à Simone.";
   const scheduled = post.scheduled_at ? new Date(post.scheduled_at as string) : null;
   const local = scheduled ? localTimeOf(scheduled, tz) : null;
   return {

@@ -40,7 +40,7 @@ export function WorkPill({ studioId }: { studioId: string }) {
       .channel(`work-${studioId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "studio_jobs", filter: `studio_id=eq.${studioId}` }, load)
       .subscribe();
-    // Realtime can miss an event: the pill also asks again when Brigitte has just answered
+    // Realtime can miss an event: the pill also asks again when Simone has just answered
     // (she may have started something), when the tab comes back, and every 15 s while visible.
     const again = () => document.visibilityState === "visible" && load();
     window.addEventListener(WORK_EVENT, load);
@@ -83,7 +83,7 @@ export function WorkPill({ studioId }: { studioId: string }) {
             {first.failed ? <XIcon size={13} /> : <CheckIcon size={13} />}
           </span>
         )}
-        <span>{running.length ? "Brigitte travaille" : first.kindLabel}</span>
+        <span>{running.length ? "Simone travaille" : first.kindLabel}</span>
         <span className="text-muted">· {label}</span>
       </button>
       {open && (

@@ -25,7 +25,7 @@ export function ColorsSection({ value, onChange }: { value: string[]; onChange: 
     >
       {value.length === 0 ? (
         <p className="rounded-[14px] bg-soft px-4 py-3 text-sm text-muted">
-          Aucune couleur : Brigitte utilise son violet par défaut.
+          Aucune couleur : Simone utilise son violet par défaut.
         </p>
       ) : (
         <ol className="flex flex-col gap-2.5">

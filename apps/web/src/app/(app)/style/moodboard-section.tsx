@@ -107,7 +107,7 @@ export function MoodboardSection({
     <Section
       id="style-moodboard"
       title="Moodboard"
-      hint="Des images qui t’inspirent : captures de Reels, affiches, photos, marques que tu aimes. Ajoute une note pour dire ce qui te plaît. Brigitte en tire une direction artistique pour tes montages."
+      hint="Des images qui t’inspirent : captures de Reels, affiches, photos, marques que tu aimes. Ajoute une note pour dire ce qui te plaît. Simone en tire une direction artistique pour tes montages."
     >
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4" aria-busy={busy}>
         {items.map((item, i) => (
@@ -172,7 +172,7 @@ export function MoodboardSection({
       {(items.length > 0 || dirty || "message" in state) && (
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" onClick={() => read()} disabled={busy || !dirty} className="btn btn-primary disabled:opacity-50">
-            {state.status === "reading" ? "Brigitte regarde tes images…" : items.length || !dirty ? "Faire lire à Brigitte · 1 crédit" : "Enregistrer"}
+            {state.status === "reading" ? "Simone regarde tes images…" : items.length || !dirty ? "Faire lire à Simone · 1 crédit" : "Enregistrer"}
           </button>
           <p
             role={state.status === "error" ? "alert" : "status"}
@@ -183,7 +183,7 @@ export function MoodboardSection({
               : state.status === "reading"
                 ? "Ça prend jusqu’à une minute."
                 : dirty
-                  ? "Moodboard modifié : fais-le lire à Brigitte pour qu’elle l’applique."
+                  ? "Moodboard modifié : fais-le lire à Simone pour qu’elle l’applique."
                   : ""}
           </p>
         </div>
@@ -193,7 +193,7 @@ export function MoodboardSection({
         <div className="flex flex-col gap-3 rounded-[16px] bg-soft p-4 sm:p-5">
           <div className="flex items-center gap-2.5">
             <Orb size={28} still />
-            <h3 className="text-[15px] font-bold">Ce que Brigitte en retient</h3>
+            <h3 className="text-[15px] font-bold">Ce que Simone en retient</h3>
           </div>
           <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-ink">{reading}</p>
           {palette.length > 0 && (
