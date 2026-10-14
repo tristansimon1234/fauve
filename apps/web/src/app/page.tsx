@@ -49,7 +49,7 @@ const faq: [string, string][] = [
   ["Est-ce qu’elle publie sans me demander ?", "Jamais. Chaque publication attend ta validation, sur WhatsApp ou dans l’app. Tu peux corriger un texte, déplacer une date ou demander une autre version."],
   ["Je n’ai pas de vidéo, ça marche quand même ?", "Oui. Elle part des photos de ton site, de celles que tu lui envoies, ou fait un Reel tout en animation à tes couleurs. Quand tu filmes, elle te dit quoi et comment."],
   ["Pour quel commerce ?", "Studios de sport ou de yoga, salons de coiffure et de beauté, restaurants, cafés, boutiques : elle parle ta langue et adapte ses idées à ton activité."],
-  ["Et la musique ?", "Instagram ne laisse pas ajouter un son tendance automatiquement : Simone te le suggère, tu l’ajoutes en un geste au moment de publier."],
+  ["Et la musique ?", "Chaque Reel a sa bande-son, composée par Simone pour ce montage : douce, pêchue ou chic, avec les coupes sur le rythme et de petits effets sonores, libre de droits. Pour un son tendance d’Instagram, Simone t’envoie la vidéo prête et tu l’ajoutes en un geste au moment de publier."],
   ["Où vont mes photos et mes données ?", "Elles sont hébergées en Europe. Tes fichiers sont supprimés peu après la publication, et tout disparaît si tu pars."],
 ];
 

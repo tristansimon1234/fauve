@@ -281,6 +281,7 @@ test("editor: library scenes keep their id and get their texts as a record", asy
   const plan = fromEditorPlan({
     ...editPlanObjectSchema.parse({ ...validPlan, segments: [{ clip_id: "a", in: 0, out: 2, zoom: "none" }], texts: [] }),
     template: "doux",
+    music: null,
     segments: [
       { motion: { brief: "Titre qui se dessine", fallback, template_id: id, template_texts: [{ slot: "title", text: "Atelier respiration" }, { slot: "Bad Slot", text: "x" }] }, duration: 3 },
       { motion: { brief: "Nouvelle scène", fallback }, duration: 3 },
@@ -918,6 +919,7 @@ test("editor: a library scene plays once per Reel, a repeat becomes a new scene 
   const plan = fromEditorPlan({
     ...editPlanObjectSchema.parse({ ...validPlan, segments: [{ clip_id: "a", in: 0, out: 2, zoom: "none" }], texts: [] }),
     template: "doux",
+    music: null,
     segments: [reuse("PIGALLE"), reuse("LA CHEFFE"), reuse("SURPRISE GARANTIE")],
   });
   const kinds = (max: number) =>
@@ -958,4 +960,54 @@ test("caption match: the Reel she published by hand, words changed or not", asyn
   assert.ok(captionMatch(ours, "Nouvelle coupe d’automne, réserve vite") >= 0.5);
   assert.ok(captionMatch(ours, "Le menu du jour est arrivé") < 0.2);
   assert.equal(captionMatch(null, "anything"), 0);
+});
+
+test("soundtrack: cuts on the beat, the choice kept, a sound with no gap", async () => {
+  const { beatSeconds, carrySoundtrack, defaultMusic, encodeWav, musicSpec, onBeat, soundCues, synthesize, withSoundtrack } = await import("./soundtrack.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    template: "dynamique",
+    duration: 6.5,
+    images: [],
+    segments: [
+      { clip_id: "a", in: 0.3, out: 2.9, zoom: "none" },
+      { scene: { kind: "title", title: "Atelier", background: "accent" }, duration: 2.2 },
+      { clip_id: "b", in: 1, out: 2.7, zoom: "none" },
+    ],
+    texts: [{ text: "Viens", from: 2.7, to: 4.4, style: "band" }],
+    music: defaultMusic("dynamique", 3),
+  });
+  assert.equal(plan.music!.style, "pechue");
+  const beat = beatSeconds(plan.music!.bpm);
+  assert.equal(beat, 0.5);
+  const timed = onBeat(plan);
+  const lengths = timed.segments.map((s) => ("clip_id" in s ? s.out - s.in : s.duration));
+  for (const l of lengths) assert.ok(Math.abs(l / beat - Math.round(l / beat)) < 0.02, `${l} is on the beat`);
+  // A clip is only shortened, never past its end.
+  assert.ok(lengths[0]! <= 2.6 && lengths[2]! <= 1.7);
+  // The text moved with its scene.
+  assert.ok(timed.texts[0]!.from >= 2.5 && timed.texts[0]!.from < 2.7);
+
+  // Chosen or turned off by hand: kept by the next version; otherwise the template's.
+  const chosen = withSoundtrack(plan, "chic", false, 3);
+  assert.deepEqual(carrySoundtrack({ ...plan, template: "doux", music: null }, chosen, 9).music, chosen.music);
+  const off = withSoundtrack(plan, "off", true, 3);
+  assert.equal(carrySoundtrack({ ...plan, music: null }, off, 9).music!.muted, true);
+  assert.equal(carrySoundtrack({ ...plan, template: "doux", music: null }, plan, 9).music!.style, "douce");
+  assert.equal(carrySoundtrack({ ...plan, music: null }, null, 9).music!.seed, 9);
+
+  // The sound: as long as the video, finite, in range; effects where the picture moves.
+  const props = buildReelProps(timed, { template: "dynamique", clipUrls: { a: "x", b: "y" }, brand: { name: "Studio" } });
+  const cues = soundCues(props);
+  assert.equal(cues.filter((c) => c.kind === "whoosh").length, 2);
+  const seconds = props.durationInFrames / props.fps;
+  const samples = synthesize(musicSpec("douce", 1), seconds, cues);
+  assert.equal(samples.length, Math.ceil(seconds * 32000));
+  assert.ok(samples.every((x) => Number.isFinite(x) && Math.abs(x) <= 1));
+  const wav = encodeWav(samples);
+  assert.equal(String.fromCharCode(...wav.slice(0, 4)), "RIFF");
+  assert.equal(wav.length, 44 + samples.length * 2);
+  // A muted soundtrack plays nothing.
+  assert.equal(buildReelProps(off, { template: "dynamique", clipUrls: { a: "x", b: "y" }, brand: { name: "Studio" } }).music, null);
 });

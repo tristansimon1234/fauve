@@ -2,6 +2,9 @@ import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   carryRetouch,
+  carrySoundtrack,
+  onBeat,
+  seedOf,
   carryTextStyle,
   brandProfileSchema,
   CLAUDE_MODEL,
@@ -194,12 +197,19 @@ export async function designEdit(params: {
   // Retouch and blur stay on their clips from one version to the next.
   // A correction also keeps the texts' styles and places (the editor names looks, it does not copy them).
   const base = previousPlan.success ? previousPlan.data : null;
-  const plan = carryRetouch(
-    carryTextStyle(
-      normalizeEditPlan(fromEditorPlan(response.parsed_output.plan, profile.text_looks ?? []), durations, params.maxNewScenes ?? MAX_FREE_SCENES),
-      params.fresh ? null : base,
+  // Simone's soundtrack (kept if she chose it, else the template's), and the cuts moved onto its beat.
+  const plan = onBeat(
+    carrySoundtrack(
+      carryRetouch(
+        carryTextStyle(
+          normalizeEditPlan(fromEditorPlan(response.parsed_output.plan, profile.text_looks ?? []), durations, params.maxNewScenes ?? MAX_FREE_SCENES),
+          params.fresh ? null : base,
+        ),
+        base,
+      ),
+      base,
+      seedOf(params.postId),
     ),
-    base,
   );
 
   // Library scenes: their saved code, with the new texts. An unknown id becomes a new scene.

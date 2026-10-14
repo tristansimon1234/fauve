@@ -152,12 +152,13 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
       {post.kind === "reel" && canEdit && (
         <PublishByHand
-          key={versionKey(post.publish_by_hand, post.handoff_at)}
+          key={versionKey(post.publish_by_hand, post.handoff_at, editor?.plan.music)}
           postId={post.id}
           initial={post.publish_by_hand}
           handedOffAt={post.handoff_at ? handedFormat(tz).format(new Date(post.handoff_at)) : null}
           downloadUrl={downloadUrl}
           caption={[post.caption ?? "", post.hashtags.map((h) => `#${h}`).join(" ")].filter(Boolean).join("\n\n")}
+          music={editor ? (editor.plan.music ?? null) : undefined}
         />
       )}
 

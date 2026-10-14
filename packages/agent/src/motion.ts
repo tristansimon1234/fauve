@@ -1,4 +1,4 @@
-import { isClipSegment, isMotionSegment, segmentSeconds, type ClipAnalysis, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
+import { isClipSegment, isMotionSegment, segmentSeconds, type ClipAnalysis, type EditPlan, type MotionTemplate, type MusicSpec, type Scene } from "./schemas.ts";
 import type { Adjust, ClipBlur, PhotoEdit } from "./retouch.ts";
 import { brandPalette, resolveBrandLook, type BrandPalette, type Bullet, type ListItem, type TextLook } from "./text-look.ts";
 import type { LogoOnDark } from "./logo.ts";
@@ -74,6 +74,10 @@ export type ReelProps = {
     customFonts?: { family: string; url: string }[];
   };
   endCard: { title: string; subtitle: string | null; from: number } | null;
+  /** Simone's soundtrack: what to play (synthesized by soundtrackWav from these props)… */
+  music?: MusicSpec | null;
+  /** …and the sound file made from it (a link for the render, a blob in the editor). */
+  soundtrack?: { src: string } | null;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
@@ -236,6 +240,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     endCard: plan.end_card
       ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, durationInFrames - endCardFrames) }
       : null,
+    music: plan.music && !plan.music.muted ? plan.music : null,
   };
 }
 
