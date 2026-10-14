@@ -783,3 +783,19 @@ test("Brigitte's instant reaction reads Jev's answers safely", async () => {
   assert.equal(emojiOf({ choice: "👍", confidence: 0.9 }, "cry"), null);
   assert.equal(emojiOf({ choice: "💩", confidence: 0.9 }, "happy"), null);
 });
+
+test("style buttons add one adjustment per kind to the art direction", async () => {
+  const { withAdjustment } = await import("./restyle.ts");
+  const once = withAdjustment("Tons clairs, serif fin.", "warmer");
+  assert.match(once, /^Tons clairs, serif fin\.\nAjustement de la gérante — Plus chaleureux/);
+  // The same button again does not pile up.
+  assert.equal(withAdjustment(once, "warmer"), once);
+  const three = withAdjustment(withAdjustment(withAdjustment(once, "sober"), "punchier"), "warmer");
+  assert.equal(three.split("\n").length, 4);
+  assert.ok(three.endsWith("rythme posé."), "the latest click comes last");
+  // Her own text is never cut for an adjustment.
+  const long = "x".repeat(1400);
+  const kept = withAdjustment(long, "punchier", 1500);
+  assert.ok(kept.startsWith(long) && kept.length <= 1500);
+  assert.equal(withAdjustment(undefined, "sober").startsWith("Ajustement"), true);
+});

@@ -42,6 +42,7 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   reply_to_comment: "Je réponds au commentaire…",
   get_metrics: "Je regarde les chiffres…",
   update_brand_profile: "Je mets ton style à jour…",
+  restyle_reel: "Je refais ta vidéo dans ce style…",
   reply_with: null,
   react_to_message: null,
 };

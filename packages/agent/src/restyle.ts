@@ -1,0 +1,50 @@
+// « Ça te ressemble ? » under the first Reel: three buttons that tune the style
+// on the manager's own video instead of asking her to describe it. A click keeps
+// the adjustment in her art direction (every next montage follows it) and makes
+// a corrected version of that Reel at once.
+
+export const RESTYLES = ["warmer", "sober", "punchier"] as const;
+export type Restyle = (typeof RESTYLES)[number];
+
+export const RESTYLE: Record<Restyle, { button: string; direction: string; brief: string }> = {
+  warmer: {
+    button: "Plus chaleureux",
+    direction: "Plus chaleureux : tons chauds, lumière douce, textes proches et accueillants, rythme posé.",
+    brief:
+      "La gérante veut ce Reel plus chaleureux. Garde le même sujet et les mêmes plans, mais réchauffe tout : textes plus proches et accueillants (tutoiement, une touche d'émotion), apparitions douces, rythme un peu plus posé, scènes animées aux tons chauds de sa charte.",
+  },
+  sober: {
+    button: "Plus sobre",
+    direction: "Plus sobre : moins de texte et d'effets, typographie fine, beaucoup d'air, fondus lents.",
+    brief:
+      "La gérante veut ce Reel plus sobre. Garde le même sujet et les mêmes plans, mais épure : moins de texte (les mots les plus forts seulement), typographie fine, plus d'espace, fondus lents, animations discrètes et élégantes.",
+  },
+  punchier: {
+    button: "Plus pêchu",
+    direction: "Plus pêchu : coupes rapides, textes qui claquent, accroche forte, rythme soutenu.",
+    brief:
+      "La gérante veut ce Reel plus pêchu. Garde le même sujet, mais donne de l'énergie : accroche plus forte dès la première seconde, coupes plus rapides, textes courts qui claquent (capitales, mots en valeur), animations plus dynamiques.",
+  },
+};
+
+/** The buttons under her first Reel: she says it fits, or which way to go. */
+export const STYLE_CHECK_OPTIONS = ["Ça me ressemble", ...RESTYLES.map((r) => RESTYLE[r].button)];
+
+const PREFIX = "Ajustement de la gérante — ";
+/** Adjustments kept in the art direction: the latest ones, one per kind. */
+const KEPT = 3;
+
+/**
+ * Her art direction with this adjustment added at the end: one line per kind
+ * (a new click on the same button replaces it), the latest few kept, within the
+ * field's 1500 characters (the oldest adjustments go first, never her own text).
+ */
+export function withAdjustment(artDirection: string | undefined, restyle: Restyle, max = 1500): string {
+  const line = `${PREFIX}${RESTYLE[restyle].direction}`;
+  const lines = (artDirection ?? "").split("\n").filter((l) => l.trim());
+  const own = lines.filter((l) => !l.startsWith(PREFIX));
+  let adjustments = [...lines.filter((l) => l.startsWith(PREFIX) && l !== line), line].slice(-KEPT);
+  const join = () => [...own, ...adjustments].join("\n");
+  while (join().length > max && adjustments.length > 1) adjustments = adjustments.slice(1);
+  return join().slice(0, max);
+}
