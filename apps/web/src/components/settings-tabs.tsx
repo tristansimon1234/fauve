@@ -4,7 +4,7 @@ import Link from "next/link";
 const tabs = [
   { href: "/reglages", label: "Compte" },
   { href: "/style", label: "Style" },
-  { href: "/composants", label: "Composants" },
+  { href: "/composants", label: "Créations" },
   { href: "/mediatheque", label: "Médiathèque" },
 ] as const;
 

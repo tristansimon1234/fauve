@@ -3,14 +3,11 @@ import { Suspense } from "react";
 import { z } from "zod";
 import { DeleteButton } from "@/components/delete-button";
 import { EmptyState, NoStudio, PageLoading } from "@/components/empty-state";
-import { FolderIcon, MicIcon } from "@/components/icons";
-import { resolveReelBrand } from "@fauve/agent";
+import { FolderIcon, LayersIcon, MicIcon } from "@/components/icons";
 import Link from "next/link";
 import { formatDuration, formatShortDateTime } from "@/lib/format";
-import { loadMontageInputs } from "@/lib/render/render-post";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
 import { deleteMedia } from "./actions";
-import { CreationsSection, type Creation } from "./creations-section";
 import { SettingsTabs } from "@/components/settings-tabs";
 
 export const metadata: Metadata = { title: "Médiathèque" };
@@ -71,7 +68,7 @@ async function Library() {
     "media_assets",
   );
 
-  const [urls, analyses, creations, inputs] = await Promise.all([
+  const [urls, analyses] = await Promise.all([
     signMediaUrls(
       db,
       studioId,
@@ -81,29 +78,7 @@ async function Library() {
       db,
       assets.filter((a) => a.kind === "video").map((a) => a.id),
     ),
-    // The studio's scenes and components.
-    db
-      .from("motion_templates")
-      .select("id, studio_id, kind, name, js, uses")
-      .eq("studio_id", studioId)
-      .in("kind", ["scene", "element"])
-      .is("archived_at", null)
-      .order("uses", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(48),
-    loadMontageInputs(studioId, { segments: [] }),
   ]);
-  const toCreation = (t: { id: unknown; studio_id: unknown; name: unknown; js: unknown; uses: unknown }): Creation => ({
-    id: t.id as string,
-    name: t.name as string,
-    js: t.js as string,
-    uses: (t.uses as number) ?? 0,
-    house: t.studio_id === null,
-  });
-  const templates = creations.data ?? [];
-  const components = templates.filter((t) => t.kind === "element").length;
-  const scenes = templates.filter((t) => t.kind === "scene").map(toCreation);
-  const brand = resolveReelBrand({}, "doux", { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, customFonts: inputs.customFonts });
 
   return (
     <>
@@ -111,8 +86,8 @@ async function Library() {
         <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Médiathèque</h1>
         <p className="text-[15px] text-muted">
           {assets.length
-            ? `Tes vidéos et photos, les plus récentes d’abord${assets.length === LIMIT ? ` (les ${LIMIT} dernières)` : ""}, et ce que Brigitte a créé pour toi.`
-            : "Tes vidéos et photos, en pleine qualité, et ce que Brigitte a créé pour toi."}
+            ? `Tes vidéos et photos, les plus récentes d’abord${assets.length === LIMIT ? ` (les ${LIMIT} dernières)` : ""}.`
+            : "Tes vidéos et photos, en pleine qualité."}
         </p>
         <p className="text-[13px] text-muted">
           Chaque fichier est gardé tant qu’une publication en a besoin, puis supprimé 24 h après sa mise en ligne (7 jours s’il ne sert à aucune publication). Tes vidéos finales restent.
@@ -150,7 +125,15 @@ async function Library() {
         </>
       )}
 
-      <CreationsSection scenes={scenes} components={components} brand={brand} />
+      <Link href="/composants" className="flex max-w-[860px] items-center gap-4 rounded-[18px] border border-line bg-white p-4 hover:border-violet">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet">
+          <LayersIcon size={20} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[15px] font-bold">Tes créations</span>
+          <span className="text-[13px] text-muted">Tes styles de texte, tes éléments pour photos et tes animations</span>
+        </span>
+      </Link>
     </>
   );
 }

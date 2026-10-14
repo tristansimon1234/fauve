@@ -80,7 +80,7 @@ async function done(job: Job, draft: KitDraft, js: Record<string, string>) {
     const slots = z.array(layerSlotSchema).catch([]).parse(designed.slots);
     // Her own sample texts stay; new slots take the designer's.
     const sample = Object.fromEntries(slots.map((s) => [s.name, before.sample[s.name] || placed?.texts[s.name] || ""]).filter(([, v]) => v));
-    await updateElement(job.studioId, elementId, { name: designed.name, code: designed.code, js: js[designed.ref]!, slots, fonts: designed.fonts.slice(0, 3), base: designed.base_width, sample, note: draft.notes });
+    await updateElement(job.studioId, elementId, { name: designed.name, code: designed.code, js: js[designed.ref]!, slots, fonts: designed.fonts.slice(0, 3), base: designed.base_width, sample, note: draft.notes.slice(0, 400) });
     await setJobTemplate(job.jobId, elementId);
     if (job.postId) {
       await refreshElementOnPosts(job.studioId, elementId, [job.postId]);
@@ -89,14 +89,14 @@ async function done(job: Job, draft: KitDraft, js: Record<string, string>) {
     }
     await finishJob(job.jobId);
     await charge(job, designed.name, { element_id: elementId });
-    if (job.origin === "chat") await notifyStudio(target, `C’est fait : « ${designed.name} » a sa nouvelle version ✨ ${draft.notes}`, { path: `/composants/${elementId}`, label: "Regarde-le ici" });
+    if (job.origin === "chat") await notifyStudio(target, `C’est fait : « ${designed.name} » a sa nouvelle version ✨ ${draft.notes.slice(0, 300)}`, { path: `/composants/${elementId}`, label: "Regarde-le ici" });
     return;
   }
 
   const examplePath = await keepExample(job, draft.kit_name);
   const ids = await saveKit(job.studioId, {
     name: draft.kit_name,
-    description: `${draft.notes} — ${job.request}`,
+    description: `${draft.notes.slice(0, 400)} — ${job.request}`,
     examplePath,
     elements: draft.elements.map((e) => {
       const placement = firstPlacement(e.ref);

@@ -135,7 +135,7 @@ async function loadContext(input: ElementsRequest) {
   if (input.mode === "edit" && !element) throw new Error("Composant introuvable");
 
   const inputs = await loadMontageInputs(input.studioId, { segments: [] });
-  const brandIn = { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, customFonts: inputs.customFonts };
+  const brandIn = { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts };
   const { data: profileRow } = await db.from("brand_profiles").select("profile").eq("studio_id", input.studioId).order("version", { ascending: false }).limit(1);
   const profile = brandProfileSchema.partial().catch({}).parse(profileRow?.[0]?.profile ?? {});
   const template = (target.template ?? profile.default_template ?? "doux") as "doux";

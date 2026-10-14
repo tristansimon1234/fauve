@@ -102,7 +102,7 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
   const { data: current } = await db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle();
   const siteFonts = ((current?.profile as { fonts?: unknown } | null)?.fonts as string[] | undefined)?.filter((f) => typeof f === "string").slice(0, 3) ?? [];
   const business = (studio?.business_type as string | null) ?? null;
-  let reading: { reading: string; palette: string[] } | null = null;
+  let reading: { reading: string; palette: string[]; fonts?: { display: string; body: string } } | null = null;
   try {
     reading = await readMoodboard(
       studioId,
@@ -127,10 +127,15 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
     if (hersOwn(current)) return profile;
     // What she sees on her site beats the CSS: its palette becomes the brand's colours (the first is the accent).
     const colors = reading.palette.length ? brandColorsFromLook(reading.palette) : null;
+    // Her fonts: the ones found in the site's CSS, else the closest Google fonts to what the reading saw.
+    const known = (profile as { fonts?: string[] }).fonts;
+    const fonts = known?.length ? null : reading.fonts ? [...new Set([reading.fonts.display, reading.fonts.body])] : null;
+    const look = { reading: reading.reading, palette: reading.palette };
     return {
       ...profile,
       ...(colors?.length ? { colors } : {}),
-      moodboard: { ...(current ?? {}), items: current?.items ?? items, ...reading, read_at: new Date().toISOString() },
+      ...(fonts?.length ? { fonts } : {}),
+      moodboard: { ...(current ?? {}), items: current?.items ?? items, ...look, read_at: new Date().toISOString() },
     };
   });
   return { photos: items.length, reading: true };

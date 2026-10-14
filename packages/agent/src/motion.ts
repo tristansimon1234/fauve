@@ -1,6 +1,6 @@
 import { isClipSegment, isMotionSegment, segmentSeconds, type ClipAnalysis, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
 import type { Adjust, ClipBlur, PhotoEdit } from "./retouch.ts";
-import type { Bullet, ListItem, TextLook } from "./text-look.ts";
+import { brandPalette, resolveBrandLook, type BrandPalette, type Bullet, type ListItem, type TextLook } from "./text-look.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -64,6 +64,8 @@ export type ReelProps = {
     accentInk: string;
     displayFont: string;
     bodyFont: string;
+    /** The brand's other colours by role (looks name them: secondary, light, dark). */
+    palette?: BrandPalette;
     logoUrl: string | null;
     /** The studio's own fonts (uploaded files), loaded by URL instead of from Google Fonts. */
     customFonts?: { family: string; url: string }[];
@@ -106,7 +108,7 @@ export type ReelInputs = {
   /** Word timings from the clip analyses, by clip_id (for subtitles). */
   words?: Record<string, ClipAnalysis["words"]>;
   /** fonts: the studio's brand fonts (display first); the plan's fonts win over them. */
-  brand: { name: string; accent?: string | null; logoUrl?: string | null; fonts?: string[]; customFonts?: { family: string; url: string }[] };
+  brand: { name: string; accent?: string | null; logoUrl?: string | null; fonts?: string[]; colors?: string[]; customFonts?: { family: string; url: string }[] };
 };
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
@@ -145,8 +147,23 @@ export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): 
   return { segments, duration: (cursor + fadeFrames) / REEL_FPS };
 }
 
+/** A text's looks and bullet with the brand's fonts and colours named by role made real. */
+export function brandLooks(
+  t: { look?: TextLook; items?: ListItem[]; detail_look?: TextLook; bullet?: Bullet },
+  brand: ReelProps["brand"],
+): { look?: TextLook; items?: ListItem[]; detail_look?: TextLook; bullet?: Bullet } {
+  const named = (c: string) => (c === "secondary" || c === "light" || c === "dark" ? (brand.palette?.[c] ?? c) : c);
+  return {
+    look: resolveBrandLook(t.look, brand),
+    items: t.items,
+    detail_look: resolveBrandLook(t.detail_look, brand),
+    bullet: t.bullet ? { ...t.bullet, color: named(t.bullet.color) } : undefined,
+  };
+}
+
 export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const fps = REEL_FPS;
+  const brand = resolveReelBrand(plan, inputs.template, inputs.brand);
   const { lengths, fadeFrames } = frameLengths(plan);
 
   let cursor = 0;
@@ -182,7 +199,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     .map((t) => {
       const from = toFrames(t.from);
       const to = Math.min(toFrames(t.to), durationInFrames);
-      return { text: t.text, style: t.style, emphasis: t.emphasis ?? [], from, durationInFrames: to - from, y: t.y, x: t.x, scale: t.scale, backdrop: t.backdrop, look: t.look, items: t.items, detail_look: t.detail_look, bullet: t.bullet };
+      return { text: t.text, style: t.style, emphasis: t.emphasis ?? [], from, durationInFrames: to - from, y: t.y, x: t.x, scale: t.scale, backdrop: t.backdrop, ...brandLooks(t, brand) };
     })
     .filter((t) => t.durationInFrames > 0);
 
@@ -212,7 +229,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     segments,
     texts,
     words,
-    brand: resolveReelBrand(plan, inputs.template, inputs.brand),
+    brand,
     endCard: plan.end_card
       ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, durationInFrames - endCardFrames) }
       : null,
@@ -227,6 +244,7 @@ export function resolveReelBrand(plan: Pick<EditPlan, "fonts">, template: Motion
     name: brand.name,
     accent,
     accentInk: inkOn(accent),
+    palette: brandPalette(brand.colors, accent),
     displayFont: plan.fonts?.display ?? brandFonts[0] ?? TEMPLATE_FONTS[template].display,
     bodyFont: plan.fonts?.body ?? brandFonts[1] ?? TEMPLATE_FONTS[template].body,
     logoUrl: brand.logoUrl ?? null,

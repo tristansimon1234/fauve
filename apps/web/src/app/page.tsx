@@ -10,7 +10,7 @@ import {
 } from "@/components/icons";
 import { LandingDemo } from "@/components/landing/landing-demo";
 import { PHOTOS, ReelMock, ReportMock, RetouchMock, unsplash, WeekMock } from "@/components/landing/mocks";
-import { CarouselShowcase, ReelsShowcase } from "@/components/landing/showcase";
+import { CarouselShowcase, ReelsShowcase, SHOWCASE_SLIDES } from "@/components/landing/showcase";
 import { Mascot } from "@/components/mascot";
 import { Logo } from "@/components/orb";
 import { whatsappLink } from "@/lib/public-env";
@@ -113,14 +113,16 @@ export default function LandingPage() {
           De vraies publications, <span className="accent">faites par l’app.</span>
         </SectionTitle>
         <p className="-mt-4 max-w-[640px] text-[16px] leading-relaxed text-muted">
-          Ces Reels et ce carrousel sortent tels quels de Brigitte, pour trois commerces d’exemple : elle a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
+          Ces Reels sortent tels quels de Brigitte, pour trois commerces d’exemple : elle a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
         </p>
-        <div className="grid items-center gap-10 rounded-[28px] border border-line bg-[radial-gradient(ellipse_at_top,#fff_0%,#FBF7F4_70%)] px-4 py-8 sm:px-8 lg:grid-cols-[1.6fr_1fr]">
+        <div className={`grid items-center gap-10 rounded-[28px] border border-line bg-[radial-gradient(ellipse_at_top,#fff_0%,#FBF7F4_70%)] px-4 py-8 sm:px-8 ${SHOWCASE_SLIDES.length ? "lg:grid-cols-[1.6fr_1fr]" : ""}`}>
           <ReelsShowcase />
-          <div className="flex flex-col items-center gap-3">
-            <CarouselShowcase />
-            <span className="text-center text-[13px] font-semibold text-muted">Carrousel · Salon de coiffure · Paris</span>
-          </div>
+          {SHOWCASE_SLIDES.length > 0 && (
+            <div className="flex flex-col items-center gap-3">
+              <CarouselShowcase />
+              <span className="text-center text-[13px] font-semibold text-muted">Carrousel · Salon de coiffure · Paris</span>
+            </div>
+          )}
         </div>
       </section>
 

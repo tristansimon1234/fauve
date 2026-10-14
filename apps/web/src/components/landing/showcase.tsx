@@ -9,12 +9,13 @@ import { useEffect, useRef, useState } from "react";
 const BASE = "https://tfxkhktofgtljlqlksba.supabase.co/storage/v1/object/public/landing";
 
 export const SHOWCASE_REELS = [
-  { file: "reel-pilates.mp4", poster: "reel-pilates.jpg", name: "studio.lune", who: "Studio de Pilates · Lyon" },
-  { file: "reel-coiffure.mp4", poster: "reel-coiffure.jpg", name: "maison.maya", who: "Salon de coiffure · Paris" },
-  { file: "reel-trattoria.mp4", poster: "reel-trattoria.jpg", name: "chezlino.bordeaux", who: "Trattoria · Bordeaux" },
+  { file: "reel-pilates.mp4", name: "studio.lune", who: "Studio de Pilates · Lyon" },
+  { file: "reel-coiffure.mp4", name: "maison.maya", who: "Salon de coiffure · Paris" },
+  { file: "reel-trattoria.mp4", name: "chezlino.bordeaux", who: "Trattoria · Bordeaux" },
 ] as const;
 
-export const SHOWCASE_SLIDES = ["carrousel-1.jpg", "carrousel-2.jpg", "carrousel-3.jpg", "carrousel-4.jpg"] as const;
+/** The carousel's rendered photos (empty until it is made: the Reels then take the whole width). */
+export const SHOWCASE_SLIDES: readonly string[] = [];
 
 /** A Reel in a phone, as on Instagram: it plays muted while it is on screen. */
 function ReelPhone({ reel, big }: { reel: (typeof SHOWCASE_REELS)[number]; big?: boolean }) {
@@ -31,8 +32,8 @@ function ReelPhone({ reel, big }: { reel: (typeof SHOWCASE_REELS)[number]; big?:
       <span className="relative block aspect-[9/16] w-full overflow-hidden rounded-[26px] bg-ink shadow-[0_24px_60px_rgba(28,21,48,.28)] ring-[6px] ring-ink">
         <video
           ref={video}
-          src={`${BASE}/${reel.file}`}
-          poster={`${BASE}/${reel.poster}`}
+          // #t: the first frames are often an animation's empty start; show a frame with something on it.
+          src={`${BASE}/${reel.file}#t=1.2`}
           muted
           loop
           playsInline

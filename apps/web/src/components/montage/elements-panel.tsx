@@ -63,7 +63,7 @@ export function ElementsPanel({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[14px] font-bold">Composants</h3>
+        <h3 className="text-[14px] font-bold">Éléments</h3>
         {bank.length > 0 && !full && (
           <button type="button" onClick={() => setAdding((a) => !a)} aria-expanded={adding} className="inline-flex items-center gap-1 text-[13px] font-bold text-violet">
             {adding ? <XIcon size={14} /> : <PlusIcon size={15} />}
