@@ -93,14 +93,12 @@ async function videoCount(studioId: string, mediaIds: string[]): Promise<number>
 }
 
 function priceAt(input: { clips: number; correction: boolean; maxNewScenes?: number }, effort: Effort, balance: number): MontageQuote | null {
-  let quote = quoteMontage({ ...input, effort });
-  const sure = quote.base + quote.fixRounds * CREDIT_PRICES.fixRound;
-  if (balance < sure) return null;
-  if (balance < quote.max) {
-    const affordable = Math.floor((balance - sure) / CREDIT_PRICES.newScene);
-    quote = quoteMontage({ ...input, effort, maxNewScenes: Math.min(quote.maxNewScenes, affordable) });
+  // Fewer new scenes when they do not all fit (the library and fixed scenes do the rest).
+  for (let scenes = quoteMontage({ ...input, effort }).maxNewScenes; scenes >= 0; scenes--) {
+    const quote = quoteMontage({ ...input, effort, maxNewScenes: scenes });
+    if (quote.max <= balance) return quote;
   }
-  return quote;
+  return null;
 }
 
 /**
@@ -336,12 +334,12 @@ export async function chargeQuote(
     .update({ charged_at: new Date().toISOString() })
     .eq("id", quoteId)
     .is("charged_at", null)
-    .select("studio_id, post_id, kind, base, max, effort")
+    .select("studio_id, post_id, kind, base, max, lines, effort")
     .maybeSingle();
   const q = claimed.data;
   if (!q) return;
   const skipped = (skipReview ? CREDIT_PRICES.review : 0) + (skipAlternative ? CREDIT_PRICES.alternative : 0);
-  const credits = Math.max(0, montageCharge({ base: q.base as number, max: q.max as number }, newScenes, fixRounds) - skipped);
+  const credits = Math.max(0, montageCharge({ base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[] }, newScenes, fixRounds) - skipped);
   const kind = q.kind as AcceptedQuote["kind"];
   const level = effortSchema.nullable().catch(null).parse(q.effort);
   const label = `${{ montage: "Montage", correction: "Correction", variant: "Variante" }[kind]}${level && level !== "rapide" ? ` ${EFFORTS[level].label}` : ""}`;

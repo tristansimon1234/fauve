@@ -49,9 +49,9 @@ export const MONTHLY_CREDITS = 150;
 export type QuoteLine = { label: string; credits: number };
 export type MontageQuote = {
   lines: QuoteLine[];
-  /** What it costs without any new animated scene. */
+  /** The price shown: the work and the new animated scenes allowed (a scene not made is not charged). */
   base: number;
-  /** The most it can cost: every allowed new scene created. */
+  /** The most it can cost: every correction the review may ask for, too. */
   max: number;
   maxNewScenes: number;
   /** Corrections the critic may ask for (each one charged only if made). */
@@ -72,6 +72,7 @@ export function quoteMontage(input: { clips: number; correction: boolean; maxNew
     ? [{ label: "Correction du montage", credits: CREDIT_PRICES.correction }]
     : [{ label: "Montage", credits: CREDIT_PRICES.montage }];
   if (!input.correction && clips) lines.push({ label: `${clips} clip${clips > 1 ? "s" : ""} analysé${clips > 1 ? "s" : ""}`, credits: clips * CREDIT_PRICES.clip });
+  if (maxNewScenes) lines.push({ label: scenesLabel(maxNewScenes), credits: maxNewScenes * CREDIT_PRICES.newScene });
   lines.push({ label: "Rendu vidéo", credits: CREDIT_PRICES.render });
   const versions = effortVersions(input.effort ?? "rapide", input.correction);
   if (versions > 1) lines.push({ label: "2e version à comparer", credits: CREDIT_PRICES.alternative });
@@ -80,7 +81,7 @@ export function quoteMontage(input: { clips: number; correction: boolean; maxNew
   return {
     lines,
     base,
-    max: base + maxNewScenes * CREDIT_PRICES.newScene + level.fixRounds * CREDIT_PRICES.fixRound,
+    max: base + level.fixRounds * CREDIT_PRICES.fixRound,
     maxNewScenes,
     fixRounds: level.fixRounds,
   };
@@ -92,7 +93,20 @@ export function quoteVariant(): MontageQuote {
   return { lines, base: CREDIT_PRICES.variant, max: CREDIT_PRICES.variant, maxNewScenes: 0, fixRounds: 0 };
 }
 
-/** What is actually charged once the montage is delivered: the real scenes and corrections, never above the quote. */
-export function montageCharge(quote: Pick<MontageQuote, "base" | "max">, newScenes: number, fixRounds = 0): number {
-  return Math.min(quote.max, quote.base + Math.max(0, newScenes) * CREDIT_PRICES.newScene + Math.max(0, fixRounds) * CREDIT_PRICES.fixRound);
+/** The quote's line for its made-to-measure animations. */
+const scenesLabel = (n: number) => (n > 1 ? `${n} animations sur mesure` : "1 animation sur mesure");
+const SCENES_LINE = /^\d+ animations? sur mesure$/;
+
+/** New animated scenes already counted in a quote's price (older quotes counted none). */
+export function scenesInQuote(lines: QuoteLine[] | null | undefined): number {
+  return (lines ?? []).filter((l) => SCENES_LINE.test(l.label)).reduce((sum, l) => sum + Math.round(l.credits / CREDIT_PRICES.newScene), 0);
+}
+
+/**
+ * What is actually charged once the montage is delivered: the work, the new scenes
+ * really made (the quoted ones not made come off) and the corrections, never above the quote.
+ */
+export function montageCharge(quote: Pick<MontageQuote, "base" | "max" | "lines">, newScenes: number, fixRounds = 0): number {
+  const work = quote.base - scenesInQuote(quote.lines) * CREDIT_PRICES.newScene;
+  return Math.min(quote.max, work + Math.max(0, newScenes) * CREDIT_PRICES.newScene + Math.max(0, fixRounds) * CREDIT_PRICES.fixRound);
 }

@@ -16,8 +16,34 @@ export type TemplateCode = { id: string; code: string; js: string };
 
 const slots = (raw: unknown): MotionSlot[] => z.array(motionSlotSchema).catch([]).parse(raw);
 
-/** The library as the editor sees it (no code). */
-export async function templatesForEditor(studioId: string): Promise<TemplateSummary[]> {
+/** Reels in a row never share a scene: the ones of the studio's last Reels are held back. */
+const RECENT_REELS = 2;
+
+/** Library scenes shown in the studio's latest Reels (their current version), this post's aside. */
+export async function recentlyShownTemplates(studioId: string, exceptPostId: string): Promise<Set<string>> {
+  const db = supabaseAdmin();
+  const { data: posts } = await db
+    .from("posts")
+    .select("edit_plan_id")
+    .eq("studio_id", studioId)
+    .neq("id", exceptPostId)
+    .not("edit_plan_id", "is", null)
+    .neq("status", "skipped")
+    .order("created_at", { ascending: false })
+    .limit(RECENT_REELS);
+  const planIds = (posts ?? []).map((p) => p.edit_plan_id as string);
+  if (!planIds.length) return new Set();
+  const { data: plans } = await db.from("edit_plans").select("plan").in("id", planIds);
+  const ids = (plans ?? []).flatMap((p) =>
+    ((p.plan as { segments?: { motion?: { template_id?: unknown } }[] } | null)?.segments ?? []).flatMap((s) =>
+      typeof s.motion?.template_id === "string" ? [s.motion.template_id] : [],
+    ),
+  );
+  return new Set(ids);
+}
+
+/** The library as the editor sees it (no code), without the scenes held back. */
+export async function templatesForEditor(studioId: string, holdBack: Set<string> = new Set()): Promise<TemplateSummary[]> {
   const { data, error } = await supabaseAdmin()
     .from("motion_templates")
     .select("id, name, description, slots, duration_seconds")
@@ -26,12 +52,12 @@ export async function templatesForEditor(studioId: string): Promise<TemplateSumm
     .is("archived_at", null)
     .order("uses", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(LIBRARY_SIZE);
+    .limit(LIBRARY_SIZE + holdBack.size);
   if (error) {
     console.warn("motion_templates: listing failed", error.message);
     return [];
   }
-  return data.map((t) => ({
+  return data.filter((t) => !holdBack.has(t.id as string)).slice(0, LIBRARY_SIZE).map((t) => ({
     id: t.id as string,
     name: t.name as string,
     // The editor only needs the gist of what the scene shows.

@@ -300,12 +300,15 @@ test("editor: library scenes keep their id and get their texts as a record", asy
 test("credits: a montage is quoted before it runs and never charged above the quote", async () => {
   const { quoteMontage, montageCharge, CREDIT_PRICES } = await import("./credits.ts");
   const quote = quoteMontage({ clips: 4, correction: false });
-  assert.deepEqual(quote.lines.map((l) => l.credits), [CREDIT_PRICES.montage, 4, CREDIT_PRICES.render]);
-  assert.equal(quote.base, 7);
-  assert.equal(quote.max, 13); // two new animated scenes at most
-  assert.equal(montageCharge(quote, 0), 7); // library scenes only
+  // The new animated scenes allowed are in the price shown, not hidden behind a maximum.
+  assert.deepEqual(quote.lines.map((l) => l.credits), [CREDIT_PRICES.montage, 4, 2 * CREDIT_PRICES.newScene, CREDIT_PRICES.render]);
+  assert.equal(quote.base, 13);
+  assert.equal(quote.max, 13); // Rapide: no correction to add
+  assert.equal(montageCharge(quote, 0), 7); // library scenes only: the quoted ones not made come off
   assert.equal(montageCharge(quote, 1), 10);
   assert.equal(montageCharge(quote, 5), 13); // capped at the quote
+  // An older quote counted no scene in its price.
+  assert.equal(montageCharge({ base: 7, max: 13, lines: [{ label: "Montage", credits: 7 }] }, 1), 10);
   const simple = quoteMontage({ clips: 2, correction: true, maxNewScenes: 0 });
   assert.equal(simple.base, 3); // a correction does not re-watch the clips
   assert.equal(simple.max, 3);
@@ -662,7 +665,7 @@ test("effort: each level adds its review, second version and corrections to the 
 
   const soigne = quoteMontage({ clips: 3, correction: false, effort: "soigne" });
   assert.equal(soigne.base, rapide.base + CREDIT_PRICES.review);
-  assert.equal(soigne.max, soigne.base + 2 * CREDIT_PRICES.newScene + CREDIT_PRICES.fixRound);
+  assert.equal(soigne.max, soigne.base + CREDIT_PRICES.fixRound); // the new scenes are already in the price
   assert.ok(soigne.max <= AUTO_START_MAX_CREDITS); // the usual montage still starts at once
 
   const max = quoteMontage({ clips: 3, correction: false, effort: "max" });
@@ -670,9 +673,10 @@ test("effort: each level adds its review, second version and corrections to the 
   assert.equal(max.fixRounds, 2);
   assert.ok(max.max > AUTO_START_MAX_CREDITS); // Max waits for a yes
 
-  // Charged: base, scenes and corrections really made, never above the quote.
-  assert.equal(montageCharge(soigne, 0, 0), soigne.base);
-  assert.equal(montageCharge(soigne, 1, 1), soigne.base + CREDIT_PRICES.newScene + CREDIT_PRICES.fixRound);
+  // Charged: the work, the scenes and corrections really made, never above the quote.
+  assert.equal(montageCharge(soigne, 2, 0), soigne.base);
+  assert.equal(montageCharge(soigne, 0, 0), soigne.base - 2 * CREDIT_PRICES.newScene);
+  assert.equal(montageCharge(soigne, 1, 1), soigne.base - CREDIT_PRICES.newScene + CREDIT_PRICES.fixRound);
   assert.equal(montageCharge(soigne, 5, 5), soigne.max);
 
   // A correction is one version, even at Max.
@@ -902,4 +906,22 @@ test("a dark one-colour logo turns white on the end card, a dark coloured one ge
   assert.equal(logoOnDark(logo([250, 250, 250])), "as_is");
   // A square logo with its own background stays as it is.
   assert.equal(logoOnDark(logo([10, 10, 10], 100)), "as_is");
+});
+
+test("editor: a library scene plays once per Reel, a repeat becomes a new scene or a fixed one", async () => {
+  const { fromEditorPlan, normalizeEditPlan } = await import("./editor.ts");
+  const id = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b";
+  const reuse = (words: string) => ({
+    motion: { brief: "La même affiche", fallback: { kind: "title" as const, title: words, background: "accent" as const }, template_id: id, template_texts: [{ slot: "title", text: words }] },
+    duration: 3,
+  });
+  const plan = fromEditorPlan({
+    ...editPlanObjectSchema.parse({ ...validPlan, segments: [{ clip_id: "a", in: 0, out: 2, zoom: "none" }], texts: [] }),
+    template: "doux",
+    segments: [reuse("PIGALLE"), reuse("LA CHEFFE"), reuse("SURPRISE GARANTIE")],
+  });
+  const kinds = (max: number) =>
+    normalizeEditPlan(plan, {}, max).segments.map((s) => ("motion" in s ? (s.motion.template_id ? "library" : "new") : "scene" in s ? `scene:${s.scene.title}` : "clip"));
+  assert.deepEqual(kinds(1), ["library", "new", "scene:SURPRISE GARANTIE"]);
+  assert.deepEqual(kinds(0), ["library", "scene:LA CHEFFE", "scene:SURPRISE GARANTIE"]);
 });

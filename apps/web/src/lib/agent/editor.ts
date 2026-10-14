@@ -26,7 +26,7 @@ import { latestReport } from "@/lib/performance";
 import { designMotionScenes } from "./motion-designer";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { isFirstReel } from "@/lib/onboarding";
-import { markTemplatesUsed, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
+import { markTemplatesUsed, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { anthropic, logClaudeCost } from "./run";
 
 export type DesignedEdit = {
@@ -59,12 +59,12 @@ export async function designEdit(params: {
   fresh?: boolean;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
-  const [post, studio, brand, previous, library, report, inspirations] = await Promise.all([
+  const [post, studio, brand, previous, recent, report, inspirations] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
     db.from("studios").select("name, business_type, booking_url, memory").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
-    templatesForEditor(params.studioId),
+    recentlyShownTemplates(params.studioId, params.postId),
     latestReport(params.studioId).catch(() => null),
     db.from("inspirations").select("analysis").eq("studio_id", params.studioId).not("analysis", "is", null).order("created_at", { ascending: false }).limit(6),
   ]);
@@ -75,6 +75,9 @@ export async function designEdit(params: {
   const baseId = params.fromPlanId ?? (post.data.edit_plan_id as string | null);
   const from = baseId ? await db.from("edit_plans").select("plan").eq("id", baseId).eq("post_id", params.postId).maybeSingle() : { data: null };
   const previousPlan = editPlanSchema.safeParse(from.data?.plan ?? previous.data?.[0]?.plan);
+  // Reels in a row never share a scene: the latest Reels' scenes are held back, except this Reel's own (a correction keeps them).
+  const own = new Set(previousPlan.success ? previousPlan.data.segments.filter(isMotionSegment).flatMap((s) => (s.motion.template_id ? [s.motion.template_id] : [])) : []);
+  const library = await templatesForEditor(params.studioId, new Set([...recent].filter((id) => !own.has(id))));
   const mediaIds = params.mediaIds?.length
     ? params.mediaIds
     : previousPlan.success

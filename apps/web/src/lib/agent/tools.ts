@@ -369,8 +369,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // Her first Reel is her first impression: it always gets its made-to-measure animations.
       const firstReel = !correction && !variant && (await isFirstReel(studioId, post_id));
       // Made-to-measure animations stay rare: one at most on a new montage (her library does the
-      // rest), none on a correction unless she asked for a new one (Brigitte then passes 1).
-      const scenes = firstReel ? MAX_FREE_SCENES : (max_new_scenes ?? (correction || variant ? 0 : 1));
+      // rest, each scene once), none on a correction unless she asked for a new one (Brigitte then
+      // passes 1). A Reel made only of animations, with three or more, needs two.
+      const animations = plan?.scenes.filter((s) => s.kind === "animation").length ?? 0;
+      const allMotion = !media_ids?.length && animations > 2;
+      const scenes = firstReel ? MAX_FREE_SCENES : (max_new_scenes ?? (correction || variant ? 0 : allMotion ? MAX_FREE_SCENES : 1));
       const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: scenes, variant, plan, effort: wanted });
       if ("error" in quote) {
         return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });
@@ -412,7 +415,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             credits_max: quote.max,
             solde: quote.balance,
             ...soin,
-            note: `Petit montage : il est déjà lancé, sans attendre d'accord, et son niveau ne change plus (un autre niveau serait un nouveau montage, après la livraison). Décris le plan en 2 ou 3 phrases (durée, scènes) avec son coût (credits, jusqu'à credits_max s'il crée des animations ou si tu le fais corriger après l'avoir regardé)${level ? `, le niveau (${level.label} : ${pitch.toLowerCase()})` : ""}, et dis que la vidéo arrive dans ${level?.minutes ?? "2 à 4"} minutes ; elle pourra demander une correction ensuite. Ne demande pas « je lance ? » et ne propose pas d'autre niveau.`,
+            note: `Petit montage : il est déjà lancé, sans attendre d'accord, et son niveau ne change plus (un autre niveau serait un nouveau montage, après la livraison). Décris le plan en 2 ou 3 phrases (durée, scènes) avec son coût (credits, animations sur mesure comprises ; jusqu'à credits_max seulement si tu le fais corriger après l'avoir regardé)${level ? `, le niveau (${level.label} : ${pitch.toLowerCase()})` : ""}, et dis que la vidéo arrive dans ${level?.minutes ?? "2 à 4"} minutes ; elle pourra demander une correction ensuite. Ne demande pas « je lance ? » et ne propose pas d'autre niveau.`,
           });
         }
       }
@@ -429,7 +432,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         solde: quote.balance,
         ...soin,
         ...(autres.length ? { autres_niveaux: autres } : {}),
-        note: `Présente le plan, le niveau et le coût (credits, ou jusqu'à credits_max s'il crée de nouvelles scènes ou si tu le fais corriger), puis attends son accord avant montage. Si elle choisit un autre niveau, lance montage avec ce quote_id et effort.${
+        note: `Présente le plan, le niveau et le coût (credits, animations sur mesure comprises ; jusqu'à credits_max si tu le fais corriger après l'avoir regardé), puis attends son accord avant montage. Si elle choisit un autre niveau, lance montage avec ce quote_id et effort.${
           ctx.waId && quote.effort && otherEffort(quote.effort, Object.keys(quote.efforts) as Effort[])
             ? ` Sur WhatsApp, un bouton « Version ${EFFORTS[otherEffort(quote.effort, Object.keys(quote.efforts) as Effort[])!].label} » est proposé sous ton message : donne son prix (autres_niveaux) en une phrase.`
             : ""
