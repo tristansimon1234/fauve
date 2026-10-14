@@ -108,7 +108,7 @@ export async function loadTestState(member: TestMember): Promise<TestState> {
     snapshot: {
       studio: {
         name: studio.data?.name ?? null,
-        onboardingStep: studio.data?.onboarding_step ?? "studio_name",
+        onboardingStep: studio.data?.onboarding_step ?? "website",
         websiteUrl: studio.data?.website_url ?? null,
         bookingUrl: studio.data?.booking_url ?? null,
       },

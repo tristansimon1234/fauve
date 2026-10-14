@@ -9,6 +9,7 @@ import { whatsappLink } from "@/lib/public-env";
 import { getStudioContext, rows } from "@/lib/studio";
 import { listConversations, loadConversation } from "./chat-actions";
 import { FauveWorkspace, type Suggestion } from "./fauve-workspace";
+import { onboardingView } from "./onboarding-actions";
 
 export const metadata: Metadata = { title: "Fauve" };
 // The chat runs Fauve (and may queue a montage) inside a server action.
@@ -52,6 +53,7 @@ async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searc
     listConversations(),
     creditBalance(studioId),
   ]);
+  const onboarding = await onboardingView();
   const active = typeof requested === "string" && conversations.some((c) => c.id === requested) ? requested : null;
   const messages = active ? ((await loadConversation(active)) ?? []) : [];
 
@@ -94,6 +96,7 @@ async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searc
       initialConversations={conversations}
       initialActive={active}
       initialMessages={messages}
+      onboarding={onboarding?.step === "done" ? null : onboarding}
     />
   );
 }

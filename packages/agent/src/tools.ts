@@ -11,6 +11,7 @@ import {
   replyExtrasSchema,
 } from "./schemas.ts";
 import { effortSchema } from "./effort.ts";
+import { ONBOARDING_STEPS } from "./onboarding.ts";
 import { slideTextSchema } from "./slides.ts";
 import { textLookSchema } from "./text-look.ts";
 
@@ -51,7 +52,7 @@ export const toolSpecs = {
       platforms: z.array(platformSchema).min(1).optional(),
       website_url: z.url().optional().describe("Site web du studio"),
       booking_url: z.url().optional().describe("Lien de réservation ou de prise de rendez-vous (bsport, Planity, TheFork, Momoyoga…), utilisé dans la bio et les stories"),
-      step: z.enum(["studio_name", "rhythm", "examples", "connect", "done"]).optional(),
+      step: z.enum(ONBOARDING_STEPS).optional().describe("L'étape d'onboarding où elle en est maintenant (avance-la dès qu'une étape est faite)"),
     }),
   },
   read_website: {
@@ -375,9 +376,14 @@ export const toolSpecs = {
       "Enregistre une nouvelle version du profil de style du studio (à partir d'exemples ou d'une correction de la gérante).",
     input: z.object({ profile: brandProfileSchema }),
   },
+  add_to_moodboard: {
+    description:
+      "Ajoute à son moodboard (Style) des images qu'elle t'a envoyées (posts qu'elle aime, ambiances, couleurs), puis Fauve relit tout le moodboard : la lecture guide ensuite les montages et les composants. Gratuit pendant l'onboarding, 1 crédit ensuite.",
+    input: z.object({ media_ids: z.array(z.string().uuid()).min(1).max(12) }),
+  },
   reply_with: {
     description:
-      "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. upload : une zone de dépôt (video, photo ou any) quand tu demandes des fichiers dans l'application. pick_media (video, photo ou any) : sa médiathèque en vignettes à cocher, avec aussi l'ajout de nouveaux fichiers ; sa réponse revient avec les media_id choisis. Ni l'un ni l'autre n'apparaît sur WhatsApp. Appelle-le au plus une fois par réponse, avec ton message.",
+      "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. upload : une zone de dépôt (video, photo ou any) quand tu demandes des fichiers dans l'application. pick_media (video, photo ou any) : sa médiathèque en vignettes à cocher, avec aussi l'ajout de nouveaux fichiers ; sa réponse revient avec les media_id choisis. step_card (onboarding, dans l'app) : la carte de l'étape en cours (website : champ pour son site ; style : sa charte trouvée et son moodboard ; rhythm : son rythme ; connect : le bouton Instagram ; first_post : créer sa première publication). Aucun de ces trois n'apparaît sur WhatsApp. Appelle-le au plus une fois par réponse, avec ton message.",
     input: replyExtrasSchema.omit({ quote: true }),
   },
   react_to_message: {

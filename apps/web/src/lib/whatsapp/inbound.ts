@@ -1,5 +1,6 @@
 import "server-only";
-import { awaitsAnswer, echoFor, emojiOnly, replyExtrasSchema } from "@fauve/agent";
+import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, replyExtrasSchema } from "@fauve/agent";
+import { claimPairing } from "@/lib/auth/pairing";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { quoteButtons } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -108,6 +109,19 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   }
 
   await markReadAndTyping(message.id).catch((e) => console.warn("typing indicator failed", e));
+
+  // « Bonjour Fauve ! Code : K7P2QX » from the start screen on a computer: that screen opens
+  // her space, and the getting started goes on there.
+  if (message.type === "text" && (await claimPairing(textOf(message), phone))) {
+    const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", member.studio_id).single();
+    const fresh = onboardingStepOf(studio?.onboarding_step) !== "done";
+    const reply = fresh
+      ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Fauve, ta community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment.`
+      : "C’est bon, ton ordinateur est connecté ✨";
+    const waMessageId = await sendText(message.from, reply).catch(() => undefined);
+    await db.from("whatsapp_messages").insert({ studio_id: member.studio_id, wa_message_id: waMessageId, direction: "outbound", phone_e164: phone, type: "text", body: reply, payload: { reply_to: message.id } });
+    return;
+  }
 
   const media = await storeMedia(member.studio_id, message).catch((e) => {
     console.error("media storage failed", e);

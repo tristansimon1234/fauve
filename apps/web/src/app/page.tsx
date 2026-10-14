@@ -1,5 +1,4 @@
 import Link from "next/link";
-import QRCode from "qrcode";
 import { WhatsAppIcon } from "@/components/icons";
 import { Logo, Orb } from "@/components/orb";
 import { whatsappLink } from "@/lib/public-env";
@@ -13,18 +12,13 @@ const exampleClips = [
 ];
 
 const steps = [
-  ["Écris à Fauve", "Elle te pose quelques questions sur ton studio et ton rythme de publication."],
-  ["Connecte ton Instagram", "Un lien sécurisé, une autorisation. TikTok aussi, si tu veux."],
-  ["Envoie tes vidéos", "Fauve monte, écrit et programme. Tu valides d’un mot, ou pas du tout."],
+  ["Présente ton commerce", "Ton site, ton style, ton rythme : Fauve apprend qui tu es, sur ton ordinateur ou sur WhatsApp."],
+  ["Connecte ton Instagram", "Un lien sécurisé, une autorisation. Rien ne part sans ta validation."],
+  ["Montre-lui ce que tu aimes", "Un post ou un Reel qui te plaît, tes photos et vidéos : Fauve monte, écrit et programme."],
 ];
 
-export default async function LandingPage() {
+export default function LandingPage() {
   const waUrl = whatsappLink();
-  const qrSvg = await QRCode.toString(waUrl, {
-    type: "svg",
-    margin: 0,
-    color: { dark: "#1C1530", light: "#0000" },
-  });
 
   return (
     <div className="min-h-dvh bg-soft">
@@ -37,7 +31,14 @@ export default async function LandingPage() {
           <a href="#tarif" className="hidden text-[15px] font-semibold sm:inline">
             Tarif
           </a>
-          <a href={waUrl} className="btn btn-primary h-11">
+          <Link href="/commencer?connexion" className="hidden text-[15px] font-semibold md:inline">
+            Se connecter
+          </Link>
+          {/* On a computer, getting started happens in the app (a code to send from the phone); on a phone, on WhatsApp. */}
+          <Link href="/commencer" className="btn btn-primary hidden h-11 md:inline-flex">
+            Commencer
+          </Link>
+          <a href={waUrl} className="btn btn-primary h-11 md:hidden">
             <WhatsAppIcon size={18} />
             Essayer sur WhatsApp
           </a>
@@ -57,7 +58,10 @@ export default async function LandingPage() {
             quelque chose, c’est elle qui te relance.
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <a href={waUrl} className="btn btn-primary h-14 px-7 text-base">
+            <Link href="/commencer" className="btn btn-primary hidden h-14 px-7 text-base md:inline-flex">
+              Commencer
+            </Link>
+            <a href={waUrl} className="btn btn-primary h-14 px-7 text-base md:hidden">
               <WhatsAppIcon />
               Commencer sur WhatsApp
             </a>
@@ -105,16 +109,16 @@ export default async function LandingPage() {
           </div>
 
           <div className="hidden items-center gap-4.5 rounded-[22px] border border-line bg-white px-5 py-4 md:flex">
-            <span
-              role="img"
-              aria-label="QR code pour ouvrir WhatsApp"
-              className="block size-28 shrink-0 [&>svg]:size-full"
-              dangerouslySetInnerHTML={{ __html: qrSvg }}
-            />
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet">
+              <WhatsAppIcon size={22} />
+            </span>
             <span className="flex flex-col gap-1">
               <span className="text-base font-bold">Sur ordinateur ?</span>
               <span className="text-sm leading-normal text-muted">
-                Scanne avec ton téléphone pour ouvrir la conversation avec Fauve.
+                On fait connaissance ici, et Fauve reste joignable sur WhatsApp.{" "}
+                <Link href="/commencer" className="font-semibold text-violet hover:underline">
+                  Commencer
+                </Link>
               </span>
             </span>
           </div>

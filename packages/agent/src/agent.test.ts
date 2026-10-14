@@ -538,6 +538,18 @@ test("components: code checks, kit output, placement and slide props", async () 
   assert.deepEqual(props.elements, [{ js: placed.js, texts: { titre: "Neuf" }, fonts: [], base: 400, box: { x: 0.6, y: 0.05, w: 0.3 } }]);
 });
 
+test("onboarding: steps in order, old values read as their new step", async () => {
+  const { nextOnboardingStep, onboardingStepOf, ONBOARDING_STEPS } = await import("./onboarding.ts");
+  assert.deepEqual([...ONBOARDING_STEPS], ["website", "style", "rhythm", "connect", "first_post", "done"]);
+  assert.equal(nextOnboardingStep("website"), "style");
+  assert.equal(nextOnboardingStep("first_post"), "done");
+  assert.equal(nextOnboardingStep("done"), "done");
+  assert.equal(onboardingStepOf("studio_name"), "website");
+  assert.equal(onboardingStepOf("examples"), "style");
+  assert.equal(onboardingStepOf("connect"), "connect");
+  assert.equal(onboardingStepOf(null), "website");
+});
+
 test("house text layers pass the same checks as generated ones", async () => {
   const { readFileSync } = await import("node:fs");
   const { checkLayerCode, layerSlotSchema } = await import("./text-layer.ts");

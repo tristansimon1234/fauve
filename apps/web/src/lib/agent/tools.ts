@@ -18,6 +18,7 @@ import {
   type Effort,
   type TextLook,
   addFacts,
+  onboardingStepOf,
   readMemory,
   removeFacts,
 } from "@fauve/agent";
@@ -37,6 +38,8 @@ import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { elementInstance, listElements, loadElement, markElementsUsed, placeElements } from "@/lib/elements";
 import { startElements } from "@/lib/elements-start";
+import { addToMoodboard } from "@/lib/moodboard-add";
+import { completeFirstPost } from "@/lib/onboarding";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
@@ -268,6 +271,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           .single(),
       );
       ctx.notes.push(`publication créée « ${post.title as string} » post_id=${post.id as string}`);
+      await completeFirstPost(studioId);
       return json({ post });
     },
 
@@ -626,6 +630,17 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         inspirations: items.map((i) => ({ inspiration_id: i.id, titre: i.title, a_reprendre: i.summary ?? (i.reading ? "en cours de lecture" : undefined), source: i.source })),
         note: items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration : elle peut partager un Reel à Fauve sur Instagram ou en ajouter un dans l'app.",
+      });
+    },
+
+    async add_to_moodboard({ media_ids }) {
+      const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
+      const result = await addToMoodboard(studioId, media_ids, { free: onboardingStepOf(studio?.onboarding_step) !== "done" });
+      if ("error" in result) return json({ error: result.error });
+      return json({
+        ajoutees: result.added,
+        lecture: result.reading ?? undefined,
+        note: "Dis en une phrase ce que tu retiens de son moodboard (la lecture), sans la recopier.",
       });
     },
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { completeFirstPost } from "@/lib/onboarding";
 import { motionTemplateSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -156,6 +157,7 @@ export async function createPost(input: {
     .select("id")
     .single();
   if (error) return { ok: false, error: "La publication n’a pas été créée. Réessaie." };
+  await completeFirstPost(member.studio.id);
   revalidateCalendar();
   return { ok: true, id: data.id as string, title };
 }

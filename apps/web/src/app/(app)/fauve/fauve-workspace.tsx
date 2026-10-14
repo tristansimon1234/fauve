@@ -27,6 +27,8 @@ import { Bubble } from "./chat-bubble";
 import { montageStep } from "./chat-cards";
 import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "./chat-sync";
 import { FileStrip, useChatUploads } from "./chat-uploads";
+import type { OnboardingView } from "./onboarding-actions";
+import { OnboardingCard, OnboardingStepper } from "@/components/onboarding/onboarding-card";
 import { applyLive, liveTurn, type LiveState } from "./live-turn";
 import { LiveTyping } from "./live-typing";
 import {
@@ -81,7 +83,10 @@ export function FauveWorkspace({
   initialConversations,
   initialActive,
   initialMessages,
+  onboarding = null,
 }: {
+  /** Getting started, while it is not done: the current step on the home, and its card. */
+  onboarding?: OnboardingView | null;
   studioId: string;
   firstName: string | null;
   summary: string;
@@ -287,6 +292,8 @@ export function FauveWorkspace({
           setArrived(arrivals(messagesRef.current, res.messages));
           setMessages(mergeMessages(messagesRef.current, res.messages));
           setConversations(res.conversations);
+          // Getting started: Fauve may have moved to the next step.
+          if (onboarding) router.refresh();
         } else {
           setError(res.error);
           if (res.conversationId) setActive(res.conversationId);
@@ -425,7 +432,22 @@ export function FauveWorkspace({
             follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
           }}
         >
-          {fresh ? (
+          {fresh && onboarding && onboarding.step !== "done" ? (
+            <div className="mx-auto flex min-h-full w-full max-w-[640px] flex-col items-center justify-center gap-6 px-4 py-8 text-center">
+              <Mascot size={88} />
+              <div className="flex flex-col gap-2.5">
+                <h1 className="text-[32px] font-extrabold tracking-[-0.03em] sm:text-[42px]">
+                  Bienvenue{firstName ? " " : ""}
+                  {firstName && <span className="accent">{firstName}</span>}
+                </h1>
+                <p className="mx-auto max-w-[520px] text-[15px] text-muted sm:text-[16px]">
+                  On prépare ton compte ensemble, en cinq étapes. Tu peux aussi me répondre en bas, ou sur WhatsApp.
+                </p>
+              </div>
+              <OnboardingStepper step={onboarding.step} />
+              <OnboardingCard key={onboarding.step} step={onboarding.step} timezone={timezone} initial={onboarding} onSend={(text) => send(text)} />
+            </div>
+          ) : fresh ? (
             <div className="mx-auto flex min-h-full w-full max-w-[820px] flex-col items-center justify-center gap-6 px-4 py-8 text-center">
               <Mascot size={104} />
               <div className="flex flex-col gap-3">
@@ -469,6 +491,11 @@ export function FauveWorkspace({
             </div>
           ) : (
             <div className="mx-auto flex w-full max-w-[780px] flex-col gap-3 px-4 py-6">
+              {onboarding && onboarding.step !== "done" && (
+                <div className="sticky top-0 z-10 -mx-1 rounded-[16px] bg-white/90 px-3 py-2.5 backdrop-blur">
+                  <OnboardingStepper step={onboarding.step} />
+                </div>
+              )}
               {running && <MontageReminder quote={running} scroller={scrollerRef} />}
               {loading && <p className="self-center text-sm text-muted">Chargement…</p>}
               {messages.map((m, i) => (
