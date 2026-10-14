@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from "react";
 import { Bubble } from "@/app/(app)/fauve/chat-bubble";
 import { applyLive, liveTurn, type LiveState } from "@/app/(app)/fauve/live-turn";
+import { BrigitteLive } from "@/app/(app)/fauve/brigitte-avatar";
 import { LiveTyping } from "@/app/(app)/fauve/live-typing";
 import { montageStep } from "@/app/(app)/fauve/chat-cards";
 import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "@/app/(app)/fauve/chat-sync";
@@ -18,7 +19,7 @@ import {
 } from "@/app/(app)/fauve/chat-actions";
 import { FileStrip, useChatUploads } from "@/app/(app)/fauve/chat-uploads";
 import { ArrowUpIcon, PaperclipIcon, XIcon } from "./icons";
-import { Orb } from "./orb";
+import { Mascot } from "./mascot";
 
 // Fauve's chat as a side panel, over any page of the app, about one
 // publication (and maybe one scene of its montage): the manager asks for a
@@ -72,7 +73,7 @@ export function AskFauveButton({
   const open = useFauveDrawer();
   return (
     <button type="button" onClick={() => open(topic)} className={className}>
-      <Orb size={18} still />
+      <Mascot size={22} still />
       {label}
     </button>
   );
@@ -320,8 +321,8 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
             <p className="text-[16px] font-bold text-violet">Dépose tes photos et vidéos</p>
           </div>
         )}
-        <header className="flex items-center gap-3 border-b border-line px-5 py-3.5">
-          <Orb size={30} />
+        <header className="flex items-center gap-3 border-b border-line px-5 py-3">
+          <BrigitteLive typing={typing} cue={null} size={44} />
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-bold leading-tight">Brigitte</p>
             <p className="truncate text-[12px] text-muted">

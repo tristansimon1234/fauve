@@ -3,17 +3,26 @@
 import { useEffect, useState } from "react";
 import { Mascot, type MascotMood } from "@/components/mascot";
 
+/** The latest message Brigitte reacts to. */
+export type BrigitteCue = { id: string; funny: boolean; upset: "sad" | "cry" | null; fresh: boolean };
+
+/** How long each reaction lasts before she goes back to rest. */
+const REACTION_MS: Partial<Record<MascotMood, number>> = { cry: 4500, sad: 4500, laugh: 3200, happy: 2200 };
+
 /**
- * Brigitte next to her latest message: she laughs a few seconds when the
- * exchange is funny (her words or the manager's), looks sad or cries when the
- * manager is upset, then goes back to rest.
+ * One Brigitte for the whole conversation (its header): she thinks while she
+ * writes, then reacts to the message that just arrived (laughs when the exchange
+ * is funny, is sad or cries when the manager is upset, is pleased otherwise) and
+ * goes back to rest. A single mascot, so every change of mood is a transition.
  */
-export function BrigitteAvatar({ funny, upset = null, fresh, size = 26 }: { funny: boolean; upset?: "sad" | "cry" | null; fresh: boolean; size?: number }) {
-  const [mood, setMood] = useState<MascotMood>(!fresh ? "idle" : upset ? upset : funny ? "laugh" : "happy");
+export function BrigitteLive({ typing, cue, size }: { typing: boolean; cue: BrigitteCue | null; size: number }) {
+  const [rested, setRested] = useState<string | null>(null);
+  const reaction: MascotMood | null = cue?.fresh && rested !== cue.id ? (cue.upset ?? (cue.funny ? "laugh" : "happy")) : null;
+  const cueId = cue?.id;
   useEffect(() => {
-    if (mood === "idle") return;
-    const timer = setTimeout(() => setMood("idle"), mood === "cry" || mood === "sad" ? 4500 : mood === "laugh" ? 3200 : 2200);
+    if (!reaction || !cueId) return;
+    const timer = setTimeout(() => setRested(cueId), REACTION_MS[reaction] ?? 2200);
     return () => clearTimeout(timer);
-  }, [mood]);
-  return <Mascot size={size} mood={mood} />;
+  }, [reaction, cueId]);
+  return <Mascot size={size} mood={typing ? "thinking" : (reaction ?? "idle")} />;
 }
