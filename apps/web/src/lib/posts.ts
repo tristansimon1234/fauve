@@ -17,7 +17,7 @@ export async function scheduleValidated(studioId: string, postId: string): Promi
   const at = planned && planned.getTime() > Date.now() + 60_000 ? planned : new Date();
   const { data } = await db
     .from("posts")
-    .update({ status: "scheduled", scheduled_at: at.toISOString(), publish_started_at: null, publish_error: null })
+    .update({ status: "scheduled", scheduled_at: at.toISOString(), publish_started_at: null, publish_error: null, handoff_at: null, handoff_via: null })
     .eq("id", postId)
     .eq("status", "validated")
     .select("id");

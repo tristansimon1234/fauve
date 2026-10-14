@@ -21,8 +21,7 @@ import { loadTextLooks } from "@/lib/text-looks";
 import { versionKey } from "@/lib/version-key";
 import { deletePost } from "./actions";
 import { CoverPicker } from "@/components/montage/cover-picker";
-import { MusicPicker } from "@/components/montage/music-picker";
-import { musicFor } from "@/lib/music";
+import { PublishByHand } from "@/components/montage/publish-by-hand";
 import { MontageEditor } from "./montage-editor";
 import { PostEditor } from "./post-editor";
 import { CarouselEditor } from "./carousel-editor";
@@ -44,7 +43,8 @@ const postSchema = z.object({
   slides: z.unknown(),
   cover: postCoverSchema.nullable().catch(null),
   share_to_feed: z.boolean().catch(true),
-  audio: z.unknown(),
+  publish_by_hand: z.boolean().catch(false),
+  handoff_at: z.string().nullable().catch(null),
 });
 
 // Read leniently: an older or partial plan still shows what it can.
@@ -68,6 +68,8 @@ type Render = z.infer<typeof renderSchema>;
 const textStyleLabels: Record<string, string> = { hook: "Accroche", band: "Bandeau", caption: "Sous-titre" };
 const segmentColors = ["bg-violet", "bg-coral", "bg-lilac", "bg-peach-ink", "bg-violet-hover"];
 const LOCKED: readonly PostStatus[] = ["published", "measured"];
+
+const handedFormat = (timeZone: string) => new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone });
 const POST_FORM = "post-form";
 
 export default function PostPage({ params }: PageProps<"/publications/[id]">) {
@@ -91,7 +93,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const { data, error } = await db
     .from("posts")
-    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed, audio")
+    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed, publish_by_hand, handoff_at")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -100,8 +102,6 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   const post = postSchema.parse(data);
 
   const plan = await loadPlan(db, post);
-  // Instagram's music, on a Reel that can still change.
-  const music = post.kind === "reel" && !LOCKED.includes(post.status) ? await musicFor(studioId, post.audio) : null;
   const render = await loadRender(db, plan?.id ?? null, post.render_id);
   const [videoUrls, clipLabels] = await Promise.all([
     render?.status === "done" && render.storage_path
@@ -110,6 +110,11 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
     plan ? loadClipLabels(db, [...plan.view.segments.map((s) => s.clip_id), ...post.media_ids]) : Promise.resolve(new Map<string, string>()),
   ]);
   const videoUrl = render?.storage_path ? videoUrls.get(render.storage_path) : undefined;
+  // « Je publie moi-même » : the video to save, under the post's name.
+  const downloadUrl =
+    post.kind === "reel" && post.publish_by_hand && render?.status === "done" && render.storage_path
+      ? ((await db.storage.from("media").createSignedUrl(render.storage_path, 3600, { download: `${post.title.replace(/[^\p{L}\p{N} _-]+/gu, "").trim() || "reel"}.mp4` })).data?.signedUrl ?? null)
+      : null;
   // Photo post, carousel or story without a montage: the post's own photos and videos, in order.
   const media = videoUrl ? [] : await loadPostMedia(db, studioId, post.media_ids);
 
@@ -145,7 +150,16 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         />
       )}
 
-      {music && <MusicPicker key={versionKey(post.audio)} postId={post.id} available={music.available} initial={music.track} />}
+      {post.kind === "reel" && canEdit && (
+        <PublishByHand
+          key={versionKey(post.publish_by_hand, post.handoff_at)}
+          postId={post.id}
+          initial={post.publish_by_hand}
+          handedOffAt={post.handoff_at ? handedFormat(tz).format(new Date(post.handoff_at)) : null}
+          downloadUrl={downloadUrl}
+          caption={[post.caption ?? "", post.hashtags.map((h) => `#${h}`).join(" ")].filter(Boolean).join("\n\n")}
+        />
+      )}
 
       <div className="flex flex-col gap-2">
         <PostEditor

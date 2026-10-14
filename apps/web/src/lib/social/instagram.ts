@@ -26,9 +26,9 @@ export class InstagramError extends Error {
 }
 
 /**
- * The Graph host for a token: a Facebook Login token (« EAA… », Instagram API with
- * Facebook Login, the one that has the music library) talks to graph.facebook.com,
- * an Instagram Login token (« IG… ») to graph.instagram.com. Same paths on both.
+ * The Graph host for a token: an Instagram Login token (« IG… ») talks to
+ * graph.instagram.com; a Facebook Login token (« EAA… », accounts connected that
+ * way earlier) to graph.facebook.com. Same paths on both.
  */
 export const viaFacebook = (token: string) => token.startsWith("EAA");
 const graphUrl = (token: string, path: string) =>
@@ -156,7 +156,7 @@ export type PublishItem = { type: "image" | "video"; url: string };
  */
 export type PublishRequest =
   /** cover: a frame of the video (seconds) or an image (public JPEG URL) for the grid. */
-  | { kind: "reel"; videoUrl: string; caption: string; cover?: { at: number } | { url: string }; shareToFeed?: boolean; audioId?: string }
+  | { kind: "reel"; videoUrl: string; caption: string; cover?: { at: number } | { url: string }; shareToFeed?: boolean }
   | { kind: "image"; imageUrl: string; caption: string }
   | { kind: "carousel"; items: PublishItem[]; caption: string }
   | { kind: "story"; item: PublishItem };
@@ -183,10 +183,6 @@ export async function publishMedia(params: {
         // The cover in the grid: a photo, or a frame of the video (in milliseconds).
         ...(request.cover && "url" in request.cover ? { cover_url: request.cover.url } : {}),
         ...(request.cover && "at" in request.cover ? { thumb_offset: String(Math.round(request.cover.at * 1000)) } : {}),
-        // Instagram's music (Facebook Login only): the montage is silent, the track plays at full volume.
-        ...(request.audioId && viaFacebook(token)
-          ? { audio_configuration: JSON.stringify({ audio_id: request.audioId, audio_volume: 100, video_volume: 0 }) }
-          : {}),
       });
       break;
     case "image":
@@ -370,107 +366,20 @@ export async function sendDirectMessage(accessToken: string, recipientId: string
 }
 
 // ---------------------------------------------------------------------------
-// Instagram API with Facebook Login (Facebook Login for Business): the same
-// publishing, stats and comments, plus Instagram's music library (ig_audio).
-// The manager logs in with Facebook and picks the Page linked to her account.
+// Accounts connected earlier through Facebook Login (« EAA… » tokens): they keep
+// publishing through graph.facebook.com and are renewed by a token exchange.
+// New connections all go through Instagram Login.
 // ---------------------------------------------------------------------------
 
-const facebookGraph = (path: string) => `https://graph.facebook.com/${env("INSTAGRAM_GRAPH_VERSION")}/${path}`;
-
-export function facebookRedirectUri(): string {
-  return `${env("APP_URL")}/api/facebook/callback`;
-}
-
-/** Facebook Login for Business, with the app's login configuration (its permissions and assets). */
-export function facebookAuthorizeUrl(state: string): string {
-  const url = new URL(`https://www.facebook.com/${env("INSTAGRAM_GRAPH_VERSION")}/dialog/oauth`);
-  url.searchParams.set("client_id", env("FACEBOOK_APP_ID"));
-  url.searchParams.set("redirect_uri", facebookRedirectUri());
-  url.searchParams.set("config_id", env("FACEBOOK_LOGIN_CONFIG_ID"));
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("state", state);
-  return url.toString();
-}
-
-/** A user token → a long-lived one (about 60 days). */
+/** A Facebook user token → a long-lived one (about 60 days). */
 async function exchangeFacebookToken(token: string) {
   const long = await call<{ access_token: string; expires_in?: number }>(
-    facebookGraph(
-      `oauth/access_token?${q({
-        grant_type: "fb_exchange_token",
-        client_id: env("FACEBOOK_APP_ID"),
-        client_secret: env("FACEBOOK_APP_SECRET"),
-        fb_exchange_token: token,
-      })}`,
-    ),
+    `https://graph.facebook.com/${env("INSTAGRAM_GRAPH_VERSION")}/oauth/access_token?${q({
+      grant_type: "fb_exchange_token",
+      client_id: env("FACEBOOK_APP_ID"),
+      client_secret: env("FACEBOOK_APP_SECRET"),
+      fb_exchange_token: token,
+    })}`,
   );
   return { accessToken: long.access_token, expiresAt: new Date(Date.now() + (long.expires_in ?? 60 * 24 * 3600) * 1000) };
-}
-
-/**
- * Authorization code → long-lived user token and the professional Instagram account
- * linked to one of her Pages. null when none of her Pages has one.
- */
-export async function connectWithFacebookCode(code: string) {
-  const short = await call<{ access_token: string }>(
-    facebookGraph(
-      `oauth/access_token?${q({
-        client_id: env("FACEBOOK_APP_ID"),
-        client_secret: env("FACEBOOK_APP_SECRET"),
-        redirect_uri: facebookRedirectUri(),
-        code,
-      })}`,
-    ),
-  );
-  const long = await exchangeFacebookToken(short.access_token);
-  const pages = await call<{ data: { id: string; name?: string; instagram_business_account?: { id: string; username?: string } }[] }>(
-    facebookGraph(`me/accounts?${q({ fields: "id,name,instagram_business_account{id,username}", limit: "50", access_token: long.accessToken })}`),
-  );
-  const page = pages.data.find((p) => p.instagram_business_account?.id);
-  if (!page?.instagram_business_account) return null;
-  const ig = page.instagram_business_account;
-  const username =
-    ig.username ??
-    (await call<{ username: string }>(facebookGraph(`${ig.id}?${q({ fields: "username", access_token: long.accessToken })}`))).username;
-  return {
-    accessToken: long.accessToken,
-    expiresAt: long.expiresAt,
-    userId: ig.id,
-    username,
-    pageId: page.id,
-    scopes: ["instagram_basic", "instagram_content_publish", "instagram_manage_comments", "instagram_manage_insights", "pages_show_list", "pages_read_engagement", "business_management"],
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Instagram's music library (Instagram API with Facebook Login only)
-// ---------------------------------------------------------------------------
-
-export type InstagramAudio = {
-  audio_id: string;
-  title?: string;
-  display_artist?: string;
-  duration_in_ms?: number;
-  audio_type?: "music" | "original_sound" | string;
-  /** A temporary preview of the file (about 1.5 days): to listen and to cut on its beats. */
-  download_url?: string | null;
-  cover_artwork_thumbnail_uri?: string | null;
-  /** The metadata endpoint's spelling of the artwork. */
-  cover_artwork_thumbnail_url?: string | null;
-  ig_username?: string;
-  on_platform_audio_preview_link?: string | null;
-};
-
-/** Music or original sounds authorised for third parties; trending ones without a query. */
-export async function searchAudio(userId: string, accessToken: string, type: "music" | "original_sound", query?: string): Promise<InstagramAudio[]> {
-  if (!viaFacebook(accessToken)) throw new InstagramError("La musique d’Instagram demande la connexion via Facebook", 400, null);
-  const res = await call<{ audio?: InstagramAudio[] }>(
-    facebookGraph(`ig_audio?${q({ audio_type: type, user_id: userId, ...(query ? { search_query: query } : {}), access_token: accessToken })}`),
-  );
-  return res.audio ?? [];
-}
-
-/** One audio asset, with a fresh preview link. */
-export async function audioInfo(audioId: string, userId: string, accessToken: string): Promise<InstagramAudio> {
-  return call<InstagramAudio>(facebookGraph(`${audioId}?${q({ user_id: userId, access_token: accessToken })}`));
 }

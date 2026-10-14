@@ -45,3 +45,21 @@ export async function setShareToFeed(postId: string, shareToFeed: boolean): Prom
   revalidatePath("/calendrier");
   return { ok: true };
 }
+
+/** « Je publie moi-même » : at its time she gets the Reel and its caption on WhatsApp, to add Instagram's music herself. */
+export async function setPublishByHand(postId: string, byHand: boolean): Promise<{ ok: boolean }> {
+  if (!z.uuid().safeParse(postId).success) return { ok: false };
+  const { db, member } = await getStudioContext();
+  if (!member) return { ok: false };
+  const { data, error } = await db
+    .from("posts")
+    .update({ publish_by_hand: Boolean(byHand), handoff_at: null, handoff_via: null })
+    .eq("id", postId)
+    .eq("studio_id", member.studio.id)
+    .eq("kind", "reel")
+    .not("status", "in", "(published,measured)")
+    .select("id");
+  if (error || !data.length) return { ok: false };
+  revalidatePath(`/publications/${postId}`);
+  return { ok: true };
+}

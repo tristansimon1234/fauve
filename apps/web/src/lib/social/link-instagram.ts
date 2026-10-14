@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
 
 // Links a professional Instagram account to a studio once its owner authorised
-// Brigitte (Instagram Login or Facebook Login): the account, its token, the end
+// Brigitte (Instagram Login): the account, its token, the end
 // of getting started, and a word on WhatsApp.
 
 export type LinkedAccount = { userId: string; username: string; accessToken: string; expiresAt: Date; scopes: string[] };
@@ -63,7 +63,7 @@ export async function linkInstagramAccount(
   }
   // Close the loop on WhatsApp (best effort: only works inside the 24 h window).
   if (member.phone_e164) {
-    const text = `C’est bon, ton Instagram @${account.username} est connecté ✅ Je peux maintenant publier tes posts dès que tu les valides${provider === "facebook" ? ", avec la musique d’Instagram" : ""}.`;
+    const text = `C’est bon, ton Instagram @${account.username} est connecté ✅ Je peux maintenant publier tes posts dès que tu les valides.`;
     const id = await sendText(member.phone_e164.slice(1), text).catch(() => undefined);
     if (id) {
       await db.from("whatsapp_messages").insert({

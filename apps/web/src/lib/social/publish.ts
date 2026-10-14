@@ -1,10 +1,11 @@
 import "server-only";
-import { DEFAULT_COVER_SECONDS, isInSessionWindow, postAudioSchema, postCoverSchema, type PostKind } from "@fauve/agent";
+import { DEFAULT_COVER_SECONDS, isInSessionWindow, postCoverSchema, type PostKind } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
 import { InstagramError, mediaInsights, publishMedia, refreshToken, type PublishRequest } from "./instagram";
 import { slidesToPublish } from "@/lib/render/slides";
 import { publishItems } from "./media-urls";
+import { handOff, matchHandPublished } from "./hand-off";
 
 // Publishing worker. Posts in "scheduled" whose time has come are claimed (one
 // worker per post), sent to Instagram, then moved to "published" or "failed".
@@ -152,12 +153,8 @@ async function publishRequest(
   rendered: Record<string, string> = {},
   chosenCover: unknown = null,
   shareToFeed = true,
-  audio: unknown = null,
 ): Promise<PublishRequest> {
-  if (kind === "reel") {
-    const music = postAudioSchema.nullable().catch(null).parse(audio);
-    return { kind: "reel", videoUrl: await renderUrl(renderId), caption, cover: await reelCover(studioId, chosenCover), shareToFeed, ...(music ? { audioId: music.audio_id } : {}) };
-  }
+  if (kind === "reel") return { kind: "reel", videoUrl: await renderUrl(renderId), caption, cover: await reelCover(studioId, chosenCover), shareToFeed };
   if (kind === "story") {
     const [item] = renderId ? [{ type: "video" as const, url: await renderUrl(renderId) }] : await publishItems(studioId, mediaIds.slice(0, 1));
     if (!item) throw new Error("Aucune photo ni vidéo pour cette story");
@@ -180,7 +177,7 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
   const post = check(
     await db
       .from("posts")
-      .select("id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids, slides, slides_render, cover, share_to_feed, audio")
+      .select("id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids, slides, slides_render, cover, share_to_feed")
       .eq("id", postId)
       .single(),
   ).data!;
@@ -194,7 +191,7 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
     const { rendered } = slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
     const hashtags = ((post.hashtags as string[] | null) ?? []).map((h) => `#${h}`).join(" ");
     const caption = [post.caption ?? "", hashtags].filter(Boolean).join("\n\n");
-    const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption, rendered, post.cover, post.share_to_feed !== false, post.audio);
+    const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption, rendered, post.cover, post.share_to_feed !== false);
     const result = await publishMedia({ userId: account.userId, accessToken: account.accessToken, request });
 
     check(
@@ -221,9 +218,11 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
   }
 }
 
-/** Claims and publishes one post if it is due (used right after a validation "now"). */
+/** Claims and publishes one post if it is due (used right after a validation "now"); « je publie moi-même » hands it over instead. */
 export async function publishIfDue(postId: string): Promise<PublishOutcome | null> {
   if (!(await claim(postId))) return null;
+  const { data } = await supabaseAdmin().from("posts").select("publish_by_hand, handoff_at").eq("id", postId).single();
+  if (data?.publish_by_hand) return data.handoff_at ? null : handOff(postId);
   return publishPost(postId);
 }
 
@@ -328,6 +327,8 @@ export async function runPublishWorker() {
       .from("posts")
       .select("id")
       .eq("status", "scheduled")
+      // Handed over already: waiting for her to publish it (matchHandPublished).
+      .is("handoff_at", null)
       .lte("scheduled_at", new Date().toISOString())
       .order("scheduled_at")
       .limit(5),
@@ -337,7 +338,11 @@ export async function runPublishWorker() {
     const outcome = await publishIfDue(id as string);
     if (outcome) published.push(outcome);
   }
+  const handPublished = await matchHandPublished().catch((error) => {
+    console.error("hand-off match failed", error);
+    return 0;
+  });
   const measured = await captureMetrics();
   const refreshed = await refreshExpiringTokens();
-  return { due: due.length, published, measured, refreshed };
+  return { due: due.length, published, handPublished, measured, refreshed };
 }

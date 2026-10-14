@@ -64,7 +64,7 @@ export function CoverPicker({
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-[16px] font-extrabold">Vignette</h2>
         <span className="text-[12px] text-muted" aria-live="polite">
-          {saved === "saving" ? "Enregistrement…" : saved === "saved" ? "Enregistrée" : saved === "error" ? "Pas enregistrée, réessaie" : "Dans ta grille et sur Instagram"}
+          {saved === "saving" ? "Enregistrement…" : saved === "saved" ? "Enregistrée" : saved === "error" ? "Pas enregistrée, réessaie" : "L’image de couverture du Reel"}
         </span>
       </div>
       <div className="flex gap-3">
@@ -143,19 +143,26 @@ export function CoverPicker({
         </div>
       </div>
       {/* Instagram puts a Reel in the profile grid and the Reels tab; she can keep it to the Reels tab. */}
-      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[12px] bg-soft px-3 py-2.5">
-        <span className="flex flex-col">
-          <span className="text-[13px] font-bold">Aussi dans ta grille</span>
-          <span className="text-[12px] text-muted">{inGrid ? "Dans ta grille et dans l’onglet Reels" : "Seulement dans l’onglet Reels"}</span>
-        </span>
-        <input type="checkbox" role="switch" checked={inGrid} onChange={toggleGrid} className="peer sr-only" />
-        <span
-          aria-hidden="true"
-          className={`relative h-6 w-10 shrink-0 rounded-full transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-violet ${inGrid ? "bg-violet" : "bg-line"}`}
-        >
-          <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left] ${inGrid ? "left-[18px]" : "left-0.5"}`} />
-        </span>
-      </label>
+      <div role="radiogroup" aria-label="Où apparaît le Reel sur ton profil" className="flex flex-col gap-1.5">
+        <span className="text-[12px] font-semibold text-muted">Où il apparaît sur ton profil</span>
+        <div className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">
+          {[
+            { on: true, label: "Grille + onglet Reels" },
+            { on: false, label: "Onglet Reels seulement" },
+          ].map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              role="radio"
+              aria-checked={inGrid === o.on}
+              onClick={() => inGrid !== o.on && toggleGrid()}
+              className={`rounded-[9px] px-2 py-2 text-[12px] font-bold leading-tight transition-colors ${inGrid === o.on ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
