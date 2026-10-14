@@ -136,14 +136,14 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
 
   let usage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
   let last: Anthropic.Beta.BetaMessage | undefined;
-  // The text of the last step that wrote some: Fauve often writes her answer with
-  // reply_with in the same step, and the loop's final step is then empty.
-  let spoken = "";
+  // Everything she wrote, step by step: an answer often starts before a tool call
+  // (« D'accord, 19 h ! ») and ends after it; keeping only the last step lost the start.
+  const spoken: string[] = [];
   const take = (message: Anthropic.Beta.BetaMessage) => {
     usage = addUsage(usage, message.usage);
     last = message;
-    const text = textOf(message);
-    if (text) spoken = text;
+    const text = textOf(message).trim();
+    if (text && spoken.at(-1) !== text) spoken.push(text);
   };
   const onEvent = input.onEvent;
   if (onEvent) {
@@ -168,7 +168,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   if (!last || last.stop_reason === "refusal") {
     return { reply: FALLBACK_REPLY, reactions: input.reactions, extras: {}, notes: input.notes, usage, afterReply: input.afterReply };
   }
-  const reply = textOf(last) || spoken;
+  const reply = spoken.join("\n\n");
   // Never silent: a turn that only reacted keeps its reaction; one that did nothing at all says so.
   const silent = !reply && !input.reactions.length;
   return {

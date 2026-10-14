@@ -5,6 +5,7 @@ import {
   editPlanSceneSegmentSchema,
   editPlanSchema,
   editPlanSegmentSchema,
+  editPlanTextSchema,
   isClipSegment,
   isMotionSegment,
   MOTION_TEMPLATES,
@@ -15,6 +16,7 @@ import {
   type MotionTemplate,
   type PlanSegment,
 } from "./schemas.ts";
+import type { SavedLook } from "./text-look.ts";
 
 // Fauve's editor: one dedicated Opus call (high effort, structured output) that
 // turns clip analyses + the studio's brand into an edit plan for the motion
@@ -47,7 +49,7 @@ Scènes de motion design (sans vidéo, aux couleurs du studio) :
 - 1,5 à 6 s par scène. Avec des clips : 1 à 3 scènes au plus. Sans clips : un Reel entièrement en motion design, de 3 à 5 scènes qui s'enchaînent.
 - Au plus « max_new_scenes » nouvelles scènes « motion » (sans template_id) dans ce Reel (2 d'habitude, 0 si la gérante veut économiser) ; les réutilisations de la bibliothèque ne comptent pas. Sinon des « scene » fixes (un titre, une liste, une citation, un chiffre bien animés suffisent souvent).
 
-Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (lecture des images d'inspiration de la gérante : ambiance, couleurs, typographie, composition, rythme ; en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. « lessons » résume ce qui marche sur l'Instagram du studio (accroches, durées, formats) : applique-les quand elles concernent ce Reel. « inspirations » décrit des Reels que la gérante aime : reprends-en l'esprit (rythme, accroche, textes), jamais le contenu. « post.chosen_inspiration » est le Reel qu'elle a choisi pour celui-ci : il passe avant les autres inspirations et avant « default_template » (accroche, rythme des coupes, textes à l'écran, transitions), toujours sans en copier le contenu. « post.chosen_template » est le gabarit qu'elle a choisi : utilise-le. Ses polices et couleurs sont appliquées automatiquement. « text_looks » : les styles de texte de la gérante (souvent copiés d'exemples qu'elle aime) ; quand l'un convient au rôle d'un texte (hook, band, caption), recopie son « look » à l'identique dans le champ look de ce texte, et garde ce style pour tous les textes du même rôle. Sans text_looks, laisse look vide : le gabarit s'en charge.
+Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (lecture des images d'inspiration de la gérante : ambiance, couleurs, typographie, composition, rythme ; en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. « lessons » résume ce qui marche sur l'Instagram du studio (accroches, durées, formats) : applique-les quand elles concernent ce Reel. « inspirations » décrit des Reels que la gérante aime : reprends-en l'esprit (rythme, accroche, textes), jamais le contenu. « post.chosen_inspiration » est le Reel qu'elle a choisi pour celui-ci : il passe avant les autres inspirations et avant « default_template » (accroche, rythme des coupes, textes à l'écran, transitions), toujours sans en copier le contenu. « post.chosen_template » est le gabarit qu'elle a choisi : utilise-le. Ses polices et couleurs sont appliquées automatiquement. « text_looks » : les styles de texte de la gérante (souvent copiés d'exemples qu'elle aime) ; quand l'un convient au rôle d'un texte (hook, band, caption), mets son nom exact dans look_name de ce texte, et garde ce style pour tous les textes du même rôle. Sans text_looks, laisse look_name vide : le gabarit s'en charge.
 
 Polices : « fonts » (display pour l'accroche et les titres, body pour le reste), uniquement des polices Google Fonts au nom exact, et seulement si la demande en cours en réclame d'autres que celles de la charte. Sinon laisse « fonts » vide.
 - « duration » est la somme des durées de plans, moins 0,35 s par fondu enchaîné.
@@ -68,9 +70,19 @@ const editorMotionSegmentSchema = z.object({
   duration: z.number().min(1).max(8),
 });
 
+/**
+ * A text as the editor writes it: a saved look is named (look_name), never copied
+ * out in full. The full look schema (fonts, colours, backgrounds, lists) made the
+ * structured-output grammar too large for the API; the look is put back after.
+ */
+const editorTextSchema = editPlanTextSchema.omit({ look: true, detail_look: true, x: true, y: true, scale: true, backdrop: true }).extend({
+  look_name: z.string().optional().describe("Nom d'un style de brand.text_looks à appliquer à ce texte, recopié exactement ; sinon rien (le gabarit s'en charge)"),
+});
+
 export const editorOutputSchema = z.object({
   plan: editPlanObjectSchema.extend({
     template: motionTemplateSchema,
+    texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
     segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
   }),
@@ -92,12 +104,49 @@ export function carryRetouch(plan: EditPlan, previous: EditPlan | null): EditPla
 }
 export type EditorOutput = z.infer<typeof editorOutputSchema>;
 
+/**
+ * The style set on a text by hand or by Fauve (look, place, size, background), kept on
+ * the same text in a correction: the editor does not write them back. Matched by the
+ * same words, else by the same role in the same order.
+ */
+export function carryTextStyle(plan: EditPlan, previous: EditPlan | null): EditPlan {
+  if (!previous) return plan;
+  const key = (t: string) => t.trim().toLowerCase();
+  const byText = new Map(previous.texts.map((t) => [key(t.text), t]));
+  const byRole = (style: string, n: number) => previous.texts.filter((t) => t.style === style)[n];
+  const seen: Record<string, number> = {};
+  return {
+    ...plan,
+    texts: plan.texts.map((t) => {
+      const n = (seen[t.style] = (seen[t.style] ?? -1) + 1);
+      const before = byText.get(key(t.text)) ?? byRole(t.style, n);
+      if (!before) return t;
+      return {
+        ...t,
+        ...(t.look || !before.look ? {} : { look: before.look }),
+        ...(t.detail_look || !before.detail_look ? {} : { detail_look: before.detail_look }),
+        ...(before.x !== undefined ? { x: before.x } : {}),
+        ...(before.y !== undefined ? { y: before.y } : {}),
+        ...(before.scale !== undefined ? { scale: before.scale } : {}),
+        ...(before.backdrop !== undefined ? { backdrop: before.backdrop } : {}),
+      };
+    }),
+  };
+}
+
 const round = (n: number) => Math.round(n * 100) / 100;
 
 /** The editor's plan as an edit plan: template texts become the segment's `texts` record. */
-export function fromEditorPlan(plan: EditorOutput["plan"]): EditPlan {
+export function fromEditorPlan(plan: EditorOutput["plan"], looks: SavedLook[] = []): EditPlan {
+  const byName = new Map(looks.map((l) => [l.name.toLowerCase(), l]));
   return {
     ...plan,
+    // A named look brings its style back (and, for a list, its details and bullets).
+    texts: plan.texts.map(({ look_name, ...t }) => {
+      const saved = look_name ? byName.get(look_name.trim().toLowerCase()) : undefined;
+      if (!saved) return t;
+      return { ...t, look: saved.look, ...(t.items?.length && saved.list?.detail_look ? { detail_look: saved.list.detail_look } : {}), ...(t.items?.length && !t.bullet && saved.list?.bullet ? { bullet: saved.list.bullet } : {}) };
+    }),
     segments: plan.segments.map((s): PlanSegment => {
       if (!("motion" in s)) return s;
       const { template_texts, template_id, ...motion } = s.motion;

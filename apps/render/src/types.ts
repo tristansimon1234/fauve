@@ -78,5 +78,14 @@ export type ReelProps = {
   brand: { name: string; accent: string; accentInk: string; displayFont: string; bodyFont: string; logoUrl: string | null };
   endCard: { title: string; subtitle: string | null; from: number } | null;
   logo?: "top" | "bottom" | null;
-  layer?: { js: string; texts: Record<string, string>; fonts: string[]; check?: boolean } | null;
+  layer?: {
+    js: string;
+    texts: Record<string, string>;
+    fonts: string[];
+    check?: boolean;
+    /** Moved and resized by hand: offset (share of the frame) and size of the whole layer. */
+    place?: { x: number; y: number; scale: number };
+    /** Its accent colour, instead of the studio's. */
+    accent?: string;
+  } | null;
 };

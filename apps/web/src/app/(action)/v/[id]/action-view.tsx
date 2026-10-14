@@ -299,6 +299,7 @@ export function ActionView({
                   texts={plan.texts}
                   active={active}
                   onMove={(i, place) => setText(i, place)}
+                  onEdit={(i, text) => setText(i, { text })}
                   onPick={pick}
                 />
               )}

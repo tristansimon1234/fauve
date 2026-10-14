@@ -22,6 +22,13 @@ type LayerComponent = (props: {
 const MARGIN = 40;
 const TOLERANCE = 8;
 
+/** Dark ink on a light colour, white on a dark one. */
+function inkOn(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.45 ? "#1C1530" : "#FFFFFF";
+}
+
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
 function Plain({ texts, props }: { texts: Record<string, string>; props: ReelProps }) {
@@ -92,8 +99,21 @@ export function TextLayer({ props }: { props: ReelProps }) {
       fallback={plain}
       onError={(error) => check && cancelRender(new Error(`erreur dans le calque : ${error instanceof Error ? error.message : String(error)}`))}
     >
-      <AbsoluteFill ref={root}>
-        <Generated width={props.width} height={props.height} brand={{ ...props.brand, ink: "#1C1530", cream: "#FBF7F4" }} texts={layer.texts} />
+      <AbsoluteFill
+        ref={root}
+        data-fauve-layer=""
+        style={
+          layer.place
+            ? { transform: `translate(${layer.place.x * props.width}px, ${layer.place.y * props.height}px) scale(${layer.place.scale})`, transformOrigin: "50% 50%" }
+            : undefined
+        }
+      >
+        <Generated
+          width={props.width}
+          height={props.height}
+          brand={{ ...props.brand, ...(layer.accent ? { accent: layer.accent, accentInk: inkOn(layer.accent) } : {}), ink: "#1C1530", cream: "#FBF7F4" }}
+          texts={layer.texts}
+        />
       </AbsoluteFill>
     </Fallback>
   );

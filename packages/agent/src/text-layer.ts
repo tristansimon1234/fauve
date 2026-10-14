@@ -28,6 +28,10 @@ export const textLayerSchema = z.object({
   texts: z.record(z.string().regex(SLOT_NAME), z.string().max(400)),
   /** Google fonts the layer uses, loaded before it is drawn. */
   fonts: z.array(z.string().regex(LOOK_FONT)).max(4),
+  /** Moved and resized by hand in the editor: offset of the whole layer (share of the frame) and its size. */
+  place: z.object({ x: z.number().min(-0.45).max(0.45), y: z.number().min(-0.45).max(0.45), scale: z.number().min(0.5).max(1.5) }).optional(),
+  /** Its accent colour, instead of the studio's. */
+  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 });
 export type TextLayer = z.infer<typeof textLayerSchema>;
 

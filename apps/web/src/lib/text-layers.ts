@@ -96,10 +96,13 @@ export async function applyLayers(studioId: string, postId: string, layers: Map<
 }
 
 /** The layouts the carousel editor offers: the studio's and Fauve's, with their code to draw them live. */
-export async function layoutsForEditor(studioId: string, limit = 16): Promise<(Omit<TextLayer, "texts" | "template_id"> & { id: string; house: boolean })[]> {
+export async function layoutsForEditor(
+  studioId: string,
+  limit = 16,
+): Promise<(Omit<TextLayer, "texts" | "template_id"> & { id: string; house: boolean; sample: Record<string, string> })[]> {
   const { data, error } = await supabaseAdmin()
     .from("motion_templates")
-    .select("id, studio_id, name, slots, js, fonts")
+    .select("id, studio_id, name, slots, js, fonts, sample")
     .eq("kind", "layer")
     .or(`studio_id.eq.${studioId},studio_id.is.null`)
     .is("archived_at", null)
@@ -118,5 +121,6 @@ export async function layoutsForEditor(studioId: string, limit = 16): Promise<(O
     slots: slotsOf(t.slots),
     js: t.js as string,
     fonts: ((t.fonts as string[] | null) ?? []).slice(0, 4),
+    sample: z.record(z.string(), z.string()).catch({}).parse(t.sample ?? {}),
   }));
 }

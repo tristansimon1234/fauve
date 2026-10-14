@@ -142,13 +142,19 @@ export const toolSpecs = {
   },
   quote_montage: {
     description:
-      "Prépare un montage ou une correction et son prix en crédits (obligatoire avant tout montage). Un petit montage (20 crédits au plus, le cas courant) part aussitôt, sans attendre d'accord : la réponse dit status started. Au-delà, c'est un devis à présenter. Pour un nouveau montage, donne toujours « plan » : la durée, le style et chaque scène dans l'ordre (vidéo, animation, fin) ; il s'affiche sur le devis, fixe le nombre de scènes animées facturables et guide le monteur. Renvoie le coût de base, le maximum si le monteur crée de nouvelles scènes animées, et le solde. Décris ensuite le plan à la gérante (durée, nombre de scènes, ce qu'elles montrent) et le coût ; pour un devis (pas started), attends son accord : montage ne part qu'au tour suivant, avec ce quote_id. Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent.",
+      "Prépare un montage ou une correction et son prix en crédits (obligatoire avant tout montage). Un petit montage (20 crédits au plus) part aussitôt seulement si go est true (elle t'a dit de le faire) : la réponse dit status started. Sinon, ou au-delà, c'est un devis à présenter, avec un bouton Lancer. Pour un nouveau montage, donne toujours « plan » : la durée, le style et chaque scène dans l'ordre (vidéo, animation, fin) ; il s'affiche sur le devis, fixe le nombre de scènes animées facturables et guide le monteur. Renvoie le coût de base, le maximum si le monteur crée de nouvelles scènes animées, et le solde. Décris ensuite le plan à la gérante (durée, nombre de scènes, ce qu'elles montrent) et le coût ; pour un devis (pas started), attends son accord : montage ne part qu'au tour suivant, avec ce quote_id. Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent.",
     input: z.object({
       post_id: z.string().uuid(),
       media_ids: z.array(z.string().uuid()).max(10).optional().describe("Clips à monter (media_id). Facultatif pour une correction ou une vidéo 100 % motion design."),
       brief: z.string().max(600).optional().describe("Intention ou correction, avec les textes exacts si besoin. Ex. « ouverture en motion design avec RENTRÉE en grand », « police Montserrat », « visages OK »"),
       correction: z.boolean().default(false).describe("true pour modifier le montage existant de cette publication"),
       plan: montagePlanSchema.optional().describe("Le plan proposé (obligatoire pour un nouveau montage, facultatif pour une correction)"),
+      go: z
+        .boolean()
+        .default(false)
+        .describe(
+          "true seulement si la gérante vient de te dire de lancer ce montage (« vas-y », « lance », « fais-la », « oui » à ta proposition de plan) ou de faire cette correction. Répondre à une question (le format, motion design ou vidéo, le sujet) n'est pas un accord : false, et le devis attend son « Lancer ».",
+        ),
       inspiration_id: z
         .string()
         .uuid()

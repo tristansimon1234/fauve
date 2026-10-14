@@ -2,6 +2,7 @@ import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   carryRetouch,
+  carryTextStyle,
   brandProfileSchema,
   CLAUDE_MODEL,
   EDITOR_SYSTEM_PROMPT,
@@ -156,9 +157,14 @@ export async function designEdit(params: {
 
   const durations = Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.duration]));
   // Retouch and blur stay on their clips from one version to the next.
+  // A correction also keeps the texts' styles and places (the editor names looks, it does not copy them).
+  const base = previousPlan.success ? previousPlan.data : null;
   const plan = carryRetouch(
-    normalizeEditPlan(fromEditorPlan(response.parsed_output.plan), durations, params.maxNewScenes ?? MAX_FREE_SCENES),
-    previousPlan.success ? previousPlan.data : null,
+    carryTextStyle(
+      normalizeEditPlan(fromEditorPlan(response.parsed_output.plan, profile.text_looks ?? []), durations, params.maxNewScenes ?? MAX_FREE_SCENES),
+      params.fresh ? null : base,
+    ),
+    base,
   );
 
   // Library scenes: their saved code, with the new texts. An unknown id becomes a new scene.
