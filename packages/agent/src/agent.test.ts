@@ -925,3 +925,15 @@ test("editor: a library scene plays once per Reel, a repeat becomes a new scene 
   assert.deepEqual(kinds(1), ["library", "new", "scene:SURPRISE GARANTIE"]);
   assert.deepEqual(kinds(0), ["library", "scene:LA CHEFFE", "scene:SURPRISE GARANTIE"]);
 });
+
+test("history: the window's start stays put for several turns, then jumps ahead", async () => {
+  const { stableWindow } = await import("./history.ts");
+  // Ids are checkpoints (step 4) when their first 8 hex digits are a multiple of 4.
+  const msg = (n: number) => ({ id: `${n.toString(16).padStart(8, "0")}-0000-4000-8000-000000000000` });
+  const all = Array.from({ length: 60 }, (_, n) => msg(n + 1));
+  const starts = [30, 31, 32, 33, 34, 35].map((len) => stableWindow(all.slice(0, len), 10, 4)[0]!.id.slice(0, 8));
+  // 30 messages: latest checkpoint at least 10 from the end is message 20; it stays until 24 qualifies.
+  assert.deepEqual(starts.map((s) => parseInt(s, 16)), [20, 20, 20, 24, 24, 24]);
+  assert.ok(stableWindow(all.slice(0, 33), 10, 4).length >= 10);
+  assert.equal(stableWindow(all.slice(0, 5), 10, 4).length, 5); // fewer than the limit: all of them
+});

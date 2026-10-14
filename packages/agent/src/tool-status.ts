@@ -23,7 +23,6 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   montage_status: "Je regarde où en est le montage…",
   choose_version: "Je remets cette version…",
   montage: "Je lance le montage…",
-  create_edit_plan: "J’écris le plan de montage…",
   render: "Je lance le rendu…",
   write_on_photos: "J’écris sur tes photos…",
   list_elements: "Je regarde tes composants…",

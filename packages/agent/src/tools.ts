@@ -3,7 +3,6 @@ import { RESTYLES } from "./restyle.ts";
 import {
   brandProfileSchema,
   motionTemplateSchema,
-  editPlanSchema,
   platformSchema,
   postKindSchema,
   postCoverSchema,
@@ -197,11 +196,6 @@ export const toolSpecs = {
       effort: effortSchema.optional().describe("Seulement si la gérante a choisi un autre niveau que celui du devis (ex. « Version Max ») : le prix est celui de ce niveau, déjà annoncé"),
     }),
   },
-  create_edit_plan: {
-    description:
-      "Plan de montage écrit à la main (à éviter : préfère montage, bien meilleur). Enregistre une nouvelle version du plan de montage d'une publication. Les clip_id sont les media_id des vidéos reçues, in/out des secondes dans ces clips (appuie-toi sur analyze_clips). Règles : coupes franches, 7 à 15 s, accroche (style hook) dès la 1re seconde, textes courts, jamais de musique intégrée. Le moteur place lui-même les textes dans les zones de sécurité ; images (logo) et sous-titres mot à mot ne sont pas encore rendus : laisse images vide et subtitles à false.",
-    input: z.object({ post_id: z.string().uuid(), plan: editPlanSchema }),
-  },
   render: {
     description:
       "Refait seulement le rendu vidéo de la dernière version du plan (sans le modifier), puis l'envoie à la gérante. Normalement inutile : montage fait déjà tout.",
@@ -376,8 +370,10 @@ export const toolSpecs = {
   },
   update_brand_profile: {
     description:
-      "Enregistre une nouvelle version du profil de style du studio (à partir d'exemples ou d'une correction de la gérante).",
-    input: z.object({ profile: brandProfileSchema }),
+      "Change le profil de style du studio (à partir d'exemples ou d'une correction de la gérante) : donne seulement ce qui change, le reste est gardé.",
+    input: brandProfileSchema
+      .pick({ tone: true, caption_length: true, emojis: true, hashtags: true, visual_notes: true, colors: true, fonts: true, art_direction: true, default_template: true, dos: true, donts: true })
+      .partial(),
   },
   restyle_reel: {
     description:

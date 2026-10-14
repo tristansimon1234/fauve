@@ -509,21 +509,6 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async create_edit_plan({ post_id, plan }) {
-      // Ownership check before writing.
-      unwrap(await db.from("posts").select("id").eq("id", post_id).eq("studio_id", studioId).single());
-      const version = await nextVersion("edit_plans", "post_id", post_id);
-      const row = unwrap(
-        await db
-          .from("edit_plans")
-          .insert({ studio_id: studioId, post_id, version, plan })
-          .select("id, version")
-          .single(),
-      );
-      check(await db.from("posts").update({ edit_plan_id: row.id }).eq("id", post_id));
-      return json({ edit_plan_id: row.id, version: row.version });
-    },
-
     async restyle_reel({ post_id, style, wish }) {
       if (style === "custom" && !wish) return json({ error: "Avec style custom, donne wish : ce qu'elle veut changer, avec ses mots. Demande-le-lui d'abord si elle ne l'a pas dit." });
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
@@ -558,9 +543,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async update_brand_profile({ profile }) {
-      const version = await nextVersion("brand_profiles", "studio_id", studioId);
-      check(await db.from("brand_profiles").insert({ studio_id: studioId, version, profile }));
+    async update_brand_profile(changes) {
+      // Only what changed: the moodboard, logo, fonts and saved text looks stay as they are.
+      const { version } = await insertProfileVersion(studioId, (profile) => ({ ...profile, ...changes }));
       return json({ version });
     },
 
@@ -569,7 +554,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const post = unwrap(
         await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single(),
       );
-      if (!post.edit_plan_id) return json({ error: "Cette publication n'a pas encore de plan de montage (create_edit_plan)." });
+      if (!post.edit_plan_id) return json({ error: "Cette publication n'a pas encore de montage (quote_montage puis montage)." });
       // A re-render of an unchanged plan: free (no AI work).
       ctx.afterReply.push(async () => {
         await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
