@@ -51,11 +51,6 @@ function withSegments(plan: EditPlan, segments: Segment[], origin: (number | nul
   return { ...plan, segments, texts, duration: Math.max(3, duration) };
 }
 
-/** The same scenes with new lengths (one for one): texts stay on their scene. */
-export function replaceSegments(plan: EditPlan, segments: Segment[]): EditPlan {
-  return withSegments(plan, segments, segments.map((_, i) => i));
-}
-
 /** Moves the segment at `from` to position `to`. */
 export function moveSegment(plan: EditPlan, from: number, to: number): EditPlan {
   if (from === to || to < 0 || to >= plan.segments.length) return plan;

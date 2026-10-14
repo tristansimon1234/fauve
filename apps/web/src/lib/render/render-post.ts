@@ -21,7 +21,6 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { logoTone } from "./logo-tone";
 import { renderInSandbox, renderReelInSandbox, smokeTestScenes } from "./sandbox";
-import { soundtrackFile } from "./soundtrack";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
@@ -190,11 +189,6 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         if (s.type !== "motion" || !checks[`m${i}`]) return s;
         console.warn("motion scene falls back to its fixed scene", renderId, checks[`m${i}`]);
         return { type: "scene", scene: s.fallback, startAt: s.startAt, durationInFrames: s.durationInFrames };
-      });
-      // Simone's soundtrack, made for this cut (the same sound the editor plays); without it, a silent Reel.
-      props.soundtrack = await soundtrackFile(studioId, props).catch((error: unknown) => {
-        console.warn("soundtrack unavailable", renderId, error);
-        return null;
       });
       try {
         mp4 = await renderReelInSandbox({ id: renderId, props });

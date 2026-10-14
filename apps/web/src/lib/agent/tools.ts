@@ -1,9 +1,6 @@
 import "server-only";
-import { insertPlanVersion } from "@/lib/edit-plans";
 import {
   APP_GUIDES,
-  seedOf,
-  withSoundtrack,
   assertTransition,
   canTransition,
   postStatusSchema,
@@ -571,20 +568,6 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         status: "started",
         note: "Le montage démarre après ta réponse et la vidéo sera envoyée automatiquement (environ une minute). Annonce-le en une phrase, sans décrire la vidéo comme si elle était déjà prête.",
       });
-    },
-
-    async set_soundtrack({ post_id, style, sfx }) {
-      const post = unwrap(await db.from("posts").select("id, edit_plan_id, status").eq("id", post_id).eq("studio_id", studioId).single());
-      if (!post.edit_plan_id) return json({ error: "Ce Reel n'a pas encore de montage." });
-      if (["published", "measured"].includes(post.status as string)) return json({ error: "Ce Reel est déjà en ligne." });
-      const row = unwrap(await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).single());
-      const plan = withSoundtrack(editPlanSchema.parse(row.plan), style, sfx, seedOf(post_id));
-      const saved = await insertPlanVersion(studioId, post_id, plan);
-      check(await db.from("posts").update({ edit_plan_id: saved.id }).eq("id", post_id));
-      ctx.afterReply.push(async () => {
-        await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
-      });
-      return json({ status: "started", note: "La vidéo se refait avec la nouvelle bande-son (environ une minute), le lien part tout seul. Dis-le en une phrase." });
     },
 
     async write_on_photos({ post_id, template, slides }) {
