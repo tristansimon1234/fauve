@@ -375,12 +375,12 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const wanted = effort ?? studioDefault;
       // Her first Reel is her first impression: it always gets its made-to-measure animations.
       const firstReel = !correction && !variant && (await isFirstReel(studioId, post_id));
-      // Made-to-measure animations stay rare: one at most on a new montage (her library does the
-      // rest, each scene once), none on a correction unless she asked for a new one (Simone then
-      // passes 1). A Reel made only of animations, with three or more, needs two.
+      // Made-to-measure animations: as many as the plan she agrees to (each priced in the quote,
+      // charged only if made: her library goes first). Without a plan, one on a new montage and
+      // none on a correction unless she asked for a new one. Her first Reel gets at least two.
       const animations = plan?.scenes.filter((s) => s.kind === "animation").length ?? 0;
-      const allMotion = !media_ids?.length && animations > 2;
-      const scenes = firstReel ? MAX_FREE_SCENES : (max_new_scenes ?? (correction || variant ? 0 : allMotion ? MAX_FREE_SCENES : 1));
+      const planned = plan ? animations : correction || variant ? 0 : 1;
+      const scenes = Math.min(MAX_FREE_SCENES, max_new_scenes ?? (firstReel ? Math.max(2, planned) : planned));
       const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: scenes, variant, plan, effort: wanted });
       if ("error" in quote) {
         return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });

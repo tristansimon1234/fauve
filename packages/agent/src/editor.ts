@@ -51,9 +51,9 @@ Scènes de motion design (sans vidéo, aux couleurs du studio) :
 - 1,5 à 6 s par scène. Avec des clips : 1 à 3 scènes au plus. Sans clips : un Reel entièrement en motion design, de 3 à 5 scènes qui s'enchaînent.
 
 Photos (« photos ») : la gérante peut monter un Reel avec ses photos (souvent celles de son site), seules ou avec des vidéos. Chaque photo est un plan comme un clip : clip_id = son media_id, in = 0, out = sa durée à l'écran (1,8 à 3,5 s ; 5 au plus), zoom « none ». Le moteur l'anime tout seul avec un zoom lent et une légère dérive, d'une photo à l'autre dans un sens puis l'autre. « contenu » dit ce qu'elle montre et « format » son cadrage : un portrait remplit l'écran vertical, un paysage est recadré au centre (évite d'y compter sur les bords). Un Reel de photos vit par son rythme et ses textes : enchaîne-les vite, un texte fort sur chacune ou presque, et ouvre ou ferme sur une scène de motion design. Toutes ses photos sont utilisables, dans l'ordre qui raconte le mieux.
-- Au plus « max_new_scenes » nouvelles scènes « motion » (sans template_id) dans ce Reel (2 d'habitude, 0 si la gérante veut économiser) ; les réutilisations de la bibliothèque ne comptent pas. Sinon des « scene » fixes (un titre, une liste, une citation, un chiffre bien animés suffisent souvent).
+- Au plus « max_new_scenes » nouvelles scènes « motion » (sans template_id) dans ce Reel : celles du plan validé par la gérante, chacune payée (0 si elle veut économiser) ; les réutilisations de la bibliothèque ne comptent pas et passent d'abord quand une scène de la bibliothèque convient. Sinon des « scene » fixes (un titre, une liste, une citation, un chiffre bien animés suffisent souvent).
 
-Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh ». Ouvre sur une scène libre de motion design créée sur mesure (son nom ou une promesse en typographie animée, à ses couleurs), puis ses plus beaux plans avec un texte sur chaque temps fort (accroche, ce qui rend son commerce unique, l'offre ou l'invitation), un rythme vivant même en « chic » ou « doux », et une fin de marque soignée. Utilise les 2 scènes libres permises.
+Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh ». Ouvre sur une scène libre de motion design créée sur mesure (son nom ou une promesse en typographie animée, à ses couleurs), puis ses plus beaux plans avec un texte sur chaque temps fort (accroche, ce qui rend son commerce unique, l'offre ou l'invitation), un rythme vivant même en « chic » ou « doux », et une fin de marque soignée. Utilise les scènes libres permises (au moins 2).
 
 Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (lecture des images d'inspiration de la gérante : ambiance, couleurs, typographie, composition, rythme ; en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. « lessons » résume ce qui marche sur l'Instagram du studio (accroches, durées, formats) : applique-les quand elles concernent ce Reel. « inspirations » décrit des Reels que la gérante aime : reprends-en l'esprit (rythme, accroche, textes), jamais le contenu. « post.chosen_inspiration » est le Reel qu'elle a choisi pour celui-ci : il passe avant les autres inspirations et avant « default_template » (accroche, rythme des coupes, textes à l'écran, transitions), toujours sans en copier le contenu. « post.chosen_template » est le gabarit qu'elle a choisi : utilise-le. Ses polices et couleurs sont appliquées automatiquement. « text_looks » : les styles de texte de la gérante (souvent copiés d'exemples qu'elle aime) ; quand l'un convient au rôle d'un texte (hook, band, caption), mets son nom exact dans look_name de ce texte, et garde ce style pour tous les textes du même rôle. Sans text_looks, laisse look_name vide : le gabarit s'en charge.
 
@@ -170,8 +170,12 @@ export function fromEditorPlan(plan: EditorOutput["plan"], looks: SavedLook[] = 
 /** The longest a photo stays on screen in a Reel (it plays still, with a slow zoom). */
 export const PHOTO_MAX_SECONDS = 5;
 
-/** Free motion-design scenes per Reel (each one is an Opus call): the rest use fixed scenes. */
-export const MAX_FREE_SCENES = 2;
+/**
+ * New made-to-measure animations in one Reel: as many as the quote she agreed to
+ * (each priced, `CREDIT_PRICES.newScene`), up to this technical ceiling (each is an
+ * Opus call and a scene to render).
+ */
+export const MAX_FREE_SCENES = 8;
 
 /**
  * Makes a model-written plan safe to render: segments inside their clips, a

@@ -67,7 +67,8 @@ export function effortVersions(effort: Effort, correction: boolean): 1 | 2 {
 /** Price of a montage or a correction at a level of care (Rapide by default), before it runs. */
 export function quoteMontage(input: { clips: number; correction: boolean; maxNewScenes?: number; effort?: Effort }): MontageQuote {
   const clips = Math.max(0, Math.min(10, Math.round(input.clips)));
-  const maxNewScenes = Math.max(0, Math.min(MAX_FREE_SCENES, input.maxNewScenes ?? MAX_FREE_SCENES));
+  // Callers pass the animations of the plan; without them, two (8 at most).
+  const maxNewScenes = Math.max(0, Math.min(MAX_FREE_SCENES, input.maxNewScenes ?? 2));
   const level = EFFORTS[input.effort ?? "rapide"];
   const lines: QuoteLine[] = input.correction
     ? [{ label: "Correction du montage", credits: CREDIT_PRICES.correction }]
