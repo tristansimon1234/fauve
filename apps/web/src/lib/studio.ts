@@ -122,13 +122,15 @@ export const socialAccountSchema = z.object({
   platform: platformSchema,
   handle: z.string().nullable(),
   status: z.enum(["pending", "connected", "expired", "disconnected"]),
+  /** How it was connected: « facebook » (Facebook Login, with Instagram's music) or « instagram ». */
+  provider: z.string().nullable().catch(null),
 });
 export type SocialAccount = z.infer<typeof socialAccountSchema>;
 
 export async function getSocialAccounts(db: Db, studioId: string): Promise<SocialAccount[]> {
   return rows(
     socialAccountSchema,
-    await db.from("social_accounts").select("platform, handle, status").eq("studio_id", studioId).order("platform"),
+    await db.from("social_accounts").select("platform, handle, status, provider").eq("studio_id", studioId).order("platform"),
     "social_accounts",
   );
 }

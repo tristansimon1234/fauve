@@ -111,7 +111,14 @@ async function Settings() {
                   <span className="text-sm font-bold">{a.handle ? `@${a.handle}` : platformLabels[a.platform]}</span>
                   <span className="text-[13px] text-muted">
                     {platformLabels[a.platform]} {accountStatusLabels[a.status]}
+                    {a.platform === "instagram" && a.provider === "facebook" ? " · avec la musique d’Instagram" : ""}
                   </span>
+                  {/* Connected without Facebook: Instagram's music needs the Facebook connection. */}
+                  {a.platform === "instagram" && a.provider !== "facebook" && (
+                    <a href="/api/facebook/connect" className="text-[13px] font-bold text-violet">
+                      Activer la musique d’Instagram (via Facebook)
+                    </a>
+                  )}
                 </span>
               </div>
             ))

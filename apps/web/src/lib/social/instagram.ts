@@ -25,7 +25,14 @@ export class InstagramError extends Error {
   }
 }
 
-const graphUrl = (path: string) => `https://graph.instagram.com/${env("INSTAGRAM_GRAPH_VERSION")}/${path}`;
+/**
+ * The Graph host for a token: a Facebook Login token (« EAA… », Instagram API with
+ * Facebook Login, the one that has the music library) talks to graph.facebook.com,
+ * an Instagram Login token (« IG… ») to graph.instagram.com. Same paths on both.
+ */
+export const viaFacebook = (token: string) => token.startsWith("EAA");
+const graphUrl = (token: string, path: string) =>
+  `https://graph.${viaFacebook(token) ? "facebook" : "instagram"}.com/${env("INSTAGRAM_GRAPH_VERSION")}/${path}`;
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
@@ -80,7 +87,7 @@ export async function connectWithCode(code: string) {
     })}`,
   );
   const me = await call<{ user_id?: string; id: string; username: string; account_type?: string }>(
-    graphUrl(`me?fields=user_id,username,account_type&access_token=${encodeURIComponent(long.access_token)}`),
+    graphUrl(long.access_token, `me?fields=user_id,username,account_type&access_token=${encodeURIComponent(long.access_token)}`),
   );
   return {
     accessToken: long.access_token,
@@ -94,6 +101,8 @@ export async function connectWithCode(code: string) {
 
 /** Extends a long-lived token by another 60 days (valid tokens older than 24 h only). */
 export async function refreshToken(accessToken: string) {
+  // A Facebook Login token is renewed by exchanging it for a new long-lived one.
+  if (viaFacebook(accessToken)) return exchangeFacebookToken(accessToken);
   const res = await call<{ access_token: string; expires_in: number }>(
     `https://graph.instagram.com/refresh_access_token?${new URLSearchParams({ grant_type: "ig_refresh_token", access_token: accessToken })}`,
   );
@@ -104,7 +113,7 @@ type ContainerStatus = { status_code?: "IN_PROGRESS" | "FINISHED" | "ERROR" | "E
 
 /** Creates a media container (any format) and returns its id. */
 async function createContainer(userId: string, token: string, fields: Record<string, string>): Promise<string> {
-  const container = await call<{ id: string }>(graphUrl(`${userId}/media`), {
+  const container = await call<{ id: string }>(graphUrl(token, `${userId}/media`), {
     method: "POST",
     body: new URLSearchParams({ ...fields, access_token: token }),
   });
@@ -116,7 +125,7 @@ async function waitUntilReady(containerId: string, token: string, timeoutMs: num
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const state = await call<ContainerStatus>(
-      graphUrl(`${containerId}?fields=status_code,status&access_token=${encodeURIComponent(token)}`),
+      graphUrl(token, `${containerId}?fields=status_code,status&access_token=${encodeURIComponent(token)}`),
     );
     if (state.status_code === "FINISHED") return;
     if (state.status_code === "ERROR" || state.status_code === "EXPIRED") {
@@ -128,12 +137,12 @@ async function waitUntilReady(containerId: string, token: string, timeoutMs: num
 }
 
 async function publishContainer(userId: string, token: string, containerId: string): Promise<{ mediaId: string; permalink: string | null }> {
-  const published = await call<{ id: string }>(graphUrl(`${userId}/media_publish`), {
+  const published = await call<{ id: string }>(graphUrl(token, `${userId}/media_publish`), {
     method: "POST",
     body: new URLSearchParams({ creation_id: containerId, access_token: token }),
   });
   const media = await call<{ permalink?: string }>(
-    graphUrl(`${published.id}?fields=permalink&access_token=${encodeURIComponent(token)}`),
+    graphUrl(token, `${published.id}?fields=permalink&access_token=${encodeURIComponent(token)}`),
   ).catch(() => ({ permalink: undefined }));
   return { mediaId: published.id, permalink: media.permalink ?? null };
 }
@@ -255,7 +264,7 @@ export async function recentMedia(
   { images = false }: { images?: boolean } = {},
 ): Promise<InstagramMedia[]> {
   const res = await call<{ data: InstagramMedia[] }>(
-    graphUrl(
+    graphUrl(accessToken,
       `${userId}/media?${q({
         fields: `id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count${images ? ",media_url,thumbnail_url" : ""}`,
         limit: String(limit),
@@ -269,7 +278,7 @@ export async function recentMedia(
 /** The account's public profile, for the grid preview. */
 export async function profile(userId: string, accessToken: string): Promise<InstagramProfile> {
   return call<InstagramProfile>(
-    graphUrl(
+    graphUrl(accessToken,
       `${userId}?${q({
         fields: "username,name,biography,profile_picture_url,followers_count,follows_count,media_count",
         access_token: accessToken,
@@ -280,7 +289,7 @@ export async function profile(userId: string, accessToken: string): Promise<Inst
 
 export async function mediaComments(mediaId: string, accessToken: string, limit = 50): Promise<InstagramComment[]> {
   const res = await call<{ data: InstagramComment[] }>(
-    graphUrl(
+    graphUrl(accessToken,
       `${mediaId}/comments?${q({
         fields: "id,text,username,timestamp,like_count,replies{id,text,username,timestamp}",
         limit: String(limit),
@@ -302,7 +311,7 @@ export async function mediaInsights(mediaId: string, accessToken: string): Promi
   for (const metrics of [FULL_METRICS, ["views", ...CORE_METRICS], CORE_METRICS]) {
     try {
       const res = await call<{ data: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] }>(
-        graphUrl(`${mediaId}/insights?${q({ metric: metrics.join(","), access_token: accessToken })}`),
+        graphUrl(accessToken, `${mediaId}/insights?${q({ metric: metrics.join(","), access_token: accessToken })}`),
       );
       return Object.fromEntries(
         res.data.map((m) => [m.name, m.total_value?.value ?? m.values?.[0]?.value ?? 0]),
@@ -318,7 +327,7 @@ export async function mediaInsights(mediaId: string, accessToken: string): Promi
 export async function mediaViews(mediaId: string, accessToken: string): Promise<number | undefined> {
   try {
     const res = await call<{ data: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] }>(
-      graphUrl(`${mediaId}/insights?${q({ metric: "views", access_token: accessToken })}`),
+      graphUrl(accessToken, `${mediaId}/insights?${q({ metric: "views", access_token: accessToken })}`),
     );
     const m = res.data[0];
     return m ? (m.total_value?.value ?? m.values?.[0]?.value) : undefined;
@@ -330,7 +339,7 @@ export async function mediaViews(mediaId: string, accessToken: string): Promise<
 
 /** Public reply under a comment, posted as the studio's account. */
 export async function replyToComment(commentId: string, accessToken: string, message: string): Promise<string> {
-  const res = await call<{ id: string }>(graphUrl(`${commentId}/replies`), {
+  const res = await call<{ id: string }>(graphUrl(accessToken, `${commentId}/replies`), {
     method: "POST",
     body: new URLSearchParams({ message: message.slice(0, 2200), access_token: accessToken }),
   });
@@ -343,15 +352,119 @@ export async function replyToComment(commentId: string, accessToken: string, mes
 
 /** Subscribes the connected account to its DM webhooks (the app must have the webhook set up in Meta). */
 export async function subscribeToMessages(accessToken: string): Promise<void> {
-  await call(graphUrl(`me/subscribed_apps?${q({ subscribed_fields: "messages", access_token: accessToken })}`), { method: "POST" });
+  await call(graphUrl(accessToken, `me/subscribed_apps?${q({ subscribed_fields: "messages", access_token: accessToken })}`), { method: "POST" });
 }
 
 /** Sends a text DM from Fauve's account (only inside the 24 h after the person wrote). */
 export async function sendDirectMessage(accessToken: string, recipientId: string, text: string): Promise<string | undefined> {
-  const res = await call<{ message_id?: string }>(graphUrl(`me/messages?${q({ access_token: accessToken })}`), {
+  const res = await call<{ message_id?: string }>(graphUrl(accessToken, `me/messages?${q({ access_token: accessToken })}`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ recipient: { id: recipientId }, message: { text: text.slice(0, 1000) } }),
   });
   return res.message_id;
+}
+
+// ---------------------------------------------------------------------------
+// Instagram API with Facebook Login (Facebook Login for Business): the same
+// publishing, stats and comments, plus Instagram's music library (ig_audio).
+// The manager logs in with Facebook and picks the Page linked to her account.
+// ---------------------------------------------------------------------------
+
+const facebookGraph = (path: string) => `https://graph.facebook.com/${env("INSTAGRAM_GRAPH_VERSION")}/${path}`;
+
+export function facebookRedirectUri(): string {
+  return `${env("APP_URL")}/api/facebook/callback`;
+}
+
+/** Facebook Login for Business, with the app's login configuration (its permissions and assets). */
+export function facebookAuthorizeUrl(state: string): string {
+  const url = new URL(`https://www.facebook.com/${env("INSTAGRAM_GRAPH_VERSION")}/dialog/oauth`);
+  url.searchParams.set("client_id", env("FACEBOOK_APP_ID"));
+  url.searchParams.set("redirect_uri", facebookRedirectUri());
+  url.searchParams.set("config_id", env("FACEBOOK_LOGIN_CONFIG_ID"));
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("state", state);
+  return url.toString();
+}
+
+/** A user token → a long-lived one (about 60 days). */
+async function exchangeFacebookToken(token: string) {
+  const long = await call<{ access_token: string; expires_in?: number }>(
+    facebookGraph(
+      `oauth/access_token?${q({
+        grant_type: "fb_exchange_token",
+        client_id: env("FACEBOOK_APP_ID"),
+        client_secret: env("FACEBOOK_APP_SECRET"),
+        fb_exchange_token: token,
+      })}`,
+    ),
+  );
+  return { accessToken: long.access_token, expiresAt: new Date(Date.now() + (long.expires_in ?? 60 * 24 * 3600) * 1000) };
+}
+
+/**
+ * Authorization code → long-lived user token and the professional Instagram account
+ * linked to one of her Pages. null when none of her Pages has one.
+ */
+export async function connectWithFacebookCode(code: string) {
+  const short = await call<{ access_token: string }>(
+    facebookGraph(
+      `oauth/access_token?${q({
+        client_id: env("FACEBOOK_APP_ID"),
+        client_secret: env("FACEBOOK_APP_SECRET"),
+        redirect_uri: facebookRedirectUri(),
+        code,
+      })}`,
+    ),
+  );
+  const long = await exchangeFacebookToken(short.access_token);
+  const pages = await call<{ data: { id: string; name?: string; instagram_business_account?: { id: string; username?: string } }[] }>(
+    facebookGraph(`me/accounts?${q({ fields: "id,name,instagram_business_account{id,username}", limit: "50", access_token: long.accessToken })}`),
+  );
+  const page = pages.data.find((p) => p.instagram_business_account?.id);
+  if (!page?.instagram_business_account) return null;
+  const ig = page.instagram_business_account;
+  const username =
+    ig.username ??
+    (await call<{ username: string }>(facebookGraph(`${ig.id}?${q({ fields: "username", access_token: long.accessToken })}`))).username;
+  return {
+    accessToken: long.accessToken,
+    expiresAt: long.expiresAt,
+    userId: ig.id,
+    username,
+    pageId: page.id,
+    scopes: ["instagram_basic", "instagram_content_publish", "instagram_manage_comments", "instagram_manage_insights", "pages_show_list", "pages_read_engagement", "business_management"],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Instagram's music library (Instagram API with Facebook Login only)
+// ---------------------------------------------------------------------------
+
+export type InstagramAudio = {
+  audio_id: string;
+  title?: string;
+  display_artist?: string;
+  duration_in_ms?: number;
+  audio_type?: "music" | "original_sound" | string;
+  /** A temporary preview of the file (about 1.5 days): to listen and to cut on its beats. */
+  download_url?: string | null;
+  cover_artwork_thumbnail_uri?: string | null;
+  ig_username?: string;
+  on_platform_audio_preview_link?: string | null;
+};
+
+/** Music or original sounds authorised for third parties; trending ones without a query. */
+export async function searchAudio(userId: string, accessToken: string, type: "music" | "original_sound", query?: string): Promise<InstagramAudio[]> {
+  if (!viaFacebook(accessToken)) throw new InstagramError("La musique d’Instagram demande la connexion via Facebook", 400, null);
+  const res = await call<{ audio?: InstagramAudio[] }>(
+    facebookGraph(`ig_audio?${q({ audio_type: type, user_id: userId, ...(query ? { search_query: query } : {}), access_token: accessToken })}`),
+  );
+  return res.audio ?? [];
+}
+
+/** One audio asset, with a fresh preview link. */
+export async function audioInfo(audioId: string, userId: string, accessToken: string): Promise<InstagramAudio> {
+  return call<InstagramAudio>(facebookGraph(`${audioId}?${q({ user_id: userId, access_token: accessToken })}`));
 }

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { connectWithCode, InstagramError, subscribeToMessages } from "@/lib/social/instagram";
 import { FAUVE_ACCOUNT_STATE, readOAuthState } from "@/lib/social/oauth-state";
-import { sendText } from "@/lib/whatsapp/client";
+import { linkInstagramAccount } from "@/lib/social/link-instagram";
 
 // Instagram redirects here after the manager authorised Fauve. The studio comes
 // from the signed state, not from a session: this page often opens in another
@@ -51,67 +51,6 @@ export async function GET(request: NextRequest) {
   }
   if (state.studioId === FAUVE_ACCOUNT_STATE) return connectFauveAccount(account);
 
-  const db = supabaseAdmin();
-  const memberRow = await db
-    .from("members")
-    .select("studio_id, phone_e164")
-    .eq("id", state.memberId)
-    .eq("studio_id", state.studioId)
-    .maybeSingle();
-  if (!memberRow.data) return back(request, "/connect", "lien-expire");
-  const member = memberRow.data as { studio_id: string; phone_e164: string | null };
-
-  const social = await db
-    .from("social_accounts")
-    .upsert(
-      {
-        studio_id: member.studio_id,
-        platform: "instagram",
-        handle: account.username,
-        provider: "instagram",
-        provider_ref: account.userId,
-        status: "connected",
-        connected_at: new Date().toISOString(),
-      },
-      { onConflict: "studio_id,platform" },
-    )
-    .select("id")
-    .single();
-  if (social.error) {
-    console.error("social_accounts upsert failed", social.error.message);
-    return back(request, "/connect", "instagram");
-  }
-  const creds = await db.from("social_credentials").upsert({
-    social_account_id: social.data.id,
-    access_token: account.accessToken,
-    expires_at: account.expiresAt.toISOString(),
-    scopes: account.scopes,
-    updated_at: new Date().toISOString(),
-  });
-  if (creds.error) {
-    console.error("social_credentials upsert failed", creds.error.message);
-    return back(request, "/connect", "instagram");
-  }
-
-  // Close the loop on WhatsApp (best effort: only works inside the 24 h window).
-  const studio = await db.from("studios").select("onboarding_step").eq("id", member.studio_id).single();
-  // Getting started: Instagram is its last step.
-  if (studio.data?.onboarding_step === "connect") {
-    await db.from("studios").update({ onboarding_step: "done" }).eq("id", member.studio_id);
-  }
-  if (member.phone_e164) {
-    const text = `C’est bon, ton Instagram @${account.username} est connecté ✅ Je peux maintenant publier tes posts dès que tu les valides.`;
-    const id = await sendText(member.phone_e164.slice(1), text).catch(() => undefined);
-    if (id) {
-      await db.from("whatsapp_messages").insert({
-        studio_id: member.studio_id,
-        wa_message_id: id,
-        direction: "outbound",
-        phone_e164: member.phone_e164,
-        type: "text",
-        body: text,
-      });
-    }
-  }
-  return back(request, "/pret");
+  const failed = await linkInstagramAccount(state, { ...account, scopes: account.scopes }, "instagram");
+  return back(request, failed ? "/connect" : "/pret", failed ?? undefined);
 }
