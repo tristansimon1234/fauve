@@ -23,7 +23,7 @@ export const RESTYLE: Record<Restyle, { button: string; direction: string; brief
     button: "Plus pêchu",
     direction: "Plus pêchu : coupes rapides, textes qui claquent, accroche forte, rythme soutenu.",
     brief:
-      "La gérante veut ce Reel plus pêchu. Garde le même sujet, mais donne de l'énergie : accroche plus forte dès la première seconde, coupes plus rapides, ses messages en textes courts qui claquent (capitales, mots en valeur), sans en inventer d'autres, animations plus dynamiques.",
+      "La gérante veut ce Reel plus pêchu. Garde le même sujet, mais donne de l'énergie : accroche plus forte dès la première seconde, coupes plus rapides, textes courts qui claquent (capitales, mots en valeur), animations plus dynamiques.",
   },
 };
 
@@ -35,7 +35,7 @@ export function customRestyle(wish: string): { direction: string; brief: string 
   const words = wish.trim().replace(/\s+/g, " ").slice(0, 200);
   return {
     direction: words.endsWith(".") ? words : `${words}.`,
-    brief: `La gérante veut ce Reel autrement : « ${words} ». Garde le même sujet et les mêmes plans, et change ce qu'elle demande, franchement et dans tout le Reel (textes, animations, rythme), sans inventer de messages qu'elle n'a pas donnés.`,
+    brief: `La gérante veut ce Reel autrement : « ${words} ». Garde le même sujet et les mêmes plans, et change ce qu'elle demande, franchement et dans tout le Reel (textes, animations, rythme).`,
   };
 }
 
