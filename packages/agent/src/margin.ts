@@ -1,18 +1,23 @@
-import { CREDIT_PRICES, MONTHLY_CREDITS } from "./credits.ts";
+import { CREDIT_PRICES } from "./credits.ts";
+import { PLANS, type PlanId } from "./plans.ts";
 
-// What a studio costs against what it pays: the plan price, the share kept as margin,
-// and what a credit is worth. Every priced job must cost at most half of what its
-// credits are worth, and a studio's whole month (work, chat, everything logged in
-// cost_events) at most half of its plan.
+// What a studio costs against what it pays: its plan's price, the share kept as
+// margin, and what a credit is worth. Every priced job must cost at most half of
+// what its credits are worth (on the plan where a credit is worth least), and a
+// studio's whole month (work, chat, everything logged in cost_events) at most half of its plan.
 
-/** Monthly plan, in euros. */
-export const PLAN_PRICE_EUR = 49;
+/** Pro's monthly price, in euros. */
+export const PLAN_PRICE_EUR = PLANS.pro.priceEur;
 /** Share of the price kept, at least: costs stay under the other half. */
 export const TARGET_MARGIN = 0.5;
-/** What one credit is worth to the studio: its plan spread over the month's credits. */
-export const CREDIT_VALUE_EUR = PLAN_PRICE_EUR / MONTHLY_CREDITS;
+/** What one credit is worth to a studio on a plan: the plan spread over its month's credits. */
+export const creditValue = (plan: PlanId) => PLANS[plan].priceEur / PLANS[plan].credits;
+/** What one credit is worth at least, whatever the plan: the margin of every job is checked against it. */
+export const CREDIT_VALUE_EUR = Math.min(...(Object.keys(PLANS) as PlanId[]).map(creditValue));
 /** The most a studio's month may cost (AI, render…) while keeping the margin. */
-export const MONTHLY_COST_BUDGET_EUR = PLAN_PRICE_EUR * (1 - TARGET_MARGIN);
+export const monthlyCostBudget = (plan: PlanId) => PLANS[plan].priceEur * (1 - TARGET_MARGIN);
+/** Pro's month budget. */
+export const MONTHLY_COST_BUDGET_EUR = monthlyCostBudget("pro");
 
 /**
  * Typical cost of each priced job in euros, measured in cost_events (October 2026 prices:
@@ -59,8 +64,8 @@ export type StudioMonth = {
   budgetLeft: number;
 };
 
-/** A studio's month from its cost_events (purpose and euros). */
-export function studioMonth(costs: { purpose: string; eur: number }[]): StudioMonth {
+/** A studio's month from its cost_events (purpose and euros), against its plan. */
+export function studioMonth(costs: { purpose: string; eur: number }[], plan: PlanId = "pro"): StudioMonth {
   const byPurpose: Record<string, number> = {};
   for (const c of costs) byPurpose[c.purpose] = (byPurpose[c.purpose] ?? 0) + c.eur;
   const total = costs.reduce((sum, c) => sum + c.eur, 0);
@@ -71,7 +76,7 @@ export function studioMonth(costs: { purpose: string; eur: number }[]): StudioMo
     chat: round(chat),
     work: round(total - chat),
     byPurpose: Object.fromEntries(Object.entries(byPurpose).map(([k, v]) => [k, round(v)])),
-    margin: Math.round((1 - total / PLAN_PRICE_EUR) * 1000) / 1000,
-    budgetLeft: round(MONTHLY_COST_BUDGET_EUR - total),
+    margin: Math.round((1 - total / PLANS[plan].priceEur) * 1000) / 1000,
+    budgetLeft: round(monthlyCostBudget(plan) - total),
   };
 }

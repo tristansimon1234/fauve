@@ -146,7 +146,8 @@ export type PublishItem = { type: "image" | "video"; url: string };
  * videos), a story (one photo or video; Instagram takes no caption on stories).
  */
 export type PublishRequest =
-  | { kind: "reel"; videoUrl: string; caption: string }
+  /** cover: a frame of the video (seconds) or an image (public JPEG URL) for the grid. */
+  | { kind: "reel"; videoUrl: string; caption: string; cover?: { at: number } | { url: string } }
   | { kind: "image"; imageUrl: string; caption: string }
   | { kind: "carousel"; items: PublishItem[]; caption: string }
   | { kind: "story"; item: PublishItem };
@@ -169,6 +170,9 @@ export async function publishMedia(params: {
         video_url: request.videoUrl,
         caption: caption(request.caption),
         share_to_feed: "true",
+        // The cover in the grid: a photo, or a frame of the video (in milliseconds).
+        ...(request.cover && "url" in request.cover ? { cover_url: request.cover.url } : {}),
+        ...(request.cover && "at" in request.cover ? { thumb_offset: String(Math.round(request.cover.at * 1000)) } : {}),
       });
       break;
     case "image":

@@ -5,7 +5,8 @@ import {
   effortSchema,
   montageCharge,
   montagePlanSchema,
-  MONTHLY_CREDITS,
+  PLANS,
+  planOf,
   otherEffort,
   planBrief,
   quoteMontage,
@@ -31,7 +32,9 @@ export type VariantChange = { template?: MotionTemplate; hook?: string };
 
 /** The studio's balance, after this month's top-up. */
 export async function creditBalance(studioId: string): Promise<number> {
-  const { data, error } = await supabaseAdmin().rpc("ensure_monthly_credits", { p_studio: studioId, p_allowance: MONTHLY_CREDITS });
+  const db = supabaseAdmin();
+  const { data: studio } = await db.from("studios").select("plan").eq("id", studioId).maybeSingle();
+  const { data, error } = await db.rpc("ensure_monthly_credits", { p_studio: studioId, p_allowance: PLANS[planOf(studio?.plan)].credits });
   if (error) throw new Error(`credits: ${error.message}`);
   return data as number;
 }
@@ -93,14 +96,12 @@ async function videoCount(studioId: string, mediaIds: string[]): Promise<number>
 }
 
 function priceAt(input: { clips: number; correction: boolean; maxNewScenes?: number }, effort: Effort, balance: number): MontageQuote | null {
-  let quote = quoteMontage({ ...input, effort });
-  const sure = quote.base + quote.fixRounds * CREDIT_PRICES.fixRound;
-  if (balance < sure) return null;
-  if (balance < quote.max) {
-    const affordable = Math.floor((balance - sure) / CREDIT_PRICES.newScene);
-    quote = quoteMontage({ ...input, effort, maxNewScenes: Math.min(quote.maxNewScenes, affordable) });
+  // Fewer new scenes when they do not all fit (the library and fixed scenes do the rest).
+  for (let scenes = quoteMontage({ ...input, effort }).maxNewScenes; scenes >= 0; scenes--) {
+    const quote = quoteMontage({ ...input, effort, maxNewScenes: scenes });
+    if (quote.max <= balance) return quote;
   }
-  return quote;
+  return null;
 }
 
 /**
@@ -336,12 +337,12 @@ export async function chargeQuote(
     .update({ charged_at: new Date().toISOString() })
     .eq("id", quoteId)
     .is("charged_at", null)
-    .select("studio_id, post_id, kind, base, max, effort")
+    .select("studio_id, post_id, kind, base, max, lines, effort")
     .maybeSingle();
   const q = claimed.data;
   if (!q) return;
   const skipped = (skipReview ? CREDIT_PRICES.review : 0) + (skipAlternative ? CREDIT_PRICES.alternative : 0);
-  const credits = Math.max(0, montageCharge({ base: q.base as number, max: q.max as number }, newScenes, fixRounds) - skipped);
+  const credits = Math.max(0, montageCharge({ base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[] }, newScenes, fixRounds) - skipped);
   const kind = q.kind as AcceptedQuote["kind"];
   const level = effortSchema.nullable().catch(null).parse(q.effort);
   const label = `${{ montage: "Montage", correction: "Correction", variant: "Variante" }[kind]}${level && level !== "rapide" ? ` ${EFFORTS[level].label}` : ""}`;

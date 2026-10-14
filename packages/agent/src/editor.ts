@@ -45,7 +45,7 @@ Règles de montage :
 
 Scènes de motion design (sans vidéo, aux couleurs du studio) :
 - « motion » : une scène libre, sur mesure, que ton motion designer animera en code (typographie cinétique, formes, tracés, masques…). Dans « brief » (600 caractères au plus), décris précisément l'idée visuelle, les textes exacts, l'ordre des mouvements, les couleurs et l'ambiance. Donne aussi « fallback », une scène fixe équivalente au cas où. Les textes restent toujours entiers et lisibles dans le cadre (marges de sécurité) : ne demande jamais qu'un texte « déborde du cadre », soit « coupé par le bord » ou « sorte de l'écran » ; seuls les formes et les décors peuvent dépasser. Une scène dont un texte sort du cadre est refusée et remplacée par sa scène fixe. Réserve-la aux moments forts : une ouverture marquante, une offre, un témoignage mis en scène. Chaque scène libre coûte cher à produire : 2 au plus par Reel.
-- Bibliothèque (« templates ») : des scènes libres déjà créées, réutilisables avec d'autres textes, gratuites et instantanées. Si l'une convient (même idée, même rôle), réutilise-la : motion { template_id, template_texts: un texte par slot (respecte max_chars), brief: une phrase sur ce que la scène montre ici, fallback }. Ne commande une nouvelle scène libre (brief détaillé, sans template_id) que si aucune ne convient. La bibliothèque passe d'abord : une scène réutilisée avec d'autres mots paraît neuve. Une nouvelle scène se mérite (le moment fort du Reel, une idée que la bibliothèque n'a pas) : jamais une variante d'une scène qu'elle a déjà (un néon de plus quand elle en a un), jamais par défaut, et dans une correction seulement si la demande le dit.
+- Bibliothèque (« templates ») : des scènes libres déjà créées, réutilisables avec d'autres textes, gratuites et instantanées. Chacune au plus une fois par Reel (la même scène deux fois, même avec d'autres mots, se voit comme une répétition). Si l'une convient (même idée, même rôle), réutilise-la : motion { template_id, template_texts: un texte par slot (respecte max_chars), brief: une phrase sur ce que la scène montre ici, fallback }. Ne commande une nouvelle scène libre (brief détaillé, sans template_id) que si aucune ne convient. La bibliothèque passe d'abord : une scène réutilisée avec d'autres mots paraît neuve. Une nouvelle scène se mérite (le moment fort du Reel, une idée que la bibliothèque n'a pas) : jamais une variante d'une scène qu'elle a déjà (un néon de plus quand elle en a un), jamais par défaut, et dans une correction seulement si la demande le dit.
 - « scene » : gabarit fixe et rapide (title, list, quote, number), si une scène libre n'apporte rien.
 - 1,5 à 6 s par scène. Avec des clips : 1 à 3 scènes au plus. Sans clips : un Reel entièrement en motion design, de 3 à 5 scènes qui s'enchaînent.
 
@@ -176,7 +176,25 @@ export const MAX_FREE_SCENES = 2;
  */
 export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>, maxFreeScenes = MAX_FREE_SCENES): EditPlan {
   let freeScenes = 0;
+  const shownTemplates = new Set<string>();
   const segments = plan.segments.flatMap((s): PlanSegment[] => {
+    // A library scene twice in one Reel reads as a repeat: the second becomes a new
+    // scene while the budget allows, else its fixed fallback, else a title with its words.
+    if (isMotionSegment(s) && s.motion.template_id) {
+      if (!shownTemplates.has(s.motion.template_id)) shownTemplates.add(s.motion.template_id);
+      else {
+        const { template_id: _repeat, texts, ...motion } = s.motion;
+        const duration = round(Math.min(6, Math.max(1, s.duration)));
+        if (freeScenes < maxFreeScenes) {
+          freeScenes++;
+          return [{ motion, duration: round(Math.min(8, Math.max(1, s.duration))) }];
+        }
+        const words = Object.values(texts ?? {}).map((w) => w.trim()).filter(Boolean);
+        const title = [...words].sort((a, b) => b.length - a.length)[0];
+        const scene = motion.fallback ?? (title ? { kind: "title" as const, title: title.slice(0, 60), background: "accent" as const } : null);
+        return scene ? [{ scene, duration }] : [];
+      }
+    }
     // Free scenes are the costly part of a montage: past the cap, the fixed fallback plays instead.
     if (isMotionSegment(s) && !s.motion.template_id && freeScenes++ >= maxFreeScenes && s.motion.fallback) {
       return [{ scene: s.motion.fallback, duration: round(Math.min(6, Math.max(1, s.duration))) }];

@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
-import { CREDIT_VALUE_EUR, MONTHLY_COST_BUDGET_EUR, PLAN_PRICE_EUR, studioMonth, TARGET_MARGIN } from "@fauve/agent";
+import { CREDIT_VALUE_EUR, PLANS, planOf, studioMonth, TARGET_MARGIN } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isValidTestKey } from "@/lib/test-studio";
 
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const db = supabaseAdmin();
   const [studios, costs, ledger] = await Promise.all([
-    db.from("studios").select("id, name"),
+    db.from("studios").select("id, name, plan"),
     db.from("cost_events").select("studio_id, kind, cost_eur, meta").gte("created_at", from).lt("created_at", to).limit(50_000),
     db.from("credit_ledger").select("studio_id, delta").lt("delta", 0).gte("created_at", from).lt("created_at", to).limit(50_000),
   ]);
@@ -33,10 +33,12 @@ export async function GET(request: NextRequest) {
       .filter((c) => c.studio_id === s.id)
       .map((c) => ({ purpose: ((c.meta as { purpose?: string } | null)?.purpose ?? c.kind) as string, eur: Number(c.cost_eur ?? 0) }));
     const creditsUsed = -(ledger.data ?? []).filter((l) => l.studio_id === s.id).reduce((sum, l) => sum + (l.delta as number), 0);
-    const result = studioMonth(own);
+    const plan = planOf(s.plan);
+    const result = studioMonth(own, plan);
     return {
       studio: s.name,
       id: s.id,
+      plan,
       ...result,
       credits_used: creditsUsed,
       // What the work cost per credit used (it must stay under half a credit's worth).
@@ -47,9 +49,8 @@ export async function GET(request: NextRequest) {
   rows.sort((a, b) => b.total - a.total);
   return Response.json({
     month,
-    plan_eur: PLAN_PRICE_EUR,
+    plans: PLANS,
     target_margin: TARGET_MARGIN,
-    monthly_cost_budget_eur: MONTHLY_COST_BUDGET_EUR,
     credit_value_eur: Math.round(CREDIT_VALUE_EUR * 1000) / 1000,
     studios: rows,
   });

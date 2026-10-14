@@ -165,6 +165,12 @@ export const GridIcon = make(
     <path d="M9.2 3.5v17M14.8 3.5v17M3.5 9.2h17M3.5 14.8h17" />
   </>,
 );
+export const ReelIcon = make(
+  <>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
+    <path d="M10 9.2v5.6l4.6-2.8z" />
+  </>,
+);
 export const LayersIcon = make(
   <>
     <rect x="7" y="7" width="13" height="13" rx="2.5" />

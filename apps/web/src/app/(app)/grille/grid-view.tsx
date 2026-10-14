@@ -2,11 +2,13 @@ import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
 import { EyeIcon, InstagramIcon, PlayIcon } from "@/components/icons";
 import { FormatBadge } from "@/components/format-badge";
+import { GridTabs } from "./grid-tabs";
 import { formatCompact, formatNumber, formatShortDateTime } from "@/lib/format";
 import type { InstagramMedia, InstagramProfile } from "@/lib/social/instagram";
 
-// The Instagram profile preview: header and 3-column grid (3:4 tiles, as on
-// Instagram), Fauve's coming posts first with a dashed frame and their status.
+// The Instagram profile preview: header, then the Publications tab (3-column
+// grid of 3:4 tiles, as on Instagram) or the Reels tab (9:16), Fauve's coming
+// posts first with a dashed frame and their status.
 
 export type Tile =
   | { kind: "upcoming"; id: string; title: string; status: string; at: string | null; videoUrl: string | null; imageUrl: string | null; format: string }
@@ -28,6 +30,7 @@ export function GridView({
   tiles: Tile[];
   timezone: string;
 }) {
+  const reelTiles = tiles.filter((t) => (t.kind === "upcoming" ? t.format === "reel" : t.media.media_product_type === "REELS"));
   return (
     <>
       {heading ? (
@@ -82,13 +85,16 @@ export function GridView({
         )}
 
         {tiles.length ? (
-          <ul className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-b-[22px] border-t border-line">
-            {tiles.map((tile) => (
-              <li key={tile.kind === "upcoming" ? `p-${tile.id}` : `ig-${tile.media.id}`} className="relative aspect-[3/4] bg-soft">
-                {tile.kind === "upcoming" ? <UpcomingTile tile={tile} tz={tz} /> : <InstagramTile media={tile.media} views={tile.views} />}
-              </li>
-            ))}
-          </ul>
+          <GridTabs
+            all={<TileGrid tiles={tiles} tz={tz} />}
+            reels={
+              reelTiles.length ? (
+                <TileGrid tiles={reelTiles} tz={tz} tall />
+              ) : (
+                <p className="px-5 py-8 text-center text-sm text-muted">Pas encore de Reel : demande-en un à Brigitte.</p>
+              )
+            }
+          />
         ) : (
           <p className="border-t border-line px-5 py-8 text-center text-sm text-muted">
             Rien à afficher pour l’instant : envoie tes vidéos à Brigitte pour remplir ta grille.
@@ -96,6 +102,19 @@ export function GridView({
         )}
       </section>
     </>
+  );
+}
+
+/** The tiles, 3:4 as in the profile grid, or 9:16 in the Reels tab. */
+function TileGrid({ tiles, tz, tall = false }: { tiles: Tile[]; tz: string; tall?: boolean }) {
+  return (
+    <ul className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-b-[22px]">
+      {tiles.map((tile) => (
+        <li key={tile.kind === "upcoming" ? `p-${tile.id}` : `ig-${tile.media.id}`} className={`relative bg-soft ${tall ? "aspect-[9/16]" : "aspect-[3/4]"}`}>
+          {tile.kind === "upcoming" ? <UpcomingTile tile={tile} tz={tz} /> : <InstagramTile media={tile.media} views={tile.views} />}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -113,7 +132,7 @@ function UpcomingTile({ tile, tz }: { tile: Extract<Tile, { kind: "upcoming" }>;
   return (
     <Link href={`/publications/${tile.id}`} className="group absolute inset-0 block outline-offset-[-3px]">
       {tile.videoUrl ? (
-        <video src={`${tile.videoUrl}#t=0.5`} muted playsInline preload="metadata" className="size-full object-cover" />
+        <video src={tile.videoUrl} muted playsInline preload="metadata" className="size-full object-cover" />
       ) : tile.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
         <img src={tile.imageUrl} alt="" className="size-full object-cover" />

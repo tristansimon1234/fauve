@@ -1,5 +1,6 @@
 "use client";
 
+import { coverSrc } from "@/lib/cover-src";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { DeleteButton } from "@/components/delete-button";
@@ -127,7 +128,7 @@ export function PostDrawer({
               {shown.cover && (
                 <div className="flex justify-center rounded-[18px] bg-soft p-2">
                   {shown.cover.video ? (
-                    <video src={`${shown.cover.url}#t=0.5`} muted playsInline controls preload="metadata" className="max-h-[260px] rounded-[12px]" />
+                    <video src={coverSrc(shown.cover)} muted playsInline controls preload="metadata" className="max-h-[260px] rounded-[12px]" />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
                     <img src={shown.cover.url} alt="" className="max-h-[260px] rounded-[12px] object-contain" />

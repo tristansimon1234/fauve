@@ -6,9 +6,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { addDays, localDateOf, localInstant, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
 import { scheduleValidated } from "@/lib/posts";
-import { slidesToPublish } from "@/lib/render/slides";
+import { postCovers, type Cover, type CoverPost } from "@/lib/covers";
 import { instagramAccount } from "@/lib/social/publish";
-import { getStudioContext, signMediaUrls } from "@/lib/studio";
+import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { deletePost } from "../publications/[id]/actions";
 
@@ -170,7 +170,7 @@ export type PostSheet = {
   /** Local day and time, for the date fields. */
   date: string | null;
   time: string | null;
-  cover: { url: string; video: boolean } | null;
+  cover: Cover | null;
   caption: string | null;
   steps: { label: string; done: boolean }[];
   /** What to do now, in a sentence. */
@@ -191,7 +191,7 @@ export async function getPostSheet(postId: string): Promise<PostSheet | null> {
   const tz = member.studio.timezone;
   const { data: post } = await db
     .from("posts")
-    .select("id, title, kind, status, scheduled_at, caption, media_ids, render_id, slides, slides_render, publish_error, external_ids")
+    .select("id, title, kind, status, scheduled_at, caption, media_ids, render_id, slides, slides_render, cover, publish_error, external_ids")
     .eq("id", postId)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -200,16 +200,11 @@ export async function getPostSheet(postId: string): Promise<PostSheet | null> {
   const kind = post.kind as PostKind;
 
   const ids = (post.media_ids as string[] | null) ?? [];
-  const [render, first, shots, instagram] = await Promise.all([
-    post.render_id ? db.from("renders").select("storage_path").eq("id", post.render_id).maybeSingle() : Promise.resolve({ data: null }),
-    ids[0] ? db.from("media_assets").select("storage_path, kind, mime_type").eq("id", ids[0]).eq("studio_id", studioId).maybeSingle() : Promise.resolve({ data: null }),
+  const [covers, shots, instagram] = await Promise.all([
+    postCovers(db, studioId, [post as unknown as CoverPost]),
     db.from("shot_requests").select("id, label, hint, done").eq("studio_id", studioId).eq("post_id", postId).order("created_at"),
     instagramAccount(studioId),
   ]);
-  const rendered = ids[0] ? slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null }).rendered[ids[0]] : undefined;
-  const coverPath = (render.data?.storage_path as string | undefined) ?? rendered ?? (first.data?.storage_path as string | undefined);
-  const coverVideo = Boolean(render.data?.storage_path) || (!rendered && (first.data?.kind === "video" || String(first.data?.mime_type ?? "").startsWith("video/")));
-  const coverUrl = coverPath ? (await signMediaUrls(db, studioId, [coverPath])).get(coverPath) : undefined;
 
   const reached = (list: PostStatus[]) => list.includes(status);
   const hasContent = ids.length > 0 || Boolean(post.render_id) || reached(["media_received", "draft", "validated", "scheduled", "published", "measured"]);
@@ -247,7 +242,7 @@ export async function getPostSheet(postId: string): Promise<PostSheet | null> {
     status,
     date: scheduled ? toIsoDate(localDateOf(scheduled, tz)) : null,
     time: local ? `${String(local.hours).padStart(2, "0")}:${String(local.minutes).padStart(2, "0")}` : null,
-    cover: coverUrl ? { url: coverUrl, video: coverVideo } : null,
+    cover: covers.get(postId) ?? null,
     caption: (post.caption as string | null) ?? null,
     steps,
     todo,

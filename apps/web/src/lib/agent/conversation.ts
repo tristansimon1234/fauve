@@ -1,6 +1,6 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_EFFORT, effortSchema, orderReplies, readMemory } from "@fauve/agent";
+import { DEFAULT_EFFORT, effortSchema, orderReplies, readMemory, stableWindow } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
@@ -8,7 +8,11 @@ import { describeJobs, runningJobs } from "@/lib/studio-jobs";
 // Shared by every channel (WhatsApp webhook, web test chat): rebuild the
 // conversation from stored messages and let Fauve answer the last one.
 
-const HISTORY_LIMIT = 24;
+const HISTORY_LIMIT = 20;
+/** The history's start moves by about this many messages at a time (prompt cache, `stableWindow`). */
+const HISTORY_STEP = 10;
+/** Rows read to find the window's start. */
+const HISTORY_READ = HISTORY_LIMIT + 4 * HISTORY_STEP;
 /** Long messages (video captions, links) are cut in the history: the model rarely needs them whole. */
 const MESSAGE_MAX_CHARS = 700;
 
@@ -87,11 +91,11 @@ export async function replyInConversation(params: {
   const ownThread = conversation?.started_by === "web";
   let messages = db
     .from("whatsapp_messages")
-    .select("direction, type, body, media_id, wa_message_id, payload, conversation_id, reactions")
+    .select("id, direction, type, body, media_id, wa_message_id, payload, conversation_id, reactions")
     .eq("studio_id", params.studioId)
     .order("created_at", { ascending: false })
     // WhatsApp keeps the studio's recent thread across conversations, minus the ones opened in the app: read a little more, then filter.
-    .limit(ownThread ? HISTORY_LIMIT : HISTORY_LIMIT * 3);
+    .limit(ownThread ? HISTORY_READ : HISTORY_READ * 2);
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
   const [studio, member, rows, instagram, brand, jobs] = await Promise.all([
@@ -118,9 +122,9 @@ export async function replyInConversation(params: {
       ? await db.from("conversations").select("id").in("id", ids).or("started_by.eq.web,post_id.not.is.null")
       : { data: [] };
     const skip = new Set((separate ?? []).map((c) => c.id as string));
-    kept = kept.filter((r) => !skip.has(r.conversation_id as string)).slice(0, HISTORY_LIMIT);
+    kept = kept.filter((r) => !skip.has(r.conversation_id as string)).slice(0, HISTORY_READ);
   }
-  const stored = kept.reverse().map((r) => ({
+  const stored = stableWindow(kept.reverse(), HISTORY_LIMIT, HISTORY_STEP).map((r) => ({
     ...(r as StoredMessage & { wa_message_id: string | null }),
     reply_to: (r.payload as { reply_to?: string } | null)?.reply_to ?? null,
     notes: (r.payload as { notes?: string[] } | null)?.notes,

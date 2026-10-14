@@ -159,6 +159,9 @@ function QuoteCard({
   const level = shown ? EFFORTS[shown] : null;
   const price = (open && effort && effort !== quote.effort && quote.efforts[effort]) || quote;
   const extra = price.max > price.base;
+  // The plan's animations beyond the made-to-measure ones in the price: reused from her library.
+  const madeToMeasure = price.lines.filter((l) => /animations? sur mesure$/.test(l.label)).reduce((n, l) => n + Math.round(l.credits / 3), 0);
+  const fromLibrary = quote.kind === "montage" && quote.plan ? Math.max(0, quote.plan.scenes.filter((sc) => sc.kind === "animation").length - madeToMeasure) : 0;
 
   const launch = async () => {
     if (!onLaunch || busy || launching) return;
@@ -282,12 +285,14 @@ function QuoteCard({
                 )}
                 {priceList}
                 <div key={shown ?? "none"} className={`flex flex-col gap-1.5 ${touched ? "fauve-fade" : ""}`}>
-                  {extra && (
+                  {fromLibrary > 0 && (
                     <p className="text-[12px] leading-snug text-muted">
-                      Jusqu’à {credits(price.max)} si Brigitte crée de nouvelles animations
-                      {level?.review ? " ou corrige la vidéo après l’avoir regardée" : ""}. Tu ne paies que ce qui est vraiment fait.
+                      {fromLibrary > 1 ? `Les ${fromLibrary} autres animations viennent` : "L’autre animation vient"} de ta bibliothèque ou des scènes simples, sans frais.
                     </p>
                   )}
+                  <p className="text-[12px] leading-snug text-muted">
+                    {extra ? `Jusqu’à ${credits(price.max)} si Brigitte corrige la vidéo après l’avoir regardée. ` : ""}Tu ne paies que ce qui est vraiment fait.
+                  </p>
                   <p className="text-[12px] text-muted tabular-nums">
                     Solde {credits(quote.balance)} · il t’en restera au moins {Math.max(0, quote.balance - price.max)}
                   </p>

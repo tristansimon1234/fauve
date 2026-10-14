@@ -1,3 +1,4 @@
+import { PLANS } from "@fauve/agent";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import {
@@ -22,6 +23,26 @@ const steps: [string, string][] = [
   ["Un premier essai", "Une première publication ensemble, ajustée jusqu’à ce qu’elle te ressemble."],
   ["Ton Instagram", "En dernier, quand ta publication est prête : elle part à l’heure prévue."],
 ];
+
+/** The two offers (the same work; Pro has room for more publications and more care). */
+const offers = [
+  {
+    id: "essentiel",
+    label: PLANS.essentiel.label,
+    price: PLANS.essentiel.priceEur,
+    pitch: "Pour être présent chaque semaine, sans y penser.",
+    points: [`${PLANS.essentiel.postsPerWeek} publications par semaine, plus les stories`, `${PLANS.essentiel.credits} crédits par mois`, "Brigitte sur WhatsApp et dans l’app"],
+    dark: false,
+  },
+  {
+    id: "pro",
+    label: PLANS.pro.label,
+    price: PLANS.pro.priceEur,
+    pitch: "Pour un compte qui bouge : plus de Reels, plus d’animations sur mesure.",
+    points: [`${PLANS.pro.postsPerWeek} publications ou plus par semaine, plus les stories`, `${PLANS.pro.credits} crédits par mois`, "Assez de crédits pour des montages Max : deux versions, la meilleure gardée"],
+    dark: true,
+  },
+] as const;
 
 const faq: [string, string][] = [
   ["Brigitte, c’est une vraie personne ?", "Non, c’est une IA, et elle le dit. Elle écrit, monte et programme comme une community manager, et tu gardes toujours la main."],
@@ -222,24 +243,42 @@ export default function LandingPage() {
 
       {/* Price */}
       <section id="tarif" className="mx-auto max-w-[1200px] scroll-mt-6 px-4 pb-24 sm:px-8">
-        <div className="grid items-center gap-8 rounded-[28px] bg-ink p-7 text-white sm:p-10 lg:grid-cols-[1fr_auto]">
-          <div className="flex flex-col gap-3">
-            <span className="text-sm font-bold tracking-[0.06em] text-lilac-ink">UN SEUL TARIF</span>
-            <span className="text-[56px] leading-none font-extrabold tracking-[-0.03em]">
-              49 € <span className="text-xl font-semibold text-lilac-ink">/ mois</span>
-            </span>
-            <ul className="mt-2 grid gap-x-8 gap-y-2 text-[15px] text-[#E4DFF2] sm:grid-cols-2">
-              {["Reels montés et corrigés", "Carrousels et posts photo", "Stories", "Légendes et hashtags", "Publication sur Instagram", "Bilan chaque semaine"].map((t) => (
-                <li key={t} className="flex items-center gap-2">
-                  <CheckIcon size={16} className="shrink-0 text-lilac-ink" />
-                  {t}
-                </li>
-              ))}
-            </ul>
-            <span className="text-[14px] text-lilac-ink">Sans engagement. Tu arrêtes quand tu veux.</span>
-          </div>
-          <Start waUrl={waUrl} size="lg" light />
+        <div className="mb-8">
+          <SectionTitle kicker="Tarif">
+            Deux offres, <span className="accent">sans engagement.</span>
+          </SectionTitle>
         </div>
+        <div className="grid gap-5 lg:grid-cols-2">
+          {offers.map((o) => (
+            <div
+              key={o.id}
+              className={`flex flex-col gap-4 rounded-[28px] p-7 sm:p-9 ${o.dark ? "bg-ink text-white" : "border border-line bg-white text-ink"}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className={`text-sm font-bold tracking-[0.06em] ${o.dark ? "text-lilac-ink" : "text-violet"}`}>{o.label.toUpperCase()}</span>
+                {o.dark && <span className="rounded-full bg-white/10 px-3 py-1 text-[12px] font-bold">Le plus complet</span>}
+              </div>
+              <span className="text-[52px] leading-none font-extrabold tracking-[-0.03em]">
+                {o.price} € <span className={`text-xl font-semibold ${o.dark ? "text-lilac-ink" : "text-muted"}`}>/ mois</span>
+              </span>
+              <p className={`text-[15px] ${o.dark ? "text-[#E4DFF2]" : "text-muted"}`}>{o.pitch}</p>
+              <ul className={`grid gap-2 text-[15px] ${o.dark ? "text-[#E4DFF2]" : "text-ink/85"}`}>
+                {o.points.map((t) => (
+                  <li key={t} className="flex items-center gap-2">
+                    <CheckIcon size={16} className={`shrink-0 ${o.dark ? "text-lilac-ink" : "text-violet"}`} />
+                    {t}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-auto pt-2">
+                <Start waUrl={waUrl} size="lg" light={o.dark} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 text-center text-[14px] text-muted">
+          Les deux font tout : Reels montés et corrigés, carrousels, stories, légendes, publication sur Instagram, bilan chaque semaine. Tu arrêtes quand tu veux.
+        </p>
       </section>
 
       {/* FAQ */}
