@@ -1,5 +1,5 @@
 import "server-only";
-import { isInSessionWindow, type PostKind } from "@fauve/agent";
+import { DEFAULT_COVER_SECONDS, isInSessionWindow, postCoverSchema, type PostKind } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
 import { InstagramError, mediaInsights, publishMedia, refreshToken, type PublishRequest } from "./instagram";
@@ -132,6 +132,16 @@ async function renderUrl(renderId: string | null): Promise<string> {
   return check(await db.storage.from("media").createSignedUrl(render.storage_path as string, 3600)).data!.signedUrl;
 }
 
+/** A Reel's cover for Instagram: the photo chosen (as a JPEG link), or the frame chosen, else the default frame. */
+async function reelCover(studioId: string, chosen: unknown): Promise<{ at: number } | { url: string }> {
+  const cover = postCoverSchema.nullable().catch(null).parse(chosen);
+  if (cover && "media_id" in cover) {
+    const [item] = await publishItems(studioId, [cover.media_id]).catch(() => []);
+    if (item?.type === "image") return { url: item.url };
+  }
+  return { at: cover && "at" in cover ? cover.at : DEFAULT_COVER_SECONDS };
+}
+
 /** What to publish for each kind: a Reel is the montage; posts, carousels and stories use the post's media. */
 async function publishRequest(
   studioId: string,
@@ -140,8 +150,9 @@ async function publishRequest(
   mediaIds: string[],
   caption: string,
   rendered: Record<string, string> = {},
+  chosenCover: unknown = null,
 ): Promise<PublishRequest> {
-  if (kind === "reel") return { kind: "reel", videoUrl: await renderUrl(renderId), caption };
+  if (kind === "reel") return { kind: "reel", videoUrl: await renderUrl(renderId), caption, cover: await reelCover(studioId, chosenCover) };
   if (kind === "story") {
     const [item] = renderId ? [{ type: "video" as const, url: await renderUrl(renderId) }] : await publishItems(studioId, mediaIds.slice(0, 1));
     if (!item) throw new Error("Aucune photo ni vidéo pour cette story");
@@ -164,7 +175,7 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
   const post = check(
     await db
       .from("posts")
-      .select("id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids, slides, slides_render")
+      .select("id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids, slides, slides_render, cover")
       .eq("id", postId)
       .single(),
   ).data!;
@@ -178,7 +189,7 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
     const { rendered } = slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
     const hashtags = ((post.hashtags as string[] | null) ?? []).map((h) => `#${h}`).join(" ");
     const caption = [post.caption ?? "", hashtags].filter(Boolean).join("\n\n");
-    const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption, rendered);
+    const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption, rendered, post.cover);
     const result = await publishMedia({ userId: account.userId, accessToken: account.accessToken, request });
 
     check(

@@ -1,5 +1,6 @@
 "use client";
 
+import { coverSrc, type Cover } from "@/lib/cover-src";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useOptimistic, useState, useTransition } from "react";
@@ -41,7 +42,7 @@ export type BoardPost = {
   /** 0 = Monday … 6 = Sunday, in the studio's time zone (null: an idea without a date). */
   day: number | null;
   time: string;
-  cover: { url: string; video: boolean } | null;
+  cover: Cover | null;
 };
 
 export type BoardDay = { date: number; iso: string; today: boolean };
@@ -189,7 +190,7 @@ export function CalendarBoard({
         {p.cover ? (
           <div className="relative aspect-[4/3] bg-soft">
             {p.cover.video ? (
-              <video src={`${p.cover.url}#t=0.5`} muted playsInline preload="metadata" className="pointer-events-none size-full object-cover" />
+              <video src={coverSrc(p.cover)} muted playsInline preload="metadata" className="pointer-events-none size-full object-cover" />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
               <img src={p.cover.url} alt="" loading="lazy" className="pointer-events-none size-full object-cover" />

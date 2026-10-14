@@ -6,6 +6,7 @@ import {
   editPlanSchema,
   platformSchema,
   postKindSchema,
+  postCoverSchema,
   postStatusSchema,
   montagePlanSchema,
   reactionSchema,
@@ -115,7 +116,7 @@ export const toolSpecs = {
   },
   update_post: {
     description:
-      "Met à jour une publication : légende, hashtags, horaire, plateformes, statut. Les changements de statut suivent la machine à états (rien n'est programmé sans validation de la gérante).",
+      "Met à jour une publication : légende, hashtags, horaire, plateformes, statut, vignette. Les changements de statut suivent la machine à états (rien n'est programmé sans validation de la gérante).",
     input: z.object({
       post_id: z.string().uuid(),
       caption: z.string().max(2200).optional(),
@@ -125,6 +126,7 @@ export const toolSpecs = {
       status: postStatusSchema.optional(),
       agent_note: z.string().max(600).optional().describe("Explication de tes choix, affichée dans la web app"),
       media_ids: postMediaIds,
+      cover: postCoverSchema.nullable().optional().describe("Vignette d'un Reel (grille, Instagram) : { at: secondes } une image de la vidéo, ou { media_id } une photo ; null la laisse par défaut"),
     }),
   },
   request_content: {

@@ -1,5 +1,5 @@
 import { versionKey } from "@/lib/version-key";
-import { alignSlides, postStatusSchema, type PostKind } from "@fauve/agent";
+import { alignSlides, postCoverSchema, postStatusSchema, type PostKind } from "@fauve/agent";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -37,7 +37,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
 
   const { data: post } = await db
     .from("posts")
-    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides, agent_note")
+    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides, agent_note, cover")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -113,6 +113,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
       slides={slides}
       looks={locked ? [] : await loadTextLooks(studioId).catch(() => [])}
       note={(post.agent_note as string | null) ?? null}
+      cover={postCoverSchema.nullable().catch(null).parse(post.cover ?? null)}
       changeHref={whatsappLink(`Pour « ${post.title as string} » : `)}
       backHref={whatsappLink("")}
     />

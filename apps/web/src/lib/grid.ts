@@ -1,4 +1,5 @@
 import "server-only";
+import { coverSrc } from "@/lib/cover-src";
 import { postCovers, type CoverPost } from "@/lib/covers";
 import { mediaViews, profile, recentMedia, type InstagramProfile } from "@/lib/social/instagram";
 import { instagramAccount } from "@/lib/social/publish";
@@ -16,7 +17,7 @@ export async function loadGrid(db: Db, studioId: string) {
   const [upcoming, feed, info] = await Promise.all([
     db
       .from("posts")
-      .select("id, title, kind, status, scheduled_at, render_id, media_ids, slides, slides_render")
+      .select("id, title, kind, status, scheduled_at, render_id, media_ids, slides, slides_render, cover")
       .eq("studio_id", studioId)
       .in("status", [...UPCOMING])
       .neq("kind", "story")
@@ -44,7 +45,7 @@ export async function loadGrid(db: Db, studioId: string) {
         title: p.title as string,
         status: p.status as string,
         at: (p.scheduled_at as string | null) ?? null,
-        videoUrl: cover?.video ? cover.url : null,
+        videoUrl: cover?.video ? coverSrc(cover) : null,
         imageUrl: cover && !cover.video ? cover.url : null,
         format: p.kind as string,
       };

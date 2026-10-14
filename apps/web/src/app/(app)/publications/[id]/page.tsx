@@ -1,4 +1,4 @@
-import { alignSlides, platformSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
+import { alignSlides, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,6 +20,7 @@ import { layoutsForEditor } from "@/lib/text-layers";
 import { loadTextLooks } from "@/lib/text-looks";
 import { versionKey } from "@/lib/version-key";
 import { deletePost } from "./actions";
+import { CoverPicker } from "@/components/montage/cover-picker";
 import { MontageEditor } from "./montage-editor";
 import { PostEditor } from "./post-editor";
 import { CarouselEditor } from "./carousel-editor";
@@ -39,6 +40,7 @@ const postSchema = z.object({
   render_id: z.uuid().nullable(),
   media_ids: z.array(z.uuid()).catch([]),
   slides: z.unknown(),
+  cover: postCoverSchema.nullable().catch(null),
 });
 
 // Read leniently: an older or partial plan still shows what it can.
@@ -85,7 +87,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const { data, error } = await db
     .from("posts")
-    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides")
+    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -175,6 +177,17 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         <p className="-mt-2 text-[12px] leading-snug text-muted">
           {post.status === "validated" ? "Validée : " : "Une fois validée, "}Brigitte la publie sur Instagram à l’horaire prévu, si ton compte est connecté.
         </p>
+      )}
+
+      {post.kind === "reel" && videoUrl && canEdit && (
+        <CoverPicker
+          key={versionKey(post.cover)}
+          postId={post.id}
+          videoUrl={videoUrl}
+          initial={post.cover}
+          defaultAt={DEFAULT_COVER_SECONDS}
+          photos={(editor?.inputs.photoIds ?? []).flatMap((id) => (editor?.inputs.clipUrls[id] ? [{ id, url: editor.inputs.clipUrls[id]! }] : []))}
+        />
       )}
 
       {plan && !editor && <PlanSection plan={plan.view} clipLabels={clipLabels} />}

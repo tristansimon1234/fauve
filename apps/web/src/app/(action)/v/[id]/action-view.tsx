@@ -1,13 +1,17 @@
 "use client";
 
+import { coverSrc } from "@/lib/cover-src";
+import { CoverPicker } from "@/components/montage/cover-picker";
 import {
   buildReelProps,
   buildSlideProps,
+  DEFAULT_COVER_SECONDS,
   editPlanSchema,
   segmentKind,
   statusLabels,
   timeline,
   type EditPlan,
+  type PostCover,
   type PostKind,
   type PostStatus,
   type ReelInputs,
@@ -36,7 +40,7 @@ const kindLabels: Record<PostKind, string> = { reel: "Reel", post: "Post", carou
 const sceneLabels = { clip: "Vidéo", scene: "Écran", motion: "Animation" } as const;
 const round = (n: number) => Math.round(n * 10) / 10;
 
-export type ActionMedia = { url: string; video: boolean };
+export type ActionMedia = { url: string; video: boolean; at?: number };
 export type GridTile = { url: string; reel: boolean; carousel: boolean };
 
 export type ActionPost = {
@@ -60,6 +64,7 @@ export function ActionView({
   backHref,
   looks = [],
   note = null,
+  cover = null,
 }: {
   post: ActionPost;
   editor: { plan: EditPlan; inputs: ReelInputs } | null;
@@ -76,8 +81,13 @@ export function ActionView({
   looks?: SavedLook[];
   /** What Fauve did and checked for this version (posts.agent_note), under the caption. */
   note?: string | null;
+  /** A Reel's chosen cover (posts.cover). */
+  cover?: PostCover | null;
 }) {
   const [mode, setMode] = useState<Mode>("view");
+  // The montage's photos, which can stand as the cover.
+  const coverPhotos = (editor?.inputs.photoIds ?? []).flatMap((id) => (editor?.inputs.clipUrls[id] ? [{ id, url: editor.inputs.clipUrls[id]! }] : []));
+  const coverPhoto = cover && "media_id" in cover ? coverPhotos.find((p) => p.id === cover.media_id) : undefined;
   const [inGrid, setInGrid] = useState(false);
   const [status, setStatus] = useState(post.status);
   const [saved, setSaved] = useState(editor?.plan ?? null);
@@ -267,7 +277,7 @@ export function ActionView({
         </div>
       )}
 
-      {showGrid && <GridPreview cover={videoUrl ? { url: videoUrl, video: true } : (media[0] ?? null)} coverNode={slideNodes?.[0]} kind={post.kind} tiles={grid} />}
+      {showGrid && <GridPreview cover={coverPhoto ? { url: coverPhoto.url, video: false } : videoUrl ? { url: videoUrl, video: true, at: cover && "at" in cover ? cover.at : DEFAULT_COVER_SECONDS } : (media[0] ?? null)} coverNode={slideNodes?.[0]} kind={post.kind} tiles={grid} />}
 
       {editingSlides && (
         <section aria-label="Texte sur les photos" className="mt-3">
@@ -367,6 +377,12 @@ export function ActionView({
           )}
         </section>
       ) : (
+        <>
+        {post.kind === "reel" && videoUrl && editor && (
+          <div className="mt-4 rounded-[16px] bg-white text-ink">
+            <CoverPicker postId={post.id} videoUrl={videoUrl} initial={cover} defaultAt={DEFAULT_COVER_SECONDS} photos={coverPhotos} />
+          </div>
+        )}
         <section aria-label="Légende" className="mt-4">
           {editingCaption ? (
             <textarea
@@ -394,6 +410,7 @@ export function ActionView({
             </button>
           )}
         </section>
+        </>
       )}
 
       {note && !editing && !editingSlides && !showGrid && (
@@ -551,7 +568,7 @@ function GridPreview({
             // A 4:5 slide in a 3:4 tile: centred, cropped at the sides like Instagram does.
             <div className="absolute inset-y-0 left-1/2 aspect-[4/5] h-full -translate-x-1/2">{coverNode}</div>
           ) : cover?.video ? (
-            <video src={`${cover.url}#t=0.5`} muted playsInline preload="metadata" className="size-full object-cover" />
+            <video src={coverSrc(cover)} muted playsInline preload="metadata" className="size-full object-cover" />
           ) : cover ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
             <img src={cover.url} alt="" className="size-full object-cover" />

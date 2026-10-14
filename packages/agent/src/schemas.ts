@@ -18,6 +18,12 @@ export const postStatusSchema = z.enum([
 export type PostStatus = z.infer<typeof postStatusSchema>;
 
 export const postKindSchema = z.enum(["reel", "post", "carousel", "story"]);
+
+/** A Reel's cover, in the grid and on Instagram: a frame of the video (seconds) or a photo of the library. */
+export const postCoverSchema = z.union([z.object({ at: z.number().min(0).max(180) }), z.object({ media_id: z.string().uuid() })]);
+export type PostCover = z.infer<typeof postCoverSchema>;
+/** The frame shown when none was chosen: past the first animation's empty start, on the hook. */
+export const DEFAULT_COVER_SECONDS = 1.2;
 export type PostKind = z.infer<typeof postKindSchema>;
 
 export const platformSchema = z.enum(["instagram", "tiktok"]);
