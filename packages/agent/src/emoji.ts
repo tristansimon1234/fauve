@@ -46,3 +46,8 @@ export function awaitsAnswer(last: { body: string | null; options?: string[]; qu
   if (!last) return false;
   return Boolean(last.options?.length || last.quote || last.upload || /\?\s*\S{0,3}\s*$/u.test((last.body ?? "").trim()));
 }
+
+/** A message that laughs (😂, « haha », « mdr »…): Brigitte laughs with it in the app. */
+export function isFunny(text: string | null | undefined): boolean {
+  return /😂|🤣|😆|😹|😝|😜|\b(?:a?ha(?:ha)+h?|hihi+|mdr+|ptdr+|lol+|xd)\b/iu.test(text ?? "");
+}

@@ -26,6 +26,7 @@ import type { CardQuote } from "@/lib/chat-cards";
 import { Bubble } from "./chat-bubble";
 import { montageStep } from "./chat-cards";
 import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "./chat-sync";
+import { isFunny } from "@fauve/agent";
 import { FileStrip, useChatUploads } from "./chat-uploads";
 import type { OnboardingView } from "./onboarding-actions";
 import { OnboardingCard, OnboardingStepper } from "@/components/onboarding/onboarding-card";
@@ -361,6 +362,7 @@ export function FauveWorkspace({
     <ConversationList conversations={conversations} active={active} onOpen={open} onNew={startNew} onDelete={remove} />
   );
 
+  const lastFauve = messages.findLastIndex((m) => m.from === "fauve");
   return (
     <div className="flex min-h-0 flex-1">
       <aside className="hidden w-[272px] shrink-0 flex-col border-r border-line bg-white md:flex">{list}</aside>
@@ -513,6 +515,8 @@ export function FauveWorkspace({
                   opening={opening}
                   busy={pending}
                   enter={arrived.has(m.id)}
+                  // Brigitte's face by her latest message; she laughs when the exchange is funny.
+                  avatar={i === lastFauve && !typing ? { funny: isFunny(m.body) || isFunny(messages.slice(0, i).findLast((x) => x.from === "me")?.body) } : null}
                 />
               ))}
               {typing && <LiveTyping live={live} />}

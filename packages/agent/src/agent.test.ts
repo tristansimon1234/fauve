@@ -550,6 +550,12 @@ test("onboarding: steps in order, old values read as their new step", async () =
   assert.equal(onboardingStepOf(null), "website");
 });
 
+test("funny messages make Brigitte laugh", async () => {
+  const { isFunny } = await import("./emoji.ts");
+  for (const t of ["haha trop bien", "Ahahah", "mdr", "ptdr ok", "lol", "😂", "c’est top 🤣"]) assert.equal(isFunny(t), true, t);
+  for (const t of ["Bonjour", "le programme de la semaine", "", null, "chaha"]) assert.equal(isFunny(t), false, String(t));
+});
+
 test("house text layers pass the same checks as generated ones", async () => {
   const { readFileSync } = await import("node:fs");
   const { checkLayerCode, layerSlotSchema } = await import("./text-layer.ts");

@@ -232,6 +232,49 @@
   transform-origin: center;
   animation: fauve-shadow 6s ease-in-out infinite;
 }
+/* At rest, an eyebrow lifts now and then (her knowing look). */
+.fauve-cat-brows {
+  transform-box: view-box;
+  animation: fauve-brows 7s ease-in-out infinite;
+}
+@keyframes fauve-brows {
+  0%, 70%, 82%, 100% { transform: translateY(0); }
+  74%, 78% { transform: translateY(-1.6px); }
+}
+/* Writing: a faster, smaller bob. Laughing: little hops, brows dancing. */
+.fauve-cat-thinking .fauve-cat-float {
+  animation: fauve-think 1.6s ease-in-out infinite;
+}
+@keyframes fauve-think {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-2%) rotate(1deg); }
+}
+.fauve-cat-laugh .fauve-cat-float {
+  animation: fauve-laugh 0.42s ease-in-out infinite;
+}
+.fauve-cat-laugh .fauve-cat-brows {
+  animation: fauve-laugh-brows 0.42s ease-in-out infinite;
+}
+@keyframes fauve-laugh {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-5%) rotate(3deg); }
+}
+@keyframes fauve-laugh-brows {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.2px); }
+}
+.fauve-cat-surprised .fauve-cat-float {
+  animation: fauve-jump 0.5s ease-out 1;
+}
+@keyframes fauve-jump {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-8%) scale(1.04); }
+  100% { transform: translateY(0) scale(1); }
+}
+.fauve-cat-still * {
+  animation: none !important;
+}
+
 @keyframes fauve-shadow {
   0%, 100% { transform: scaleX(1); opacity: 0.12; }
   50% { transform: scaleX(0.8); opacity: 0.08; }
