@@ -4,12 +4,12 @@
 /** Montage (editor, motion designer): quality first. */
 export const CLAUDE_MODEL = "claude-opus-5-5";
 /**
- * WhatsApp / web conversation: Opus. Haiku misread the calendar and changed posts
- * on its own; Sonnet still missed what the manager meant (a time she asked for,
- * a step she skipped). The chat drives tools on real data, so understanding her
- * matters more than the few cents a turn (Opus is twice Sonnet's price).
+ * WhatsApp / web conversation: Sonnet. Haiku misread the calendar and changed posts
+ * on its own. Opus was tried too: ~€0.085 a turn against ~€0.03, too much for a
+ * 49 € plan (what looked like Sonnet misunderstanding was a lost answer, fixed in
+ * runFauve). The creative work (cuts, motion design) runs on Opus.
  */
-export const CHAT_MODEL = "claude-opus-5-5";
+export const CHAT_MODEL = "claude-sonnet-5-5";
 export const CHAT_EFFORT = "medium" as const;
 /** Weekly "what works" analysis: a small table of numbers, reasoning matters more than volume. */
 export const ANALYST_MODEL = "claude-sonnet-5-5";
