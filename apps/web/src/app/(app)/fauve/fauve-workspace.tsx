@@ -422,42 +422,40 @@ export function FauveWorkspace({
             <p className="text-[14px] text-violet/80">Brigitte en fait un Reel, un carrousel ou un post</p>
           </div>
         )}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 pt-3 sm:px-6 sm:pt-4">
-          <div className="flex items-center gap-1 md:invisible">
-            <button type="button" onClick={() => setShowList(true)} className="h-9 rounded-full px-3 text-[13px] font-bold hover:bg-white">
-              Conversations
-            </button>
-            <button type="button" aria-label="Nouvelle conversation" onClick={startNew} className="flex size-9 items-center justify-center rounded-full hover:bg-white">
-              <PenIcon size={18} />
-            </button>
-          </div>
-          {/* Brigitte herself, in the middle of the conversation: she thinks, laughs, frowns as it goes (hidden while the welcome shows her big). */}
-          {fresh ? (
-            <span />
-          ) : (
-            <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 px-4 pt-3 sm:px-6 sm:pt-4">
+          {/* Brigitte herself, top left of the conversation: she thinks, laughs, frowns as it goes (hidden while the welcome shows her big). */}
+          {!fresh && (
+            <div className="flex min-w-0 items-center gap-2.5">
               <span className="hidden sm:block">
                 <BrigitteLive typing={typing} cue={cue} size={60} />
               </span>
               <span className="sm:hidden">
                 <BrigitteLive typing={typing} cue={cue} size={44} />
               </span>
-              <span className="hidden flex-col leading-tight sm:flex">
+              <span className="flex min-w-0 flex-col leading-tight">
                 <span className="text-[15px] font-bold">Brigitte</span>
-                <span key={typing ? (live?.status ?? "writing") : "online"} className={`fauve-fade max-w-[180px] truncate text-[12px] ${typing ? "text-violet" : "text-muted"}`}>
+                <span key={typing ? (live?.status ?? "writing") : "online"} className={`fauve-fade truncate text-[12px] ${typing ? "text-violet" : "text-muted"}`}>
                   {typing ? (live?.status ?? "écrit…") : "ta community manager"}
                 </span>
               </span>
             </div>
           )}
-          <a
-            href={whatsappHref}
-            aria-label="Continuer sur WhatsApp"
-            title="Continuer sur WhatsApp"
-            className="flex size-10 items-center justify-center justify-self-end rounded-full text-muted hover:bg-white hover:text-ink"
-          >
-            <WhatsAppIcon size={20} />
-          </a>
+          <div className="ml-auto flex items-center gap-1">
+            <button type="button" onClick={() => setShowList(true)} className="h-9 rounded-full px-3 text-[13px] font-bold hover:bg-white md:hidden">
+              Conversations
+            </button>
+            <button type="button" aria-label="Nouvelle conversation" onClick={startNew} className="flex size-9 items-center justify-center rounded-full hover:bg-white md:hidden">
+              <PenIcon size={18} />
+            </button>
+            <a
+              href={whatsappHref}
+              aria-label="Continuer sur WhatsApp"
+              title="Continuer sur WhatsApp"
+              className="flex size-10 items-center justify-center rounded-full text-muted hover:bg-white hover:text-ink"
+            >
+              <WhatsAppIcon size={20} />
+            </a>
+          </div>
         </div>
 
         <div
