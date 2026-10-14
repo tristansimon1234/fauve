@@ -877,3 +877,14 @@ test("post ideas follow the kind of business", () => {
   assert.equal(businessFamily(null), "other");
   assert.ok(postIdeas("restaurant").reel.includes("Le plat du jour"));
 });
+
+test("site colours: Squarespace theme HSL variables count, its generic sheets do not", async () => {
+  const { extractBrandStyle, stylesheetLinks } = await import("./website.ts");
+  const style = extractBrandStyle("<html></html>", [":root{--accent-hsl:189.68,62%,80.39%;--darkAccent-hsl:108,68.18%,34.51%;--white-hsl:52.5,44.44%,92.94%}"]);
+  assert.deepEqual(style.colors.slice(0, 2), ["#aee2ec", "#34941c"]);
+  const links = stylesheetLinks(
+    '<link rel="stylesheet" href="//assets.squarespace.com/universal/styles-compressed/commerce.css"><link rel="stylesheet" href="https://static1.squarespace.com/static/versioned-site-css/x/site.css">',
+    "https://www.example.com/",
+  );
+  assert.deepEqual(links, ["https://static1.squarespace.com/static/versioned-site-css/x/site.css"]);
+});
