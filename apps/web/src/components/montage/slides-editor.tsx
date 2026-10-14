@@ -90,6 +90,7 @@ export function SlidesEditor({
                 active={active}
                 yRange={[SLIDE_Y.min, SLIDE_Y.max]}
                 onMove={(t, place) => patchText(t, place)}
+                onEdit={(t, text) => patchText(t, { text })}
                 onPick={setActive}
               />
               )}

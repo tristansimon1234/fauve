@@ -4,10 +4,10 @@
 /** Montage (editor, motion designer): quality first. */
 export const CLAUDE_MODEL = "claude-opus-5-5";
 /**
- * WhatsApp / web conversation: Sonnet. Haiku was tried and cost ~20x less, but it
- * misread the calendar and changed posts on its own: the chat drives tools on
- * real data, so judgement matters more than the ~€0.02 a turn. The creative
- * work (cuts, motion design) runs on Opus.
+ * WhatsApp / web conversation: Sonnet. Haiku misread the calendar and changed posts
+ * on its own. Opus was tried too: ~€0.085 a turn against ~€0.03, too much for a
+ * 49 € plan (what looked like Sonnet misunderstanding was a lost answer, fixed in
+ * runFauve). The creative work (cuts, motion design) runs on Opus.
  */
 export const CHAT_MODEL = "claude-sonnet-5-5";
 export const CHAT_EFFORT = "medium" as const;

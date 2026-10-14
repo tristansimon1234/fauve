@@ -158,6 +158,7 @@ export function MontageEditor({
               texts={plan.texts}
               active={activeText}
               onMove={(i, place) => setText(i, place)}
+              onEdit={(i, text) => setText(i, { text })}
               onPick={(i) => {
                 setActiveText(i);
                 const at = plan.texts[i];

@@ -82,7 +82,15 @@ export function buildSlideProps(
     brand: resolveReelBrand({}, inputs.template, inputs.brand),
     endCard: null,
     logo: slide.logo ?? null,
-    layer: slide.layer ? { js: slide.layer.js, texts: slide.layer.texts, fonts: slide.layer.fonts } : null,
+    layer: slide.layer
+      ? {
+          js: slide.layer.js,
+          texts: slide.layer.texts,
+          fonts: slide.layer.fonts,
+          ...(slide.layer.place ? { place: slide.layer.place } : {}),
+          ...(slide.layer.accent ? { accent: slide.layer.accent } : {}),
+        }
+      : null,
   };
 }
 

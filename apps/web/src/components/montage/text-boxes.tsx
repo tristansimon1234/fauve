@@ -3,6 +3,7 @@
 import type { EditPlan } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
 import { useEffect, useRef, useState } from "react";
+import { InlineEdit } from "./inline-edit";
 
 // Shared by the scene editor (publication page) and the mobile action page:
 // the texts of a montage, grabbable on the live preview.
@@ -35,6 +36,7 @@ export function TextBoxes({
   active,
   onMove,
   onPick,
+  onEdit,
   yRange = [Y_MIN, Y_MAX],
 }: {
   container: React.RefObject<HTMLDivElement | null>;
@@ -46,7 +48,10 @@ export function TextBoxes({
   active: number | null;
   onMove: (index: number, place: { x: number; y: number }) => void;
   onPick: (index: number) => void;
+  /** Tapping a text (without moving it) writes it in place on the preview. */
+  onEdit?: (index: number, text: string) => void;
 }) {
+  const [editing, setEditing] = useState<number | null>(null);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [dragging, setDragging] = useState(false);
   const drag = useRef<{ index: number; px: number; py: number; x0: number; y0: number; moved: boolean } | null>(null);
@@ -105,9 +110,12 @@ export function TextBoxes({
           <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 border-l border-dashed border-white/60" />
         </>
       )}
+      {editing !== null && onEdit && texts[editing] && boxes.find((b) => b.index === editing) && (
+        <InlineEdit box={boxes.find((b) => b.index === editing)!} value={texts[editing]!.text} onChange={(t) => onEdit(editing, t)} onDone={() => setEditing(null)} />
+      )}
       {boxes.map((box) => {
         const text = texts[box.index];
-        if (!text) return null;
+        if (!text || box.index === editing) return null;
         return (
           <button
             key={box.index}
@@ -128,7 +136,10 @@ export function TextBoxes({
               const d = drag.current;
               drag.current = null;
               setDragging(false);
-              if (d && !d.moved) onPick(d.index);
+              if (d && !d.moved) {
+                onPick(d.index);
+                if (onEdit) setEditing(d.index);
+              }
             }}
             onPointerCancel={() => {
               drag.current = null;

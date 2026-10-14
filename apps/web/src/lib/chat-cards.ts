@@ -79,7 +79,8 @@ export function extrasOf(payload: unknown) {
 }
 
 const GRID_POSTS = 6;
-const UPCOMING = ["draft", "validated", "scheduled"];
+/** Every publication still to come shows in the grid, even before its photos or video are ready. */
+const UPCOMING = ["planned", "content_requested", "media_received", "draft", "validated", "scheduled"];
 
 /** Post and grid cards for every message of a page, in one pass (posts, renders, photos). */
 async function postAndGridCards(studioId: string, payloads: unknown[]): Promise<ChatCard[][]> {

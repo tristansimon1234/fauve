@@ -28,10 +28,10 @@ if (process.argv.includes("--sql")) {
   const rows = layers.map(
     (l) =>
       // The source stays in the repo; the library only needs what runs.
-      `(${q(l.id)}, null, 'layer', ${q(l.name)}, ${q(l.description)}, ${q(JSON.stringify(l.slots))}::jsonb, '', ${q(l.js)}, '{${l.fonts.join(",")}}')`,
+      `(${q(l.id)}, null, 'layer', ${q(l.name)}, ${q(l.description)}, ${q(JSON.stringify(l.slots))}::jsonb, ${q(JSON.stringify(l.sample ?? {}))}::jsonb, '', ${q(l.js)}, '{${l.fonts.join(",")}}')`,
   );
   console.log(
-    `insert into public.motion_templates (id, studio_id, kind, name, description, slots, code, js, fonts) values\n${rows.join(",\n")}\non conflict (id) do update set name = excluded.name, description = excluded.description, slots = excluded.slots, code = excluded.code, js = excluded.js, fonts = excluded.fonts;`,
+    `insert into public.motion_templates (id, studio_id, kind, name, description, slots, sample, code, js, fonts) values\n${rows.join(",\n")}\non conflict (id) do update set name = excluded.name, description = excluded.description, slots = excluded.slots, sample = excluded.sample, code = excluded.code, js = excluded.js, fonts = excluded.fonts;`,
   );
 } else {
   writeFileSync(new URL("../supabase/seed/text-layers.json", import.meta.url), `${JSON.stringify(layers, null, 2)}\n`);

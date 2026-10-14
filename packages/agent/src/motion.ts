@@ -63,7 +63,16 @@ export type ReelProps = {
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
   /** A text layer designed as code (carousel slides); `check` makes the render fail when a text leaves the frame. */
-  layer?: { js: string; texts: Record<string, string>; fonts: string[]; check?: boolean } | null;
+  layer?: {
+    js: string;
+    texts: Record<string, string>;
+    fonts: string[];
+    check?: boolean;
+    /** Moved and resized by hand: offset (share of the frame) and size of the whole layer. */
+    place?: { x: number; y: number; scale: number };
+    /** Its accent colour, instead of the studio's. */
+    accent?: string;
+  } | null;
 };
 
 export type ReelInputs = {

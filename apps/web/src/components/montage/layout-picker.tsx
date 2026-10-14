@@ -9,7 +9,7 @@ import { SlidePreview } from "./slide-preview";
 // each drawn live on the selected photo with its own texts. A click puts it on
 // this photo; « Sur toutes les photos » on every photo, each with its texts.
 
-export type Layout = Omit<TextLayer, "texts" | "template_id"> & { id: string; house: boolean };
+export type Layout = Omit<TextLayer, "texts" | "template_id"> & { id: string; house: boolean; sample?: Record<string, string> };
 type Slide = SlidesPlan["slides"][number];
 
 /** The photo's words, in order: a layer's texts, else its free texts (a list gives one line per item). */
@@ -26,7 +26,8 @@ export function layoutOn(layout: Layout, slide: Slide): TextLayer {
   const order = title > 0 ? [layout.slots[title]!, ...layout.slots.filter((_, i) => i !== title)] : layout.slots;
   const texts = Object.fromEntries(
     order.map((slot, i) => {
-      const word = words[i] ?? slot.role.charAt(0).toUpperCase() + slot.role.slice(1);
+      // No word of hers for this slot: the layout's own example text, never the slot's description.
+      const word = words[i] ?? layout.sample?.[slot.name] ?? (slot.multiline ? "Premier point\nDeuxième point" : "Ton texte");
       return [slot.name, (slot.multiline ? word : word.replace(/\n/g, " ")).slice(0, slot.max_chars)];
     }),
   );

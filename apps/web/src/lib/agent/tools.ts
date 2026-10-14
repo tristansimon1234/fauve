@@ -331,7 +331,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async quote_montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id }) {
+    async quote_montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, go }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
       if (inspiration_id) {
         const known = await db.from("inspirations").select("id").eq("id", inspiration_id).eq("studio_id", studioId).maybeSingle();
@@ -366,7 +366,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // above the studio's default level: a higher one is the manager's choice, on a quote.
       const order = ["rapide", "soigne", "max"] as const;
       const aboveDefault = quote.effort !== null && order.indexOf(quote.effort) > order.indexOf(studioDefault);
-      if (!aboveDefault && quote.max <= AUTO_START_MAX_CREDITS && quote.balance >= quote.max) {
+      // Only once she said so: answering a question is not a yes.
+      if (go && !aboveDefault && quote.max <= AUTO_START_MAX_CREDITS && quote.balance >= quote.max) {
         const accepted = await acceptQuote(studioId, quote.id, turnStartedAt, { immediate: true });
         if (!("error" in accepted)) {
           ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));

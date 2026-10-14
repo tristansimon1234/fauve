@@ -11,9 +11,10 @@ import {
   type TextLook,
 } from "@fauve/agent";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { AskFauveButton } from "@/components/fauve-drawer";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ImageIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { LayerFields } from "@/components/montage/layer-fields";
+import { LayerHandles } from "@/components/montage/layer-handles";
+import { PhotoAsk } from "@/components/montage/photo-ask";
 import { LayoutPicker, layoutOn, type Layout } from "@/components/montage/layout-picker";
 import { ListItems } from "@/components/montage/list-items";
 import { LookPanel } from "@/components/montage/look-panel";
@@ -50,6 +51,8 @@ const logoPlaces = [
 /** Background swatches: the studio's colour, then a few soft ones that go with most photos. */
 const FILLS = ["accent", "#FFFFFF", "#1C1530", "#F2694E", "#FFD65A", "#F7B6C8", "#A8E6CF", "#BFD7FF"] as const;
 const INKS = ["#FFFFFF", "#1C1530", "accent"] as const;
+/** A layout's colour: the studio's first, then a few that go with most photos. */
+const LAYER_ACCENTS = [null, "#1C1530", "#7A1F2B", "#F2694E", "#C9A227", "#E58FA8", "#7FA88B", "#5B7FD9"] as const;
 
 const round = (n: number) => Math.round(n * 10) / 10;
 const clampY = (y: number) => Math.min(SLIDE_Y.max, Math.max(SLIDE_Y.min, y));
@@ -171,6 +174,7 @@ export function CarouselEditor({
             {props ? (
               <>
                 <SlidePreview key={`${index}`} props={props} className="fauve-fade" />
+                {slide.layer && <LayerHandles key={`${index}-${slide.layer.template_id ?? slide.layer.name}`} container={previewRef} layer={slide.layer} onChange={(layer) => setSlide({ layer })} />}
                 {!slide.layer && (
                   <TextBoxes
                     container={previewRef}
@@ -178,6 +182,7 @@ export function CarouselEditor({
                     active={active}
                     yRange={[SLIDE_Y.min, SLIDE_Y.max]}
                     onMove={(t, place) => setText(t, place)}
+                    onEdit={(t, text) => setText(t, { text })}
                     onPick={(t) => {
                       setActive(t);
                       requestAnimationFrame(() => document.getElementById(`fauve-slide-text-${t}`)?.focus());
@@ -266,13 +271,7 @@ export function CarouselEditor({
               Photo {index + 1} <span className="font-semibold text-muted">sur {plan.slides.length}</span>
             </h2>
           </div>
-          {!dirty && (
-            <AskFauveButton
-              topic={{ postId, title: postTitle, sceneLabel: `Photo ${index + 1}` }}
-              label="Demander à Fauve pour cette photo"
-              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-soft px-3 py-2 text-[13px] font-bold text-violet hover:bg-violet hover:text-white"
-            />
-          )}
+          {props && !dirty && <PhotoAsk key={index} postId={postId} postTitle={postTitle} photo={index + 1} total={plan.slides.length} />}
 
           {props && url && (
             <LayoutPicker
@@ -291,7 +290,56 @@ export function CarouselEditor({
           )}
 
           {props && slide.layer ? (
-            <LayerFields layer={slide.layer} onChange={(texts) => setSlide({ layer: { ...slide.layer!, texts } })} onRemove={() => setSlide({ layer: undefined })} />
+            <div className="flex flex-col gap-4">
+              <p className="rounded-[12px] bg-violet-tint px-3 py-2 text-[12px] leading-snug text-violet">
+                Clique sur un texte de la photo pour l’écrire, glisse la mise en page pour la déplacer, tire le rond du coin pour l’agrandir.
+              </p>
+              <div className="flex flex-col gap-2">
+                <span className="text-[12px] font-semibold text-muted">Couleur</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {LAYER_ACCENTS.map((c) => {
+                    const on = (slide.layer!.accent ?? null) === c;
+                    return (
+                      <button
+                        key={c ?? "studio"}
+                        type="button"
+                        aria-label={c ? `Couleur ${c}` : "Couleur du studio"}
+                        aria-pressed={on}
+                        onClick={() => setSlide({ layer: { ...slide.layer!, accent: c ?? undefined } })}
+                        className={swatch(on)}
+                        style={{ background: c ?? brandLook.accent }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[12px] font-semibold text-muted">Taille</span>
+                {[
+                  { label: "A−", d: -0.1 },
+                  { label: "A+", d: 0.1 },
+                ].map(({ label, d }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      const p = slide.layer!.place ?? { x: 0, y: 0, scale: 1 };
+                      const scale = Math.round(Math.min(1.5, Math.max(0.5, p.scale + d)) * 100) / 100;
+                      setSlide({ layer: { ...slide.layer!, place: { ...p, scale } } });
+                    }}
+                    className="h-8 rounded-full bg-soft px-3 text-[13px] font-bold hover:bg-violet-soft hover:text-violet"
+                  >
+                    {label}
+                  </button>
+                ))}
+                {slide.layer.place && (
+                  <button type="button" onClick={() => setSlide({ layer: { ...slide.layer!, place: undefined } })} className="text-[13px] font-semibold text-violet hover:underline">
+                    Remettre en place
+                  </button>
+                )}
+              </div>
+              <LayerFields layer={slide.layer} onChange={(texts) => setSlide({ layer: { ...slide.layer!, texts } })} onRemove={() => setSlide({ layer: undefined })} />
+            </div>
           ) : (
             props && (
               <div className="flex flex-col gap-3">
