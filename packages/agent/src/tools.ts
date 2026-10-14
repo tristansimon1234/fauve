@@ -170,7 +170,7 @@ export const toolSpecs = {
         .uuid()
         .optional()
         .describe("L'inspiration choisie par la gérante pour ce Reel (list_inspirations) : le monteur la suit en priorité. Inutile si elle l'a déjà choisie en créant la publication."),
-      max_new_scenes: z.number().int().min(0).max(2).optional().describe("Nouvelles scènes animées sur mesure permises (3 crédits chacune). Par défaut 1 pour un nouveau montage (2 pour le tout premier Reel) et 0 pour une correction : le monteur réutilise sa bibliothèque. Mets 1 sur une correction seulement si elle demande une nouvelle animation, 2 seulement si elle veut un Reel très travaillé, 0 si elle veut économiser."),
+      max_new_scenes: z.number().int().min(0).max(8).optional().describe("Nouvelles animations sur mesure permises (3 crédits chacune, comptées dans le prix du devis). Par défaut : autant que d'animations dans le plan (au moins 2 pour le tout premier Reel) ; sans plan, 1 pour un nouveau montage et 0 pour une correction. Autant qu'elle veut (8 au plus) ; 0 si elle veut économiser (le monteur réutilise sa bibliothèque)."),
       effort: effortSchema
         .optional()
         .describe(

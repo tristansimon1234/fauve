@@ -267,9 +267,11 @@ test("editor: free motion scenes past the cap play their fixed fallback", async 
   const plan = normalizeEditPlan(
     editPlanObjectSchema.parse({ ...validPlan, segments: [motion(1), motion(2), motion(3), motion(4)], texts: [] }),
     {},
+    2,
   );
   const kinds = plan.segments.map((s) => ("motion" in s ? "motion" : "scene" in s ? `scene:${s.scene.title}` : "clip"));
-  assert.equal(MAX_FREE_SCENES, 2);
+  // The quote decides how many (2 here); 8 is only the ceiling.
+  assert.equal(MAX_FREE_SCENES, 8);
   assert.deepEqual(kinds, ["motion", "motion", "scene:Titre 3", "scene:Titre 4"]);
   assert.equal(segmentSeconds(plan.segments[2]!), 6); // fixed scenes last 6 s at most
 });
@@ -294,8 +296,10 @@ test("editor: library scenes keep their id and get their texts as a record", asy
   assert.equal(first.motion.template_id, id);
   assert.deepEqual(first.motion.texts, { title: "Atelier respiration" }); // invalid slot names are dropped
   // Reused scenes do not count toward the cap: the two new ones stay free scenes, the third falls back.
-  const kinds = normalizeEditPlan(plan, {}).segments.map((s) => ("motion" in s ? "motion" : "scene"));
+  const kinds = normalizeEditPlan(plan, {}, 2).segments.map((s) => ("motion" in s ? "motion" : "scene"));
   assert.deepEqual(kinds, ["motion", "motion", "motion", "scene"]);
+  // With a bigger quote, every new scene stays.
+  assert.deepEqual(normalizeEditPlan(plan, {}, 3).segments.map((s) => ("motion" in s ? "motion" : "scene")), ["motion", "motion", "motion", "motion"]);
 });
 
 test("credits: a montage is quoted before it runs and never charged above the quote", async () => {
