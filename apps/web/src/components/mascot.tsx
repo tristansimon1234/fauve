@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 /**
  * Brigitte's mascot: just a head, drawn like an icon. A full silhouette of
@@ -30,49 +30,63 @@ export type MascotMood = "idle" | "thinking" | "laugh" | "happy" | "surprised";
 
 const INK = "#1C1530";
 
-/** Eyebrows: the left one stays low, the right one is up (her look over the glasses); higher when surprised. */
-function Brows({ mood }: { mood: MascotMood }) {
-  const d =
-    mood === "surprised" || mood === "laugh"
-      ? "M39 51.6 Q42.6 49.4 45.8 50.8 M54.2 50.2 Q57.8 47.6 61.2 49.4"
-      : mood === "thinking"
-        ? "M39.4 54.2 Q42.6 53.2 45.8 54.6 M54.2 53.6 Q57.6 52.2 60.8 53.4"
-        : "M39.2 54 Q42.6 52.2 45.6 53.4 M54.4 52 Q57.8 49.9 61 51.6";
-  return <path className="fauve-cat-brows" d={d} fill="none" stroke={INK} strokeWidth="1.5" strokeLinecap="round" />;
-}
+const BROWS: Record<MascotMood, string> = {
+  idle: "M39.2 54 Q42.6 52.2 45.6 53.4 M54.4 52 Q57.8 49.9 61 51.6",
+  happy: "M39.2 53.6 Q42.6 51.8 45.6 53 M54.4 51.6 Q57.8 49.5 61 51.2",
+  thinking: "M39.4 54.2 Q42.6 53.2 45.8 54.6 M54.2 53.6 Q57.6 52.2 60.8 53.4",
+  laugh: "M39 51.6 Q42.6 49.4 45.8 50.8 M54.2 50.2 Q57.8 47.6 61.2 49.4",
+  surprised: "M39 51 Q42.6 48.6 45.8 50.2 M54.2 49.6 Q57.8 47 61.2 48.8",
+};
 
-function Eyes({ mood }: { mood: MascotMood }) {
-  if (mood === "laugh") {
-    // Shut tight with laughter: two happy arcs.
-    return <path d="M39.8 60 Q42.6 56.6 45.4 60 M54.8 59.4 Q57.6 56 60.4 59.4" fill="none" stroke={INK} strokeWidth="1.6" strokeLinecap="round" />;
-  }
-  // Thinking: she looks up and aside. Surprised: wide open.
-  const dx = mood === "thinking" ? -0.9 : 0;
-  const dy = mood === "thinking" ? -1.1 : 0;
-  const big = mood === "surprised" ? 1.2 : 1;
+const MOUTHS: Record<MascotMood, ReactNode> = {
+  idle: <path d="M46.4 76 Q50.5 78 54.4 75.4" fill="none" stroke={INK} strokeWidth="1.3" strokeLinecap="round" />,
+  happy: <path d="M45.4 75 Q50.5 79.6 55.4 74.6" fill="none" stroke={INK} strokeWidth="1.4" strokeLinecap="round" />,
+  thinking: <path d="M47.6 76.6 Q50.4 75.8 53.4 76.4" fill="none" stroke={INK} strokeWidth="1.3" strokeLinecap="round" />,
+  laugh: (
+    <>
+      <path d="M44.8 74.2 Q50.4 74.8 56 73.6 Q55 80.6 50.2 80.6 Q45.6 80.6 44.8 74.2 Z" fill={INK} />
+      <path d="M47.2 78.4 Q50.2 76.8 53.4 78.2 Q51.8 80 50.2 80 Q48.4 80 47.2 78.4 Z" fill="#F2694E" />
+    </>
+  ),
+  surprised: <ellipse cx="50.4" cy="76.4" rx="2.2" ry="2.8" fill={INK} />,
+};
+
+/**
+ * The face, every expression drawn at once and only the current one shown: changing
+ * mood cross-fades the mouth and the eyes, and slides the brows and the look.
+ */
+function Face({ mood }: { mood: MascotMood }) {
+  const fade = (on: boolean) => ({ opacity: on ? 1 : 0, transition: "opacity 220ms ease" });
+  // Thinking: she looks up and aside. Surprised: eyes wide open.
+  const look = mood === "thinking" ? "translate(-0.9px, -1.1px)" : mood === "surprised" ? "scale(1.18)" : "none";
   return (
-    <g className="fauve-cat-eyes">
-      <ellipse cx={42.6 + dx} cy={59 + dy} rx={2.3 * big} ry={2.9 * big} fill={INK} />
-      <ellipse cx={57.6 + dx} cy={58.4 + dy} rx={2.3 * big} ry={2.9 * big} fill={INK} />
-      <circle cx={43.4 + dx} cy={58 + dy} r="0.75" fill="#FFFFFF" />
-      <circle cx={58.4 + dx} cy={57.4 + dy} r="0.75" fill="#FFFFFF" />
-    </g>
-  );
-}
-
-function Mouth({ mood }: { mood: MascotMood }) {
-  if (mood === "laugh") {
-    return (
-      <g>
-        <path d="M44.8 74.2 Q50.4 74.8 56 73.6 Q55 80.6 50.2 80.6 Q45.6 80.6 44.8 74.2 Z" fill={INK} />
-        <path d="M47.2 78.4 Q50.2 76.8 53.4 78.2 Q51.8 80 50.2 80 Q48.4 80 47.2 78.4 Z" fill="#F2694E" />
+    <>
+      <path
+        className="fauve-cat-brows"
+        d={BROWS[mood]}
+        style={{ d: `path("${BROWS[mood]}")`, transition: "d 260ms ease" } as CSSProperties}
+        fill="none"
+        stroke={INK}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <g style={{ ...fade(mood !== "laugh"), transform: look, transformBox: "fill-box", transformOrigin: "center", transition: "opacity 220ms ease, transform 260ms ease" }}>
+        <g className="fauve-cat-eyes">
+          <ellipse cx="42.6" cy="59" rx="2.3" ry="2.9" fill={INK} />
+          <ellipse cx="57.6" cy="58.4" rx="2.3" ry="2.9" fill={INK} />
+          <circle cx="43.4" cy="58" r="0.75" fill="#FFFFFF" />
+          <circle cx="58.4" cy="57.4" r="0.75" fill="#FFFFFF" />
+        </g>
       </g>
-    );
-  }
-  if (mood === "surprised") return <ellipse cx="50.4" cy="76.4" rx="2.2" ry="2.8" fill={INK} />;
-  if (mood === "happy") return <path d="M45.4 75 Q50.5 79.6 55.4 74.6" fill="none" stroke={INK} strokeWidth="1.4" strokeLinecap="round" />;
-  if (mood === "thinking") return <path d="M47.6 76.6 Q50.4 75.8 53.4 76.4" fill="none" stroke={INK} strokeWidth="1.3" strokeLinecap="round" />;
-  return <path d="M46.4 76 Q50.5 78 54.4 75.4" fill="none" stroke={INK} strokeWidth="1.3" strokeLinecap="round" />;
+      {/* Shut tight with laughter: two happy arcs. */}
+      <path d="M39.8 60 Q42.6 56.6 45.4 60 M54.8 59.4 Q57.6 56 60.4 59.4" fill="none" stroke={INK} strokeWidth="1.6" strokeLinecap="round" style={fade(mood === "laugh")} />
+      {(Object.keys(MOUTHS) as MascotMood[]).map((m) => (
+        <g key={m} style={fade(m === mood)}>
+          {MOUTHS[m]}
+        </g>
+      ))}
+    </>
+  );
 }
 
 export function Mascot({ size = 120, className, mood = "idle", still = false }: { size?: number; className?: string; mood?: MascotMood; still?: boolean }) {
@@ -98,6 +112,7 @@ export function Mascot({ size = 120, className, mood = "idle", still = false }: 
         {/* A soft shadow on the ground: it stays put and narrows as she floats up. */}
         <ellipse className="fauve-cat-shadow" cx="50" cy="90" rx="15" ry="2.4" fill={INK} opacity="0.12" />
         <g className="fauve-cat-float">
+          <g className="fauve-cat-mood">
           <g fill={`url(#${id}-hair)`}>
             <ellipse cx="50" cy="55" rx="27" ry="25" />
             {HAIR.map((c, i) => (
@@ -113,16 +128,15 @@ export function Mascot({ size = 120, className, mood = "idle", still = false }: 
             ))}
           </g>
           {/* She looks over her reading glasses, one eyebrow up: the knowing look of a pro. */}
-          <Brows mood={mood} />
-          <Eyes mood={mood} />
-          <ellipse cx="36.8" cy="70.5" rx="3.2" ry="2" fill="#F2694E" opacity={mood === "laugh" || mood === "happy" ? 0.38 : 0.22} />
-          <ellipse cx="64" cy="70" rx="3.2" ry="2" fill="#F2694E" opacity={mood === "laugh" || mood === "happy" ? 0.38 : 0.22} />
+          <ellipse cx="36.8" cy="70.5" rx="3.2" ry="2" fill="#F2694E" opacity={mood === "laugh" || mood === "happy" ? 0.38 : 0.22} style={{ transition: "opacity 260ms ease" }} />
+          <ellipse cx="64" cy="70" rx="3.2" ry="2" fill="#F2694E" opacity={mood === "laugh" || mood === "happy" ? 0.38 : 0.22} style={{ transition: "opacity 260ms ease" }} />
           <g fill="#5B3FD9" fillOpacity="0.1" stroke={INK} strokeWidth="1.2" strokeLinejoin="round">
             <path d="M36.6 65.8 H48.2 A5.8 4.8 0 0 1 36.6 65.8 Z" />
             <path d="M52.6 65.8 H64.2 A5.8 4.8 0 0 1 52.6 65.8 Z" />
           </g>
           <path d="M48.2 66.2 Q50.4 65 52.6 66.2" fill="none" stroke={INK} strokeWidth="1.2" strokeLinecap="round" />
-          <Mouth mood={mood} />
+          <Face mood={mood} />
+          </g>
         </g>
       </svg>
     </span>

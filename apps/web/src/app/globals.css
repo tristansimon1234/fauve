@@ -227,6 +227,10 @@
   transform-origin: 50% 100%;
   animation: fauve-sway 6s ease-in-out infinite;
 }
+.fauve-cat-mood {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
 .fauve-cat-shadow {
   transform-box: fill-box;
   transform-origin: center;
@@ -242,14 +246,14 @@
   74%, 78% { transform: translateY(-1.6px); }
 }
 /* Writing: a faster, smaller bob. Laughing: little hops, brows dancing. */
-.fauve-cat-thinking .fauve-cat-float {
+.fauve-cat-thinking .fauve-cat-mood {
   animation: fauve-think 1.6s ease-in-out infinite;
 }
 @keyframes fauve-think {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
   50% { transform: translateY(-2%) rotate(1deg); }
 }
-.fauve-cat-laugh .fauve-cat-float {
+.fauve-cat-laugh .fauve-cat-mood {
   animation: fauve-laugh 0.42s ease-in-out infinite;
 }
 .fauve-cat-laugh .fauve-cat-brows {
@@ -263,7 +267,7 @@
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-1.2px); }
 }
-.fauve-cat-surprised .fauve-cat-float {
+.fauve-cat-surprised .fauve-cat-mood {
   animation: fauve-jump 0.5s ease-out 1;
 }
 @keyframes fauve-jump {
