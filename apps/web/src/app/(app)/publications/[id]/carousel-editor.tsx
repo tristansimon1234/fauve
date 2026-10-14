@@ -542,7 +542,7 @@ export function CarouselEditor({
                 light={Boolean(slide.edit?.adjust)}
                 faces={Boolean(slide.edit?.blur?.some((b) => b.kind === "face"))}
                 onChange={async (next) => {
-                  const res = await photoRetouch(slide.media_id, next).catch(() => ({ ok: false as const, error: "Fauve n’a pas pu regarder cette photo." }));
+                  const res = await photoRetouch(slide.media_id, next).catch(() => ({ ok: false as const, error: "Brigitte n’a pas pu regarder cette photo." }));
                   if (!res.ok) return { ok: false, message: res.error };
                   setSlide({ edit: res.value ?? undefined });
                   return { ok: true, message: res.note };

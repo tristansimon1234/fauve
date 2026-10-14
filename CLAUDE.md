@@ -1,6 +1,8 @@
 # CLAUDE.md — Fauve, l'agent réseaux sociaux des studios
 
 ## Produit en une phrase
+> **Nom : Brigitte.** Le produit et l'assistante s'appellent Brigitte pour les gérantes (app, WhatsApp, prompts : « Tu es Brigitte »). « Fauve » reste le nom interne du code (repo, routes comme `/fauve`, classes `fauve-*`, composants `Fauve…`, ce document) : ne pas le montrer à l'écran. Mascotte : une tête ronde et nette sous une ligne de boucles en dégradé corail → violet, deux yeux en pilule (`components/mascot.tsx`, aussi dans le logo et `app/icon.svg`).
+
 Fauve est une community manager IA qui vit **dans WhatsApp**. La gérante d'un commerce de quartier (studio de Pilates ou de yoga, salon de coiffure, restaurant, boutique…) envoie ses vidéos, et Fauve les monte, écrit les légendes, programme sur Instagram et TikTok, relance quand il manque un contenu, et fait un bilan chaque semaine. Une petite web app (desktop + mobile) sert à voir le calendrier, valider, déposer des vidéos en pleine qualité et suivre les résultats.
 
 - Prix cible : **49 € / mois**. Pour l'instant on optimise la **qualité et la vitesse**, pas les coûts, mais on **journalise le coût par studio dès le jour 1**.

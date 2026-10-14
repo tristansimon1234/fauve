@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         result = await chatTurn(text, conversationId, attachments, about, send);
       } catch (error) {
         console.error("chat turn failed", error);
-        result = { ok: false, error: "Fauve n’a pas pu répondre. Réessaie dans un instant.", conversationId };
+        result = { ok: false, error: "Brigitte n’a pas pu répondre. Réessaie dans un instant.", conversationId };
       }
       send({ type: "done", result });
       if (open) controller.close();

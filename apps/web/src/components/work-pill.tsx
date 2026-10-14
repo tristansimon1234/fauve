@@ -70,7 +70,7 @@ export function WorkPill({ studioId }: { studioId: string }) {
             {first.failed ? <XIcon size={13} /> : <CheckIcon size={13} />}
           </span>
         )}
-        <span>{running.length ? "Fauve travaille" : first.kindLabel}</span>
+        <span>{running.length ? "Brigitte travaille" : first.kindLabel}</span>
         <span className="text-muted">· {label}</span>
       </button>
       {open && (

@@ -34,7 +34,7 @@ export function LiveTyping({ live }: { live: LiveState | null }) {
       </span>
       {/* key: each new line fades in */}
       <span key={live?.status ?? "writing"} className="fauve-fade">
-        {live?.status ?? "Fauve écrit…"}
+        {live?.status ?? "Brigitte écrit…"}
       </span>
     </div>
   );

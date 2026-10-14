@@ -74,7 +74,7 @@ export function ElementsPanel({
 
       {bank.length === 0 && (
         <p className="rounded-[12px] bg-soft px-3 py-2.5 text-[13px] leading-snug text-muted">
-          Ta banque de composants est vide. Envoie à Fauve une inspiration (la capture d’un post qui te plaît) : elle en sortira tes titres, étiquettes, listes… réutilisables sur toutes tes photos.
+          Ta banque de composants est vide. Envoie à Brigitte une inspiration (la capture d’un post qui te plaît) : elle en sortira tes titres, étiquettes, listes… réutilisables sur toutes tes photos.
         </p>
       )}
 

@@ -38,22 +38,22 @@ export async function createComponents(input: { request: string; examplePath?: s
   const request = wish || "Décompose cette inspiration en composants réutilisables, fidèles à l’exemple, avec des textes d’exemple adaptés à mon commerce.";
   const started = await startElements({ studioId: studio, mode: "create", request, examplePath, origin: "app" });
   if (started.status === "error") return { ok: false, error: started.error };
-  if (started.status === "already_running") return { ok: true, message: "Fauve y travaille déjà." };
-  return { ok: true, message: `Fauve s’y met : 2 à 4 minutes, ${started.credits} crédits une fois prêts.` };
+  if (started.status === "already_running") return { ok: true, message: "Brigitte y travaille déjà." };
+  return { ok: true, message: `Brigitte s’y met : 2 à 4 minutes, ${started.credits} crédits une fois prêts.` };
 }
 
 /** A change to one component: a new version, the current one kept. */
 export async function changeComponent(id: string, input: { change: string; examplePath?: string }): Promise<BankResult> {
   if (!z.uuid().safeParse(id).success) return { ok: false, error: "Composant introuvable." };
   const change = z.string().trim().min(2).max(2000).safeParse(input.change);
-  if (!change.success) return { ok: false, error: "Dis à Fauve ce que tu veux changer." };
+  if (!change.success) return { ok: false, error: "Dis à Brigitte ce que tu veux changer." };
   const studio = await studioId();
   if (!studio) return NO_STUDIO;
   const started = await startElements({ studioId: studio, mode: "edit", elementId: id, request: change.data, examplePath: examplePathOf(studio, input.examplePath), origin: "app" });
   if (started.status === "error") return { ok: false, error: started.error };
   if (started.status === "already_running") return { ok: true, message: "Ce composant est déjà en cours de modification." };
   revalidatePath(`/composants/${id}`);
-  return { ok: true, message: `Fauve prépare la nouvelle version (une à deux minutes, ${started.credits} crédit).` };
+  return { ok: true, message: `Brigitte prépare la nouvelle version (une à deux minutes, ${started.credits} crédit).` };
 }
 
 async function patchElement(id: string, patch: Record<string, unknown>): Promise<BankResult> {

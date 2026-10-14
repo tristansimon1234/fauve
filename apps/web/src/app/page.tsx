@@ -12,9 +12,9 @@ const exampleClips = [
 ];
 
 const steps = [
-  ["Présente ton commerce", "Ton site, ton style, ton rythme : Fauve apprend qui tu es, sur ton ordinateur ou sur WhatsApp."],
+  ["Présente ton commerce", "Ton site, ton style, ton rythme : Brigitte apprend qui tu es, sur ton ordinateur ou sur WhatsApp."],
   ["Connecte ton Instagram", "Un lien sécurisé, une autorisation. Rien ne part sans ta validation."],
-  ["Montre-lui ce que tu aimes", "Un post ou un Reel qui te plaît, tes photos et vidéos : Fauve monte, écrit et programme."],
+  ["Montre-lui ce que tu aimes", "Un post ou un Reel qui te plaît, tes photos et vidéos : Brigitte monte, écrit et programme."],
 ];
 
 export default function LandingPage() {
@@ -54,7 +54,7 @@ export default function LandingPage() {
             Ton community manager vit dans <span className="accent">WhatsApp.</span>
           </h1>
           <p className="max-w-[520px] text-[19px] leading-[1.55] text-muted">
-            Envoie tes vidéos. Fauve les monte, écrit les légendes et programme tes posts. Et quand il manque
+            Envoie tes vidéos. Brigitte les monte, écrit les légendes et programme tes posts. Et quand il manque
             quelque chose, c’est elle qui te relance.
           </p>
           <div className="flex flex-wrap items-center gap-3">
@@ -80,7 +80,7 @@ export default function LandingPage() {
             <div className="flex items-center gap-2.5 border-b border-line pb-2">
               <Orb size={32} />
               <span className="flex flex-col">
-                <span className="text-[15px] font-bold">Fauve</span>
+                <span className="text-[15px] font-bold">Brigitte</span>
                 <span className="text-xs text-muted">en ligne</span>
               </span>
             </div>
@@ -115,7 +115,7 @@ export default function LandingPage() {
             <span className="flex flex-col gap-1">
               <span className="text-base font-bold">Sur ordinateur ?</span>
               <span className="text-sm leading-normal text-muted">
-                On fait connaissance ici, et Fauve reste joignable sur WhatsApp.{" "}
+                On fait connaissance ici, et Brigitte reste joignable sur WhatsApp.{" "}
                 <Link href="/commencer" className="font-semibold text-violet hover:underline">
                   Commencer
                 </Link>

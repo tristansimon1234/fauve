@@ -222,7 +222,7 @@ export function Bubble({
       )}
       <span className="flex items-center gap-1 px-1 text-[11px] text-muted">
         {message.channel === "whatsapp" && <WhatsAppIcon size={11} />}
-        {mine ? "Toi" : "Fauve"} · {time}
+        {mine ? "Toi" : "Brigitte"} · {time}
       </span>
     </div>
   );

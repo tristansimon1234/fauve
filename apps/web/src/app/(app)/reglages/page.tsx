@@ -24,12 +24,12 @@ const CREDIT_LINES: [string, string][] = [
   ["Scène de ta bibliothèque", "gratuit"],
   ["Correction d’un montage", `${CREDIT_PRICES.correction}`],
   ["Variante d’un montage", `${CREDIT_PRICES.variant}`],
-  ["Fauve regarde la vidéo (Soigné, Max)", `${CREDIT_PRICES.review}`],
+  ["Brigitte regarde la vidéo (Soigné, Max)", `${CREDIT_PRICES.review}`],
   ["Correction après l’avoir regardée", `${CREDIT_PRICES.fixRound}`],
   ["2e version à comparer (Max)", `${CREDIT_PRICES.alternative}`],
   ["Rendu vidéo", `${CREDIT_PRICES.render}`],
   ["Lecture du moodboard", `${CREDIT_PRICES.moodboard}`],
-  ["Messages à Fauve", "gratuit"],
+  ["Messages à Brigitte", "gratuit"],
 ];
 
 const accountStatusLabels: Record<SocialAccount["status"], string> = {
@@ -86,10 +86,10 @@ async function Settings() {
           <Field label="Activité" value={(care.data?.business_type as string | null) ?? null} />
           <Field label="Site web" value={studio.website_url} href={studio.website_url} />
           <Field label="Lien de réservation" value={studio.booking_url} href={studio.booking_url} />
-          <p className="text-[13px] text-muted">Pour changer ces informations, dis-le à Fauve.</p>
+          <p className="text-[13px] text-muted">Pour changer ces informations, dis-le à Brigitte.</p>
         </Section>
 
-        <Section title="Ce que Fauve sait de ton commerce">
+        <Section title="Ce que Brigitte sait de ton commerce">
           <MemoryList initial={readMemory(care.data?.memory).map((f) => f.fact)} />
         </Section>
 
@@ -120,19 +120,19 @@ async function Settings() {
               <a href="/connect" className="font-bold text-violet">
                 Connecter Instagram
               </a>{" "}
-              pour que Fauve publie tes posts validés. TikTok arrive bientôt.
+              pour que Brigitte publie tes posts validés. TikTok arrive bientôt.
             </p>
           )}
         </Section>
 
         {fauveInstagram?.username && (
-          <Section title="Fauve sur Instagram">
+          <Section title="Brigitte sur Instagram">
             <p className="text-sm leading-normal">
               Quand un Reel t’inspire, partage-le à{" "}
               <a href={`https://ig.me/m/${fauveInstagram.username}`} target="_blank" rel="noreferrer" className="font-bold text-violet">
                 @{fauveInstagram.username}
               </a>{" "}
-              (bouton Partager) : Fauve en tire des idées pour ton style. Tu peux aussi lui écrire là-bas comme sur WhatsApp.
+              (bouton Partager) : Brigitte en tire des idées pour ton style. Tu peux aussi lui écrire là-bas comme sur WhatsApp.
             </p>
             {dmContact.data ? (
               <p className="text-sm font-semibold text-success">Ton compte Instagram est relié.</p>
@@ -144,7 +144,7 @@ async function Settings() {
 
         <Section title="Style des vidéos">
           <p className="text-sm leading-normal">
-            Direction artistique, couleurs, polices, logo et gabarit que Fauve applique à chaque Reel.{" "}
+            Direction artistique, couleurs, polices, logo et gabarit que Brigitte applique à chaque Reel.{" "}
             <Link href="/style" className="font-bold text-violet">
               Régler mon style
             </Link>
@@ -153,7 +153,7 @@ async function Settings() {
 
         <Section title="Soin des montages">
           <p className="text-sm leading-normal">
-            Le niveau que Fauve utilise par défaut pour tes Reels. Pour un Reel en particulier, choisis-en un autre sur le devis, ou dis-le-lui.
+            Le niveau que Brigitte utilise par défaut pour tes Reels. Pour un Reel en particulier, choisis-en un autre sur le devis, ou dis-le-lui.
           </p>
           <EffortSetting initial={effortSchema.catch(DEFAULT_EFFORT).parse(care.data?.montage_effort)} />
         </Section>
@@ -164,11 +164,11 @@ async function Settings() {
               {plural(plan.posts_per_week, "post", "posts")} et {plural(plan.stories_per_week, "story", "stories")} par
               semaine
               {plan.platforms.length ? `, sur ${plan.platforms.map((p) => platformLabels[p]).join(" et ")}` : ""}.
-              Demande à Fauve sur WhatsApp pour le changer.
+              Demande à Brigitte sur WhatsApp pour le changer.
             </p>
           ) : (
             <p className="text-sm leading-normal">
-              Pas encore de rythme choisi. Dis à Fauve sur WhatsApp combien de posts et de stories tu veux par semaine.
+              Pas encore de rythme choisi. Dis à Brigitte sur WhatsApp combien de posts et de stories tu veux par semaine.
             </p>
           )}
         </Section>
@@ -187,7 +187,7 @@ async function Settings() {
             <span className="text-sm font-semibold text-muted">crédits disponibles</span>
           </p>
           <p className="text-sm leading-normal text-muted">
-            Ton solde remonte à {MONTHLY_CREDITS} crédits le 1er de chaque mois. Avant chaque montage, Fauve t’annonce ce
+            Ton solde remonte à {MONTHLY_CREDITS} crédits le 1er de chaque mois. Avant chaque montage, Brigitte t’annonce ce
             qu’elle va faire et ce que ça coûte ; tu ne paies jamais plus que l’annonce, et rien si le montage échoue.
           </p>
           <ul className="grid gap-x-6 gap-y-1 text-[13px] sm:grid-cols-2">
@@ -221,7 +221,7 @@ async function Settings() {
 
         <a href={whatsappLink()} className="btn btn-secondary self-start">
           <WhatsAppIcon size={18} />
-          Écrire à Fauve sur WhatsApp
+          Écrire à Brigitte sur WhatsApp
         </a>
       </div>
     </>

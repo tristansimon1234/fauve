@@ -241,7 +241,7 @@ async function refreshExpiringTokens(): Promise<number> {
         .eq("key", row.key);
       refreshed++;
     } catch (error) {
-      console.error("Fauve account token refresh failed", error instanceof InstagramError ? error.body : error);
+      console.error("Brigitte account token refresh failed", error instanceof InstagramError ? error.body : error);
     }
   }
   return refreshed;

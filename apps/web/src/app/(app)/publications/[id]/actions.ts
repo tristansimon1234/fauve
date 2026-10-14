@@ -96,10 +96,10 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
     status: "ok",
     message:
       scheduled === "now"
-        ? "C’est validé : Fauve le publie sur Instagram maintenant."
+        ? "C’est validé : Brigitte le publie sur Instagram maintenant."
         : scheduled
-          ? `C’est validé : Fauve le publie sur Instagram le ${scheduled}.`
-          : "C’est validé. Connecte Instagram (Réglages) pour que Fauve le publie.",
+          ? `C’est validé : Brigitte le publie sur Instagram le ${scheduled}.`
+          : "C’est validé. Connecte Instagram (Réglages) pour que Brigitte le publie.",
   };
 }
 

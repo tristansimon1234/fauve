@@ -284,7 +284,7 @@ function QuoteCard({
                 <div key={shown ?? "none"} className={`flex flex-col gap-1.5 ${touched ? "fauve-fade" : ""}`}>
                   {extra && (
                     <p className="text-[12px] leading-snug text-muted">
-                      Jusqu’à {credits(price.max)} si Fauve crée de nouvelles animations
+                      Jusqu’à {credits(price.max)} si Brigitte crée de nouvelles animations
                       {level?.review ? " ou corrige la vidéo après l’avoir regardée" : ""}. Tu ne paies que ce qui est vraiment fait.
                     </p>
                   )}
@@ -464,17 +464,17 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
               : "La vidéo se fabrique"
         : quote.stage === "review"
           ? seen.includes("fix")
-            ? "Fauve vérifie la correction"
+            ? "Brigitte vérifie la correction"
             : max
-              ? "Fauve compare les deux versions"
-              : "Fauve regarde la vidéo"
+              ? "Brigitte compare les deux versions"
+              : "Brigitte regarde la vidéo"
           : quote.stage === "fix"
-            ? "Fauve corrige ce qu’elle a repéré"
+            ? "Brigitte corrige ce qu’elle a repéré"
             : quote.stage === "delivered"
               ? "Ta vidéo est prête"
               : quote.kind === "correction"
-                ? "Fauve applique tes changements"
-                : "Fauve choisit les plans et anime les scènes";
+                ? "Brigitte applique tes changements"
+                : "Brigitte choisit les plans et anime les scènes";
   const [firstText] = useState(text);
 
   const now = useNow(30_000);

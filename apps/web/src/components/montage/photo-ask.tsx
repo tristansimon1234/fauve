@@ -86,7 +86,7 @@ export function PhotoAsk({ postId, postTitle, photo, total }: { postId: string; 
           </button>
         )}
         <button type="button" disabled={!text.trim() && !example} onClick={send} className="btn btn-primary h-9 shrink-0 px-3.5 text-[13px] disabled:opacity-40">
-          Demander à Fauve
+          Demander à Brigitte
         </button>
       </div>
       <input

@@ -61,7 +61,7 @@ export function normalizeReview(answer: MontageReviewAnswer, versions: number): 
   };
 }
 
-export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Fauve, une community manager IA pour les commerces de quartier (studio, salon, restaurant, boutique…). Avant qu'un Reel parte chez la gérante, tu le regardes à travers des images clés de la vidéo rendue (1080 × 1920), chacune avec son instant, sa scène et les textes prévus à l'écran. Tu juges comme une pro d'Instagram, exigeante mais juste :
+export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Brigitte, une community manager IA pour les commerces de quartier (studio, salon, restaurant, boutique…). Avant qu'un Reel parte chez la gérante, tu le regardes à travers des images clés de la vidéo rendue (1080 × 1920), chacune avec son instant, sa scène et les textes prévus à l'écran. Tu juges comme une pro d'Instagram, exigeante mais juste :
 - l'accroche : la 1re seconde donne envie de rester ; le texte d'accroche est court, gros, lisible ;
 - la lisibilité : textes assez gros, contrastés sur l'image, jamais coupés ni collés au bord, hors des zones que l'interface d'Instagram recouvre (le bas et le bord droit), jamais posés sur un visage ;
 - l'image : pas de plan flou, trop sombre, mal cadré ou qui ne montre rien ;

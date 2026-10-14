@@ -12,7 +12,7 @@ export default function DataDeletionPage() {
       <h2>Comment faire</h2>
       <ul>
         <li>
-          Écris « <strong>Supprimer mes données</strong> » à Fauve sur WhatsApp, depuis le numéro associé à ton studio ;
+          Écris « <strong>Supprimer mes données</strong> » à Brigitte sur WhatsApp, depuis le numéro associé à ton studio ;
         </li>
         <li>ou envoie un e-mail à {company.email} en indiquant le numéro WhatsApp et le nom du studio.</li>
       </ul>

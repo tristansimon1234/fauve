@@ -62,7 +62,7 @@ export const toolSpecs = {
   },
   get_connect_link: {
     description:
-      "Renvoie le lien sécurisé (valable 15 min) vers la page où la gérante connecte son compte Instagram professionnel à Fauve (TikTok arrive bientôt). À envoyer quand Instagram n'est pas connecté.",
+      "Renvoie le lien sécurisé (valable 15 min) vers la page où la gérante connecte son compte Instagram professionnel à Brigitte (TikTok arrive bientôt). À envoyer quand Instagram n'est pas connecté.",
     input: z.object({}),
   },
   get_post_link: {
@@ -165,7 +165,7 @@ export const toolSpecs = {
       effort: effortSchema
         .optional()
         .describe(
-          "Niveau de soin : rapide (une version, sans relecture), soigne (Fauve regarde la vidéo rendue et la fait corriger si besoin), max (deux versions, Fauve garde la meilleure et la peaufine). Par défaut celui du studio (contexte). rapide si elle est pressée ou pour un essai ; max pour un post important (lancement, offre, temps fort) ou si elle le demande.",
+          "Niveau de soin : rapide (une version, sans relecture), soigne (Brigitte regarde la vidéo rendue et la fait corriger si besoin), max (deux versions, Brigitte garde la meilleure et la peaufine). Par défaut celui du studio (contexte). rapide si elle est pressée ou pour un essai ; max pour un post important (lancement, offre, temps fort) ou si elle le demande.",
         ),
       variant: z
         .object({
@@ -188,7 +188,7 @@ export const toolSpecs = {
   },
   montage: {
     description:
-      "Lance le montage (ou la correction) devisé par quote_montage, une fois que la gérante a dit oui. En tâche de fond : ton monteur regarde les clips, choisit le gabarit, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Fauve la regarde et la fait corriger avant de l'envoyer automatiquement (Rapide 2 à 4 min, Soigné 4 à 8, Max 8 à 15). Les crédits sont débités à la livraison, jamais plus que le devis.",
+      "Lance le montage (ou la correction) devisé par quote_montage, une fois que la gérante a dit oui. En tâche de fond : ton monteur regarde les clips, choisit le gabarit, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Brigitte la regarde et la fait corriger avant de l'envoyer automatiquement (Rapide 2 à 4 min, Soigné 4 à 8, Max 8 à 15). Les crédits sont débités à la livraison, jamais plus que le devis.",
     input: z.object({
       quote_id: z.string().uuid(),
       effort: effortSchema.optional().describe("Seulement si la gérante a choisi un autre niveau que celui du devis (ex. « Version Max ») : le prix est celui de ce niveau, déjà annoncé"),
@@ -267,7 +267,7 @@ export const toolSpecs = {
   },
   design_elements: {
     description:
-      "Fauve crée de nouveaux composants pour la banque, comme un directeur artistique : à partir d'une inspiration (example_media_id, la capture d'un post qu'elle aime), il en sort chaque pièce réutilisable (titre, étiquette, checklist, prix dans un rond…), la code, la teste et la relit ; ou il crée les composants décrits dans request. Avec post_id, il les pose aussitôt sur les photos de la publication avec les mots du commerce. Prend 2 à 4 minutes et coûte 3 crédits, débités une fois livré ; un message part tout seul à la fin.",
+      "Brigitte crée de nouveaux composants pour la banque, comme un directeur artistique : à partir d'une inspiration (example_media_id, la capture d'un post qu'elle aime), il en sort chaque pièce réutilisable (titre, étiquette, checklist, prix dans un rond…), la code, la teste et la relit ; ou il crée les composants décrits dans request. Avec post_id, il les pose aussitôt sur les photos de la publication avec les mots du commerce. Prend 2 à 4 minutes et coûte 3 crédits, débités une fois livré ; un message part tout seul à la fin.",
     input: z.object({
       request: z
         .string()
@@ -291,7 +291,7 @@ export const toolSpecs = {
   },
   retouch_photos: {
     description:
-      "Retouche et/ou floute les photos d'un carrousel ou d'un post photo, gratuit. Fauve regarde chaque photo (visages, plaques, écrans, lumière, horizon, sujet) : light = retouche légère et naturelle (lumière, contraste, couleurs, horizon redressé, recadrage qui garde le sujet) ; blur = les zones à flouter (face : visages, plate : plaques, screen : écrans, document : papiers). L'original n'est jamais modifié ; light false et blur vide retirent la retouche. Le rendu part après ta réponse et le lien est envoyé tout seul.",
+      "Retouche et/ou floute les photos d'un carrousel ou d'un post photo, gratuit. Brigitte regarde chaque photo (visages, plaques, écrans, lumière, horizon, sujet) : light = retouche légère et naturelle (lumière, contraste, couleurs, horizon redressé, recadrage qui garde le sujet) ; blur = les zones à flouter (face : visages, plate : plaques, screen : écrans, document : papiers). L'original n'est jamais modifié ; light false et blur vide retirent la retouche. Le rendu part après ta réponse et le lien est envoyé tout seul.",
     input: z.object({
       post_id: z.string().uuid(),
       photos: z.array(z.number().int().min(1).max(10)).max(10).optional().describe("Numéros des photos (à partir de 1) ; par défaut toutes"),
@@ -310,7 +310,7 @@ export const toolSpecs = {
   },
   copy_text_style: {
     description:
-      "Copie le style des textes d'un exemple que la gérante a envoyé (une photo ou une capture d'un post qu'elle aime) : Fauve lit chaque texte de l'image (police la plus proche, graisse, couleurs, fond en bloc, pilule ou surlignage, contour, ombre, inclinaison, place) et l'enregistre dans les styles de texte du studio. Avec post_id, l'applique aussitôt aux textes de cette publication (texte sur photos ou montage) et refait le rendu, gratuit ; le lien part tout seul. Renvoie les styles lus avec leur nom.",
+      "Copie le style des textes d'un exemple que la gérante a envoyé (une photo ou une capture d'un post qu'elle aime) : Brigitte lit chaque texte de l'image (police la plus proche, graisse, couleurs, fond en bloc, pilule ou surlignage, contour, ombre, inclinaison, place) et l'enregistre dans les styles de texte du studio. Avec post_id, l'applique aussitôt aux textes de cette publication (texte sur photos ou montage) et refait le rendu, gratuit ; le lien part tout seul. Renvoie les styles lus avec leur nom.",
     input: z.object({
       media_id: z.string().uuid().describe("media_id de l'image d'exemple reçue"),
       post_id: z.string().uuid().optional().describe("La publication à laquelle appliquer ce style"),
@@ -347,7 +347,7 @@ export const toolSpecs = {
   },
   get_instagram_activity: {
     description:
-      "Lit le compte Instagram connecté du studio : derniers posts (y compris ceux publiés sans Fauve) avec likes, nombre de commentaires, statistiques (vues, portée, enregistrements, partages) et les commentaires récents avec leurs réponses. Sert à analyser ce qui marche, repérer les questions sans réponse et préparer des réponses ou le bilan.",
+      "Lit le compte Instagram connecté du studio : derniers posts (y compris ceux publiés sans Brigitte) avec likes, nombre de commentaires, statistiques (vues, portée, enregistrements, partages) et les commentaires récents avec leurs réponses. Sert à analyser ce qui marche, repérer les questions sans réponse et préparer des réponses ou le bilan.",
     input: z.object({
       media_limit: z.number().int().min(1).max(20).default(6),
       comments_per_post: z.number().int().min(0).max(30).default(8),
@@ -355,7 +355,7 @@ export const toolSpecs = {
   },
   analyze_performance: {
     description:
-      "« Ce qui marche » : compare les derniers posts Instagram du studio (chiffres, formats, heures, légendes, recette des Reels de Fauve) et en tire 2 à 5 leçons avec leurs preuves, plus des idées pour la semaine. Gratuit. Renvoie le dernier bilan s'il a moins de 3 jours, sauf refresh. Les leçons guident aussi les prochains montages.",
+      "« Ce qui marche » : compare les derniers posts Instagram du studio (chiffres, formats, heures, légendes, recette des Reels de Brigitte) et en tire 2 à 5 leçons avec leurs preuves, plus des idées pour la semaine. Gratuit. Renvoie le dernier bilan s'il a moins de 3 jours, sauf refresh. Les leçons guident aussi les prochains montages.",
     input: z.object({ refresh: z.boolean().default(false).describe("true pour refaire l'analyse même si le dernier bilan est récent") }),
   },
   reply_to_comment: {
@@ -368,7 +368,7 @@ export const toolSpecs = {
   },
   get_metrics: {
     description:
-      "Statistiques mesurées des publications faites par Fauve (dernière mesure par publication) entre deux dates : vues, portée, likes, enregistrements, partages, commentaires, visites du profil.",
+      "Statistiques mesurées des publications faites par Brigitte (dernière mesure par publication) entre deux dates : vues, portée, likes, enregistrements, partages, commentaires, visites du profil.",
     input: z.object({ from: isoDateTime, to: isoDateTime }),
   },
   update_brand_profile: {
@@ -378,7 +378,7 @@ export const toolSpecs = {
   },
   add_to_moodboard: {
     description:
-      "Ajoute à son moodboard (Style) des images qu'elle t'a envoyées (posts qu'elle aime, ambiances, couleurs), puis Fauve relit tout le moodboard : la lecture guide ensuite les montages et les composants. Gratuit pendant l'onboarding, 1 crédit ensuite.",
+      "Ajoute à son moodboard (Style) des images qu'elle t'a envoyées (posts qu'elle aime, ambiances, couleurs), puis Brigitte relit tout le moodboard : la lecture guide ensuite les montages et les composants. Gratuit pendant l'onboarding, 1 crédit ensuite.",
     input: z.object({ media_ids: z.array(z.string().uuid()).min(1).max(12) }),
   },
   reply_with: {

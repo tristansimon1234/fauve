@@ -98,7 +98,7 @@ function NewInspiration({ studioId, onDone }: { studioId: string; onDone: (messa
               onChange={(e) => setText(e.target.value)}
               rows={3}
               maxLength={600}
-              placeholder={example ? "Facultatif : Fauve en sort chaque pièce (titre, étiquette, liste…). Dis-lui si tu veux seulement une partie." : "Ex. une checklist de ce qu’il faut apporter au cours, une étiquette « Nouveau »"}
+              placeholder={example ? "Facultatif : Brigitte en sort chaque pièce (titre, étiquette, liste…). Dis-lui si tu veux seulement une partie." : "Ex. une checklist de ce qu’il faut apporter au cours, une étiquette « Nouveau »"}
               className="resize-none rounded-[12px] border border-line bg-white px-3 py-2 text-[14px] leading-snug outline-none focus:border-violet"
             />
           </label>
@@ -128,7 +128,7 @@ function NewInspiration({ studioId, onDone }: { studioId: string; onDone: (messa
             <button type="button" disabled={pending || (!text.trim() && !example)} onClick={submit} className="btn btn-primary h-10 px-4 text-[14px] disabled:opacity-40">
               {pending ? "Envoi…" : "Créer mes composants"}
             </button>
-            <span className="text-[12px] text-muted">{CREDIT_PRICES.textLayer} crédits · 2 à 4 minutes · testés et relus par Fauve</span>
+            <span className="text-[12px] text-muted">{CREDIT_PRICES.textLayer} crédits · 2 à 4 minutes · testés et relus par Brigitte</span>
           </div>
           {error && (
             <p role="alert" className="text-[13px] font-semibold text-danger">
@@ -187,7 +187,7 @@ export function ComponentsBank({
         <div className="flex max-w-[640px] flex-col gap-1.5">
           <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Composants</h1>
           <p className="text-[15px] leading-relaxed text-muted">
-            Ton design system : les titres, étiquettes, listes… que Fauve a tirés de tes inspirations. Elle les pose sur tes photos avec tes mots, et tu peux retoucher chacun à part.
+            Ton design system : les titres, étiquettes, listes… que Brigitte a tirés de tes inspirations. Elle les pose sur tes photos avec tes mots, et tu peux retoucher chacun à part.
           </p>
         </div>
         {!open && (
@@ -219,7 +219,7 @@ export function ComponentsBank({
       {(creating > 0 || notice) && (
         <div className="fauve-enter flex max-w-[860px] items-center gap-3 rounded-[16px] bg-violet-tint px-4 py-3 text-[14px] text-violet">
           <Orb size={26} />
-          <span className="min-w-0 flex-1 font-semibold">{creating > 0 ? "Fauve découpe ton inspiration en composants, les teste et les relit. Ils arrivent ici tout seuls." : notice}</span>
+          <span className="min-w-0 flex-1 font-semibold">{creating > 0 ? "Brigitte découpe ton inspiration en composants, les teste et les relit. Ils arrivent ici tout seuls." : notice}</span>
         </div>
       )}
 

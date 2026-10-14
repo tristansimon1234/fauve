@@ -85,10 +85,10 @@ export async function handleDm(event: DmEvent): Promise<void> {
     const linked = code ? await linkWithCode(igsid, code) : null;
     await reply(
       linked
-        ? `C’est relié à ${linked.name} ! Partage-moi les Reels qui t’inspirent (bouton Partager → Fauve) : je les garde pour ton style. Tu peux aussi m’écrire ici.`
+        ? `C’est relié à ${linked.name} ! Partage-moi les Reels qui t’inspirent (bouton Partager → Brigitte) : je les garde pour ton style. Tu peux aussi m’écrire ici.`
         : code
           ? "Ce code n’est plus valable. Récupère-en un nouveau dans l’app (Réglages → Instagram) et renvoie-le-moi."
-          : "Hello, je suis Fauve, l’IA qui gère les réseaux de ton studio. Pour relier ton compte, envoie-moi le code affiché dans l’app (Réglages → Instagram).",
+          : "Hello, je suis Brigitte, l’IA qui gère les réseaux de ton studio. Pour relier ton compte, envoie-moi le code affiché dans l’app (Réglages → Instagram).",
     );
     return;
   }

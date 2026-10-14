@@ -215,7 +215,7 @@
   }
 }
 
-/* Fauve's mascot (components/mascot.tsx): a sketchy doodle whose line boils, blinks and sways. */
+/* Brigitte's mascot (components/mascot.tsx): a clean head under a line of curls; it floats and blinks. */
 .fauve-cat {
   display: inline-block;
   flex-shrink: 0;
@@ -247,7 +247,7 @@
   animation: fauve-blink 4.5s ease-in-out infinite;
 }
 .fauve-cat-orbit {
-  transform-origin: 50px 56px;
+  transform-origin: 50px 62px;
   animation: fauve-tilt 8s ease-in-out infinite;
 }
 @keyframes fauve-boil {
@@ -256,8 +256,7 @@
 }
 @keyframes fauve-sway {
   0%, 100% { transform: rotate(0deg) translateY(0); }
-  30% { transform: rotate(-4deg) translateY(-2%); }
-  60% { transform: rotate(3deg) translateY(0); }
+  50% { transform: rotate(-2deg) translateY(-3%); }
 }
 @keyframes fauve-blink {
   0%, 44%, 50%, 100% { transform: scaleY(1); }

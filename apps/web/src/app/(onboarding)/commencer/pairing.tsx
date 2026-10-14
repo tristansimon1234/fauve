@@ -71,8 +71,8 @@ export function Pairing({ signIn, expired }: { signIn: boolean; expired: boolean
         </h1>
         <p className="text-[15px] leading-[1.55] text-muted">
           {signIn
-            ? "Scanne ce code avec ton téléphone et envoie le message à Fauve : ton compte s’ouvre ici."
-            : "Scanne ce code avec ton téléphone et envoie le message à Fauve. Ton espace s’ouvre ici, et on continue sur cet écran."}
+            ? "Scanne ce code avec ton téléphone et envoie le message à Brigitte : ton compte s’ouvre ici."
+            : "Scanne ce code avec ton téléphone et envoie le message à Brigitte. Ton espace s’ouvre ici, et on continue sur cet écran."}
         </p>
       </div>
 
@@ -91,7 +91,7 @@ export function Pairing({ signIn, expired }: { signIn: boolean; expired: boolean
       ) : (
         <>
           <div className="flex size-[232px] items-center justify-center rounded-[24px] border border-line bg-white p-4 shadow-[0_12px_40px_rgba(28,21,48,.08)]">
-            {pair ? <div className="size-full [&_svg]:size-full" aria-label="QR code pour écrire à Fauve" role="img" dangerouslySetInnerHTML={{ __html: pair.qr }} /> : <Orb size={36} />}
+            {pair ? <div className="size-full [&_svg]:size-full" aria-label="QR code pour écrire à Brigitte" role="img" dangerouslySetInnerHTML={{ __html: pair.qr }} /> : <Orb size={36} />}
           </div>
           {pair && (
             <p className="text-[13px] text-muted">

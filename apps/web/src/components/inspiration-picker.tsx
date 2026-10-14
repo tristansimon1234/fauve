@@ -81,7 +81,7 @@ export function InspirationPicker({
     <div className="flex flex-col gap-2">
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]" role="radiogroup" aria-label="Inspiration">
         <button type="button" role="radio" aria-checked={value === null} onClick={() => onChange(null)} className={card(value === null)}>
-          <span className="pr-5 text-[13px] font-bold">Fauve choisit</span>
+          <span className="pr-5 text-[13px] font-bold">Brigitte choisit</span>
           <span className="text-[11px] leading-snug text-muted">D’après ton style et ce qui marche</span>
           {value === null && <Tick />}
         </button>
@@ -94,7 +94,7 @@ export function InspirationPicker({
                 <BulbIcon size={13} />
                 <span className="truncate">{item.title}</span>
               </span>
-              <span className="line-clamp-2 text-[11px] leading-snug text-muted">{item.reading ? "Fauve la regarde…" : (item.summary ?? "Partagée sur Instagram")}</span>
+              <span className="line-clamp-2 text-[11px] leading-snug text-muted">{item.reading ? "Brigitte la regarde…" : (item.summary ?? "Partagée sur Instagram")}</span>
               {on && <Tick />}
             </button>
           );
@@ -125,7 +125,7 @@ export function InspirationPicker({
           {error}
         </p>
       ) : (
-        <p className="text-[12px] leading-snug text-muted">Enregistre un Reel qui te plaît (ou une capture) et ajoute-le : Fauve en reprend le rythme et l’accroche, sans le copier.</p>
+        <p className="text-[12px] leading-snug text-muted">Enregistre un Reel qui te plaît (ou une capture) et ajoute-le : Brigitte en reprend le rythme et l’accroche, sans le copier.</p>
       )}
     </div>
   );

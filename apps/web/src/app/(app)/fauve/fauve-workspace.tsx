@@ -402,7 +402,7 @@ export function FauveWorkspace({
           <div className="fauve-fade pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/85 text-center">
             <PaperclipIcon size={28} className="text-violet" />
             <p className="text-[17px] font-bold text-violet">Dépose tes photos et vidéos</p>
-            <p className="text-[14px] text-violet/80">Fauve en fait un Reel, un carrousel ou un post</p>
+            <p className="text-[14px] text-violet/80">Brigitte en fait un Reel, un carrousel ou un post</p>
           </div>
         )}
         <div className="flex items-center justify-between gap-2 px-4 pt-3 sm:px-6 sm:pt-5">
@@ -590,7 +590,7 @@ export function FauveWorkspace({
                 </>
               )}
               <label htmlFor="message-fauve" className="sr-only">
-                Message à Fauve
+                Message à Brigitte
               </label>
               <textarea
                 id="message-fauve"
@@ -608,7 +608,7 @@ export function FauveWorkspace({
                     send(draft, true);
                   }
                 }}
-                placeholder={files.length ? "Dis à Fauve ce que tu veux en faire : un Reel, un carrousel…" : "Demande à Fauve, ou glisse tes photos et vidéos ici…"}
+                placeholder={files.length ? "Dis à Brigitte ce que tu veux en faire : un Reel, un carrousel…" : "Demande à Brigitte, ou glisse tes photos et vidéos ici…"}
                 className="max-h-[180px] min-h-11 flex-1 resize-none bg-transparent py-2.5 text-[16px] outline-none placeholder:text-muted/70"
               />
               <button
@@ -685,7 +685,7 @@ function ConversationList({
         </button>
       </div>
       <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-6">
-        {conversations.length === 0 && <li className="px-2 py-2 text-sm text-muted">Tes conversations avec Fauve s’afficheront ici.</li>}
+        {conversations.length === 0 && <li className="px-2 py-2 text-sm text-muted">Tes conversations avec Brigitte s’afficheront ici.</li>}
         {conversations.map((c) => (
           <li key={c.id} className="group relative">
             <button

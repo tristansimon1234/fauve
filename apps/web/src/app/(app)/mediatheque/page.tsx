@@ -38,7 +38,7 @@ type Analysis = z.infer<typeof analysisSchema>;
 const sourceLabels: Record<Asset["source"], string> = {
   whatsapp: "Reçue sur WhatsApp",
   web_upload: "Déposée sur le site",
-  render: "Montage de Fauve",
+  render: "Montage de Brigitte",
   library: "Bibliothèque",
 };
 
@@ -110,8 +110,8 @@ async function Library() {
         <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Médiathèque</h1>
         <p className="text-[15px] text-muted">
           {assets.length
-            ? `Tes vidéos et photos, les plus récentes d’abord${assets.length === LIMIT ? ` (les ${LIMIT} dernières)` : ""}, et ce que Fauve a créé pour toi.`
-            : "Tes vidéos et photos, en pleine qualité, et ce que Fauve a créé pour toi."}
+            ? `Tes vidéos et photos, les plus récentes d’abord${assets.length === LIMIT ? ` (les ${LIMIT} dernières)` : ""}, et ce que Brigitte a créé pour toi.`
+            : "Tes vidéos et photos, en pleine qualité, et ce que Brigitte a créé pour toi."}
         </p>
         <p className="text-[13px] text-muted">
           Chaque fichier est gardé tant qu’une publication en a besoin, puis supprimé 24 h après sa mise en ligne (7 jours s’il ne sert à aucune publication). Tes vidéos finales restent.
@@ -119,19 +119,19 @@ async function Library() {
       </div>
 
       {assets.length === 0 ? (
-        <EmptyState title="Pas encore de photo ni de vidéo" className="max-w-[760px]" cta="Envoyer mes vidéos à Fauve">
-          Glisse tes photos et vidéos dans la conversation avec Fauve (en pleine qualité), ou envoie-les sur WhatsApp en
-          tant que document. Elles apparaîtront ici, avec ce que Fauve y a vu. Pense à avoir l’accord des personnes filmées.
+        <EmptyState title="Pas encore de photo ni de vidéo" className="max-w-[760px]" cta="Envoyer mes vidéos à Brigitte">
+          Glisse tes photos et vidéos dans la conversation avec Brigitte (en pleine qualité), ou envoie-les sur WhatsApp en
+          tant que document. Elles apparaîtront ici, avec ce que Brigitte y a vu. Pense à avoir l’accord des personnes filmées.
         </EmptyState>
       ) : (
         <>
           <div className="flex max-w-[860px] flex-wrap items-center gap-4 rounded-[20px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-5 py-4">
             <p className="min-w-0 flex-[1_1_320px] text-sm leading-relaxed">
-              <strong>Ajoute des photos et des vidéos</strong> en les glissant dans la conversation avec Fauve : elles
+              <strong>Ajoute des photos et des vidéos</strong> en les glissant dans la conversation avec Brigitte : elles
               arrivent en pleine qualité. Sur WhatsApp, envoie-les en tant que document.
             </p>
             <Link href="/fauve" className="btn btn-primary h-11 text-sm">
-              Ouvrir Fauve
+              Ouvrir Brigitte
             </Link>
           </div>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
@@ -231,9 +231,9 @@ function AssetCard({
             )}
           </>
         ) : asset.kind === "video" && asset.analysis_status === "running" ? (
-          <p className="text-[13px] text-muted">Fauve regarde cette vidéo…</p>
+          <p className="text-[13px] text-muted">Brigitte regarde cette vidéo…</p>
         ) : asset.kind === "video" && asset.analysis_status === "failed" ? (
-          <p className="text-[13px] text-muted">Fauve n’a pas pu analyser cette vidéo.</p>
+          <p className="text-[13px] text-muted">Brigitte n’a pas pu analyser cette vidéo.</p>
         ) : null}
         {!url && (asset.kind === "video" || asset.kind === "image") && (
           <p className="text-xs text-muted">Aperçu indisponible pour le moment.</p>

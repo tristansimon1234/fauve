@@ -74,7 +74,7 @@ export function OwnFonts({
     <div className="flex flex-col gap-3 rounded-[16px] bg-soft p-4">
       <div className="flex flex-col gap-0.5">
         <span className="text-[14px] font-bold">Tes polices</span>
-        <span className="text-[13px] text-muted">Ta police à toi (celle de ton logo ou de ton site), en fichier .ttf, .otf ou .woff. Fauve l’utilise dans tes Reels et tes textes sur photo.</span>
+        <span className="text-[13px] text-muted">Ta police à toi (celle de ton logo ou de ton site), en fichier .ttf, .otf ou .woff. Brigitte l’utilise dans tes Reels et tes textes sur photo.</span>
       </div>
       {fonts.map((f) => (
         <div key={f.path} className="flex flex-wrap items-center gap-2 rounded-[12px] bg-white p-3">

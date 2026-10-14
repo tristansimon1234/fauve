@@ -58,7 +58,7 @@ async function ReadyForMember() {
   const items: Item[] = [
     instagram
       ? { icon: InstagramIcon, label: instagram.handle ? `@${instagram.handle}` : "Instagram", detail: "Instagram connecté" }
-      : { icon: InstagramIcon, label: "Instagram", detail: "Pas encore connecté : demande le lien à Fauve" },
+      : { icon: InstagramIcon, label: "Instagram", detail: "Pas encore connecté : demande le lien à Brigitte" },
     ...(tiktok
       ? [{ icon: TikTokIcon, label: tiktok.handle ? `@${tiktok.handle}` : "TikTok", detail: "TikTok connecté" }]
       : []),
@@ -68,11 +68,11 @@ async function ReadyForMember() {
           label: `${plural(plan.posts_per_week, "post", "posts")} + ${plural(plan.stories_per_week, "story", "stories")}`,
           detail: "par semaine",
         }
-      : { icon: CalendarIcon, label: "Ton rythme", detail: "à choisir avec Fauve sur WhatsApp" },
+      : { icon: CalendarIcon, label: "Ton rythme", detail: "à choisir avec Brigitte sur WhatsApp" },
     {
       icon: PenIcon,
       label: "Ton style",
-      detail: examples ? `appris à partir de ${plural(examples, "exemple", "exemples")}` : "Fauve l’apprend au fil de vos échanges",
+      detail: examples ? `appris à partir de ${plural(examples, "exemple", "exemples")}` : "Brigitte l’apprend au fil de vos échanges",
       warm: true,
     },
   ];
@@ -88,7 +88,7 @@ function Ready({ firstName, items }: { firstName: string | null; items: Item[] |
           {firstName && <span className="accent">{firstName}.</span>}
         </h1>
         <p className="text-[15px] leading-[1.55] text-muted">
-          La suite se passe sur WhatsApp : envoie tes vidéos à Fauve, elle prépare tes publications avec toi.
+          La suite se passe sur WhatsApp : envoie tes vidéos à Brigitte, elle prépare tes publications avec toi.
         </p>
       </div>
       {items && (
