@@ -11,6 +11,7 @@ import {
   AUTO_START_MAX_CREDITS,
   DEFAULT_EFFORT,
   EFFORTS,
+  MAX_FREE_SCENES,
   effortSchema,
   editPlanSchema,
   effortPitch,
@@ -342,10 +343,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : fais un devis de montage (correction: false).";
       // The level asked for, else the studio's default (Réglages).
-      const studio = await db.from("studios").select("montage_effort").eq("id", studioId).single();
+      const studio = await db.from("studios").select("montage_effort, onboarding_step").eq("id", studioId).single();
       const studioDefault = effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);
       const wanted = effort ?? studioDefault;
-      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: max_new_scenes, variant, plan, effort: wanted });
+      // Her first Reel is her first impression: it always gets its made-to-measure animations.
+      const firstReel = studio.data?.onboarding_step === "first_post" && !correction && !variant;
+      const scenes = firstReel ? MAX_FREE_SCENES : max_new_scenes;
+      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: scenes, variant, plan, effort: wanted });
       if ("error" in quote) {
         return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });
       }

@@ -21,6 +21,12 @@ const SETUP = [
   ),
 ].join("\n");
 
+/**
+ * Downloads $2 to $1. HTTP/1.1: Supabase Storage's HTTP/2 streams sometimes break
+ * mid-file on large videos ("stream was not closed cleanly"); retried on any error.
+ */
+const FETCH = 'curl -fsSL --http1.1 --retry 4 --retry-all-errors --retry-delay 1 --connect-timeout 15 -o "$1" "$2"';
+
 async function bash(sandbox: Sandbox, script: string, args: string[] = []) {
   const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", script, "bash", ...args] });
   if (result.exitCode !== 0) {
@@ -67,7 +73,7 @@ export async function renderInSandbox(job: SandboxRenderJob): Promise<Buffer> {
     await sandbox.writeFiles([{ path: `${dir}/texts.ass`, content: job.ass }]);
     await Promise.all(
       Object.entries(job.clips).map(([file, url]) =>
-        bash(sandbox, 'curl -fsSL --retry 2 -o "$1/$2" "$3"', [dir, file, url]),
+        bash(sandbox, FETCH, [`${dir}/${file}`, url]),
       ),
     );
     await bash(sandbox, `cd "$1" && shift && exec ${ROOT}/ffmpeg "$@"`, [dir, ...job.ffmpegArgs]);
@@ -122,13 +128,36 @@ export function remotionSandbox(): Promise<Sandbox> {
   return remotionReady;
 }
 
+/**
+ * Copies the Reel's clips and photos into the bundle's public folder before the
+ * render, which then reads local files (`/public/jobs/…`, served with the bundle)
+ * instead of streaming each video from Storage frame after frame: a slow or broken
+ * stream used to time the render out.
+ */
+async function localMedia(sandbox: Sandbox, id: string, props: ReelProps): Promise<ReelProps> {
+  const downloads: Promise<unknown>[] = [];
+  const segments = props.segments.map((segment, i) => {
+    if ((segment.type !== "clip" && segment.type !== "image") || !/^https?:/.test(segment.src)) return segment;
+    const ext = segment.type === "clip" ? "mp4" : (/\.(png|webp|jpe?g)(?:\?|$)/i.exec(segment.src)?.[1]?.toLowerCase() ?? "jpg");
+    const file = `jobs/${id}/m${i}.${ext}`;
+    downloads.push(bash(sandbox, FETCH, [`${REMOTION}/build/public/${file}`, segment.src]));
+    return { ...segment, src: `/public/${file}` };
+  });
+  if (!downloads.length) return props;
+  await bash(sandbox, 'mkdir -p "$1"', [`${REMOTION}/build/public/jobs/${id}`]);
+  await Promise.all(downloads);
+  return { ...props, segments };
+}
+
 /** Renders the Reel composition with the given props and returns the MP4 bytes. */
 export async function renderReelInSandbox(job: { id: string; props: ReelProps }): Promise<Buffer> {
   const sandbox = await remotionSandbox();
   const dir = `${ROOT}/jobs/${job.id}`;
+  const media = `${REMOTION}/build/public/jobs/${job.id}`;
   try {
-    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
-    await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(job.props) }]);
+    await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
+    const props = await localMedia(sandbox, job.id, job.props);
+    await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(props) }]);
     await bash(
       sandbox,
       `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=4 --codec=h264 --crf=19 --pixel-format=yuv420p --enforce-audio-track --log=error`,
@@ -138,7 +167,7 @@ export async function renderReelInSandbox(job: { id: string; props: ReelProps })
     if (!mp4?.length) throw new Error("render produced no file");
     return mp4;
   } finally {
-    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+    await bash(sandbox, 'rm -rf "$1" "$2"', [dir, media]).catch(() => {});
   }
 }
 
@@ -226,7 +255,8 @@ export async function videoFramesInSandbox(id: string, url: string, times: numbe
   const sandbox = await renderSandbox();
   const dir = `${ROOT}/jobs/${id}`;
   try {
-    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1" && curl -fsSL --retry 2 -o "$1/in.mp4" "$2"', [dir, url]);
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await bash(sandbox, FETCH, [`${dir}/in.mp4`, url]);
     await bash(
       sandbox,
       `cd "$1" && shift && i=0; for t in "$@"; do ${ROOT}/ffmpeg -loglevel error -y -ss "$t" -i in.mp4 -frames:v 1 -vf scale=540:-2 -q:v 4 "f$i.jpg" || true; i=$((i+1)); done`,
