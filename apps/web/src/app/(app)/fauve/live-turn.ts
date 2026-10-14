@@ -17,8 +17,30 @@ export type LiveEvent =
 export function applyLive(state: LiveState, event: LiveEvent): LiveState {
   if (event.type === "mood") return state;
   if (event.type === "status") return { ...state, status: event.label };
-  // A new step starts over: what she wrote before a tool call was a preamble.
-  return event.step === state.step ? { ...state, text: state.text + event.delta } : { ...state, step: event.step, text: event.delta };
+  // A new step (after a tool call) goes on in a new paragraph: her reply keeps the words of every step.
+  if (event.step === state.step) return { ...state, text: state.text + event.delta };
+  return { ...state, step: event.step, text: state.text.trim() ? `${state.text.trimEnd()}\n\n${event.delta.trimStart()}` : event.delta };
+}
+
+/** Her paragraphs already written in full (a bubble each), and whether one is still being written. */
+export function liveParagraphs(text: string): { done: string[]; writing: boolean } {
+  const parts = text.split(/\n{2,}/).map((p) => p.trim());
+  const closed = /\n{2,}\s*$/.test(text);
+  const done = (closed ? parts : parts.slice(0, -1)).filter(Boolean);
+  return { done, writing: !closed && Boolean(parts.at(-1)) };
+}
+
+/**
+ * The turn's new messages that should enter with an animation: not her reply when
+ * its first paragraphs are already on screen (written live), so nothing jumps.
+ */
+export function enteringAfterLive<M extends { id: string; from: string; body: string | null }>(fresh: Set<string>, messages: M[], live: LiveState | null): Set<string> {
+  if (!live || !liveParagraphs(live.text).done.length) return fresh;
+  const reply = messages.find((m) => fresh.has(m.id) && m.from === "fauve" && m.body);
+  if (!reply) return fresh;
+  const still = new Set(fresh);
+  still.delete(reply.id);
+  return still;
 }
 
 export async function liveTurn(

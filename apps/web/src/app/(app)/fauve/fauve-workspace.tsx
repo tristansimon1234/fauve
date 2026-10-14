@@ -31,7 +31,7 @@ import { isFunny, upsetLevel } from "@fauve/agent";
 import { FileStrip, useChatUploads } from "./chat-uploads";
 import type { OnboardingView } from "./onboarding-actions";
 import { OnboardingCard, OnboardingStepper } from "@/components/onboarding/onboarding-card";
-import { applyLive, liveTurn, type LiveState } from "./live-turn";
+import { applyLive, enteringAfterLive, liveTurn, type LiveState } from "./live-turn";
 import { BrigitteLive, type BrigitteCue } from "./brigitte-avatar";
 import { LiveTyping } from "./live-typing";
 import {
@@ -112,6 +112,8 @@ export function FauveWorkspace({
   const [creating, setCreating] = useState(false);
   // While Fauve answers: the line of what she is doing, then her words as she writes them.
   const [live, setLive] = useState<LiveState | null>(null);
+  /** The live turn as it stands, for the end of the turn (state updates are not read back). */
+  const liveRef = useRef<LiveState>({ status: null, text: "", step: -1 });
   // Brigitte's instant reaction to the message being answered (Jev), until the next one.
   const [turnMood, setTurnMood] = useState<BrigitteCue | null>(null);
   // Messages that just arrived (they rise in); a conversation that loads whole does not animate.
@@ -290,7 +292,8 @@ export function FauveWorkspace({
     const conversationId = active;
     startTransition(async () => {
       try {
-        setLive({ status: null, text: "", step: -1 });
+        liveRef.current = { status: null, text: "", step: -1 };
+        setLive(liveRef.current);
         setTurnMood(null);
         const res = await liveTurn({ text, conversationId, attachments, about }, (event) => {
           if (event.type === "mood") {
@@ -305,11 +308,12 @@ export function FauveWorkspace({
             }
             return;
           }
-          setLive((state) => applyLive(state ?? { status: null, text: "", step: -1 }, event));
+          liveRef.current = applyLive(liveRef.current, event);
+          setLive(liveRef.current);
         });
         if (res.ok) {
           setActive(res.conversationId);
-          setArrived(arrivals(messagesRef.current, res.messages));
+          setArrived(enteringAfterLive(arrivals(messagesRef.current, res.messages), res.messages, liveRef.current));
           setMessages(mergeMessages(messagesRef.current, res.messages));
           setConversations(res.conversations);
           // Getting started: Fauve may have moved to the next step.

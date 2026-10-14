@@ -36,7 +36,7 @@ function linkLabel(url: string): string {
 }
 
 /** A message's text with its links clickable. */
-function MessageText({ text, light }: { text: string; light: boolean }) {
+export function MessageText({ text, light }: { text: string; light: boolean }) {
   const pieces = text.split(URL_RE);
   return (
     <span>

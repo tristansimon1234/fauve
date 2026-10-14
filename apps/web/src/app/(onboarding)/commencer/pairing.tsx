@@ -119,7 +119,7 @@ export function Pairing({ signIn, expired }: { signIn: boolean; expired: boolean
           </>
         ) : (
           <>
-            Déjà inscrite ?{" "}
+            Déjà un compte ?{" "}
             <Link href="/commencer?connexion" className="font-semibold text-violet hover:underline">
               Se connecter
             </Link>

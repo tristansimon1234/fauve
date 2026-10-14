@@ -798,7 +798,7 @@ test("Brigitte's instant reaction reads Jev's answers safely", async () => {
 test("style buttons add one adjustment per kind to the art direction", async () => {
   const { withAdjustment } = await import("./restyle.ts");
   const once = withAdjustment("Tons clairs, serif fin.", "warmer");
-  assert.match(once, /^Tons clairs, serif fin\.\nAjustement de la gérante — Plus chaleureux/);
+  assert.match(once, /^Tons clairs, serif fin\.\nAjustement demandé — Plus chaleureux/);
   // The same button again does not pile up.
   assert.equal(withAdjustment(once, "warmer"), once);
   const three = withAdjustment(withAdjustment(withAdjustment(once, "sober"), "punchier"), "warmer");
@@ -811,7 +811,7 @@ test("style buttons add one adjustment per kind to the art direction", async () 
   assert.equal(withAdjustment(undefined, "sober").startsWith("Ajustement"), true);
   // « Autre chose »: her own words, as one more adjustment.
   const custom = withAdjustment(once, { wish: "  plus de couleurs   de ma charte " });
-  assert.ok(custom.endsWith("Ajustement de la gérante — plus de couleurs de ma charte."));
+  assert.ok(custom.endsWith("Ajustement demandé — plus de couleurs de ma charte."));
 });
 
 test("the site's photos: share image first, big images, no logos or icons", async () => {
