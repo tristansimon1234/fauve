@@ -203,13 +203,13 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           <dt className="sr-only">Quand</dt>
           <dd className="inline-flex items-center gap-1.5">
             <ClockIcon size={16} className="text-violet" />
-            {post.scheduled_at ? formatDateTime(post.scheduled_at, tz) : "Date à définir avec Brigitte"}
+            {post.scheduled_at ? formatDateTime(post.scheduled_at, tz) : "Date à définir avec Simone"}
           </dd>
         </div>
       </dl>
       {(post.status === "draft" || post.status === "validated") && (
         <p className="-mt-2 text-[12px] leading-snug text-muted">
-          {post.status === "validated" ? "Validée : " : "Une fois validée, "}Brigitte la publie sur Instagram à l’horaire prévu, si ton compte est connecté.
+          {post.status === "validated" ? "Validée : " : "Une fois validée, "}Simone la publie sur Instagram à l’horaire prévu, si ton compte est connecté.
         </p>
       )}
 
@@ -252,7 +252,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
             compact
             confirmText={
               LOCKED.includes(post.status)
-                ? "Supprimer cette publication de Brigitte ? Elle reste en ligne sur Instagram."
+                ? "Supprimer cette publication de Simone ? Elle reste en ligne sur Instagram."
                 : "Supprimer cette publication, son montage et ses versions ?"
             }
           />
@@ -371,13 +371,13 @@ async function loadClipLabels(db: Db, clipIds: string[]): Promise<Map<string, st
 
 function previewMessage(status: PostStatus, hasPlan: boolean, render: Render | null): string {
   if (render?.status === "queued" || render?.status === "rendering") return "Le montage est en cours de fabrication.";
-  if (render?.status === "failed") return "Le montage n’a pas abouti. Demande à Brigitte de le relancer sur WhatsApp.";
+  if (render?.status === "failed") return "Le montage n’a pas abouti. Demande à Simone de le relancer sur WhatsApp.";
   if (render?.status === "done") return "La vidéo montée n’est pas disponible pour le moment.";
   if (hasPlan) return "Le plan de montage est prêt. La vidéo montée apparaîtra ici.";
   if (status === "planned" || status === "content_requested") {
-    return "J’attends encore les vidéos pour cette publication. Envoie-les à Brigitte sur WhatsApp.";
+    return "J’attends encore les vidéos pour cette publication. Envoie-les à Simone sur WhatsApp.";
   }
-  if (status === "media_received") return "Vidéos bien reçues : Brigitte prépare le brouillon.";
+  if (status === "media_received") return "Vidéos bien reçues : Simone prépare le brouillon.";
   return "Pas d’aperçu pour cette publication.";
 }
 

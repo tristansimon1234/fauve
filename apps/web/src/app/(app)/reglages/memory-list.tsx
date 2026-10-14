@@ -54,7 +54,7 @@ export function MemoryList({ initial }: { initial: string[] }) {
           ))}
         </ul>
       ) : (
-        <p className="text-[13px] text-muted">Rien pour l’instant : Brigitte note ce que tu lui dis sur ton commerce et ce qu’elle lit sur ton site.</p>
+        <p className="text-[13px] text-muted">Rien pour l’instant : Simone note ce que tu lui dis sur ton commerce et ce qu’elle lit sur ton site.</p>
       )}
       <form
         onSubmit={(e) => {

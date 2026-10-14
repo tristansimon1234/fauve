@@ -147,7 +147,7 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
           </div>
           <Link href="/fauve" className="btn btn-secondary">
             <ChatIcon size={18} />
-            Demander à Brigitte
+            Demander à Simone
           </Link>
           <NewPostButton timezone={tz} />
         </div>
@@ -202,7 +202,7 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
                   <Progress label="Stories" value={done(stories)} total={plan.stories_per_week} color="bg-coral" />
                 </>
               ) : (
-                <p className="text-[13px] text-muted">Pas encore de rythme : dis à Brigitte combien de posts et de stories tu veux par semaine.</p>
+                <p className="text-[13px] text-muted">Pas encore de rythme : dis à Simone combien de posts et de stories tu veux par semaine.</p>
               )}
             </section>
           </div>
@@ -220,7 +220,7 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
           />
           {posts.length === 0 && (
             <p className="rounded-2xl bg-soft px-5 py-4 text-sm leading-relaxed text-muted">
-              Aucune publication cette semaine. Ajoute une idée avec le + d’un jour, ou dis à Brigitte ce que tu veux publier : elle prépare
+              Aucune publication cette semaine. Ajoute une idée avec le + d’un jour, ou dis à Simone ce que tu veux publier : elle prépare
               le calendrier avec toi.
             </p>
           )}

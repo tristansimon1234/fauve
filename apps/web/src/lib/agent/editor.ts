@@ -114,7 +114,7 @@ export async function designEdit(params: {
       name: studio.data?.name,
       business: studio.data?.business_type ?? undefined,
       booking: Boolean(studio.data?.booking_url),
-      // What Brigitte knows of the business (its site, what was said): where the words on screen come from.
+      // What Simone knows of the business (its site, what was said): where the words on screen come from.
       facts: readMemory(studio.data?.memory).map((f) => f.fact),
     },
     brand: {

@@ -24,7 +24,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "animations", label: "Animations" },
 ];
 
-// « Tes créations »: everything Brigitte made for the studio and keeps, in three tabs:
+// « Tes créations »: everything Simone made for the studio and keeps, in three tabs:
 // text styles (with the brand they follow), elements for photos (the components) and
 // animated scenes for Reels.
 export default function CreationsPage({ searchParams }: { searchParams: Promise<{ kit?: string; onglet?: string }> }) {
@@ -51,7 +51,7 @@ async function Creations({ searchParams }: { searchParams: Promise<{ kit?: strin
       <div className="flex max-w-[680px] flex-col gap-1.5">
         <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Tes créations</h1>
         <p className="text-[15px] leading-relaxed text-muted">
-          Ce que Brigitte a créé pour toi et réutilise avec d’autres mots : plus vite, et sans crédit.
+          Ce que Simone a créé pour toi et réutilise avec d’autres mots : plus vite, et sans crédit.
         </p>
       </div>
       <nav aria-label="Sortes de créations" className="flex gap-1.5 overflow-x-auto">

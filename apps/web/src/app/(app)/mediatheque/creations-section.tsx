@@ -85,7 +85,7 @@ function Card({ creation, ratio, children }: { creation: Creation; ratio: string
       <div className="flex flex-col gap-0.5 p-3">
         <span className="line-clamp-2 text-[14px] leading-snug font-semibold">{creation.name}</span>
         <span className="text-xs font-semibold text-muted">
-          {creation.house ? "Proposée par Brigitte" : `Utilisée ${creation.uses} fois`}
+          {creation.house ? "Proposée par Simone" : `Utilisée ${creation.uses} fois`}
         </span>
       </div>
     </li>

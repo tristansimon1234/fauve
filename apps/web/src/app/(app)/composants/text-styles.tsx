@@ -59,7 +59,7 @@ export function TextStyles({ brand, colors, saved }: { brand: StyleBrand; colors
             ))}
           </ul>
         ) : (
-          <p className="text-[13.5px] text-muted">Pas encore de style à toi : demande à Brigitte un texte « comme sur cette image », elle le garde ici.</p>
+          <p className="text-[13.5px] text-muted">Pas encore de style à toi : demande à Simone un texte « comme sur cette image », elle le garde ici.</p>
         )}
       </section>
 

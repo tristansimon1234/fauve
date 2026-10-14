@@ -33,7 +33,7 @@ import { FileStrip, useChatUploads } from "./chat-uploads";
 import type { OnboardingView } from "./onboarding-actions";
 import { OnboardingCard, OnboardingStepper } from "@/components/onboarding/onboarding-card";
 import { applyLive, enteringAfterLive, liveTurn, type LiveState } from "./live-turn";
-import { BrigitteLive, type BrigitteCue } from "./brigitte-avatar";
+import { SimoneLive, type SimoneCue } from "./simone-avatar";
 import { LiveTyping } from "./live-typing";
 import {
   deleteConversation,
@@ -115,8 +115,8 @@ export function FauveWorkspace({
   const [live, setLive] = useState<LiveState | null>(null);
   /** The live turn as it stands, for the end of the turn (state updates are not read back). */
   const liveRef = useRef<LiveState>({ status: null, text: "", step: -1 });
-  // Brigitte's instant reaction to the message being answered (Jev), until the next one.
-  const [turnMood, setTurnMood] = useState<BrigitteCue | null>(null);
+  // Simone's instant reaction to the message being answered (Jev), until the next one.
+  const [turnMood, setTurnMood] = useState<SimoneCue | null>(null);
   // Messages that just arrived (they rise in); a conversation that loads whole does not animate.
   const [arrived, setArrived] = useState<Set<string>>(() => new Set());
   // The quote launched from its card: no « Fauve écrit… » meanwhile (nobody is writing), and its progress is scrolled to.
@@ -392,7 +392,7 @@ export function FauveWorkspace({
     <ConversationList conversations={conversations} active={active} onOpen={open} onNew={startNew} onDelete={remove} />
   );
 
-  // « Confier à Brigitte » from a new publication on this page: it goes on in this conversation
+  // « Confier à Simone » from a new publication on this page: it goes on in this conversation
   // (no panel over the chat). Its files go up with the composer's uploads, then the message leaves on its own.
   const handed = useRef<{ postId: string; text: string; files: number } | null>(null);
   const [handedAt, setHandedAt] = useState(0);
@@ -414,11 +414,11 @@ export function FauveWorkspace({
   }, [handedAt, pending, files.length, uploading]);
 
   const lastFauve = messages.findLastIndex((m) => m.from === "fauve");
-  // What Brigitte reacts to in the header: her latest message, and the manager's words before it.
+  // What Simone reacts to in the header: her latest message, and the manager's words before it.
   const latest = lastFauve >= 0 ? messages[lastFauve] : null;
   const asked = messages.slice(0, lastFauve).findLast((x) => x.from === "me")?.body;
   // While she writes: her instant reaction to the message (Jev); then her face as her answer arrives.
-  const cue: BrigitteCue | null = typing
+  const cue: SimoneCue | null = typing
     ? turnMood
     : latest
       ? {
@@ -427,7 +427,7 @@ export function FauveWorkspace({
           fresh: arrived.has(latest.id),
         }
       : null;
-  // Getting started: the current step's card always sits under Brigitte's latest
+  // Getting started: the current step's card always sits under Simone's latest
   // message, even when she forgot to attach it; not when she offered answer
   // buttons or asked for files instead (the first post's flow in the chat), nor
   // Instagram (she offers it herself once the publication is ready, not during the montage).
@@ -478,21 +478,21 @@ export function FauveWorkspace({
           <div className="fauve-fade pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/85 text-center">
             <PaperclipIcon size={28} className="text-violet" />
             <p className="text-[17px] font-bold text-violet">Dépose tes photos et vidéos</p>
-            <p className="text-[14px] text-violet/80">Brigitte en fait un Reel, un carrousel ou un post</p>
+            <p className="text-[14px] text-violet/80">Simone en fait un Reel, un carrousel ou un post</p>
           </div>
         )}
         <div className="flex items-center gap-2 px-4 pt-3 sm:px-6 sm:pt-4">
-          {/* Brigitte herself, top left of the conversation: she thinks, laughs, frowns as it goes (hidden while the welcome shows her big). */}
+          {/* Simone herself, top left of the conversation: she thinks, laughs, frowns as it goes (hidden while the welcome shows her big). */}
           {!fresh && (
             <div className="flex min-w-0 items-center gap-2.5">
               <span className="hidden sm:block">
-                <BrigitteLive typing={typing} cue={cue} size={60} />
+                <SimoneLive typing={typing} cue={cue} size={60} />
               </span>
               <span className="sm:hidden">
-                <BrigitteLive typing={typing} cue={cue} size={44} />
+                <SimoneLive typing={typing} cue={cue} size={44} />
               </span>
               <span className="flex min-w-0 flex-col leading-tight">
-                <span className="text-[15px] font-bold">Brigitte</span>
+                <span className="text-[15px] font-bold">Simone</span>
                 <span key={typing ? (live?.status ?? "writing") : "online"} className={`fauve-fade truncate text-[12px] ${typing ? "text-violet" : "text-muted"}`}>
                   {typing ? (live?.status ?? "écrit…") : "ta community manager"}
                 </span>
@@ -609,7 +609,7 @@ export function FauveWorkspace({
                 />
               ))}
               {typing && <LiveTyping live={live} />}
-              {/* Getting started: the current step's card always sits under Brigitte's latest message, even when she forgot to attach it. */}
+              {/* Getting started: the current step's card always sits under Simone's latest message, even when she forgot to attach it. */}
               {!typing && stepUnder && <OnboardingCard key={`under-${stepUnder}`} step={stepUnder} timezone={timezone} initial={onboarding} onSend={(text) => send(text)} className="fauve-enter" />}
               <div ref={endRef} />
             </div>
@@ -685,7 +685,7 @@ export function FauveWorkspace({
                 </>
               )}
               <label htmlFor="message-fauve" className="sr-only">
-                Message à Brigitte
+                Message à Simone
               </label>
               <textarea
                 id="message-fauve"
@@ -703,7 +703,7 @@ export function FauveWorkspace({
                     send(draft, true);
                   }
                 }}
-                placeholder={files.length ? "Dis à Brigitte ce que tu veux en faire : un Reel, un carrousel…" : "Demande à Brigitte, ou glisse tes photos et vidéos ici…"}
+                placeholder={files.length ? "Dis à Simone ce que tu veux en faire : un Reel, un carrousel…" : "Demande à Simone, ou glisse tes photos et vidéos ici…"}
                 className="max-h-[180px] min-h-11 flex-1 resize-none bg-transparent py-2.5 text-[16px] outline-none placeholder:text-muted/70"
               />
               <button
@@ -781,7 +781,7 @@ function ConversationList({
         </button>
       </div>
       <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-6">
-        {conversations.length === 0 && <li className="px-2 py-2 text-sm text-muted">Tes conversations avec Brigitte s’afficheront ici.</li>}
+        {conversations.length === 0 && <li className="px-2 py-2 text-sm text-muted">Tes conversations avec Simone s’afficheront ici.</li>}
         {conversations.map((c) => (
           <li key={c.id} className="group relative">
             <button

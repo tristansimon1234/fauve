@@ -47,13 +47,13 @@ export function awaitsAnswer(last: { body: string | null; options?: string[]; qu
   return Boolean(last.options?.length || last.quote || last.upload || /\?\s*\S{0,3}\s*$/u.test((last.body ?? "").trim()));
 }
 
-/** A message that laughs (😂, « haha », « mdr »…): Brigitte laughs with it in the app. */
+/** A message that laughs (😂, « haha », « mdr »…): Simone laughs with it in the app. */
 export function isFunny(text: string | null | undefined): boolean {
   return /😂|🤣|😆|😹|😝|😜|\b(?:a?ha(?:ha)+h?|hihi+|mdr+|ptdr+|lol+|xd)\b/iu.test(text ?? "");
 }
 
 /**
- * The manager is upset: Brigitte looks sad when she is disappointed (« c'est nul »,
+ * The manager is upset: Simone looks sad when she is disappointed (« c'est nul »,
  * 😞), cross when she is angry (😡, shouting, capitals, « !! » with a reproach), and
  * cries when the words are hurtful to her (« t'es nulle », « tu sers à rien ») or 😭.
  */
@@ -70,7 +70,7 @@ export function upsetLevel(text: string | null | undefined): "sad" | "angry" | "
   return null;
 }
 
-/** A compliment or a sweet word for Brigitte herself: she blushes in the app. */
+/** A compliment or a sweet word for Simone herself: she blushes in the app. */
 export function isSweet(text: string | null | undefined): boolean {
   return /😘|🥰|😍|\b(?:t['’]es (?:géniale|top|la meilleure|un amour|trop forte|parfaite)|tu es (?:géniale|la meilleure|un amour|parfaite|top|trop forte)|je t['’]adore|je t['’]aime|qu['’]est-ce que je ferais sans toi)\b/iu.test(text ?? "");
 }

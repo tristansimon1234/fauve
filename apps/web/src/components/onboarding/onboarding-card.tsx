@@ -91,7 +91,7 @@ export function OnboardingCard({
 
   // A step already passed shows as done (an older card in the conversation).
   const passed = view ? ONBOARDING_STEPS.indexOf(view.step) > ONBOARDING_STEPS.indexOf(step) : false;
-  // Moving on from the card also says so in the conversation: Brigitte answers and opens the next step.
+  // Moving on from the card also says so in the conversation: Simone answers and opens the next step.
   const next = (message: string) =>
     start(async () => {
       await finishStep(step);
@@ -218,7 +218,7 @@ function StyleStep({
   const fileRef = useRef<HTMLInputElement>(null);
   const items = view.moodboard.items;
   const room = MOODBOARD_MAX_ITEMS - items.length;
-  // Brigitte reads her site's photos and look right after its step: they land here in a few seconds.
+  // Simone reads her site's photos and look right after its step: they land here in a few seconds.
   const [waited, setWaited] = useState(0);
   const lookingAtSite = Boolean(view.website) && !items.length && waited < 24;
   useEffect(() => {

@@ -67,7 +67,7 @@ export type RunFauveInput = ToolContext & {
 export type ChatEvent =
   | { type: "status"; label: string }
   | { type: "text"; step: number; delta: string }
-  /** Brigitte's instant reaction to the manager's message (Jev): her face, and an emoji on the message. */
+  /** Simone's instant reaction to the manager's message (Jev): her face, and an emoji on the message. */
   | { type: "mood"; mood: ReactionMood; emoji: string | null };
 
 export type RunFauveResult = {

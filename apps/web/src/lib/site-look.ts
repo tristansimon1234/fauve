@@ -10,7 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // The look of the studio's website, read once while it gets started, in two steps
 // so she never waits long: first its best photos land in her moodboard and her
 // media library (a few seconds; she can make her first post with them), then
-// Brigitte reads them with a capture of the home page (light, colours, typography,
+// Simone reads them with a capture of the home page (light, colours, typography,
 // layout, mood) and the montage follows that reading. Never over a moodboard the
 // manager already made.
 

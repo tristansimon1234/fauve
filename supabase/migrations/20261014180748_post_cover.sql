@@ -1,6 +1,6 @@
 -- A Reel's cover (the frame or photo shown in the grid and on Instagram).
 alter table public.posts add column if not exists cover jsonb;
-comment on column public.posts.cover is 'Reel cover: {"at": seconds} (a frame of the video) or {"media_id": uuid} (a photo); null = Brigitte''s default frame.';
+comment on column public.posts.cover is 'Reel cover: {"at": seconds} (a frame of the video) or {"media_id": uuid} (a photo); null = Simone''s default frame.';
 
 -- A cover photo is kept like the post's other media.
 create or replace function public.expired_media(max_rows integer default 200)

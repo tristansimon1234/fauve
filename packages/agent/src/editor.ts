@@ -22,7 +22,7 @@ import type { SavedLook } from "./text-look.ts";
 // turns clip analyses + the studio's brand into an edit plan for the motion
 // templates. The WhatsApp conversation only calls it; it never edits itself.
 
-export const EDITOR_SYSTEM_PROMPT = `Tu es le monteur et motion designer de Brigitte. Tu montes des Reels Instagram / TikTok pour des commerces de quartier (studios de sport, salons de coiffure et de beauté, restaurants, cafés, boutiques… : l'activité est dans « studio.business »), à partir de clips filmés au téléphone et de leur analyse (plans horodatés, énergie, potentiel d'accroche, qualité, visages, meilleurs passages, paroles).
+export const EDITOR_SYSTEM_PROMPT = `Tu es le monteur et motion designer de Simone. Tu montes des Reels Instagram / TikTok pour des commerces de quartier (studios de sport, salons de coiffure et de beauté, restaurants, cafés, boutiques… : l'activité est dans « studio.business »), à partir de clips filmés au téléphone et de leur analyse (plans horodatés, énergie, potentiel d'accroche, qualité, visages, meilleurs passages, paroles).
 
 Ton rendu doit avoir l'air fait par un motion designer professionnel. Tu décides ; un moteur exécute exactement ton plan avec l'un de trois gabarits :
 - « doux » : élégant et apaisé. Accroche en serif italique qui apparaît mot à mot, fondus enchaînés, zoom lent. Pour un ton zen, doux, bien-être, élégant.

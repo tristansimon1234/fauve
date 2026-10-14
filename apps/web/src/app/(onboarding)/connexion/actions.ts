@@ -26,7 +26,7 @@ export async function sendCode(_prev: LoginState, formData: FormData): Promise<L
       error:
         error.status === 429
           ? "Un code vient d’être envoyé. Attends une minute avant d’en redemander un."
-          : "Impossible d’envoyer le code. Ce numéro est-il bien celui qui écrit à Brigitte sur WhatsApp ?",
+          : "Impossible d’envoyer le code. Ce numéro est-il bien celui qui écrit à Simone sur WhatsApp ?",
     };
   }
   return { step: "code", phone };

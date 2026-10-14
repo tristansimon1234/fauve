@@ -8,15 +8,15 @@ export default function TermsPage() {
     <>
       <h1>Conditions d’utilisation</h1>
       <p>
-        Ces conditions encadrent l’utilisation de Brigitte, service édité par {company.name} ({company.registration},{" "}
-        {company.address}). En utilisant Brigitte, le studio les accepte.
+        Ces conditions encadrent l’utilisation de Simone, service édité par {company.name} ({company.registration},{" "}
+        {company.address}). En utilisant Simone, le studio les accepte.
       </p>
 
       <h2>Le service</h2>
       <p>
-        Brigitte est une assistante fondée sur l’intelligence artificielle. Elle prépare le calendrier de publication, monte
+        Simone est une assistante fondée sur l’intelligence artificielle. Elle prépare le calendrier de publication, monte
         les vidéos envoyées par le studio, rédige les légendes, programme les publications sur les comptes connectés et
-        envoie un bilan chaque semaine. Brigitte indique toujours qu’elle est une IA.
+        envoie un bilan chaque semaine. Simone indique toujours qu’elle est une IA.
       </p>
 
       <h2>Validation avant publication</h2>
@@ -41,7 +41,7 @@ export default function TermsPage() {
 
       <h2>Disponibilité et responsabilité</h2>
       <p>
-        Brigitte dépend de services tiers (WhatsApp, Instagram, TikTok, prestataires d’IA). Nous faisons notre possible pour
+        Simone dépend de services tiers (WhatsApp, Instagram, TikTok, prestataires d’IA). Nous faisons notre possible pour
         assurer la continuité du service, sans garantie de résultat sur l’audience ou les réservations. Les contenus
         générés par l’IA peuvent contenir des erreurs : le studio les relit avant de valider.
       </p>

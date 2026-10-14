@@ -226,7 +226,7 @@ export function PostDrawer({
               <DeleteButton
                 action={deletePost.bind(null, shown.id)}
                 onDone={() => onDeleted(shown.id)}
-                confirmText={shown.locked ? "Supprimer cette publication de Brigitte ? Elle reste en ligne sur Instagram." : "Supprimer cette publication ?"}
+                confirmText={shown.locked ? "Supprimer cette publication de Simone ? Elle reste en ligne sur Instagram." : "Supprimer cette publication ?"}
                 compact
               />
             </div>

@@ -291,7 +291,7 @@ function QuoteCard({
                     </p>
                   )}
                   <p className="text-[12px] leading-snug text-muted">
-                    {extra ? `Jusqu’à ${credits(price.max)} si Brigitte corrige la vidéo après l’avoir regardée. ` : ""}Tu ne paies que ce qui est vraiment fait.
+                    {extra ? `Jusqu’à ${credits(price.max)} si Simone corrige la vidéo après l’avoir regardée. ` : ""}Tu ne paies que ce qui est vraiment fait.
                   </p>
                   <p className="text-[12px] text-muted tabular-nums">
                     Solde {credits(quote.balance)} · il t’en restera au moins {Math.max(0, quote.balance - price.max)}
@@ -469,17 +469,17 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
               : "La vidéo se fabrique"
         : quote.stage === "review"
           ? seen.includes("fix")
-            ? "Brigitte vérifie la correction"
+            ? "Simone vérifie la correction"
             : max
-              ? "Brigitte compare les deux versions"
-              : "Brigitte regarde la vidéo"
+              ? "Simone compare les deux versions"
+              : "Simone regarde la vidéo"
           : quote.stage === "fix"
-            ? "Brigitte corrige ce qu’elle a repéré"
+            ? "Simone corrige ce qu’elle a repéré"
             : quote.stage === "delivered"
               ? "Ta vidéo est prête"
               : quote.kind === "correction"
-                ? "Brigitte applique tes changements"
-                : "Brigitte choisit les plans et anime les scènes";
+                ? "Simone applique tes changements"
+                : "Simone choisit les plans et anime les scènes";
   const [firstText] = useState(text);
 
   const now = useNow(30_000);

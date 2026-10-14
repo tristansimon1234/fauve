@@ -258,7 +258,7 @@ function isNeutral(hex: string): boolean {
 }
 
 /**
- * The brand's colours from the palette Brigitte saw on the site (its photos and
+ * The brand's colours from the palette Simone saw on the site (its photos and
  * home page): signature colours first, in her order (the first one is the
  * montage's accent), then the neutrals. Truer than the colours found in the CSS,
  * which on site builders are often the theme's, not the brand's.

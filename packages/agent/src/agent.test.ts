@@ -568,13 +568,13 @@ test("onboarding: steps in order, old values read as their new step", async () =
   assert.equal(onboardingStepOf(null), "website");
 });
 
-test("funny messages make Brigitte laugh", async () => {
+test("funny messages make Simone laugh", async () => {
   const { isFunny } = await import("./emoji.ts");
   for (const t of ["haha trop bien", "Ahahah", "mdr", "ptdr ok", "lol", "😂", "c’est top 🤣"]) assert.equal(isFunny(t), true, t);
   for (const t of ["Bonjour", "le programme de la semaine", "", null, "chaha"]) assert.equal(isFunny(t), false, String(t));
 });
 
-test("an upset manager makes Brigitte sad, or cry when it is strong", async () => {
+test("an upset manager makes Simone sad, or cry when it is strong", async () => {
   const { upsetLevel } = await import("./emoji.ts");
   assert.equal(upsetLevel("franchement c'est nul"), "sad");
   assert.equal(upsetLevel("je suis déçue 😞"), "sad");
@@ -588,7 +588,7 @@ test("an upset manager makes Brigitte sad, or cry when it is strong", async () =
   assert.equal(upsetLevel("OK"), null);
   const { isSweet } = await import("./emoji.ts");
   assert.equal(isSweet("merci, t'es la meilleure"), true);
-  assert.equal(isSweet("je t'adore Brigitte 😘"), true);
+  assert.equal(isSweet("je t'adore Simone 😘"), true);
   assert.equal(isSweet("merci"), false);
 });
 
@@ -795,7 +795,7 @@ test("memory keeps each fact once, drops removed ones and ignores junk", async (
   assert.equal(awaitsAnswer({ body: "Dépose-les ici", upload: "video" }), true);
 });
 
-test("Brigitte's instant reaction reads Jev's answers safely", async () => {
+test("Simone's instant reaction reads Jev's answers safely", async () => {
   const { moodOf, emojiOf } = await import("./mood.ts");
   assert.equal(moodOf({ choice: "laugh", confidence: 0.9 }), "laugh");
   assert.equal(moodOf({ choice: "laugh", confidence: 0.3 }), "neutral");

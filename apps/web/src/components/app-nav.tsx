@@ -10,7 +10,7 @@ import { CalendarIcon, ChartIcon, ChatIcon, FolderIcon, GridIcon, LayersIcon, Pa
 // Style open from Réglages' tabs.
 // `also`: the pages that belong to a section, to highlight it.
 const nav = [
-  { href: "/fauve", label: "Brigitte", icon: ChatIcon, also: [], group: "work" },
+  { href: "/fauve", label: "Simone", icon: ChatIcon, also: [], group: "work" },
   { href: "/calendrier", label: "Calendrier", icon: CalendarIcon, also: ["/publications"], group: "work" },
   { href: "/grille", label: "Grille", icon: GridIcon, also: [], group: "work" },
   { href: "/resultats", label: "Résultats", icon: ChartIcon, also: [], group: "work" },

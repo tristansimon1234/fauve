@@ -4,11 +4,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Mascot, type MascotMood } from "@/components/mascot";
 import { PHOTOS, ReelMock, unsplash } from "./mocks";
 
-// The landing's living example: a manager gives her site, Brigitte reads it,
+// The landing's living example: a manager gives her site, Simone reads it,
 // her first Reel arrives, she loves it. Plays once in a loop; still (the whole
 // conversation at once) when the device asks for reduced motion.
 
-/** Brigitte's face at each step: 1 her site, 2 reading it, 3 what she saw, 4 editing, 5 the first Reel, 6 « J'adore ». */
+/** Simone's face at each step: 1 her site, 2 reading it, 3 what she saw, 4 editing, 5 the first Reel, 6 « J'adore ». */
 const MOODS: MascotMood[] = ["idle", "happy", "thinking", "happy", "thinking", "surprised", "laugh"];
 /** When each step comes, from the start of a loop (ms). */
 const AT = [0, 0, 900, 2400, 4200, 6000, 9000];
@@ -45,11 +45,11 @@ export function LandingDemo() {
   const seen = (n: number) => step >= n;
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-[28px] bg-chat shadow-[0_24px_60px_rgba(28,21,48,.12)]" aria-label="Exemple de conversation avec Brigitte">
+    <div className="flex flex-col overflow-hidden rounded-[28px] bg-chat shadow-[0_24px_60px_rgba(28,21,48,.12)]" aria-label="Exemple de conversation avec Simone">
       <div className="flex items-center gap-3 border-b border-line/80 bg-white/60 px-5 py-3.5">
         <Mascot size={52} mood={mood} still={still} />
         <span className="flex flex-col">
-          <span className="text-[16px] font-bold">Brigitte</span>
+          <span className="text-[16px] font-bold">Simone</span>
           <span className="text-[12.5px] text-muted">{typing ? "écrit…" : "ta community manager"}</span>
         </span>
       </div>

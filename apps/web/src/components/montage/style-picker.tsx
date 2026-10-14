@@ -7,7 +7,7 @@ import { useEffect } from "react";
 // drawn as it will look (font, colours, background, outline), on a dark photo-
 // like tile. The studio's saved styles first, then a few ready-made ones in its
 // colours, and the plain style of the montage. No settings: anything finer is
-// asked of Brigitte.
+// asked of Simone.
 
 type Role = "hook" | "band" | "caption";
 export type StyleBrand = { accent: string; accentInk: string; displayFont: string; bodyFont: string; palette?: BrandPalette };
@@ -102,7 +102,7 @@ export function StylePicker({
     ...stylePresets(role, brand).map((p) => ({ key: `preset:${p.name}`, name: p.name, look: p.look as TextLook | undefined, preview: p.look })),
     { key: "plain", name: "Simple", look: undefined as TextLook | undefined, preview: plain },
   ];
-  // A style Brigitte made for this text only: shown first, so it is never lost by a tap.
+  // A style Simone made for this text only: shown first, so it is never lost by a tap.
   const own = look && !choices.some((c) => same(c.look, look)) ? { key: "own", name: "Actuel", look, preview: look } : null;
   const all = own ? [own, ...choices] : choices;
   useFonts(all.map((c) => resolveBrandLook(c.preview, brand).font));

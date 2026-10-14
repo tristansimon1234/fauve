@@ -15,7 +15,7 @@ export type OnboardingView = {
   website: string | null;
   businessType: string | null;
   brand: { colors: string[]; fonts: string[]; logoUrl: string | null };
-  /** fromSite: Brigitte took these photos from her website (she has not made her own moodboard yet). */
+  /** fromSite: Simone took these photos from her website (she has not made her own moodboard yet). */
   moodboard: { items: { path: string; url: string }[]; reading: string | null; fromSite: boolean };
   rhythm: { posts: number; stories: number };
   instagram: string | null;
