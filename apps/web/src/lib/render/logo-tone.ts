@@ -10,10 +10,14 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 const known = new Map<string, Promise<LogoOnDark>>();
 
 async function read(source: { path: string } | { url: string }): Promise<LogoOnDark> {
-  const bytes =
-    "path" in source
-      ? Buffer.from(await ((await supabaseAdmin().storage.from("media").download(source.path)).data?.arrayBuffer() ?? Promise.reject(new Error("logo illisible"))))
-      : await fetchPublicImage(source.url, AbortSignal.timeout(6000));
+  let bytes: Buffer;
+  if ("path" in source) {
+    const { data } = await supabaseAdmin().storage.from("media").download(source.path);
+    if (!data) throw new Error("logo illisible");
+    bytes = Buffer.from(await data.arrayBuffer());
+  } else {
+    bytes = await fetchPublicImage(source.url, AbortSignal.timeout(6000));
+  }
   const { data } = await sharp(bytes).ensureAlpha().resize(64, 64, { fit: "inside" }).raw().toBuffer({ resolveWithObject: true });
   return logoOnDark(data);
 }
