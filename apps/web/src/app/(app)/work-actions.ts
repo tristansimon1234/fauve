@@ -10,6 +10,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export type WorkItem = {
   id: string;
   postId: string | null;
+  /** The component made or changed (components work). */
+  templateId: string | null;
   title: string | null;
   kind: JobKind;
   kindLabel: string;
@@ -28,6 +30,10 @@ export async function workNow(): Promise<{ studioId: string; items: WorkItem[] }
   const jobs = await recentJobs(studioId);
   const ids = jobs.flatMap((j) => (j.postId ? [j.postId] : []));
   const titles = ids.length ? new Map(((await supabaseAdmin().from("posts").select("id, title").in("id", ids)).data ?? []).map((p) => [p.id as string, p.title as string])) : new Map<string, string>();
+  const templateIds = jobs.flatMap((j) => (j.templateId && !j.postId ? [j.templateId] : []));
+  const names = templateIds.length
+    ? new Map(((await supabaseAdmin().from("motion_templates").select("id, name, kit_name").in("id", templateIds)).data ?? []).map((t) => [t.id as string, (t.kit_name as string | null) ?? (t.name as string)]))
+    : new Map<string, string>();
   return {
     studioId,
     items: jobs.map((j) => {
@@ -35,7 +41,8 @@ export async function workNow(): Promise<{ studioId: string; items: WorkItem[] }
       return {
         id: j.id,
         postId: j.postId,
-        title: j.postId ? (titles.get(j.postId) ?? null) : null,
+        templateId: j.templateId,
+        title: j.postId ? (titles.get(j.postId) ?? null) : j.templateId ? (names.get(j.templateId) ?? null) : null,
         kind: j.kind,
         kindLabel: JOB_KIND_LABELS[j.kind],
         steps: steps.map((s) => s.label),

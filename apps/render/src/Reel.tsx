@@ -15,6 +15,7 @@ import { loadCustomFonts, loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
 import { SceneView } from "./Scene";
 import { ClipBlurLayer, cssFilter, Photo } from "./Retouch";
+import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
 import { THEMES, type Theme } from "./theme";
 import type { ReelProps, TextLook } from "./types";
@@ -37,6 +38,7 @@ export function Reel(props: ReelProps) {
     props.brand.bodyFont,
     ...props.texts.flatMap((t) => [t.look, t.detail_look].flatMap((l) => (l ? [l.font, ...(l.emphasis?.font ? [l.emphasis.font] : [])] : []))),
     ...(props.layer?.fonts ?? []),
+    ...(props.elements ?? []).flatMap((e) => e.fonts),
   ]);
   const k = props.width / 1080;
 
@@ -85,6 +87,7 @@ export function Reel(props: ReelProps) {
 
       {props.words.length > 0 && <Subtitles props={props} theme={theme} k={k} />}
       {props.layer ? <TextLayer props={props} /> : null}
+      {props.elements?.length ? <Elements props={props} /> : null}
       <Logo props={props} k={k} />
 
       {props.endCard && (

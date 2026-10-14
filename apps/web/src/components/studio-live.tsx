@@ -36,6 +36,10 @@ export function StudioLive({ studioId }: { studioId: string }) {
       .channel(`studio-${studioId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "posts", filter: `studio_id=eq.${studioId}` }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "media_assets", filter: `studio_id=eq.${studioId}` }, refresh)
+      // Work that ends (new components, a new version) shows up on the page that waits for it.
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_jobs", filter: `studio_id=eq.${studioId}` }, (payload) => {
+        if ((payload.new as { finished_at?: string | null }).finished_at) refresh();
+      })
       .subscribe();
     document.addEventListener("visibilitychange", onVisible);
     return () => {

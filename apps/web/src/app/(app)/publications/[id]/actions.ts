@@ -210,8 +210,8 @@ export async function saveSlidesPlan(postId: string, input: unknown): Promise<Sa
   const { data: post } = await supabaseAdmin().from("posts").select("id, status").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   if (!post) return { ok: false, error: "Publication introuvable." };
   if (LOCKED.includes(postStatusSchema.parse(post.status))) return { ok: false, error: "Cette publication est déjà en ligne." };
-  // A text layer's code comes from Fauve (this post or the library), never from the browser.
-  const layers = parsed.data.slides.flatMap((s) => (s.layer ? [s.layer.js] : []));
+  // A text layer's or a component's code comes from Fauve (this post or the library), never from the browser.
+  const layers = parsed.data.slides.flatMap((s) => [...(s.layer ? [s.layer.js] : []), ...(s.elements ?? []).map((e) => e.js)]);
   if (layers.length) {
     const known = await knownLayerCode(studioId, postId);
     if (layers.some((js) => !known.has(js))) return { ok: false, error: "Un calque de texte a été modifié d’une façon que l’éditeur ne permet pas." };

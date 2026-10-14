@@ -2,6 +2,8 @@
 
 import {
   buildSlideProps,
+  MAX_ELEMENTS,
+  placeElement,
   defaultLook,
   SLIDE_Y,
   type ReelInputs,
@@ -12,6 +14,8 @@ import {
 } from "@fauve/agent";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ImageIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { ElementHandles } from "@/components/montage/element-handles";
+import { ElementsPanel, type BankElementView } from "@/components/montage/elements-panel";
 import { LayerFields } from "@/components/montage/layer-fields";
 import { LayerHandles } from "@/components/montage/layer-handles";
 import { PhotoAsk } from "@/components/montage/photo-ask";
@@ -72,6 +76,7 @@ export function CarouselEditor({
   brand,
   looks,
   layouts = [],
+  bank = [],
 }: {
   postId: string;
   postTitle: string;
@@ -82,11 +87,14 @@ export function CarouselEditor({
   looks: SavedLook[];
   /** Text layouts of the library (Fauve's and the studio's), with their code. */
   layouts?: Layout[];
+  /** The studio's components (its design system), with their code to draw them live. */
+  bank?: BankElementView[];
 }) {
   const [saved, setSaved] = useState(initialPlan);
   const [plan, setPlan] = useState(initialPlan);
   const [index, setIndex] = useState(() => Math.max(0, initialPlan.slides.findIndex((s) => photos[s.media_id])));
   const [active, setActive] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, start] = useTransition();
   const previewRef = useRef<HTMLDivElement>(null);
@@ -109,7 +117,11 @@ export function CarouselEditor({
     if (i < 0 || i >= plan.slides.length) return;
     setIndex(i);
     setActive(null);
+    setPicked(null);
   };
+  const elements = slide.elements ?? [];
+  // Components replace a designed layout on the photo (one look per photo).
+  const setElements = (next: typeof elements) => setSlide({ elements: next.length ? next : undefined, ...(next.length ? { layer: undefined } : {}) });
 
   // ← → move between photos (not while typing).
   useEffect(() => {
@@ -186,6 +198,20 @@ export function CarouselEditor({
                     onPick={(t) => {
                       setActive(t);
                       requestAnimationFrame(() => document.getElementById(`fauve-slide-text-${t}`)?.focus());
+                    }}
+                  />
+                )}
+                {elements.length > 0 && (
+                  <ElementHandles
+                    key={`elements-${index}`}
+                    container={previewRef}
+                    elements={elements}
+                    selected={picked}
+                    onSelect={setPicked}
+                    onChange={(i, p) => setElements(elements.map((e, j) => (j === i ? { ...e, ...p } : e)))}
+                    onRemove={(i) => {
+                      setElements(elements.filter((_, j) => j !== i));
+                      setPicked(null);
                     }}
                   />
                 )}
@@ -273,7 +299,27 @@ export function CarouselEditor({
           </div>
           {props && !dirty && <PhotoAsk key={index} postId={postId} postTitle={postTitle} photo={index + 1} total={plan.slides.length} />}
 
-          {props && url && (
+          {props && (
+            <ElementsPanel
+              bank={bank}
+              placed={elements}
+              selected={picked}
+              brand={props.brand}
+              onSelect={setPicked}
+              onChange={setElements}
+              onKitAll={
+                plan.slides.filter((s) => photos[s.media_id]).length > 1
+                  ? (kit) =>
+                      edit({
+                        ...plan,
+                        slides: plan.slides.map((s) => (photos[s.media_id] ? { ...s, layer: undefined, elements: [...(s.elements ?? []), ...kit.map((e) => placeElement(e))].slice(-MAX_ELEMENTS) } : s)),
+                      })
+                  : undefined
+              }
+            />
+          )}
+
+          {props && url && layouts.length > 0 && (
             <LayoutPicker
               layouts={layouts}
               slide={slide}

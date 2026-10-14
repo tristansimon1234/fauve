@@ -2,6 +2,7 @@ import { z } from "zod";
 import { REEL_FPS, resolveReelBrand, type ReelInputs, type ReelProps } from "./motion.ts";
 import { motionTemplateSchema, type MotionTemplate } from "./schemas.ts";
 import { photoEditSchema } from "./retouch.ts";
+import { MAX_ELEMENTS, slideElementSchema } from "./elements.ts";
 import { textLayerSchema } from "./text-layer.ts";
 import { listFields, textLookSchema } from "./text-look.ts";
 
@@ -39,6 +40,8 @@ export const slideSchema = z.object({
   logo: z.enum(["top", "bottom"]).optional(),
   /** A text layer designed as code (text designer): drawn instead of `texts`. */
   layer: textLayerSchema.optional(),
+  /** Components of the studio's bank placed on the photo (drawn over its texts). */
+  elements: z.array(slideElementSchema).max(MAX_ELEMENTS).optional(),
   /** Retouch and blurred zones of the photo. */
   edit: photoEditSchema.optional(),
 });
@@ -91,6 +94,7 @@ export function buildSlideProps(
           ...(slide.layer.accent ? { accent: slide.layer.accent } : {}),
         }
       : null,
+    elements: (slide.elements ?? []).map((e) => ({ js: e.js, texts: e.texts, fonts: e.fonts, base: e.base, box: e.box, ...(e.accent ? { accent: e.accent } : {}) })),
   };
 }
 

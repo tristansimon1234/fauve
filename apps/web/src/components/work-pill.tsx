@@ -80,7 +80,7 @@ export function WorkPill({ studioId }: { studioId: string }) {
               <div className="flex items-start gap-2">
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="text-[12px] font-semibold text-muted">{item.kindLabel}</span>
-                  <span className="truncate text-[14px] font-bold">{item.title ?? "Ta publication"}</span>
+                  <span className="truncate text-[14px] font-bold">{item.title ?? (item.kind === "elements" ? "Tes nouveaux composants" : "Ta publication")}</span>
                 </div>
                 <button
                   type="button"
@@ -96,8 +96,8 @@ export function WorkPill({ studioId }: { studioId: string }) {
                   <span className={`text-[13px] font-semibold ${item.failed ? "text-danger" : "text-violet"}`}>
                     {item.failed ? "N’a pas abouti : aucun crédit débité" : "C’est prêt"}
                   </span>
-                  {item.postId && !item.failed && (
-                    <Link href={`/publications/${item.postId}`} onClick={() => setOpen(false)} className="btn btn-primary h-8 px-3 text-[13px]">
+                  {!item.failed && (item.postId || item.templateId) && (
+                    <Link href={item.postId ? `/publications/${item.postId}` : `/composants/${item.templateId}`} onClick={() => setOpen(false)} className="btn btn-primary h-8 px-3 text-[13px]">
                       Voir
                     </Link>
                   )}
@@ -113,7 +113,7 @@ export function WorkPill({ studioId }: { studioId: string }) {
                     ))}
                   </ol>
                   <span className="text-[12px] text-muted">
-                    Depuis {minutesSince(item.startedAt, now) || "moins d’une"} min · {item.kind === "montage" ? "4 à 15 min en tout" : "2 à 4 min en tout"} · le lien arrive tout seul
+                    Depuis {minutesSince(item.startedAt, now) || "moins d’une"} min · {item.kind === "montage" ? "4 à 15 min en tout" : "2 à 4 min en tout"} · {item.postId ? "le lien arrive tout seul" : "ils arrivent dans ta banque"}
                   </span>
                 </>
               )}

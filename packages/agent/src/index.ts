@@ -18,6 +18,7 @@ export * from "./plan-edit.ts";
 export * from "./slides.ts";
 export * from "./text-look.ts";
 export * from "./text-layer.ts";
+export * from "./elements.ts";
 export * from "./retouch.ts";
 export * from "./effort.ts";
 export * from "./critic.ts";

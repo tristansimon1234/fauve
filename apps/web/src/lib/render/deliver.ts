@@ -1,6 +1,7 @@
 import "server-only";
 import { CREDIT_PRICES } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
+import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
 import { renderPost } from "./render-post";
@@ -40,6 +41,18 @@ function store(target: DeliveryTarget, fields: { wa_message_id?: string; type: s
 export async function notifyFailure(target: DeliveryTarget, text: string, detail: unknown) {
   const id = target.waId ? await sendText(target.waId, text).catch(() => undefined) : undefined;
   await store(target, { wa_message_id: id, type: "text", body: text, payload: { error: String(detail).slice(0, 500) } });
+}
+
+/** A message to the manager on the channel she uses, with a link to a page of the app (signed in, on WhatsApp). */
+export async function notifyStudio(target: Pick<DeliveryTarget, "studioId" | "waId" | "replyTo">, text: string, link?: { path: string; label: string }) {
+  const full = { ...target, postId: "" };
+  if (target.waId) {
+    const url = link ? await createLoginLink(`+${target.waId}`, link.path, "open_post") : null;
+    const id = await sendText(target.waId, url ? `${text}\n\n${link!.label} : ${url}` : text);
+    await store(full, { wa_message_id: id, type: "text", body: text, payload: link ? { open_path: link.path } : {} });
+  } else {
+    await store(full, { type: "text", body: link ? `${text}\n\n${link.label} : ${env("APP_URL")}${link.path}` : text, payload: link ? { open_path: link.path } : {} });
+  }
 }
 
 /**

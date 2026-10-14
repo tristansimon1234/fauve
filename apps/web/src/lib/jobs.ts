@@ -5,7 +5,7 @@ import { env } from "@/lib/env";
 // CRON_SECRET. The route answers 202 at once and does the work in after(), so
 // each step gets a full function invocation (5 min) of its own.
 
-export async function queueJob(name: "montage" | "text-layer", body: Record<string, unknown>): Promise<void> {
+export async function queueJob(name: "montage" | "elements", body: Record<string, unknown>): Promise<void> {
   const res = await fetch(`${env("APP_URL")}/api/jobs/${name}`, {
     method: "POST",
     headers: { authorization: `Bearer ${env("CRON_SECRET")}`, "content-type": "application/json" },

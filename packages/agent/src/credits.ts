@@ -25,6 +25,8 @@ export const CREDIT_PRICES = {
   variant: 1,
   /** A new text layer for photos, designed as code from an example (Opus, checks and a critic). Reusing one is free. */
   textLayer: 3,
+  /** A change to one component of the studio's bank (a new version). */
+  elementEdit: 1,
   /** Fauve watching the rendered video before it goes out (Soigné, Max). */
   review: 1,
   /** A correction the critic asks for: the editor again, a render, a new look. */

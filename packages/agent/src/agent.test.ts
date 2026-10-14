@@ -501,6 +501,43 @@ test("text layers: code checks, slot texts, and a layer replaces the slide's own
   assert.deepEqual(props.layer, { js: layer.js, texts: { title: "Hi" }, fonts: ["Anton"] });
 });
 
+test("components: code checks, kit output, placement and slide props", async () => {
+  const { checkElementCode, clampBox, elementTexts, kitDesignOutputSchema, placeElement, slideElementSchema } = await import("./elements.ts");
+  const { buildSlideProps, slidesPlanSchema } = await import("./slides.ts");
+  assert.deepEqual(checkElementCode("function Element({ width, texts }) { return null; }"), []);
+  assert.ok(checkElementCode("function Layer() { return null; }").includes("il faut une fonction Element"));
+  assert.ok(checkElementCode("function Element() { fetch('https://x'); return null; }").includes("accès réseau"));
+
+  // The model's placements are kept inside what the editor allows.
+  assert.deepEqual(clampBox({ x: -3, y: 0.5, w: 4, rotate: 90 }), { x: -0.2, y: 0.5, w: 1.2, rotate: 45 });
+  assert.deepEqual(clampBox({ x: 0.1, y: 0.2, w: 0.5, rotate: 0 }), { x: 0.1, y: 0.2, w: 0.5 });
+  const slots = [{ name: "titre", role: "titre", max_chars: 5, multiline: false }];
+  assert.deepEqual(elementTexts([{ slot: "titre", text: "Bonjour" }, { slot: "autre", text: "x" }], slots), { titre: "Bonj" + "o" });
+
+  const kit = {
+    kit_name: "Checklist",
+    notes: "",
+    elements: [{ ref: "e1", name: "Étiquette", role: "etiquette", code: "function Element(){return null}", slots, fonts: ["Anton"], base_width: 400 }],
+    slides: [{ photo: 1, placements: [{ ref: "e1", x: 0.1, y: 0.1, w: 0.4, rotate: -4, texts: [{ slot: "titre", text: "Hey" }] }] }],
+  };
+  assert.equal(kitDesignOutputSchema.safeParse(kit).success, true);
+  assert.equal(kitDesignOutputSchema.safeParse({ ...kit, elements: [{ ...kit.elements[0], ref: "x1" }] }).success, false);
+
+  // A bank component placed with no box takes its kit's place, and its sample for the missing words.
+  const source = { id: "00000000-0000-4000-8000-0000000000e1", name: "Étiquette", role: "etiquette" as const, slots, js: "function Element(){return null}", fonts: [], base: 400, box: { x: 0.6, y: 0.05, w: 0.3 }, sample: { titre: "Neuf" } };
+  const placed = placeElement(source);
+  assert.deepEqual(placed.box, { x: 0.6, y: 0.05, w: 0.3 });
+  assert.deepEqual(placed.texts, { titre: "Neuf" });
+  assert.deepEqual(placeElement(source, { box: { y: 0.8 }, texts: { titre: "Promo" } }).box, { x: 0.6, y: 0.8, w: 0.3 });
+  slideElementSchema.parse(placed);
+
+  // Components ride along with the slide's own texts (unlike a layer).
+  const plan = slidesPlanSchema.parse({ template: "doux", slides: [{ media_id: "00000000-0000-4000-8000-00000000000a", texts: [{ text: "Gardé", style: "hook" }], elements: [placed] }] });
+  const props = buildSlideProps(plan.slides[0]!, { template: "doux", imageUrl: "https://example.com/a.jpg", brand: { name: "Studio" } });
+  assert.equal(props.texts.length, 1);
+  assert.deepEqual(props.elements, [{ js: placed.js, texts: { titre: "Neuf" }, fonts: [], base: 400, box: { x: 0.6, y: 0.05, w: 0.3 } }]);
+});
+
 test("house text layers pass the same checks as generated ones", async () => {
   const { readFileSync } = await import("node:fs");
   const { checkLayerCode, layerSlotSchema } = await import("./text-layer.ts");

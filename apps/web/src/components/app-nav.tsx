@@ -2,21 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarIcon, ChartIcon, ChatIcon, FolderIcon, PaletteIcon, SlidersIcon } from "./icons";
+import { CalendarIcon, ChartIcon, ChatIcon, FolderIcon, LayersIcon, PaletteIcon, SlidersIcon } from "./icons";
 
 // The work (talk to Fauve, the calendar with every publication, the results),
 // the studio's material (media library, style) and the settings. On a phone
-// the bar keeps four places: Médiathèque and Style open from Réglages' tabs.
+// the bar keeps four places: Médiathèque, Composants and Style open from Réglages' tabs.
 // `also`: the pages that belong to a section, to highlight it.
 const nav = [
   { href: "/fauve", label: "Fauve", icon: ChatIcon, also: [], group: "work" },
   { href: "/calendrier", label: "Calendrier", icon: CalendarIcon, also: ["/publications", "/grille"], group: "work" },
   { href: "/resultats", label: "Résultats", icon: ChartIcon, also: [], group: "work" },
   { href: "/mediatheque", label: "Médiathèque", icon: FolderIcon, also: [], group: "studio" },
+  { href: "/composants", label: "Composants", icon: LayersIcon, also: [], group: "studio" },
   { href: "/style", label: "Style", icon: PaletteIcon, also: [], group: "studio" },
   { href: "/reglages", label: "Réglages", icon: SlidersIcon, also: [], group: "settings" },
 ] as const;
-const barAlso: Record<string, string[]> = { "/reglages": ["/style", "/mediatheque"] };
+const barAlso: Record<string, string[]> = { "/reglages": ["/style", "/mediatheque", "/composants"] };
 
 type Variant = "sidebar" | "bar";
 
