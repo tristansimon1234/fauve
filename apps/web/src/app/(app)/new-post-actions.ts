@@ -49,7 +49,7 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     }),
     inspirations,
     layouts,
-    brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts },
+    brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, customFonts: inputs.customFonts },
   };
 }
 

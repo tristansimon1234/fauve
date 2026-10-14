@@ -266,6 +266,11 @@ export const brandProfileSchema = z.object({
     .describe("Couleurs de la charte, la principale en premier (ex. tirées du site web)"),
   fonts: z.array(z.string().max(60)).max(3).optional().describe("Polices de la charte (Google Fonts) : titres d'abord, puis texte"),
   logo_url: z.url().optional(),
+  /** The studio's own fonts (files uploaded in Style, private bucket): usable by name like any Google font. */
+  custom_fonts: z
+    .array(z.object({ family: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/), path: z.string().max(300) }))
+    .max(6)
+    .optional(),
   /** Logo uploaded in the web app (path in the private media bucket); wins over logo_url. */
   logo_path: z.string().max(300).optional(),
   /** Free-text art direction written by the manager, followed by the editor and the motion designer. */

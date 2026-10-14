@@ -58,7 +58,16 @@ export type ReelProps = {
   segments: ReelSegment[];
   texts: ReelText[];
   words: ReelWord[];
-  brand: { name: string; accent: string; accentInk: string; displayFont: string; bodyFont: string; logoUrl: string | null };
+  brand: {
+    name: string;
+    accent: string;
+    accentInk: string;
+    displayFont: string;
+    bodyFont: string;
+    logoUrl: string | null;
+    /** The studio's own fonts (uploaded files), loaded by URL instead of from Google Fonts. */
+    customFonts?: { family: string; url: string }[];
+  };
   endCard: { title: string; subtitle: string | null; from: number } | null;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
@@ -82,7 +91,7 @@ export type ReelInputs = {
   /** Word timings from the clip analyses, by clip_id (for subtitles). */
   words?: Record<string, ClipAnalysis["words"]>;
   /** fonts: the studio's brand fonts (display first); the plan's fonts win over them. */
-  brand: { name: string; accent?: string | null; logoUrl?: string | null; fonts?: string[] };
+  brand: { name: string; accent?: string | null; logoUrl?: string | null; fonts?: string[]; customFonts?: { family: string; url: string }[] };
 };
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
@@ -204,5 +213,6 @@ export function resolveReelBrand(plan: Pick<EditPlan, "fonts">, template: Motion
     displayFont: plan.fonts?.display ?? brandFonts[0] ?? TEMPLATE_FONTS[template].display,
     bodyFont: plan.fonts?.body ?? brandFonts[1] ?? TEMPLATE_FONTS[template].body,
     logoUrl: brand.logoUrl ?? null,
+    ...(brand.customFonts?.length ? { customFonts: brand.customFonts } : {}),
   };
 }

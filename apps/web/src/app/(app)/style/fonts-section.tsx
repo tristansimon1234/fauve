@@ -23,12 +23,15 @@ export function FontsSection({
   body,
   templateFonts,
   onChange,
+  own,
 }: {
   display: string | null;
   body: string | null;
   /** Fonts of the chosen template, used when none is picked. */
   templateFonts: { display: string; body: string };
   onChange: (fonts: { display_font?: string | null; body_font?: string | null }) => void;
+  /** The studio's own font files. */
+  own?: React.ReactNode;
 }) {
   useStylesheets(sampleSheets);
   return (
@@ -51,6 +54,7 @@ export function FontsSection({
           onChange={(family) => onChange({ body_font: family })}
         />
       </div>
+      {own}
     </Section>
   );
 }

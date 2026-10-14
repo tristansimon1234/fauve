@@ -88,7 +88,7 @@ async function loadContext(input: DesignRequest) {
   }
 
   const inputs = await loadMontageInputs(input.studioId, { segments: [] });
-  const brandIn = { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts };
+  const brandIn = { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, customFonts: inputs.customFonts };
   const { data: profileRow } = await db.from("brand_profiles").select("profile").eq("studio_id", input.studioId).order("version", { ascending: false }).limit(1);
   const profile = brandProfileSchema.partial().catch({}).parse(profileRow?.[0]?.profile ?? {});
   const slides = slidesPlanSchema.safeParse(post.slides);
@@ -107,6 +107,8 @@ async function design(input: DesignRequest, ctx: Context, fix?: { draft: LayerDr
     format: "1080 × 1350 (4:5)",
     marque: { name: ctx.brand.name, accent: ctx.brand.accent, accentInk: ctx.brand.accentInk, displayFont: ctx.brand.displayFont, bodyFont: ctx.brand.bodyFont, logo: Boolean(ctx.brand.logoUrl) },
     direction_artistique: ctx.artDirection,
+    // Her own font files: already loaded, use them by name (fontFamily) and do not list them in "fonts".
+    ...(ctx.brand.customFonts?.length ? { polices_du_studio: ctx.brand.customFonts.map((f) => f.family) } : {}),
   };
   const content = [
     ...(ctx.exampleUrl

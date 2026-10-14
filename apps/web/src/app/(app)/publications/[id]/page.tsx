@@ -116,7 +116,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
     canEdit && (post.kind === "carousel" || post.kind === "post") && Object.keys(photos).length
       ? {
           plan: postSlides({ slides: post.slides, media_ids: post.media_ids }) ?? alignSlides({ template: "doux", slides: [] }, post.media_ids),
-          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, fonts: i.fonts })),
+          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, fonts: i.fonts, customFonts: i.customFonts })),
           layouts: await layoutsForEditor(studioId),
         }
       : null;

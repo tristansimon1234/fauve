@@ -42,6 +42,25 @@ async function loadFamily(family: string): Promise<void> {
   );
 }
 
+/** The studio's own fonts (uploaded files): loaded from their URL, never asked of Google. */
+export function loadCustomFonts(fonts: { family: string; url: string }[] | undefined): void {
+  const wanted = (fonts ?? []).filter((f) => /^[A-Za-z0-9 ]{2,40}$/.test(f.family) && !loaded.has(f.family));
+  if (!wanted.length || typeof document === "undefined") return;
+  wanted.forEach((f) => loaded.add(f.family));
+  const handle = delayRender(`custom fonts: ${wanted.map((f) => f.family).join(", ")}`, { timeoutInMilliseconds: 25000 });
+  const finished = Promise.all(
+    wanted.map((f) =>
+      new FontFace(f.family, `url("${f.url}")`)
+        .load()
+        .then((face) => {
+          document.fonts.add(face);
+        })
+        .catch(() => undefined),
+    ),
+  ).then(() => continueRender(handle));
+  settled = Promise.all([settled, finished]).then(() => undefined);
+}
+
 export function loadFonts(families: string[]): void {
   const wanted = [...new Set(families)].filter((f) => /^[A-Za-z0-9 ]{2,40}$/.test(f) && !loaded.has(f));
   if (!wanted.length || typeof document === "undefined") return;

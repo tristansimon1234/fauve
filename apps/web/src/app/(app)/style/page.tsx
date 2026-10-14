@@ -67,6 +67,14 @@ async function StyleLoader() {
   };
 
 
+  // Her own font files, signed to draw them on the page.
+  const fontFiles = (profile.custom_fonts ?? []).filter((f) => f.path.startsWith(`${studioId}/`));
+  const fontUrls = await signMediaUrls(db, studioId, fontFiles.map((f) => f.path));
+  const ownFonts = fontFiles.flatMap((f) => {
+    const url = fontUrls.get(f.path);
+    return url ? [{ family: f.family, path: f.path, url }] : [];
+  });
+
   const [{ data: shared }, fauve] = await Promise.all([
     db.from("inspirations").select("id, title, url, analysis, storage_path, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(12),
     fauveAccount(),
@@ -89,6 +97,7 @@ async function StyleLoader() {
       initial={toStyleForm(profile)}
       version={(data?.version as number | undefined) ?? null}
       logo={logo}
+      ownFonts={ownFonts}
     />
   );
 }

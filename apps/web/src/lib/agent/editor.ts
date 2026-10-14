@@ -100,6 +100,8 @@ export async function designEdit(params: {
       visual_notes: profile.visual_notes,
       colors: profile.colors,
       fonts: profile.fonts,
+      // Her own uploaded fonts: usable by name in fonts and looks.
+      own_fonts: profile.custom_fonts?.map((f) => f.family),
       // Text looks the manager keeps (copied from examples): the editor reuses them.
       text_looks: profile.text_looks?.length ? profile.text_looks : undefined,
       dos: profile.dos,

@@ -102,7 +102,7 @@ async function Library() {
   // House layers last: the studio's own work first.
   const layers = templates.filter((t) => t.kind === "layer").map(toCreation).sort((a, b) => Number(a.house) - Number(b.house));
   const scenes = templates.filter((t) => t.kind === "scene").map(toCreation);
-  const brand = resolveReelBrand({}, "doux", { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts });
+  const brand = resolveReelBrand({}, "doux", { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, customFonts: inputs.customFonts });
 
   return (
     <>

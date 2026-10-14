@@ -80,7 +80,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
       : Promise.resolve({ data: [] as { media_id: string; analysis: unknown }[] }),
   ]);
   const style = brandProfileSchema
-    .pick({ colors: true, logo_url: true, logo_path: true, fonts: true })
+    .pick({ colors: true, logo_url: true, logo_path: true, fonts: true, custom_fonts: true })
     .catch({})
     .parse(brand.data?.[0]?.profile ?? {});
   const accent = style.colors?.[0];
@@ -88,6 +88,10 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   const logoUrl = style.logo_path?.startsWith(`${studioId}/`)
     ? ((await db.storage.from("media").createSignedUrl(style.logo_path, 3600)).data?.signedUrl ?? style.logo_url ?? null)
     : (style.logo_url ?? null);
+  // The studio's own fonts: signed for the render (and the live preview) like the logo.
+  const ownFonts = (style.custom_fonts ?? []).filter((f) => f.path.startsWith(`${studioId}/`));
+  const signedFonts = ownFonts.length ? ((await db.storage.from("media").createSignedUrls(ownFonts.map((f) => f.path), 7200)).data ?? []) : [];
+  const customFonts = ownFonts.flatMap((f, i) => (signedFonts[i]?.signedUrl ? [{ family: f.family, url: signedFonts[i]!.signedUrl }] : []));
   const words: Record<string, ClipAnalysis["words"]> = {};
   for (const row of analyses.data ?? []) {
     const parsed = clipAnalysisSchema.safeParse(row.analysis);
@@ -103,6 +107,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
     accent,
     logoUrl,
     fonts: style.fonts,
+    customFonts,
     studioName: (studio.data?.name as string | null) ?? "",
   };
 }
@@ -130,7 +135,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  const { clipFiles, clips, clipUrls, words, accent, logoUrl, studioName, fonts } = await loadMontageInputs(studioId, plan);
+  const { clipFiles, clips, clipUrls, words, accent, logoUrl, studioName, fonts, customFonts } = await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
@@ -156,7 +161,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         template: motion.data,
         clipUrls,
         words,
-        brand: { name: studioName, accent, logoUrl, fonts },
+        brand: { name: studioName, accent, logoUrl, fonts, customFonts },
       });
       // Library scenes play with new texts, older plans predate the layout check: every
       // scene is checked before the render, and one whose text leaves the frame plays its
