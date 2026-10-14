@@ -66,14 +66,27 @@ export function AskFauveButton({
   topic,
   label = "Demander à Brigitte",
   className = "btn btn-secondary",
+  before,
 }: {
   topic: DrawerTopic;
   label?: string;
   className?: string;
+  /** Runs first (e.g. saving the changes Brigitte must see); the drawer opens only if it succeeds. */
+  before?: () => Promise<boolean>;
 }) {
   const open = useFauveDrawer();
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    if (before) {
+      setBusy(true);
+      const ok = await before().catch(() => false);
+      setBusy(false);
+      if (!ok) return;
+    }
+    open(topic);
+  };
   return (
-    <button type="button" onClick={() => open(topic)} className={className}>
+    <button type="button" onClick={go} disabled={busy} className={className}>
       <Mascot size={22} still />
       {label}
     </button>

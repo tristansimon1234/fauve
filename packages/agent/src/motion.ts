@@ -164,7 +164,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     const src = inputs.clipUrls[s.clip_id];
     if (!src) throw new Error(`No URL for clip ${s.clip_id}`);
     // A photo in a Reel: still, with a slow zoom so it lives.
-    if (inputs.photoIds?.includes(s.clip_id)) return { type: "image", src, startAt, durationInFrames: lengths[i]!, zoom: true };
+    if (inputs.photoIds?.includes(s.clip_id)) return { type: "image", src, startAt, durationInFrames: lengths[i]!, zoom: true, ...(s.photo ? { edit: s.photo } : {}) };
     return {
       type: "clip",
       src,
