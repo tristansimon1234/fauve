@@ -6,6 +6,7 @@ import { canTransition } from "./status.ts";
 import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES } from "./credits.ts";
+import { businessFamily, postIdeas } from "./post-ideas.ts";
 import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 
 const validPlan = {
@@ -866,4 +867,13 @@ test("a studio's month splits the chat from the work and says what is left", () 
   assert.equal(month.byPurpose.editor, 3.5);
   assert.equal(month.budgetLeft, 24.5 - 13.5);
   assert.equal(month.margin, Math.round((1 - 13.5 / 49) * 1000) / 1000);
+});
+
+test("post ideas follow the kind of business", () => {
+  assert.equal(businessFamily("studio de Pilates"), "sport");
+  assert.equal(businessFamily("Salon de coiffure"), "beauty");
+  assert.equal(businessFamily("brasserie"), "food");
+  assert.equal(businessFamily("fleuriste"), "shop");
+  assert.equal(businessFamily(null), "other");
+  assert.ok(postIdeas("restaurant").reel.includes("Le plat du jour"));
 });
