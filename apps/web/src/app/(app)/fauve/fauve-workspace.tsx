@@ -363,6 +363,14 @@ export function FauveWorkspace({
   );
 
   const lastFauve = messages.findLastIndex((m) => m.from === "fauve");
+  // Getting started: the current step's card always sits under Brigitte's latest
+  // message, even when she forgot to attach it; not when she offered answer
+  // buttons instead, nor for the first post (it has its own flow).
+  const last = messages.at(-1);
+  const stepUnder =
+    onboarding && onboarding.step !== "done" && onboarding.step !== "first_post" && last?.from === "fauve" && !last.options.length && last.stepCard !== onboarding.step
+      ? onboarding.step
+      : null;
   return (
     <div className="flex min-h-0 flex-1">
       <aside className="hidden w-[272px] shrink-0 flex-col border-r border-line bg-white md:flex">{list}</aside>
@@ -527,6 +535,8 @@ export function FauveWorkspace({
                 />
               ))}
               {typing && <LiveTyping live={live} />}
+              {/* Getting started: the current step's card always sits under Brigitte's latest message, even when she forgot to attach it. */}
+              {!typing && stepUnder && <OnboardingCard key={`under-${stepUnder}`} step={stepUnder} timezone={timezone} initial={onboarding} onSend={(text) => send(text)} className="fauve-enter" />}
               <div ref={endRef} />
             </div>
           )}
