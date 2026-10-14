@@ -1,7 +1,7 @@
 # CLAUDE.md — Fauve, l'agent réseaux sociaux des studios
 
 ## Produit en une phrase
-> **Nom : Brigitte.** Le produit et l'assistante s'appellent Brigitte pour les gérantes (app, WhatsApp, prompts : « Tu es Brigitte »). « Fauve » reste le nom interne du code (repo, routes comme `/fauve`, classes `fauve-*`, composants `Fauve…`, ce document) : ne pas le montrer à l'écran. Mascotte : juste une tête « patate » cartoon cernée d'un trait, silhouette de boucles en un seul dégradé violet → corail, grands yeux qui regardent par-dessus des lunettes demi-lune, sourcil levé, joues roses (`components/mascot.tsx`, aussi dans le logo et `app/icon.svg`).
+> **Nom : Brigitte.** Le produit et l'assistante s'appellent Brigitte pour les gérantes (app, WhatsApp, prompts : « Tu es Brigitte »). « Fauve » reste le nom interne du code (repo, routes comme `/fauve`, classes `fauve-*`, composants `Fauve…`, ce document) : ne pas le montrer à l'écran. Mascotte : juste une tête « patate » en flat (sans contour), silhouette de boucles en un seul dégradé violet → corail, yeux qui regardent par-dessus des lunettes demi-lune, sourcil levé ; elle flotte (ombre au sol qui respire) et cligne des yeux (`components/mascot.tsx`, aussi dans le logo et `app/icon.svg`).
 
 Fauve est une community manager IA qui vit **dans WhatsApp**. La gérante d'un commerce de quartier (studio de Pilates ou de yoga, salon de coiffure, restaurant, boutique…) envoie ses vidéos, et Fauve les monte, écrit les légendes, programme sur Instagram et TikTok, relance quand il manque un contenu, et fait un bilan chaque semaine. Une petite web app (desktop + mobile) sert à voir le calendrier, valider, déposer des vidéos en pleine qualité et suivre les résultats.
 

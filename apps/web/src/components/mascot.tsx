@@ -3,8 +3,8 @@ import type { CSSProperties } from "react";
 /**
  * Brigitte's mascot: just a head, drawn like an icon. A full silhouette of
  * curly hair in the brand's gradient (its curls read in the scalloped edge),
- * a potato of a face, big cartoon eyes looking over half-moon reading glasses
- * low on the nose, one eyebrow up, a round nose, a smirk; the eyes blink and
+ * a flat potato of a face, eyes looking over half-moon reading glasses low on
+ * the nose, one eyebrow up, a smirk; the eyes blink and
  * the head floats slowly. Pure SVG/CSS (.fauve-cat in globals.css); motion stops
  * for reduced motion. Decorative: pair it with text.
  */
@@ -30,44 +30,51 @@ export function Mascot({ size = 120, className }: { size?: number; className?: s
   const id = `brigitte-${size}`;
   return (
     <span aria-hidden="true" className={`fauve-cat${className ? ` ${className}` : ""}`} style={{ "--cat": `${size}px` } as CSSProperties}>
-      <svg viewBox="14 16 72 72" overflow="visible">
+      <svg viewBox="14 18 72 76" overflow="visible">
         <defs>
           {/* One gradient over the whole hair (not one per curl), so it reads as a single silhouette. */}
           <linearGradient id={`${id}-hair`} gradientUnits="userSpaceOnUse" x1="24" y1="26" x2="78" y2="80">
             <stop offset="0" stopColor="#5B3FD9" />
             <stop offset="1" stopColor="#F2694E" />
           </linearGradient>
+          <clipPath id={`${id}-shade`}>
+            <path d="M58 40 C70 50 74 68 64 86 L90 86 L90 40 Z" />
+          </clipPath>
         </defs>
+        {/* A soft shadow on the ground: it stays put and narrows as she floats up. */}
+        <ellipse className="fauve-cat-shadow" cx="50" cy="90" rx="15" ry="2.4" fill="#1C1530" opacity="0.12" />
+        <g className="fauve-cat-float">
         <g fill={`url(#${id}-hair)`}>
           <ellipse cx="50" cy="55" rx="27" ry="25" />
           {HAIR.map((c, i) => (
             <circle key={i} cx={c.x} cy={c.y} r={c.r} />
           ))}
         </g>
-        <path d={FACE} fill="#FFE3D6" stroke="#1C1530" strokeWidth="1.6" strokeLinejoin="round" />
+        {/* Flat: no outline, a soft shade on one side gives the potato its volume. */}
+        <path d={FACE} fill="#FFE3D6" />
+        <path d={FACE} fill="#F7C9B6" clipPath={`url(#${id}-shade)`} />
         <g fill={`url(#${id}-hair)`}>
           {FRINGE.map((c, i) => (
             <circle key={i} cx={c.x} cy={c.y} r={c.r} />
           ))}
         </g>
         {/* She looks over her reading glasses, one eyebrow up: the knowing look of a pro. */}
-        <path d="M38.8 54.2 Q42.4 52 45.8 53.6 M54.2 52.2 Q57.8 49.8 61.4 51.8" fill="none" stroke="#1C1530" strokeWidth="1.7" strokeLinecap="round" />
+        <path d="M39.2 54 Q42.6 52.2 45.6 53.4 M54.4 52 Q57.8 49.9 61 51.6" fill="none" stroke="#1C1530" strokeWidth="1.5" strokeLinecap="round" />
         <g className="fauve-cat-eyes">
-          <ellipse cx="42.6" cy="58.6" rx="3.4" ry="3.8" fill="#FFFFFF" stroke="#1C1530" strokeWidth="1.3" />
-          <ellipse cx="57.6" cy="58" rx="3.4" ry="3.8" fill="#FFFFFF" stroke="#1C1530" strokeWidth="1.3" />
-          <circle cx="43" cy="59.8" r="1.7" fill="#1C1530" />
-          <circle cx="58" cy="59.2" r="1.7" fill="#1C1530" />
+          <ellipse cx="42.6" cy="59" rx="2.3" ry="2.9" fill="#1C1530" />
+          <ellipse cx="57.6" cy="58.4" rx="2.3" ry="2.9" fill="#1C1530" />
+          <circle cx="43.4" cy="58" r="0.75" fill="#FFFFFF" />
+          <circle cx="58.4" cy="57.4" r="0.75" fill="#FFFFFF" />
         </g>
-        <ellipse cx="36.5" cy="70" rx="3.6" ry="2.3" fill="#F8A48C" opacity="0.65" />
-        <ellipse cx="64" cy="69.5" rx="3.6" ry="2.3" fill="#F8A48C" opacity="0.65" />
-        {/* A round little nose, then the half-moon glasses resting low on it. */}
-        <path d="M49 64.5 C47.4 68.2 49.2 70.4 51.6 69.6" fill="none" stroke="#1C1530" strokeWidth="1.4" strokeLinecap="round" />
-        <g fill="#FFFFFF" fillOpacity="0.4" stroke="#1C1530" strokeWidth="1.6" strokeLinejoin="round">
-          <path d="M36.4 66.2 H48.4 A6 5 0 0 1 36.4 66.2 Z" />
-          <path d="M52.4 66.2 H64.4 A6 5 0 0 1 52.4 66.2 Z" />
+        <ellipse cx="36.8" cy="70.5" rx="3.2" ry="2" fill="#F2694E" opacity="0.22" />
+        <ellipse cx="64" cy="70" rx="3.2" ry="2" fill="#F2694E" opacity="0.22" />
+        <g fill="#5B3FD9" fillOpacity="0.1" stroke="#1C1530" strokeWidth="1.2" strokeLinejoin="round">
+          <path d="M36.6 65.8 H48.2 A5.8 4.8 0 0 1 36.6 65.8 Z" />
+          <path d="M52.6 65.8 H64.2 A5.8 4.8 0 0 1 52.6 65.8 Z" />
         </g>
-        <path d="M48.4 66.6 Q50.4 65.4 52.4 66.6" fill="none" stroke="#1C1530" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M45.5 76.2 Q50.5 78.6 55 75.4" fill="none" stroke="#1C1530" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M48.2 66.2 Q50.4 65 52.6 66.2" fill="none" stroke="#1C1530" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M46.4 76 Q50.5 78 54.4 75.4" fill="none" stroke="#1C1530" strokeWidth="1.3" strokeLinecap="round" />
+        </g>
       </svg>
     </span>
   );
