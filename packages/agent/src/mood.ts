@@ -7,14 +7,20 @@
 export const REACTION_MOODS = ["laugh", "happy", "surprised", "sad", "cry", "neutral"] as const;
 export type ReactionMood = (typeof REACTION_MOODS)[number];
 
-/** What each face means, as Jev reads it. */
+/** What each face means, as Jev reads it (in English; the messages themselves are in French). */
 export const MOOD_CRITERIA: Record<ReactionMood, string> = {
-  laugh: "Le message est drôle : une blague, de l'humour, du second degré, une taquinerie, « mdr », « haha », 😂.",
-  happy: "La gérante est contente ou enthousiaste : elle remercie, félicite, valide, partage une bonne nouvelle ou un compliment.",
-  surprised: "La gérante annonce quelque chose d'inattendu ou d'impressionnant (un record, une grosse nouvelle), ou s'étonne.",
-  sad: "La gérante est déçue, triste ou découragée : le résultat ne lui plaît pas, une mauvaise nouvelle, de la lassitude.",
-  cry: "La gérante est énervée ou en colère : reproches, frustration forte, « c'est nul », insultes, majuscules, « !!! ».",
-  neutral: "Un message neutre : une question, une information, une consigne, une demande de travail.",
+  laugh:
+    "The message is funny or playful and Brigitte would laugh: a joke, a pun, irony or self-mockery, teasing Brigitte, an absurd or comic situation, or laughter markers such as « mdr », « ptdr », « haha », « lol », « 😂 », « 🤣 ». Also when the manager laughs at a joke Brigitte just made. Not for polite friendliness alone, and never when the joke is bitter or sarcastic about Brigitte's work.",
+  happy:
+    "The manager is pleased, grateful or enthusiastic: she thanks Brigitte, compliments her work, approves a draft (« super », « parfait », « j'adore », « top », « génial »), shares good news about her business (a full class, a good month, a new client), or answers warmly with positive emojis (❤️, 🥰, 😍, 🙌, ✨). The default face for a friendly, positive message that is not funny.",
+  surprised:
+    "The manager shares something unexpected, impressive or out of the ordinary: a record, a big number, a sudden change of plans, an unusual request, or she is amazed herself (« waouh », « sérieux ? », « incroyable », « 😮 », « 😱 »). Also a surprising question that Brigitte would not expect. Not for a routine piece of information.",
+  sad:
+    "The manager is disappointed, sad, tired or discouraged, without being angry: the result does not please her (« bof », « pas fan », « ça ne me ressemble pas », « dommage »), bad news (an empty class, a cancellation, a bad week, a closure), lack of time or energy (« je suis épuisée », « je n'ai rien filmé »), or doubts about her business. Gentle and low, not aggressive.",
+  cry:
+    "The manager is upset, angry or very frustrated, usually at Brigitte or the result: reproaches (« c'est nul », « n'importe quoi », « ça ne marche pas », « encore raté », « j'en ai marre »), insults, shouting in capital letters, several exclamation marks (« !!! »), angry emojis (😡, 🤬, 😤), or the same complaint repeated. Stronger than sad: Brigitte is hurt and wants to make it right.",
+  neutral:
+    "A plain, matter-of-fact message with no particular emotion: a question, an instruction, a piece of information (a date, a link, a website, a number of posts per week), a request for work (« fais-moi un Reel », « change le texte »), or a short answer to Brigitte's question. The most common case; choose it whenever no other face clearly fits.",
 };
 
 /** Emojis Brigitte may put on the manager's message; « none » most of the time. */
@@ -22,21 +28,22 @@ export const REACTION_EMOJIS = ["none", "❤️", "😂", "🔥", "👍", "🙏"
 export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 
 export const EMOJI_CRITERIA: Record<ReactionEmoji, string> = {
-  none: "Aucune réaction : une question, une demande, une consigne, une info, un message neutre ou fâché. C'est le cas le plus fréquent.",
-  "❤️": "Un message chaleureux ou affectueux, un compliment sincère adressé à Brigitte.",
-  "😂": "Une vraie blague ou un message franchement drôle.",
-  "🔥": "La gérante partage un super contenu, une réussite, un chiffre impressionnant, une idée enthousiasmante.",
-  "👍": "Un simple accord ou un accusé de réception : « ok », « ça marche », « parfait », « vas-y ».",
-  "🙏": "Un remerciement.",
-  "🥰": "Un message tendre ou attendrissant (un élève fidèle, une jolie histoire).",
-  "😮": "Une nouvelle surprenante ou impressionnante.",
+  none:
+    "No reaction. The most frequent answer by far: a question, a request for work, an instruction, an information (link, date, number), a long message, a neutral or upset message, or anything Brigitte will answer in words anyway. When in doubt, choose none.",
+  "❤️": "A warm, affectionate or heartfelt message: a sincere compliment to Brigitte (« tu es géniale », « merci pour tout »), a love note about her own business or clients, or a message full of hearts.",
+  "😂": "A real joke or a clearly funny message, that would make a friend laugh out loud. Not for a light « haha » in an otherwise serious message.",
+  "🔥": "The manager shares something great: a strong photo or video, a big success, an impressive number (bookings, views, followers), an exciting new idea or launch.",
+  "👍": "A short agreement or acknowledgement that needs nothing more than a nod: « ok », « ça marche », « vas-y », « d'accord », « parfait », « c'est noté ». Only when the message is just that.",
+  "🙏": "A thank-you that stands on its own: « merci », « merci beaucoup », « merci Brigitte ».",
+  "🥰": "A tender or touching message: a sweet story about a client or a student, a kind word about her team, something that moves her.",
+  "😮": "Surprising or impressive news that leaves Brigitte amazed: an unexpected event, a record, a big change.",
 };
 
 /** The two questions, asked in one request. */
 export const MOOD_INSTRUCTIONS =
-  "Message de la gérante d'un commerce à Brigitte, sa community manager (une IA chaleureuse et un brin malicieuse). Quelle tête fait Brigitte en le lisant ?";
+  "A message (in French) from the manager of a local business (a Pilates or yoga studio, a hair salon, a restaurant, a shop…) to Brigitte, her AI community manager: warm, frank, with an expert eye and a touch of mischief. The previous message from Brigitte is given for context (a « haha » may answer her joke, a « bof » may judge her work). Which face does Brigitte make as she reads the manager's message? Judge the manager's emotion in this message only.";
 export const EMOJI_INSTRUCTIONS =
-  "Brigitte peut réagir par un emoji au message de la gérante, comme sur WhatsApp, mais seulement quand c'est naturel : jamais sur une question ni une demande de travail. Lequel ?";
+  "Brigitte may react to the manager's message with one emoji, as on WhatsApp, but only when it feels natural, like a friend would: rarely, never on a question, a request for work or an upset message, since she answers those in words. Which emoji, if any?";
 
 /** Below this confidence the answer is a guess: no emoji, a neutral face. */
 export const MIN_CONFIDENCE = 0.55;
