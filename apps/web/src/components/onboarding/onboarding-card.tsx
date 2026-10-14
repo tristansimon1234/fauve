@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { finishStep, onboardingView, saveRhythm, type OnboardingView } from "@/app/(app)/fauve/onboarding-actions";
-import { saveMoodboard } from "@/app/(app)/style/actions";
+import { saveLogo, saveMoodboard } from "@/app/(app)/style/actions";
+import { LOGO_MAX_BYTES, LOGO_TYPES } from "@/app/(app)/style/style-options";
 import { CheckIcon, InstagramIcon, PlusIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { NewPostSheet } from "@/components/new-post-sheet";
@@ -133,7 +134,7 @@ export function OnboardingCard({
         />
       )}
       {step === "connect" && view && <ConnectStep handle={view.instagram} onNext={() => next(view.instagram ? "Mon Instagram est connecté." : "Je brancherai Instagram plus tard.")} pending={pending} />}
-      {step === "first_post" && <FirstPostStep timezone={timezone} onLater={() => next("Je ferai ma première publication plus tard.")} pending={pending} />}
+      {step === "first_post" && <FirstPostStep timezone={timezone} sitePhotos={Boolean(view?.moodboard.fromSite)} onLater={() => next("Je ferai ma première publication plus tard.")} pending={pending} />}
       {!view && step !== "website" && step !== "first_post" && <Orb size={28} />}
       {error && (
         <p role="alert" className="text-[13px] font-semibold text-danger">
@@ -274,6 +275,7 @@ function StyleStep({
           </Link>
         </div>
       )}
+      {!view.brand.logoUrl && !lookingAtSite && <LogoAsk studioId={studioId} onSaved={onChange} setError={setError} />}
       <div className="flex flex-col gap-2">
         <span className="text-[14px] font-bold">Ton moodboard</span>
         <p className="-mt-1 text-[13px] leading-snug text-muted">
@@ -363,6 +365,43 @@ function StyleStep({
   );
 }
 
+/** No logo on her site: she adds it here (it ends her Reels and goes on her photos). */
+function LogoAsk({ studioId, onSaved, setError }: { studioId: string; onSaved: () => void; setError: (e: string | null) => void }) {
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const upload = async (file: File) => {
+    const ext = LOGO_TYPES[file.type];
+    if (!ext) return setError("Ton logo : PNG, SVG, WebP ou JPEG.");
+    if (file.size > LOGO_MAX_BYTES) return setError("Le logo dépasse 5 Mo.");
+    setError(null);
+    setBusy(true);
+    try {
+      const path = `${studioId}/brand/logo-${Date.now()}.${ext}`;
+      const { error } = await supabaseBrowser().storage.from("media").upload(path, file, { contentType: file.type });
+      if (error) throw error;
+      const res = await saveLogo(path);
+      if (res.status === "error") setError(res.message);
+      onSaved();
+    } catch {
+      setError("Le logo n’a pas pu être ajouté. Réessaie.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-[16px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-3.5 py-3">
+      <span className="min-w-0 flex-1 text-[13px] leading-snug text-violet">
+        <b>Ton logo</b> : je ne l’ai pas trouvé sur ton site. Ajoute-le, il signera tes Reels et tes photos.
+      </span>
+      <button type="button" disabled={busy} onClick={() => ref.current?.click()} className="btn btn-primary h-10 px-4 text-[13px] disabled:opacity-50">
+        {busy ? <Orb size={18} /> : <PlusIcon size={16} />}
+        {busy ? "Envoi…" : "Ajouter mon logo"}
+      </button>
+      <input ref={ref} type="file" accept={Object.keys(LOGO_TYPES).join(",")} className="sr-only" onChange={(e) => (e.target.files?.[0] && void upload(e.target.files[0]), (e.target.value = ""))} />
+    </div>
+  );
+}
+
 function Counter({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-[16px] bg-soft px-4 py-3">
@@ -426,11 +465,13 @@ function ConnectStep({ handle, onNext, pending }: { handle: string | null; onNex
   );
 }
 
-function FirstPostStep({ timezone, onLater, pending }: { timezone: string; onLater: () => void; pending: boolean }) {
+function FirstPostStep({ timezone, sitePhotos, onLater, pending }: { timezone: string; sitePhotos: boolean; onLater: () => void; pending: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <p className="text-[14px] leading-relaxed text-muted">On commence par ce qui compte le plus : une inspiration, un post ou un Reel que tu aimerais refaire à ta façon. Je m’occupe du reste.</p>
+      <p className="text-[14px] leading-relaxed text-muted">
+        Une première publication pour l’essai : elle me sert à comprendre ta direction artistique, et on l’ajuste ensemble jusqu’à ce qu’elle te ressemble. Pars d’une inspiration (un post ou un Reel que tu aimerais refaire à ta façon).{sitePhotos ? " Les photos de ton site sont déjà dans ta médiathèque." : ""}
+      </p>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => setOpen(true)} className="btn btn-primary h-11 px-5">
           <PlusIcon size={17} />

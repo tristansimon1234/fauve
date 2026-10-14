@@ -21,7 +21,7 @@ const assetSchema = z.object({
   id: z.uuid(),
   storage_path: z.string(),
   kind: z.enum(["video", "image", "audio", "document"]),
-  source: z.enum(["whatsapp", "web_upload", "render", "library"]),
+  source: z.enum(["whatsapp", "web_upload", "render", "library", "website"]),
   duration: z.coerce.number().nullable(),
   created_at: z.string(),
   analysis_status: z.string().nullable(),
@@ -40,6 +40,7 @@ const sourceLabels: Record<Asset["source"], string> = {
   web_upload: "Déposée sur le site",
   render: "Montage de Brigitte",
   library: "Bibliothèque",
+  website: "Prise sur ton site",
 };
 
 export default function LibraryPage() {

@@ -98,6 +98,14 @@ test("website: extracts what onboarding needs", async () => {
   assert.doesNotMatch(info.text, /evil/);
 });
 
+test("website: the logo is the image in the link back home, lazy-loaded or not", async () => {
+  const { extractSiteInfo } = await import("./website.ts");
+  const page = (header: string) => `<html><body><header>${header}<a href="/cours"><img src="/cours.jpg"></a></header></body></html>`;
+  assert.equal(extractSiteInfo(page(`<a href="/"><img data-src="/brume-noir.png" alt="Brume"></a>`), "https://www.brume.fr/").logo, "https://www.brume.fr/brume-noir.png");
+  assert.equal(extractSiteInfo(page(`<a href="https://www.brume.fr"><img src="/b.svg"></a>`), "https://www.brume.fr/").logo, "https://www.brume.fr/b.svg");
+  assert.equal(extractSiteInfo(page(""), "https://www.brume.fr/").logo, null);
+});
+
 test("website: extracts brand colours and fonts", async () => {
   const { extractBrandStyle, stylesheetLinks } = await import("./website.ts");
   const html = `<head><meta name="theme-color" content="#5B3FD9">
