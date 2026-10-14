@@ -132,6 +132,7 @@ export const toolSpecs = {
       agent_note: z.string().max(600).optional().describe("Explication de tes choix, affichée dans la web app"),
       media_ids: postMediaIds,
       cover: postCoverSchema.nullable().optional().describe("Vignette d'un Reel (grille, Instagram) : { at: secondes } une image de la vidéo, ou { media_id } une photo ; null la laisse par défaut"),
+      publish_by_hand: z.boolean().optional().describe("Reel : true = à l'heure prévue, elle reçoit la vidéo et la légende sur WhatsApp et publie elle-même dans Instagram (pour mettre la musique de son choix) ; je retrouve ensuite le Reel sur son compte"),
     }),
   },
   request_content: {
@@ -342,18 +343,6 @@ export const toolSpecs = {
       reset: z.boolean().default(false).describe("Revenir au style du gabarit"),
       save_as: z.string().min(1).max(40).optional().describe("Enregistrer le style obtenu sous ce nom"),
     }),
-  },
-  find_music: {
-    description:
-      "Cherche dans la musique d'Instagram (autorisée pour les Reels) : sans query, les tendances du moment ; avec query, un titre, un artiste ou une ambiance. Demande la connexion d'Instagram via Facebook (sinon la réponse le dit : propose-lui Réglages › « Activer la musique d'Instagram »). Propose ensuite 2 ou 3 sons qui vont avec l'ambiance du Reel, en boutons (titre — artiste), puis set_music avec celui qu'elle choisit.",
-    input: z.object({
-      query: z.string().max(80).optional(),
-      type: z.enum(["music", "original_sound"]).default("music").describe("music : morceaux ; original_sound : sons originaux de Reels"),
-    }),
-  },
-  set_music: {
-    description: "Met une musique d'Instagram sur un Reel (audio_id de find_music), ou l'enlève (null). Instagram l'ajoute à la publication ; le montage n'est pas refait. Gratuit.",
-    input: z.object({ post_id: z.string().uuid(), audio_id: z.string().regex(/^\d+$/).nullable() }),
   },
   schedule_post: {
     description:

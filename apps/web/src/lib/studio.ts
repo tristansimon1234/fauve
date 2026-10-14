@@ -122,7 +122,7 @@ export const socialAccountSchema = z.object({
   platform: platformSchema,
   handle: z.string().nullable(),
   status: z.enum(["pending", "connected", "expired", "disconnected"]),
-  /** How it was connected: « facebook » (Facebook Login, with Instagram's music) or « instagram ». */
+  /** How it was connected: « instagram » (Instagram Login) or « facebook » (Facebook Login, earlier connections). */
   provider: z.string().nullable().catch(null),
 });
 export type SocialAccount = z.infer<typeof socialAccountSchema>;

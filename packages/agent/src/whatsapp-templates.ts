@@ -4,6 +4,8 @@ export const whatsappTemplates = {
   content_request: { category: "utility", params: ["what", "day"] },
   draft_ready: { category: "utility", params: ["kind", "day"] },
   weekly_report: { category: "utility", params: [] },
+  // « C’est l’heure de publier « {{1}} » ! Réponds-moi et je t’envoie la vidéo et la légende. »
+  ready_to_post: { category: "utility", params: ["title"] },
   login_code: { category: "authentication", params: ["code"] },
 } as const;
 

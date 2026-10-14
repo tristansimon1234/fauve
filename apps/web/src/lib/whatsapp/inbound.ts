@@ -1,6 +1,7 @@
 import "server-only";
 import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, replyExtrasSchema } from "@fauve/agent";
 import { claimPairing } from "@/lib/auth/pairing";
+import { deliverPendingHandOffs } from "@/lib/social/hand-off";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { quoteButtons } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -122,6 +123,9 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     await db.from("whatsapp_messages").insert({ studio_id: member.studio_id, wa_message_id: waMessageId, direction: "outbound", phone_e164: phone, type: "text", body: reply, payload: { reply_to: message.id } });
     return;
   }
+
+  // Her answer to the « ready_to_post » template: the Reels to publish herself, now.
+  await deliverPendingHandOffs(member.studio_id, phone).catch((e) => console.error("pending hand-offs failed", e));
 
   const media = await storeMedia(member.studio_id, message).catch((e) => {
     console.error("media storage failed", e);

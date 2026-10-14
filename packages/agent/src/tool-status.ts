@@ -37,8 +37,6 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   copy_text_style: "J’étudie ton exemple…",
   read_post: "Je relis la publication…",
   style_texts: "Je change le style des textes…",
-  find_music: "Je cherche une musique…",
-  set_music: "Je mets la musique…",
   schedule_post: "Je programme la publication…",
   get_instagram_activity: "Je regarde ton Instagram…",
   analyze_performance: "J’analyse ce qui marche…",
