@@ -217,6 +217,25 @@ const GENERIC_FONTS = new Set([
   "noto color emoji", "times new roman", "times", "courier new", "sans", "var",
 ]);
 
+/** Black, white, greys, near-whites: the background of a brand, not its signature. */
+function isNeutral(hex: string): boolean {
+  const { s, l } = saturationAndLightness(hex);
+  return s < 0.15 || l > 0.95 || l < 0.08;
+}
+
+/**
+ * The brand's colours from the palette Brigitte saw on the site (its photos and
+ * home page): signature colours first, in her order (the first one is the
+ * montage's accent), then the neutrals. Truer than the colours found in the CSS,
+ * which on site builders are often the theme's, not the brand's.
+ */
+export function brandColorsFromLook(palette: string[], max = 6): string[] {
+  const hexes = [...new Set(palette.map((c) => c.toLowerCase()))].filter((c) => /^#[0-9a-f]{6}$/.test(c));
+  // Creams and off-whites count as backgrounds here too.
+  const plain = (c: string) => isNeutral(c) || saturationAndLightness(c).l > 0.9;
+  return [...hexes.filter((c) => !plain(c)), ...hexes.filter(plain)].slice(0, max);
+}
+
 export function extractBrandStyle(rawHtml: string, cssTexts: string[] = []): BrandStyle {
   const inlineCss = [
     ...[...rawHtml.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1] ?? ""),
@@ -247,10 +266,6 @@ export function extractBrandStyle(rawHtml: string, cssTexts: string[] = []): Bra
   }
 
   const ranked = [...scores.entries()].sort((a, b) => b[1] - a[1]).map(([hex]) => hex);
-  const isNeutral = (hex: string) => {
-    const { s, l } = saturationAndLightness(hex);
-    return s < 0.15 || l > 0.95 || l < 0.08;
-  };
 
   const fontScores = new Map<string, number>();
   const addFont = (name: string, weight: number) => {

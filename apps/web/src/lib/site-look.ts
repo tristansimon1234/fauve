@@ -1,5 +1,5 @@
 import "server-only";
-import { CHAT_MODEL } from "@fauve/agent";
+import { brandColorsFromLook, CHAT_MODEL } from "@fauve/agent";
 import sharp from "sharp";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
 import { readMoodboard } from "@/lib/agent/moodboard";
@@ -79,7 +79,13 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
     const current = (profile as { moodboard?: { items?: unknown[] } }).moodboard;
     // She made her own moodboard meanwhile: hers wins.
     if (current?.items?.length) return profile;
-    return { ...profile, moodboard: { items, ...(reading ? { ...reading, read_at: new Date().toISOString() } : {}) } };
+    // What she sees on her site beats the CSS: its palette becomes the brand's colours (the first is the accent).
+    const colors = reading?.palette.length ? brandColorsFromLook(reading.palette) : null;
+    return {
+      ...profile,
+      ...(colors?.length ? { colors } : {}),
+      moodboard: { items, ...(reading ? { ...reading, read_at: new Date().toISOString() } : {}) },
+    };
   });
   return { photos: items.length, reading: Boolean(reading) };
 }

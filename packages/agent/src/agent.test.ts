@@ -822,3 +822,9 @@ test("the site's photos: share image first, big images, no logos or icons", asyn
     "https://cdn.example.com/banner.jpg",
   ]);
 });
+
+test("brand colours from the site's look: signature first, neutrals after", async () => {
+  const { brandColorsFromLook } = await import("./website.ts");
+  assert.deepEqual(brandColorsFromLook(["#0A0A0A", "#ff3b1f", "#f4a6c0", "#f5f0ea", "#c9c9c9"]), ["#ff3b1f", "#f4a6c0", "#0a0a0a", "#f5f0ea", "#c9c9c9"]);
+  assert.deepEqual(brandColorsFromLook(["#fff", "nope", "#111111"]), ["#111111"]);
+});
