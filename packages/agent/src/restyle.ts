@@ -27,8 +27,17 @@ export const RESTYLE: Record<Restyle, { button: string; direction: string; brief
   },
 };
 
-/** The buttons under her first Reel: she says it fits, or which way to go. */
-export const STYLE_CHECK_OPTIONS = ["Ça me ressemble", ...RESTYLES.map((r) => RESTYLE[r].button)];
+/** The buttons under her first Reel: she says it fits, which way to go, or something else in her words. */
+export const STYLE_CHECK_OPTIONS = ["Ça me ressemble", ...RESTYLES.map((r) => RESTYLE[r].button), "Autre chose"];
+
+/** Her own wish (« Autre chose »): the same treatment as a button, in her words. */
+export function customRestyle(wish: string): { direction: string; brief: string } {
+  const words = wish.trim().replace(/\s+/g, " ").slice(0, 200);
+  return {
+    direction: words.endsWith(".") ? words : `${words}.`,
+    brief: `La gérante veut ce Reel autrement : « ${words} ». Garde le même sujet et les mêmes plans, et change ce qu'elle demande, franchement et dans tout le Reel (textes, animations, rythme).`,
+  };
+}
 
 const PREFIX = "Ajustement de la gérante — ";
 /** Adjustments kept in the art direction: the latest ones, one per kind. */
@@ -39,8 +48,8 @@ const KEPT = 3;
  * (a new click on the same button replaces it), the latest few kept, within the
  * field's 1500 characters (the oldest adjustments go first, never her own text).
  */
-export function withAdjustment(artDirection: string | undefined, restyle: Restyle, max = 1500): string {
-  const line = `${PREFIX}${RESTYLE[restyle].direction}`;
+export function withAdjustment(artDirection: string | undefined, restyle: Restyle | { wish: string }, max = 1500): string {
+  const line = `${PREFIX}${typeof restyle === "string" ? RESTYLE[restyle].direction : customRestyle(restyle.wish).direction}`;
   const lines = (artDirection ?? "").split("\n").filter((l) => l.trim());
   const own = lines.filter((l) => !l.startsWith(PREFIX));
   let adjustments = [...lines.filter((l) => l.startsWith(PREFIX) && l !== line), line].slice(-KEPT);

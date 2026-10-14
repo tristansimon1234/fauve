@@ -24,6 +24,7 @@ import {
   removeFacts,
   brandProfileSchema,
   RESTYLE,
+  customRestyle,
   withAdjustment,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
@@ -502,19 +503,21 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({ edit_plan_id: row.id, version: row.version });
     },
 
-    async restyle_reel({ post_id, style }) {
+    async restyle_reel({ post_id, style, wish }) {
+      if (style === "custom" && !wish) return json({ error: "Avec style custom, donne wish : ce qu'elle veut changer, avec ses mots. Demande-le-lui d'abord si elle ne l'a pas dit." });
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
       if (!post.edit_plan_id) return json({ error: "Cette publication n'a pas encore de montage." });
+      const change = style === "custom" ? { ...customRestyle(wish!), button: "à sa façon" } : RESTYLE[style];
       // The adjustment stays in her art direction: every next montage follows it.
       const latest = await db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1);
       const current = brandProfileSchema.partial().catch({}).parse(latest.data?.[0]?.profile ?? {});
-      const profile = { dos: [], donts: [], ...current, art_direction: withAdjustment(current.art_direction, style) };
+      const profile = { dos: [], donts: [], ...current, art_direction: withAdjustment(current.art_direction, style === "custom" ? { wish: wish! } : style) };
       const version = await nextVersion("brand_profiles", "studio_id", studioId);
       check(await db.from("brand_profiles").insert({ studio_id: studioId, version, profile }));
       // Her click is her yes: the corrected version starts at once, at the studio's level.
       const studio = await db.from("studios").select("montage_effort").eq("id", studioId).single();
       const effort = effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);
-      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: [], brief: RESTYLE[style].brief, correction: true, effort });
+      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: [], brief: change.brief, correction: true, effort });
       if ("error" in quote) {
         return json({ possible: false, style_garde: true, solde: quote.balance, credits_necessaires: quote.needed, note: "Le style est gardé pour les prochains montages, mais le solde ne suffit pas pour refaire la vidéo : dis-le simplement." });
       }
@@ -523,10 +526,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
       ctx.extras.quote = quote.id;
       if (ctx.waId) ctx.extras.posts = [post_id];
-      ctx.notes.push(`version ${RESTYLE[style].button.toLowerCase()} lancée quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id}`);
+      ctx.notes.push(`version ${change.button.toLowerCase()} lancée quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id}`);
       return json({
         status: "started",
-        style: RESTYLE[style].button,
+        style: style === "custom" ? wish : change.button,
         credits: quote.base,
         credits_max: quote.max,
         note: `Le style est retenu pour tous ses prochains montages, et la nouvelle version de ce Reel est en route (${quote.effort ? EFFORTS[quote.effort].minutes : "2 à 4"} min). Dis-le en une ou deux phrases chaleureuses, avec le coût (credits, jusqu'à credits_max).`,
