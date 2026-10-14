@@ -7,6 +7,10 @@ import { searchMusic, setMusic, type MusicSearch, type MusicTrack } from "@/app/
 // page, chosen in one tap. Instagram attaches it when it publishes the Reel (the
 // montage itself stays silent). Needs the Instagram connection through Facebook.
 
+// Moods in one tap: unlike the trending list, searches come with a preview to
+// listen to here.
+const MOODS = ["Pop", "Dance", "Chill", "Feel good", "Lo-fi", "Chanson française"];
+
 const time = (ms?: number | null) => {
   if (!ms) return "";
   const s = Math.round(ms / 1000);
@@ -26,6 +30,10 @@ export function MusicPicker({ postId, available, initial }: { postId: string; av
   useEffect(() => () => audio.current?.pause(), []);
 
   const search = (q: string) => start(async () => setResult(await searchMusic(q)));
+  const pick = (q: string) => {
+    setQuery(q);
+    search(q);
+  };
   const toggleOpen = () => {
     setOpen((o) => !o);
     if (!result) search("");
@@ -104,7 +112,25 @@ export function MusicPicker({ postId, available, initial }: { postId: string; av
               Chercher
             </button>
           </form>
-          <p className="text-[12px] font-semibold text-muted">{query.trim() ? "Résultats" : "Tendances sur Instagram"}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {["", ...MOODS].map((m) => {
+              const on = query.trim() === m;
+              return (
+                <button
+                  key={m || "trending"}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => pick(m)}
+                  className={`h-8 rounded-full px-3 text-[12px] font-bold transition-colors ${on ? "bg-violet text-white" : "bg-soft text-ink hover:bg-violet-soft"}`}
+                >
+                  {m || "Tendances"}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[12px] font-semibold text-muted">
+            {query.trim() ? "Résultats" : "Tendances sur Instagram (à écouter sur Instagram)"}
+          </p>
           {searching ? (
             <p className="text-[13px] text-muted">Je cherche…</p>
           ) : result?.status === "error" ? (
@@ -134,6 +160,9 @@ export function MusicPicker({ postId, available, initial }: { postId: string; av
               Sans musique
             </button>
           )}
+          <p className="text-[12px] leading-snug text-muted">
+            Instagram ne laisse pas choisir le passage du morceau depuis une autre appli : il prend son passage par défaut. Pour un passage précis, ajoute le son dans l’appli Instagram au moment de publier.
+          </p>
         </div>
       )}
     </section>
@@ -143,21 +172,39 @@ export function MusicPicker({ postId, available, initial }: { postId: string; av
 function TrackRow({ track, playing, onPlay, children }: { track: MusicTrack; playing: boolean; onPlay: () => void; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2.5 rounded-[12px] px-1 py-1">
-      <button
-        type="button"
-        onClick={onPlay}
-        disabled={!track.preview}
-        aria-label={playing ? "Arrêter l’écoute" : "Écouter"}
-        className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-ink text-white disabled:opacity-50"
-      >
-        {track.cover && (
-          // eslint-disable-next-line @next/next/no-img-element -- Instagram's artwork
-          <img src={track.cover} alt="" className="absolute inset-0 size-full object-cover opacity-70" />
-        )}
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="relative" aria-hidden="true">
-          {playing ? <path d="M7 5h4v14H7zM13 5h4v14h-4z" /> : <path d="M8 5l11 7-11 7z" />}
-        </svg>
-      </button>
+      {track.preview || !track.link ? (
+        <button
+          type="button"
+          onClick={onPlay}
+          disabled={!track.preview}
+          aria-label={playing ? "Arrêter l’écoute" : "Écouter"}
+          className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-ink text-white disabled:opacity-50"
+        >
+          {track.cover && (
+            // eslint-disable-next-line @next/next/no-img-element -- Instagram's artwork
+            <img src={track.cover} alt="" className="absolute inset-0 size-full object-cover opacity-70" />
+          )}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="relative" aria-hidden="true">
+            {playing ? <path d="M7 5h4v14H7zM13 5h4v14h-4z" /> : <path d="M8 5l11 7-11 7z" />}
+          </svg>
+        </button>
+      ) : (
+        // No preview through the API (trending tracks): listened to on Instagram.
+        <a
+          href={track.link}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Écouter sur Instagram"
+          title="Écouter sur Instagram"
+          className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-violet-soft text-violet hover:bg-violet hover:text-white"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9 18V5l11-2v13" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="17" cy="16" r="3" />
+          </svg>
+        </a>
+      )}
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[14px] font-bold">{track.title ?? "Son original"}</span>
         <span className="truncate text-[12px] text-muted">

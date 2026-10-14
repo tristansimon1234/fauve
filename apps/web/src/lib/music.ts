@@ -7,7 +7,9 @@ import { instagramAccount } from "@/lib/social/publish";
 // the post, and a temporary preview to listen to it (about 1.5 days, asked again
 // when the page opens).
 
-export type MusicTrack = PostAudio & { preview: string | null };
+// Trending tracks come without a preview or artwork (searches have them): those
+// are listened to on Instagram through `link`.
+export type MusicTrack = PostAudio & { preview: string | null; link: string | null };
 
 export async function toTrack(a: InstagramAudio): Promise<MusicTrack> {
   return {
@@ -16,8 +18,9 @@ export async function toTrack(a: InstagramAudio): Promise<MusicTrack> {
     artist: a.display_artist ?? a.ig_username ?? null,
     duration_ms: a.duration_in_ms ?? null,
     type: a.audio_type ?? null,
-    cover: a.cover_artwork_thumbnail_uri ?? null,
+    cover: a.cover_artwork_thumbnail_uri ?? a.cover_artwork_thumbnail_url ?? null,
     preview: a.download_url ?? null,
+    link: a.on_platform_audio_preview_link ?? null,
   };
 }
 
@@ -27,11 +30,12 @@ export async function musicFor(studioId: string, stored: unknown): Promise<{ ava
   const available = Boolean(ig && viaFacebook(ig.accessToken));
   const audio = postAudioSchema.nullable().catch(null).parse(stored ?? null);
   if (!audio) return { available, track: null };
-  if (!available || !ig) return { available, track: { ...audio, preview: null } };
+  if (!available || !ig) return { available, track: { ...audio, preview: null, link: null } };
   try {
-    return { available, track: { ...audio, preview: (await toTrack(await audioInfo(audio.audio_id, ig.userId, ig.accessToken))).preview } };
+    const fresh = await toTrack(await audioInfo(audio.audio_id, ig.userId, ig.accessToken));
+    return { available, track: { ...audio, preview: fresh.preview, link: fresh.link } };
   } catch (error) {
     console.warn("music preview unavailable", error instanceof InstagramError ? error.body : error);
-    return { available, track: { ...audio, preview: null } };
+    return { available, track: { ...audio, preview: null, link: null } };
   }
 }

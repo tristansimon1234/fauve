@@ -455,6 +455,8 @@ export type InstagramAudio = {
   /** A temporary preview of the file (about 1.5 days): to listen and to cut on its beats. */
   download_url?: string | null;
   cover_artwork_thumbnail_uri?: string | null;
+  /** The metadata endpoint's spelling of the artwork. */
+  cover_artwork_thumbnail_url?: string | null;
   ig_username?: string;
   on_platform_audio_preview_link?: string | null;
 };
