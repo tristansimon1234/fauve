@@ -1,4 +1,5 @@
 import "server-only";
+import { insertPlanVersion } from "@/lib/edit-plans";
 import {
   alignSlides,
   clipBlurFrom,
@@ -109,10 +110,7 @@ export async function blurMontage(studioId: string, postId: string, kinds: Regio
     return { ...s, blur };
   });
   const next = editPlanSchema.parse({ ...plan.data, segments });
-  const { data: versions } = await db.from("edit_plans").select("version").eq("post_id", postId);
-  const version = Math.max(0, ...(versions ?? []).map((v) => v.version as number)) + 1;
-  const { data: inserted, error } = await db.from("edit_plans").insert({ studio_id: studioId, post_id: postId, version, plan: next }).select("id").single();
-  if (error) throw new Error(error.message);
+  const inserted = await insertPlanVersion(studioId, postId, next);
   await db.from("posts").update({ edit_plan_id: inserted.id }).eq("id", postId);
   return { clips: clipIds.length, tracks, skipped };
 }

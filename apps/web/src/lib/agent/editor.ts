@@ -1,4 +1,5 @@
 import "server-only";
+import { insertPlanVersion } from "@/lib/edit-plans";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   carryRetouch,
@@ -275,16 +276,11 @@ export async function designEdit(params: {
   });
   await markTemplatesUsed([...reused.keys()]).catch((e: unknown) => console.warn("motion_templates: usage count failed", e));
 
-  const version = ((previous.data?.[0]?.version as number | undefined) ?? 0) + 1;
-  const row = await db
-    .from("edit_plans")
-    .insert({ studio_id: params.studioId, post_id: params.postId, version, plan })
-    .select("id")
-    .single();
-  if (row.error) throw new Error(row.error.message);
-  await db.from("posts").update({ edit_plan_id: row.data.id }).eq("id", params.postId);
+  const row = await insertPlanVersion(params.studioId, params.postId, plan);
+  const version = row.version;
+  await db.from("posts").update({ edit_plan_id: row.id }).eq("id", params.postId);
   return {
-    editPlanId: row.data.id as string,
+    editPlanId: row.id,
     version,
     plan,
     rationale: response.parsed_output.rationale,

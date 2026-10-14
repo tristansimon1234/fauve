@@ -1,4 +1,5 @@
 import "server-only";
+import { insertPlanVersion } from "@/lib/edit-plans";
 import {
   APP_GUIDES,
   seedOf,
@@ -578,10 +579,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (["published", "measured"].includes(post.status as string)) return json({ error: "Ce Reel est déjà en ligne." });
       const row = unwrap(await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).single());
       const plan = withSoundtrack(editPlanSchema.parse(row.plan), style, sfx, seedOf(post_id));
-      const { data: last } = await db.from("edit_plans").select("version").eq("post_id", post_id).order("version", { ascending: false }).limit(1).maybeSingle();
-      const saved = unwrap(
-        await db.from("edit_plans").insert({ studio_id: studioId, post_id, version: ((last?.version as number | undefined) ?? 0) + 1, plan }).select("id").single(),
-      );
+      const saved = await insertPlanVersion(studioId, post_id, plan);
       check(await db.from("posts").update({ edit_plan_id: saved.id }).eq("id", post_id));
       ctx.afterReply.push(async () => {
         await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });

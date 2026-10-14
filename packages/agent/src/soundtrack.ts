@@ -55,7 +55,8 @@ export function seedOf(text: string): number {
 export function carrySoundtrack(plan: EditPlan, previous: EditPlan | null, seed: number): EditPlan {
   const before = previous?.music;
   if (before?.chosen || before?.muted) return { ...plan, music: before };
-  const fresh = defaultMusic(plan.template, before?.seed ?? seed);
+  // Off unless she picks one: the synthesized music is not good enough to play by default yet.
+  const fresh = { ...defaultMusic(plan.template, before?.seed ?? seed), muted: true };
   return { ...plan, music: before ? { ...fresh, sfx: before.sfx } : fresh };
 }
 

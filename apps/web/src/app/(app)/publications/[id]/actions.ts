@@ -1,5 +1,6 @@
 "use server";
 
+import { insertPlanVersion } from "@/lib/edit-plans";
 import { assertTransition, editPlanSchema, isClipSegment, postStatusSchema, slidesPlanSchema, type PostStatus } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -178,12 +179,14 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   const unknown = plan.segments.some((s) => "motion" in s && s.motion.js && !knownCode.has(s.motion.js));
   if (unknown) return { ok: false, error: "Une animation a été modifiée d’une façon que l’éditeur ne permet pas." };
 
-  const version = Math.max(0, ...(versions ?? []).map((v) => v.version as number)) + 1;
-  const { data: row, error } = await db.from("edit_plans").insert({ studio_id: studioId, post_id: postId, version, plan }).select("id").single();
-  if (error) {
-    console.warn("saveEditPlan failed", error.message);
+  let row: { id: string; version: number };
+  try {
+    row = await insertPlanVersion(studioId, postId, plan);
+  } catch (error) {
+    console.warn("saveEditPlan failed", error);
     return { ok: false, error: "L’enregistrement a échoué. Réessaie dans un instant." };
   }
+  const version = row.version;
   await db.from("posts").update({ edit_plan_id: row.id }).eq("id", postId);
   // The final video follows in about a minute; the editor already shows it live.
   after(() =>
