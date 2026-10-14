@@ -3,11 +3,10 @@
 import type { Bullet, ListItem, SavedLook, TextLook } from "@fauve/agent";
 import { ListItems } from "./list-items";
 import { TrashIcon, XIcon } from "@/components/icons";
-import { LookPanel } from "./look-panel";
-import { DEFAULT_Y } from "./text-boxes";
+import { StylePicker } from "./style-picker";
 
-// The selected text of a montage or a carousel slide: its words, style, size and
-// background, big enough for a thumb (mobile page) and fine on a desktop.
+// The selected text of a montage or a carousel slide: its words, a style in one tap
+// and its size, big enough for a thumb (mobile page). It is placed by dragging it.
 
 export type SheetText = {
   text: string;
@@ -21,7 +20,6 @@ export type SheetText = {
   bullet?: Bullet;
 };
 
-const styleLabels: Record<SheetText["style"], string> = { hook: "Accroche", band: "Bandeau", caption: "Sous-titre" };
 const round = (n: number) => Math.round(n * 10) / 10;
 
 /** The selected text: its words, style, size and background, big enough for a thumb. */
@@ -31,7 +29,6 @@ export function TextSheet<T extends SheetText>({
   onRemove,
   onClose,
   looks,
-  video,
 }: {
   text: T;
   onChange: (patch: Partial<SheetText>) => void;
@@ -39,6 +36,7 @@ export function TextSheet<T extends SheetText>({
   onClose: () => void;
   /** With the studio's colours and fonts: the look controls (fonts, colours, fill…) and its saved looks. */
   looks?: { saved: SavedLook[]; brand: { accent: string; accentInk: string; displayFont: string; bodyFont: string } };
+  /** A video (entrances matter) or a photo: kept for the callers, the style tiles are the same. */
   video?: boolean;
 }) {
   const scale = text.scale ?? 1;
@@ -61,18 +59,6 @@ export function TextSheet<T extends SheetText>({
         </button>
       </div>
       {text.items && <ListItems items={text.items} bullet={text.bullet} onChange={(patch) => onChange({ ...patch, ...(patch.items ? { text: patch.items[0]?.title ?? text.text } : {}) })} />}
-      <div className="flex flex-wrap gap-1.5">
-        {(Object.keys(styleLabels) as SheetText["style"][]).map((style) => (
-          <button
-            key={style}
-            type="button"
-            onClick={() => onChange({ style, y: text.y ?? DEFAULT_Y[text.style] })}
-            className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${text.style === style ? "bg-violet text-white" : "bg-violet-soft text-violet"}`}
-          >
-            {styleLabels[style]}
-          </button>
-        ))}
-      </div>
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -92,21 +78,12 @@ export function TextSheet<T extends SheetText>({
         >
           A+
         </button>
-        <button
-          type="button"
-          aria-pressed={text.backdrop ?? false}
-          onClick={() => onChange({ backdrop: text.backdrop ? undefined : true })}
-          className={`rounded-full px-3.5 py-2.5 text-[13px] font-semibold ${text.backdrop ? "bg-ink text-white" : "border border-line"}`}
-        >
-          Fond derrière
-        </button>
         <button type="button" aria-label="Supprimer le texte" onClick={onRemove} className="ml-auto flex size-10 items-center justify-center rounded-full text-danger">
           <TrashIcon size={17} />
         </button>
       </div>
-      {looks && (
-        <LookPanel role={text.style} look={text.look} saved={looks.saved} brand={looks.brand} video={video} onChange={(look) => onChange({ look })} />
-      )}
+      {looks && <StylePicker role={text.style} look={text.look} saved={looks.saved} brand={looks.brand} sample={text.text} onChange={(look) => onChange({ look })} />}
+      <p className="text-[12px] text-muted">Pour le placer, fais-le glisser du doigt. Pour le reste, demande à Brigitte.</p>
     </div>
   );
 }

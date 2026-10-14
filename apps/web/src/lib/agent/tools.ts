@@ -367,7 +367,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const wanted = effort ?? studioDefault;
       // Her first Reel is her first impression: it always gets its made-to-measure animations.
       const firstReel = !correction && !variant && (await isFirstReel(studioId, post_id));
-      const scenes = firstReel ? MAX_FREE_SCENES : max_new_scenes;
+      // Made-to-measure animations stay rare: one at most on a new montage (her library does the
+      // rest), none on a correction unless she asked for a new one (Brigitte then passes 1).
+      const scenes = firstReel ? MAX_FREE_SCENES : (max_new_scenes ?? (correction || variant ? 0 : 1));
       const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: scenes, variant, plan, effort: wanted });
       if ("error" in quote) {
         return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });
@@ -532,7 +534,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // Her click is her yes: the corrected version starts at once, at the studio's level.
       const studio = await db.from("studios").select("montage_effort").eq("id", studioId).single();
       const effort = effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);
-      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: [], brief: change.brief, correction: true, effort });
+      // A change of style may deserve one new animation, never two.
+      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: [], brief: change.brief, correction: true, maxNewScenes: 1, effort });
       if ("error" in quote) {
         return json({ possible: false, style_garde: true, solde: quote.balance, credits_necessaires: quote.needed, note: "Le style est gardé pour les prochains montages, mais le solde ne suffit pas pour refaire la vidéo : dis-le simplement." });
       }
@@ -948,8 +951,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           return { look: parsed.data };
         });
         if (invalid && !last) return json({ error: `Style invalide : ${invalid}` });
-        if (save_as && last && target !== "all") await keepTextLooks(studioId, [{ name: save_as, role: target, look: last }]);
-        else if (save_as && last) await keepTextLooks(studioId, [{ name: save_as, role: "hook", look: last }]);
+        // A new look is always kept in her styles (the editors show them as tiles), with its name or a plain one.
+        const role = target === "all" ? "hook" : target;
+        const keptAs = last && (save_as ?? (look && !named && !reset ? `${{ hook: "Titre", band: "Bandeau", caption: "Petite ligne" }[role]} ${last.font}` : undefined));
+        if (keptAs && last) await keepTextLooks(studioId, [{ name: keptAs.slice(0, 40), role, look: last }]);
         // One render per post and turn, after every change (a style per photo is several calls).
         if (!rendering.has(post_id)) {
           rendering.add(post_id);
@@ -962,7 +967,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           status: "started",
           texts: result.changed,
           on: result.kind === "slides" ? "photos" : "montage",
-          saved_as: save_as && last ? save_as : undefined,
+          saved_as: keptAs || undefined,
           note: "Le rendu part après ta réponse et le lien est envoyé tout seul. Annonce le changement en une phrase.",
         });
       } catch (error) {

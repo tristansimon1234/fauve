@@ -4,13 +4,11 @@ import {
   buildSlideProps,
   MAX_ELEMENTS,
   placeElement,
-  defaultLook,
   SLIDE_Y,
   type ReelInputs,
   type SavedLook,
   type SlidesPlan,
   type SlideText,
-  type TextLook,
 } from "@fauve/agent";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ImageIcon, PlusIcon, TrashIcon } from "@/components/icons";
@@ -21,7 +19,7 @@ import { LayerHandles } from "@/components/montage/layer-handles";
 import { PhotoAsk } from "@/components/montage/photo-ask";
 import { LayoutPicker, layoutOn, type Layout } from "@/components/montage/layout-picker";
 import { ListItems } from "@/components/montage/list-items";
-import { LookPanel } from "@/components/montage/look-panel";
+import { StylePicker } from "@/components/montage/style-picker";
 import { photoRetouch } from "@/components/montage/retouch-actions";
 import { RetouchSwitches } from "@/components/montage/retouch-switches";
 import { SlidePreview } from "@/components/montage/slide-preview";
@@ -34,13 +32,6 @@ import { saveSlidesPlan } from "./actions";
 // photo: its texts with quick colours, size and place, retouch, logo, and what
 // applies to the whole carousel.
 
-const styleLabels: Record<SlideText["style"], string> = { hook: "Accroche", band: "Bandeau", caption: "Petite ligne" };
-const DEFAULT_Y: Record<SlideText["style"], number> = { hook: 0.1, band: 0.42, caption: 0.7 };
-const places = [
-  { label: "Haut", y: 0.1 },
-  { label: "Milieu", y: 0.42 },
-  { label: "Bas", y: 0.7 },
-] as const;
 const templates = [
   { value: "doux", label: "Doux" },
   { value: "dynamique", label: "Dynamique" },
@@ -52,21 +43,10 @@ const logoPlaces = [
   { value: "bottom", label: "En bas" },
 ] as const;
 
-/** Background swatches: the studio's colour, then a few soft ones that go with most photos. */
-const FILLS = ["accent", "#FFFFFF", "#1C1530", "#F2694E", "#FFD65A", "#F7B6C8", "#A8E6CF", "#BFD7FF"] as const;
-const INKS = ["#FFFFFF", "#1C1530", "accent"] as const;
 /** A layout's colour: the studio's first, then a few that go with most photos. */
 const LAYER_ACCENTS = [null, "#1C1530", "#7A1F2B", "#F2694E", "#C9A227", "#E58FA8", "#7FA88B", "#5B7FD9"] as const;
 
 const round = (n: number) => Math.round(n * 10) / 10;
-const clampY = (y: number) => Math.min(SLIDE_Y.max, Math.max(SLIDE_Y.min, y));
-
-/** Dark ink on a light background, white on a dark one. */
-function inkOn(hex: string): string {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
-  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.45 ? "#1C1530" : "#FFFFFF";
-}
 
 export function CarouselEditor({
   postId,
@@ -104,7 +84,6 @@ export function CarouselEditor({
   const url = photos[slide.media_id];
   const props = useMemo(() => (url ? buildSlideProps(slide, { template: plan.template, imageUrl: url, brand }) : null), [slide, plan.template, url, brand]);
   const brandLook = props?.brand ?? { accent: brand.accent ?? "#5B3FD9", accentInk: "#FFFFFF", displayFont: "Playfair Display", bodyFont: "Plus Jakarta Sans" };
-  const hex = (c: string) => (c === "accent" ? brandLook.accent : c === "accent_ink" ? brandLook.accentInk : c);
 
   const edit = (next: SlidesPlan) => {
     setPlan(next);
@@ -112,7 +91,6 @@ export function CarouselEditor({
   };
   const setSlide = (patch: Partial<(typeof plan.slides)[number]>) => edit({ ...plan, slides: plan.slides.map((s, i) => (i === index ? { ...s, ...patch } : s)) });
   const setText = (t: number, patch: Partial<SlideText>) => setSlide({ texts: slide.texts.map((x, j) => (j === t ? { ...x, ...patch } : x)) });
-  const lookOf = (t: SlideText): TextLook => t.look ?? defaultLook(t.style, { display: brandLook.displayFont, body: brandLook.bodyFont });
   const go = (i: number) => {
     if (i < 0 || i >= plan.slides.length) return;
     setIndex(i);
@@ -398,9 +376,12 @@ export function CarouselEditor({
                     </button>
                   )}
                 </div>
-                {slide.texts.length === 0 && <p className="text-[13px] text-muted">Pas de texte : la photo parle d’elle-même.</p>}
+                {slide.texts.length === 0 ? (
+                  <p className="text-[13px] text-muted">Pas de texte : la photo parle d’elle-même.</p>
+                ) : (
+                  <p className="-mt-1 text-[12px] text-muted">Pour le placer, fais glisser le texte sur la photo. Clique dessus pour changer les mots.</p>
+                )}
                 {slide.texts.map((t, i) => {
-                  const look = t.look;
                   return (
                     <div
                       key={i}
@@ -430,70 +411,15 @@ export function CarouselEditor({
                           onChange={(patch) => setText(i, { ...patch, ...(patch.items ? { text: patch.items[0]?.title.slice(0, 120) ?? t.text } : {}) })}
                         />
                       )}
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {(Object.keys(styleLabels) as SlideText["style"][]).map((style) => (
-                          <button key={style} type="button" onClick={() => setText(i, { style })} className={chip(t.style === style)}>
-                            {styleLabels[style]}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Quick looks: a highlight colour, the letters' colour, the size, the place. */}
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-[12px] font-semibold text-muted">Fond</span>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            aria-label="Sans fond"
-                            aria-pressed={!look?.fill && !t.backdrop}
-                            onClick={() => setText(i, { backdrop: undefined, look: look ? { ...look, fill: undefined } : undefined })}
-                            className={`${swatch(!look?.fill && !t.backdrop)} bg-[linear-gradient(135deg,#fff_45%,#E5484D_45%,#E5484D_55%,#fff_55%)]`}
-                          />
-                          {FILLS.filter((c) => c === "accent" || c.toLowerCase() !== brandLook.accent.toLowerCase()).map((c) => (
-                            <button
-                              key={c}
-                              type="button"
-                              aria-label={c === "accent" ? "Fond couleur du studio" : `Fond ${c}`}
-                              aria-pressed={look?.fill?.color === c}
-                              onClick={() => {
-                                const base = lookOf(t);
-                                setText(i, { backdrop: undefined, look: { ...base, fill: { kind: base.fill?.kind ?? "line", color: c, opacity: 1, radius: base.fill?.radius }, color: inkOn(hex(c)), shadow: "none" } });
-                              }}
-                              className={swatch(look?.fill?.color === c)}
-                              style={{ background: hex(c) }}
-                            />
-                          ))}
-                        </div>
-                        {look?.fill && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {(["line", "box", "pill"] as const).map((kind) => (
-                              <button key={kind} type="button" onClick={() => setText(i, { look: { ...look, fill: { ...look.fill!, kind } } })} className={chip(look.fill!.kind === kind)}>
-                                {{ line: "Surligné", box: "Bloc", pill: "Pilule" }[kind]}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[12px] font-semibold text-muted">Lettres</span>
-                        {INKS.map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            aria-label={c === "accent" ? "Lettres couleur du studio" : `Lettres ${c}`}
-                            aria-pressed={look?.color === c}
-                            onClick={() => setText(i, { look: { ...lookOf(t), color: c } })}
-                            className={swatch(look?.color === c)}
-                            style={{ background: hex(c) }}
-                          />
-                        ))}
-                        <span className="ml-2 text-[12px] font-semibold text-muted">Taille</span>
+                      <StylePicker role={t.style} look={t.look} saved={looks} brand={brandLook} sample={t.text} onChange={(next) => setText(i, { look: next })} />
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] font-semibold text-muted">Taille</span>
                         <button
                           type="button"
                           aria-label="Plus petit"
                           disabled={(t.scale ?? 1) <= 0.6}
                           onClick={() => setText(i, { scale: Math.max(0.6, round((t.scale ?? 1) - 0.1)) })}
-                          className="h-8 w-9 rounded-full bg-white text-[12px] font-bold text-muted disabled:opacity-30"
+                          className="size-9 rounded-full bg-white text-[13px] font-bold text-muted disabled:opacity-30"
                         >
                           A−
                         </button>
@@ -502,29 +428,14 @@ export function CarouselEditor({
                           aria-label="Plus grand"
                           disabled={(t.scale ?? 1) >= 1.6}
                           onClick={() => setText(i, { scale: Math.min(1.6, round((t.scale ?? 1) + 0.1)) })}
-                          className="h-8 w-9 rounded-full bg-white text-[14px] font-bold text-muted disabled:opacity-30"
+                          className="size-9 rounded-full bg-white text-[15px] font-bold text-muted disabled:opacity-30"
                         >
                           A+
                         </button>
                       </div>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="mr-1 text-[12px] font-semibold text-muted">Place</span>
-                        {places.map((place) => (
-                          <button
-                            key={place.label}
-                            type="button"
-                            onClick={() => setText(i, { y: clampY(place.y) })}
-                            className={chip(Math.abs((t.y ?? DEFAULT_Y[t.style]) - place.y) < 0.05)}
-                          >
-                            {place.label}
-                          </button>
-                        ))}
-                        <span className="text-[11px] text-muted">ou attrape-le sur la photo</span>
-                      </div>
-                      <LookPanel role={t.style} look={t.look} saved={looks} brand={brandLook} video={false} onChange={(next) => setText(i, { look: next })} />
                       {plan.slides.length > 1 && (
                         <button type="button" onClick={() => applyToAll(t)} className="self-start text-[12px] font-bold text-violet hover:underline">
-                          Même style sur toutes les photos ({styleLabels[t.style].toLowerCase()})
+                          Même style sur toutes les photos
                         </button>
                       )}
                     </div>
@@ -565,14 +476,14 @@ export function CarouselEditor({
         <section aria-label="Tout le carrousel" className="flex flex-col gap-3 rounded-[20px] border border-line bg-white p-5">
           <h2 className="text-[16px] font-bold">Tout le carrousel</h2>
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[12px] font-semibold text-muted">Gabarit</span>
+            <span className="mr-1 text-[12px] font-semibold text-muted">Ambiance</span>
             {templates.map((t) => (
               <button key={t.value} type="button" aria-pressed={plan.template === t.value} onClick={() => edit({ ...plan, template: t.value })} className={chip(plan.template === t.value)}>
                 {t.label}
               </button>
             ))}
           </div>
-          <p className="text-[12px] leading-snug text-muted">Le gabarit donne les polices et les couleurs des textes qui n’ont pas de style à eux.</p>
+          <p className="text-[12px] leading-snug text-muted">L’ambiance donne les polices et les couleurs des textes en style « Simple ».</p>
         </section>
       </aside>
     </>

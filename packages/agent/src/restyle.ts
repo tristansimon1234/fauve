@@ -11,13 +11,13 @@ export const RESTYLE: Record<Restyle, { button: string; direction: string; brief
     button: "Plus chaleureux",
     direction: "Plus chaleureux : tons chauds, lumière douce, textes proches et accueillants, rythme posé.",
     brief:
-      "La gérante veut ce Reel plus chaleureux. Garde le même sujet et les mêmes plans, mais réchauffe tout : textes plus proches et accueillants (tutoiement, une touche d'émotion), apparitions douces, rythme un peu plus posé, scènes animées aux tons chauds de sa charte.",
+      "La gérante veut ce Reel plus chaleureux. Garde le même sujet et les mêmes plans, mais réchauffe tout : mêmes messages dits de façon plus proche et accueillante (tutoiement, une touche d'émotion), apparitions douces, rythme un peu plus posé, scènes animées aux tons chauds de sa charte.",
   },
   sober: {
     button: "Plus sobre",
     direction: "Plus sobre : moins de texte et d'effets, typographie fine, beaucoup d'air, fondus lents.",
     brief:
-      "La gérante veut ce Reel plus sobre. Garde le même sujet et les mêmes plans, mais épure : moins de texte (les mots les plus forts seulement), typographie fine, plus d'espace, fondus lents, animations discrètes et élégantes.",
+      "La gérante veut ce Reel plus sobre. Garde le même sujet et les mêmes plans, mais épure : moins de texte (les mots les plus forts de ses messages seulement), typographie fine, plus d'espace, fondus lents, animations discrètes et élégantes.",
   },
   punchier: {
     button: "Plus pêchu",

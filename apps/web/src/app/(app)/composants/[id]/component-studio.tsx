@@ -278,7 +278,7 @@ export function ComponentStudio({
                   </button>
                 )}
                 <button type="button" disabled={pending || change.trim().length < 2} onClick={ask} className="btn btn-primary h-9 shrink-0 px-3.5 text-[13px] disabled:opacity-40">
-                  Modifier · {CREDIT_PRICES.elementEdit} crédit
+                  Modifier · {CREDIT_PRICES.elementEdit} crédits
                 </button>
               </div>
               <input

@@ -162,7 +162,7 @@ export const toolSpecs = {
         .uuid()
         .optional()
         .describe("L'inspiration choisie par la gérante pour ce Reel (list_inspirations) : le monteur la suit en priorité. Inutile si elle l'a déjà choisie en créant la publication."),
-      max_new_scenes: z.number().int().min(0).max(2).optional().describe("Nouvelles scènes animées permises (3 crédits chacune). 0 si la gérante veut faire simple ou économiser : le monteur réutilise alors la bibliothèque et les scènes fixes."),
+      max_new_scenes: z.number().int().min(0).max(2).optional().describe("Nouvelles scènes animées sur mesure permises (3 crédits chacune). Par défaut 1 pour un nouveau montage (2 pour le tout premier Reel) et 0 pour une correction : le monteur réutilise sa bibliothèque. Mets 1 sur une correction seulement si elle demande une nouvelle animation, 2 seulement si elle veut un Reel très travaillé, 0 si elle veut économiser."),
       effort: effortSchema
         .optional()
         .describe(
@@ -282,7 +282,7 @@ export const toolSpecs = {
   },
   edit_element: {
     description:
-      "Fait évoluer UN composant de la banque (« l'étiquette plus arrondie », « le titre en serif fin », « des cases plus grandes ») : une nouvelle version, l'ancienne est gardée. Avec post_id, la publication passe aussitôt à la nouvelle version et ses photos sont refaites. 1 crédit, une à deux minutes ; un message part tout seul à la fin. Pour changer seulement des mots ou une place sur une photo, utilise place_elements (gratuit).",
+      "Fait évoluer UN composant de la banque (« l'étiquette plus arrondie », « le titre en serif fin », « des cases plus grandes ») : une nouvelle version, l'ancienne est gardée. Avec post_id, la publication passe aussitôt à la nouvelle version et ses photos sont refaites. 2 crédits, une à deux minutes ; un message part tout seul à la fin. Pour changer seulement des mots ou une place sur une photo, utilise place_elements (gratuit).",
     input: z.object({
       element_id: z.string().uuid(),
       change: z.string().min(1).max(2000).describe("Le changement demandé, précis"),
@@ -326,7 +326,7 @@ export const toolSpecs = {
   },
   style_texts: {
     description:
-      "Change le style des textes d'une publication (texte sur photos ou montage), gratuit, puis refait le rendu (le lien part tout seul). Tout est possible : police Google Fonts, graisse, italique, majuscules, taille, interlettrage, couleur, fond derrière (box : bloc, pill : pilule, line : surlignage ligne à ligne) avec couleur et transparence, contour, ombre (soft, strong, hard), mots en valeur (autre couleur, police, surlignage), inclinaison, apparition (fade, rise, pop, typewriter, slide), alignement. Prends un style enregistré (look_name), et/ou donne seulement ce qui change (look). reset remet le style du gabarit. save_as enregistre le résultat dans les styles du studio.",
+      "Change le style des textes d'une publication (texte sur photos ou montage), gratuit, puis refait le rendu (le lien part tout seul). Tout est possible : police Google Fonts, graisse, italique, majuscules, taille, interlettrage, couleur, fond derrière (box : bloc, pill : pilule, line : surlignage ligne à ligne) avec couleur et transparence, contour, ombre (soft, strong, hard), mots en valeur (autre couleur, police, surlignage), inclinaison, apparition (fade, rise, pop, typewriter, slide), alignement. Prends un style enregistré (look_name), et/ou donne seulement ce qui change (look). reset remet le style du gabarit. Un nouveau style est toujours gardé dans les styles du studio (la gérante le retrouve en un clic dans l'éditeur) : donne-lui un nom parlant avec save_as (« Titre néon », « Bandeau rouge »), sinon il prend un nom simple.",
     input: z.object({
       post_id: z.string().uuid(),
       target: z.enum(["all", "hook", "band", "caption"]).default("all").describe("Quels textes : tous, ou seulement l'accroche (hook), les bandeaux (band), les petites lignes (caption)"),

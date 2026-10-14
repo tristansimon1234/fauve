@@ -18,10 +18,10 @@ import type { PlayerRef } from "@remotion/player";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FilmIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { ListItems } from "@/components/montage/list-items";
-import { LookPanel } from "@/components/montage/look-panel";
+import { StylePicker } from "@/components/montage/style-picker";
 import { clipFaceBlur } from "@/components/montage/retouch-actions";
 import { RetouchSwitches } from "@/components/montage/retouch-switches";
-import { DEFAULT_Y, places, TextBoxes, Y_MAX, Y_MIN } from "@/components/montage/text-boxes";
+import { TextBoxes } from "@/components/montage/text-boxes";
 import { AskFauveButton, useFauveDrawer } from "@/components/fauve-drawer";
 import { ReelPlayer } from "@/components/reel-player";
 import { saveEditPlan } from "./actions";
@@ -33,19 +33,6 @@ import { saveEditPlan } from "./actions";
 type Text = EditPlan["texts"][number];
 
 const kindLabels = { clip: "Vidéo", scene: "Texte", motion: "Animation" } as const;
-const styleLabels: Record<Text["style"], string> = { hook: "Accroche", band: "Bandeau", caption: "Sous-titre" };
-const sceneKinds = [
-  { value: "title", label: "Titre" },
-  { value: "list", label: "Liste" },
-  { value: "quote", label: "Citation" },
-  { value: "number", label: "Chiffre" },
-] as const;
-const backgrounds = [
-  { value: "accent", label: "Couleur" },
-  { value: "ink", label: "Sombre" },
-  { value: "cream", label: "Clair" },
-] as const;
-
 const round = (n: number) => Math.round(n * 10) / 10;
 
 function sceneLabel(segment: Segment, clipLabels: Record<string, string>): string {
@@ -280,7 +267,7 @@ export function MontageEditor({
               className="inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-soft px-3 py-2 text-[13px] font-bold text-violet hover:bg-violet hover:text-white"
             />
           )}
-          <SegmentFields segment={segment} onChange={setSegment} clipDuration={"clip_id" in segment ? clipDurations[segment.clip_id] : null} />
+          <SegmentFields segment={segment} onChange={setSegment} />
           <div className="flex flex-col gap-3 border-t border-line pt-4">
             <div className="flex items-center justify-between">
               <h3 className="text-[14px] font-bold">Textes sur cette scène</h3>
@@ -289,7 +276,11 @@ export function MontageEditor({
                 Ajouter un texte
               </button>
             </div>
-            {sceneTexts.length === 0 && <p className="text-[13px] text-muted">Aucun texte par-dessus cette scène.</p>}
+            {sceneTexts.length === 0 ? (
+              <p className="text-[13px] text-muted">Aucun texte par-dessus cette scène.</p>
+            ) : (
+              <p className="-mt-1 text-[12px] text-muted">Pour le placer, fais glisser le texte sur la vidéo. Clique dessus pour changer les mots.</p>
+            )}
             {sceneTexts.map(({ t, i }) => (
               <div
                 key={i}
@@ -313,82 +304,31 @@ export function MontageEditor({
                     onChange={(patch) => setText(i, { ...patch, ...(patch.items ? { text: patch.items[0]?.title.slice(0, 120) ?? t.text } : {}) })}
                   />
                 )}
-                <div className="flex flex-wrap items-center gap-2">
-                  {(Object.keys(styleLabels) as Text["style"][]).map((style) => (
-                    <button
-                      key={style}
-                      type="button"
-                      onClick={() => setText(i, { style })}
-                      className={`h-8 rounded-full px-3 text-[12px] font-semibold ${t.style === style ? "bg-violet text-white" : "bg-white text-muted"}`}
-                    >
-                      {styleLabels[style]}
-                    </button>
-                  ))}
-                  <button type="button" aria-label="Supprimer ce texte" onClick={() => removeText(i)} className="ml-auto text-muted hover:text-danger">
-                    <TrashIcon size={16} />
-                  </button>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[12px] font-semibold text-muted">Place</span>
-                  {places.map((place) => (
-                    <button
-                      key={place.label}
-                      type="button"
-                      onClick={() => setText(i, { y: place.y })}
-                      className={`h-8 rounded-full px-3 text-[12px] font-semibold ${
-                        Math.abs((t.y ?? DEFAULT_Y[t.style]) - place.y) < 0.04 ? "bg-violet text-white" : "bg-white text-muted"
-                      }`}
-                    >
-                      {place.label}
-                    </button>
-                  ))}
-                  <span className="ml-2 text-[12px] font-semibold text-muted">Taille</span>
+                <StylePicker role={t.style} look={t.look} saved={looks} brand={props.brand} sample={t.text} onChange={(look) => setText(i, { look })} />
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] font-semibold text-muted">Taille</span>
                   <button
                     type="button"
                     aria-label="Plus petit"
+                    disabled={(t.scale ?? 1) <= 0.6}
                     onClick={() => setText(i, { scale: Math.max(0.6, round((t.scale ?? 1) - 0.1)) })}
-                    className="h-8 w-9 rounded-full bg-white text-[12px] font-bold text-muted"
+                    className="size-9 rounded-full bg-white text-[13px] font-bold text-muted disabled:opacity-30"
                   >
                     A−
                   </button>
                   <button
                     type="button"
                     aria-label="Plus grand"
+                    disabled={(t.scale ?? 1) >= 1.6}
                     onClick={() => setText(i, { scale: Math.min(1.6, round((t.scale ?? 1) + 0.1)) })}
-                    className="h-8 w-9 rounded-full bg-white text-[14px] font-bold text-muted"
+                    className="size-9 rounded-full bg-white text-[15px] font-bold text-muted disabled:opacity-30"
                   >
                     A+
                   </button>
-                  <label className="ml-2 flex items-center gap-1.5 text-[12px] font-semibold text-muted">
-                    <input type="checkbox" checked={t.backdrop ?? false} onChange={(e) => setText(i, { backdrop: e.target.checked || undefined })} />
-                    Fond derrière
-                  </label>
+                  <button type="button" aria-label="Supprimer ce texte" onClick={() => removeText(i)} className="ml-auto flex size-9 items-center justify-center rounded-full text-muted hover:text-danger">
+                    <TrashIcon size={16} />
+                  </button>
                 </div>
-                <label className="flex flex-col gap-1 text-[12px] text-muted">
-                  <span>Hauteur (ou attrape le texte sur l’aperçu)</span>
-                  <input
-                    type="range"
-                    min={Y_MIN}
-                    max={Y_MAX}
-                    step={0.01}
-                    value={t.y ?? DEFAULT_Y[t.style]}
-                    onChange={(e) => setText(i, { y: Number(e.target.value) })}
-                    className="accent-violet"
-                  />
-                </label>
-                <LookPanel role={t.style} look={t.look} saved={looks} brand={props.brand} onChange={(look) => setText(i, { look })} />
-                <Range
-                  label="Apparaît"
-                  min={span.start}
-                  max={span.end}
-                  from={t.from}
-                  to={t.to}
-                  onChange={(from, to) => {
-                    setText(i, { from, to });
-                    seek(from + 0.05);
-                  }}
-                  offset={span.start}
-                />
               </div>
             ))}
           </div>
@@ -425,91 +365,27 @@ function Field({ label, value, max, onChange }: { label: string; value: string; 
   );
 }
 
-/** Two sliders: start and end, in seconds from `offset` (the scene's start). */
-function Range({
-  label,
-  min,
-  max,
-  from,
-  to,
-  offset = 0,
-  onChange,
-}: {
-  label: string;
-  min: number;
-  max: number;
-  from: number;
-  to: number;
-  offset?: number;
-  onChange: (from: number, to: number) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1 text-[12px] text-muted">
-      <span>
-        {label} de {round(from - offset)} s à {round(to - offset)} s
-      </span>
-      <div className="flex gap-3">
-        <input
-          type="range"
-          aria-label="Début"
-          min={min}
-          max={max}
-          step={0.1}
-          value={from}
-          onChange={(e) => onChange(Math.min(Number(e.target.value), to - 0.3), to)}
-          className="flex-1 accent-violet"
-        />
-        <input
-          type="range"
-          aria-label="Fin"
-          min={min}
-          max={max}
-          step={0.1}
-          value={to}
-          onChange={(e) => onChange(from, Math.max(Number(e.target.value), from + 0.3))}
-          className="flex-1 accent-violet"
-        />
-      </div>
-    </div>
-  );
-}
-
-/** The fields of one scene, by kind. */
-function SegmentFields({ segment, onChange, clipDuration }: { segment: Segment; onChange: (s: Segment) => void; clipDuration: number | null | undefined }) {
+/** The words of one scene (cuts, lengths and looks are Brigitte's: « Demander à Brigitte »). */
+function SegmentFields({ segment, onChange }: { segment: Segment; onChange: (s: Segment) => void }) {
   if ("clip_id" in segment) {
-    const length = clipDuration ?? Math.max(segment.out, 15);
+    // Faces are tracked over the whole clip, so the blur follows this clip wherever it is used.
     return (
-      <div className="flex flex-col gap-3">
-        <Range
-          label="Passage de la vidéo"
-          min={0}
-          max={round(length)}
-          from={segment.in}
-          to={segment.out}
-          onChange={(from, to) => onChange({ ...segment, in: round(from), out: round(to) })}
-        />
-        <label className="flex items-center gap-2 text-[13px]">
-          <input type="checkbox" checked={segment.zoom === "light"} onChange={(e) => onChange({ ...segment, zoom: e.target.checked ? "light" : "none" })} />
-          Léger zoom
-        </label>
-        {/* Faces are tracked over the whole clip, so the blur follows this clip wherever it is used. */}
-        <RetouchSwitches
-          key={segment.clip_id}
-          showLight={false}
-          light={false}
-          faces={Boolean(segment.blur?.tracks.length)}
-          onChange={async (next) => {
-            if (!next.faces) {
-              onChange({ ...segment, blur: undefined });
-              return { ok: true };
-            }
-            const res = await clipFaceBlur(segment.clip_id).catch(() => ({ ok: false as const, error: "Brigitte n’a pas pu regarder cette vidéo." }));
-            if (!res.ok) return { ok: false, message: res.error };
-            if (res.value) onChange({ ...segment, blur: res.value });
-            return { ok: true, message: res.note };
-          }}
-        />
-      </div>
+      <RetouchSwitches
+        key={segment.clip_id}
+        showLight={false}
+        light={false}
+        faces={Boolean(segment.blur?.tracks.length)}
+        onChange={async (next) => {
+          if (!next.faces) {
+            onChange({ ...segment, blur: undefined });
+            return { ok: true };
+          }
+          const res = await clipFaceBlur(segment.clip_id).catch(() => ({ ok: false as const, error: "Brigitte n’a pas pu regarder cette vidéo." }));
+          if (!res.ok) return { ok: false, message: res.error };
+          if (res.value) onChange({ ...segment, blur: res.value });
+          return { ok: true, message: res.note };
+        }}
+      />
     );
   }
   if ("scene" in segment) {
@@ -517,24 +393,13 @@ function SegmentFields({ segment, onChange, clipDuration }: { segment: Segment; 
     const set = (patch: Partial<typeof scene>) => onChange({ ...segment, scene: { ...scene, ...patch } });
     return (
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] font-semibold text-muted">Type</span>
-          {sceneKinds.map((k) => (
-            <button
-              key={k.value}
-              type="button"
-              onClick={() => set({ kind: k.value, items: k.value === "list" ? (scene.items?.length ? scene.items : ["Première ligne"]) : scene.items })}
-              className={`h-8 rounded-full px-3 text-[12px] font-semibold ${scene.kind === k.value ? "bg-violet text-white" : "bg-soft text-muted"}`}
-            >
-              {k.label}
-            </button>
-          ))}
-        </div>
         <Field label={scene.kind === "quote" ? "Citation" : scene.kind === "number" ? "Chiffre ou offre" : "Titre"} value={scene.title} max={60} onChange={(title) => set({ title })} />
-        <Field label={scene.kind === "quote" ? "Auteur" : "Petit texte au-dessus"} value={scene.kicker ?? ""} max={40} onChange={(kicker) => set({ kicker: kicker || undefined })} />
+        {(scene.kicker || scene.kind === "quote") && (
+          <Field label={scene.kind === "quote" ? "Auteur" : "Petit texte au-dessus"} value={scene.kicker ?? ""} max={40} onChange={(kicker) => set({ kicker: kicker || undefined })} />
+        )}
         {scene.kind === "list" && (
           <label className="flex flex-col gap-1">
-            <span className="text-[12px] font-semibold text-muted">Lignes de la liste (une par ligne, 5 au plus)</span>
+            <span className="text-[12px] font-semibold text-muted">Lignes de la liste (une par ligne)</span>
             <textarea
               value={(scene.items ?? []).join("\n")}
               rows={4}
@@ -543,47 +408,23 @@ function SegmentFields({ segment, onChange, clipDuration }: { segment: Segment; 
             />
           </label>
         )}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] font-semibold text-muted">Fond</span>
-          {backgrounds.map((b) => (
-            <button
-              key={b.value}
-              type="button"
-              onClick={() => set({ background: b.value })}
-              className={`h-8 rounded-full px-3 text-[12px] font-semibold ${scene.background === b.value ? "bg-violet text-white" : "bg-soft text-muted"}`}
-            >
-              {b.label}
-            </button>
-          ))}
-        </div>
-        <Duration value={segment.duration} max={6} onChange={(duration) => onChange({ ...segment, duration })} />
       </div>
     );
   }
   const texts = segment.motion.texts ?? {};
+  if (!Object.keys(texts).length) return null;
   return (
     <div className="flex flex-col gap-3">
-      {Object.keys(texts).length === 0 && <p className="text-[13px] text-muted">Cette animation n’a pas de texte modifiable.</p>}
-      {Object.entries(texts).map(([slot, value]) => (
+      {Object.entries(texts).map(([slot, value], n) => (
         <Field
           key={slot}
-          label={`Texte « ${slot.replace(/_/g, " ")} »`}
+          label={Object.keys(texts).length > 1 ? `Texte ${n + 1}` : "Texte de l’animation"}
           value={value}
           max={200}
           onChange={(text) => onChange({ ...segment, motion: { ...segment.motion, texts: { ...texts, [slot]: text } } })}
         />
       ))}
-      <Duration value={segment.duration} max={8} onChange={(duration) => onChange({ ...segment, duration })} />
     </div>
-  );
-}
-
-function Duration({ value, max, onChange }: { value: number; max: number; onChange: (v: number) => void }) {
-  return (
-    <label className="flex flex-col gap-1 text-[12px] text-muted">
-      <span>Durée : {round(value)} s</span>
-      <input type="range" min={1} max={max} step={0.1} value={value} onChange={(e) => onChange(round(Number(e.target.value)))} className="accent-violet" />
-    </label>
   );
 }
 
