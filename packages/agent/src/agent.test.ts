@@ -798,4 +798,7 @@ test("style buttons add one adjustment per kind to the art direction", async () 
   const kept = withAdjustment(long, "punchier", 1500);
   assert.ok(kept.startsWith(long) && kept.length <= 1500);
   assert.equal(withAdjustment(undefined, "sober").startsWith("Ajustement"), true);
+  // « Autre chose »: her own words, as one more adjustment.
+  const custom = withAdjustment(once, { wish: "  plus de couleurs   de ma charte " });
+  assert.ok(custom.endsWith("Ajustement de la gérante — plus de couleurs de ma charte."));
 });

@@ -86,7 +86,7 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const intro = `Ton montage « ${r.title} » est prêt 🎬${seconds ? ` (${seconds} s)` : ""}.`;
   const notes = [target.rationale, target.care].filter(Boolean).join("\n\n");
   const after = [
-    styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus chaleureux, plus sobre ou plus pêchu : je retiens ton style pour tous les prochains." : "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
+    styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus chaleureux, plus sobre, plus pêchu ou autrement : je retiens ton style pour tous les prochains." : "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
     target.offerVariant === false || styleCheck
       ? ""
       : `Je peux aussi te faire une variante (autre style, autre accroche) pour ${CREDIT_PRICES.variant} crédit${CREDIT_PRICES.variant > 1 ? "s" : ""}.`,
