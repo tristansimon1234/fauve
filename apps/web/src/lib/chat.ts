@@ -2,7 +2,7 @@ import "server-only";
 import { awaitsAnswer, echoFor, emojiOnly, segmentKind, editPlanSchema } from "@fauve/agent";
 import { after } from "next/server";
 import { replyInConversation } from "@/lib/agent/conversation";
-import { reactTo } from "@/lib/agent/mood";
+import { reactTo, type Reaction } from "@/lib/agent/mood";
 import type { ChatEvent } from "@/lib/agent/run";
 import { extrasOf, resolveCards, type ChatCard } from "@/lib/chat-cards";
 import { setReaction, type Reactions } from "@/lib/reactions";
@@ -202,6 +202,9 @@ export async function chatTurn(
   const body = text.trim().slice(0, 4000);
   const files = attachments.slice(0, MAX_ATTACHMENTS);
   if (!body && !files.length) return { ok: false, error: "Message vide.", conversationId };
+  // Her face (and an emoji) as early as possible: Jev reads the message while it is being stored
+  // and while Claude starts, and the page gets it the moment it is known. Only emojis: no reading.
+  const reading = body && !emojiOnly(body) ? readReaction(ctx.studioId, conversationId, body, onEvent) : null;
   const valid = files.every(
     (f) => f.path.startsWith(`${ctx.studioId}/chat/`) && !f.path.includes("..") && /^(image|video)\//.test(f.mime) && f.size > 0,
   );
@@ -279,7 +282,8 @@ export async function chatTurn(
   }
 
   // Her face and an emoji on the message, in a fraction of a second (Jev), while the chat model writes.
-  const reacting = body && lastRowId ? instantReaction(ctx.studioId, id, body, lastRowId, onEvent) : null;
+  // The emoji is kept on her message once both are there.
+  const reacting = reading && lastRowId ? keepReaction(reading, lastRowId) : null;
 
   try {
     const result = await replyInConversation({
@@ -313,18 +317,29 @@ export async function chatTurn(
   return { ok: true, conversationId: id, messages, conversations };
 }
 
-/** Brigitte's reaction to the manager's message, sent to the page as soon as it is known and kept on the message. */
-async function instantReaction(studioId: string, conversationId: string, body: string, rowId: string, onEvent?: (event: ChatEvent) => void) {
-  const { data: previous } = await supabaseAdmin()
-    .from("whatsapp_messages")
-    .select("body")
-    .eq("conversation_id", conversationId)
-    .eq("direction", "outbound")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const reaction = await reactTo(studioId, body, (previous?.body as string | null) ?? null);
+/** Brigitte's reaction to the manager's message, sent to the page the moment Jev answers. */
+async function readReaction(studioId: string, conversationId: string | null, body: string, onEvent?: (event: ChatEvent) => void) {
+  const started = Date.now();
+  // Her previous message helps read a joke or a reply; only from this studio's conversation.
+  const previous = conversationId
+    ? await supabaseAdmin()
+        .from("whatsapp_messages")
+        .select("body")
+        .eq("studio_id", studioId)
+        .eq("conversation_id", conversationId)
+        .eq("direction", "outbound")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => (data?.body as string | null) ?? null, () => null)
+    : null;
+  const reaction = await reactTo(studioId, body, previous);
   onEvent?.({ type: "mood", mood: reaction.mood, emoji: reaction.emoji });
-  if (reaction.emoji) await setReaction({ id: rowId }, "fauve", reaction.emoji);
+  console.info("instant reaction", { by: reaction.by, ms: Date.now() - started, mood: reaction.mood, emoji: reaction.emoji });
+  return reaction;
 }
 
+async function keepReaction(reading: Promise<Reaction>, rowId: string) {
+  const reaction = await reading;
+  if (reaction.emoji) await setReaction({ id: rowId }, "fauve", reaction.emoji);
+}

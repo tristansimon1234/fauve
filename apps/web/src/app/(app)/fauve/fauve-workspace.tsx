@@ -396,11 +396,11 @@ export function FauveWorkspace({
       : null;
   // Getting started: the current step's card always sits under Brigitte's latest
   // message, even when she forgot to attach it; not when she offered answer
-  // buttons instead, nor for the first post (it has its own flow) nor Instagram
-  // (she offers it herself once the publication is ready, not during the montage).
+  // buttons or asked for files instead (the first post's flow in the chat), nor
+  // Instagram (she offers it herself once the publication is ready, not during the montage).
   const last = messages.at(-1);
   const stepUnder =
-    onboarding && onboarding.step !== "done" && onboarding.step !== "first_post" && onboarding.step !== "connect" && last?.from === "fauve" && !last.options.length && last.stepCard !== onboarding.step
+    onboarding && onboarding.step !== "done" && onboarding.step !== "connect" && last?.from === "fauve" && !last.options.length && !last.upload && !last.pickMedia && last.stepCard !== onboarding.step
       ? onboarding.step
       : null;
   return (
