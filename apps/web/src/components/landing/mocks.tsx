@@ -1,8 +1,9 @@
 // Small drawings of what Brigitte makes, for the landing (illustrations, not data).
 
 /** Photos from Unsplash (free licence), served by its CDN at the size asked. */
+// Asked at the size shown (CSS pixels) with dpr 2, so they stay sharp on phone and retina screens.
 export const unsplash = (id: string, w: number, h?: number) =>
-  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=70&w=${w}${h ? `&h=${h}` : ""}`;
+  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=80&dpr=2&w=${w}${h ? `&h=${h}` : ""}`;
 
 export const PHOTOS = {
   studioClass: "1518611012118-696072aa579a",
@@ -35,7 +36,7 @@ export function ReelMock({ width, still = false, name = "Studio Lune" }: { width
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={id}
-          src={unsplash(id, Math.round(width * 2), Math.round((width * 32) / 9))}
+          src={unsplash(id, Math.round(width), Math.round((width * 16) / 9))}
           alt=""
           loading="lazy"
           className={`absolute inset-0 size-full object-cover ${still ? "" : "landing-reel-shot"}`}
@@ -83,7 +84,7 @@ export function CarouselMock() {
             style={{ transform: `translateX(${(i - 1) * 64}px) rotate(${(i - 1) * 6}deg) scale(${i === 0 ? 1 : 0.9})`, zIndex: 3 - i }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={unsplash(s.id, 256, 320)} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" />
+            <img src={unsplash(s.id, 128, 160)} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" />
             <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_40%,rgba(0,0,0,.55)_100%)]" />
             <span className="relative font-[family-name:var(--font-serif)] text-[24px] leading-none italic">{s.title}</span>
             <span className="relative mt-1 text-[11px] leading-tight font-semibold">{s.sub}</span>
@@ -148,7 +149,7 @@ export function RetouchMock() {
         <span key={String(after)} className="relative h-[120px] overflow-hidden rounded-[12px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={unsplash(PHOTOS.cafe, 300, 240)}
+            src={unsplash(PHOTOS.cafe, 180, 120)}
             alt=""
             loading="lazy"
             className="size-full object-cover"

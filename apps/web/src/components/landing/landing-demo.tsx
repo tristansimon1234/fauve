@@ -65,7 +65,7 @@ export function LandingDemo() {
               <span className="ml-1 grid grid-cols-3 gap-1">
                 {[PHOTOS.studioClass, PHOTOS.groupClass, PHOTOS.yogaSunset].map((id) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={id} src={unsplash(id, 56, 64)} alt="" className="h-8 w-7 rounded-[6px] object-cover" />
+                  <img key={id} src={unsplash(id, 28, 32)} alt="" className="h-8 w-7 rounded-[6px] object-cover" />
                 ))}
               </span>
             </span>

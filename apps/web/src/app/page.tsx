@@ -100,7 +100,7 @@ export default function LandingPage() {
           ).map(([id, label]) => (
             <li key={id} className="relative h-[180px] overflow-hidden rounded-[22px] sm:h-[220px]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={unsplash(id, 600, 440)} alt={label} loading="lazy" className="size-full object-cover" />
+              <img src={unsplash(id, 400, 300)} alt={label} loading="lazy" className="size-full object-cover" />
               <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(28,21,48,0)_45%,rgba(28,21,48,.7)_100%)]" />
               <span className="absolute inset-x-4 bottom-3.5 text-[15px] leading-snug font-bold text-white">{label}</span>
             </li>
