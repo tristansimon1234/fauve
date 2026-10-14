@@ -6,6 +6,7 @@ import { canTransition } from "./status.ts";
 import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES } from "./credits.ts";
+import { businessFamily, postIdeas } from "./post-ideas.ts";
 import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 
 const validPlan = {
@@ -866,4 +867,24 @@ test("a studio's month splits the chat from the work and says what is left", () 
   assert.equal(month.byPurpose.editor, 3.5);
   assert.equal(month.budgetLeft, 24.5 - 13.5);
   assert.equal(month.margin, Math.round((1 - 13.5 / 49) * 1000) / 1000);
+});
+
+test("post ideas follow the kind of business", () => {
+  assert.equal(businessFamily("studio de Pilates"), "sport");
+  assert.equal(businessFamily("Salon de coiffure"), "beauty");
+  assert.equal(businessFamily("brasserie"), "food");
+  assert.equal(businessFamily("fleuriste"), "shop");
+  assert.equal(businessFamily(null), "other");
+  assert.ok(postIdeas("restaurant").reel.includes("Le plat du jour"));
+});
+
+test("site colours: Squarespace theme HSL variables count, its generic sheets do not", async () => {
+  const { extractBrandStyle, stylesheetLinks } = await import("./website.ts");
+  const style = extractBrandStyle("<html></html>", [":root{--accent-hsl:189.68,62%,80.39%;--darkAccent-hsl:108,68.18%,34.51%;--white-hsl:52.5,44.44%,92.94%}"]);
+  assert.deepEqual(style.colors.slice(0, 2), ["#aee2ec", "#34941c"]);
+  const links = stylesheetLinks(
+    '<link rel="stylesheet" href="//assets.squarespace.com/universal/styles-compressed/commerce.css"><link rel="stylesheet" href="https://static1.squarespace.com/static/versioned-site-css/x/site.css">',
+    "https://www.example.com/",
+  );
+  assert.deepEqual(links, ["https://static1.squarespace.com/static/versioned-site-css/x/site.css"]);
 });

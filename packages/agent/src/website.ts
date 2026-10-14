@@ -203,7 +203,10 @@ export function stylesheetLinks(rawHtml: string, pageUrl: string, max = 3): stri
     const url = href ? absolute(href, pageUrl) : null;
     if (url && !/fonts\.googleapis|use\.typekit|fontawesome|font-awesome|icons?\b/i.test(url)) hrefs.push(url);
   }
-  return unique(hrefs).slice(0, max);
+  // Site builders load their own generic sheets first (shop, account, components: error reds,
+  // default greys): skip them, the site's theme sheet holds its colours.
+  const generic = /assets\.squarespace\.com\/universal|definitions\.sqspcdn\.com|static\.parastorage\.com\/services|cdn\.shopify\.com\/shopifycloud/i;
+  return unique(hrefs.filter((h) => !generic.test(h))).slice(0, max);
 }
 
 const hex2 = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
@@ -219,7 +222,17 @@ function toHex(raw: string): string | null {
   }
   m = value.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/) ?? value.match(/^(\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})$/);
   if (m) return `#${hex2(+m[1]!)}${hex2(+m[2]!)}${hex2(+m[3]!)}`;
+  // HSL, written out or as Squarespace's theme variables (« --accent-hsl: 189.68,62%,80.39% »).
+  m = value.match(/^(?:hsla?\(\s*)?(\d+(?:\.\d+)?)(?:deg)?[\s,]+(\d+(?:\.\d+)?)%[\s,]+(\d+(?:\.\d+)?)%/);
+  if (m) return hslToHex(+m[1]!, +m[2]! / 100, +m[3]! / 100);
   return null;
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return `#${hex2(f(0) * 255)}${hex2(f(8) * 255)}${hex2(f(4) * 255)}`;
 }
 
 function saturationAndLightness(hex: string): { s: number; l: number } {
@@ -283,7 +296,7 @@ export function extractBrandStyle(rawHtml: string, cssTexts: string[] = []): Bra
         ? 1
         : 0;
     if (!weight) continue;
-    for (const c of value.match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|^\s*\d{1,3},\s*\d{1,3},\s*\d{1,3}\s*$/gi) ?? []) add(c, weight);
+    for (const c of value.match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|^\s*\d{1,3},\s*\d{1,3},\s*\d{1,3}\s*$|^\s*\d+(?:\.\d+)?,\s*\d+(?:\.\d+)?%,\s*\d+(?:\.\d+)?%\s*$/gi) ?? []) add(c, weight);
   }
 
   const ranked = [...scores.entries()].sort((a, b) => b[1] - a[1]).map(([hex]) => hex);

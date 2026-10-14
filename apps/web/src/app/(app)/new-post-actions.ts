@@ -1,6 +1,6 @@
 "use server";
 
-import { type ReelInputs } from "@fauve/agent";
+import { postIdeas, type ReelInputs } from "@fauve/agent";
 import { listInspirations, type InspirationItem } from "@/lib/inspirations";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { freeSlots, type Slot } from "@/lib/slots";
@@ -23,6 +23,8 @@ export type NewPostOptions = {
   /** The studio's components, by kit (the inspiration they came from). */
   kits: { id: string; name: string; elements: BankElementView[] }[];
   brand: ReelInputs["brand"];
+  /** One-tap ideas by format, for this kind of business. */
+  ideas: Record<"reel" | "carousel" | "post" | "story", string[]>;
 };
 
 export async function newPostOptions(): Promise<NewPostOptions | null> {
@@ -39,6 +41,7 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     listElements(studioId, 60),
     loadMontageInputs(studioId, { segments: [] }),
   ]);
+  const { data: studio } = await db.from("studios").select("business_type").eq("id", studioId).maybeSingle();
 
   const media = (assets.data ?? []).map((a) => ({ id: a.id as string, path: a.storage_path as string, video: a.kind === "video", at: a.created_at as string }));
   const urls = await signMediaUrls(db, studioId, media.map((m) => m.path));
@@ -53,6 +56,7 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     inspirations,
     kits: kitsFrom(elements),
     brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts },
+    ideas: postIdeas(studio?.business_type as string | null),
   };
 }
 

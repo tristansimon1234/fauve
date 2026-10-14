@@ -101,6 +101,8 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
   // Her site's fonts, as saved from its CSS by now (read_website): the reading names them, not look-alikes.
   const { data: current } = await db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle();
   const siteFonts = ((current?.profile as { fonts?: unknown } | null)?.fonts as string[] | undefined)?.filter((f) => typeof f === "string").slice(0, 3) ?? [];
+  // Her theme's colours, as found in the site's code: the palette starts from them.
+  const siteColors = ((current?.profile as { colors?: unknown } | null)?.colors as string[] | undefined)?.filter((c) => typeof c === "string").slice(0, 6) ?? [];
   const business = (studio?.business_type as string | null) ?? null;
   let reading: { reading: string; palette: string[]; fonts?: { display: string; body: string } } | null = null;
   try {
@@ -113,7 +115,7 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
       ],
       {
         model: CHAT_MODEL,
-        intro: `Le site de « ${name} »${business ? ` (${business})` : ""} : la gérante n'a pas encore fait de moodboard, son site est le meilleur indice de son style. Lis-en la direction artistique comme pour un moodboard (lumière, couleurs, typographie, cadrages, mise en page, ambiance), pour que ses Reels et ses visuels lui ressemblent.${siteFonts.length ? ` Les polices de son site sont ${siteFonts.join(", ")} : ce sont elles que ses visuels utilisent ; pour la typographie, décris comment elles sont employées (graisse, capitales, espacement, taille) sans proposer d'autres polices.` : ""}`,
+        intro: `Le site de « ${name} »${business ? ` (${business})` : ""} : la gérante n'a pas encore fait de moodboard, son site est le meilleur indice de son style. Lis-en la direction artistique comme pour un moodboard (lumière, couleurs, typographie, cadrages, mise en page, ambiance), pour que ses Reels et ses visuels lui ressemblent.${siteColors.length ? ` Les couleurs du thème de son site (dans son code) sont ${siteColors.join(", ")} : ta palette part d'elles.` : ""} La palette est celle de sa charte (fonds, titres, boutons, logo, aplats), jamais la couleur d'un objet photographié (plat, produit, vêtement, fleur, décor).${siteFonts.length ? ` Les polices de son site sont ${siteFonts.join(", ")} : ce sont elles que ses visuels utilisent ; pour la typographie, décris comment elles sont employées (graisse, capitales, espacement, taille) sans proposer d'autres polices.` : ""}`,
       },
     );
   } catch (error) {

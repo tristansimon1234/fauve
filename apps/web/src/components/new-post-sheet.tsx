@@ -40,8 +40,8 @@ const placeholders: Record<PostKind, string> = {
   story: "Ex. il reste 2 places ce soir",
 };
 
-/** A few ideas to start from, by format. */
-const ideas: Record<PostKind, string[]> = {
+/** A few ideas to start from, by format, until the studio's own (by its kind of business) are loaded. */
+const fallbackIdeas: Record<PostKind, string[]> = {
   reel: ["Les coulisses", "Un moment fort", "Une astuce", "Avant / après", "Une offre"],
   carousel: ["3 conseils", "Le planning de la semaine", "Une nouveauté", "Un témoignage", "Les tarifs"],
   post: ["Une nouveauté", "L’équipe", "Une offre", "Une citation"],
@@ -461,7 +461,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                 className="rounded-[14px] border border-line bg-white px-3.5 py-3 text-[15px] leading-snug outline-none focus:border-violet"
               />
               <div className="flex flex-wrap gap-1.5" aria-label="Idées">
-                {ideas[kind].map((idea) => (
+                {(options?.ideas ?? fallbackIdeas)[kind].map((idea) => (
                   <button
                     key={idea}
                     type="button"

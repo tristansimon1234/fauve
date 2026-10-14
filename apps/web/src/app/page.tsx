@@ -113,7 +113,7 @@ export default function LandingPage() {
           De vraies publications, <span className="accent">faites par l’app.</span>
         </SectionTitle>
         <p className="-mt-4 max-w-[640px] text-[16px] leading-relaxed text-muted">
-          Ces Reels sortent tels quels de Brigitte, pour trois commerces d’exemple : elle a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
+          Ces Reels et ce carrousel sortent tels quels de Brigitte, pour trois commerces d’exemple : elle a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
         </p>
         <div className={`grid items-center gap-10 rounded-[28px] border border-line bg-[radial-gradient(ellipse_at_top,#fff_0%,#FBF7F4_70%)] px-4 py-8 sm:px-8 ${SHOWCASE_SLIDES.length ? "lg:grid-cols-[1.6fr_1fr]" : ""}`}>
           <ReelsShowcase />

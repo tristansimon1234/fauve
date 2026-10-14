@@ -15,7 +15,7 @@ export const SHOWCASE_REELS = [
 ] as const;
 
 /** The carousel's rendered photos (empty until it is made: the Reels then take the whole width). */
-export const SHOWCASE_SLIDES: readonly string[] = [];
+export const SHOWCASE_SLIDES: readonly string[] = ["carrousel-1.jpg", "carrousel-2.jpg", "carrousel-3.jpg", "carrousel-4.jpg"];
 
 /** A Reel in a phone, as on Instagram: it plays muted while it is on screen. */
 function ReelPhone({ reel, big }: { reel: (typeof SHOWCASE_REELS)[number]; big?: boolean }) {
