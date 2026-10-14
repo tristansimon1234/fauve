@@ -27,7 +27,7 @@ import type { CardQuote } from "@/lib/chat-cards";
 import { Bubble } from "./chat-bubble";
 import { montageStep } from "./chat-cards";
 import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "./chat-sync";
-import { isFunny, upsetLevel } from "@fauve/agent";
+import { isFunny, isSweet, upsetLevel } from "@fauve/agent";
 import { FileStrip, useChatUploads } from "./chat-uploads";
 import type { OnboardingView } from "./onboarding-actions";
 import { OnboardingCard, OnboardingStepper } from "@/components/onboarding/onboarding-card";
@@ -416,7 +416,7 @@ export function FauveWorkspace({
     : latest
       ? {
           id: latest.id,
-          mood: turnMood?.mood ?? upsetLevel(asked) ?? (isFunny(latest.body) || isFunny(asked) ? "laugh" : "happy"),
+          mood: turnMood?.mood ?? upsetLevel(asked) ?? (isSweet(asked) ? "shy" : isFunny(latest.body) || isFunny(asked) ? "laugh" : "happy"),
           fresh: arrived.has(latest.id),
         }
       : null;

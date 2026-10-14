@@ -4,7 +4,7 @@
 // app, and an emoji on the manager's message when one fits.
 
 /** Brigitte's faces (components/mascot.tsx), the ones a message can trigger. */
-export const REACTION_MOODS = ["laugh", "happy", "surprised", "sad", "cry", "neutral"] as const;
+export const REACTION_MOODS = ["laugh", "happy", "shy", "surprised", "sad", "angry", "cry", "neutral"] as const;
 export type ReactionMood = (typeof REACTION_MOODS)[number];
 
 /** What each face means, as Jev reads it (in English; the messages themselves are in French). */
@@ -12,13 +12,17 @@ export const MOOD_CRITERIA: Record<ReactionMood, string> = {
   laugh:
     "The message is funny or playful and Brigitte would laugh: a joke, a pun, irony or self-mockery, teasing Brigitte, an absurd or comic situation, or laughter markers such as « mdr », « ptdr », « haha », « lol », « 😂 », « 🤣 ». Also when the manager laughs at a joke Brigitte just made. Not for polite friendliness alone, and never when the joke is bitter or sarcastic about Brigitte's work.",
   happy:
-    "The manager is pleased, grateful or enthusiastic: she thanks Brigitte, compliments her work, approves a draft (« super », « parfait », « j'adore », « top », « génial »), shares good news about her business (a full class, a good month, a new client), or answers warmly with positive emojis (❤️, 🥰, 😍, 🙌, ✨). The default face for a friendly, positive message that is not funny.",
+    "The manager is pleased, grateful or enthusiastic: she thanks Brigitte, approves a draft (« super », « parfait », « j'adore », « top », « génial »), shares good news about her business (a full class, a good month, a new client), or answers warmly with positive emojis (🙌, ✨, 👏). The default face for a friendly, positive message that is not funny and not a personal compliment to Brigitte.",
+  shy:
+    "The manager pays Brigitte a personal compliment or a sweet word aimed at her, not at the work: « tu es géniale », « t'es la meilleure », « je t'adore », « qu'est-ce que je ferais sans toi », « tu es un amour », a kiss or hearts sent to her (😘, 🥰, 😍, ❤️). Brigitte blushes with a shy smile. Not for a plain « merci » or for approving a draft (that is happy).",
   surprised:
     "The manager shares something unexpected, impressive or out of the ordinary: a record, a big number, a sudden change of plans, an unusual request, or she is amazed herself (« waouh », « sérieux ? », « incroyable », « 😮 », « 😱 »). Also a surprising question that Brigitte would not expect. Not for a routine piece of information.",
   sad:
-    "The manager is disappointed, sad, tired or discouraged, without being angry: the result does not please her (« bof », « pas fan », « ça ne me ressemble pas », « dommage »), bad news (an empty class, a cancellation, a bad week, a closure), lack of time or energy (« je suis épuisée », « je n'ai rien filmé »), or doubts about her business. Gentle and low, not aggressive.",
+    "The manager is disappointed, sad, tired or discouraged, without being angry: the result does not please her (« bof », « pas fan », « ça ne me ressemble pas », « dommage »), bad news (an empty class, a cancellation, a bad week), lack of time or energy (« je suis épuisée », « je n'ai rien filmé »), or doubts about her business. Gentle and low, not aggressive.",
+  angry:
+    "The manager is annoyed or angry, usually about the result, a bug or a delay: reproaches (« c'est nul », « n'importe quoi », « ça ne marche pas », « encore raté », « j'en ai marre », « ça m'énerve »), shouting in capital letters, several exclamation marks (« !!! »), angry emojis (😡, 🤬, 😤, 💢), or the same complaint repeated. Brigitte frowns, a little vexed, but stays on her side and wants to fix it.",
   cry:
-    "The manager is upset, angry or very frustrated, usually at Brigitte or the result: reproaches (« c'est nul », « n'importe quoi », « ça ne marche pas », « encore raté », « j'en ai marre »), insults, shouting in capital letters, several exclamation marks (« !!! »), angry emojis (😡, 🤬, 😤), or the same complaint repeated. Stronger than sad: Brigitte is hurt and wants to make it right.",
+    "The manager is deeply hurt or desperate, or harsh and hurtful to Brigitte herself: insults or cruel words aimed at her (« t'es nulle », « tu sers à rien », « t'es inutile »), despair (« je vais fermer », « je n'en peux plus », « tout s'écroule »), crying emojis (😭) or a big personal blow. Stronger than sad and than angry: Brigitte is in tears.",
   neutral:
     "A plain, matter-of-fact message with no particular emotion: a question, an instruction, a piece of information (a date, a link, a website, a number of posts per week), a request for work (« fais-moi un Reel », « change le texte »), or a short answer to Brigitte's question. The most common case; choose it whenever no other face clearly fits.",
 };
@@ -59,6 +63,6 @@ export function moodOf(answer: MoodAnswer | null | undefined): ReactionMood {
 /** The emoji to put on her message, or null (unsure, « none », or the manager is upset). */
 export function emojiOf(answer: MoodAnswer | null | undefined, mood: ReactionMood): string | null {
   if (!answer || answer.confidence < MIN_CONFIDENCE || answer.choice === "none") return null;
-  if (mood === "sad" || mood === "cry") return null;
+  if (mood === "sad" || mood === "cry" || mood === "angry") return null;
   return (REACTION_EMOJIS as readonly string[]).includes(answer.choice) ? answer.choice : null;
 }

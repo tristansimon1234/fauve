@@ -7,7 +7,7 @@ import { Mascot, type MascotMood } from "@/components/mascot";
 export type BrigitteCue = { id: string; mood: MascotMood; fresh: boolean };
 
 /** How long each reaction lasts before she goes back to rest. */
-const REACTION_MS: Partial<Record<MascotMood, number>> = { cry: 4500, sad: 4500, laugh: 3200, surprised: 2400, happy: 2200 };
+const REACTION_MS: Partial<Record<MascotMood, number>> = { cry: 4500, sad: 4500, angry: 3800, shy: 3200, laugh: 3200, surprised: 2400, happy: 2200 };
 
 /**
  * One Brigitte for the whole conversation (its header): she reacts to the

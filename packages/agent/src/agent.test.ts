@@ -571,12 +571,18 @@ test("an upset manager makes Brigitte sad, or cry when it is strong", async () =
   const { upsetLevel } = await import("./emoji.ts");
   assert.equal(upsetLevel("franchement c'est nul"), "sad");
   assert.equal(upsetLevel("je suis déçue 😞"), "sad");
-  assert.equal(upsetLevel("j'en ai marre !!"), "cry");
-  assert.equal(upsetLevel("ça ne marche toujours pas !!!"), "cry");
-  assert.equal(upsetLevel("😡"), "cry");
-  assert.equal(upsetLevel("C'EST PAS CE QUE JE VEUX"), "cry");
+  assert.equal(upsetLevel("j'en ai marre !!"), "angry");
+  assert.equal(upsetLevel("ça ne marche toujours pas !!!"), "angry");
+  assert.equal(upsetLevel("😡"), "angry");
+  assert.equal(upsetLevel("C'EST PAS CE QUE JE VEUX"), "angry");
+  assert.equal(upsetLevel("t'es nulle franchement"), "cry");
+  assert.equal(upsetLevel("je n'en peux plus 😭"), "cry");
   assert.equal(upsetLevel("super, merci !"), null);
   assert.equal(upsetLevel("OK"), null);
+  const { isSweet } = await import("./emoji.ts");
+  assert.equal(isSweet("merci, t'es la meilleure"), true);
+  assert.equal(isSweet("je t'adore Brigitte 😘"), true);
+  assert.equal(isSweet("merci"), false);
 });
 
 test("house text layers pass the same checks as generated ones", async () => {
@@ -785,7 +791,9 @@ test("Brigitte's instant reaction reads Jev's answers safely", async () => {
   const { moodOf, emojiOf } = await import("./mood.ts");
   assert.equal(moodOf({ choice: "laugh", confidence: 0.9 }), "laugh");
   assert.equal(moodOf({ choice: "laugh", confidence: 0.3 }), "neutral");
-  assert.equal(moodOf({ choice: "angry", confidence: 0.99 }), "neutral");
+  assert.equal(moodOf({ choice: "angry", confidence: 0.99 }), "angry");
+  assert.equal(moodOf({ choice: "furious", confidence: 0.99 }), "neutral");
+  assert.equal(emojiOf({ choice: "👍", confidence: 0.9 }, "angry"), null);
   assert.equal(moodOf(null), "neutral");
   assert.equal(emojiOf({ choice: "🔥", confidence: 0.8 }, "happy"), "🔥");
   assert.equal(emojiOf({ choice: "none", confidence: 0.9 }, "happy"), null);

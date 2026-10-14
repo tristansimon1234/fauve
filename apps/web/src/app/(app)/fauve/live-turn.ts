@@ -11,7 +11,7 @@ export type LiveEvent =
   | { type: "status"; label: string }
   | { type: "text"; step: number; delta: string }
   /** Brigitte's instant reaction to the manager's message (her face, an emoji on it), before her answer. */
-  | { type: "mood"; mood: "laugh" | "happy" | "surprised" | "sad" | "cry" | "neutral"; emoji: string | null };
+  | { type: "mood"; mood: "laugh" | "happy" | "surprised" | "sad" | "cry" | "angry" | "shy" | "neutral"; emoji: string | null };
 
 /** What the « Fauve écrit » bubble shows after an event: the latest line, and the text of the step being written. */
 export function applyLive(state: LiveState, event: LiveEvent): LiveState {

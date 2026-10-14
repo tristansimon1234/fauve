@@ -287,6 +287,33 @@
   0%, 100% { transform: translateY(2%) rotate(-1.5deg); }
   50% { transform: translateY(3%) rotate(1.5deg); }
 }
+/* Cross: a quick huff now and then, the anger mark throbbing. Shy: head tilted, a slow sway. */
+.fauve-cat-angry .fauve-cat-mood {
+  animation: fauve-huff 1.4s ease-in-out infinite;
+}
+@keyframes fauve-huff {
+  0%, 40%, 100% { transform: translateX(0) rotate(0); }
+  48% { transform: translateX(-1.6%) rotate(-2deg); }
+  56% { transform: translateX(1.6%) rotate(2deg); }
+  64% { transform: translateX(-1%) rotate(-1deg); }
+  72% { transform: translateX(0) rotate(0); }
+}
+.fauve-cat-vein {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fauve-vein 0.7s ease-in-out infinite;
+}
+@keyframes fauve-vein {
+  0%, 100% { transform: scale(0.85); }
+  50% { transform: scale(1.12); }
+}
+.fauve-cat-shy .fauve-cat-mood {
+  animation: fauve-shy 2.4s ease-in-out infinite;
+}
+@keyframes fauve-shy {
+  0%, 100% { transform: rotate(-6deg) translateY(1%); }
+  50% { transform: rotate(-3deg) translateY(0.4%); }
+}
 .fauve-cat-tear {
   transform-box: fill-box;
   animation: fauve-tear 1.3s ease-in infinite;
