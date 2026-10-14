@@ -540,9 +540,12 @@ test("components: code checks, kit output, placement and slide props", async () 
 
 test("onboarding: steps in order, old values read as their new step", async () => {
   const { nextOnboardingStep, onboardingStepOf, ONBOARDING_STEPS } = await import("./onboarding.ts");
-  assert.deepEqual([...ONBOARDING_STEPS], ["website", "style", "rhythm", "connect", "first_post", "done"]);
+  // Instagram last: once there is a first publication to put out.
+  assert.deepEqual([...ONBOARDING_STEPS], ["website", "style", "rhythm", "first_post", "connect", "done"]);
   assert.equal(nextOnboardingStep("website"), "style");
-  assert.equal(nextOnboardingStep("first_post"), "done");
+  assert.equal(nextOnboardingStep("rhythm"), "first_post");
+  assert.equal(nextOnboardingStep("first_post"), "connect");
+  assert.equal(nextOnboardingStep("connect"), "done");
   assert.equal(nextOnboardingStep("done"), "done");
   assert.equal(onboardingStepOf("studio_name"), "website");
   assert.equal(onboardingStepOf("examples"), "style");

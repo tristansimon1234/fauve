@@ -368,14 +368,14 @@ function ConnectStep({ handle, onNext, pending }: { handle: string | null; onNex
           Ton compte <strong className="text-ink">@{handle}</strong> est connecté.
         </p>
         <button type="button" disabled={pending} onClick={onNext} className="btn btn-primary h-11 self-start px-5">
-          On continue
+          C’est tout bon
         </button>
       </>
     );
   }
   return (
     <>
-      <p className="text-[14px] leading-relaxed text-muted">Pour que je publie à l’heure prévue et que je lise tes résultats. Il faut un compte professionnel ou créateur ; rien ne part sans ta validation.</p>
+      <p className="text-[14px] leading-relaxed text-muted">Dernière étape : branche ton Instagram pour que ta publication parte à l’heure prévue et que je lise tes résultats. Il faut un compte professionnel ou créateur ; rien ne part sans ta validation.</p>
       <div className="flex flex-wrap items-center gap-3">
         <a href="/api/instagram/connect" className="btn btn-primary h-11 px-5">
           <InstagramIcon size={18} />

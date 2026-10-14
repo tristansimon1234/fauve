@@ -95,9 +95,9 @@ export async function GET(request: NextRequest) {
 
   // Close the loop on WhatsApp (best effort: only works inside the 24 h window).
   const studio = await db.from("studios").select("onboarding_step").eq("id", member.studio_id).single();
-  // Getting started: Instagram done, the first publication comes next.
+  // Getting started: Instagram is its last step.
   if (studio.data?.onboarding_step === "connect") {
-    await db.from("studios").update({ onboarding_step: "first_post" }).eq("id", member.studio_id);
+    await db.from("studios").update({ onboarding_step: "done" }).eq("id", member.studio_id);
   }
   if (member.phone_e164) {
     const text = `C’est bon, ton Instagram @${account.username} est connecté ✅ Je peux maintenant publier tes posts dès que tu les valides.`;

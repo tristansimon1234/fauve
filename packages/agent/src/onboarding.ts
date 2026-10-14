@@ -1,10 +1,10 @@
 // Getting a new business ready, in this order: its website (Fauve learns the
 // business), its style (colours, fonts, logo, moodboard), its rhythm (how many
-// posts a week: what Fauve plans the week with), Instagram, then its first
-// publication. On a computer it happens in the app (cards and chat), on a phone
+// posts a week: what Fauve plans the week with), its first publication, then
+// Instagram, last, once there is something to publish. On a computer it happens in the app (cards and chat), on a phone
 // on WhatsApp; the same step is kept for both.
 
-export const ONBOARDING_STEPS = ["website", "style", "rhythm", "connect", "first_post", "done"] as const;
+export const ONBOARDING_STEPS = ["website", "style", "rhythm", "first_post", "connect", "done"] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 /** The steps the manager sees (done is not one). */
@@ -12,8 +12,8 @@ export const ONBOARDING_LABELS: Record<Exclude<OnboardingStep, "done">, string> 
   website: "Ton commerce",
   style: "Ton style",
   rhythm: "Ton rythme",
-  connect: "Instagram",
   first_post: "Première publication",
+  connect: "Instagram",
 };
 
 export function nextOnboardingStep(step: OnboardingStep): OnboardingStep {

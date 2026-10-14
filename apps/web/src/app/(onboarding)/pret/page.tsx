@@ -38,10 +38,10 @@ export default function ReadyPage() {
           <span className="hidden md:inline">Continuer sur WhatsApp</span>
         </a>
         <Link
-          href="/fauve"
+          href="/calendrier"
           className="flex h-12 items-center justify-center rounded-full border-[1.5px] border-line text-[15px] font-semibold md:hidden"
         >
-          Créer ma première publication
+          Voir mon calendrier
         </Link>
       </div>
     </>
@@ -97,7 +97,7 @@ function Ready({ firstName, items }: { firstName: string | null; items: Item[] |
         </h1>
         <p className="text-[15px] leading-[1.55] text-muted">
           <span className="md:hidden">La suite se passe sur WhatsApp : envoie tes vidéos à Brigitte, elle prépare tes publications avec toi.</span>
-          <span className="hidden md:inline">Dernière étape dans l’app : ta première publication, avec Brigitte.</span>
+          <span className="hidden md:inline">Ta première publication peut partir sur Instagram. La suite se passe dans l’app, avec Brigitte.</span>
         </p>
       </div>
       {items && (
