@@ -1,5 +1,6 @@
 "use client";
 
+import { nudgeWork } from "./work-pill";
 import type { Effort } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from "react";
@@ -235,6 +236,9 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
             setLive(liveRef.current);
           });
           if (res.ok) {
+            // What she started after her answer shows in the pill now, and once more when it has begun.
+            nudgeWork();
+            setTimeout(nudgeWork, 4000);
             setConversationId(res.conversationId);
             setArrived(enteringAfterLive(arrivals(messagesRef.current, res.messages), res.messages, liveRef.current));
             setMessages(mergeMessages(messagesRef.current, res.messages));
@@ -277,6 +281,9 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
       start(async () => {
         const res = await launchQuote(quoteId, conversationId, effort).catch(() => null);
         if (res?.ok) {
+          // What she started after her answer shows in the pill now, and once more when it has begun.
+          nudgeWork();
+          setTimeout(nudgeWork, 4000);
           focusQuote.current = quoteId;
           setArrived(arrivals(messagesRef.current, res.messages));
           setMessages(mergeMessages(messagesRef.current, res.messages));

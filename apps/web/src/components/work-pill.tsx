@@ -11,6 +11,10 @@ import { Orb } from "./orb";
 // a text layer is being made, live (Realtime on studio_jobs), with its steps
 // and the time elapsed; « Prêt » with a link when it is done.
 
+/** Fired by the chat when a turn ends or a montage is launched: the pill looks again. */
+export const WORK_EVENT = "fauve:work";
+export const nudgeWork = () => window.dispatchEvent(new Event(WORK_EVENT));
+
 const minutesSince = (iso: string, now: number) => Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60_000));
 
 export function WorkPill({ studioId }: { studioId: string }) {
@@ -36,9 +40,18 @@ export function WorkPill({ studioId }: { studioId: string }) {
       .channel(`work-${studioId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "studio_jobs", filter: `studio_id=eq.${studioId}` }, load)
       .subscribe();
+    // Realtime can miss an event: the pill also asks again when Brigitte has just answered
+    // (she may have started something), when the tab comes back, and every 15 s while visible.
+    const again = () => document.visibilityState === "visible" && load();
+    window.addEventListener(WORK_EVENT, load);
+    document.addEventListener("visibilitychange", again);
+    const poll = setInterval(again, 15_000);
     // The elapsed time, and finished work fading out after a while.
     const tick = setInterval(() => setNow(Date.now()), 20_000);
     return () => {
+      window.removeEventListener(WORK_EVENT, load);
+      document.removeEventListener("visibilitychange", again);
+      clearInterval(poll);
       clearInterval(tick);
       clearTimeout(timer.current);
       void db.removeChannel(channel);
