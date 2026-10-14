@@ -568,6 +568,14 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
   );
 }
 
+const plainName = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .toLowerCase();
+const sameName = (title: string, name: string) => Boolean(plainName(title)) && plainName(title) === plainName(name);
+
 function EndCard({ props, k }: { props: ReelProps; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -587,11 +595,32 @@ function EndCard({ props, k }: { props: ReelProps; k: number }) {
         {(fit) => (
           <div style={{ opacity: p, transform: `translateY(${(1 - p) * 24 * k}px)` }}>
             {props.brand.logoUrl ? (
-              <Img src={props.brand.logoUrl} style={{ maxWidth: 520 * k, maxHeight: 220 * k, objectFit: "contain", marginBottom: 28 * k }} />
+              // A dark logo would vanish on the dark veil: in white if it is one colour, else on a light plate.
+              <div
+                style={{
+                  display: "inline-block",
+                  marginBottom: 28 * k,
+                  ...(props.brand.logoOnDark === "plate" ? { background: "#FBF7F4", padding: `${22 * k}px ${30 * k}px`, borderRadius: 26 * k, boxShadow: "0 12px 40px rgba(0,0,0,.35)" } : {}),
+                }}
+              >
+                <Img
+                  src={props.brand.logoUrl}
+                  style={{
+                    display: "block",
+                    maxWidth: 520 * k,
+                    maxHeight: 220 * k,
+                    objectFit: "contain",
+                    ...(props.brand.logoOnDark === "white" ? { filter: "brightness(0) invert(1) drop-shadow(0 2px 10px rgba(0,0,0,.35))" } : {}),
+                  }}
+                />
+              </div>
             ) : null}
-            <div style={{ fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontSize: 96 * k, lineHeight: 1.05 }}>
-              {card.title}
-            </div>
+            {/* The logo already says the name: written again under it, it reads twice. */}
+            {props.brand.logoUrl && sameName(card.title, props.brand.name) ? null : (
+              <div style={{ fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontSize: 96 * k, lineHeight: 1.05 }}>
+                {card.title}
+              </div>
+            )}
             {card.subtitle ? (
               <div
                 style={{

@@ -117,7 +117,7 @@ export async function renderSlides(studioId: string, postId: string): Promise<Sl
       const { data: assets } = await db.from("media_assets").select("id, storage_path, kind, mime_type").eq("studio_id", studioId).in("id", ids);
       const byId = new Map((assets ?? []).map((a) => [a.id as string, a]));
       const inputs = await loadMontageInputs(studioId, { segments: [] });
-      const brand = { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts };
+      const brand = { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts };
       // Every photo goes through the render, texts or not: the slides share one 4:5 frame.
       const jobs = [];
       for (const [i, slide] of plan.slides.entries()) {

@@ -1,6 +1,7 @@
 import { isClipSegment, isMotionSegment, segmentSeconds, type ClipAnalysis, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
 import type { Adjust, ClipBlur, PhotoEdit } from "./retouch.ts";
 import { brandPalette, resolveBrandLook, type BrandPalette, type Bullet, type ListItem, type TextLook } from "./text-look.ts";
+import type { LogoOnDark } from "./logo.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -67,6 +68,8 @@ export type ReelProps = {
     /** The brand's other colours by role (looks name them: secondary, light, dark). */
     palette?: BrandPalette;
     logoUrl: string | null;
+    /** How the logo shows over a dark picture (end card): as it is, in white, or on a light plate. */
+    logoOnDark?: LogoOnDark;
     /** The studio's own fonts (uploaded files), loaded by URL instead of from Google Fonts. */
     customFonts?: { family: string; url: string }[];
   };
@@ -108,7 +111,7 @@ export type ReelInputs = {
   /** Word timings from the clip analyses, by clip_id (for subtitles). */
   words?: Record<string, ClipAnalysis["words"]>;
   /** fonts: the studio's brand fonts (display first); the plan's fonts win over them. */
-  brand: { name: string; accent?: string | null; logoUrl?: string | null; fonts?: string[]; colors?: string[]; customFonts?: { family: string; url: string }[] };
+  brand: { name: string; accent?: string | null; logoUrl?: string | null; logoOnDark?: LogoOnDark; fonts?: string[]; colors?: string[]; customFonts?: { family: string; url: string }[] };
 };
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
@@ -248,6 +251,7 @@ export function resolveReelBrand(plan: Pick<EditPlan, "fonts">, template: Motion
     displayFont: plan.fonts?.display ?? brandFonts[0] ?? TEMPLATE_FONTS[template].display,
     bodyFont: plan.fonts?.body ?? brandFonts[1] ?? TEMPLATE_FONTS[template].body,
     logoUrl: brand.logoUrl ?? null,
+    ...(brand.logoUrl && brand.logoOnDark && brand.logoOnDark !== "as_is" ? { logoOnDark: brand.logoOnDark } : {}),
     ...(brand.customFonts?.length ? { customFonts: brand.customFonts } : {}),
   };
 }

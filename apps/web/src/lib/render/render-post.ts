@@ -19,6 +19,7 @@ import {
   type PostStatus,
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { logoTone } from "./logo-tone";
 import { renderInSandbox, renderReelInSandbox, smokeTestScenes } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -91,6 +92,9 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   const logoUrl = style.logo_path?.startsWith(`${studioId}/`)
     ? ((await db.storage.from("media").createSignedUrl(style.logo_path, 3600)).data?.signedUrl ?? style.logo_url ?? null)
     : (style.logo_url ?? null);
+  const logoOnDark = !logoUrl
+    ? undefined
+    : await logoTone(style.logo_path?.startsWith(`${studioId}/`) ? { path: style.logo_path } : { url: style.logo_url! });
   // The studio's own fonts: signed for the render (and the live preview) like the logo.
   const ownFonts = (style.custom_fonts ?? []).filter((f) => f.path.startsWith(`${studioId}/`));
   const signedFonts = ownFonts.length ? ((await db.storage.from("media").createSignedUrls(ownFonts.map((f) => f.path), 7200)).data ?? []) : [];
@@ -110,6 +114,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
     words,
     accent,
     logoUrl,
+    logoOnDark,
     fonts: style.fonts,
     colors: style.colors,
     customFonts,
@@ -140,7 +145,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  const { clipFiles, clips, clipUrls, photoIds, words, accent, logoUrl, studioName, fonts, colors, customFonts } = await loadMontageInputs(studioId, plan);
+  const { clipFiles, clips, clipUrls, photoIds, words, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts } = await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
@@ -168,7 +173,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         clipUrls,
         photoIds,
         words,
-        brand: { name: studioName, accent, logoUrl, fonts, colors, customFonts },
+        brand: { name: studioName, accent, logoUrl, logoOnDark, fonts, colors, customFonts },
       });
       // Library scenes play with new texts, older plans predate the layout check: every
       // scene is checked before the render, and one whose text leaves the frame plays its

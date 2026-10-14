@@ -8,6 +8,7 @@ import { isInSessionWindow } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES } from "./credits.ts";
 import { businessFamily, postIdeas } from "./post-ideas.ts";
 import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
+import { logoOnDark } from "./logo.ts";
 
 const validPlan = {
   format: "9:16",
@@ -887,4 +888,18 @@ test("site colours: Squarespace theme HSL variables count, its generic sheets do
     "https://www.example.com/",
   );
   assert.deepEqual(links, ["https://static1.squarespace.com/static/versioned-site-css/x/site.css"]);
+});
+
+test("a dark one-colour logo turns white on the end card, a dark coloured one gets a plate", () => {
+  // 10×10 RGBA: a block of logo pixels on a transparent background.
+  const logo = (rgb: [number, number, number], filled = 30) => {
+    const px = new Uint8Array(400);
+    for (let i = 0; i < 100; i++) if (i < filled) px.set([...rgb, 255], i * 4);
+    return px;
+  };
+  assert.equal(logoOnDark(logo([10, 10, 10])), "white");
+  assert.equal(logoOnDark(logo([120, 20, 30])), "plate");
+  assert.equal(logoOnDark(logo([250, 250, 250])), "as_is");
+  // A square logo with its own background stays as it is.
+  assert.equal(logoOnDark(logo([10, 10, 10], 100)), "as_is");
 });

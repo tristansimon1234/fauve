@@ -82,6 +82,8 @@ export type ReelProps = {
     displayFont: string;
     bodyFont: string;
     logoUrl: string | null;
+    /** How the logo shows over a dark picture (end card): in white, or on a light plate; else as it is. */
+    logoOnDark?: "as_is" | "white" | "plate";
     /** The studio's own fonts (uploaded files), loaded by URL instead of from Google Fonts. */
     customFonts?: { family: string; url: string }[];
   };
