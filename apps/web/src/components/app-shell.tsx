@@ -42,7 +42,7 @@ export function AppShell({
 
       <nav
         aria-label="Navigation principale"
-        className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-4 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         <Suspense fallback={<NavList variant="bar" pathname={null} />}>
           <NavLinks variant="bar" />

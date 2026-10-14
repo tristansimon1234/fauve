@@ -156,7 +156,7 @@ export type PublishItem = { type: "image" | "video"; url: string };
  */
 export type PublishRequest =
   /** cover: a frame of the video (seconds) or an image (public JPEG URL) for the grid. */
-  | { kind: "reel"; videoUrl: string; caption: string; cover?: { at: number } | { url: string }; shareToFeed?: boolean }
+  | { kind: "reel"; videoUrl: string; caption: string; cover?: { at: number } | { url: string }; shareToFeed?: boolean; audioId?: string }
   | { kind: "image"; imageUrl: string; caption: string }
   | { kind: "carousel"; items: PublishItem[]; caption: string }
   | { kind: "story"; item: PublishItem };
@@ -183,6 +183,10 @@ export async function publishMedia(params: {
         // The cover in the grid: a photo, or a frame of the video (in milliseconds).
         ...(request.cover && "url" in request.cover ? { cover_url: request.cover.url } : {}),
         ...(request.cover && "at" in request.cover ? { thumb_offset: String(Math.round(request.cover.at * 1000)) } : {}),
+        // Instagram's music (Facebook Login only): the montage is silent, the track plays at full volume.
+        ...(request.audioId && viaFacebook(token)
+          ? { audio_configuration: JSON.stringify({ audio_id: request.audioId, audio_volume: 100, video_volume: 0 }) }
+          : {}),
       });
       break;
     case "image":

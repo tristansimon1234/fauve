@@ -1,6 +1,8 @@
 import "server-only";
 import {
   APP_GUIDES,
+  postAudioSchema,
+  type PostAudio,
   assertTransition,
   canTransition,
   postStatusSchema,
@@ -38,7 +40,7 @@ import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
 import { notifyFailure, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
 import { saveSlides } from "@/lib/render/slides";
-import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
+import { audioInfo, mediaComments, mediaInsights, recentMedia, replyToComment, searchAudio, viaFacebook } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
@@ -140,6 +142,30 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   }
 
   return {
+    async find_music({ query, type }) {
+      const ig = await instagramAccount(studioId);
+      if (!ig) return json({ error: "Instagram n'est pas connecté : la musique d'Instagram demande la connexion via Facebook (get_connect_link)." });
+      if (!viaFacebook(ig.accessToken)) return json({ unavailable: true, note: "Connecté sans Facebook : la musique d'Instagram s'active dans Réglages › Comptes connectés › « Activer la musique d'Instagram ». Sinon elle ajoute le son dans l'appli au moment de publier." });
+      const found = await searchAudio(ig.userId, ig.accessToken, type, query);
+      return json({
+        tendances: !query,
+        sons: found.slice(0, 10).map((a) => ({ audio_id: a.audio_id, titre: a.title, artiste: a.display_artist ?? a.ig_username, duree_s: a.duration_in_ms ? Math.round(a.duration_in_ms / 1000) : null })),
+      });
+    },
+
+    async set_music({ post_id, audio_id }) {
+      unwrap(await db.from("posts").select("id").eq("id", post_id).eq("studio_id", studioId).eq("kind", "reel").single());
+      let audio: PostAudio | null = null;
+      if (audio_id) {
+        const ig = await instagramAccount(studioId);
+        if (!ig || !viaFacebook(ig.accessToken)) return json({ error: "La musique d'Instagram demande la connexion via Facebook." });
+        const info = await audioInfo(audio_id, ig.userId, ig.accessToken);
+        audio = postAudioSchema.parse({ audio_id, title: info.title ?? null, artist: info.display_artist ?? info.ig_username ?? null, duration_ms: info.duration_in_ms ?? null, type: info.audio_type ?? null, cover: info.cover_artwork_thumbnail_uri ?? null });
+      }
+      check(await db.from("posts").update({ audio }).eq("id", post_id).eq("studio_id", studioId));
+      return json({ ok: true, musique: audio ? `${audio.title ?? "son"}${audio.artist ? ` — ${audio.artist}` : ""}` : null, note: "Instagram l'ajoutera au moment de publier. Dis-le en une phrase." });
+    },
+
     async app_guide({ topic }) {
       return APP_GUIDES[topic];
     },
