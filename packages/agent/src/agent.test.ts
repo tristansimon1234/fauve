@@ -950,3 +950,12 @@ test("plans: Essentiel and Pro, a credit worth about the same, each month under 
   const month = studioMonth([{ purpose: "editor", eur: 7.25 }], "essentiel");
   assert.equal(month.margin, 0.75);
 });
+
+test("caption match: the Reel she published by hand, words changed or not", async () => {
+  const { captionMatch } = await import("./caption-match.ts");
+  const ours = "Nouvelle coupe d’automne ✂️ Réserve ton créneau cette semaine !";
+  assert.equal(captionMatch(ours, "nouvelle coupe d'automne ✂️🍂 réserve ton créneau cette semaine ! #coiffure"), 1);
+  assert.ok(captionMatch(ours, "Nouvelle coupe d’automne, réserve vite") >= 0.5);
+  assert.ok(captionMatch(ours, "Le menu du jour est arrivé") < 0.2);
+  assert.equal(captionMatch(null, "anything"), 0);
+});

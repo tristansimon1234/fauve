@@ -1,5 +1,5 @@
 import "server-only";
-import { isInSessionWindow } from "@fauve/agent";
+import { captionMatch, isInSessionWindow } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendTemplate, sendText, sendVideo } from "@/lib/whatsapp/client";
@@ -126,24 +126,6 @@ export async function deliverPendingHandOffs(studioId: string, phone: string): P
       console.error("pending hand-off failed", post.id, error);
     }
   }
-}
-
-const words = (text: string | null | undefined) =>
-  (text ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .split(" ")
-    .filter((w) => w.length > 2);
-
-/** Share of the post's caption words found in the published caption (0 to 1). */
-export function captionMatch(ours: string | null, theirs: string | null | undefined): number {
-  const a = words(ours).slice(0, 30);
-  if (!a.length) return 0;
-  const b = new Set(words(theirs));
-  return a.filter((w) => b.has(w)).length / a.length;
 }
 
 /**
