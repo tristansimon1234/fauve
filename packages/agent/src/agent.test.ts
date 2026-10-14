@@ -937,3 +937,16 @@ test("history: the window's start stays put for several turns, then jumps ahead"
   assert.ok(stableWindow(all.slice(0, 33), 10, 4).length >= 10);
   assert.equal(stableWindow(all.slice(0, 5), 10, 4).length, 5); // fewer than the limit: all of them
 });
+
+test("plans: Essentiel and Pro, a credit worth about the same, each month under half its price", async () => {
+  const { PLANS, planOf } = await import("./plans.ts");
+  const { creditValue, monthlyCostBudget } = await import("./margin.ts");
+  assert.equal(planOf("trial"), "pro");
+  assert.equal(planOf("essentiel"), "essentiel");
+  assert.equal(PLANS.essentiel.priceEur, 29);
+  // Essentiel's credit is not cheaper than Pro's: no job loses its margin there.
+  assert.ok(creditValue("essentiel") >= creditValue("pro"));
+  assert.equal(monthlyCostBudget("essentiel"), 14.5);
+  const month = studioMonth([{ purpose: "editor", eur: 7.25 }], "essentiel");
+  assert.equal(month.margin, 0.75);
+});

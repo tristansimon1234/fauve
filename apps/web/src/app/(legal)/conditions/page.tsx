@@ -35,7 +35,7 @@ export default function TermsPage() {
 
       <h2>Abonnement</h2>
       <p>
-        L’abonnement est de 49 € par mois, sans engagement, résiliable à tout moment depuis les réglages ou en écrivant à{" "}
+        L’abonnement est de 29 € par mois (Essentiel) ou 49 € par mois (Pro), sans engagement, résiliable à tout moment depuis les réglages ou en écrivant à{" "}
         {company.email}. La résiliation prend effet à la fin de la période en cours.
       </p>
 

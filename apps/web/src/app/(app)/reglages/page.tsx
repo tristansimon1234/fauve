@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTHLY_CREDITS, readMemory } from "@fauve/agent";
+import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, PLANS, planOf, readMemory } from "@fauve/agent";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
@@ -66,6 +66,7 @@ async function Settings() {
     );
   }
   const { studio } = member;
+  const offer = planOf(studio.plan);
   const [accounts, plan, balance, ledger, fauveInstagram, dmContact, care] = await Promise.all([
     getSocialAccounts(db, studio.id),
     getContentPlan(db, studio.id),
@@ -176,8 +177,8 @@ async function Settings() {
         <Section title="Abonnement">
           <p className="text-sm leading-normal">
             {studio.plan === "trial"
-              ? "Période d’essai en cours. Ensuite : 49 € / mois, sans engagement."
-              : "49 € / mois, sans engagement."}
+              ? `Période d’essai en cours, avec tout ${PLANS.pro.label}. Ensuite : ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € / mois, sans engagement.`
+              : `${PLANS[offer].label} : ${PLANS[offer].priceEur} € / mois, ${PLANS[offer].credits} crédits par mois, sans engagement.`}
           </p>
         </Section>
 
@@ -187,7 +188,7 @@ async function Settings() {
             <span className="text-sm font-semibold text-muted">crédits disponibles</span>
           </p>
           <p className="text-sm leading-normal text-muted">
-            Ton solde remonte à {MONTHLY_CREDITS} crédits le 1er de chaque mois. Avant chaque montage, Brigitte t’annonce ce
+            Ton solde remonte à {PLANS[offer].credits} crédits le 1er de chaque mois. Avant chaque montage, Brigitte t’annonce ce
             qu’elle va faire et ce que ça coûte ; tu ne paies jamais plus que l’annonce, et rien si le montage échoue.
           </p>
           <ul className="grid gap-x-6 gap-y-1 text-[13px] sm:grid-cols-2">

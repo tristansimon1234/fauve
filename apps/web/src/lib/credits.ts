@@ -5,7 +5,8 @@ import {
   effortSchema,
   montageCharge,
   montagePlanSchema,
-  MONTHLY_CREDITS,
+  PLANS,
+  planOf,
   otherEffort,
   planBrief,
   quoteMontage,
@@ -31,7 +32,9 @@ export type VariantChange = { template?: MotionTemplate; hook?: string };
 
 /** The studio's balance, after this month's top-up. */
 export async function creditBalance(studioId: string): Promise<number> {
-  const { data, error } = await supabaseAdmin().rpc("ensure_monthly_credits", { p_studio: studioId, p_allowance: MONTHLY_CREDITS });
+  const db = supabaseAdmin();
+  const { data: studio } = await db.from("studios").select("plan").eq("id", studioId).maybeSingle();
+  const { data, error } = await db.rpc("ensure_monthly_credits", { p_studio: studioId, p_allowance: PLANS[planOf(studio?.plan)].credits });
   if (error) throw new Error(`credits: ${error.message}`);
   return data as number;
 }

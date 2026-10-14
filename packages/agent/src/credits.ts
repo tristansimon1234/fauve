@@ -1,5 +1,6 @@
 import { EFFORTS, type Effort } from "./effort.ts";
 import { MAX_FREE_SCENES } from "./editor.ts";
+import { PLANS } from "./plans.ts";
 
 // Credits: what a studio is charged for the costly work, shown to the manager
 // before it runs. A fixed price list (not metered tokens) keeps the quote
@@ -43,8 +44,8 @@ export const CREDIT_PRICES = {
  */
 export const AUTO_START_MAX_CREDITS = 20;
 
-/** Each month the balance goes back up to this (unused credits do not pile up beyond it). */
-export const MONTHLY_CREDITS = 150;
+/** Each month the balance goes back up to the plan's credits (unused credits do not pile up beyond it); this is Pro's. */
+export const MONTHLY_CREDITS = PLANS.pro.credits;
 
 export type QuoteLine = { label: string; credits: number };
 export type MontageQuote = {
