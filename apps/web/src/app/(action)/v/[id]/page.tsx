@@ -1,3 +1,4 @@
+import { versionKey } from "@/lib/version-key";
 import { alignSlides, postStatusSchema, type PostKind } from "@fauve/agent";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -95,6 +96,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
 
   return (
     <ActionView
+      key={versionKey(post.caption, status, editor?.plan ?? null, slides?.plan ?? null)}
       post={{
         id: post.id as string,
         title: post.title as string,

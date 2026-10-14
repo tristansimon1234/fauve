@@ -82,7 +82,14 @@ export function CalendarBoard({
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [list, setList] = useState([...posts, ...undated]);
+  // Local moves show at once; whatever the server sends next (a refresh, a change made by
+  // Fauve or in another tab) replaces them.
+  const [list, setList] = useState(() => [...posts, ...undated]);
+  const [fromServer, setFromServer] = useState({ posts, undated });
+  if (fromServer.posts !== posts || fromServer.undated !== undated) {
+    setFromServer({ posts, undated });
+    setList([...posts, ...undated]);
+  }
   const [open, setOpen] = useState<string | null>(null);
   const [over, setOver] = useState<number | null>(null);
   const [adding, setAdding] = useState<number | null>(null);

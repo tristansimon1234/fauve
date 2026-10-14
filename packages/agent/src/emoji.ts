@@ -42,7 +42,7 @@ export function echoFor(text: string): Reaction | null {
  * mark, answer buttons, a quote): then it is read by Fauve like any message
  * (👍 to « je lance ? » is a yes she must confirm), never echoed blindly.
  */
-export function awaitsAnswer(last: { body: string | null; options?: string[]; quote?: boolean } | null): boolean {
+export function awaitsAnswer(last: { body: string | null; options?: string[]; quote?: boolean; upload?: string } | null): boolean {
   if (!last) return false;
-  return Boolean(last.options?.length || last.quote || /\?\s*\S{0,3}\s*$/u.test((last.body ?? "").trim()));
+  return Boolean(last.options?.length || last.quote || last.upload || /\?\s*\S{0,3}\s*$/u.test((last.body ?? "").trim()));
 }

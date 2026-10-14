@@ -15,7 +15,9 @@ import { loadEditorData } from "@/lib/montage-editor-data";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { postSlides } from "@/lib/render/slides";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
+import { layoutsForEditor } from "@/lib/text-layers";
 import { loadTextLooks } from "@/lib/text-looks";
+import { versionKey } from "@/lib/version-key";
 import { deletePost } from "./actions";
 import { MontageEditor } from "./montage-editor";
 import { PostEditor } from "./post-editor";
@@ -115,6 +117,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
       ? {
           plan: postSlides({ slides: post.slides, media_ids: post.media_ids }) ?? alignSlides({ template: "doux", slides: [] }, post.media_ids),
           brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, fonts: i.fonts })),
+          layouts: await layoutsForEditor(studioId),
         }
       : null;
 
@@ -123,6 +126,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
     <>
       <div className="flex flex-col gap-2">
         <PostEditor
+          key={versionKey(post.caption, post.status)}
           postId={post.id}
           caption={post.caption ?? ""}
           canEdit={canEdit}
@@ -230,7 +234,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           <div className="order-3 flex min-w-0 flex-col gap-4 xl:order-none">
             {details}
           </div>
-          <CarouselEditor postId={post.id} postTitle={post.title} initialPlan={slides.plan} photos={photos} brand={slides.brand} looks={looks} />
+          <CarouselEditor key={versionKey(slides.plan)} postId={post.id} postTitle={post.title} initialPlan={slides.plan} photos={photos} brand={slides.brand} looks={looks} layouts={slides.layouts} />
         </div>
       ) : editor ? (
         // A video editor: the publication on the left, the montage in the middle, the selected scene on the right.
@@ -239,6 +243,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
             {details}
           </div>
           <MontageEditor
+            key={versionKey(editor.plan)}
             postId={post.id}
             postTitle={post.title}
             initialPlan={editor.plan}

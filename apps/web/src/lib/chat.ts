@@ -27,6 +27,10 @@ export type ChatMessage = {
   reactions: Reactions;
   /** Answer buttons Fauve offered (reply_with). */
   options: string[];
+  /** A drop zone Fauve offered for photos or videos (reply_with upload). */
+  upload: "video" | "photo" | "any" | null;
+  /** A picker of the library Fauve offered (reply_with pick_media). */
+  pickMedia: "video" | "photo" | "any" | null;
   /** Post and grid cards under the message. */
   cards: ChatCard[];
   /** A delivered montage: the app opens this post's page when the message arrives. */
@@ -129,6 +133,8 @@ export async function messagesOf(studioId: string, conversationId: string): Prom
       media,
       reactions: (r.reactions as Reactions | null) ?? {},
       options: r.direction === "outbound" ? (extrasOf(r.payload).options ?? []) : [],
+      upload: r.direction === "outbound" ? (extrasOf(r.payload).upload ?? null) : null,
+      pickMedia: r.direction === "outbound" ? (extrasOf(r.payload).pick_media ?? null) : null,
       cards: cards[i] ?? [],
       openPost: r.direction === "outbound" ? ((r.payload as { open_post?: string } | null)?.open_post ?? null) : null,
     };
@@ -261,7 +267,7 @@ export async function chatTurn(
       .limit(1)
       .maybeSingle();
     const extras = extrasOf(last?.payload);
-    if (echo && !awaitsAnswer(last ? { body: last.body as string | null, options: extras.options, quote: Boolean(extras.quote) } : null)) {
+    if (echo && !awaitsAnswer(last ? { body: last.body as string | null, options: extras.options, quote: Boolean(extras.quote), upload: extras.upload ?? extras.pick_media } : null)) {
       await setReaction({ id: lastRowId }, "fauve", echo);
       const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, id), list(ctx.studioId)]);
       return { ok: true, conversationId: id, messages, conversations };

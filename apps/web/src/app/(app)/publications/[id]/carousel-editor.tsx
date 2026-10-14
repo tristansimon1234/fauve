@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AskFauveButton } from "@/components/fauve-drawer";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ImageIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { LayerFields } from "@/components/montage/layer-fields";
+import { LayoutPicker, layoutOn, type Layout } from "@/components/montage/layout-picker";
 import { ListItems } from "@/components/montage/list-items";
 import { LookPanel } from "@/components/montage/look-panel";
 import { photoRetouch } from "@/components/montage/retouch-actions";
@@ -67,6 +68,7 @@ export function CarouselEditor({
   photos,
   brand,
   looks,
+  layouts = [],
 }: {
   postId: string;
   postTitle: string;
@@ -75,6 +77,8 @@ export function CarouselEditor({
   photos: Record<string, string>;
   brand: ReelInputs["brand"];
   looks: SavedLook[];
+  /** Text layouts of the library (Fauve's and the studio's), with their code. */
+  layouts?: Layout[];
 }) {
   const [saved, setSaved] = useState(initialPlan);
   const [plan, setPlan] = useState(initialPlan);
@@ -267,6 +271,22 @@ export function CarouselEditor({
               topic={{ postId, title: postTitle, sceneLabel: `Photo ${index + 1}` }}
               label="Demander à Fauve pour cette photo"
               className="inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-soft px-3 py-2 text-[13px] font-bold text-violet hover:bg-violet hover:text-white"
+            />
+          )}
+
+          {props && url && (
+            <LayoutPicker
+              layouts={layouts}
+              slide={slide}
+              template={plan.template}
+              imageUrl={url}
+              brand={brand}
+              many={plan.slides.filter((s) => photos[s.media_id]).length > 1}
+              onPick={(layout) => setSlide({ layer: layoutOn(layout, slide) })}
+              onClear={() => setSlide({ layer: undefined })}
+              onPickAll={(layout) =>
+                edit({ ...plan, slides: plan.slides.map((s) => (photos[s.media_id] ? { ...s, layer: s.layer?.template_id === layout.id ? s.layer : layoutOn(layout, s) } : s)) })
+              }
             />
           )}
 

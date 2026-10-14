@@ -1,9 +1,11 @@
 import "server-only";
 import { platformSchema, postKindSchema, postStatusSchema } from "@fauve/agent";
 import { redirect } from "next/navigation";
+import { cacheLife } from "next/cache";
 import { connection } from "next/server";
 import { cache } from "react";
 import { z } from "zod";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 
 // Data access for the signed-in web app. Every read goes through the user's own
@@ -145,24 +147,31 @@ export function rows<T>(
 // Media: signed URLs from the private "media" bucket
 // ---------------------------------------------------------------------------
 
-const SIGNED_URL_SECONDS = 60 * 60;
+const SIGNED_URL_SECONDS = 2 * 60 * 60;
 
 /**
- * Signs storage paths with the user's client: the storage RLS policy only lets
- * members read objects under their own `<studio_id>/` folder. Paths outside it
- * are skipped rather than sent to Storage.
+ * Signs storage paths of the studio's own `<studio_id>/` folder (paths outside it
+ * are skipped; the caller passes the signed-in member's studio). The links are
+ * kept for an hour, so a refresh gives back the same URLs: images and videos
+ * already on screen do not reload or flicker.
  */
-export async function signMediaUrls(db: Db, studioId: string, paths: string[]): Promise<Map<string, string>> {
-  const own = [...new Set(paths.filter((p) => p.startsWith(`${studioId}/`)))];
-  const urls = new Map<string, string>();
-  if (!own.length) return urls;
-  const { data, error } = await db.storage.from("media").createSignedUrls(own, SIGNED_URL_SECONDS);
-  if (error) {
-    console.warn("media: signing failed", error.message);
-    return urls;
+export async function signMediaUrls(_db: Db, studioId: string, paths: string[]): Promise<Map<string, string>> {
+  const own = [...new Set(paths.filter((p) => p.startsWith(`${studioId}/`) && !p.includes("..")))].sort();
+  if (!own.length) return new Map();
+  try {
+    return new Map(Object.entries(await signedUrls(own)));
+  } catch (error) {
+    console.warn("media: signing failed", error instanceof Error ? error.message : error);
+    return new Map();
   }
-  for (const item of data ?? []) {
-    if (item.path && item.signedUrl && !item.error) urls.set(item.path, item.signedUrl);
-  }
-  return urls;
+}
+
+async function signedUrls(paths: string[]): Promise<Record<string, string>> {
+  "use cache";
+  // Kept an hour at most: every link served is still valid for an hour.
+  cacheLife({ stale: 1800, revalidate: 1800, expire: 3600 });
+  const { data, error } = await supabaseAdmin().storage.from("media").createSignedUrls(paths, SIGNED_URL_SECONDS);
+  // A failure throws, so it is not kept.
+  if (error) throw new Error(error.message);
+  return Object.fromEntries((data ?? []).flatMap((item) => (item.path && item.signedUrl && !item.error ? [[item.path, item.signedUrl]] : [])));
 }

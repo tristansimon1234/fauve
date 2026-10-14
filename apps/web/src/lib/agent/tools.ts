@@ -18,6 +18,9 @@ import {
   otherEffort,
   type Effort,
   type TextLook,
+  addFacts,
+  readMemory,
+  removeFacts,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -34,6 +37,8 @@ import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { applyLayers, listLayers, loadLayer, markLayerUsed } from "@/lib/text-layers";
+import { listInspirations } from "@/lib/inspirations";
+import { freeSlots } from "@/lib/slots";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
 import { creditBalance } from "@/lib/credits";
 import { queueJob } from "@/lib/jobs";
@@ -326,8 +331,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async quote_montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort }) {
+    async quote_montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
+      if (inspiration_id) {
+        const known = await db.from("inspirations").select("id").eq("id", inspiration_id).eq("studio_id", studioId).maybeSingle();
+        if (!known.data) return "Inspiration introuvable : reprends un inspiration_id de list_inspirations.";
+        check(await db.from("posts").update({ inspiration_id }).eq("id", post_id).eq("studio_id", studioId));
+      }
       if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : fais un devis de montage (correction: false).";
       // The level asked for, else the studio's default (Réglages).
       const studio = await db.from("studios").select("montage_effort").eq("id", studioId).single();
@@ -590,6 +600,32 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         note: what.length
           ? "Fauve repère les zones dans chaque vidéo puis refait le rendu avec le flou (deux à trois minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase."
           : "Le flou est retiré et le rendu refait ; le lien est envoyé tout seul.",
+      });
+    },
+
+    async remember({ add, remove }) {
+      const { data } = await db.from("studios").select("memory").eq("id", studioId).single();
+      let memory = readMemory(data?.memory);
+      if (remove?.length) memory = removeFacts(memory, remove);
+      if (add?.length) memory = addFacts(memory, add, new Date().toISOString());
+      check(await db.from("studios").update({ memory }).eq("id", studioId));
+      return `ok : ${memory.length} info${memory.length > 1 ? "s" : ""} en mémoire. Ne l'annonce pas, continue la conversation.`;
+    },
+
+    async suggest_dates({ count }) {
+      const { data } = await db.from("studios").select("timezone").eq("id", studioId).single();
+      const slots = await freeSlots(studioId, (data?.timezone as string | undefined) ?? "Europe/Paris", count);
+      return json({
+        jours_libres: slots.map((s) => ({ date: s.date, heure: s.time, libelle: `${s.label} à ${s.time.replace(":", " h ").replace(/ 00$/, "")}` })),
+        note: slots.length ? "Propose-les en boutons (reply_with options, le libellé), plus « Autre date »." : "Aucun jour libre dans les deux semaines : demande-lui une date.",
+      });
+    },
+
+    async list_inspirations() {
+      const items = await listInspirations(studioId, 10);
+      return json({
+        inspirations: items.map((i) => ({ inspiration_id: i.id, titre: i.title, a_reprendre: i.summary ?? (i.reading ? "en cours de lecture" : undefined), source: i.source })),
+        note: items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration : elle peut partager un Reel à Fauve sur Instagram ou en ajouter un dans l'app.",
       });
     },
 
@@ -951,7 +987,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return "ok";
     },
 
-    async reply_with({ options, posts, grid }) {
+    async reply_with({ options, posts, grid, upload, pick_media }) {
       let own: string[] = [];
       if (posts?.length) {
         const { data } = await db.from("posts").select("id").eq("studio_id", studioId).in("id", posts);
@@ -962,6 +998,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.extras.options = options;
       ctx.extras.posts = own.length ? own : undefined;
       ctx.extras.grid = grid || undefined;
+      // The drop zone is the app's: WhatsApp has its own paperclip.
+      ctx.extras.upload = ctx.waId ? undefined : upload;
+      ctx.extras.pick_media = ctx.waId ? undefined : pick_media;
       return "ok : affiché sous ton message.";
     },
   };

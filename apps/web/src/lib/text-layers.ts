@@ -94,3 +94,29 @@ export async function applyLayers(studioId: string, postId: string, layers: Map<
   const next = { ...plan, slides: plan.slides.map((s, i) => (layers.has(i + 1) ? { ...s, layer: layers.get(i + 1)! } : s)) };
   return saveSlides(studioId, postId, next);
 }
+
+/** The layouts the carousel editor offers: the studio's and Fauve's, with their code to draw them live. */
+export async function layoutsForEditor(studioId: string, limit = 16): Promise<(Omit<TextLayer, "texts" | "template_id"> & { id: string; house: boolean })[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("motion_templates")
+    .select("id, studio_id, name, slots, js, fonts")
+    .eq("kind", "layer")
+    .or(`studio_id.eq.${studioId},studio_id.is.null`)
+    .is("archived_at", null)
+    .neq("js", "")
+    .order("uses", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.warn("text layers: editor listing failed", error.message);
+    return [];
+  }
+  return data.map((t) => ({
+    id: t.id as string,
+    name: (t.name as string).slice(0, 80),
+    house: t.studio_id === null,
+    slots: slotsOf(t.slots),
+    js: t.js as string,
+    fonts: ((t.fonts as string[] | null) ?? []).slice(0, 4),
+  }));
+}

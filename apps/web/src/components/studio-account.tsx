@@ -2,6 +2,7 @@ import Link from "next/link";
 import { InstagramIcon, TikTokIcon } from "@/components/icons";
 import { initials } from "@/lib/format";
 import { getSocialAccounts, getStudioContext } from "@/lib/studio";
+import { StudioLive } from "./studio-live";
 
 // Sidebar and header pieces of the app shell that depend on the signed-in member.
 
@@ -72,4 +73,10 @@ function Avatar({ name, small = false }: { name: string | null | undefined; smal
 
 export function AvatarPlaceholder() {
   return <span className="size-9 shrink-0 rounded-full bg-soft" />;
+}
+
+/** Live updates for the signed-in studio (see StudioLive). */
+export async function LiveUpdates() {
+  const { member } = await getStudioContext();
+  return member ? <StudioLive studioId={member.studio.id} /> : null;
 }

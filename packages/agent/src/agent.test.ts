@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { addFacts, readMemory, removeFacts } from "./memory.ts";
 import { editPlanObjectSchema, editPlanSchema, segmentSeconds } from "./schemas.ts";
 import { canTransition } from "./status.ts";
 import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
@@ -688,4 +689,16 @@ test("emoji: only emojis get an instant reaction, unless they may answer a quest
   assert.equal(awaitsAnswer({ body: "C'est parti !", options: ["Oui", "Non"] }), true);
   assert.equal(awaitsAnswer({ body: "Ta vidéo est prête 🎬", quote: false }), false);
   assert.equal(awaitsAnswer(null), false);
+});
+
+test("memory keeps each fact once, drops removed ones and ignores junk", async () => {
+  const { awaitsAnswer } = await import("./emoji.ts");
+  const at = "2026-10-13T00:00:00Z";
+  let memory = addFacts([], ["Studio de Pilates Reformer à Lyon", "studio de pilates reformer à Lyon !", "Cours de 12 personnes max"], at);
+  assert.deepEqual(memory.map((f) => f.fact), ["Studio de Pilates Reformer à Lyon", "Cours de 12 personnes max"]);
+  memory = removeFacts(memory, [1]);
+  assert.deepEqual(memory.map((f) => f.fact), ["Cours de 12 personnes max"]);
+  assert.equal(readMemory([{ fact: "ok", at }, { nope: 1 }, "x"]).length, 1);
+  assert.equal(readMemory(null).length, 0);
+  assert.equal(awaitsAnswer({ body: "Dépose-les ici", upload: "video" }), true);
 });

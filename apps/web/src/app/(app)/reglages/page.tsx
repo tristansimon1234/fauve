@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTHLY_CREDITS } from "@fauve/agent";
+import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTHLY_CREDITS, readMemory } from "@fauve/agent";
 import { NoStudio, PageLoading } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
@@ -11,6 +11,7 @@ import { whatsappLink } from "@/lib/public-env";
 import { getContentPlan, getSocialAccounts, getStudioContext, type SocialAccount } from "@/lib/studio";
 import { signOut } from "../../(onboarding)/connexion/actions";
 import { EffortSetting } from "./effort-setting";
+import { MemoryList } from "./memory-list";
 import { InstagramLinkCode } from "./instagram-link";
 import { SettingsTabs } from "@/components/settings-tabs";
 
@@ -72,7 +73,7 @@ async function Settings() {
     db.from("credit_ledger").select("id, delta, label, created_at").eq("studio_id", studio.id).order("created_at", { ascending: false }).limit(10),
     fauveAccount(),
     db.from("instagram_contacts").select("igsid").eq("studio_id", studio.id).limit(1).maybeSingle(),
-    db.from("studios").select("montage_effort").eq("id", studio.id).maybeSingle(),
+    db.from("studios").select("montage_effort, business_type, memory").eq("id", studio.id).maybeSingle(),
   ]);
   const dateFormat = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: studio.timezone });
 
@@ -82,9 +83,14 @@ async function Settings() {
       <div className="flex max-w-[640px] flex-col gap-4">
         <Section title="Mon studio">
           <Field label="Nom" value={studio.name} />
+          <Field label="Activité" value={(care.data?.business_type as string | null) ?? null} />
           <Field label="Site web" value={studio.website_url} href={studio.website_url} />
           <Field label="Lien de réservation" value={studio.booking_url} href={studio.booking_url} />
-          <p className="text-[13px] text-muted">Pour changer ces informations, dis-le à Fauve sur WhatsApp.</p>
+          <p className="text-[13px] text-muted">Pour changer ces informations, dis-le à Fauve.</p>
+        </Section>
+
+        <Section title="Ce que Fauve sait de ton commerce">
+          <MemoryList initial={readMemory(care.data?.memory).map((f) => f.fact)} />
         </Section>
 
         <Section title="Mon compte">

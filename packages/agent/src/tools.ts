@@ -69,6 +69,24 @@ export const toolSpecs = {
       "Renvoie le lien sécurisé (valable 15 min, à usage unique) vers la page mobile d'une publication : la gérante y regarde la vidéo, lit la légende, valide, ou déplace et corrige un texte du doigt. À envoyer quand elle veut revoir ou modifier une publication (« renvoie-moi le lien », « je veux voir le rendu »). Dans l'application, pas de lien : la carte de la publication s'affiche sous ton message.",
     input: z.object({ post_id: z.string().uuid() }),
   },
+  remember: {
+    description:
+      "Garde dans ta mémoire du commerce (valable dans toutes les conversations) des infos durables : activité précise, offre, prestations, prix, horaires, adresse, équipe, public, temps forts, goûts de la gérante pour ses posts. Une phrase précise par info. remove : les numéros d'infos de la Mémoire du contexte devenues fausses.",
+    input: z.object({
+      add: z.array(z.string().min(3).max(240)).max(8).optional(),
+      remove: z.array(z.number().int().min(1)).max(10).optional(),
+    }),
+  },
+  suggest_dates: {
+    description:
+      "Les prochains jours libres pour publier (sans publication déjà prévue), à l'heure habituelle du commerce. Pour proposer une date en boutons quand elle crée une publication sans en donner.",
+    input: z.object({ count: z.number().int().min(1).max(6).default(3) }),
+  },
+  list_inspirations: {
+    description:
+      "Les inspirations de la gérante : des Reels qu'elle aime, partagés sur Instagram ou ajoutés dans l'app, avec ce qu'on peut en reprendre (accroche, rythme, textes). À regarder avant de proposer un nouveau Reel, pour lui demander s'il doit suivre l'une d'elles.",
+    input: z.object({}),
+  },
   list_media: {
     description:
       "La médiathèque du studio : les photos et vidéos déjà reçues (WhatsApp, app, médiathèque), les plus récentes d'abord, avec leur media_id, leur date, leur format et ce qu'on y voit quand c'est connu. À regarder dès que la gérante parle de photos ou de vidéos déjà envoyées (« celles de ce matin », « regarde dans la médiathèque », « les 4 photos que j'ai prises ») : ne lui demande jamais de les renvoyer.",
@@ -131,6 +149,11 @@ export const toolSpecs = {
       brief: z.string().max(600).optional().describe("Intention ou correction, avec les textes exacts si besoin. Ex. « ouverture en motion design avec RENTRÉE en grand », « police Montserrat », « visages OK »"),
       correction: z.boolean().default(false).describe("true pour modifier le montage existant de cette publication"),
       plan: montagePlanSchema.optional().describe("Le plan proposé (obligatoire pour un nouveau montage, facultatif pour une correction)"),
+      inspiration_id: z
+        .string()
+        .uuid()
+        .optional()
+        .describe("L'inspiration choisie par la gérante pour ce Reel (list_inspirations) : le monteur la suit en priorité. Inutile si elle l'a déjà choisie en créant la publication."),
       max_new_scenes: z.number().int().min(0).max(2).optional().describe("Nouvelles scènes animées permises (3 crédits chacune). 0 si la gérante veut faire simple ou économiser : le monteur réutilise alors la bibliothèque et les scènes fixes."),
       effort: effortSchema
         .optional()
@@ -321,7 +344,7 @@ export const toolSpecs = {
   },
   reply_with: {
     description:
-      "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. Appelle-le au plus une fois par réponse, avec ton message.",
+      "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. upload : une zone de dépôt (video, photo ou any) quand tu demandes des fichiers dans l'application. pick_media (video, photo ou any) : sa médiathèque en vignettes à cocher, avec aussi l'ajout de nouveaux fichiers ; sa réponse revient avec les media_id choisis. Ni l'un ni l'autre n'apparaît sur WhatsApp. Appelle-le au plus une fois par réponse, avec ton message.",
     input: replyExtrasSchema.omit({ quote: true }),
   },
   react_to_message: {
