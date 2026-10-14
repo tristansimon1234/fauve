@@ -18,6 +18,7 @@ import {
   type ToolHandlers,
   type ReplyExtras,
   type ToolName,
+  type ReactionMood,
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -63,7 +64,11 @@ export type RunFauveInput = ToolContext & {
 };
 
 /** A live event of a turn: a line for a tool she calls, or a piece of her text (`step`: the loop step it belongs to). */
-export type ChatEvent = { type: "status"; label: string } | { type: "text"; step: number; delta: string };
+export type ChatEvent =
+  | { type: "status"; label: string }
+  | { type: "text"; step: number; delta: string }
+  /** Brigitte's instant reaction to the manager's message (Jev): her face, and an emoji on the message. */
+  | { type: "mood"; mood: ReactionMood; emoji: string | null };
 
 export type RunFauveResult = {
   reply: string | null;

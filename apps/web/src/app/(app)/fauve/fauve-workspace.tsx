@@ -111,6 +111,8 @@ export function FauveWorkspace({
   const [creating, setCreating] = useState(false);
   // While Fauve answers: the line of what she is doing, then her words as she writes them.
   const [live, setLive] = useState<LiveState | null>(null);
+  // Brigitte's instant reaction to the message being answered (Jev), until the next one.
+  const [turnMood, setTurnMood] = useState<BrigitteCue | null>(null);
   // Messages that just arrived (they rise in); a conversation that loads whole does not animate.
   const [arrived, setArrived] = useState<Set<string>>(() => new Set());
   // The quote launched from its card: no « Fauve écrit… » meanwhile (nobody is writing), and its progress is scrolled to.
@@ -288,7 +290,22 @@ export function FauveWorkspace({
     startTransition(async () => {
       try {
         setLive({ status: null, text: "", step: -1 });
-        const res = await liveTurn({ text, conversationId, attachments }, (event) => setLive((state) => applyLive(state ?? { status: null, text: "", step: -1 }, event)));
+        setTurnMood(null);
+        const res = await liveTurn({ text, conversationId, attachments }, (event) => {
+          if (event.type === "mood") {
+            if (event.mood !== "neutral") setTurnMood({ id: `instant-${Date.now()}`, mood: event.mood, fresh: true });
+            // Her emoji shows on the message at once, before her answer.
+            const emoji = event.emoji;
+            if (emoji) {
+              setMessages((list) => {
+                const i = list.findLastIndex((m) => m.from === "me");
+                return i < 0 ? list : list.map((m, j) => (j === i ? { ...m, reactions: { ...m.reactions, fauve: emoji } } : m));
+              });
+            }
+            return;
+          }
+          setLive((state) => applyLive(state ?? { status: null, text: "", step: -1 }, event));
+        });
         if (res.ok) {
           setActive(res.conversationId);
           setArrived(arrivals(messagesRef.current, res.messages));
@@ -367,9 +384,16 @@ export function FauveWorkspace({
   // What Brigitte reacts to in the header: her latest message, and the manager's words before it.
   const latest = lastFauve >= 0 ? messages[lastFauve] : null;
   const asked = messages.slice(0, lastFauve).findLast((x) => x.from === "me")?.body;
-  const cue: BrigitteCue | null = latest
-    ? { id: latest.id, funny: isFunny(latest.body) || isFunny(asked), upset: upsetLevel(asked), fresh: arrived.has(latest.id) }
-    : null;
+  // While she writes: her instant reaction to the message (Jev); then her face as her answer arrives.
+  const cue: BrigitteCue | null = typing
+    ? turnMood
+    : latest
+      ? {
+          id: latest.id,
+          mood: turnMood?.mood ?? upsetLevel(asked) ?? (isFunny(latest.body) || isFunny(asked) ? "laugh" : "happy"),
+          fresh: arrived.has(latest.id),
+        }
+      : null;
   // Getting started: the current step's card always sits under Brigitte's latest
   // message, even when she forgot to attach it; not when she offered answer
   // buttons instead, nor for the first post (it has its own flow).
