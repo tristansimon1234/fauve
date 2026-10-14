@@ -19,6 +19,7 @@ import {
   type Effort,
   type TextLook,
   addFacts,
+  jobStepLabel,
   readMemory,
   removeFacts,
 } from "@fauve/agent";
@@ -39,6 +40,7 @@ import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, 
 import { applyLayers, listLayers, loadLayer, markLayerUsed } from "@/lib/text-layers";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
+import { finishJob, runningJobs, startJob } from "@/lib/studio-jobs";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
 import { creditBalance } from "@/lib/credits";
 import { queueJob } from "@/lib/jobs";
@@ -685,12 +687,25 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         const example = await db.from("media_assets").select("kind").eq("id", example_media_id).eq("studio_id", studioId).maybeSingle();
         if (example.data?.kind !== "image") return json({ error: "L'exemple doit être une image (photo ou capture d'écran)." });
       }
+      // Already being drawn: never a second time (it would be charged twice).
+      const [running] = await runningJobs(studioId, { postId: post_id, kind: "text_layer" });
+      if (running) {
+        return json({
+          status: "already_running",
+          etape: jobStepLabel("text_layer", running.stage),
+          depuis_minutes: Math.round((Date.now() - new Date(running.startedAt).getTime()) / 60_000),
+          note: "Ce texte est déjà en cours de dessin : ne relance rien. Dis où il en est (étape, depuis combien de temps) ; le lien arrive tout seul. Elle peut suivre l'avancement dans l'app (pastille « Fauve travaille »).",
+        });
+      }
       const balance = await creditBalance(studioId);
       if (balance < CREDIT_PRICES.textLayer) {
         return json({ error: `Il faut ${CREDIT_PRICES.textLayer} crédits pour dessiner un calque, il en reste ${balance}. Propose un calque de la bibliothèque (gratuit).` });
       }
+      let jobId: string | undefined;
       try {
+        jobId = await startJob({ studioId, postId: post_id, kind: "text_layer", stage: "design" });
         await queueJob("text-layer", {
+          jobId,
           step: "design",
           studioId,
           postId: post_id,
@@ -702,6 +717,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           replyTo: ctx.replyToMessageId,
         });
       } catch (error) {
+        await finishJob(jobId, true);
         return json({ error: error instanceof Error ? error.message : "Le dessin n'a pas pu démarrer" });
       }
       ctx.notes.push(`calque de texte en cours pour la publication ${post_id}`);

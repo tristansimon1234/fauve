@@ -157,7 +157,7 @@ async function review(input: DesignRequest, ctx: Context, stills: { index: numbe
   const response = await anthropic().beta.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: 4000,
-    output_config: { effort: "low", format: betaZodOutputFormat(layerReviewSchema) },
+    output_config: { effort: "medium", format: betaZodOutputFormat(layerReviewSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: LAYER_CRITIC_PROMPT,
@@ -183,7 +183,13 @@ export function layerFor(draft: LayerDraft, js: string, photo: number, templateI
 }
 
 /** One round: design (or fix), check, render the covered photos, have them reviewed. */
-export async function designRound(input: DesignRequest, round: number, previous?: { draft: LayerDraft; feedback: string }): Promise<RoundResult> {
+export async function designRound(
+  input: DesignRequest,
+  round: number,
+  previous?: { draft: LayerDraft; feedback: string },
+  /** Where the round is (the app's progress pill). */
+  onStage?: (stage: "review") => Promise<void>,
+): Promise<RoundResult> {
   const ctx = await loadContext(input);
   let draft: LayerDraft;
   try {
@@ -198,6 +204,15 @@ export async function designRound(input: DesignRequest, round: number, previous?
 
   const problems = checkLayerCode(draft.code);
   if (problems.length) return next(`code refusé : ${problems.join(", ")}`);
+  // The words must be the business's, not the slots' descriptions.
+  const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const labels = draft.slides.flatMap((slide) =>
+    slide.texts.filter((t) => {
+      const slot = draft.slots.find((s) => s.name === t.slot);
+      return slot && norm(t.text) && (norm(t.text) === norm(slot.role) || norm(t.text) === norm(slot.name));
+    }),
+  );
+  if (labels.length) return next(`textes à remplacer par les vrais mots de la demande (ce sont les descriptions des slots) : ${labels.map((t) => `${t.slot} = « ${t.text} »`).join(", ")}`);
   let js: string;
   try {
     js = transpile(draft.code);
@@ -218,6 +233,7 @@ export async function designRound(input: DesignRequest, round: number, previous?
   if (errors.length) return next(`le rendu test a échoué : ${errors.slice(0, 3).join(" | ")}`);
 
   const stills = Object.entries(images).flatMap(([id, image]) => (image instanceof Buffer ? [{ index: Number(id.slice(1)), jpeg: image }] : []));
+  await onStage?.("review");
   const verdict = await review(input, ctx, stills);
   if (!verdict.ok && verdict.issues.length && round + 1 < MAX_ROUNDS) return { status: "retry", draft, feedback: `relecture du rendu : ${verdict.issues.join(" ; ")}` };
   return { status: "done", draft, js, review: verdict.ok ? null : verdict.issues.join(" ; ") };

@@ -7,6 +7,7 @@ import { chargeCredits } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
 import { notifyFailure, renderSlidesAndDeliver } from "@/lib/render/deliver";
+import { finishJob, jobAlive, setJobStage } from "@/lib/studio-jobs";
 import { applyLayers, saveLayer } from "@/lib/text-layers";
 
 // A new text layer, one step per invocation (each gets its own time budget):
@@ -29,6 +30,8 @@ const bodySchema = z.object({
   name: z.string().max(80).optional(),
   waId: z.string().regex(/^\d{6,16}$/).optional(),
   replyTo: z.string().max(200).optional(),
+  /** The studio_jobs row that follows this work. */
+  jobId: z.uuid().optional(),
 });
 
 function authorized(request: Request): boolean {
@@ -45,16 +48,21 @@ export async function POST(request: Request) {
   const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo };
 
   after(async () => {
+    // A newer request replaced this one (or it was given up): nothing more to do.
+    if (job.jobId && !(await jobAlive(job.jobId))) return;
     if (job.step === "render") {
+      await setJobStage(job.jobId, "render");
       const delivered = await renderSlidesAndDeliver(target);
+      await finishJob(job.jobId, !delivered);
       // Charged only once the photos are out.
       if (delivered) await chargeCredits(job.studioId, CREDIT_PRICES.textLayer, "text_layer", `Calque de texte « ${job.name ?? ""} »`, { post_id: job.postId });
       return;
     }
     try {
+      await setJobStage(job.jobId, job.round === 0 ? "design" : "fix");
       const input = { studioId: job.studioId, postId: job.postId, request: job.request, exampleMediaId: job.exampleMediaId, photos: job.photos };
       const previous = job.draft && job.feedback ? { draft: job.draft as LayerDraft, feedback: job.feedback } : undefined;
-      const result = await designRound(input, job.round, previous);
+      const result = await designRound(input, job.round, previous, (stage) => setJobStage(job.jobId, stage));
       if (result.status === "retry") {
         await queueJob("text-layer", { ...job, round: job.round + 1, draft: result.draft ?? job.draft, feedback: result.feedback });
         return;
@@ -79,6 +87,7 @@ export async function POST(request: Request) {
       await queueJob("text-layer", { ...job, step: "render", name: draft.name, draft: undefined, feedback: undefined });
     } catch (error) {
       console.error("text layer design failed", job.postId, error);
+      await finishJob(job.jobId, true);
       await notifyFailure(target, "Je n’ai pas réussi à dessiner ce texte cette fois. Aucun crédit n’a été débité. Tu veux que je réessaie, ou que je pose un texte plus simple ?", error);
     }
   });

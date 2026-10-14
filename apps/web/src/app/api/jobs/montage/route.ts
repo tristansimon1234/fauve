@@ -21,6 +21,7 @@ import { queueJob } from "@/lib/jobs";
 import { deliverMontage, notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
 import { renderPost } from "@/lib/render/render-post";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { finishJob } from "@/lib/studio-jobs";
 
 // Montage pipeline, one step per invocation (each with its own time budget).
 // Rapide (and older quotes): design → render, delivered at once.
@@ -411,4 +412,5 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
 async function reopenQuote(quoteId: string | undefined) {
   if (!quoteId) return;
   await supabaseAdmin().from("credit_quotes").update({ used_at: null, stage: null }).eq("id", quoteId).is("charged_at", null);
+  await finishJob(quoteId, true);
 }

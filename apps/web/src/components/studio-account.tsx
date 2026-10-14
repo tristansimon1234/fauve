@@ -3,6 +3,7 @@ import { InstagramIcon, TikTokIcon } from "@/components/icons";
 import { initials } from "@/lib/format";
 import { getSocialAccounts, getStudioContext } from "@/lib/studio";
 import { StudioLive } from "./studio-live";
+import { WorkPill } from "./work-pill";
 
 // Sidebar and header pieces of the app shell that depend on the signed-in member.
 
@@ -78,5 +79,11 @@ export function AvatarPlaceholder() {
 /** Live updates for the signed-in studio (see StudioLive). */
 export async function LiveUpdates() {
   const { member } = await getStudioContext();
-  return member ? <StudioLive studioId={member.studio.id} /> : null;
+  if (!member) return null;
+  return (
+    <>
+      <StudioLive studioId={member.studio.id} />
+      <WorkPill studioId={member.studio.id} />
+    </>
+  );
 }

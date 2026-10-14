@@ -18,6 +18,7 @@ import {
 } from "@fauve/agent";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { finishJob, setJobStage, startJob } from "@/lib/studio-jobs";
 
 // Credits (see packages/agent/src/credits.ts for the price list). The balance is
 // the sum of the ledger, topped up once a month. A montage is quoted first, the
@@ -279,8 +280,17 @@ export async function quoteButtons(studioId: string, quoteId: string): Promise<s
 /** Records where a launched montage is (montage_status and the quote card read it). */
 export async function setQuoteStage(quoteId: string | undefined, stage: QuoteStage): Promise<void> {
   if (!quoteId) return;
-  const { error } = await supabaseAdmin().from("credit_quotes").update({ stage, stage_at: new Date().toISOString() }).eq("id", quoteId);
+  const { data, error } = await supabaseAdmin()
+    .from("credit_quotes")
+    .update({ stage, stage_at: new Date().toISOString() })
+    .eq("id", quoteId)
+    .select("studio_id, post_id")
+    .maybeSingle();
   if (error) console.warn("credit_quotes: stage not recorded", error.message);
+  // The progress the app shows (the job has the quote's id).
+  if (stage === "delivered") await finishJob(quoteId);
+  else if (stage === "design" && data) await startJob({ id: quoteId, studioId: data.studio_id as string, postId: (data.post_id as string | null) ?? null, kind: "montage", stage }).catch(() => {});
+  else await setJobStage(quoteId, stage);
 }
 
 /** The latest unused quote made before this turn (the one the manager has seen), if any. */

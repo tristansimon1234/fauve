@@ -56,6 +56,7 @@ export type RunFauveInput = ToolContext & {
     montageEffort?: Effort;
     /** What Fauve knows about the business (site, tone, memory). */
     known?: { website: string | null; booking: string | null; tone: string | null; memory: string[] };
+    work?: string[];
   };
   /** Live: what Fauve is doing, and her words as she writes them (the app's chat). */
   onEvent?: (event: ChatEvent) => void;
@@ -129,6 +130,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           channel: input.studio.channel,
           montageEffort: input.studio.montageEffort,
           known: input.studio.known,
+          work: input.studio.work,
         }),
       },
     ],
