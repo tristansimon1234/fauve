@@ -41,6 +41,6 @@ export async function readMoodboard(
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`moodboard reading failed (${response.stop_reason})`);
   }
-  const { reading, palette } = response.parsed_output;
-  return { reading: reading.slice(0, 2000), palette: [...new Set(palette.map((c) => c.toLowerCase()))].slice(0, 6) };
+  const { reading, palette, fonts } = response.parsed_output;
+  return { reading: reading.slice(0, 2000), palette: [...new Set(palette.map((c) => c.toLowerCase()))].slice(0, 6), fonts };
 }

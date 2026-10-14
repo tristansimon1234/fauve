@@ -41,7 +41,7 @@ const slotTextsSchema = z.array(z.object({ slot: z.string().regex(SLOT_NAME), te
 export const layerDesignOutputSchema = z.object({
   code: z.string(),
   name: z.string().max(80).describe("Nom court et parlant, ex. « Checklist surlignée menthe »"),
-  notes: z.string().max(400).describe("Ce que tu as repris de l'exemple, en une phrase"),
+  notes: z.string().describe("Ce que tu as repris de l'exemple, en une phrase (300 caractères au plus)"),
   slots: z.array(layerSlotSchema).max(16),
   fonts: z.array(z.string().regex(LOOK_FONT)).max(4).describe("Familles Google Fonts utilisées"),
   slides: z.array(z.object({ photo: z.number().int().min(1), texts: slotTextsSchema })).min(1).max(10).describe("Les textes de chaque photo, par slot"),

@@ -8,6 +8,7 @@ import type { DeleteResult } from "@/components/delete-button";
 import { loadElement, refreshElementOnPosts, restoreElementVersion, saveKit } from "@/lib/elements";
 import { startElements } from "@/lib/elements-start";
 import { renderSlides } from "@/lib/render/slides";
+import { insertProfileVersion } from "@/app/(app)/style/profile";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -137,4 +138,20 @@ export async function duplicateComponent(id: string): Promise<BankResult & { id?
 export async function archiveComponent(id: string): Promise<DeleteResult> {
   const res = await patchElement(id, { archived_at: new Date().toISOString() });
   return res.ok ? { ok: true } : res;
+}
+
+/** Removes one of the studio's saved text styles (a new version of its brand profile). */
+export async function removeTextLook(name: string): Promise<DeleteResult> {
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  try {
+    await insertProfileVersion(member.studio.id, (current) => {
+      const looks = Array.isArray(current.text_looks) ? (current.text_looks as { name?: string }[]) : [];
+      return { ...current, text_looks: looks.filter((l) => l.name !== name) };
+    });
+    revalidatePath("/composants");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Le style n’a pas pu être retiré. Réessaie." };
+  }
 }

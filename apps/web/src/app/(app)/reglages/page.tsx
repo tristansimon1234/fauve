@@ -144,7 +144,7 @@ async function Settings() {
 
         <Section title="Style des vidéos">
           <p className="text-sm leading-normal">
-            Direction artistique, couleurs, polices, logo et gabarit que Brigitte applique à chaque Reel.{" "}
+            Direction artistique, couleurs, polices, logo et ambiance que Brigitte applique à chaque publication.{" "}
             <Link href="/style" className="font-bold text-violet">
               Régler mon style
             </Link>

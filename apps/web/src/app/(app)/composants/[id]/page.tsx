@@ -12,14 +12,14 @@ import { runningJobs } from "@/lib/studio-jobs";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ComponentStudio } from "./component-studio";
 
-export const metadata: Metadata = { title: "Composant" };
+export const metadata: Metadata = { title: "Élément pour photos" };
 
 export default function ComponentPage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <main className="flex min-w-0 flex-col gap-5 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
-      <Link href="/composants" className="inline-flex items-center gap-1.5 self-start text-[14px] font-semibold text-muted hover:text-ink">
+      <Link href="/composants?onglet=photos" className="inline-flex items-center gap-1.5 self-start text-[14px] font-semibold text-muted hover:text-ink">
         <ArrowLeftIcon size={16} />
-        Composants
+        Éléments pour photos
       </Link>
       <Suspense fallback={<PageLoading title="Composant" />}>
         <Component params={params} />
@@ -50,7 +50,7 @@ async function Component({ params }: { params: Promise<{ id: string }> }) {
     // The studio's latest photo, to see the component on something real.
     db.from("media_assets").select("storage_path, mime_type").eq("studio_id", studioId).eq("kind", "image").order("created_at", { ascending: false }).limit(1),
   ]);
-  const brand = resolveReelBrand({}, "doux", { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, customFonts: inputs.customFonts });
+  const brand = resolveReelBrand({}, "doux", { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts });
   const photoPath = photo.data?.[0]?.storage_path as string | undefined;
   const [photoUrl, exampleUrl] = await Promise.all([signed(photoPath), signed(element.examplePath)]);
 

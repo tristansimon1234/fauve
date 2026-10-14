@@ -6,16 +6,32 @@ import { z } from "zod";
 // likes), keeps it in the studio's style, and the montages, carousels and the
 // editors all render it the same way (apps/render, LookText).
 
-/** A colour: hex, or the studio's own (« accent », and « accent_ink » for text on it). */
+/**
+ * A colour: hex, or one of the studio's own, from its brand (Style): « accent » (its main
+ * colour), « accent_ink » (text that reads on it), « secondary », « light », « dark ».
+ * Brand colours follow the brand when it changes.
+ */
 export const lookColorSchema = z
   .string()
-  .regex(/^(#[0-9a-fA-F]{6}|accent|accent_ink)$/)
-  .describe("#rrggbb, ou « accent » (couleur du studio), « accent_ink » (texte lisible sur la couleur du studio)");
+  .regex(/^(#[0-9a-fA-F]{6}|accent|accent_ink|secondary|light|dark)$/)
+  .describe(
+    "Couleur de la charte du commerce de préférence : « accent » (sa couleur principale), « accent_ink » (texte lisible sur elle), « secondary » (sa 2e couleur), « light » (sa couleur claire), « dark » (sa couleur foncée) ; sinon #rrggbb",
+  );
 
 export const LOOK_FONT = /^[A-Za-z0-9 ]{2,40}$/;
+/** The studio's own fonts by role, resolved at render time from its brand. */
+export const BRAND_FONTS = ["brand_display", "brand_body"] as const;
+/** A look's font: a Google Fonts family, or the studio's title / text font (brand_display, brand_body). */
+export const LOOK_FONT_OR_BRAND = /^([A-Za-z0-9 ]{2,40}|brand_display|brand_body)$/;
+const lookFontSchema = z
+  .string()
+  .regex(LOOK_FONT_OR_BRAND)
+  .describe(
+    "Police : « brand_display » (la police des titres du commerce) ou « brand_body » (sa police de texte) de préférence, pour suivre sa charte ; une famille Google Fonts précise (« Anton », « Caveat »…) seulement pour refaire un exemple qu'elle a envoyé",
+  );
 
 export const textLookSchema = z.object({
-  font: z.string().regex(LOOK_FONT).describe("Famille Google Fonts la plus proche, ex. « Anton », « Bebas Neue », « Playfair Display », « Caveat »"),
+  font: lookFontSchema,
   weight: z.number().int().min(100).max(900).describe("Graisse : 400 normal, 700 gras, 900 très gras"),
   italic: z.boolean(),
   uppercase: z.boolean(),
@@ -39,7 +55,7 @@ export const textLookSchema = z.object({
   emphasis: z
     .object({
       color: lookColorSchema.optional(),
-      font: z.string().regex(LOOK_FONT).optional().describe("Autre police pour les mots en valeur, ex. une manuscrite"),
+      font: z.string().regex(LOOK_FONT_OR_BRAND).optional().describe("Autre police pour les mots en valeur : brand_display, brand_body, ou une famille Google Fonts"),
       italic: z.boolean().optional(),
       fill: lookColorSchema.optional().describe("Surlignage derrière les mots en valeur"),
     })
@@ -144,3 +160,59 @@ Pour chaque bloc distinct (5 au plus, les plus visibles ; ignore l'interface d'I
   - enter : l'apparition qui irait avec ce style dans une vidéo (pop pour un style punchy, rise ou fade pour un style doux, typewriter pour un style machine à écrire, slide pour un bandeau).
 logo : où le logo du commerce est posé, s'il y en a un.
 summary : le style et la mise en page en une ou deux phrases simples, sans jargon, comme tu l'expliquerais à la gérante.`;
+
+/** The studio's colours by role, for looks that name them (« secondary », « light », « dark »). */
+export type BrandPalette = { secondary: string; light: string; dark: string };
+
+const luminance = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+};
+
+/**
+ * The brand's colours by role: the second colour (else the main one), its lightest and
+ * darkest ones when they are light or dark enough (else white and near-black).
+ */
+export function brandPalette(colors: string[] | undefined, accent: string): BrandPalette {
+  const hexes = (colors ?? []).filter((c) => /^#[0-9a-f]{6}$/i.test(c));
+  const byLight = [...hexes].sort((a, b) => luminance(b) - luminance(a));
+  const lightest = byLight[0];
+  const darkest = byLight[byLight.length - 1];
+  return {
+    secondary: hexes.find((c) => c.toLowerCase() !== accent.toLowerCase() && luminance(c) > 0.08 && luminance(c) < 0.8) ?? accent,
+    light: lightest && luminance(lightest) > 0.7 ? lightest : "#ffffff",
+    dark: darkest && luminance(darkest) < 0.06 ? darkest : "#141414",
+  };
+}
+
+type LookBrand = { displayFont: string; bodyFont: string; palette?: BrandPalette };
+
+/**
+ * A look with the studio's fonts and colours named by role (brand_display, secondary…)
+ * turned into real ones, for the render and the previews. Hex colours, accent and
+ * accent_ink, and named Google fonts are left as they are.
+ */
+export function resolveBrandLook<T extends TextLook | undefined>(look: T, brand: LookBrand): T {
+  if (!look) return look;
+  const font = (f: string) => (f === "brand_display" ? brand.displayFont : f === "brand_body" ? brand.bodyFont : f);
+  const palette = brand.palette ?? { secondary: "accent", light: "#ffffff", dark: "#141414" };
+  const color = (c: string) => (c === "secondary" || c === "light" || c === "dark" ? palette[c] : c);
+  return {
+    ...look,
+    font: font(look.font),
+    color: color(look.color),
+    ...(look.fill ? { fill: { ...look.fill, color: color(look.fill.color) } } : {}),
+    ...(look.stroke ? { stroke: { ...look.stroke, color: color(look.stroke.color) } } : {}),
+    ...(look.emphasis
+      ? {
+          emphasis: {
+            ...look.emphasis,
+            ...(look.emphasis.color ? { color: color(look.emphasis.color) } : {}),
+            ...(look.emphasis.fill ? { fill: color(look.emphasis.fill) } : {}),
+            ...(look.emphasis.font ? { font: font(look.emphasis.font) } : {}),
+          },
+        }
+      : {}),
+  };
+}

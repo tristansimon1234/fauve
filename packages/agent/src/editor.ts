@@ -89,7 +89,7 @@ export const editorOutputSchema = z.object({
     template: motionTemplateSchema,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
-    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
+    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
   }),
   rationale: z.string(),
 });
@@ -97,13 +97,13 @@ export const editorOutputSchema = z.object({
 /** The retouch and blur of each clip in the previous version, kept on the same clip in the new one. */
 export function carryRetouch(plan: EditPlan, previous: EditPlan | null): EditPlan {
   if (!previous) return plan;
-  const byClip = new Map(previous.segments.filter(isClipSegment).map((s) => [s.clip_id, { adjust: s.adjust, blur: s.blur }]));
+  const byClip = new Map(previous.segments.filter(isClipSegment).map((s) => [s.clip_id, { adjust: s.adjust, blur: s.blur, photo: s.photo }]));
   return {
     ...plan,
     segments: plan.segments.map((s) => {
       if (!isClipSegment(s)) return s;
       const kept = byClip.get(s.clip_id);
-      return kept ? { ...s, ...(kept.adjust ? { adjust: kept.adjust } : {}), ...(kept.blur ? { blur: kept.blur } : {}) } : s;
+      return kept ? { ...s, ...(kept.adjust ? { adjust: kept.adjust } : {}), ...(kept.blur ? { blur: kept.blur } : {}), ...(kept.photo ? { photo: kept.photo } : {}) } : s;
     }),
   };
 }

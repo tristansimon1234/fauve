@@ -19,7 +19,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, FilmIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { ListItems } from "@/components/montage/list-items";
 import { StylePicker } from "@/components/montage/style-picker";
-import { clipFaceBlur } from "@/components/montage/retouch-actions";
+import { clipFaceBlur, photoRetouch } from "@/components/montage/retouch-actions";
 import { RetouchSwitches } from "@/components/montage/retouch-switches";
 import { TextBoxes } from "@/components/montage/text-boxes";
 import { AskFauveButton, useFauveDrawer } from "@/components/fauve-drawer";
@@ -102,14 +102,15 @@ export function MontageEditor({
       texts: [...plan.texts, { text: "Ton texte", from: round(span.start), to: round(Math.min(span.end, span.start + 2.5)), style: "band" }],
     });
 
-  const save = () =>
-    startSaving(async () => {
-      const res = await saveEditPlan(postId, plan).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
-      if (res.ok) {
-        setSaved(plan);
-        setMessage({ ok: true, text: "Enregistré. La vidéo finale se met à jour (environ une minute)." });
-      } else setMessage({ ok: false, text: res.error });
-    });
+  const saveNow = async () => {
+    const res = await saveEditPlan(postId, plan).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
+    if (res.ok) {
+      setSaved(plan);
+      setMessage({ ok: true, text: "Enregistré. La vidéo finale se met à jour (environ une minute)." });
+    } else setMessage({ ok: false, text: res.error });
+    return res.ok;
+  };
+  const save = () => startSaving(async () => void (await saveNow()));
 
   const remove = (i: number) => {
     edit(removeSegment(plan, i));
@@ -259,15 +260,14 @@ export function MontageEditor({
             </button>
           </div>
           <p className="-mt-2 truncate text-[13px] text-muted">{sceneLabel(segment, clipLabels)}</p>
-          {/* Brigitte reads the saved montage: ask about a scene once the changes are saved. */}
-          {!dirty && (
-            <AskFauveButton
-              topic={{ postId, title: postTitle, scene: index, sceneLabel: `Scène ${index + 1} · ${kindLabels[segmentKind(segment)]}` }}
-              label={segmentKind(segment) === "motion" ? "Demander à Brigitte de refaire l’animation" : "Demander à Brigitte pour cette scène"}
-              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-soft px-3 py-2 text-[13px] font-bold text-violet hover:bg-violet hover:text-white"
-            />
-          )}
-          <SegmentFields segment={segment} onChange={setSegment} />
+          {/* Brigitte reads the saved montage: changes not saved yet are saved first. */}
+          <AskFauveButton
+            topic={{ postId, title: postTitle, scene: index, sceneLabel: `Scène ${index + 1} · ${kindLabels[segmentKind(segment)]}` }}
+            label={segmentKind(segment) === "motion" ? "Demander à Brigitte de refaire l’animation" : "Demander à Brigitte pour cette scène"}
+            before={dirty && valid ? saveNow : undefined}
+            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-soft px-3 py-2 text-[13px] font-bold text-violet hover:bg-violet hover:text-white disabled:opacity-60"
+          />
+          <SegmentFields segment={segment} onChange={setSegment} photo={"clip_id" in segment && Boolean(inputs.photoIds?.includes(segment.clip_id))} />
           <div className="flex flex-col gap-3 border-t border-line pt-4">
             <div className="flex items-center justify-between">
               <h3 className="text-[14px] font-bold">Textes sur cette scène</h3>
@@ -366,7 +366,23 @@ function Field({ label, value, max, onChange }: { label: string; value: string; 
 }
 
 /** The words of one scene (cuts, lengths and looks are Brigitte's: « Demander à Brigitte »). */
-function SegmentFields({ segment, onChange }: { segment: Segment; onChange: (s: Segment) => void }) {
+function SegmentFields({ segment, onChange, photo }: { segment: Segment; onChange: (s: Segment) => void; photo: boolean }) {
+  if ("clip_id" in segment && photo) {
+    // A photo of the Reel: retouched and blurred like a carousel slide.
+    return (
+      <RetouchSwitches
+        key={segment.clip_id}
+        light={Boolean(segment.photo?.adjust)}
+        faces={Boolean(segment.photo?.blur?.some((b) => b.kind === "face"))}
+        onChange={async (next) => {
+          const res = await photoRetouch(segment.clip_id, next).catch(() => ({ ok: false as const, error: "Brigitte n’a pas pu regarder cette photo." }));
+          if (!res.ok) return { ok: false, message: res.error };
+          onChange({ ...segment, photo: res.value ?? undefined });
+          return { ok: true, message: res.note };
+        }}
+      />
+    );
+  }
   if ("clip_id" in segment) {
     // Faces are tracked over the whole clip, so the blur follows this clip wherever it is used.
     return (

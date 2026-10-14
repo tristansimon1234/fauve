@@ -77,7 +77,7 @@ const designedElementSchema = z.object({
 /** What the component designer answers: the components, and where they go on each photo. */
 export const kitDesignOutputSchema = z.object({
   kit_name: z.string().max(80).describe("Nom du kit, ex. « Checklist bordeaux et script »"),
-  notes: z.string().max(400).describe("Ce que tu as repris de l'exemple, en une phrase"),
+  notes: z.string().describe("Ce que tu as repris de l'exemple, en une phrase (300 caractères au plus)"),
   elements: z.array(designedElementSchema).min(1).max(MAX_ELEMENTS),
   slides: z
     .array(

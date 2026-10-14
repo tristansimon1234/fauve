@@ -595,3 +595,46 @@
     opacity: 1;
   }
 }
+
+/* Style picker tiles: a tile plays its text's entrance when hovered or chosen. */
+.fauve-tile-anim {
+  animation-duration: 2.6s;
+  animation-iteration-count: infinite;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.group:hover .fauve-tile-anim,
+.fauve-tile-anim.is-on {
+  animation-name: var(--tile-anim);
+}
+@keyframes fauve-tile-fade {
+  0% { opacity: 0; }
+  20%, 82% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes fauve-tile-rise {
+  0% { opacity: 0; transform: translateY(12px); }
+  20%, 82% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+@keyframes fauve-tile-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  12% { opacity: 1; transform: scale(1.14); }
+  20%, 82% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; }
+}
+@keyframes fauve-tile-slide {
+  0% { opacity: 0; transform: translateX(-18px); }
+  20%, 82% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+@keyframes fauve-tile-typewriter {
+  0% { clip-path: inset(0 100% 0 0); }
+  40%, 82% { clip-path: inset(0 0 0 0); opacity: 1; }
+  100% { clip-path: inset(0 0 0 0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .group:hover .fauve-tile-anim,
+  .fauve-tile-anim.is-on {
+    animation-name: none;
+  }
+}

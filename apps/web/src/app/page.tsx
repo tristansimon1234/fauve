@@ -5,13 +5,12 @@ import {
   ChartIcon,
   CheckIcon,
   EyeIcon,
-  FilmIcon,
-  LayersIcon,
   PenIcon,
   WhatsAppIcon,
 } from "@/components/icons";
 import { LandingDemo } from "@/components/landing/landing-demo";
-import { CarouselMock, PHOTOS, ReelMock, ReportMock, RetouchMock, unsplash, WeekMock } from "@/components/landing/mocks";
+import { PHOTOS, ReelMock, ReportMock, RetouchMock, unsplash, WeekMock } from "@/components/landing/mocks";
+import { CarouselShowcase, ReelsShowcase, SHOWCASE_SLIDES } from "@/components/landing/showcase";
 import { Mascot } from "@/components/mascot";
 import { Logo } from "@/components/orb";
 import { whatsappLink } from "@/lib/public-env";
@@ -108,52 +107,51 @@ export default function LandingPage() {
         </ul>
       </section>
 
-      {/* What she makes */}
-      <section id="ce-qu-elle-fait" className="mx-auto flex max-w-[1200px] scroll-mt-6 flex-col gap-8 px-4 pb-24 sm:px-8">
-        <SectionTitle kicker="Ce qu’elle fait">
+      {/* Her real work */}
+      <section id="ce-qu-elle-fait" className="mx-auto flex max-w-[1200px] scroll-mt-6 flex-col gap-8 px-4 pb-16 sm:px-8">
+        <SectionTitle kicker="Fait par Brigitte">
+          De vraies publications, <span className="accent">faites par l’app.</span>
+        </SectionTitle>
+        <p className="-mt-4 max-w-[640px] text-[16px] leading-relaxed text-muted">
+          Ces Reels sortent tels quels de Brigitte, pour trois commerces d’exemple : elle a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
+        </p>
+        <div className={`grid items-center gap-10 rounded-[28px] border border-line bg-[radial-gradient(ellipse_at_top,#fff_0%,#FBF7F4_70%)] px-4 py-8 sm:px-8 ${SHOWCASE_SLIDES.length ? "lg:grid-cols-[1.6fr_1fr]" : ""}`}>
+          <ReelsShowcase />
+          {SHOWCASE_SLIDES.length > 0 && (
+            <div className="flex flex-col items-center gap-3">
+              <CarouselShowcase />
+              <span className="text-center text-[13px] font-semibold text-muted">Carrousel · Salon de coiffure · Paris</span>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* What else she does */}
+      <section className="mx-auto flex max-w-[1200px] flex-col gap-8 px-4 pb-24 sm:px-8">
+        <SectionTitle kicker="Ce qu’elle fait aussi">
           Tout ce qu’une community manager fait, <span className="accent">à tes couleurs.</span>
         </SectionTitle>
-        <div className="grid gap-4 md:grid-cols-6">
-          <Card className="md:col-span-3 md:row-span-2" icon={FilmIcon} title="Des Reels montés comme par un pro">
-            Elle choisit les meilleurs moments de tes vidéos ou anime tes photos, ajoute des textes et des animations à ton style, puis regarde le résultat et le corrige avant de te l’envoyer.
-            <span className="mt-6 flex items-end justify-center gap-4">
-              <ReelMock width={150} />
-              <span className="hidden flex-col gap-2 pb-3 sm:flex">
-                {["Accroche dès la 1re seconde", "Textes animés à tes couleurs", "Ton logo à la fin"].map((t) => (
-                  <span key={t} className="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-[12.5px] font-semibold">
-                    <CheckIcon size={14} className="text-violet" />
-                    {t}
-                  </span>
-                ))}
-              </span>
-            </span>
-          </Card>
-          <Card className="md:col-span-3" icon={LayersIcon} title="Des carrousels qui te ressemblent">
-            Tes photos, ses textes posés dessus avec ta police et tes couleurs : conseils, planning, offres.
-            <span className="mt-3 block">
-              <CarouselMock />
-            </span>
-          </Card>
-          <Card className="md:col-span-3" icon={PenIcon} title="Les légendes et les hashtags">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card icon={PenIcon} title="Les légendes et les hashtags">
             Écrits avec ton ton, ton offre et ton lien de réservation.
             <span className="mt-4 block rounded-[14px] border border-line bg-soft p-3.5 text-[13.5px] leading-relaxed text-ink">
               Le cours de 7 h, c’est notre moment préféré ☀️ Lumière douce, 8 personnes max, et la journée qui commence bien. Réserve ta place, lien en bio.
               <span className="mt-1.5 block font-semibold text-violet">#pilateslyon #studiolune #coursdumatin</span>
             </span>
           </Card>
-          <Card className="md:col-span-2" icon={CalendarIcon} title="Publié à la bonne heure">
+          <Card icon={CalendarIcon} title="Publié à la bonne heure">
             Elle tient ton calendrier et publie sur Instagram quand tu as validé.
             <span className="mt-4 block">
               <WeekMock />
             </span>
           </Card>
-          <Card className="md:col-span-2" icon={ChartIcon} title="Ce qui marche, chaque dimanche">
+          <Card icon={ChartIcon} title="Ce qui marche, chaque dimanche">
             Elle compare tes posts et en tire des leçons pour les suivants.
             <span className="mt-4 block">
               <ReportMock />
             </span>
           </Card>
-          <Card className="md:col-span-2" icon={EyeIcon} title="Des photos plus belles">
+          <Card icon={EyeIcon} title="Des photos plus belles">
             Lumière, couleurs, horizon, et les visages floutés quand il le faut. L’original ne bouge pas.
             <span className="mt-4 block">
               <RetouchMock />

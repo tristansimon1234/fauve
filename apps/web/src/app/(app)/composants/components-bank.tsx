@@ -185,9 +185,8 @@ export function ComponentsBank({
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex max-w-[640px] flex-col gap-1.5">
-          <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Composants</h1>
           <p className="text-[15px] leading-relaxed text-muted">
-            Ton design system : les titres, étiquettes, listes… que Brigitte a tirés de tes inspirations. Elle les pose sur tes photos avec tes mots, et tu peux retoucher chacun à part.
+            Les titres, étiquettes, listes… que Brigitte a tirés de tes inspirations. Elle les pose sur tes photos avec tes mots, et tu peux retoucher chacun à part.
           </p>
         </div>
         {!open && (

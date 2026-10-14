@@ -1,13 +1,11 @@
 "use client";
 
 import { REEL_FPS, type ReelProps } from "@fauve/agent";
-import Link from "next/link";
 import { Thumbnail } from "@remotion/player";
 import { Reel } from "@render/Reel";
 import type { ReelProps as RenderReelProps } from "@render/types";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { DeleteButton } from "@/components/delete-button";
-import { LayersIcon } from "@/components/icons";
 import { archiveCreation } from "./actions";
 
 // What Fauve made for the studio and keeps for later: animated scenes (Reels),
@@ -94,44 +92,17 @@ function Card({ creation, ratio, children }: { creation: Creation; ratio: string
   );
 }
 
-export function CreationsSection({ scenes, components, brand }: { scenes: Creation[]; components: number; brand: ReelProps["brand"] }) {
-  return (
-    <section aria-labelledby="creations" className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1">
-        <h2 id="creations" className="text-[24px] font-extrabold tracking-[-0.02em]">
-          Tes créations
-        </h2>
-        <p className="text-[15px] text-muted">
-          Ce que Brigitte a créé pour toi et garde pour la suite : elle le réutilise avec d’autres textes, plus vite et sans crédit.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <h3 className="text-[16px] font-bold">Scènes animées</h3>
-        {scenes.length ? (
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
-            {scenes.map((s) => (
-              <Card key={s.id} creation={s} ratio="aspect-[9/16]">
-                <LivePreview props={sceneProps(s.js, s.name, brand)} frame={Math.round(SCENE_FRAMES * 0.6)} />
-              </Card>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted">Pas encore de scène : la première arrivera avec ton prochain montage animé.</p>
-        )}
-      </div>
-
-      <Link href="/composants" className="flex items-center gap-4 rounded-[18px] border border-line bg-white p-4 hover:border-violet">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet">
-          <LayersIcon size={20} />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[15px] font-bold">Tes composants pour les photos</span>
-          <span className="text-[13px] text-muted">
-            {components ? `${components} composant${components > 1 ? "s" : ""} : titres, étiquettes, listes…` : "Titres, étiquettes, listes… tirés de tes inspirations"}
-          </span>
-        </span>
-      </Link>
-    </section>
+/** The studio's animated scenes for Reels, each drawn live by the render composition. */
+export function CreationsSection({ scenes, brand }: { scenes: Creation[]; brand: ReelProps["brand"] }) {
+  return scenes.length ? (
+    <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
+      {scenes.map((s) => (
+        <Card key={s.id} creation={s} ratio="aspect-[9/16]">
+          <LivePreview props={sceneProps(s.js, s.name, brand)} frame={Math.round(SCENE_FRAMES * 0.6)} />
+        </Card>
+      ))}
+    </ul>
+  ) : (
+    <p className="text-sm text-muted">Pas encore d’animation : la première arrivera avec ton prochain Reel animé.</p>
   );
 }

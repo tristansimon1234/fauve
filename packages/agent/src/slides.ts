@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { REEL_FPS, resolveReelBrand, type ReelInputs, type ReelProps } from "./motion.ts";
+import { brandLooks, REEL_FPS, resolveReelBrand, type ReelInputs, type ReelProps } from "./motion.ts";
 import { motionTemplateSchema, type MotionTemplate } from "./schemas.ts";
 import { photoEditSchema } from "./retouch.ts";
 import { MAX_ELEMENTS, slideElementSchema } from "./elements.ts";
@@ -58,6 +58,7 @@ export function buildSlideProps(
   slide: Slide,
   inputs: { template: MotionTemplate; imageUrl: string; brand: ReelInputs["brand"] },
 ): ReelProps {
+  const brand = resolveReelBrand({}, inputs.template, inputs.brand);
   return {
     template: inputs.template,
     ...SLIDE_SIZE,
@@ -76,13 +77,10 @@ export function buildSlideProps(
       x: t.x,
       scale: t.scale,
       backdrop: t.backdrop,
-      look: t.look,
-      items: t.items,
-      detail_look: t.detail_look,
-      bullet: t.bullet,
+      ...brandLooks(t, brand),
     })),
     words: [],
-    brand: resolveReelBrand({}, inputs.template, inputs.brand),
+    brand,
     endCard: null,
     logo: slide.logo ?? null,
     layer: slide.layer

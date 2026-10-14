@@ -35,7 +35,6 @@ const postSchema = z.object({
   platforms: z.array(platformSchema),
   caption: z.string().nullable(),
   hashtags: z.array(z.string()),
-  agent_note: z.string().nullable(),
   edit_plan_id: z.uuid().nullable(),
   render_id: z.uuid().nullable(),
   media_ids: z.array(z.uuid()).catch([]),
@@ -86,7 +85,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const { data, error } = await db
     .from("posts")
-    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, agent_note, edit_plan_id, render_id, media_ids, slides")
+    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -117,7 +116,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
     canEdit && (post.kind === "carousel" || post.kind === "post") && Object.keys(photos).length
       ? {
           plan: postSlides({ slides: post.slides, media_ids: post.media_ids }) ?? alignSlides({ template: "doux", slides: [] }, post.media_ids),
-          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, fonts: i.fonts, customFonts: i.customFonts })),
+          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, fonts: i.fonts, colors: i.colors, customFonts: i.customFonts })),
           layouts: await layoutsForEditor(studioId),
           bank: (await listElements(studioId)).map(({ id, name, role, slots, js, fonts, base, box, sample, kitId, kitName }) => ({ id, name, role, slots, js, fonts, base, box, sample, kitId, kitName })),
         }
@@ -180,12 +179,6 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
       {plan && !editor && <PlanSection plan={plan.view} clipLabels={clipLabels} />}
 
-      {post.agent_note && (
-        <div className="flex items-start gap-3 rounded-[18px] border border-line p-4">
-          <Orb size={24} className="shrink-0" />
-          <p className="text-[13px] leading-normal text-muted">{post.agent_note}</p>
-        </div>
-      )}
     </>
   );
 

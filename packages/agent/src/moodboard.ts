@@ -23,5 +23,11 @@ Palette : 3 à 5 couleurs hex tirées des images, la principale en premier.`;
 export const moodboardReadingSchema = z.object({
   reading: z.string().describe("La direction artistique tirée du moodboard, 900 caractères au maximum"),
   palette: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).describe("3 à 5 couleurs hex, la principale en premier"),
+  fonts: z
+    .object({
+      display: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).describe("Police des titres : la famille Google Fonts exacte, ou la plus proche de la typographie vue (logo, titres)"),
+      body: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).describe("Police du texte : la famille Google Fonts exacte, ou la plus proche, bien lisible"),
+    })
+    .describe("Les deux polices de la charte, en familles Google Fonts"),
 });
 export type MoodboardReading = z.infer<typeof moodboardReadingSchema>;

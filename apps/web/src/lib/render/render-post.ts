@@ -111,6 +111,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
     accent,
     logoUrl,
     fonts: style.fonts,
+    colors: style.colors,
     customFonts,
     studioName: (studio.data?.name as string | null) ?? "",
   };
@@ -139,7 +140,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  const { clipFiles, clips, clipUrls, photoIds, words, accent, logoUrl, studioName, fonts, customFonts } = await loadMontageInputs(studioId, plan);
+  const { clipFiles, clips, clipUrls, photoIds, words, accent, logoUrl, studioName, fonts, colors, customFonts } = await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
@@ -167,7 +168,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         clipUrls,
         photoIds,
         words,
-        brand: { name: studioName, accent, logoUrl, fonts, customFonts },
+        brand: { name: studioName, accent, logoUrl, fonts, colors, customFonts },
       });
       // Library scenes play with new texts, older plans predate the layout check: every
       // scene is checked before the render, and one whose text leaves the frame plays its
