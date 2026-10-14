@@ -23,7 +23,7 @@ const MARGIN = 40;
 const TOLERANCE = 8;
 
 /** Dark ink on a light colour, white on a dark one. */
-function inkOn(hex: string): string {
+export function inkOn(hex: string): string {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.45 ? "#1C1530" : "#FFFFFF";
@@ -47,7 +47,7 @@ function Plain({ texts, props }: { texts: Record<string, string>; props: ReelPro
 }
 
 /** In check mode: once fonts and fitted boxes have settled, every text must sit inside the frame's margins. */
-function useLayerCheck(root: React.RefObject<HTMLDivElement | null>, props: ReelProps, enabled: boolean) {
+export function useLayerCheck(root: React.RefObject<HTMLDivElement | null>, props: ReelProps, enabled: boolean) {
   const [handle] = useState(() => (enabled ? delayRender("text layer check", { timeoutInMilliseconds: 60000 }) : null));
   useEffect(() => {
     if (handle === null) return;

@@ -1,25 +1,21 @@
 "use client";
 
-import { buildSlideProps, REEL_FPS, type ReelProps } from "@fauve/agent";
+import { REEL_FPS, type ReelProps } from "@fauve/agent";
+import Link from "next/link";
 import { Thumbnail } from "@remotion/player";
 import { Reel } from "@render/Reel";
 import type { ReelProps as RenderReelProps } from "@render/types";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { DeleteButton } from "@/components/delete-button";
+import { LayersIcon } from "@/components/icons";
 import { archiveCreation } from "./actions";
 
-// What Fauve made for the studio and keeps for later: animated scenes (Reels)
-// and text layers (photos). Each one is drawn live by the render composition,
+// What Fauve made for the studio and keeps for later: animated scenes (Reels),
+// and a way to its components for photos (their own page). Each one is drawn live by the render composition,
 // so the manager sees it rather than reads a technical description.
 
 export type Creation = { id: string; name: string; js: string; uses: number; house: boolean };
 
-// A neutral photo under the text layers, so the layout itself is what shows.
-const BACKDROP =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    "<svg xmlns='http://www.w3.org/2000/svg' width='1080' height='1350'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#b9aea4'/><stop offset='1' stop-color='#5d544e'/></linearGradient></defs><rect width='1080' height='1350' fill='url(#g)'/></svg>",
-  );
 const SCENE_FRAMES = 90;
 
 function sceneProps(js: string, name: string, brand: ReelProps["brand"]): ReelProps {
@@ -98,8 +94,7 @@ function Card({ creation, ratio, children }: { creation: Creation; ratio: string
   );
 }
 
-export function CreationsSection({ scenes, layers, brand }: { scenes: Creation[]; layers: Creation[]; brand: ReelProps["brand"] }) {
-  const layerBrand = { name: brand.name, accent: brand.accent, logoUrl: brand.logoUrl, fonts: [brand.displayFont, brand.bodyFont] };
+export function CreationsSection({ scenes, components, brand }: { scenes: Creation[]; components: number; brand: ReelProps["brand"] }) {
   return (
     <section aria-labelledby="creations" className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
@@ -126,22 +121,17 @@ export function CreationsSection({ scenes, layers, brand }: { scenes: Creation[]
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
-        <h3 className="text-[16px] font-bold">Mises en page de texte</h3>
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-4">
-          {layers.map((l) => {
-            const props = buildSlideProps(
-              { media_id: "00000000-0000-4000-8000-000000000000", texts: [], layer: { name: l.name, js: l.js, slots: [], texts: {}, fonts: [] } },
-              { template: "doux", imageUrl: BACKDROP, brand: layerBrand },
-            );
-            return (
-              <Card key={l.id} creation={l} ratio="aspect-[4/5]">
-                <LivePreview props={props} frame={props.durationInFrames - 30} />
-              </Card>
-            );
-          })}
-        </ul>
-      </div>
+      <Link href="/composants" className="flex items-center gap-4 rounded-[18px] border border-line bg-white p-4 hover:border-violet">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet">
+          <LayersIcon size={20} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[15px] font-bold">Tes composants pour les photos</span>
+          <span className="text-[13px] text-muted">
+            {components ? `${components} composant${components > 1 ? "s" : ""} : titres, étiquettes, listes…` : "Titres, étiquettes, listes… tirés de tes inspirations"}
+          </span>
+        </span>
+      </Link>
     </section>
   );
 }

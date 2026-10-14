@@ -34,7 +34,7 @@ export type SceneComponent = (props: {
 }) => ReactNode;
 
 /** The component a generated code defines (`Scene` for a motion scene, `Layer` for a text layer), or null. */
-export function compileComponent<C>(js: string, name: "Scene" | "Layer", scope: typeof SCOPE = SCOPE): C | null {
+export function compileComponent<C>(js: string, name: "Scene" | "Layer" | "Element", scope: typeof SCOPE = SCOPE): C | null {
   try {
     const factory = new Function(
       "React",

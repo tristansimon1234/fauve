@@ -3,6 +3,7 @@
 import type { TextLayer } from "@fauve/agent";
 import { useEffect, useRef, useState } from "react";
 import { InlineEdit, type FrameBox } from "./inline-edit";
+import { slotBoxes, union } from "./measure";
 
 // A text layout on the preview, handled like any design tool: click a text to
 // write it in place, drag the layout to move it, pull the corner to resize it.
@@ -12,33 +13,7 @@ import { InlineEdit, type FrameBox } from "./inline-edit";
 type Place = NonNullable<TextLayer["place"]>;
 const NO_PLACE: Place = { x: 0, y: 0, scale: 1 };
 
-const norm = (s: string) => s.normalize("NFKD").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
-/** What a slot shows first: its first line, before a « | » detail. */
-const firstWords = (value: string) => norm((value.split("\n").find((l) => l.trim()) ?? "").split("|")[0] ?? "");
-
 type Measured = { frame: FrameBox | null; slots: Record<string, FrameBox> };
-
-function union(rects: DOMRect[], base: DOMRect): FrameBox | null {
-  const real = rects.filter((r) => r.width > 1 && r.height > 1);
-  if (!real.length) return null;
-  const left = Math.min(...real.map((r) => r.left));
-  const top = Math.min(...real.map((r) => r.top));
-  const right = Math.max(...real.map((r) => r.right));
-  const bottom = Math.max(...real.map((r) => r.bottom));
-  return { left: (left - base.left) / base.width, top: (top - base.top) / base.height, width: (right - left) / base.width, height: (bottom - top) / base.height };
-}
-
-/** The deepest elements whose text is (or starts with) these words. */
-function elementsFor(root: Element, words: string): Element[] {
-  if (!words) return [];
-  const all = [...root.querySelectorAll("*")].filter((el) => !el.closest("[data-fauve-overlay]"));
-  for (const match of [(t: string) => t === words, (t: string) => t.startsWith(words)]) {
-    const hits = all.filter((el) => match(norm(el.textContent ?? "")));
-    const deepest = hits.filter((el) => !hits.some((other) => other !== el && el.contains(other)));
-    if (deepest.length) return deepest;
-  }
-  return [];
-}
 
 export function LayerHandles({
   container,
@@ -66,14 +41,7 @@ export function LayerHandles({
       const drawn = root?.querySelector("[data-fauve-layer]");
       if (!root || !drawn) return;
       const base = root.getBoundingClientRect();
-      const slots: Record<string, FrameBox> = {};
-      for (const slot of latest.current.slots) {
-        const value = latest.current.texts[slot.name] ?? "";
-        const lines = slot.multiline ? value.split("\n").filter((l) => l.trim()) : [value];
-        const els = lines.flatMap((line) => elementsFor(drawn, firstWords(line)));
-        const box = union(els.map((el) => el.getBoundingClientRect()), base);
-        if (box) slots[slot.name] = box;
-      }
+      const slots = slotBoxes(drawn, base, latest.current.slots, latest.current.texts);
       // The layout's own shapes (cards, bands, badges) and its texts.
       const shapes = [...drawn.querySelectorAll<HTMLElement>("*")].filter((el) => {
         const style = getComputedStyle(el);

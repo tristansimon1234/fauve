@@ -29,7 +29,7 @@ export type SlidesRender = {
 };
 
 export const slidesKey = (plan: SlidesPlan) => createHash("sha256").update(JSON.stringify(plan)).digest("hex").slice(0, 16);
-export const hasTexts = (plan: SlidesPlan) => plan.slides.some((s) => s.texts.length > 0 || s.layer || s.logo || s.edit);
+export const hasTexts = (plan: SlidesPlan) => plan.slides.some((s) => s.texts.length > 0 || s.layer || s.elements?.length || s.logo || s.edit);
 
 /** A post's slides plan, one slide per photo in order; null without one. */
 export function postSlides(post: { slides: unknown; media_ids: string[] | null }): SlidesPlan | null {
@@ -62,16 +62,16 @@ export function slidesToPublish(post: { slides: unknown; slides_render: unknown;
   return { state: recent ? "rendering" : "failed", rendered: {} };
 }
 
-/** Text layer code this post may use: the layers already on it, and the studio's and Fauve's library. */
+/** Layer and component code this post may use: what is already on it, and the studio's and Fauve's library. */
 export async function knownLayerCode(studioId: string, postId: string): Promise<Set<string>> {
   const db = supabaseAdmin();
   const [post, library] = await Promise.all([
     db.from("posts").select("slides").eq("id", postId).eq("studio_id", studioId).maybeSingle(),
-    db.from("motion_templates").select("js").eq("kind", "layer").or(`studio_id.eq.${studioId},studio_id.is.null`).is("archived_at", null),
+    db.from("motion_templates").select("js").in("kind", ["layer", "element"]).or(`studio_id.eq.${studioId},studio_id.is.null`).is("archived_at", null),
   ]);
   const current = slidesPlanSchema.safeParse(post.data?.slides);
   return new Set([
-    ...(current.success ? current.data.slides.flatMap((s) => (s.layer ? [s.layer.js] : [])) : []),
+    ...(current.success ? current.data.slides.flatMap((s) => [...(s.layer ? [s.layer.js] : []), ...(s.elements ?? []).map((e) => e.js)]) : []),
     ...(library.data ?? []).map((t) => t.js as string),
   ]);
 }

@@ -15,6 +15,7 @@ import { loadEditorData } from "@/lib/montage-editor-data";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { postSlides } from "@/lib/render/slides";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
+import { listElements } from "@/lib/elements";
 import { layoutsForEditor } from "@/lib/text-layers";
 import { loadTextLooks } from "@/lib/text-looks";
 import { versionKey } from "@/lib/version-key";
@@ -118,6 +119,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           plan: postSlides({ slides: post.slides, media_ids: post.media_ids }) ?? alignSlides({ template: "doux", slides: [] }, post.media_ids),
           brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, fonts: i.fonts, customFonts: i.customFonts })),
           layouts: await layoutsForEditor(studioId),
+          bank: (await listElements(studioId)).map(({ id, name, role, slots, js, fonts, base, box, sample, kitId, kitName }) => ({ id, name, role, slots, js, fonts, base, box, sample, kitId, kitName })),
         }
       : null;
 
@@ -234,7 +236,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           <div className="order-3 flex min-w-0 flex-col gap-4 xl:order-none">
             {details}
           </div>
-          <CarouselEditor key={versionKey(slides.plan)} postId={post.id} postTitle={post.title} initialPlan={slides.plan} photos={photos} brand={slides.brand} looks={looks} layouts={slides.layouts} />
+          <CarouselEditor key={versionKey(slides.plan)} postId={post.id} postTitle={post.title} initialPlan={slides.plan} photos={photos} brand={slides.brand} looks={looks} layouts={slides.layouts} bank={slides.bank} />
         </div>
       ) : editor ? (
         // A video editor: the publication on the left, the montage in the middle, the selected scene on the right.

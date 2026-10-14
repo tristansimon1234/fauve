@@ -9,7 +9,6 @@ import {
   slidesPlanSchema,
   textLookSchema,
   AUTO_START_MAX_CREDITS,
-  CREDIT_PRICES,
   DEFAULT_EFFORT,
   EFFORTS,
   effortSchema,
@@ -19,7 +18,6 @@ import {
   type Effort,
   type TextLook,
   addFacts,
-  jobStepLabel,
   readMemory,
   removeFacts,
 } from "@fauve/agent";
@@ -37,13 +35,11 @@ import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
-import { applyLayers, listLayers, loadLayer, markLayerUsed } from "@/lib/text-layers";
+import { elementInstance, listElements, loadElement, markElementsUsed, placeElements } from "@/lib/elements";
+import { startElements } from "@/lib/elements-start";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
-import { finishJob, runningJobs, startJob } from "@/lib/studio-jobs";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
-import { creditBalance } from "@/lib/credits";
-import { queueJob } from "@/lib/jobs";
 import { readWebsite, WebsiteError } from "./website";
 
 export type ToolContext = {
@@ -368,8 +364,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // above the studio's default level: a higher one is the manager's choice, on a quote.
       const order = ["rapide", "soigne", "max"] as const;
       const aboveDefault = quote.effort !== null && order.indexOf(quote.effort) > order.indexOf(studioDefault);
-      // Only once she said so: answering a question is not a yes.
-      if (go && !aboveDefault && quote.max <= AUTO_START_MAX_CREDITS && quote.balance >= quote.max) {
+      // Only once she said so: answering a question is not a yes. A correction or a variant never
+      // starts on its own: a criticism (« c'est plat ») is not a yes, she sees the plan and the price first.
+      if (go && !correction && !variant && !aboveDefault && quote.max <= AUTO_START_MAX_CREDITS && quote.balance >= quote.max) {
         const accepted = await acceptQuote(studioId, quote.id, turnStartedAt, { immediate: true });
         if (!("error" in accepted)) {
           ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
@@ -632,100 +629,93 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async list_text_layers() {
-      const layers = await listLayers(studioId);
+    async list_elements() {
+      const elements = await listElements(studioId, 60);
       return json({
-        layers: layers.map((l) => ({ layer_id: l.id, name: l.name, description: l.description, slots: l.slots, house: l.house || undefined })),
-        note: layers.length ? "Réutiliser un calque est gratuit (apply_text_layer)." : "Bibliothèque vide : design_text_layer en dessine un.",
+        composants: elements.map((e) => ({
+          element_id: e.id,
+          nom: e.name,
+          type: e.role,
+          kit: e.kitName ?? undefined,
+          slots: e.slots.map((sl) => ({ slot: sl.name, role: sl.role, max: sl.max_chars, multiline: sl.multiline || undefined })),
+          exemple: e.sample,
+          place_sur_son_kit: e.box ?? undefined,
+        })),
+        note: elements.length
+          ? "Les poser est gratuit (place_elements). Pour un kit entier, pose tous les composants du même kit à leur place."
+          : "Banque vide : design_elements en crée à partir d'une inspiration (la capture d'un post qu'elle aime).",
       });
     },
 
-    async apply_text_layer({ post_id, layer_id, photos }) {
-      const layer = await loadLayer(studioId, layer_id);
-      if (!layer) return json({ error: "Calque introuvable dans la bibliothèque du studio (list_text_layers)." });
-      const known = new Set(layer.slots.map((s) => s.name));
-      const unknown = new Set<string>();
-      const layers = new Map(
-        photos.map((p) => {
-          const texts = Object.fromEntries(
-            p.texts.flatMap((t) => {
-              if (!known.has(t.slot)) {
-                unknown.add(t.slot);
-                return [];
-              }
-              return [[t.slot, t.text]];
-            }),
-          );
-          return [p.photo, { template_id: layer.id, name: layer.name, js: layer.js, slots: layer.slots, texts, fonts: layer.fonts }] as const;
-        }),
+    async place_elements({ post_id, photos, mode }) {
+      const bank = new Map((await listElements(studioId)).map((e) => [e.id, e]));
+      const missing = new Set<string>();
+      const unknownSlots = new Set<string>();
+      const perPhoto = new Map(
+        photos.map((p) => [
+          p.photo,
+          p.elements.flatMap((pl) => {
+            const element = bank.get(pl.element_id);
+            if (!element) {
+              missing.add(pl.element_id);
+              return [];
+            }
+            const known = new Set(element.slots.map((sl) => sl.name));
+            for (const t of pl.texts) if (!known.has(t.slot)) unknownSlots.add(`${element.name} : ${t.slot}`);
+            const texts = Object.fromEntries(pl.texts.filter((t) => known.has(t.slot)).map((t) => [t.slot, t.text]));
+            const box = { ...(pl.x !== undefined ? { x: pl.x } : {}), ...(pl.y !== undefined ? { y: pl.y } : {}), ...(pl.w !== undefined ? { w: pl.w } : {}), ...(pl.rotate !== undefined ? { rotate: pl.rotate } : {}) };
+            return [elementInstance(element, { box, texts })];
+          }),
+        ] as const),
       );
+      if (missing.size) return json({ error: `Composants introuvables dans la banque : ${[...missing].join(", ")} (list_elements).` });
       try {
-        await applyLayers(studioId, post_id, layers);
+        await placeElements(studioId, post_id, perPhoto, mode);
       } catch (error) {
-        return json({ error: error instanceof Error ? error.message : "Calque non posé" });
+        return json({ error: error instanceof Error ? error.message : "Composants non posés" });
       }
-      await markLayerUsed(layer.id, layer.uses);
+      await markElementsUsed([...new Set(photos.flatMap((p) => p.elements.map((e) => e.element_id)))]);
       ctx.afterReply.push(async () => {
         await renderSlidesAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
       });
       return json({
         status: "started",
         photos: photos.map((p) => p.photo),
-        unknown_slots: unknown.size ? `Slots inconnus ignorés : ${[...unknown].join(", ")} (slots du calque : ${[...known].join(", ")})` : undefined,
+        slots_inconnus: unknownSlots.size ? `Ignorés : ${[...unknownSlots].join(", ")}` : undefined,
         note: "Le rendu part après ta réponse (environ une minute) et le lien est envoyé tout seul. Annonce-le en une phrase.",
       });
     },
 
-    async design_text_layer({ post_id, request, example_media_id, photos }) {
-      const post = unwrap(await db.from("posts").select("id, kind, status, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
-      if (post.kind !== "carousel" && post.kind !== "post") {
-        return json({ error: "Un calque de texte se pose sur les photos d'un carrousel ou d'un post photo. Pour un Reel, les textes font partie du montage." });
+    async design_elements({ request, example_media_id, post_id, photos }) {
+      if (post_id) {
+        const post = unwrap(await db.from("posts").select("kind, status, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
+        if (post.kind !== "carousel" && post.kind !== "post") return json({ error: "Les composants se posent sur les photos d'un carrousel ou d'un post photo. Pour un Reel, les textes font partie du montage." });
+        if (post.status === "published" || post.status === "measured") return json({ error: "Cette publication est déjà en ligne." });
+        if (!((post.media_ids as string[] | null) ?? []).length) return json({ error: "Cette publication n'a pas encore de photos : ajoute-les d'abord (update_post media_ids)." });
       }
-      if (post.status === "published" || post.status === "measured") return json({ error: "Cette publication est déjà en ligne." });
-      if (!((post.media_ids as string[] | null) ?? []).length) return json({ error: "Cette publication n'a pas encore de photos : ajoute-les d'abord (update_post media_ids)." });
       if (example_media_id) {
         const example = await db.from("media_assets").select("kind").eq("id", example_media_id).eq("studio_id", studioId).maybeSingle();
-        if (example.data?.kind !== "image") return json({ error: "L'exemple doit être une image (photo ou capture d'écran)." });
+        if (example.data?.kind !== "image") return json({ error: "L'inspiration doit être une image (photo ou capture d'écran)." });
       }
-      // Already being drawn: never a second time (it would be charged twice).
-      const [running] = await runningJobs(studioId, { postId: post_id, kind: "text_layer" });
-      if (running) {
-        return json({
-          status: "already_running",
-          etape: jobStepLabel("text_layer", running.stage),
-          depuis_minutes: Math.round((Date.now() - new Date(running.startedAt).getTime()) / 60_000),
-          note: "Ce texte est déjà en cours de dessin : ne relance rien. Dis où il en est (étape, depuis combien de temps) ; le lien arrive tout seul. Elle peut suivre l'avancement dans l'app (pastille « Fauve travaille »).",
-        });
+      const started = await startElements({ studioId, mode: "create", postId: post_id, request, exampleMediaId: example_media_id, photos, origin: "chat", waId: ctx.waId, replyTo: ctx.replyToMessageId });
+      if (started.status === "already_running") {
+        return json({ status: "already_running", etape: started.stage, depuis_minutes: started.minutes, note: "C'est déjà en cours : ne relance rien. Dis où ça en est ; le message arrive tout seul (pastille « Fauve travaille » dans l'app)." });
       }
-      const balance = await creditBalance(studioId);
-      if (balance < CREDIT_PRICES.textLayer) {
-        return json({ error: `Il faut ${CREDIT_PRICES.textLayer} crédits pour dessiner un calque, il en reste ${balance}. Propose un calque de la bibliothèque (gratuit).` });
+      if (started.status === "error") return json({ error: `${started.error} Propose plutôt des composants de sa banque (gratuit).` });
+      ctx.notes.push(`composants en cours${post_id ? ` pour la publication ${post_id}` : ""}`);
+      return json({ status: "started", credits: started.credits, note: "Fauve décompose l'inspiration en composants, les teste et les relit : 2 à 4 minutes. Les crédits sont débités une fois livré et un message part tout seul. Annonce-le en une phrase (délai et coût), sans lien." });
+    },
+
+    async edit_element({ element_id, change, example_media_id, post_id }) {
+      const element = await loadElement(studioId, element_id);
+      if (!element) return json({ error: "Composant introuvable dans la banque (list_elements)." });
+      const started = await startElements({ studioId, mode: "edit", elementId: element_id, postId: post_id, request: change, exampleMediaId: example_media_id, origin: "chat", waId: ctx.waId, replyTo: ctx.replyToMessageId });
+      if (started.status === "already_running") {
+        return json({ status: "already_running", etape: started.stage, depuis_minutes: started.minutes, note: "Ce composant est déjà en cours de modification : ne relance rien." });
       }
-      let jobId: string | undefined;
-      try {
-        jobId = await startJob({ studioId, postId: post_id, kind: "text_layer", stage: "design" });
-        await queueJob("text-layer", {
-          jobId,
-          step: "design",
-          studioId,
-          postId: post_id,
-          request,
-          exampleMediaId: example_media_id,
-          photos,
-          round: 0,
-          waId: ctx.waId,
-          replyTo: ctx.replyToMessageId,
-        });
-      } catch (error) {
-        await finishJob(jobId, true);
-        return json({ error: error instanceof Error ? error.message : "Le dessin n'a pas pu démarrer" });
-      }
-      ctx.notes.push(`calque de texte en cours pour la publication ${post_id}`);
-      return json({
-        status: "started",
-        credits: CREDIT_PRICES.textLayer,
-        note: "Fauve dessine, teste et relit le calque : 2 à 4 minutes. Les crédits sont débités une fois les photos livrées, et le lien est envoyé tout seul. Annonce-le en une phrase (délai et coût), sans lien.",
-      });
+      if (started.status === "error") return json({ error: started.error });
+      ctx.notes.push(`modification du composant ${element_id} en cours`);
+      return json({ status: "started", credits: started.credits, note: `Nouvelle version de « ${element.name} » en préparation (une à deux minutes, ${started.credits} crédit). L'ancienne reste dans son historique. Un message part tout seul. Annonce-le en une phrase.` });
     },
 
     async copy_text_style({ media_id, post_id, note, copy_places }) {
@@ -830,6 +820,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
                 photo: i + 1,
                 media_id: s.media_id,
                 ...(s.layer ? { calque: s.layer.name, textes_du_calque: s.layer.texts } : {}),
+                ...(s.elements?.length ? { composants: s.elements.map((e) => ({ element_id: e.element_id, nom: e.name, textes: e.texts, place: e.box })) } : {}),
                 textes: s.texts.map((t) => ({ texte: t.text, role: t.style, ...(t.items?.length ? { liste: t.items.map((it) => it.title) } : {}), ...lookOf(t.look) })),
               })),
               gabarit_photos: slides.data.template,

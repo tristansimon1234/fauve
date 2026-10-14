@@ -153,7 +153,7 @@ export const toolSpecs = {
         .boolean()
         .default(false)
         .describe(
-          "true seulement si la gérante vient de te dire de lancer ce montage (« vas-y », « lance », « fais-la », « oui » à ta proposition de plan) ou de faire cette correction. Répondre à une question (le format, motion design ou vidéo, le sujet) n'est pas un accord : false, et le devis attend son « Lancer ».",
+          "true seulement si la gérante vient de te dire de lancer ce nouveau montage (« vas-y », « lance », « fais-la », « oui » à ta proposition de plan). Répondre à une question (le format, motion design ou vidéo, le sujet) n'est pas un accord : false, et le devis attend son « Lancer ». Une correction ou une variante ne part jamais toute seule : une critique (« c'est plat », « je n'aime pas ») n'est pas un accord, elle voit d'abord le plan et le prix.",
         ),
       inspiration_id: z
         .string()
@@ -230,35 +230,62 @@ export const toolSpecs = {
         .max(10),
     }),
   },
-  list_text_layers: {
+  list_elements: {
     description:
-      "La bibliothèque des calques de texte pour les photos (carrousel, post photo) : ceux de Fauve (house) et ceux déjà dessinés pour le studio, avec leurs slots (les textes à remplir). Réutiliser un calque est gratuit et immédiat : regarde-la avant d'en dessiner un nouveau.",
+      "La banque de composants du commerce (son design system pour le texte sur les photos) : titres, étiquettes, listes, prix, citations… chacun avec ses slots (les textes à remplir), ses textes d'exemple, et le kit (l'inspiration) d'où il vient. Les poser est gratuit et immédiat : regarde-la avant d'en créer.",
     input: z.object({}),
   },
-  apply_text_layer: {
+  place_elements: {
     description:
-      "Pose un calque de la bibliothèque sur des photos d'un carrousel ou d'un post photo, avec les textes du commerce pour chaque slot (un slot multiline prend plusieurs lignes séparées par \n). Gratuit ; le rendu part après ta réponse et le lien est envoyé tout seul.",
+      "Pose des composants de la banque sur des photos d'un carrousel ou d'un post photo, avec les mots du commerce pour chaque slot (un slot multiline prend plusieurs lignes séparées par \n). Sans x/y/w, un composant reprend sa place sur son kit. replace (par défaut) retire les composants déjà sur ces photos ; add les ajoute. Gratuit ; le rendu part après ta réponse et le lien est envoyé tout seul.",
     input: z.object({
       post_id: z.string().uuid(),
-      layer_id: z.string().uuid(),
       photos: z
-        .array(z.object({ photo: z.number().int().min(1).max(10).describe("Numéro de la photo, à partir de 1"), texts: z.array(z.object({ slot: z.string(), text: z.string().max(400) })) }))
+        .array(
+          z.object({
+            photo: z.number().int().min(1).max(10).describe("Numéro de la photo, à partir de 1"),
+            elements: z
+              .array(
+                z.object({
+                  element_id: z.string().uuid(),
+                  texts: z.array(z.object({ slot: z.string(), text: z.string().max(400) })),
+                  x: z.number().min(0).max(1).optional().describe("Bord gauche, part de la largeur"),
+                  y: z.number().min(0).max(1).optional().describe("Bord haut, part de la hauteur"),
+                  w: z.number().min(0.06).max(1).optional().describe("Largeur, part de la largeur"),
+                  rotate: z.number().min(-45).max(45).optional(),
+                }),
+              )
+              .min(1)
+              .max(8),
+          }),
+        )
         .min(1)
         .max(10),
+      mode: z.enum(["replace", "add"]).default("replace"),
     }),
   },
-  design_text_layer: {
+  design_elements: {
     description:
-      "Fauve dessine un nouveau calque de texte pour les photos d'un carrousel ou d'un post photo, comme un graphiste : n'importe quelle mise en page (liste, cases, prix dans un rond, flèches, colonnes, tampon, texte en arc…), polices, couleurs, formes. Avec example_media_id, il refait la même chose que l'exemple envoyé par la gérante (une capture d'un post qu'elle aime), avec les mots du commerce. Testé et relu avant envoi ; prend 2 à 4 minutes et coûte 3 crédits, débités une fois les photos livrées ; le lien est envoyé tout seul. Le calque rejoint la bibliothèque et se réutilise ensuite gratuitement.",
+      "Fauve crée de nouveaux composants pour la banque, comme un directeur artistique : à partir d'une inspiration (example_media_id, la capture d'un post qu'elle aime), il en sort chaque pièce réutilisable (titre, étiquette, checklist, prix dans un rond…), la code, la teste et la relit ; ou il crée les composants décrits dans request. Avec post_id, il les pose aussitôt sur les photos de la publication avec les mots du commerce. Prend 2 à 4 minutes et coûte 3 crédits, débités une fois livré ; un message part tout seul à la fin.",
     input: z.object({
-      post_id: z.string().uuid(),
       request: z
         .string()
         .min(1)
         .max(4000)
-        .describe("Ce qu'il faut écrire, photo par photo, avec les mots exacts du commerce (titre, éléments d'une liste, prix…), et ce que la gérante a dit du style"),
-      example_media_id: z.string().uuid().optional().describe("media_id de l'image d'exemple à reproduire"),
+        .describe("Ce qu'il faut créer, et pour une publication ce qu'il faut écrire photo par photo, avec les mots exacts du commerce, et ce que la gérante a dit du style"),
+      example_media_id: z.string().uuid().optional().describe("media_id de l'image d'inspiration à décomposer"),
+      post_id: z.string().uuid().optional().describe("La publication où les poser (carrousel ou post photo), si c'est pour elle"),
       photos: z.array(z.number().int().min(1).max(10)).max(10).optional().describe("Photos à couvrir (à partir de 1) ; par défaut toutes"),
+    }),
+  },
+  edit_element: {
+    description:
+      "Fait évoluer UN composant de la banque (« l'étiquette plus arrondie », « le titre en serif fin », « des cases plus grandes ») : une nouvelle version, l'ancienne est gardée. Avec post_id, la publication passe aussitôt à la nouvelle version et ses photos sont refaites. 1 crédit, une à deux minutes ; un message part tout seul à la fin. Pour changer seulement des mots ou une place sur une photo, utilise place_elements (gratuit).",
+    input: z.object({
+      element_id: z.string().uuid(),
+      change: z.string().min(1).max(2000).describe("Le changement demandé, précis"),
+      example_media_id: z.string().uuid().optional().describe("Une image jointe pour montrer le style voulu"),
+      post_id: z.string().uuid().optional(),
     }),
   },
   retouch_photos: {

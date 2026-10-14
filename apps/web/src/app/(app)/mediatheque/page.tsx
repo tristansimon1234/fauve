@@ -80,11 +80,12 @@ async function Library() {
       db,
       assets.filter((a) => a.kind === "video").map((a) => a.id),
     ),
-    // The studio's scenes and layers, and Fauve's house layers.
+    // The studio's scenes and components.
     db
       .from("motion_templates")
       .select("id, studio_id, kind, name, js, uses")
-      .or(`studio_id.eq.${studioId},and(studio_id.is.null,kind.eq.layer)`)
+      .eq("studio_id", studioId)
+      .in("kind", ["scene", "element"])
       .is("archived_at", null)
       .order("uses", { ascending: false })
       .order("created_at", { ascending: false })
@@ -99,8 +100,7 @@ async function Library() {
     house: t.studio_id === null,
   });
   const templates = creations.data ?? [];
-  // House layers last: the studio's own work first.
-  const layers = templates.filter((t) => t.kind === "layer").map(toCreation).sort((a, b) => Number(a.house) - Number(b.house));
+  const components = templates.filter((t) => t.kind === "element").length;
   const scenes = templates.filter((t) => t.kind === "scene").map(toCreation);
   const brand = resolveReelBrand({}, "doux", { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, customFonts: inputs.customFonts });
 
@@ -149,7 +149,7 @@ async function Library() {
         </>
       )}
 
-      <CreationsSection scenes={scenes} layers={layers} brand={brand} />
+      <CreationsSection scenes={scenes} components={components} brand={brand} />
     </>
   );
 }

@@ -71,6 +71,19 @@ export type ReelProps = {
   endCard: { title: string; subtitle: string | null; from: number } | null;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
+  /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
+  elements?: {
+    js: string;
+    texts: Record<string, string>;
+    fonts: string[];
+    base: number;
+    box: { x: number; y: number; w: number; rotate?: number };
+    accent?: string;
+    /** Named in the test render's errors (the designer's reference, e1…). */
+    label?: string;
+  }[];
+  /** The designer's test render: fails when a text leaves the frame or a component breaks. */
+  elementsCheck?: boolean;
   /** A text layer designed as code (carousel slides); `check` makes the render fail when a text leaves the frame. */
   layer?: {
     js: string;
