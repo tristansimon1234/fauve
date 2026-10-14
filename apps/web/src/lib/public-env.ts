@@ -10,7 +10,7 @@ export const publicEnv = {
   fauveWhatsAppNumber: process.env.NEXT_PUBLIC_FAUVE_WHATSAPP_NUMBER ?? "",
 };
 
-export function whatsappLink(text = "Bonjour Fauve !"): string {
+export function whatsappLink(text = "Bonjour Brigitte !"): string {
   const number = publicEnv.fauveWhatsAppNumber.replace(/\D/g, "");
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }

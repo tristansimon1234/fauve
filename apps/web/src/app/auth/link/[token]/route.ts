@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Fauve</title>
-<meta property="og:title" content="Fauve">
+<title>Brigitte</title>
+<meta property="og:title" content="Brigitte">
 <meta property="og:description" content="Ouvre le lien pour voir ta publication.">
 <style>
   body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; background: #1c1530; color: #fff;

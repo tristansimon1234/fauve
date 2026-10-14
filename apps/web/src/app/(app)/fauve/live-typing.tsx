@@ -1,5 +1,6 @@
 "use client";
 
+import { Mascot } from "@/components/mascot";
 import type { LiveState } from "./live-turn";
 
 /**
@@ -25,16 +26,13 @@ export function LiveTyping({ live }: { live: LiveState | null }) {
     <div
       role="status"
       aria-live="polite"
-      className="fauve-enter flex items-center gap-2 self-start rounded-[18px_18px_18px_6px] border border-line bg-white px-4 py-3 text-sm text-muted [--fauve-delay:120ms]"
+      className="fauve-enter flex items-center gap-2 self-start rounded-[18px_18px_18px_6px] border border-line bg-white py-2 pr-4 pl-2.5 text-sm text-muted [--fauve-delay:120ms]"
     >
-      <span className="fauve-dots" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </span>
+      {/* Brigitte at work: she looks up, thinking. */}
+      <Mascot size={30} mood="thinking" />
       {/* key: each new line fades in */}
       <span key={live?.status ?? "writing"} className="fauve-fade">
-        {live?.status ?? "Fauve écrit…"}
+        {live?.status ?? "Brigitte écrit…"}
       </span>
     </div>
   );

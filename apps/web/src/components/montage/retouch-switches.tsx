@@ -22,7 +22,7 @@ function Switch({ label, on, busy, disabled, onToggle, dark }: { label: string; 
           className={`absolute top-0.5 left-0.5 size-3 rounded-full bg-white transition-transform duration-200 ease-fauve motion-reduce:transition-none ${on ? "translate-x-3" : ""}`}
         />
       </span>
-      {busy ? "Fauve regarde…" : label}
+      {busy ? "Brigitte regarde…" : label}
     </button>
   );
 }

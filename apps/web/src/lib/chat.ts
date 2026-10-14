@@ -302,7 +302,7 @@ export async function chatTurn(
     });
   } catch (error) {
     console.error("chat: agent failed", error);
-    return { ok: false, error: "Fauve n’a pas pu répondre. Réessaie dans un instant.", conversationId: id };
+    return { ok: false, error: "Brigitte n’a pas pu répondre. Réessaie dans un instant.", conversationId: id };
   }
   const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, id), list(ctx.studioId)]);
   return { ok: true, conversationId: id, messages, conversations };

@@ -1,3 +1,4 @@
+import { Mascot } from "./mascot";
 import type { CSSProperties } from "react";
 
 /**
@@ -27,9 +28,9 @@ export function Orb({ size = 36, className, still = false }: { size?: number; cl
 
 export function Logo({ size = 36 }: { size?: number }) {
   return (
-    <span className="flex items-center gap-2.5">
-      <Orb size={size} />
-      <span className="text-xl font-extrabold tracking-[-0.02em]">Fauve</span>
+    <span className="flex items-center gap-2">
+      <Mascot size={Math.round(size * 1.25)} />
+      <span className="text-xl font-extrabold tracking-[-0.02em]">Brigitte</span>
     </span>
   );
 }

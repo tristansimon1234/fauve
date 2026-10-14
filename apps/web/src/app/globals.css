@@ -215,13 +215,97 @@
   }
 }
 
-/* Fauve's mascot (components/mascot.tsx): a sketchy doodle whose line boils, blinks and sways. */
+/* Brigitte's mascot (components/mascot.tsx): a clean head under a line of curls; it floats and blinks. */
 .fauve-cat {
   display: inline-block;
   flex-shrink: 0;
   width: var(--cat);
   height: var(--cat);
+}
+.fauve-cat-float {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
   animation: fauve-sway 6s ease-in-out infinite;
+}
+.fauve-cat-mood {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.fauve-cat-shadow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fauve-shadow 6s ease-in-out infinite;
+}
+/* At rest, an eyebrow lifts now and then (her knowing look). */
+.fauve-cat-brows {
+  transform-box: view-box;
+  animation: fauve-brows 7s ease-in-out infinite;
+}
+@keyframes fauve-brows {
+  0%, 70%, 82%, 100% { transform: translateY(0); }
+  74%, 78% { transform: translateY(-1.6px); }
+}
+/* Writing: a faster, smaller bob. Laughing: little hops, brows dancing. */
+.fauve-cat-thinking .fauve-cat-mood {
+  animation: fauve-think 1.6s ease-in-out infinite;
+}
+@keyframes fauve-think {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-2%) rotate(1deg); }
+}
+.fauve-cat-laugh .fauve-cat-mood {
+  animation: fauve-laugh 0.42s ease-in-out infinite;
+}
+.fauve-cat-laugh .fauve-cat-brows {
+  animation: fauve-laugh-brows 0.42s ease-in-out infinite;
+}
+@keyframes fauve-laugh {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-5%) rotate(3deg); }
+}
+@keyframes fauve-laugh-brows {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.2px); }
+}
+.fauve-cat-surprised .fauve-cat-mood {
+  animation: fauve-jump 0.5s ease-out 1;
+}
+@keyframes fauve-jump {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-8%) scale(1.04); }
+  100% { transform: translateY(0) scale(1); }
+}
+/* Sad: she sinks a little. In tears: a small tremble, and the tears fall. */
+.fauve-cat-sad .fauve-cat-mood {
+  transform: translateY(2%) rotate(-2deg);
+  transition: transform 300ms ease;
+}
+.fauve-cat-cry .fauve-cat-mood {
+  animation: fauve-sob 0.5s ease-in-out infinite;
+}
+@keyframes fauve-sob {
+  0%, 100% { transform: translateY(2%) rotate(-1.5deg); }
+  50% { transform: translateY(3%) rotate(1.5deg); }
+}
+.fauve-cat-tear {
+  transform-box: fill-box;
+  animation: fauve-tear 1.3s ease-in infinite;
+}
+.fauve-cat-tear-b {
+  animation-delay: -0.6s;
+}
+@keyframes fauve-tear {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(160%); opacity: 0; }
+}
+.fauve-cat-still * {
+  animation: none !important;
+}
+
+@keyframes fauve-shadow {
+  0%, 100% { transform: scaleX(1); opacity: 0.12; }
+  50% { transform: scaleX(0.8); opacity: 0.08; }
 }
 .fauve-cat svg {
   display: block;
@@ -247,7 +331,7 @@
   animation: fauve-blink 4.5s ease-in-out infinite;
 }
 .fauve-cat-orbit {
-  transform-origin: 50px 56px;
+  transform-origin: 50px 62px;
   animation: fauve-tilt 8s ease-in-out infinite;
 }
 @keyframes fauve-boil {
@@ -256,8 +340,7 @@
 }
 @keyframes fauve-sway {
   0%, 100% { transform: rotate(0deg) translateY(0); }
-  30% { transform: rotate(-4deg) translateY(-2%); }
-  60% { transform: rotate(3deg) translateY(0); }
+  50% { transform: rotate(-2deg) translateY(-3%); }
 }
 @keyframes fauve-blink {
   0%, 44%, 50%, 100% { transform: scaleY(1); }

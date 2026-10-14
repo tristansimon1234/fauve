@@ -20,7 +20,7 @@ export function RefreshReportButton({ label = "Analyser maintenant" }: { label?:
         }
         className="btn btn-secondary h-10 text-sm disabled:opacity-60"
       >
-        {pending ? "Fauve analyse tes posts…" : label}
+        {pending ? "Brigitte analyse tes posts…" : label}
       </button>
       {error && (
         <p role="alert" className="text-sm font-semibold text-danger">

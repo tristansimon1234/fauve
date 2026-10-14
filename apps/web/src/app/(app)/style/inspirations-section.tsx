@@ -49,7 +49,7 @@ export function InspirationsSection({ items: initial, fauveHandle, studioId }: {
     <Section
       id="style-inspirations"
       title="Tes inspirations"
-      hint={`Des Reels qui te plaisent : Fauve en reprend le rythme, l’accroche et les textes pour tes montages, sans jamais les copier. Enregistre-les et ajoute-les ici${fauveHandle ? `, ou partage-les à @${fauveHandle} sur Instagram` : ""}. En créant un Reel, tu peux en choisir une.`}
+      hint={`Des Reels qui te plaisent : Brigitte en reprend le rythme, l’accroche et les textes pour tes montages, sans jamais les copier. Enregistre-les et ajoute-les ici${fauveHandle ? `, ou partage-les à @${fauveHandle} sur Instagram` : ""}. En créant un Reel, tu peux en choisir une.`}
     >
       {items.length > 0 && (
         <ul className="flex flex-col divide-y divide-line">
@@ -61,7 +61,7 @@ export function InspirationsSection({ items: initial, fauveHandle, studioId }: {
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="truncate text-sm font-semibold">{item.title || "Reel partagé"}</span>
                 <span className="text-[13px] leading-relaxed text-muted">
-                  {item.analysis ?? (item.reading ? "Fauve la regarde, sa lecture arrive dans une minute." : "Pas encore lue.")}
+                  {item.analysis ?? (item.reading ? "Brigitte la regarde, sa lecture arrive dans une minute." : "Pas encore lue.")}
                 </span>
               </div>
               <button

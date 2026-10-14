@@ -89,7 +89,7 @@ export function TestChat({ testKey, initial }: { testKey: string; initial: TestS
               <div className="flex flex-col items-center gap-3 py-10 text-center">
                 <Orb size={64} />
                 <p className="max-w-[420px] text-[15px] leading-relaxed text-muted">
-                  Tu es une gérante qui écrit à Fauve pour la première fois. Dis bonjour : Fauve va te guider pour
+                  Tu es une gérante qui écrit à Brigitte pour la première fois. Dis bonjour : Brigitte va te guider pour
                   configurer ton studio, comme sur WhatsApp.
                 </p>
               </div>
@@ -107,7 +107,7 @@ export function TestChat({ testKey, initial }: { testKey: string; initial: TestS
                   <span />
                   <span />
                 </span>
-                Fauve écrit…
+                Brigitte écrit…
               </div>
             )}
             {error && (
@@ -128,7 +128,7 @@ export function TestChat({ testKey, initial }: { testKey: string; initial: TestS
         >
           <div className="mx-auto flex max-w-[720px] items-end gap-2">
             <label htmlFor="msg" className="sr-only">
-              Message à Fauve
+              Message à Brigitte
             </label>
             <textarea
               id="msg"
@@ -141,7 +141,7 @@ export function TestChat({ testKey, initial }: { testKey: string; initial: TestS
                   send();
                 }
               }}
-              placeholder="Écris à Fauve…"
+              placeholder="Écris à Brigitte…"
               className="max-h-40 min-h-11 flex-1 resize-none rounded-[22px] border border-line bg-soft px-4 py-2.5 text-[15px] outline-none focus:border-violet"
             />
             <button
@@ -181,7 +181,7 @@ function Panel({ snapshot }: { snapshot: TestSnapshot }) {
   return (
     <aside className="flex w-full shrink-0 flex-col gap-4 overflow-y-auto border-t border-line bg-white p-5 lg:w-[360px] lg:border-t-0 lg:border-l">
       <div className="flex flex-col gap-1">
-        <h2 className="text-base font-bold">Ce que Fauve a enregistré</h2>
+        <h2 className="text-base font-bold">Ce que Brigitte a enregistré</h2>
         <p className="text-[13px] text-muted">Mis à jour après chaque réponse, depuis la base Supabase.</p>
       </div>
 

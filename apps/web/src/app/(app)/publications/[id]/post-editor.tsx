@@ -41,7 +41,7 @@ export function PostEditor({
         value={caption}
         readOnly={!canEdit}
         onChange={(e) => setCaption(e.target.value)}
-        placeholder={canEdit ? "Fauve n’a pas encore écrit de légende. Tu peux en écrire une ici." : undefined}
+        placeholder={canEdit ? "Brigitte n’a pas encore écrit de légende. Tu peux en écrire une ici." : undefined}
         className="w-full resize-y rounded-[14px] border-[1.5px] border-line bg-white px-4 py-3.5 text-[15px] leading-normal read-only:bg-soft"
       />
       {canEdit && (!compact || dirty || pending) && (

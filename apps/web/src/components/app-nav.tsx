@@ -9,7 +9,7 @@ import { CalendarIcon, ChartIcon, ChatIcon, FolderIcon, LayersIcon, PaletteIcon,
 // the bar keeps four places: Médiathèque, Composants and Style open from Réglages' tabs.
 // `also`: the pages that belong to a section, to highlight it.
 const nav = [
-  { href: "/fauve", label: "Fauve", icon: ChatIcon, also: [], group: "work" },
+  { href: "/fauve", label: "Brigitte", icon: ChatIcon, also: [], group: "work" },
   { href: "/calendrier", label: "Calendrier", icon: CalendarIcon, also: ["/publications", "/grille"], group: "work" },
   { href: "/resultats", label: "Résultats", icon: ChartIcon, also: [], group: "work" },
   { href: "/mediatheque", label: "Médiathèque", icon: FolderIcon, also: [], group: "studio" },

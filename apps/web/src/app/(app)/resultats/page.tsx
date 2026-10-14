@@ -140,8 +140,8 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         {header}
         <EmptyState title="Tes résultats arrivent après tes premières publications" className="max-w-[760px]">
           Dès que tes posts seront en ligne sur Instagram ou TikTok, tu verras ici ce qu’ils ont donné : les réservations
-          venues des réseaux d’abord, puis les vues, les comptes touchés et le bilan de Fauve. Tu peux déjà demander à
-          Fauve d’analyser tes posts Instagram existants.
+          venues des réseaux d’abord, puis les vues, les comptes touchés et le bilan de Brigitte. Tu peux déjà demander à
+          Brigitte d’analyser tes posts Instagram existants.
         </EmptyState>
         <RefreshReportButton label="Analyser mes posts Instagram" />
       </>
@@ -236,13 +236,13 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
                   ))}
                 </div>
               )}
-              <p className="text-[13px] text-muted">Fauve applique ces leçons à tes prochains montages. Le bilan se met à jour chaque dimanche.</p>
+              <p className="text-[13px] text-muted">Brigitte applique ces leçons à tes prochains montages. Le bilan se met à jour chaque dimanche.</p>
               <RefreshReportButton label="Refaire l’analyse" />
             </>
           ) : (
             <>
               <p className="text-[15px] leading-relaxed text-muted">
-                Fauve compare tes derniers posts Instagram (formats, accroches, heures, chiffres) pour te dire ce qui marche,
+                Brigitte compare tes derniers posts Instagram (formats, accroches, heures, chiffres) pour te dire ce qui marche,
                 avec les preuves. Le bilan arrive chaque dimanche.
               </p>
               <RefreshReportButton />

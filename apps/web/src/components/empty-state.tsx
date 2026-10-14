@@ -6,7 +6,7 @@ import { whatsappLink } from "@/lib/public-env";
 export function EmptyState({
   title,
   children,
-  cta = "Écrire à Fauve sur WhatsApp",
+  cta = "Écrire à Brigitte sur WhatsApp",
   message,
   className = "",
 }: {
@@ -38,7 +38,7 @@ export function EmptyState({
 export function NoStudio() {
   return (
     <EmptyState title="Ton studio n’est pas encore créé" cta="Commencer sur WhatsApp">
-      Ce numéro n’est relié à aucun studio pour l’instant. Écris à Fauve sur WhatsApp avec ce même numéro : elle crée
+      Ce numéro n’est relié à aucun studio pour l’instant. Écris à Brigitte sur WhatsApp avec ce même numéro : elle crée
       ton studio en quelques questions, et tout apparaîtra ici.
     </EmptyState>
   );

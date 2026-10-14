@@ -26,6 +26,7 @@ import type { CardQuote } from "@/lib/chat-cards";
 import { Bubble } from "./chat-bubble";
 import { montageStep } from "./chat-cards";
 import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "./chat-sync";
+import { isFunny, upsetLevel } from "@fauve/agent";
 import { FileStrip, useChatUploads } from "./chat-uploads";
 import type { OnboardingView } from "./onboarding-actions";
 import { OnboardingCard, OnboardingStepper } from "@/components/onboarding/onboarding-card";
@@ -361,6 +362,7 @@ export function FauveWorkspace({
     <ConversationList conversations={conversations} active={active} onOpen={open} onNew={startNew} onDelete={remove} />
   );
 
+  const lastFauve = messages.findLastIndex((m) => m.from === "fauve");
   return (
     <div className="flex min-h-0 flex-1">
       <aside className="hidden w-[272px] shrink-0 flex-col border-r border-line bg-white md:flex">{list}</aside>
@@ -402,7 +404,7 @@ export function FauveWorkspace({
           <div className="fauve-fade pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/85 text-center">
             <PaperclipIcon size={28} className="text-violet" />
             <p className="text-[17px] font-bold text-violet">Dépose tes photos et vidéos</p>
-            <p className="text-[14px] text-violet/80">Fauve en fait un Reel, un carrousel ou un post</p>
+            <p className="text-[14px] text-violet/80">Brigitte en fait un Reel, un carrousel ou un post</p>
           </div>
         )}
         <div className="flex items-center justify-between gap-2 px-4 pt-3 sm:px-6 sm:pt-5">
@@ -513,6 +515,15 @@ export function FauveWorkspace({
                   opening={opening}
                   busy={pending}
                   enter={arrived.has(m.id)}
+                  // Brigitte's face by her latest message: she laughs when the exchange is funny, is sad or cries when the manager is upset.
+                  avatar={
+                    i === lastFauve && !typing
+                      ? {
+                          funny: isFunny(m.body) || isFunny(messages.slice(0, i).findLast((x) => x.from === "me")?.body),
+                          upset: upsetLevel(messages.slice(0, i).findLast((x) => x.from === "me")?.body),
+                        }
+                      : null
+                  }
                 />
               ))}
               {typing && <LiveTyping live={live} />}
@@ -590,7 +601,7 @@ export function FauveWorkspace({
                 </>
               )}
               <label htmlFor="message-fauve" className="sr-only">
-                Message à Fauve
+                Message à Brigitte
               </label>
               <textarea
                 id="message-fauve"
@@ -608,7 +619,7 @@ export function FauveWorkspace({
                     send(draft, true);
                   }
                 }}
-                placeholder={files.length ? "Dis à Fauve ce que tu veux en faire : un Reel, un carrousel…" : "Demande à Fauve, ou glisse tes photos et vidéos ici…"}
+                placeholder={files.length ? "Dis à Brigitte ce que tu veux en faire : un Reel, un carrousel…" : "Demande à Brigitte, ou glisse tes photos et vidéos ici…"}
                 className="max-h-[180px] min-h-11 flex-1 resize-none bg-transparent py-2.5 text-[16px] outline-none placeholder:text-muted/70"
               />
               <button
@@ -685,7 +696,7 @@ function ConversationList({
         </button>
       </div>
       <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-6">
-        {conversations.length === 0 && <li className="px-2 py-2 text-sm text-muted">Tes conversations avec Fauve s’afficheront ici.</li>}
+        {conversations.length === 0 && <li className="px-2 py-2 text-sm text-muted">Tes conversations avec Brigitte s’afficheront ici.</li>}
         {conversations.map((c) => (
           <li key={c.id} className="group relative">
             <button

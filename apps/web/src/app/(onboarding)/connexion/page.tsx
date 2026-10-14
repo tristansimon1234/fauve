@@ -15,7 +15,7 @@ export default function LoginPage() {
           Content de te <span className="accent">revoir</span>
         </h1>
         <p className="text-[15px] leading-[1.55] text-muted">
-          Entre le numéro avec lequel tu écris à Fauve. Ton code arrive sur WhatsApp.
+          Entre le numéro avec lequel tu écris à Brigitte. Ton code arrive sur WhatsApp.
         </p>
       </div>
       <Suspense>

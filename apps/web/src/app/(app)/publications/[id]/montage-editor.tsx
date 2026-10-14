@@ -272,11 +272,11 @@ export function MontageEditor({
             </button>
           </div>
           <p className="-mt-2 truncate text-[13px] text-muted">{sceneLabel(segment, clipLabels)}</p>
-          {/* Fauve reads the saved montage: ask about a scene once the changes are saved. */}
+          {/* Brigitte reads the saved montage: ask about a scene once the changes are saved. */}
           {!dirty && (
             <AskFauveButton
               topic={{ postId, title: postTitle, scene: index, sceneLabel: `Scène ${index + 1} · ${kindLabels[segmentKind(segment)]}` }}
-              label={segmentKind(segment) === "motion" ? "Demander à Fauve de refaire l’animation" : "Demander à Fauve pour cette scène"}
+              label={segmentKind(segment) === "motion" ? "Demander à Brigitte de refaire l’animation" : "Demander à Brigitte pour cette scène"}
               className="inline-flex items-center justify-center gap-1.5 rounded-full bg-violet-soft px-3 py-2 text-[13px] font-bold text-violet hover:bg-violet hover:text-white"
             />
           )}
@@ -503,7 +503,7 @@ function SegmentFields({ segment, onChange, clipDuration }: { segment: Segment; 
               onChange({ ...segment, blur: undefined });
               return { ok: true };
             }
-            const res = await clipFaceBlur(segment.clip_id).catch(() => ({ ok: false as const, error: "Fauve n’a pas pu regarder cette vidéo." }));
+            const res = await clipFaceBlur(segment.clip_id).catch(() => ({ ok: false as const, error: "Brigitte n’a pas pu regarder cette vidéo." }));
             if (!res.ok) return { ok: false, message: res.error };
             if (res.value) onChange({ ...segment, blur: res.value });
             return { ok: true, message: res.note };
@@ -681,7 +681,7 @@ function AddScene({
                   <span className="size-2.5 rounded-full bg-violet" />
                   Animation
                 </span>
-                <span className="text-[12px] text-muted">{canAskFauve ? "Fauve la crée selon ta demande" : "Enregistre d’abord tes modifications"}</span>
+                <span className="text-[12px] text-muted">{canAskFauve ? "Brigitte la crée selon ta demande" : "Enregistre d’abord tes modifications"}</span>
               </button>
               <button type="button" onClick={done(onText)} className={item}>
                 <span className="flex items-center gap-2 text-[14px] font-bold">

@@ -8,7 +8,7 @@ export default function PrivacyPage() {
     <>
       <h1>Politique de confidentialité</h1>
       <p>
-        Fauve est une assistante IA qui gère les réseaux sociaux des commerces de quartier (studios, salons, restaurants, boutiques), principalement
+        Brigitte est une assistante IA qui gère les réseaux sociaux des commerces de quartier (studios, salons, restaurants, boutiques), principalement
         depuis WhatsApp. Cette page explique quelles données nous traitons, pourquoi, et quels sont tes droits.
       </p>
 
@@ -20,14 +20,14 @@ export default function PrivacyPage() {
       <h2>Données traitées</h2>
       <ul>
         <li>Identité et contact : numéro de téléphone WhatsApp, prénom, nom du studio.</li>
-        <li>Conversations avec Fauve (WhatsApp et web app) et les fichiers envoyés : vidéos, photos, messages vocaux.</li>
+        <li>Conversations avec Brigitte (WhatsApp et web app) et les fichiers envoyés : vidéos, photos, messages vocaux.</li>
         <li>Contenus préparés : légendes, plans de montage, vidéos montées, calendrier de publication.</li>
         <li>Comptes Instagram et TikTok connectés et leurs statistiques (vues, portée, interactions, réservations attribuées).</li>
         <li>Données techniques : journaux de connexion, sessions, coûts de traitement.</li>
       </ul>
       <p>
         Les vidéos peuvent montrer des clients ou l’équipe du commerce. Le commerce s’engage à recueillir leur accord avant de nous les
-        transmettre ; Fauve propose des cadrages sans visage et peut flouter les visages.
+        transmettre ; Brigitte propose des cadrages sans visage et peut flouter les visages.
       </p>
 
       <h2>Finalités et bases légales</h2>
@@ -64,7 +64,7 @@ export default function PrivacyPage() {
       <h2>Tes droits</h2>
       <p>
         Tu peux demander l’accès, la rectification, l’effacement, la portabilité ou la limitation de tes données, et
-        t’opposer à certains traitements, en écrivant à {company.email} ou directement à Fauve sur WhatsApp. Voir aussi{" "}
+        t’opposer à certains traitements, en écrivant à {company.email} ou directement à Brigitte sur WhatsApp. Voir aussi{" "}
         <a href="/suppression-des-donnees">la suppression des données</a>. Tu peux introduire une réclamation auprès de la
         CNIL (cnil.fr).
       </p>

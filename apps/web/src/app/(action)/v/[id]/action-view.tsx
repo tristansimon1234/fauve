@@ -310,7 +310,7 @@ export function ActionView({
             <MediaSlides media={media} nodes={slideNodes} ratio={post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]"} />
           ) : (
             <div className="flex aspect-[9/16] w-full items-center justify-center p-6 text-center text-[14px] text-white/60">
-              Fauve prépare encore cette publication.
+              Brigitte prépare encore cette publication.
             </div>
           )}
         </div>
@@ -471,7 +471,7 @@ export function ActionView({
                 )}
               </div>
               <a href={changeHref} className="flex items-center justify-center gap-1.5 py-1 text-[13px] font-semibold text-white/65">
-                <WhatsAppIcon size={14} /> Demander un changement à Fauve
+                <WhatsAppIcon size={14} /> Demander un changement à Brigitte
               </a>
             </>
           )}

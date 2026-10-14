@@ -11,7 +11,7 @@ import { listConversations, loadConversation } from "./chat-actions";
 import { FauveWorkspace, type Suggestion } from "./fauve-workspace";
 import { onboardingView } from "./onboarding-actions";
 
-export const metadata: Metadata = { title: "Fauve" };
+export const metadata: Metadata = { title: "Brigitte" };
 // The chat runs Fauve (and may queue a montage) inside a server action.
 export const maxDuration = 300;
 

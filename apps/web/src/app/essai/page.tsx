@@ -4,7 +4,7 @@ import { Orb } from "@/components/orb";
 import { getOrCreateTestMember, isValidTestKey, loadTestState } from "@/lib/test-studio";
 import { TestChat } from "./test-chat";
 
-export const metadata: Metadata = { title: "Tester Fauve", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Tester Brigitte", robots: { index: false, follow: false } };
 
 // The agent may run several tools before answering.
 export const maxDuration = 300;

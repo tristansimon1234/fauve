@@ -87,7 +87,7 @@ function Card({ creation, ratio, children }: { creation: Creation; ratio: string
       <div className="flex flex-col gap-0.5 p-3">
         <span className="line-clamp-2 text-[14px] leading-snug font-semibold">{creation.name}</span>
         <span className="text-xs font-semibold text-muted">
-          {creation.house ? "Proposée par Fauve" : `Utilisée ${creation.uses} fois`}
+          {creation.house ? "Proposée par Brigitte" : `Utilisée ${creation.uses} fois`}
         </span>
       </div>
     </li>
@@ -102,7 +102,7 @@ export function CreationsSection({ scenes, components, brand }: { scenes: Creati
           Tes créations
         </h2>
         <p className="text-[15px] text-muted">
-          Ce que Fauve a créé pour toi et garde pour la suite : elle le réutilise avec d’autres textes, plus vite et sans crédit.
+          Ce que Brigitte a créé pour toi et garde pour la suite : elle le réutilise avec d’autres textes, plus vite et sans crédit.
         </p>
       </div>
 

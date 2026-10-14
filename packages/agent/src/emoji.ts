@@ -46,3 +46,23 @@ export function awaitsAnswer(last: { body: string | null; options?: string[]; qu
   if (!last) return false;
   return Boolean(last.options?.length || last.quote || last.upload || /\?\s*\S{0,3}\s*$/u.test((last.body ?? "").trim()));
 }
+
+/** A message that laughs (😂, « haha », « mdr »…): Brigitte laughs with it in the app. */
+export function isFunny(text: string | null | undefined): boolean {
+  return /😂|🤣|😆|😹|😝|😜|\b(?:a?ha(?:ha)+h?|hihi+|mdr+|ptdr+|lol+|xd)\b/iu.test(text ?? "");
+}
+
+/**
+ * The manager is upset (« c'est nul », « j'en ai marre », 😡, shouting): Brigitte looks sad
+ * in the app, and cries when it is strong (angry emojis, several « ! », capitals).
+ */
+export function upsetLevel(text: string | null | undefined): "sad" | "cry" | null {
+  const t = text ?? "";
+  const angry = /😡|😠|🤬|😤|💢/u.test(t);
+  const shouting = /!{3,}/.test(t) || (t.replace(/[^A-Za-zÀ-ÿ]/g, "").length >= 8 && t === t.toUpperCase() && /[A-Z]/.test(t));
+  const sad = /😢|😭|😞|😔|☹|🙁|😩|😫|💔/u.test(t);
+  const words = /\b(?:c['’]?est nul|nul(?:le)?\b|trop nul|j['’]?en ai marre|ras le bol|ça m['’]?énerve|énervée?|déçue?|décevant|pas content|n['’]?importe quoi|catastroph|horrible|affreu|ça marche pas|ça ne marche pas|toujours pas|encore raté)/iu.test(t);
+  if (angry || shouting || (words && /!{2,}/.test(t))) return "cry";
+  if (words || sad) return "sad";
+  return null;
+}

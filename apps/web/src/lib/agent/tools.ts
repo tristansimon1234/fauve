@@ -586,7 +586,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
       return json({
         status: "started",
-        note: "Fauve regarde les photos puis les retouche (une à deux minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase, en disant ce que tu fais (lumière, flou des visages…).",
+        note: "Brigitte regarde les photos puis les retouche (une à deux minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase, en disant ce que tu fais (lumière, flou des visages…).",
       });
     },
 
@@ -602,7 +602,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         status: "started",
         note: what.length
-          ? "Fauve repère les zones dans chaque vidéo puis refait le rendu avec le flou (deux à trois minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase."
+          ? "Brigitte repère les zones dans chaque vidéo puis refait le rendu avec le flou (deux à trois minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase."
           : "Le flou est retiré et le rendu refait ; le lien est envoyé tout seul.",
       });
     },
@@ -629,7 +629,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const items = await listInspirations(studioId, 10);
       return json({
         inspirations: items.map((i) => ({ inspiration_id: i.id, titre: i.title, a_reprendre: i.summary ?? (i.reading ? "en cours de lecture" : undefined), source: i.source })),
-        note: items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration : elle peut partager un Reel à Fauve sur Instagram ou en ajouter un dans l'app.",
+        note: items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration : elle peut partager un Reel à Brigitte sur Instagram ou en ajouter un dans l'app.",
       });
     },
 
@@ -714,11 +714,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       const started = await startElements({ studioId, mode: "create", postId: post_id, request, exampleMediaId: example_media_id, photos, origin: "chat", waId: ctx.waId, replyTo: ctx.replyToMessageId });
       if (started.status === "already_running") {
-        return json({ status: "already_running", etape: started.stage, depuis_minutes: started.minutes, note: "C'est déjà en cours : ne relance rien. Dis où ça en est ; le message arrive tout seul (pastille « Fauve travaille » dans l'app)." });
+        return json({ status: "already_running", etape: started.stage, depuis_minutes: started.minutes, note: "C'est déjà en cours : ne relance rien. Dis où ça en est ; le message arrive tout seul (pastille « Brigitte travaille » dans l'app)." });
       }
       if (started.status === "error") return json({ error: `${started.error} Propose plutôt des composants de sa banque (gratuit).` });
       ctx.notes.push(`composants en cours${post_id ? ` pour la publication ${post_id}` : ""}`);
-      return json({ status: "started", credits: started.credits, note: "Fauve décompose l'inspiration en composants, les teste et les relit : 2 à 4 minutes. Les crédits sont débités une fois livré et un message part tout seul. Annonce-le en une phrase (délai et coût), sans lien." });
+      return json({ status: "started", credits: started.credits, note: "Brigitte décompose l'inspiration en composants, les teste et les relit : 2 à 4 minutes. Les crédits sont débités une fois livré et un message part tout seul. Annonce-le en une phrase (délai et coût), sans lien." });
     },
 
     async edit_element({ element_id, change, example_media_id, post_id }) {
@@ -930,7 +930,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         scheduled_at: at.toISOString(),
         note: now
           ? "Publication immédiate après ta réponse ; la gérante recevra le lien du Reel."
-          : "Fauve publiera automatiquement à l'horaire prévu et préviendra la gérante.",
+          : "Brigitte publiera automatiquement à l'horaire prévu et préviendra la gérante.",
       });
     },
 
