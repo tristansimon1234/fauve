@@ -114,6 +114,8 @@ export async function createPost(input: {
   /** Montage style and inspiration picked for a Reel or a story. */
   template?: string | null;
   inspirationId?: string | null;
+  /** Photos and videos picked in the library, in order. */
+  mediaIds?: string[];
 }): Promise<{ ok: true; id: string; title: string } | { ok: false; error: string }> {
   const kind = postKindSchema.safeParse(input.kind);
   const day = parseIsoDate(input.date);
@@ -133,6 +135,10 @@ export async function createPost(input: {
     input.inspirationId && z.uuid().safeParse(input.inspirationId).success
       ? (await db.from("inspirations").select("id").eq("id", input.inspirationId).eq("studio_id", member.studio.id).maybeSingle()).data
       : null;
+  // Only this studio's media, in the order she picked them.
+  const wanted = (input.mediaIds ?? []).filter((id) => z.uuid().safeParse(id).success).slice(0, 10);
+  const owned = wanted.length ? new Set(((await db.from("media_assets").select("id").eq("studio_id", member.studio.id).in("id", wanted)).data ?? []).map((m) => m.id as string)) : new Set<string>();
+  const mediaIds = wanted.filter((id) => owned.has(id));
   const { data, error } = await db
     .from("posts")
     .insert({
@@ -144,6 +150,8 @@ export async function createPost(input: {
       scheduled_at: at.toISOString(),
       template: template.success ? template.data : null,
       inspiration_id: inspiration?.id ?? null,
+      media_ids: mediaIds,
+      ...(mediaIds.length ? { status: "media_received" } : {}),
     })
     .select("id")
     .single();

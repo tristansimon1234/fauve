@@ -43,6 +43,7 @@ export function LayoutPicker({
   onPickAll,
   onClear,
   many,
+  freeLabel = "Textes libres",
 }: {
   layouts: Layout[];
   slide: Slide;
@@ -54,6 +55,8 @@ export function LayoutPicker({
   onClear: () => void;
   /** Several photos: the « on every photo » action is offered. */
   many: boolean;
+  /** The first tile (no layout). */
+  freeLabel?: string;
 }) {
   const [all, setAll] = useState(false);
   const current = slide.layer?.template_id ?? null;
@@ -90,7 +93,7 @@ export function LayoutPicker({
             <SlidePreview props={free} />
             {!slide.layer && <Tick />}
           </span>
-          <span className="truncate text-[11px] font-semibold">Textes libres</span>
+          <span className="truncate text-[11px] font-semibold">{freeLabel}</span>
         </button>
         {shown.map(({ layout, props }) => {
           const on = current === layout.id;

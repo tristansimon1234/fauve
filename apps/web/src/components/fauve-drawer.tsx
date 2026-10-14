@@ -212,6 +212,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         reactions: {},
         options: [],
         upload: null,
+        pickMedia: null,
         cards: [],
         openPost: null,
         ...part,

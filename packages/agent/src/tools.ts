@@ -77,6 +77,11 @@ export const toolSpecs = {
       remove: z.array(z.number().int().min(1)).max(10).optional(),
     }),
   },
+  suggest_dates: {
+    description:
+      "Les prochains jours libres pour publier (sans publication déjà prévue), à l'heure habituelle du commerce. Pour proposer une date en boutons quand elle crée une publication sans en donner.",
+    input: z.object({ count: z.number().int().min(1).max(6).default(3) }),
+  },
   list_inspirations: {
     description:
       "Les inspirations de la gérante : des Reels qu'elle aime, partagés sur Instagram ou ajoutés dans l'app, avec ce qu'on peut en reprendre (accroche, rythme, textes). À regarder avant de proposer un nouveau Reel, pour lui demander s'il doit suivre l'une d'elles.",
@@ -339,7 +344,7 @@ export const toolSpecs = {
   },
   reply_with: {
     description:
-      "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. upload : une zone de dépôt (video, photo ou any) quand tu demandes des fichiers dans l'application (sur WhatsApp, elle n'apparaît pas). Appelle-le au plus une fois par réponse, avec ton message.",
+      "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. upload : une zone de dépôt (video, photo ou any) quand tu demandes des fichiers dans l'application. pick_media (video, photo ou any) : sa médiathèque en vignettes à cocher, avec aussi l'ajout de nouveaux fichiers ; sa réponse revient avec les media_id choisis. Ni l'un ni l'autre n'apparaît sur WhatsApp. Appelle-le au plus une fois par réponse, avec ton message.",
     input: replyExtrasSchema.omit({ quote: true }),
   },
   react_to_message: {

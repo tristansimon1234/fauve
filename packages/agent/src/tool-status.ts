@@ -13,6 +13,7 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   list_media: "Je regarde ta médiathèque…",
   list_inspirations: "Je regarde tes inspirations…",
   remember: "Je note…",
+  suggest_dates: "Je regarde tes jours libres…",
   get_calendar: "Je regarde ton calendrier…",
   create_post: "J’ajoute la publication…",
   update_post: "Je mets la publication à jour…",

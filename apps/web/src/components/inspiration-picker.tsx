@@ -12,13 +12,23 @@ import { BulbIcon, CheckIcon, PlusIcon } from "./icons";
 
 const MAX_BYTES = 50 * 1024 * 1024;
 
-export function InspirationPicker({ value, onChange }: { value: string | null; onChange: (item: InspirationItem | null) => void }) {
-  const [data, setData] = useState<{ studioId: string; items: InspirationItem[] } | null>(null);
+export function InspirationPicker({
+  value,
+  onChange,
+  initial = null,
+}: {
+  value: string | null;
+  onChange: (item: InspirationItem | null) => void;
+  /** Already loaded by the caller (no second fetch). */
+  initial?: { studioId: string; items: InspirationItem[] } | null;
+}) {
+  const [data, setData] = useState<{ studioId: string; items: InspirationItem[] } | null>(initial);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (initial) return;
     let live = true;
     getInspirations()
       .then((d) => live && setData(d))
@@ -26,7 +36,7 @@ export function InspirationPicker({ value, onChange }: { value: string | null; o
     return () => {
       live = false;
     };
-  }, []);
+  }, [initial]);
 
   // While Fauve watches a new one, check every few seconds.
   const reading = data?.items.filter((i) => i.reading).map((i) => i.id) ?? [];

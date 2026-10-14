@@ -6,6 +6,7 @@ import { SmileIcon, WhatsAppIcon } from "@/components/icons";
 import type { ChatMessage } from "./chat-actions";
 import { ChatCards } from "./chat-cards";
 import { DropCard } from "./drop-card";
+import { MediaPickCard } from "./media-pick-card";
 
 // One message of the conversation with Fauve: text, media, cards, answer
 // buttons and reactions. Shared by the Fauve page and the chat drawer.
@@ -199,7 +200,10 @@ export function Bubble({
         busy={busy}
         className={enter ? "fauve-enter [--fauve-delay:80ms]" : ""}
       />
-      {onFiles && !mine && message.upload && <DropCard kind={message.upload} onFiles={onFiles} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />}
+      {onFiles && onChoose && !mine && message.pickMedia && (
+        <MediaPickCard kind={message.pickMedia} onPick={onChoose} onFiles={onFiles} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />
+      )}
+      {onFiles && !mine && message.upload && !message.pickMedia && <DropCard kind={message.upload} onFiles={onFiles} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />}
       {options.length > 0 && (
         <div className={`flex flex-wrap gap-2 pt-0.5 ${enter ? "fauve-enter [--fauve-delay:140ms]" : ""}`} role="group" aria-label="Réponses proposées">
           {options.map((option) => (

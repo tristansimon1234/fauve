@@ -259,6 +259,7 @@ export function FauveWorkspace({
       reactions: {},
       options: [],
         upload: null,
+        pickMedia: null,
       cards: [],
       openPost: null,
       ...part,

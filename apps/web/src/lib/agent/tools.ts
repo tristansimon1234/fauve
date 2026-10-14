@@ -38,6 +38,7 @@ import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { applyLayers, listLayers, loadLayer, markLayerUsed } from "@/lib/text-layers";
 import { listInspirations } from "@/lib/inspirations";
+import { freeSlots } from "@/lib/slots";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
 import { creditBalance } from "@/lib/credits";
 import { queueJob } from "@/lib/jobs";
@@ -611,6 +612,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return `ok : ${memory.length} info${memory.length > 1 ? "s" : ""} en mémoire. Ne l'annonce pas, continue la conversation.`;
     },
 
+    async suggest_dates({ count }) {
+      const { data } = await db.from("studios").select("timezone").eq("id", studioId).single();
+      const slots = await freeSlots(studioId, (data?.timezone as string | undefined) ?? "Europe/Paris", count);
+      return json({
+        jours_libres: slots.map((s) => ({ date: s.date, heure: s.time, libelle: `${s.label} à ${s.time.replace(":", " h ").replace(/ 00$/, "")}` })),
+        note: slots.length ? "Propose-les en boutons (reply_with options, le libellé), plus « Autre date »." : "Aucun jour libre dans les deux semaines : demande-lui une date.",
+      });
+    },
+
     async list_inspirations() {
       const items = await listInspirations(studioId, 10);
       return json({
@@ -977,7 +987,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return "ok";
     },
 
-    async reply_with({ options, posts, grid, upload }) {
+    async reply_with({ options, posts, grid, upload, pick_media }) {
       let own: string[] = [];
       if (posts?.length) {
         const { data } = await db.from("posts").select("id").eq("studio_id", studioId).in("id", posts);
@@ -990,6 +1000,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.extras.grid = grid || undefined;
       // The drop zone is the app's: WhatsApp has its own paperclip.
       ctx.extras.upload = ctx.waId ? undefined : upload;
+      ctx.extras.pick_media = ctx.waId ? undefined : pick_media;
       return "ok : affiché sous ton message.";
     },
   };

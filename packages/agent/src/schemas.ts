@@ -34,6 +34,8 @@ export const replyExtrasSchema = z.object({
   grid: z.boolean().optional(),
   /** A drop zone for photos or videos under the message (app only). */
   upload: z.enum(["video", "photo", "any"]).optional(),
+  /** A picker of the studio's library under the message (app only): she ticks files, they come back as media_id. */
+  pick_media: z.enum(["video", "photo", "any"]).optional(),
   /** A quote to show as a card with a « Lancer » button (set by quote_montage, not by the model). */
   quote: z.uuid().optional(),
 });
