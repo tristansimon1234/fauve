@@ -1,8 +1,8 @@
+import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { z } from "zod";
 import { DeleteButton } from "@/components/delete-button";
-import { EmptyState, NoStudio, PageLoading } from "@/components/empty-state";
+import { EmptyState, NoStudio } from "@/components/empty-state";
 import { FolderIcon, LayersIcon, MicIcon } from "@/components/icons";
 import Link from "next/link";
 import { formatDuration, formatShortDateTime } from "@/lib/format";
@@ -44,9 +44,9 @@ export default function LibraryPage() {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
       <SettingsTabs current="/mediatheque" />
-      <Suspense fallback={<PageLoading title="Médiathèque" />}>
+      <PageSuspense title="Médiathèque">
         <Library />
-      </Suspense>
+      </PageSuspense>
     </main>
   );
 }
