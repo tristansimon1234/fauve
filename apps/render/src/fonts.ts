@@ -53,7 +53,8 @@ export function loadCustomFonts(fonts: { family: string; url: string }[] | undef
       new FontFace(f.family, `url("${f.url}")`)
         .load()
         .then((face) => {
-          document.fonts.add(face);
+          // FontFaceSet.add is not in this TypeScript lib, but every browser has it.
+          (document.fonts as unknown as { add(face: FontFace): void }).add(face);
         })
         .catch(() => undefined),
     ),
