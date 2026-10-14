@@ -22,6 +22,7 @@ import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { latestReport } from "@/lib/performance";
 import { designMotionScenes } from "./motion-designer";
 import { ensureInspirationRead } from "@/lib/inspirations";
+import { isFirstReel } from "@/lib/onboarding";
 import { markTemplatesUsed, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { anthropic, logClaudeCost } from "./run";
 
@@ -57,7 +58,7 @@ export async function designEdit(params: {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, library, report, inspirations] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
-    db.from("studios").select("name, business_type, booking_url, onboarding_step").eq("id", params.studioId).single(),
+    db.from("studios").select("name, business_type, booking_url").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
     templatesForEditor(params.studioId),
@@ -140,7 +141,7 @@ export async function designEdit(params: {
         : undefined,
     request: params.brief ?? "Premier montage de cette publication.",
     // Her very first Reel (getting started): it has to wow her.
-    first_reel: studio.data?.onboarding_step === "first_post" && !previousPlan.success ? true : undefined,
+    first_reel: !previousPlan.success && (await isFirstReel(params.studioId, params.postId)) ? true : undefined,
     // Credits: past this, the editor must reuse library scenes or use fixed ones.
     max_new_scenes: params.maxNewScenes ?? MAX_FREE_SCENES,
   };

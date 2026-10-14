@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RESTYLES } from "./restyle.ts";
 import {
   brandProfileSchema,
   motionTemplateSchema,
@@ -375,6 +376,11 @@ export const toolSpecs = {
     description:
       "Enregistre une nouvelle version du profil de style du studio (à partir d'exemples ou d'une correction de la gérante).",
     input: z.object({ profile: brandProfileSchema }),
+  },
+  restyle_reel: {
+    description:
+      "Sous son premier Reel, la gérante a les boutons « Ça me ressemble », « Plus chaleureux », « Plus sobre », « Plus pêchu ». Quand elle répond l'un des trois derniers (ou le dit avec ses mots), appelle restyle_reel : l'ajustement est gardé dans sa direction artistique pour tous les prochains montages, et une version corrigée de ce Reel part aussitôt (son clic vaut accord : pas de devis à présenter). Le coût est celui d'une correction, débité à la livraison. Annonce-le en une phrase, avec le coût.",
+    input: z.object({ post_id: z.uuid(), style: z.enum(RESTYLES) }),
   },
   add_to_moodboard: {
     description:

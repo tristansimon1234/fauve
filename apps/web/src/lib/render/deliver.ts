@@ -1,9 +1,10 @@
 import "server-only";
-import { CREDIT_PRICES } from "@fauve/agent";
+import { CREDIT_PRICES, STYLE_CHECK_OPTIONS } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { sendText } from "@/lib/whatsapp/client";
+import { isFirstReel } from "@/lib/onboarding";
+import { sendReply, sendText } from "@/lib/whatsapp/client";
 import { renderPost } from "./render-post";
 import { renderSlides } from "./slides";
 
@@ -79,18 +80,20 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const seconds = Math.round(r.durationMs / 1000);
   // On a phone: the one-action page (watch, validate, move a text).
   const page = `/v/${target.postId}`;
+  // Her first Reel: « Ça te ressemble ? », her style is tuned on her own video (restyle_reel).
+  const styleCheck = await isFirstReel(target.studioId, target.postId);
   // Short paragraphs, the link right under the first line: it is the one action.
   const intro = `Ton montage « ${r.title} » est prêt 🎬${seconds ? ` (${seconds} s)` : ""}.`;
   const notes = [target.rationale, target.care].filter(Boolean).join("\n\n");
   const after = [
-    "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
-    target.offerVariant === false
+    styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus chaleureux, plus sobre ou plus pêchu : je retiens ton style pour tous les prochains." : "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
+    target.offerVariant === false || styleCheck
       ? ""
       : `Je peux aussi te faire une variante (autre style, autre accroche) pour ${CREDIT_PRICES.variant} crédit${CREDIT_PRICES.variant > 1 ? "s" : ""}.`,
   ]
     .filter(Boolean)
     .join(" ");
-  const payload = { posts: [target.postId], open_post: target.postId };
+  const payload = { posts: [target.postId], open_post: target.postId, ...(styleCheck ? { options: STYLE_CHECK_OPTIONS } : {}) };
   if (target.note) {
     const { error } = await supabaseAdmin().from("posts").update({ agent_note: target.note.slice(0, 600) }).eq("id", target.postId).eq("studio_id", target.studioId);
     if (error) console.warn("delivery: note not kept", error.message);
@@ -99,7 +102,8 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const stored = [intro, notes, after].filter(Boolean).join("\n\n");
   if (target.waId) {
     const link = await createLoginLink(`+${target.waId}`, page, "open_post");
-    const id = await sendText(target.waId, [`${intro}\nRegarde-le ici : ${link}`, notes, after].filter(Boolean).join("\n\n"));
+    const message = [`${intro}\nRegarde-le ici : ${link}`, notes, after].filter(Boolean).join("\n\n");
+    const id = styleCheck ? await sendReply(target.waId, message, STYLE_CHECK_OPTIONS) : await sendText(target.waId, message);
     await store(target, { wa_message_id: id, type: "text", body: stored, payload });
   } else {
     await store(target, { type: "text", body: stored, payload });
