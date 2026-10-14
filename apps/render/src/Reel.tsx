@@ -52,7 +52,9 @@ export function Reel(props: ReelProps) {
                 {segment.type === "clip" ? (
                   <Shot segment={segment} theme={theme} />
                 ) : (
-                  <Photo src={segment.src} edit={segment.edit} />
+                  <KenBurns on={Boolean(segment.zoom)} index={i} durationInFrames={segment.durationInFrames}>
+                    <Photo src={segment.src} edit={segment.edit} />
+                  </KenBurns>
                 )}
                 {/* Soft gradients keep white text readable on any footage. */}
                 <AbsoluteFill
@@ -102,6 +104,17 @@ export function Reel(props: ReelProps) {
 function FadeIn({ frames, children }: { frames: number; children: ReactNode }) {
   const frame = useCurrentFrame();
   return <AbsoluteFill style={{ opacity: frames ? interpolate(frame, [0, frames], [0, 1], clamp) : 1 }}>{children}</AbsoluteFill>;
+}
+
+/** A photo in a Reel: a slow zoom with a slight drift, one way then the other from a photo to the next. */
+function KenBurns({ on, index, durationInFrames, children }: { on: boolean; index: number; durationInFrames: number; children: ReactNode }) {
+  const frame = useCurrentFrame();
+  if (!on) return <>{children}</>;
+  const p = interpolate(frame, [0, durationInFrames], [0, 1], { ...clamp, easing: Easing.inOut(Easing.sin) });
+  const zoomIn = index % 2 === 0;
+  const scale = zoomIn ? 1.04 + 0.12 * p : 1.16 - 0.12 * p;
+  const drift = (index % 4 < 2 ? 1 : -1) * 1.6 * p;
+  return <AbsoluteFill style={{ transform: `scale(${scale}) translateX(${drift}%)` }}>{children}</AbsoluteFill>;
 }
 
 type ClipSegment = Extract<ReelProps["segments"][number], { type: "clip" }>;

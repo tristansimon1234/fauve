@@ -53,16 +53,24 @@ export function isFunny(text: string | null | undefined): boolean {
 }
 
 /**
- * The manager is upset (« c'est nul », « j'en ai marre », 😡, shouting): Brigitte looks sad
- * in the app, and cries when it is strong (angry emojis, several « ! », capitals).
+ * The manager is upset: Brigitte looks sad when she is disappointed (« c'est nul »,
+ * 😞), cross when she is angry (😡, shouting, capitals, « !! » with a reproach), and
+ * cries when the words are hurtful to her (« t'es nulle », « tu sers à rien ») or 😭.
  */
-export function upsetLevel(text: string | null | undefined): "sad" | "cry" | null {
+export function upsetLevel(text: string | null | undefined): "sad" | "angry" | "cry" | null {
   const t = text ?? "";
+  const hurtful = /😭|\b(?:t['’]es (?:nulle?|inutile|bête|conne?)|tu (?:es|sers) (?:nulle?|à rien|inutile)|tu sers à rien|je (?:vais|veux) fermer|j['’]en peux plus)\b/iu.test(t);
   const angry = /😡|😠|🤬|😤|💢/u.test(t);
   const shouting = /!{3,}/.test(t) || (t.replace(/[^A-Za-zÀ-ÿ]/g, "").length >= 8 && t === t.toUpperCase() && /[A-Z]/.test(t));
-  const sad = /😢|😭|😞|😔|☹|🙁|😩|😫|💔/u.test(t);
+  const sad = /😢|😞|😔|☹|🙁|😩|😫|💔/u.test(t);
   const words = /\b(?:c['’]?est nul|nul(?:le)?\b|trop nul|j['’]?en ai marre|ras le bol|ça m['’]?énerve|énervée?|déçue?|décevant|pas content|n['’]?importe quoi|catastroph|horrible|affreu|ça marche pas|ça ne marche pas|toujours pas|encore raté)/iu.test(t);
-  if (angry || shouting || (words && /!{2,}/.test(t))) return "cry";
+  if (hurtful) return "cry";
+  if (angry || shouting || (words && /!{2,}/.test(t))) return "angry";
   if (words || sad) return "sad";
   return null;
+}
+
+/** A compliment or a sweet word for Brigitte herself: she blushes in the app. */
+export function isSweet(text: string | null | undefined): boolean {
+  return /😘|🥰|😍|\b(?:t['’]es (?:géniale|top|la meilleure|un amour|trop forte|parfaite)|tu es (?:géniale|la meilleure|un amour|parfaite|top|trop forte)|je t['’]adore|je t['’]aime|qu['’]est-ce que je ferais sans toi)\b/iu.test(text ?? "");
 }

@@ -4,7 +4,7 @@ import type { Effort } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from "react";
 import { Bubble } from "@/app/(app)/fauve/chat-bubble";
-import { applyLive, liveTurn, type LiveState } from "@/app/(app)/fauve/live-turn";
+import { applyLive, enteringAfterLive, liveTurn, type LiveState } from "@/app/(app)/fauve/live-turn";
 import { BrigitteLive } from "@/app/(app)/fauve/brigitte-avatar";
 import { LiveTyping } from "@/app/(app)/fauve/live-typing";
 import { montageStep } from "@/app/(app)/fauve/chat-cards";
@@ -95,6 +95,8 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
   const [pending, start] = useTransition();
   // While Fauve answers: the line of what she is doing, then her words as she writes them.
   const [live, setLive] = useState<LiveState | null>(null);
+  /** The live turn as it stands, for the end of the turn (state updates are not read back). */
+  const liveRef = useRef<LiveState>({ status: null, text: "", step: -1 });
   // Messages that just arrived rise in; the history that loads with the panel does not.
   const [arrived, setArrived] = useState<Set<string>>(() => new Set());
   const [launching, setLaunching] = useState(false);
@@ -226,13 +228,15 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
       setMessages((m) => [...m, ...locals]);
       start(async () => {
         try {
-          setLive({ status: null, text: "", step: -1 });
-          const res = await liveTurn({ text, conversationId, attachments, about: { postId: topic.postId, scene: topic.scene } }, (event) =>
-            setLive((state) => applyLive(state ?? { status: null, text: "", step: -1 }, event)),
-          );
+          liveRef.current = { status: null, text: "", step: -1 };
+          setLive(liveRef.current);
+          const res = await liveTurn({ text, conversationId, attachments, about: { postId: topic.postId, scene: topic.scene } }, (event) => {
+            liveRef.current = applyLive(liveRef.current, event);
+            setLive(liveRef.current);
+          });
           if (res.ok) {
             setConversationId(res.conversationId);
-            setArrived(arrivals(messagesRef.current, res.messages));
+            setArrived(enteringAfterLive(arrivals(messagesRef.current, res.messages), res.messages, liveRef.current));
             setMessages(mergeMessages(messagesRef.current, res.messages));
           } else {
             setError(res.error);

@@ -24,8 +24,8 @@ const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> 
 
 export type ReelSegment =
   | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean; adjust?: Adjust; blur?: ClipBlur }
-  /** A photo (a carousel slide), with its retouch and blurred zones. */
-  | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit }
+  /** A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move). */
+  | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean }
   | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
   | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number };
 export type ReelText = {
@@ -101,6 +101,8 @@ export type ReelInputs = {
   template: MotionTemplate;
   /** Signed URL of each clip, by clip_id. */
   clipUrls: Record<string, string>;
+  /** The clips that are photos (shown still with a slow zoom). */
+  photoIds?: string[];
   /** Word timings from the clip analyses, by clip_id (for subtitles). */
   words?: Record<string, ClipAnalysis["words"]>;
   /** fonts: the studio's brand fonts (display first); the plan's fonts win over them. */
@@ -161,6 +163,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     if (!isClipSegment(s)) return { type: "scene", scene: s.scene, startAt, durationInFrames: lengths[i]! };
     const src = inputs.clipUrls[s.clip_id];
     if (!src) throw new Error(`No URL for clip ${s.clip_id}`);
+    // A photo in a Reel: still, with a slow zoom so it lives.
+    if (inputs.photoIds?.includes(s.clip_id)) return { type: "image", src, startAt, durationInFrames: lengths[i]!, zoom: true };
     return {
       type: "clip",
       src,

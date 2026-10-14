@@ -287,6 +287,33 @@
   0%, 100% { transform: translateY(2%) rotate(-1.5deg); }
   50% { transform: translateY(3%) rotate(1.5deg); }
 }
+/* Cross: a quick huff now and then, the anger mark throbbing. Shy: head tilted, a slow sway. */
+.fauve-cat-angry .fauve-cat-mood {
+  animation: fauve-huff 1.4s ease-in-out infinite;
+}
+@keyframes fauve-huff {
+  0%, 40%, 100% { transform: translateX(0) rotate(0); }
+  48% { transform: translateX(-1.6%) rotate(-2deg); }
+  56% { transform: translateX(1.6%) rotate(2deg); }
+  64% { transform: translateX(-1%) rotate(-1deg); }
+  72% { transform: translateX(0) rotate(0); }
+}
+.fauve-cat-vein {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fauve-vein 0.7s ease-in-out infinite;
+}
+@keyframes fauve-vein {
+  0%, 100% { transform: scale(0.85); }
+  50% { transform: scale(1.12); }
+}
+.fauve-cat-shy .fauve-cat-mood {
+  animation: fauve-shy 2.4s ease-in-out infinite;
+}
+@keyframes fauve-shy {
+  0%, 100% { transform: rotate(-6deg) translateY(1%); }
+  50% { transform: rotate(-3deg) translateY(0.4%); }
+}
 .fauve-cat-tear {
   transform-box: fill-box;
   animation: fauve-tear 1.3s ease-in infinite;
@@ -523,4 +550,48 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .fauve-pulse { animation: none; opacity: 0.8; }
+}
+
+/* Landing: the little Reel that plays on its own (three photos, a slow zoom, a word on each). */
+.landing-reel-shot {
+  animation: landing-shot 9s linear infinite;
+  animation-delay: calc(var(--i) * 3s);
+  opacity: 0;
+}
+@keyframes landing-shot {
+  0% { opacity: 0; transform: scale(1.04); }
+  4% { opacity: 1; }
+  33% { opacity: 1; }
+  37% { opacity: 0; transform: scale(1.16); }
+  100% { opacity: 0; transform: scale(1.16); }
+}
+.landing-reel-word {
+  animation: landing-word 9s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  animation-delay: calc(var(--i) * 3s + 0.25s);
+  opacity: 0;
+}
+@keyframes landing-word {
+  0% { opacity: 0; transform: translateY(14px); filter: blur(4px); }
+  5% { opacity: 1; transform: none; filter: none; }
+  30% { opacity: 1; transform: none; }
+  34%, 100% { opacity: 0; transform: translateY(-6px); }
+}
+.landing-reel-bar {
+  animation: landing-bar 9s linear infinite;
+  transform-origin: left;
+}
+@keyframes landing-bar {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-reel-shot,
+  .landing-reel-word,
+  .landing-reel-bar {
+    animation: none;
+  }
+  .landing-reel-shot:first-child,
+  .landing-reel-word:first-of-type {
+    opacity: 1;
+  }
 }

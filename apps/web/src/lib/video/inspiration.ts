@@ -12,7 +12,7 @@ const MAX_BYTES = 60 * 1024 * 1024;
 const PROCESSING_TIMEOUT_MS = 90_000;
 
 const PROMPT = `Tu es la directrice artistique de Brigitte, qui monte les Reels Instagram d'un commerce de quartier (studio de sport, salon de coiffure ou de beauté, restaurant, boutique…).
-La gérante t'a partagé ce contenu parce qu'il l'inspire. Dis en 3 phrases courtes ce qu'elle aime probablement et qu'on peut reprendre dans ses propres Reels :
+La personne qui gère le commerce (femme ou homme : n'accorde rien, ne dis ni « elle » ni « il ») t'a partagé ce contenu parce qu'il l'inspire. Dis en 3 phrases courtes ce qui plaît probablement et qu'on peut reprendre dans ses propres Reels :
 l'accroche des premières secondes, le rythme des coupes, les textes à l'écran (police, taille, animation, placement), les couleurs et la lumière, les transitions.
 Concret et réutilisable, sans décrire la personne ni recopier le contenu. En français.`;
 

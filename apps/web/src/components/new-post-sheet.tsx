@@ -2,7 +2,7 @@
 
 import type { PostKind } from "@fauve/agent";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState, useTransition, type ComponentType } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ComponentType } from "react";
 import { createPost } from "@/app/(app)/calendrier/actions";
 import { newPostOptions, type NewPostOptions } from "@/app/(app)/new-post-actions";
 import type { InspirationItem } from "@/lib/inspirations";
@@ -12,6 +12,10 @@ import { InspirationPicker } from "./inspiration-picker";
 import { buildSlideProps, placeElement } from "@fauve/agent";
 import { SlidePreview } from "./montage/slide-preview";
 import { Orb } from "./orb";
+
+/** Where « Confier à Brigitte » goes: by default her panel; on the Brigitte page, its own conversation (no panel over the chat). */
+export type NewPostHandOff = (start: { postId: string; text: string; files: File[] }) => void;
+export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 
 // « Nouvelle publication », step by step: the format, then what matters most,
 // the inspiration (a Reel she likes; for photos, a kit of her components drawn
@@ -84,6 +88,7 @@ function tomorrow(timezone: string): string {
 export function NewPostSheet({ date, timezone, onClose }: { date?: string; timezone: string; onClose: () => void }) {
   const router = useRouter();
   const openFauve = useFauveDrawer();
+  const handOff = useContext(NewPostHandOffContext);
   const titleId = useId();
   const [options, setOptions] = useState<NewPostOptions | null>(null);
   const [step, setStep] = useState<Step>("format");
@@ -203,7 +208,9 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
         ]
           .filter(Boolean)
           .join("\n\n");
-        openFauve({ postId: res.id, title: res.title, start: { text, files: [...files.map((f) => f.file), ...(example ? [example.file] : [])] } });
+        const handed = [...files.map((f) => f.file), ...(example ? [example.file] : [])];
+        if (handOff) handOff({ postId: res.id, text, files: handed });
+        else openFauve({ postId: res.id, title: res.title, start: { text, files: handed } });
       }
       onClose();
     });

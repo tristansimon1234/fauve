@@ -98,6 +98,9 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
   const page = capture ? await sharp(capture).resize({ width: 1000 }).jpeg({ quality: 80 }).toBuffer().catch(() => null) : null;
   if (!photos.length && !page) return { photos: 0, reading: false };
   const name = (studio?.name as string | null) ?? "ce commerce";
+  // Her site's fonts, as saved from its CSS by now (read_website): the reading names them, not look-alikes.
+  const { data: current } = await db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle();
+  const siteFonts = ((current?.profile as { fonts?: unknown } | null)?.fonts as string[] | undefined)?.filter((f) => typeof f === "string").slice(0, 3) ?? [];
   const business = (studio?.business_type as string | null) ?? null;
   let reading: { reading: string; palette: string[] } | null = null;
   try {
@@ -110,7 +113,7 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
       ],
       {
         model: CHAT_MODEL,
-        intro: `Le site de « ${name} »${business ? ` (${business})` : ""} : la gérante n'a pas encore fait de moodboard, son site est le meilleur indice de son style. Lis-en la direction artistique comme pour un moodboard (lumière, couleurs, typographie, cadrages, mise en page, ambiance), pour que ses Reels et ses visuels lui ressemblent.`,
+        intro: `Le site de « ${name} »${business ? ` (${business})` : ""} : la gérante n'a pas encore fait de moodboard, son site est le meilleur indice de son style. Lis-en la direction artistique comme pour un moodboard (lumière, couleurs, typographie, cadrages, mise en page, ambiance), pour que ses Reels et ses visuels lui ressemblent.${siteFonts.length ? ` Les polices de son site sont ${siteFonts.join(", ")} : ce sont elles que ses visuels utilisent ; pour la typographie, décris comment elles sont employées (graisse, capitales, espacement, taille) sans proposer d'autres polices.` : ""}`,
       },
     );
   } catch (error) {

@@ -7,6 +7,7 @@ import {
   clipAnalysisSchema,
   isClipSegment,
   motionTemplateSchema,
+  PHOTO_MAX_SECONDS,
   withoutScenes,
   type ClipAnalysis,
   buildFfmpegArgs,
@@ -20,7 +21,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { renderInSandbox, renderReelInSandbox, smokeTestScenes } from "./sandbox";
 
-const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm" };
+const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
 export type RenderResult = {
   renderId: string;
@@ -55,7 +56,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   const db = supabaseAdmin();
   const clipIds = [...new Set(plan.segments.filter(isClipSegment).map((s) => s.clip_id))];
   const assets = clipIds.length
-    ? check(await db.from("media_assets").select("id, storage_path, mime_type, duration").eq("studio_id", studioId).in("id", clipIds)).data!
+    ? check(await db.from("media_assets").select("id, storage_path, mime_type, duration, kind").eq("studio_id", studioId).in("id", clipIds)).data!
     : [];
   const clipFiles: Record<string, string> = {};
   const clips: Record<string, string> = {};
@@ -69,8 +70,10 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
     clipFiles[id] = file;
     clips[file] = signed.signedUrl;
     clipUrls[id] = signed.signedUrl;
-    clipDurations[id] = asset.duration === null ? null : Number(asset.duration);
+    clipDurations[id] = asset.kind === "image" ? PHOTO_MAX_SECONDS : asset.duration === null ? null : Number(asset.duration);
   }
+  // Photos play still in a Reel, with a slow zoom.
+  const photoIds = assets.filter((a) => a.kind === "image").map((a) => a.id as string);
 
   const [brand, studio, analyses] = await Promise.all([
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
@@ -99,6 +102,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   }
   return {
     clipIds,
+    photoIds,
     clipFiles,
     clips,
     clipUrls,
@@ -135,7 +139,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  const { clipFiles, clips, clipUrls, words, accent, logoUrl, studioName, fonts, customFonts } = await loadMontageInputs(studioId, plan);
+  const { clipFiles, clips, clipUrls, photoIds, words, accent, logoUrl, studioName, fonts, customFonts } = await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
@@ -148,6 +152,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     const needsBlur = plan.segments.some((s) => isClipSegment(s) && s.blur?.tracks.length);
     const ffmpegRender = () => {
       if (needsBlur) throw new Error("Ce montage floute des zones : le moteur de secours ne sait pas le faire, réessaie dans un instant");
+      if (photoIds.length) throw new Error("Ce montage anime des photos : le moteur de secours ne sait pas le faire, réessaie dans un instant");
       const clipsOnly = withoutScenes(plan);
       if (!clipsOnly.segments.length) throw new Error("Montage sans vidéo : le moteur de motion design est indisponible");
       return renderInSandbox({ id: renderId, clips, ass: buildAss(clipsOnly, accent), ffmpegArgs: buildFfmpegArgs(clipsOnly, { clipFiles }) });
@@ -160,6 +165,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       const props = buildReelProps(plan, {
         template: motion.data,
         clipUrls,
+        photoIds,
         words,
         brand: { name: studioName, accent, logoUrl, fonts, customFonts },
       });

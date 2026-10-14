@@ -39,7 +39,10 @@ export function customRestyle(wish: string): { direction: string; brief: string 
   };
 }
 
-const PREFIX = "Ajustement de la gérante — ";
+const PREFIX = "Ajustement demandé — ";
+/** The first wording, still in older art directions. */
+const OLD_PREFIX = "Ajustement de la gérante — ";
+const isAdjustment = (l: string) => l.startsWith(PREFIX) || l.startsWith(OLD_PREFIX);
 /** Adjustments kept in the art direction: the latest ones, one per kind. */
 const KEPT = 3;
 
@@ -51,8 +54,8 @@ const KEPT = 3;
 export function withAdjustment(artDirection: string | undefined, restyle: Restyle | { wish: string }, max = 1500): string {
   const line = `${PREFIX}${typeof restyle === "string" ? RESTYLE[restyle].direction : customRestyle(restyle.wish).direction}`;
   const lines = (artDirection ?? "").split("\n").filter((l) => l.trim());
-  const own = lines.filter((l) => !l.startsWith(PREFIX));
-  let adjustments = [...lines.filter((l) => l.startsWith(PREFIX) && l !== line), line].slice(-KEPT);
+  const own = lines.filter((l) => !isAdjustment(l));
+  let adjustments = [...lines.filter((l) => isAdjustment(l) && l !== line), line].slice(-KEPT);
   const join = () => [...own, ...adjustments].join("\n");
   while (join().length > max && adjustments.length > 1) adjustments = adjustments.slice(1);
   return join().slice(0, max);

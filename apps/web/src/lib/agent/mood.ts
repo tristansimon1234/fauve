@@ -1,6 +1,6 @@
 import "server-only";
 
-import { EMOJI_CRITERIA, EMOJI_INSTRUCTIONS, MOOD_CRITERIA, MOOD_INSTRUCTIONS, emojiOf, isFunny, moodOf, upsetLevel, usdToEur, type ReactionMood } from "@fauve/agent";
+import { EMOJI_CRITERIA, EMOJI_INSTRUCTIONS, MOOD_CRITERIA, MOOD_INSTRUCTIONS, emojiOf, isFunny, isSweet, moodOf, upsetLevel, usdToEur, type ReactionMood } from "@fauve/agent";
 import { choice, TypeSafeClient } from "@typesafe-ai/sdk";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -24,7 +24,7 @@ function jev(): TypeSafeClient | null {
 /** The keyword rules used before Jev, kept as the fallback. */
 function byRules(text: string, previous: string | null): Reaction {
   const upset = upsetLevel(text);
-  return { mood: upset ?? (isFunny(text) || isFunny(previous) ? "laugh" : "neutral"), emoji: null, by: "rules" };
+  return { mood: upset ?? (isSweet(text) ? "shy" : isFunny(text) || isFunny(previous) ? "laugh" : "neutral"), emoji: null, by: "rules" };
 }
 
 /**

@@ -20,17 +20,18 @@ import {
   XIcon,
 } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
-import { NewPostSheet } from "@/components/new-post-sheet";
+import { NewPostHandOffContext, NewPostSheet, type NewPostHandOff } from "@/components/new-post-sheet";
+import type { ChatAbout } from "@/lib/chat";
 import { Orb } from "@/components/orb";
 import type { CardQuote } from "@/lib/chat-cards";
 import { Bubble } from "./chat-bubble";
 import { montageStep } from "./chat-cards";
 import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "./chat-sync";
-import { isFunny, upsetLevel } from "@fauve/agent";
+import { isFunny, isSweet, upsetLevel } from "@fauve/agent";
 import { FileStrip, useChatUploads } from "./chat-uploads";
 import type { OnboardingView } from "./onboarding-actions";
 import { OnboardingCard, OnboardingStepper } from "@/components/onboarding/onboarding-card";
-import { applyLive, liveTurn, type LiveState } from "./live-turn";
+import { applyLive, enteringAfterLive, liveTurn, type LiveState } from "./live-turn";
 import { BrigitteLive, type BrigitteCue } from "./brigitte-avatar";
 import { LiveTyping } from "./live-typing";
 import {
@@ -111,6 +112,8 @@ export function FauveWorkspace({
   const [creating, setCreating] = useState(false);
   // While Fauve answers: the line of what she is doing, then her words as she writes them.
   const [live, setLive] = useState<LiveState | null>(null);
+  /** The live turn as it stands, for the end of the turn (state updates are not read back). */
+  const liveRef = useRef<LiveState>({ status: null, text: "", step: -1 });
   // Brigitte's instant reaction to the message being answered (Jev), until the next one.
   const [turnMood, setTurnMood] = useState<BrigitteCue | null>(null);
   // Messages that just arrived (they rise in); a conversation that loads whole does not animate.
@@ -252,8 +255,8 @@ export function FauveWorkspace({
     deleteConversation(id).catch(() => {});
   };
 
-  /** `withFiles`: the composer's send, which carries the photos and videos added to it. */
-  const send = (raw: string, withFiles = false) => {
+  /** `withFiles`: the composer's send, which carries the photos and videos added to it. `about`: the publication it is about. */
+  const send = (raw: string, withFiles = false, about?: ChatAbout) => {
     const text = raw.trim();
     const ready = withFiles ? files.filter((f) => f.status === "ready" && f.path) : [];
     if ((!text && !ready.length) || pending || (withFiles && uploading)) return;
@@ -289,9 +292,10 @@ export function FauveWorkspace({
     const conversationId = active;
     startTransition(async () => {
       try {
-        setLive({ status: null, text: "", step: -1 });
+        liveRef.current = { status: null, text: "", step: -1 };
+        setLive(liveRef.current);
         setTurnMood(null);
-        const res = await liveTurn({ text, conversationId, attachments }, (event) => {
+        const res = await liveTurn({ text, conversationId, attachments, about }, (event) => {
           if (event.type === "mood") {
             if (event.mood !== "neutral") setTurnMood({ id: `instant-${Date.now()}`, mood: event.mood, fresh: true });
             // Her emoji shows on the message at once, before her answer.
@@ -304,11 +308,12 @@ export function FauveWorkspace({
             }
             return;
           }
-          setLive((state) => applyLive(state ?? { status: null, text: "", step: -1 }, event));
+          liveRef.current = applyLive(liveRef.current, event);
+          setLive(liveRef.current);
         });
         if (res.ok) {
           setActive(res.conversationId);
-          setArrived(arrivals(messagesRef.current, res.messages));
+          setArrived(enteringAfterLive(arrivals(messagesRef.current, res.messages), res.messages, liveRef.current));
           setMessages(mergeMessages(messagesRef.current, res.messages));
           setConversations(res.conversations);
           // Getting started: Fauve may have moved to the next step.
@@ -380,6 +385,27 @@ export function FauveWorkspace({
     <ConversationList conversations={conversations} active={active} onOpen={open} onNew={startNew} onDelete={remove} />
   );
 
+  // « Confier à Brigitte » from a new publication on this page: it goes on in this conversation
+  // (no panel over the chat). Its files go up with the composer's uploads, then the message leaves on its own.
+  const handed = useRef<{ postId: string; text: string; files: number } | null>(null);
+  const [handedAt, setHandedAt] = useState(0);
+  const handOff = useCallback<NewPostHandOff>(
+    (start) => {
+      if (start.files.length) addFiles(start.files);
+      handed.current = { postId: start.postId, text: start.text, files: start.files.length };
+      setHandedAt(Date.now());
+    },
+    [addFiles],
+  );
+  useEffect(() => {
+    const next = handed.current;
+    if (!next || pending) return;
+    if (next.files && (files.length < next.files || uploading)) return;
+    handed.current = null;
+    send(next.text, next.files > 0, { postId: next.postId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- send is rebuilt each render; the hand-off fires once
+  }, [handedAt, pending, files.length, uploading]);
+
   const lastFauve = messages.findLastIndex((m) => m.from === "fauve");
   // What Brigitte reacts to in the header: her latest message, and the manager's words before it.
   const latest = lastFauve >= 0 ? messages[lastFauve] : null;
@@ -390,7 +416,7 @@ export function FauveWorkspace({
     : latest
       ? {
           id: latest.id,
-          mood: turnMood?.mood ?? upsetLevel(asked) ?? (isFunny(latest.body) || isFunny(asked) ? "laugh" : "happy"),
+          mood: turnMood?.mood ?? upsetLevel(asked) ?? (isSweet(asked) ? "shy" : isFunny(latest.body) || isFunny(asked) ? "laugh" : "happy"),
           fresh: arrived.has(latest.id),
         }
       : null;
@@ -404,6 +430,7 @@ export function FauveWorkspace({
       ? onboarding.step
       : null;
   return (
+    <NewPostHandOffContext.Provider value={handOff}>
     <div className="flex min-h-0 flex-1">
       <aside className="hidden w-[272px] shrink-0 flex-col border-r border-line bg-white md:flex">{list}</aside>
 
@@ -685,6 +712,7 @@ export function FauveWorkspace({
         </form>
       </section>
     </div>
+    </NewPostHandOffContext.Provider>
   );
 }
 

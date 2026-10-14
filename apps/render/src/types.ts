@@ -54,7 +54,7 @@ export type ReelProps = {
   fadeFrames: number;
   segments: (
     | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean; adjust?: Adjust; blur?: ClipBlur }
-    | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit }
+    | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean }
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
     | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number }
   )[];
