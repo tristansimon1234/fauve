@@ -183,7 +183,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         const step = onboardingStepOf(studio?.onboarding_step);
         if ((step === "website" || step === "style") && (images.length || site.url)) {
           ctx.afterReply.push(() =>
-            readSiteLook(studioId, site.url, images).then(
+            // Its logo is not one of its photos.
+            readSiteLook(studioId, site.url, site.logo ? images.filter((i) => i.split("?")[0] !== site.logo!.split("?")[0]) : images).then(
               (r) => console.info("site look", studioId, r),
               (e: unknown) => console.warn("site look failed", e),
             ),

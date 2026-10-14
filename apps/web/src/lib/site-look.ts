@@ -24,6 +24,11 @@ async function toPhoto(bytes: Buffer): Promise<{ jpeg: Buffer; width: number; he
   if (!meta?.width || !meta.height) return null;
   const ratio = meta.width / meta.height;
   if (Math.min(meta.width, meta.height) < 360 || ratio > 2.6 || ratio < 0.4) return null;
+  // A logo or a graphic on a transparent background is not a photo (in JPEG its
+  // background turns black); nor is a plain colour (a placeholder, a blank image).
+  const stats = await sharp(bytes).stats().catch(() => null);
+  if (!stats || (meta.hasAlpha && !stats.isOpaque)) return null;
+  if (Math.max(...stats.channels.slice(0, 3).map((c) => c.stdev)) < 12) return null;
   const { data, info } = await sharp(bytes)
     .rotate()
     .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })

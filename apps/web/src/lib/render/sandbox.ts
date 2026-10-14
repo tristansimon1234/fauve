@@ -186,7 +186,7 @@ export type SmokeScene = {
  */
 export async function smokeTestScenes(
   scenes: SmokeScene[],
-  brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl">,
+  brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">,
 ): Promise<Record<string, string | null>> {
   if (!scenes.length) return {};
   const sandbox = await remotionSandbox();
