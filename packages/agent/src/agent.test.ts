@@ -843,6 +843,23 @@ test("style buttons add one adjustment per kind to the art direction", async () 
   // « Autre chose »: her own words, as one more adjustment.
   const custom = withAdjustment(once, { wish: "  plus de couleurs   de ma charte " });
   assert.ok(custom.endsWith("Ajustement demandé — plus de couleurs de ma charte."));
+  // A reworded button still replaces its own line (one per kind), older wording included.
+  const reworded = withAdjustment("Tons clairs.\nAjustement de la gérante — Plus chaleureux : tons chauds, rythme posé.", "warmer");
+  assert.equal(reworded.split("\n").filter((l) => /Plus chaleureux/.test(l)).length, 1);
+  assert.ok(reworded.endsWith("rythme posé.") && reworded.includes("des visages"));
+});
+
+test("the first Reel's buttons and the ambiances speak plain words", async () => {
+  const { STYLE_CHECK_OPTIONS } = await import("./restyle.ts");
+  assert.deepEqual(STYLE_CHECK_OPTIONS, ["Ça me ressemble", "Plus rapide", "Moins de texte", "Plus chaleureux", "Autre chose"]);
+  const { AMBIANCES, MOTION_TEMPLATES } = await import("./schemas.ts");
+  for (const t of MOTION_TEMPLATES) {
+    const { label, hint, photo } = AMBIANCES[t];
+    assert.ok(label && hint && photo, t);
+    assert.doesNotMatch(`${label} ${hint} ${photo}`, /dynamique|pêchu|doux\b|chic\b/i, "no designer's adjective on screen");
+  }
+  const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
+  assert.ok(FAUVE_SYSTEM_PROMPT.includes("« Coupes rapides »") && !FAUVE_SYSTEM_PROMPT.includes("« Dynamique »"));
 });
 
 test("the site's photos: share image first, big images, no logos or icons", async () => {

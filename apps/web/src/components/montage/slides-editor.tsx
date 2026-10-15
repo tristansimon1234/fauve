@@ -1,6 +1,6 @@
 "use client";
 
-import { buildSlideProps, SLIDE_Y, type ReelInputs, type SavedLook, type SlidesPlan, type SlideText } from "@fauve/agent";
+import { AMBIANCES, buildSlideProps, SLIDE_Y, type ReelInputs, type SavedLook, type SlidesPlan, type SlideText } from "@fauve/agent";
 import { useMemo, useRef, useState } from "react";
 import { PenIcon, PlusIcon } from "@/components/icons";
 import { SlidePreview } from "./slide-preview";
@@ -20,11 +20,8 @@ const logoPlaces = [
   { value: "bottom", label: "En bas" },
 ] as const;
 
-const templates = [
-  { value: "doux", label: "Doux" },
-  { value: "dynamique", label: "Dynamique" },
-  { value: "chic", label: "Chic" },
-] as const;
+/** On photos only the texts change: each ambiance named by its texts. */
+const templates = (["doux", "dynamique", "chic"] as const).map((value) => ({ value, label: AMBIANCES[value].photo }));
 
 export function SlidesEditor({
   plan,
@@ -175,7 +172,7 @@ export function SlidesEditor({
         ))}
 
       <div className="flex items-center gap-2">
-        <span className={`text-[12px] font-bold ${muted}`}>Style</span>
+        <span className={`text-[12px] font-bold ${muted}`}>Textes</span>
         {templates.map((t) => (
           <button
             key={t.value}

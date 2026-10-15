@@ -1,6 +1,6 @@
 "use client";
 
-import type { PostKind } from "@fauve/agent";
+import { AMBIANCES, MOTION_TEMPLATES, type MotionTemplate, type PostKind } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ComponentType } from "react";
 import { createPost } from "@/app/(app)/calendrier/actions";
@@ -50,20 +50,9 @@ const fallbackIdeas: Record<PostKind, string[]> = {
 
 const phrases: Record<PostKind, string> = { reel: "un Reel", carousel: "un carrousel", post: "un post photo", story: "une story" };
 
-const styles = [
-  { value: null, label: "Simone choisit" },
-  { value: "doux", label: "Doux" },
-  { value: "dynamique", label: "Dynamique" },
-  { value: "chic", label: "Chic" },
-  { value: "collage", label: "Collage" },
-] as const;
-type Style = (typeof styles)[number]["value"];
-const styleHints: Record<NonNullable<Style>, string> = {
-  doux: "élégant, des textes qui glissent",
-  dynamique: "rythmé, des textes qui claquent",
-  chic: "minimal, beaucoup d’espace",
-  collage: "fait main, photos découpées, à la mode",
-};
+/** The ambiances in plain words (what she will see), and Simone's own pick. */
+type Style = MotionTemplate | null;
+const styles: { value: Style; label: string }[] = [{ value: null, label: "Simone choisit" }, ...MOTION_TEMPLATES.map((t) => ({ value: t, label: AMBIANCES[t].label }))];
 
 /** A Reel's sound (a story has no publishing by hand: only Simone's music or none). */
 const sounds = [
@@ -210,7 +199,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
           `Nouvelle publication : ${phrases[kind]} pour ${when} à ${time.replace(":", " h ")}.`,
           intention.trim() ? `L’idée : ${intention.trim()}` : "",
           video && (style || inspiration)
-            ? [style ? `Style : ${styles.find((s) => s.value === style)!.label}.` : "", inspiration ? `Inspiration : « ${inspiration.title} ».` : ""].filter(Boolean).join(" ")
+            ? [style ? `Style : ${AMBIANCES[style].label}.` : "", inspiration ? `Inspiration : « ${inspiration.title} ».` : ""].filter(Boolean).join(" ")
             : "",
           video ? `Musique : ${sound === "instagram" ? "un son d’Instagram, je le publierai moi-même" : sound === "none" ? "sans musique" : "ta musique"}.` : "",
           kit ? `Composants à poser sur mes photos : le kit « ${kit.name} » (element_id ${kit.elements.map((e) => e.id).join(", ")}).` : "",
@@ -511,7 +500,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                     );
                   })}
                 </div>
-                <p className="text-[12px] text-muted">{style ? `${styles.find((s) => s.value === style)!.label} : ${styleHints[style]}.` : "Simone prend ton style habituel, ou celui de ton inspiration."}</p>
+                <p className="text-[12px] text-muted">{style ? `${AMBIANCES[style].label} : ${AMBIANCES[style].hint}.` : "Simone prend ton style habituel, ou celui de ton inspiration."}</p>
               </fieldset>
               <fieldset className="flex flex-col gap-2">
                 <legend className="mb-2 text-[13px] font-bold">La musique</legend>

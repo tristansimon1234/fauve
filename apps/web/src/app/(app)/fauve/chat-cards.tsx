@@ -1,4 +1,4 @@
-import { effortPitch, EFFORTS, montageLate, type Effort } from "@fauve/agent";
+import { AMBIANCES, effortPitch, EFFORTS, montageLate, type Effort } from "@fauve/agent";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { CheckIcon, ClockIcon, LayersIcon, PlayIcon } from "@/components/icons";
@@ -53,7 +53,6 @@ export function ChatCards({
 }
 
 const sceneLabels = { clip: "Vidéo", animation: "Animation", end: "Fin" } as const;
-const styleLabels = { doux: "style doux", dynamique: "style dynamique", chic: "style chic", collage: "style collage" } as const;
 
 /** Scenes shown before « Voir les N scènes » when the card is narrow (a phone, the drawer). */
 const FIRST_SCENES = 3;
@@ -81,7 +80,7 @@ function PlanList({ plan }: { plan: NonNullable<CardQuote["plan"]> }) {
     <div className="flex flex-col gap-3">
       <span className="text-[13px] font-semibold text-muted">
         ~{Math.round(plan.duration)} s · {plan.scenes.length} scène{plan.scenes.length > 1 ? "s" : ""}
-        {plan.style ? ` · ${styleLabels[plan.style]}` : ""}
+        {plan.style ? ` · ${AMBIANCES[plan.style].label.toLowerCase()}` : ""}
       </span>
       <ol className="flex flex-col gap-2.5">{plan.scenes.slice(0, FIRST_SCENES).map(scene)}</ol>
       {rest.length > 0 && (

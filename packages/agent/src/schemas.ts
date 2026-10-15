@@ -151,10 +151,22 @@ export const MOTION_TEMPLATES = ["doux", "dynamique", "chic", "collage"] as cons
 export const motionTemplateSchema = z.enum(MOTION_TEMPLATES);
 export type MotionTemplate = z.infer<typeof motionTemplateSchema>;
 
+/**
+ * Each template as the manager reads it: what she will see, in plain words, never a
+ * designer's adjective (« dynamique » told her nothing). `photo` names it on a carousel,
+ * where only the texts change. The keys stay the stored values.
+ */
+export const AMBIANCES: Record<MotionTemplate, { label: string; hint: string; photo: string }> = {
+  doux: { label: "Calme et lumineux", hint: "des plans qui prennent leur temps, une lumière douce, un mot en italique", photo: "Textes légers" },
+  dynamique: { label: "Coupes rapides", hint: "des plans courts calés sur la musique, de gros titres, des coups de zoom", photo: "Gros titres" },
+  chic: { label: "Sobre et élégant", hint: "peu de texte, de l'italique, un rythme lent", photo: "Italique élégant" },
+  collage: { label: "Façon collage", hint: "des photos découpées et scotchées sur du papier, de petits dessins", photo: "Papier découpé" },
+};
+
 /** What Fauve proposes before a montage, shown on the quote and followed by the editor. */
 export const montagePlanSchema = z.object({
   duration: z.number().min(5).max(30).describe("Durée visée en secondes : 7 à 15 pour une annonce ou une ambiance, 20 à 30 pour une histoire (quelqu'un qui parle, un conseil, un avant/après)"),
-  style: motionTemplateSchema.optional().describe("Gabarit visé : doux (élégant), dynamique (qui claque), chic (minimal), collage (fait main, photos découpées, à la mode)"),
+  style: motionTemplateSchema.optional().describe("Ambiance visée : doux (calme et lumineux), dynamique (coupes rapides), chic (sobre et élégant), collage (façon collage : photos découpées, à la mode)"),
   scenes: z
     .array(
       z.object({
