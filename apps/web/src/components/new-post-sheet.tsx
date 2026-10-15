@@ -1,6 +1,18 @@
 "use client";
 
-import { advisedFormat, creationSteps, formatBlocked, formatWhy, publishWhen, type Effort, type Picked, type PostKind } from "@fauve/agent";
+import {
+  advisedFormat,
+  creationSteps,
+  findVoice,
+  formatBlocked,
+  formatWhy,
+  publishWhen,
+  SIMONE_VOICES,
+  voiceSamplePath,
+  type Effort,
+  type Picked,
+  type PostKind,
+} from "@fauve/agent";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
@@ -8,7 +20,8 @@ import { creationProgress, launchCreation, type CreationProgress, type LaunchRes
 import { MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/chat-uploads";
 import { newPostOptions, type NewPostOptions } from "@/app/(app)/new-post-actions";
 import { useFauveDrawer } from "./fauve-drawer";
-import { CheckIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
+import { publicEnv } from "@/lib/public-env";
+import { CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, ImageIcon, LayersIcon, MicIcon, PauseIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
 import { Mascot } from "./mascot";
 import { nudgeWork } from "./work-pill";
 
@@ -22,12 +35,38 @@ export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 // « C'est parti »: a Reel starts at once and the screen follows it (« Je m'en occupe »);
 // a carousel, a photo or a story goes on with Simone in the chat, who writes the texts.
 
-const FORMATS: { kind: PostKind; title: string; phrase: string; hint: string; feminine?: boolean }[] = [
-  { kind: "reel", title: "Un Reel", phrase: "un Reel", hint: "Une vidéo montée, avec musique" },
-  { kind: "carousel", title: "Un carrousel", phrase: "un carrousel", hint: "Tes photos, à faire défiler" },
-  { kind: "post", title: "Une photo", phrase: "un post photo", hint: "Une seule image, dans ta grille" },
-  { kind: "story", title: "Une story", phrase: "une story", hint: "Visible 24 h, pour un rappel ou une info du jour", feminine: true },
+const FORMATS: { kind: PostKind; title: string; phrase: string; hint: string; Icon: typeof FilmIcon }[] = [
+  { kind: "reel", title: "Un Reel", phrase: "un Reel", hint: "Une vidéo montée, avec musique", Icon: FilmIcon },
+  { kind: "carousel", title: "Un carrousel", phrase: "un carrousel", hint: "Tes photos, à faire défiler", Icon: LayersIcon },
+  { kind: "post", title: "Une photo", phrase: "un post photo", hint: "Une seule image, dans ta grille", Icon: ImageIcon },
+  { kind: "story", title: "Une story", phrase: "une story", hint: "Visible 24 h, pour un rappel ou une info du jour", Icon: PlayIcon },
 ];
+
+/** What « Ce que tu imagines » can say: the scenario, in her words. */
+const SCENARIO_EXAMPLE: Record<PostKind, string> = {
+  reel: "Ex. on commence par l’avant, puis le geste, et on finit sur le résultat avec l’offre du mois.",
+  carousel: "Ex. 3 conseils pour l’hiver, un par photo, et l’offre sur la dernière.",
+  post: "Ex. la nouveauté de la semaine, avec le prix.",
+  story: "Ex. il reste 2 places jeudi soir.",
+};
+
+const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
+
+/** Her studio's voice setting (Style), as the first choice: « Simone choisit », without, or its voice. */
+function defaultVoice(o: NewPostOptions | null): string {
+  if (!o || o.voice.use === "auto") return "auto";
+  if (o.voice.use === "never") return "off";
+  return o.voice.voiceId && findVoice(o.voice.voiceId) ? o.voice.voiceId : SIMONE_VOICES[0]!.id;
+}
+
+/** Under « Voix off »: « Simone choisit », « Aucune », « Eva ». */
+function voiceLabel(voice: string): string {
+  if (voice === "auto") return "Simone choisit";
+  if (voice === "off") return "Aucune";
+  return findVoice(voice)?.name ?? "Simone choisit";
+}
+
+const placeLabel = (platforms: string[]) => platforms.map((p) => (p === "tiktok" ? "TikTok" : "Instagram")).join(" et ");
 
 /** The first library items shown (with the upload tile, four rows of three). */
 const FIRST_TILES = 11;
@@ -118,7 +157,10 @@ function Create({
   const [format, setFormat] = useState<PostKind | null>(null);
   const [when, setWhen] = useState<When | null>(null);
   const [other, setOther] = useState("");
-  const [sheet, setSheet] = useState<"format" | "date" | "nothing" | null>(null);
+  /** Her choices, else the studio's (voice) and the usual places (platforms). */
+  const [voice, setVoice] = useState<string | null>(null);
+  const [platforms, setPlatforms] = useState<string[] | null>(null);
+  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "nothing" | null>(null);
   const [all, setAll] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
@@ -155,6 +197,12 @@ function Create({
   const kind = format && !formatBlocked(format, counts) ? format : advised;
   const meta = FORMATS.find((f) => f.kind === kind)!;
   const chosenWhen = when ?? defaultWhen(options, date);
+  const chosenVoice = voice ?? defaultVoice(options);
+  // TikTok only takes videos (a Reel here), and only once it is connected.
+  const places = (platforms ?? (kind === "reel" && options?.tiktok ? ["instagram", "tiktok"] : ["instagram"])).filter(
+    (p) => p === "instagram" || (p === "tiktok" && kind === "reel" && options?.tiktok),
+  );
+  const where = places.length ? places : ["instagram"];
   const sending = picked.some((k) => k.startsWith("u:") && drafts.get(k.slice(2))?.status === "uploading");
   const broken = picked.some((k) => k.startsWith("u:") && drafts.get(k.slice(2))?.status === "error");
   const ready = picked.length > 0 && Boolean(chosenWhen) && !sending && !broken;
@@ -181,7 +229,15 @@ function Create({
         const f = drafts.get(k.slice(2));
         return f?.path ? [{ upload: { path: f.path, mime: f.file.type, size: f.file.size } }] : [];
       });
-      const res = await launchCreation({ kind, date: chosenWhen.date, time: chosenWhen.time, idea, items }).catch(
+      const res = await launchCreation({
+        kind,
+        date: chosenWhen.date,
+        time: chosenWhen.time,
+        idea,
+        items,
+        voice: kind === "reel" ? chosenVoice : "auto",
+        platforms: where.filter((p): p is "instagram" | "tiktok" => p === "instagram" || p === "tiktok"),
+      }).catch(
         (): LaunchResult => ({ ok: false, error: "Ça n’est pas parti. Réessaie dans un instant." }),
       );
       if (!res.ok) {
@@ -199,7 +255,7 @@ function Create({
       // A carousel, a photo or a story: Simone writes the texts, in the chat.
       const text = [
         `Nouvelle publication : ${meta.phrase} pour ${chosenWhen.full.charAt(0).toLowerCase()}${chosenWhen.full.slice(1)}.`,
-        idea.trim() ? `L’idée : ${idea.trim()}` : "",
+        idea.trim() ? `Ce que j’imagine : ${idea.trim()}` : "",
         `${counts.videos ? "Mes photos et vidéos" : "Mes photos"} (media_id, dans l’ordre) : ${res.mediaIds.join(", ")}.`,
         "Choisis toi-même la mise en page et les textes, et lance-toi : je regarde le résultat après.",
       ]
@@ -212,7 +268,6 @@ function Create({
 
   const shownLibrary = all ? library : library.slice(0, Math.max(0, FIRST_TILES - uploads.files.length));
   const ideas = (options?.ideas[kind] ?? []).slice(0, 4);
-  const linkish = "fauve-press text-violet font-extrabold underline decoration-2 underline-offset-4";
 
   return (
     <>
@@ -345,21 +400,27 @@ function Create({
 
         <section className="flex flex-col gap-2.5">
           <label htmlFor={`${titleId}-idea`} className="text-[17px] font-extrabold tracking-[-0.01em]">
-            De quoi ça parle ? <span className="text-[13px] font-semibold tracking-normal text-muted">facultatif</span>
+            Ce que tu imagines <span className="text-[13px] font-semibold tracking-normal text-muted">facultatif</span>
           </label>
-          <input
+          <textarea
             id={`${titleId}-idea`}
-            type="text"
             value={idea}
-            maxLength={300}
+            maxLength={500}
+            rows={3}
             onChange={(e) => setIdea(e.target.value)}
-            placeholder="Une nouveauté, une offre…"
-            className="h-[50px] w-full rounded-[14px] border-[1.5px] border-line bg-white px-3.5 text-[15.5px] outline-none focus:border-violet"
+            placeholder={SCENARIO_EXAMPLE[kind]}
+            className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-3 text-[15.5px] leading-snug outline-none focus:border-violet"
           />
-          {ideas.length > 0 && (
+          {/* Ideas only while she has written nothing: a tap fills the field, which she then edits. */}
+          {ideas.length > 0 && !idea.trim() && (
             <div className="flex flex-wrap gap-1.5" aria-label="Idées">
               {ideas.map((it) => (
-                <button key={it} type="button" onClick={() => setIdea(it)} className="fauve-press h-[34px] rounded-full border border-line bg-soft px-[13px] text-[13.5px] font-semibold hover:border-violet/40">
+                <button
+                  key={it}
+                  type="button"
+                  onClick={() => setIdea(it)}
+                  className="fauve-press h-[34px] rounded-full border border-line bg-soft px-[13px] text-[13.5px] font-semibold hover:border-violet/40"
+                >
                   {it}
                 </button>
               ))}
@@ -380,22 +441,13 @@ function Create({
       </div>
 
       <footer className="flex shrink-0 flex-col items-stretch gap-1 border-t border-line bg-white px-5 pt-3 pb-[max(1.1rem,env(safe-area-inset-bottom))]">
-        {/* What will happen, right above the button that does it; each part changes in a tap. */}
+        {/* What Simone will do, right above the button that does it: each line opens its choice. */}
         {picked.length > 0 && chosenWhen && (
-          <p aria-live="polite" className="fauve-enter flex items-start gap-2 pb-2 text-[17px] leading-[1.45] font-semibold">
-            <Mascot size={28} mood="happy" still />
-            <span>
-              J’en fais{" "}
-              <button type="button" onClick={() => setSheet("format")} className={linkish}>
-                {meta.phrase}
-              </button>
-              , publié{meta.feminine ? "e" : ""}{" "}
-              <button type="button" onClick={() => setSheet("date")} className={linkish}>
-                {chosenWhen.short}
-              </button>
-              .
-            </span>
-          </p>
+          <div aria-live="polite" className="fauve-enter grid grid-cols-2 gap-2 pb-2">
+            <Field wide={kind !== "reel"} icon={<meta.Icon size={17} />} label="Format" value={meta.title} onClick={() => setSheet("format")} />
+            {kind === "reel" && <Field icon={<MicIcon size={17} />} label="Voix off" value={voiceLabel(chosenVoice)} onClick={() => setSheet("voice")} />}
+            <Field wide icon={<CalendarIcon size={17} />} label="Quand et où" value={chosenWhen.full} sub={placeLabel(where)} onClick={() => setSheet("date")} />
+          </div>
         )}
         <button
           type="button"
@@ -451,7 +503,26 @@ function Create({
 
       {sheet === "date" && options && (
         <Sheet label="La date" onClose={() => setSheet(null)}>
-          <SheetHead title="Quand le publier ?" hint="Tes prochains jours libres, à ton heure habituelle." onClose={() => setSheet(null)} />
+          <SheetHead title="Quand et où le publier ?" hint="Tes prochains jours libres, à ton heure habituelle." onClose={() => setSheet(null)} />
+          {kind === "reel" && options.tiktok && (
+            <div className="flex items-center gap-2">
+              <span className="flex-1 text-[14px] font-bold">Où ?</span>
+              {(["instagram", "tiktok"] as const).map((p) => {
+                const on = where.includes(p);
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setPlatforms(on ? (where.length > 1 ? where.filter((x) => x !== p) : where) : [...where, p])}
+                    className={`h-9 rounded-full border-[1.5px] px-3.5 text-[13.5px] font-bold ${on ? "border-violet bg-violet-soft text-violet" : "border-line bg-white text-muted"}`}
+                  >
+                    {p === "instagram" ? "Instagram" : "TikTok"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div role="radiogroup" aria-label="Date" className="flex flex-col gap-2">
             {options.slots.map((s, i) => (
               <Choice
@@ -489,6 +560,19 @@ function Create({
               </button>
             )}
           </div>
+        </Sheet>
+      )}
+
+      {sheet === "voice" && (
+        <Sheet label="La voix off" onClose={() => setSheet(null)}>
+          <SheetHead title="Une voix off ?" hint="Une voix raconte ton Reel, la musique passe dessous. Écoute et choisis." onClose={() => setSheet(null)} />
+          <VoicePicker
+            value={chosenVoice}
+            onPick={(v) => {
+              setVoice(v);
+              setSheet(null);
+            }}
+          />
         </Sheet>
       )}
 
@@ -649,6 +733,75 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
         )}
       </footer>
     </>
+  );
+}
+
+/** One line of what Simone will do (format, voice, when and where): obviously a choice to open. */
+function Field({ icon, label, value, sub, wide, onClick }: { icon: ReactNode; label: string; value: string; sub?: string; wide?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`fauve-press flex min-w-0 items-center gap-2.5 rounded-[16px] border-[1.5px] border-line bg-white py-2 pr-2.5 pl-2 text-left transition-colors hover:border-violet/40 ${wide ? "col-span-2" : "max-[419px]:pl-3.5"}`}
+    >
+      {/* Half a narrow phone: the words first. */}
+      <span className={`flex size-9 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet ${wide ? "" : "max-[419px]:hidden"}`}>{icon}</span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[11.5px] font-semibold text-muted">{label}</span>
+        <span className="truncate text-[14.5px] leading-tight font-extrabold">{value}</span>
+        {sub && <span className="truncate text-[12.5px] text-muted">{sub}</span>}
+      </span>
+      <span className="shrink-0 text-muted">
+        <ChevronRightIcon size={16} />
+      </span>
+    </button>
+  );
+}
+
+/** « Simone choisit », without, or one of her voices (each to listen to first). */
+function VoicePicker({ value, onPick }: { value: string; onPick: (voice: string) => void }) {
+  const [playing, setPlaying] = useState<string | null>(null);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => () => audio.current?.pause(), []);
+  const listen = (id: string) => {
+    audio.current?.pause();
+    if (playing === id) return setPlaying(null);
+    const sample = new Audio(`${SAMPLES}/${voiceSamplePath(id)}`);
+    audio.current = sample;
+    sample.onended = () => setPlaying((p) => (p === id ? null : p));
+    setPlaying(id);
+    sample.play().catch(() => setPlaying(null));
+  };
+  const pick = (v: string) => {
+    audio.current?.pause();
+    onPick(v);
+  };
+  return (
+    <div role="radiogroup" aria-label="La voix off" className="flex flex-col gap-2">
+      <Choice on={value === "auto"} title="Simone choisit" hint="Une voix quand personne ne parle dans tes vidéos" onClick={() => pick("auto")} />
+      <Choice on={value === "off"} title="Sans voix off" hint="Juste la musique" onClick={() => pick("off")} />
+      <div className="grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-2">
+        {SIMONE_VOICES.map((v) => {
+          const on = value === v.id;
+          return (
+            <div key={v.id} className={`flex items-center gap-1.5 rounded-[14px] border-[1.5px] py-1 pr-1 pl-3 ${on ? "border-violet bg-violet-tint" : "border-line bg-white"}`}>
+              <button type="button" role="radio" aria-checked={on} onClick={() => pick(v.id)} className="flex min-w-0 flex-1 flex-col py-1.5 text-left">
+                <span className="text-[14.5px] font-extrabold">{v.name}</span>
+                <span className="truncate text-[12.5px] text-muted">{`${v.hint.charAt(0).toUpperCase()}${v.hint.slice(1)}`}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => listen(v.id)}
+                aria-label={playing === v.id ? `Arrêter ${v.name}` : `Écouter ${v.name}`}
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-chip text-ink hover:bg-violet-tint"
+              >
+                {playing === v.id ? <PauseIcon size={14} /> : <PlayIcon size={14} />}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

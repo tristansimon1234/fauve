@@ -26,9 +26,10 @@ import type { ReviewData } from "@/lib/review";
 
 // « Qu'est-ce qu'on change ? » under a Reel: what she changes herself (instant, free)
 // and what Simone remakes (a new version in about two minutes), in her words, plus
-// anything else said her way. One view at a time; each one ends with « C'est bon ».
+// anything else said her way. One view at a time; nothing Simone remakes starts on a
+// tap: each view says what will happen, takes a précision if she wants, and asks to confirm.
 
-export type ChangeView = "menu" | "texts" | "caption" | "cover" | "date" | "music" | "voice";
+export type ChangeView = "menu" | "texts" | "caption" | "cover" | "date" | "shorter" | "punchier" | "music" | "voice";
 
 const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
 const BIG = 1.25;
@@ -69,6 +70,7 @@ export function ChangePanel(props: Props) {
       {view === "caption" && <CaptionView {...props} />}
       {view === "cover" && <CoverView {...props} />}
       {view === "date" && <DateView {...props} />}
+      {(view === "shorter" || view === "punchier") && <RedoView {...props} kind={view} />}
       {view === "music" && <MusicView {...props} />}
       {view === "voice" && <VoiceView {...props} />}
     </div>
@@ -80,6 +82,8 @@ const TITLES: Record<Exclude<ChangeView, "menu">, string> = {
   caption: "La légende",
   cover: "La couverture",
   date: "Le jour et l’heure",
+  shorter: "Plus court",
+  punchier: "Plus rythmé",
   music: "La musique",
   voice: "Une voix off",
 };
@@ -102,18 +106,9 @@ function Tile({ icon, label, onClick, tone, disabled }: { icon: React.ReactNode;
   );
 }
 
-function Menu({ data, onView, onDone, ask, editorHref }: Props) {
+function Menu({ data, onView, ask, editorHref }: Props) {
   const [wish, setWish] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const busy = pending || data.making !== null;
-  const redo = (kind: "shorter" | "punchier") =>
-    start(async () => {
-      setError(null);
-      const result = await redoReel(data.postId, kind);
-      if (!result.ok) setError(result.error);
-      else onDone("C’est parti : Simone refait la vidéo, environ 2 minutes. Tu peux fermer, je te préviens.");
-    });
+  const busy = data.making !== null;
   const send = () => {
     const text = wish.trim();
     if (!text) return;
@@ -132,16 +127,11 @@ function Menu({ data, onView, onDone, ask, editorHref }: Props) {
       </div>
       <h3 className="mt-1 text-[13.5px] font-bold text-muted">Simone refait la vidéo, 2 minutes environ</h3>
       <div className="grid grid-cols-2 gap-2">
-        <Tile tone="peach" icon={<ScissorsIcon size={18} />} label="Plus court" onClick={() => redo("shorter")} disabled={busy} />
-        <Tile tone="peach" icon={<ZapIcon size={18} />} label="Plus rythmé" onClick={() => redo("punchier")} disabled={busy} />
+        <Tile tone="peach" icon={<ScissorsIcon size={18} />} label="Plus court" onClick={() => onView("shorter")} disabled={busy} />
+        <Tile tone="peach" icon={<ZapIcon size={18} />} label="Plus rythmé" onClick={() => onView("punchier")} disabled={busy} />
         <Tile tone="peach" icon={<MusicIcon size={18} />} label="La musique" onClick={() => onView("music")} disabled={busy} />
         <Tile tone="peach" icon={<MicIcon size={18} />} label="Une voix off" onClick={() => onView("voice")} disabled={busy} />
       </div>
-      {error && (
-        <p role="alert" className="text-[13.5px] font-semibold text-danger">
-          {error}
-        </p>
-      )}
       <form
         className="mt-1 flex items-center gap-2"
         onSubmit={(e) => {
@@ -175,11 +165,76 @@ function Menu({ data, onView, onDone, ask, editorHref }: Props) {
   );
 }
 
+/** The button that applies a choice: always in sight at the bottom, even under a long list. */
 function Done({ children, disabled, onClick, pending }: { children: React.ReactNode; disabled?: boolean; onClick: () => void; pending?: boolean }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled || pending} className="btn btn-primary mt-1 w-full disabled:opacity-60">
-      {pending ? "Un instant…" : children}
-    </button>
+    <div className="sticky bottom-0 z-[1] mt-1 bg-white pt-2 shadow-[0_-14px_14px_-6px_#fff]">
+      <button type="button" onClick={onClick} disabled={disabled || pending} className="btn btn-primary w-full disabled:opacity-60">
+        {pending ? "Un instant…" : children}
+      </button>
+    </div>
+  );
+}
+
+/** What she adds in her words, sent with the request (optional). */
+function NoteField({ label, placeholder, value, onChange }: { label: string; placeholder: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[13.5px] font-bold">
+        {label} <span className="font-semibold text-muted">facultatif</span>
+      </span>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        maxLength={300}
+        rows={2}
+        placeholder={placeholder}
+        className="resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-2.5 text-[15px] leading-snug outline-none focus:border-violet"
+      />
+    </label>
+  );
+}
+
+const REDO_TEXT = {
+  shorter: {
+    what: "Simone garde l’accroche et la fin, et retire les passages les moins forts : environ un tiers de moins.",
+    placeholder: "Ex. garde le plan du shampoing",
+    button: "Refaire la vidéo, plus courte",
+  },
+  punchier: {
+    what: "Des coupes plus rapprochées et plus d’énergie, calées sur la musique. Le sujet et la fin restent.",
+    placeholder: "Ex. va plus vite au résultat",
+    button: "Refaire la vidéo, plus rythmée",
+  },
+} as const;
+
+/** « Plus court », « Plus rythmé »: what Simone will do, a précision if she wants, then her go. */
+function RedoView({ data, onDone, kind }: Props & { kind: "shorter" | "punchier" }) {
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const text = REDO_TEXT[kind];
+  const go = () =>
+    start(async () => {
+      setError(null);
+      const result = await redoReel(data.postId, kind, note);
+      if (!result.ok) return setError(result.error);
+      onDone("C’est parti : Simone refait la vidéo, environ 2 minutes. Tu peux fermer, je te préviens.");
+    });
+  return (
+    <div className="flex flex-col gap-2.5">
+      <p className="text-[14px] leading-snug text-muted">{text.what}</p>
+      <NoteField label="Une précision ?" placeholder={text.placeholder} value={note} onChange={setNote} />
+      <p className="text-[12.5px] leading-snug text-muted">Environ 2 minutes. Ta version actuelle reste, tu pourras y revenir.</p>
+      {error && (
+        <p role="alert" className="text-[13.5px] font-semibold text-danger">
+          {error}
+        </p>
+      )}
+      <Done onClick={go} pending={pending} disabled={data.making !== null}>
+        {text.button}
+      </Done>
+    </div>
   );
 }
 
@@ -434,29 +489,41 @@ function DateView({ data, onDone }: Props) {
   );
 }
 
+type MusicOption = { id: string; title: string; hint: string; button: string; message: string; apply: () => Promise<{ ok: boolean }> };
+
+/** The music: she picks, then confirms (the video is made again). */
 function MusicView({ data, onDone }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const current = data.publishByHand ? "trend" : data.music?.on === false ? "none" : "simone";
-  const run = (action: () => Promise<{ ok: boolean }>, message: string) =>
-    start(async () => {
-      setError(null);
-      const result = await action();
-      if (!result.ok) return setError("Ça n’a pas marché. Réessaie dans un instant.");
-      onDone(message);
-    });
-  const options = [
+  const [choice, setChoice] = useState(current);
+  const hers = async () => {
+    if (data.publishByHand) await setPublishByHand(data.postId, false);
+  };
+  const options: MusicOption[] = [
     ...(data.music
       ? [
+          {
+            id: "another",
+            title: "Une autre musique",
+            hint: "Simone en compose une nouvelle pour ce Reel.",
+            button: "Composer une autre musique",
+            message: "Simone compose une autre musique. La vidéo arrive dans deux minutes environ.",
+            apply: async () => {
+              await hers();
+              return setMusic(data.postId, "another");
+            },
+          },
           {
             id: "simone",
             title: "La musique de Simone",
             hint: "Composée pour ce Reel, libre de droits.",
-            pick: () =>
-              run(async () => {
-                if (data.publishByHand) await setPublishByHand(data.postId, false);
-                return data.music?.on ? { ok: true } : setMusic(data.postId, "on");
-              }, "La musique de Simone revient. La vidéo se refait, une minute environ."),
+            button: "Remettre la musique de Simone",
+            message: "La musique de Simone revient. La vidéo se refait, une minute environ.",
+            apply: async () => {
+              await hers();
+              return data.music?.on ? { ok: true } : setMusic(data.postId, "on");
+            },
           },
         ]
       : []),
@@ -464,7 +531,9 @@ function MusicView({ data, onDone }: Props) {
       id: "trend",
       title: "Un son tendance d’Instagram",
       hint: "Tu le choisis en publiant : à l’heure prévue, je t’envoie la vidéo et la légende sur WhatsApp.",
-      pick: () => run(() => setPublishByHand(data.postId, true), "C’est noté : à l’heure prévue, je t’envoie la vidéo pour que tu ajoutes ton son."),
+      button: "Je mettrai un son d’Instagram",
+      message: "C’est noté : à l’heure prévue, je t’envoie la vidéo pour que tu ajoutes ton son.",
+      apply: () => setPublishByHand(data.postId, true),
     },
     ...(data.music
       ? [
@@ -472,31 +541,31 @@ function MusicView({ data, onDone }: Props) {
             id: "none",
             title: "Sans musique",
             hint: "Juste le son de tes vidéos.",
-            pick: () =>
-              run(async () => {
-                if (data.publishByHand) await setPublishByHand(data.postId, false);
-                return setMusic(data.postId, "off");
-              }, "Sans musique : la vidéo se refait, une minute environ."),
+            button: "Retirer la musique",
+            message: "Sans musique : la vidéo se refait, une minute environ.",
+            apply: async () => {
+              await hers();
+              return setMusic(data.postId, "off");
+            },
           },
         ]
       : []),
   ];
+  const picked = options.find((o) => o.id === choice);
+  const changed = choice !== current;
+  const apply = () =>
+    start(async () => {
+      if (!picked || !changed) return onDone("");
+      setError(null);
+      const result = await picked.apply();
+      if (!result.ok) return setError("Ça n’a pas marché. Réessaie dans un instant.");
+      onDone(picked.message);
+    });
   return (
-    <div className="flex flex-col gap-2">
-      {data.music && (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => run(() => setMusic(data.postId, "another"), "Simone compose une autre musique. La vidéo arrive dans deux minutes environ.")}
-          className="flex flex-col items-start gap-0.5 rounded-[16px] border-[1.5px] border-line bg-white px-3.5 py-3 text-left hover:border-lilac disabled:opacity-60"
-        >
-          <span className="text-[15px] font-extrabold">Une autre musique</span>
-          <span className="text-[13px] text-muted">Simone en compose une nouvelle pour ce Reel.</span>
-        </button>
-      )}
+    <div className="flex flex-col gap-2.5">
       <div role="radiogroup" aria-label="La musique" className="flex flex-col gap-2">
         {options.map((o) => {
-          const on = current === o.id;
+          const on = choice === o.id;
           return (
             <button
               key={o.id}
@@ -504,11 +573,14 @@ function MusicView({ data, onDone }: Props) {
               role="radio"
               aria-checked={on}
               disabled={pending}
-              onClick={() => (on ? onDone("") : o.pick())}
+              onClick={() => setChoice(o.id)}
               className={`flex items-center gap-3 rounded-[16px] border-[1.5px] px-3.5 py-3 text-left disabled:opacity-60 ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
             >
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[15px] font-extrabold">{o.title}</span>
+                <span className="flex items-center gap-2 text-[15px] font-extrabold">
+                  {o.title}
+                  {o.id === current && <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-bold text-muted">Actuelle</span>}
+                </span>
                 <span className="text-[13px] leading-snug text-muted">{o.hint}</span>
               </span>
               <span className={`flex size-5.5 shrink-0 items-center justify-center rounded-full border-2 ${on ? "border-violet" : "border-lilac"}`}>
@@ -523,6 +595,9 @@ function MusicView({ data, onDone }: Props) {
           {error}
         </p>
       )}
+      <Done onClick={apply} pending={pending}>
+        {changed && picked ? picked.button : "C’est bon"}
+      </Done>
     </div>
   );
 }
@@ -531,6 +606,7 @@ function VoiceView({ data, onDone }: Props) {
   const hers = data.voice?.who === "hers";
   const onReel = data.voice?.who === "simone" ? (SIMONE_VOICES.find((v) => v.name === data.voice?.name)?.id ?? null) : null;
   const [picked, setPicked] = useState<string | null>(onReel);
+  const [note, setNote] = useState("");
   const [playing, setPlaying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -549,17 +625,20 @@ function VoiceView({ data, onDone }: Props) {
     start(async () => {
       setError(null);
       audio.current?.pause();
-      if (picked === onReel && !hers) return onDone("");
+      const words = note.trim();
+      if (picked === onReel && !hers && !words) return onDone("");
       if (picked === null) {
         const result = await setVoiceOff(data.postId);
         return result.ok ? onDone("Sans voix : la vidéo se refait, une minute environ.") : setError("Ça n’a pas marché. Réessaie.");
       }
-      const result = await putVoice(data.postId, picked);
+      const result = await putVoice(data.postId, picked, words);
       if (!result.ok) return setError(result.error);
       const name = SIMONE_VOICES.find((v) => v.id === picked)?.name ?? "";
       onDone(`C’est parti : ${name} enregistre la voix et Simone refait la vidéo, deux minutes environ.`);
     });
-  const label = picked === null ? (onReel || hers ? "Retirer la voix" : "C’est bon") : picked === onReel ? "C’est bon" : `Mettre la voix de ${SIMONE_VOICES.find((v) => v.id === picked)?.name ?? ""}`;
+  const name = SIMONE_VOICES.find((v) => v.id === picked)?.name ?? "";
+  const label =
+    picked === null ? (onReel || hers ? "Retirer la voix" : "C’est bon") : picked === onReel && !note.trim() ? "C’est bon" : picked === onReel ? `Refaire la voix de ${name}` : `Mettre la voix de ${name}`;
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-[13.5px] leading-snug text-muted">
@@ -588,6 +667,9 @@ function VoiceView({ data, onDone }: Props) {
           );
         })}
       </div>
+      {picked !== null && (
+        <NoteField label="Ce que la voix doit dire ?" placeholder="Ex. parle du cours offert pour une première venue" value={note} onChange={setNote} />
+      )}
       <p className="text-[13px] leading-snug text-muted">Ou ta propre voix : envoie un vocal à Simone sur WhatsApp, elle le pose dessus.</p>
       {error && (
         <p role="alert" className="text-[13.5px] font-semibold text-danger">
