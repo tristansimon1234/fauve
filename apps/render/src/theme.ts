@@ -1,6 +1,6 @@
 import type { MotionTemplate } from "./types";
 
-// One visual system, three temperaments. Sizes are for a 1080-wide frame.
+// One visual system, four temperaments (collage draws its own texts, Collage.tsx). Sizes are for a 1080-wide frame.
 export type Theme = {
   hook: {
     family: "display" | "body";
@@ -48,5 +48,14 @@ export const THEMES: Record<MotionTemplate, Theme> = {
     zoomTo: 1.04,
     spring: { damping: 200, stiffness: 60, mass: 1 },
     exitFrames: 14,
+  },
+  collage: {
+    hook: { family: "display", weight: 800, italic: false, size: 92, uppercase: true, letterSpacing: -0.5, lineHeight: 1.05, stagger: 3, enter: "pop" },
+    band: { weight: 700, size: 44, uppercase: true, letterSpacing: 1, radius: 0, outline: false, tilt: -2.5 },
+    caption: { weight: 600, size: 40 },
+    subtitle: { weight: 800, size: 58, uppercase: false, highlight: "pill" },
+    zoomTo: 1.05,
+    spring: { damping: 12, stiffness: 210, mass: 0.6 },
+    exitFrames: 6,
   },
 };

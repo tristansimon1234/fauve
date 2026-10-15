@@ -53,7 +53,7 @@ export function ChatCards({
 }
 
 const sceneLabels = { clip: "Vidéo", animation: "Animation", end: "Fin" } as const;
-const styleLabels = { doux: "style doux", dynamique: "style dynamique", chic: "style chic" } as const;
+const styleLabels = { doux: "style doux", dynamique: "style dynamique", chic: "style chic", collage: "style collage" } as const;
 
 /** Scenes shown before « Voir les N scènes » when the card is narrow (a phone, the drawer). */
 const FIRST_SCENES = 3;

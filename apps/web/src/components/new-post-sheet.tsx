@@ -55,12 +55,14 @@ const styles = [
   { value: "doux", label: "Doux" },
   { value: "dynamique", label: "Dynamique" },
   { value: "chic", label: "Chic" },
+  { value: "collage", label: "Collage" },
 ] as const;
 type Style = (typeof styles)[number]["value"];
 const styleHints: Record<NonNullable<Style>, string> = {
   doux: "élégant, des textes qui glissent",
   dynamique: "rythmé, des textes qui claquent",
   chic: "minimal, beaucoup d’espace",
+  collage: "fait main, photos découpées, à la mode",
 };
 
 type Step = "format" | "when" | "files" | "idea" | "inspiration";

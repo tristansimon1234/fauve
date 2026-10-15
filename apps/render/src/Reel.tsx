@@ -11,6 +11,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, Grain } from "./Collage";
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
@@ -34,7 +35,9 @@ export function Reel(props: ReelProps) {
   const theme = THEMES[props.template];
   // The studio's own fonts first, so their families are not asked of Google.
   loadCustomFonts(props.brand.customFonts);
+  const collage = props.template === "collage";
   loadFonts([
+    ...(collage ? [COLLAGE_SERIF] : []),
     props.brand.displayFont,
     props.brand.bodyFont,
     ...props.texts.flatMap((t) => [t.look, t.detail_look].flatMap((l) => (l ? [l.font, ...(l.emphasis?.font ? [l.emphasis.font] : [])] : []))),
@@ -45,10 +48,25 @@ export function Reel(props: ReelProps) {
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
+      {collage ? <CollageBackdrop props={props} /> : null}
       {props.segments.map((segment, i) => (
-        <Sequence key={i} from={segment.startAt} durationInFrames={segment.durationInFrames} layout="none">
-          <FadeIn frames={i > 0 ? props.fadeFrames : 0}>
-            {segment.type === "clip" || segment.type === "image" ? (
+        <Sequence
+          key={i}
+          from={segment.startAt}
+          // Collage: a card stays a little under the next one sliding over it.
+          durationInFrames={
+            collage && (segment.type === "clip" || segment.type === "image")
+              ? Math.min(segment.durationInFrames + COLLAGE_OVERLAP, props.durationInFrames - segment.startAt)
+              : segment.durationInFrames
+          }
+          layout="none"
+        >
+          <FadeIn frames={i > 0 && !collage ? props.fadeFrames : 0}>
+            {collage && (segment.type === "clip" || segment.type === "image") ? (
+              <CollageCard index={i} props={props}>
+                {segment.type === "clip" ? <Shot segment={segment} theme={theme} /> : <Photo src={segment.src} edit={segment.edit} />}
+              </CollageCard>
+            ) : segment.type === "clip" || segment.type === "image" ? (
               <>
                 {segment.type === "clip" ? (
                   <Shot segment={segment} theme={theme} />
@@ -95,9 +113,10 @@ export function Reel(props: ReelProps) {
 
       {props.endCard && (
         <Sequence from={props.endCard.from} layout="none">
-          <EndCard props={props} k={k} />
+          {collage ? <CollageEndCard props={props} k={k} /> : <EndCard props={props} k={k} />}
         </Sequence>
       )}
+      {collage ? <Grain props={props} /> : null}
       {props.soundtrack?.src ? <Audio src={props.soundtrack.src} /> : null}
     </AbsoluteFill>
   );
@@ -171,6 +190,10 @@ function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][n
   // Remount when edited, so the fit is measured again (scene editor).
   const key = `${text.text}|${text.style}|${text.scale ?? 1}|${text.x ?? ""}|${text.backdrop ?? false}|${text.look ? JSON.stringify(text.look) : ""}`;
   if (text.look || text.items) return <LookText key={`${key}|${JSON.stringify([text.items, text.detail_look, text.bullet])}`} text={text} index={index} props={props} theme={theme} k={k} />;
+  if (props.template === "collage") {
+    const C = text.style === "hook" ? CollageHook : text.style === "band" ? CollageBand : CollageCaption;
+    return <C key={key} text={text} index={index} props={props} theme={theme} k={k} sides={sides(text, props, k)} />;
+  }
   if (text.style === "hook") return <Hook key={key} text={text} index={index} props={props} theme={theme} k={k} />;
   if (text.style === "band") return <Band key={key} text={text} index={index} props={props} theme={theme} k={k} />;
   return <Caption key={key} text={text} index={index} props={props} theme={theme} k={k} />;

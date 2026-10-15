@@ -45,7 +45,7 @@ test("style: the form is normalized and applied over the current profile", () =>
   assert.deepEqual(next.extra, { kept: true });
   assert.equal(next.default_template, "chic");
   // The missing body font takes the template's.
-  assert.deepEqual(next.fonts, ["Fraunces", "Plus Jakarta Sans"]);
+  assert.deepEqual(next.fonts, ["Fraunces", "Inter Tight"]);
 });
 
 test("style: emptied optional fields are removed", () => {

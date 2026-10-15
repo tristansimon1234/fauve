@@ -1,7 +1,7 @@
 // Mirror of ReelProps in packages/agent/src/motion.ts (the web app builds them).
 // This package is shipped alone to the render sandbox, so it cannot import it.
 
-export type MotionTemplate = "doux" | "dynamique" | "chic";
+export type MotionTemplate = "doux" | "dynamique" | "chic" | "collage";
 
 /** Mirror of the retouch types in packages/agent/src/retouch.ts. */
 export type Adjust = {
@@ -79,6 +79,8 @@ export type ReelProps = {
     name: string;
     accent: string;
     accentInk: string;
+    /** The brand's other colours by role (mirror of BrandPalette). */
+    palette?: { secondary: string; light: string; dark: string };
     displayFont: string;
     bodyFont: string;
     logoUrl: string | null;
