@@ -12,12 +12,23 @@ const labels = {
   any: { title: "Dépose tes photos et vidéos ici", accept: "image/*,video/*" },
 } as const;
 
-export function DropCard({ kind, onFiles, className = "" }: { kind: keyof typeof labels; onFiles: (files: FileList | File[]) => void; className?: string }) {
+export function DropCard({
+  kind,
+  onFiles,
+  className = "",
+  wide = false,
+}: {
+  kind: keyof typeof labels;
+  onFiles: (files: FileList | File[]) => void;
+  className?: string;
+  /** The whole width of its card (onboarding), instead of a bubble's. */
+  wide?: boolean;
+}) {
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { title, accept } = labels[kind];
   return (
-    <div className={`w-full max-w-[340px] ${className}`}>
+    <div className={`w-full ${wide ? "" : "max-w-[340px]"} ${className}`}>
       <button
         type="button"
         onClick={() => inputRef.current?.click()}

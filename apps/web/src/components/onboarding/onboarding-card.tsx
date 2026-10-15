@@ -553,25 +553,29 @@ function FirstPostStep({
   pending: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // One thing to do: drop her photos and videos. Simone's message says why; the rest are small links.
   return (
     <>
-      <p className="text-[14px] leading-relaxed text-muted">
-        Une première publication pour l’essai, faite avec <strong className="text-ink">ta vraie matière</strong> : c’est elle qui donne envie de venir chez toi. Prends 3 à 10 photos ou vidéos dans
-        ta galerie : ton lieu, un plat ou un produit, un geste, ton équipe, des vidéos même courtes si tu en as. Je m’en sers pour te montrer ce que je sais faire, et on l’ajuste jusqu’à ce
-        qu’elle te ressemble.
-      </p>
-      {onFiles ? <DropCard kind="any" onFiles={onFiles} /> : null}
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => setOpen(true)} className={`btn ${onFiles ? "btn-secondary" : "btn-primary"} h-11 px-5`}>
+      {onFiles ? (
+        <DropCard kind="any" onFiles={onFiles} wide />
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className="btn btn-primary h-11 self-start px-5">
           <PlusIcon size={17} />
           Créer ma première publication
         </button>
-        {sitePhotos ? (
-          <button type="button" disabled={pending} onClick={onSite} className="text-[13px] font-semibold text-muted hover:text-ink">
-            Je n’ai rien sous la main : les photos de mon site
+      )}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] font-semibold text-muted">
+        {onFiles ? (
+          <button type="button" onClick={() => setOpen(true)} className="hover:text-ink">
+            Choisir dans ma médiathèque
           </button>
         ) : null}
-        <button type="button" disabled={pending} onClick={onLater} className="text-[13px] font-semibold text-muted hover:text-ink">
+        {sitePhotos ? (
+          <button type="button" disabled={pending} onClick={onSite} className="hover:text-ink">
+            Partir des photos de mon site
+          </button>
+        ) : null}
+        <button type="button" disabled={pending} onClick={onLater} className="hover:text-ink">
           Plus tard
         </button>
       </div>

@@ -204,8 +204,11 @@ export function Bubble({
       {onFiles && onChoose && !mine && message.pickMedia && (
         <MediaPickCard kind={message.pickMedia} onPick={onChoose} onFiles={onFiles} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />
       )}
-      {onChoose && !mine && message.stepCard && <OnboardingCard step={message.stepCard} timezone={timezone} onSend={onChoose} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />}
-      {onFiles && !mine && message.upload && !message.pickMedia && <DropCard kind={message.upload} onFiles={onFiles} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />}
+      {onChoose && !mine && message.stepCard && (
+        <OnboardingCard step={message.stepCard} timezone={timezone} onSend={onChoose} onFiles={onFiles} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />
+      )}
+      {/* The step card has its own drop zone: never a second one under it. */}
+      {onFiles && !mine && message.upload && !message.pickMedia && !message.stepCard && <DropCard kind={message.upload} onFiles={onFiles} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />}
       {options.length > 0 && (
         <div className={`flex flex-wrap gap-2 pt-0.5 ${enter ? "fauve-enter [--fauve-delay:140ms]" : ""}`} role="group" aria-label="Réponses proposées">
           {options.map((option) => (
