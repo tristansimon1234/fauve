@@ -1,5 +1,5 @@
 import "server-only";
-import { CREDIT_PRICES, MOODBOARD_MAX_ITEMS } from "@fauve/agent";
+import { CREDIT_PRICES, MOODBOARD_MAX_ITEMS, withArtDirection } from "@fauve/agent";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
 import { readMoodboard } from "@/lib/agent/moodboard";
 import { chargeCredits, creditBalance } from "@/lib/credits";
@@ -33,7 +33,7 @@ export async function addToMoodboard(studioId: string, mediaIds: string[], optio
   if (!added.length) return { error: "Les images n’ont pas pu être ajoutées." };
   const items = [...current, ...added];
 
-  let reading: { reading: string; palette: string[] } | null = null;
+  let reading: { reading: string; direction?: string; palette: string[] } | null = null;
   if (options.free || (await creditBalance(studioId)) >= CREDIT_PRICES.moodboard) {
     const signed = await db.storage.from("media").createSignedUrls(items.map((i) => i.path), 3600);
     const urls = (signed.data ?? []).flatMap((s, i) => (s.signedUrl ? [{ url: s.signedUrl, note: items[i]?.note }] : []));
@@ -45,8 +45,8 @@ export async function addToMoodboard(studioId: string, mediaIds: string[], optio
     }
   }
   await insertProfileVersion(studioId, (profile) => ({
-    ...profile,
-    moodboard: { items, ...(reading ? { ...reading, read_at: new Date().toISOString() } : {}) },
+    ...withArtDirection(profile as { art_direction?: unknown }, reading?.direction),
+    moodboard: { items, ...(reading ? { reading: reading.reading, palette: reading.palette, read_at: new Date().toISOString() } : {}) },
   }));
   return { added: added.length, reading: reading?.reading ?? null };
 }
