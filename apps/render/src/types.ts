@@ -114,7 +114,7 @@ export type ReelProps = {
   };
   endCard: { title: string; subtitle: string | null; from: number } | null;
   /** Simone's music in the live preview (the render gets it mixed in afterwards). */
-  soundtrack?: { src: string } | null;
+  soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
   /** Her voice note over the Reel, from `from` (frames). */
   voice?: { src: string; from: number } | null;
   logo?: "top" | "bottom" | null;

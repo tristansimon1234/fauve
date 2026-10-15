@@ -149,5 +149,5 @@ export async function withMusic(params: {
       meta: { post_id: params.postId, render_id: params.renderId, song_id: composed.songId, model: env("ELEVENLABS_MUSIC_MODEL"), signature, ms: composed.ms },
     });
   }
-  return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3), music: made };
+  return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice) }), music: made };
 }

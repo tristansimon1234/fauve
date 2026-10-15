@@ -3,6 +3,7 @@ import type { Adjust, ClipBlur, PhotoEdit } from "./retouch.ts";
 import { brandPalette, resolveBrandLook, type BrandPalette, type Bullet, type ListItem, type TextLook } from "./text-look.ts";
 import type { LogoOnDark } from "./logo.ts";
 import type { VoiceWord } from "./voice.ts";
+import { previewMusic, speechWindows, type MixCase } from "./mix.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -102,8 +103,11 @@ export type ReelProps = {
     customFonts?: { family: string; url: string }[];
   };
   endCard: { title: string; subtitle: string | null; from: number } | null;
-  /** Simone's music, played in the live preview (the render gets it mixed in afterwards). */
-  soundtrack?: { src: string } | null;
+  /**
+   * Simone's music, played in the live preview (the render gets it mixed in afterwards):
+   * its volume (0–1), and the lower one while someone speaks, in `duck.windows` (frames).
+   */
+  soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
   /** Her voice note over the Reel, from `from` (frames), in the render and the preview. */
   voice?: { src: string; from: number } | null;
   /** The studio's logo over the whole video or still (carousel slides). */
@@ -292,6 +296,20 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     words.sort((a, b) => a.from - b.from);
   }
 
+  // The music of the live preview sits under what is said, as in the render's mix:
+  // when her voice (or Simone's) speaks, else in the passages that keep their sound.
+  const spoken = voice
+    ? voice.words.map((w) => ({ from: voice.from + toFrames(w.start), to: voice.from + toFrames(w.end) }))
+    : plan.segments.flatMap((s, i) => {
+        const segment = segments[i];
+        if (!isClipSegment(s) || segment?.type !== "clip" || !segment.speech) return [];
+        return (inputs.words?.[s.clip_id] ?? [])
+          .filter((w) => w.start >= s.in && w.end <= s.out)
+          .map((w) => ({ from: segment.startAt + toFrames(w.start - s.in), to: segment.startAt + toFrames(w.end - s.in) }));
+      });
+  const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : "music";
+  const music = previewMusic(mix, speechWindows(spoken.filter((w) => w.from < durationInFrames), toFrames(0.5)));
+
   const endCardFrames = toFrames(END_CARD_SECONDS);
 
   return {
@@ -307,7 +325,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     endCard: plan.end_card
       ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, durationInFrames - endCardFrames) }
       : null,
-    ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack } } : {}),
+    ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack, ...music } } : {}),
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
   };
 }

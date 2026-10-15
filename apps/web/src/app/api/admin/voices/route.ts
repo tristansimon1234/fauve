@@ -2,7 +2,7 @@ import { z } from "zod";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { speak } from "@/lib/voice-over";
+import { levelSpeech, speak } from "@/lib/voice-over";
 
 // Voices for Simone, by ear. POST with CRON_SECRET, from the database (call_app):
 //   ?use_case=social_media|conversational|narrative_story&gender=female|male
@@ -13,7 +13,7 @@ import { speak } from "@/lib/voice-over";
 //   ?clone=<name>&media=<uuid>,<uuid>…
 //     an instant clone of a person's voice from her voice notes (audio media of one studio,
 //     a minute or two in all, her own voice and with her consent): answers the new voice id.
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const voiceSchema = z.object({
   voice_id: z.string(),
@@ -58,20 +58,28 @@ const SAMPLE =
 
 async function say(voiceIds: string[]) {
   const db = supabaseAdmin();
-  const samples = await Promise.all(
-    voiceIds.map(async (id) => {
-      try {
-        const voice = await speak(SAMPLE, id);
-        const path = `lab/voices/${id}.mp3`;
-        const up = await db.storage.from("media").upload(path, voice.mp3, { contentType: "audio/mpeg", upsert: true });
-        if (up.error) throw new Error(up.error.message);
-        const signed = await db.storage.from("media").createSignedUrl(path, 86_400);
-        return { id, model: voice.model, seconds: voice.transcript.duration, url: signed.data?.signedUrl ?? null };
-      } catch (error) {
-        return { id, error: error instanceof Error ? error.message.slice(0, 300) : String(error) };
-      }
-    }),
-  );
+  const samples = [];
+  // 4 at a time: the plan reads 5 texts at once.
+  for (let i = 0; i < voiceIds.length; i += 4) {
+    samples.push(
+      ...(await Promise.all(
+        voiceIds.slice(i, i + 4).map(async (id) => {
+          try {
+            const voice = await speak(SAMPLE, id);
+            // At the level of a voice in a Reel, so they are compared by ear and not by volume.
+            const leveled = await levelSpeech(`sample-${id}`, voice.mp3);
+            const path = `lab/voices/${id}.mp3`;
+            const up = await db.storage.from("media").upload(path, leveled.mp3, { contentType: "audio/mpeg", upsert: true });
+            if (up.error) throw new Error(up.error.message);
+            const signed = await db.storage.from("media").createSignedUrl(path, 86_400);
+            return { id, model: voice.model, seconds: voice.transcript.duration, lufs: leveled.lufs, url: signed.data?.signedUrl ?? null };
+          } catch (error) {
+            return { id, error: error instanceof Error ? error.message.slice(0, 300) : String(error) };
+          }
+        }),
+      )),
+    );
+  }
   return Response.json({ samples });
 }
 
