@@ -389,7 +389,7 @@ export const toolSpecs = {
   },
   get_metrics: {
     description:
-      "Statistiques mesurées des publications faites par Simone (dernière mesure par publication) entre deux dates : vues, portée, likes, enregistrements, partages, commentaires, visites du profil.",
+      "Statistiques entre deux dates : celles des publications de Simone (dernière mesure par publication : vues, portée, likes, enregistrements, partages, commentaires, visites du profil) et celles du compte, semaine par semaine (nouveaux abonnés, désabonnements, solde, abonnés au total, vues, visites du profil, clics sur le lien ; Instagram et TikTok). À lire dès qu'on parle d'abonnés ou de croissance.",
     input: z.object({ from: isoDateTime, to: isoDateTime }),
   },
   update_brand_profile: {

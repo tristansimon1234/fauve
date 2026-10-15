@@ -1017,3 +1017,40 @@ test("TikTok: caption with every hashtag, settings and states", async () => {
   assert.match(tiktokStateLine({ ...sent, post_id: "7" }), /En ligne/);
   assert.equal(readTikTokExternal({ instagram: {} }), null);
 });
+
+test("growth: weeks of new followers, net from counts, formats and moments", async () => {
+  const { weeklyGrowth, weekStart, periodTotals, byFormat, bestMoments } = await import("./growth.ts");
+  assert.equal(weekStart("2026-10-15"), "2026-10-12"); // a Thursday → its Monday
+  assert.equal(weekStart("2026-10-12"), "2026-10-12");
+  const row = (day: string, o: Partial<Record<string, number | null>> = {}) => ({
+    day, followers: null, new_followers: null, unfollows: null, views: null, reach: null, profile_views: null, link_taps: null, interactions: null, ...o,
+  });
+  const rows = [
+    row("2026-10-05", { followers: 100 }),
+    row("2026-10-06", { new_followers: 5, unfollows: 1, views: 300 }),
+    row("2026-10-08", { new_followers: 3, unfollows: 0, views: 200, followers: 107 }),
+    row("2026-10-13", { followers: 110 }), // counts only (e.g. TikTok)
+  ];
+  const weeks = weeklyGrowth(rows, 3, new Date("2026-10-15T10:00:00Z"));
+  assert.deepEqual(weeks.map((w) => w.start), ["2026-09-28", "2026-10-05", "2026-10-12"]);
+  assert.equal(weeks[1]!.newFollowers, 8);
+  assert.equal(weeks[1]!.net, 7);
+  assert.equal(weeks[1]!.views, 500);
+  assert.equal(weeks[2]!.net, 3); // 110 − 107, from the follower counts
+  assert.equal(weeks[0]!.days, 0);
+  const total = periodTotals(rows, "2026-10-06");
+  assert.equal(total.newFollowers, 8);
+  assert.equal(total.followers, 110);
+  const posts = [
+    { kind: "reel", publishedAt: "2026-10-06T16:00:00Z", views: 1000, reach: 800, likes: 50, comments: 5, saves: 20, shares: 5 },
+    { kind: "reel", publishedAt: "2026-10-07T07:00:00Z", views: 600, reach: 400, likes: 20, comments: 0, saves: 10, shares: 10 },
+    { kind: "carousel", publishedAt: "2026-10-06T17:00:00Z", views: 300, reach: 250, likes: 30, comments: 2, saves: 15, shares: 3 },
+  ];
+  const formats = byFormat(posts);
+  assert.equal(formats[0]!.kind, "reel");
+  assert.equal(formats[0]!.views, 800);
+  assert.ok(Math.abs(formats[0]!.engagement! - (80 / 800 + 40 / 400) / 2) < 1e-9);
+  const moments = bestMoments(posts, "Europe/Paris");
+  assert.equal(moments.days[0]!.label, "mardi"); // 7 Oct 9:00 in Paris
+  assert.equal(moments.slots[0]!.label, "le soir"); // 650 on average (18 h, 19 h) against 600 at 9 h
+});

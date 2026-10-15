@@ -2,6 +2,9 @@ import "server-only";
 import {
   APP_GUIDES,
   cleanCaption,
+  periodTotals,
+  weeklyGrowth,
+  type DailyRow,
   assertTransition,
   canTransition,
   postStatusSchema,
@@ -1125,7 +1128,26 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       );
       const latest = new Map<string, (typeof rows)[number]>();
       for (const row of rows) if (!latest.has(`${row.post_id}:${row.platform}`)) latest.set(`${row.post_id}:${row.platform}`, row);
-      return json({ metrics: [...latest.values()] });
+      // The account itself, week by week (relevé chaque jour par le cron).
+      const days = unwrap(
+        await db
+          .from("account_daily")
+          .select("platform, day, followers, new_followers, unfollows, views, reach, profile_views, link_taps, interactions")
+          .eq("studio_id", studioId)
+          .gte("day", new Date(new Date(from).getTime() - 7 * 86_400_000).toISOString().slice(0, 10))
+          .lte("day", to.slice(0, 10))
+          .order("day"),
+      ) as (DailyRow & { platform: string })[];
+      const weeksCount = Math.min(26, Math.max(1, Math.ceil((new Date(to).getTime() - new Date(from).getTime()) / (7 * 86_400_000)) + 1));
+      const account = Object.fromEntries(
+        ["instagram", "tiktok"].flatMap((platform) => {
+          const list = days.filter((d) => d.platform === platform);
+          return list.length
+            ? [[platform, { weeks: weeklyGrowth(list, weeksCount, new Date(to)).filter((w) => w.days > 0), period: periodTotals(list, from.slice(0, 10)) }]]
+            : [];
+        }),
+      );
+      return json({ metrics: [...latest.values()], account });
     },
 
     async react_to_message({ emoji }) {

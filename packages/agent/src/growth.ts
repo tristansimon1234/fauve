@@ -1,0 +1,141 @@
+// The account week by week, from its daily rows (account_daily): new followers,
+// unfollows, net growth, views, profile visits, link taps. Pure, so the page,
+// Simone and the weekly analysis read the same numbers.
+
+export type DailyRow = {
+  day: string; // YYYY-MM-DD
+  followers: number | null;
+  new_followers: number | null;
+  unfollows: number | null;
+  views: number | null;
+  reach: number | null;
+  profile_views: number | null;
+  link_taps: number | null;
+  interactions: number | null;
+};
+
+export type Week = {
+  /** Monday of the week, YYYY-MM-DD. */
+  start: string;
+  newFollowers: number | null;
+  unfollows: number | null;
+  /** Gained minus lost; from the follower count when the detail is missing. */
+  net: number | null;
+  /** Followers at the end of the week (last count known). */
+  followers: number | null;
+  views: number | null;
+  profileViews: number | null;
+  linkTaps: number | null;
+  interactions: number | null;
+  /** Days with data in this week. */
+  days: number;
+};
+
+const DAY_MS = 86_400_000;
+
+/** Monday (UTC) of the week of a YYYY-MM-DD day. */
+export function weekStart(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  const offset = (d.getUTCDay() + 6) % 7;
+  return new Date(d.getTime() - offset * DAY_MS).toISOString().slice(0, 10);
+}
+
+const add = (a: number | null, b: number | null) => (b === null ? a : (a ?? 0) + b);
+
+/** The last `count` weeks up to the week of `today` (oldest first), empty weeks included. */
+export function weeklyGrowth(rows: DailyRow[], count: number, today: Date = new Date()): Week[] {
+  const current = weekStart(today.toISOString().slice(0, 10));
+  const starts = Array.from({ length: count }, (_, i) => new Date(new Date(`${current}T00:00:00Z`).getTime() - (count - 1 - i) * 7 * DAY_MS).toISOString().slice(0, 10));
+  const byWeek = new Map<string, DailyRow[]>();
+  for (const r of rows) byWeek.set(weekStart(r.day), [...(byWeek.get(weekStart(r.day)) ?? []), r]);
+  // The follower count before each week: the last one known before it.
+  const sorted = [...rows].filter((r) => r.followers !== null).sort((a, b) => a.day.localeCompare(b.day));
+  const lastBefore = (day: string) => [...sorted].reverse().find((r) => r.day < day)?.followers ?? null;
+  return starts.map((start) => {
+    const list = (byWeek.get(start) ?? []).sort((a, b) => a.day.localeCompare(b.day));
+    const week: Week = { start, newFollowers: null, unfollows: null, net: null, followers: null, views: null, profileViews: null, linkTaps: null, interactions: null, days: list.length };
+    for (const r of list) {
+      week.newFollowers = add(week.newFollowers, r.new_followers);
+      week.unfollows = add(week.unfollows, r.unfollows);
+      week.views = add(week.views, r.views);
+      week.profileViews = add(week.profileViews, r.profile_views);
+      week.linkTaps = add(week.linkTaps, r.link_taps);
+      week.interactions = add(week.interactions, r.interactions);
+      if (r.followers !== null) week.followers = r.followers;
+    }
+    if (week.newFollowers !== null) week.net = week.newFollowers - (week.unfollows ?? 0);
+    else {
+      const before = lastBefore(start);
+      if (week.followers !== null && before !== null) week.net = week.followers - before;
+    }
+    return week;
+  });
+}
+
+/** Totals over the days since `from` (YYYY-MM-DD, included). */
+export function periodTotals(rows: DailyRow[], from: string) {
+  const list = rows.filter((r) => r.day >= from).sort((a, b) => a.day.localeCompare(b.day));
+  const sum = (key: keyof DailyRow) => list.reduce<number | null>((acc, r) => add(acc, r[key] as number | null), null);
+  const counts = list.filter((r) => r.followers !== null);
+  const before = [...rows].filter((r) => r.day < from && r.followers !== null).sort((a, b) => b.day.localeCompare(a.day))[0]?.followers ?? null;
+  const last = counts.at(-1)?.followers ?? null;
+  const newFollowers = sum("new_followers");
+  const unfollows = sum("unfollows");
+  return {
+    newFollowers,
+    unfollows,
+    net: newFollowers !== null ? newFollowers - (unfollows ?? 0) : last !== null && before !== null ? last - before : null,
+    followers: last,
+    views: sum("views"),
+    profileViews: sum("profile_views"),
+    linkTaps: sum("link_taps"),
+    interactions: sum("interactions"),
+    days: list.length,
+  };
+}
+
+export type PostStat = { kind: string; publishedAt: string | null; views: number | null; reach: number | null; likes: number | null; comments: number | null; saves: number | null; shares: number | null };
+
+/** Average per post for each format, with the engagement rate (likes, comments, saves, shares over reach). */
+export function byFormat(posts: PostStat[]) {
+  const groups = new Map<string, PostStat[]>();
+  for (const p of posts) groups.set(p.kind, [...(groups.get(p.kind) ?? []), p]);
+  return [...groups.entries()]
+    .map(([kind, list]) => {
+      const avg = (key: "views" | "reach" | "saves" | "shares") => {
+        const known = list.map((p) => p[key]).filter((v): v is number => v !== null);
+        return known.length ? Math.round(known.reduce((a, b) => a + b, 0) / known.length) : null;
+      };
+      const rated = list.filter((p) => p.reach);
+      const engagement = rated.length
+        ? rated.reduce((acc, p) => acc + ((p.likes ?? 0) + (p.comments ?? 0) + (p.saves ?? 0) + (p.shares ?? 0)) / p.reach!, 0) / rated.length
+        : null;
+      return { kind, posts: list.length, views: avg("views"), reach: avg("reach"), saves: avg("saves"), shares: avg("shares"), engagement };
+    })
+    .sort((a, b) => (b.views ?? b.reach ?? 0) - (a.views ?? a.reach ?? 0));
+}
+
+const WEEKDAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+
+/** The best moments to post: average views (or reach) by weekday and by time of day, in the studio's time zone. */
+export function bestMoments(posts: PostStat[], timeZone: string) {
+  const fmt = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "short", hour: "2-digit", hourCycle: "h23" });
+  const score = (p: PostStat) => p.views ?? p.reach;
+  const days = new Map<number, number[]>();
+  const slots = new Map<string, number[]>();
+  for (const p of posts) {
+    const value = score(p);
+    if (!p.publishedAt || value === null) continue;
+    const parts = Object.fromEntries(fmt.formatToParts(new Date(p.publishedAt)).map((x) => [x.type, x.value]));
+    const weekday = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(parts.weekday ?? "");
+    const hour = Number(parts.hour);
+    const slot = hour < 11 ? "le matin" : hour < 14 ? "le midi" : hour < 18 ? "l'après-midi" : "le soir";
+    if (weekday >= 0) days.set(weekday, [...(days.get(weekday) ?? []), value]);
+    slots.set(slot, [...(slots.get(slot) ?? []), value]);
+  }
+  const mean = (list: number[]) => Math.round(list.reduce((a, b) => a + b, 0) / list.length);
+  return {
+    days: [...days.entries()].map(([d, list]) => ({ label: WEEKDAYS[d]!, posts: list.length, average: mean(list) })).sort((a, b) => b.average - a.average),
+    slots: [...slots.entries()].map(([label, list]) => ({ label, posts: list.length, average: mean(list) })).sort((a, b) => b.average - a.average),
+  };
+}
