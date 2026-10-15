@@ -1,5 +1,5 @@
 import "server-only";
-import { DEFAULT_COVER_SECONDS, isInSessionWindow, postCoverSchema, type PostKind } from "@fauve/agent";
+import { captionForInstagram, DEFAULT_COVER_SECONDS, isInSessionWindow, postCoverSchema, type PostKind } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
 import { InstagramError, mediaInsights, publishMedia, refreshToken, type PublishRequest } from "./instagram";
@@ -189,8 +189,8 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
     if (!account) throw new Error("Instagram n'est pas connecté");
     if ((await montageState(postId)) === "failed") throw new Error("la dernière version du montage ou du texte sur les photos n'a pas pu être rendue");
     const { rendered } = slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
-    const hashtags = ((post.hashtags as string[] | null) ?? []).map((h) => `#${h}`).join(" ");
-    const caption = [post.caption ?? "", hashtags].filter(Boolean).join("\n\n");
+    // Cleaned, 5 hashtags at most (Instagram's cap).
+    const caption = captionForInstagram(post.caption as string | null, post.hashtags as string[] | null);
     const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption, rendered, post.cover, post.share_to_feed !== false);
     const result = await publishMedia({ userId: account.userId, accessToken: account.accessToken, request });
 
