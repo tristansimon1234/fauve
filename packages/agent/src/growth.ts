@@ -139,3 +139,40 @@ export function bestMoments(posts: PostStat[], timeZone: string) {
     slots: [...slots.entries()].map(([label, list]) => ({ label, posts: list.length, average: mean(list) })).sort((a, b) => b.average - a.average),
   };
 }
+
+export type FollowerPoint = { day: string; followers: number; counted: boolean };
+
+/**
+ * The follower count day by day over the last `days` days. Counts read on the
+ * account are kept; between them, and before the first one, each day is worked
+ * back from the next day's count minus that day's gains and losses (Instagram
+ * gives those for the past 30 days, so the curve has a month on day one).
+ * `counted`: a count read on the account, not worked back.
+ */
+export function followerSeries(rows: DailyRow[], days: number, today: Date = new Date()): FollowerPoint[] {
+  const byDay = new Map(rows.map((r) => [r.day, r]));
+  const end = new Date(`${today.toISOString().slice(0, 10)}T00:00:00Z`).getTime() - DAY_MS;
+  const points: FollowerPoint[] = [];
+  let next: number | null = null; // the count at the end of the day after
+  for (let t = end; t > end - days * DAY_MS; t -= DAY_MS) {
+    const day = new Date(t).toISOString().slice(0, 10);
+    const row = byDay.get(day);
+    let count: number | null = null;
+    let counted = false;
+    if (row?.followers != null) {
+      count = row.followers;
+      counted = true;
+    } else if (next !== null) {
+      // The end of this day = the end of the next day minus the next day's net.
+      const after = byDay.get(new Date(t + DAY_MS).toISOString().slice(0, 10));
+      if (after?.new_followers != null) count = next - (after.new_followers - (after.unfollows ?? 0));
+    }
+    if (count === null) {
+      next = null;
+      continue;
+    }
+    points.push({ day, followers: Math.max(0, count), counted });
+    next = count;
+  }
+  return points.reverse();
+}

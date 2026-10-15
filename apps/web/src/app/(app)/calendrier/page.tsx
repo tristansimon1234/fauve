@@ -17,7 +17,7 @@ import {
   type PostRow,
 } from "@/lib/studio";
 import { COVER_COLUMNS, postCovers, type CoverPost } from "@/lib/covers";
-import { loadGrid } from "@/lib/grid";
+import { loadGrid, loadTikTokGrid } from "@/lib/grid";
 import { GridView } from "../grille/grid-view";
 import { NewPostButton } from "@/components/new-post-sheet";
 import { CalendarBoard, ShotList, type BoardPost } from "./calendar-board";
@@ -78,7 +78,7 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
     getContentPlan(db, studioId),
     // Drafts waiting for her, whatever their week.
     db.from("posts").select(POST_COLUMNS).eq("studio_id", studioId).eq("status", "draft").order("scheduled_at", { ascending: true, nullsFirst: false }).limit(20),
-    gridView ? loadGrid(db, studioId) : Promise.resolve(null),
+    gridView ? Promise.all([loadGrid(db, studioId), loadTikTokGrid(db, studioId)]).then(([ig, tiktok]) => ({ ...ig, tiktok })) : Promise.resolve(null),
   ]);
 
   const posts = rows(postRowSchema, postsResult, "posts");
@@ -156,7 +156,7 @@ async function Calendar({ searchParams }: { searchParams: PageProps<"/calendrier
       {/* Semaine ⇄ Grille: the same place, other content: a crossfade. */}
       <ViewTransition key={grid ? "grille" : "semaine"} enter="fauve-fade-swap" exit="fauve-fade-swap" default="none">
       {grid ? (
-        <GridView heading={false} connected={grid.connected} handle={grid.handle} info={grid.info} tiles={grid.tiles} timezone={tz} />
+        <GridView heading={false} connected={grid.connected} handle={grid.handle} info={grid.info} tiles={grid.tiles} timezone={tz} tiktok={grid.tiktok} />
       ) : (
         <>
           {/* What needs her, at a glance: drafts to validate, shots to film, the rhythm of the week. */}

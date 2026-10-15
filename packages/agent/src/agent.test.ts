@@ -1062,3 +1062,28 @@ test("art direction: filled from a reading only when empty", async () => {
   assert.equal(withArtDirection({ art_direction: "Le mien." }, "Chaleureux.").art_direction, "Le mien.");
   assert.deepEqual(withArtDirection({ tone: "x" } as { tone: string; art_direction?: string }, null), { tone: "x" });
 });
+
+test("followers: counts kept, earlier days worked back from gains and losses", async () => {
+  const { followerSeries } = await import("./growth.ts");
+  const row = (day: string, o: Partial<Record<string, number | null>> = {}) => ({
+    day, followers: null, new_followers: null, unfollows: null, views: null, reach: null, profile_views: null, link_taps: null, interactions: null, ...o,
+  });
+  const rows = [
+    row("2026-10-11", { new_followers: 4, unfollows: 1 }),
+    row("2026-10-12", { new_followers: 5, unfollows: 2 }),
+    row("2026-10-13", { new_followers: 2, unfollows: 0 }),
+    row("2026-10-14", { followers: 110, new_followers: 6, unfollows: 1 }),
+  ];
+  const series = followerSeries(rows, 5, new Date("2026-10-15T09:00:00Z"));
+  // 14: 110 (read) ; 13: 110 − (6 − 1) = 105 ; 12: 105 − 2 = 103 ; 11: 103 − 3 = 100 ; 10: 100 − 3 = 97.
+  assert.deepEqual(series.map((p) => [p.day, p.followers, p.counted]), [
+    ["2026-10-10", 97, false],
+    ["2026-10-11", 100, false],
+    ["2026-10-12", 103, false],
+    ["2026-10-13", 105, false],
+    ["2026-10-14", 110, true],
+  ]);
+  // Without gains and losses (TikTok), only the counts read.
+  const tiktok = followerSeries([row("2026-10-12", { followers: 40 }), row("2026-10-14", { followers: 44 })], 5, new Date("2026-10-15T09:00:00Z"));
+  assert.deepEqual(tiktok.map((p) => p.followers), [40, 44]);
+});

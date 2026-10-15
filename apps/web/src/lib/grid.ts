@@ -3,6 +3,8 @@ import { coverSrc } from "@/lib/cover-src";
 import { postCovers, type CoverPost } from "@/lib/covers";
 import { mediaViews, profile, recentMedia, type InstagramProfile } from "@/lib/social/instagram";
 import { instagramAccount } from "@/lib/social/publish";
+import { recentTikToks, tiktokEnabled, tiktokUser, type TikTokUser } from "@/lib/social/tiktok";
+import { tiktokAccount } from "@/lib/social/tiktok-account";
 import type { Db } from "@/lib/studio";
 import type { Tile } from "@/app/(app)/grille/grid-view";
 
@@ -55,4 +57,58 @@ export async function loadGrid(db: Db, studioId: string) {
   ];
 
   return { connected: Boolean(account), handle: info?.username ?? account?.handle ?? null, info, tiles };
+}
+
+/**
+ * Her TikTok profile as followers see it: videos only (TikTok has no carousels
+ * here), 3:4 tiles with their views, Simone's coming videos first, then those
+ * waiting in her TikTok drafts. null when TikTok is not offered.
+ */
+export async function loadTikTokGrid(db: Db, studioId: string) {
+  if (!tiktokEnabled()) return null;
+  const account = await tiktokAccount(studioId).catch(() => null);
+  const [upcoming, drafts, user, videos] = await Promise.all([
+    db
+      .from("posts")
+      .select("id, title, kind, status, scheduled_at, render_id, media_ids, slides, slides_render, cover, share_to_feed")
+      .eq("studio_id", studioId)
+      .in("status", [...UPCOMING])
+      .eq("kind", "reel")
+      .contains("platforms", ["tiktok"])
+      .order("scheduled_at", { ascending: false, nullsFirst: true })
+      .limit(12),
+    db
+      .from("posts")
+      .select("id, title, kind, status, scheduled_at, render_id, media_ids, slides, slides_render, cover, share_to_feed")
+      .eq("studio_id", studioId)
+      .eq("external_ids->tiktok->>mode", "draft")
+      .is("external_ids->tiktok->>post_id", null)
+      .neq("external_ids->tiktok->>status", "FAILED")
+      .order("scheduled_at", { ascending: false })
+      .limit(6),
+    account ? tiktokUser(account.accessToken).catch((): TikTokUser | null => null) : Promise.resolve(null),
+    account ? recentTikToks(account.accessToken, 20).catch(() => []) : Promise.resolve([]),
+  ]);
+  const posts = [...(upcoming.data ?? []), ...(drafts.data ?? [])];
+  if (!account && !posts.length) return { connected: false, handle: null, user: null, tiles: [] as Tile[] };
+  const covers = await postCovers(db, studioId, posts.map((p) => ({ ...(p as CoverPost), id: p.id as string })));
+  const tile = (p: (typeof posts)[number], status: string): Tile => {
+    const cover = covers.get(p.id as string);
+    return {
+      kind: "upcoming",
+      id: p.id as string,
+      title: p.title as string,
+      status,
+      at: (p.scheduled_at as string | null) ?? null,
+      videoUrl: cover?.video ? coverSrc(cover) : null,
+      imageUrl: cover && !cover.video ? cover.url : null,
+      format: "reel",
+    };
+  };
+  const tiles: Tile[] = [
+    ...(upcoming.data ?? []).map((p) => tile(p, p.status as string)),
+    ...(drafts.data ?? []).map((p) => tile(p, "tiktok_draft")),
+    ...videos.map((video): Tile => ({ kind: "tiktok", video })),
+  ];
+  return { connected: Boolean(account), handle: user?.username ?? account?.handle ?? null, user, tiles };
 }

@@ -198,6 +198,8 @@ export type TikTokVideo = {
   title?: string;
   video_description?: string;
   create_time?: number;
+  /** A signed link TikTok renews: shown, never kept. */
+  cover_image_url?: string;
   share_url?: string;
   view_count?: number;
   like_count?: number;
@@ -205,7 +207,7 @@ export type TikTokVideo = {
   share_count?: number;
 };
 
-const VIDEO_FIELDS = "id,title,video_description,create_time,share_url,view_count,like_count,comment_count,share_count";
+const VIDEO_FIELDS = "id,title,video_description,create_time,cover_image_url,share_url,view_count,like_count,comment_count,share_count";
 
 /** Her latest videos, newest first. */
 export async function recentTikToks(accessToken: string, max = 20): Promise<TikTokVideo[]> {
