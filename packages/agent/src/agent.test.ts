@@ -258,6 +258,16 @@ test("editor: model plans are clamped to the clips and the timeline", async () =
   assert.throws(() => normalizeEditPlan(lonely, {}), /aucun plan/);
 });
 
+test("editor: a plan longer than MAX_REEL_SECONDS loses plans before the end", async () => {
+  const { normalizeEditPlan, MAX_REEL_SECONDS } = await import("./editor.ts");
+  const segments = Array.from({ length: 12 }, (_, i) => ({ clip_id: "a", in: 0, out: i === 11 ? 2 : 4, zoom: "none" }));
+  const plan = normalizeEditPlan(editPlanObjectSchema.parse({ ...validPlan, template: "dynamique", duration: 46, segments, transitions: "cut" }), { a: 10 });
+  assert.ok(plan.duration <= MAX_REEL_SECONDS);
+  assert.equal(plan.duration, 30);
+  const last = plan.segments.at(-1)!;
+  assert.ok("clip_id" in last && last.out === 2, "the closing plan stays");
+});
+
 test("editor: free motion scenes past the cap play their fixed fallback", async () => {
   const { normalizeEditPlan, MAX_FREE_SCENES } = await import("./editor.ts");
   const motion = (n: number) => ({
