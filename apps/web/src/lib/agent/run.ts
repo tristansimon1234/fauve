@@ -158,13 +158,23 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     const text = textOf(message).trim();
     if (text && spoken.at(-1) !== text) spoken.push(text);
   };
-  // A step that only closes her message (buttons, a reaction) ends the turn: its tools run,
-  // and the model is not asked again, which made it write the same answer twice.
-  const closes = (message: Anthropic.Beta.BetaMessage) =>
-    endsTurn(
-      message.content.filter((b) => b.type === "tool_use").map((b) => b.name),
-      spoken.length > 0,
-    );
+  const toolsOf = (message: Anthropic.Beta.BetaMessage) => message.content.filter((b) => b.type === "tool_use").map((b) => b.name);
+  // A step that closes her message with its own words (buttons, a reaction) ends the turn: its
+  // tools run, and the model is not asked again, which made it write the same answer twice.
+  // Buttons or a reaction alone go back to the model: the answer they belong to is still to come.
+  const closes = (message: Anthropic.Beta.BetaMessage) => endsTurn(toolsOf(message), textOf(message).length > 0);
+  // A step that stops without a word after tools (« Je regarde tes vidéos… », then nothing) is
+  // asked once more: she answers from what the tools returned instead of leaving a promise.
+  let usedTools = false;
+  let nudged = false;
+  const mute = (message: Anthropic.Beta.BetaMessage) => {
+    const tools = toolsOf(message);
+    if (tools.length) usedTools = true;
+    if (nudged || !usedTools || tools.length || textOf(message) || message.stop_reason !== "end_turn") return false;
+    nudged = true;
+    return true;
+  };
+  const NUDGE = "[Note du système, pas de la gérante : tu as utilisé des outils mais tu ne lui as pas encore répondu. Réponds-lui maintenant d'après leurs résultats, ou fais tout de suite ce que tu lui as annoncé.]";
   const onEvent = input.onEvent;
   if (onEvent) {
     // Live (the app): her words as she writes them, then a line for each tool she calls, before it runs.
@@ -183,6 +193,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
         await runner.generateToolResponse();
         break;
       }
+      if (mute(message)) runner.pushMessages({ role: "user", content: NUDGE });
     }
   } else {
     const runner = anthropic().beta.messages.toolRunner(params);
@@ -192,6 +203,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
         await runner.generateToolResponse();
         break;
       }
+      if (mute(message)) runner.pushMessages({ role: "user", content: NUDGE });
     }
   }
 

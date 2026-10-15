@@ -7,10 +7,11 @@ export const CLOSING_TOOLS: ReadonlySet<string> = new Set(["reply_with", "react_
 
 /**
  * True when a step of the tool loop ends the turn: it only calls closing tools,
- * which run without a new model call. Buttons with no word at all yet still go
- * back to the model, so it writes the message they sit under.
+ * which run without a new model call, and it carries her words itself. Buttons
+ * or a reaction alone still go back to the model: words from an earlier step are
+ * often only a preamble (« Je regarde tes vidéos… »), the answer is still to come.
  */
-export function endsTurn(tools: string[], hasSpoken: boolean): boolean {
+export function endsTurn(tools: string[], stepSpeaks: boolean): boolean {
   if (!tools.length || !tools.every((name) => CLOSING_TOOLS.has(name))) return false;
-  return hasSpoken || !tools.includes("reply_with");
+  return stepSpeaks;
 }

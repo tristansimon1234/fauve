@@ -10,6 +10,7 @@ import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureTranscript } from "@/lib/voice";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { photoRegions } from "@/lib/video/regions";
 
 // The in-app chat, server side: conversations, their messages as the app shows
 // them, and one turn (the manager's message, then Fauve's answer). Shared by the
@@ -246,6 +247,8 @@ export async function chatTurn(
     lastRowId = row.data.id as string;
     // Watched once by Gemini, in the background: ready for the montage.
     if (video) after(() => ensureClipAnalysis(ctx.studioId, mediaId).then(() => undefined, (e) => console.error("chat: clip analysis failed", e)));
+    // A photo is read once too (what it shows, its subject, any text on it): Simone and the editor know it before choosing.
+    else if (kind === "image") after(() => photoRegions(ctx.studioId, mediaId).then(() => undefined, (e) => console.warn("chat: photo read failed", e)));
   }
   if (body) {
     const memo = about && UUID.test(about.postId) ? await aboutMemo(ctx.studioId, about) : null;
