@@ -53,7 +53,7 @@ export type ReelProps = {
   durationInFrames: number;
   fadeFrames: number;
   segments: (
-    | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean; adjust?: Adjust; blur?: ClipBlur }
+    | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean; adjust?: Adjust; blur?: ClipBlur; speech?: boolean }
     | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean }
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
     | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number }
@@ -92,6 +92,8 @@ export type ReelProps = {
   endCard: { title: string; subtitle: string | null; from: number } | null;
   /** Simone's music in the live preview (the render gets it mixed in afterwards). */
   soundtrack?: { src: string } | null;
+  /** Her voice note over the Reel, from `from` (frames). */
+  voice?: { src: string; from: number } | null;
   logo?: "top" | "bottom" | null;
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {

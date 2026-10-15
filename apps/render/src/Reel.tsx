@@ -118,6 +118,11 @@ export function Reel(props: ReelProps) {
       )}
       {collage ? <Grain props={props} /> : null}
       {props.soundtrack?.src ? <Audio src={props.soundtrack.src} /> : null}
+      {props.voice?.src ? (
+        <Sequence from={props.voice.from} layout="none">
+          <Audio src={props.voice.src} />
+        </Sequence>
+      ) : null}
     </AbsoluteFill>
   );
 }
@@ -150,7 +155,8 @@ function Shot({ segment, theme }: { segment: ClipSegment; theme: Theme }) {
       <OffthreadVideo
         src={segment.src}
         trimBefore={segment.startFrom}
-        muted
+        // Only the passages where someone speaks keep their sound; the rest is under the music.
+        muted={!segment.speech}
         style={{ width: "100%", height: "100%", objectFit: "cover", filter: cssFilter(segment.adjust) }}
       />
       {segment.blur?.tracks.length ? <ClipBlurLayer blur={segment.blur} startFrom={segment.startFrom} /> : null}

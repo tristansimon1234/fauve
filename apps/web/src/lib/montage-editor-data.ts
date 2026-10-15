@@ -24,6 +24,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
   // Signed along with the plan's clips, so a video added by hand plays at once.
   const inputs = await loadMontageInputs(studioId, {
     segments: [...plan.data.segments, ...extraVideos.map((clip_id) => ({ clip_id, in: 0, out: 1, zoom: "none" as const }))],
+    voice: plan.data.voice,
   });
   // Simone's music plays in the live preview too (the piece kept for this post).
   const { data: post } = data?.post_id ? await db.from("posts").select("music").eq("id", data.post_id).maybeSingle() : { data: null };
@@ -40,6 +41,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       words: inputs.words,
       brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts },
       ...(soundtrack ? { soundtrack } : {}),
+      ...(inputs.voice ? { voice: inputs.voice } : {}),
     } satisfies ReelInputs,
   };
 }

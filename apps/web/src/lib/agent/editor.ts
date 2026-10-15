@@ -19,9 +19,12 @@ import {
   readMemory,
   resolveReelBrand,
   type EditPlan,
+  VOICE_AT,
+  voiceForEditor,
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { ensureTranscript } from "@/lib/voice";
 import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { designMotionScenes } from "./motion-designer";
@@ -61,7 +64,7 @@ export async function designEdit(params: {
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, recent, report, inspirations] = await Promise.all([
-    db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
+    db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id, voice_media_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
     db.from("studios").select("name, business_type, booking_url, memory").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
@@ -105,6 +108,10 @@ export async function designEdit(params: {
     };
   });
 
+  // Her voice note over the Reel: read once (her words with their timings), the editor cuts on her phrases.
+  const voiceId = post.data.voice_media_id as string | null;
+  const voice = voiceId ? await ensureTranscript(params.studioId, voiceId) : null;
+
   // The inspiration she picked for this post (read now if it was just added in the app).
   const inspirationId = post.data.inspiration_id as string | null;
   const chosenInspiration = inspirationId ? await ensureInspirationRead(params.studioId, inspirationId).catch(() => null) : null;
@@ -142,10 +149,13 @@ export async function designEdit(params: {
       edit_plan_id: undefined,
       template: undefined,
       inspiration_id: undefined,
+      voice_media_id: undefined,
       chosen_template: chosenTemplate.success ? chosenTemplate.data : undefined,
       chosen_inspiration: chosenInspiration ?? undefined,
     },
     clips: clips.map((c) => ({ media_id: c.media_id, ...c.analysis, words: c.analysis.words?.length ? c.analysis.words : undefined })),
+    // Her voice over the Reel: her phrases on the Reel's clock (the voice is placed for you).
+    voice: voice ? voiceForEditor(voice) : undefined,
     // Her photos: each one a still shot with a slow zoom (clip_id = media_id, in 0, out = how long it shows).
     photos: photos.length ? photos : undefined,
     // Scenes already made: reusing one costs nothing.
@@ -202,6 +212,12 @@ export async function designEdit(params: {
     ),
     base,
   );
+
+  // Her voice plays from VOICE_AT, with her words as subtitles; without it, the plan has no voice.
+  if (voice && voiceId) {
+    plan.voice = { media_id: voiceId, at: VOICE_AT };
+    plan.subtitles = true;
+  } else delete plan.voice;
 
   // Library scenes: their saved code, with the new texts. An unknown id becomes a new scene.
   const reused = await templateCode(
