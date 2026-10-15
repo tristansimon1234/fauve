@@ -1,5 +1,5 @@
 import "server-only";
-import { captionMatch, isInSessionWindow } from "@fauve/agent";
+import { captionForInstagram, captionMatch, isInSessionWindow } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendTemplate, sendText, sendVideo } from "@/lib/whatsapp/client";
@@ -37,8 +37,7 @@ async function inWindow(phone: string): Promise<boolean> {
 }
 
 function fullCaption(post: { caption: string | null; hashtags: string[] | null }): string {
-  const hashtags = (post.hashtags ?? []).map((h) => `#${h}`).join(" ");
-  return [post.caption ?? "", hashtags].filter(Boolean).join("\n\n");
+  return captionForInstagram(post.caption, post.hashtags);
 }
 
 async function store(studioId: string, phone: string | null, id: string | undefined, body: string, payload: Record<string, unknown> = {}) {

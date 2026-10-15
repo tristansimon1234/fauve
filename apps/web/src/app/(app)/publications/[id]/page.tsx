@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import { env } from "@/lib/env";
 import { readPostMusic } from "@/lib/render/music";
-import { alignSlides, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
+import { alignSlides, captionForInstagram, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -163,7 +163,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           initial={post.publish_by_hand}
           handedOffAt={post.handoff_at ? handedFormat(tz).format(new Date(post.handoff_at)) : null}
           downloadUrl={downloadUrl}
-          caption={[post.caption ?? "", post.hashtags.map((h) => `#${h}`).join(" ")].filter(Boolean).join("\n\n")}
+          caption={captionForInstagram(post.caption, post.hashtags)}
           music={musicState}
         />
       )}

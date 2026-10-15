@@ -1,6 +1,7 @@
 import "server-only";
 import {
   APP_GUIDES,
+  cleanCaption,
   assertTransition,
   canTransition,
   postStatusSchema,
@@ -308,6 +309,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         await db.from("posts").select("status").eq("id", post_id).eq("studio_id", studioId).single(),
       );
       if (status) assertTransition(postStatusSchema.parse(current.status), status);
+      // Her caption without the marks of machine writing (long dashes, invisible characters).
+      if (fields.caption !== undefined) fields.caption = cleanCaption(fields.caption);
       const post = unwrap(
         await db
           .from("posts")

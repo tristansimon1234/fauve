@@ -125,7 +125,7 @@ export const toolSpecs = {
     input: z.object({
       post_id: z.string().uuid(),
       caption: z.string().max(2200).optional(),
-      hashtags: z.array(z.string().regex(/^[^#\s]+$/)).max(30).optional().describe("Sans le #"),
+      hashtags: z.array(z.string().regex(/^[^#\s]+$/)).max(5).optional().describe("Sans le #, 5 au plus (limite d'Instagram, hashtags de la légende compris)"),
       scheduled_at: isoDateTime.optional(),
       platforms: z.array(platformSchema).min(1).optional(),
       status: postStatusSchema.optional(),

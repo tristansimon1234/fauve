@@ -963,3 +963,17 @@ test("caption match: the Reel she published by hand, words changed or not", asyn
   assert.ok(captionMatch(ours, "Le menu du jour est arrivé") < 0.2);
   assert.equal(captionMatch(null, "anything"), 0);
 });
+
+test("captions: 5 hashtags at most, marks of machine writing taken out", async () => {
+  const { captionForInstagram, cleanCaption, MAX_HASHTAGS } = await import("./caption.ts");
+  assert.equal(MAX_HASHTAGS, 5);
+  // Long dashes, invisible characters and non-breaking spaces go; French quotes, apostrophes and emojis stay.
+  assert.equal(cleanCaption("Nouveau cours — le mardi​ à 18 h !"), "Nouveau cours, le mardi à 18 h !");
+  assert.equal(cleanCaption("De 10–12 h, « venez » c’est ✨"), "De 10-12 h, « venez » c’est ✨");
+  assert.equal(cleanCaption("— Une ligne\nfin —."), "Une ligne\nfin.");
+  // The caption's own hashtags count first, duplicates once, the post's tags fill the rest.
+  assert.equal(captionForInstagram("Viens #pilates #Lyon", ["pilates", "#yoga", "bienetre", "sport", "matin", "trop"]), "Viens #pilates #Lyon\n\n#yoga #bienetre #sport");
+  const many = captionForInstagram("#a #b #c #d #e #f #g fin", ["h"]);
+  assert.equal(many, "#a #b #c #d #e fin");
+  assert.equal(captionForInstagram(null, []), "");
+});
