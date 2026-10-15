@@ -1,12 +1,15 @@
 import { z } from "zod";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { env } from "@/lib/env";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
-// The French voices of the ElevenLabs library, to pick Simone's voices by ear: the
-// most used ones for social media or conversation (a creator talking, not an
-// announcer), with their own sample. POST with CRON_SECRET, from the database
-// (call_app): ?use_case=social_media|conversational|narrative_story&gender=female|male.
-export const maxDuration = 30;
+// Voices for Simone, by ear. POST with CRON_SECRET, from the database (call_app):
+//   ?use_case=social_media|conversational|narrative_story&gender=female|male
+//     the most used French voices of the ElevenLabs library for that use, with their own sample;
+//   ?clone=<name>&media=<uuid>,<uuid>…
+//     an instant clone of a person's voice from her voice notes (audio media of one studio,
+//     a minute or two in all, her own voice and with her consent): answers the new voice id.
+export const maxDuration = 60;
 
 const voiceSchema = z.object({
   voice_id: z.string(),
@@ -24,11 +27,40 @@ const voiceSchema = z.object({
   free_users_allowed: z.boolean().nullish(),
 });
 
+async function clone(key: string, name: string, mediaIds: string[]) {
+  const db = supabaseAdmin();
+  const { data: assets } = await db.from("media_assets").select("id, studio_id, kind, storage_path, mime_type").in("id", mediaIds);
+  const notes = (assets ?? []).filter((a) => a.kind === "audio");
+  if (!notes.length) return Response.json({ error: "no voice note among these media" }, { status: 400 });
+  if (new Set(notes.map((n) => n.studio_id)).size > 1) return Response.json({ error: "voice notes of one studio only" }, { status: 400 });
+  const form = new FormData();
+  form.append("name", name);
+  form.append("description", "Voix de la gérante, clonée avec son accord pour ses Reels (Simone)");
+  form.append("remove_background_noise", "true");
+  for (const note of notes) {
+    const file = await db.storage.from("media").download(note.storage_path as string);
+    if (file.error || !file.data) return Response.json({ error: `download ${note.id}: ${file.error?.message}` }, { status: 500 });
+    form.append("files", new Blob([await file.data.arrayBuffer()], { type: (note.mime_type as string | null) ?? "audio/ogg" }), `${note.id}.${(note.mime_type as string | null)?.includes("mpeg") ? "mp3" : "ogg"}`);
+  }
+  const res = await fetch("https://api.elevenlabs.io/v1/voices/add", { method: "POST", headers: { "xi-api-key": key }, body: form });
+  const text = await res.text();
+  if (!res.ok) return Response.json({ error: `ElevenLabs ${res.status}: ${text.slice(0, 300)}` }, { status: 502 });
+  return Response.json({ ok: true, studio: notes[0]!.studio_id, notes: notes.length, ...(JSON.parse(text) as Record<string, unknown>) });
+}
+
 export async function POST(request: Request) {
   if (!cronAuthorized(request)) return new Response("unauthorized", { status: 401 });
   const key = env("ELEVENLABS_API_KEY");
   if (!key) return Response.json({ error: "ELEVENLABS_API_KEY missing" }, { status: 400 });
   const params = new URL(request.url).searchParams;
+
+  const name = params.get("clone");
+  if (name) {
+    const media = z.array(z.uuid()).min(1).max(10).safeParse((params.get("media") ?? "").split(",").filter(Boolean));
+    if (!media.success || !/^[\p{L}\p{N} '-]{2,40}$/u.test(name)) return Response.json({ error: "clone=<name>&media=<uuid>,<uuid>" }, { status: 400 });
+    return clone(key, name, media.data);
+  }
+
   const query = new URLSearchParams({ page_size: "24", language: "fr", sort: "usage_character_count_1y" });
   const useCase = params.get("use_case");
   const gender = params.get("gender");
