@@ -33,6 +33,10 @@ import {
   withAdjustment,
   VOICE_MAX_SECONDS,
   accessMessage,
+  findVoice,
+  readPostVoice,
+  readVoiceSetting,
+  SIMONE_VOICES,
   type ToolName,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
@@ -46,6 +50,7 @@ import { sendReaction } from "@/lib/whatsapp/client";
 import { AiImageError, canAffordImages, improvePhoto, makeAmbiance, placeOnPost } from "@/lib/ai-images";
 import { deliverImages, notifyFailure, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
 import { readPostMusic } from "@/lib/render/music";
+import { removeVoice } from "@/lib/voice-over";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
@@ -622,6 +627,57 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, freshMusic: mode === "another" });
       });
       return json({ status: "started", note: "La vidéo se refait (1 à 2 min) et le lien part tout seul. Dis-le en une phrase." });
+    },
+
+    async set_voice({ post_id, mode, wish, voice, use }) {
+      const chosen = voice ? findVoice(voice) : undefined;
+      if (voice && !chosen) return json({ error: `Voix inconnue. Voix possibles : ${SIMONE_VOICES.map((v) => v.name).join(", ")}.` });
+      // The studio's setting, for its next Reels.
+      if (!post_id) {
+        if (!use && !chosen) return json({ error: "Dis ce qui change : use (auto, always, never) et/ou voice." });
+        await insertProfileVersion(studioId, (profile) => ({
+          ...profile,
+          voice: { ...readVoiceSetting(profile.voice), ...(use ? { use } : {}), ...(chosen ? { voice_id: chosen.id } : {}) },
+        }));
+        return json({ ok: true, note: "Gardé pour ses prochains Reels (elle le retrouve dans Style). Dis-le en une phrase." });
+      }
+      const post = unwrap(
+        await db.from("posts").select("id, kind, status, edit_plan_id, voice_media_id, voice_over").eq("id", post_id).eq("studio_id", studioId).single(),
+      );
+      if (post.kind !== "reel") return json({ error: "La voix off se met sur un Reel." });
+      if (["published", "measured"].includes(post.status as string)) return json({ error: "Ce Reel est déjà en ligne." });
+      if (mode === "off") {
+        const rerender = await removeVoice(studioId, post_id);
+        if (!rerender) return json({ ok: true, note: "C'est noté : pas de voix sur ce Reel." });
+        ctx.afterReply.push(async () => {
+          await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
+        });
+        return json({ status: "started", note: "La vidéo se refait sans voix (1 à 2 min) et le lien part tout seul. Dis-le en une phrase." });
+      }
+      const onReel = post.voice_media_id
+        ? (await db.from("media_assets").select("source").eq("id", post.voice_media_id as string).maybeSingle()).data
+        : null;
+      if (onReel && onReel.source !== "ai") {
+        return json({
+          error: "Ce Reel porte sa propre voix (son vocal). Elle reste : pour mettre ta voix à la place, demande-lui d'abord si elle veut retirer la sienne (set_voice off), puis remets-en une (on).",
+        });
+      }
+      const current = readPostVoice(post.voice_over);
+      const voiceId = chosen?.id ?? current?.voice_id;
+      // Another text or another voice: the voice Simone made goes at the next montage, once.
+      const remake = Boolean(onReel) && (mode === "redo" || Boolean(chosen));
+      check(
+        await db
+          .from("posts")
+          .update({ voice_over: { mode: "on", ...(voiceId ? { voice_id: voiceId } : {}), ...(wish ? { wish } : {}), ...(remake ? { remake: true } : {}) } })
+          .eq("id", post_id),
+      );
+      return json({
+        ok: true,
+        note: post.edit_plan_id
+          ? "C'est noté. Ce Reel est déjà monté : la voix arrive avec un nouveau montage (une correction). Propose-le-lui (quote_montage avec le post_id), et lance-le quand elle est d'accord."
+          : "C'est noté : la voix sera posée à son montage.",
+      });
     },
 
     async write_on_photos({ post_id, template, slides }) {

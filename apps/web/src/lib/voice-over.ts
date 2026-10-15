@@ -4,7 +4,13 @@ import {
   brandProfileSchema,
   CLAUDE_MODEL,
   clipAnalysisSchema,
+  DEFAULT_VOICE_ID,
+  editPlanSchema,
+  findVoice,
   fromTtsAlignment,
+  readPostVoice,
+  readVoiceSetting,
+  wantsVoiceOver,
   readMemory,
   spokenWords,
   stripAudioTags,
@@ -28,7 +34,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // own voice note: phrases for the cuts, word by word subtitles, music under it.
 
 /** What the script is written from: the business, the idea, the tone and what the images show, in order. */
-async function scriptInput(studioId: string, postId: string) {
+async function scriptInput(studioId: string, postId: string, mediaIds?: string[]) {
   const db = supabaseAdmin();
   const [post, studio, brand] = await Promise.all([
     db.from("posts").select("title, kind, agent_note, media_ids").eq("id", postId).eq("studio_id", studioId).single(),
@@ -36,7 +42,7 @@ async function scriptInput(studioId: string, postId: string) {
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (post.error) throw new Error("Publication introuvable");
-  const ids = (post.data.media_ids as string[] | null) ?? [];
+  const ids = mediaIds?.length ? mediaIds : ((post.data.media_ids as string[] | null) ?? []);
   const [media, analyses] = await Promise.all([
     ids.length ? db.from("media_assets").select("id, kind, regions").eq("studio_id", studioId).in("id", ids) : Promise.resolve({ data: [] }),
     ids.length ? db.from("clip_analyses").select("media_id, analysis").in("media_id", ids) : Promise.resolve({ data: [] }),
@@ -68,8 +74,12 @@ async function scriptInput(studioId: string, postId: string) {
 }
 
 /** Simone writes what the voice says (a creator talking over the images, not an ad). */
-export async function writeVoiceScript(studioId: string, postId: string, wish?: string): Promise<VoiceOverScript> {
-  const input = { ...(await scriptInput(studioId, postId)), ...(wish ? { demande: wish } : {}) };
+export async function writeVoiceScript(studioId: string, postId: string, wish?: string, mediaIds?: string[], whispered = false): Promise<VoiceOverScript> {
+  const input = {
+    ...(await scriptInput(studioId, postId, mediaIds)),
+    ...(wish ? { demande: wish } : {}),
+    ...(whispered ? { voix: "chuchotée (ASMR)" } : {}),
+  };
   for (let attempt = 0; ; attempt++) {
     const response = await anthropic().beta.messages.parse({
       model: CLAUDE_MODEL,
@@ -146,12 +156,97 @@ export async function levelSpeech(id: string, mp3: Buffer): Promise<{ mp3: Buffe
 }
 
 /**
+ * Before a montage: Simone's voice over the Reel when it should have one
+ * (wantsVoiceOver: the Reel's own choice, else the studio's; « auto » when nobody
+ * speaks in the shots and there is enough to show). Made before the editor, which
+ * then cuts on it like on her own voice note. A failure leaves the Reel without a
+ * voice rather than without a montage. Returns the voice's name when one was made.
+ */
+export async function voiceOverIfWanted(params: { studioId: string; postId: string; mediaIds?: string[]; correction?: boolean }): Promise<{ mediaId: string; voice: string } | null> {
+  if (!env("ELEVENLABS_API_KEY")) return null;
+  const db = supabaseAdmin();
+  const [post, brand] = await Promise.all([
+    db.from("posts").select("kind, voice_media_id, voice_over, media_ids").eq("id", params.postId).eq("studio_id", params.studioId).single(),
+    db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (post.error || post.data.kind !== "reel") return null;
+  const choice = readPostVoice(post.data.voice_over);
+  const setting = readVoiceSetting((brand.data?.profile as { voice?: unknown } | null)?.voice);
+  const ids = params.mediaIds?.length ? params.mediaIds : ((post.data.media_ids as string[] | null) ?? []);
+  const { data: media } = ids.length
+    ? await db.from("media_assets").select("id, kind, duration").eq("studio_id", params.studioId).in("id", ids)
+    : { data: [] as { id: string; kind: string; duration: number | null }[] };
+  const videos = (media ?? []).filter((m) => m.kind === "video");
+  const { data: analyses } = videos.length
+    ? await db.from("clip_analyses").select("media_id, analysis").in("media_id", videos.map((v) => v.id as string))
+    : { data: [] as { media_id: string; analysis: unknown }[] };
+  const read = (analyses ?? []).map((a) => clipAnalysisSchema.safeParse(a.analysis)).flatMap((a) => (a.success ? [a.data] : []));
+  // Someone speaking in a shot carries the Reel with their own words.
+  const speechInClips = read.some((a) => (a.words?.length ?? 0) >= 6);
+  const footageSeconds = videos.reduce((sum, v) => sum + (Number(v.duration) || 0), 0) || read.reduce((sum, a) => sum + a.duration, 0);
+  // The voice on the Reel now: hers (a voice note she sent) or one Simone made.
+  const current = post.data.voice_media_id
+    ? (await db.from("media_assets").select("source").eq("id", post.data.voice_media_id as string).maybeSingle()).data
+    : null;
+  const wanted = wantsVoiceOver({
+    post: choice,
+    studio: setting.use,
+    onReel: post.data.voice_media_id ? (current?.source === "ai" ? "simone" : "hers") : null,
+    correction: Boolean(params.correction),
+    speechInClips,
+    footageSeconds,
+    photos: (media ?? []).filter((m) => m.kind === "image").length,
+  });
+  if (!wanted) return null;
+  // A voice of the gallery, or one of her own (a clone made with her consent) kept as it is.
+  const voiceId = choice?.voice_id ?? setting.voice_id ?? DEFAULT_VOICE_ID;
+  try {
+    const made = await makeVoiceOver({ studioId: params.studioId, postId: params.postId, wish: choice?.wish, voiceId, mediaIds: ids });
+    // Her wish and the remake were for this voice: used once.
+    if (choice?.wish || choice?.remake) await db.from("posts").update({ voice_over: { mode: choice.mode, ...(choice.voice_id ? { voice_id: choice.voice_id } : {}) } }).eq("id", params.postId);
+    return { mediaId: made.mediaId, voice: findVoice(voiceId)?.name ?? "ta voix" };
+  } catch (error) {
+    console.error("voice over failed, the montage goes on without it", params.postId, error);
+    return null;
+  }
+}
+
+/**
+ * A Reel without a voice (hers or Simone's): the choice is kept on the post and,
+ * when it is already montaged, its plan gets a new version without the voice (the
+ * cut stays; the music is made again for a Reel without voice). True when the
+ * video must be made again.
+ */
+export async function removeVoice(studioId: string, postId: string): Promise<boolean> {
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("edit_plan_id").eq("id", postId).eq("studio_id", studioId).single();
+  const off = await db.from("posts").update({ voice_over: { mode: "off" }, voice_media_id: null }).eq("id", postId).eq("studio_id", studioId);
+  if (off.error) throw new Error(off.error.message);
+  if (!post?.edit_plan_id) return false;
+  const [current, latest] = await Promise.all([
+    db.from("edit_plans").select("plan").eq("id", post.edit_plan_id as string).single(),
+    db.from("edit_plans").select("version").eq("post_id", postId).order("version", { ascending: false }).limit(1).single(),
+  ]);
+  const plan = editPlanSchema.safeParse(current.data?.plan);
+  if (!plan.success || !plan.data.voice) return false;
+  // The same plan, its voice left out (undefined is dropped when stored).
+  const row = await db
+    .from("edit_plans")
+    .insert({ studio_id: studioId, post_id: postId, version: ((latest.data?.version as number | undefined) ?? 0) + 1, plan: { ...plan.data, voice: undefined } })
+    .select("id")
+    .single();
+  if (row.error) throw new Error(row.error.message);
+  await db.from("posts").update({ edit_plan_id: row.data.id }).eq("id", postId);
+  return true;
+}
+
+/**
  * Simone's voice on a Reel: the script, the voice, kept as an audio media with its
  * words, set on the post. The next montage of the post is cut on it.
  */
-export async function makeVoiceOver(params: { studioId: string; postId: string; wish?: string; voiceId?: string }): Promise<{ mediaId: string; script: string; seconds: number }> {
+export async function makeVoiceOver(params: { studioId: string; postId: string; wish?: string; voiceId?: string; mediaIds?: string[] }): Promise<{ mediaId: string; script: string; seconds: number }> {
   const db = supabaseAdmin();
-  const script = await writeVoiceScript(params.studioId, params.postId, params.wish);
+  const script = await writeVoiceScript(params.studioId, params.postId, params.wish, params.mediaIds, Boolean(findVoice(params.voiceId)?.asmr));
   const started = Date.now();
   const voice = await speak(script.script, params.voiceId);
   if (voice.transcript.duration > VOICE_MAX_SECONDS) throw new Error(`Voix trop longue (${voice.transcript.duration} s)`);

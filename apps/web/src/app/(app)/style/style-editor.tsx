@@ -12,6 +12,7 @@ import { LogoSection } from "./logo-section";
 import { MoodboardSection } from "./moodboard-section";
 import { MAX_COLORS, TEMPLATE_FONTS, fontStylesheet, type Logo, type MoodboardView, type StyleForm } from "./style-options";
 import { ToneSection } from "./tone-section";
+import { VoiceSection } from "./voice-section";
 import { useStylesheets } from "./use-stylesheet";
 
 type SaveState = { status: "idle" } | { status: "ok"; version: number } | { status: "error"; message: string };
@@ -124,6 +125,7 @@ export function StyleEditor({
         onChange={update}
         own={<OwnFonts studioId={studioId} initial={ownFonts} display={form.display_font} body={form.body_font} onUse={update} />}
       />
+      <VoiceSection value={form} onChange={update} />
       <ToneSection value={form} onChange={update} />
 
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[18px] border border-line bg-white/95 px-4 py-3 shadow-[0_8px_30px_rgba(28,21,48,0.08)] backdrop-blur lg:bottom-4">

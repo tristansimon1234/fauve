@@ -361,6 +361,17 @@ export const toolSpecs = {
       "Musique d'un Reel, composée par Simone pour ce montage (ElevenLabs, calée sur les images, libre de droits, sans voix) : on (par défaut), off (Reel muet, par ex. pour mettre un son d'Instagram en publiant elle-même), another (une nouvelle musique). Refait la vidéo, gratuit.",
     input: z.object({ post_id: z.string().uuid(), mode: z.enum(["on", "off", "another"]) }),
   },
+  set_voice: {
+    description:
+      "Voix off de Simone sur les Reels (une vraie voix française qui raconte les images, texte écrit par toi, posée avant le montage, la musique passe dessous) : voix Eva, Victoria, Lucie, Koraly (chuchotée, ASMR) pour les femmes, Neto, Antonin, Jules, Mister K (chuchotée, ASMR) pour les hommes ; une voix chuchotée seulement si elle la veut (spa, massage, soin, un moment très calme). Avec post_id, pour ce Reel : mode on (en mettre une), off (sans voix, ni la sienne), redo (refaire le texte, avec wish : ce qu'elle veut qu'on dise) ; voice pour changer de voix. Sans post_id : le réglage du commerce pour ses prochains Reels (use : auto = quand ça raconte quelque chose et que personne ne parle déjà dans ses vidéos, always, never ; voice). Gratuit. off sur un Reel monté refait la vidéo tout de suite ; on, redo et voice valent pour le prochain montage du Reel : sur un Reel déjà monté, propose de le refaire (quote_montage, une correction).",
+    input: z.object({
+      post_id: z.string().uuid().optional(),
+      mode: z.enum(["on", "off", "redo"]).optional(),
+      wish: z.string().max(300).optional().describe("redo : ce que la voix doit dire ou comment (« parle de la promo », « plus drôle »)"),
+      voice: z.string().max(40).optional().describe("Le prénom d'une voix (Eva, Victoria, Lucie, Koraly, Neto, Antonin, Jules, Mister K)"),
+      use: z.enum(["auto", "always", "never"]).optional().describe("Sans post_id : quand mettre une voix sur ses Reels"),
+    }),
+  },
   schedule_post: {
     description:
       "Programme une publication validée sur ses plateformes (Instagram, TikTok), à son horaire (scheduled_at) ou à l'horaire donné ; si l'horaire est passé ou absent, elle part tout de suite. Il faut chaque compte connecté (sinon envoie le lien get_connect_link) et le contenu du format : un Reel a besoin de sa vidéo montée ; un post d'une photo (media_ids) ; un carrousel de 2 à 10 photos ou vidéos (media_ids, dans l'ordre) ; une story de sa vidéo montée ou d'une photo/vidéo (pas de légende sur une story). Ne programme jamais sans l'accord explicite de la gérante.",

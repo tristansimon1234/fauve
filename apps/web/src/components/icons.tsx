@@ -136,6 +136,13 @@ export const MicIcon = make(
   </>,
 );
 export const PlayIcon = make(<polygon points="8 5 19 12 8 19 8 5" />, { fill: "currentColor", stroke: "none" });
+export const PauseIcon = make(
+  <>
+    <rect x="6.5" y="5" width="4" height="14" rx="1" />
+    <rect x="13.5" y="5" width="4" height="14" rx="1" />
+  </>,
+  { fill: "currentColor", stroke: "none" },
+);
 export const PaletteIcon = make(
   <>
     <path d="M12 3a9 9 0 1 0 0 18c1 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.7-1.7H16a5 5 0 0 0 5-5c0-4-4-7.2-9-7.2z" />

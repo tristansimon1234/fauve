@@ -15,6 +15,8 @@ const form = {
   hashtags: ["#pilates", "pilates", "reformer"],
   dos: ["Montrer les mains", " ", ""],
   donts: [],
+  voice_use: "always" as const,
+  voice_id: "8qnuneLiGjGrT4A62CCe",
 };
 
 test("style: a missing or broken profile gets the required defaults", () => {
@@ -29,6 +31,9 @@ test("style: a missing or broken profile gets the required defaults", () => {
   assert.equal(form.body_font, "Inter");
   assert.deepEqual(form.colors, ["#abcdef"]);
   assert.equal(form.default_template, null);
+  // No voice set yet: Simone puts one when it tells something, with her first voice.
+  assert.equal(form.voice_use, "auto");
+  assert.equal(form.voice_id, "D6VK2PsbVdaFL5aALfRc");
 });
 
 test("style: the form is normalized and applied over the current profile", () => {
@@ -46,6 +51,8 @@ test("style: the form is normalized and applied over the current profile", () =>
   assert.equal(next.default_template, "chic");
   // The missing body font takes the template's.
   assert.deepEqual(next.fonts, ["Fraunces", "Inter Tight"]);
+  assert.deepEqual(next.voice, { use: "always", voice_id: "8qnuneLiGjGrT4A62CCe" });
+  assert.equal(toStyleForm(next).voice_use, "always");
 });
 
 test("style: emptied optional fields are removed", () => {
@@ -63,6 +70,8 @@ test("style: invalid input is rejected", () => {
   assert.equal(styleFormSchema.safeParse({ ...form, colors: Array(7).fill("#000000") }).success, false);
   assert.equal(styleFormSchema.safeParse({ ...form, hashtags: ["deux mots"] }).success, false);
   assert.equal(styleFormSchema.safeParse({ ...form, default_template: "neon" }).success, false);
+  assert.equal(styleFormSchema.safeParse({ ...form, voice_use: "sometimes" }).success, false);
+  assert.equal(styleFormSchema.safeParse({ ...form, voice_id: "../voices" }).success, false);
 });
 
 test("style: font stylesheets and ink colour", () => {

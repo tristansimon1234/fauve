@@ -1,3 +1,4 @@
+import { SIMONE_VOICES, voiceSamplePath } from "@fauve/agent";
 import { z } from "zod";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { env } from "@/lib/env";
@@ -10,6 +11,8 @@ import { levelSpeech, speak } from "@/lib/voice-over";
 //   ?say=<voice id>,<voice id>…
 //     the same lines read by each voice (Simone's text for a pizzeria, with its acting tags),
 //     to compare them by ear: a signed link (24 h) per voice;
+//   ?gallery=1
+//     the samples of Simone's voices heard in Style (public bucket landing/voices/);
 //   ?info=<voice id>
 //     one voice's card (name, labels, description);
 //   ?clone=<name>&media=<uuid>,<uuid>…
@@ -85,11 +88,41 @@ async function say(voiceIds: string[]) {
   return Response.json({ samples });
 }
 
+/** What each voice of Simone's gallery reads in Style: words for any business, with acting tags. */
+const GALLERY_SAMPLE =
+  "[smiling] Tu vois ce geste ? On le refait chaque jour, et on ne s'en lasse pas. Ici, tout est fait sur place, avec soin. [warmly] Passe nous voir cette semaine, on t'attend.";
+
+/** What the whispered voices (ASMR) read: a whisper, close to the ear. */
+const GALLERY_WHISPER =
+  "[whispers] Écoute... le bruit des ciseaux, tout près. Une mèche, puis une autre... [softly] Ici, on prend le temps. Viens te poser un moment.";
+
+/** The gallery's samples, read and leveled, in the public bucket (landing/voices/<id>.mp3), 4 at a time. */
+async function gallery() {
+  const db = supabaseAdmin();
+  const done: Record<string, string> = {};
+  for (let i = 0; i < SIMONE_VOICES.length; i += 4) {
+    await Promise.all(
+      SIMONE_VOICES.slice(i, i + 4).map(async (v) => {
+        try {
+          const leveled = await levelSpeech(`gallery-${v.id}`, (await speak(v.asmr ? GALLERY_WHISPER : GALLERY_SAMPLE, v.id)).mp3);
+          const up = await db.storage.from("landing").upload(voiceSamplePath(v.id), leveled.mp3, { contentType: "audio/mpeg", upsert: true, cacheControl: "3600" });
+          done[v.name] = up.error ? up.error.message : `ok ${leveled.lufs ?? "?"} LUFS`;
+        } catch (error) {
+          done[v.name] = error instanceof Error ? error.message.slice(0, 200) : String(error);
+        }
+      }),
+    );
+  }
+  return Response.json(done);
+}
+
 export async function POST(request: Request) {
   if (!cronAuthorized(request)) return new Response("unauthorized", { status: 401 });
   const key = env("ELEVENLABS_API_KEY");
   if (!key) return Response.json({ error: "ELEVENLABS_API_KEY missing" }, { status: 400 });
   const params = new URL(request.url).searchParams;
+
+  if (params.get("gallery")) return gallery();
 
   const listed = params.get("say");
   if (listed) {

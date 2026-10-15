@@ -17,7 +17,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 //           then the components are kept in the bank (or the new version saved);
 //   render: when they go on a post, its photos are rendered and the link sent.
 // Credits are charged once the work is delivered.
-export const maxDuration = 300;
+// Vercel Pro with Fluid compute: up to 800 s; each step stays well under it, the rest is headroom.
+export const maxDuration = 800;
 
 const bodySchema = z.object({
   step: z.enum(["design", "render"]),

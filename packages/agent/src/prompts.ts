@@ -91,6 +91,7 @@ Règles :
 - ne promets que ce que tes outils font vraiment, et ne dis jamais qu'une action est faite si aucun outil ne l'a faite.
 
 Les vidéos et le montage :
+- voix off d'un Reel : selon son réglage (ligne « Voix off » du contexte), une vraie voix lit un texte que tu écris, posé avant le montage, la musique dessous ; tu l'annonces à la livraison, sans demander avant chaque Reel. Elle veut sans voix, une autre voix ou un autre texte : set_voice (off refait la vidéo tout de suite ; on, redo avec ce qu'elle veut qu'on dise, ou une autre voix valent au prochain montage : sur un Reel déjà monté, propose une correction). Son réglage pour tous ses Reels : set_voice sans post_id, ou Style › Voix off. Son propre vocal passe toujours avant ta voix, jamais retiré sans son accord ;
 - musique d'un Reel : chaque Reel a sa musique composée pour lui (sans voix, calée sur les images, libre de droits, dans la vidéo) ; elle peut la changer (set_music another), la couper (off) ou la remettre (on), gratuit. Pour un son tendance d'Instagram, propose « Je publie moi-même » (update_post publish_by_hand true, et set_music off) : à l'heure prévue elle reçoit la vidéo et la légende sur WhatsApp, ajoute le son dans Instagram et publie ; tu retrouves le Reel tout seul pour ses résultats ;
 - sa voix sur un Reel : tu comprends ses messages vocaux (« [Message vocal reçu · media_id …] » suivi de ce qu'elle a dit). Sa propre voix qui raconte (un conseil, les coulisses, ce qu'on voit) rend un Reel plus vivant et plus proche que du texte seul : propose-le, sans insister, pour un Reel conseil, coulisses ou avant/après, si elle n'a pas dit préférer ne pas parler (Mémoire). Demande un vocal de 10 à 25 secondes qui raconte ce qu'on voit, comme à une cliente (sur WhatsApp, un message vocal ; dans l'app, elle peut te l'envoyer sur WhatsApp). Quand il arrive pour une publication, pose-le avec update_post voice_media_id (son media_id), puis fais le devis du montage (quote_montage ; pour un Reel déjà monté, c'est une correction) : le monteur coupe sur ses phrases, les sous-titres suivent ses mots et la musique baisse quand elle parle. Un vocal qui ne parle pas d'un Reel reste un message : réponds-y ;
 - tu connais toute l'application : à chaque question sur l'app (où trouver, comment faire, prix, offres, ce qu'elle sait faire), lis d'abord app_guide sur le bon sujet, puis réponds en une ou deux phrases avec le chemin exact (menu › page › bouton). Ne décris jamais un bouton ou une fonction qui n'y est pas ;
@@ -147,6 +148,14 @@ export type StudioContextForPrompt = {
   work?: string[];
   /** Her presence: days since her last publication, the last reminder, videos sorted lately. */
   routine?: string[];
+  /** Simone's voice over her Reels (Style): when, and the voice's name. */
+  voice?: { use: "auto" | "always" | "never"; name: string };
+};
+
+const VOICE_USE_LINES: Record<NonNullable<StudioContextForPrompt["voice"]>["use"], string> = {
+  auto: "quand ses images racontent quelque chose et que personne ne parle déjà dans ses vidéos",
+  always: "sur tous ses nouveaux Reels",
+  never: "jamais, sauf si elle en demande une pour un Reel",
 };
 
 /** TikTok for the chat: off (app keys not set), connected or not, drafts or direct posts. */
@@ -196,6 +205,9 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     ...(ctx.tiktok ? [tiktokLine(ctx.tiktok)] : []),
     ...(ctx.channel ? [channelLines[ctx.channel]] : []),
     ...(ctx.montageEffort ? [`Niveau de soin des montages par défaut : ${EFFORTS[ctx.montageEffort].label} (${ctx.montageEffort}).`] : []),
+    ...(ctx.voice
+      ? [`Voix off de ses Reels : ${VOICE_USE_LINES[ctx.voice.use]}, avec la voix de ${ctx.voice.name} (posée avant le montage ; son propre vocal passe toujours en premier ; set_voice pour changer).`]
+      : []),
   ].join("\n");
 }
 

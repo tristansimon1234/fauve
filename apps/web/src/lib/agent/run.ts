@@ -10,6 +10,7 @@ import {
   claudeCostUsd,
   FAUVE_SYSTEM_PROMPT,
   studioContextPrompt,
+  type StudioContextForPrompt,
   toolSpecs,
   usdToEur,
   TOOL_STATUS,
@@ -62,6 +63,7 @@ export type RunFauveInput = ToolContext & {
     known?: { website: string | null; booking: string | null; tone: string | null; memory: string[] };
     work?: string[];
     routine?: string[];
+    voice?: StudioContextForPrompt["voice"];
   };
   /** Live: what Fauve is doing, and her words as she writes them (the app's chat). */
   onEvent?: (event: ChatEvent) => void;
@@ -142,6 +144,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           known: input.studio.known,
           work: input.studio.work,
           routine: input.studio.routine,
+          voice: input.studio.voice,
         }),
       },
     ],
