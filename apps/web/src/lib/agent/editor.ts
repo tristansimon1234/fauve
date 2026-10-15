@@ -39,6 +39,27 @@ import { isFirstReel } from "@/lib/onboarding";
 import { markTemplatesUsed, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { anthropic, logClaudeCost } from "./run";
 
+/** The hooks of the studio's latest other Reels: the next one takes another form and other words. */
+async function recentHooks(studioId: string, postId: string): Promise<string[]> {
+  const db = supabaseAdmin();
+  const { data: posts } = await db
+    .from("posts")
+    .select("edit_plan_id")
+    .eq("studio_id", studioId)
+    .eq("kind", "reel")
+    .neq("id", postId)
+    .not("edit_plan_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(3);
+  const ids = (posts ?? []).map((p) => p.edit_plan_id as string);
+  if (!ids.length) return [];
+  const { data: plans } = await db.from("edit_plans").select("plan").in("id", ids);
+  return (plans ?? []).flatMap((row) => {
+    const plan = editPlanSchema.safeParse(row.plan);
+    return plan.success ? plan.data.texts.filter((t) => t.style === "hook").map((t) => t.text) : [];
+  });
+}
+
 export type DesignedEdit = {
   editPlanId: string;
   version: number;
@@ -69,7 +90,7 @@ export async function designEdit(params: {
   fresh?: boolean;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
-  const [post, studio, brand, previous, recent, report, inspirations] = await Promise.all([
+  const [post, studio, brand, previous, recent, report, inspirations, hooks] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id, voice_media_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
     db.from("studios").select("name, business_type, booking_url, memory").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
@@ -77,6 +98,7 @@ export async function designEdit(params: {
     recentlyShownTemplates(params.studioId, params.postId),
     latestReport(params.studioId).catch(() => null),
     db.from("inspirations").select("analysis").eq("studio_id", params.studioId).not("analysis", "is", null).order("created_at", { ascending: false }).limit(6),
+    recentHooks(params.studioId, params.postId).catch(() => []),
   ]);
   if (post.error) throw new Error("Publication introuvable");
 
@@ -167,6 +189,8 @@ export async function designEdit(params: {
     photos: photos.length ? photos : undefined,
     // Scenes already made: reusing one costs nothing.
     templates: library,
+    // The hooks of her latest Reels: this one takes another form and other words.
+    recent_hooks: hooks.length ? hooks : undefined,
     // Motion code stays out of the editor's context: it only needs the briefs.
     previous_plan:
       params.brief && !params.fresh && previousPlan.success

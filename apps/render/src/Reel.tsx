@@ -350,6 +350,34 @@ function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][n
 
 /** A soft double shadow: white type reads on any footage without looking like a sticker. */
 const TEXT_SHADOW = "0 2px 6px rgba(0,0,0,0.22), 0 10px 36px rgba(0,0,0,0.42)";
+/** A line set bare over footage: a tighter shadow under the letters, so it reads on a bright wall too. */
+const LINE_SHADOW = "0 1px 3px rgba(0,0,0,0.45), 0 3px 14px rgba(0,0,0,0.45), 0 10px 34px rgba(0,0,0,0.3)";
+
+const hexRgb = (hex: string): [number, number, number] | null => {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return null;
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+const rgbLuminance = ([r, g, b]: [number, number, number]) => {
+  const lin = (c: number) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+};
+const rgbHex = (c: number[]) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
+
+/**
+ * The brand colour as it reads where it is set: over footage a dark colour is lifted toward
+ * white (same hue) until the word stands out; on a white box a pale one is taken down toward ink.
+ */
+function legible(hex: string, on: "footage" | "white"): string {
+  let c = hexRgb(hex);
+  if (!c) return hex;
+  for (let i = 0; i < 8; i++) {
+    const l = rgbLuminance(c);
+    if (on === "footage" ? l >= 0.3 : l <= 0.3) break;
+    c = c.map((v) => (on === "footage" ? v + (255 - v) * 0.2 : v * 0.8)) as [number, number, number];
+  }
+  return rgbHex(c);
+}
 
 function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
@@ -370,7 +398,7 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
   };
   const style: CSSProperties = {
     display: "block",
-    fontFamily: `"${h.family === "display" ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`,
+    fontFamily: `"${h.family === "display" || MONOSPACE.test(props.brand.bodyFont) ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`,
     fontWeight: h.weight,
     fontStyle: h.italic ? "italic" : "normal",
     fontSize: h.size * k * (text.scale ?? 1),
@@ -387,14 +415,23 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
     if (h.stress === "italic") return { fontStyle: "italic" };
     // A serif accent in a sans hook: the display font's italic, a touch larger (serif faces run small).
     if (h.stress === "serif") return { fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontWeight: 400, fontSize: "1.12em", letterSpacing: 0 };
-    return { color: props.brand.accent };
+    return { color: legible(props.brand.accent, "footage") };
   };
+
+  // Words enter one after the other; stressed words side by side share one block (« cette pâte »), never a chip each.
+  const groups: { words: string[]; stress: CSSProperties | undefined }[] = [];
+  for (const word of words) {
+    const stress = stressed(word);
+    const last = groups.at(-1);
+    if (last && stress && last.stress) last.words.push(word);
+    else groups.push({ words: [word], stress });
+  }
 
   // The dark background, when set, hugs the lines of text, not the whole box.
   return (
     <Fit style={box} innerStyle={style} marker={String(index)}>
       <span style={text.backdrop ? { ...backdrop(text, k), lineHeight: 1.3 } : undefined}>
-        {words.map((word, i) => {
+        {groups.map((group, i) => {
           const p = spring({ frame: frame - i * h.stagger, fps, config: theme.spring });
           const enter: CSSProperties =
             h.enter === "pop"
@@ -402,10 +439,18 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
               : h.enter === "rise"
                 ? { transform: `translateY(${interpolate(p, [0, 1], [26 * k, 0])}px)`, opacity: interpolate(p, [0, 0.6], [0, 1], clamp) }
                 : { transform: `translateY(${interpolate(p, [0, 1], [10 * k, 0])}px)`, opacity: p };
+          // A strong number stressed in the hook (« 48 h », « 6 ») stands alone on its line, very big, in the brand colour.
+          if (group.stress && /^\d/.test(group.words[0]!)) {
+            return (
+              <span key={i} style={{ display: "block", ...enter }}>
+                <span style={{ display: "inline-block", fontSize: "2.1em", lineHeight: 0.92, letterSpacing: "-0.03em", color: legible(props.brand.accent, "footage") }}>{group.words.join(" ")}</span>
+              </span>
+            );
+          }
           return (
             <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...enter }}>
-              <span style={{ display: "inline-block", ...stressed(word) }}>{word}</span>
-              {i < words.length - 1 ? " " : ""}
+              <span style={{ display: "inline-block", ...group.stress }}>{group.words.join(" ")}</span>
+              {i < groups.length - 1 ? " " : ""}
             </span>
           );
         })}
@@ -428,16 +473,12 @@ function Band({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
   const emphasis = new Set(text.emphasis.flatMap((e) => e.split(/\s+/)).map(normalize));
   const size = b.size * k * (text.scale ?? 1);
   const onBox = b.box === "white" ? { bg: "#FFFFFF", fg: "#16121F" } : { bg: props.brand.accent, fg: props.brand.accentInk };
-  // A stressed word: in the brand colour on a white box; on the brand colour, a white chip of its own.
+  // A stressed word: in the brand colour (one that reads on its box), never a chip of its own.
   const stress = (word: string): CSSProperties | undefined =>
-    !emphasis.has(normalize(word))
-      ? undefined
-      : b.box === "white"
-        ? { color: props.brand.accent }
-        : { background: "#FFFFFF", color: props.brand.accent, borderRadius: Math.max(4, b.radius * 0.6) * k, padding: `0 ${10 * k}px` };
+    !emphasis.has(normalize(word)) ? undefined : b.box === "white" ? { color: legible(props.brand.accent, "white") } : { textDecoration: "underline", textDecorationThickness: `${3 * k}px`, textUnderlineOffset: `${6 * k}px` };
   const words = text.text.split(/\s+/).filter(Boolean);
   const type: CSSProperties = {
-    fontFamily: `"${b.family === "display" ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`,
+    fontFamily: `"${b.family === "display" || MONOSPACE.test(props.brand.bodyFont) ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`,
     fontWeight: b.weight,
     fontSize: size,
     letterSpacing: b.letterSpacing * k,
@@ -514,7 +555,7 @@ function Caption({ text, index, props, theme, k }: { text: ReelProps["texts"][nu
       data-fauve-text={index}
       style={{
         position: "absolute",
-        top: props.height * (text.y ?? TEXT_Y.caption),
+        top: props.height * (text.y ?? (props.words.length ? TEXT_Y.band : TEXT_Y.caption)),
         ...sides(text, props, k),
         textAlign: "center",
         opacity: Math.min(p, exit.opacity),
@@ -528,7 +569,7 @@ function Caption({ text, index, props, theme, k }: { text: ReelProps["texts"][nu
             fontFamily: `"${font}", sans-serif`,
             fontWeight: theme.caption.weight,
             fontSize: theme.caption.size * k * (text.scale ?? 1),
-            textShadow: text.backdrop || boxed ? "none" : TEXT_SHADOW,
+            textShadow: text.backdrop || boxed ? "none" : LINE_SHADOW,
             ...(boxed
               ? { background: "rgba(14,12,20,0.74)", padding: `${6 * k}px ${20 * k}px`, borderRadius: 14 * k, boxDecorationBreak: "clone", WebkitBoxDecorationBreak: "clone" }
               : backdrop(text, k)),
@@ -748,6 +789,9 @@ function Logo({ props, k }: { props: ReelProps; k: number }) {
   );
 }
 
+/** Where the voice's subtitles sit: low, above the apps' buttons and caption (a line set meanwhile moves up). */
+const SUBTITLE_Y = 0.64;
+
 /** Word-by-word subtitles: short phrases, the spoken word lit up. */
 function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
@@ -766,17 +810,17 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
     <div
       style={{
         position: "absolute",
-        top: props.height * 0.58,
+        top: props.height * SUBTITLE_Y,
         left: SAFE.left * k,
         right: SAFE.right * k,
         textAlign: "center",
-        fontFamily: `"${props.brand.bodyFont}", sans-serif`,
+        fontFamily: `"${MONOSPACE.test(props.brand.bodyFont) ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`,
         fontWeight: s.weight,
         fontSize: s.size * k,
         textTransform: s.uppercase ? "uppercase" : "none",
         lineHeight: 1.3,
         color: "#fff",
-        textShadow: "0 3px 16px rgba(0,0,0,0.5)",
+        textShadow: LINE_SHADOW,
       }}
     >
       {chunk.map((word, i) => {
@@ -785,7 +829,7 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
           active && s.highlight === "pill"
             ? { background: props.brand.accent, color: props.brand.accentInk, borderRadius: 10 * k, padding: `0 ${10 * k}px`, textShadow: "none" }
             : active
-              ? { color: props.brand.accent }
+              ? { color: legible(props.brand.accent, "footage") }
               : {};
         return (
           <span key={i} style={{ display: "inline-block", margin: `0 ${8 * k}px`, ...style }}>
