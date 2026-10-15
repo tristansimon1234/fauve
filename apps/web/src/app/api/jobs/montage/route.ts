@@ -16,6 +16,7 @@ import {
 } from "@fauve/agent";
 import { reviewMontage } from "@/lib/agent/critic";
 import { designEdit } from "@/lib/agent/editor";
+import { voiceOverIfWanted } from "@/lib/voice-over";
 import { chargeQuote, setQuoteStage } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
@@ -33,7 +34,8 @@ import { finishJob } from "@/lib/studio-jobs";
 // (review) → the editor corrects it (fix) → render → review again, as many
 // rounds as the level allows. The best rendered version is always kept, so a
 // correction that fails never loses the montage.
-export const maxDuration = 300;
+// Vercel Pro with Fluid compute: up to 800 s; each step stays well under it, the rest is headroom.
+export const maxDuration = 800;
 
 const versionSchema = z.object({
   planId: z.uuid(),
@@ -81,6 +83,10 @@ const bodySchema = z.object({
   compared: z.boolean().optional(),
   /** The critic gave a verdict at least once. */
   reviewed: z.boolean().optional(),
+  /** The voice Simone recorded over this Reel (its name), told at delivery. */
+  voice: z.string().max(40).optional(),
+  /** The voice step is done: the design goes on (in its own invocation when a voice was recorded). */
+  voiced: z.boolean().optional(),
 });
 type Job = z.infer<typeof bodySchema>;
 
@@ -147,7 +153,7 @@ async function run(job: Job) {
   if (!reviewed) {
     if (job.step === "render") {
       await setQuoteStage(job.quoteId, "render");
-      const delivered = await renderAndDeliver({ ...target, rationale: job.rationale, note: job.note ?? job.rationale, offerVariant: true });
+      const delivered = await renderAndDeliver({ ...target, rationale: job.rationale, note: job.note ?? job.rationale, offerVariant: true, voice: job.voice });
       // Charged only once the video is out, for the scenes really made (never above the quote).
       if (delivered && job.quoteId) {
         await setQuoteStage(job.quoteId, "delivered");
@@ -157,8 +163,9 @@ async function run(job: Job) {
     }
     try {
       await setQuoteStage(job.quoteId, "design");
+      if (await voiceFirst(job)) return;
       const edit = await designEdit({ ...designInput(job), effort: level?.editorEffort });
-      await queueJob("montage", { ...target, step: "render", rationale: edit.rationale, quoteId: job.quoteId, newScenes: edit.newScenes, effort: job.effort });
+      await queueJob("montage", { ...target, step: "render", rationale: edit.rationale, quoteId: job.quoteId, newScenes: edit.newScenes, effort: job.effort, voice: job.voice });
     } catch (error) {
       console.error("montage design failed", job.postId, error);
       await reopenQuote(job.quoteId);
@@ -195,8 +202,23 @@ function designInput(job: Job) {
 /** New animated scenes still allowed by the quote for the next version. */
 const scenesLeft = (job: Job) => Math.max(0, (job.maxNewScenes ?? 2) - (job.newScenes ?? 0));
 
+/**
+ * Simone's voice over the Reel, before the editor (who cuts on it) when it should
+ * have one: recorded once, kept for the corrections and the second take. When a
+ * voice was recorded, the design goes on in a new invocation with its own time
+ * budget (true); otherwise right away (false).
+ */
+async function voiceFirst(job: Job): Promise<boolean> {
+  if (job.voiced) return false;
+  const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction });
+  if (!made) return false;
+  await next(job, { step: "design", voiced: true, voice: made.voice });
+  return true;
+}
+
 async function design(job: Job) {
   await setQuoteStage(job.quoteId, "design");
+  if (await voiceFirst(job)) return;
   const edit = await designEdit({ ...designInput(job), effort: EFFORTS[job.effort!].editorEffort });
   const versions: Version[] = [{ planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) }];
   const two = effortVersions(job.effort!, Boolean(job.correction)) > 1;
@@ -386,6 +408,7 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         note: [best.rationale, care].filter(Boolean).join(" ").slice(0, 600) || undefined,
         // Two versions were already compared: no variant offered on top.
         offerVariant: !job.compared,
+        voice: job.voice,
       },
       { title, durationMs: (render.data?.duration_ms as number | null) ?? 0 },
     );

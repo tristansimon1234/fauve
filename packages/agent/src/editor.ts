@@ -328,7 +328,7 @@ export function oneAccent(segments: PlanSegment[]): PlanSegment[] {
 
 /**
  * The longest Reel made: a discovery Reel tells a story in 20 to 30 s, and a
- * render takes 4 to 7 s per second of video inside a 300 s job step.
+ * render takes 4 to 7 s per second of video (job steps have 800 s, the limit of Vercel Pro).
  */
 export const MAX_REEL_SECONDS = 30;
 

@@ -1,6 +1,6 @@
 // Pure logic of the Style page's brand profile (no I/O, unit tested): reading a
 // stored profile, validating the form, applying it to the profile.
-import { brandProfileSchema, motionTemplateSchema, type BrandProfile } from "@fauve/agent";
+import { brandProfileSchema, DEFAULT_VOICE_ID, motionTemplateSchema, readVoiceSetting, type BrandProfile } from "@fauve/agent";
 import { z } from "zod";
 import {
   ART_DIRECTION_MAX,
@@ -16,6 +16,7 @@ import {
   TEMPLATE_FONTS,
   TEMPLATES,
   TONE_MAX,
+  VOICE_USES,
   type StyleForm,
 } from "./style-options.ts";
 
@@ -73,6 +74,8 @@ export function toStyleForm(profile: StyleProfile): StyleForm {
     hashtags: profile.hashtags,
     dos: profile.dos,
     donts: profile.donts,
+    voice_use: readVoiceSetting(profile.voice).use,
+    voice_id: profile.voice?.voice_id ?? DEFAULT_VOICE_ID,
   };
 }
 
@@ -118,6 +121,8 @@ export const styleFormSchema = z.object({
     .transform((tags) => [...new Set(tags)]),
   dos: ruleList,
   donts: ruleList,
+  voice_use: z.enum(VOICE_USES),
+  voice_id: z.string().regex(/^[A-Za-z0-9]{10,40}$/, "Voix inconnue."),
 });
 
 /** Applies the form onto the current profile; optional fields left empty are removed. */
@@ -130,6 +135,7 @@ export function applyStyleForm(current: StoredProfile, form: z.output<typeof sty
     hashtags: form.hashtags,
     dos: form.dos,
     donts: form.donts,
+    voice: { use: form.voice_use, voice_id: form.voice_id },
   };
   const set = (key: string, value: unknown) => {
     if (value === undefined) delete next[key];

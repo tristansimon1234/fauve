@@ -1,7 +1,7 @@
 import "server-only";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_EFFORT, effortSchema, orderReplies, readMemory, stableWindow } from "@fauve/agent";
+import { DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, readMemory, readVoiceSetting, stableWindow } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
@@ -106,7 +106,7 @@ export async function replyInConversation(params: {
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
-    db.from("brand_profiles").select("profile->>tone").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+    db.from("brand_profiles").select("profile->>tone, profile->voice").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     runningJobs(params.studioId).catch(() => []),
     db.from("social_accounts").select("handle, status").eq("studio_id", params.studioId).eq("platform", "tiktok").maybeSingle(),
   ]);
@@ -175,6 +175,10 @@ export async function replyInConversation(params: {
         memory: readMemory(studio.data.memory).map((f) => f.fact),
       },
       work: describeJobs(jobs.map((j) => ({ ...j, title: j.postId ? jobTitles.get(j.postId) : undefined }))),
+      voice: (() => {
+        const setting = readVoiceSetting((brand.data as { voice?: unknown } | null)?.voice);
+        return { use: setting.use, name: findVoice(setting.voice_id ?? DEFAULT_VOICE_ID)?.name ?? "sa voix" };
+      })(),
       routine: await Promise.all([
         accessLine(params.studioId).catch(() => null),
         presenceLines(params.studioId).catch((error) => {

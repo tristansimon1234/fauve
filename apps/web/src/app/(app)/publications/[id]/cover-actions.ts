@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { readPostMusic } from "@/lib/render/music";
 import { renderPost } from "@/lib/render/render-post";
+import { removeVoice } from "@/lib/voice-over";
 import { z } from "zod";
 import { getStudioContext } from "@/lib/studio";
 
@@ -92,6 +93,34 @@ export async function setMusic(postId: string, mode: "on" | "off" | "another"): 
       (e: unknown) => console.error("setMusic: render failed", postId, e),
     ),
   );
+  revalidatePath(`/publications/${postId}`);
+  return { ok: true };
+}
+
+/**
+ * A Reel without its voice over (Simone's or her own voice note): the montage keeps
+ * its cut, the video is made again after the answer (about a minute, free).
+ */
+export async function setVoiceOff(postId: string): Promise<{ ok: boolean }> {
+  if (!z.uuid().safeParse(postId).success) return { ok: false };
+  const { db, member } = await getStudioContext();
+  if (!member) return { ok: false };
+  const studioId = member.studio.id;
+  const { data: post } = await db.from("posts").select("id").eq("id", postId).eq("studio_id", studioId).eq("kind", "reel").not("status", "in", "(published,measured)").maybeSingle();
+  if (!post) return { ok: false };
+  const again = await removeVoice(studioId, postId).catch((e: unknown) => {
+    console.error("setVoiceOff failed", postId, e);
+    return null;
+  });
+  if (again === null) return { ok: false };
+  if (again) {
+    after(() =>
+      renderPost(studioId, postId).then(
+        () => revalidatePath(`/publications/${postId}`),
+        (e: unknown) => console.error("setVoiceOff: render failed", postId, e),
+      ),
+    );
+  }
   revalidatePath(`/publications/${postId}`);
   return { ok: true };
 }

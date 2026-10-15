@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { adjustSchema, clipBlurSchema, photoEditSchema } from "./retouch.ts";
 import { listFields, savedLookSchema, textLookSchema } from "./text-look.ts";
+import { voiceSettingSchema } from "./voice-over.ts";
 
 // Mirrors the Postgres enums in supabase/migrations.
 export const postStatusSchema = z.enum([
@@ -363,6 +364,8 @@ export const brandProfileSchema = z.object({
   moodboard: moodboardSchema.optional(),
   /** Text looks the manager keeps (copied from examples she sent, or set by hand). */
   text_looks: z.array(savedLookSchema).max(12).optional(),
+  /** Simone's voice over the Reels: when, and which voice (absent: auto, the first voice). */
+  voice: voiceSettingSchema.optional(),
   dos: z.array(z.string()),
   donts: z.array(z.string()),
 });

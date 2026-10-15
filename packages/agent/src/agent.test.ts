@@ -1201,6 +1201,42 @@ test("voice: Scribe words, phrases on the Reel's clock, subtitles and speech", a
   assert.equal(plain.voice, undefined);
 });
 
+test("voice over: when Simone puts her voice on a Reel, and which voice", async () => {
+  const { wantsVoiceOver, findVoice, readVoiceSetting, readPostVoice, SIMONE_VOICES, DEFAULT_VOICE_ID } = await import("./voice-over.ts");
+  const base = { post: null, studio: "auto" as const, onReel: null, correction: false, speechInClips: false, footageSeconds: 14, photos: 0 };
+  // Auto: a new Reel whose images tell something, with nobody speaking and enough to show.
+  assert.equal(wantsVoiceOver(base), true);
+  assert.equal(wantsVoiceOver({ ...base, speechInClips: true }), false);
+  assert.equal(wantsVoiceOver({ ...base, footageSeconds: 6 }), false);
+  assert.equal(wantsVoiceOver({ ...base, footageSeconds: 6, photos: 2 }), true);
+  // A correction keeps what the Reel had, unless she asked for a voice on it.
+  assert.equal(wantsVoiceOver({ ...base, correction: true }), false);
+  assert.equal(wantsVoiceOver({ ...base, correction: true, post: { mode: "on" } }), true);
+  // The studio's setting, then the Reel's own choice over it.
+  assert.equal(wantsVoiceOver({ ...base, studio: "never" }), false);
+  assert.equal(wantsVoiceOver({ ...base, studio: "never", post: { mode: "on" } }), true);
+  assert.equal(wantsVoiceOver({ ...base, studio: "always", speechInClips: true }), true);
+  assert.equal(wantsVoiceOver({ ...base, studio: "always", post: { mode: "off" } }), false);
+  // Her own voice note is never covered; Simone's voice is made again only when asked (another text or voice).
+  assert.equal(wantsVoiceOver({ ...base, onReel: "hers", post: { mode: "on", remake: true } }), false);
+  assert.equal(wantsVoiceOver({ ...base, onReel: "simone", post: { mode: "on" } }), false);
+  assert.equal(wantsVoiceOver({ ...base, onReel: "simone", post: { mode: "on", remake: true } }), true);
+  // Voices by name or id, the first one by default; broken settings read as auto.
+  assert.equal(findVoice("jules")?.id, "8qnuneLiGjGrT4A62CCe");
+  assert.equal(findVoice("D6VK2PsbVdaFL5aALfRc")?.name, "Eva");
+  assert.equal(findVoice("Gérard"), undefined);
+  assert.equal(DEFAULT_VOICE_ID, SIMONE_VOICES[0].id);
+  assert.equal(SIMONE_VOICES.length, 8);
+  // The whispered voices are hers to choose: never the default.
+  assert.equal(SIMONE_VOICES[0].asmr, false);
+  assert.deepEqual(SIMONE_VOICES.filter((v) => v.asmr).map((v) => v.name), ["Koraly", "Mister K"]);
+  assert.equal(findVoice("mister k")?.id, "k1w1SeihHyKDJXr7nZRX");
+  assert.deepEqual(readVoiceSetting(undefined), { use: "auto" });
+  assert.deepEqual(readVoiceSetting({ use: "loud" }), { use: "auto" });
+  assert.equal(readPostVoice({ mode: "maybe" }), null);
+  assert.deepEqual(readPostVoice({ mode: "on", wish: "parle de la promo" }), { mode: "on", wish: "parle de la promo" });
+});
+
 test("mix: what is said at the level of a voice, the music well under it", async () => {
   const { mixGains, mixFilter, previewMusic, speechWindows, speechGain, SPEECH_LUFS } = await import("./mix.ts");
   const { buildReelProps } = await import("./motion.ts");

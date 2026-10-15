@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { setMusic, setPublishByHand } from "@/app/(app)/publications/[id]/cover-actions";
+import { setMusic, setPublishByHand, setVoiceOff } from "@/app/(app)/publications/[id]/cover-actions";
 
 // The sound of a Reel. Simone's music (composed by ElevenLabs for this cut, in
 // the video): on, another one, or none. And who publishes: Simone, or the manager
@@ -16,9 +16,12 @@ export function PublishByHand({
   downloadUrl,
   caption,
   music,
+  voice,
 }: {
   /** Simone's music: on or off, and whether a piece was made already; undefined without a montage or without the service. */
   music?: { on: boolean; made: boolean };
+  /** The voice over the Reel: Simone's (her name, the words) or her own voice note; null: none; undefined: not shown. */
+  voice?: { who: "simone"; name: string; text: string } | { who: "hers"; text: string } | null;
   postId: string;
   initial: boolean;
   /** When the Reel was handed over (formatted), if it was. */
@@ -32,7 +35,18 @@ export function PublishByHand({
   const [state, setState] = useState<"idle" | "saving" | "error">("idle");
   const [musicOn, setMusicOn] = useState(music?.on ?? true);
   const [remaking, setRemaking] = useState(false);
+  const [voiceGone, setVoiceGone] = useState(false);
   const [, start] = useTransition();
+
+  const dropVoice = () => {
+    setState("saving");
+    start(async () => {
+      const result = await setVoiceOff(postId);
+      setState(result.ok ? "idle" : "error");
+      setVoiceGone(result.ok);
+      setRemaking(result.ok);
+    });
+  };
 
   const changeMusic = (mode: "on" | "off" | "another") => {
     const before = musicOn;
@@ -75,6 +89,27 @@ export function PublishByHand({
           {state === "saving" ? "Enregistrement…" : state === "error" ? "Pas enregistré, réessaie" : remaking ? "La vidéo se refait (1 à 2 min)" : ""}
         </span>
       </div>
+      {voice !== undefined && (
+        <div className="flex flex-col gap-1 rounded-[12px] bg-soft px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12px] font-bold">
+              {voice && !voiceGone ? (voice.who === "simone" ? `Voix off : ${voice.name}` : "Voix off : ta voix") : "Sans voix off"}
+            </span>
+            {voice && !voiceGone && (
+              <button type="button" onClick={dropVoice} className="shrink-0 text-[12px] font-bold text-violet">
+                Sans voix
+              </button>
+            )}
+          </div>
+          <span className="text-[12px] leading-snug text-muted">
+            {voice && !voiceGone
+              ? voice.text
+                ? `« ${voice.text}${voice.text.length >= 280 ? "…" : ""} »`
+                : "Le montage est calé sur ses phrases."
+              : "Une autre voix, un autre texte : demande-le à Simone (tes réglages sont dans Style › Voix off)."}
+          </span>
+        </div>
+      )}
       {music && (
         <div className="flex flex-col gap-2">
           <div role="radiogroup" aria-label="Musique de Simone" className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">

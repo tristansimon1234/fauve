@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import { env } from "@/lib/env";
 import { readPostMusic } from "@/lib/render/music";
-import { alignSlides, captionForInstagram, captionForTikTok, readTikTokExternal, readTikTokSettings, tiktokStateLine, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
+import { alignSlides, captionForInstagram, captionForTikTok, findVoice, readTikTokExternal, readTikTokSettings, tiktokStateLine, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -90,6 +90,7 @@ const postSchema = z.object({
   music: z.unknown(),
   tiktok: z.unknown(),
   external_ids: z.unknown(),
+  voice_media_id: z.uuid().nullable().catch(null),
 });
 
 // Read leniently: an older or partial plan still shows what it can.
@@ -117,6 +118,17 @@ const LOCKED: readonly PostStatus[] = ["published", "measured"];
 const handedFormat = (timeZone: string) => new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone });
 const POST_FORM = "post-form";
 
+/** The voice over a Reel, for its page: Simone's (her name, the words) or the manager's own voice note; null: none. */
+async function loadVoice(db: Awaited<ReturnType<typeof getStudioContext>>["db"], studioId: string, mediaId: string | null) {
+  if (!mediaId) return null;
+  const { data } = await db.from("media_assets").select("source, ai, transcript").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
+  if (!data) return null;
+  const text = ((data.transcript as { text?: string } | null)?.text ?? "").slice(0, 280);
+  if (data.source !== "ai") return { who: "hers" as const, text };
+  const voiceId = (data.ai as { voice_id?: string } | null)?.voice_id;
+  return { who: "simone" as const, name: findVoice(voiceId)?.name ?? "Simone", text };
+}
+
 export default function PostPage({ params }: PageProps<"/publications/[id]">) {
   return (
     <main className="flex min-w-0 flex-col gap-5 px-4 pt-5 pb-14 sm:px-8 sm:pt-6">
@@ -140,7 +152,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const { data, error } = await db
     .from("posts")
-    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed, publish_by_hand, handoff_at, music, tiktok, external_ids")
+    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed, publish_by_hand, handoff_at, music, tiktok, external_ids, voice_media_id")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -171,6 +183,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   // Simone's music: offered on a Reel with a montage, when the service is set up.
   const postMusic = readPostMusic(post.music);
   const musicState = post.kind === "reel" && editor && env("ELEVENLABS_API_KEY") ? { on: postMusic.mode === "on", made: Boolean(postMusic.track) } : undefined;
+  // The voice over the Reel: Simone's (which voice, what it says) or her own voice note.
+  const voiceState = post.kind === "reel" && canEdit ? await loadVoice(db, studioId, post.voice_media_id) : undefined;
   // The studio's text looks (copied by Fauve from examples, or kept by hand), offered on every text.
   const looks = canEdit ? await loadTextLooks(studioId).catch(() => []) : [];
   // Text over the photos of a carousel or photo post, editable by hand.
@@ -209,13 +223,14 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
       {post.kind === "reel" && canEdit && (
         <PublishByHand
-          key={versionKey(post.publish_by_hand, post.handoff_at, post.music)}
+          key={versionKey(post.publish_by_hand, post.handoff_at, post.music, post.voice_media_id)}
           postId={post.id}
           initial={post.publish_by_hand}
           handedOffAt={post.handoff_at ? handedFormat(tz).format(new Date(post.handoff_at)) : null}
           downloadUrl={downloadUrl}
           caption={captionForInstagram(post.caption, post.hashtags)}
           music={musicState}
+          voice={voiceState}
         />
       )}
 

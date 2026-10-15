@@ -26,6 +26,8 @@ export type DeliveryTarget = {
   offerVariant?: boolean;
   /** A new piece of music rather than the one kept for this cut. */
   freshMusic?: boolean;
+  /** Simone recorded a voice over this Reel (its name): said, with how to change it. */
+  voice?: string;
 };
 
 function store(target: DeliveryTarget, fields: { wa_message_id?: string; type: string; body: string; payload?: Record<string, unknown>; media_id?: string }) {
@@ -89,7 +91,10 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const styleCheck = unlocked && (await isFirstReel(target.studioId, target.postId));
   // Short paragraphs, the link right under the first line: it is the one action.
   const intro = `Ton montage « ${r.title} » est prêt 🎬${seconds ? ` (${seconds} s)` : ""}.`;
-  const notes = [target.rationale, target.care].filter(Boolean).join("\n\n");
+  const voiceLine = target.voice
+    ? `J’ai posé une voix off dessus (${target.voice}) : si tu le préfères sans, ou avec une autre voix, dis-le-moi.`
+    : "";
+  const notes = [target.rationale, target.care, voiceLine].filter(Boolean).join("\n\n");
   const after = [
     !unlocked
       ? `Pour le voir en entier et le publier, démarre ton essai : ${TRIAL_DAYS} jours offerts, sans engagement.`
