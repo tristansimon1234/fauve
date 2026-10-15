@@ -81,9 +81,9 @@ export async function POST(request: Request) {
   if (!key) return Response.json({ error: "ELEVENLABS_API_KEY missing" }, { status: 400 });
   const params = new URL(request.url).searchParams;
 
-  const voices = params.get("say");
-  if (voices) {
-    const ids = voices.split(",").filter((id) => /^[A-Za-z0-9]{10,40}$/.test(id)).slice(0, 8);
+  const listed = params.get("say");
+  if (listed) {
+    const ids = listed.split(",").filter((id) => /^[A-Za-z0-9]{10,40}$/.test(id)).slice(0, 8);
     if (!ids.length) return Response.json({ error: "say=<voice id>,<voice id>" }, { status: 400 });
     return say(ids);
   }
