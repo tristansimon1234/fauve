@@ -26,7 +26,7 @@ export * from "./emoji.ts";
 export * from "./tool-status.ts";
 export * from "./turn.ts";
 export * from "./bank.ts";
-export * from "./week.ts";
+export * from "./nudge.ts";
 export * from "./clip-sort.ts";
 export * from "./memory.ts";
 export * from "./jobs.ts";

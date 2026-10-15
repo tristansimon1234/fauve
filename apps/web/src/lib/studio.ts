@@ -105,15 +105,13 @@ export const contentPlanSchema = z.object({
   posts_per_week: z.number().int(),
   stories_per_week: z.number().int(),
   platforms: z.array(platformSchema),
-  post_days: z.array(z.number().int()).nullable().catch(null),
-  post_time: z.string().nullable().catch(null),
 });
 export type ContentPlan = z.infer<typeof contentPlanSchema>;
 
 export async function getContentPlan(db: Db, studioId: string): Promise<ContentPlan | null> {
   const { data, error } = await db
     .from("content_plans")
-    .select("posts_per_week, stories_per_week, platforms, post_days, post_time")
+    .select("posts_per_week, stories_per_week, platforms")
     .eq("studio_id", studioId)
     .maybeSingle();
   if (error) throw new Error(`content_plans: ${error.message}`);

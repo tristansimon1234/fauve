@@ -2,7 +2,7 @@
 // choose without pushing for more. Quality over quantity: a few posts made with
 // care, every week, rather than many made fast.
 
-export const WEEK = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+const WEEK = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 
 /** Posting days spread over the week for each count. */
 const DAYS: Record<number, string[]> = {
@@ -30,12 +30,6 @@ const IDEAS = [
 export function sampleWeek(posts: number): { day: string; idea: string }[] {
   const n = Math.max(1, Math.min(7, Math.round(posts)));
   return DAYS[n]!.map((day, i) => ({ day, idea: IDEAS[i % IDEAS.length]! }));
-}
-
-/** Default posting days for a number of posts a week, 0 = Monday … 6 = Sunday. */
-export function defaultPostDays(posts: number): number[] {
-  const n = Math.max(1, Math.min(7, Math.round(posts)));
-  return DAYS[n]!.map((day) => WEEK.indexOf(day));
 }
 
 /** The presets of the rhythm card, the advised one marked. */

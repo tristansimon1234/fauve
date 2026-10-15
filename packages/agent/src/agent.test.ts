@@ -1277,49 +1277,6 @@ test("bank: a clean shot that moves or hooks is kept, a dark or shaky clip is no
   assert.equal(bankWorthy({ lighting: "ok", shots: [{ ...shot, energy: 1, hook_score: 2 }] } as never), false);
 });
 
-test("week: slots on her days at her hour, stories elsewhere at lunch, nothing before tomorrow", async () => {
-  const { weekSlots, normalizeWeekPlan, weekMessage, filmDay, postDaysOf } = await import("./week.ts");
-  // Week of Monday 2026-10-19; she posts Tuesday, Thursday, Saturday at 18:30.
-  const slots = weekSlots({ monday: "2026-10-19", postDays: [1, 3, 5], postTime: "18:30", postsPerWeek: 3, storiesPerWeek: 2, existing: [], from: "2026-10-19" });
-  assert.deepEqual(
-    slots.map((s) => [s.date, s.time, s.story]),
-    [
-      ["2026-10-19", "12:30", true],
-      ["2026-10-20", "18:30", false],
-      ["2026-10-21", "12:30", true],
-      ["2026-10-22", "18:30", false],
-      ["2026-10-24", "18:30", false],
-    ],
-  );
-  // A post already planned on Tuesday counts toward the rhythm; Monday is past.
-  const later = weekSlots({ monday: "2026-10-19", postDays: [1, 3, 5], postsPerWeek: 3, storiesPerWeek: 0, existing: [{ date: "2026-10-20", story: false }], from: "2026-10-21" });
-  assert.deepEqual(later.map((s) => s.date), ["2026-10-22", "2026-10-24"]);
-  assert.deepEqual(postDaysOf(null, 3), [1, 3, 5]);
-
-  // The planner's answer: one item per known slot, no story on a post slot, unknown media dropped → film.
-  const items = normalizeWeekPlan(
-    {
-      intro: "Voici ta semaine !",
-      items: [
-        { slot: 1, format: "story", title: "Le plat du jour", angle: "Donne faim", media: "bank", media_ids: ["unknown"], film: null },
-        { slot: 1, format: "reel", title: "Doublon", angle: "", media: "text", media_ids: [], film: null },
-        { slot: 3, format: "carousel", title: "Nos producteurs", angle: "Circuit court", media: "site", media_ids: ["site-1"], film: null },
-        { slot: 99, format: "reel", title: "Hors créneau", angle: "", media: "text", media_ids: [], film: null },
-      ],
-    },
-    slots,
-    new Set(["site-1"]),
-  );
-  assert.deepEqual(items.map((i) => [i.date, i.format, i.media]), [["2026-10-20", "reel", "film"], ["2026-10-22", "carousel", "site"]]);
-  assert.ok(items[0]!.film?.label);
-  const message = weekMessage("Voici ta semaine !", items);
-  assert.match(message, /mardi 20 · Reel « Le plat du jour »/);
-  assert.match(message, /À filmer :\nlundi 19 · /);
-  // Filming the day before, never before today.
-  assert.equal(filmDay("2026-10-20", "2026-10-20"), "2026-10-20");
-  assert.equal(filmDay("2026-10-22", "2026-10-19"), "2026-10-21");
-});
-
 test("clip sort: only a sure match on a known publication is kept", async () => {
   const { acceptedSort } = await import("./clip-sort.ts");
   const candidates = new Set(["p1"]);
@@ -1327,4 +1284,19 @@ test("clip sort: only a sure match on a known publication is kept", async () => 
   assert.equal(acceptedSort({ post_id: "p1", sure: false, why: "" }, candidates), null);
   assert.equal(acceptedSort({ post_id: "p2", sure: true, why: "" }, candidates), null);
   assert.equal(acceptedSort({ post_id: null, sure: true, why: "" }, candidates), null);
+});
+
+test("nudge: one short reminder when nothing went out for a while, never twice a week", async () => {
+  const { nudgeAfterDays, shouldNudge, nudgeMessage } = await import("./nudge.ts");
+  assert.equal(nudgeAfterDays(3), 4);
+  assert.equal(nudgeAfterDays(2), 6);
+  assert.equal(nudgeAfterDays(7), 3);
+  const base = { daysSince: 6, upcoming: false, daysSinceNudge: null, postsPerWeek: 3 };
+  assert.equal(shouldNudge(base), true);
+  assert.equal(shouldNudge({ ...base, daysSince: 2 }), false);
+  assert.equal(shouldNudge({ ...base, upcoming: true }), false);
+  assert.equal(shouldNudge({ ...base, daysSinceNudge: 3 }), false);
+  assert.equal(shouldNudge({ ...base, daysSinceNudge: 8 }), true);
+  assert.match(nudgeMessage(6, 0), /^Ça fait 6 jours sans publication 🙂 Envoie-moi les photos ou vidéos que tu as sous la main, je m'occupe du reste\.$/);
+  assert.match(nudgeMessage(6, 2), /vidéos que j'ai gardées/);
 });

@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, PLANS, planOf, postDaysOf, readMemory, reelsPerMonth, validTime } from "@fauve/agent";
+import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, PLANS, planOf, readMemory, reelsPerMonth } from "@fauve/agent";
 import { NoStudio } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
@@ -10,7 +10,6 @@ import { formatPhone, platformLabels, plural, shortUrl } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
 import { getContentPlan, getSocialAccounts, getStudioContext, type SocialAccount } from "@/lib/studio";
 import { signOut } from "../../(onboarding)/connexion/actions";
-import { DaysSetting } from "./days-setting";
 import { EffortSetting } from "./effort-setting";
 import { MemoryList } from "./memory-list";
 import { InstagramLinkCode } from "./instagram-link";
@@ -177,14 +176,13 @@ async function Settings() {
               {plural(plan.posts_per_week, "post", "posts")} et {plural(plan.stories_per_week, "story", "stories")} par
               semaine
               {plan.platforms.length ? `, sur ${plan.platforms.map((p) => platformLabels[p]).join(" et ")}` : ""}.
-              Chaque dimanche soir, Simone te propose ta semaine sur ces jours.
+              Demande à Simone sur WhatsApp pour le changer.
             </p>
           ) : (
             <p className="text-sm leading-normal">
-              Pas encore de rythme choisi. Dis à Simone combien de posts et de stories tu veux par semaine.
+              Pas encore de rythme choisi. Dis à Simone sur WhatsApp combien de posts et de stories tu veux par semaine.
             </p>
           )}
-          <DaysSetting initial={postDaysOf(plan?.post_days, plan?.posts_per_week ?? 3)} time={validTime(plan?.post_time)} />
         </Section>
 
         <Section title="Abonnement">

@@ -68,16 +68,15 @@ const TEMPLATE_DEFINITIONS = [
     ],
   },
   {
-    name: "week_ready",
+    name: "nudge",
     language: "fr",
     category: "UTILITY",
     components: [
       {
         type: "BODY",
-        text: "Ta semaine est prête : {{1}} publications prévues. On la regarde ensemble ?",
-        example: { body_text: [["5"]] },
+        text: "Ça fait {{1}} jours sans publication. Envoie-moi les photos ou vidéos que tu as sous la main, je m’occupe du reste.",
+        example: { body_text: [["6"]] },
       },
-      { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Voir ma semaine" }] },
     ],
   },
   {

@@ -45,20 +45,3 @@ export async function editMemory(change: { add?: string; remove?: string }): Pro
   if (error) return { ok: false, error: "Ce n’est pas enregistré. Réessaie dans un instant." };
   return { ok: true, facts: memory.map((f) => f.fact) };
 }
-
-/** Her posting days (0 = Monday) and hour: what Simone plans each week on. */
-export async function setPostingDays(days: number[], time: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const valid = days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6) && days.length > 0 && /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
-  if (!valid) return { ok: false, error: "Choisis au moins un jour." };
-  const { member } = await getStudioContext();
-  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
-  const { error } = await supabaseAdmin()
-    .from("content_plans")
-    .upsert({ studio_id: member.studio.id, post_days: [...new Set(days)].sort((a, b) => a - b), post_time: time }, { onConflict: "studio_id" });
-  if (error) {
-    console.warn("setPostingDays failed", error.message);
-    return { ok: false, error: "Le réglage n’a pas été enregistré. Réessaie dans un instant." };
-  }
-  revalidatePath("/reglages");
-  return { ok: true };
-}
