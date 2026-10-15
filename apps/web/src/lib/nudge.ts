@@ -23,6 +23,23 @@ async function lastPublication(studioId: string, now: number): Promise<number | 
   return at ? Math.floor((now - new Date(at).getTime()) / DAY) : null;
 }
 
+/** Reminders sent since her last message (any channel). */
+async function unansweredNudges(studioId: string): Promise<number> {
+  const db = supabaseAdmin();
+  const { data: last } = await db
+    .from("whatsapp_messages")
+    .select("created_at")
+    .eq("studio_id", studioId)
+    .eq("direction", "inbound")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let query = db.from("whatsapp_messages").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("direction", "outbound").eq("payload->>kind", "nudge");
+  if (last) query = query.gt("created_at", last.created_at as string);
+  const { count } = await query;
+  return count ?? 0;
+}
+
 /** Sends the reminder if it is time; returns whether it was sent. */
 export async function nudgeIfQuiet(studioId: string, now = Date.now()): Promise<boolean> {
   const db = supabaseAdmin();
@@ -40,7 +57,9 @@ export async function nudgeIfQuiet(studioId: string, now = Date.now()): Promise<
     db.from("media_assets").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("bank", true),
   ]);
   const nudgedAt = studio?.nudged_at as string | null | undefined;
+  const unanswered = await unansweredNudges(studioId);
   const ok = shouldNudge({
+    unanswered,
     daysSince,
     upcoming: Boolean(upcoming),
     daysSinceNudge: nudgedAt ? Math.floor((now - new Date(nudgedAt).getTime()) / DAY) : null,
@@ -50,6 +69,7 @@ export async function nudgeIfQuiet(studioId: string, now = Date.now()): Promise<
   const text = nudgeMessage(daysSince, banked ?? 0);
   await messageOwner(studioId, {
     text,
+    kind: "nudge",
     template: { name: "nudge", params: [daysSince === null ? "quelques" : String(daysSince)] },
   });
   await db.from("studios").update({ nudged_at: new Date(now).toISOString() }).eq("id", studioId);

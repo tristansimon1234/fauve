@@ -14,6 +14,8 @@ export type OwnerMessage = {
   options?: string[];
   /** Memos kept for Simone's next turns (ids she needs). */
   notes?: string[];
+  /** What kind of message it is, kept in its payload (e.g. « nudge », counted by lib/nudge.ts). */
+  kind?: string;
   /** Outside the 24 h window: an approved template and its parameters. */
   template?: { name: string; params: string[] };
 };
@@ -28,7 +30,7 @@ export async function messageOwner(studioId: string, message: OwnerMessage): Pro
     .limit(1)
     .maybeSingle();
   const phone = (owner?.phone_e164 as string | undefined) ?? null;
-  const payload = { ...(message.options?.length ? { options: message.options } : {}), ...(message.notes?.length ? { notes: message.notes } : {}) };
+  const payload = { ...(message.kind ? { kind: message.kind } : {}), ...(message.options?.length ? { options: message.options } : {}), ...(message.notes?.length ? { notes: message.notes } : {}) };
 
   if (phone) {
     const { data: last } = await db

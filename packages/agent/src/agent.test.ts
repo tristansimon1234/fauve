@@ -1291,12 +1291,15 @@ test("nudge: one short reminder when nothing went out for a while, never twice a
   assert.equal(nudgeAfterDays(3), 4);
   assert.equal(nudgeAfterDays(2), 6);
   assert.equal(nudgeAfterDays(7), 3);
-  const base = { daysSince: 6, upcoming: false, daysSinceNudge: null, postsPerWeek: 3 };
+  const base = { daysSince: 6, upcoming: false, daysSinceNudge: null, unanswered: 0, postsPerWeek: 3 };
   assert.equal(shouldNudge(base), true);
   assert.equal(shouldNudge({ ...base, daysSince: 2 }), false);
   assert.equal(shouldNudge({ ...base, upcoming: true }), false);
   assert.equal(shouldNudge({ ...base, daysSinceNudge: 3 }), false);
   assert.equal(shouldNudge({ ...base, daysSinceNudge: 8 }), true);
+  // Two reminders without an answer: no more until she writes.
+  assert.equal(shouldNudge({ ...base, daysSinceNudge: 8, unanswered: 1 }), true);
+  assert.equal(shouldNudge({ ...base, daysSinceNudge: 30, unanswered: 2 }), false);
   assert.match(nudgeMessage(6, 0), /^Ça fait 6 jours sans publication 🙂 Envoie-moi les photos ou vidéos que tu as sous la main, je m'occupe du reste\.$/);
   assert.match(nudgeMessage(6, 2), /vidéos que j'ai gardées/);
 });
