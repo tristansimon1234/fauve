@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import {
   AbsoluteFill,
+  Audio,
   Easing,
   Img,
   OffthreadVideo,
@@ -97,6 +98,7 @@ export function Reel(props: ReelProps) {
           <EndCard props={props} k={k} />
         </Sequence>
       )}
+      {props.soundtrack?.src ? <Audio src={props.soundtrack.src} /> : null}
     </AbsoluteFill>
   );
 }

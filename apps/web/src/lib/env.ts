@@ -20,6 +20,9 @@ const schema = {
   // Secret for the browser test chat (/essai?cle=…). Unset = test chat disabled.
   FAUVE_TEST_KEY: z.string().min(16),
   USD_TO_EUR: z.coerce.number().positive().optional(),
+  // ElevenLabs Music: each Reel's soundtrack, composed from the rendered video. Unset = silent Reels.
+  ELEVENLABS_API_KEY: z.string().min(1).optional(),
+  ELEVENLABS_MUSIC_MODEL: z.string().default("music_v2_5"),
   // Instagram API with Instagram Login (Meta app → Instagram product).
   INSTAGRAM_APP_ID: z.string().regex(/^\d+$/),
   INSTAGRAM_APP_SECRET: z.string().min(1),

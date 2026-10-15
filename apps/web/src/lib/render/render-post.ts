@@ -16,10 +16,12 @@ import {
   postStatusSchema,
   renderDuration,
   type EditPlan,
+  type PostKind,
   type PostStatus,
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { logoTone } from "./logo-tone";
+import { withMusic } from "./music";
 import { renderInSandbox, renderReelInSandbox, smokeTestScenes } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -126,12 +128,12 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
  * Renders the post's current edit plan (or the version given, which becomes the
  * current one) to MP4, stores it and links it to the post.
  */
-export async function renderPost(studioId: string, postId: string, options: { editPlanId?: string } = {}): Promise<RenderResult> {
+export async function renderPost(studioId: string, postId: string, options: { editPlanId?: string; freshMusic?: boolean } = {}): Promise<RenderResult> {
   const db = supabaseAdmin();
   const post = check(
     await db
       .from("posts")
-      .select("id, title, caption, hashtags, status, edit_plan_id")
+      .select("id, title, kind, caption, hashtags, status, edit_plan_id")
       .eq("id", postId)
       .eq("studio_id", studioId)
       .single(),
@@ -201,6 +203,12 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     } else {
       mp4 = await ffmpegRender();
     }
+    // Simone's music, composed for this cut (or the one kept for it), on the video.
+    const voiced = await withMusic({ studioId, postId, kind: post.kind as PostKind, plan, mp4, renderId, fresh: options.freshMusic }).catch((error: unknown) => {
+      console.warn("music unavailable, silent Reel", renderId, error);
+      return { mp4, music: "none" as const };
+    });
+    mp4 = voiced.mp4;
     const storagePath = `${studioId}/renders/${renderId}.mp4`;
     check(await db.storage.from("media").upload(storagePath, mp4, { contentType: "video/mp4", upsert: true }));
     check(await db.from("renders").update({ status: "done", storage_path: storagePath, duration_ms: durationMs }).eq("id", renderId));

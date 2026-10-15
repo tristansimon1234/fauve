@@ -23,6 +23,8 @@ export type DeliveryTarget = {
   note?: string;
   /** Offers a variant at the end (not after Max, which already compared two versions). */
   offerVariant?: boolean;
+  /** A new piece of music rather than the one kept for this cut. */
+  freshMusic?: boolean;
 };
 
 function store(target: DeliveryTarget, fields: { wa_message_id?: string; type: string; body: string; payload?: Record<string, unknown> }) {
@@ -64,7 +66,7 @@ export async function notifyStudio(target: Pick<DeliveryTarget, "studioId" | "wa
  */
 export async function renderAndDeliver(target: DeliveryTarget): Promise<{ title: string } | null> {
   try {
-    const r = await renderPost(target.studioId, target.postId);
+    const r = await renderPost(target.studioId, target.postId, { freshMusic: target.freshMusic });
     await deliverMontage(target, r);
     return { title: r.title };
   } catch (error) {

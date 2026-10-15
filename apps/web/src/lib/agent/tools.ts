@@ -37,6 +37,7 @@ import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
 import { notifyFailure, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
+import { readPostMusic } from "@/lib/render/music";
 import { saveSlides } from "@/lib/render/slides";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
@@ -568,6 +569,17 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         status: "started",
         note: "Le montage démarre après ta réponse et la vidéo sera envoyée automatiquement (environ une minute). Annonce-le en une phrase, sans décrire la vidéo comme si elle était déjà prête.",
       });
+    },
+
+    async set_music({ post_id, mode }) {
+      const post = unwrap(await db.from("posts").select("id, kind, status, edit_plan_id, music").eq("id", post_id).eq("studio_id", studioId).single());
+      if (post.kind !== "reel" || !post.edit_plan_id) return json({ error: "La musique se met sur un Reel monté." });
+      if (["published", "measured"].includes(post.status as string)) return json({ error: "Ce Reel est déjà en ligne." });
+      check(await db.from("posts").update({ music: { ...readPostMusic(post.music), mode: mode === "off" ? "off" : "on" } }).eq("id", post_id));
+      ctx.afterReply.push(async () => {
+        await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, freshMusic: mode === "another" });
+      });
+      return json({ status: "started", note: "La vidéo se refait (1 à 2 min) et le lien part tout seul. Dis-le en une phrase." });
     },
 
     async write_on_photos({ post_id, template, slides }) {

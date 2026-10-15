@@ -1,4 +1,5 @@
 import "server-only";
+import { readPostMusic } from "@/lib/render/music";
 import { editPlanSchema, isClipSegment, motionTemplateSchema, type ReelInputs } from "@fauve/agent";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -10,7 +11,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
  */
 export async function loadEditorData(studioId: string, planId: string, extraMedia: string[] = []) {
   const db = supabaseAdmin();
-  const { data } = await db.from("edit_plans").select("plan").eq("id", planId).eq("studio_id", studioId).maybeSingle();
+  const { data } = await db.from("edit_plans").select("plan, post_id").eq("id", planId).eq("studio_id", studioId).maybeSingle();
   const plan = editPlanSchema.safeParse(data?.plan);
   if (!plan.success) return null;
   const template = motionTemplateSchema.safeParse(plan.data.template);
@@ -24,6 +25,11 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
   const inputs = await loadMontageInputs(studioId, {
     segments: [...plan.data.segments, ...extraVideos.map((clip_id) => ({ clip_id, in: 0, out: 1, zoom: "none" as const }))],
   });
+  // Simone's music plays in the live preview too (the piece kept for this post).
+  const { data: post } = data?.post_id ? await db.from("posts").select("music").eq("id", data.post_id).maybeSingle() : { data: null };
+  const music = readPostMusic(post?.music);
+  const soundtrack =
+    music.mode === "on" && music.track ? ((await db.storage.from("media").createSignedUrl(music.track.path, 3600)).data?.signedUrl ?? undefined) : undefined;
   return {
     plan: plan.data,
     clipDurations: inputs.clipDurations,
@@ -33,6 +39,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       photoIds: inputs.photoIds,
       words: inputs.words,
       brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts },
+      ...(soundtrack ? { soundtrack } : {}),
     } satisfies ReelInputs,
   };
 }
