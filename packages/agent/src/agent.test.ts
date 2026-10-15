@@ -1183,3 +1183,44 @@ test("voice: Scribe words, phrases on the Reel's clock, subtitles and speech", a
   assert.equal(plain.segments[0]!.type === "clip" && plain.segments[0]!.speech, true);
   assert.equal(plain.voice, undefined);
 });
+
+test("tempo: cuts and texts on the beats, one signature transition, the rhythm for the critic", async () => {
+  const { snapToTempo, beatOf } = await import("./tempo.ts");
+  const { normalizeEditPlan } = await import("./editor.ts");
+  const { planTimeline } = await import("./motion.ts");
+  const { rhythmLine } = await import("./critic.ts");
+  const beat = beatOf("dynamique")!; // 120 BPM: 0.5 s
+  const plan = editPlanObjectSchema.parse({
+    ...validPlan,
+    template: "dynamique",
+    duration: 6,
+    images: [],
+    transitions: "cut",
+    segments: [
+      { clip_id: "a", in: 0, out: 1.37, zoom: "none", accent: "punch" },
+      { clip_id: "b", in: 2, out: 3.1, zoom: "none", accent: "wipe" },
+      { clip_id: "a", in: 3, out: 5.66, zoom: "none" },
+    ],
+    texts: [{ text: "Le geste juste", from: 0.1, to: 1.2, style: "hook" }],
+  });
+  const snapped = snapToTempo(plan, { a: 10, b: 3.3 });
+  const starts = planTimeline(snapped).segments.map((s) => s.start);
+  for (const t of starts) assert.ok(Math.abs(t - Math.round(t / beat) * beat) < 0.025, `cut at ${t}`);
+  assert.equal(snapped.texts[0]!.from, 0);
+  assert.ok(snapped.texts[0]!.to - snapped.texts[0]!.from >= 1.5);
+  // A clip never goes past its end: b (3.3 s long) starts at 2, so at most 1.3 s → 1 s (2 beats).
+  const b = snapped.segments[1]!;
+  assert.ok("clip_id" in b && b.out <= 3.3);
+  // Crossfades: each cut still on a beat (the overlap is added to the lengths).
+  const faded = snapToTempo({ ...plan, template: "doux", transitions: "fade" }, { a: 10, b: 10 });
+  const doux = beatOf("doux")!;
+  for (const t of planTimeline(faded).segments.map((s) => s.start)) assert.ok(Math.abs(t - Math.round(t / doux) * doux) < 0.025, `faded cut at ${t}`);
+  // Over her voice: no grid.
+  assert.deepEqual(snapToTempo({ ...plan, voice: { media_id: "v", at: 0.3 } }, { a: 10, b: 3.3 }).segments, plan.segments);
+
+  const normalized = normalizeEditPlan(plan, { a: 10, b: 3.3 });
+  assert.equal(normalized.segments.filter((s) => "accent" in s && s.accent).length, 1);
+  assert.match(rhythmLine(normalized), /2 coupes sur 2 sur un temps \(120 BPM\)/);
+  assert.match(rhythmLine(normalized), /transition signature : punch à la scène 1/);
+});
+

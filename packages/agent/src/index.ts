@@ -41,3 +41,4 @@ export * from "./tiktok.ts";
 export * from "./growth.ts";
 export * from "./ai-image.ts";
 export * from "./voice.ts";
+export * from "./tempo.ts";

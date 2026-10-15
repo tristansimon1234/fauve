@@ -66,6 +66,8 @@ export const editPlanSegmentSchema = z.object({
   blur: clipBlurSchema.optional(),
   /** A photo in a Reel: its retouch and blurred zones (as on a carousel slide). */
   photo: photoEditSchema.optional(),
+  /** The Reel's one signature transition into this shot (punch: a short zoom that settles; wipe: a panel in the brand colour sweeps away). At most one per Reel. */
+  accent: z.enum(["punch", "wipe"]).optional(),
 });
 
 /** Full motion-design screen (animated typography in the studio's colours, no video). */
