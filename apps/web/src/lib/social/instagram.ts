@@ -275,6 +275,14 @@ export async function recentMedia(
   return res.data;
 }
 
+export type InstagramStory = { id: string; media_type?: string; permalink?: string; timestamp?: string };
+
+/** The account's stories still online (the last 24 h), to find one she published herself. */
+export async function recentStories(userId: string, accessToken: string): Promise<InstagramStory[]> {
+  const res = await call<{ data: InstagramStory[] }>(graphUrl(accessToken, `${userId}/stories?${q({ fields: "id,media_type,permalink,timestamp", access_token: accessToken })}`));
+  return res.data;
+}
+
 /** The account's public profile, for the grid preview. */
 export async function profile(userId: string, accessToken: string): Promise<InstagramProfile> {
   return call<InstagramProfile>(

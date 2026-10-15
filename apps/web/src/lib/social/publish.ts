@@ -145,6 +145,13 @@ async function reelCover(studioId: string, chosen: unknown): Promise<{ at: numbe
   return { at: cover && "at" in cover ? cover.at : DEFAULT_COVER_SECONDS };
 }
 
+/** A story's picture or video: its montage if it has one, else its first photo or video. */
+export async function storyItem(studioId: string, renderId: string | null, mediaIds: string[]): Promise<{ type: "image" | "video"; url: string }> {
+  const [item] = renderId ? [{ type: "video" as const, url: await renderUrl(renderId) }] : await publishItems(studioId, mediaIds.slice(0, 1));
+  if (!item) throw new Error("Aucune photo ni vidéo pour cette story");
+  return item;
+}
+
 /** What to publish for each kind: a Reel is the montage; posts, carousels and stories use the post's media. */
 async function publishRequest(
   studioId: string,
@@ -157,11 +164,7 @@ async function publishRequest(
   shareToFeed = true,
 ): Promise<PublishRequest> {
   if (kind === "reel") return { kind: "reel", videoUrl: await renderUrl(renderId), caption, cover: await reelCover(studioId, chosenCover), shareToFeed };
-  if (kind === "story") {
-    const [item] = renderId ? [{ type: "video" as const, url: await renderUrl(renderId) }] : await publishItems(studioId, mediaIds.slice(0, 1));
-    if (!item) throw new Error("Aucune photo ni vidéo pour cette story");
-    return { kind: "story", item };
-  }
+  if (kind === "story") return { kind: "story", item: await storyItem(studioId, renderId, mediaIds) };
   const items = await publishItems(studioId, mediaIds, rendered);
   if (kind === "carousel") {
     if (items.length < 2) throw new Error("Un carrousel demande au moins 2 photos ou vidéos");

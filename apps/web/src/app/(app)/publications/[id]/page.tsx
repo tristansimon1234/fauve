@@ -24,6 +24,7 @@ import { versionKey } from "@/lib/version-key";
 import { deletePost } from "./actions";
 import { CoverPicker } from "@/components/montage/cover-picker";
 import { PublishByHand } from "@/components/montage/publish-by-hand";
+import { StoryLink } from "@/components/montage/story-link";
 import { WhereToPost, type TikTokPanel } from "@/components/montage/where-to-post";
 import { creatorInfo, tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import { tiktokAccount, tiktokCanTake } from "@/lib/social/tiktok-account";
@@ -181,6 +182,9 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
       : null;
 
   const tiktok = await tiktokPanel(studioId, post, canEdit);
+  // A story with a link: her booking link goes with it on WhatsApp.
+  const bookingUrl =
+    post.kind === "story" && canEdit ? (((await db.from("studios").select("booking_url").eq("id", studioId).single()).data?.booking_url as string | null) ?? null) : null;
   const sentToTikTok = readTikTokExternal(post.external_ids);
   const tiktokLine = sentToTikTok ? tiktokStateLine(sentToTikTok) : null;
 
@@ -208,6 +212,16 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           downloadUrl={downloadUrl}
           caption={captionForInstagram(post.caption, post.hashtags)}
           music={musicState}
+        />
+      )}
+
+      {post.kind === "story" && canEdit && (post.platforms.includes("instagram") || !post.platforms.length) && (
+        <StoryLink
+          key={versionKey(post.publish_by_hand, post.handoff_at)}
+          postId={post.id}
+          initial={post.publish_by_hand}
+          handedOffAt={post.handoff_at ? handedFormat(tz).format(new Date(post.handoff_at)) : null}
+          bookingUrl={bookingUrl}
         />
       )}
 
