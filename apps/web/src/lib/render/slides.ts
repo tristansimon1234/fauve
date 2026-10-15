@@ -11,7 +11,7 @@ import {
 import { jpegPath } from "@/lib/social/media-urls";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { loadMontageInputs, towardsDraft } from "./render-post";
-import { renderStillsInSandbox } from "./sandbox";
+import { renderStillsInSandbox, sandboxCostEur } from "./sandbox";
 
 // Text over the photos of a carousel or photo post: the plan lives in
 // posts.slides, the rendered JPEGs in posts.slides_render (published instead of
@@ -140,11 +140,13 @@ export async function renderSlides(studioId: string, postId: string): Promise<Sl
           return path;
         }),
       );
+      const seconds = Math.round((Date.now() - started) / 1000);
       await db.from("cost_events").insert({
         studio_id: studioId,
         kind: "render",
         provider: "vercel_sandbox",
-        units: Math.round((Date.now() - started) / 1000),
+        units: seconds,
+        cost_eur: sandboxCostEur(seconds),
         meta: { post_id: postId, engine: "remotion_still", slides: jobs.length },
       });
     }

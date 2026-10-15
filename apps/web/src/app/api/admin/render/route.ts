@@ -1,4 +1,5 @@
-import { type NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
 import { renderPost } from "@/lib/render/render-post";
 import { remotionSandbox } from "@/lib/render/sandbox";
@@ -9,8 +10,25 @@ import { isValidTestKey } from "@/lib/test-studio";
 //   ?cle=…&post=<post id>  renders the post's latest edit plan and returns a 24 h link.
 //   ?cle=…&action=warm     installs the Remotion templates in the sandbox ahead of the first render.
 //   ?cle=…&post=…&design=1[&brief=…]  has the editor (Opus) write a new plan first, then renders it.
+// And POST ?action=warm with CRON_SECRET, from the database (call_app): the same warm-up,
+// in the background (a new sandbox installs everything once, a few minutes).
 
-export const maxDuration = 300;
+export const maxDuration = 800;
+
+export async function POST(request: NextRequest) {
+  if (!cronAuthorized(request)) return new Response("Forbidden", { status: 403 });
+  if (request.nextUrl.searchParams.get("action") !== "warm") return Response.json({ error: "unknown action" }, { status: 400 });
+  after(async () => {
+    const started = Date.now();
+    try {
+      await remotionSandbox();
+      console.log("render sandbox warm", { elapsedMs: Date.now() - started });
+    } catch (error) {
+      console.error("render sandbox warm-up failed", error);
+    }
+  });
+  return Response.json({ ok: true, warming: true }, { status: 202 });
+}
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;

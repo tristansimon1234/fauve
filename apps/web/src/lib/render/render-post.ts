@@ -25,7 +25,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { logoTone } from "./logo-tone";
 import { withMusic } from "./music";
-import { renderInSandbox, renderReelInSandbox, smokeTestScenes } from "./sandbox";
+import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
@@ -241,11 +241,13 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     for (const next of towardsDraft(status)) status = next;
     check(await db.from("posts").update({ render_id: renderId, status, ...(options.editPlanId ? { edit_plan_id: planRow.id } : {}) }).eq("id", postId));
 
+    const seconds = Math.round((Date.now() - started) / 1000);
     await db.from("cost_events").insert({
       studio_id: studioId,
       kind: "render",
       provider: "vercel_sandbox",
-      units: Math.round((Date.now() - started) / 1000),
+      units: seconds,
+      cost_eur: sandboxCostEur(seconds),
       meta: { render_id: renderId, engine, template: plan.template, seconds_of_video: durationMs / 1000, bytes: mp4.length },
     });
 

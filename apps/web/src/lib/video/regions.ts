@@ -5,13 +5,13 @@ import {
   clipDetectionSchema,
   PHOTO_DETECT_PROMPT,
   photoDetectionSchema,
-  usdToEur,
   type ClipDetection,
   type PhotoDetection,
 } from "@fauve/agent";
 import sharp from "sharp";
 import { z } from "zod";
 import { env } from "@/lib/env";
+import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // What Gemini sees in a photo or a clip for retouching and blurring: sensitive
@@ -44,24 +44,6 @@ const storedSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("clip"), aspect: z.number(), detection: clipDetectionSchema, model: z.string() }),
 ]);
 export type StoredRegions = z.infer<typeof storedSchema>;
-
-async function logCost(studioId: string, model: string, usage: Record<string, number | undefined> | undefined) {
-  const input = usage?.promptTokenCount ?? 0;
-  const output = (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0);
-  const inPrice = env("GEMINI_INPUT_USD_PER_MTOK");
-  const outPrice = env("GEMINI_OUTPUT_USD_PER_MTOK");
-  const usd = inPrice !== undefined && outPrice !== undefined ? (input * inPrice + output * outPrice) / 1e6 : null;
-  await supabaseAdmin()
-    .from("cost_events")
-    .insert({
-      studio_id: studioId,
-      kind: "region_detection",
-      provider: "google",
-      units: input + output,
-      cost_eur: usd === null ? 0 : usdToEur(usd, env("USD_TO_EUR")),
-      meta: { model, usage, cost_usd: usd, priced: usd !== null },
-    });
-}
 
 async function loadAsset(studioId: string, mediaId: string) {
   const { data, error } = await supabaseAdmin()
@@ -102,7 +84,7 @@ export async function photoRegions(studioId: string, mediaId: string): Promise<E
     contents: [{ role: "user", parts: [{ inlineData: { mimeType: "image/jpeg", data: jpeg.toString("base64") } }, { text: PHOTO_DETECT_PROMPT }] }],
     config: { responseMimeType: "application/json", responseJsonSchema: geminiSchema(photoDetectionSchema) },
   });
-  await logCost(studioId, model, response.usageMetadata as Record<string, number | undefined> | undefined);
+  await logGeminiCost({ studioId, kind: "region_detection", model, usage: response.usageMetadata as GeminiUsage });
   const detection: PhotoDetection = photoDetectionSchema.parse(JSON.parse(response.text ?? ""));
   const stored = { kind: "photo" as const, width, height, detection, model };
   await keep(mediaId, stored);
@@ -140,7 +122,7 @@ export async function clipRegions(studioId: string, mediaId: string): Promise<Ex
       contents: [{ role: "user", parts: [{ fileData: { fileUri: file.uri, mimeType }, videoMetadata: { fps: 4 } }, { text: CLIP_DETECT_PROMPT }] }],
       config: { responseMimeType: "application/json", responseJsonSchema: geminiSchema(clipDetectionSchema) },
     });
-    await logCost(studioId, model, response.usageMetadata as Record<string, number | undefined> | undefined);
+    await logGeminiCost({ studioId, kind: "region_detection", model, usage: response.usageMetadata as GeminiUsage });
     const detection: ClipDetection = clipDetectionSchema.parse(JSON.parse(response.text ?? ""));
     const stored = { kind: "clip" as const, aspect, detection, model };
     await keep(mediaId, stored);

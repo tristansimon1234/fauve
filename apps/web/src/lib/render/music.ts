@@ -1,5 +1,5 @@
 import "server-only";
-import { isClipSegment, isMotionSegment, TEMPLATE_BPM, type EditPlan, type MotionTemplate, type PostKind } from "@fauve/agent";
+import { isClipSegment, isMotionSegment, musicCostUsd, TEMPLATE_BPM, usdToEur, type EditPlan, type MotionTemplate, type PostKind } from "@fauve/agent";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { env } from "@/lib/env";
@@ -140,13 +140,15 @@ export async function withMusic(params: {
       .from("posts")
       .update({ music: { mode: "on", track: { path, signature, song_id: composed.songId, created_at: new Date().toISOString() } } })
       .eq("id", params.postId);
-    // Logged from day one; the price per composition is not known yet (cost_eur left empty).
+    // Billed by the length of the track, which is the Reel's.
+    const usd = musicCostUsd(params.plan.duration);
     await db.from("cost_events").insert({
       studio_id: params.studioId,
       kind: "music",
       provider: "elevenlabs",
       units: 1,
-      meta: { post_id: params.postId, render_id: params.renderId, song_id: composed.songId, model: env("ELEVENLABS_MUSIC_MODEL"), signature, ms: composed.ms },
+      cost_eur: usdToEur(usd, env("USD_TO_EUR")),
+      meta: { post_id: params.postId, render_id: params.renderId, song_id: composed.songId, model: env("ELEVENLABS_MUSIC_MODEL"), signature, ms: composed.ms, seconds: params.plan.duration, cost_usd: usd },
     });
   }
   return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice) }), music: made };

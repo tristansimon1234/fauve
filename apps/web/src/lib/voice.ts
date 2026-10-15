@@ -1,5 +1,5 @@
 import "server-only";
-import { fromScribe, voiceTranscriptSchema, type VoiceTranscript } from "@fauve/agent";
+import { fromScribe, transcriptionCostUsd, usdToEur, voiceTranscriptSchema, type VoiceTranscript } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -35,12 +35,13 @@ export async function ensureTranscript(studioId: string, mediaId: string): Promi
     const transcript = fromScribe(await res.json());
     await Promise.all([
       db.from("media_assets").update({ transcript, duration: transcript.duration || null }).eq("id", mediaId),
-      // Logged from day one; billed by the hour of audio (price to fill in, like the music).
+      // Billed by the hour of audio.
       db.from("cost_events").insert({
         studio_id: studioId,
         kind: "transcription",
         provider: "elevenlabs",
         units: transcript.duration,
+        cost_eur: usdToEur(transcriptionCostUsd(transcript.duration), env("USD_TO_EUR")),
         meta: { media_id: mediaId, model: env("ELEVENLABS_STT_MODEL"), purpose: "transcription", ms: Date.now() - started },
       }),
     ]);
