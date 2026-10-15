@@ -160,12 +160,28 @@ const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
 
 const DEFAULT_ACCENT = "#5B3FD9";
 
-/** White or ink text on top of the accent colour, whichever reads better. */
-function inkOn(hex: string): string {
+/**
+ * White or ink text on top of the accent colour, whichever has the better contrast
+ * (WCAG): a mid-tone accent (a dusty pink, a sage) takes ink, white on it would not read.
+ */
+export function inkOn(hex: string): string {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-  return luminance > 0.45 ? "#1C1530" : "#FFFFFF";
+  // #1C1530, the ink of the app, has a luminance of about 0.01.
+  return (luminance + 0.05) / 0.06 > 1.05 / (luminance + 0.05) ? "#1C1530" : "#FFFFFF";
+}
+
+/**
+ * The business's name kept on one line: the spaces inside it become non-breaking, so
+ * « Trattoria Sole » never ends a line on « Trattoria » (the renderers split words on
+ * the other spaces only).
+ */
+export function keepName(text: string, name: string | undefined): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return text;
+  const escaped = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return text.replace(new RegExp(escaped.join("[ \\t]+"), "giu"), (found) => found.replace(/[ \t]+/g, "\u00a0"));
 }
 
 const toFrames = (seconds: number) => Math.max(0, Math.round(seconds * REEL_FPS));
@@ -268,7 +284,19 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     .map((t) => {
       const from = toFrames(t.from);
       const to = Math.min(toFrames(t.to), durationInFrames);
-      return { text: t.text, style: t.style, emphasis: t.emphasis ?? [], from, durationInFrames: to - from, y: t.y, x: t.x, scale: t.scale, backdrop: t.backdrop, ...brandLooks(t, brand) };
+      const name = inputs.brand.name;
+      return {
+        text: keepName(t.text, name),
+        style: t.style,
+        emphasis: (t.emphasis ?? []).map((e) => keepName(e, name)),
+        from,
+        durationInFrames: to - from,
+        y: t.y,
+        x: t.x,
+        scale: t.scale,
+        backdrop: t.backdrop,
+        ...brandLooks(t, brand),
+      };
     })
     .filter((t) => t.durationInFrames > 0);
 
@@ -323,7 +351,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     words,
     brand,
     endCard: plan.end_card
-      ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, durationInFrames - endCardFrames) }
+      ? { title: keepName(plan.end_card.title, inputs.brand.name), subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, durationInFrames - endCardFrames) }
       : null,
     ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack, ...music } } : {}),
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),

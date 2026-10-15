@@ -1430,7 +1430,7 @@ test("editor: the signature transition goes on the shot where the band appears, 
   const { z } = await import("zod");
   const base = {
     format: "9:16" as const,
-    duration: 9,
+    duration: 11,
     template: "dynamique" as const,
     images: [],
     transitions: "cut" as const,
@@ -1440,6 +1440,7 @@ test("editor: the signature transition goes on the shot where the band appears, 
       { clip_id: "a", in: 0, out: 3, zoom: "none" as const },
       { clip_id: "b", in: 0, out: 3, zoom: "none" as const },
       { clip_id: "c", in: 0, out: 3, zoom: "none" as const },
+      { clip_id: "d", in: 0, out: 2, zoom: "none" as const },
     ],
     texts: [
       { text: "Le geste juste", from: 0, to: 2, style: "hook" as const },
@@ -1448,7 +1449,7 @@ test("editor: the signature transition goes on the shot where the band appears, 
   };
   assert.equal(signatureShot(base), 2);
   const plan = fromEditorPlan(base);
-  assert.deepEqual(plan.segments.map((s) => ("accent" in s ? s.accent : undefined)), [undefined, undefined, "punch"]);
+  assert.deepEqual(plan.segments.map((s) => ("accent" in s ? s.accent : undefined)), [undefined, undefined, "punch", undefined]);
   assert.equal(signatureShot({ ...base, texts: [base.texts[0]!] }), null);
   // The editor writes no accent: the structured-output grammar is at the API's limit.
   assert.doesNotMatch(JSON.stringify(z.toJSONSchema(editorOutputSchema, { unrepresentable: "any" })), /"accent":/);
@@ -1677,4 +1678,86 @@ test("acting tags are played, never read in the subtitles", async () => {
   assert.equal(t.text, "Viens ce soir. Promis.");
   assert.equal(spokenWords(text), 4);
   assert.equal(stripAudioTags("Tu sais pourquoi ? [warmly] Viens."), "Tu sais pourquoi ? Viens.");
+});
+
+test("voice: the hook keeps the first phrase, other texts move to its silences", async () => {
+  const { clearOfVoice } = await import("./editor.ts");
+  const phrases = [
+    { start: 0.3, end: 2.1 },
+    { start: 2.4, end: 6 },
+    { start: 7.6, end: 11 },
+  ];
+  const texts = [
+    { text: "ta pizza, sans raccourci", from: 0, to: 3.5, style: "hook" },
+    { text: "48 h de pousse", from: 3, to: 5, style: "band" },
+    { text: "réserve ta table", from: 10, to: 13, style: "caption" },
+  ];
+  const kept = clearOfVoice(texts, phrases, 13);
+  // The hook ends soon after the first phrase; the band waits for the pause; the invitation for the voice's end.
+  assert.deepEqual(
+    kept.map((t) => [t.text, t.from, t.to]),
+    [
+      ["ta pizza, sans raccourci", 0, 2.5],
+      ["48 h de pousse", 6.1, 7.6],
+      ["réserve ta table", 11.1, 13],
+    ],
+  );
+  // No quiet moment long enough: the text goes.
+  assert.deepEqual(clearOfVoice([{ text: "x", from: 3, to: 5, style: "band" }], [{ start: 0.3, end: 12 }], 12.5), []);
+});
+
+test("voice: the last shot holds after the last word when its clip has room", async () => {
+  const { holdAfterVoice } = await import("./editor.ts");
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 8,
+    segments: [
+      { clip_id: "a", in: 0, out: 4, zoom: "none" },
+      { clip_id: "b", in: 1, out: 5, zoom: "none" },
+    ],
+    texts: [],
+    images: [],
+  });
+  const held = holdAfterVoice(plan, 8.2, { a: 10, b: 20 });
+  const last = held.segments.at(-1)!;
+  assert.equal("clip_id" in last ? last.out : null, 6.7);
+  assert.equal(held.duration, 9.7);
+  // No room left in the clip: unchanged.
+  assert.equal(holdAfterVoice(plan, 8.2, { a: 10, b: 5 }), plan);
+});
+
+test("ending: the last text cut by the end starts earlier, never over another one", async () => {
+  const { readableEnding } = await import("./editor.ts");
+  const texts = [
+    { from: 2, to: 6 },
+    { from: 9.3, to: 10 },
+  ];
+  assert.deepEqual(readableEnding(texts, [], 10), [
+    { from: 2, to: 6 },
+    { from: 8.2, to: 10 },
+  ]);
+  // Over an animation: left as it was (normalize drops it when too short).
+  assert.deepEqual(readableEnding(texts, [{ from: 8, to: 9.2 }], 10).at(-1), { from: 9.3, to: 10 });
+});
+
+test("signature transition: never on the last shot", async () => {
+  const { signatureShot } = await import("./editor.ts");
+  const segments = [
+    { clip_id: "a", in: 0, out: 2 },
+    { clip_id: "b", in: 0, out: 2 },
+    { clip_id: "c", in: 0, out: 3 },
+  ];
+  assert.equal(signatureShot({ segments, texts: [{ style: "band", from: 2.1 }], transitions: "cut" }), 1);
+  assert.equal(signatureShot({ segments, texts: [{ style: "band", from: 4.2 }], transitions: "cut" }), null);
+});
+
+test("brand: ink on a mid-tone accent, the business's name on one line", async () => {
+  const { inkOn, keepName } = await import("./motion.ts");
+  // A dusty pink takes ink (white on it reads at 2.8:1), a deep plum keeps white.
+  assert.equal(inkOn("#C9898F"), "#1C1530");
+  assert.equal(inkOn("#5B3FD9"), "#FFFFFF");
+  assert.equal(inkOn("#F2694E"), "#1C1530");
+  assert.equal(keepName("Viens chez Trattoria Sole ce soir", "Trattoria Sole"), "Viens chez Trattoria Sole ce soir");
+  assert.equal(keepName("atelier mila, rue des Lilas", "Atelier Mila"), "atelier mila, rue des Lilas");
+  assert.equal(keepName("Maya", "Maya"), "Maya");
 });

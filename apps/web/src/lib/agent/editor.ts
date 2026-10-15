@@ -10,6 +10,9 @@ import {
   type MediaFacts,
   carryRetouch,
   carryTextStyle,
+  clearOfVoice,
+  END_CARD_SECONDS,
+  holdAfterVoice,
   brandProfileSchema,
   CLAUDE_MODEL,
   EDITOR_SYSTEM_PROMPT,
@@ -270,6 +273,11 @@ export async function designEdit(params: {
   if (voice && voiceId) {
     plan.voice = { media_id: voiceId, at: VOICE_AT };
     plan.subtitles = true;
+    // Her voice leads: the Reel holds a moment after its last word, and the other texts keep to
+    // its silences (its words are the subtitles; the hook stays over its first phrase).
+    const spoken = voiceForEditor(voice);
+    Object.assign(plan, holdAfterVoice(plan, spoken.ends_at, durations));
+    plan.texts = clearOfVoice(plan.texts, spoken.phrases, plan.end_card ? plan.duration - END_CARD_SECONDS : plan.duration);
   } else delete plan.voice;
 
   // Library scenes: their saved code, with the new texts. An unknown id becomes a new scene.

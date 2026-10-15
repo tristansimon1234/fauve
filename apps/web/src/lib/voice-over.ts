@@ -17,7 +17,7 @@ import {
   usdToEur,
   VOICE_MAX_SECONDS,
   VOICE_OVER_PROMPT,
-  VOICE_OVER_WORDS,
+  voiceWordsFor,
   voiceOverScriptSchema,
   type VoiceOverScript,
   type VoiceTranscript,
@@ -60,7 +60,16 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
     return a?.success ? [{ video: a.data.summary, plans: a.data.shots.slice(0, 6).map((s) => s.description) }] : [];
   });
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.profile ?? {});
+  // What there is to show: the videos' length, a photo about 2 s.
+  const footage = ids.reduce((sum, id) => {
+    const asset = kinds.get(id);
+    if (asset?.kind === "image") return sum + 2;
+    const a = read.get(id);
+    return sum + (a?.success ? a.data.duration : 0);
+  }, 0);
+  const length = voiceWordsFor(footage);
   return {
+    longueur: { mots_min: length.min, mots_max: length.max },
     commerce: {
       nom: studio.data?.name ?? undefined,
       activite: studio.data?.business_type ?? undefined,
@@ -93,8 +102,9 @@ export async function writeVoiceScript(studioId: string, postId: string, wish?: 
     if (!script) throw new Error("La voix off n'a pas pu être écrite");
     const words = spokenWords(script.script);
     // Too long, it would not fit in a Reel; too short, it says nothing: once more.
-    if ((words >= VOICE_OVER_WORDS.min - 8 && words <= VOICE_OVER_WORDS.max + 8) || attempt >= 1) return script;
-    input.publication = { ...input.publication, angle: `${input.publication.angle ?? ""} La version précédente faisait ${words} mots : vise ${VOICE_OVER_WORDS.min} à ${VOICE_OVER_WORDS.max}.`.trim() };
+    const { mots_min: min, mots_max: max } = input.longueur;
+    if ((words >= min - 6 && words <= max + 4) || attempt >= 1) return script;
+    input.publication = { ...input.publication, angle: `${input.publication.angle ?? ""} La version précédente faisait ${words} mots : vise ${min} à ${max}.`.trim() };
   }
 }
 
