@@ -44,6 +44,7 @@ import { readPostMusic } from "@/lib/render/music";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
+import { defaultPlatforms, tiktokAccount } from "@/lib/social/tiktok-account";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { elementInstance, listElements, loadElement, markElementsUsed, placeElements } from "@/lib/elements";
@@ -298,7 +299,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const post = unwrap(
         await db
           .from("posts")
-          .insert({ studio_id: studioId, status: "planned", ...input })
+          .insert({ studio_id: studioId, status: "planned", ...input, platforms: input.platforms ?? (await defaultPlatforms(studioId, input.kind)) })
           .select("id, kind, title, scheduled_at, status")
           .single(),
       );
@@ -1030,12 +1031,16 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async schedule_post({ post_id, scheduled_at }) {
       const post = unwrap(
-        await db.from("posts").select("id, kind, status, render_id, media_ids, scheduled_at").eq("id", post_id).eq("studio_id", studioId).single(),
+        await db.from("posts").select("id, kind, status, render_id, media_ids, scheduled_at, platforms").eq("id", post_id).eq("studio_id", studioId).single(),
       );
       const missing = missingContent(post.kind as PostKind, Boolean(post.render_id), ((post.media_ids as string[] | null) ?? []).length);
       if (missing) return json({ error: missing });
-      if (!(await instagramAccount(studioId))) {
+      const platforms = (post.platforms as string[] | null) ?? ["instagram"];
+      if (platforms.includes("instagram") && !(await instagramAccount(studioId))) {
         return json({ error: "Instagram n'est pas connecté pour ce studio. Envoie le lien de connexion (get_connect_link)." });
+      }
+      if (platforms.includes("tiktok") && !(await tiktokAccount(studioId).catch(() => null))) {
+        return json({ error: "TikTok n'est pas connecté (ou la connexion a expiré). Envoie le lien de connexion (get_connect_link), ou retire TikTok de la publication (update_post platforms)." });
       }
       const current = postStatusSchema.parse(post.status);
       if (current !== "validated" && current !== "failed" && current !== "scheduled") {

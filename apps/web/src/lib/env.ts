@@ -33,6 +33,12 @@ const schema = {
   FACEBOOK_APP_SECRET: z.string().min(1),
   // Instagram webhooks (DMs to Fauve's account): the "verify token" entered in the Meta dashboard.
   INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().min(16),
+  // TikTok for Developers app (Login Kit + Content Posting API). Unset = TikTok not offered.
+  TIKTOK_CLIENT_KEY: z.string().min(1).optional(),
+  TIKTOK_CLIENT_SECRET: z.string().min(1).optional(),
+  // Once TikTok has audited the app: posts go straight to the account (her privacy
+  // choice). Before that, videos go to her TikTok drafts and she posts them herself.
+  TIKTOK_DIRECT_POST: z.stringbool().default(false),
   // Bearer secret for /api/cron/* (pg_cron sends it from Supabase Vault).
   CRON_SECRET: z.string().min(32),
   // Google AI Studio key and model for video analysis.

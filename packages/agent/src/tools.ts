@@ -69,7 +69,7 @@ export const toolSpecs = {
   },
   get_connect_link: {
     description:
-      "Renvoie le lien sécurisé (valable 15 min) vers la page où la gérante connecte son compte Instagram professionnel à Simone (TikTok arrive bientôt). À envoyer quand Instagram n'est pas connecté.",
+      "Renvoie le lien sécurisé (valable 15 min) vers la page où la gérante connecte son compte Instagram professionnel et, si elle veut, son TikTok. À envoyer quand un compte n'est pas connecté.",
     input: z.object({}),
   },
   get_post_link: {
@@ -114,7 +114,7 @@ export const toolSpecs = {
       kind: postKindSchema,
       title: z.string().min(1).max(120).describe("Titre court affiché dans le calendrier"),
       scheduled_at: isoDateTime,
-      platforms: z.array(platformSchema).min(1),
+      platforms: z.array(platformSchema).min(1).optional().describe("Par défaut Instagram, plus TikTok pour un Reel si TikTok est connecté"),
       theme: z.string().max(60).optional(),
       media_ids: postMediaIds,
     }),
@@ -127,7 +127,7 @@ export const toolSpecs = {
       caption: z.string().max(2200).optional(),
       hashtags: z.array(z.string().regex(/^[^#\s]+$/)).max(5).optional().describe("Sans le #, 5 au plus (limite d'Instagram, hashtags de la légende compris)"),
       scheduled_at: isoDateTime.optional(),
-      platforms: z.array(platformSchema).min(1).optional(),
+      platforms: z.array(platformSchema).min(1).optional().describe("instagram, tiktok (vidéos seulement) ou les deux"),
       status: postStatusSchema.optional(),
       agent_note: z.string().max(600).optional().describe("Explication de tes choix, affichée dans la web app"),
       media_ids: postMediaIds,
@@ -363,7 +363,7 @@ export const toolSpecs = {
   },
   schedule_post: {
     description:
-      "Programme une publication validée sur Instagram, à son horaire (scheduled_at) ou à l'horaire donné ; si l'horaire est passé ou absent, elle part tout de suite. Il faut un compte Instagram connecté (sinon envoie le lien get_connect_link) et le contenu du format : un Reel a besoin de sa vidéo montée ; un post d'une photo (media_ids) ; un carrousel de 2 à 10 photos ou vidéos (media_ids, dans l'ordre) ; une story de sa vidéo montée ou d'une photo/vidéo (pas de légende sur une story). Ne programme jamais sans l'accord explicite de la gérante.",
+      "Programme une publication validée sur ses plateformes (Instagram, TikTok), à son horaire (scheduled_at) ou à l'horaire donné ; si l'horaire est passé ou absent, elle part tout de suite. Il faut chaque compte connecté (sinon envoie le lien get_connect_link) et le contenu du format : un Reel a besoin de sa vidéo montée ; un post d'une photo (media_ids) ; un carrousel de 2 à 10 photos ou vidéos (media_ids, dans l'ordre) ; une story de sa vidéo montée ou d'une photo/vidéo (pas de légende sur une story). Ne programme jamais sans l'accord explicite de la gérante.",
     input: z.object({ post_id: z.string().uuid(), scheduled_at: isoDateTime.optional() }),
   },
   get_instagram_activity: {

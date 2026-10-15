@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import { env } from "@/lib/env";
 import { readPostMusic } from "@/lib/render/music";
-import { alignSlides, captionForInstagram, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
+import { alignSlides, captionForInstagram, captionForTikTok, readTikTokExternal, readTikTokSettings, tiktokStateLine, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -24,11 +24,48 @@ import { versionKey } from "@/lib/version-key";
 import { deletePost } from "./actions";
 import { CoverPicker } from "@/components/montage/cover-picker";
 import { PublishByHand } from "@/components/montage/publish-by-hand";
+import { WhereToPost, type TikTokPanel } from "@/components/montage/where-to-post";
+import { creatorInfo, tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
+import { tiktokAccount, tiktokCanTake } from "@/lib/social/tiktok-account";
 import { MontageEditor } from "./montage-editor";
 import { PostEditor } from "./post-editor";
 import { CarouselEditor } from "./carousel-editor";
 
 export const metadata: Metadata = { title: "Publication" };
+
+/** TikTok for this post: connected or not, her choices, and (direct posts) what TikTok offers her right now. */
+async function tiktokPanel(
+  studioId: string,
+  post: { kind: PostKind; platforms: string[]; caption: string | null; hashtags: string[]; tiktok: unknown; external_ids: unknown },
+  canEdit: boolean,
+): Promise<TikTokPanel | null> {
+  if (!tiktokEnabled() || !canEdit) return null;
+  const account = await tiktokAccount(studioId).catch(() => null);
+  const direct = tiktokDirectPost();
+  const info =
+    direct && account && post.platforms.includes("tiktok")
+      ? await creatorInfo(account.accessToken).catch(() => null)
+      : null;
+  const sent = readTikTokExternal(post.external_ids);
+  return {
+    connected: Boolean(account),
+    handle: account?.handle ?? null,
+    canTake: tiktokCanTake(post.kind),
+    direct,
+    settings: readTikTokSettings(post.tiktok),
+    options: info
+      ? {
+          privacy: info.privacy_level_options,
+          commentDisabled: info.comment_disabled,
+          duetDisabled: info.duet_disabled,
+          stitchDisabled: info.stitch_disabled,
+          nickname: info.creator_nickname ?? null,
+        }
+      : null,
+    state: sent ? tiktokStateLine(sent) : null,
+    caption: captionForTikTok(post.caption, post.hashtags),
+  };
+}
 
 const postSchema = z.object({
   id: z.uuid(),
@@ -48,6 +85,8 @@ const postSchema = z.object({
   publish_by_hand: z.boolean().catch(false),
   handoff_at: z.string().nullable().catch(null),
   music: z.unknown(),
+  tiktok: z.unknown(),
+  external_ids: z.unknown(),
 });
 
 // Read leniently: an older or partial plan still shows what it can.
@@ -96,7 +135,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const { data, error } = await db
     .from("posts")
-    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed, publish_by_hand, handoff_at, music")
+    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed, publish_by_hand, handoff_at, music, tiktok, external_ids")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -140,6 +179,10 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           bank: (await listElements(studioId)).map(({ id, name, role, slots, js, fonts, base, box, sample, kitId, kitName }) => ({ id, name, role, slots, js, fonts, base, box, sample, kitId, kitName })),
         }
       : null;
+
+  const tiktok = await tiktokPanel(studioId, post, canEdit);
+  const sentToTikTok = readTikTokExternal(post.external_ids);
+  const tiktokLine = sentToTikTok ? tiktokStateLine(sentToTikTok) : null;
 
   // The publication itself: caption, platforms, date, Fauve's note.
   const details = (
@@ -189,6 +232,10 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         )}
       </div>
 
+      {canEdit && (tiktok || post.platforms.includes("tiktok")) && (
+        <WhereToPost key={versionKey(post.platforms, post.tiktok, post.external_ids)} postId={post.id} initial={post.platforms} tiktok={tiktok} />
+      )}
+
       {/* Where and when, in two quiet lines. */}
       <dl className="flex flex-col gap-2 rounded-[16px] bg-soft px-4 py-3 text-[14px]">
         <div className="flex items-center gap-2.5">
@@ -216,9 +263,11 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
       </dl>
       {(post.status === "draft" || post.status === "validated") && (
         <p className="-mt-2 text-[12px] leading-snug text-muted">
-          {post.status === "validated" ? "Validée : " : "Une fois validée, "}Simone la publie sur Instagram à l’horaire prévu, si ton compte est connecté.
+          {post.status === "validated" ? "Validée : " : "Une fois validée, "}Simone la publie sur {post.platforms.map((p) => platformLabels[p]).join(" et ") || "Instagram"} à l’horaire prévu, si ton compte est connecté.
         </p>
       )}
+
+      {!canEdit && tiktokLine && <p className="-mt-2 text-[13px] font-semibold">{tiktokLine}</p>}
 
       {plan && !editor && <PlanSection plan={plan.view} clipLabels={clipLabels} />}
 
