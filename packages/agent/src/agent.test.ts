@@ -1761,3 +1761,15 @@ test("brand: ink on a mid-tone accent, the business's name on one line", async (
   assert.equal(keepName("atelier mila, rue des Lilas", "Atelier Mila"), "atelier mila, rue des Lilas");
   assert.equal(keepName("Maya", "Maya"), "Maya");
 });
+
+test("fonts: a well-known family Google does not serve gets its free twin", async () => {
+  const { fontTwin, googleFamilyName } = await import("./fonts.ts");
+  assert.equal(fontTwin("fairplex"), "Lora");
+  assert.equal(fontTwin("Proxima-Nova Soft W01"), "Montserrat");
+  assert.equal(fontTwin("futura_pt_book"), "Jost");
+  assert.equal(fontTwin("Canela Deck"), "Fraunces");
+  assert.equal(fontTwin("Helvetica Neue"), "Inter");
+  assert.equal(fontTwin("Ma Police Maison"), null);
+  assert.equal(googleFamilyName("playfair  display"), "Playfair Display");
+  assert.equal(googleFamilyName("DM Sans"), "DM Sans");
+});

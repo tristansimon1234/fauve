@@ -25,6 +25,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { logoTone } from "./logo-tone";
 import { withMusic } from "./music";
+import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes } from "./sandbox";
 
@@ -59,7 +60,7 @@ export function towardsDraft(status: PostStatus): PostStatus[] {
  * for subtitles, the brand (accent, logo, fonts, name) and each clip's length.
  * Shared by the render and the live editor.
  */
-export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"] }) {
+export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"] }) {
   const db = supabaseAdmin();
   const clipIds = planMediaIds(plan);
   const assets = clipIds.length
@@ -105,6 +106,9 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   const ownFonts = (style.custom_fonts ?? []).filter((f) => f.path.startsWith(`${studioId}/`));
   const signedFonts = ownFonts.length ? ((await db.storage.from("media").createSignedUrls(ownFonts.map((f) => f.path), 7200)).data ?? []) : [];
   const customFonts = ownFonts.flatMap((f, i) => (signedFonts[i]?.signedUrl ? [{ family: f.family, url: signedFonts[i]!.signedUrl }] : []));
+  // Her fonts as the render can load them: a site's font Google does not serve gets its twin (or the ambiance's).
+  const template = motionTemplateSchema.catch("doux").parse(plan.template);
+  const { fonts } = await usableFonts(style.fonts, ownFonts.map((f) => f.family), template);
   // Her voice note over the Reel: signed for the render and the preview, with her words.
   const voice = plan.voice ? await voiceInput(studioId, plan.voice.media_id) : undefined;
   const words: Record<string, ClipAnalysis["words"]> = {};
@@ -128,7 +132,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
     accent,
     logoUrl,
     logoOnDark,
-    fonts: style.fonts,
+    fonts,
     colors: style.colors,
     customFonts,
     studioName: (studio.data?.name as string | null) ?? "",

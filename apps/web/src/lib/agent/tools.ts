@@ -64,6 +64,7 @@ import { studioAccess } from "@/lib/billing/access";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
 import { readSiteLook } from "@/lib/site-look";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
+import { usableFonts } from "@/lib/fonts";
 import { readWebsite, WebsiteError } from "./website";
 
 export type ToolContext = {
@@ -526,7 +527,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     async update_brand_profile(changes) {
       // Only what changed: the moodboard, logo, fonts and saved text looks stay as they are.
       const { version } = await insertProfileVersion(studioId, (profile) => ({ ...profile, ...changes }));
-      return json({ version });
+      // A font Google does not serve (a site's Adobe font): the Reels use its closest free twin; she can add her file.
+      const fonts = Array.isArray(changes.fonts) ? changes.fonts.filter((f): f is string => typeof f === "string") : [];
+      const { swaps } = fonts.length ? await usableFonts(fonts, [], "doux").catch(() => ({ swaps: [] })) : { swaps: [] };
+      if (!swaps.length) return json({ version });
+      return json({
+        version,
+        polices: swaps.map((s) => `« ${s.from} » n'est pas une police libre : ses Reels et ses photos utiliseront « ${s.to} », la plus proche`).join(" ; "),
+        note: "Dis-le-lui en une phrase, sans jargon, et propose : si elle a le fichier de sa police, elle peut l'ajouter dans Style › Polices › « Tes polices » pour que ce soit exactement la sienne.",
+      });
     },
 
     async render({ post_id }) {

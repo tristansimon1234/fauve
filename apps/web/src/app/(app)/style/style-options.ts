@@ -164,12 +164,12 @@ export function fontStack(family: string, fallback: "serif" | "sans-serif" = "sa
 // Colours
 // ---------------------------------------------------------------------------
 
-/** White or ink text on the accent colour, whichever reads better (same rule as the Reel). */
+/** White or ink text on the accent colour, whichever has the better contrast (same rule as the Reel). */
 export function inkOn(hex: string): string {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-  return luminance > 0.45 ? "#1C1530" : "#FFFFFF";
+  return (luminance + 0.05) / 0.06 > 1.05 / (luminance + 0.05) ? "#1C1530" : "#FFFFFF";
 }
 
 /** Colours offered when the manager adds one. */
