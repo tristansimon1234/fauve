@@ -31,6 +31,7 @@ import {
   VOICE_AT,
   voiceForEditor,
 } from "@fauve/agent";
+import { usableFonts } from "@/lib/fonts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { ensureTranscript } from "@/lib/voice";
@@ -304,19 +305,39 @@ export async function designEdit(params: {
       ? [{ id: `s${i}`, brief: s.motion.brief, durationInFrames: Math.round(s.duration * 30) }]
       : [],
   );
+  // Its motion kit: the business's latest scenes, whose language the new ones keep (a family from one Reel to the next).
+  const kit = requests.length
+    ? (
+        (
+          await supabaseAdmin()
+            .from("motion_templates")
+            .select("name, code")
+            .eq("studio_id", params.studioId)
+            .eq("kind", "scene")
+            .eq("role", "overlay")
+            .is("archived_at", null)
+            .order("created_at", { ascending: false })
+            .limit(2)
+        ).data ?? []
+      ).flatMap((t) => (t.code ? [{ name: (t.name as string | null) ?? "", code: (t.code as string).slice(0, 6000) }] : []))
+    : [];
+  const template = motionTemplateSchema.catch("doux").parse(plan.template);
+  // Its fonts as the render loads them (a site's font Google does not serve gets its twin).
+  const { fonts: usable } = await usableFonts(profile.fonts, (profile.custom_fonts ?? []).map((f) => f.family), template).catch(() => ({ fonts: profile.fonts }));
   const designed = await designMotionScenes(
     params.studioId,
     requests,
     [profile.art_direction, profile.moodboard?.reading && `Lecture du moodboard de la gérante : ${profile.moodboard.reading}`]
       .filter(Boolean)
       .join("\n\n") || undefined,
-    resolveReelBrand(plan, motionTemplateSchema.catch("doux").parse(plan.template), {
+    resolveReelBrand(plan, template, {
       name: (studio.data?.name as string | null) ?? "",
       accent: profile.colors?.[0],
       // The real (signed) URL is set at render time; the designer only needs to know a logo exists.
       logoUrl: profile.logo_path ? "https://logo.fauve/studio" : profile.logo_url,
-      fonts: profile.fonts,
+      fonts: usable,
     }),
+    kit,
   );
   plan.segments = plan.segments.map((s, i) => {
     if (!isMotionSegment(s) || s.motion.js) return s;
