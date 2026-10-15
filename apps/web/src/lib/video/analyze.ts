@@ -3,6 +3,7 @@ import { FileState, GoogleGenAI } from "@google/genai";
 import { bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisSchema, usdToEur, type ClipAnalysis } from "@fauve/agent";
 import { z } from "zod";
 import { env } from "@/lib/env";
+import { sortClip } from "@/lib/clip-sort";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Clip analysis with Gemini: the clip goes from Storage to the Gemini Files API,
@@ -136,6 +137,8 @@ async function runAnalysis(asset: { id: string; studio_id: string; storage_path:
       .from("media_assets")
       .update({ analysis_status: "done", duration: analysis.duration, bank: bankWorthy(analysis) })
       .eq("id", asset.id);
+    // Sent without a word about what it is for: put it on the publication it fits.
+    await sortClip(asset.studio_id, asset.id, analysis).catch((error) => console.warn("clip sort failed", asset.id, error));
     return { media_id: asset.id, analysis };
   } finally {
     await ai.files.delete({ name: file.name! }).catch(() => {});

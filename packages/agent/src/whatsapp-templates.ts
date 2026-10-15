@@ -6,6 +6,8 @@ export const whatsappTemplates = {
   weekly_report: { category: "utility", params: [] },
   // « C’est l’heure de publier « {{1}} » ! Réponds-moi et je t’envoie la vidéo et la légende. »
   ready_to_post: { category: "utility", params: ["title"] },
+  // « Ta semaine est prête : {{1}} publications prévues. On la regarde ensemble ? »
+  week_ready: { category: "utility", params: ["count"] },
   login_code: { category: "authentication", params: ["code"] },
 } as const;
 

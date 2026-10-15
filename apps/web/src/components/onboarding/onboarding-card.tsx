@@ -1,6 +1,6 @@
 "use client";
 
-import { MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STEPS, RHYTHM_PRESETS, sampleWeek, type OnboardingStep } from "@fauve/agent";
+import { defaultPostDays, MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STEPS, RHYTHM_PRESETS, sampleWeek, WEEK, type OnboardingStep } from "@fauve/agent";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -124,12 +124,14 @@ export function OnboardingCard({
           initial={view.rhythm}
           offer={view.offer}
           pending={pending}
-          onSave={(posts, stories) =>
+          onSave={(posts, stories, days) =>
             start(async () => {
-              const res = await saveRhythm(posts, stories);
+              const res = await saveRhythm(posts, stories, days);
               if (!res.ok) return setError("Le rythme n’a pas pu être enregistré.");
               await reload();
-              onSend(`Mon rythme : ${posts} post${posts > 1 ? "s" : ""} et ${stories} stor${stories > 1 ? "ies" : "y"} par semaine.`);
+              onSend(
+                `Mon rythme : ${posts} post${posts > 1 ? "s" : ""} et ${stories} stor${stories > 1 ? "ies" : "y"} par semaine, le ${days.map((d) => WEEK[d]).join(", ")}.`,
+              );
             })
           }
         />
@@ -426,16 +428,24 @@ function RhythmStep({
   pending,
   onSave,
 }: {
-  initial: { posts: number; stories: number };
+  initial: { posts: number; stories: number; days: number[] | null };
   offer: OnboardingView["offer"];
   pending: boolean;
-  onSave: (posts: number, stories: number) => void;
+  onSave: (posts: number, stories: number, days: number[]) => void;
 }) {
   const [posts, setPosts] = useState(initial.posts);
   const [stories, setStories] = useState(initial.stories);
+  // Her posting days: the default spread for her rhythm until she picks her own.
+  const [picked, setPicked] = useState<number[] | null>(initial.days);
+  const days = picked ?? defaultPostDays(posts);
+  const toggle = (d: number) => setPicked((prev) => {
+    const current = prev ?? defaultPostDays(posts);
+    return current.includes(d) ? current.filter((x) => x !== d) : [...current, d].sort((a, b) => a - b);
+  });
   // About 4.3 weeks a month.
   const perMonth = Math.round(posts * 4.3);
-  const week = sampleWeek(posts);
+  const ideas = sampleWeek(posts);
+  const week = days.slice(0, posts).map((d, i) => ({ day: WEEK[d]!, idea: ideas[i % ideas.length]!.idea }));
   return (
     <>
       <p className="text-[14px] leading-relaxed text-muted">
@@ -468,6 +478,26 @@ function RhythmStep({
         <Counter label="Posts et Reels" value={posts} min={1} max={14} onChange={setPosts} />
         <Counter label="Stories" value={stories} min={0} max={21} onChange={setStories} />
       </div>
+      <div className="flex flex-col gap-2">
+        <span className="text-[13px] font-bold">Tes jours de publication</span>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Jours de publication">
+          {WEEK.map((name, d) => {
+            const on = days.includes(d);
+            return (
+              <button
+                key={name}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggle(d)}
+                className={`h-9 min-w-11 rounded-full border-[1.5px] px-3 text-[13px] font-bold capitalize ${on ? "border-violet bg-violet text-white" : "border-line bg-white text-muted hover:border-lilac"}`}
+              >
+                {name.slice(0, 3)}
+              </button>
+            );
+          })}
+        </div>
+        {days.length < posts && <span className="text-[12px] text-muted">Choisis {posts} jours, ou je complète avec les autres.</span>}
+      </div>
       <div className="flex flex-col gap-1.5 rounded-[16px] bg-soft px-4 py-3">
         <span className="text-xs font-extrabold tracking-[.06em] text-muted">UNE SEMAINE TYPE</span>
         <ul className="flex flex-col gap-1">
@@ -488,7 +518,7 @@ function RhythmStep({
           {posts > offer.postsPerWeek + 1 && " À ce rythme, alterne les Reels avec des carrousels pour garder le même soin sur chacun."}
         </span>
       </div>
-      <button type="button" disabled={pending} onClick={() => onSave(posts, stories)} className="btn btn-primary h-11 self-start px-5 disabled:opacity-40">
+      <button type="button" disabled={pending} onClick={() => onSave(posts, stories, days)} className="btn btn-primary h-11 self-start px-5 disabled:opacity-40">
         C’est mon rythme
       </button>
     </>

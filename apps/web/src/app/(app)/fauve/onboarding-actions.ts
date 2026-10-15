@@ -17,7 +17,7 @@ export type OnboardingView = {
   brand: { colors: string[]; fonts: string[]; logoUrl: string | null };
   /** fromSite: Simone took these photos from her website (she has not made her own moodboard yet). */
   moodboard: { items: { path: string; url: string }[]; reading: string | null; fromSite: boolean };
-  rhythm: { posts: number; stories: number };
+  rhythm: { posts: number; stories: number; days: number[] | null };
   /** Her offer: what its credits hold, to choose a rhythm she can keep with care. */
   offer: { label: string; credits: number; postsPerWeek: number; reels: number };
   instagram: string | null;
@@ -31,7 +31,7 @@ export async function onboardingView(): Promise<OnboardingView | null> {
   const [studio, profileRow, plan, account] = await Promise.all([
     admin.from("studios").select("onboarding_step, website_url, business_type, plan").eq("id", studioId).single(),
     admin.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
-    admin.from("content_plans").select("posts_per_week, stories_per_week").eq("studio_id", studioId).maybeSingle(),
+    admin.from("content_plans").select("posts_per_week, stories_per_week, post_days").eq("studio_id", studioId).maybeSingle(),
     admin.from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").eq("status", "connected").limit(1).maybeSingle(),
   ]);
   const profile = brandProfileSchema.partial().catch({}).parse(profileRow.data?.profile ?? {});
@@ -51,7 +51,7 @@ export async function onboardingView(): Promise<OnboardingView | null> {
       logoUrl: (profile.logo_path ? urls.get(profile.logo_path) : null) ?? profile.logo_url ?? null,
     },
     moodboard: { items: items.flatMap((i) => (urls.get(i.path) ? [{ path: i.path, url: urls.get(i.path)! }] : [])), reading: profile.moodboard?.reading ?? null, fromSite: items.some((i) => i.note === "Photo de ton site") },
-    rhythm: { posts: (plan.data?.posts_per_week as number | null) ?? offer.postsPerWeek, stories: (plan.data?.stories_per_week as number | null) ?? 4 },
+    rhythm: { posts: (plan.data?.posts_per_week as number | null) ?? offer.postsPerWeek, stories: (plan.data?.stories_per_week as number | null) ?? 4, days: (plan.data?.post_days as number[] | null) ?? null },
     offer: { label: offer.label, credits: offer.credits, postsPerWeek: offer.postsPerWeek, reels: reelsPerMonth(offerId) },
     instagram: (account.data?.handle as string | null) ?? null,
   };
@@ -82,13 +82,23 @@ export async function finishStep(step: OnboardingStep): Promise<{ ok: boolean }>
 }
 
 /** Posts and stories a week: what Fauve plans the week with (and reminds her of). */
-export async function saveRhythm(posts: number, stories: number): Promise<{ ok: boolean }> {
-  const parsed = z.object({ posts: z.number().int().min(0).max(21), stories: z.number().int().min(0).max(50) }).safeParse({ posts, stories });
+export async function saveRhythm(posts: number, stories: number, days?: number[]): Promise<{ ok: boolean }> {
+  const parsed = z
+    .object({ posts: z.number().int().min(0).max(21), stories: z.number().int().min(0).max(50), days: z.array(z.number().int().min(0).max(6)).max(7).optional() })
+    .safeParse({ posts, stories, days });
   const studioId = await studioOf();
   if (!parsed.success || !studioId) return { ok: false };
   const { error } = await supabaseAdmin()
     .from("content_plans")
-    .upsert({ studio_id: studioId, posts_per_week: parsed.data.posts, stories_per_week: parsed.data.stories }, { onConflict: "studio_id" });
+    .upsert(
+      {
+        studio_id: studioId,
+        posts_per_week: parsed.data.posts,
+        stories_per_week: parsed.data.stories,
+        ...(parsed.data.days?.length ? { post_days: [...new Set(parsed.data.days)].sort((a, b) => a - b) } : {}),
+      },
+      { onConflict: "studio_id" },
+    );
   if (error) return { ok: false };
   return goToStep(nextOnboardingStep("rhythm"));
 }

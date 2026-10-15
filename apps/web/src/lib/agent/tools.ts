@@ -33,6 +33,7 @@ import {
   customRestyle,
   withAdjustment,
   VOICE_MAX_SECONDS,
+  WEEK,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -58,6 +59,7 @@ import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
+import { acceptWeek, proposeWeek } from "@/lib/week-plan";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
 import { readSiteLook } from "@/lib/site-look";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
@@ -158,7 +160,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const [studio, member, plan, accounts, brand] = await Promise.all([
         db.from("studios").select("name, timezone, onboarding_step, website_url, booking_url").eq("id", studioId).single(),
         db.from("members").select("first_name, role").eq("id", ctx.memberId).single(),
-        db.from("content_plans").select("posts_per_week, stories_per_week, platforms, themes").eq("studio_id", studioId).maybeSingle(),
+        db.from("content_plans").select("posts_per_week, stories_per_week, post_days, post_time, platforms, themes").eq("studio_id", studioId).maybeSingle(),
         db.from("social_accounts").select("platform, handle, status").eq("studio_id", studioId),
         db.from("brand_profiles").select("version, profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
       ]);
@@ -241,7 +243,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     async list_media({ kind, days, limit, bank }) {
       let query = db
         .from("media_assets")
-        .select("id, kind, source, mime_type, duration, width, height, created_at, regions, ai, bank")
+        .select("id, kind, source, mime_type, duration, width, height, created_at, regions, ai, bank, sorted_post_id")
         .eq("studio_id", studioId)
         .neq("source", "render")
         .order("created_at", { ascending: false })
@@ -278,6 +280,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             ...(summaries.get(r.id as string) ? { contenu: summaries.get(r.id as string) } : {}),
             ...((r.regions as { notes?: string } | null)?.notes ? { contenu: (r.regions as { notes: string }).notes } : {}),
             ...(r.bank ? { banque: true } : {}),
+            ...(r.sorted_post_id ? { rangee_dans_post_id: r.sorted_post_id } : {}),
             ...(ai ? { ia: ai.mode === "improve" ? `photo améliorée (${ai.instruction.slice(0, 80)})` : `image d'ambiance : ${ai.instruction.slice(0, 80)}` } : {}),
           };
         }),
@@ -341,7 +344,48 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           .select("id, title, status, scheduled_at")
           .single(),
       );
+      // Her material arrived: the filming missions of this publication are done.
+      if (fields.media_ids?.length) {
+        await db.from("shot_requests").update({ done: true }).eq("post_id", post_id).eq("studio_id", studioId).eq("done", false);
+        if (!status && (current.status === "planned" || current.status === "content_requested")) {
+          await db.from("posts").update({ status: "media_received" }).eq("id", post_id).eq("studio_id", studioId);
+        }
+      }
       return json({ post });
+    },
+
+    async plan_week({ which, notes }) {
+      const proposal = await proposeWeek(studioId, { which, notes });
+      if ("error" in proposal) return json({ error: proposal.error });
+      ctx.notes.push(`semaine proposée week_plan_id=${proposal.week.id}`);
+      return json({
+        week_plan_id: proposal.week.id,
+        message: proposal.message,
+        note: "Montre ce message tel quel (tu peux l'adapter à ses mots s'il répond à une demande), avec reply_with options « Valider ma semaine » et « Modifier ». À « Modifier », demande ce qu'elle veut changer puis refais plan_week avec notes.",
+      });
+    },
+
+    async accept_week({ week_plan_id }) {
+      const result = await acceptWeek(studioId, week_plan_id);
+      if ("error" in result) return json({ error: result.error });
+      ctx.notes.push(...result.posts.map((p) => `publication créée « ${p.title} » post_id=${p.id}`));
+      return json({
+        ...result,
+        note: result.films.length
+          ? "C'est dans son calendrier. Dis-lui qu'elle recevra chaque mission le matin du jour où filmer, et qu'elle peut les voir dans « À faire »."
+          : "C'est dans son calendrier, rien à filmer : tu prépares tout avec ce qu'elle a déjà.",
+      });
+    },
+
+    async set_posting_days({ days, time }) {
+      const indexes = days.map((d) => WEEK.indexOf(d)).sort((a, b) => a - b);
+      const { data: plan } = await db.from("content_plans").select("id").eq("studio_id", studioId).maybeSingle();
+      const fields = { post_days: indexes, ...(time ? { post_time: time } : {}) };
+      const { error } = plan
+        ? await db.from("content_plans").update(fields).eq("id", plan.id)
+        : await db.from("content_plans").insert({ studio_id: studioId, ...fields });
+      if (error) throw new Error(error.message);
+      return json({ ok: true, jours: days, heure: time ?? null });
     },
 
     async request_content({ post_id, label, hint, due_date }) {

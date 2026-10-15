@@ -145,6 +145,26 @@ export const toolSpecs = {
       publish_by_hand: z.boolean().optional().describe("Reel : true = à l'heure prévue, elle reçoit la vidéo et la légende sur WhatsApp et publie elle-même dans Instagram (pour mettre la musique de son choix). Story : true = elle reçoit la story et son lien de réservation sur WhatsApp et la partage elle-même en story avec le sticker Lien (aucune appli ne peut poser de sticker). Je retrouve ensuite la publication sur son compte"),
     }),
   },
+  plan_week: {
+    description:
+      "Prépare sa semaine de publications sur ses jours (son rythme) : une idée par créneau, avec ce qu'il faut filmer et quand, gardée comme proposition (rien n'entre dans le calendrier avant son oui). Quand elle demande de préparer sa semaine, ou pour refaire la proposition avec ses changements (notes). Renvoie le message à lui montrer tel quel, avec les boutons « Valider ma semaine » et « Modifier » (reply_with).",
+    input: z.object({
+      which: z.enum(["this", "next", "auto"]).default("auto").describe("this : la semaine en cours (à partir de demain) ; next : la suivante ; auto : la suivante à partir du vendredi"),
+      notes: z.string().max(600).optional().describe("Ses changements ou envies pour cette semaine, avec ses mots"),
+    }),
+  },
+  accept_week: {
+    description:
+      "Son oui à la semaine proposée (week_plan_id du mémo) : crée les publications à leurs jours et heures, et la liste « À filmer » avec un jour pour chaque mission (la veille). Elle recevra sa mission le matin du jour.",
+    input: z.object({ week_plan_id: z.string().uuid() }),
+  },
+  set_posting_days: {
+    description: "Ses jours et son heure de publication, pour préparer ses semaines (plan_week). Seulement les jours qu'elle a choisis.",
+    input: z.object({
+      days: z.array(z.enum(["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"])).min(1).max(7),
+      time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().describe("HH:MM, ex. 18:00"),
+    }),
+  },
   request_content: {
     description:
       "Ajoute un élément à la liste « À filmer » et passe la publication liée en « content_requested ».",

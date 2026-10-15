@@ -54,6 +54,19 @@ const TEMPLATE_DEFINITIONS = [
     ],
   },
   {
+    name: "week_ready",
+    language: "fr",
+    category: "UTILITY",
+    components: [
+      {
+        type: "BODY",
+        text: "Ta semaine est prête : {{1}} publications prévues. On la regarde ensemble ?",
+        example: { body_text: [["5"]] },
+      },
+      { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Voir ma semaine" }] },
+    ],
+  },
+  {
     name: "weekly_report",
     language: "fr",
     category: "UTILITY",

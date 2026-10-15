@@ -11,15 +11,18 @@ import { Logo } from "./orb";
 export function AppShell({
   children,
   account,
+  todo,
   avatar,
 }: {
   children: React.ReactNode;
   account: React.ReactNode;
+  /** Her to-do list, between the menu and the account. */
+  todo?: React.ReactNode;
   avatar: React.ReactNode;
 }) {
   return (
     <div className="flex min-h-dvh bg-white">
-      <aside className="sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col gap-9 border-r border-line px-4 pt-7 pb-6 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col gap-7 border-r border-line px-4 pt-7 pb-6 lg:flex">
         <div className="px-1.5">
           <Logo />
         </div>
@@ -28,6 +31,7 @@ export function AppShell({
             <NavLinks variant="sidebar" />
           </Suspense>
         </nav>
+        {todo ? <div className="flex min-h-0 flex-1 flex-col">{todo}</div> : null}
         <div className="mt-auto flex flex-col gap-3.5">{account}</div>
       </aside>
 
