@@ -68,25 +68,35 @@ function footageUnder(plan: EditPlan, i: number, facts: MediaFacts, clipDuration
   const fits = (clip: string, from: number) => from >= 0 && from + length <= (clipDurations[clip] ?? Infinity) + 0.01;
   // Only her own footage of this Reel: an unknown id is ignored.
   const named = s.over?.clip_id && (facts.clips[s.over.clip_id] || facts.photos[s.over.clip_id]) ? s.over.clip_id : undefined;
+  // The shot before carries on (what comes right after it in its clip), else the shot after starts early.
+  const neighbour = (): { clip_id: string; in?: number } | undefined => {
+    const before = plan.segments[i - 1];
+    if (before && isClipSegment(before)) {
+      if (facts.photos[before.clip_id]) return { clip_id: before.clip_id };
+      if (fits(before.clip_id, before.out)) return { clip_id: before.clip_id, in: before.out };
+    }
+    const after = plan.segments[i + 1];
+    if (after && isClipSegment(after)) {
+      if (facts.photos[after.clip_id]) return { clip_id: after.clip_id };
+      const from = Math.round((after.in - length) * 100) / 100;
+      if (fits(after.clip_id, from)) return { clip_id: after.clip_id, in: from };
+    }
+    return undefined;
+  };
   if (named) {
     if (s.over?.in !== undefined) return { clip_id: named, in: s.over.in };
     if (facts.photos[named]) return { clip_id: named };
     const analysis = facts.clips[named];
     const options = [...(analysis?.best_moments ?? []).map((m) => m.start), ...(analysis?.shots ?? []).map((x) => x.start), 0];
-    const start = options.find((t) => fits(named, t) && free(named, t)) ?? options.find((t) => fits(named, t)) ?? 0;
-    return { clip_id: named, in: Math.round(start * 100) / 100 };
+    const unseen = options.find((t) => fits(named, t) && free(named, t));
+    if (unseen !== undefined) return { clip_id: named, in: Math.round(unseen * 100) / 100 };
+    // Every passage of it is already in the Reel: a shot seen twice reads as a repeat, a neighbour carries on instead.
+    const carried = neighbour();
+    if (carried) return carried;
+    return { clip_id: named, in: Math.round((options.find((t) => fits(named, t)) ?? 0) * 100) / 100 };
   }
-  const before = plan.segments[i - 1];
-  if (before && isClipSegment(before)) {
-    if (facts.photos[before.clip_id]) return { clip_id: before.clip_id };
-    if (fits(before.clip_id, before.out)) return { clip_id: before.clip_id, in: before.out };
-  }
-  const after = plan.segments[i + 1];
-  if (after && isClipSegment(after)) {
-    if (facts.photos[after.clip_id]) return { clip_id: after.clip_id };
-    const from = Math.round((after.in - length) * 100) / 100;
-    if (fits(after.clip_id, from)) return { clip_id: after.clip_id, in: from };
-  }
+  const carried = neighbour();
+  if (carried) return carried;
   // No neighbour to carry on: any video of hers, from its best moment.
   const any = plan.segments.find((x): x is Extract<PlanSegment, { clip_id: string }> => isClipSegment(x) && !facts.photos[x.clip_id]);
   return any ? { clip_id: any.clip_id, in: Math.max(0, Math.min(facts.clips[any.clip_id]?.best_moments[0]?.start ?? 0, (clipDurations[any.clip_id] ?? length) - length)) } : undefined;

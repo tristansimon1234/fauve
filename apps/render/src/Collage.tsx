@@ -162,6 +162,9 @@ export function CollageCard({ index, props, children }: { index: number; props: 
 
 const normalize = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 
+/** Where a text breaks into words: any space but the non-breaking ones, which hold a business's name together. */
+const SPACES = /[^\S\u00a0]+/;
+
 function useExit(durationInFrames: number, theme: Theme) {
   const frame = useCurrentFrame();
   return interpolate(onTwos(frame), [durationInFrames - theme.exitFrames, durationInFrames], [1, 0], clamp);
@@ -179,8 +182,8 @@ export function CollageHook({ text, index, props, theme, k, sides }: TextProps) 
   const { fps } = useVideoConfig();
   const out = useExit(text.durationInFrames, theme);
   const c = collageColors(props);
-  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(/\s+/)).map(normalize));
-  const words = text.text.split(/\s+/).filter(Boolean);
+  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(SPACES)).map(normalize));
+  const words = text.text.split(SPACES).filter(Boolean);
   const size = 124 * k * (text.scale ?? 1);
   return (
     <Fit

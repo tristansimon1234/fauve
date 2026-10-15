@@ -11,6 +11,17 @@ import type { VoiceTranscript } from "./voice.ts";
 export const VOICE_OVER_WORDS = { min: 35, max: 58 } as const;
 
 /**
+ * How many words the voice says over these images: about as long as what there is to
+ * show (a photo counts 2 s), never longer, between 12 and 22 seconds of voice. A voice
+ * longer than the footage makes the editor stretch it (shots shown twice, photos held).
+ */
+export function voiceWordsFor(footageSeconds: number): { min: number; max: number } {
+  const seconds = Math.min(22, Math.max(12, footageSeconds));
+  const words = Math.round(seconds * 2.6);
+  return { min: Math.max(26, words - 8), max: Math.min(VOICE_OVER_WORDS.max, words + 3) };
+}
+
+/**
  * Simone's voices, ElevenLabs library voices picked by ear: natural French voices
  * that sound like someone talking to you, never like an ad, and two whispered ones
  * (ASMR) for calm places (spa, massage, beauty, a slow food moment), chosen by her,
@@ -95,17 +106,19 @@ export type VoiceOverScript = z.infer<typeof voiceOverScriptSchema>;
 
 export const VOICE_OVER_PROMPT = `Tu écris la voix off d'un Reel Instagram pour un commerce de quartier : ce qu'une vraie personne dit sur ses images, comme un créateur qui parle à ses abonnés, jamais comme une pub. Cette voix fait rester les gens jusqu'au bout : elle doit donner envie, pas vendre.
 
-Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée de la publication, le ton du commerce, et ce que montrent ses images, dans l'ordre où elles ont été filmées.
+Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée de la publication, le ton du commerce, ce que montrent ses images, dans l'ordre où elles ont été filmées, et la longueur à viser (« longueur » : de mots_min à mots_max mots).
+
+Les exemples entre guillemets ci-dessous montrent une forme, jamais des mots à reprendre : écris toujours les tiens, à partir de ce commerce et de ces images.
 
 Règles :
-- 15 à 22 secondes à l'oral : ${VOICE_OVER_WORDS.min} à ${VOICE_OVER_WORDS.max} mots, des phrases courtes, à l'oral (on peut commencer une phrase par « Et », dire « on ») ;
-- la première phrase accroche en moins de 2 secondes : une question qui intrigue, un détail surprenant ou une promesse précise (« Tu sais pourquoi notre pâte repose quarante-huit heures ? ») ; jamais « Bienvenue chez… », jamais le nom du commerce en premier ;
+- la longueur demandée, jamais plus : la voix ne dure pas plus longtemps que ce que ses images montrent (environ 2,6 mots par seconde) ; des phrases courtes, à l'oral (on peut commencer une phrase par « Et », dire « on ») ;
+- la première phrase accroche en moins de 2 secondes : une question sur un détail que seul ce commerce connaît, un détail surprenant de ses images ou une promesse précise ; jamais « Bienvenue chez… », jamais le nom du commerce en premier ;
 - raconte ce qu'on voit, dans l'ordre : un geste, un détail, un résultat ; seulement des faits vrais (ceux qu'on te donne et ce que montrent les images), rien d'inventé : ni prix, ni chiffre, ni promesse qui ne sont pas dans ce qu'on te donne ;
 - le commerce parle à la première personne (« chez nous », « ici », « je ») et tutoie la personne qui regarde ;
-- finis par une invitation simple et concrète, qui dit quoi faire (« Viens goûter ce soir, le lien est dans la bio. ») ;
+- finis par une invitation simple et concrète, qui dit quoi faire (venir, réserver, essayer : le geste précis pour ce commerce, et où le faire, par exemple « le lien est dans la bio ») ;
 - interdit : les formules de pub (« découvrez », « n'hésitez pas », « une expérience unique », « de qualité », « savoureux », « au cœur de »), les superlatifs creux, les emojis, les hashtags, le tiret long, les parenthèses ;
-- écris les nombres en lettres quand ils se disent mal en chiffres (« quarante-huit heures ») et la ponctuation d'une voix qui parle : des points, des virgules, des points de suspension pour une petite pause, une question au plus ;
-- pour une voix humaine, glisse 1 ou 2 balises de jeu entre crochets, en anglais, juste avant la phrase qu'elles colorent : [warmly], [smiling], [softly], [excited], [laughs softly], [whispers], [sighs] ; par exemple « [smiling] Cette pizza, on l'a commencée avant-hier. » ; jamais plus de 2, jamais au milieu d'un mot, jamais d'autres crochets ;
+- écris les nombres en lettres quand ils se disent mal en chiffres (« dix-huit mois ») et la ponctuation d'une voix qui parle : des points, des virgules, des points de suspension pour une petite pause, une question au plus ;
+- pour une voix humaine, glisse 1 ou 2 balises de jeu entre crochets, en anglais, juste avant la phrase qu'elles colorent : [warmly], [smiling], [softly], [excited], [laughs softly], [whispers], [sighs] ; par exemple « [smiling] » devant une phrase qui fait sourire ; jamais plus de 2, jamais au milieu d'un mot, jamais d'autres crochets ;
 - si on te dit que la voix est chuchotée (ASMR), écris pour un murmure tout près de l'oreille : des phrases encore plus courtes et lentes, des points de suspension, ce qu'on entend et ce qu'on sent (le bruit des ciseaux, la mousse, la croûte qui craque, la chaleur d'une serviette), aucune question qui claque ni point d'exclamation, [whispers] ou [softly] comme balises.
 
 Réponds avec hook (la première phrase) et script (tout le texte, première phrase comprise, balises comprises).`;

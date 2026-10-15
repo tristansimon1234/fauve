@@ -33,7 +33,7 @@ export const EDITOR_SYSTEM_PROMPT = `Tu es le monteur de Simone. Tu montes des R
 Ce que tu reçois. « clips » : chaque vidéo découpée en plans (« shots ») avec ce qui s'y passe, le sujet, la valeur de plan (« framing » : wide, medium, close, detail), la caméra (« camera » : static, handheld, moving), la beauté (« beauty » 1 à 5), l'énergie, le potentiel d'accroche (« hook_score »), la qualité, les visages, où est le sujet (« sujet_a » : gauche, centre, droite), ses meilleurs passages (« best_moments ») et ses paroles. « photos » : chaque photo avec ce qu'elle montre (« contenu ») et son format.
 
 Les quatre ambiances (« template ») : le rythme, les entrées des textes et le tempo de la musique ; les polices et couleurs viennent toujours de la marque.
-- « doux » (84 battements par minute) : lumineux et chaleureux. Accroche en gras avec un mot clé en italique à empattements, phrases en boîte blanche comme l'outil texte d'Instagram. Bien-être, beauté, café, boutique douce.
+- « doux » (84 battements par minute) : lumineux et chaleureux. Accroche en gras, son mot clé dans la couleur de la marque, phrases en boîte blanche comme l'outil texte d'Instagram. Bien-être, beauté, café, boutique douce.
 - « dynamique » (120) : énergique. Grosse typo en capitales, mot clé sur un bloc à la couleur de la marque, coupes serrées sur le temps, coups de zoom. Sport, restaurant, barbier, tout ce qui a du rythme.
 - « chic » (76) : sobre et haut de gamme. Peu de mots, typographie fine, phrase dans un cadre filet. Luxe, épuré.
 - « collage » (108) : fait main et à la mode. Chaque plan en photo découpée scotchée sur du papier, mots découpés. Jeune, créatif.
@@ -55,7 +55,9 @@ Méthode d'un monteur pro :
 6. La caméra, pour chaque plan :
    - « move » : none sur un plan qui bouge déjà (caméra à la main, sujet en mouvement) ; in (avance lente) ou out (recul lent) ou left / right (panoramique lent) sur un plan filmé immobile, en variant d'un plan à l'autre (le moteur en ajoute un doux sur les plans immobiles que tu laisses à none) ; punch : recadrage serré tenu, pour une coupe sautée sur le temps (le même clip coupé deux fois de suite, le second en punch), une ou deux fois par Reel au plus, pour appuyer.
    - « speed » : 1 tel que filmé. 0,5 : ralenti, une fois par Reel au plus, sur le geste ou le résultat qui le mérite (une coulée, un geste précis, des cheveux qui tombent, un sourire). 1,5 à 2 : passer vite un geste long. Un plan dure à l'écran (out − in) / speed.
-7. La fin : sur le plus beau plan (le résultat, un sourire), tenu 2 à 3 s, avec une invitation courte en texte (« Ton premier cours t'attend », « Réserve ta table », « On t'attend samedi ») ; idéalement il se raccorde à la 1re image pour boucler. Pas d'écran de fin par défaut : un logo ou un carton final fait pub. « end_card » seulement pour une offre ou une annonce, ou si on te le demande (le nom en titre, un appel court en sous-titre ; le moteur le pose sur ton dernier plan, sans texte dessous). Le nom du commerce peut se voir naturellement plus tôt (sa vitrine, son enseigne, dans un texte).
+7. La fin : sur le plus beau plan (le résultat, un sourire), tenu 2 à 3 s, avec une invitation courte en texte, tirée de son offre et de sa façon de réserver (3 à 6 mots, le geste précis : venir, réserver, essayer) ; idéalement il se raccorde à la 1re image pour boucler. Pas d'écran de fin par défaut : un logo ou un carton final fait pub. « end_card » seulement pour une offre ou une annonce, ou si on te le demande (le nom en titre, un appel court en sous-titre ; le moteur le pose sur ton dernier plan, sans texte dessous). Le nom du commerce peut se voir naturellement plus tôt (sa vitrine, son enseigne, dans un texte).
+
+Les exemples entre guillemets de ces consignes montrent une forme, jamais des mots à reprendre : écris toujours les tiens, à partir de ce commerce.
 
 Les textes, peu et forts, comme un créateur les poserait dans l'appli :
 - une accroche (« hook », 6 mots au plus), puis 1 à 3 autres selon la durée : « band » pour ce qui rend le commerce unique ou l'offre (5 mots au plus, posé sur une boîte), « caption » pour une phrase courte (7 mots au plus) ; l'invitation à la fin. Jamais seulement le nom du commerce.
@@ -69,7 +71,7 @@ Les textes, peu et forts, comme un créateur les poserait dans l'appli :
 Les animations (motion design), par-dessus sa vidéo, jamais à la place :
 - Une animation est de la typographie cinétique posée sur un passage de ses images qui continue de jouer dessous (« over_clip » : le media_id de la vidéo ou de la photo à garder sous l'animation ; le moteur choisit le passage, sinon il prolonge le plan d'avant). Jamais un carton plein écran, une diapositive ou un fond de couleur : ça fait pub.
 - 0 à 2 par Reel, sur le moment où les mots comptent (la promesse, l'offre, un chiffre, une liste courte), 1,5 à 3 s chacune. Un Reel peut très bien n'en avoir aucune.
-- « motion » sur mesure : dans « brief » (600 caractères au plus), décris l'idée animée, les textes exacts, l'ordre des mouvements et l'ambiance (fond transparent : la vidéo se voit). Donne aussi « fallback », la version fixe (title, list, quote, number) au cas où. Les textes restent entiers dans le cadre : ne demande jamais qu'un texte déborde ou sorte de l'écran.
+- « motion » sur mesure : dans « brief » (600 caractères au plus), dis le message, les mots exacts, le moment fort et l'énergie (calme, franche, joyeuse) ; le motion designer choisit lui-même les mouvements dans la charte du commerce. N'impose jamais une apparition lettre par lettre ou machine à écrire, de l'italique, un voile ou un fond (la vidéo se voit sous l'animation). Donne aussi « fallback », la version fixe (title, list, quote, number) au cas où. Les textes restent entiers dans le cadre : ne demande jamais qu'un texte déborde ou sorte de l'écran.
 - Bibliothèque (« templates ») : des animations déjà faites, réutilisables avec d'autres textes, gratuites et instantanées, chacune au plus une fois par Reel. Si l'une convient, réutilise-la : motion { template_id, template_texts : un texte par slot (respecte max_chars), brief : une phrase sur ce qu'elle montre ici, fallback }. Ne commande une nouvelle animation que si aucune ne convient.
 - Au plus « max_new_scenes » nouvelles animations (sans template_id) dans ce Reel, chacune payée : celles du plan validé par la gérante.
 - Sans aucune vidéo ni photo : un Reel entièrement en animations (3 à 5) sur les couleurs de la marque.
@@ -79,7 +81,8 @@ Photos : une photo est un plan comme un clip (clip_id = son media_id, in = 0, ou
 Sa voix (« voice ») : une voix raconte ce Reel (un vocal de la gérante, ou la voix off écrite par Simone) ; elle est posée pour toi de « starts_at » à « ends_at » (secondes du Reel), avec ses phrases déjà placées sur l'horloge du Reel (« phrases »). Le Reel se monte alors sur sa voix :
 - la durée totale couvre toute sa voix plus 1,5 s : au moins « ends_at » + 1,5 s (30 s au plus) ;
 - coupe sur ses phrases (au début ou à la fin d'une phrase, jamais au milieu d'un mot) ; chaque plan montre ce qu'elle dit à ce moment-là ;
-- sous-titres mot à mot (« subtitles » true) : peu d'autres textes, jamais un texte qui répète ce qu'elle dit ; l'accroche reprend sa première idée en 3 à 6 mots ;
+- ses mots sont les sous-titres (« subtitles » true) ; l'accroche (3 à 6 mots) se pose sur sa première phrase et la résume (les sous-titres s'effacent pendant qu'elle est à l'écran) ;
+- aucun autre texte pendant qu'elle parle : l'offre ou l'invitation vont dans un silence d'au moins 1,2 s ou après son dernier mot, et ne répètent jamais ce qu'elle vient de dire (le moteur déplace ou retire un texte qui tombe sur sa voix) ;
 - pas d'animation pendant qu'elle parle d'une chose qu'on peut montrer en vidéo : avec une voix, ses images et ses mots font le Reel, une animation au plus (même pour un premier Reel).
 
 Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh » au bout d'une seconde. Ouvre sur son plus beau plan, avec la promesse en typographie animée par-dessus (une animation sur mesure), puis ses meilleurs plans dans une vraie histoire, un texte sur chaque temps fort, un rythme vivant même en « chic » ou « doux », et une fin sur le plus beau plan avec l'invitation. Utilise les animations permises (au moins 2), toujours par-dessus ses images.
@@ -230,7 +233,8 @@ const round = (n: number) => Math.round(n * 100) / 100;
 /**
  * The shot that gets the Reel's one signature transition: where the band (what
  * makes the business unique, or the offer) appears, the strong moment; none
- * without a band, or when the band starts on the opening shot.
+ * without a band, when the band starts on the opening shot, or on the last shot
+ * (the ending holds still: a sweep there reads as a flash before it stops).
  */
 export function signatureShot(plan: { segments: object[]; texts: { style: string; from: number }[]; transitions: EditPlan["transitions"] }): number | null {
   const band = plan.texts.find((t) => t.style === "band");
@@ -238,7 +242,7 @@ export function signatureShot(plan: { segments: object[]; texts: { style: string
   // Lengths only: the editor's segments time like the plan's.
   const timeline = planTimeline(plan as unknown as Pick<EditPlan, "segments" | "transitions">);
   const i = timeline.segments.findIndex((s) => band.from >= s.start - 0.3 && band.from < s.start + s.length);
-  return i > 0 && "clip_id" in plan.segments[i]! ? i : null;
+  return i > 0 && i < plan.segments.length - 1 && "clip_id" in plan.segments[i]! ? i : null;
 }
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
@@ -340,7 +344,7 @@ export const MAX_REEL_SECONDS = 30;
 const FADE_MIN_AVERAGE = 2.4;
 
 /** The end card's length, and the last shot that holds it with a little of itself before it. */
-const END_CARD_SECONDS = 1.6;
+export const END_CARD_SECONDS = 1.6;
 const END_CARD_HOLD = 2.2;
 
 export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>, maxFreeScenes = MAX_FREE_SCENES): EditPlan {
@@ -406,15 +410,39 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
   const textsEnd = plan.end_card ? duration - END_CARD_SECONDS : duration;
   const timeline = planTimeline(draft);
   const animations = draft.segments.flatMap((s, i) => (isClipSegment(s) ? [] : [timeline.segments[i]!])).map((a) => ({ from: a.start, to: a.start + a.length }));
-  const texts = clearOfAnimations(
-    tempo.texts.map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, textsEnd)) })),
+  const texts = readableEnding(
+    clearOfAnimations(
+      tempo.texts.map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, textsEnd)) })),
+      animations,
+      textsEnd,
+    ),
     animations,
     textsEnd,
   )
-    .filter((t) => t.to - t.from >= 0.5)
+    .filter((t) => t.to - t.from >= MIN_TEXT_SECONDS)
     .map((t) => ({ ...t, emphasis: t.emphasis?.filter((e) => t.text.toLowerCase().includes(e.toLowerCase())) }));
 
   return editPlanSchema.parse({ ...draft, duration, texts });
+}
+
+/** A text on screen for less than this is not read: it goes. */
+const MIN_TEXT_SECONDS = 1;
+
+/** How long the last words of a Reel (its invitation) stay, at least, when there is room. */
+const ENDING_TEXT_SECONDS = 1.8;
+
+/**
+ * The last text of a Reel cut short by its end (an invitation on screen for 0.7 s) starts
+ * earlier, so it stays ENDING_TEXT_SECONDS: never over another text nor an animation.
+ */
+export function readableEnding<T extends { from: number; to: number }>(texts: T[], animations: { from: number; to: number }[], end: number): T[] {
+  const sorted = [...texts].sort((a, b) => a.from - b.from);
+  const last = sorted.at(-1);
+  if (!last || last.to < end - 0.05 || last.to - last.from >= ENDING_TEXT_SECONDS) return sorted;
+  const previous = sorted.at(-2);
+  const from = round(Math.max(previous ? previous.to : 0, end - ENDING_TEXT_SECONDS));
+  if (animations.some((a) => from < a.to - 0.05 && last.to > a.from + 0.05)) return sorted;
+  return [...sorted.slice(0, -1), { ...last, from: Math.min(last.from, from) }];
 }
 
 /**
@@ -443,6 +471,69 @@ export function clearOfAnimations<T extends { from: number; to: number }>(texts:
     const clear = !animations.some((a) => from < a.to - 0.05 && to > a.from + 0.05);
     if (to - from >= 1.2 && clear && free(from, to)) kept.push({ ...text, from, to });
   }
+  return kept.sort((a, b) => a.from - b.from);
+}
+
+/** With a voice, what the Reel keeps after its last word: the invitation, read in silence. */
+export const VOICE_TAIL = 1.5;
+
+/** The quiet a text needs between two phrases of the voice to show there. */
+const TEXT_PAUSE = 1.2;
+
+/**
+ * With a voice, the Reel holds VOICE_TAIL after its last word: the last shot is
+ * lengthened when its clip (or photo) has the room, never past MAX_REEL_SECONDS.
+ */
+export function holdAfterVoice(plan: EditPlan, voiceEnd: number, clipDurations: Record<string, number>): EditPlan {
+  const total = renderDuration(plan);
+  const missing = Math.min(voiceEnd + VOICE_TAIL, MAX_REEL_SECONDS) - total;
+  const last = plan.segments.at(-1);
+  if (missing <= 0.05 || !last || !isClipSegment(last)) return plan;
+  const speed = last.speed ?? 1;
+  const room = ((clipDurations[last.clip_id] ?? last.out) - last.out) / speed;
+  const add = Math.min(missing, room);
+  if (add < 0.1) return plan;
+  const next = { ...plan, segments: [...plan.segments.slice(0, -1), { ...last, out: round(last.out + add * speed) }] };
+  return { ...next, duration: round(Math.max(3, renderDuration(next))) };
+}
+
+/**
+ * Texts over a voice: its words are the subtitles, so a text says something else at another
+ * moment. The hook stays over the first phrase (the subtitles step aside while a text shows),
+ * ending soon after it; any other text goes into a quiet moment of the voice (a pause of
+ * TEXT_PAUSE or more, or after its last word), the nearest to where it was, or goes.
+ */
+export function clearOfVoice<T extends { from: number; to: number; style: string }>(texts: T[], phrases: { start: number; end: number }[], end: number): T[] {
+  if (!phrases.length) return texts;
+  const first = phrases[0]!;
+  const quiet = [
+    ...phrases.slice(1).map((p, i) => ({ from: phrases[i]!.end, to: p.start })),
+    { from: phrases.at(-1)!.end, to: end },
+  ].filter((q) => q.to - q.from >= TEXT_PAUSE);
+  const speaks = (from: number, to: number) => phrases.some((p) => from < p.end - 0.05 && to > p.start + 0.05);
+  const kept: T[] = [];
+  const free = (from: number, to: number) => kept.every((k) => k.to <= from + 0.001 || k.from >= to - 0.001);
+  [...texts]
+    .sort((a, b) => a.from - b.from)
+    .forEach((t, i) => {
+      if (i === 0 && t.style === "hook" && t.from < first.end) {
+        kept.push({ ...t, to: round(Math.min(t.to, Math.max(first.end + 0.4, t.from + TEXT_PAUSE))) });
+        return;
+      }
+      if (!speaks(t.from, t.to) && free(t.from, t.to)) {
+        kept.push(t);
+        return;
+      }
+      const length = Math.max(TEXT_PAUSE, t.to - t.from);
+      const best = quiet
+        .map((q) => {
+          const from = Math.min(Math.max(q.from + 0.1, t.from), q.to - Math.min(length, q.to - q.from - 0.1));
+          return { from: round(from), to: round(Math.min(q.to, from + length)) };
+        })
+        .filter((o) => o.to - o.from >= TEXT_PAUSE && free(o.from, o.to))
+        .sort((a, b) => Math.abs(a.from - t.from) - Math.abs(b.from - t.from))[0];
+      if (best) kept.push({ ...t, ...best });
+    });
   return kept.sort((a, b) => a.from - b.from);
 }
 

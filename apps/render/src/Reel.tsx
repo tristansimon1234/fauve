@@ -31,6 +31,9 @@ const SAFE = { left: 140, right: 140 };
 
 const normalize = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 
+/** Where a text breaks into words: any space but the non-breaking ones, which hold a business's name together. */
+const SPACES = /[^\S\u00a0]+/;
+
 export function Reel(props: ReelProps) {
   const theme = THEMES[props.template];
   // The studio's own fonts first, so their families are not asked of Google.
@@ -151,8 +154,9 @@ function musicVolume(track: NonNullable<ReelProps["soundtrack"]>, frame: number)
 
 /**
  * The Reel's one signature transition into a shot, kept sober: « punch », a short
- * zoom that settles (8 frames, no bounce); « wipe », a panel in the brand colour
- * that sweeps away to reveal the shot (10 frames). Anything else is a clean cut.
+ * zoom that settles (8 frames, no bounce); « wipe », a band in the brand colour that
+ * sweeps across the new shot (12 frames), never a frame of colour alone. Anything else
+ * is a clean cut.
  */
 function Accent({ kind, color, children }: { kind?: "punch" | "wipe"; color: string; children: ReactNode }) {
   const frame = useCurrentFrame();
@@ -161,11 +165,12 @@ function Accent({ kind, color, children }: { kind?: "punch" | "wipe"; color: str
     return <AbsoluteFill style={{ transform: `scale(${scale})` }}>{children}</AbsoluteFill>;
   }
   if (kind === "wipe") {
-    const x = interpolate(frame, [0, 10], [0, -102], { ...clamp, easing: Easing.inOut(Easing.cubic) });
+    // A band a third of the frame wide, from the right edge out past the left one.
+    const x = interpolate(frame, [0, 12], [100, -36], { ...clamp, easing: Easing.inOut(Easing.cubic) });
     return (
       <AbsoluteFill>
         {children}
-        {frame < 11 ? <AbsoluteFill style={{ backgroundColor: color, transform: `translateX(${x}%)` }} /> : null}
+        {frame < 13 ? <div style={{ position: "absolute", top: 0, bottom: 0, left: `${x}%`, width: "36%", backgroundColor: color }} /> : null}
       </AbsoluteFill>
     );
   }
@@ -400,9 +405,9 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const exit = useExit(text.durationInFrames, theme);
-  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(/\s+/)).map(normalize));
+  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(SPACES)).map(normalize));
   const h = theme.hook;
-  const words = text.text.split(/\s+/).filter(Boolean);
+  const words = text.text.split(SPACES).filter(Boolean);
 
   // The hook sits in the upper third, big, where the eye lands first; a long one shrinks to its box.
   const box: CSSProperties = {
@@ -487,13 +492,13 @@ function Band({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
   const exit = useExit(text.durationInFrames, theme);
   const b = theme.band;
   const reveal = spring({ frame, fps, config: { damping: 200, stiffness: 170, mass: 0.7 } });
-  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(/\s+/)).map(normalize));
+  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(SPACES)).map(normalize));
   const size = b.size * k * (text.scale ?? 1);
   const onBox = b.box === "white" ? { bg: "#FFFFFF", fg: "#16121F" } : { bg: props.brand.accent, fg: props.brand.accentInk };
   // A stressed word: in the brand colour (one that reads on its box), never a chip of its own.
   const stress = (word: string): CSSProperties | undefined =>
     !emphasis.has(normalize(word)) ? undefined : b.box === "white" ? { color: legible(props.brand.accent, "white") } : { textDecoration: "underline", textDecorationThickness: `${3 * k}px`, textUnderlineOffset: `${6 * k}px` };
-  const words = text.text.split(/\s+/).filter(Boolean);
+  const words = text.text.split(SPACES).filter(Boolean);
   const type: CSSProperties = {
     fontFamily: `"${b.family === "display" || MONOSPACE.test(props.brand.bodyFont) ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`,
     fontWeight: b.weight,
@@ -694,7 +699,7 @@ function LookText({ text, index, props, theme, k }: { text: ReelProps["texts"][n
   const exit = useExit(text.durationInFrames, theme);
   const look = text.look ?? listFallback(props);
   const scale = text.scale ?? 1;
-  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(/\s+/)).map(normalize));
+  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(SPACES)).map(normalize));
   const top = text.y ?? TEXT_Y[text.style];
 
   const box: CSSProperties = {
@@ -756,7 +761,7 @@ function LookText({ text, index, props, theme, k }: { text: ReelProps["texts"][n
     );
   }
 
-  const words = text.text.split(/\s+/).filter(Boolean);
+  const words = text.text.split(SPACES).filter(Boolean);
   const typed = look.enter === "typewriter" ? Math.floor(Math.max(0, frame) / 1.4) : Infinity;
   let shown = 0;
   return (
@@ -809,6 +814,12 @@ function Logo({ props, k }: { props: ReelProps; k: number }) {
 /** Where the voice's subtitles sit: low, above the apps' buttons and caption (a line set meanwhile moves up). */
 const SUBTITLE_Y = 0.64;
 
+/** A tight dark halo and a soft shadow: subtitles stay sharp on a bright picture. */
+const SUBTITLE_SHADOW = "0 0 3px rgba(0,0,0,0.55), 0 2px 10px rgba(0,0,0,0.45)";
+
+/** A phrase's end: the next words start a new line of subtitles. */
+const PHRASE_END = /[.,!?;:…]$/;
+
 /** Word-by-word subtitles: short phrases, the spoken word lit up. */
 function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
@@ -816,11 +827,15 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
   for (const word of props.words) {
     const current = chunks.at(-1);
     const last = current?.at(-1);
-    // Two or three words at a time: read at a glance, in time with the voice.
-    if (current && last && current.length < 3 && word.from - last.to < 12) current.push(word);
+    // Two or three words at a time, never across a phrase's end: read at a glance, in time with the voice.
+    if (current && last && current.length < 3 && word.from - last.to < 12 && !PHRASE_END.test(last.w)) current.push(word);
     else chunks.push([word]);
   }
-  const chunk = chunks.find((c) => frame >= c[0]!.from && frame <= c.at(-1)!.to + 6);
+  // Another text or an animation on screen says it already: the subtitles step aside (never two texts at once).
+  const busy =
+    props.texts.some((t) => frame >= t.from && frame < t.from + t.durationInFrames) ||
+    props.segments.some((seg) => seg.type === "motion" && frame >= seg.startAt && frame < seg.startAt + seg.durationInFrames);
+  const chunk = busy ? undefined : chunks.find((c) => frame >= c[0]!.from && frame <= c.at(-1)!.to + 6);
   if (!chunk) return null;
   const s = theme.subtitle;
   return (
@@ -837,9 +852,21 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
         textTransform: s.uppercase ? "uppercase" : "none",
         lineHeight: 1.3,
         color: "#fff",
-        textShadow: LINE_SHADOW,
+        textShadow: SUBTITLE_SHADOW,
+        // Its own layer, so the shade sits behind the words and above the picture.
+        isolation: "isolate",
       }}
     >
+      {/* A soft shade behind the words: they read on a white wall too. */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: `${-40 * k}px ${-30 * k}px`,
+          zIndex: -1,
+          background: "radial-gradient(ellipse 62% 58% at 50% 50%, rgba(10,8,18,0.42) 0%, rgba(10,8,18,0.18) 55%, rgba(10,8,18,0) 100%)",
+        }}
+      />
       {chunk.map((word, i) => {
         const active = frame >= word.from && frame <= word.to;
         const style: CSSProperties =
