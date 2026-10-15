@@ -30,14 +30,14 @@ export const TYPICAL_COST_EUR: Record<keyof typeof CREDIT_PRICES, number> = {
   correction: 0.06, // the editor again
   newScene: 0.11, // the motion designer, with its sandbox test
   reusedScene: 0,
-  render: 0.02, // Vercel Sandbox
+  render: 0.06, // Vercel Sandbox in Paris (~€0.01 a minute), and the music composed for the cut (ElevenLabs, ~€0.04 for 20 s)
   moodboard: 0.06, // Opus reading a few images
-  variant: 0.02, // a render
+  variant: 0.02, // a render (same cut: the music is kept)
   textLayer: 0.4, // the component designer (one or two rounds) and its critic
   elementEdit: 0.2, // one round of the component designer on one component
   review: 0.03, // the critic watching key frames
-  fixRound: 0.11, // the editor, a render, the critic again
-  alternative: 0.08, // the editor and a render
+  fixRound: 0.15, // the editor, a render with its new music, the critic again
+  alternative: 0.12, // the editor and a render with its music
   image: 0.05, // the image model at 2K (about $0.05), with the photo read in
 };
 

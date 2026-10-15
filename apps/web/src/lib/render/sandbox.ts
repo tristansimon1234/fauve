@@ -1,13 +1,20 @@
 import "server-only";
 import { Sandbox } from "@vercel/sandbox";
-import { MIX_CEILING, mixFilter, mixGains, RENDER_FONTS, speechGain, type ReelProps } from "@fauve/agent";
+import { MIX_CEILING, mixFilter, mixGains, RENDER_FONTS, SANDBOX_REGION, sandboxCostUsd, speechGain, usdToEur, type ReelProps } from "@fauve/agent";
+import { env } from "@/lib/env";
 import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
 
 // The render worker: a persistent Vercel Sandbox (Firecracker microVM) holding a
 // static ffmpeg build and the fonts. Nothing heavy runs in the Vercel function
-// itself; it only sends the job (clip URLs + plan) and collects the MP4.
+// itself; it only sends the job (clip URLs + plan) and collects the MP4. It runs in
+// Paris (SANDBOX_REGION), like the functions and the database: the first one,
+// "fauve-render", was left in the default region (Virginia).
 
-const NAME = "fauve-render";
+const NAME = "fauve-render-paris";
+/** vCPUs of the render sandbox (2 GB of memory each). */
+const VCPUS = 4;
+/** A session stops at its deadline, even in the middle of a render: each job starts with this much time left. */
+const JOB_MS = 6 * 60_000;
 const ROOT = "/vercel/sandbox/fauve";
 // Static ffmpeg 7 (johnvansickle build): libx264 + libass, no drawtext.
 const FFMPEG_URL = "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-linux-x64.gz";
@@ -44,7 +51,8 @@ export function renderSandbox(): Promise<Sandbox> {
     const sandbox = await Sandbox.getOrCreate({
       name: NAME,
       persistent: true,
-      resources: { vcpus: 4 },
+      region: SANDBOX_REGION,
+      resources: { vcpus: VCPUS },
       timeout: 15 * 60_000,
     });
     await bash(sandbox, SETUP);
@@ -54,6 +62,27 @@ export function renderSandbox(): Promise<Sandbox> {
     throw error;
   });
   return ready;
+}
+
+/**
+ * Gives the running session time for one more job, extending it only by what is missing
+ * (a stopped one is resumed by the next command, with its full timeout).
+ */
+async function withTimeLeft(sandbox: Sandbox): Promise<Sandbox> {
+  if (sandbox.status !== "running") return sandbox;
+  const left = (sandbox.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY) - Date.now();
+  if (left < JOB_MS) {
+    await sandbox.extendTimeout(JOB_MS - Math.max(0, left)).catch((error: unknown) => console.warn("render sandbox: timeout not extended", error));
+  }
+  return sandbox;
+}
+
+/** The sandbox for one job (ffmpeg, frames, mixing). */
+const jobSandbox = async () => withTimeLeft(await renderSandbox());
+
+/** What `seconds` of work in the render sandbox cost, in euros (logged in cost_events). */
+export function sandboxCostEur(seconds: number): number {
+  return usdToEur(sandboxCostUsd(seconds, VCPUS, SANDBOX_REGION), env("USD_TO_EUR"));
 }
 
 export type SandboxRenderJob = {
@@ -66,7 +95,7 @@ export type SandboxRenderJob = {
 
 /** Runs one render and returns the MP4 bytes. */
 export async function renderInSandbox(job: SandboxRenderJob): Promise<Buffer> {
-  const sandbox = await renderSandbox();
+  const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${job.id}`;
   try {
     await bash(sandbox, `rm -rf "$1" && mkdir -p "$1" && ln -s ${ROOT}/fonts "$1/fonts"`, [dir]);
@@ -102,7 +131,7 @@ const CHROME_DEPS = [
 let remotionReady: Promise<Sandbox> | undefined;
 
 async function prepareRemotion(): Promise<Sandbox> {
-  const sandbox = await renderSandbox();
+  const sandbox = await jobSandbox();
   const current = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cat ${REMOTION}/.hash 2>/dev/null || true`] });
   if ((await current.stdout()).trim() === REMOTION_SOURCE_HASH) return sandbox;
 
@@ -151,7 +180,7 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps): Promi
 
 /** Renders the Reel composition with the given props and returns the MP4 bytes. */
 export async function renderReelInSandbox(job: { id: string; props: ReelProps }): Promise<Buffer> {
-  const sandbox = await remotionSandbox();
+  const sandbox = await withTimeLeft(await remotionSandbox());
   const dir = `${ROOT}/jobs/${job.id}`;
   const media = `${REMOTION}/build/public/jobs/${job.id}`;
   try {
@@ -189,7 +218,7 @@ export async function smokeTestScenes(
   brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">,
 ): Promise<Record<string, string | null>> {
   if (!scenes.length) return {};
-  const sandbox = await remotionSandbox();
+  const sandbox = await withTimeLeft(await remotionSandbox());
   const file = `${ROOT}/jobs/smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
   try {
     await sandbox.writeFiles([{ path: file, content: JSON.stringify(scenes.map((s) => ({ ...s, brand }))) }]);
@@ -215,7 +244,7 @@ export async function renderStillsInSandbox(
   jobs: { id: string; frame: number; props: ReelProps }[],
 ): Promise<Record<string, Buffer | Error>> {
   if (!jobs.length) return {};
-  const sandbox = await remotionSandbox();
+  const sandbox = await withTimeLeft(await remotionSandbox());
   const dir = `${ROOT}/jobs/${id}`;
   try {
     await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
@@ -252,7 +281,7 @@ export async function renderStillsInSandbox(
  */
 export async function videoFramesInSandbox(id: string, url: string, times: number[]): Promise<{ t: number; jpeg: Buffer }[]> {
   if (!times.length) return [];
-  const sandbox = await renderSandbox();
+  const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${id}`;
   try {
     await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
@@ -291,7 +320,7 @@ function printed(stdout: string, name: string): number | null {
  * at its level around a few spoken shots). A video without sound just gets the music.
  */
 export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Array, options: { voiceOver?: boolean } = {}): Promise<Buffer> {
-  const sandbox = await renderSandbox();
+  const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${id}-mux`;
   try {
     await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
@@ -326,7 +355,7 @@ export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Arr
  * out 12 dB apart, and the live preview plays the file as it is. Unchanged when silent.
  */
 export async function levelSpeechInSandbox(id: string, mp3: Buffer): Promise<{ mp3: Buffer; lufs: number | null }> {
-  const sandbox = await renderSandbox();
+  const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${id}-level`;
   try {
     await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
@@ -353,7 +382,7 @@ export async function levelSpeechInSandbox(id: string, mp3: Buffer): Promise<{ m
  * The URL was checked to be public before; null when the capture fails.
  */
 export async function screenshotInSandbox(id: string, url: string): Promise<Buffer | null> {
-  const sandbox = await remotionSandbox();
+  const sandbox = await withTimeLeft(await remotionSandbox());
   const dir = `${ROOT}/jobs/${id}`;
   try {
     await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);

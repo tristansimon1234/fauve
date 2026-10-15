@@ -1,8 +1,9 @@
 import "server-only";
 import { FileState, GoogleGenAI } from "@google/genai";
-import { accessMessage, bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisRequestSchema, clipAnalysisSchema, usdToEur, type ClipAnalysis } from "@fauve/agent";
+import { accessMessage, bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisRequestSchema, clipAnalysisSchema, type ClipAnalysis } from "@fauve/agent";
 import { z } from "zod";
 import { env } from "@/lib/env";
+import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
 import { studioAccess } from "@/lib/billing/access";
 import { sortClip } from "@/lib/clip-sort";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -66,25 +67,6 @@ async function claim(mediaId: string): Promise<boolean> {
   return data.length > 0;
 }
 
-async function logCost(studioId: string, model: string, usage: Record<string, number | undefined> | undefined) {
-  const input = (usage?.promptTokenCount ?? 0) + (usage?.toolUsePromptTokenCount ?? 0);
-  const output = (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0);
-  const inPrice = env("GEMINI_INPUT_USD_PER_MTOK");
-  const outPrice = env("GEMINI_OUTPUT_USD_PER_MTOK");
-  const usd = inPrice !== undefined && outPrice !== undefined ? (input * inPrice + output * outPrice) / 1e6 : null;
-  const { error } = await supabaseAdmin()
-    .from("cost_events")
-    .insert({
-      studio_id: studioId,
-      kind: "video_analysis",
-      provider: "google",
-      units: input + output,
-      cost_eur: usd === null ? 0 : usdToEur(usd, env("USD_TO_EUR")),
-      meta: { model, usage, cost_usd: usd, priced: usd !== null },
-    });
-  if (error) console.error("cost_events insert failed", error.message);
-}
-
 async function runAnalysis(asset: { id: string; studio_id: string; storage_path: string; mime_type: string | null }) {
   const db = supabaseAdmin();
   const download = await db.storage.from("media").download(asset.storage_path);
@@ -126,7 +108,7 @@ async function runAnalysis(asset: { id: string; studio_id: string; storage_path:
       }
     }
     if (!response) throw new Error("Gemini gave no response");
-    await logCost(asset.studio_id, model, response.usageMetadata as Record<string, number | undefined> | undefined);
+    await logGeminiCost({ studioId: asset.studio_id, kind: "video_analysis", model, usage: response.usageMetadata as GeminiUsage });
 
     const raw = JSON.parse(response.text ?? "") as { words?: unknown };
     // Words are a bonus for subtitles: keep only a clean, bounded list.

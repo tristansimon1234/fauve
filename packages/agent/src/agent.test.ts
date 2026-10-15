@@ -370,6 +370,21 @@ test("motion scenes: the renderer, the smoke test and the prompt share one scope
   }
 });
 
+test("pricing: Gemini, the sandbox, the music and the transcriptions are priced", async () => {
+  const { geminiCostUsd, musicCostUsd, sandboxCostUsd, transcriptionCostUsd } = await import("./pricing.ts");
+  const tokens = { input: 1_000_000, output: 100_000 };
+  // Introductory Flash price through 2026, doubled from January 1, 2027.
+  assert.equal(geminiCostUsd("gemini-3.7-flash", tokens, new Date("2026-10-15T12:00:00Z")), 0.75 + 0.375);
+  assert.equal(geminiCostUsd("gemini-3.8-flash", tokens, new Date("2027-01-01T00:00:00Z")), 1.5 + 0.75);
+  assert.equal(geminiCostUsd("gemini-unknown", tokens), null);
+  // An hour on 4 vCPUs in Paris: CPU on every vCPU and 2 GB of memory each.
+  assert.ok(Math.abs(sandboxCostUsd(3600, 4, "cdg1") - 4 * (0.177 + 2 * 0.0292)) < 1e-9);
+  assert.ok(sandboxCostUsd(60, 4, "iad1") < sandboxCostUsd(60, 4, "cdg1"));
+  assert.equal(sandboxCostUsd(-5, 4), 0);
+  assert.ok(Math.abs(musicCostUsd(20) - 0.05) < 1e-9);
+  assert.ok(Math.abs(transcriptionCostUsd(3600) - 0.22) < 1e-9);
+});
+
 test("pricing: the chat model is priced", async () => {
   const { CHAT_MODEL, claudeCostUsd } = await import("./pricing.ts");
   assert.ok(claudeCostUsd(CHAT_MODEL, { input_tokens: 1_000_000, output_tokens: 100_000 }) > 0);
