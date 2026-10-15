@@ -1224,22 +1224,6 @@ test("tempo: cuts and texts on the beats, one signature transition, the rhythm f
   assert.match(rhythmLine(normalized), /transition signature : punch à la scène 1/);
 });
 
-test("reply: a paragraph said again after a tool call is kept once, in its last wording", async () => {
-  const { mergeReplySteps } = await import("./reply.ts");
-  const reply = mergeReplySteps([
-    "Samedi 17 octobre à 18 h, noté 📅 J'utiliserai les deux photos de ton site, donc tu n'as rien à envoyer.\n\nQuelle idée pour ce premier Reel ?",
-    "Samedi 17 octobre à 18 h, c'est noté 📅 J'utiliserai les deux photos de ton site, donc tu n'as rien à envoyer.\n\nQuelle idée pour ce premier Reel ? Tu as trois propositions juste en dessous.",
-  ]);
-  assert.deepEqual(reply.split("\n\n"), [
-    "Samedi 17 octobre à 18 h, c'est noté 📅 J'utiliserai les deux photos de ton site, donc tu n'as rien à envoyer.",
-    "Quelle idée pour ce premier Reel ? Tu as trois propositions juste en dessous.",
-  ]);
-  // An answer that starts before a tool and ends after it keeps both parts.
-  assert.equal(mergeReplySteps(["D'accord, 19 h !", "Je l'ai déplacée au jeudi 19 h, la carte est juste en dessous."]), "D'accord, 19 h !\n\nJe l'ai déplacée au jeudi 19 h, la carte est juste en dessous.");
-  // Short paragraphs are only merged when identical.
-  assert.equal(mergeReplySteps(["Top !", "Top !"]), "Top !");
-});
-
 test("editor: the signature transition goes on the shot where the band appears, the schema stays small", async () => {
   const { fromEditorPlan, signatureShot, editorOutputSchema } = await import("./editor.ts");
   const { z } = await import("zod");
@@ -1269,3 +1253,15 @@ test("editor: the signature transition goes on the shot where the band appears, 
   assert.doesNotMatch(JSON.stringify(z.toJSONSchema(editorOutputSchema, { unrepresentable: "any" })), /"accent":/);
 });
 
+
+test("turn: a step that only adds buttons or a reaction ends the turn", async () => {
+  const { endsTurn } = await import("./turn.ts");
+  // Her words, then buttons: no new model call, so no second copy of the answer.
+  assert.equal(endsTurn(["reply_with"], true), true);
+  assert.equal(endsTurn(["react_to_message"], false), true);
+  // Buttons with no word yet: she still writes the message they sit under.
+  assert.equal(endsTurn(["reply_with"], false), false);
+  // Any other tool needs its result read.
+  assert.equal(endsTurn(["update_post", "reply_with"], true), false);
+  assert.equal(endsTurn([], true), false);
+});

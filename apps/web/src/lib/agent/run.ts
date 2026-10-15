@@ -20,7 +20,7 @@ import {
   type ReplyExtras,
   type ToolName,
   type ReactionMood,
-  mergeReplySteps,
+  endsTurn,
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -156,11 +156,19 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     const text = textOf(message).trim();
     if (text && spoken.at(-1) !== text) spoken.push(text);
   };
+  // A step that only closes her message (buttons, a reaction) ends the turn: its tools run,
+  // and the model is not asked again, which made it write the same answer twice.
+  const closes = (message: Anthropic.Beta.BetaMessage) =>
+    endsTurn(
+      message.content.filter((b) => b.type === "tool_use").map((b) => b.name),
+      spoken.length > 0,
+    );
   const onEvent = input.onEvent;
   if (onEvent) {
     // Live (the app): her words as she writes them, then a line for each tool she calls, before it runs.
     let step = 0;
-    for await (const stream of anthropic().beta.messages.toolRunner({ ...params, stream: true })) {
+    const runner = anthropic().beta.messages.toolRunner({ ...params, stream: true });
+    for await (const stream of runner) {
       const current = step++;
       stream.on("text", (delta) => onEvent({ type: "text", step: current, delta }));
       const message = await stream.finalMessage();
@@ -169,9 +177,20 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
         const label = block.type === "tool_use" ? TOOL_STATUS[block.name as ToolName] : null;
         if (label) onEvent({ type: "status", label });
       }
+      if (closes(message)) {
+        await runner.generateToolResponse();
+        break;
+      }
     }
   } else {
-    for await (const message of anthropic().beta.messages.toolRunner(params)) take(message);
+    const runner = anthropic().beta.messages.toolRunner(params);
+    for await (const message of runner) {
+      take(message);
+      if (closes(message)) {
+        await runner.generateToolResponse();
+        break;
+      }
+    }
   }
 
   await logClaudeCost(input.studioId, usage, "conversation", CHAT_MODEL);
@@ -179,8 +198,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   if (!last || last.stop_reason === "refusal") {
     return { reply: FALLBACK_REPLY, reactions: input.reactions, extras: {}, notes: input.notes, usage, afterReply: input.afterReply };
   }
-  // A paragraph said again after a tool call (in other words) is kept once, in its last wording.
-  const reply = mergeReplySteps(spoken);
+  const reply = spoken.join("\n\n");
   // Never silent: a turn that only reacted keeps its reaction; one that did nothing at all says so.
   const silent = !reply && !input.reactions.length;
   return {
