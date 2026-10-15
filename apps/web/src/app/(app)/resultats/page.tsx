@@ -1,5 +1,5 @@
 import { PageSuspense } from "@/components/page-suspense";
-import { bestMoments, byFormat, periodTotals, platformSchema, postKindSchema, weeklyGrowth, type PostStat } from "@fauve/agent";
+import { bestMoments, byFormat, followerSeries, periodTotals, platformSchema, postKindSchema, weeklyGrowth, type PostStat } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import { formatNumber, formatShortDate, kindLabels } from "@/lib/format";
 import { getStudioContext, rows } from "@/lib/studio";
 import { RefreshReportButton } from "./refresh-button";
 import { FollowersChart, FormatTable, Ranking, WeeklyBars } from "./growth";
+import { FollowersLine } from "./followers-line";
 
 export const metadata: Metadata = { title: "Résultats" };
 
@@ -144,6 +145,9 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   const ig = periodTotals(igDaily, from);
   const tt = ttDaily.length ? periodTotals(ttDaily, from) : null;
   const weeks = weeklyGrowth(igDaily, WEEKS);
+  // The total, day by day over the period (Instagram worked back from its daily gains and losses).
+  const igLine = followerSeries(igDaily, period.days);
+  const ttLine = followerSeries(ttDaily, period.days);
   const ttWeeks = ttDaily.length ? weeklyGrowth(ttDaily, WEEKS) : null;
   const audience = audienceSchema.parse((audienceResult.data as { data?: unknown } | null)?.data ?? {});
   const tz = member.studio.timezone;
@@ -254,8 +258,15 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           <h2 className="text-lg font-bold">Tes abonnés, semaine par semaine</h2>
           {ig.followers !== null && <span className="text-[13px] font-semibold text-muted">{formatNumber(ig.followers)} abonnés sur Instagram</span>}
         </div>
+        {(igLine.length > 1 || ttLine.length > 1) && (
+          <div className="flex flex-wrap gap-6">
+            <FollowersLine label="Instagram" points={igLine} timeZone={tz} />
+            <FollowersLine label="TikTok" points={ttLine} timeZone={tz} />
+          </div>
+        )}
         {hasWeeks ? (
           <>
+            <span className="text-xs font-extrabold tracking-[.06em] text-muted">CHAQUE SEMAINE</span>
             <FollowersChart weeks={weeks} timeZone={tz} />
             <div className="flex flex-wrap gap-3">
               <WeeklyBars weeks={weeks} pick={(w) => w.views} label="Vues" timeZone={tz} />
