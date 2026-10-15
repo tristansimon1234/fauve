@@ -20,6 +20,7 @@ export * from "./text-look.ts";
 export * from "./text-layer.ts";
 export * from "./elements.ts";
 export * from "./retouch.ts";
+export * from "./finish.ts";
 export * from "./effort.ts";
 export * from "./critic.ts";
 export * from "./emoji.ts";

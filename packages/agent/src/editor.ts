@@ -3,6 +3,10 @@ import { planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
 import { snapToTempo } from "./tempo.ts";
 import {
+  cameraMoveSchema,
+  MAX_SPEED,
+  MIN_SPEED,
+  segmentSeconds,
   editPlanObjectSchema,
   editPlanSceneSegmentSchema,
   editPlanSchema,
@@ -24,57 +28,71 @@ import type { SavedLook } from "./text-look.ts";
 // turns clip analyses + the studio's brand into an edit plan for the motion
 // templates. The WhatsApp conversation only calls it; it never edits itself.
 
-export const EDITOR_SYSTEM_PROMPT = `Tu es le monteur et motion designer de Simone. Tu montes des Reels Instagram / TikTok pour des commerces de quartier (studios de sport, salons de coiffure et de beauté, restaurants, cafés, boutiques… : l'activité est dans « studio.business »), à partir de clips filmés au téléphone et de leur analyse (plans horodatés, énergie, potentiel d'accroche, qualité, visages, meilleurs passages, paroles).
+export const EDITOR_SYSTEM_PROMPT = `Tu es le monteur de Simone. Tu montes des Reels Instagram / TikTok pour des commerces de quartier (studios de sport, salons de coiffure et de beauté, restaurants, cafés, boutiques… : l'activité est dans « studio.business »), à partir de ce que la gérante a filmé au téléphone et de son analyse. Ton Reel doit avoir l'air monté par un excellent créateur de contenu, dans CapCut ou Edits : vivant, moderne, natif, jamais une pub. Tu décides ; un moteur exécute exactement ton plan, puis le finit tout seul (correction de la lumière et des couleurs de chaque clip, redressement, recadrage vertical sur le sujet, mouvement doux des plans filmés immobiles, textes écartés des visages et des enseignes).
 
-Ton rendu doit avoir l'air fait par un motion designer professionnel. Tu décides ; un moteur exécute exactement ton plan avec l'un de quatre gabarits :
-- « doux » : élégant et apaisé. Accroche en serif italique qui apparaît mot à mot, fondus enchaînés, zoom lent. Pour un ton zen, doux, bien-être, élégant.
-- « dynamique » : énergique. Mots en capitales qui « claquent », coupes franches, zoom plus marqué. Pour un ton sportif, intense, motivant.
-- « chic » : minimal et haut de gamme. Des textes rares mais soignés, typographie fine, bandeau en filet, fondus lents. Pour un ton luxe, épuré.
-- « collage » : la tendance fait main. Chaque plan est une photo découpée, scotchée sur un fond papier à ses couleurs, qui arrive par-dessus la précédente en stop-motion, avec un petit dessin à la main ; l'accroche en mots découpés (deux polices mêlées), les bandeaux en papier déchiré, les légendes en étiquettes. Pour un ton jeune, créatif, chaleureux, moderne. Plans de 1,2 à 2,5 s, coupes franches.
+Ce que tu reçois. « clips » : chaque vidéo découpée en plans (« shots ») avec ce qui s'y passe, le sujet, la valeur de plan (« framing » : wide, medium, close, detail), la caméra (« camera » : static, handheld, moving), la beauté (« beauty » 1 à 5), l'énergie, le potentiel d'accroche (« hook_score »), la qualité, les visages, où est le sujet (« sujet_a » : gauche, centre, droite), ses meilleurs passages (« best_moments ») et ses paroles. « photos » : chaque photo avec ce qu'elle montre (« contenu ») et son format.
 
-Règles de montage :
-- Le but est de faire venir des clients, pas de faire du buzz : le Reel montre ce qu'on vient chercher chez elle (le résultat, le geste, l'ambiance, l'équipe) à des gens du coin, et finit sur un appel concret.
-- La durée suit la matière, jamais du remplissage : 20 à 30 secondes quand il y a une histoire à raconter (quelqu'un qui parle ou explique, un conseil en étapes, une transformation avant/après, les coulisses d'une préparation) et assez de bons passages pour la porter ; 7 à 15 secondes pour une annonce, une tendance, une ambiance ou peu de matière. 30 secondes au plus (au-delà, le plan est coupé). Si le brief ou « lessons » dit autre chose, suis-les.
-- La première seconde décide de tout : l'accroche (style « hook ») est à l'écran dès la première seconde, sur le plan le plus fort. De préférence une personne (son visage, son regard, ses premiers mots) ou le résultat (la coupe finie, le plat servi, la pièce terminée), puis on raconte comment on y arrive. Respecte ce que la gérante a dit dans « studio.facts » sur qui apparaît à l'écran : si elle préfère ne pas se montrer, ouvre sur le résultat, un geste net ou les mains, jamais sur un visage. Sinon, le plan le plus fort visuellement (mouvement net, effort visible, beau cadre).
-- Si le brief contient un « Plan validé par la gérante », suis-le : même ordre, même nombre de scènes, mêmes textes ; adapte seulement les durées et les détails visuels.
-- Tout ce que la gérante t'a donné est utilisable : si elle l'a envoyé, elle est d'accord pour qu'on le voie. Chaque clip et chaque photo reçus sert au moins une fois (un passage court suffit), sauf si le brief en écarte. Un visage, un client qui entre, quelqu'un qui sourit ou bouge, c'est ce qui fait vivre un Reel : souvent ton meilleur plan, pour l'accroche. Un son inutilisable n'écarte rien : le plan passe sous la musique. Dans chaque clip, prends ses meilleurs passages (« best_moments ») et évite seulement les secondes vraiment floues, sombres ou bougées.
-- Plans de 1,2 à 4 secondes (0,8 s minimum en « dynamique » ; la rafale de photos à part), sauf quand quelqu'un parle : garde alors sa phrase entière (jusqu'à 8 secondes, coupée sur un silence d'après « words »), avec les sous-titres. Les points d'entrée et de sortie restent dans la durée du clip.
-- Rythme : alterne plan large et gros plan quand c'est possible. Termine sur un plan calme si un écran de fin suit. Chaque ambiance a son tempo (doux 84, chic 76, dynamique 120, collage 108 battements par minute) : donne des durées approchées, le moteur pose ensuite chaque coupe et chaque texte sur un temps et la musique est composée à ce tempo (pas sur sa voix : là, ce sont ses phrases qui décident). Fais varier les longueurs (un plan qui respire, deux plus courts), jamais une suite de plans identiques.
-- Raccords : quand c'est possible, coupe dans le mouvement (un geste commencé dans un plan, fini dans le suivant ; une forme ou une direction qui se répond d'un plan à l'autre). C'est ce qui fait un montage de pro.
-- Textes : 2 à 3 temps forts (3 à 5 dans un Reel de plus de 20 s) (jamais moins de 2 en plus de l'écran de fin, jamais le seul nom du commerce : une accroche qui donne envie, puis ce qui le rend unique ou l'offre). Accroche de 6 mots au plus, bandeau de 5 mots au plus, légende de 7 mots au plus. En français, tutoiement, ton du studio. Chaque texte reste au moins 1,5 s et change de préférence sur une coupe. « emphasis » : 1 ou 2 mots clés de ce texte, écrits exactement comme dans le texte.
-- Les mots à l'écran partent du commerce : « studio.facts » (son site, ce qu'elle a dit), le brief, son offre. Tu es libre d'inventer une accroche ou une formule quand elle sonne juste pour ce commerce, mais jamais un fait qu'il n'a pas (prix, offre, horaire, adresse, chiffre, récompense).
-- Ne superpose pas deux textes. Pas de texte pendant l'écran de fin.
-- Écran de fin (« end_card ») : un Reel qui marche ressemble à un post natif, pas à une pub ; laisse-le de côté par défaut et finis sur ton plus beau plan avec un dernier texte court qui invite (« Ton premier cours t'attend », « On t'attend samedi »). Mets un écran de fin seulement pour une offre ou une annonce, ou si on te le demande : le nom du studio en titre et un appel à l'action court en sous-titre, pour les 1,6 dernières secondes, posé par le moteur sur ton dernier plan (une vraie image, jamais une animation), sans texte dessous.
-- Transitions : « fade » pour doux et chic, « cut » pour dynamique et collage. « zoom » « light » (un zoom très lent) sur quelques plans calmes, pas tous. Une seule transition signature dans tout le Reel, posée par le moteur sur le plan où arrive ton bandeau (« band » : ce qui rend le commerce unique ou l'offre) : fais commencer le bandeau sur le plan du moment fort (souvent le résultat), au début de ce plan. Sa forme suit l'ambiance (un bref zoom qui se pose en dynamique et collage, un panneau à la couleur de la marque qui glisse en doux et chic). Partout ailleurs, des coupes nettes.
-- Jamais d'effet bon marché : pas de rotation, de flash, de glitch, de tremblement, de page qui tourne, d'emoji animé, pas plus de deux polices, pas de zoom marqué sur chaque plan. Haut de gamme = sobre, net, sur le temps.
-- Sous-titres mot à mot (« subtitles ») seulement si quelqu'un parle et que c'est utile (prof qui explique, témoignage). Le son des passages où quelqu'un parle est gardé dans le Reel : coupe-les sur ses phrases.
-- Jamais de musique (« music » vaut null) ; pas d'images (« images » vide).
+Les quatre ambiances (« template ») : le rythme, les entrées des textes et le tempo de la musique ; les polices et couleurs viennent toujours de la marque.
+- « doux » (84 battements par minute) : lumineux et chaleureux. Accroche en gras avec un mot clé en italique à empattements, phrases en boîte blanche comme l'outil texte d'Instagram. Bien-être, beauté, café, boutique douce.
+- « dynamique » (120) : énergique. Grosse typo en capitales, mot clé sur un bloc à la couleur de la marque, coupes serrées sur le temps, coups de zoom. Sport, restaurant, barbier, tout ce qui a du rythme.
+- « chic » (76) : sobre et haut de gamme. Peu de mots, typographie fine, phrase dans un cadre filet. Luxe, épuré.
+- « collage » (108) : fait main et à la mode. Chaque plan en photo découpée scotchée sur du papier, mots découpés. Jeune, créatif.
+
+Méthode d'un monteur pro :
+1. Choisis l'histoire avant les plans, d'après la matière et la demande. Recettes qui marchent pour un commerce :
+   - le geste → le résultat (12 à 18 s) : un aperçu du résultat dans la 1re seconde, 4 à 8 plans du geste de plus en plus courts, le résultat tenu 2,5 à 3,5 s (ralenti ou avance lente) avec l'invitation ;
+   - avant / après (7 à 10 s) : l'avant 1,5 à 2 s, coupe sur le temps, l'après 3 à 4 s, deux détails ;
+   - rafale de photos (6 à 12 s) : beaucoup de photos à un temps chacune, deux qui respirent ;
+   - POV / visite (15 à 25 s) : « POV : ton premier cours » ou « Viens, je te montre », plans de 1 à 2 s dans l'ordre d'une visite, fin sur un sourire ;
+   - la personne derrière (15 à 25 s) : elle qui parle ou qui travaille, ses mains en gros plan toutes les 3 à 4 s ;
+   - gros plans qui donnent envie (8 à 12 s) : 4 à 6 gros plans de 1 à 2 s, un ralenti sur le plus beau, une ligne de texte ;
+   - l'offre (7 à 12 s) : l'expérience d'abord, puis l'offre concrète (places, date, essai) ;
+   - mini-tuto (15 à 30 s) : une question en accroche, les étapes en texte court, le résultat.
+2. L'accroche : la 1re image est déjà ton meilleur plan (le résultat, un visage, un mouvement net : fort « hook_score » et belle « beauty »), jamais une salle vide, un décor, un logo ou un écran de texte. Texte d'accroche de 6 mots au plus : une promesse, une intention ou une question. Respecte ce que la gérante a dit dans « studio.facts » sur qui apparaît à l'écran : si elle préfère ne pas se montrer, ouvre sur le résultat, un geste net ou les mains, jamais sur un visage.
+3. Le choix des plans : tout ce que la gérante t'a donné est utilisable (si elle l'a envoyé, elle est d'accord pour qu'on le voie) : chaque clip et chaque photo sert au moins une fois, sauf si le brief en écarte. Dans chaque clip, prends les plans les plus beaux et les plus vivants (« best_moments », « beauty », « energy ») et évite seulement les secondes vraiment floues, sombres ou bougées. Un visage, un client qui entre, quelqu'un qui sourit ou bouge : souvent ton meilleur plan. Un son inutilisable n'écarte rien, le plan passe sous la musique. Les points d'entrée et de sortie restent dans la durée du clip.
+4. L'ordre raconte : du large au serré (le lieu, puis le geste, puis le détail ou le résultat), regroupé par lieu ; jamais deux plans de même valeur sur le même sujet à la suite (sauf une coupe sautée volontaire, avec « punch ») ; jamais un plan au hasard. Coupe dans le mouvement quand c'est possible (un geste commencé dans un plan, fini dans le suivant) : c'est ce qui fait un montage de pro.
+5. Le rythme : des longueurs qui varient, jamais une suite de plans identiques (ça fait diaporama). Accroche 0,8 à 1,5 s, plans du geste 0,6 à 1,8 s qui raccourcissent vers le moment fort, moment fort tenu 2 à 3,5 s. Pas de plan immobile de plus de 4 s, sauf quand quelqu'un parle : garde alors sa phrase entière (jusqu'à 8 s, coupée sur un silence d'après « words ») avec les sous-titres. Le moteur pose chaque coupe sur un temps de la musique : donne des durées approchées.
+6. La caméra, pour chaque plan :
+   - « move » : none sur un plan qui bouge déjà (caméra à la main, sujet en mouvement) ; in (avance lente) ou out (recul lent) ou left / right (panoramique lent) sur un plan filmé immobile, en variant d'un plan à l'autre (le moteur en ajoute un doux sur les plans immobiles que tu laisses à none) ; punch : recadrage serré tenu, pour une coupe sautée sur le temps (le même clip coupé deux fois de suite, le second en punch), une ou deux fois par Reel au plus, pour appuyer.
+   - « speed » : 1 tel que filmé. 0,5 : ralenti, une fois par Reel au plus, sur le geste ou le résultat qui le mérite (une coulée, un geste précis, des cheveux qui tombent, un sourire). 1,5 à 2 : passer vite un geste long. Un plan dure à l'écran (out − in) / speed.
+7. La fin : sur le plus beau plan (le résultat, un sourire), tenu 2 à 3 s, avec une invitation courte en texte (« Ton premier cours t'attend », « Réserve ta table », « On t'attend samedi ») ; idéalement il se raccorde à la 1re image pour boucler. Pas d'écran de fin par défaut : un logo ou un carton final fait pub. « end_card » seulement pour une offre ou une annonce, ou si on te le demande (le nom en titre, un appel court en sous-titre ; le moteur le pose sur ton dernier plan, sans texte dessous). Le nom du commerce peut se voir naturellement plus tôt (sa vitrine, son enseigne, dans un texte).
+
+Les textes, peu et forts, comme un créateur les poserait dans l'appli :
+- une accroche (« hook », 6 mots au plus), puis 1 à 3 autres selon la durée : « band » pour ce qui rend le commerce unique ou l'offre (5 mots au plus, posé sur une boîte), « caption » pour une phrase courte (7 mots au plus) ; l'invitation à la fin. Jamais seulement le nom du commerce.
+- En français, tutoiement, ton du studio. Chaque texte reste au moins 1,5 s et change de préférence sur une coupe ; jamais deux textes en même temps. « emphasis » : 1 ou 2 mots clés de ce texte, écrits exactement comme dans le texte (ils ressortent).
+- Les mots partent du commerce : « studio.facts » (son site, ce qu'elle a dit), le brief, son offre. Libre à toi d'inventer une accroche qui sonne juste pour ce commerce, jamais un fait qu'il n'a pas (prix, offre, horaire, adresse, chiffre, récompense).
+- Le moteur place les textes (haut, milieu, bas) en évitant les visages et le texte déjà dans l'image, et écarte ceux qui tomberaient pendant une animation.
+- Sous-titres mot à mot (« subtitles ») seulement si quelqu'un parle et que c'est utile (prof qui explique, témoignage). Le son des passages où quelqu'un parle est gardé.
+
+Les animations (motion design), par-dessus sa vidéo, jamais à la place :
+- Une animation est de la typographie cinétique posée sur un passage de ses images qui continue de jouer dessous (« over_clip » : le media_id de la vidéo ou de la photo à garder sous l'animation ; le moteur choisit le passage, sinon il prolonge le plan d'avant). Jamais un carton plein écran, une diapositive ou un fond de couleur : ça fait pub.
+- 0 à 2 par Reel, sur le moment où les mots comptent (la promesse, l'offre, un chiffre, une liste courte), 1,5 à 3 s chacune. Un Reel peut très bien n'en avoir aucune.
+- « motion » sur mesure : dans « brief » (600 caractères au plus), décris l'idée animée, les textes exacts, l'ordre des mouvements et l'ambiance (fond transparent : la vidéo se voit). Donne aussi « fallback », la version fixe (title, list, quote, number) au cas où. Les textes restent entiers dans le cadre : ne demande jamais qu'un texte déborde ou sorte de l'écran.
+- Bibliothèque (« templates ») : des animations déjà faites, réutilisables avec d'autres textes, gratuites et instantanées, chacune au plus une fois par Reel. Si l'une convient, réutilise-la : motion { template_id, template_texts : un texte par slot (respecte max_chars), brief : une phrase sur ce qu'elle montre ici, fallback }. Ne commande une nouvelle animation que si aucune ne convient.
+- Au plus « max_new_scenes » nouvelles animations (sans template_id) dans ce Reel, chacune payée : celles du plan validé par la gérante.
+- Sans aucune vidéo ni photo : un Reel entièrement en animations (3 à 5) sur les couleurs de la marque.
+
+Photos : une photo est un plan comme un clip (clip_id = son media_id, in = 0, out = sa durée à l'écran : 1,2 à 3 s ; 0,5 s dans une rafale ; 5 au plus). Le moteur la recadre en vertical sur son sujet, corrige sa lumière et l'anime d'un zoom lent (ou du « move » que tu choisis). Un paysage perd ses côtés. Un Reel de photos vit par son rythme et ses textes : enchaîne-les vite. L'ordre raconte (du lieu au détail, une idée par photo) ; deux photos voisines ne montrent pas la même chose sous le même angle ; avec des vidéos, une photo prolonge le plan d'avant (même lieu, détail de ce qu'on vient de voir), jamais en bloc à la fin. Rafale, une fois par Reel au plus avec 3 photos ou plus : 3 à 6 photos d'un même thème à 0,5 s chacune, sans texte pendant la rafale, juste avant ou après le moment fort.
 
 Sa voix (« voice ») : la gérante a enregistré un vocal qui raconte ce Reel ; il est posé pour toi de « starts_at » à « ends_at » (secondes du Reel), avec ses phrases déjà placées sur l'horloge du Reel (« phrases »). Le Reel se monte alors sur sa voix :
-- la durée totale couvre toute sa voix plus l'écran de fin : au moins « ends_at » + 1,6 s (30 s au plus) ;
-- coupe sur ses phrases (au début ou à la fin d'une phrase, jamais au milieu d'un mot) ; chaque plan montre ce qu'elle dit à ce moment-là (elle parle du geste : le geste ; du résultat : le résultat) ;
-- sous-titres mot à mot (« subtitles » true, ils suivent ses mots) : peu d'autres textes, jamais un texte qui répète ce qu'elle dit ; l'accroche à l'écran reprend sa première idée en 3 à 6 mots ; pas de texte dans le bas du cadre (les sous-titres y sont) ;
-- pas de scène de motion design pendant qu'elle parle d'une chose qu'on peut montrer en vidéo ; une scène reste possible en ouverture ou sur un chiffre ou une liste qu'elle donne.
+- la durée totale couvre toute sa voix plus 1,5 s : au moins « ends_at » + 1,5 s (30 s au plus) ;
+- coupe sur ses phrases (au début ou à la fin d'une phrase, jamais au milieu d'un mot) ; chaque plan montre ce qu'elle dit à ce moment-là ;
+- sous-titres mot à mot (« subtitles » true) : peu d'autres textes, jamais un texte qui répète ce qu'elle dit ; l'accroche reprend sa première idée en 3 à 6 mots ;
+- pas d'animation pendant qu'elle parle d'une chose qu'on peut montrer en vidéo.
 
-Scènes de motion design (sans vidéo, aux couleurs du studio) :
-- « motion » : une scène libre, sur mesure, que ton motion designer animera en code (typographie cinétique, formes, tracés, masques…). Dans « brief » (600 caractères au plus), décris précisément l'idée visuelle, les textes exacts, l'ordre des mouvements, les couleurs et l'ambiance. Donne aussi « fallback », une scène fixe équivalente au cas où. Les textes restent toujours entiers et lisibles dans le cadre (marges de sécurité) : ne demande jamais qu'un texte « déborde du cadre », soit « coupé par le bord » ou « sorte de l'écran » ; seuls les formes et les décors peuvent dépasser. Une scène dont un texte sort du cadre est refusée et remplacée par sa scène fixe. Réserve-la aux moments forts : une ouverture marquante, une offre, un témoignage mis en scène. Chaque scène libre coûte cher à produire : 2 au plus par Reel.
-- Bibliothèque (« templates ») : des scènes libres déjà créées, réutilisables avec d'autres textes, gratuites et instantanées. Chacune au plus une fois par Reel (la même scène deux fois, même avec d'autres mots, se voit comme une répétition). Si l'une convient (même idée, même rôle), réutilise-la : motion { template_id, template_texts: un texte par slot (respecte max_chars), brief: une phrase sur ce que la scène montre ici, fallback }. Ne commande une nouvelle scène libre (brief détaillé, sans template_id) que si aucune ne convient. La bibliothèque passe d'abord : une scène réutilisée avec d'autres mots paraît neuve. Une nouvelle scène se mérite (le moment fort du Reel, une idée que la bibliothèque n'a pas) : jamais une variante d'une scène qu'elle a déjà (un néon de plus quand elle en a un), jamais par défaut, et dans une correction seulement si la demande le dit.
-- « scene » : gabarit fixe et rapide (title, list, quote, number), si une scène libre n'apporte rien.
-- 1,5 à 6 s par scène. Avec des clips : 1 à 3 scènes au plus. Sans clips : un Reel entièrement en motion design, de 3 à 5 scènes qui s'enchaînent.
+Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh » au bout d'une seconde. Ouvre sur son plus beau plan, avec la promesse en typographie animée par-dessus (une animation sur mesure), puis ses meilleurs plans dans une vraie histoire, un texte sur chaque temps fort, un rythme vivant même en « chic » ou « doux », et une fin sur le plus beau plan avec l'invitation. Utilise les animations permises (au moins 2), toujours par-dessus ses images.
 
-Photos (« photos ») : la gérante peut monter un Reel avec ses photos (souvent celles de son site), seules ou avec des vidéos. Chaque photo est un plan comme un clip : clip_id = son media_id, in = 0, out = sa durée à l'écran (1,2 à 3 s, 0,5 s dans une rafale ; 5 au plus), zoom « none ». Le moteur l'anime tout seul avec un zoom lent et une légère dérive, d'une photo à l'autre dans un sens puis l'autre, et la recadre en vertical autour de son sujet, lumière corrigée. « contenu » dit ce qu'elle montre et « format » son cadrage : un portrait remplit l'écran vertical, un paysage perd ses côtés (le sujet reste au centre). Un Reel de photos vit par son rythme et ses textes : enchaîne-les vite, un texte fort sur chacune ou presque, et ouvre ou ferme sur une scène de motion design. Toutes ses photos sont utilisables. L'ordre raconte quelque chose, jamais au hasard : du plus large au plus proche (le lieu, puis le détail, puis le geste ou le résultat), ou une idée par photo qui suit les textes ; deux photos voisines ne montrent pas la même chose sous le même angle. Avec des vidéos, une photo se pose là où elle prolonge le plan d'avant (même lieu, détail de ce qu'on vient de voir), jamais en bloc à la fin. Effet rafale, une fois par Reel au plus et seulement avec 3 photos ou plus : 3 à 6 photos d'un même thème à 0,5 s chacune (un temps de la musique chacune ; le moteur cale chaque coupe sur le temps), sans texte pendant la rafale, souvent juste avant ou juste après le moment fort ; c'est ce qui donne de l'énergie à un Reel de photos, en « dynamique » et « collage » surtout, plus rare en « doux » et « chic ».
-- Au plus « max_new_scenes » nouvelles scènes « motion » (sans template_id) dans ce Reel : celles du plan validé par la gérante, chacune payée (0 si elle veut économiser) ; les réutilisations de la bibliothèque ne comptent pas et passent d'abord quand une scène de la bibliothèque convient. Sinon des « scene » fixes (un titre, une liste, une citation, un chiffre bien animés suffisent souvent).
+Jamais d'effet bon marché : pas de rotation, de flash, de glitch, de tremblement, de page qui tourne, d'emoji animé, pas plus de deux polices, pas de zoom marqué sur chaque plan, pas de fondu sur chaque coupe. « transitions » : « cut » (coupes nettes) presque toujours ; « fade » seulement pour un Reel calme aux plans longs (2,5 s et plus). Le moteur pose une seule transition signature sur le plan où arrive ton « band » : fais-le commencer au début du plan du moment fort.
 
-Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh ». Ouvre sur une scène libre de motion design créée sur mesure (son nom ou une promesse en typographie animée, à ses couleurs), puis ses plus beaux plans avec un texte sur chaque temps fort (accroche, ce qui rend son commerce unique, l'offre ou l'invitation), un rythme vivant même en « chic » ou « doux », et une fin de marque soignée. Utilise les scènes libres permises (au moins 2).
+Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. « lessons » résume ce qui marche sur son Instagram : applique-les quand elles concernent ce Reel. « inspirations » décrit des Reels qu'elle aime : reprends-en l'esprit (rythme, accroche, textes), jamais le contenu. « post.chosen_inspiration » est le Reel qu'elle a choisi pour celui-ci : il passe avant les autres inspirations et avant « default_template », toujours sans en copier le contenu. « post.chosen_template » est l'ambiance qu'elle a choisie : utilise-la. « text_looks » : ses styles de texte ; quand l'un convient au rôle d'un texte (hook, band, caption), mets son nom exact dans look_name, et garde-le pour tous les textes du même rôle. Sans text_looks, laisse look_name vide.
 
-Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (lecture des images d'inspiration de la gérante : ambiance, couleurs, typographie, composition, rythme ; en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. « lessons » résume ce qui marche sur l'Instagram du studio (accroches, durées, formats) : applique-les quand elles concernent ce Reel. « inspirations » décrit des Reels que la gérante aime : reprends-en l'esprit (rythme, accroche, textes), jamais le contenu. « post.chosen_inspiration » est le Reel qu'elle a choisi pour celui-ci : il passe avant les autres inspirations et avant « default_template » (accroche, rythme des coupes, textes à l'écran, transitions), toujours sans en copier le contenu. « post.chosen_template » est le gabarit qu'elle a choisi : utilise-le. Ses polices et couleurs sont appliquées automatiquement. « text_looks » : les styles de texte de la gérante (souvent copiés d'exemples qu'elle aime) ; quand l'un convient au rôle d'un texte (hook, band, caption), mets son nom exact dans look_name de ce texte, et garde ce style pour tous les textes du même rôle. Sans text_looks, laisse look_name vide : le gabarit s'en charge.
+Polices : « fonts » (display pour l'accroche et les titres, body pour le reste), des polices Google Fonts au nom exact ou celles de la gérante (brand.own_fonts), seulement si la demande en cours en réclame d'autres que celles de la charte. Sinon laisse « fonts » vide.
 
-Polices : « fonts » (display pour l'accroche et les titres, body pour le reste), des polices Google Fonts au nom exact ou les polices déposées par la gérante (brand.own_fonts), et seulement si la demande en cours en réclame d'autres que celles de la charte. Sinon laisse « fonts » vide.
-- « duration » est la somme des durées de plans, moins 0,35 s par fondu enchaîné.
+« duration » : la somme des durées des plans à l'écran.
 
-Correction : si un plan précédent et une demande de changement sont fournis, pars du plan précédent et applique exactement ce qui est demandé, sans changer le reste. Une demande de style (plus pêchu, plus sobre, plus chaleureux…) change surtout la forme (rythme, styles, animations) ; garde l'idée des messages, libre à toi de les reformuler si ça sert le style.
+Correction : si un plan précédent et une demande de changement sont fournis, pars du plan précédent et applique exactement ce qui est demandé, sans changer le reste. Une demande de style change surtout la forme (rythme, caméra, textes, animations) ; garde l'idée des messages.
 
-« rationale » : une seule phrase pour la gérante, en français, tutoiement, qui explique ton choix principal (ex. « J'ouvre sur la planche, c'est le moment le plus intense, puis je ralentis sur la respiration. »).`;
+« rationale » : une seule phrase pour la gérante, en français, tutoiement, qui explique ton choix principal (ex. « J'ouvre sur la pizza qui sort du four, puis je remonte au geste du pizzaiolo, et je finis sur la tablée. »).`;
 
 /** Motion segment as the editor writes it: a brief and a fallback (the code comes later), or a template to reuse. */
 const editorMotionSegmentSchema = z.object({
@@ -97,7 +115,11 @@ const editorTextSchema = editPlanTextSchema.omit({ look: true, detail_look: true
   look_name: z.string().optional().describe("Nom d'un style de brand.text_looks à appliquer à ce texte, recopié exactement ; sinon rien (le gabarit s'en charge)"),
 });
 
-export const editorOutputSchema = z.object({
+/**
+ * The editor's answer before the camera work came in: kept as the fallback if the API
+ * refuses the current schema (structured-output grammars have limits of their own).
+ */
+export const editorOutputSchemaLegacy = z.object({
   plan: editPlanObjectSchema.omit({ voice: true }).extend({
     template: motionTemplateSchema,
     texts: z.array(editorTextSchema),
@@ -105,6 +127,48 @@ export const editorOutputSchema = z.object({
     // No signature transition field here: the structured-output grammar is at the API's
     // limit (400 « compiled grammar is too large »); the engine places it (signatureShot).
     segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
+  }),
+  rationale: z.string(),
+});
+
+/** A shot as the editor writes it: a passage of a clip or a photo, the camera's move on it, its speed. */
+const editorShotSchema = z.object({
+  clip_id: z.string(),
+  in: z.number(),
+  out: z.number(),
+  move: z
+    .string()
+    .describe("Mouvement de caméra : none (tel que filmé), in (avance lente), out (recul lent), left ou right (panoramique lent), punch (recadrage serré tenu, pour une coupe sautée sur le temps)"),
+  speed: z.number().describe("Vitesse : 1 tel que filmé ; 0.5 ralenti sur un geste fort ; 1.5 à 2 pour passer vite un geste long"),
+});
+
+/** An animation as the editor writes it, with the footage that keeps playing under it. */
+const editorAnimationSchema = z.object({
+  motion: z.object({
+    brief: z.string(),
+    fallback: sceneSchema,
+    template_id: z.string().optional(),
+    template_texts: z.array(z.object({ slot: z.string(), text: z.string() })).optional(),
+  }),
+  duration: z.number(),
+  over_clip: z.string().optional().describe("media_id de la vidéo ou de la photo qui continue de jouer sous l'animation"),
+});
+
+/**
+ * What the editor answers. Kept small on purpose (the API compiles it into a grammar
+ * with limits): no fixed-scene branch, no images, no format, no patterns; the engine
+ * adds the rest (retouch, framing, footage passages, the signature transition).
+ */
+export const editorOutputSchema = z.object({
+  plan: z.object({
+    duration: z.number(),
+    template: motionTemplateSchema,
+    segments: z.array(z.union([editorShotSchema, editorAnimationSchema])).min(1),
+    texts: z.array(editorTextSchema),
+    transitions: z.enum(["cut", "fade", "light_zoom"]),
+    subtitles: z.boolean(),
+    fonts: z.object({ display: z.string().optional(), body: z.string().optional() }).optional(),
+    end_card: z.object({ title: z.string(), subtitle: z.string().optional() }).optional(),
   }),
   rationale: z.string(),
 });
@@ -126,6 +190,7 @@ export function carryRetouch(plan: EditPlan, previous: EditPlan | null): EditPla
   };
 }
 export type EditorOutput = z.infer<typeof editorOutputSchema>;
+export type EditorOutputLegacy = z.infer<typeof editorOutputSchemaLegacy>;
 
 /**
  * The style set on a text by hand or by Fauve (look, place, size, background), kept on
@@ -165,7 +230,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
  * makes the business unique, or the offer) appears, the strong moment; none
  * without a band, or when the band starts on the opening shot.
  */
-export function signatureShot(plan: Pick<EditorOutput["plan"], "segments" | "texts" | "transitions">): number | null {
+export function signatureShot(plan: { segments: object[]; texts: { style: string; from: number }[]; transitions: EditPlan["transitions"] }): number | null {
   const band = plan.texts.find((t) => t.style === "band");
   if (!band) return null;
   // Lengths only: the editor's segments time like the plan's.
@@ -174,34 +239,69 @@ export function signatureShot(plan: Pick<EditorOutput["plan"], "segments" | "tex
   return i > 0 && "clip_id" in plan.segments[i]! ? i : null;
 }
 
-export function fromEditorPlan(plan: EditorOutput["plan"], looks: SavedLook[] = []): EditPlan {
+const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
+
+export function fromEditorPlan(plan: EditorOutput["plan"] | EditorOutputLegacy["plan"], looks: SavedLook[] = []): EditPlan {
   const byName = new Map(looks.map((l) => [l.name.toLowerCase(), l]));
   const signature = SIGNATURE[plan.template];
   const signatureAt = signatureShot(plan);
+  // Fonts are only names here: a malformed one is dropped, the brand's fonts are used.
+  const fonts = plan.fonts
+    ? {
+        ...(plan.fonts.display && FONT_NAME.test(plan.fonts.display) ? { display: plan.fonts.display } : {}),
+        ...(plan.fonts.body && FONT_NAME.test(plan.fonts.body) ? { body: plan.fonts.body } : {}),
+      }
+    : undefined;
+  const endCard = plan.end_card?.title?.trim() ? { title: plan.end_card.title.trim().slice(0, 40), ...(plan.end_card.subtitle?.trim() ? { subtitle: plan.end_card.subtitle.trim().slice(0, 60) } : {}) } : undefined;
+  const { end_card: _endCard, fonts: _fonts, ...rest } = plan;
   return {
-    ...plan,
+    ...rest,
+    format: "9:16",
+    images: [],
+    music: null,
+    ...(fonts && Object.keys(fonts).length ? { fonts } : {}),
+    ...(endCard ? { end_card: endCard } : {}),
     // A named look brings its style back (and, for a list, its details and bullets).
     texts: plan.texts.map(({ look_name, ...t }) => {
       const saved = look_name ? byName.get(look_name.trim().toLowerCase()) : undefined;
       if (!saved) return t;
       return { ...t, look: saved.look, ...(t.items?.length && saved.list?.detail_look ? { detail_look: saved.list.detail_look } : {}), ...(t.items?.length && !t.bullet && saved.list?.bullet ? { bullet: saved.list.bullet } : {}) };
     }),
-    segments: plan.segments.map((s, i): PlanSegment => {
-      // The one signature transition goes on the shot the editor named (a video or a photo).
-      if ("clip_id" in s) return i === signatureAt ? { ...s, accent: signature } : s;
-      if (!("motion" in s)) return s;
-      const { template_texts, template_id, ...motion } = s.motion;
-      if (!template_id) return { ...s, motion };
+    segments: (plan.segments as object[]).map((s, i): PlanSegment => {
+      if ("clip_id" in s) {
+        const shot = s as { clip_id: string; in: number; out: number; zoom?: "none" | "light"; move?: string; speed?: number };
+        const move = shot.move === undefined ? undefined : cameraMoveSchema.catch("none").parse(shot.move.trim().toLowerCase());
+        const speed = typeof shot.speed === "number" && Number.isFinite(shot.speed) && Math.abs(shot.speed - 1) > 0.01 ? shot.speed : undefined;
+        return {
+          clip_id: shot.clip_id,
+          in: shot.in,
+          out: shot.out,
+          zoom: shot.zoom ?? "none",
+          ...(move ? { move } : {}),
+          ...(speed ? { speed } : {}),
+          // The one signature transition goes on the shot the editor named (a video or a photo).
+          ...(i === signatureAt ? { accent: signature } : {}),
+        };
+      }
+      if (!("motion" in s)) return s as PlanSegment;
+      const animation = s as z.infer<typeof editorAnimationSchema>;
+      const { template_texts, template_id, ...motion } = animation.motion;
+      const over = animation.over_clip?.trim() ? { over: { clip_id: animation.over_clip.trim() } } : {};
+      const reused = template_id && z.uuid().safeParse(template_id).success ? template_id : undefined;
+      if (!reused) return { motion, duration: animation.duration, ...over };
       const texts = Object.fromEntries(
         (template_texts ?? []).filter((t) => SLOT_NAME.test(t.slot)).map((t) => [t.slot, t.text.slice(0, 200)]),
       );
-      return { ...s, motion: { ...motion, template_id, texts } };
+      return { motion: { ...motion, template_id: reused, texts }, duration: animation.duration, ...over };
     }),
   };
 }
 
 /** The longest a photo stays on screen in a Reel (it plays still, with a slow zoom). */
 export const PHOTO_MAX_SECONDS = 5;
+
+/** A photo's « clip » is given PHOTO_MAX_SECONDS as its length (a video almost never lasts exactly that). */
+const photoLike = (clipId: string, clipDurations: Record<string, number>) => clipDurations[clipId] === PHOTO_MAX_SECONDS;
 
 /**
  * New made-to-measure animations in one Reel: as many as the quote she agreed to
@@ -234,6 +334,9 @@ export const MAX_REEL_SECONDS = 30;
  * Makes a model-written plan safe to render: segments inside their clips, a
  * duration that matches the timeline, texts inside it. Throws if nothing usable is left.
  */
+/** Crossfades only when the shots last this long on average (seconds); below, clean cuts. */
+const FADE_MIN_AVERAGE = 2.4;
+
 /** The end card's length, and the last shot that holds it with a little of itself before it. */
 const END_CARD_SECONDS = 1.6;
 const END_CARD_HOLD = 2.2;
@@ -267,8 +370,11 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
     if (!isClipSegment(s)) return [{ ...s, duration: round(Math.min(6, Math.max(1, s.duration))) }];
     const max = clipDurations[s.clip_id];
     const out = round(max ? Math.min(s.out, max) : s.out);
-    const clip = { ...s, in: round(Math.max(0, s.in)), out };
-    return s.clip_id in clipDurations && clip.out - clip.in >= 0.5 ? [clip] : [];
+    const speed = s.speed === undefined ? undefined : Math.min(MAX_SPEED, Math.max(MIN_SPEED, s.speed));
+    const clip = { ...s, in: round(Math.max(0, s.in)), out, ...(speed === undefined || Math.abs(speed - 1) < 0.01 ? { speed: undefined } : { speed }) };
+    // A burst of photos goes down to a beat (0.4 s); a video shot holds at least half a second.
+    const shortest = photoLike(s.clip_id, clipDurations) ? 0.35 : 0.5;
+    return s.clip_id in clipDurations && segmentSeconds(clip) >= shortest ? [clip] : [];
   });
   if (!segments.length) throw new Error("Le plan de montage ne garde aucun plan utilisable");
   // The end card lays over the last shot's final seconds: an animation there would show
@@ -279,25 +385,63 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
   }
   const ending = segments.at(-1)!;
   if (plan.end_card && isClipSegment(ending)) {
-    const room = (clipDurations[ending.clip_id] ?? ending.out) - ending.in;
-    ending.out = round(ending.in + Math.min(room, Math.max(ending.out - ending.in, END_CARD_HOLD)));
+    const speed = ending.speed ?? 1;
+    const room = ((clipDurations[ending.clip_id] ?? ending.out) - ending.in) / speed;
+    ending.out = round(ending.in + Math.min(room, Math.max(segmentSeconds(ending), END_CARD_HOLD)) * speed);
   }
+  // A crossfade between short shots reads as a double exposure: cuts, unless the shots breathe.
+  const average = segments.reduce((sum, x) => sum + segmentSeconds(x), 0) / segments.length;
+  const transitions = plan.transitions === "fade" && average < FADE_MIN_AVERAGE ? "cut" : plan.transitions;
   // The cuts on the ambiance's beats (not over her voice), then at most one signature transition.
-  const tempo = snapToTempo({ ...plan, segments }, clipDurations);
+  const tempo = snapToTempo({ ...plan, transitions, segments }, clipDurations);
   segments.splice(0, segments.length, ...oneAccent(tempo.segments));
   // Too long to render in time: the plans before the last one go, the last (the end) stays.
-  while (segments.length > 2 && renderDuration({ ...plan, segments }) > MAX_REEL_SECONDS) segments.splice(segments.length - 2, 1);
+  while (segments.length > 2 && renderDuration({ ...plan, transitions, segments }) > MAX_REEL_SECONDS) segments.splice(segments.length - 2, 1);
 
-  const draft = { ...plan, segments, images: [], music: null };
+  const draft = { ...plan, transitions, segments, images: [], music: null };
   const duration = Math.max(3, renderDuration(draft));
-  // No text under the end card.
+  // No text under the end card, nor over an animation (it carries its own words).
   const textsEnd = plan.end_card ? duration - END_CARD_SECONDS : duration;
-  const texts = tempo.texts
-    .map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, textsEnd)) }))
+  const timeline = planTimeline(draft);
+  const animations = draft.segments.flatMap((s, i) => (isClipSegment(s) ? [] : [timeline.segments[i]!])).map((a) => ({ from: a.start, to: a.start + a.length }));
+  const texts = clearOfAnimations(
+    tempo.texts.map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, textsEnd)) })),
+    animations,
+    textsEnd,
+  )
     .filter((t) => t.to - t.from >= 0.5)
     .map((t) => ({ ...t, emphasis: t.emphasis?.filter((e) => t.text.toLowerCase().includes(e.toLowerCase())) }));
 
   return editPlanSchema.parse({ ...draft, duration, texts });
+}
+
+/**
+ * Texts moved off the animations, which carry their own words: one that starts during an
+ * animation waits for its end, one that runs into it stops before it (if it still lasts
+ * long enough to be read); otherwise it goes. Never over another text.
+ */
+export function clearOfAnimations<T extends { from: number; to: number }>(texts: T[], animations: { from: number; to: number }[], end: number): T[] {
+  const kept: T[] = [];
+  const free = (from: number, to: number) => to <= end + 0.001 && kept.every((k) => k.to <= from + 0.001 || k.from >= to - 0.001);
+  for (const text of [...texts].sort((a, b) => a.from - b.from)) {
+    const hit = animations.find((a) => text.from < a.to - 0.05 && text.to > a.from + 0.05);
+    if (!hit) {
+      kept.push(text);
+      continue;
+    }
+    const length = text.to - text.from;
+    // Starts before the animation: stops just before it, if that still reads.
+    if (text.from < hit.from && hit.from - text.from >= 1.2 && free(text.from, hit.from)) {
+      kept.push({ ...text, to: round(hit.from) });
+      continue;
+    }
+    // Else right after it, the same length.
+    const from = round(hit.to);
+    const to = round(Math.min(end, hit.to + length));
+    const clear = !animations.some((a) => from < a.to - 0.05 && to > a.from + 0.05);
+    if (to - from >= 1.2 && clear && free(from, to)) kept.push({ ...text, from, to });
+  }
+  return kept.sort((a, b) => a.from - b.from);
 }
 
 /**

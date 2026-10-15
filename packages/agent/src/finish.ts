@@ -1,0 +1,172 @@
+import { avoidPhotoText, boxFrom2d, headZone, photoEditFrom, type Adjust, type Box, type PhotoDetection } from "./retouch.ts";
+import { planTimeline } from "./motion.ts";
+import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type EditPlan, type PlanSegment } from "./schemas.ts";
+
+// The finishing touches a professional editor gives every cut, decided by the engine from
+// what Gemini read in her photos and videos (never left to chance, never written by the
+// model): each clip's light and colour corrected when it needs it and straightened when it
+// leans, the vertical crop framed on its subject, a slow camera move on a shot that was
+// filmed still, her footage under every animation, and texts kept off faces and off the
+// lettering already in a picture.
+
+export type PhotoFacts = { width: number; height: number; detection: PhotoDetection };
+export type MediaFacts = {
+  /** Video analyses by media_id. */
+  clips: Record<string, ClipAnalysis>;
+  /** Photo readings by media_id. */
+  photos: Record<string, PhotoFacts>;
+};
+
+type Shot = ClipAnalysis["shots"][number];
+
+/** The shot of a clip that plays at `t` seconds (the nearest one between shots). */
+export function shotAt(analysis: ClipAnalysis, t: number): Shot | undefined {
+  const inside = analysis.shots.find((s) => t >= s.start && t <= s.end);
+  if (inside) return inside;
+  return [...analysis.shots].sort((a, b) => Math.abs((a.start + a.end) / 2 - t) - Math.abs((b.start + b.end) / 2 - t))[0];
+}
+
+/** The centre of a shot's subject (shares of the picture), to keep it in the vertical crop. */
+export function subjectFocus(box: number[] | undefined): { x: number; y: number } | undefined {
+  if (!box || box.length !== 4) return undefined;
+  const [ymin, xmin, ymax, xmax] = box.map((v) => Math.min(1000, Math.max(0, v)) / 1000) as [number, number, number, number];
+  if (xmax <= xmin || ymax <= ymin) return undefined;
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  return { x: round((xmin + xmax) / 2), y: round((ymin + ymax) / 2) };
+}
+
+/** The correction Gemini proposed for a clip, as a retouch (small values only; 0 means nothing to do). */
+export function correctionAdjust(analysis: ClipAnalysis): Adjust | undefined {
+  const c = analysis.correction;
+  if (!c) return undefined;
+  const clampTo = (n: number, max: number) => Math.round(Math.min(max, Math.max(-max, n)) * 100) / 100;
+  const adjust: Adjust = {
+    ...(Math.abs(c.exposure) >= 0.03 ? { exposure: clampTo(c.exposure, 0.5) } : {}),
+    ...(Math.abs(c.contrast) >= 0.03 ? { contrast: clampTo(c.contrast, 0.4) } : {}),
+    ...(Math.abs(c.saturation) >= 0.03 ? { saturation: clampTo(c.saturation, 0.4) } : {}),
+    ...(Math.abs(c.warmth) >= 0.03 ? { warmth: clampTo(c.warmth, 0.4) } : {}),
+    // Only a visible tilt is worth the crop straightening costs.
+    ...(Math.abs(c.straighten) >= 0.8 ? { straighten: clampTo(c.straighten, 6) } : {}),
+  };
+  return Object.keys(adjust).length ? adjust : undefined;
+}
+
+/** A shot filmed still (on a tripod, or a phone set down): it gets a slow camera move. */
+const isStill = (shot: Shot | undefined) => shot?.camera === "static" || (!shot?.camera && (shot?.energy ?? 3) <= 2);
+
+/**
+ * Where the footage under an animation comes from when the plan does not say: the clip
+ * named (its best passage not shown elsewhere), else the shot before it carried on, else
+ * the shot after it, so the picture flows under the words.
+ */
+function footageUnder(plan: EditPlan, i: number, facts: MediaFacts, clipDurations: Record<string, number>): { clip_id: string; in?: number } | undefined {
+  const s = plan.segments[i]!;
+  if (!isMotionSegment(s)) return undefined;
+  const length = s.duration;
+  const shown = plan.segments.filter(isClipSegment).map((x) => ({ clip: x.clip_id, from: x.in, to: x.out }));
+  const free = (clip: string, from: number) => shown.every((x) => x.clip !== clip || from >= x.to || from + length <= x.from);
+  const fits = (clip: string, from: number) => from >= 0 && from + length <= (clipDurations[clip] ?? Infinity) + 0.01;
+  // Only her own footage of this Reel: an unknown id is ignored.
+  const named = s.over?.clip_id && (facts.clips[s.over.clip_id] || facts.photos[s.over.clip_id]) ? s.over.clip_id : undefined;
+  if (named) {
+    if (s.over?.in !== undefined) return { clip_id: named, in: s.over.in };
+    if (facts.photos[named]) return { clip_id: named };
+    const analysis = facts.clips[named];
+    const options = [...(analysis?.best_moments ?? []).map((m) => m.start), ...(analysis?.shots ?? []).map((x) => x.start), 0];
+    const start = options.find((t) => fits(named, t) && free(named, t)) ?? options.find((t) => fits(named, t)) ?? 0;
+    return { clip_id: named, in: Math.round(start * 100) / 100 };
+  }
+  const before = plan.segments[i - 1];
+  if (before && isClipSegment(before)) {
+    if (facts.photos[before.clip_id]) return { clip_id: before.clip_id };
+    if (fits(before.clip_id, before.out)) return { clip_id: before.clip_id, in: before.out };
+  }
+  const after = plan.segments[i + 1];
+  if (after && isClipSegment(after)) {
+    if (facts.photos[after.clip_id]) return { clip_id: after.clip_id };
+    const from = Math.round((after.in - length) * 100) / 100;
+    if (fits(after.clip_id, from)) return { clip_id: after.clip_id, in: from };
+  }
+  // No neighbour to carry on: any video of hers, from its best moment.
+  const any = plan.segments.find((x): x is Extract<PlanSegment, { clip_id: string }> => isClipSegment(x) && !facts.photos[x.clip_id]);
+  return any ? { clip_id: any.clip_id, in: Math.max(0, Math.min(facts.clips[any.clip_id]?.best_moments[0]?.start ?? 0, (clipDurations[any.clip_id] ?? length) - length)) } : undefined;
+}
+
+export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Record<string, number> = {}): EditPlan {
+  let still = 0;
+  const segments = plan.segments.map((s, i): PlanSegment => {
+    if (isMotionSegment(s)) {
+      const over = footageUnder(plan, i, facts, clipDurations);
+      return over ? { ...s, over } : s;
+    }
+    if (!isClipSegment(s)) return s;
+    const photo = facts.photos[s.clip_id];
+    if (photo) {
+      // A photo: framed on its subject, light corrected (unless retouched by hand already).
+      return s.photo ? s : { ...s, photo: photoEditFrom(photo.detection, { width: photo.width, height: photo.height }, { retouch: true, blur: "none" }) };
+    }
+    const analysis = facts.clips[s.clip_id];
+    if (!analysis) return s;
+    const shot = shotAt(analysis, (s.in + s.out) / 2);
+    const focus = subjectFocus(shot?.subject_box);
+    // A clip's light and framing are the engine's (no switch sets them by hand): read again for
+    // the passage shown, so a correction that picks another passage is framed on its own subject.
+    const adjust: Adjust = { ...correctionAdjust(analysis), ...(focus ? { focus } : {}) };
+    const filmedStill = isStill(shot) && !s.speed;
+    const move: CameraMove | undefined = (s.move ?? (s.zoom === "light" ? "in" : "none")) === "none" && filmedStill ? (still++ % 2 === 0 ? "in" : "out") : s.move;
+    const { adjust: _carried, ...rest } = s;
+    return {
+      ...rest,
+      ...(Object.keys(adjust).length ? { adjust } : {}),
+      ...(move ? { move } : {}),
+    };
+  });
+  const finished = { ...plan, segments };
+
+  // What texts must not cover, shot by shot: lettering and faces in photos, faces in videos.
+  const timeline = planTimeline(finished);
+  const shots = segments.map((s, i) => {
+    const at = timeline.segments[i]!;
+    const boxes: Box[] = [];
+    if (isClipSegment(s)) {
+      const photo = facts.photos[s.clip_id];
+      if (photo) {
+        boxes.push(...(photo.detection.text_boxes ?? []).map((b) => boxFrom2d(b, 0.05)));
+        boxes.push(...photo.detection.regions.filter((r) => r.kind === "face" && r.recognizable).map((r) => boxFrom2d(r.box_2d, 0.1)));
+      } else {
+        const analysis = facts.clips[s.clip_id];
+        const speed = s.speed ?? 1;
+        // Every shot of the clip this passage shows.
+        for (const shot of analysis?.shots ?? []) {
+          if (shot.end < s.in || shot.start > s.in + segmentSeconds(s) * speed) continue;
+          const head = shot.faces_visible ? headZone(shot.subject_box) : null;
+          if (head) boxes.push(head);
+        }
+      }
+    }
+    return { start: at.start, length: at.length, boxes };
+  });
+  return { ...finished, texts: avoidPhotoText(finished.texts, shots) };
+}
+
+/** Where the subject sits across the picture, in the editor's words. */
+export function subjectPlace(box: number[] | undefined): "gauche" | "centre" | "droite" | undefined {
+  const focus = subjectFocus(box);
+  if (!focus) return undefined;
+  return focus.x < 0.38 ? "gauche" : focus.x > 0.62 ? "droite" : "centre";
+}
+
+/**
+ * A clip's analysis as the editor reads it: every shot with what a professional editor
+ * weighs (size, camera, beauty, energy, hook, where the subject is), without the raw
+ * coordinates and retouch values the engine uses on its own.
+ */
+export function editorClip(mediaId: string, analysis: ClipAnalysis) {
+  const { correction: _correction, words, shots, ...rest } = analysis;
+  return {
+    media_id: mediaId,
+    ...rest,
+    shots: shots.map(({ subject_box, ...shot }) => ({ ...shot, ...(subjectPlace(subject_box) ? { sujet_a: subjectPlace(subject_box) } : {}) })),
+    words: words?.length ? words : undefined,
+  };
+}

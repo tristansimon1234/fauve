@@ -39,6 +39,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       clipUrls: inputs.clipUrls,
       photoIds: inputs.photoIds,
       words: inputs.words,
+      aspects: inputs.aspects,
       brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts },
       ...(soundtrack ? { soundtrack } : {}),
       ...(inputs.voice ? { voice: inputs.voice } : {}),

@@ -2,10 +2,12 @@ import "server-only";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
-  avoidPhotoText,
-  boxFrom2d,
-  photoEditFrom,
-  planTimeline,
+  editorClip,
+  editorOutputSchemaLegacy,
+  finishPlan,
+  type EditorOutput,
+  type EditorOutputLegacy,
+  type MediaFacts,
   carryRetouch,
   carryTextStyle,
   brandProfileSchema,
@@ -157,7 +159,8 @@ export async function designEdit(params: {
       chosen_template: chosenTemplate.success ? chosenTemplate.data : undefined,
       chosen_inspiration: chosenInspiration ?? undefined,
     },
-    clips: clips.map((c) => ({ media_id: c.media_id, ...c.analysis, words: c.analysis.words?.length ? c.analysis.words : undefined })),
+    // Every shot as an editor weighs it (size, camera, beauty, energy, hook, where the subject is).
+    clips: clips.map((c) => editorClip(c.media_id, c.analysis)),
     // Her voice over the Reel: her phrases on the Reel's clock (the voice is placed for you).
     voice: voice ? voiceForEditor(voice) : undefined,
     // Her photos: each one a still shot with a slow zoom (clip_id = media_id, in 0, out = how long it shows).
@@ -191,16 +194,28 @@ export async function designEdit(params: {
     max_new_scenes: params.maxNewScenes ?? MAX_FREE_SCENES,
   };
 
-  const response = await anthropic().beta.messages.parse({
-    model: CLAUDE_MODEL,
-    max_tokens: 16000,
-    output_config: { effort: params.effort ?? "high", format: betaZodOutputFormat(editorOutputSchema) },
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system: [{ type: "text", text: EDITOR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content: JSON.stringify(input) }],
+  const ask = async (legacy: boolean) => {
+    const response = await anthropic().beta.messages.parse({
+      model: CLAUDE_MODEL,
+      max_tokens: 16000,
+      output_config: { effort: params.effort ?? "high", format: betaZodOutputFormat(legacy ? editorOutputSchemaLegacy : editorOutputSchema) },
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      system: [{ type: "text", text: EDITOR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: JSON.stringify(input) }],
+    });
+    await logClaudeCost(params.studioId, response.usage, "editor");
+    return response as { stop_reason: string | null; parsed_output: EditorOutput | EditorOutputLegacy | null };
+  };
+  // The answer's schema is compiled into a grammar with limits of its own: if the API ever
+  // refuses it, the editor answers in the previous, smaller schema rather than not at all.
+  const response = await ask(false).catch((error: unknown) => {
+    const status = (error as { status?: number }).status;
+    const message = error instanceof Error ? error.message : String(error);
+    if (status !== 400 || !/grammar|schema|complex|compil/i.test(message)) throw error;
+    console.warn("editor: schema refused, answering in the legacy schema", message);
+    return ask(true);
   });
-  await logClaudeCost(params.studioId, response.usage, "editor");
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`Le montage n'a pas pu être préparé (${response.stop_reason})`);
   }
@@ -217,19 +232,15 @@ export async function designEdit(params: {
     base,
   );
 
-  // Her photos framed on their subject, light corrected (unless already retouched by hand),
-  // and the texts moved off any text already in a photo (a sign, a logo on a window).
-  const reads = new Map(photoIds.map((id, i) => [id, photoReads[i]] as const));
-  plan.segments = plan.segments.map((s) => {
-    const read = isClipSegment(s) && !s.photo ? reads.get(s.clip_id) : null;
-    return read ? { ...s, photo: photoEditFrom(read.detection, { width: read.width, height: read.height }, { retouch: true, blur: "none" }) } : s;
-  });
-  const shots = planTimeline(plan).segments.map((t, i) => {
-    const s = plan.segments[i]!;
-    return { ...t, clipId: isClipSegment(s) ? s.clip_id : undefined };
-  });
-  const photoText = Object.fromEntries(photoIds.map((id) => [id, (reads.get(id)?.detection.text_boxes ?? []).map((b) => boxFrom2d(b, 0.05))]));
-  plan.texts = avoidPhotoText(plan.texts, shots, photoText);
+  // The finishing touches of a professional editor, from what Gemini read: each clip's
+  // light, colour and tilt corrected when it needs it, the vertical crop framed on its
+  // subject, a slow move on shots filmed still, her footage under every animation, texts
+  // kept off faces and off the lettering in a picture.
+  const facts: MediaFacts = {
+    clips: Object.fromEntries(clips.map((c) => [c.media_id, c.analysis])),
+    photos: Object.fromEntries(photoIds.flatMap((id, i) => (photoReads[i] ? [[id, photoReads[i]!]] : []))),
+  };
+  Object.assign(plan, finishPlan(plan, facts, durations));
 
   // Her voice plays from VOICE_AT, with her words as subtitles; without it, the plan has no voice.
   if (voice && voiceId) {

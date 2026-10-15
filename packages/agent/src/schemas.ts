@@ -55,11 +55,29 @@ export type Reaction = z.infer<typeof reactionSchema>;
 // Edit plan: Claude decides, the render worker executes.
 // ---------------------------------------------------------------------------
 
+/**
+ * The camera's move on a shot, as an editor would add it: in (slow push-in), out
+ * (slow pull-out), left / right (slow pan), punch (a tighter crop held, for a jump
+ * cut on the beat). none: the shot as filmed.
+ */
+export const CAMERA_MOVES = ["none", "in", "out", "left", "right", "punch"] as const;
+export const cameraMoveSchema = z.enum(CAMERA_MOVES);
+export type CameraMove = z.infer<typeof cameraMoveSchema>;
+
+/** Speeds a shot may play at: 0.5 for slow motion on a gesture, up to 2 to speed through a long one. */
+export const MIN_SPEED = 0.5;
+export const MAX_SPEED = 2;
+
 export const editPlanSegmentSchema = z.object({
   clip_id: z.string().min(1),
   in: z.number().min(0),
   out: z.number().positive(),
+  /** Old plans: « light » is a slow push-in (move « in »). */
   zoom: z.enum(["none", "light"]).default("none"),
+  /** The camera's move on this shot (default: from `zoom`). */
+  move: cameraMoveSchema.optional(),
+  /** Playback speed: 1 as filmed, 0.5 slow motion, up to 2 faster. `in` and `out` stay times of the clip. */
+  speed: z.number().min(MIN_SPEED).max(MAX_SPEED).optional(),
   /** Light and colour of the clip (retouch). */
   adjust: adjustSchema.optional(),
   /** Zones blurred over the clip (faces, plates…), tracked in time. */
@@ -104,6 +122,8 @@ export const editPlanMotionSegmentSchema = z.object({
     texts: z.record(z.string().regex(SLOT_NAME), z.string().max(200)).optional(),
   }),
   duration: z.number().min(1).max(8),
+  /** The footage that keeps playing under the animation (a passage of one of her clips or a photo), from `in` seconds (chosen by the engine when missing). */
+  over: z.object({ clip_id: z.string().min(1), in: z.number().min(0).optional() }).optional(),
 });
 
 export const editPlanTextSchema = z.object({
@@ -205,7 +225,13 @@ export type PlanSegment = EditPlan["segments"][number];
 export const isClipSegment = (s: PlanSegment): s is ClipSegment => "clip_id" in s;
 export type MotionSegment = z.infer<typeof editPlanMotionSegmentSchema>;
 export const isMotionSegment = (s: PlanSegment): s is MotionSegment => "motion" in s;
-export const segmentSeconds = (s: PlanSegment) => (isClipSegment(s) ? s.out - s.in : s.duration);
+/** How long a segment lasts in the video (a shot at another speed lasts its clip time divided by the speed). */
+export const segmentSeconds = (s: PlanSegment) => (isClipSegment(s) ? (s.out - s.in) / (s.speed ?? 1) : s.duration);
+
+/** Every clip or photo a plan plays: its shots and the footage under its animations. */
+export function planMediaIds(plan: Pick<EditPlan, "segments">): string[] {
+  return [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : isMotionSegment(s) && s.over ? [s.over.clip_id] : [])))];
+}
 
 /** The plan with its motion-design scenes removed (what the ffmpeg engine can render). */
 export function withoutScenes(plan: EditPlan): EditPlan {
@@ -218,26 +244,45 @@ export function withoutScenes(plan: EditPlan): EditPlan {
 
 const seconds = z.number().min(0).describe("Secondes depuis le début du clip, ex. 3.5");
 
+/** What an editor reads in a shot besides its content: its size, the camera, where the subject is, how beautiful it is. */
+export const shotLookSchema = z.object({
+  framing: z
+    .enum(["wide", "medium", "close", "detail"])
+    .describe("Valeur de plan : wide (plan large, le lieu entier), medium (plan moyen, une personne à mi-corps ou en entier), close (gros plan : un visage, des mains au travail), detail (très gros plan : un objet, une texture, un geste précis)"),
+  camera: z.enum(["static", "handheld", "moving"]).describe("static : caméra immobile (posée ou sur pied) ; handheld : tenue à la main, petits mouvements ; moving : panoramique, travelling ou suivi du sujet"),
+  subject_box: z.array(z.number()).describe("Boîte du sujet principal au milieu du plan : [ymin, xmin, ymax, xmax] sur une grille de 0 à 1000"),
+  beauty: z.number().int().min(1).max(5).describe("Beauté du plan (lumière, cadrage, netteté, couleurs) : 1 médiocre, 3 correct, 5 superbe"),
+});
+export type ShotLook = z.infer<typeof shotLookSchema>;
+
+/** The light retouch a clip needs to look its best and match the others (0 = leave as is). */
+export const clipCorrectionSchema = z.object({
+  exposure: z.number().min(-1).max(1),
+  contrast: z.number().min(-1).max(1),
+  saturation: z.number().min(-1).max(1),
+  warmth: z.number().min(-1).max(1),
+  straighten: z.number().min(-10).max(10).describe("Degrés pour remettre l'horizon ou les verticales droites, 0 si c'est droit"),
+});
+
+const clipShotBase = z.object({
+  start: seconds,
+  end: seconds,
+  description: z.string().describe("Ce qui se passe dans ce plan"),
+  subject: z.string().describe("Sujet principal : groupe, équipe, client, mains, produit, plat, outil, détail…"),
+  energy: z.number().int().min(1).max(5).describe("1 = calme, 5 = très dynamique"),
+  hook_score: z.number().int().min(1).max(5).describe("Potentiel comme accroche des 2 premières secondes"),
+  quality: z.object({ blurry: z.boolean(), dark: z.boolean(), shaky: z.boolean() }),
+  faces_visible: z.boolean(),
+});
+
 export const clipAnalysisSchema = z.object({
   duration: z.number().positive().describe("Durée totale du clip en secondes"),
   orientation: z.enum(["portrait", "landscape", "square"]),
   summary: z.string().describe("Ce qu'on voit, en une ou deux phrases"),
   setting: z.string().describe("Lieu et matériel : salle, machine, fauteuil, cuisine, comptoir, vitrine, extérieur…"),
   lighting: z.enum(["good", "ok", "poor"]),
-  shots: z
-    .array(
-      z.object({
-        start: seconds,
-        end: seconds,
-        description: z.string().describe("Ce qui se passe dans ce plan"),
-        subject: z.string().describe("Sujet principal : groupe, équipe, client, mains, produit, plat, outil, détail…"),
-        energy: z.number().int().min(1).max(5).describe("1 = calme, 5 = très dynamique"),
-        hook_score: z.number().int().min(1).max(5).describe("Potentiel comme accroche des 2 premières secondes"),
-        quality: z.object({ blurry: z.boolean(), dark: z.boolean(), shaky: z.boolean() }),
-        faces_visible: z.boolean(),
-      }),
-    )
-    .describe("Plans successifs, sans trou ni chevauchement"),
+  // The look fields came later: older analyses do not have them.
+  shots: z.array(clipShotBase.extend(shotLookSchema.partial().shape)).describe("Plans successifs, sans trou ni chevauchement"),
   best_moments: z
     .array(z.object({ start: seconds, end: seconds, why: z.string() }))
     .max(3)
@@ -248,9 +293,16 @@ export const clipAnalysisSchema = z.object({
     .max(400)
     .optional()
     .describe("Chaque mot prononcé avec son début et sa fin, pour les sous-titres mot à mot ; vide s'il n'y a pas de voix"),
-  issues: z.array(z.string()).describe("Problèmes à signaler : flou, contre-jour, visage reconnaissable d'un client, logo d'une marque…"),
+  issues: z.array(z.string()).describe("Problèmes techniques à signaler : flou, contre-jour, bougé, son inaudible…"),
+  correction: clipCorrectionSchema.optional().describe("La retouche légère qui rendrait le clip plus beau et naturel sur Instagram, comme un bon étalonneur : ±0,1 à ±0,3 en général, 0 pour ne rien changer"),
 });
 export type ClipAnalysis = z.infer<typeof clipAnalysisSchema>;
+
+/** What Gemini is asked for: the same, with the look of every shot and the clip's correction required. */
+export const clipAnalysisRequestSchema = clipAnalysisSchema.extend({
+  shots: z.array(clipShotBase.extend(shotLookSchema.shape)).describe("Plans successifs, sans trou ni chevauchement"),
+  correction: clipCorrectionSchema.describe("La retouche légère qui rendrait le clip plus beau et naturel sur Instagram, comme un bon étalonneur : ±0,1 à ±0,3 en général, 0 pour ne rien changer"),
+});
 
 // ---------------------------------------------------------------------------
 // Brand profile (versioned in brand_profiles.profile).

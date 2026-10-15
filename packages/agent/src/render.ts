@@ -1,4 +1,4 @@
-import { isClipSegment, type ClipSegment, type EditPlan } from "./schemas.ts";
+import { isClipSegment, segmentSeconds, type ClipSegment, type EditPlan } from "./schemas.ts";
 
 // Edit plan → ffmpeg command. The model decides (the plan), this file executes:
 // deterministic, testable, no model in the loop. Texts are drawn with libass
@@ -35,7 +35,7 @@ const even = (n: number) => Math.round(n / 2) * 2;
 export const FADE = 0.35; // crossfade length (transitions: "fade")
 const KEN_BURNS = 0.08; // slow push-in over a segment: 100 % → 108 %
 
-const segmentLength = (s: EditPlan["segments"][number]) => round(isClipSegment(s) ? s.out - s.in : s.duration);
+const segmentLength = (s: EditPlan["segments"][number]) => round(segmentSeconds(s));
 
 /** Crossfades need every segment to outlast the fade; otherwise the plan falls back to cuts. */
 export function usesFades(plan: Pick<EditPlan, "segments" | "transitions">): boolean {
@@ -140,7 +140,9 @@ export function buildFfmpegArgs(plan: EditPlan, options: RenderOptions): string[
 
   const kenBurns = (s: ClipSegment) => s.zoom === "light" || plan.transitions === "light_zoom";
   const filters = clips.map((s, i) => {
-    const frame = `[${i}:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1,fps=${FPS},setpts=PTS-STARTPTS`;
+    // A shot at another speed: its frames are spread (slow motion) or packed (faster).
+    const speed = s.speed && s.speed !== 1 ? `setpts=(PTS-STARTPTS)/${s.speed},` : "";
+    const frame = `[${i}:v]${speed}scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1,fps=${FPS},setpts=PTS-STARTPTS`;
     // fps again at the end: xfade needs a constant frame rate, which per-frame scaling drops.
     // Slow push-in (Ken Burns): the frame grows a little every frame, the centre stays put.
     const zoom = kenBurns(s)

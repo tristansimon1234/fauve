@@ -70,10 +70,12 @@ export function MotionScene(p: {
   props: ReelProps;
   theme: Theme;
   k: number;
+  /** Played over her footage: the fixed fallback has no background either. */
+  overlay?: boolean;
 }) {
   const { fps } = useVideoConfig();
   const Generated = useMemo(() => compileScene(p.js), [p.js]);
-  const fixed = <SceneView scene={p.fallback} durationInFrames={p.durationInFrames} props={p.props} theme={p.theme} k={p.k} />;
+  const fixed = <SceneView scene={p.fallback} durationInFrames={p.durationInFrames} props={p.props} theme={p.theme} k={p.k} overlay={p.overlay} />;
   if (!Generated) return fixed;
   return (
     <Fallback fallback={fixed}>

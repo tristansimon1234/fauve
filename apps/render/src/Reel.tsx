@@ -15,12 +15,12 @@ import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCa
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
-import { SceneView } from "./Scene";
+import { Backdrop, SceneView } from "./Scene";
 import { ClipBlurLayer, cssFilter, Photo } from "./Retouch";
 import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
-import { THEMES, type Theme } from "./theme";
-import type { ReelProps, TextLook } from "./types";
+import { TEXT_Y, THEMES, type Theme } from "./theme";
+import type { CameraMove, ReelProps, ReelUnder, TextLook } from "./types";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -64,37 +64,43 @@ export function Reel(props: ReelProps) {
           <FadeIn frames={i > 0 && !collage ? props.fadeFrames : 0}>
             {collage && (segment.type === "clip" || segment.type === "image") ? (
               <CollageCard index={i} props={props}>
-                {segment.type === "clip" ? <Shot segment={segment} theme={theme} /> : <Photo src={segment.src} edit={segment.edit} />}
+                {segment.type === "clip" ? <Shot segment={segment} theme={theme} /> : <Photo src={segment.src} edit={segment.edit} grade={theme.grade} />}
               </CollageCard>
             ) : segment.type === "clip" || segment.type === "image" ? (
               <Accent kind={segment.accent} color={props.brand.accent}>
                 {segment.type === "clip" ? (
                   <Shot segment={segment} theme={theme} />
                 ) : (
-                  <KenBurns on={Boolean(segment.zoom)} index={i} durationInFrames={segment.durationInFrames}>
-                    <Photo src={segment.src} edit={segment.edit} />
+                  <KenBurns on={Boolean(segment.zoom)} move={segment.move} index={i} durationInFrames={segment.durationInFrames} theme={theme}>
+                    <Photo src={segment.src} edit={segment.edit} grade={theme.grade} />
                   </KenBurns>
                 )}
-                {/* Soft gradients keep white text readable on any footage. */}
-                <AbsoluteFill
-                  style={{
-                    background:
-                      "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.12) 30%, rgba(0,0,0,0) 45%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.28) 100%)",
-                  }}
-                />
+                <Legibility theme={theme} />
               </Accent>
-            ) : segment.type === "motion" ? (
-              <MotionScene
-                js={segment.js}
-                texts={segment.texts ?? {}}
-                fallback={segment.fallback}
-                durationInFrames={segment.durationInFrames}
-                props={props}
-                theme={theme}
-                k={k}
-              />
             ) : (
-              <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} />
+              // Animations play over her footage (the passage the plan names), else on the studio's colours.
+              <AbsoluteFill>
+                {segment.under ? (
+                  <Under under={segment.under} durationInFrames={segment.durationInFrames} theme={theme} />
+                ) : segment.type === "motion" ? (
+                  // No footage to play over: the studio's colours (new scenes are transparent).
+                  <Backdrop background={segment.fallback.background} props={props} k={k} />
+                ) : null}
+                {segment.type === "motion" ? (
+                  <MotionScene
+                    js={segment.js}
+                    texts={segment.texts ?? {}}
+                    fallback={segment.fallback}
+                    durationInFrames={segment.durationInFrames}
+                    props={props}
+                    theme={theme}
+                    k={k}
+                    overlay={Boolean(segment.under)}
+                  />
+                ) : (
+                  <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} overlay={Boolean(segment.under)} />
+                )}
+              </AbsoluteFill>
             )}
           </FadeIn>
         </Sequence>
@@ -155,9 +161,60 @@ function FadeIn({ frames, children }: { frames: number; children: ReactNode }) {
   return <AbsoluteFill style={{ opacity: frames ? interpolate(frame, [0, frames], [0, 1], clamp) : 1 }}>{children}</AbsoluteFill>;
 }
 
-/** A photo in a Reel: a slow zoom with a slight drift, one way then the other from a photo to the next. */
-function KenBurns({ on, index, durationInFrames, children }: { on: boolean; index: number; durationInFrames: number; children: ReactNode }) {
+/**
+ * Soft gradients keep white text readable on any footage (the hook's upper third, the
+ * lines lower down), and darker corners give the picture depth.
+ */
+function Legibility({ theme }: { theme: Theme }) {
+  return (
+    <>
+      <AbsoluteFill
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0.2) 26%, rgba(0,0,0,0.06) 46%, rgba(0,0,0,0) 56%, rgba(0,0,0,0.1) 72%, rgba(0,0,0,0.3) 100%)",
+        }}
+      />
+      {theme.vignette ? <AbsoluteFill style={{ background: `radial-gradient(ellipse 85% 70% at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,${theme.vignette}) 100%)` }} /> : null}
+    </>
+  );
+}
+
+/**
+ * The camera's move over a shot, like an editor adds it to a still shot: a slow push-in
+ * or pull-out, a slow pan, or a tighter crop held (a jump cut on the beat).
+ */
+function cameraTransform(move: CameraMove, frame: number, durationInFrames: number, theme: Theme): string | undefined {
+  const p = interpolate(frame, [0, Math.max(1, durationInFrames)], [0, 1], { ...clamp, easing: Easing.inOut(Easing.sin) });
+  const z = theme.zoomTo - 1;
+  if (move === "in") return `scale(${1 + z * p})`;
+  if (move === "out") return `scale(${1 + z - z * p})`;
+  if (move === "left" || move === "right") {
+    // A pan needs room on both sides: slightly enlarged, it slides by a few percent.
+    const way = move === "left" ? 1 : -1;
+    return `scale(${1.02 + z}) translateX(${way * (2.6 * p - 1.3)}%)`;
+  }
+  if (move === "punch") return `scale(${theme.punch})`;
+  return undefined;
+}
+
+/** A photo in a Reel: the move the editor chose, else a slow zoom with a slight drift, one way then the other from a photo to the next. */
+function KenBurns({
+  on,
+  move,
+  index,
+  durationInFrames,
+  theme,
+  children,
+}: {
+  on: boolean;
+  move?: CameraMove;
+  index: number;
+  durationInFrames: number;
+  theme: Theme;
+  children: ReactNode;
+}) {
   const frame = useCurrentFrame();
+  if (move && move !== "none") return <AbsoluteFill style={{ transform: cameraTransform(move, frame, durationInFrames, theme) }}>{children}</AbsoluteFill>;
   if (!on) return <>{children}</>;
   const p = interpolate(frame, [0, durationInFrames], [0, 1], { ...clamp, easing: Easing.inOut(Easing.sin) });
   const zoomIn = index % 2 === 0;
@@ -168,21 +225,84 @@ function KenBurns({ on, index, durationInFrames, children }: { on: boolean; inde
 
 type ClipSegment = Extract<ReelProps["segments"][number], { type: "clip" }>;
 
+/**
+ * Where to anchor a wider clip in the vertical crop so its subject (focus, shares of
+ * the picture) stays in view: object-position puts that share of the overflow on the left.
+ */
+function framing(focus: { x: number; y: number } | undefined, aspect: number | undefined, frameAspect: number): string | undefined {
+  if (!focus || !aspect) return undefined;
+  const at = (f: number, ratio: number) => {
+    // The picture is `ratio` times the frame along this side: the subject at the centre when the edges allow.
+    if (ratio <= 1.001) return 50;
+    return Math.round(Math.min(100, Math.max(0, ((f * ratio - 0.5) / (ratio - 1)) * 100)));
+  };
+  return `${at(focus.x, aspect / frameAspect)}% ${at(focus.y, frameAspect / aspect)}%`;
+}
+
+/** A tilted picture rotated straight, enlarged just enough that no corner shows. */
+function straighten(degrees: number | undefined, frameAspect: number): string | undefined {
+  if (!degrees) return undefined;
+  const a = (Math.abs(degrees) * Math.PI) / 180;
+  const scale = Math.max(Math.cos(a) + Math.sin(a) / frameAspect, Math.cos(a) + Math.sin(a) * frameAspect);
+  return `rotate(${degrees}deg) scale(${scale.toFixed(4)})`;
+}
+
 function Shot({ segment, theme }: { segment: ClipSegment; theme: Theme }) {
   const frame = useCurrentFrame();
-  const scale = segment.zoom
-    ? interpolate(frame, [0, segment.durationInFrames], [1, theme.zoomTo], { ...clamp, easing: Easing.inOut(Easing.quad) })
-    : 1;
+  const { width, height } = useVideoConfig();
+  const move = segment.move ?? (segment.zoom ? "in" : "none");
+  const frameAspect = width / height;
   return (
-    <AbsoluteFill style={{ transform: `scale(${scale})` }}>
-      <OffthreadVideo
-        src={segment.src}
-        trimBefore={segment.startFrom}
-        // Only the passages where someone speaks keep their sound; the rest is under the music.
-        muted={!segment.speech}
-        style={{ width: "100%", height: "100%", objectFit: "cover", filter: cssFilter(segment.adjust) }}
-      />
-      {segment.blur?.tracks.length ? <ClipBlurLayer blur={segment.blur} startFrom={segment.startFrom} /> : null}
+    <AbsoluteFill style={{ transform: cameraTransform(move, frame, segment.durationInFrames, theme) }}>
+      <AbsoluteFill style={{ transform: straighten(segment.adjust?.straighten, frameAspect) }}>
+        <OffthreadVideo
+          src={segment.src}
+          trimBefore={segment.startFrom}
+          playbackRate={segment.speed ?? 1}
+          // Only the passages where someone speaks keep their sound; the rest is under the music.
+          muted={!segment.speech}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: framing(segment.adjust?.focus, segment.aspect, frameAspect),
+            filter: [theme.grade, cssFilter(segment.adjust)].filter(Boolean).join(" ") || undefined,
+          }}
+        />
+        {segment.blur?.tracks.length ? (
+          <ClipBlurLayer blur={segment.blur} startFrom={segment.startFrom} focus={segment.adjust?.focus} speed={segment.speed} />
+        ) : null}
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+}
+
+/** Her footage under an animation: the passage keeps playing with a slow push-in, a little darker so the animation reads. */
+function Under({ under, durationInFrames, theme }: { under: ReelUnder; durationInFrames: number; theme: Theme }) {
+  const frame = useCurrentFrame();
+  const { width, height } = useVideoConfig();
+  return (
+    <AbsoluteFill>
+      <AbsoluteFill style={{ transform: cameraTransform("in", frame, durationInFrames, theme) }}>
+        {under.type === "clip" ? (
+          <OffthreadVideo
+            src={under.src}
+            trimBefore={under.startFrom}
+            muted
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: framing(under.adjust?.focus, under.aspect, width / height),
+              filter: [theme.grade, cssFilter(under.adjust)].filter(Boolean).join(" ") || undefined,
+            }}
+          />
+        ) : (
+          <Photo src={under.src} edit={under.edit} grade={theme.grade} />
+        )}
+      </AbsoluteFill>
+      <AbsoluteFill style={{ background: "rgba(10,8,18,0.32)" }} />
+      <Legibility theme={theme} />
     </AbsoluteFill>
   );
 }
@@ -228,6 +348,9 @@ function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][n
   return <Caption key={key} text={text} index={index} props={props} theme={theme} k={k} />;
 }
 
+/** A soft double shadow: white type reads on any footage without looking like a sticker. */
+const TEXT_SHADOW = "0 2px 6px rgba(0,0,0,0.22), 0 10px 36px rgba(0,0,0,0.42)";
+
 function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -236,17 +359,18 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
   const h = theme.hook;
   const words = text.text.split(/\s+/).filter(Boolean);
 
+  // The hook sits in the upper third, big, where the eye lands first; a long one shrinks to its box.
   const box: CSSProperties = {
     position: "absolute",
-    top: props.height * (text.y ?? 0.12),
-    height: props.height * 0.26 * (text.scale ?? 1),
+    top: props.height * (text.y ?? TEXT_Y.hook),
+    height: props.height * 0.27 * (text.scale ?? 1),
     ...sides(text, props, k),
     opacity: exit.opacity,
     transform: `translateY(${exit.translate * k}px)`,
   };
   const style: CSSProperties = {
     display: "block",
-    fontFamily: `"${h.family === "display" ? props.brand.displayFont : props.brand.bodyFont}", serif`,
+    fontFamily: `"${h.family === "display" ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`,
     fontWeight: h.weight,
     fontStyle: h.italic ? "italic" : "normal",
     fontSize: h.size * k * (text.scale ?? 1),
@@ -254,10 +378,18 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
     letterSpacing: h.letterSpacing * k,
     textTransform: h.uppercase ? "uppercase" : "none",
     color: "#fff",
-    textShadow: text.backdrop ? "none" : "0 4px 28px rgba(0,0,0,0.35)",
+    textShadow: text.backdrop ? "none" : TEXT_SHADOW,
+  };
+  // A stressed word: on a box in the brand colour (like a creator highlights it), in italic, or in the brand colour.
+  const stressed = (word: string): CSSProperties | undefined => {
+    if (!emphasis.has(normalize(word))) return undefined;
+    if (h.stress === "box") return { background: props.brand.accent, color: props.brand.accentInk, borderRadius: 12 * k, padding: `0 ${14 * k}px`, textShadow: "none" };
+    if (h.stress === "italic") return { fontStyle: "italic" };
+    // A serif accent in a sans hook: the display font's italic, a touch larger (serif faces run small).
+    if (h.stress === "serif") return { fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontWeight: 400, fontSize: "1.12em", letterSpacing: 0 };
+    return { color: props.brand.accent };
   };
 
-  // A long hook shrinks to its box (top of the frame, inside the side margins).
   // The dark background, when set, hugs the lines of text, not the whole box.
   return (
     <Fit style={box} innerStyle={style} marker={String(index)}>
@@ -266,14 +398,13 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
           const p = spring({ frame: frame - i * h.stagger, fps, config: theme.spring });
           const enter: CSSProperties =
             h.enter === "pop"
-              ? { transform: `scale(${interpolate(p, [0, 1], [0.55, 1])})`, opacity: interpolate(p, [0, 0.4], [0, 1], clamp) }
+              ? { transform: `scale(${interpolate(p, [0, 1], [0.6, 1])})`, opacity: interpolate(p, [0, 0.35], [0, 1], clamp) }
               : h.enter === "rise"
-                ? { transform: `translateY(${interpolate(p, [0, 1], [34 * k, 0])}px)`, opacity: p, filter: `blur(${interpolate(p, [0, 1], [8, 0])}px)` }
+                ? { transform: `translateY(${interpolate(p, [0, 1], [26 * k, 0])}px)`, opacity: interpolate(p, [0, 0.6], [0, 1], clamp) }
                 : { transform: `translateY(${interpolate(p, [0, 1], [10 * k, 0])}px)`, opacity: p };
-          const stressed = emphasis.has(normalize(word));
           return (
             <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...enter }}>
-              <span style={stressed ? { color: props.brand.accent, filter: "brightness(1.15)" } : undefined}>{word}</span>
+              <span style={{ display: "inline-block", ...stressed(word) }}>{word}</span>
               {i < words.length - 1 ? " " : ""}
             </span>
           );
@@ -283,84 +414,129 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
   );
 }
 
+/**
+ * The statement: the words on a box hugging each line, like the text tool of Instagram or
+ * TikTok (white with dark letters, or the brand colour), or an outlined frame for the
+ * minimal ambiance. It grows in from slightly smaller, then holds.
+ */
 function Band({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const exit = useExit(text.durationInFrames, theme);
   const b = theme.band;
-  const reveal = spring({ frame, fps, config: { damping: 200, stiffness: 120, mass: 0.8 } });
-  const textIn = spring({ frame: frame - 4, fps, config: { damping: 200, stiffness: 120, mass: 0.8 } });
+  const reveal = spring({ frame, fps, config: { damping: 200, stiffness: 170, mass: 0.7 } });
   const emphasis = new Set(text.emphasis.flatMap((e) => e.split(/\s+/)).map(normalize));
+  const size = b.size * k * (text.scale ?? 1);
+  const onBox = b.box === "white" ? { bg: "#FFFFFF", fg: "#16121F" } : { bg: props.brand.accent, fg: props.brand.accentInk };
+  // A stressed word: in the brand colour on a white box; on the brand colour, a white chip of its own.
+  const stress = (word: string): CSSProperties | undefined =>
+    !emphasis.has(normalize(word))
+      ? undefined
+      : b.box === "white"
+        ? { color: props.brand.accent }
+        : { background: "#FFFFFF", color: props.brand.accent, borderRadius: Math.max(4, b.radius * 0.6) * k, padding: `0 ${10 * k}px` };
+  const words = text.text.split(/\s+/).filter(Boolean);
+  const type: CSSProperties = {
+    fontFamily: `"${b.family === "display" ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`,
+    fontWeight: b.weight,
+    fontSize: size,
+    letterSpacing: b.letterSpacing * k,
+    textTransform: b.uppercase ? "uppercase" : "none",
+  };
 
   return (
     <div
       style={{
         position: "absolute",
-        top: props.height * (text.y ?? 0.37),
+        top: props.height * (text.y ?? TEXT_Y.band),
         ...sides(text, props, k),
         display: "flex",
         justifyContent: "center",
-        opacity: exit.opacity,
-        transform: `translateY(${exit.translate * k}px) rotate(${b.tilt}deg)`,
+        opacity: Math.min(exit.opacity, interpolate(reveal, [0, 0.4], [0, 1], clamp)),
+        transform: `translateY(${exit.translate * k}px) rotate(${b.tilt}deg) scale(${0.9 + 0.1 * reveal})`,
       }}
     >
-      <div
-        data-fauve-text={index}
-        style={{
-          clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0 round ${b.radius * k}px)`,
-          background: b.outline ? "rgba(0,0,0,0.18)" : props.brand.accent,
-          border: b.outline ? `${2 * k}px solid rgba(255,255,255,0.9)` : "none",
-          borderRadius: b.radius * k,
-          padding: `${18 * k}px ${36 * k}px`,
-          color: b.outline ? "#fff" : props.brand.accentInk,
-          fontFamily: `"${props.brand.bodyFont}", sans-serif`,
-          fontWeight: b.weight,
-          fontSize: b.size * k * (text.scale ?? 1),
-          letterSpacing: b.letterSpacing * k,
-          textTransform: b.uppercase ? "uppercase" : "none",
-          textAlign: "center",
-          lineHeight: 1.2,
-          boxShadow: b.outline ? "none" : "0 10px 30px rgba(0,0,0,0.18)",
-        }}
-      >
-        <span style={{ opacity: textIn, display: "inline-block", transform: `translateX(${(1 - textIn) * -14 * k}px)` }}>
-          {text.text.split(/\s+/).map((word, i, all) => (
-            <span key={i} style={emphasis.has(normalize(word)) ? { fontStyle: "italic" } : undefined}>
-              {word}
-              {i < all.length - 1 ? " " : ""}
-            </span>
-          ))}
-        </span>
-      </div>
+      {b.box === "outline" ? (
+        <div
+          data-fauve-text={index}
+          style={{
+            ...type,
+            border: `${2 * k}px solid rgba(255,255,255,0.92)`,
+            padding: `${20 * k}px ${40 * k}px`,
+            color: "#fff",
+            textAlign: "center",
+            lineHeight: 1.25,
+            background: "rgba(0,0,0,0.16)",
+            textShadow: "0 2px 12px rgba(0,0,0,0.35)",
+          }}
+        >
+          {text.text}
+        </div>
+      ) : (
+        <div data-fauve-text={index} style={{ textAlign: "center", lineHeight: 1.42 }}>
+          <span
+            style={{
+              ...type,
+              background: onBox.bg,
+              color: onBox.fg,
+              padding: `${6 * k}px ${22 * k}px`,
+              borderRadius: b.radius * k,
+              boxDecorationBreak: "clone",
+              WebkitBoxDecorationBreak: "clone",
+            }}
+          >
+            {words.map((word, i) => (
+              <span key={i}>
+                <span style={stress(word)}>{word}</span>
+                {i < words.length - 1 ? " " : ""}
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
+
+/** A typewriter face reads thin in a caption: the display font takes over. */
+const MONOSPACE = /mono|code|courier|typewriter/i;
 
 function Caption({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const exit = useExit(text.durationInFrames, theme);
-  const p = spring({ frame, fps, config: { damping: 200, stiffness: 100 } });
+  const p = spring({ frame, fps, config: { damping: 200, stiffness: 160 } });
+  const font = MONOSPACE.test(props.brand.bodyFont) ? props.brand.displayFont : props.brand.bodyFont;
+  // Lively ambiances put the line on a dark box, like the apps' text tool; the calm ones keep it bare, with a soft shadow.
+  const boxed = theme.caption.box && !text.backdrop;
   return (
     <div
       data-fauve-text={index}
       style={{
         position: "absolute",
-        top: props.height * (text.y ?? 0.63),
+        top: props.height * (text.y ?? TEXT_Y.caption),
         ...sides(text, props, k),
         textAlign: "center",
-        color: "#fff",
-        fontFamily: `"${props.brand.bodyFont}", sans-serif`,
-        fontWeight: theme.caption.weight,
-        fontSize: theme.caption.size * k * (text.scale ?? 1),
-        lineHeight: 1.25,
-        textShadow: "0 2px 18px rgba(0,0,0,0.45)",
-        ...backdrop(text, k),
         opacity: Math.min(p, exit.opacity),
-        transform: `translateY(${(1 - p) * 18 * k + exit.translate * k}px)`,
+        transform: `translateY(${(1 - p) * 14 * k + exit.translate * k}px)`,
       }}
     >
-      {text.text}
+      <div style={{ lineHeight: boxed ? 1.42 : 1.2 }}>
+        <span
+          style={{
+            color: "#fff",
+            fontFamily: `"${font}", sans-serif`,
+            fontWeight: theme.caption.weight,
+            fontSize: theme.caption.size * k * (text.scale ?? 1),
+            textShadow: text.backdrop || boxed ? "none" : TEXT_SHADOW,
+            ...(boxed
+              ? { background: "rgba(14,12,20,0.74)", padding: `${6 * k}px ${20 * k}px`, borderRadius: 14 * k, boxDecorationBreak: "clone", WebkitBoxDecorationBreak: "clone" }
+              : backdrop(text, k)),
+          }}
+        >
+          {text.text}
+        </span>
+      </div>
     </div>
   );
 }
@@ -380,8 +556,6 @@ const lookShadows = (k: number) => ({
   hard: `${5 * k}px ${5 * k}px 0 rgba(0,0,0,0.9)`,
 });
 
-/** Default place of a text by role (top edge, share of the height), like the template styles. */
-const LOOK_Y = { hook: 0.12, band: 0.37, caption: 0.63 } as const;
 
 /** The look a list without one of its own gets: the template's body font, white, a soft shadow. */
 function listFallback(props: ReelProps): TextLook {
@@ -463,7 +637,7 @@ function LookText({ text, index, props, theme, k }: { text: ReelProps["texts"][n
   const look = text.look ?? listFallback(props);
   const scale = text.scale ?? 1;
   const emphasis = new Set(text.emphasis.flatMap((e) => e.split(/\s+/)).map(normalize));
-  const top = text.y ?? LOOK_Y[text.style];
+  const top = text.y ?? TEXT_Y[text.style];
 
   const box: CSSProperties = {
     position: "absolute",
@@ -581,7 +755,8 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
   for (const word of props.words) {
     const current = chunks.at(-1);
     const last = current?.at(-1);
-    if (current && last && current.length < 4 && word.from - last.to < 12) current.push(word);
+    // Two or three words at a time: read at a glance, in time with the voice.
+    if (current && last && current.length < 3 && word.from - last.to < 12) current.push(word);
     else chunks.push([word]);
   }
   const chunk = chunks.find((c) => frame >= c[0]!.from && frame <= c.at(-1)!.to + 6);
@@ -591,7 +766,7 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
     <div
       style={{
         position: "absolute",
-        top: props.height * 0.55,
+        top: props.height * 0.58,
         left: SAFE.left * k,
         right: SAFE.right * k,
         textAlign: "center",

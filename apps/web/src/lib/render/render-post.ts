@@ -7,6 +7,7 @@ import {
   clipAnalysisSchema,
   isClipSegment,
   motionTemplateSchema,
+  planMediaIds,
   PHOTO_MAX_SECONDS,
   withoutScenes,
   type ClipAnalysis,
@@ -59,7 +60,7 @@ export function towardsDraft(status: PostStatus): PostStatus[] {
  */
 export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"] }) {
   const db = supabaseAdmin();
-  const clipIds = [...new Set(plan.segments.filter(isClipSegment).map((s) => s.clip_id))];
+  const clipIds = planMediaIds(plan);
   const assets = clipIds.length
     ? check(await db.from("media_assets").select("id, storage_path, mime_type, duration, kind").eq("studio_id", studioId).in("id", clipIds)).data!
     : [];
@@ -106,9 +107,13 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   // Her voice note over the Reel: signed for the render and the preview, with her words.
   const voice = plan.voice ? await voiceInput(studioId, plan.voice.media_id) : undefined;
   const words: Record<string, ClipAnalysis["words"]> = {};
+  // Each clip's shape, to frame its subject in the vertical crop (phones film 16:9 or 9:16).
+  const aspects: Record<string, number> = {};
   for (const row of analyses.data ?? []) {
     const parsed = clipAnalysisSchema.safeParse(row.analysis);
-    if (parsed.success && !(row.media_id in words)) words[row.media_id as string] = parsed.data.words;
+    if (!parsed.success || row.media_id in words) continue;
+    words[row.media_id as string] = parsed.data.words;
+    aspects[row.media_id as string] = parsed.data.orientation === "landscape" ? 16 / 9 : parsed.data.orientation === "square" ? 1 : 9 / 16;
   }
   return {
     clipIds,
@@ -118,6 +123,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
     clipUrls,
     clipDurations,
     words,
+    aspects,
     accent,
     logoUrl,
     logoOnDark,
@@ -162,7 +168,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  const { clipFiles, clips, clipUrls, photoIds, words, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, voice } = await loadMontageInputs(studioId, plan);
+  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, voice } = await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
@@ -191,6 +197,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         clipUrls,
         photoIds,
         words,
+        aspects,
         brand: { name: studioName, accent, logoUrl, logoOnDark, fonts, colors, customFonts },
         ...(voice ? { voice } : {}),
       });
@@ -207,7 +214,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       props.segments = props.segments.map((s, i) => {
         if (s.type !== "motion" || !checks[`m${i}`]) return s;
         console.warn("motion scene falls back to its fixed scene", renderId, checks[`m${i}`]);
-        return { type: "scene", scene: s.fallback, startAt: s.startAt, durationInFrames: s.durationInFrames };
+        return { type: "scene", scene: s.fallback, startAt: s.startAt, durationInFrames: s.durationInFrames, ...(s.under ? { under: s.under } : {}) };
       });
       try {
         mp4 = await renderReelInSandbox({ id: renderId, props });

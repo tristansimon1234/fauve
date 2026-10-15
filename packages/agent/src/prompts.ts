@@ -197,7 +197,9 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
 
 export const CLIP_ANALYSIS_PROMPT = `Tu analyses un clip vidéo filmé dans un commerce de quartier (studio de sport ou de bien-être, salon de coiffure ou de beauté, restaurant, café, boutique…), pour préparer un Reel Instagram / TikTok (7 à 30 secondes).
 
-Découpe le clip en plans successifs (un plan change quand le cadrage, le sujet ou l'action change nettement). Pour chaque plan : horodatages en secondes, ce qui se passe, le sujet, l'énergie, le potentiel d'accroche et la qualité (flou, sombre, bougé), et si un visage est reconnaissable.
+Découpe le clip en plans successifs (un plan change quand le cadrage, le sujet ou l'action change nettement). Pour chaque plan, ce dont un monteur professionnel a besoin pour choisir et enchaîner : horodatages en secondes, ce qui se passe, le sujet, l'énergie, le potentiel d'accroche, la qualité (flou, sombre, bougé), si un visage est reconnaissable, la valeur de plan (framing : large, moyen, gros plan, détail), la caméra (static, handheld, moving), la boîte du sujet principal (subject_box, pour recadrer en vertical sans le couper) et la beauté du plan (beauty, de 1 à 5 : lumière, cadrage, netteté, couleurs ; sois exigeant, 5 est rare).
+
+Donne aussi la correction légère qui rendrait le clip plus beau et cohérent avec d'autres vidéos du même commerce (correction : exposition, contraste, saturation, chaleur, redressement en degrés si l'horizon ou les verticales penchent ; 0 pour ce qui est déjà bien).
 
 Repère ensuite les meilleurs passages pour un Reel : une personne qui regarde l'objectif ou parle, un résultat fini (coupe, plat, pièce terminée), mouvement net et lisible, geste précis (un exercice, une coupe, un dressage), produit ou plat appétissant, transformation avant/après, belle lumière, moment surprenant. Signale ce qui gêne techniquement (flou, sombre, bougé, son inaudible) ; un visage ou une personne n'est pas un problème, c'est souvent le meilleur plan.
 

@@ -43,8 +43,10 @@ export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number
     const extra = i === last ? 0 : fade;
     const scene = !isClipSegment(s);
     const minBeats = scene ? Math.ceil(SCENE_MIN / beat) : 1;
+    // A shot at another speed lasts its clip time divided by the speed.
+    const speed = isClipSegment(s) ? (s.speed ?? 1) : 1;
     const maxLen = isClipSegment(s)
-      ? (clipDurations[s.clip_id] ?? s.out) - s.in
+      ? ((clipDurations[s.clip_id] ?? s.out) - s.in) / speed
       : isMotionSegment(s)
         ? MOTION_MAX
         : SCENE_MAX;
@@ -58,7 +60,7 @@ export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number
       return s;
     }
     beats += n;
-    return isClipSegment(s) ? { ...s, out: round(s.in + length) } : { ...s, duration: length };
+    return isClipSegment(s) ? { ...s, out: round(s.in + length * speed) } : { ...s, duration: length };
   });
   const onBeat = (t: number) => round(Math.round(t / beat) * beat);
   const texts = plan.texts.map((t) => {
