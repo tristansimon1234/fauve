@@ -190,3 +190,39 @@ export const EyeIcon = make(
     <circle cx="12" cy="12" r="2.8" />
   </>,
 );
+export const TypeIcon = make(<path d="M5 6.5V5h14v1.5M12 5v14M9 19h6" />);
+export const CaptionIcon = make(<path d="M5 7h14M5 12h14M5 17h9" />);
+export const ScissorsIcon = make(
+  <>
+    <circle cx="6.5" cy="7" r="2.5" />
+    <circle cx="6.5" cy="17" r="2.5" />
+    <path d="M8.6 8.4 19 17M8.6 15.6 19 7" />
+  </>,
+);
+export const ZapIcon = make(<path d="M13 3 5 13.5h6L10 21l8-10.5h-6z" />);
+export const MusicIcon = make(
+  <>
+    <path d="M9 18V6l10-2v12" />
+    <circle cx="6.5" cy="18" r="2.5" />
+    <circle cx="16.5" cy="16" r="2.5" />
+  </>,
+);
+export const VolumeIcon = make(
+  <>
+    <path d="M4 10v4h3.5L12 18V6L7.5 10z" />
+    <path d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10" />
+  </>,
+);
+export const VolumeOffIcon = make(
+  <>
+    <path d="M4 10v4h3.5L12 18V6L7.5 10z" />
+    <path d="m16.5 9.5 5 5M21.5 9.5l-5 5" />
+  </>,
+);
+export const UndoIcon = make(
+  <>
+    <path d="M9 7 4.5 11.5 9 16" />
+    <path d="M5 11.5h9.5a5 5 0 0 1 0 10H12" />
+  </>,
+);
+export const ChevronRightIcon = make(<path d="m9 6 6 6-6 6" />);

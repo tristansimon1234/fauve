@@ -16,6 +16,9 @@ import { recentMedia } from "@/lib/social/instagram";
 import { ActionView, type ActionMedia } from "./action-view";
 import { Paywall } from "@/components/paywall";
 import { studioAccess } from "@/lib/billing/access";
+import { Mascot } from "@/components/mascot";
+import { PostReview } from "@/components/review/post-review";
+import { loadReview } from "@/lib/review";
 
 export const metadata: Metadata = { title: "Ta publication" };
 
@@ -41,11 +44,55 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
 
   const { data: post } = await db
     .from("posts")
-    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides, agent_note, cover, share_to_feed")
+    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides, agent_note, cover, share_to_feed, platforms, publish_by_hand, music, voice_media_id")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
   if (!post) notFound();
+
+  // A Reel with its montage: the same simple page as in the app, light, for the phone.
+  if (post.kind === "reel") {
+    const review = await loadReview(
+      db,
+      studioId,
+      {
+        id: post.id as string,
+        title: post.title as string,
+        status: post.status as string,
+        scheduled_at: (post.scheduled_at as string | null) ?? null,
+        platforms: (post.platforms as string[] | null) ?? [],
+        caption: (post.caption as string | null) ?? null,
+        hashtags: (post.hashtags as string[] | null) ?? [],
+        edit_plan_id: (post.edit_plan_id as string | null) ?? null,
+        render_id: (post.render_id as string | null) ?? null,
+        publish_by_hand: post.publish_by_hand === true,
+        music: post.music,
+        voice_media_id: (post.voice_media_id as string | null) ?? null,
+      },
+      member.studio.timezone,
+    );
+    if (review) {
+      return (
+        <div className="min-h-dvh bg-white px-4 pt-4 text-ink sm:px-8">
+          <header className="mx-auto flex max-w-[1040px] items-center gap-2.5 pb-4">
+            <Mascot size={34} still />
+            <h1 className="min-w-0 flex-1 truncate text-[18px] font-extrabold tracking-[-0.01em]">{post.title as string}</h1>
+          </header>
+          <div className="mx-auto max-w-[1040px]">
+            <PostReview
+              key={`${review.version}-${review.renderId ?? ""}-${review.status}`}
+              data={review}
+              surface="whatsapp"
+              editorHref={`/publications/${post.id as string}?editeur=1`}
+              whatsAppPrefix={`Pour « ${post.title as string} » : `}
+              cover={postCoverSchema.nullable().catch(null).parse(post.cover ?? null)}
+              shareToFeed={post.share_to_feed !== false}
+            />
+          </div>
+        </div>
+      );
+    }
+  }
 
   const planId =
     (post.edit_plan_id as string | null) ??

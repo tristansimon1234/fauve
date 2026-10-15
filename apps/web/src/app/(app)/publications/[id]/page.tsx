@@ -31,6 +31,8 @@ import { WhereToPost, type TikTokPanel } from "@/components/montage/where-to-pos
 import { creatorInfo, tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import { tiktokAccount, tiktokCanTake } from "@/lib/social/tiktok-account";
 import { MontageEditor } from "./montage-editor";
+import { PostReview } from "@/components/review/post-review";
+import { loadReview } from "@/lib/review";
 import { PostEditor } from "./post-editor";
 import { CarouselEditor } from "./carousel-editor";
 
@@ -129,19 +131,21 @@ async function loadVoice(db: Awaited<ReturnType<typeof getStudioContext>>["db"],
   return { who: "simone" as const, name: findVoice(voiceId)?.name ?? "Simone", text };
 }
 
-export default function PostPage({ params }: PageProps<"/publications/[id]">) {
+export default function PostPage({ params, searchParams }: PageProps<"/publications/[id]">) {
   return (
     <main className="flex min-w-0 flex-col gap-5 px-4 pt-5 pb-14 sm:px-8 sm:pt-6">
       <PageSuspense title="Publication">
-        <PostDetail params={params} />
+        <PostDetail params={params} searchParams={searchParams} />
       </PageSuspense>
     </main>
   );
 }
 
-async function PostDetail({ params }: { params: PageProps<"/publications/[id]">["params"] }) {
+async function PostDetail({ params, searchParams }: { params: PageProps<"/publications/[id]">["params"]; searchParams: PageProps<"/publications/[id]">["searchParams"] }) {
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
+  // « Tout régler moi-même »: the full editor instead of the simple page of a Reel.
+  const fullEditor = (await searchParams).editeur !== undefined;
 
   const { db, member } = await getStudioContext();
   if (!member) return <NoStudio />;
@@ -159,6 +163,37 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   if (error) throw new Error(`posts: ${error.message}`);
   if (!data) notFound();
   const post = postSchema.parse(data);
+
+  // A Reel with its montage: the simple page (the video, when, one button, « Changer quelque chose »).
+  if (post.kind === "reel" && !fullEditor) {
+    const review = await loadReview(db, studioId, post, tz);
+    if (review) {
+      return (
+        <>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <Link href="/grille" aria-label="Retour à la grille" title="Grille" className="flex size-10 shrink-0 items-center justify-center rounded-full border border-line text-ink hover:bg-soft">
+              <ArrowLeftIcon size={18} />
+            </Link>
+            <h1 className="min-w-0 flex-1 truncate text-[24px] leading-tight font-extrabold tracking-[-0.02em]">{post.title}</h1>
+            <DeleteButton
+              action={deletePost.bind(null, post.id)}
+              redirectTo="/grille"
+              compact
+              confirmText={review.locked ? "Supprimer cette publication de Simone ? Elle reste en ligne sur Instagram." : "Supprimer cette publication, son montage et ses versions ?"}
+            />
+          </div>
+          <PostReview
+            key={`${review.version}-${review.renderId ?? ""}-${review.status}`}
+            data={review}
+            surface="app"
+            editorHref={`/publications/${post.id}?editeur=1`}
+            cover={post.cover}
+            shareToFeed={post.share_to_feed}
+          />
+        </>
+      );
+    }
+  }
 
   const plan = await loadPlan(db, post);
   const render = await loadRender(db, plan?.id ?? null, post.render_id);
@@ -327,6 +362,11 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {post.kind === "reel" && fullEditor && (
+            <Link href={`/publications/${post.id}`} className="btn btn-secondary">
+              Vue simple
+            </Link>
+          )}
           <AskFauveButton topic={{ postId: post.id, title: post.title }} label="Demander une modif" />
           {canEdit && post.status === "draft" && (
             // Submits the caption form, so a caption being edited is saved with the validation.
