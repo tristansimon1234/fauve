@@ -8,6 +8,7 @@ import {
   effortVersions,
   editPlanSchema,
   fixBrief,
+  MAX_FREE_SCENES,
   montageIssueSchema,
   motionTemplateSchema,
   variantPlan,
@@ -59,7 +60,7 @@ const bodySchema = z.object({
   note: z.string().max(600).optional(),
   /** Credits: the accepted quote, the new scenes it allows, and the new scenes made so far. */
   quoteId: z.uuid().optional(),
-  maxNewScenes: z.number().int().min(0).max(2).optional(),
+  maxNewScenes: z.number().int().min(0).max(MAX_FREE_SCENES).optional(),
   newScenes: z.number().int().min(0).max(10).optional(),
   title: z.string().max(200).optional(),
   /** Variant step: the template and hook to change. */
