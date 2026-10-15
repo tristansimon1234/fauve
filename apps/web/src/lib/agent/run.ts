@@ -14,6 +14,7 @@ import {
   usdToEur,
   TOOL_STATUS,
   type Effort,
+  type TikTokContext,
   type TokenUsage,
   type ToolHandlers,
   type ReplyExtras,
@@ -52,6 +53,7 @@ export type RunFauveInput = ToolContext & {
     onboardingStep: string;
     firstName: string | null;
     instagram: string | null;
+    tiktok?: TikTokContext;
     channel?: "whatsapp" | "web" | "instagram";
     /** Default level of care for montages (Réglages). */
     montageEffort?: Effort;
@@ -132,6 +134,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           firstName: input.studio.firstName,
           onboardingStep: input.studio.onboardingStep,
           instagram: input.studio.instagram,
+          tiktok: input.studio.tiktok,
           channel: input.studio.channel,
           montageEffort: input.studio.montageEffort,
           known: input.studio.known,

@@ -8,6 +8,7 @@ import { addDays, localDateOf, localInstant, localTimeOf, parseIsoDate, toIsoDat
 import { scheduleValidated } from "@/lib/posts";
 import { postCovers, type Cover, type CoverPost } from "@/lib/covers";
 import { instagramAccount } from "@/lib/social/publish";
+import { defaultPlatforms } from "@/lib/social/tiktok-account";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { deletePost } from "../publications/[id]/actions";
@@ -93,7 +94,7 @@ export async function addPost(date: string, kind: PostKind, title: string): Prom
   const at = localInstant(parseIsoDate(date)!, DEFAULT_TIME.hours, DEFAULT_TIME.minutes, member.studio.timezone);
   const { data, error } = await supabaseAdmin()
     .from("posts")
-    .insert({ studio_id: member.studio.id, kind, title: name, status: "planned", platforms: ["instagram"], scheduled_at: at.toISOString() })
+    .insert({ studio_id: member.studio.id, kind, title: name, status: "planned", platforms: await defaultPlatforms(member.studio.id, kind), scheduled_at: at.toISOString() })
     .select("id")
     .single();
   if (error) return { ok: false, error: "L’idée n’a pas été ajoutée. Réessaie." };
@@ -151,7 +152,7 @@ export async function createPost(input: {
       kind: kind.data,
       title,
       status: "planned",
-      platforms: ["instagram"],
+      platforms: await defaultPlatforms(member.studio.id, kind.data),
       scheduled_at: at.toISOString(),
       template: template.success ? template.data : null,
       inspiration_id: inspiration?.id ?? null,

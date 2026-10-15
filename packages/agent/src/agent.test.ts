@@ -1001,3 +1001,19 @@ test("ai images: real photos kept truthful, ambiance never her place, frames and
   assert.equal(toolSpecs.make_image.input.parse({ mode: "ambiance", instruction: "un fond de lin" }).format, "4:5");
   assert.equal(toolSpecs.make_image.input.safeParse({ mode: "ambiance", instruction: "x", count: 9 }).success, false);
 });
+
+test("TikTok: caption with every hashtag, settings and states", async () => {
+  const { captionForTikTok, TIKTOK_CAPTION_MAX } = await import("./caption.ts");
+  const { readTikTokSettings, readTikTokExternal, tiktokStateLine } = await import("./tiktok.ts");
+  // No cap of 5 on TikTok; hashtags already written are not repeated.
+  assert.equal(captionForTikTok("Viens — vite #pilates", ["pilates", "a", "b", "c", "d", "e"]), "Viens, vite #pilates\n\n#a #b #c #d #e");
+  assert.ok(captionForTikTok("x".repeat(3000)).length <= TIKTOK_CAPTION_MAX);
+  // Nothing preselected for who sees it (TikTok's rule).
+  assert.deepEqual(readTikTokSettings(null), { privacy_level: null, allow_comment: true, allow_duet: true, allow_stitch: true });
+  assert.equal(readTikTokSettings({ privacy_level: 3 }).privacy_level, null);
+  const sent = readTikTokExternal({ tiktok: { publish_id: "v_inbox_file~1", mode: "draft", status: "SEND_TO_USER_INBOX", sent_at: "2026-10-15T10:00:00Z" } });
+  assert.ok(sent);
+  assert.match(tiktokStateLine(sent), /brouillons/);
+  assert.match(tiktokStateLine({ ...sent, post_id: "7" }), /En ligne/);
+  assert.equal(readTikTokExternal({ instagram: {} }), null);
+});

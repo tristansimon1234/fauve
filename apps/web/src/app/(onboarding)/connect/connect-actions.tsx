@@ -2,19 +2,29 @@ import Link from "next/link";
 import { CheckIcon, InstagramIcon, TikTokIcon } from "@/components/icons";
 import { currentMember } from "@/lib/social/current-member";
 import { instagramAccount } from "@/lib/social/publish";
+import { tiktokEnabled } from "@/lib/social/tiktok";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const errors: Record<string, string> = {
   refus: "La connexion a été annulée. Tu peux réessayer quand tu veux.",
   "lien-expire": "Le lien a expiré. Recommence la connexion.",
   "compte-perso": "Ce compte Instagram est personnel. Passe-le en compte professionnel (gratuit), puis réessaie.",
   instagram: "Instagram n’a pas répondu comme prévu. Réessaie dans un instant.",
+  tiktok: "TikTok n’a pas répondu comme prévu. Réessaie dans un instant.",
+  "tiktok-indisponible": "La connexion TikTok n’est pas encore ouverte.",
 };
 
 // Server component: reads the session and the studio's Instagram status.
 export async function ConnectActions({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [params, member] = await Promise.all([searchParams, currentMember()]);
   const error = typeof params.erreur === "string" ? errors[params.erreur] : undefined;
-  const account = member ? await instagramAccount(member.studio_id) : null;
+  const [account, tiktok] = member
+    ? await Promise.all([
+        instagramAccount(member.studio_id),
+        supabaseAdmin().from("social_accounts").select("handle, status").eq("studio_id", member.studio_id).eq("platform", "tiktok").maybeSingle().then((r) => r.data),
+      ])
+    : [null, null];
+  const tiktokOn = tiktokEnabled();
 
   return (
     <>
@@ -36,12 +46,27 @@ export async function ConnectActions({ searchParams }: { searchParams: Promise<R
         </div>
       )}
 
-      <div className="flex items-center gap-3 rounded-2xl border border-line px-4 py-3.5 opacity-70">
+      <div className={`flex items-center gap-3 rounded-2xl border border-line px-4 py-3.5 ${tiktokOn ? "" : "opacity-70"}`}>
         <TikTokIcon className="shrink-0" />
         <span className="flex flex-1 flex-col gap-0.5">
           <span className="text-[15px] font-bold">TikTok</span>
-          <span className="text-[13px] text-muted">Bientôt disponible</span>
+          <span className="text-[13px] text-muted">
+            {!tiktokOn
+              ? "Bientôt disponible"
+              : tiktok?.status === "connected"
+                ? `Connecté${tiktok.handle ? ` · @${tiktok.handle}` : ""}`
+                : tiktok?.status === "expired"
+                  ? "Connexion expirée"
+                  : "Facultatif : tes Reels partent aussi sur TikTok"}
+          </span>
         </span>
+        {tiktokOn && member && tiktok?.status !== "connected" && (
+          // Plain link: the OAuth start is a route handler.
+          <a href="/api/tiktok/connect" className="btn btn-secondary shrink-0">
+            {tiktok?.status === "expired" ? "Reconnecter" : "Connecter"}
+          </a>
+        )}
+        {tiktok?.status === "connected" && <CheckIcon size={18} className="shrink-0 text-violet" />}
       </div>
 
       <p className="text-[13px] leading-normal text-muted">

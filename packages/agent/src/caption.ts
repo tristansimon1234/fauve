@@ -58,3 +58,21 @@ export function captionForInstagram(caption: string | null | undefined, hashtags
   }
   return [inline.text, extra.join(" ")].filter(Boolean).join("\n\n");
 }
+
+/** TikTok's caption limit (hashtags included; no cap on their number). */
+export const TIKTOK_CAPTION_MAX = 2200;
+
+/** The caption for TikTok: cleaned, then the post's hashtags not already written, cut at TikTok's limit. */
+export function captionForTikTok(caption: string | null | undefined, hashtags: readonly string[] | null | undefined = []): string {
+  const text = cleanCaption(caption ?? "");
+  const seen = new Set((text.match(HASHTAG) ?? []).map((t) => t.toLowerCase()));
+  const extra: string[] = [];
+  for (const raw of hashtags ?? []) {
+    const tag = `#${raw.replace(/^#+/, "").trim()}`;
+    if (tag.length < 2 || seen.has(tag.toLowerCase())) continue;
+    seen.add(tag.toLowerCase());
+    extra.push(tag);
+  }
+  const full = [text, extra.join(" ")].filter(Boolean).join("\n\n");
+  return full.length <= TIKTOK_CAPTION_MAX ? full : `${full.slice(0, TIKTOK_CAPTION_MAX - 1).trimEnd()}…`;
+}

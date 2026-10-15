@@ -15,7 +15,7 @@ export const maxDuration = 300;
 const REELS: Record<string, { studio: string; template: MotionTemplate; fonts: { display: string; body: string } }> = {
   pilates: { studio: "Studio Lune", template: "collage", fonts: { display: "Bricolage Grotesque", body: "DM Mono" } },
   coiffure: { studio: "Maison Maya", template: "doux", fonts: { display: "Instrument Serif", body: "Inter Tight" } },
-  trattoria: { studio: "Chez Lino", template: "collage", fonts: { display: "Anton", body: "Space Mono" } },
+  trattoria: { studio: "Chez Lino", template: "dynamique", fonts: { display: "Anton", body: "Space Mono" } },
 };
 
 function authorized(request: Request): boolean {

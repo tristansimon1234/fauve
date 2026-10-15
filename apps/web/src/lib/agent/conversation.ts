@@ -1,4 +1,5 @@
 import "server-only";
+import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_EFFORT, effortSchema, orderReplies, readMemory, stableWindow } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -98,13 +99,14 @@ export async function replyInConversation(params: {
     .limit(ownThread ? HISTORY_READ : HISTORY_READ * 2);
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
-  const [studio, member, rows, instagram, brand, jobs] = await Promise.all([
+  const [studio, member, rows, instagram, brand, jobs, tiktok] = await Promise.all([
     db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
     db.from("brand_profiles").select("profile->>tone").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     runningJobs(params.studioId).catch(() => []),
+    db.from("social_accounts").select("handle, status").eq("studio_id", params.studioId).eq("platform", "tiktok").maybeSingle(),
   ]);
   const jobTitles = jobs.length
     ? new Map(
@@ -155,6 +157,13 @@ export async function replyInConversation(params: {
       onboardingStep: studio.data.onboarding_step,
       firstName: member.data?.first_name ?? null,
       instagram: (instagram.data?.handle as string | null | undefined) ?? null,
+      tiktok: tiktokEnabled()
+        ? {
+            state: tiktok.data?.status === "connected" ? "connected" : tiktok.data?.status === "expired" ? "expired" : "not_connected",
+            handle: (tiktok.data?.handle as string | null | undefined) ?? null,
+            direct: tiktokDirectPost(),
+          }
+        : { state: "off", handle: null, direct: false },
       channel: params.channel ?? (params.waId ? "whatsapp" : "web"),
       montageEffort: effortSchema.catch(DEFAULT_EFFORT).parse(studio.data.montage_effort),
       known: {

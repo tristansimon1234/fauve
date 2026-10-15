@@ -1,11 +1,13 @@
 import "server-only";
-import { captionForInstagram, DEFAULT_COVER_SECONDS, isInSessionWindow, postCoverSchema, type PostKind } from "@fauve/agent";
+import { captionForInstagram, DEFAULT_COVER_SECONDS, isInSessionWindow, postCoverSchema, type PostKind, type TikTokExternal } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
 import { InstagramError, mediaInsights, publishMedia, refreshToken, type PublishRequest } from "./instagram";
 import { slidesToPublish } from "@/lib/render/slides";
 import { publishItems } from "./media-urls";
 import { handOff, matchHandPublished } from "./hand-off";
+import { TikTokError } from "./tiktok";
+import { captureTikTokMetrics, matchTikTokDrafts, refreshIdleTikTokTokens, sendToTikTok, tiktokCanTake, trackTikTok } from "./tiktok-account";
 
 // Publishing worker. Posts in "scheduled" whose time has come are claimed (one
 // worker per post), sent to Instagram, then moved to "published" or "failed".
@@ -171,58 +173,114 @@ async function publishRequest(
   return first.type === "video" ? { kind: "reel", videoUrl: first.url, caption } : { kind: "image", imageUrl: first.url, caption };
 }
 
-/** Publishes one claimed post now. */
+const POST_COLUMNS = "id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids, slides, slides_render, cover, share_to_feed, platforms, tiktok";
+type PostRow = {
+  id: string;
+  studio_id: string;
+  kind: PostKind;
+  title: string;
+  caption: string | null;
+  hashtags: string[] | null;
+  render_id: string | null;
+  media_ids: string[] | null;
+  external_ids: Record<string, unknown> | null;
+  slides: unknown;
+  slides_render: unknown;
+  cover: unknown;
+  share_to_feed: boolean | null;
+  platforms: string[];
+  tiktok: unknown;
+};
+
+/** The TikTok part of a post: sent (drafts or direct), or why not. */
+async function tiktokPart(post: PostRow): Promise<{ external?: TikTokExternal; error?: string }> {
+  try {
+    if (!tiktokCanTake(post.kind)) throw new Error("TikTok ne prend que des vidéos (pas de carrousels pour l'instant)");
+    return { external: await sendToTikTok(post) };
+  } catch (error) {
+    console.error("tiktok send failed", post.id, error instanceof TikTokError ? error.body : error);
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+const tiktokNote = (t: TikTokExternal) =>
+  t.mode === "draft" ? "dans tes brouillons TikTok (ouvre TikTok, ajoute un son, colle la légende et publie)" : "envoyé sur TikTok";
+
+/** Publishes one claimed post now, on each of its platforms. */
 async function publishPost(postId: string): Promise<PublishOutcome> {
   const db = supabaseAdmin();
-  const post = check(
+  const post = check(await db.from("posts").select(POST_COLUMNS).eq("id", postId).single()).data as unknown as PostRow;
+  const studioId = post.studio_id;
+  const kind = post.kind;
+  const toInstagram = post.platforms.includes("instagram") || !post.platforms.length;
+  const toTikTok = post.platforms.includes("tiktok");
+  const externalIds: Record<string, unknown> = { ...(post.external_ids ?? {}) };
+  const errors: string[] = [];
+  const lines: string[] = [];
+  let permalink: string | null = null;
+
+  if ((await montageState(postId)) === "failed") errors.push("la dernière version du montage ou du texte sur les photos n'a pas pu être rendue");
+  else {
+    if (toInstagram) {
+      try {
+        const account = await instagramAccount(studioId);
+        if (!account) throw new Error("Instagram n'est pas connecté");
+        const { rendered } = slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
+        // Cleaned, 5 hashtags at most (Instagram's cap).
+        const caption = captionForInstagram(post.caption, post.hashtags);
+        const request = await publishRequest(studioId, kind, post.render_id, post.media_ids ?? [], caption, rendered, post.cover, post.share_to_feed !== false);
+        const result = await publishMedia({ userId: account.userId, accessToken: account.accessToken, request });
+        externalIds.instagram = { media_id: result.mediaId, permalink: result.permalink, published_at: new Date().toISOString() };
+        permalink = result.permalink;
+        lines.push("en ligne sur Instagram ✅");
+      } catch (error) {
+        console.error("publish failed", postId, error instanceof InstagramError ? error.body : error);
+        errors.push(`Instagram : ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    if (toTikTok) {
+      const tiktok = await tiktokPart(post);
+      if (tiktok.external) {
+        externalIds.tiktok = tiktok.external;
+        lines.push(tiktokNote(tiktok.external));
+      } else errors.push(`TikTok : ${tiktok.error}`);
+    }
+  }
+
+  const sent = lines.length > 0;
+  const message = errors.join(" ; ");
+  await db
+    .from("posts")
+    .update({ status: sent ? "published" : "failed", publish_error: message ? message.slice(0, 1000) : null, external_ids: externalIds })
+    .eq("id", postId);
+  if (sent) {
+    await notify(studioId, `${kindNames[kind]} « ${post.title} » : ${lines.join(", et ")}.${message ? `\nPar contre, ${message}.` : ""}${permalink ? `\n${permalink}` : ""}`);
+  }
+  else await notify(studioId, `Je n’ai pas pu publier « ${post.title} » : ${message}. Dis-moi si je réessaie.`);
+  return sent ? { postId, ok: true, permalink } : { postId, ok: false, error: message };
+}
+
+/** « Je publie moi-même » on Instagram: TikTok, if chosen, still gets the video at the post's time. */
+async function handOffWithTikTok(postId: string): Promise<PublishOutcome> {
+  const db = supabaseAdmin();
+  const post = check(await db.from("posts").select(POST_COLUMNS).eq("id", postId).single()).data as unknown as PostRow;
+  if (post.platforms.includes("tiktok")) {
+    const tiktok = await tiktokPart(post);
     await db
       .from("posts")
-      .select("id, studio_id, kind, title, caption, hashtags, render_id, media_ids, external_ids, slides, slides_render, cover, share_to_feed")
-      .eq("id", postId)
-      .single(),
-  ).data!;
-  const studioId = post.studio_id as string;
-
-  const kind = post.kind as PostKind;
-  try {
-    const account = await instagramAccount(studioId);
-    if (!account) throw new Error("Instagram n'est pas connecté");
-    if ((await montageState(postId)) === "failed") throw new Error("la dernière version du montage ou du texte sur les photos n'a pas pu être rendue");
-    const { rendered } = slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
-    // Cleaned, 5 hashtags at most (Instagram's cap).
-    const caption = captionForInstagram(post.caption as string | null, post.hashtags as string[] | null);
-    const request = await publishRequest(studioId, kind, post.render_id as string | null, (post.media_ids as string[] | null) ?? [], caption, rendered, post.cover, post.share_to_feed !== false);
-    const result = await publishMedia({ userId: account.userId, accessToken: account.accessToken, request });
-
-    check(
-      await db
-        .from("posts")
-        .update({
-          status: "published",
-          publish_error: null,
-          external_ids: {
-            ...(post.external_ids as object),
-            instagram: { media_id: result.mediaId, permalink: result.permalink, published_at: new Date().toISOString() },
-          },
-        })
-        .eq("id", postId),
-    );
-    await notify(studioId, `${kindNames[kind]} « ${post.title} » est en ligne sur Instagram ✅${result.permalink ? `\n${result.permalink}` : ""}`);
-    return { postId, ok: true, permalink: result.permalink };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("publish failed", postId, error instanceof InstagramError ? error.body : error);
-    await db.from("posts").update({ status: "failed", publish_error: message.slice(0, 1000) }).eq("id", postId);
-    await notify(studioId, `Je n’ai pas pu publier « ${post.title} » sur Instagram : ${message}. Dis-moi si je réessaie.`);
-    return { postId, ok: false, error: message };
+      .update({ external_ids: { ...(post.external_ids ?? {}), ...(tiktok.external ? { tiktok: tiktok.external } : {}) }, ...(tiktok.error ? { publish_error: `TikTok : ${tiktok.error}` } : {}) })
+      .eq("id", postId);
+    if (tiktok.external?.mode === "draft") await notify(post.studio_id, `Pour TikTok, « ${post.title} » est ${tiktokNote(tiktok.external)}.`);
   }
+  const outcome = await handOff(postId);
+  return { postId, ok: outcome.ok };
 }
 
 /** Claims and publishes one post if it is due (used right after a validation "now"); « je publie moi-même » hands it over instead. */
 export async function publishIfDue(postId: string): Promise<PublishOutcome | null> {
   if (!(await claim(postId))) return null;
-  const { data } = await supabaseAdmin().from("posts").select("publish_by_hand, handoff_at").eq("id", postId).single();
-  if (data?.publish_by_hand) return data.handoff_at ? null : handOff(postId);
+  const { data } = await supabaseAdmin().from("posts").select("publish_by_hand, handoff_at, platforms").eq("id", postId).single();
+  if (data?.publish_by_hand && data.platforms?.includes("instagram")) return data.handoff_at ? null : handOffWithTikTok(postId);
   return publishPost(postId);
 }
 
@@ -230,7 +288,13 @@ export async function publishIfDue(postId: string): Promise<PublishOutcome | nul
 async function refreshExpiringTokens(): Promise<number> {
   const db = supabaseAdmin();
   const soon = new Date(Date.now() + REFRESH_BEFORE_MS).toISOString();
-  const { data } = await db.from("social_credentials").select("social_account_id, access_token").lt("expires_at", soon).limit(20);
+  // Instagram only: a TikTok token lasts a day and is renewed with its refresh token (tiktok-account.ts).
+  const { data } = await db
+    .from("social_credentials")
+    .select("social_account_id, access_token, social_accounts!inner(platform)")
+    .eq("social_accounts.platform", "instagram")
+    .lt("expires_at", soon)
+    .limit(20);
   let refreshed = 0;
   for (const row of data ?? []) {
     try {
@@ -342,7 +406,12 @@ export async function runPublishWorker() {
     console.error("hand-off match failed", error);
     return 0;
   });
-  const measured = await captureMetrics();
-  const refreshed = await refreshExpiringTokens();
-  return { due: due.length, published, handPublished, measured, refreshed };
+  const tiktok =
+    (await trackTikTok().catch((error) => {
+      console.error("tiktok tracking failed", error);
+      return 0;
+    })) + (await matchTikTokDrafts().catch(() => 0));
+  const measured = (await captureMetrics()) + (await captureTikTokMetrics().catch(() => 0));
+  const refreshed = (await refreshExpiringTokens()) + (await refreshIdleTikTokTokens().catch(() => 0));
+  return { due: due.length, published, handPublished, tiktok, measured, refreshed };
 }

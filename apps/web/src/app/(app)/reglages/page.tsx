@@ -13,6 +13,7 @@ import { signOut } from "../../(onboarding)/connexion/actions";
 import { EffortSetting } from "./effort-setting";
 import { MemoryList } from "./memory-list";
 import { InstagramLinkCode } from "./instagram-link";
+import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import { SettingsTabs } from "@/components/settings-tabs";
 
 export const metadata: Metadata = { title: "Réglages" };
@@ -76,6 +77,7 @@ async function Settings() {
     db.from("instagram_contacts").select("igsid").eq("studio_id", studio.id).limit(1).maybeSingle(),
     db.from("studios").select("montage_effort, business_type, memory").eq("id", studio.id).maybeSingle(),
   ]);
+  const tiktokOn = tiktokEnabled();
   const dateFormat = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: studio.timezone });
 
   return (
@@ -113,6 +115,11 @@ async function Settings() {
                     {platformLabels[a.platform]} {accountStatusLabels[a.status]}
                   </span>
                 </span>
+                {a.platform === "tiktok" && a.status !== "connected" && tiktokOn && (
+                  <a href="/api/tiktok/connect" className="ml-auto text-sm font-bold text-violet">
+                    Reconnecter
+                  </a>
+                )}
               </div>
             ))
           ) : (
@@ -121,7 +128,17 @@ async function Settings() {
               <a href="/connect" className="font-bold text-violet">
                 Connecter Instagram
               </a>{" "}
-              pour que Simone publie tes posts validés. TikTok arrive bientôt.
+              pour que Simone publie tes posts validés.
+            </p>
+          )}
+          {tiktokOn && !accounts.some((a) => a.platform === "tiktok") && (
+            <p className="text-sm leading-normal">
+              <a href="/api/tiktok/connect" className="font-bold text-violet">
+                Connecter TikTok
+              </a>{" "}
+              {tiktokDirectPost()
+                ? "pour que tes Reels validés partent aussi sur TikTok."
+                : "pour que Simone envoie tes Reels dans tes brouillons TikTok, à l’heure prévue : tu ajoutes un son et tu publies."}
             </p>
           )}
         </Section>

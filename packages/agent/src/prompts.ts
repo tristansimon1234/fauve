@@ -90,7 +90,7 @@ Instagram, commentaires et résultats :
 - ne cite que des chiffres renvoyés par les outils.
 
 Ce qui n'est pas encore disponible (sois transparente si on te le demande, sans t'excuser trois fois) :
-- TikTok : la connexion arrive bientôt ; d'ici là, la gérante peut publier la vidéo elle-même depuis WhatsApp ;
+- TikTok : voir la ligne TikTok du contexte (connecté ou non, brouillons ou publication directe). Les tendances TikTok (sons, effets) s'ajoutent dans l'appli TikTok ;
 - la musique : composée pour chaque Reel (libre de droits, jamais de morceau existant) ; un son tendance d'Instagram s'ajoute dans l'appli (« Je publie moi-même »).`;
 
 export type StudioContextForPrompt = {
@@ -104,6 +104,7 @@ export type StudioContextForPrompt = {
   firstName: string | null;
   onboardingStep: string;
   instagram: string | null;
+  tiktok?: TikTokContext;
   /** Where the manager is writing from: the advice on sending files depends on it. */
   channel?: "whatsapp" | "web" | "instagram";
   /** The studio's default level of care for montages (Réglages). */
@@ -113,6 +114,19 @@ export type StudioContextForPrompt = {
   /** What is running in the background right now (montages, text layers, components), one line each. */
   work?: string[];
 };
+
+/** TikTok for the chat: off (app keys not set), connected or not, drafts or direct posts. */
+export type TikTokContext = { state: "off" | "not_connected" | "connected" | "expired"; handle: string | null; direct: boolean };
+
+function tiktokLine(t: TikTokContext): string {
+  if (t.state === "off") return "TikTok : pas encore ouvert dans Simone ; elle peut publier la vidéo elle-même (« Télécharger la vidéo » sur la page de la publication).";
+  if (t.state === "not_connected") return "TikTok : pas connecté (facultatif ; get_connect_link pour le proposer si elle veut ses Reels aussi sur TikTok).";
+  if (t.state === "expired") return "TikTok : connexion expirée, propose de reconnecter (get_connect_link).";
+  const who = t.handle ? `@${t.handle} connecté` : "connecté";
+  return t.direct
+    ? `TikTok : ${who}. Les vidéos dont les plateformes comprennent tiktok y sont publiées à l'heure prévue, avec la visibilité qu'elle choisit sur la page de la publication (TikTok l'exige ; sans choix, elles vont dans ses brouillons).`
+    : `TikTok : ${who}. À l'heure prévue, les vidéos dont les plateformes comprennent tiktok arrivent dans ses brouillons TikTok : elle ajoute un son tendance, colle la légende et publie depuis l'appli ; Simone retrouve ensuite la vidéo pour suivre ses vues. Seules les vidéos (Reels) vont sur TikTok, pas les carrousels.`;
+}
 
 const channelLines: Record<NonNullable<StudioContextForPrompt["channel"]>, string> = {
   whatsapp: "Canal : WhatsApp. Pour des vidéos, invite à les envoyer « en tant que document » (trombone, puis Document) sinon WhatsApp les compresse, ou par le lien de dépôt de la web app pour les gros fichiers.",
@@ -144,6 +158,7 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     `Prénom de la personne qui gère : ${ctx.firstName ?? "pas encore connu"}.`,
     `Étape d'onboarding : ${ctx.onboardingStep}.`,
     `Instagram : ${ctx.instagram ? `@${ctx.instagram} connecté` : "pas encore connecté"}.`,
+    ...(ctx.tiktok ? [tiktokLine(ctx.tiktok)] : []),
     ...(ctx.channel ? [channelLines[ctx.channel]] : []),
     ...(ctx.montageEffort ? [`Niveau de soin des montages par défaut : ${EFFORTS[ctx.montageEffort].label} (${ctx.montageEffort}).`] : []),
   ].join("\n");
