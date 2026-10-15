@@ -1483,3 +1483,14 @@ test("Simone's voice: character timings become words, punctuation kept for the p
   assert.equal(voicePhrases(t, 0).at(-1)!.text, "Viens ce soir.");
   assert.equal(spokenWords("Tu sais pourquoi ? Viens — ce soir."), 6);
 });
+
+test("acting tags are played, never read in the subtitles", async () => {
+  const { fromTtsAlignment, spokenWords, stripAudioTags } = await import("./voice-over.ts");
+  const text = "[smiling] Viens ce soir. [laughs softly] Promis.";
+  const characters = [...text];
+  const t = fromTtsAlignment({ characters, character_start_times_seconds: characters.map((_, i) => i * 0.05), character_end_times_seconds: characters.map((_, i) => i * 0.05 + 0.05) }, text);
+  assert.deepEqual(t.words.map((w) => w.w), ["Viens", "ce", "soir.", "Promis."]);
+  assert.equal(t.text, "Viens ce soir. Promis.");
+  assert.equal(spokenWords(text), 4);
+  assert.equal(stripAudioTags("Tu sais pourquoi ? [warmly] Viens."), "Tu sais pourquoi ? Viens.");
+});

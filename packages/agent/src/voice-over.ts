@@ -27,12 +27,17 @@ Règles :
 - le commerce parle à la première personne (« chez nous », « ici », « je ») et tutoie la personne qui regarde ;
 - finis par une invitation simple et concrète, qui dit quoi faire (« Viens goûter ce soir, le lien est dans la bio. ») ;
 - interdit : les formules de pub (« découvrez », « n'hésitez pas », « une expérience unique », « de qualité », « savoureux », « au cœur de »), les superlatifs creux, les emojis, les hashtags, le tiret long, les parenthèses ;
-- écris les nombres en lettres quand ils se disent mal en chiffres (« quarante-huit heures ») et la ponctuation d'une voix qui parle : des points et des virgules, une question au plus.
+- écris les nombres en lettres quand ils se disent mal en chiffres (« quarante-huit heures ») et la ponctuation d'une voix qui parle : des points, des virgules, des points de suspension pour une petite pause, une question au plus ;
+- pour une voix humaine, glisse 1 ou 2 balises de jeu entre crochets, en anglais, juste avant la phrase qu'elles colorent : [warmly], [smiling], [softly], [excited], [laughs softly], [whispers], [sighs] ; par exemple « [smiling] Cette pizza, on l'a commencée avant-hier. » ; jamais plus de 2, jamais au milieu d'un mot, jamais d'autres crochets.
 
-Réponds avec hook (la première phrase) et script (tout le texte, première phrase comprise).`;
+Réponds avec hook (la première phrase) et script (tout le texte, première phrase comprise, balises comprises).`;
 
-/** The words of a script, counted as a speaker says them. */
-export const spokenWords = (text: string) => text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+/** Acting tags (« [warmly] »): played by the voice, never read, never shown in the subtitles. */
+const TAG = /\[[^\]]*\]/g;
+export const stripAudioTags = (text: string) => text.replace(TAG, " ").replace(/\s+/g, " ").replace(/\s+([,.…])/g, "$1").trim();
+
+/** The words of a script, counted as a speaker says them (acting tags aside). */
+export const spokenWords = (text: string) => stripAudioTags(text).split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 
 const alignmentSchema = z.object({
   characters: z.array(z.string()),
@@ -62,7 +67,18 @@ export function fromTtsAlignment(raw: unknown, text: string, language = "fr"): V
     // French puts a space before « ? ! : » : the mark joins the word before it, so a phrase still closes on it.
     else if (words.length) words[words.length - 1]!.w += `\u202F${token}`;
   };
+  let inTag = false;
   a.characters.forEach((c, i) => {
+    // An acting tag (« [warmly] ») is played, not said: its characters make no word.
+    if (c === "[") {
+      close();
+      inTag = true;
+      return;
+    }
+    if (inTag) {
+      if (c === "]") inTag = false;
+      return;
+    }
     if (/\s/.test(c)) return close();
     if (!current) start = a.character_start_times_seconds[i] ?? end;
     current += c;
@@ -70,5 +86,5 @@ export function fromTtsAlignment(raw: unknown, text: string, language = "fr"): V
   });
   close();
   const last = a.character_end_times_seconds.at(-1) ?? words.at(-1)?.end ?? 0;
-  return { text: text.trim(), duration: round(last), words, language };
+  return { text: stripAudioTags(text), duration: round(last), words, language };
 }
