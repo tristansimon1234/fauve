@@ -6,7 +6,6 @@ import {
   weeklyGrowth,
   type DailyRow,
   assertTransition,
-  canTransition,
   postStatusSchema,
   type PostKind,
   type ReplyExtras,
@@ -372,19 +371,6 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         }
       }
       return json({ post });
-    },
-
-    async request_content({ post_id, label, hint, due_date }) {
-      check(await db.from("shot_requests").insert({ studio_id: studioId, post_id, label, hint, due_date }));
-      if (post_id) {
-        const current = unwrap(
-          await db.from("posts").select("status").eq("id", post_id).eq("studio_id", studioId).single(),
-        );
-        if (canTransition(postStatusSchema.parse(current.status), "content_requested")) {
-          check(await db.from("posts").update({ status: "content_requested" }).eq("id", post_id));
-        }
-      }
-      return "ok";
     },
 
     async analyze_clips({ media_ids }) {

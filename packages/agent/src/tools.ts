@@ -145,16 +145,6 @@ export const toolSpecs = {
       publish_by_hand: z.boolean().optional().describe("Reel : true = à l'heure prévue, elle reçoit la vidéo et la légende sur WhatsApp et publie elle-même dans Instagram (pour mettre la musique de son choix). Story : true = elle reçoit la story et son lien de réservation sur WhatsApp et la partage elle-même en story avec le sticker Lien (aucune appli ne peut poser de sticker). Je retrouve ensuite la publication sur son compte"),
     }),
   },
-  request_content: {
-    description:
-      "Ajoute un élément à la liste « À filmer » et passe la publication liée en « content_requested ».",
-    input: z.object({
-      post_id: z.string().uuid().optional(),
-      label: z.string().min(1).max(120).describe("Quoi filmer, ex. « Les mains en gros plan sur le geste »"),
-      hint: z.string().max(160).optional().describe("Angle, lumière, durée"),
-      due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    }),
-  },
   analyze_clips: {
     description:
       "Regarde les vidéos reçues (analyse Gemini) : plans horodatés, sujet, énergie, potentiel d'accroche, qualité, visages, meilleurs passages, paroles. À appeler avant tout plan de montage, avec les media_id indiqués dans la conversation. Peut prendre jusqu'à une minute par vidéo.",
