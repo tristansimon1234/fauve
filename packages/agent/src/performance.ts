@@ -9,7 +9,7 @@ On te donne les derniers posts Instagram du studio : type, date et heure, début
 
 Dis ce qui marche et ce qui ne marche pas, avec des preuves chiffrées tirées des données :
 - compare des groupes de posts (format, sujet, accroche, heure, durée, présence de visages ou de texte…) plutôt que des posts isolés ; avec peu de posts, dis-le et reste prudent ;
-- les enregistrements et les partages pèsent plus que les likes ; les abonnements gagnés et les visites de profil sont le meilleur signe ;
+- le but du commerce, ce sont des clients, pas du buzz : ce qui compte d'abord, ce sont les visites du profil, les clics sur le lien (réservation, site), les abonnements gagnés, puis les enregistrements et les partages ; les likes et les vues seules comptent peu. Un post qui fait beaucoup de vues sans visites ni clics n'est pas un modèle à suivre ;
 - pas de banalités (« publie régulièrement ») : seulement ce que ces données montrent pour CE studio.
 
 Réponds en français, tutoiement, phrases courtes :

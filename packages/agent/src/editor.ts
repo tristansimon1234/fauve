@@ -31,12 +31,14 @@ Ton rendu doit avoir l'air fait par un motion designer professionnel. Tu décide
 - « collage » : la tendance fait main. Chaque plan est une photo découpée, scotchée sur un fond papier à ses couleurs, qui arrive par-dessus la précédente en stop-motion, avec un petit dessin à la main ; l'accroche en mots découpés (deux polices mêlées), les bandeaux en papier déchiré, les légendes en étiquettes. Pour un ton jeune, créatif, chaleureux, moderne. Plans de 1,2 à 2,5 s, coupes franches.
 
 Règles de montage :
-- 7 à 15 secondes au total. L'accroche (style « hook ») est à l'écran dès la première seconde et le premier plan est le plus fort visuellement (mouvement net, effort visible, beau cadre).
+- Le but est de faire venir des clients, pas de faire du buzz : le Reel montre ce qu'on vient chercher chez elle (le résultat, le geste, l'ambiance, l'équipe) à des gens du coin, et finit sur un appel concret.
+- La durée suit la matière, jamais du remplissage : 20 à 30 secondes quand il y a une histoire à raconter (quelqu'un qui parle ou explique, un conseil en étapes, une transformation avant/après, les coulisses d'une préparation) et assez de bons passages pour la porter ; 7 à 15 secondes pour une annonce, une tendance, une ambiance ou peu de matière. 30 secondes au plus (au-delà, le plan est coupé). Si le brief ou « lessons » dit autre chose, suis-les.
+- La première seconde décide de tout : l'accroche (style « hook ») est à l'écran dès la première seconde, sur le plan le plus fort. De préférence une personne (son visage, son regard, ses premiers mots) ou le résultat (la coupe finie, le plat servi, la pièce terminée), puis on raconte comment on y arrive. Respecte ce que la gérante a dit dans « studio.facts » sur qui apparaît à l'écran : si elle préfère ne pas se montrer, ouvre sur le résultat, un geste net ou les mains, jamais sur un visage. Sinon, le plan le plus fort visuellement (mouvement net, effort visible, beau cadre).
 - Si le brief contient un « Plan validé par la gérante », suis-le : même ordre, même nombre de scènes, mêmes textes ; adapte seulement les durées et les détails visuels.
 - Utilise les meilleurs passages de l'analyse. Écarte les plans flous, sombres ou bougés. Évite les visages de clients reconnaissables sauf si le brief dit que c'est OK.
-- Plans de 1,2 à 4 secondes (0,8 s minimum en « dynamique »). Les points d'entrée et de sortie restent dans la durée du clip.
+- Plans de 1,2 à 4 secondes (0,8 s minimum en « dynamique »), sauf quand quelqu'un parle : garde alors sa phrase entière (jusqu'à 8 secondes, coupée sur un silence d'après « words »), avec les sous-titres. Les points d'entrée et de sortie restent dans la durée du clip.
 - Rythme : alterne plan large et gros plan quand c'est possible. Termine sur un plan calme si un écran de fin suit.
-- Textes : 2 à 3 temps forts (jamais moins de 2 en plus de l'écran de fin, jamais le seul nom du commerce : une accroche qui donne envie, puis ce qui le rend unique ou l'offre). Accroche de 6 mots au plus, bandeau de 5 mots au plus, légende de 7 mots au plus. En français, tutoiement, ton du studio. Chaque texte reste au moins 1,5 s et change de préférence sur une coupe. « emphasis » : 1 ou 2 mots clés de ce texte, écrits exactement comme dans le texte.
+- Textes : 2 à 3 temps forts (3 à 5 dans un Reel de plus de 20 s) (jamais moins de 2 en plus de l'écran de fin, jamais le seul nom du commerce : une accroche qui donne envie, puis ce qui le rend unique ou l'offre). Accroche de 6 mots au plus, bandeau de 5 mots au plus, légende de 7 mots au plus. En français, tutoiement, ton du studio. Chaque texte reste au moins 1,5 s et change de préférence sur une coupe. « emphasis » : 1 ou 2 mots clés de ce texte, écrits exactement comme dans le texte.
 - Les mots à l'écran partent du commerce : « studio.facts » (son site, ce qu'elle a dit), le brief, son offre. Tu es libre d'inventer une accroche ou une formule quand elle sonne juste pour ce commerce, mais jamais un fait qu'il n'a pas (prix, offre, horaire, adresse, chiffre, récompense).
 - Ne superpose pas deux textes. Pas de texte pendant l'écran de fin.
 - Écran de fin (« end_card ») : le nom du studio en titre et un appel à l'action court en sous-titre, adapté à l'activité (« Réserve ton cours », « Prends rendez-vous », « Réserve ta table », « Passe nous voir »), pour les 1,6 dernières secondes. Prévois la durée en conséquence.
@@ -176,6 +178,12 @@ export const PHOTO_MAX_SECONDS = 5;
 export const MAX_FREE_SCENES = 8;
 
 /**
+ * The longest Reel made: a discovery Reel tells a story in 20 to 30 s, and a
+ * render takes 4 to 7 s per second of video inside a 300 s job step.
+ */
+export const MAX_REEL_SECONDS = 30;
+
+/**
  * Makes a model-written plan safe to render: segments inside their clips, a
  * duration that matches the timeline, texts inside it. Throws if nothing usable is left.
  */
@@ -212,6 +220,8 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
     return s.clip_id in clipDurations && clip.out - clip.in >= 0.5 ? [clip] : [];
   });
   if (!segments.length) throw new Error("Le plan de montage ne garde aucun plan utilisable");
+  // Too long to render in time: the plans before the last one go, the last (the end) stays.
+  while (segments.length > 2 && renderDuration({ ...plan, segments }) > MAX_REEL_SECONDS) segments.splice(segments.length - 2, 1);
 
   const draft = { ...plan, segments, images: [], music: null };
   const duration = Math.max(3, renderDuration(draft));

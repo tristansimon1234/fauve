@@ -131,7 +131,7 @@ export type MotionTemplate = z.infer<typeof motionTemplateSchema>;
 
 /** What Fauve proposes before a montage, shown on the quote and followed by the editor. */
 export const montagePlanSchema = z.object({
-  duration: z.number().min(5).max(60).describe("Durée visée, en secondes"),
+  duration: z.number().min(5).max(30).describe("Durée visée en secondes : 7 à 15 pour une annonce ou une ambiance, 20 à 30 pour une histoire (quelqu'un qui parle, un conseil, un avant/après)"),
   style: motionTemplateSchema.optional().describe("Gabarit visé : doux (élégant), dynamique (qui claque), chic (minimal), collage (fait main, photos découpées, à la mode)"),
   scenes: z
     .array(

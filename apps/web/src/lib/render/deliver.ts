@@ -78,7 +78,7 @@ export async function renderAndDeliver(target: DeliveryTarget): Promise<{ title:
 
 /** Points the manager to a rendered montage: a sign-in link to its page on WhatsApp, its card in the app. */
 export async function deliverMontage(target: DeliveryTarget, r: { title: string; durationMs: number }): Promise<void> {
-  // Reels last 7 to 15 s: whole seconds, and nothing when the render did not say.
+  // Reels last 7 to 30 s: whole seconds, and nothing when the render did not say.
   const seconds = Math.round(r.durationMs / 1000);
   // On a phone: the one-action page (watch, validate, move a text).
   const page = `/v/${target.postId}`;
