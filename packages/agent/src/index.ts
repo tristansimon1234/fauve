@@ -51,3 +51,4 @@ export * from "./voice-over.ts";
 export * from "./tempo.ts";
 export * from "./mix.ts";
 export * from "./when.ts";
+export * from "./creation.ts";

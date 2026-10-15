@@ -6,7 +6,7 @@ import { canTransition } from "./status.ts";
 import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES } from "./credits.ts";
-import { businessFamily, postIdeas } from "./post-ideas.ts";
+import { businessFamily, filmIdeas, postIdeas } from "./post-ideas.ts";
 import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 
@@ -393,6 +393,43 @@ test("when a publication goes out, in her words", async () => {
   assert.equal(publishWhen("2026-10-17T08:00:00Z", "Europe/Paris", now).short, "samedi à 10 h");
   assert.equal(publishWhen("2026-10-24T16:00:00Z", "Europe/Paris", now).short, "le 24 octobre à 18 h");
   assert.equal(publishWhen("2026-11-01T17:00:00Z", "Europe/Paris", now).full, "Dimanche 1er novembre à 18 h");
+});
+
+test("créer: the format Simone advises, what fits, and the steps she shows", async () => {
+  const { advisedFormat, formatBlocked, mediaPhrase, creationSteps, creationPhase } = await import("./creation.ts");
+  assert.equal(advisedFormat({ videos: 1, photos: 3 }), "reel");
+  assert.equal(advisedFormat({ videos: 0, photos: 3 }), "carousel");
+  assert.equal(advisedFormat({ videos: 0, photos: 1 }), "post");
+  assert.equal(advisedFormat({ videos: 0, photos: 0 }), "reel");
+  assert.equal(formatBlocked("reel", { videos: 0, photos: 1 }), null);
+  assert.ok(formatBlocked("carousel", { videos: 1, photos: 2 }));
+  assert.ok(formatBlocked("carousel", { videos: 0, photos: 1 }));
+  assert.equal(formatBlocked("post", { videos: 0, photos: 1 }), null);
+  assert.ok(formatBlocked("story", { videos: 1, photos: 1 }));
+  assert.equal(mediaPhrase({ videos: 3, photos: 1 }), "tes 3 vidéos et ta photo");
+  assert.equal(mediaPhrase({ videos: 1, photos: 0 }), "ta vidéo");
+  // Rapide: no review; Max: a second version; no music: no composing.
+  assert.deepEqual(creationSteps("rapide", { videos: 2, photos: 0 }, true).map((s) => s.phase), ["watch", "edit", "render"]);
+  assert.deepEqual(creationSteps("max", { videos: 2, photos: 0 }, true).map((s) => s.phase), ["watch", "edit", "second", "render", "review"]);
+  assert.equal(creationSteps("soigne", { videos: 1, photos: 0 }, false).find((s) => s.phase === "render")?.label, "Je monte la vidéo");
+  assert.equal(creationPhase(null, false), "watch");
+  assert.equal(creationPhase("design", false), "watch");
+  assert.equal(creationPhase("design", true), "edit");
+  assert.equal(creationPhase("fix", true), "review");
+});
+
+test("créer: « Oui, publie-le » and « Je regarde d’abord » are answered without Simone", async () => {
+  const { publishOfferAnswer, publishQuestion, PUBLISH_OFFER_OPTIONS } = await import("./creation.ts");
+  assert.equal(publishOfferAnswer(PUBLISH_OFFER_OPTIONS[0]), "yes");
+  assert.equal(publishOfferAnswer(PUBLISH_OFFER_OPTIONS[1]), "look");
+  assert.equal(publishOfferAnswer("Je regarde d'abord !"), "look");
+  // The draft_ready template's own buttons.
+  assert.equal(publishOfferAnswer("Oui, vas-y"), "yes");
+  assert.equal(publishOfferAnswer("Je veux le voir"), "look");
+  assert.equal(publishOfferAnswer("oui mais change la musique"), null);
+  assert.equal(publishQuestion({ full: "Vendredi 16 octobre à 18 h", short: "vendredi à 18 h" }, true), "Je le publie vendredi à 18 h ?");
+  assert.equal(publishQuestion({ full: "Vendredi 16 octobre à 18 h", short: "vendredi à 18 h" }, false), "Je le publie maintenant ?");
+  assert.ok(PUBLISH_OFFER_OPTIONS.every((o) => o.length <= 20), "WhatsApp reply buttons hold 20 characters");
 });
 
 test("pricing: the chat model is priced", async () => {
@@ -938,6 +975,8 @@ test("post ideas follow the kind of business", () => {
   assert.equal(businessFamily("fleuriste"), "shop");
   assert.equal(businessFamily(null), "other");
   assert.ok(postIdeas("restaurant").reel.includes("Le plat du jour"));
+  assert.equal(filmIdeas("Salon de coiffure").length, 3);
+  assert.ok(filmIdeas(null).every((f) => f.idea && f.how));
 });
 
 test("site colours: Squarespace theme HSL variables count, its generic sheets do not", async () => {

@@ -5,6 +5,7 @@ import { replyInConversation } from "@/lib/agent/conversation";
 import { reactTo, type Reaction } from "@/lib/agent/mood";
 import type { ChatEvent } from "@/lib/agent/run";
 import { extrasOf, resolveCards, type ChatCard } from "@/lib/chat-cards";
+import { answerPublishOffer } from "@/lib/publish-offer";
 import { setReaction, type Reactions } from "@/lib/reactions";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -292,6 +293,28 @@ export async function chatTurn(
   // Her face and an emoji on the message, in a fraction of a second (Jev), while the chat model writes.
   // The emoji is kept on her message once both are there.
   const reacting = reading && lastRowId ? keepReaction(reading, lastRowId) : null;
+
+  // « Oui, publie-le » / « Je regarde d’abord » under a delivered Reel: answered at once, no turn needed.
+  if (!files.length && body) {
+    const { data: last } = await db
+      .from("whatsapp_messages")
+      .select("payload")
+      .eq("conversation_id", id)
+      .eq("direction", "outbound")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const offer = await answerPublishOffer(ctx.studioId, body, last, {}).catch((e) => {
+      console.error("chat: publish offer answer failed", e);
+      return null;
+    });
+    if (offer) {
+      await db.from("whatsapp_messages").insert({ studio_id: ctx.studioId, conversation_id: id, channel: "web", direction: "outbound", type: "text", body: offer.body, payload: offer.payload });
+      await reacting;
+      const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, id), list(ctx.studioId)]);
+      return { ok: true, conversationId: id, messages, conversations };
+    }
+  }
 
   try {
     const result = await replyInConversation({

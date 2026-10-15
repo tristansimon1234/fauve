@@ -44,6 +44,35 @@ const IDEAS: Record<Family, Record<IdeaKind, string[]>> = {
   },
 };
 
+/** Three things easy to film this week, with how (« Je n’ai rien sous la main » when she creates a post). */
+const FILM: Record<Family, { idea: string; how: string }[]> = {
+  sport: [
+    { idea: "Un mouvement du cours", how: "De côté, tout le corps dans le cadre." },
+    { idea: "Le studio avant le cours", how: "Un tour lent, le téléphone à hauteur d’yeux." },
+    { idea: "Un prof qui donne un conseil", how: "Face caméra, dix secondes suffisent." },
+  ],
+  beauty: [
+    { idea: "Tes mains pendant un geste", how: "De près, à côté d’une fenêtre." },
+    { idea: "L’avant et l’après d’une cliente", how: "Même endroit, même lumière." },
+    { idea: "Ton salon à l’ouverture", how: "Un tour lent, le téléphone à hauteur d’yeux." },
+  ],
+  food: [
+    { idea: "Un plat qui sort de la cuisine", how: "De près, à hauteur d’assiette." },
+    { idea: "Un geste en cuisine", how: "Les mains, de près, près d’une lumière." },
+    { idea: "La salle avant le service", how: "Un tour lent depuis l’entrée." },
+  ],
+  shop: [
+    { idea: "Une nouveauté qu’on déballe", how: "Sur le comptoir, de près." },
+    { idea: "Ta vitrine", how: "Un pas en arrière, puis on avance doucement." },
+    { idea: "Un coup de cœur en main", how: "On le tourne lentement devant le téléphone." },
+  ],
+  other: [
+    { idea: "Un geste de ton métier", how: "De près, à côté d’une fenêtre." },
+    { idea: "Ton lieu à l’ouverture", how: "Un tour lent, le téléphone à hauteur d’yeux." },
+    { idea: "Toi qui donnes un conseil", how: "Face caméra, dix secondes suffisent." },
+  ],
+};
+
 /** The kind of business a free-text activity belongs to. */
 export function businessFamily(businessType: string | null | undefined): Family {
   if (!businessType) return "other";
@@ -53,4 +82,9 @@ export function businessFamily(businessType: string | null | undefined): Family 
 /** One-tap ideas for each format, for this business. */
 export function postIdeas(businessType: string | null | undefined): Record<IdeaKind, string[]> {
   return IDEAS[businessFamily(businessType)];
+}
+
+/** Three things easy to film this week, for this business. */
+export function filmIdeas(businessType: string | null | undefined): { idea: string; how: string }[] {
+  return FILM[businessFamily(businessType)];
 }

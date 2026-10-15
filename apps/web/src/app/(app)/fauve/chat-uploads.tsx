@@ -18,10 +18,14 @@ export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 export function useChatUploads(studioId: string | null, onError: (message: string) => void) {
   const [files, setFiles] = useState<DraftFile[]>([]);
 
-  const addFiles = (list: FileList | File[]) => {
-    if (!studioId) return;
+  /** Adds and starts sending the files; returns the ids of those kept. */
+  const addFiles = (list: FileList | File[]): string[] => {
+    if (!studioId) return [];
     const picked = [...list].filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
-    if (!picked.length) return onError("Ajoute des photos ou des vidéos.");
+    if (!picked.length) {
+      onError("Ajoute des photos ou des vidéos.");
+      return [];
+    }
     if (picked.some((f) => f.size > MAX_FILE_BYTES)) onError("Un fichier dépasse 50 Mo : envoie-le plutôt sur WhatsApp en tant que document.");
     const added = picked
       .filter((f) => f.size <= MAX_FILE_BYTES)
@@ -33,7 +37,7 @@ export function useChatUploads(studioId: string | null, onError: (message: strin
         video: file.type.startsWith("video/"),
         status: "uploading",
       }));
-    if (!added.length) return;
+    if (!added.length) return [];
     setFiles((current) => [...current, ...added]);
     const storage = supabaseBrowser().storage.from("media");
     for (const draft of added) {
@@ -43,6 +47,7 @@ export function useChatUploads(studioId: string | null, onError: (message: strin
         .upload(path, draft.file, { contentType: draft.file.type })
         .then(({ error }) => setFiles((current) => current.map((f) => (f.id === draft.id ? { ...f, status: error ? "error" : "ready", path } : f))));
     }
+    return added.map((d) => d.id);
   };
 
   const removeFile = (id: string) =>

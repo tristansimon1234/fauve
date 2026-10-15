@@ -1,0 +1,173 @@
+"use server";
+
+import {
+  creationPhase,
+  DEFAULT_EFFORT,
+  EFFORTS,
+  effortSchema,
+  JOB_STALE_MINUTES,
+  postKindSchema,
+  TRIAL_DAYS,
+  type CreationPhase,
+  type Effort,
+  type PostKind,
+} from "@fauve/agent";
+import { after } from "next/server";
+import { z } from "zod";
+import { createPost } from "@/app/(app)/calendrier/actions";
+import { studioAccess } from "@/lib/billing/access";
+import { acceptQuote, createMontageQuote } from "@/lib/credits";
+import { env } from "@/lib/env";
+import { startMontage } from "@/lib/montage-start";
+import { isFirstReel } from "@/lib/onboarding";
+import { getStudioContext } from "@/lib/studio";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { photoRegions } from "@/lib/video/regions";
+
+// « C'est parti » on the Créer screen: her new files join her library, the publication
+// is created, and a Reel starts at once (her tap is her yes; charged on delivery, like
+// any montage). The other formats go on with Simone in the chat, who writes their texts.
+
+const uploadSchema = z.object({ path: z.string().max(300), mime: z.string().max(100), size: z.number().int().positive() });
+const launchSchema = z.object({
+  kind: postKindSchema,
+  date: z.string().max(10),
+  time: z.string().max(5),
+  idea: z.string().max(300),
+  /** In the order she picked them: from her library, or just sent (already in Storage). */
+  items: z.array(z.union([z.object({ media: z.uuid() }), z.object({ upload: uploadSchema })])).min(1).max(10),
+});
+
+export type LaunchInput = z.infer<typeof launchSchema>;
+
+export type LaunchResult =
+  | {
+      ok: true;
+      postId: string;
+      title: string;
+      kind: PostKind;
+      mediaIds: string[];
+      /** A Reel: the montage that started, to follow on the working screen. */
+      montage: { quoteId: string; effort: Effort; minutes: string; music: boolean } | null;
+    }
+  | { ok: false; error: string; locked?: "subscribe" | "credits"; postId?: string };
+
+export async function launchCreation(input: LaunchInput): Promise<LaunchResult> {
+  const parsed = launchSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Choisis au moins une photo ou une vidéo." };
+  const { kind, date, time, items } = parsed.data;
+  const idea = parsed.data.idea.trim();
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  const studioId = member.studio.id;
+
+  // Before the subscription, only her first publication; without credits, no Reel (texts on photos are free).
+  const access = await studioAccess(studioId);
+  if (!access.create && (access.reason === "subscribe" || kind === "reel")) {
+    return access.reason === "subscribe"
+      ? { ok: false, locked: "subscribe", error: `Ta première publication est faite. Pour en créer d’autres, démarre ton essai : ${TRIAL_DAYS} jours offerts.` }
+      : { ok: false, locked: "credits", error: "Tu n’as plus de crédits ce mois-ci : ils reviennent le 1er du mois." };
+  }
+
+  // Her new files become her library's, read once in the background (ready for the montage).
+  const db = supabaseAdmin();
+  const mediaIds: string[] = [];
+  for (const item of items) {
+    if ("media" in item) {
+      mediaIds.push(item.media);
+      continue;
+    }
+    const file = item.upload;
+    if (!file.path.startsWith(`${studioId}/chat/`) || file.path.includes("..") || !/^(image|video)\//.test(file.mime)) {
+      return { ok: false, error: "Un des fichiers n’est pas une photo ou une vidéo." };
+    }
+    const video = file.mime.startsWith("video/");
+    const asset = await db
+      .from("media_assets")
+      .insert({ studio_id: studioId, storage_path: file.path, kind: video ? "video" : "image", source: "web_upload", mime_type: file.mime, size_bytes: file.size })
+      .select("id")
+      .single();
+    if (asset.error) return { ok: false, error: "Un fichier n’a pas pu être ajouté. Réessaie." };
+    const mediaId = asset.data.id as string;
+    mediaIds.push(mediaId);
+    after(() => (video ? ensureClipAnalysis(studioId, mediaId) : photoRegions(studioId, mediaId)).then(() => undefined, (e: unknown) => console.warn("create: file read failed", e)));
+  }
+
+  const created = await createPost({ kind, date, time, intention: idea, mediaIds });
+  if (!created.ok) return created;
+  if (kind !== "reel") return { ok: true, postId: created.id, title: created.title, kind, mediaIds, montage: null };
+
+  // The level of care of the studio (Réglages); her first Reel gets its made-to-measure animations, as in the chat.
+  const { data: studio } = await db.from("studios").select("montage_effort").eq("id", studioId).single();
+  const effort = effortSchema.catch(DEFAULT_EFFORT).parse(studio?.montage_effort);
+  const scenes = (await isFirstReel(studioId, created.id)) ? 2 : 1;
+  const quote = await createMontageQuote({
+    studioId,
+    postId: created.id,
+    mediaIds,
+    brief: idea ? `L’idée de la gérante : ${idea}` : undefined,
+    correction: false,
+    maxNewScenes: scenes,
+    effort,
+  });
+  if ("error" in quote) {
+    return { ok: false, locked: "credits", postId: created.id, error: "Il ne te reste pas assez de crédits pour ce Reel : je l’ai gardé comme idée dans ta grille." };
+  }
+  const accepted = await acceptQuote(studioId, quote.id, new Date(), { immediate: true });
+  if ("error" in accepted) return { ok: false, postId: created.id, error: accepted.error };
+  // Delivered in the app and on WhatsApp (she may close the app meanwhile).
+  after(() => startMontage(studioId, accepted, { notify: true }));
+  const level = quote.effort ?? effort;
+  return {
+    ok: true,
+    postId: created.id,
+    title: created.title,
+    kind,
+    mediaIds,
+    montage: { quoteId: quote.id, effort: level, minutes: EFFORTS[level].minutes, music: Boolean(env("ELEVENLABS_API_KEY")) },
+  };
+}
+
+export type CreationProgress = {
+  phase: CreationPhase;
+  done: boolean;
+  failed: boolean;
+  /** The Reel's length once made. */
+  seconds: number | null;
+};
+
+/** Never started this long after the tap: the job was lost. */
+const START_MS = 4 * 60_000;
+
+/** Where the Reel launched from the Créer screen stands, for its working screen. */
+export async function creationProgress(quoteId: string, postId: string): Promise<CreationProgress | null> {
+  if (!z.uuid().safeParse(quoteId).success || !z.uuid().safeParse(postId).success) return null;
+  const { member } = await getStudioContext();
+  if (!member) return null;
+  const studioId = member.studio.id;
+  const db = supabaseAdmin();
+  const [quote, job, post] = await Promise.all([
+    db.from("credit_quotes").select("stage, created_at").eq("id", quoteId).eq("studio_id", studioId).maybeSingle(),
+    db.from("studio_jobs").select("finished_at, failed, updated_at").eq("id", quoteId).eq("studio_id", studioId).maybeSingle(),
+    db.from("posts").select("media_ids, render_id").eq("id", postId).eq("studio_id", studioId).maybeSingle(),
+  ]);
+  if (!quote.data || !post.data) return null;
+  const stage = (quote.data.stage as string | null) ?? null;
+  const ids = (post.data.media_ids as string[] | null) ?? [];
+  const videos = ids.length ? ((await db.from("media_assets").select("analysis_status").in("id", ids).eq("kind", "video")).data ?? []) : [];
+  const watched = videos.every((v) => v.analysis_status === "done");
+  const now = Date.now();
+  const finished = Boolean(job.data?.finished_at);
+  // No news for a long while, or never started: it died (nothing is charged).
+  const silent = job.data ? !finished && now - new Date(job.data.updated_at as string).getTime() > JOB_STALE_MINUTES * 60_000 : now - new Date(quote.data.created_at as string).getTime() > START_MS;
+  const failed = Boolean(job.data?.failed) || (silent && stage !== "delivered");
+  const done = !failed && (stage === "delivered" || finished);
+  const render = done && post.data.render_id ? (await db.from("renders").select("duration_ms").eq("id", post.data.render_id as string).maybeSingle()).data : null;
+  return {
+    phase: creationPhase(stage, watched),
+    done,
+    failed,
+    seconds: render?.duration_ms ? Math.round((render.duration_ms as number) / 1000) : null,
+  };
+}

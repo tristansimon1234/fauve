@@ -1,6 +1,7 @@
 import "server-only";
 import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, replyExtrasSchema } from "@fauve/agent";
 import { claimPairing } from "@/lib/auth/pairing";
+import { answerPublishOffer } from "@/lib/publish-offer";
 import { deliverPendingHandOffs } from "@/lib/social/hand-off";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { quoteButtons } from "@/lib/credits";
@@ -188,6 +189,36 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
       await sendReaction(message.from, message.id, echo)
         .then(() => setReaction({ waMessageId: message.id }, "fauve", echo))
         .catch((e) => console.warn("reaction failed", e));
+      return;
+    }
+  }
+
+  // « Oui, publie-le » / « Je regarde d’abord » under a delivered Reel (or the draft_ready
+  // template's buttons): answered at once, no turn needed.
+  if (text) {
+    const { data: last } = await db
+      .from("whatsapp_messages")
+      .select("payload")
+      .eq("studio_id", member.studio_id)
+      .eq("direction", "outbound")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const offer = await answerPublishOffer(member.studio_id, text, last, { waId: message.from }).catch((e) => {
+      console.error("publish offer answer failed", e);
+      return null;
+    });
+    if (offer) {
+      const waMessageId = await sendText(message.from, offer.reply);
+      await db.from("whatsapp_messages").insert({
+        studio_id: member.studio_id,
+        wa_message_id: waMessageId,
+        direction: "outbound",
+        phone_e164: phone,
+        type: "text",
+        body: offer.body,
+        payload: { reply_to: message.id, ...offer.payload },
+      });
       return;
     }
   }
