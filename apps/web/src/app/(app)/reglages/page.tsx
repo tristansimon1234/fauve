@@ -103,44 +103,38 @@ async function Settings() {
         </Section>
 
         <Section title="Comptes connectés">
-          {accounts.length ? (
-            accounts.map((a) => (
-              <div key={a.platform} className="flex items-center gap-3">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-violet-soft text-violet">
-                  {a.platform === "tiktok" ? <TikTokIcon size={18} /> : <InstagramIcon size={18} />}
+          {(["instagram", "tiktok"] as const).map((platform) => {
+            const account = accounts.find((a) => a.platform === platform);
+            // TikTok is offered only once the app has its TikTok keys.
+            if (platform === "tiktok" && !tiktokOn && !account) return null;
+            const connected = account?.status === "connected";
+            const href = platform === "tiktok" ? "/api/tiktok/connect" : "/api/instagram/connect";
+            const hint =
+              platform === "instagram"
+                ? "Simone y publie tes posts validés et suit leurs résultats."
+                : tiktokDirectPost()
+                  ? "Tes Reels validés y partent aussi."
+                  : "Simone envoie tes Reels dans tes brouillons TikTok : tu ajoutes un son et tu publies.";
+            return (
+              <div key={platform} className="flex items-center gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-violet-soft text-violet">
+                  {platform === "tiktok" ? <TikTokIcon size={18} /> : <InstagramIcon size={18} />}
                 </span>
-                <span className="flex flex-col">
-                  <span className="text-sm font-bold">{a.handle ? `@${a.handle}` : platformLabels[a.platform]}</span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-bold">{account?.handle ? `@${account.handle}` : platformLabels[platform]}</span>
                   <span className="text-[13px] text-muted">
-                    {platformLabels[a.platform]} {accountStatusLabels[a.status]}
+                    {account ? `${platformLabels[platform]} ${accountStatusLabels[account.status]}` : hint}
                   </span>
                 </span>
-                {a.platform === "tiktok" && a.status !== "connected" && tiktokOn && (
-                  <a href="/api/tiktok/connect" className="ml-auto text-sm font-bold text-violet">
-                    Reconnecter
+                {(platform === "instagram" || tiktokOn) && (
+                  // Plain link: the OAuth start is a route handler, not a page.
+                  <a href={href} className={`${connected ? "btn btn-secondary" : "btn btn-primary"} h-9 shrink-0 px-4 text-[13px]`}>
+                    {connected ? "Changer de compte" : account ? "Reconnecter" : "Connecter"}
                   </a>
                 )}
               </div>
-            ))
-          ) : (
-            <p className="text-sm leading-normal">
-              Aucun compte connecté pour l’instant.{" "}
-              <a href="/connect" className="font-bold text-violet">
-                Connecter Instagram
-              </a>{" "}
-              pour que Simone publie tes posts validés.
-            </p>
-          )}
-          {tiktokOn && !accounts.some((a) => a.platform === "tiktok") && (
-            <p className="text-sm leading-normal">
-              <a href="/api/tiktok/connect" className="font-bold text-violet">
-                Connecter TikTok
-              </a>{" "}
-              {tiktokDirectPost()
-                ? "pour que tes Reels validés partent aussi sur TikTok."
-                : "pour que Simone envoie tes Reels dans tes brouillons TikTok, à l’heure prévue : tu ajoutes un son et tu publies."}
-            </p>
-          )}
+            );
+          })}
         </Section>
 
         {fauveInstagram?.username && (
