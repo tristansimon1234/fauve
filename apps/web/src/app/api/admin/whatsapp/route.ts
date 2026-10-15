@@ -1,4 +1,5 @@
 import { type NextRequest } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { env, type EnvKey } from "@/lib/env";
 import { isValidTestKey } from "@/lib/test-studio";
 import { graph, WhatsAppError } from "@/lib/whatsapp/client";
@@ -9,6 +10,7 @@ import { graph, WhatsAppError } from "@/lib/whatsapp/client";
 //   ?action=subscribe           subscribe this app to the WABA's webhooks
 //   ?action=templates           list message templates and their review status
 //   ?action=create_templates    submit Fauve's templates (see whatsappTemplates) for review
+// POST with CRON_SECRET (select public.call_app('/api/admin/whatsapp?action=…')): templates and create_templates only.
 
 // Must match whatsappTemplates (packages/agent) and the senders in lib/whatsapp/client.ts.
 const TEMPLATE_DEFINITIONS = [
@@ -50,6 +52,18 @@ const TEMPLATE_DEFINITIONS = [
           { type: "QUICK_REPLY", text: "Oui, vas-y" },
           { type: "QUICK_REPLY", text: "Je veux le voir" },
         ],
+      },
+    ],
+  },
+  {
+    name: "ready_to_post",
+    language: "fr",
+    category: "UTILITY",
+    components: [
+      {
+        type: "BODY",
+        text: "C’est l’heure de publier « {{1}} » ! Réponds-moi et je t’envoie la vidéo et la légende.",
+        example: { body_text: [["Le service du soir"]] },
       },
     ],
   },
@@ -112,7 +126,18 @@ async function attempt<T>(fn: () => Promise<T>) {
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   if (!isValidTestKey(params.get("cle"))) return new Response("Forbidden", { status: 403 });
+  return run(params);
+}
 
+/** The same with CRON_SECRET (pg_net, call_app): to list or submit the templates from the database. */
+export async function POST(request: NextRequest) {
+  if (!cronAuthorized(request)) return new Response("Forbidden", { status: 403 });
+  const params = request.nextUrl.searchParams;
+  if (!["templates", "create_templates"].includes(params.get("action") ?? "")) return Response.json({ error: "templates or create_templates only" }, { status: 400 });
+  return run(params);
+}
+
+async function run(params: URLSearchParams) {
   const action = params.get("action") ?? "status";
 
   if (action === "register") {
