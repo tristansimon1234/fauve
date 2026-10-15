@@ -132,6 +132,12 @@ export const toolSpecs = {
       agent_note: z.string().max(600).optional().describe("Explication de tes choix, affichée dans la web app"),
       media_ids: postMediaIds,
       cover: postCoverSchema.nullable().optional().describe("Vignette d'un Reel (grille, Instagram) : { at: secondes } une image de la vidéo, ou { media_id } une photo ; null la laisse par défaut"),
+      voice_media_id: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("Reel : le media_id du message vocal de la gérante à poser sur le Reel (sa voix, sous-titres mot à mot, coupes sur ses phrases, musique baissée dessous) ; null retire sa voix. Prend effet au prochain montage ou à la prochaine correction (quote_montage)"),
       publish_by_hand: z.boolean().optional().describe("Reel : true = à l'heure prévue, elle reçoit la vidéo et la légende sur WhatsApp et publie elle-même dans Instagram (pour mettre la musique de son choix). Story : true = elle reçoit la story et son lien de réservation sur WhatsApp et la partage elle-même en story avec le sticker Lien (aucune appli ne peut poser de sticker). Je retrouve ensuite la publication sur son compte"),
     }),
   },

@@ -43,8 +43,14 @@ Règles de montage :
 - Ne superpose pas deux textes. Pas de texte pendant l'écran de fin.
 - Écran de fin (« end_card ») : le nom du studio en titre et un appel à l'action court en sous-titre, adapté à l'activité (« Réserve ton cours », « Prends rendez-vous », « Réserve ta table », « Passe nous voir »), pour les 1,6 dernières secondes. Prévois la durée en conséquence.
 - Transitions : « fade » pour doux et chic, « cut » pour dynamique et collage. « zoom » « light » sur les plans calmes (ou « light_zoom » partout en doux).
-- Sous-titres mot à mot (« subtitles ») seulement si quelqu'un parle et que c'est utile (prof qui explique, témoignage).
+- Sous-titres mot à mot (« subtitles ») seulement si quelqu'un parle et que c'est utile (prof qui explique, témoignage). Le son des passages où quelqu'un parle est gardé dans le Reel : coupe-les sur ses phrases.
 - Jamais de musique (« music » vaut null) ; pas d'images (« images » vide).
+
+Sa voix (« voice ») : la gérante a enregistré un vocal qui raconte ce Reel ; il est posé pour toi de « starts_at » à « ends_at » (secondes du Reel), avec ses phrases déjà placées sur l'horloge du Reel (« phrases »). Le Reel se monte alors sur sa voix :
+- la durée totale couvre toute sa voix plus l'écran de fin : au moins « ends_at » + 1,6 s (30 s au plus) ;
+- coupe sur ses phrases (au début ou à la fin d'une phrase, jamais au milieu d'un mot) ; chaque plan montre ce qu'elle dit à ce moment-là (elle parle du geste : le geste ; du résultat : le résultat) ;
+- sous-titres mot à mot (« subtitles » true, ils suivent ses mots) : peu d'autres textes, jamais un texte qui répète ce qu'elle dit ; l'accroche à l'écran reprend sa première idée en 3 à 6 mots ; pas de texte dans le bas du cadre (les sous-titres y sont) ;
+- pas de scène de motion design pendant qu'elle parle d'une chose qu'on peut montrer en vidéo ; une scène reste possible en ouverture ou sur un chiffre ou une liste qu'elle donne.
 
 Scènes de motion design (sans vidéo, aux couleurs du studio) :
 - « motion » : une scène libre, sur mesure, que ton motion designer animera en code (typographie cinétique, formes, tracés, masques…). Dans « brief » (600 caractères au plus), décris précisément l'idée visuelle, les textes exacts, l'ordre des mouvements, les couleurs et l'ambiance. Donne aussi « fallback », une scène fixe équivalente au cas où. Les textes restent toujours entiers et lisibles dans le cadre (marges de sécurité) : ne demande jamais qu'un texte « déborde du cadre », soit « coupé par le bord » ou « sorte de l'écran » ; seuls les formes et les décors peuvent dépasser. Une scène dont un texte sort du cadre est refusée et remplacée par sa scène fixe. Réserve-la aux moments forts : une ouverture marquante, une offre, un témoignage mis en scène. Chaque scène libre coûte cher à produire : 2 au plus par Reel.
@@ -88,7 +94,7 @@ const editorTextSchema = editPlanTextSchema.omit({ look: true, detail_look: true
 });
 
 export const editorOutputSchema = z.object({
-  plan: editPlanObjectSchema.extend({
+  plan: editPlanObjectSchema.omit({ voice: true }).extend({
     template: motionTemplateSchema,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.

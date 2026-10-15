@@ -32,6 +32,7 @@ import {
   RESTYLE,
   customRestyle,
   withAdjustment,
+  VOICE_MAX_SECONDS,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -49,6 +50,7 @@ import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { defaultPlatforms, tiktokAccount } from "@/lib/social/tiktok-account";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { ensureTranscript } from "@/lib/voice";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { elementInstance, listElements, loadElement, markElementsUsed, placeElements } from "@/lib/elements";
 import { startElements } from "@/lib/elements-start";
@@ -313,6 +315,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async update_post({ post_id, status, ...fields }) {
       if (fields.media_ids?.length) await assertOwnMedia(fields.media_ids);
+      // Her voice note: one of hers, read once (her words with their timings) before the montage uses it.
+      if (fields.voice_media_id) {
+        const { data: note } = await db.from("media_assets").select("kind").eq("id", fields.voice_media_id).eq("studio_id", studioId).maybeSingle();
+        if (note?.kind !== "audio") throw new Error("Ce media_id n'est pas un message vocal de ce studio.");
+        const transcript = await ensureTranscript(studioId, fields.voice_media_id);
+        if (!transcript?.words.length) throw new Error("Je n'arrive pas à lire ce vocal : demande-lui de le renvoyer.");
+        if (transcript.duration > VOICE_MAX_SECONDS) throw new Error(`Ce vocal dure ${Math.round(transcript.duration)} s : ${VOICE_MAX_SECONDS} s au plus pour un Reel. Demande-lui une version plus courte.`);
+      }
       const current = unwrap(
         await db.from("posts").select("status").eq("id", post_id).eq("studio_id", studioId).single(),
       );

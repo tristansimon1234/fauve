@@ -275,7 +275,8 @@ export async function videoFramesInSandbox(id: string, url: string, times: numbe
 
 /**
  * A rendered video with its soundtrack: the picture copied as it is, the music
- * in AAC, faded out over the last 0.8 s and cut at the end of the video.
+ * in AAC under the video's own sound (ducked while someone speaks), faded out
+ * over the last 0.8 s and cut at the end of the video.
  */
 export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Array): Promise<Buffer> {
   const sandbox = await renderSandbox();
@@ -286,9 +287,15 @@ export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Arr
       { path: `${dir}/in.mp4`, content: mp4 },
       { path: `${dir}/music.mp3`, content: audio },
     ]);
+    // The video's own sound (her voice, someone speaking in a clip) stays on top: the
+    // music ducks under it (sidechain), then fades out on the last 0.8 s. A video
+    // without sound (older engine) just gets the music.
     await bash(
       sandbox,
-      `cd "$1" && d=$(${ROOT}/ffmpeg -i in.mp4 2>&1 | sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' | awk -F: '{print $1*3600+$2*60+$3}') && st=$(awk -v d="$d" 'BEGIN{s=d-0.8; if(s<0)s=0; print s}') && ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -af "afade=t=out:st=$st:d=0.8" -shortest -movflags +faststart out.mp4`,
+      `cd "$1" && info=$(${ROOT}/ffmpeg -i in.mp4 2>&1 || true) && d=$(printf '%s' "$info" | sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' | awk -F: '{print $1*3600+$2*60+$3}') && st=$(awk -v d="$d" 'BEGIN{s=d-0.8; if(s<0)s=0; print s}') && ` +
+        `if printf '%s' "$info" | grep -q 'Audio:'; then ` +
+        `${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 -filter_complex "[0:a]aformat=sample_rates=44100:channel_layouts=stereo,asplit=2[key][own];[1:a]aformat=sample_rates=44100:channel_layouts=stereo[m];[m][key]sidechaincompress=threshold=0.02:ratio=12:attack=15:release=450[ducked];[ducked][own]amix=inputs=2:duration=first:normalize=0,afade=t=out:st=$st:d=0.8[a]" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4; ` +
+        `else ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -af "afade=t=out:st=$st:d=0.8" -shortest -movflags +faststart out.mp4; fi`,
       [dir],
     );
     const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });

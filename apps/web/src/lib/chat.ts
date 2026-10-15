@@ -8,6 +8,7 @@ import { extrasOf, resolveCards, type ChatCard } from "@/lib/chat-cards";
 import { setReaction, type Reactions } from "@/lib/reactions";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { ensureTranscript } from "@/lib/voice";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 
 // The in-app chat, server side: conversations, their messages as the app shows
@@ -225,16 +226,20 @@ export async function chatTurn(
   let lastRowId: string | null = null;
   for (const file of files) {
     const video = file.mime.startsWith("video/");
+    const audio = file.mime.startsWith("audio/");
+    const kind = video ? "video" : audio ? "audio" : "image";
     const asset = await db
       .from("media_assets")
-      .insert({ studio_id: ctx.studioId, storage_path: file.path, kind: video ? "video" : "image", source: "web_upload", mime_type: file.mime, size_bytes: file.size })
+      .insert({ studio_id: ctx.studioId, storage_path: file.path, kind, source: "web_upload", mime_type: file.mime, size_bytes: file.size })
       .select("id")
       .single();
     if (asset.error) return { ok: false, error: "Un fichier n’a pas pu être ajouté. Réessaie.", conversationId: id };
     const mediaId = asset.data.id as string;
+    // A voice note is read before Simone answers: she knows what it says.
+    const transcript = audio ? await ensureTranscript(ctx.studioId, mediaId) : null;
     const row = await db
       .from("whatsapp_messages")
-      .insert({ studio_id: ctx.studioId, conversation_id: id, channel: "web", direction: "inbound", phone_e164: ctx.phone, type: video ? "video" : "image", media_id: mediaId })
+      .insert({ studio_id: ctx.studioId, conversation_id: id, channel: "web", direction: "inbound", phone_e164: ctx.phone, type: kind, media_id: mediaId, ...(transcript?.text ? { body: transcript.text } : {}) })
       .select("id")
       .single();
     if (row.error) return { ok: false, error: "Un fichier n’a pas pu être ajouté. Réessaie.", conversationId: id };

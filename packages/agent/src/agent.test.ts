@@ -1130,3 +1130,56 @@ test("rhythm: a sample week per count, Reels a month of credits holds", async ()
     assert.ok(reelsPerMonth(plan) >= PLANS[plan].postsPerWeek * 3, plan);
   }
 });
+
+test("voice: Scribe words, phrases on the Reel's clock, subtitles and speech", async () => {
+  const { fromScribe, voicePhrases, voiceForEditor, VOICE_AT } = await import("./voice.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  const t = fromScribe({
+    text: "Le secret ? Trois minutes. Pas plus.",
+    language_code: "fra",
+    audio_duration_secs: 4.2,
+    words: [
+      { text: "Le", type: "word", start: 0.1, end: 0.2 },
+      { text: " ", type: "spacing", start: 0.2, end: 0.25 },
+      { text: "secret ?", type: "word", start: 0.25, end: 0.7 },
+      { text: "(rires)", type: "audio_event", start: 0.7, end: 1 },
+      { text: "Trois", type: "word", start: 1.2, end: 1.5 },
+      { text: "minutes.", type: "word", start: 1.5, end: 2 },
+      { text: "Pas", type: "word", start: 2.6, end: 2.8 },
+      { text: "plus.", type: "word", start: 2.8, end: 3.1 },
+    ],
+  });
+  assert.deepEqual(t.words.map((w) => w.w), ["Le", "secret ?", "Trois", "minutes.", "Pas", "plus."]);
+  assert.equal(t.duration, 4.2);
+  const phrases = voicePhrases(t);
+  assert.deepEqual(phrases.map((p) => p.text), ["Le secret ?", "Trois minutes.", "Pas plus."]);
+  assert.equal(phrases[0]!.start, Math.round((0.1 + VOICE_AT) * 100) / 100);
+  assert.equal(voiceForEditor(t).ends_at, 4.5);
+
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 6,
+    subtitles: true,
+    segments: [{ clip_id: "a", in: 0, out: 6, zoom: "none" }],
+    texts: [],
+    images: [],
+    voice: { media_id: "v1", at: VOICE_AT },
+  });
+  const props = buildReelProps(plan, {
+    template: "doux",
+    clipUrls: { a: "https://x/a.mp4" },
+    words: { a: [{ w: "bonjour", start: 1, end: 1.5 }] },
+    voice: { src: "https://x/v.ogg", words: t.words },
+    brand: { name: "Lune" },
+  });
+  // Her voice plays from 0.3 s, its words are the subtitles, the clip's own speech stays muted.
+  assert.deepEqual(props.voice, { src: "https://x/v.ogg", from: 9 });
+  assert.equal(props.words[0]!.w, "Le");
+  assert.equal(props.words[0]!.from, 9 + 3);
+  assert.equal(props.segments[0]!.type === "clip" && props.segments[0]!.speech, undefined);
+  // Without her voice, the clip where someone speaks keeps its sound.
+  const { voice: _v, ...noVoice } = plan;
+  const plain = buildReelProps(noVoice, { template: "doux", clipUrls: { a: "https://x/a.mp4" }, words: { a: [{ w: "bonjour", start: 1, end: 1.5 }] }, brand: { name: "Lune" } });
+  assert.equal(plain.segments[0]!.type === "clip" && plain.segments[0]!.speech, true);
+  assert.equal(plain.voice, undefined);
+});

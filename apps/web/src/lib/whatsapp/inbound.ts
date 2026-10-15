@@ -5,6 +5,7 @@ import { deliverPendingHandOffs } from "@/lib/social/hand-off";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { quoteButtons } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { ensureTranscript } from "@/lib/voice";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { setReaction } from "@/lib/reactions";
 import { env } from "@/lib/env";
@@ -132,6 +133,11 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     return null;
   });
   if (media) await db.from("whatsapp_messages").update({ media_id: media.id }).eq("wa_message_id", message.id);
+  // A voice note: Simone reads what she said (and it can go over a Reel, word by word).
+  if (media && message.type === "audio") {
+    const transcript = await ensureTranscript(member.studio_id, media.id);
+    if (transcript?.text) await db.from("whatsapp_messages").update({ body: transcript.text }).eq("wa_message_id", message.id);
+  }
 
   // Watching a clip takes up to a minute: acknowledge it now (👍 = reçu), then start
   // the analysis right away so whoever answers finds it ready.

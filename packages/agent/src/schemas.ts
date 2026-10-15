@@ -178,6 +178,8 @@ export const editPlanObjectSchema = z.object({
     .optional(),
   /** Closing card over the last ~1.6 s: studio name or logo, plus a call to action. */
   end_card: z.object({ title: z.string().min(1).max(40), subtitle: z.string().max(60).optional() }).optional(),
+  /** Her own voice over the Reel: a voice note (media_assets, with its transcript), from `at` seconds. Set from the post, never written by the editor. */
+  voice: z.object({ media_id: z.string().min(1), at: z.number().min(0).max(10) }).optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {

@@ -23,6 +23,8 @@ const schema = {
   // ElevenLabs Music: each Reel's soundtrack, composed from the rendered video. Unset = silent Reels.
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
   ELEVENLABS_MUSIC_MODEL: z.string().default("music_v2_5"),
+  /** Speech to text for her voice notes (word timings for the Reels' subtitles). */
+  ELEVENLABS_STT_MODEL: z.string().default("scribe_v2"),
   // Instagram API with Instagram Login (Meta app → Instagram product).
   INSTAGRAM_APP_ID: z.string().regex(/^\d+$/),
   INSTAGRAM_APP_SECRET: z.string().min(1),

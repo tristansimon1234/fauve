@@ -18,6 +18,8 @@ import {
   type EditPlan,
   type PostKind,
   type PostStatus,
+  type ReelInputs,
+  voiceTranscriptSchema,
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { logoTone } from "./logo-tone";
@@ -55,7 +57,7 @@ export function towardsDraft(status: PostStatus): PostStatus[] {
  * for subtitles, the brand (accent, logo, fonts, name) and each clip's length.
  * Shared by the render and the live editor.
  */
-export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "segments">) {
+export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"] }) {
   const db = supabaseAdmin();
   const clipIds = [...new Set(plan.segments.filter(isClipSegment).map((s) => s.clip_id))];
   const assets = clipIds.length
@@ -101,6 +103,8 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   const ownFonts = (style.custom_fonts ?? []).filter((f) => f.path.startsWith(`${studioId}/`));
   const signedFonts = ownFonts.length ? ((await db.storage.from("media").createSignedUrls(ownFonts.map((f) => f.path), 7200)).data ?? []) : [];
   const customFonts = ownFonts.flatMap((f, i) => (signedFonts[i]?.signedUrl ? [{ family: f.family, url: signedFonts[i]!.signedUrl }] : []));
+  // Her voice note over the Reel: signed for the render and the preview, with her words.
+  const voice = plan.voice ? await voiceInput(studioId, plan.voice.media_id) : undefined;
   const words: Record<string, ClipAnalysis["words"]> = {};
   for (const row of analyses.data ?? []) {
     const parsed = clipAnalysisSchema.safeParse(row.analysis);
@@ -121,7 +125,18 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
     colors: style.colors,
     customFonts,
     studioName: (studio.data?.name as string | null) ?? "",
+    voice,
   };
+}
+
+/** A voice note as the composition plays it: its signed link and its words; undefined if it is gone or not read. */
+async function voiceInput(studioId: string, mediaId: string): Promise<ReelInputs["voice"]> {
+  const db = supabaseAdmin();
+  const { data: asset } = await db.from("media_assets").select("storage_path, transcript").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
+  const transcript = voiceTranscriptSchema.safeParse(asset?.transcript);
+  if (!asset || !transcript.success) return undefined;
+  const signed = await db.storage.from("media").createSignedUrl(asset.storage_path as string, 7200);
+  return signed.data ? { src: signed.data.signedUrl, words: transcript.data.words } : undefined;
 }
 
 /**
@@ -147,7 +162,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  const { clipFiles, clips, clipUrls, photoIds, words, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts } = await loadMontageInputs(studioId, plan);
+  const { clipFiles, clips, clipUrls, photoIds, words, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, voice } = await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
@@ -161,6 +176,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     const ffmpegRender = () => {
       if (needsBlur) throw new Error("Ce montage floute des zones : le moteur de secours ne sait pas le faire, réessaie dans un instant");
       if (photoIds.length) throw new Error("Ce montage anime des photos : le moteur de secours ne sait pas le faire, réessaie dans un instant");
+      if (plan.voice) throw new Error("Ce montage porte ta voix : le moteur de secours ne sait pas la poser, réessaie dans un instant");
       const clipsOnly = withoutScenes(plan);
       if (!clipsOnly.segments.length) throw new Error("Montage sans vidéo : le moteur de motion design est indisponible");
       return renderInSandbox({ id: renderId, clips, ass: buildAss(clipsOnly, accent), ffmpegArgs: buildFfmpegArgs(clipsOnly, { clipFiles }) });
@@ -176,6 +192,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         photoIds,
         words,
         brand: { name: studioName, accent, logoUrl, logoOnDark, fonts, colors, customFonts },
+        ...(voice ? { voice } : {}),
       });
       // Library scenes play with new texts, older plans predate the layout check: every
       // scene is checked before the render, and one whose text leaves the frame plays its
