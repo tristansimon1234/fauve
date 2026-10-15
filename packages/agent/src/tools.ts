@@ -271,7 +271,7 @@ export const toolSpecs = {
   },
   design_elements: {
     description:
-      "Simone crée de nouveaux composants pour la banque, comme un directeur artistique : à partir d'une inspiration (example_media_id, la capture d'un post qu'elle aime), il en sort chaque pièce réutilisable (titre, étiquette, checklist, prix dans un rond…), la code, la teste et la relit ; ou il crée les composants décrits dans request. Avec post_id, il les pose aussitôt sur les photos de la publication avec les mots du commerce. Prend 2 à 4 minutes et coûte 3 crédits, débités une fois livré ; un message part tout seul à la fin.",
+      "Simone crée de nouveaux composants pour la banque, comme un directeur artistique : à partir d'une inspiration (example_media_id, la capture d'un post qu'elle aime), il en sort chaque pièce réutilisable (titre, étiquette, checklist, prix dans un rond…), la code, la teste et la relit ; ou il crée les composants décrits dans request. Avec post_id, il les pose aussitôt sur les photos de la publication avec les mots du commerce. Prend 2 à 4 minutes et coûte 4 crédits, débités une fois livré ; un message part tout seul à la fin.",
     input: z.object({
       request: z
         .string()

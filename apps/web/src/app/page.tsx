@@ -25,22 +25,22 @@ const steps: [string, string][] = [
   ["Ton Instagram", "En dernier, quand ta publication est prête : elle part à l’heure prévue."],
 ];
 
-/** The two offers (the same work; Pro has room for more publications and more care). */
+/** The two offers (the same work; quality over quantity: Pro has room for more care on each Reel). */
 const offers = [
   {
     id: "essentiel",
     label: PLANS.essentiel.label,
     price: PLANS.essentiel.priceEur,
-    pitch: "Pour être présent chaque semaine, sans y penser.",
-    points: [`${PLANS.essentiel.postsPerWeek} publications par semaine, plus les stories`, `${PLANS.essentiel.credits} crédits par mois`, "Simone sur WhatsApp et dans l’app"],
+    pitch: "Pour être présent chaque semaine avec des publications soignées, sans y penser.",
+    points: [`${PLANS.essentiel.postsPerWeek} publications soignées par semaine, plus les stories`, `${PLANS.essentiel.credits} crédits par mois`, "Simone sur WhatsApp et dans l’app"],
     dark: false,
   },
   {
     id: "pro",
     label: PLANS.pro.label,
     price: PLANS.pro.priceEur,
-    pitch: "Pour un compte qui bouge : plus de Reels, plus d’animations sur mesure.",
-    points: [`${PLANS.pro.postsPerWeek} publications ou plus par semaine, plus les stories`, `${PLANS.pro.credits} crédits par mois`, "Assez de crédits pour des montages Max : deux versions, la meilleure gardée"],
+    pitch: "Pour aller plus loin : plus de Reels et le plus grand soin sur chacun.",
+    points: [`${PLANS.pro.postsPerWeek} publications soignées par semaine, plus les stories`, `${PLANS.pro.credits} crédits par mois`, "Assez de crédits pour des montages Max : deux versions, la meilleure gardée"],
     dark: true,
   },
 ] as const;

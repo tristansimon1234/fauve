@@ -1,5 +1,5 @@
 import { PageSuspense } from "@/components/page-suspense";
-import { bestMoments, byFormat, followerSeries, periodTotals, platformSchema, postKindSchema, weeklyGrowth, type PostStat } from "@fauve/agent";
+import { bestMoments, byFormat, followerSeries, periodTotals, platformSchema, postKindSchema, suggestedMoment, weeklyGrowth, type PostStat } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { z } from "zod";
@@ -181,7 +181,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         {header}
         <EmptyState title="Tes résultats arrivent après tes premières publications" className="max-w-[760px]">
           Dès que tes posts seront en ligne sur Instagram ou TikTok, tu verras ici ce qu’ils ont donné : les réservations
-          venues des réseaux d’abord, puis les vues, les comptes touchés et le bilan de Simone. Tu peux déjà demander à
+          venues des réseaux d’abord, puis les clics sur ton lien, les visites de ton profil et le bilan de Simone. Tu peux déjà demander à
           Simone d’analyser tes posts Instagram existants.
         </EmptyState>
         <RefreshReportButton label="Analyser mes posts Instagram" />
@@ -192,9 +192,11 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   const totals = sum(snapshots);
   const byPost = new Map<string, Metric[]>();
   for (const m of snapshots) byPost.set(m.post_id, [...(byPost.get(m.post_id) ?? []), m]);
+  // Ranked by what brings clients (profile visits, saves, shares), not by views.
+  const interest = (t: Totals) => (t.profile_visits ?? 0) + (t.saves ?? 0) + (t.shares ?? 0);
   const ranked = [...byPost.entries()]
     .map(([postId, list]) => ({ postId, totals: sum(list) }))
-    .sort((a, b) => (b.totals.views ?? b.totals.reach ?? 0) - (a.totals.views ?? a.totals.reach ?? 0))
+    .sort((a, b) => interest(b.totals) - interest(a.totals) || (b.totals.views ?? b.totals.reach ?? 0) - (a.totals.views ?? a.totals.reach ?? 0))
     .slice(0, 3);
 
   const titles = new Map<string, { title: string; kind: z.infer<typeof postKindSchema>; published_at: string | null }>();
@@ -214,16 +216,22 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   const postStats: PostStat[] = [...byPost.entries()].flatMap(([postId, list]) => {
     const post = titles.get(postId);
     const m = list.find((x) => x.platform === "instagram") ?? list[0]!;
-    return post ? [{ kind: post.kind, publishedAt: post.published_at, views: m.views, reach: m.reach, likes: m.likes, comments: m.comments, saves: m.saves, shares: m.shares }] : [];
+    return post ? [{ kind: post.kind, publishedAt: post.published_at, views: m.views, reach: m.reach, likes: m.likes, comments: m.comments, saves: m.saves, shares: m.shares, profileVisits: m.profile_visits }] : [];
   });
   const formats = byFormat(postStats);
   const moments = bestMoments(postStats, tz);
+  const moment = suggestedMoment(moments);
+  const momentUnit = moments.by === "visits" ? "visites" : "vues";
 
   const show = (value: number | null) => (value === null ? "—" : formatNumber(value));
   const signed = (n: number | null) => (n === null ? "—" : `${n > 0 ? "+" : n < 0 ? "−" : ""}${formatNumber(Math.abs(n))}`);
   const gained = ig.newFollowers ?? ig.net;
+  // Clients first: bookings, then the steps towards one (link taps, profile visits), then followers. Views come last, in the weekly bars.
+  const profileVisits = ig.profileViews ?? totals.profile_visits;
   const kpis: [string, string, string][] = [
     ["Réservations venues des réseaux", formatNumber(bookings), "via tes liens de réservation suivis"],
+    ["Clics sur ton lien", show(ig.linkTaps), ig.linkTaps !== null ? "depuis ton profil : ta réservation, ton site" : "dès que ton lien est dans ta bio"],
+    ["Visites du profil", show(profileVisits), ig.views !== null ? `pour ${formatNumber(ig.views)} vues sur ton compte` : "le premier pas vers une réservation"],
     [
       "Nouveaux abonnés",
       gained === null ? "—" : `${ig.newFollowers === null ? signed(gained) : `+${formatNumber(gained)}`}`,
@@ -233,8 +241,6 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           ? `${formatNumber(ig.followers)} abonnés Instagram au total`
           : "Instagram, relevé chaque jour",
     ],
-    ["Vues", show(ig.views ?? totals.views), ig.views !== null ? "tout ton compte Instagram" : "Reels, posts et stories"],
-    ["Visites du profil", show(ig.profileViews ?? totals.profile_visits), ig.linkTaps ? `${formatNumber(ig.linkTaps)} clics sur ton lien` : "depuis tes publications"],
   ];
   // The first KPI (bookings from social media) is the product's headline number.
   const kpiStyles = ["bg-violet text-white", "bg-peach text-ink", "bg-soft text-ink", "bg-soft text-ink"];
@@ -269,10 +275,10 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
             <span className="text-xs font-extrabold tracking-[.06em] text-muted">CHAQUE SEMAINE</span>
             <FollowersChart weeks={weeks} timeZone={tz} />
             <div className="flex flex-wrap gap-3">
-              <WeeklyBars weeks={weeks} pick={(w) => w.views} label="Vues" timeZone={tz} />
-              <WeeklyBars weeks={weeks} pick={(w) => w.profileViews} label="Visites du profil" timeZone={tz} />
               <WeeklyBars weeks={weeks} pick={(w) => w.linkTaps} label="Clics sur ton lien" timeZone={tz} />
+              <WeeklyBars weeks={weeks} pick={(w) => w.profileViews} label="Visites du profil" timeZone={tz} />
               <WeeklyBars weeks={weeks} pick={(w) => w.interactions} label="Interactions" timeZone={tz} />
+              <WeeklyBars weeks={weeks} pick={(w) => w.views} label="Vues" timeZone={tz} />
             </div>
           </>
         ) : (
@@ -298,20 +304,27 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
             <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
               <h2 className="text-base font-bold">Ce que rapporte chaque format</h2>
               <FormatTable rows={formats} labels={kindLabels} />
-              <p className="text-[12px] text-muted">Moyenne par publication de Simone sur la période. Engagement : j’aime, commentaires, enregistrements et partages rapportés aux comptes touchés.</p>
+              <p className="text-[12px] text-muted">Moyenne par publication de Simone sur la période, le format qui donne le plus envie en premier. Intérêt : visites du profil, enregistrements et partages rapportés aux comptes touchés, les signes qu’un futur client s’intéresse à toi.</p>
             </section>
           )}
           {moments.days.length > 0 && (
             <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
               <h2 className="text-base font-bold">Tes meilleurs moments</h2>
-              <Ranking items={moments.days.slice(0, 4)} unit="vues" />
+              {moment && (
+                <p className="rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[14px] font-semibold text-violet">
+                  D’après tes posts, publie plutôt {moment}.
+                </p>
+              )}
+              <Ranking items={moments.days.slice(0, 4)} unit={momentUnit} />
               {moments.slots.length > 1 && (
                 <>
                   <span className="text-xs font-extrabold tracking-[.06em] text-muted">DANS LA JOURNÉE</span>
-                  <Ranking items={moments.slots} unit="vues" />
+                  <Ranking items={moments.slots} unit={momentUnit} />
                 </>
               )}
-              <p className="text-[12px] text-muted">Vues moyennes selon le jour et l’heure de publication. Plus il y a de posts, plus c’est fiable.</p>
+              <p className="text-[12px] text-muted">
+                {moments.by === "visits" ? "Visites du profil" : "Vues"} moyennes selon le jour et l’heure de publication. Plus il y a de posts, plus c’est fiable.
+              </p>
             </section>
           )}
         </div>
@@ -396,7 +409,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         </section>
 
         <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3.5 rounded-[22px] border border-line p-5.5">
-          <h2 className="text-base font-bold">Ce qui a le mieux marché</h2>
+          <h2 className="text-base font-bold">Ce qui a le plus donné envie</h2>
           {ranked.length ? (
             ranked.map(({ postId, totals: t }) => {
               const post = titles.get(postId);
@@ -406,15 +419,17 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
                     <span className="truncate text-sm font-bold">{post?.title ?? "Publication"}</span>
                     <span className="text-[13px] text-muted">
                       {post ? kindLabels[post.kind] : ""}
-                      {t.saves ? ` · ${formatNumber(t.saves)} enregistrements` : ""}
+                      {t.views !== null ? ` · ${formatNumber(t.views)} vues` : t.reach !== null ? ` · ${formatNumber(t.reach)} comptes touchés` : ""}
                     </span>
                   </span>
-                  <span className="text-[13px] font-bold whitespace-nowrap text-violet">
-                    {t.views !== null
-                      ? `${formatNumber(t.views)} vues`
-                      : t.reach !== null
-                        ? `${formatNumber(t.reach)} comptes touchés`
-                        : "—"}
+                  <span className="text-right text-[13px] font-bold whitespace-nowrap text-violet">
+                    {[
+                      t.profile_visits ? `${formatNumber(t.profile_visits)} visites du profil` : null,
+                      t.saves ? `${formatNumber(t.saves)} enreg.` : null,
+                      t.shares ? `${formatNumber(t.shares)} partages` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "—"}
                   </span>
                 </Link>
               );
@@ -422,6 +437,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           ) : (
             <p className="text-sm text-muted">Pas encore de statistiques sur cette période.</p>
           )}
+          {ranked.length > 0 && <p className="text-[12px] text-muted">Classées par visites du profil, enregistrements et partages : ce qui fait venir des clients, plus que les vues.</p>}
         </section>
       </div>
       <p className="text-[13px] text-muted">Chiffres du compte : relevés chaque jour. Pour chaque publication : le dernier relevé des {period.days} derniers jours.</p>

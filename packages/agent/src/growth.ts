@@ -94,33 +94,59 @@ export function periodTotals(rows: DailyRow[], from: string) {
   };
 }
 
-export type PostStat = { kind: string; publishedAt: string | null; views: number | null; reach: number | null; likes: number | null; comments: number | null; saves: number | null; shares: number | null };
+export type PostStat = {
+  kind: string;
+  publishedAt: string | null;
+  views: number | null;
+  reach: number | null;
+  likes: number | null;
+  comments: number | null;
+  saves: number | null;
+  shares: number | null;
+  /** Visits to her profile from this post: the first step towards a booking. */
+  profileVisits?: number | null;
+};
 
-/** Average per post for each format, with the engagement rate (likes, comments, saves, shares over reach). */
+/** Signs that someone may become a client: profile visits, saves and shares, over the accounts reached. */
+const interestOf = (p: PostStat) => (p.reach ? ((p.profileVisits ?? 0) + (p.saves ?? 0) + (p.shares ?? 0)) / p.reach : null);
+
+/**
+ * Average per post for each format: profile visits, saves, shares, views, the
+ * interest rate (visits, saves and shares over reach: what brings clients, not
+ * likes) and the engagement rate. Best interest first.
+ */
 export function byFormat(posts: PostStat[]) {
   const groups = new Map<string, PostStat[]>();
   for (const p of posts) groups.set(p.kind, [...(groups.get(p.kind) ?? []), p]);
   return [...groups.entries()]
     .map(([kind, list]) => {
-      const avg = (key: "views" | "reach" | "saves" | "shares") => {
-        const known = list.map((p) => p[key]).filter((v): v is number => v !== null);
+      const avg = (key: "views" | "reach" | "saves" | "shares" | "profileVisits") => {
+        const known = list.map((p) => p[key] ?? null).filter((v): v is number => v !== null);
         return known.length ? Math.round(known.reduce((a, b) => a + b, 0) / known.length) : null;
       };
       const rated = list.filter((p) => p.reach);
-      const engagement = rated.length
-        ? rated.reduce((acc, p) => acc + ((p.likes ?? 0) + (p.comments ?? 0) + (p.saves ?? 0) + (p.shares ?? 0)) / p.reach!, 0) / rated.length
-        : null;
-      return { kind, posts: list.length, views: avg("views"), reach: avg("reach"), saves: avg("saves"), shares: avg("shares"), engagement };
+      const mean = (f: (p: PostStat) => number) => (rated.length ? rated.reduce((acc, p) => acc + f(p), 0) / rated.length : null);
+      const engagement = mean((p) => ((p.likes ?? 0) + (p.comments ?? 0) + (p.saves ?? 0) + (p.shares ?? 0)) / p.reach!);
+      const interest = mean((p) => interestOf(p)!);
+      return { kind, posts: list.length, views: avg("views"), reach: avg("reach"), saves: avg("saves"), shares: avg("shares"), profileVisits: avg("profileVisits"), interest, engagement };
     })
-    .sort((a, b) => (b.views ?? b.reach ?? 0) - (a.views ?? a.reach ?? 0));
+    .sort((a, b) => (b.interest ?? -1) - (a.interest ?? -1) || (b.views ?? b.reach ?? 0) - (a.views ?? a.reach ?? 0));
 }
 
 const WEEKDAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 
-/** The best moments to post: average views (or reach) by weekday and by time of day, in the studio's time zone. */
+/** Posts with a known number of profile visits from this many on: moments are ranked by visits, not views. */
+const VISITS_FROM = 3;
+
+/**
+ * The best moments to post, in the studio's time zone: by weekday and by time of
+ * day, ranked by profile visits (what leads to a booking) when the posts give
+ * them, else by views. `by` says which.
+ */
 export function bestMoments(posts: PostStat[], timeZone: string) {
   const fmt = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "short", hour: "2-digit", hourCycle: "h23" });
-  const score = (p: PostStat) => p.views ?? p.reach;
+  const by: "visits" | "views" = posts.filter((p) => p.publishedAt && p.profileVisits != null).length >= VISITS_FROM ? "visits" : "views";
+  const score = (p: PostStat) => (by === "visits" ? (p.profileVisits ?? null) : (p.views ?? p.reach));
   const days = new Map<number, number[]>();
   const slots = new Map<string, number[]>();
   for (const p of posts) {
@@ -135,9 +161,25 @@ export function bestMoments(posts: PostStat[], timeZone: string) {
   }
   const mean = (list: number[]) => Math.round(list.reduce((a, b) => a + b, 0) / list.length);
   return {
+    by,
     days: [...days.entries()].map(([d, list]) => ({ label: WEEKDAYS[d]!, posts: list.length, average: mean(list) })).sort((a, b) => b.average - a.average),
     slots: [...slots.entries()].map(([label, list]) => ({ label, posts: list.length, average: mean(list) })).sort((a, b) => b.average - a.average),
   };
+}
+
+/** Enough posts to suggest a moment: fewer and the ranking is chance. */
+export const MOMENT_ADVICE_FROM = 5;
+
+/**
+ * Her own best moment to post, in one line (« le mardi, le soir »), when she has
+ * enough posts and the best day was seen at least twice; null otherwise.
+ */
+export function suggestedMoment(moments: ReturnType<typeof bestMoments>): string | null {
+  const posts = moments.days.reduce((n, d) => n + d.posts, 0);
+  const day = moments.days.find((d) => d.posts >= 2);
+  if (posts < MOMENT_ADVICE_FROM || !day) return null;
+  const slot = moments.slots.find((s) => s.posts >= 2);
+  return slot ? `le ${day.label}, ${slot.label}` : `le ${day.label}`;
 }
 
 export type FollowerPoint = { day: string; followers: number; counted: boolean };

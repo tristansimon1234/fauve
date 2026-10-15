@@ -26,7 +26,7 @@ export const CREDIT_PRICES = {
   /** A variant of a delivered montage: same cut, another style and hook (render only). */
   variant: 1,
   /** A new text layer for photos, designed as code from an example (Opus, checks and a critic). Reusing one is free. */
-  textLayer: 3,
+  textLayer: 4,
   /** A change to one component of the studio's bank (a new version): a round of Opus. */
   elementEdit: 2,
   /** Fauve watching the rendered video before it goes out (Soigné, Max). */
