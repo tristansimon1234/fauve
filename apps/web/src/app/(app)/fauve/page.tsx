@@ -40,9 +40,8 @@ async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searc
   const week = weekOf(localDateOf(new Date(), tz), tz);
   const requested = (await searchParams).c;
 
-  const [drafts, shots, weekPosts, conversations, credits] = await Promise.all([
+  const [drafts, weekPosts, conversations, credits] = await Promise.all([
     db.from("posts").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("status", "draft"),
-    db.from("shot_requests").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("done", false),
     db
       .from("posts")
       .select("status")
@@ -58,7 +57,6 @@ async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searc
   const messages = active ? ((await loadConversation(active)) ?? []) : [];
 
   const toValidate = drafts.count ?? 0;
-  const toFilm = shots.count ?? 0;
   const thisWeek = rows(z.object({ status: z.string() }), weekPosts, "posts");
   const published = thisWeek.filter((p) => p.status === "published" || p.status === "measured").length;
   const summary = [
@@ -66,22 +64,20 @@ async function Home({ searchParams }: { searchParams: PageProps<"/fauve">["searc
       ? `Cette semaine : ${plural(thisWeek.length, "publication prévue", "publications prévues")}, ${plural(published, "publiée", "publiées")}.`
       : "Rien n’est encore prévu cette semaine.",
     toValidate ? `${plural(toValidate, "brouillon attend", "brouillons attendent")} ta validation.` : "",
-    toFilm ? `${plural(toFilm, "plan", "plans")} à filmer.` : "",
     `Il te reste ${plural(credits, "crédit", "crédits")}.`,
   ]
     .filter(Boolean)
     .join(" ");
 
-  // Three ways in: make something, see how it went, see what is waiting.
-  const tasks = [toValidate ? `${plural(toValidate, "à valider", "à valider")}` : "", toFilm ? `${plural(toFilm, "plan à filmer", "plans à filmer")}` : ""].filter(Boolean);
+  // Three ways in: make something, see how it went, an idea from what she has.
   const suggestions: Suggestion[] = [
     { icon: "plus", label: "Créer une publication", hint: "Reel, carrousel, photo ou story", action: "new-post" },
     { icon: "chart", label: "Voir mes derniers résultats", hint: "Ce qui a marché, et pourquoi", prompt: "Comment ont marché mes dernières publications ? Dis-moi ce qui a le mieux marché et pourquoi." },
     {
       icon: "check",
-      label: "Voir ce qui m’attend",
-      hint: tasks.length ? tasks.join(" · ") : "Rien d’urgent pour l’instant",
-      prompt: "Qu’est-ce qui m’attend ? Ce que je dois valider, filmer ou t’envoyer, du plus urgent au moins urgent.",
+      label: "Une idée pour cette semaine",
+      hint: toValidate ? `${plural(toValidate, "publication attend", "publications attendent")} ta validation` : "Avec ce que tu as déjà",
+      prompt: "Tu aurais une idée de publication pour cette semaine, avec ce que j’ai déjà ?",
     },
   ];
 

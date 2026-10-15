@@ -297,9 +297,9 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
       {/* One bar: back, what it is, and the actions (validating first). */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <Link
-          href="/calendrier"
-          aria-label="Retour au calendrier"
-          title="Calendrier"
+          href="/grille"
+          aria-label="Retour à la grille"
+          title="Grille"
           className="flex size-10 shrink-0 items-center justify-center rounded-full border border-line text-ink hover:bg-soft"
         >
           <ArrowLeftIcon size={18} />
@@ -322,7 +322,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           )}
           <DeleteButton
             action={deletePost.bind(null, post.id)}
-            redirectTo="/calendrier"
+            redirectTo="/grille"
             compact
             confirmText={
               LOCKED.includes(post.status)

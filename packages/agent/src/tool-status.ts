@@ -19,7 +19,6 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   create_post: "J’ajoute la publication…",
   update_post: "Je mets la publication à jour…",
   set_music: "Je m’occupe de la musique…",
-  request_content: "J’ajoute ça à ta liste « À filmer »…",
   analyze_clips: "Je regarde tes vidéos…",
   quote_montage: "Je prépare le montage et son prix…",
   montage_status: "Je regarde où en est le montage…",

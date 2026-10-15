@@ -38,10 +38,10 @@ export default function ReadyPage() {
           <span className="hidden md:inline">Continuer sur WhatsApp</span>
         </a>
         <Link
-          href="/calendrier"
+          href="/fauve"
           className="flex h-12 items-center justify-center rounded-full border-[1.5px] border-line text-[15px] font-semibold md:hidden"
         >
-          Voir mon calendrier
+          Continuer dans l’app
         </Link>
       </div>
     </>
