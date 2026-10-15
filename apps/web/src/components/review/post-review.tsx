@@ -1,8 +1,9 @@
 "use client";
 
-import type { PostCover } from "@fauve/agent";
+import { timeline, type PostCover } from "@fauve/agent";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
 import { useFauveDrawer } from "@/components/fauve-drawer";
@@ -11,11 +12,17 @@ import { Mascot } from "@/components/mascot";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
 import { ChangePanel, type ChangeView } from "./change-panel";
+import type { EditStart } from "./reel-editor";
+import { SceneStrip } from "./scene-strip";
+
+// « Modifier » plays the montage live (Remotion): loaded only when she opens it.
+const ReelEditor = dynamic(() => import("./reel-editor").then((m) => m.ReelEditor), { ssr: false });
 
 // « Ta publication », the page of a Reel for someone who has never edited a video: the
-// video as it will go out, when and where, its caption, ONE button that says what it
-// does (« Publier vendredi à 18 h »), and « Changer quelque chose ». The full editor
-// stays one link away. Same page in the app and from WhatsApp.
+// video as it will go out, its scenes in a row, when and where, its caption, ONE button
+// that says what it does (« Publier vendredi à 18 h »), and « Changer quelque chose ».
+// A scene or « Le texte à l'écran » opens « Modifier » (texts, their place and style,
+// the order of the scenes), live. Same page in the app and from WhatsApp.
 
 const STEPS: Record<string, string> = {
   montage: "Simone refait le montage",
@@ -28,7 +35,6 @@ const STEPS: Record<string, string> = {
 export function PostReview({
   data,
   surface,
-  editorHref,
   whatsAppPrefix,
   cover,
   shareToFeed,
@@ -36,7 +42,6 @@ export function PostReview({
   data: ReviewData;
   /** In the app (menu, Simone's panel) or on the page opened from WhatsApp. */
   surface: "app" | "whatsapp";
-  editorHref: string;
   /** From WhatsApp, « Autre chose » goes back to WhatsApp with her words after this. */
   whatsAppPrefix?: string;
   cover: PostCover | null;
@@ -49,6 +54,11 @@ export function PostReview({
   const [view, setView] = useState<ChangeView>("menu");
   const [sheet, setSheet] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  /** « Modifier » open, on a text or a scene. */
+  const [editing, setEditing] = useState<EditStart | null>(null);
+  /** Where the video is, for the scene it shows. */
+  const [time, setTime] = useState(0);
+  const spans = useMemo(() => timeline(data.plan), [data.plan]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -72,11 +82,27 @@ export function PostReview({
     video.current?.play().catch(() => {});
     router.refresh();
   };
-  const seek = (seconds: number) => {
-    const el = video.current;
-    if (!el) return;
-    el.pause();
-    el.currentTime = seconds;
+  const edit = (start: EditStart) => {
+    setSheet(false);
+    video.current?.pause();
+    setEditing(start);
+  };
+  const closeEditor = (saved?: string) => {
+    setEditing(null);
+    if (saved) {
+      setToast(saved);
+      router.refresh();
+    }
+    video.current?.play().catch(() => {});
+  };
+  // « Demander à Simone » about one scene: her panel in the app, WhatsApp from its page.
+  const askScene = (scene: number, label: string) => {
+    setEditing(null);
+    if (surface === "whatsapp") {
+      window.location.href = whatsappLink(`${whatsAppPrefix ?? ""}${label.toLowerCase()} : `);
+      return;
+    }
+    openDrawer({ postId: data.postId, title: data.title, scene, sceneLabel: label });
   };
   const ask = (text: string) => {
     if (surface === "whatsapp") {
@@ -132,9 +158,8 @@ export function PostReview({
       view={view}
       onView={setView}
       onDone={done}
-      seek={seek}
+      onEdit={edit}
       ask={ask}
-      editorHref={editorHref}
       cover={cover}
       shareToFeed={shareToFeed}
     />
@@ -171,10 +196,22 @@ export function PostReview({
         {/* The Reel as it will go out. */}
         <section aria-label="Aperçu" className="flex flex-col items-center gap-3 rounded-[24px] bg-soft px-4 py-5 lg:py-8">
           <StatusLine data={data} onBack={back} pending={pending} />
-          {/* On a phone it leaves room for the date and the buttons below; from a laptop, 320 px wide. */}
-          <div className="relative aspect-[9/16] w-[max(176px,min(280px,calc((100dvh-400px)*0.5625)))] overflow-hidden rounded-[22px] bg-ink shadow-[0_18px_44px_rgba(28,21,48,.18)] lg:w-[320px]">
+          {/* On a phone it leaves room for its scenes and the buttons below; from a laptop, 320 px wide. */}
+          <div className="relative aspect-[9/16] w-[max(176px,min(280px,calc((100dvh-470px)*0.5625)))] overflow-hidden rounded-[22px] bg-ink shadow-[0_18px_44px_rgba(28,21,48,.18)] lg:w-[320px]">
             {data.videoUrl ? (
-              <video key={data.videoUrl} ref={video} src={data.videoUrl} autoPlay muted loop playsInline preload="auto" className="size-full object-cover" aria-label="Ton Reel" />
+              <video
+                key={data.videoUrl}
+                ref={video}
+                src={data.videoUrl}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
+                className="size-full object-cover"
+                aria-label="Ton Reel"
+              />
             ) : null}
             {data.videoUrl && (
               <button
@@ -205,6 +242,18 @@ export function PostReview({
               </div>
             )}
           </div>
+          {/* Its scenes: a tap opens « Modifier » on that one. */}
+          {!data.locked && !data.making && !data.failed && data.videoUrl && data.plan.segments.length > 1 && (
+            <div className="flex w-full max-w-[340px] flex-col items-center gap-1">
+              <SceneStrip
+                segments={data.plan.segments}
+                sprite={data.scenes}
+                playing={spans.findIndex((s) => time >= s.start && time < s.end)}
+                onPick={(scene) => edit({ scene })}
+              />
+              <p className="text-[12px] font-semibold text-muted">Touche une scène pour la modifier</p>
+            </div>
+          )}
           <p className="w-full max-w-[320px] text-[13.5px] leading-snug">
             <strong className="font-extrabold">{data.handle ?? "toi"}</strong> {clip(data.captionShown)}{" "}
             {!data.locked && (
@@ -213,6 +262,11 @@ export function PostReview({
               </button>
             )}
           </p>
+          {data.downloadUrl && (
+            <a href={data.downloadUrl} download className="text-[13px] font-semibold text-muted underline underline-offset-3 hover:text-ink">
+              Télécharger la vidéo
+            </a>
+          )}
         </section>
 
         <aside className="flex flex-col gap-3.5">
@@ -266,6 +320,8 @@ export function PostReview({
           {panel}
         </Sheet>
       )}
+
+      {editing && <ReelEditor postId={data.postId} scenes={data.scenes} start={editing} onClose={closeEditor} onAsk={askScene} />}
 
       {toast && (
         <p

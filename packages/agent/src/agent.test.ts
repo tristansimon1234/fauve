@@ -500,6 +500,23 @@ test("plan edit: texts follow their scene when scenes move, change or go", async
   assert.equal(editPlanSchema.safeParse(inserted).success, true);
 });
 
+test("plan edit: one thumbnail moment per scene, in its middle", async () => {
+  const { sceneTimes } = await import("./plan-edit.ts");
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 8,
+    segments: [
+      { clip_id: "a", in: 2, out: 5 },
+      { scene: { kind: "title", title: "B", background: "accent" }, duration: 2 },
+      { clip_id: "c", in: 0, out: 3, speed: 0.5 },
+    ],
+    texts: [],
+    images: [],
+  });
+  // A slowed clip lasts longer on screen: its middle moves with it.
+  assert.deepEqual(sceneTimes(plan), [1.5, 4, 8]);
+});
+
 test("carousel slides: aligned with the photos, built as a 4:5 still of the Reel", async () => {
   const { alignSlides, buildSlideProps, slidesPlanSchema, SLIDE_FRAME } = await import("./slides.ts");
   const [a, b, c] = ["00000000-0000-4000-8000-00000000000a", "00000000-0000-4000-8000-00000000000b", "00000000-0000-4000-8000-00000000000c"];

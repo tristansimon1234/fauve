@@ -25,6 +25,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { logoTone } from "./logo-tone";
 import { withMusic } from "./music";
+import { makeSceneSprite } from "./scene-sprite";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -249,6 +250,12 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     for (const next of towardsDraft(status)) status = next;
     check(await db.from("posts").update({ render_id: renderId, status, ...(options.editPlanId ? { edit_plan_id: planRow.id } : {}) }).eq("id", postId));
 
+    const url = check(await db.storage.from("media").createSignedUrl(storagePath, 24 * 3600)).data!.signedUrl;
+    // The strip of scenes under the Reel, when the video follows the plan (the ffmpeg engine drops its animations).
+    if (engine === "remotion" || plan.segments.every(isClipSegment)) {
+      await makeSceneSprite({ studioId, renderId, videoUrl: url, plan }).catch((error: unknown) => console.warn("scenes strip failed", renderId, error));
+    }
+
     const seconds = Math.round((Date.now() - started) / 1000);
     await db.from("cost_events").insert({
       studio_id: studioId,
@@ -259,7 +266,6 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       meta: { render_id: renderId, engine, template: plan.template, seconds_of_video: durationMs / 1000, bytes: mp4.length },
     });
 
-    const url = check(await db.storage.from("media").createSignedUrl(storagePath, 24 * 3600)).data!.signedUrl;
     return {
       renderId,
       postId,

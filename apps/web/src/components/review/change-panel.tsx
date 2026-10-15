@@ -1,12 +1,12 @@
 "use client";
 
-import { DEFAULT_COVER_SECONDS, SIMONE_VOICES, voiceSamplePath, type EditPlan, type PostCover } from "@fauve/agent";
+import { DEFAULT_COVER_SECONDS, SIMONE_VOICES, voiceSamplePath, type PostCover } from "@fauve/agent";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { setMusic, setPublishByHand, setVoiceOff } from "@/app/(app)/publications/[id]/cover-actions";
-import { saveEditPlan, updatePost } from "@/app/(app)/publications/[id]/actions";
-import { setPlatforms } from "@/app/(app)/publications/[id]/platform-actions";
+import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { putVoice, redoReel, reschedule } from "@/app/(app)/publications/[id]/review-actions";
 import { CoverPicker } from "@/components/montage/cover-picker";
+import { WhereToPost } from "@/components/montage/where-to-post";
 import {
   ArrowLeftIcon,
   ArrowUpIcon,
@@ -23,16 +23,17 @@ import {
 } from "@/components/icons";
 import { publicEnv } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
+import type { EditStart } from "./reel-editor";
 
-// « Qu'est-ce qu'on change ? » under a Reel: what she changes herself (instant, free)
-// and what Simone remakes (a new version in about two minutes), in her words, plus
-// anything else said her way. One view at a time; nothing Simone remakes starts on a
-// tap: each view says what will happen, takes a précision if she wants, and asks to confirm.
+// « Qu'est-ce qu'on change ? » under a Reel: what she changes herself (instant, free:
+// the texts and scenes open « Modifier ») and what Simone remakes (a new version in
+// about two minutes), plus anything else said her way. One view at a time; nothing
+// Simone remakes starts on a tap: each view says what will happen, takes a précision
+// if she wants, and asks to confirm.
 
-export type ChangeView = "menu" | "texts" | "caption" | "cover" | "date" | "shorter" | "punchier" | "music" | "voice";
+export type ChangeView = "menu" | "caption" | "cover" | "date" | "shorter" | "punchier" | "music" | "voice";
 
 const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
-const BIG = 1.25;
 
 type Props = {
   data: ReviewData;
@@ -40,12 +41,10 @@ type Props = {
   onView: (view: ChangeView) => void;
   /** Something changed: a line to show her, and the page refreshed. */
   onDone: (message: string) => void;
-  /** Shows the video at this second (where a text appears). */
-  seek: (seconds: number) => void;
+  /** « Modifier »: the texts and the scenes, live. */
+  onEdit: (start: EditStart) => void;
   /** « Autre chose » in her words: Simone's panel in the app, WhatsApp from its page. */
   ask: (text: string) => void;
-  /** « Tout régler moi-même »: the full editor. */
-  editorHref: string;
   cover: PostCover | null;
   shareToFeed: boolean;
 };
@@ -66,7 +65,6 @@ export function ChangePanel(props: Props) {
         </button>
         <h2 className="text-[18px] font-extrabold tracking-[-0.01em]">{TITLES[view]}</h2>
       </div>
-      {view === "texts" && <TextsView {...props} />}
       {view === "caption" && <CaptionView {...props} />}
       {view === "cover" && <CoverView {...props} />}
       {view === "date" && <DateView {...props} />}
@@ -78,7 +76,6 @@ export function ChangePanel(props: Props) {
 }
 
 const TITLES: Record<Exclude<ChangeView, "menu">, string> = {
-  texts: "Le texte à l’écran",
   caption: "La légende",
   cover: "La couverture",
   date: "Le jour et l’heure",
@@ -106,7 +103,7 @@ function Tile({ icon, label, onClick, tone, disabled }: { icon: React.ReactNode;
   );
 }
 
-function Menu({ data, onView, ask, editorHref }: Props) {
+function Menu({ data, onView, onEdit, ask }: Props) {
   const [wish, setWish] = useState("");
   const busy = data.making !== null;
   const send = () => {
@@ -120,7 +117,7 @@ function Menu({ data, onView, ask, editorHref }: Props) {
       <h2 className="text-[19px] font-extrabold tracking-[-0.01em]">Qu’est-ce qu’on change ?</h2>
       <h3 className="text-[13.5px] font-bold text-muted">Change-le toi-même, c’est immédiat</h3>
       <div className="grid grid-cols-2 gap-2">
-        <Tile tone="violet" icon={<TypeIcon size={18} />} label="Le texte à l’écran" onClick={() => onView("texts")} disabled={data.making !== null} />
+        <Tile tone="violet" icon={<TypeIcon size={18} />} label="Le texte à l’écran" onClick={() => onEdit({ text: 0 })} disabled={data.making !== null} />
         <Tile tone="violet" icon={<CaptionIcon size={18} />} label="La légende" onClick={() => onView("caption")} />
         <Tile tone="violet" icon={<ImageIcon size={18} />} label="La couverture" onClick={() => onView("cover")} disabled={!data.videoUrl} />
         <Tile tone="violet" icon={<CalendarIcon size={18} />} label="Le jour et l’heure" onClick={() => onView("date")} />
@@ -158,9 +155,6 @@ function Menu({ data, onView, ask, editorHref }: Props) {
           <ArrowUpIcon size={20} />
         </button>
       </form>
-      <a href={editorHref} className="self-center py-1.5 text-[13.5px] font-semibold text-muted underline underline-offset-3 hover:text-ink">
-        Tout régler moi-même dans l’éditeur complet
-      </a>
     </div>
   );
 }
@@ -237,83 +231,6 @@ function RedoView({ data, onDone, kind }: Props & { kind: "shorter" | "punchier"
     </div>
   );
 }
-
-function TextsView({ data, onDone, seek }: Props) {
-  const [texts, setTexts] = useState(() => data.plan.texts.map((t) => t.text));
-  const [big, setBig] = useState(() => data.plan.texts.length > 0 && data.plan.texts.every((t) => (t.scale ?? 1) >= BIG));
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const wasBig = data.plan.texts.length > 0 && data.plan.texts.every((t) => (t.scale ?? 1) >= BIG);
-  const changed = big !== wasBig || texts.some((t, i) => t.trim() !== data.plan.texts[i]?.text);
-  const save = () =>
-    start(async () => {
-      setError(null);
-      if (!changed) return onDone("");
-      if (texts.some((t) => !t.trim())) return setError("Un texte est vide : écris quelque chose ou demande à Simone de le retirer.");
-      const plan: EditPlan = {
-        ...data.plan,
-        texts: data.plan.texts.map((t, i) => ({
-          ...t,
-          text: texts[i]!.trim().slice(0, 120),
-          ...(big !== wasBig ? { scale: big ? BIG : undefined } : {}),
-        })),
-      };
-      const result = await saveEditPlan(data.postId, plan);
-      if (!result.ok) return setError(result.error);
-      onDone("Textes changés : la vidéo se met à jour, une minute environ.");
-    });
-  if (!data.plan.texts.length) {
-    return <p className="text-[14px] leading-relaxed text-muted">Ce Reel n’a pas de texte à l’écran. Pour en ajouter un, dis-le à Simone.</p>;
-  }
-  return (
-    <div className="flex flex-col gap-2.5">
-      <p className="text-[13.5px] leading-snug text-muted">Touche un texte : la vidéo te montre où il apparaît.</p>
-      {data.plan.texts.map((t, i) => (
-        <label key={i} className="flex items-center gap-2">
-          <span className="w-10 shrink-0 text-[12px] font-bold text-muted tabular-nums">{clock(t.from)}</span>
-          <input
-            value={texts[i] ?? ""}
-            maxLength={120}
-            onFocus={() => seek(t.from + 0.3)}
-            onChange={(e) => setTexts((list) => list.map((v, j) => (j === i ? e.target.value : v)))}
-            aria-label={`Texte ${i + 1}`}
-            className="h-11 min-w-0 flex-1 rounded-[14px] border-[1.5px] border-line bg-white px-3 text-[15px] font-semibold outline-none focus:border-violet"
-          />
-        </label>
-      ))}
-      <div className="mt-1 flex items-center gap-2">
-        <span className="flex-1 text-[14px] font-bold">Taille</span>
-        <div role="radiogroup" aria-label="Taille des textes" className="flex gap-1 rounded-full bg-chip p-1">
-          {[
-            { on: false, label: "Normale" },
-            { on: true, label: "Plus grande" },
-          ].map((o) => (
-            <button
-              key={o.label}
-              type="button"
-              role="radio"
-              aria-checked={big === o.on}
-              onClick={() => setBig(o.on)}
-              className={`h-9 rounded-full px-3.5 text-[13.5px] font-bold ${big === o.on ? "bg-white shadow-sm" : "text-muted"}`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {error && (
-        <p role="alert" className="text-[13.5px] font-semibold text-danger">
-          {error}
-        </p>
-      )}
-      <Done onClick={save} pending={pending}>
-        C’est bon
-      </Done>
-    </div>
-  );
-}
-
-const clock = (seconds: number) => `0:${String(Math.floor(seconds)).padStart(2, "0")}`;
 
 function CaptionView({ data, onDone }: Props) {
   const [caption, setCaption] = useState(data.caption);
@@ -401,22 +318,15 @@ function DateView({ data, onDone }: Props) {
   const current = data.scheduledAt;
   const [chosen, setChosen] = useState<string | null>(current);
   const [other, setOther] = useState(() => (current ? localValue(current, data.timezone) : ""));
-  const [platforms, setLocalPlatforms] = useState<string[]>(data.platforms.length ? data.platforms : ["instagram"]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const options = [
     ...(current ? [{ iso: current, label: data.when?.full ?? "", hint: "le jour prévu" }] : []),
     ...data.slots.filter((s) => s.iso !== current),
   ].slice(0, 5);
-  const toggle = (p: string) =>
-    setLocalPlatforms((list) => (list.includes(p) ? (list.length > 1 ? list.filter((x) => x !== p) : list) : [...list, p]));
   const save = () =>
     start(async () => {
       setError(null);
-      if (platforms.join() !== data.platforms.join()) {
-        const ok = await setPlatforms(data.postId, platforms);
-        if (!ok.ok) return setError("Les réseaux n’ont pas pu changer. Réessaie.");
-      }
       if (chosen && chosen !== current) {
         const result = await reschedule(data.postId, chosen);
         if (!result.ok) return setError(result.error);
@@ -463,20 +373,10 @@ function DateView({ data, onDone }: Props) {
           className="h-11 rounded-[14px] border-[1.5px] border-line bg-white px-3 text-[15px] font-semibold text-ink outline-none focus:border-violet"
         />
       </label>
-      <div className="flex items-center gap-2">
-        <span className="flex-1 text-[14px] font-bold">Où ?</span>
-        {(["instagram", "tiktok"] as const).map((p) => (
-          <button
-            key={p}
-            type="button"
-            aria-pressed={platforms.includes(p)}
-            onClick={() => toggle(p)}
-            className={`h-9 rounded-full border-[1.5px] px-3.5 text-[13.5px] font-bold ${platforms.includes(p) ? "border-violet bg-violet-tint" : "border-line bg-white text-muted"}`}
-          >
-            {p === "instagram" ? "Instagram" : "TikTok"}
-          </button>
-        ))}
-      </div>
+      {/* Instagram, and TikTok once the app offers it (her choices for a direct post too). */}
+      {data.tiktok && (
+        <WhereToPost postId={data.postId} initial={data.platforms.filter((p): p is "instagram" | "tiktok" => p === "instagram" || p === "tiktok")} tiktok={data.tiktok} />
+      )}
       {error && (
         <p role="alert" className="text-[13.5px] font-semibold text-danger">
           {error}
