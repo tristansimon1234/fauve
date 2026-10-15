@@ -20,6 +20,7 @@ import {
   type ReplyExtras,
   type ToolName,
   type ReactionMood,
+  mergeReplySteps,
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -178,7 +179,8 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   if (!last || last.stop_reason === "refusal") {
     return { reply: FALLBACK_REPLY, reactions: input.reactions, extras: {}, notes: input.notes, usage, afterReply: input.afterReply };
   }
-  const reply = spoken.join("\n\n");
+  // A paragraph said again after a tool call (in other words) is kept once, in its last wording.
+  const reply = mergeReplySteps(spoken);
   // Never silent: a turn that only reacted keeps its reaction; one that did nothing at all says so.
   const silent = !reply && !input.reactions.length;
   return {
