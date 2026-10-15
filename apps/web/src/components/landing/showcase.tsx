@@ -4,22 +4,44 @@ import { useEffect, useRef, useState } from "react";
 
 // Real work by Simone for the landing: three Reels and a carousel made by the
 // app itself (montage, motion design, review) for demo businesses, from free
-// Unsplash photos. Files in the public `landing` bucket of Supabase Storage.
+// Unsplash photos, with the music Simone composed for them (ElevenLabs). Files in
+// the public `landing` bucket of Supabase Storage.
 
 const BASE = "https://tfxkhktofgtljlqlksba.supabase.co/storage/v1/object/public/landing";
 
 export const SHOWCASE_REELS = [
-  { file: "reel-pilates.mp4", name: "studio.lune", who: "Studio de Pilates · Lyon" },
-  { file: "reel-coiffure.mp4", name: "maison.maya", who: "Salon de coiffure · Paris" },
-  { file: "reel-trattoria.mp4", name: "chezlino.bordeaux", who: "Trattoria · Bordeaux" },
+  { file: "reel-pilates-music.mp4", name: "studio.lune", who: "Studio de Pilates · Lyon" },
+  { file: "reel-coiffure-music.mp4", name: "maison.maya", who: "Salon de coiffure · Paris" },
+  { file: "reel-trattoria-music.mp4", name: "chezlino.bordeaux", who: "Trattoria · Bordeaux" },
 ] as const;
 
 /** The carousel's rendered photos (empty until it is made: the Reels then take the whole width). */
 export const SHOWCASE_SLIDES: readonly string[] = ["carrousel-1.jpg", "carrousel-2.jpg", "carrousel-3.jpg", "carrousel-4.jpg"];
 
-/** A Reel in a phone, as on Instagram: it plays muted while it is on screen. */
+/** A Reel in a phone, as on Instagram: it plays muted while it is on screen; a tap on the speaker plays its music. */
 function ReelPhone({ reel, big }: { reel: (typeof SHOWCASE_REELS)[number]; big?: boolean }) {
   const video = useRef<HTMLVideoElement>(null);
+  const [sound, setSound] = useState(false);
+  const [src, setSrc] = useState<string>(reel.file);
+  const toggleSound = () => {
+    const el = video.current;
+    if (!el) return;
+    el.muted = sound;
+    setSound(!sound);
+    if (!sound) {
+      // One Reel heard at a time.
+      document.querySelectorAll<HTMLVideoElement>("video[data-showcase]").forEach((v) => {
+        if (v !== el) v.muted = true;
+      });
+      window.dispatchEvent(new CustomEvent("showcase-sound", { detail: reel.file }));
+      el.play().catch(() => {});
+    }
+  };
+  useEffect(() => {
+    const quiet = (e: Event) => (e as CustomEvent<string>).detail !== reel.file && setSound(false);
+    window.addEventListener("showcase-sound", quiet);
+    return () => window.removeEventListener("showcase-sound", quiet);
+  }, [reel.file]);
   useEffect(() => {
     const el = video.current;
     if (!el) return;
@@ -33,14 +55,29 @@ function ReelPhone({ reel, big }: { reel: (typeof SHOWCASE_REELS)[number]; big?:
         <video
           ref={video}
           // #t: the first frames are often an animation's empty start; show a frame with something on it.
-          src={`${BASE}/${reel.file}#t=1.2`}
+          src={`${BASE}/${src}#t=1.2`}
+          // The version with music is made once after a deploy: until then, the silent one.
+          onError={() => setSrc(reel.file.replace("-music", ""))}
           muted
           loop
           playsInline
           preload="metadata"
+          data-showcase
           aria-label={`Reel de ${reel.who}, monté par Simone`}
           className="size-full object-cover"
         />
+        <button
+          type="button"
+          onClick={toggleSound}
+          aria-label={sound ? "Couper le son" : "Écouter la musique"}
+          aria-pressed={sound}
+          className="absolute top-3 right-3 z-10 flex size-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M11 5 6 9H3v6h3l5 4V5z" />
+            {sound ? <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" /> : <path d="m16 9 5 6M21 9l-5 6" />}
+          </svg>
+        </button>
         {/* Instagram's frame: the account at the bottom, the actions on the right. */}
         <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,.45))] px-3 pt-8 pb-3">
           <span className="size-6 shrink-0 rounded-full bg-[conic-gradient(from_180deg,#F2694E,#5B3FD9,#F2694E)] p-[2px]">

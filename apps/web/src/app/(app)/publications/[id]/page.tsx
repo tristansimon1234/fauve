@@ -1,4 +1,6 @@
 import { PageSuspense } from "@/components/page-suspense";
+import { env } from "@/lib/env";
+import { readPostMusic } from "@/lib/render/music";
 import { alignSlides, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -45,6 +47,7 @@ const postSchema = z.object({
   share_to_feed: z.boolean().catch(true),
   publish_by_hand: z.boolean().catch(false),
   handoff_at: z.string().nullable().catch(null),
+  music: z.unknown(),
 });
 
 // Read leniently: an older or partial plan still shows what it can.
@@ -93,7 +96,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const { data, error } = await db
     .from("posts")
-    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed, publish_by_hand, handoff_at")
+    .select("id, kind, title, status, scheduled_at, platforms, caption, hashtags, edit_plan_id, render_id, media_ids, slides, cover, share_to_feed, publish_by_hand, handoff_at, music")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -121,6 +124,9 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   const canEdit = !LOCKED.includes(post.status);
   const editor = canEdit && plan ? await loadEditorData(studioId, plan.id, post.media_ids).catch(() => null) : null;
   const isVideo = post.kind === "reel" || post.kind === "story";
+  // Simone's music: offered on a Reel with a montage, when the service is set up.
+  const postMusic = readPostMusic(post.music);
+  const musicState = post.kind === "reel" && editor && env("ELEVENLABS_API_KEY") ? { on: postMusic.mode === "on", made: Boolean(postMusic.track) } : undefined;
   // The studio's text looks (copied by Fauve from examples, or kept by hand), offered on every text.
   const looks = canEdit ? await loadTextLooks(studioId).catch(() => []) : [];
   // Text over the photos of a carousel or photo post, editable by hand.
@@ -152,12 +158,13 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
       {post.kind === "reel" && canEdit && (
         <PublishByHand
-          key={versionKey(post.publish_by_hand, post.handoff_at)}
+          key={versionKey(post.publish_by_hand, post.handoff_at, post.music)}
           postId={post.id}
           initial={post.publish_by_hand}
           handedOffAt={post.handoff_at ? handedFormat(tz).format(new Date(post.handoff_at)) : null}
           downloadUrl={downloadUrl}
           caption={[post.caption ?? "", post.hashtags.map((h) => `#${h}`).join(" ")].filter(Boolean).join("\n\n")}
+          music={musicState}
         />
       )}
 

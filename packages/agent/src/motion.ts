@@ -74,6 +74,8 @@ export type ReelProps = {
     customFonts?: { family: string; url: string }[];
   };
   endCard: { title: string; subtitle: string | null; from: number } | null;
+  /** Simone's music, played in the live preview (the render gets it mixed in afterwards). */
+  soundtrack?: { src: string } | null;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
@@ -112,6 +114,8 @@ export type ReelInputs = {
   words?: Record<string, ClipAnalysis["words"]>;
   /** fonts: the studio's brand fonts (display first); the plan's fonts win over them. */
   brand: { name: string; accent?: string | null; logoUrl?: string | null; logoOnDark?: LogoOnDark; fonts?: string[]; colors?: string[]; customFonts?: { family: string; url: string }[] };
+  /** Signed link of the music kept for the post: the editors play it with the preview. */
+  soundtrack?: string;
 };
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
@@ -236,6 +240,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     endCard: plan.end_card
       ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, durationInFrames - endCardFrames) }
       : null,
+    ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack } } : {}),
   };
 }
 

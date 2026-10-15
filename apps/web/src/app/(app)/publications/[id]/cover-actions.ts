@@ -2,6 +2,9 @@
 
 import { postCoverSchema, type PostCover } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { readPostMusic } from "@/lib/render/music";
+import { renderPost } from "@/lib/render/render-post";
 import { z } from "zod";
 import { getStudioContext } from "@/lib/studio";
 
@@ -60,6 +63,35 @@ export async function setPublishByHand(postId: string, byHand: boolean): Promise
     .not("status", "in", "(published,measured)")
     .select("id");
   if (error || !data.length) return { ok: false };
+  revalidatePath(`/publications/${postId}`);
+  return { ok: true };
+}
+
+/**
+ * Simone's music on a Reel: on, off, or another piece. The video is made again
+ * after the answer (about a minute), with the new music or none.
+ */
+export async function setMusic(postId: string, mode: "on" | "off" | "another"): Promise<{ ok: boolean }> {
+  if (!z.uuid().safeParse(postId).success || !["on", "off", "another"].includes(mode)) return { ok: false };
+  const { db, member } = await getStudioContext();
+  if (!member) return { ok: false };
+  const studioId = member.studio.id;
+  const { data: post } = await db.from("posts").select("music, edit_plan_id").eq("id", postId).eq("studio_id", studioId).eq("kind", "reel").maybeSingle();
+  if (!post?.edit_plan_id) return { ok: false };
+  const music = readPostMusic(post.music);
+  const { error } = await db
+    .from("posts")
+    .update({ music: { ...music, mode: mode === "off" ? "off" : "on" } })
+    .eq("id", postId)
+    .eq("studio_id", studioId)
+    .not("status", "in", "(published,measured)");
+  if (error) return { ok: false };
+  after(() =>
+    renderPost(studioId, postId, { freshMusic: mode === "another" }).then(
+      () => revalidatePath(`/publications/${postId}`),
+      (e: unknown) => console.error("setMusic: render failed", postId, e),
+    ),
+  );
   revalidatePath(`/publications/${postId}`);
   return { ok: true };
 }

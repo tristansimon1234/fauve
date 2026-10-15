@@ -274,6 +274,32 @@ export async function videoFramesInSandbox(id: string, url: string, times: numbe
 }
 
 /**
+ * A rendered video with its soundtrack: the picture copied as it is, the music
+ * in AAC, faded out over the last 0.8 s and cut at the end of the video.
+ */
+export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Array): Promise<Buffer> {
+  const sandbox = await renderSandbox();
+  const dir = `${ROOT}/jobs/${id}-mux`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await sandbox.writeFiles([
+      { path: `${dir}/in.mp4`, content: mp4 },
+      { path: `${dir}/music.mp3`, content: audio },
+    ]);
+    await bash(
+      sandbox,
+      `cd "$1" && d=$(${ROOT}/ffmpeg -i in.mp4 2>&1 | sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' | awk -F: '{print $1*3600+$2*60+$3}') && st=$(awk -v d="$d" 'BEGIN{s=d-0.8; if(s<0)s=0; print s}') && ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -af "afade=t=out:st=$st:d=0.8" -shortest -movflags +faststart out.mp4`,
+      [dir],
+    );
+    const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
+    if (!out?.length) throw new Error("mux produced no file");
+    return out;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/**
  * A capture of a public web page as a visitor sees it (1280 × 1600, the top of
  * the page), with the headless Chrome the Remotion templates already installed.
  * The URL was checked to be public before; null when the capture fails.

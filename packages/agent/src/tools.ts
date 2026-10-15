@@ -344,6 +344,11 @@ export const toolSpecs = {
       save_as: z.string().min(1).max(40).optional().describe("Enregistrer le style obtenu sous ce nom"),
     }),
   },
+  set_music: {
+    description:
+      "Musique d'un Reel, composée par Simone pour ce montage (ElevenLabs, calée sur les images, libre de droits, sans voix) : on (par défaut), off (Reel muet, par ex. pour mettre un son d'Instagram en publiant elle-même), another (une nouvelle musique). Refait la vidéo, gratuit.",
+    input: z.object({ post_id: z.string().uuid(), mode: z.enum(["on", "off", "another"]) }),
+  },
   schedule_post: {
     description:
       "Programme une publication validée sur Instagram, à son horaire (scheduled_at) ou à l'horaire donné ; si l'horaire est passé ou absent, elle part tout de suite. Il faut un compte Instagram connecté (sinon envoie le lien get_connect_link) et le contenu du format : un Reel a besoin de sa vidéo montée ; un post d'une photo (media_ids) ; un carrousel de 2 à 10 photos ou vidéos (media_ids, dans l'ordre) ; une story de sa vidéo montée ou d'une photo/vidéo (pas de légende sur une story). Ne programme jamais sans l'accord explicite de la gérante.",
