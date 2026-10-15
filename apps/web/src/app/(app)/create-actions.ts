@@ -5,6 +5,7 @@ import {
   DEFAULT_EFFORT,
   EFFORTS,
   effortSchema,
+  findVoice,
   JOB_STALE_MINUTES,
   postKindSchema,
   TRIAL_DAYS,
@@ -26,20 +27,26 @@ import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { photoRegions } from "@/lib/video/regions";
 
 // « C'est parti » on the Créer screen: her new files join her library, the publication
-// is created, and a Reel starts at once (her tap is her yes; charged on delivery, like
-// any montage). The other formats go on with Simone in the chat, who writes their texts.
+// is created (where it goes, and for a Reel with or without a voice over, as she chose),
+// and a Reel starts at once (her tap is her yes; charged on delivery, like any montage).
+// The other formats go on with Simone in the chat, who writes their texts.
 
 const uploadSchema = z.object({ path: z.string().max(300), mime: z.string().max(100), size: z.number().int().positive() });
 const launchSchema = z.object({
   kind: postKindSchema,
   date: z.string().max(10),
   time: z.string().max(5),
-  idea: z.string().max(300),
+  /** What she imagines (the scenario, an offer, a message), in her words. */
+  idea: z.string().max(500),
   /** In the order she picked them: from her library, or just sent (already in Storage). */
   items: z.array(z.union([z.object({ media: z.uuid() }), z.object({ upload: uploadSchema })])).min(1).max(10),
+  /** A Reel's voice over: as the studio's setting (auto), none, or one of Simone's voices. */
+  voice: z.union([z.literal("auto"), z.literal("off"), z.string().regex(/^[A-Za-z0-9]{10,40}$/)]).default("auto"),
+  /** Where it goes (TikTok only takes a Reel); by default the usual places. */
+  platforms: z.array(z.enum(["instagram", "tiktok"])).min(1).max(2).optional(),
 });
 
-export type LaunchInput = z.infer<typeof launchSchema>;
+export type LaunchInput = z.input<typeof launchSchema>;
 
 export type LaunchResult =
   | {
@@ -56,7 +63,7 @@ export type LaunchResult =
 export async function launchCreation(input: LaunchInput): Promise<LaunchResult> {
   const parsed = launchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Choisis au moins une photo ou une vidéo." };
-  const { kind, date, time, items } = parsed.data;
+  const { kind, date, time, items, voice, platforms } = parsed.data;
   const idea = parsed.data.idea.trim();
   const { member } = await getStudioContext();
   if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
@@ -96,6 +103,14 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
 
   const created = await createPost({ kind, date, time, intention: idea, mediaIds });
   if (!created.ok) return created;
+  // Her choices, before anything is made: where it goes, and the voice over of a Reel.
+  const where = platforms ? [...new Set(platforms.filter((p) => p === "instagram" || kind === "reel"))] : [];
+  const spoken = kind === "reel" && voice !== "auto" ? (voice === "off" ? { mode: "off" as const } : findVoice(voice) ? { mode: "on" as const, voice_id: voice } : null) : null;
+  if (where.length || spoken) {
+    const patch = { ...(where.length ? { platforms: where } : {}), ...(spoken ? { voice_over: spoken } : {}) };
+    const { error } = await db.from("posts").update(patch).eq("id", created.id).eq("studio_id", studioId);
+    if (error) console.warn("create: choices not saved", error.message);
+  }
   if (kind !== "reel") return { ok: true, postId: created.id, title: created.title, kind, mediaIds, montage: null };
 
   // The level of care of the studio (Réglages); her first Reel gets its made-to-measure animations, as in the chat.
@@ -106,7 +121,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     studioId,
     postId: created.id,
     mediaIds,
-    brief: idea ? `L’idée de la gérante : ${idea}` : undefined,
+    brief: idea ? `Ce que la gérante imagine : ${idea}` : undefined,
     correction: false,
     maxNewScenes: scenes,
     effort,

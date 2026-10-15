@@ -1,6 +1,6 @@
 "use server";
 
-import { filmIdeas, postIdeas, publishWhen } from "@fauve/agent";
+import { filmIdeas, postIdeas, publishWhen, readVoiceSetting } from "@fauve/agent";
 import { localInstant, localDateOf, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
 import { freeSlots, type Slot } from "@/lib/slots";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
@@ -23,6 +23,10 @@ export type NewPostOptions = {
   media: LibraryItem[];
   /** One-tap ideas by format, for this kind of business. */
   ideas: Record<"reel" | "carousel" | "post" | "story", string[]>;
+  /** Her voice-over setting (Style), the first choice for a Reel. */
+  voice: { use: "auto" | "always" | "never"; voiceId: string | null };
+  /** TikTok connected: a Reel goes there too, unless she says otherwise. */
+  tiktok: boolean;
 };
 
 export async function newPostOptions(): Promise<NewPostOptions | null> {
@@ -36,7 +40,12 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     freeSlots(studioId, tz, 4, now),
     db.from("media_assets").select("id, storage_path, kind, created_at, duration").eq("studio_id", studioId).in("kind", ["image", "video"]).order("created_at", { ascending: false }).limit(40),
   ]);
-  const { data: studio } = await db.from("studios").select("business_type").eq("id", studioId).maybeSingle();
+  const [{ data: studio }, { data: brand }, { data: tiktok }] = await Promise.all([
+    db.from("studios").select("business_type").eq("id", studioId).maybeSingle(),
+    db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+    db.from("social_accounts").select("status").eq("studio_id", studioId).eq("platform", "tiktok").maybeSingle(),
+  ]);
+  const voice = readVoiceSetting((brand?.profile as { voice?: unknown } | null)?.voice);
 
   const media = (assets.data ?? []).map((a) => ({
     id: a.id as string,
@@ -66,6 +75,8 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
       return url ? [{ id: m.id, url, video: m.video, at: m.at, duration: m.duration }] : [];
     }),
     ideas: postIdeas(studio?.business_type as string | null),
+    voice: { use: voice.use, voiceId: voice.voice_id ?? null },
+    tiktok: tiktok?.status === "connected",
   };
 }
 
