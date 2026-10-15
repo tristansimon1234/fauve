@@ -1,7 +1,13 @@
+import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { after } from "next/server";
-import { isMotionSegment, motionTemplateSchema, editPlanSchema, type MotionTemplate } from "@fauve/agent";
+import { z } from "zod";
+import { CHAT_MODEL, isMotionSegment, motionTemplateSchema, editPlanSchema, type MotionTemplate } from "@fauve/agent";
+import { anthropic, logClaudeCost } from "@/lib/agent/run";
+import { readWebsite } from "@/lib/agent/website";
 import { cronAuthorized } from "@/lib/cron-auth";
+import { usableFonts } from "@/lib/fonts";
 import { queueJob } from "@/lib/jobs";
+import { readSiteLook } from "@/lib/site-look";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { makeVoiceOver } from "@/lib/voice-over";
@@ -20,6 +26,12 @@ import { photoRegions } from "@/lib/video/regions";
 //                        voice=1 (or voice=<ElevenLabs voice id>) puts Simone's voice over it first.
 //   ?case=…&step=result  every version: its render (signed link, 24 h), the plan kept
 //                        (without the scenes' code), the delivered message and the costs.
+//   ?site=<url>&kind=coiffeur|restaurant|pilates[&clips=1][&reset=1][&voice=…]
+//                        a real business from its website, as at onboarding: its site read
+//                        (facts, colours and fonts of its code, logo), then its look (photos into
+//                        its moodboard and library, a capture read by Sonnet: art direction,
+//                        palette), then its first Reel from its site's photos (clips=1 adds the
+//                        stock clips of the same trade). Never published. step=result adds its brand.
 // Lab studios go with /api/admin/delete-studio.
 export const maxDuration = 300;
 
@@ -92,6 +104,88 @@ const CASES: Record<string, LabCase> = {
 
 const labUrl = (name: string) => `lab://${name}`;
 
+/** A real business tested from its site: what it is, what it asks for, and stock clips of the same trade. */
+const KINDS: Record<string, { business: string; title: string; idea: string; clipsOf?: string }> = {
+  coiffeur: {
+    business: "salon de coiffure",
+    title: "Le salon",
+    idea: "Un Reel avec les photos de mon site, qui fait découvrir le salon et donne envie de prendre rendez-vous.",
+  },
+  restaurant: {
+    business: "restaurant",
+    title: "Ce soir",
+    idea: "Un Reel avec les photos de mon site, qui donne envie de venir manger ce soir.",
+    clipsOf: "pizzeria",
+  },
+  pilates: {
+    business: "studio de Pilates",
+    title: "Cours d'essai",
+    idea: "Un Reel avec les photos de mon site, qui donne envie de réserver un cours d'essai.",
+    clipsOf: "pilates",
+  },
+};
+
+const siteKey = (url: string) => `lab://site/${new URL(url).hostname.replace(/^www\./, "")}`;
+
+const factsSchema = z.object({
+  name: z.string().describe("Le nom du commerce, tel qu'il l'écrit"),
+  facts: z.array(z.string()).describe("3 à 5 faits courts et vrais, tirés du site : ville ou quartier, spécialités, ce qui le rend unique, offre ou façon de réserver"),
+});
+
+/** What its site says, in a few true facts (what the editor writes its texts from). */
+async function siteFacts(studioId: string, site: Awaited<ReturnType<typeof readWebsite>>) {
+  const response = await anthropic().beta.messages.parse({
+    model: CHAT_MODEL,
+    max_tokens: 1000,
+    output_config: { effort: "low", format: betaZodOutputFormat(factsSchema) },
+    system: "Tu lis le site d'un commerce de quartier. Réponds en français. Uniquement ce que le site dit, rien d'inventé.",
+    messages: [{ role: "user", content: JSON.stringify({ titre: site.title, nom: site.siteName, description: site.description, texte: site.text.slice(0, 5000) }) }],
+  });
+  await logClaudeCost(studioId, response.usage, "lab_site", CHAT_MODEL);
+  return response.parsed_output;
+}
+
+/** The lab studio of a real business: created from its site once, then its look read (photos, capture). */
+async function siteStudio(url: string, kind: (typeof KINDS)[string]): Promise<string> {
+  const db = supabaseAdmin();
+  const key = siteKey(url);
+  const found = await db.from("studios").select("id").eq("website_url", key).maybeSingle();
+  if (found.data) return found.data.id as string;
+  const site = await readWebsite(url);
+  const host = new URL(site.url).hostname.replace(/^www\./, "");
+  const at = new Date().toISOString();
+  const studio = await db
+    .from("studios")
+    .insert({ name: site.siteName ?? site.title?.split(/[|–—-]/)[0]?.trim() ?? host, business_type: kind.business, website_url: key, onboarding_step: "style", booking_url: site.bookingLinks[0] ?? null })
+    .select("id")
+    .single();
+  if (studio.error) throw new Error(studio.error.message);
+  const studioId = studio.data.id as string;
+  const read = await siteFacts(studioId, site).catch((error: unknown) => {
+    console.warn("lab: site facts failed", error);
+    return null;
+  });
+  await db
+    .from("studios")
+    .update({ ...(read?.name ? { name: read.name.slice(0, 80) } : {}), memory: [...(read?.facts ?? []).slice(0, 5), `Site : ${site.url}`].map((fact) => ({ fact, at })) })
+    .eq("id", studioId);
+  // As Simone saves it after reading the site: the colours and fonts of its code, its logo.
+  const profile = {
+    tone: "chaleureux, tutoiement",
+    colors: site.style.colors.slice(0, 6),
+    fonts: site.style.fonts.slice(0, 2),
+    ...(site.logo ? { logo_url: site.logo } : {}),
+    dos: [],
+    donts: [],
+  };
+  const brand = await db.from("brand_profiles").insert({ studio_id: studioId, version: 1, profile });
+  if (brand.error) throw new Error(brand.error.message);
+  // Its look: the photos into its moodboard and library, then the reading of a capture.
+  const look = await readSiteLook(studioId, site.url, site.logo ? site.images.filter((i) => i.split("?")[0] !== site.logo!.split("?")[0]) : site.images);
+  console.log("lab: site look", host, look);
+  return studioId;
+}
+
 async function labStudio(name: string, c: LabCase): Promise<string> {
   const db = supabaseAdmin();
   const found = await db.from("studios").select("id").eq("website_url", labUrl(name)).maybeSingle();
@@ -159,13 +253,35 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
 }
 
 async function start(name: string, c: LabCase, reset: boolean, voice: string | null) {
-  const db = supabaseAdmin();
   const studioId = await labStudio(name, c);
-  if (reset) {
-    await db.from("posts").delete().eq("studio_id", studioId);
-    await db.from("motion_templates").delete().eq("studio_id", studioId);
-  }
+  if (reset) await clearPosts(studioId);
   const { videos, photos } = await labMedia(studioId, c);
+  await montage(name, studioId, c, videos, photos, voice);
+}
+
+/** A new first Reel: the studio's posts and scenes go (its media and brand stay). */
+async function clearPosts(studioId: string) {
+  const db = supabaseAdmin();
+  await db.from("posts").delete().eq("studio_id", studioId);
+  await db.from("motion_templates").delete().eq("studio_id", studioId);
+}
+
+/** A real business from its site: its site's photos (and the stock clips of its trade, if asked), then its first Reel. */
+async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: string | null) {
+  const kind = KINDS[kindName]!;
+  const studioId = await siteStudio(url, kind);
+  if (reset) await clearPosts(studioId);
+  const db = supabaseAdmin();
+  const { data: site } = await db.from("media_assets").select("id").eq("studio_id", studioId).eq("source", "website").eq("kind", "image").order("created_at").limit(8);
+  const stock = withClips && kind.clipsOf ? CASES[kind.clipsOf] : undefined;
+  const { videos } = stock ? await labMedia(studioId, { ...stock, photosOf: undefined }) : { videos: [] as string[] };
+  const photos = (site ?? []).map((m) => m.id as string);
+  if (!photos.length && !videos.length) throw new Error("lab: no photo on the site, try clips=1");
+  await montage(siteKey(url), studioId, { title: kind.title, idea: kind.idea }, videos, photos, voice);
+}
+
+async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template">, videos: string[], photos: string[], voice: string | null) {
+  const db = supabaseAdmin();
   // Everything read first, as when she sends them: Gemini watches each video, each photo is framed.
   const [analyses] = await Promise.all([
     Promise.all(videos.map((id) => ensureClipAnalysis(studioId, id, { waitMs: 240_000 }))),
@@ -191,19 +307,23 @@ async function start(name: string, c: LabCase, reset: boolean, voice: string | n
   console.log("lab: montage started", name, post.data.id);
 }
 
-async function result(name: string) {
+async function result(key: string) {
   const db = supabaseAdmin();
-  const studio = await db.from("studios").select("id").eq("website_url", labUrl(name)).maybeSingle();
+  const studio = await db.from("studios").select("id, name, business_type, memory").eq("website_url", key).maybeSingle();
   if (!studio.data) return { error: "case not set up" };
   const studioId = studio.data.id as string;
   const post = await db.from("posts").select("id, title, status, agent_note, edit_plan_id, render_id, voice_media_id, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!post.data) return { studioId, error: "no post" };
-  const [plans, message, costs, voice] = await Promise.all([
+  const [plans, message, costs, voice, brand] = await Promise.all([
     db.from("edit_plans").select("id, version, plan, created_at").eq("post_id", post.data.id).order("version"),
     db.from("whatsapp_messages").select("body, created_at").eq("studio_id", studioId).eq("direction", "outbound").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     db.from("cost_events").select("kind, cost_eur").eq("studio_id", studioId),
     post.data.voice_media_id ? db.from("media_assets").select("transcript").eq("id", post.data.voice_media_id).maybeSingle() : Promise.resolve({ data: null }),
+    db.from("brand_profiles").select("version, profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
   ]);
+  // Its charter as the Reel used it: colours, fonts (and the ones swapped for a free twin), art direction.
+  const profile = (brand.data?.profile ?? {}) as { colors?: string[]; fonts?: string[]; art_direction?: string; logo_url?: string; moodboard?: { reading?: string } };
+  const fonts = await usableFonts(profile.fonts, [], "doux").catch(() => ({ fonts: profile.fonts, swaps: [] }));
   const planIds = (plans.data ?? []).map((p) => p.id as string);
   const renders = planIds.length
     ? ((await db.from("renders").select("id, edit_plan_id, status, storage_path, duration_ms, error, created_at").in("edit_plan_id", planIds).order("created_at")).data ?? [])
@@ -217,6 +337,17 @@ async function result(name: string) {
   for (const c of costs.data ?? []) byKind[c.kind as string] = Math.round(((byKind[c.kind as string] ?? 0) + Number(c.cost_eur)) * 1000) / 1000;
   return {
     studioId,
+    studio: { name: studio.data.name, business: studio.data.business_type, facts: studio.data.memory },
+    brand: {
+      version: brand.data?.version ?? null,
+      colors: profile.colors ?? [],
+      fonts: profile.fonts ?? [],
+      fonts_used: fonts.fonts ?? [],
+      font_swaps: fonts.swaps,
+      logo: profile.logo_url ?? null,
+      art_direction: profile.art_direction ?? null,
+      reading: profile.moodboard?.reading?.slice(0, 1200) ?? null,
+    },
     post: post.data,
     plans: (plans.data ?? []).map((p) => ({ id: p.id, version: p.version, at: p.created_at })),
     renders: renders.map((r) => ({ plan: r.edit_plan_id, status: r.status, seconds: r.duration_ms ? Math.round((r.duration_ms as number) / 100) / 10 : null, error: r.error, url: r.storage_path ? url.get(r.storage_path as string) : null })),
@@ -236,11 +367,28 @@ async function result(name: string) {
 export async function POST(request: Request) {
   if (!cronAuthorized(request)) return new Response("unauthorized", { status: 401 });
   const params = new URL(request.url).searchParams;
+  // A real business, from its website.
+  const site = params.get("site");
+  if (site) {
+    const kind = params.get("kind") ?? "";
+    let url: URL;
+    try {
+      url = new URL(/^https?:\/\//i.test(site) ? site : `https://${site}`);
+    } catch {
+      return Response.json({ error: "site" }, { status: 400 });
+    }
+    if (params.get("step") === "result") return Response.json(await result(siteKey(url.href)));
+    if (!KINDS[kind]) return Response.json({ error: `kind=${Object.keys(KINDS).join("|")}` }, { status: 400 });
+    after(() =>
+      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", params.get("voice")).catch((error: unknown) => console.error("lab: site failed", url.href, error)),
+    );
+    return Response.json({ ok: true, site: url.href, kind, started: true });
+  }
   const name = params.get("case") ?? "";
   const c = CASES[name];
   if (!c) return Response.json({ error: `case=${Object.keys(CASES).join("|")}` }, { status: 400 });
   if (c.template && !motionTemplateSchema.safeParse(c.template).success) return Response.json({ error: "template" }, { status: 400 });
-  if (params.get("step") === "result") return Response.json(await result(name));
+  if (params.get("step") === "result") return Response.json(await result(labUrl(name)));
   // call_app gives up after a few seconds: the work goes on after the answer.
   after(() => start(name, c, params.get("reset") === "1", params.get("voice")).catch((error: unknown) => console.error("lab: case failed", name, error)));
   return Response.json({ ok: true, case: name, started: true });

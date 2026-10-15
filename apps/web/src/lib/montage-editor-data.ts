@@ -25,6 +25,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
   const inputs = await loadMontageInputs(studioId, {
     segments: [...plan.data.segments, ...extraVideos.map((clip_id) => ({ clip_id, in: 0, out: 1, zoom: "none" as const }))],
     voice: plan.data.voice,
+    template: plan.data.template,
   });
   // Simone's music plays in the live preview too (the piece kept for this post).
   const { data: post } = data?.post_id ? await db.from("posts").select("music").eq("id", data.post_id).maybeSingle() : { data: null };

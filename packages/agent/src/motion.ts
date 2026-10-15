@@ -27,6 +27,9 @@ const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> 
   collage: { display: "Bricolage Grotesque", body: "Space Mono" },
 };
 
+/** The fonts an ambiance uses when the studio has none (or one a Reel cannot load). */
+export const templateFonts = (template: MotionTemplate) => TEMPLATE_FONTS[template];
+
 /** Footage that keeps playing under an animation: a passage of a clip, or a photo. */
 export type ReelUnder =
   | { type: "clip"; src: string; startFrom: number; adjust?: Adjust; aspect?: number }
