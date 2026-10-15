@@ -304,6 +304,18 @@ export const toolSpecs = {
       only_recognizable: z.boolean().default(false).describe("Ne flouter que les visages reconnaissables (pas les silhouettes de dos ou floues)"),
     }),
   },
+  make_image: {
+    description:
+      "Images par IA, 1 crédit l'image, faites après ta réponse et envoyées toutes seules. improve : améliore une vraie photo (media_id) sans changer ce qu'elle montre : agrandir au format sans couper, fond plus net, plus lumineuse, retirer un objet (instruction). ambiance : 1 à 4 images d'ambiance génériques (fond, texture, détail, objet, nature morte) pour porter un texte quand elle n'a pas de photo ; jamais son lieu, ses produits, ses réalisations ni des personnes. La nouvelle image va dans sa médiathèque (l'original est gardé) ; avec post_id, elle remplace la photo améliorée ou s'ajoute aux photos.",
+    input: z.object({
+      mode: z.enum(["improve", "ambiance"]),
+      media_id: z.uuid().optional().describe("improve : la photo à améliorer"),
+      instruction: z.string().trim().min(3).max(400).describe("improve : ce qu'il faut changer ; ambiance : ce qu'on voit (sujet, matières, lumière)"),
+      format: z.enum(["4:5", "1:1", "9:16"]).default("4:5").describe("4:5 carrousel ou post, 9:16 story ou Reel"),
+      count: z.number().int().min(1).max(4).default(1).describe("ambiance : combien d'images"),
+      post_id: z.uuid().optional(),
+    }),
+  },
   blur_video: {
     description:
       "Floute des zones sur toutes les vidéos du montage d'une publication (par défaut les visages), en les suivant dans le temps, gratuit. Pour les personnes filmées sans leur accord. what vide retire le flou. Refait le rendu après ta réponse (une à deux minutes) ; le lien est envoyé tout seul.",

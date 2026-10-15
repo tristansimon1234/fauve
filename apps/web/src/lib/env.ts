@@ -38,6 +38,9 @@ const schema = {
   // Google AI Studio key and model for video analysis.
   GEMINI_API_KEY: z.string().min(1),
   GEMINI_MODEL: z.string().default("gemini-3.7-flash"),
+  // Image model: real photos improved and ambiance images (lib/ai-images.ts), and its price per 2K image in USD.
+  GEMINI_IMAGE_MODEL: z.string().default("gemini-nano-banana-2.1"),
+  GEMINI_IMAGE_USD: z.coerce.number().nonnegative().default(0.05),
   // Optional prices (USD per million tokens) to log Gemini costs; tokens are logged regardless.
   GEMINI_INPUT_USD_PER_MTOK: z.coerce.number().nonnegative().optional(),
   GEMINI_OUTPUT_USD_PER_MTOK: z.coerce.number().nonnegative().optional(),

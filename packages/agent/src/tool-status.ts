@@ -35,6 +35,7 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   edit_element: "Je prépare la modification…",
   retouch_photos: "Je prépare la retouche…",
   blur_video: "Je prépare le floutage…",
+  make_image: "Je prépare ton image…",
   copy_text_style: "J’étudie ton exemple…",
   read_post: "Je relis la publication…",
   style_texts: "Je change le style des textes…",
