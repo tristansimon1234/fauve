@@ -413,5 +413,11 @@ export async function runPublishWorker() {
     })) + (await matchTikTokDrafts().catch(() => 0));
   const measured = (await captureMetrics()) + (await captureTikTokMetrics().catch(() => 0));
   const refreshed = (await refreshExpiringTokens()) + (await refreshIdleTikTokTokens().catch(() => 0));
-  return { due: due.length, published, handPublished, tiktok, measured, refreshed };
+  // The account day by day (Résultats): a few studios per run.
+  const { captureAccountStats } = await import("./account-stats");
+  const account = await captureAccountStats().catch((error) => {
+    console.error("account stats failed", error);
+    return 0;
+  });
+  return { due: due.length, published, handPublished, tiktok, measured, refreshed, account };
 }

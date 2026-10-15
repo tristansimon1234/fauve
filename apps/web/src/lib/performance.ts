@@ -2,6 +2,8 @@ import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   ANALYST_MODEL,
+  weeklyGrowth,
+  type DailyRow,
   editPlanSchema,
   isMotionSegment,
   MIN_POSTS_FOR_ANALYSIS,
@@ -108,6 +110,18 @@ export async function analyzePerformance(studioId: string): Promise<StoredReport
     };
   });
 
+  // The account week by week (new followers, unfollows, views, profile visits, link taps), when read.
+  const { data: days } = await supabaseAdmin()
+    .from("account_daily")
+    .select("day, followers, new_followers, unfollows, views, reach, profile_views, link_taps, interactions")
+    .eq("studio_id", studioId)
+    .eq("platform", "instagram")
+    .gte("day", new Date(Date.now() - 9 * 7 * 86_400_000).toISOString().slice(0, 10))
+    .order("day");
+  const compte_par_semaine = weeklyGrowth((days ?? []) as DailyRow[], 8)
+    .filter((w) => w.days > 0)
+    .map((w) => ({ semaine_du: w.start, nouveaux_abonnes: w.newFollowers, desabonnements: w.unfollows, solde: w.net, abonnes: w.followers, vues: w.views, visites_profil: w.profileViews, clics_lien: w.linkTaps }));
+
   const response = await anthropic().beta.messages.parse({
     model: ANALYST_MODEL,
     max_tokens: 8000,
@@ -115,7 +129,7 @@ export async function analyzePerformance(studioId: string): Promise<StoredReport
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: PERFORMANCE_PROMPT,
-    messages: [{ role: "user", content: JSON.stringify({ posts: rows }) }],
+    messages: [{ role: "user", content: JSON.stringify({ posts: rows, ...(compte_par_semaine.length ? { compte_par_semaine } : {}) }) }],
   });
   await logClaudeCost(studioId, response.usage, "performance", ANALYST_MODEL);
   if (response.stop_reason === "refusal" || !response.parsed_output) return { error: "L'analyse n'a pas abouti." };

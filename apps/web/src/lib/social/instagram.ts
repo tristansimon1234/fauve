@@ -337,6 +337,82 @@ export async function mediaViews(mediaId: string, accessToken: string): Promise<
   }
 }
 
+// ---------------------------------------------------------------------------
+// The account itself: one day of insights, and who follows it
+// ---------------------------------------------------------------------------
+
+export type AccountDay = Partial<
+  Record<"reach" | "views" | "profile_views" | "website_clicks" | "profile_links_taps" | "accounts_engaged" | "total_interactions" | "new_followers" | "unfollows", number>
+>;
+
+type InsightRow = {
+  name: string;
+  values?: { value: number; end_time?: string }[];
+  total_value?: { value: number; breakdowns?: { results?: { dimension_values: string[]; value: number }[] }[] };
+};
+
+const DAY_METRICS = ["reach", "views", "profile_views", "website_clicks", "profile_links_taps", "accounts_engaged", "total_interactions"];
+
+async function accountInsights(userId: string, token: string, params: Record<string, string>): Promise<InsightRow[]> {
+  const res = await call<{ data: InsightRow[] }>(graphUrl(token, `${userId}/insights?${q({ ...params, access_token: token })}`));
+  return res.data;
+}
+
+/**
+ * One day of the account (since → until, unix seconds): reach, views, profile
+ * visits, link taps, interactions, and follows / unfollows. Meta refuses some
+ * metrics on some accounts (too few followers, retired names): those are left
+ * out instead of failing the day.
+ */
+export async function accountDay(userId: string, token: string, since: number, until: number): Promise<AccountDay> {
+  const range = { period: "day", metric_type: "total_value", since: String(since), until: String(until) };
+  const day: AccountDay = {};
+  const take = (rows: InsightRow[]) => {
+    for (const r of rows) if (DAY_METRICS.includes(r.name)) day[r.name as keyof AccountDay] = r.total_value?.value ?? r.values?.[0]?.value ?? 0;
+  };
+  try {
+    take(await accountInsights(userId, token, { ...range, metric: DAY_METRICS.join(",") }));
+  } catch (error) {
+    if (!(error instanceof InstagramError) || error.status !== 400) throw error;
+    for (const metric of DAY_METRICS) {
+      await accountInsights(userId, token, { ...range, metric }).then(take, () => undefined);
+    }
+  }
+  // Follows (FOLLOWER) and unfollows (NON_FOLLOWER) of the day.
+  const follows = await accountInsights(userId, token, { ...range, metric: "follows_and_unfollows", breakdown: "follow_type" }).catch(() => []);
+  for (const result of follows[0]?.total_value?.breakdowns?.[0]?.results ?? []) {
+    if (result.dimension_values[0] === "FOLLOWER") day.new_followers = result.value;
+    if (result.dimension_values[0] === "NON_FOLLOWER") day.unfollows = result.value;
+  }
+  if (day.new_followers === undefined) {
+    // Older metric: new followers per day (accounts with 100 followers or more, last 30 days).
+    const count = await accountInsights(userId, token, { metric: "follower_count", period: "day", since: String(since), until: String(until) }).catch(() => []);
+    const value = count[0]?.values?.[0]?.value;
+    if (typeof value === "number") day.new_followers = value;
+  }
+  return day;
+}
+
+export type Audience = Partial<Record<"city" | "country" | "age" | "gender", { key: string; value: number }[]>>;
+
+/** Who follows the account (Meta gives it from 100 followers): top cities, countries, ages, genders. */
+export async function followerAudience(userId: string, token: string): Promise<Audience> {
+  const audience: Audience = {};
+  for (const breakdown of ["city", "country", "age", "gender"] as const) {
+    for (const timeframe of ["this_month", "last_30_days"]) {
+      const rows = await accountInsights(userId, token, { metric: "follower_demographics", period: "lifetime", metric_type: "total_value", timeframe, breakdown }).catch(() => null);
+      const results = rows?.[0]?.total_value?.breakdowns?.[0]?.results;
+      if (!results?.length) continue;
+      audience[breakdown] = results
+        .map((r) => ({ key: r.dimension_values.join(" "), value: r.value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+      break;
+    }
+  }
+  return audience;
+}
+
 /** Public reply under a comment, posted as the studio's account. */
 export async function replyToComment(commentId: string, accessToken: string, message: string): Promise<string> {
   const res = await call<{ id: string }>(graphUrl(accessToken, `${commentId}/replies`), {

@@ -1,5 +1,5 @@
 import { PageSuspense } from "@/components/page-suspense";
-import { platformSchema, postKindSchema } from "@fauve/agent";
+import { bestMoments, byFormat, periodTotals, platformSchema, postKindSchema, weeklyGrowth, type PostStat } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { z } from "zod";
@@ -10,13 +10,31 @@ import { daysBefore } from "@/lib/dates";
 import { formatNumber, formatShortDate, kindLabels } from "@/lib/format";
 import { getStudioContext, rows } from "@/lib/studio";
 import { RefreshReportButton } from "./refresh-button";
+import { FollowersChart, FormatTable, Ranking, WeeklyBars } from "./growth";
 
 export const metadata: Metadata = { title: "Résultats" };
 
 const periods = [
   { key: "7", label: "7 jours", days: 7 },
   { key: "30", label: "30 jours", days: 30 },
+  { key: "90", label: "90 jours", days: 90 },
 ] as const;
+const WEEKS = 12;
+
+const nullableInt = z.number().nullable().catch(null);
+const dailySchema = z.object({
+  platform: platformSchema,
+  day: z.string(),
+  followers: nullableInt,
+  new_followers: nullableInt,
+  unfollows: nullableInt,
+  views: nullableInt,
+  reach: nullableInt,
+  profile_views: nullableInt,
+  link_taps: nullableInt,
+  interactions: nullableInt,
+});
+const audienceSchema = z.record(z.string(), z.array(z.object({ key: z.string(), value: z.number() }))).catch({});
 
 const count = z.number().int().nullable();
 const metricSchema = z.object({
@@ -79,7 +97,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   const period = periods.find((p) => p.key === periode) ?? periods[1];
   const since = daysBefore(new Date(), period.days).toISOString();
 
-  const [metricsResult, bookingsResult, reportResult] = await Promise.all([
+  const [metricsResult, bookingsResult, reportResult, dailyResult, audienceResult] = await Promise.all([
     db
       .from("metrics")
       .select("post_id, platform, captured_at, views, reach, likes, saves, shares, comments, profile_visits")
@@ -98,6 +116,13 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
       .eq("studio_id", studioId)
       .order("period_end", { ascending: false })
       .limit(1),
+    db
+      .from("account_daily")
+      .select("platform, day, followers, new_followers, unfollows, views, reach, profile_views, link_taps, interactions")
+      .eq("studio_id", studioId)
+      .gte("day", daysBefore(new Date(), WEEKS * 7 + 7).toISOString().slice(0, 10))
+      .order("day"),
+    db.from("account_audience").select("data").eq("studio_id", studioId).eq("platform", "instagram").order("captured_on", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (bookingsResult.error) throw new Error(`bookings_attribution: ${bookingsResult.error.message}`);
   const report = rows(reportSchema, reportResult, "weekly_reports")[0] ?? null;
@@ -110,6 +135,18 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   }
   const snapshots = [...latest.values()];
   const bookings = bookingsResult.count ?? 0;
+
+  // The account itself, day by day (lib/social/account-stats.ts).
+  const daily = rows(dailySchema, dailyResult, "account_daily");
+  const igDaily = daily.filter((d) => d.platform === "instagram");
+  const ttDaily = daily.filter((d) => d.platform === "tiktok");
+  const from = since.slice(0, 10);
+  const ig = periodTotals(igDaily, from);
+  const tt = ttDaily.length ? periodTotals(ttDaily, from) : null;
+  const weeks = weeklyGrowth(igDaily, WEEKS);
+  const ttWeeks = ttDaily.length ? weeklyGrowth(ttDaily, WEEKS) : null;
+  const audience = audienceSchema.parse((audienceResult.data as { data?: unknown } | null)?.data ?? {});
+  const tz = member.studio.timezone;
 
   const header = (
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -134,7 +171,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
     </div>
   );
 
-  if (!snapshots.length && !bookings && !report) {
+  if (!snapshots.length && !bookings && !report && !daily.length) {
     return (
       <>
         {header}
@@ -156,32 +193,48 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
     .sort((a, b) => (b.totals.views ?? b.totals.reach ?? 0) - (a.totals.views ?? a.totals.reach ?? 0))
     .slice(0, 3);
 
-  const titles = new Map<string, { title: string; kind: z.infer<typeof postKindSchema> }>();
-  if (ranked.length) {
+  const titles = new Map<string, { title: string; kind: z.infer<typeof postKindSchema>; published_at: string | null }>();
+  if (byPost.size) {
     const posts = rows(
-      z.object({ id: z.uuid(), title: z.string(), kind: postKindSchema }),
+      z.object({ id: z.uuid(), title: z.string(), kind: postKindSchema, published_at: z.string().nullable() }),
       await db
         .from("posts")
-        .select("id, title, kind")
+        .select("id, title, kind, published_at")
         .eq("studio_id", studioId)
-        .in(
-          "id",
-          ranked.map((r) => r.postId),
-        ),
+        .in("id", [...byPost.keys()]),
       "posts",
     );
     for (const p of posts) titles.set(p.id, p);
   }
+  // Each post's numbers (Instagram first), for the formats and the best moments.
+  const postStats: PostStat[] = [...byPost.entries()].flatMap(([postId, list]) => {
+    const post = titles.get(postId);
+    const m = list.find((x) => x.platform === "instagram") ?? list[0]!;
+    return post ? [{ kind: post.kind, publishedAt: post.published_at, views: m.views, reach: m.reach, likes: m.likes, comments: m.comments, saves: m.saves, shares: m.shares }] : [];
+  });
+  const formats = byFormat(postStats);
+  const moments = bestMoments(postStats, tz);
 
   const show = (value: number | null) => (value === null ? "—" : formatNumber(value));
+  const signed = (n: number | null) => (n === null ? "—" : `${n > 0 ? "+" : n < 0 ? "−" : ""}${formatNumber(Math.abs(n))}`);
+  const gained = ig.newFollowers ?? ig.net;
   const kpis: [string, string, string][] = [
     ["Réservations venues des réseaux", formatNumber(bookings), "via tes liens de réservation suivis"],
-    ["Vues", show(totals.views), "Reels, posts et stories"],
-    ["Comptes touchés", show(totals.reach), "personnes différentes"],
-    ["Visites du profil", show(totals.profile_visits), "depuis tes publications"],
+    [
+      "Nouveaux abonnés",
+      gained === null ? "—" : `${ig.newFollowers === null ? signed(gained) : `+${formatNumber(gained)}`}`,
+      ig.newFollowers !== null && ig.unfollows !== null
+        ? `${formatNumber(ig.unfollows)} désabonnements · solde ${signed(ig.net)}${ig.followers !== null ? ` · ${formatNumber(ig.followers)} au total` : ""}`
+        : ig.followers !== null
+          ? `${formatNumber(ig.followers)} abonnés Instagram au total`
+          : "Instagram, relevé chaque jour",
+    ],
+    ["Vues", show(ig.views ?? totals.views), ig.views !== null ? "tout ton compte Instagram" : "Reels, posts et stories"],
+    ["Visites du profil", show(ig.profileViews ?? totals.profile_visits), ig.linkTaps ? `${formatNumber(ig.linkTaps)} clics sur ton lien` : "depuis tes publications"],
   ];
   // The first KPI (bookings from social media) is the product's headline number.
   const kpiStyles = ["bg-violet text-white", "bg-peach text-ink", "bg-soft text-ink", "bg-soft text-ink"];
+  const hasWeeks = weeks.some((w) => w.days > 0);
 
   return (
     <>
@@ -195,6 +248,87 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           </div>
         ))}
       </div>
+
+      <section className="flex flex-col gap-4 rounded-[22px] border border-line p-5 sm:p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-bold">Tes abonnés, semaine par semaine</h2>
+          {ig.followers !== null && <span className="text-[13px] font-semibold text-muted">{formatNumber(ig.followers)} abonnés sur Instagram</span>}
+        </div>
+        {hasWeeks ? (
+          <>
+            <FollowersChart weeks={weeks} timeZone={tz} />
+            <div className="flex flex-wrap gap-3">
+              <WeeklyBars weeks={weeks} pick={(w) => w.views} label="Vues" timeZone={tz} />
+              <WeeklyBars weeks={weeks} pick={(w) => w.profileViews} label="Visites du profil" timeZone={tz} />
+              <WeeklyBars weeks={weeks} pick={(w) => w.linkTaps} label="Clics sur ton lien" timeZone={tz} />
+              <WeeklyBars weeks={weeks} pick={(w) => w.interactions} label="Interactions" timeZone={tz} />
+            </div>
+          </>
+        ) : (
+          <p className="text-sm leading-relaxed text-muted">
+            Simone relève les chiffres de ton compte Instagram chaque jour (nouveaux abonnés, désabonnements, vues, visites du profil, clics) et remonte jusqu’à 30 jours en arrière.
+            Les premières semaines apparaissent ici dans l’heure qui suit la connexion.
+          </p>
+        )}
+        {tt && ttWeeks && (
+          <div className="flex flex-col gap-2 border-t border-line pt-4">
+            <span className="text-[14px] font-bold">
+              TikTok{tt.followers !== null ? ` · ${formatNumber(tt.followers)} abonnés` : ""}
+              {tt.net !== null ? <span className="font-semibold text-muted"> · {signed(tt.net)} sur la période</span> : null}
+            </span>
+            <FollowersChart weeks={ttWeeks} timeZone={tz} />
+          </div>
+        )}
+      </section>
+
+      {(formats.length > 0 || moments.days.length > 0) && (
+        <div className="flex flex-wrap items-start gap-6">
+          {formats.length > 0 && (
+            <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
+              <h2 className="text-base font-bold">Ce que rapporte chaque format</h2>
+              <FormatTable rows={formats} labels={kindLabels} />
+              <p className="text-[12px] text-muted">Moyenne par publication de Simone sur la période. Engagement : j’aime, commentaires, enregistrements et partages rapportés aux comptes touchés.</p>
+            </section>
+          )}
+          {moments.days.length > 0 && (
+            <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
+              <h2 className="text-base font-bold">Tes meilleurs moments</h2>
+              <Ranking items={moments.days.slice(0, 4)} unit="vues" />
+              {moments.slots.length > 1 && (
+                <>
+                  <span className="text-xs font-extrabold tracking-[.06em] text-muted">DANS LA JOURNÉE</span>
+                  <Ranking items={moments.slots} unit="vues" />
+                </>
+              )}
+              <p className="text-[12px] text-muted">Vues moyennes selon le jour et l’heure de publication. Plus il y a de posts, plus c’est fiable.</p>
+            </section>
+          )}
+        </div>
+      )}
+
+      {Boolean(audience.city?.length || audience.age?.length) && (
+        <section className="flex flex-col gap-4 rounded-[22px] border border-line p-5.5">
+          <h2 className="text-base font-bold">Qui te suit</h2>
+          <div className="flex flex-wrap gap-6">
+            {[
+              ["Villes", audience.city],
+              ["Âges", audience.age],
+              ["Genre", audience.gender?.map((g) => ({ ...g, key: g.key === "F" ? "femmes" : g.key === "M" ? "hommes" : "autre" }))],
+            ].map(([title, list]) => {
+              const items = list as { key: string; value: number }[] | undefined;
+              if (!items?.length) return null;
+              const total = items.reduce((a, b) => a + b.value, 0) || 1;
+              return (
+                <div key={title as string} className="flex min-w-0 flex-[1_1_240px] flex-col gap-2">
+                  <span className="text-xs font-extrabold tracking-[.06em] text-muted uppercase">{title as string}</span>
+                  <Ranking items={items.slice(0, 5).map((i) => ({ label: i.key.split(",")[0]!, value: Math.round((i.value / total) * 100) }))} unit="%" />
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[12px] text-muted">D’après Instagram (à partir de 100 abonnés). Pour un commerce de quartier, la part de ta ville est le chiffre à suivre.</p>
+        </section>
+      )}
 
       <div className="flex flex-wrap items-start gap-6">
         <section className="flex min-w-0 flex-[1_1_380px] flex-col gap-3.5 rounded-[22px] bg-soft p-6">
@@ -279,7 +413,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           )}
         </section>
       </div>
-      <p className="text-[13px] text-muted">Pour chaque publication, le dernier relevé des {period.days} derniers jours.</p>
+      <p className="text-[13px] text-muted">Chiffres du compte : relevés chaque jour. Pour chaque publication : le dernier relevé des {period.days} derniers jours.</p>
     </>
   );
 }

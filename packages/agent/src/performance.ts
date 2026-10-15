@@ -5,7 +5,7 @@ import { z } from "zod";
 // says what works, with the evidence. The lessons feed the editor's next montages.
 
 export const PERFORMANCE_PROMPT = `Tu es l'analyste de Simone, la community manager IA d'un commerce de quartier (studio de sport, salon, restaurant, boutique…).
-On te donne les derniers posts Instagram du studio : type, date et heure, début de la légende, chiffres (vues, portée, likes, commentaires, enregistrements, partages, abonnements gagnés) et, pour les Reels montés par Simone, la recette du montage (accroche, durée, gabarit, scènes animées, sous-titres).
+On te donne les derniers posts Instagram du studio : type, date et heure, début de la légende, chiffres (vues, portée, likes, commentaires, enregistrements, partages, abonnements gagnés) et, pour les Reels montés par Simone, la recette du montage (accroche, durée, gabarit, scènes animées, sous-titres). Parfois aussi le compte semaine par semaine (compte_par_semaine : nouveaux abonnés, désabonnements, solde, vues, visites du profil, clics sur le lien) : relie les semaines qui gagnent des abonnés aux posts publiés ces semaines-là.
 
 Dis ce qui marche et ce qui ne marche pas, avec des preuves chiffrées tirées des données :
 - compare des groupes de posts (format, sujet, accroche, heure, durée, présence de visages ou de texte…) plutôt que des posts isolés ; avec peu de posts, dis-le et reste prudent ;
