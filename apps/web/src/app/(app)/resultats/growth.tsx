@@ -82,21 +82,22 @@ export function WeeklyBars({ weeks, pick, label, timeZone }: { weeks: Week[]; pi
   );
 }
 
-export type FormatRow = { kind: string; posts: number; views: number | null; reach: number | null; saves: number | null; shares: number | null; engagement: number | null };
+export type FormatRow = { kind: string; posts: number; views: number | null; reach: number | null; saves: number | null; shares: number | null; profileVisits: number | null; interest: number | null };
 
 export function FormatTable({ rows, labels }: { rows: FormatRow[]; labels: Record<string, string> }) {
   const percent = (v: number | null) => (v === null ? "—" : `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(v * 100)} %`);
   const show = (v: number | null) => (v === null ? "—" : formatNumber(v));
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[420px] text-left text-[13px]">
+      <table className="w-full min-w-[480px] text-left text-[13px]">
         <thead className="text-[11px] font-extrabold tracking-[.05em] text-muted uppercase">
           <tr>
             <th className="py-2 pr-3 font-extrabold">Format</th>
-            <th className="py-2 pr-3 text-right font-extrabold">Vues / post</th>
-            <th className="py-2 pr-3 text-right font-extrabold">Comptes touchés</th>
+            <th className="py-2 pr-3 text-right font-extrabold">Visites du profil</th>
             <th className="py-2 pr-3 text-right font-extrabold">Enregistrements</th>
-            <th className="py-2 text-right font-extrabold">Engagement</th>
+            <th className="py-2 pr-3 text-right font-extrabold">Partages</th>
+            <th className="py-2 pr-3 text-right font-extrabold">Vues</th>
+            <th className="py-2 text-right font-extrabold">Intérêt</th>
           </tr>
         </thead>
         <tbody>
@@ -105,10 +106,11 @@ export function FormatTable({ rows, labels }: { rows: FormatRow[]; labels: Recor
               <td className="py-2.5 pr-3 font-bold">
                 {labels[r.kind] ?? r.kind} <span className="font-semibold text-muted">· {r.posts}</span>
               </td>
-              <td className="py-2.5 pr-3 text-right tabular-nums">{show(r.views)}</td>
-              <td className="py-2.5 pr-3 text-right tabular-nums">{show(r.reach)}</td>
+              <td className="py-2.5 pr-3 text-right tabular-nums">{show(r.profileVisits)}</td>
               <td className="py-2.5 pr-3 text-right tabular-nums">{show(r.saves)}</td>
-              <td className="py-2.5 text-right font-bold tabular-nums">{percent(r.engagement)}</td>
+              <td className="py-2.5 pr-3 text-right tabular-nums">{show(r.shares)}</td>
+              <td className="py-2.5 pr-3 text-right text-muted tabular-nums">{show(r.views)}</td>
+              <td className="py-2.5 text-right font-bold tabular-nums">{percent(r.interest)}</td>
             </tr>
           ))}
         </tbody>

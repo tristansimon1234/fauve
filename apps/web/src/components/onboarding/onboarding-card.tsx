@@ -1,6 +1,6 @@
 "use client";
 
-import { MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STEPS, type OnboardingStep } from "@fauve/agent";
+import { MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STEPS, RHYTHM_PRESETS, sampleWeek, type OnboardingStep } from "@fauve/agent";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -122,6 +122,7 @@ export function OnboardingCard({
       {step === "rhythm" && view && (
         <RhythmStep
           initial={view.rhythm}
+          offer={view.offer}
           pending={pending}
           onSave={(posts, stories) =>
             start(async () => {
@@ -419,15 +420,73 @@ function Counter({ label, value, min, max, onChange }: { label: string; value: n
   );
 }
 
-function RhythmStep({ initial, pending, onSave }: { initial: { posts: number; stories: number }; pending: boolean; onSave: (posts: number, stories: number) => void }) {
+function RhythmStep({
+  initial,
+  offer,
+  pending,
+  onSave,
+}: {
+  initial: { posts: number; stories: number };
+  offer: OnboardingView["offer"];
+  pending: boolean;
+  onSave: (posts: number, stories: number) => void;
+}) {
   const [posts, setPosts] = useState(initial.posts);
   const [stories, setStories] = useState(initial.stories);
+  // About 4.3 weeks a month.
+  const perMonth = Math.round(posts * 4.3);
+  const week = sampleWeek(posts);
   return (
     <>
-      <p className="text-[14px] leading-relaxed text-muted">Combien de publications par semaine ? Je prépare ta semaine avec, et je te relance s’il manque quelque chose. Tu pourras le changer quand tu veux.</p>
+      <p className="text-[14px] leading-relaxed text-muted">
+        Combien de publications par semaine ? Mieux vaut 2 ou 3 publications soignées, chaque semaine, que 5 faites à la va-vite : ce qui fait venir des clients, c’est d’être là
+        régulièrement avec des posts qui donnent envie. Je prépare ta semaine avec, et tu pourras le changer quand tu veux.
+      </p>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Rythmes proposés">
+        {RHYTHM_PRESETS.map((p) => {
+          const on = p.posts === posts && p.stories === stories;
+          return (
+            <button
+              key={p.label}
+              type="button"
+              aria-pressed={on}
+              onClick={() => (setPosts(p.posts), setStories(p.stories))}
+              className={`flex flex-col items-start rounded-[14px] border-[1.5px] px-3.5 py-2 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
+            >
+              <span className="text-[13px] font-bold">
+                {p.label}
+                {p.advised && <span className="ml-1.5 rounded-full bg-violet px-1.5 py-0.5 text-[10px] font-extrabold text-white">conseillé</span>}
+              </span>
+              <span className="text-[12px] text-muted">
+                {p.posts} posts · {p.stories} stories
+              </span>
+            </button>
+          );
+        })}
+      </div>
       <div className="flex flex-col gap-2">
         <Counter label="Posts et Reels" value={posts} min={1} max={14} onChange={setPosts} />
         <Counter label="Stories" value={stories} min={0} max={21} onChange={setStories} />
+      </div>
+      <div className="flex flex-col gap-1.5 rounded-[16px] bg-soft px-4 py-3">
+        <span className="text-xs font-extrabold tracking-[.06em] text-muted">UNE SEMAINE TYPE</span>
+        <ul className="flex flex-col gap-1">
+          {week.map((d) => (
+            <li key={d.day} className="text-[13px]">
+              <b className="capitalize">{d.day}</b> · {d.idea}
+            </li>
+          ))}
+          {stories > 0 && (
+            <li className="text-[13px]">
+              <b>Stories</b> · les coulisses du jour, une question, les places ou créneaux libres : elles parlent à ceux qui te suivent déjà, ceux qui réservent.
+            </li>
+          )}
+        </ul>
+        <span className="text-[12px] leading-snug text-muted">
+          Environ {perMonth} publications par mois. Avec {offer.label} ({offer.credits} crédits), de quoi faire {offer.reels} Reels soignés par mois ; les carrousels et les photos avec leurs
+          textes ne coûtent rien.
+          {posts > offer.postsPerWeek + 1 && " À ce rythme, alterne les Reels avec des carrousels pour garder le même soin sur chacun."}
+        </span>
       </div>
       <button type="button" disabled={pending} onClick={() => onSave(posts, stories)} className="btn btn-primary h-11 self-start px-5 disabled:opacity-40">
         C’est mon rythme

@@ -1,6 +1,6 @@
 "use server";
 
-import { brandProfileSchema, nextOnboardingStep, ONBOARDING_STEPS, onboardingStepOf, type OnboardingStep } from "@fauve/agent";
+import { brandProfileSchema, nextOnboardingStep, ONBOARDING_STEPS, onboardingStepOf, PLANS, planOf, reelsPerMonth, type OnboardingStep } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
@@ -18,6 +18,8 @@ export type OnboardingView = {
   /** fromSite: Simone took these photos from her website (she has not made her own moodboard yet). */
   moodboard: { items: { path: string; url: string }[]; reading: string | null; fromSite: boolean };
   rhythm: { posts: number; stories: number };
+  /** Her offer: what its credits hold, to choose a rhythm she can keep with care. */
+  offer: { label: string; credits: number; postsPerWeek: number; reels: number };
   instagram: string | null;
 };
 
@@ -27,12 +29,14 @@ export async function onboardingView(): Promise<OnboardingView | null> {
   const studioId = member.studio.id;
   const admin = supabaseAdmin();
   const [studio, profileRow, plan, account] = await Promise.all([
-    admin.from("studios").select("onboarding_step, website_url, business_type").eq("id", studioId).single(),
+    admin.from("studios").select("onboarding_step, website_url, business_type, plan").eq("id", studioId).single(),
     admin.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     admin.from("content_plans").select("posts_per_week, stories_per_week").eq("studio_id", studioId).maybeSingle(),
     admin.from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").eq("status", "connected").limit(1).maybeSingle(),
   ]);
   const profile = brandProfileSchema.partial().catch({}).parse(profileRow.data?.profile ?? {});
+  const offerId = planOf(studio.data?.plan);
+  const offer = PLANS[offerId];
   const items = profile.moodboard?.items ?? [];
   const paths = [...items.map((i) => i.path), ...(profile.logo_path ? [profile.logo_path] : [])];
   const urls = paths.length ? await signMediaUrls(db, studioId, paths) : new Map<string, string>();
@@ -47,7 +51,8 @@ export async function onboardingView(): Promise<OnboardingView | null> {
       logoUrl: (profile.logo_path ? urls.get(profile.logo_path) : null) ?? profile.logo_url ?? null,
     },
     moodboard: { items: items.flatMap((i) => (urls.get(i.path) ? [{ path: i.path, url: urls.get(i.path)! }] : [])), reading: profile.moodboard?.reading ?? null, fromSite: items.some((i) => i.note === "Photo de ton site") },
-    rhythm: { posts: (plan.data?.posts_per_week as number | null) ?? 3, stories: (plan.data?.stories_per_week as number | null) ?? 4 },
+    rhythm: { posts: (plan.data?.posts_per_week as number | null) ?? offer.postsPerWeek, stories: (plan.data?.stories_per_week as number | null) ?? 4 },
+    offer: { label: offer.label, credits: offer.credits, postsPerWeek: offer.postsPerWeek, reels: reelsPerMonth(offerId) },
     instagram: (account.data?.handle as string | null) ?? null,
   };
 }

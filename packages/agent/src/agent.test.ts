@@ -1029,7 +1029,7 @@ test("TikTok: caption with every hashtag, settings and states", async () => {
 });
 
 test("growth: weeks of new followers, net from counts, formats and moments", async () => {
-  const { weeklyGrowth, weekStart, periodTotals, byFormat, bestMoments } = await import("./growth.ts");
+  const { weeklyGrowth, weekStart, periodTotals, byFormat, bestMoments, suggestedMoment } = await import("./growth.ts");
   assert.equal(weekStart("2026-10-15"), "2026-10-12"); // a Thursday → its Monday
   assert.equal(weekStart("2026-10-12"), "2026-10-12");
   const row = (day: string, o: Partial<Record<string, number | null>> = {}) => ({
@@ -1057,12 +1057,30 @@ test("growth: weeks of new followers, net from counts, formats and moments", asy
     { kind: "carousel", publishedAt: "2026-10-06T17:00:00Z", views: 300, reach: 250, likes: 30, comments: 2, saves: 15, shares: 3 },
   ];
   const formats = byFormat(posts);
-  assert.equal(formats[0]!.kind, "reel");
-  assert.equal(formats[0]!.views, 800);
-  assert.ok(Math.abs(formats[0]!.engagement! - (80 / 800 + 40 / 400) / 2) < 1e-9);
+  // Interest (saves and shares over reach here) ranks the carousel first, despite fewer views.
+  assert.equal(formats[0]!.kind, "carousel");
+  const reel = formats.find((f) => f.kind === "reel")!;
+  assert.equal(reel.views, 800);
+  assert.ok(Math.abs(reel.engagement! - (80 / 800 + 40 / 400) / 2) < 1e-9);
+  assert.ok(Math.abs(reel.interest! - (25 / 800 + 20 / 400) / 2) < 1e-9);
   const moments = bestMoments(posts, "Europe/Paris");
+  assert.equal(moments.by, "views");
   assert.equal(moments.days[0]!.label, "mardi"); // 7 Oct 9:00 in Paris
   assert.equal(moments.slots[0]!.label, "le soir"); // 650 on average (18 h, 19 h) against 600 at 9 h
+  // With profile visits, the moments follow visits, not views.
+  const visited = posts.map((p, i) => ({ ...p, profileVisits: [4, 30, 6][i]! }));
+  const byVisits = bestMoments(visited, "Europe/Paris");
+  assert.equal(byVisits.by, "visits");
+  assert.equal(byVisits.slots[0]!.label, "le matin");
+  assert.equal(suggestedMoment(byVisits), null); // 3 posts: too few to advise
+  // Tuesday mornings bring the visits, week after week: that is her moment.
+  const at = (publishedAt: string, profileVisits: number) => ({ ...posts[0]!, publishedAt, profileVisits });
+  const regular = [
+    at("2026-09-29T07:00:00Z", 30), at("2026-10-06T07:00:00Z", 28), // Tuesdays, 9 h
+    at("2026-10-01T16:00:00Z", 5), at("2026-10-08T16:00:00Z", 6), // Thursdays, 18 h
+    at("2026-10-03T10:00:00Z", 8), at("2026-10-10T10:00:00Z", 7), // Saturdays, noon
+  ];
+  assert.equal(suggestedMoment(bestMoments(regular, "Europe/Paris")), "le mardi, le matin");
 });
 
 test("art direction: filled from a reading only when empty", async () => {
@@ -1096,4 +1114,19 @@ test("followers: counts kept, earlier days worked back from gains and losses", a
   // Without gains and losses (TikTok), only the counts read.
   const tiktok = followerSeries([row("2026-10-12", { followers: 40 }), row("2026-10-14", { followers: 44 })], 5, new Date("2026-10-15T09:00:00Z"));
   assert.deepEqual(tiktok.map((p) => p.followers), [40, 44]);
+});
+
+test("rhythm: a sample week per count, Reels a month of credits holds", async () => {
+  const { sampleWeek, RHYTHM_PRESETS } = await import("./rhythm.ts");
+  const { PLANS, reelsPerMonth, CARED_REEL_CREDITS } = await import("./plans.ts");
+  assert.deepEqual(sampleWeek(3).map((d) => d.day), ["mardi", "jeudi", "samedi"]);
+  assert.match(sampleWeek(3)[0]!.idea, /résultat/);
+  assert.equal(sampleWeek(0).length, 1);
+  assert.equal(sampleWeek(12).length, 7);
+  assert.equal(RHYTHM_PRESETS.filter((p) => p.advised).length, 1);
+  // Each offer pays for at least one Reel made with care per post of its weekly rhythm (about 4 weeks a month), carousels aside.
+  for (const plan of ["essentiel", "pro"] as const) {
+    assert.equal(reelsPerMonth(plan), Math.floor(PLANS[plan].credits / CARED_REEL_CREDITS));
+    assert.ok(reelsPerMonth(plan) >= PLANS[plan].postsPerWeek * 3, plan);
+  }
 });

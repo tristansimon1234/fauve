@@ -9,7 +9,7 @@ import type { InspirationItem } from "@/lib/inspirations";
 import { useFauveDrawer } from "./fauve-drawer";
 import { ArrowLeftIcon, CheckIcon, FilmIcon, ImageIcon, LayersIcon, PlayIcon, PlusIcon, UploadIcon, XIcon } from "./icons";
 import { InspirationPicker } from "./inspiration-picker";
-import { buildSlideProps, placeElement } from "@fauve/agent";
+import { buildSlideProps, CREDIT_PRICES, placeElement } from "@fauve/agent";
 import { SlidePreview } from "./montage/slide-preview";
 import { Orb } from "./orb";
 
@@ -597,7 +597,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                 <div className="flex items-center gap-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={example.preview} alt="" className="h-20 w-16 rounded-lg object-cover" />
-                  <span className="min-w-0 flex-1 text-[13px] leading-snug text-muted">Simone en tire tes composants (titre, étiquette, liste…), les garde dans ta banque et les pose sur tes photos (3 crédits).</span>
+                  <span className="min-w-0 flex-1 text-[13px] leading-snug text-muted">Simone en tire tes composants (titre, étiquette, liste…), les garde dans ta banque et les pose sur tes photos ({CREDIT_PRICES.textLayer} crédits).</span>
                   <button
                     type="button"
                     onClick={() => {
