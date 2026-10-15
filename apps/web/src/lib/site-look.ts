@@ -1,5 +1,5 @@
 import "server-only";
-import { brandColorsFromLook, CHAT_MODEL } from "@fauve/agent";
+import { brandColorsFromLook, CHAT_MODEL, withArtDirection } from "@fauve/agent";
 import sharp from "sharp";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
 import { readMoodboard } from "@/lib/agent/moodboard";
@@ -109,7 +109,7 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
   // Her theme's colours, as found in the site's code: the palette starts from them.
   const siteColors = ((current?.profile as { colors?: unknown } | null)?.colors as string[] | undefined)?.filter((c) => typeof c === "string").slice(0, 6) ?? [];
   const business = (studio?.business_type as string | null) ?? null;
-  let reading: { reading: string; palette: string[]; fonts?: { display: string; body: string } } | null = null;
+  let reading: { reading: string; direction?: string; palette: string[]; fonts?: { display: string; body: string } } | null = null;
   try {
     reading = await readMoodboard(
       studioId,
@@ -139,7 +139,8 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
     const fonts = known?.length ? null : reading.fonts ? [...new Set([reading.fonts.display, reading.fonts.body])] : null;
     const look = { reading: reading.reading, palette: reading.palette };
     return {
-      ...profile,
+      // Her « Direction artistique » too, when she has not written one.
+      ...withArtDirection(profile as { art_direction?: unknown }, reading.direction),
       ...(colors?.length ? { colors } : {}),
       ...(fonts?.length ? { fonts } : {}),
       moodboard: { ...(current ?? {}), items: current?.items ?? items, ...look, read_at: new Date().toISOString() },

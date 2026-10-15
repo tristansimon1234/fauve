@@ -18,10 +18,14 @@ La personne qui gère le commerce (femme ou homme : n'accorde rien de ce qui la 
 Sois concrète et directive, sans généralités ni paraphrase des images une par une. Tiens compte des notes de la gérante : elles disent ce qu'elle aime dans chaque image.
 Si les images partent dans des directions opposées, dis-le et propose la ligne qui les réunit.
 Texte en français, 900 caractères au maximum, en phrases courtes ou tirets.
-Palette : 3 à 5 couleurs hex tirées des images, la principale en premier.`;
+Palette : 3 à 5 couleurs hex tirées des images, la principale en premier.
+Direction : la même chose en 2 ou 3 phrases simples, à la deuxième personne ou sans sujet, comme une note qu'elle pourrait avoir écrite (« Minimaliste et lumineux, tons terracotta et crème, typographie éditoriale, mouvements lents. Jamais de néon. »), 300 caractères au maximum.`;
 
 export const moodboardReadingSchema = z.object({
   reading: z.string().describe("La direction artistique tirée du moodboard, 900 caractères au maximum"),
+  direction: z
+    .string()
+    .describe("La même direction en 2 ou 3 phrases simples, comme la personne qui gère l'écrirait elle-même dans son profil (ambiance, couleurs, typographie, mouvements, ce qu'on évite), 300 caractères au maximum"),
   palette: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).describe("3 à 5 couleurs hex, la principale en premier"),
   fonts: z
     .object({
@@ -31,3 +35,13 @@ export const moodboardReadingSchema = z.object({
     .describe("Les deux polices de la charte, en familles Google Fonts"),
 });
 export type MoodboardReading = z.infer<typeof moodboardReadingSchema>;
+
+/**
+ * Her « Direction artistique » (Style) stays hers: Simone only fills it when it
+ * is empty, with the short version of a reading (site or moodboard).
+ */
+export function withArtDirection<T extends { art_direction?: unknown }>(profile: T, direction: string | null | undefined): T {
+  const current = typeof profile.art_direction === "string" ? profile.art_direction.trim() : "";
+  const next = direction?.trim();
+  return current || !next ? profile : { ...profile, art_direction: next.slice(0, 600) };
+}

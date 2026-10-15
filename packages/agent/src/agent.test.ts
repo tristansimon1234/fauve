@@ -1054,3 +1054,11 @@ test("growth: weeks of new followers, net from counts, formats and moments", asy
   assert.equal(moments.days[0]!.label, "mardi"); // 7 Oct 9:00 in Paris
   assert.equal(moments.slots[0]!.label, "le soir"); // 650 on average (18 h, 19 h) against 600 at 9 h
 });
+
+test("art direction: filled from a reading only when empty", async () => {
+  const { withArtDirection } = await import("./moodboard.ts");
+  assert.equal(withArtDirection({} as { art_direction?: string }, "Chaleureux et naturel.").art_direction, "Chaleureux et naturel.");
+  assert.equal(withArtDirection({ art_direction: "  " }, "Chaleureux.").art_direction, "Chaleureux.");
+  assert.equal(withArtDirection({ art_direction: "Le mien." }, "Chaleureux.").art_direction, "Le mien.");
+  assert.deepEqual(withArtDirection({ tone: "x" } as { tone: string; art_direction?: string }, null), { tone: "x" });
+});
