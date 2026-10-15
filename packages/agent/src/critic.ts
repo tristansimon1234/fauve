@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { planTimeline } from "./motion.ts";
-import { isClipSegment, isMotionSegment, type EditPlan } from "./schemas.ts";
+import { isClipSegment, isMotionSegment, type EditPlan, type MotionTemplate } from "./schemas.ts";
+import { beatOf, TEMPLATE_BPM } from "./tempo.ts";
 
 // The critic: before a Soigné or Max montage goes out, Opus watches key frames
 // of the rendered video (the hook, every scene, the end), picks the best
@@ -65,7 +66,8 @@ export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Simone, 
 - l'accroche : la 1re seconde donne envie de rester (une personne, un résultat ou un mouvement fort, jamais un plan vide, un décor ou un logo seul) ; le texte d'accroche est court, gros, lisible ;
 - la lisibilité : textes assez gros, contrastés sur l'image, jamais coupés ni collés au bord, hors des zones que l'interface d'Instagram recouvre (le bas et le bord droit), jamais posés sur un visage ;
 - l'image : pas de plan flou, trop sombre, mal cadré ou qui ne montre rien ;
-- le rythme et l'histoire : un ordre logique, pas de scène inutile ou répétée, une fin claire (nom ou logo, appel à l'action) ;
+- le rythme et l'histoire : un ordre logique, pas de scène inutile ou répétée, une fin claire (nom ou logo, appel à l'action) ; la ligne « Rythme » du plan te donne ce que les images ne montrent pas (longueur de chaque plan, coupes sur le temps, transition signature) : refuse un Reel mou (plans trop longs sans raison), haché (que des plans très courts) ou monotone (tous les plans de la même longueur) ;
+- jamais bon marché : pas d'effet gadget (rotation, flash, glitch, emoji animé, plus de deux polices, texte qui rebondit sans raison), au plus une transition signature ; un Reel qui fait « modèle gratuit » n'est pas ok, même s'il est lisible ;
 - la marque : couleurs, polices et ton cohérents avec le commerce et avec ce que la gérante a demandé.
 
 Ne relève que ce qui se voit vraiment sur les images et qui change le résultat, pas tes goûts. Une image est un instant : un texte en train d'apparaître ou une animation en mouvement n'est pas un défaut.
@@ -123,9 +125,29 @@ export function planDigest(plan: EditPlan): string {
   return [
     `Gabarit ${plan.template}, ${Math.round(timeline.duration)} s, ${plan.segments.length} scènes : ${plan.segments.map((s, i) => `${i + 1}. ${kindOf(s)}${isMotionSegment(s) ? ` (${s.motion.brief.slice(0, 80)})` : ""}`).join(" ; ")}.`,
     hook.length ? `Accroche : « ${hook.join(" / ")} ».` : "",
+    rhythmLine(plan),
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+const seconds = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(n);
+
+/** The rhythm the frames cannot show: each shot's length, the cuts on the beat, the signature transitions. */
+export function rhythmLine(plan: EditPlan): string {
+  const timeline = planTimeline(plan);
+  const beat = beatOf(plan.template);
+  const cuts = timeline.segments.slice(1).map((s) => s.start);
+  const onBeat = beat && !plan.voice ? cuts.filter((t) => Math.abs(t / beat - Math.round(t / beat)) * beat < 0.05).length : null;
+  const accents = plan.segments.flatMap((s, i) => (isClipSegment(s) && s.accent ? [`${s.accent} à la scène ${i + 1}`] : []));
+  return [
+    `Rythme : plans de ${timeline.segments.map((s) => seconds(s.length)).join(" / ")} s`,
+    plan.voice ? "coupes sur les phrases de sa voix" : onBeat !== null ? `${onBeat} coupes sur ${cuts.length} sur un temps (${TEMPLATE_BPM[plan.template as MotionTemplate]} BPM)` : "",
+    accents.length ? `transition signature : ${accents.join(", ")}` : "aucune transition signature",
+  ]
+    .filter(Boolean)
+    .join(" ; ")
+    .concat(".");
 }
 
 /** The critic's corrections, as the brief of the editor's next version. */

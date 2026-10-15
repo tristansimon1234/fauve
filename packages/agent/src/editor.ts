@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { renderDuration } from "./render.ts";
+import { snapToTempo } from "./tempo.ts";
 import {
   editPlanObjectSchema,
   editPlanSceneSegmentSchema,
@@ -37,12 +38,14 @@ Règles de montage :
 - Si le brief contient un « Plan validé par la gérante », suis-le : même ordre, même nombre de scènes, mêmes textes ; adapte seulement les durées et les détails visuels.
 - Utilise les meilleurs passages de l'analyse. Écarte les plans flous, sombres ou bougés. Évite les visages de clients reconnaissables sauf si le brief dit que c'est OK.
 - Plans de 1,2 à 4 secondes (0,8 s minimum en « dynamique »), sauf quand quelqu'un parle : garde alors sa phrase entière (jusqu'à 8 secondes, coupée sur un silence d'après « words »), avec les sous-titres. Les points d'entrée et de sortie restent dans la durée du clip.
-- Rythme : alterne plan large et gros plan quand c'est possible. Termine sur un plan calme si un écran de fin suit.
+- Rythme : alterne plan large et gros plan quand c'est possible. Termine sur un plan calme si un écran de fin suit. Chaque ambiance a son tempo (doux 84, chic 76, dynamique 120, collage 108 battements par minute) : donne des durées approchées, le moteur pose ensuite chaque coupe et chaque texte sur un temps et la musique est composée à ce tempo (pas sur sa voix : là, ce sont ses phrases qui décident). Fais varier les longueurs (un plan qui respire, deux plus courts), jamais une suite de plans identiques.
+- Raccords : quand c'est possible, coupe dans le mouvement (un geste commencé dans un plan, fini dans le suivant ; une forme ou une direction qui se répond d'un plan à l'autre). C'est ce qui fait un montage de pro.
 - Textes : 2 à 3 temps forts (3 à 5 dans un Reel de plus de 20 s) (jamais moins de 2 en plus de l'écran de fin, jamais le seul nom du commerce : une accroche qui donne envie, puis ce qui le rend unique ou l'offre). Accroche de 6 mots au plus, bandeau de 5 mots au plus, légende de 7 mots au plus. En français, tutoiement, ton du studio. Chaque texte reste au moins 1,5 s et change de préférence sur une coupe. « emphasis » : 1 ou 2 mots clés de ce texte, écrits exactement comme dans le texte.
 - Les mots à l'écran partent du commerce : « studio.facts » (son site, ce qu'elle a dit), le brief, son offre. Tu es libre d'inventer une accroche ou une formule quand elle sonne juste pour ce commerce, mais jamais un fait qu'il n'a pas (prix, offre, horaire, adresse, chiffre, récompense).
 - Ne superpose pas deux textes. Pas de texte pendant l'écran de fin.
 - Écran de fin (« end_card ») : le nom du studio en titre et un appel à l'action court en sous-titre, adapté à l'activité (« Réserve ton cours », « Prends rendez-vous », « Réserve ta table », « Passe nous voir »), pour les 1,6 dernières secondes. Prévois la durée en conséquence.
-- Transitions : « fade » pour doux et chic, « cut » pour dynamique et collage. « zoom » « light » sur les plans calmes (ou « light_zoom » partout en doux).
+- Transitions : « fade » pour doux et chic, « cut » pour dynamique et collage. « zoom » « light » (un zoom très lent) sur quelques plans calmes, pas tous. Une seule transition signature dans tout le Reel, sur le moment fort (souvent l'arrivée du résultat ou de l'offre), avec « accent » sur ce plan : « punch » (un bref zoom qui se pose, pour dynamique et collage) ou « wipe » (un panneau à la couleur de la marque qui glisse, pour doux et chic) ; partout ailleurs, des coupes nettes.
+- Jamais d'effet bon marché : pas de rotation, de flash, de glitch, de tremblement, de page qui tourne, d'emoji animé, pas plus de deux polices, pas de zoom marqué sur chaque plan. Haut de gamme = sobre, net, sur le temps.
 - Sous-titres mot à mot (« subtitles ») seulement si quelqu'un parle et que c'est utile (prof qui explique, témoignage). Le son des passages où quelqu'un parle est gardé dans le Reel : coupe-les sur ses phrases.
 - Jamais de musique (« music » vaut null) ; pas d'images (« images » vide).
 
@@ -183,6 +186,20 @@ export const PHOTO_MAX_SECONDS = 5;
  */
 export const MAX_FREE_SCENES = 8;
 
+/** A Reel has one signature transition at most (the first the editor asked for): more looks cheap. */
+export function oneAccent(segments: PlanSegment[]): PlanSegment[] {
+  let seen = false;
+  return segments.map((s) => {
+    if (!isClipSegment(s) || !s.accent) return s;
+    if (!seen) {
+      seen = true;
+      return s;
+    }
+    const { accent: _extra, ...rest } = s;
+    return rest;
+  });
+}
+
 /**
  * The longest Reel made: a discovery Reel tells a story in 20 to 30 s, and a
  * render takes 4 to 7 s per second of video inside a 300 s job step.
@@ -226,12 +243,15 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
     return s.clip_id in clipDurations && clip.out - clip.in >= 0.5 ? [clip] : [];
   });
   if (!segments.length) throw new Error("Le plan de montage ne garde aucun plan utilisable");
+  // The cuts on the ambiance's beats (not over her voice), then at most one signature transition.
+  const tempo = snapToTempo({ ...plan, segments }, clipDurations);
+  segments.splice(0, segments.length, ...oneAccent(tempo.segments));
   // Too long to render in time: the plans before the last one go, the last (the end) stays.
   while (segments.length > 2 && renderDuration({ ...plan, segments }) > MAX_REEL_SECONDS) segments.splice(segments.length - 2, 1);
 
   const draft = { ...plan, segments, images: [], music: null };
   const duration = Math.max(3, renderDuration(draft));
-  const texts = plan.texts
+  const texts = tempo.texts
     .map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, duration)) }))
     .filter((t) => t.to - t.from >= 0.5)
     .map((t) => ({ ...t, emphasis: t.emphasis?.filter((e) => t.text.toLowerCase().includes(e.toLowerCase())) }));

@@ -28,9 +28,9 @@ const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> 
 
 export type ReelSegment =
   /** speech: someone speaks in this passage, its sound is kept (the other clips play muted). */
-  | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean; adjust?: Adjust; blur?: ClipBlur; speech?: boolean }
+  | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean; adjust?: Adjust; blur?: ClipBlur; speech?: boolean; accent?: "punch" | "wipe" }
   /** A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move). */
-  | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean }
+  | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; accent?: "punch" | "wipe" }
   | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
   | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number };
 export type ReelText = {
@@ -198,7 +198,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     // Someone speaks in this passage: its sound stays (unless her voice is over the Reel).
     const speech = !plan.voice && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out);
     // A photo in a Reel: still, with a slow zoom so it lives.
-    if (inputs.photoIds?.includes(s.clip_id)) return { type: "image", src, startAt, durationInFrames: lengths[i]!, zoom: true, ...(s.photo ? { edit: s.photo } : {}) };
+    if (inputs.photoIds?.includes(s.clip_id)) return { type: "image", src, startAt, durationInFrames: lengths[i]!, zoom: true, ...(s.photo ? { edit: s.photo } : {}), ...(s.accent ? { accent: s.accent } : {}) };
     return {
       type: "clip",
       src,
@@ -209,6 +209,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       ...(s.adjust ? { adjust: s.adjust } : {}),
       ...(s.blur ? { blur: s.blur } : {}),
       ...(speech ? { speech: true } : {}),
+      ...(s.accent ? { accent: s.accent } : {}),
     };
   });
   const durationInFrames = cursor + fadeFrames;

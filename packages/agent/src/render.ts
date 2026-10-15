@@ -32,13 +32,13 @@ export type RenderOptions = {
 const round = (n: number) => Math.round(n * 1000) / 1000;
 const even = (n: number) => Math.round(n / 2) * 2;
 
-const FADE = 0.35; // crossfade length (transitions: "fade")
+export const FADE = 0.35; // crossfade length (transitions: "fade")
 const KEN_BURNS = 0.08; // slow push-in over a segment: 100 % → 108 %
 
 const segmentLength = (s: EditPlan["segments"][number]) => round(isClipSegment(s) ? s.out - s.in : s.duration);
 
 /** Crossfades need every segment to outlast the fade; otherwise the plan falls back to cuts. */
-function usesFades(plan: EditPlan): boolean {
+export function usesFades(plan: Pick<EditPlan, "segments" | "transitions">): boolean {
   return plan.transitions === "fade" && plan.segments.length > 1 && plan.segments.every((s) => segmentLength(s) > FADE + 0.15);
 }
 

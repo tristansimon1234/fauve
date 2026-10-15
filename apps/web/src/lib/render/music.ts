@@ -1,5 +1,5 @@
 import "server-only";
-import { isClipSegment, isMotionSegment, type EditPlan, type PostKind } from "@fauve/agent";
+import { isClipSegment, isMotionSegment, TEMPLATE_BPM, type EditPlan, type MotionTemplate, type PostKind } from "@fauve/agent";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { env } from "@/lib/env";
@@ -32,11 +32,11 @@ export type PostMusic = z.infer<typeof postMusicSchema>;
 export const readPostMusic = (value: unknown): PostMusic => postMusicSchema.catch({ mode: "on" }).parse(value ?? {});
 
 /** The cut of a montage: what the music follows (the clips, scenes and their lengths), not the texts. */
-export function cutSignature(plan: Pick<EditPlan, "segments" | "template" | "transitions">): string {
+export function cutSignature(plan: Pick<EditPlan, "segments" | "template" | "transitions"> & { voice?: EditPlan["voice"] }): string {
   const cut = plan.segments.map((s) =>
     isClipSegment(s) ? ["c", s.clip_id, s.in, s.out] : isMotionSegment(s) ? ["m", s.duration] : ["s", s.duration],
   );
-  return createHash("sha1").update(JSON.stringify([plan.template, plan.transitions, cut])).digest("hex").slice(0, 16);
+  return createHash("sha1").update(JSON.stringify([plan.template, plan.transitions, cut, ...(plan.voice ? [plan.voice.media_id] : [])])).digest("hex").slice(0, 16);
 }
 
 const MOODS: Record<string, { words: string; tags: string[] }> = {
@@ -51,8 +51,11 @@ function brief(plan: EditPlan, business: string | null, adjustments: string[]): 
   const mood = MOODS[plan.template] ?? MOODS.doux!;
   const where = business ? `a ${business}` : "a neighbourhood business";
   const notes = adjustments.length ? ` Notes from the owner: ${adjustments.join("; ").slice(0, 300)}.` : "";
+  // The cuts sit on this tempo's beats (snapToTempo): the music keeps it, so they land on the beat. Over her voice there is no grid.
+  const bpm = plan.voice ? null : TEMPLATE_BPM[plan.template as MotionTemplate];
+  const tempo = bpm ? ` Steady tempo of ${bpm} BPM, the video's cuts fall on the beats.` : " Soft and low, under a spoken voice.";
   return {
-    description: `Instrumental background music for an Instagram Reel of ${where}: ${mood.words}. No vocals. Follows the cuts of the video, starts right away, lands on the last shot.${notes}`.slice(0, 1000),
+    description: `Instrumental background music for an Instagram Reel of ${where}: ${mood.words}. No vocals.${tempo} Follows the cuts of the video, starts right away, lands on the last shot.${notes}`.slice(0, 1000),
     tags: [...mood.tags, "instrumental"],
   };
 }

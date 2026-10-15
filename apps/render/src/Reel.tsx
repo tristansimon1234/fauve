@@ -67,7 +67,7 @@ export function Reel(props: ReelProps) {
                 {segment.type === "clip" ? <Shot segment={segment} theme={theme} /> : <Photo src={segment.src} edit={segment.edit} />}
               </CollageCard>
             ) : segment.type === "clip" || segment.type === "image" ? (
-              <>
+              <Accent kind={segment.accent} color={props.brand.accent}>
                 {segment.type === "clip" ? (
                   <Shot segment={segment} theme={theme} />
                 ) : (
@@ -82,7 +82,7 @@ export function Reel(props: ReelProps) {
                       "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.12) 30%, rgba(0,0,0,0) 45%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.28) 100%)",
                   }}
                 />
-              </>
+              </Accent>
             ) : segment.type === "motion" ? (
               <MotionScene
                 js={segment.js}
@@ -125,6 +125,29 @@ export function Reel(props: ReelProps) {
       ) : null}
     </AbsoluteFill>
   );
+}
+
+/**
+ * The Reel's one signature transition into a shot, kept sober: « punch », a short
+ * zoom that settles (8 frames, no bounce); « wipe », a panel in the brand colour
+ * that sweeps away to reveal the shot (10 frames). Anything else is a clean cut.
+ */
+function Accent({ kind, color, children }: { kind?: "punch" | "wipe"; color: string; children: ReactNode }) {
+  const frame = useCurrentFrame();
+  if (kind === "punch") {
+    const scale = interpolate(frame, [0, 8], [1.12, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
+    return <AbsoluteFill style={{ transform: `scale(${scale})` }}>{children}</AbsoluteFill>;
+  }
+  if (kind === "wipe") {
+    const x = interpolate(frame, [0, 10], [0, -102], { ...clamp, easing: Easing.inOut(Easing.cubic) });
+    return (
+      <AbsoluteFill>
+        {children}
+        {frame < 11 ? <AbsoluteFill style={{ backgroundColor: color, transform: `translateX(${x}%)` }} /> : null}
+      </AbsoluteFill>
+    );
+  }
+  return <>{children}</>;
 }
 
 function FadeIn({ frames, children }: { frames: number; children: ReactNode }) {
