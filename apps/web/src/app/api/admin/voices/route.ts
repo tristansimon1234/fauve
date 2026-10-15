@@ -10,6 +10,8 @@ import { levelSpeech, speak } from "@/lib/voice-over";
 //   ?say=<voice id>,<voice id>…
 //     the same lines read by each voice (Simone's text for a pizzeria, with its acting tags),
 //     to compare them by ear: a signed link (24 h) per voice;
+//   ?info=<voice id>
+//     one voice's card (name, labels, description);
 //   ?clone=<name>&media=<uuid>,<uuid>…
 //     an instant clone of a person's voice from her voice notes (audio media of one studio,
 //     a minute or two in all, her own voice and with her consent): answers the new voice id.
@@ -94,6 +96,19 @@ export async function POST(request: Request) {
     const ids = listed.split(",").filter((id) => /^[A-Za-z0-9]{10,40}$/.test(id)).slice(0, 8);
     if (!ids.length) return Response.json({ error: "say=<voice id>,<voice id>" }, { status: 400 });
     return say(ids);
+  }
+
+  // One voice's card (name, labels, description): a voice of the account, else found in the library.
+  const info = params.get("info");
+  if (info && /^[A-Za-z0-9]{10,40}$/.test(info)) {
+    const own = await fetch(`https://api.elevenlabs.io/v1/voices/${info}`, { headers: { "xi-api-key": key } });
+    if (own.ok) {
+      const v = (await own.json()) as { voice_id?: string; name?: string; labels?: Record<string, string>; description?: string; category?: string };
+      return Response.json({ voice_id: v.voice_id, name: v.name, labels: v.labels, description: v.description?.slice(0, 300), category: v.category });
+    }
+    const shared = await fetch(`https://api.elevenlabs.io/v1/shared-voices?${new URLSearchParams({ page_size: "5", search: info })}`, { headers: { "xi-api-key": key } });
+    const found = ((await shared.json().catch(() => ({}))) as { voices?: unknown[] }).voices ?? [];
+    return Response.json({ own: own.status, library: found.flatMap((v) => (voiceSchema.safeParse(v).success ? [voiceSchema.parse(v)] : [])) });
   }
 
   const name = params.get("clone");
