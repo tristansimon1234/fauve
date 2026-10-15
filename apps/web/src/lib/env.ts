@@ -25,6 +25,10 @@ const schema = {
   ELEVENLABS_MUSIC_MODEL: z.string().default("music_v2_5"),
   /** Speech to text for her voice notes (word timings for the Reels' subtitles). */
   ELEVENLABS_STT_MODEL: z.string().default("scribe_v2"),
+  /** Text to speech: Simone's voice over a Reel (a native French voice of the library), and its price per 1,000 characters. */
+  ELEVENLABS_TTS_MODEL: z.string().default("eleven_v4"),
+  ELEVENLABS_VOICE_ID: z.string().default("WeAAwKYcS06VmXw086yZ"),
+  ELEVENLABS_TTS_USD_PER_KCHAR: z.coerce.number().nonnegative().default(0.08),
   // Instagram API with Instagram Login (Meta app → Instagram product).
   INSTAGRAM_APP_ID: z.string().regex(/^\d+$/),
   INSTAGRAM_APP_SECRET: z.string().min(1),

@@ -39,24 +39,32 @@ export function cutSignature(plan: Pick<EditPlan, "segments" | "template" | "tra
   return createHash("sha1").update(JSON.stringify([plan.template, plan.transitions, cut, ...(plan.voice ? [plan.voice.media_id] : [])])).digest("hex").slice(0, 16);
 }
 
+// A genre with a character, like the track a creator picks for a Reel: adjectives
+// (« warm, elegant ») gave corporate stock music that sounded like an ad.
 const MOODS: Record<string, { words: string; tags: string[] }> = {
-  doux: { words: "soft, warm and elegant, gentle energy that builds slightly", tags: ["warm", "elegant", "soft"] },
-  dynamique: { words: "upbeat, punchy and feel-good, with a clear groove", tags: ["upbeat", "energetic", "feel-good"] },
-  chic: { words: "minimal, chic and modern, refined and confident", tags: ["chic", "minimal", "modern"] },
-  collage: { words: "playful, quirky and trendy, lo-fi indie pop with handclaps and a bouncy groove", tags: ["playful", "indie", "lo-fi"] },
+  doux: { words: "a warm chillhop groove (lo-fi hip hop): mellow Rhodes chords, soft vinyl texture, a round bass, a laid-back beat, one simple melodic hook", tags: ["chillhop", "lo-fi hip hop", "groovy"] },
+  dynamique: { words: "a funky nu-disco groove: punchy four-on-the-floor kick, slap bass, bright clean guitar licks, a catchy hook from the first bar", tags: ["nu-disco", "funk", "groovy"] },
+  chic: { words: "a jazzy downtempo groove: upright bass, brushed drums, smoky Rhodes chords, a touch of trip-hop, sleek and confident", tags: ["downtempo", "jazzy", "trip-hop"] },
+  collage: { words: "a playful indie pop groove: handclaps, ukulele and glockenspiel, a bouncy bass, a whistled hook, quirky and fun", tags: ["indie pop", "playful", "lo-fi"] },
 };
 
-/** What the composer is asked for: the business, the mood of the template, and the art direction adjustments. */
+/** Under a voice: the groove stays, the melody steps back. */
+const UNDER_VOICE = "a sparse, mellow lo-fi groove that sits under a spoken voice-over: soft drums, a warm bass, a few chords, no lead melody competing with the voice";
+
+/** What the composer is asked for: the business, the groove of the template, and the art direction adjustments. */
 function brief(plan: EditPlan, business: string | null, adjustments: string[]): { description: string; tags: string[] } {
   const mood = MOODS[plan.template] ?? MOODS.doux!;
   const where = business ? `a ${business}` : "a neighbourhood business";
   const notes = adjustments.length ? ` Notes from the owner: ${adjustments.join("; ").slice(0, 300)}.` : "";
   // The cuts sit on this tempo's beats (snapToTempo): the music keeps it, so they land on the beat. Over her voice there is no grid.
   const bpm = plan.voice ? null : TEMPLATE_BPM[plan.template as MotionTemplate];
-  const tempo = bpm ? ` Steady tempo of ${bpm} BPM, the video's cuts fall on the beats.` : " Soft and low, under a spoken voice.";
+  const tempo = bpm ? ` Steady tempo of ${bpm} BPM, the video's cuts fall on the beats.` : "";
   return {
-    description: `Instrumental background music for an Instagram Reel of ${where}: ${mood.words}. No vocals.${tempo} Follows the cuts of the video, starts right away, lands on the last shot.${notes}`.slice(0, 1000),
-    tags: [...mood.tags, "instrumental"],
+    description:
+      `Instrumental track for an Instagram Reel of ${where}, the kind of track a content creator picks, not advertising music: ${plan.voice ? UNDER_VOICE : mood.words}. No vocals.${tempo} ` +
+      `On the groove from the very first second (no intro, no fade-in), it holds the groove and ends cleanly on the last shot. ` +
+      `Not corporate, not stock music, no inspirational build-up, no cinematic swells, no jingle, no cliché of the place.${notes}`.slice(0, 1000),
+    tags: [...(plan.voice ? ["lo-fi", "chillhop"] : mood.tags), "instrumental", "modern"],
   };
 }
 

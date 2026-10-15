@@ -1465,3 +1465,21 @@ test("speed: a slowed shot lasts longer on screen and its cut still lands on a b
   assert.equal(first.speed, 0.5);
   assert.equal(first.out, 1);
 });
+
+test("Simone's voice: character timings become words, punctuation kept for the phrases", async () => {
+  const { fromTtsAlignment, spokenWords } = await import("./voice-over.ts");
+  const { voicePhrases } = await import("./voice.ts");
+  const text = "Tu sais pourquoi ? Viens ce soir.";
+  const characters = [...text];
+  const starts = characters.map((_, i) => i * 0.05);
+  const ends = characters.map((_, i) => i * 0.05 + 0.05);
+  const t = fromTtsAlignment({ characters, character_start_times_seconds: starts, character_end_times_seconds: ends }, text);
+  assert.deepEqual(t.words.map((w) => w.w), ["Tu", "sais", "pourquoi\u202F?", "Viens", "ce", "soir."], "a lone « ? » joins the word before it");
+  assert.equal(t.words[0]!.start, 0);
+  assert.equal(t.words[1]!.start, 0.15);
+  assert.equal(t.duration, Math.round(ends.at(-1)! * 100) / 100);
+  assert.equal(t.language, "fr");
+  // Phrases still close on a full stop, like a transcribed voice note.
+  assert.equal(voicePhrases(t, 0).at(-1)!.text, "Viens ce soir.");
+  assert.equal(spokenWords("Tu sais pourquoi ? Viens — ce soir."), 6);
+});

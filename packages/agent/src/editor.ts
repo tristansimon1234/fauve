@@ -74,11 +74,11 @@ Les animations (motion design), par-dessus sa vidéo, jamais à la place :
 
 Photos : une photo est un plan comme un clip (clip_id = son media_id, in = 0, out = sa durée à l'écran : 1,2 à 3 s ; 0,5 s dans une rafale ; 5 au plus). Le moteur la recadre en vertical sur son sujet, corrige sa lumière et l'anime d'un zoom lent (ou du « move » que tu choisis). Un paysage perd ses côtés. Un Reel de photos vit par son rythme et ses textes : enchaîne-les vite. L'ordre raconte (du lieu au détail, une idée par photo) ; deux photos voisines ne montrent pas la même chose sous le même angle ; avec des vidéos, une photo prolonge le plan d'avant (même lieu, détail de ce qu'on vient de voir), jamais en bloc à la fin. Rafale, une fois par Reel au plus avec 3 photos ou plus : 3 à 6 photos d'un même thème à 0,5 s chacune, sans texte pendant la rafale, juste avant ou après le moment fort.
 
-Sa voix (« voice ») : la gérante a enregistré un vocal qui raconte ce Reel ; il est posé pour toi de « starts_at » à « ends_at » (secondes du Reel), avec ses phrases déjà placées sur l'horloge du Reel (« phrases »). Le Reel se monte alors sur sa voix :
+Sa voix (« voice ») : une voix raconte ce Reel (un vocal de la gérante, ou la voix off écrite par Simone) ; elle est posée pour toi de « starts_at » à « ends_at » (secondes du Reel), avec ses phrases déjà placées sur l'horloge du Reel (« phrases »). Le Reel se monte alors sur sa voix :
 - la durée totale couvre toute sa voix plus 1,5 s : au moins « ends_at » + 1,5 s (30 s au plus) ;
 - coupe sur ses phrases (au début ou à la fin d'une phrase, jamais au milieu d'un mot) ; chaque plan montre ce qu'elle dit à ce moment-là ;
 - sous-titres mot à mot (« subtitles » true) : peu d'autres textes, jamais un texte qui répète ce qu'elle dit ; l'accroche reprend sa première idée en 3 à 6 mots ;
-- pas d'animation pendant qu'elle parle d'une chose qu'on peut montrer en vidéo.
+- pas d'animation pendant qu'elle parle d'une chose qu'on peut montrer en vidéo : avec une voix, ses images et ses mots font le Reel, une animation au plus (même pour un premier Reel).
 
 Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh » au bout d'une seconde. Ouvre sur son plus beau plan, avec la promesse en typographie animée par-dessus (une animation sur mesure), puis ses meilleurs plans dans une vraie histoire, un texte sur chaque temps fort, un rythme vivant même en « chic » ou « doux », et une fin sur le plus beau plan avec l'invitation. Utilise les animations permises (au moins 2), toujours par-dessus ses images.
 
