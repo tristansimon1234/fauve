@@ -1,5 +1,5 @@
 import "server-only";
-import { Sandbox } from "@vercel/sandbox";
+import { APIError, Sandbox } from "@vercel/sandbox";
 import { MIX_CEILING, mixFilter, mixGains, RENDER_FONTS, SANDBOX_REGION, sandboxCostUsd, speechGain, usdToEur, type ReelProps } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
@@ -81,6 +81,23 @@ async function withTimeLeft(sandbox: Sandbox): Promise<Sandbox> {
 const jobSandbox = async () => withTimeLeft(await renderSandbox());
 
 /** What `seconds` of work in the render sandbox cost, in euros (logged in cost_events). */
+/**
+ * Deletes a render sandbox no longer used (an old name or region) with the snapshots
+ * only it holds. Never the one in service; "missing" when none has that name.
+ */
+export async function dropSandbox(name: string): Promise<"deleted" | "missing"> {
+  if (name === NAME) throw new Error(`${NAME} is the render sandbox in service`);
+  let sandbox: Sandbox;
+  try {
+    sandbox = await Sandbox.get({ name });
+  } catch (error) {
+    if (error instanceof APIError && error.response.status === 404) return "missing";
+    throw error;
+  }
+  await sandbox.delete({ deleteOrphanSnapshots: true });
+  return "deleted";
+}
+
 export function sandboxCostEur(seconds: number): number {
   return usdToEur(sandboxCostUsd(seconds, VCPUS, SANDBOX_REGION), env("USD_TO_EUR"));
 }
