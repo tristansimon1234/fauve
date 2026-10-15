@@ -227,9 +227,9 @@ export async function acceptQuote(
     .eq("id", quoteId)
     .eq("studio_id", studioId)
     .maybeSingle();
-  if (!q) return { error: "Devis introuvable : refais un devis avec quote_montage." };
-  if (q.used_at) return { error: "Ce devis a déjà été utilisé : refais un devis pour un nouveau montage." };
-  if (new Date(q.expires_at as string).getTime() < Date.now()) return { error: "Ce devis a expiré : refais un devis." };
+  if (!q) return { error: "Montage introuvable : relance-le avec montage." };
+  if (q.used_at) return { error: "Ce montage est déjà lancé." };
+  if (new Date(q.expires_at as string).getTime() < Date.now()) return { error: "Cette proposition a expiré : relance avec montage." };
   if (!immediate && new Date(q.created_at as string).getTime() >= turnStartedAt.getTime()) {
     return { error: "Montre d'abord le plan et le coût à la gérante, et attends son accord avant de lancer." };
   }
@@ -237,7 +237,7 @@ export async function acceptQuote(
   const current = effortSchema.nullable().catch(null).parse(q.effort);
   const level = effort && effort !== current && q.kind !== "variant" ? quoteEfforts(q.params)[effort] : undefined;
   if (effort && effort !== current && q.kind !== "variant" && !level) {
-    return { error: `Le niveau ${EFFORTS[effort].label} n'est pas possible pour ce devis (solde insuffisant) : garde le niveau du devis ou refais un devis.` };
+    return { error: `Le niveau ${EFFORTS[effort].label} n'est pas possible avec le solde : garde le niveau prévu.` };
   }
   const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number; variant?: VariantChange | null; plan?: unknown };
   const available = await availableCredits(studioId, quoteId);
@@ -253,7 +253,7 @@ export async function acceptQuote(
           available,
         );
   if (!price || available < price.base) {
-    return { error: "Solde de crédits insuffisant pour ce devis : propose un niveau plus simple ou refais un devis." };
+    return { error: "Pas assez de crédits pour ce montage : dis-le simplement, sans rien lancer." };
   }
   const repriced = q.kind !== "variant" && chosen && (level || price.max !== q.max);
   const claimed = await db
@@ -265,7 +265,7 @@ export async function acceptQuote(
     .eq("id", quoteId)
     .is("used_at", null)
     .select("id");
-  if (!claimed.data?.length) return { error: "Ce devis a déjà été utilisé." };
+  if (!claimed.data?.length) return { error: "Ce montage est déjà lancé." };
   // The plan the manager said yes to goes to the editor with the brief.
   const plan = montagePlanSchema.safeParse(params.plan);
   const brief = [params.brief, plan.success ? planBrief(plan.data) : null].filter(Boolean).join("\n\n") || null;
@@ -306,36 +306,25 @@ export async function setQuoteStage(quoteId: string | undefined, stage: QuoteSta
   else await setJobStage(quoteId, stage);
 }
 
-/** The latest unused quote made before this turn (the one the manager has seen), if any. */
-export async function lastPresentedQuote(studioId: string, turnStartedAt: Date): Promise<{ id: string; title: string } | null> {
-  const { data } = await supabaseAdmin()
-    .from("credit_quotes")
-    .select("id, posts(title)")
-    .eq("studio_id", studioId)
-    .is("used_at", null)
-    .lt("created_at", turnStartedAt.toISOString())
-    .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!data) return null;
-  const post = data.posts as { title?: string | null } | { title?: string | null }[] | null;
-  const title = (Array.isArray(post) ? post[0]?.title : post?.title) ?? "publication";
-  return { id: data.id as string, title };
+/** Work priced for a montage that did not happen: the review (the critic could not watch), the second take. */
+type Skipped = { skipReview?: boolean; skipAlternative?: boolean };
+
+/** The credits a delivered montage costs: its real new scenes and corrections, never above what was priced. */
+function chargeOf(q: { base: unknown; max: unknown; lines: unknown }, newScenes: number, fixRounds: number, { skipReview = false, skipAlternative = false }: Skipped): number {
+  const skipped = (skipReview ? CREDIT_PRICES.review : 0) + (skipAlternative ? CREDIT_PRICES.alternative : 0);
+  return Math.max(0, montageCharge({ base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[] }, newScenes, fixRounds) - skipped);
 }
 
-/**
- * Charges a delivered montage: its real new scenes and corrections, never above the quote. Once per quote.
- * skipReview: the quote priced Fauve watching the video but the critic could not (it is not charged).
- */
-export async function chargeQuote(
-  quoteId: string,
-  newScenes: number,
-  title: string,
-  fixRounds = 0,
-  /** Work the quote priced that did not happen: the review, the second take. */
-  { skipReview = false, skipAlternative = false } = {},
-): Promise<void> {
+/** What delivering a montage will cost, and what will be left, before it is charged (said in the delivery message). */
+export async function montageCost(quoteId: string, newScenes: number, fixRounds = 0, skipped: Skipped = {}): Promise<{ credits: number; left: number } | null> {
+  const { data: q } = await supabaseAdmin().from("credit_quotes").select("studio_id, base, max, lines, charged_at").eq("id", quoteId).maybeSingle();
+  if (!q || q.charged_at) return null;
+  const credits = chargeOf(q, newScenes, fixRounds, skipped);
+  return { credits, left: Math.max(0, (await creditBalance(q.studio_id as string)) - credits) };
+}
+
+/** Charges a delivered montage: its real new scenes and corrections, never above what was priced. Once per montage. */
+export async function chargeQuote(quoteId: string, newScenes: number, title: string, fixRounds = 0, skipped: Skipped = {}): Promise<void> {
   const db = supabaseAdmin();
   const claimed = await db
     .from("credit_quotes")
@@ -346,8 +335,7 @@ export async function chargeQuote(
     .maybeSingle();
   const q = claimed.data;
   if (!q) return;
-  const skipped = (skipReview ? CREDIT_PRICES.review : 0) + (skipAlternative ? CREDIT_PRICES.alternative : 0);
-  const credits = Math.max(0, montageCharge({ base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[] }, newScenes, fixRounds) - skipped);
+  const credits = chargeOf(q, newScenes, fixRounds, skipped);
   const kind = q.kind as AcceptedQuote["kind"];
   const level = effortSchema.nullable().catch(null).parse(q.effort);
   const label = `${{ montage: "Montage", correction: "Correction", variant: "Variante" }[kind]}${level && level !== "rapide" ? ` ${EFFORTS[level].label}` : ""}`;

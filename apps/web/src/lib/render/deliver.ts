@@ -28,6 +28,8 @@ export type DeliveryTarget = {
   freshMusic?: boolean;
   /** Simone recorded a voice over this Reel (its name): said, with how to change it. */
   voice?: string;
+  /** What the montage used, and what is left (charged right after the delivery): said in the message. */
+  cost?: { credits: number; left: number } | null;
 };
 
 function store(target: DeliveryTarget, fields: { wa_message_id?: string; type: string; body: string; payload?: Record<string, unknown>; media_id?: string }) {
@@ -94,7 +96,9 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const voiceLine = target.voice
     ? `J’ai posé une voix off dessus (${target.voice}) : si tu le préfères sans, ou avec une autre voix, dis-le-moi.`
     : "";
-  const notes = [target.rationale, target.care, voiceLine].filter(Boolean).join("\n\n");
+  // No quote before: what it used is said once it is there.
+  const costLine = unlocked && target.cost?.credits ? `Ça a utilisé ${target.cost.credits} crédit${target.cost.credits > 1 ? "s" : ""}, il t’en reste ${target.cost.left}.` : "";
+  const notes = [target.rationale, target.care, voiceLine, costLine].filter(Boolean).join("\n\n");
   const after = [
     !unlocked
       ? `Pour le voir en entier et le publier, démarre ton essai : ${TRIAL_DAYS} jours offerts, sans engagement.`

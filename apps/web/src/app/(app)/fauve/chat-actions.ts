@@ -74,7 +74,7 @@ export async function launchQuote(quoteId: string, conversationId: string, effor
   if (!ctx) return { ok: false, error: "Ton numéro n’est relié à aucun studio.", conversationId };
   const level = effortSchema.optional().safeParse(effort);
   if (!UUID.test(quoteId) || !level.success || !(await owns(ctx.studioId, conversationId))) {
-    return { ok: false, error: "Ce devis n’est plus disponible.", conversationId };
+    return { ok: false, error: "Ce montage n’est plus disponible.", conversationId };
   }
   // The level picked on the card, at the price it showed.
   const quote = await acceptQuote(ctx.studioId, quoteId, new Date(), { effort: level.data });

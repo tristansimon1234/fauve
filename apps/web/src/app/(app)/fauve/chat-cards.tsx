@@ -115,10 +115,10 @@ const LEVELS: Effort[] = ["rapide", "soigne", "max"];
 
 /** The card's eyebrow, by state and by what is quoted. */
 const eyebrows: Record<CardQuote["state"], Record<CardQuote["kind"], string>> = {
-  open: { montage: "Devis", correction: "Devis", variant: "Devis" },
+  open: { montage: "À lancer", correction: "À lancer", variant: "À lancer" },
   launched: { montage: "Montage en cours", correction: "Correction en cours", variant: "Variante en cours" },
   delivered: { montage: "Montage livré", correction: "Correction livrée", variant: "Variante livrée" },
-  expired: { montage: "Devis expiré", correction: "Devis expiré", variant: "Devis expiré" },
+  expired: { montage: "Pas lancé", correction: "Pas lancé", variant: "Pas lancé" },
 };
 
 /**
@@ -208,7 +208,7 @@ function QuoteCard({
   return (
     <article
       data-quote={quote.id}
-      className={`@container flex ${quote.plan ? "w-[640px]" : "w-[360px]"} max-w-full flex-col overflow-hidden rounded-[20px] border border-line bg-white shadow-[0_4px_18px_rgba(28,21,48,0.07)]`}
+      className={`@container flex ${quote.plan && open ? "w-[640px]" : "w-[360px]"} max-w-full flex-col overflow-hidden rounded-[20px] border border-line bg-white shadow-[0_4px_18px_rgba(28,21,48,0.07)]`}
     >
       <div className="flex items-start justify-between gap-3 border-b border-line px-5 pt-4 pb-3">
         <div className="flex min-w-0 flex-col gap-0.5">
@@ -221,8 +221,9 @@ function QuoteCard({
           <span className="mt-0.5 shrink-0 rounded-full bg-violet-soft px-2.5 py-1 text-[12px] font-bold text-violet">{level.label}</span>
         )}
       </div>
-      <div className={`grid gap-5 p-5 ${quote.plan ? "@xl:grid-cols-[1fr_230px]" : ""}`}>
-        {quote.plan && <PlanList plan={quote.plan} />}
+      {/* Montages start at once now: the plan and its prices only show on an older quote still waiting for its « Lancer ». */}
+      <div className={`grid gap-5 p-5 ${quote.plan && open ? "@xl:grid-cols-[1fr_230px]" : ""}`}>
+        {quote.plan && open && <PlanList plan={quote.plan} />}
         <div className="flex min-w-0 flex-col @xl:rounded-[16px] @xl:bg-soft @xl:p-4">
           {/* The part that changes with the state rises in when it changes live. */}
           <div key={quote.state} className={`flex flex-col gap-3 ${quote.state !== first ? "fauve-enter" : ""}`}>
@@ -375,14 +376,14 @@ function QuoteCard({
             ) : (
               <>
                 <div className="opacity-60">{priceList}</div>
-                <p className="text-[13px] leading-snug text-muted">Ce devis a expiré : les prix et ton solde ont pu changer depuis.</p>
+                <p className="text-[13px] leading-snug text-muted">Ce montage n’a pas été lancé à temps.</p>
                 {onAsk && (
                   <button
                     type="button"
-                    onClick={() => onAsk(`Refais-moi le devis pour « ${quote.title} »`)}
+                    onClick={() => onAsk(`Lance le montage de « ${quote.title} »`)}
                     className="fauve-press h-10 rounded-full border border-lilac bg-white px-4 text-[14px] font-semibold text-violet hover:bg-violet-soft"
                   >
-                    Refaire le devis
+                    Le lancer maintenant
                   </button>
                 )}
               </>

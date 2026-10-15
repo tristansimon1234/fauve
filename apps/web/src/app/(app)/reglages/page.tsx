@@ -172,7 +172,7 @@ async function Settings() {
 
         <Section title="Soin des montages">
           <p className="text-sm leading-normal">
-            Le niveau que Simone utilise par défaut pour tes Reels. Pour un Reel en particulier, choisis-en un autre sur le devis, ou dis-le-lui.
+            Le niveau que Simone utilise par défaut pour tes Reels. Pour un Reel en particulier, dis-le à Simone.
           </p>
           <EffortSetting initial={effortSchema.catch(DEFAULT_EFFORT).parse(care.data?.montage_effort)} />
         </Section>

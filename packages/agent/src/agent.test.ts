@@ -671,8 +671,8 @@ test("retouch: boxes, tracking, cover layout without empty corners, edits from G
   assert.equal(next.segments[0] && "blur" in next.segments[0] ? next.segments[0].blur?.tracks.length : 0, 1);
 });
 
-test("effort: each level adds its review, second version and corrections to the quote", async () => {
-  const { quoteMontage, montageCharge, effortVersions, CREDIT_PRICES, AUTO_START_MAX_CREDITS } = await import("./credits.ts");
+test("effort: each level adds its review, second version and corrections to what a montage may cost", async () => {
+  const { quoteMontage, montageCharge, effortVersions, CREDIT_PRICES } = await import("./credits.ts");
   const { otherEffort } = await import("./effort.ts");
   const rapide = quoteMontage({ clips: 3, correction: false });
   assert.deepEqual(quoteMontage({ clips: 3, correction: false, effort: "rapide" }), rapide); // no level = Rapide, as before
@@ -681,12 +681,12 @@ test("effort: each level adds its review, second version and corrections to the 
   const soigne = quoteMontage({ clips: 3, correction: false, effort: "soigne" });
   assert.equal(soigne.base, rapide.base + CREDIT_PRICES.review);
   assert.equal(soigne.max, soigne.base + CREDIT_PRICES.fixRound); // the new scenes are already in the price
-  assert.ok(soigne.max <= AUTO_START_MAX_CREDITS); // the usual montage still starts at once
+  assert.ok(soigne.max <= 20); // a cared Reel stays near CARED_REEL_CREDITS
 
   const max = quoteMontage({ clips: 3, correction: false, effort: "max" });
   assert.equal(max.base, rapide.base + CREDIT_PRICES.alternative + CREDIT_PRICES.review);
   assert.equal(max.fixRounds, 2);
-  assert.ok(max.max > AUTO_START_MAX_CREDITS); // Max waits for a yes
+  assert.ok(max.max > soigne.max);
 
   // Charged: the work, the scenes and corrections really made, never above the quote.
   assert.equal(montageCharge(soigne, 2, 0), soigne.base);
