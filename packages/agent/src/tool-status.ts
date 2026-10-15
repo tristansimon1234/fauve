@@ -21,7 +21,6 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   set_music: "Je m’occupe de la musique…",
   set_voice: "Je m’occupe de la voix off…",
   analyze_clips: "Je regarde tes vidéos…",
-  quote_montage: "Je prépare le montage et son prix…",
   montage_status: "Je regarde où en est le montage…",
   choose_version: "Je remets cette version…",
   montage: "Je lance le montage…",

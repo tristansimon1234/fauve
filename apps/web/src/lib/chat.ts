@@ -168,7 +168,7 @@ async function aboutMemo(studioId: string, about: ChatAbout): Promise<string | n
           : "motion" in segment
             ? `animation (${Object.values(segment.motion.texts ?? {}).join(" / ") || segment.motion.brief.slice(0, 80)})`
             : `passage vidéo media_id=${(segment as { clip_id: string }).clip_id}`;
-      memo += `, scène ${about.scene + 1} sur ${parsed.data.segments.length} (${kind}) : ${what}. Une demande sur cette scène est une correction du montage (quote_montage avec correction: true)`;
+      memo += `, scène ${about.scene + 1} sur ${parsed.data.segments.length} (${kind}) : ${what}. Une demande sur cette scène est une correction du montage (montage avec correction: true)`;
     }
   }
   return memo;

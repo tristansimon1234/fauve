@@ -17,7 +17,7 @@ import {
 import { reviewMontage } from "@/lib/agent/critic";
 import { designEdit } from "@/lib/agent/editor";
 import { voiceOverIfWanted } from "@/lib/voice-over";
-import { chargeQuote, setQuoteStage } from "@/lib/credits";
+import { chargeQuote, montageCost, setQuoteStage } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
 import { deliverMontage, notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
@@ -153,7 +153,8 @@ async function run(job: Job) {
   if (!reviewed) {
     if (job.step === "render") {
       await setQuoteStage(job.quoteId, "render");
-      const delivered = await renderAndDeliver({ ...target, rationale: job.rationale, note: job.note ?? job.rationale, offerVariant: true, voice: job.voice });
+      const cost = job.quoteId ? await montageCost(job.quoteId, job.newScenes ?? 0) : null;
+      const delivered = await renderAndDeliver({ ...target, rationale: job.rationale, note: job.note ?? job.rationale, offerVariant: true, voice: job.voice, cost });
       // Charged only once the video is out, for the scenes really made (never above the quote).
       if (delivered && job.quoteId) {
         await setQuoteStage(job.quoteId, "delivered");
@@ -399,6 +400,11 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
   ]);
   const title = (post.data?.title as string | null) ?? "";
   const care = careLine(Boolean(job.compared), outcome);
+  // The review priced is not charged when the critic could not watch the video, nor a second take never compared.
+  const skipped = {
+    skipReview: !outcome?.reviewed && Boolean(job.effort && EFFORTS[job.effort].review),
+    skipAlternative: Boolean(job.effort && effortVersions(job.effort, Boolean(job.correction)) > 1 && !job.compared),
+  };
   try {
     await deliverMontage(
       {
@@ -409,6 +415,7 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         // Two versions were already compared: no variant offered on top.
         offerVariant: !job.compared,
         voice: job.voice,
+        cost: job.quoteId ? await montageCost(job.quoteId, job.newScenes ?? 0, job.fixes ?? 0, skipped) : null,
       },
       { title, durationMs: (render.data?.duration_ms as number | null) ?? 0 },
     );
@@ -420,11 +427,7 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
   }
   if (job.quoteId) {
     await setQuoteStage(job.quoteId, "delivered");
-    // The review the quote priced is not charged when the critic could not watch the video.
-    const skipReview = !outcome?.reviewed && Boolean(job.effort && EFFORTS[job.effort].review);
-    // Nor a second take that was never compared.
-    const skipAlternative = Boolean(job.effort && effortVersions(job.effort, Boolean(job.correction)) > 1 && !job.compared);
-    await chargeQuote(job.quoteId, job.newScenes ?? 0, title, job.fixes ?? 0, { skipReview, skipAlternative });
+    await chargeQuote(job.quoteId, job.newScenes ?? 0, title, job.fixes ?? 0, skipped);
   }
   return true;
 }

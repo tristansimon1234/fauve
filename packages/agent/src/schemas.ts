@@ -46,7 +46,7 @@ export const replyExtrasSchema = z.object({
   pick_media: z.enum(["video", "photo", "any"]).optional(),
   /** The card of an onboarding step under the message (app only). */
   step_card: z.enum(["website", "style", "rhythm", "connect", "first_post"]).optional(),
-  /** A quote to show as a card with a « Lancer » button (set by quote_montage, not by the model). */
+  /** A montage under way, shown as a card that follows its steps (set by the montage tools, not by the model). */
   quote: z.uuid().optional(),
 });
 export type ReplyExtras = z.infer<typeof replyExtrasSchema>;

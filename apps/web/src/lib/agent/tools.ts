@@ -12,16 +12,12 @@ import {
   type ToolHandlers,
   slidesPlanSchema,
   textLookSchema,
-  AUTO_START_MAX_CREDITS,
   CREDIT_PRICES,
   DEFAULT_EFFORT,
   EFFORTS,
   MAX_FREE_SCENES,
   effortSchema,
   editPlanSchema,
-  effortPitch,
-  otherEffort,
-  type Effort,
   type TextLook,
   addFacts,
   onboardingStepOf,
@@ -41,7 +37,7 @@ import {
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { acceptQuote, createMontageQuote, lastPresentedQuote } from "@/lib/credits";
+import { acceptQuote, createMontageQuote } from "@/lib/credits";
 import { startMontage } from "@/lib/montage-start";
 import { montageStatus } from "@/lib/montage-status";
 import { analyzePerformance, latestReport } from "@/lib/performance";
@@ -144,7 +140,6 @@ function missingContent(kind: PostKind, hasRender: boolean, media: number): stri
 /** Tools that spend (models, renders, images): refused without a subscription or credits. */
 const COSTLY_TOOLS = [
   "analyze_clips",
-  "quote_montage",
   "montage",
   "restyle_reel",
   "render",
@@ -405,89 +400,48 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async quote_montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, go }) {
+    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
       if (inspiration_id) {
         const known = await db.from("inspirations").select("id").eq("id", inspiration_id).eq("studio_id", studioId).maybeSingle();
         if (!known.data) return "Inspiration introuvable : reprends un inspiration_id de list_inspirations.";
         check(await db.from("posts").update({ inspiration_id }).eq("id", post_id).eq("studio_id", studioId));
       }
-      if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : fais un devis de montage (correction: false).";
+      if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : lance d'abord un montage (correction: false).";
       // The level asked for, else the studio's default (Réglages).
       const studio = await db.from("studios").select("montage_effort").eq("id", studioId).single();
-      const studioDefault = effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);
-      const wanted = effort ?? studioDefault;
+      const wanted = effort ?? effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);
       // Her first Reel is her first impression: it always gets its made-to-measure animations.
       const firstReel = !correction && !variant && (await isFirstReel(studioId, post_id));
-      // Made-to-measure animations: as many as the plan she agrees to (each priced in the quote,
-      // charged only if made: her library goes first). Without a plan, one on a new montage and
-      // none on a correction unless she asked for a new one. Her first Reel gets at least two.
+      // Made-to-measure animations: as many as asked in the plan (charged only if made: her library
+      // goes first). Without a plan, one on a new montage and none on a correction. Her first Reel gets at least two.
       const animations = plan?.scenes.filter((s) => s.kind === "animation").length ?? 0;
       const planned = plan ? animations : correction || variant ? 0 : 1;
       const scenes = Math.min(MAX_FREE_SCENES, max_new_scenes ?? (firstReel ? Math.max(2, planned) : planned));
-      const quote = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: scenes, variant, plan, effort: wanted });
-      if ("error" in quote) {
-        return json({ possible: false, solde: quote.balance, credits_necessaires: quote.needed, note: "Solde insuffisant : dis-le simplement à la gérante, sans lancer." });
+      // No quote to show: the work is priced, started at once (her request is the go) and charged on delivery for what was made.
+      const job = await createMontageQuote({ studioId, postId: post_id, mediaIds: media_ids ?? [], brief, correction, maxNewScenes: scenes, variant, plan, effort: wanted });
+      if ("error" in job) {
+        return json({
+          possible: false,
+          solde: job.balance,
+          credits_necessaires: job.needed,
+          note: "Pas assez de crédits pour ce montage : dis-le simplement, sans rien lancer (ils reviennent le 1er du mois ; pour en avoir plus tout de suite, Réglages › Abonnement).",
+        });
       }
-      const level = quote.effort ? EFFORTS[quote.effort] : null;
-      const pitch = quote.effort ? effortPitch(quote.effort, correction) : "";
-      // What Fauve says about the level.
-      const soin = level
-        ? {
-            niveau: level.label,
-            ce_que_ca_fait: pitch,
-            duree: `${level.minutes} min`,
-            ...(quote.effort !== wanted ? { attention: `Niveau ${EFFORTS[wanted].label} impossible avec le solde : devis en ${level.label}.` } : {}),
-          }
-        : {};
-      // The price of the other levels, for a quote she has not said yes to yet.
-      const autres = (Object.keys(quote.efforts) as Effort[])
-        .filter((e) => e !== quote.effort)
-        .map((e) => ({ niveau: EFFORTS[e].label, effort: e, ce_que_ca_fait: effortPitch(e, correction), credits: quote.efforts[e]!.base, credits_max: quote.efforts[e]!.max }));
-      // A small montage starts at once (Fauve tells the plan and the price, no yes needed), but never
-      // above the studio's default level: a higher one is the manager's choice, on a quote.
-      const order = ["rapide", "soigne", "max"] as const;
-      const aboveDefault = quote.effort !== null && order.indexOf(quote.effort) > order.indexOf(studioDefault);
-      // Only once she said so: answering a question is not a yes. A correction or a variant never
-      // starts on its own: a criticism (« c'est plat ») is not a yes, she sees the plan and the price first.
-      if (go && !correction && !variant && !aboveDefault && quote.max <= AUTO_START_MAX_CREDITS && quote.balance >= quote.max) {
-        const accepted = await acceptQuote(studioId, quote.id, turnStartedAt, { immediate: true });
-        if (!("error" in accepted)) {
-          ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
-          // In the app, the quote card follows the montage step by step (already launched, no button);
-          // on WhatsApp, cards become links, so the post's link stays.
-          ctx.extras.quote = quote.id;
-          if (ctx.waId) ctx.extras.posts = [post_id];
-          ctx.notes.push(`montage lancé directement quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id} (${quote.base} à ${quote.max} crédits${level ? `, ${level.label}` : ""})`);
-          return json({
-            status: "started",
-            publication: post.title,
-            credits: quote.base,
-            credits_max: quote.max,
-            solde: quote.balance,
-            ...soin,
-            note: `Petit montage : il est déjà lancé, sans attendre d'accord, et son niveau ne change plus (un autre niveau serait un nouveau montage, après la livraison). Décris le plan en 2 ou 3 phrases (durée, scènes) avec son coût (credits, animations sur mesure comprises ; jusqu'à credits_max seulement si tu le fais corriger après l'avoir regardé)${level ? `, le niveau (${level.label} : ${pitch.toLowerCase()})` : ""}, et dis que la vidéo arrive dans ${level?.minutes ?? "2 à 4"} minutes ; elle pourra demander une correction ensuite. Ne demande pas « je lance ? » et ne propose pas d'autre niveau.`,
-          });
-        }
-      }
-      // Shown as a card with a « Lancer » button under the reply (WhatsApp: yes / no buttons).
-      ctx.extras.quote = quote.id;
-      ctx.notes.push(`devis présenté quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id} (${quote.base} à ${quote.max} crédits${level ? `, ${level.label}` : ""})`);
+      const accepted = await acceptQuote(studioId, job.id, turnStartedAt, { immediate: true });
+      if ("error" in accepted) return json({ error: accepted.error });
+      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
+      // In the app, the card follows the montage step by step; on WhatsApp, cards become links, so the post's link stays.
+      ctx.extras.quote = job.id;
+      if (ctx.waId) ctx.extras.posts = [post_id];
+      const level = job.effort ? EFFORTS[job.effort] : null;
+      ctx.notes.push(`montage lancé job=${job.id} pour « ${post.title as string} » post_id=${post_id}${level ? ` (${level.label})` : ""}`);
       return json({
-        quote_id: quote.id,
+        status: "started",
         publication: post.title,
-        lignes: quote.lines,
-        credits: quote.base,
-        credits_max: quote.max,
-        nouvelles_scenes_max: quote.maxNewScenes,
-        solde: quote.balance,
-        ...soin,
-        ...(autres.length ? { autres_niveaux: autres } : {}),
-        note: `Présente le plan, le niveau et le coût (credits, animations sur mesure comprises ; jusqu'à credits_max si tu le fais corriger après l'avoir regardé), puis attends son accord avant montage. Si elle choisit un autre niveau, lance montage avec ce quote_id et effort.${
-          ctx.waId && quote.effort && otherEffort(quote.effort, Object.keys(quote.efforts) as Effort[])
-            ? ` Sur WhatsApp, un bouton « Version ${EFFORTS[otherEffort(quote.effort, Object.keys(quote.efforts) as Effort[])!].label} » est proposé sous ton message : donne son prix (autres_niveaux) en une phrase.`
-            : ""
-        } Les boutons du devis sont ajoutés tout seuls : n'appelle pas reply_with avec des options pour ce message.`,
+        ...(level ? { niveau: level.label, duree: `${level.minutes} min` } : {}),
+        ...(job.effort && job.effort !== wanted ? { attention: `Le solde ne permettait pas le niveau ${EFFORTS[wanted].label} : lancé en ${level?.label}.` } : {}),
+        note: `C'est lancé. Dis en une ou deux phrases ce que tu vas faire et quand la vidéo arrive (${level?.minutes ?? "2 à 4"} min). Ne parle pas de prix ni de devis : le message de livraison dira combien de crédits ont servi. Ne demande pas « je lance ? ».`,
       });
     },
 
@@ -511,7 +465,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (!montages.length) return json({ montages: [], note: "Aucun montage lancé récemment." });
       return json({
         montages: montages.map((m) => ({ post_id: m.postId, publication: m.title, etape: m.step, depuis_minutes: m.minutes, late: m.late })),
-        note: "En montage, en rendu, en relecture ou en correction : tout va bien, la vidéo arrive toute seule. late : propose de relancer (quote_montage puis montage).",
+        note: "En montage, en rendu, en relecture ou en correction : tout va bien, la vidéo arrive toute seule. late : propose de relancer (montage).",
       });
     },
 
@@ -534,29 +488,6 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         version,
         video: render ? "prête" : "pas encore rendue : lance render",
         note: "C'est cette version qui sera publiée. Confirme-le en une phrase.",
-      });
-    },
-
-    async montage({ quote_id, effort }) {
-      const quote = await acceptQuote(studioId, quote_id, turnStartedAt, { effort });
-      if ("error" in quote) {
-        // The model lost the id of the quote the manager said yes to: point it back to it. A quote
-        // already launched is not a lost id: never send it to another (perhaps another post's) quote.
-        const lost = quote.error.startsWith("Devis introuvable");
-        const shown = lost ? await lastPresentedQuote(studioId, turnStartedAt) : null;
-        return shown && shown.id !== quote_id
-          ? `${quote.error} Le devis présenté à la gérante est quote_id=${shown.id} (« ${shown.title} ») : lance montage avec celui-ci, sans refaire de devis ni de publication.`
-          : quote.error;
-      }
-      const post = unwrap(await db.from("posts").select("id, title").eq("id", quote.postId).eq("studio_id", studioId).single());
-      // The montage outlives this reply: it runs as a background job and sends the video itself.
-      ctx.afterReply.push(() => startMontage(studioId, quote, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
-      ctx.notes.push(`montage lancé (quote_id=${quote.id})`);
-      return json({
-        status: "started",
-        post: post.title,
-        niveau: quote.effort ? EFFORTS[quote.effort].label : "Rapide",
-        note: `Le monteur prépare la vidéo (plans, scènes de motion design, textes)${quote.effort && EFFORTS[quote.effort].review ? ", tu la regardes et la fais corriger si besoin," : ""} puis elle part automatiquement avec la légende, en ${quote.effort ? EFFORTS[quote.effort].minutes : "2 à 4"} minutes. Annonce-le en une phrase courte.`,
       });
     },
 
@@ -588,9 +519,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         status: "started",
         style: style === "custom" ? wish : change.button,
-        credits: quote.base,
-        credits_max: quote.max,
-        note: `Le style est retenu pour tous ses prochains montages, et la nouvelle version de ce Reel est en route (${quote.effort ? EFFORTS[quote.effort].minutes : "2 à 4"} min). Dis-le en une ou deux phrases chaleureuses, avec le coût (credits, jusqu'à credits_max).`,
+        note: `Le style est retenu pour tous ses prochains montages, et la nouvelle version de ce Reel est en route (${quote.effort ? EFFORTS[quote.effort].minutes : "2 à 4"} min). Dis-le en une ou deux phrases chaleureuses, sans parler de prix : la livraison dira combien de crédits ont servi.`,
       });
     },
 
@@ -605,7 +534,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const post = unwrap(
         await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single(),
       );
-      if (!post.edit_plan_id) return json({ error: "Cette publication n'a pas encore de montage (quote_montage puis montage)." });
+      if (!post.edit_plan_id) return json({ error: "Cette publication n'a pas encore de montage : lance montage." });
       // A re-render of an unchanged plan: free (no AI work).
       ctx.afterReply.push(async () => {
         await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
@@ -675,7 +604,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         ok: true,
         note: post.edit_plan_id
-          ? "C'est noté. Ce Reel est déjà monté : la voix arrive avec un nouveau montage (une correction). Propose-le-lui (quote_montage avec le post_id), et lance-le quand elle est d'accord."
+          ? "C'est noté. Ce Reel est déjà monté : la voix arrive avec un nouveau montage (une correction). Propose-le-lui (montage avec correction: true), et lance-le quand elle est d'accord."
           : "C'est noté : la voix sera posée à son montage.",
       });
     },

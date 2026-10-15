@@ -141,7 +141,7 @@ export const toolSpecs = {
         .uuid()
         .nullable()
         .optional()
-        .describe("Reel : le media_id du message vocal de la gérante à poser sur le Reel (sa voix, sous-titres mot à mot, coupes sur ses phrases, musique baissée dessous) ; null retire sa voix. Prend effet au prochain montage ou à la prochaine correction (quote_montage)"),
+        .describe("Reel : le media_id du message vocal de la gérante à poser sur le Reel (sa voix, sous-titres mot à mot, coupes sur ses phrases, musique baissée dessous) ; null retire sa voix. Prend effet au prochain montage ou à la prochaine correction (montage)"),
       publish_by_hand: z.boolean().optional().describe("Reel : true = à l'heure prévue, elle reçoit la vidéo et la légende sur WhatsApp et publie elle-même dans Instagram (pour mettre la musique de son choix). Story : true = elle reçoit la story et son lien de réservation sur WhatsApp et la partage elle-même en story avec le sticker Lien (aucune appli ne peut poser de sticker). Je retrouve ensuite la publication sur son compte"),
     }),
   },
@@ -150,27 +150,21 @@ export const toolSpecs = {
       "Regarde les vidéos reçues (analyse Gemini) : plans horodatés, sujet, énergie, potentiel d'accroche, qualité, visages, meilleurs passages, paroles. À appeler avant tout plan de montage, avec les media_id indiqués dans la conversation. Peut prendre jusqu'à une minute par vidéo.",
     input: z.object({ media_ids: z.array(z.string().uuid()).min(1).max(10) }),
   },
-  quote_montage: {
+  montage: {
     description:
-      "Prépare un montage ou une correction et son prix en crédits (obligatoire avant tout montage). Un petit montage (20 crédits au plus) part aussitôt seulement si go est true (elle t'a dit de le faire) : la réponse dit status started. Sinon, ou au-delà, c'est un devis à présenter, avec un bouton Lancer. Pour un nouveau montage, donne toujours « plan » : la durée, le style et chaque scène dans l'ordre (vidéo, animation, fin) ; il s'affiche sur le devis, fixe le nombre de scènes animées facturables et guide le monteur. Renvoie le prix (animations sur mesure comprises ; celles qui ne sont pas créées ne sont pas débitées), le maximum avec les corrections après relecture, et le solde. Décris ensuite le plan à la gérante (durée, nombre de scènes, ce qu'elles montrent) et le coût ; pour un devis (pas started), attends son accord : montage ne part qu'au tour suivant, avec ce quote_id. Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent.",
+      "Lance un montage ou une correction, tout de suite, dès qu'elle le demande (pas de devis : les crédits sont débités à la livraison pour ce qui a vraiment été fait, et le message de livraison dit combien). En tâche de fond : ton monteur regarde les clips, choisit le gabarit, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Simone la regarde et la fait corriger avant de l'envoyer (Rapide 2 à 4 min, Soigné 4 à 8, Max 8 à 15). Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent. Si le solde ne suffit pas, rien ne part : la réponse le dit.",
     input: z.object({
       post_id: z.string().uuid(),
       media_ids: z.array(z.string().uuid()).max(10).optional().describe("Clips à monter (media_id). Facultatif pour une correction ou une vidéo 100 % motion design."),
       brief: z.string().max(600).optional().describe("Intention ou correction, avec les textes exacts si besoin. Ex. « ouverture en motion design avec RENTRÉE en grand », « police Montserrat », « visages OK »"),
       correction: z.boolean().default(false).describe("true pour modifier le montage existant de cette publication"),
-      plan: montagePlanSchema.optional().describe("Le plan proposé (obligatoire pour un nouveau montage, facultatif pour une correction)"),
-      go: z
-        .boolean()
-        .default(false)
-        .describe(
-          "true seulement si la gérante vient de te dire de lancer ce nouveau montage (« vas-y », « lance », « fais-la », « oui » à ta proposition de plan). Répondre à une question (le format, motion design ou vidéo, le sujet) n'est pas un accord : false, et le devis attend son « Lancer ». Une correction ou une variante ne part jamais toute seule : une critique (« c'est plat », « je n'aime pas ») n'est pas un accord, elle voit d'abord le plan et le prix.",
-        ),
+      plan: montagePlanSchema.optional().describe("Facultatif : ce qu'elle a demandé de précis (durée, style, scènes, textes exacts des animations) ; sinon le monteur décide"),
       inspiration_id: z
         .string()
         .uuid()
         .optional()
         .describe("L'inspiration choisie par la gérante pour ce Reel (list_inspirations) : le monteur la suit en priorité. Inutile si elle l'a déjà choisie en créant la publication."),
-      max_new_scenes: z.number().int().min(0).max(8).optional().describe("Nouvelles animations sur mesure permises (3 crédits chacune, comptées dans le prix du devis). Par défaut : autant que d'animations dans le plan (au moins 2 pour le tout premier Reel) ; sans plan, 1 pour un nouveau montage et 0 pour une correction. Autant qu'elle veut (8 au plus) ; 0 si elle veut économiser (le monteur réutilise sa bibliothèque)."),
+      max_new_scenes: z.number().int().min(0).max(8).optional().describe("Nouvelles animations sur mesure permises (3 crédits chacune, débitées seulement si elles sont créées). Par défaut : autant que d'animations dans le plan (au moins 2 pour le tout premier Reel) ; sans plan, 1 pour un nouveau montage et 0 pour une correction. 0 si elle veut économiser (le monteur réutilise sa bibliothèque)."),
       effort: effortSchema
         .optional()
         .describe(
@@ -194,14 +188,6 @@ export const toolSpecs = {
     description:
       "Remet une version précédente du montage d'une publication (par ex. la gérante préfère l'original à la variante). Gratuit. Les versions sont numérotées dans l'ordre (la plus récente est la dernière).",
     input: z.object({ post_id: z.string().uuid(), version: z.number().int().min(1) }),
-  },
-  montage: {
-    description:
-      "Lance le montage (ou la correction) devisé par quote_montage, une fois que la gérante a dit oui. En tâche de fond : ton monteur regarde les clips, choisit le gabarit, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Simone la regarde et la fait corriger avant de l'envoyer automatiquement (Rapide 2 à 4 min, Soigné 4 à 8, Max 8 à 15). Les crédits sont débités à la livraison, jamais plus que le devis.",
-    input: z.object({
-      quote_id: z.string().uuid(),
-      effort: effortSchema.optional().describe("Seulement si la gérante a choisi un autre niveau que celui du devis (ex. « Version Max ») : le prix est celui de ce niveau, déjà annoncé"),
-    }),
   },
   render: {
     description:
@@ -363,7 +349,7 @@ export const toolSpecs = {
   },
   set_voice: {
     description:
-      "Voix off de Simone sur les Reels (une vraie voix française qui raconte les images, texte écrit par toi, posée avant le montage, la musique passe dessous) : voix Eva, Victoria, Lucie, Koraly (chuchotée, ASMR) pour les femmes, Neto, Antonin, Jules, Mister K (chuchotée, ASMR) pour les hommes ; une voix chuchotée seulement si elle la veut (spa, massage, soin, un moment très calme). Avec post_id, pour ce Reel : mode on (en mettre une), off (sans voix, ni la sienne), redo (refaire le texte, avec wish : ce qu'elle veut qu'on dise) ; voice pour changer de voix. Sans post_id : le réglage du commerce pour ses prochains Reels (use : auto = quand ça raconte quelque chose et que personne ne parle déjà dans ses vidéos, always, never ; voice). Gratuit. off sur un Reel monté refait la vidéo tout de suite ; on, redo et voice valent pour le prochain montage du Reel : sur un Reel déjà monté, propose de le refaire (quote_montage, une correction).",
+      "Voix off de Simone sur les Reels (une vraie voix française qui raconte les images, texte écrit par toi, posée avant le montage, la musique passe dessous) : voix Eva, Victoria, Lucie, Koraly (chuchotée, ASMR) pour les femmes, Neto, Antonin, Jules, Mister K (chuchotée, ASMR) pour les hommes ; une voix chuchotée seulement si elle la veut (spa, massage, soin, un moment très calme). Avec post_id, pour ce Reel : mode on (en mettre une), off (sans voix, ni la sienne), redo (refaire le texte, avec wish : ce qu'elle veut qu'on dise) ; voice pour changer de voix. Sans post_id : le réglage du commerce pour ses prochains Reels (use : auto = quand ça raconte quelque chose et que personne ne parle déjà dans ses vidéos, always, never ; voice). Gratuit. off sur un Reel monté refait la vidéo tout de suite ; on, redo et voice valent pour le prochain montage du Reel : sur un Reel déjà monté, propose de le refaire (montage avec correction).",
     input: z.object({
       post_id: z.string().uuid().optional(),
       mode: z.enum(["on", "off", "redo"]).optional(),
