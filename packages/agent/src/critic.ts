@@ -62,11 +62,14 @@ export function normalizeReview(answer: MontageReviewAnswer, versions: number): 
   };
 }
 
-export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Simone, une community manager IA pour les commerces de quartier (studio, salon, restaurant, boutique…). Avant qu'un Reel parte chez la gérante, tu le regardes à travers des images clés de la vidéo rendue (1080 × 1920), chacune avec son instant, sa scène et les textes prévus à l'écran. Tu juges comme une pro d'Instagram, exigeante mais juste :
-- l'accroche : la 1re seconde donne envie de rester (une personne, un résultat ou un mouvement fort, jamais un plan vide, un décor ou un logo seul) ; le texte d'accroche est court, gros, lisible ;
-- la lisibilité : textes assez gros, contrastés sur l'image, jamais coupés ni collés au bord, hors des zones que l'interface d'Instagram recouvre (le bas et le bord droit), jamais posés sur un visage ;
+export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Simone, une community manager IA pour les commerces de quartier (studio, salon, restaurant, boutique…). Avant qu'un Reel parte chez la gérante, tu le regardes à travers des images clés de la vidéo rendue (1080 × 1920), chacune avec son instant, sa scène et les textes prévus à l'écran. Tu juges comme une pro d'Instagram, exigeante mais juste. La barre : on doit croire qu'un excellent créateur l'a monté à la main, pour ce commerce ; un Reel qui fait pub, diaporama ou modèle n'est pas ok :
+- l'accroche : la 1re seconde donne envie de rester (une personne, un résultat ou un mouvement fort, jamais un plan vide, un décor, un logo ou un écran de texte) ; le texte d'accroche est court, gros, lisible ;
+- natif et moderne : des images du commerce plein cadre du début à la fin, les textes posés dessus comme dans l'appli (gros, peu de mots) ; jamais un carton ou un fond de couleur plein écran à la place de la vidéo, jamais un écran de logo pour finir ;
+- le cadrage : le sujet (la personne, le geste, le plat, la coupe) est dans l'image, pas coupé par le recadrage vertical, et l'horizon est droit ;
+- la couleur : des plans qui ont l'air du même film (lumière et couleurs cohérentes), aucun trop sombre ou terne ;
+- la lisibilité : textes assez gros (une phrase se lit d'un coup d'œil sur un téléphone), contrastés sur l'image, jamais coupés ni collés au bord, hors des zones que l'interface d'Instagram recouvre (le bas et le bord droit), jamais posés sur un visage ni sur un texte déjà dans l'image ;
 - l'image : pas de plan flou, trop sombre, mal cadré ou qui ne montre rien ;
-- le rythme et l'histoire : un ordre logique, pas de scène inutile ou répétée, une fin claire (un dernier plan fort avec une invitation, ou le nom et l'appel à l'action), qui fait post natif et pas pub ; jamais un écran de fin par-dessus une animation ou un texte ; la ligne « Rythme » du plan te donne ce que les images ne montrent pas (longueur de chaque plan, coupes sur le temps, transition signature) : refuse un Reel mou (plans trop longs sans raison), haché (que des plans très courts) ou monotone (tous les plans de la même longueur) ;
+- le rythme et l'histoire : un ordre qui raconte (du large au serré, le geste puis le résultat), pas deux plans presque identiques à la suite, pas de scène inutile ou répétée, une fin claire (un dernier plan fort avec une invitation, ou le nom et l'appel à l'action), qui fait post natif et pas pub ; jamais un écran de fin par-dessus une animation ou un texte ; la ligne « Rythme » du plan te donne ce que les images ne montrent pas (longueur de chaque plan, coupes sur le temps, transition signature) : refuse un Reel mou (plans trop longs sans raison), haché (que des plans très courts) ou monotone (tous les plans de la même longueur) ;
 - jamais bon marché : pas d'effet gadget (rotation, flash, glitch, emoji animé, plus de deux polices, texte qui rebondit sans raison), au plus une transition signature ; un Reel qui fait « modèle gratuit » n'est pas ok, même s'il est lisible ; un texte posé sur un texte déjà dans l'image (enseigne, logo, lettrage) n'est pas ok ;
 - la marque : couleurs, polices et ton cohérents avec le commerce et avec ce que la gérante a demandé.
 
@@ -81,6 +84,8 @@ Pour la version retenue :
 - summary : une phrase pour la gérante, au tutoiement, sans jargon, au passé, car elle la lit avec la vidéo finie : ce que tu as vérifié si la version peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. »).`;
 
 export type ReviewMoment = { t: number; scene: number | null; label: string; texts: string[] };
+
+const MOVE_WORDS: Record<string, string> = { in: "avance lente", out: "recul lent", left: "panoramique", right: "panoramique", punch: "coup de zoom" };
 
 const kindOf = (s: EditPlan["segments"][number]) => (isClipSegment(s) ? "vidéo" : isMotionSegment(s) ? "animation" : "écran de texte");
 
@@ -140,8 +145,20 @@ export function rhythmLine(plan: EditPlan): string {
   const cuts = timeline.segments.slice(1).map((s) => s.start);
   const onBeat = beat && !plan.voice ? cuts.filter((t) => Math.abs(t / beat - Math.round(t / beat)) * beat < 0.05).length : null;
   const accents = plan.segments.flatMap((s, i) => (isClipSegment(s) && s.accent ? [`${s.accent} à la scène ${i + 1}`] : []));
+  // What still frames cannot show: the camera's moves and the speed of each shot.
+  const camera = plan.segments.flatMap((s, i) =>
+    isClipSegment(s)
+      ? [
+          ...(s.move && s.move !== "none" ? [`${MOVE_WORDS[s.move] ?? s.move} scène ${i + 1}`] : []),
+          ...(s.speed && s.speed < 1 ? [`ralenti scène ${i + 1}`] : s.speed && s.speed > 1 ? [`accéléré scène ${i + 1}`] : []),
+        ]
+      : isMotionSegment(s) && s.over
+        ? [`animation par-dessus la vidéo scène ${i + 1}`]
+        : [],
+  );
   return [
     `Rythme : plans de ${timeline.segments.map((s) => seconds(s.length)).join(" / ")} s`,
+    camera.length ? `caméra : ${camera.join(", ")}` : "",
     plan.voice ? "coupes sur les phrases de sa voix" : onBeat !== null ? `${onBeat} coupes sur ${cuts.length} sur un temps (${TEMPLATE_BPM[plan.template as MotionTemplate]} BPM)` : "",
     accents.length ? `transition signature : ${accents.join(", ")}` : "aucune transition signature",
   ]

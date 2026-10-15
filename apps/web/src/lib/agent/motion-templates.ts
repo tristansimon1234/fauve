@@ -42,12 +42,19 @@ export async function recentlyShownTemplates(studioId: string, exceptPostId: str
   return new Set(ids);
 }
 
+/**
+ * Scenes made to play over her footage (transparent, kinetic type on the video) carry this
+ * role; the older ones filled the frame like a slide, which reads as an ad: not offered again.
+ */
+export const OVERLAY_ROLE = "overlay";
+
 /** The library as the editor sees it (no code), without the scenes held back. */
 export async function templatesForEditor(studioId: string, holdBack: Set<string> = new Set()): Promise<TemplateSummary[]> {
   const { data, error } = await supabaseAdmin()
     .from("motion_templates")
     .select("id, name, description, slots, duration_seconds")
     .eq("kind", "scene")
+    .eq("role", OVERLAY_ROLE)
     .or(`studio_id.eq.${studioId},studio_id.is.null`)
     .is("archived_at", null)
     .order("uses", { ascending: false })
@@ -113,6 +120,7 @@ export async function saveTemplates(
         code: s.code,
         js: s.js,
         duration_seconds: s.durationSeconds,
+        role: OVERLAY_ROLE,
         uses: 1,
         last_used_at: new Date().toISOString(),
       })),

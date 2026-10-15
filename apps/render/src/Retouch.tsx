@@ -75,16 +75,16 @@ function BlurBox({ box, shape, size }: { box: Box; shape: "ellipse" | "rect"; si
   return <div style={style} />;
 }
 
-/** A photo with its retouch and blurred zones, covering the frame. */
-export function Photo({ src, edit }: { src: string; edit?: PhotoEdit }) {
+/** A photo with its retouch and blurred zones, covering the frame; `grade`: the Reel's light grade, before its own retouch. */
+export function Photo({ src, edit, grade }: { src: string; edit?: PhotoEdit; grade?: string }) {
   const { width, height } = useVideoConfig();
-  if (!edit) return <Img src={src} style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
+  if (!edit) return <Img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", filter: grade }} />;
   const layout = coverLayout({ width, height }, edit.source, edit.adjust);
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
       <AbsoluteFill style={{ transform: edit.adjust?.straighten ? `rotate(${edit.adjust.straighten}deg)` : undefined }}>
         <div style={{ position: "absolute", left: layout.left, top: layout.top, width: layout.width, height: layout.height }}>
-          <Img src={src} style={{ width: "100%", height: "100%", display: "block", filter: cssFilter(edit.adjust) }} />
+          <Img src={src} style={{ width: "100%", height: "100%", display: "block", filter: [grade, cssFilter(edit.adjust)].filter(Boolean).join(" ") || undefined }} />
           {(edit.blur ?? []).map((region, i) => (
             <BlurBox key={i} box={region} shape={region.shape} size={layout} />
           ))}
@@ -95,12 +95,12 @@ export function Photo({ src, edit }: { src: string; edit?: PhotoEdit }) {
 }
 
 /** Blurred zones over a clip, at the clip's own time (they follow faces as Gemini tracked them). */
-export function ClipBlurLayer({ blur, startFrom }: { blur: ClipBlur; startFrom: number }) {
+export function ClipBlurLayer({ blur, startFrom, focus, speed = 1 }: { blur: ClipBlur; startFrom: number; focus?: { x: number; y: number }; speed?: number }) {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
-  const t = (startFrom + frame) / fps;
-  // The clip covers the frame like object-fit: cover, centred.
-  const layout = coverLayout({ width, height }, { width: blur.aspect * 1000, height: 1000 });
+  const t = (startFrom + frame * speed) / fps;
+  // The clip covers the frame like object-fit: cover, anchored on its subject like the video.
+  const layout = coverLayout({ width, height }, { width: blur.aspect * 1000, height: 1000 }, focus ? { focus } : undefined);
   return (
     <div style={{ position: "absolute", left: layout.left, top: layout.top, width: layout.width, height: layout.height }}>
       {blur.tracks.map((track, i) => {

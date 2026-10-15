@@ -66,25 +66,66 @@ function CountUp({ value, frame }: { value: string; frame: number }) {
   );
 }
 
+/** The studio's colours, alive (two soft orbs drifting slowly): what an animation plays over when there is no footage. */
+export function Backdrop({ background = "accent", props, k }: { background?: Scene["background"]; props: ReelProps; k: number }) {
+  const frame = useCurrentFrame();
+  const c = palette(background, props.brand);
+  const drift = (speed: number, amp: number) => Math.sin(frame / speed) * amp;
+  return (
+    <AbsoluteFill style={{ backgroundColor: c.bg, overflow: "hidden" }}>
+      <div
+        style={{
+          position: "absolute",
+          width: props.width * 1.1,
+          height: props.width * 1.1,
+          left: props.width * (-0.35 + drift(45, 0.06)),
+          top: props.height * (0.02 + drift(60, 0.04)),
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${c.orbA} 0%, transparent 65%)`,
+          filter: `blur(${40 * k}px)`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          width: props.width * 1.2,
+          height: props.width * 1.2,
+          right: props.width * (-0.45 + drift(52, 0.05)),
+          bottom: props.height * (0.05 + drift(70, 0.05)),
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${c.orbB} 0%, transparent 65%)`,
+          filter: `blur(${50 * k}px)`,
+        }}
+      />
+    </AbsoluteFill>
+  );
+}
+
 export function SceneView({
   scene,
   durationInFrames,
   props,
   theme,
   k,
+  overlay = false,
 }: {
   scene: Scene;
   durationInFrames: number;
   props: ReelProps;
   theme: Theme;
   k: number;
+  /** Over her footage: no background of its own, white type that reads on the picture. */
+  overlay?: boolean;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const c = palette(scene.background, props.brand);
+  const c = overlay
+    ? { bg: "transparent", fg: "#FFFFFF", mark: props.brand.accent, orbA: "transparent", orbB: "transparent" }
+    : palette(scene.background, props.brand);
   const exit = interpolate(frame, [durationInFrames - 8, durationInFrames], [1, 0], clamp);
   const drift = (speed: number, amp: number) => Math.sin(frame / speed) * amp;
-  const display = `"${props.brand.displayFont}", serif`;
+  // Titles in the hook's font (a sans hook keeps its serif for accents only).
+  const display = theme.hook.family === "display" ? `"${props.brand.displayFont}", serif` : `"${props.brand.bodyFont}", sans-serif`;
   const body = `"${props.brand.bodyFont}", sans-serif`;
   const kickerIn = spring({ frame, fps, config: { damping: 200, stiffness: 110 } });
   const line = interpolate(frame, [10, 28], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
@@ -114,8 +155,9 @@ export function SceneView({
     );
 
   return (
-    <AbsoluteFill style={{ backgroundColor: c.bg, overflow: "hidden" }}>
-      {/* Living background: two soft orbs drifting slowly. */}
+    <AbsoluteFill style={{ backgroundColor: c.bg, overflow: "hidden", textShadow: overlay ? "0 2px 6px rgba(0,0,0,0.25), 0 10px 40px rgba(0,0,0,0.45)" : undefined }}>
+      {/* Living background: two soft orbs drifting slowly (none over footage). */}
+      {overlay ? null : (
       <div
         style={{
           position: "absolute",
@@ -128,6 +170,8 @@ export function SceneView({
           filter: `blur(${40 * k}px)`,
         }}
       />
+      )}
+      {overlay ? null : (
       <div
         style={{
           position: "absolute",
@@ -140,6 +184,7 @@ export function SceneView({
           filter: `blur(${50 * k}px)`,
         }}
       />
+      )}
 
       {/* Sizes below are the ideal ones: a long title, word or list shrinks to stay in the safe zone. */}
       <Fit
@@ -213,7 +258,7 @@ export function SceneView({
                   delay={6}
                   theme={theme}
                   k={k}
-                  style={{ fontFamily: display, fontStyle: "italic", fontWeight: 400, fontSize: (scene.title.length <= 40 ? 84 : 66) * k, lineHeight: 1.12 }}
+                  style={{ fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontWeight: 400, fontSize: (scene.title.length <= 40 ? 84 : 66) * k, lineHeight: 1.12 }}
                 />
                 {scene.kicker ? (
                   <div style={{ marginTop: 36 * k, fontFamily: body, fontWeight: 600, fontSize: readable(36, fit), opacity: line }}>— {scene.kicker}</div>

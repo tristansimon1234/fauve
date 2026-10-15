@@ -1324,9 +1324,8 @@ test("access: the first publication is free, then nothing without a subscription
 
 test("photo text: a Reel's text moves off text already in the photo", async () => {
   const { avoidPhotoText } = await import("./retouch.ts");
-  const shots = [{ start: 0, length: 2, clipId: "photo" }, { start: 2, length: 2, clipId: "clip" }];
   // Lettering across the lower middle of the photo, where a caption sits by default.
-  const boxes = { photo: [{ x: 0.1, y: 0.6, w: 0.8, h: 0.1 }] };
+  const shots = [{ start: 0, length: 2, boxes: [{ x: 0.1, y: 0.6, w: 0.8, h: 0.1 }] }, { start: 2, length: 2, boxes: [] }];
   const [caption, hook, later, placed] = avoidPhotoText(
     [
       { from: 0, to: 1.5, style: "caption" as const },
@@ -1335,7 +1334,6 @@ test("photo text: a Reel's text moves off text already in the photo", async () =
       { from: 0, to: 1.5, style: "caption" as const, y: 0.6 },
     ],
     shots,
-    boxes,
   );
   assert.notEqual(caption!.y, undefined);
   assert.ok(caption!.y! + 0.1 < 0.6 || caption!.y! > 0.7);
@@ -1365,4 +1363,88 @@ test("end card: the Reel ends on a real shot and no text runs under the card", a
   const out = normalizeEditPlan(plan, { a: 9 });
   assert.equal("clip_id" in out.segments.at(-1)!, true);
   assert.ok(out.texts.every((t) => t.to <= out.duration - 1.6 + 0.001));
+});
+
+test("finish: clips corrected and framed, still shots move, animations play over footage, texts off faces", async () => {
+  const { finishPlan } = await import("./finish.ts");
+  const shot = (start: number, end: number, extra: object) => ({
+    start, end, description: "", subject: "", energy: 2, hook_score: 3, quality: { blurry: false, dark: false, shaky: false }, faces_visible: false, ...extra,
+  });
+  const analysis = (shots: object[], correction?: object) => ({
+    duration: 10, orientation: "landscape", summary: "", setting: "", lighting: "ok", shots, best_moments: [{ start: 6, end: 8, why: "" }], transcript: "", issues: [], ...(correction ? { correction } : {}),
+  });
+  const facts = {
+    clips: {
+      // A still shot of the room, a bit dark and leaning; a handheld shot of a face on the left.
+      a: analysis([shot(0, 10, { camera: "static", subject_box: [200, 600, 900, 900] })], { exposure: 0.3, contrast: 0.02, saturation: 0, warmth: 0.1, straighten: 2 }),
+      b: analysis([shot(0, 10, { camera: "handheld", faces_visible: true, subject_box: [400, 100, 1000, 400] })]),
+    },
+    photos: {},
+  } as never;
+  const plan = {
+    format: "9:16", duration: 8, template: "doux", images: [], transitions: "cut", subtitles: false, music: null,
+    segments: [
+      { clip_id: "a", in: 0, out: 2, zoom: "none" },
+      { motion: { brief: "Offre", fallback: { kind: "title", title: "Offre", background: "accent" } }, duration: 2 },
+      { clip_id: "b", in: 1, out: 4, zoom: "none", move: "none" },
+    ],
+    // A band over the face of shot b (its default row is right where the head is).
+    texts: [{ text: "Petits groupes", from: 4.2, to: 6.5, style: "band" }],
+  } as never;
+  const out = finishPlan(plan, facts, { a: 10, b: 10 });
+  const [a, motion, b] = out.segments as Record<string, unknown>[];
+  assert.deepEqual(a!.adjust, { exposure: 0.3, warmth: 0.1, straighten: 2, focus: { x: 0.75, y: 0.55 } });
+  assert.equal(a!.move, "in");
+  // The animation carries on shot a's footage, from where it stopped.
+  assert.deepEqual(motion!.over, { clip_id: "a", in: 2 });
+  // A handheld shot keeps the camera as filmed.
+  assert.equal(b!.move, "none");
+  assert.notEqual(out.texts[0]!.y, undefined);
+});
+
+test("editor: the answer's camera, speed and footage under animations become the plan", async () => {
+  const { z } = await import("zod");
+  const { fromEditorPlan, editorOutputSchema } = await import("./editor.ts");
+  const plan = fromEditorPlan({
+    duration: 6, template: "dynamique", transitions: "cut", subtitles: false,
+    fonts: { display: "Anton", body: "bad;font" },
+    segments: [
+      { clip_id: "a", in: 0, out: 2, move: "Punch", speed: 1 },
+      { clip_id: "b", in: 1, out: 2, move: "zoom-in", speed: 0.5 },
+      { motion: { brief: "Offre", fallback: { kind: "title", title: "Offre", background: "accent" }, template_id: "not-a-uuid" }, duration: 2, over_clip: "b" },
+    ],
+    texts: [{ text: "Ce soir on dîne italien", from: 0, to: 2, style: "hook" }],
+  } as never);
+  const [a, b, motion] = plan.segments as Record<string, unknown>[];
+  assert.equal(a!.move, "punch");
+  assert.equal("speed" in a!, false);
+  // An unknown move is no move; slow motion is kept.
+  assert.equal(b!.move, "none");
+  assert.equal(b!.speed, 0.5);
+  assert.deepEqual(motion!.over, { clip_id: "b" });
+  assert.equal("template_id" in (motion!.motion as object), false);
+  assert.deepEqual(plan.fonts, { display: "Anton" });
+  assert.equal(plan.format, "9:16");
+  assert.deepEqual(plan.images, []);
+  // The answer stays a small grammar: one union, no formats (a uuid compiles to a long pattern).
+  const json = JSON.stringify(z.toJSONSchema(editorOutputSchema, { unrepresentable: "any" }));
+  assert.equal((json.match(/"anyOf"/g) ?? []).length, 1);
+  assert.doesNotMatch(json, /"format"/);
+});
+
+test("speed: a slowed shot lasts longer on screen and its cut still lands on a beat", async () => {
+  const { segmentSeconds } = await import("./schemas.ts");
+  const { normalizeEditPlan } = await import("./editor.ts");
+  assert.equal(segmentSeconds({ clip_id: "a", in: 1, out: 2, zoom: "none", speed: 0.5 } as never), 2);
+  const plan = normalizeEditPlan(
+    {
+      format: "9:16", duration: 4, template: "dynamique", images: [], transitions: "cut", subtitles: false, music: null, texts: [],
+      segments: [{ clip_id: "a", in: 0, out: 1.1, zoom: "none", speed: 0.5 }, { clip_id: "b", in: 0, out: 1.9, zoom: "none" }],
+    } as never,
+    { a: 10, b: 10 },
+  );
+  const first = plan.segments[0] as { in: number; out: number; speed?: number };
+  // 1.1 s of clip at half speed ≈ 2.2 s on screen → 4 beats of 0.5 s at 120 BPM = 2 s, i.e. 1 s of clip.
+  assert.equal(first.speed, 0.5);
+  assert.equal(first.out, 1);
 });

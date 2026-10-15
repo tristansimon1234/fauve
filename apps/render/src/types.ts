@@ -45,6 +45,14 @@ export type TextLook = {
   enter: "none" | "fade" | "rise" | "pop" | "typewriter" | "slide";
 };
 
+/** The camera's move on a shot (mirror of CameraMove). */
+export type CameraMove = "none" | "in" | "out" | "left" | "right" | "punch";
+
+/** Footage that keeps playing under an animation (mirror of ReelUnder). */
+export type ReelUnder =
+  | { type: "clip"; src: string; startFrom: number; adjust?: Adjust; aspect?: number }
+  | { type: "image"; src: string; edit?: PhotoEdit };
+
 export type ReelProps = {
   template: MotionTemplate;
   width: number;
@@ -53,10 +61,25 @@ export type ReelProps = {
   durationInFrames: number;
   fadeFrames: number;
   segments: (
-    | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean; adjust?: Adjust; blur?: ClipBlur; speech?: boolean; accent?: "punch" | "wipe" }
-    | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; accent?: "punch" | "wipe" }
-    | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
-    | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number }
+    | {
+        type: "clip";
+        src: string;
+        startFrom: number;
+        startAt: number;
+        durationInFrames: number;
+        zoom: boolean;
+        move?: CameraMove;
+        speed?: number;
+        /** The clip's width / height, to frame its subject in the vertical crop. */
+        aspect?: number;
+        adjust?: Adjust;
+        blur?: ClipBlur;
+        speech?: boolean;
+        accent?: "punch" | "wipe";
+      }
+    | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; move?: CameraMove; accent?: "punch" | "wipe" }
+    | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
+    | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder }
   )[];
   texts: {
     text: string;

@@ -198,26 +198,25 @@ export function clipBlurFrom(detection: ClipDetection, aspect: number, kinds: Re
   return tracks.length ? { aspect, tracks } : null;
 }
 
-/** Where each text style sits by default (top of its box, share of the frame height) and roughly how tall it is. */
-const TEXT_ROWS = { hook: { y: 0.12, h: 0.16 }, band: { y: 0.37, h: 0.12 }, caption: { y: 0.63, h: 0.1 } } as const;
-const FREE_ROWS = [0.12, 0.37, 0.63, 0.24, 0.5];
+/** Where each text style sits by default (top of its box, share of the frame height) and roughly how tall it is. Mirror of TEXT_Y in apps/render/src/theme.ts. */
+export const TEXT_ROWS = { hook: { y: 0.2, h: 0.2 }, band: { y: 0.47, h: 0.1 }, caption: { y: 0.62, h: 0.08 } } as const;
+const FREE_ROWS = [0.2, 0.47, 0.62, 0.33, 0.12, 0.55];
 
 /**
- * A Reel's texts never sit on text already in a photo (a sign, a logo on a window):
- * a text shown over such a photo moves to the nearest free row. `photoText`: the text
- * boxes of each photo (fractions of the photo; a portrait or a 3:4 photo fills the
- * frame's height, so its rows are the frame's). Texts placed by hand stay put.
+ * A Reel's texts never sit on what must stay seen: text already in a photo (a sign, a
+ * logo on a window) or a face in a shot. A text shown over such a shot moves to the
+ * nearest free row. `shots`: when each shot plays and its busy zones (shares of the
+ * frame; only the rows matter, texts span the width). Texts placed by hand stay put.
  */
 export function avoidPhotoText<T extends { from: number; to: number; style: "hook" | "band" | "caption"; y?: number }>(
   texts: T[],
-  shots: { start: number; length: number; clipId?: string }[],
-  photoText: Record<string, Box[]>,
+  shots: { start: number; length: number; boxes: Box[] }[],
 ): T[] {
   return texts.map((t) => {
     if (t.y !== undefined) return t;
     const boxes = shots
-      .filter((s) => s.clipId && s.start < t.to && s.start + s.length > t.from)
-      .flatMap((s) => photoText[s.clipId!] ?? [])
+      .filter((s) => s.boxes.length && s.start < t.to && s.start + s.length > t.from)
+      .flatMap((s) => s.boxes)
       // A word too small to read under a text does not count.
       .filter((b) => b.w > 0.12 || b.h > 0.04);
     if (!boxes.length) return t;
@@ -227,4 +226,12 @@ export function avoidPhotoText<T extends { from: number; to: number; style: "hoo
     const free = FREE_ROWS.filter((y) => y + row.h <= 0.82 && clear(y)).sort((a, b) => Math.abs(a - row.y) - Math.abs(b - row.y))[0];
     return free === undefined ? t : { ...t, y: Math.min(0.66, free) };
   });
+}
+
+/** Where a face is in a shot: the upper part of the subject's box, in shares of the frame (only the rows matter). */
+export function headZone(subjectBox: number[] | undefined): Box | null {
+  if (!subjectBox || subjectBox.length !== 4) return null;
+  const [ymin, xmin, ymax, xmax] = subjectBox.map((v) => Math.min(1000, Math.max(0, v)) / 1000) as [number, number, number, number];
+  if (ymax <= ymin) return null;
+  return { x: xmin, y: ymin, w: Math.max(0.01, xmax - xmin), h: Math.max(0.04, (ymax - ymin) * 0.4) };
 }

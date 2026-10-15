@@ -1,6 +1,6 @@
 import "server-only";
 import { FileState, GoogleGenAI } from "@google/genai";
-import { accessMessage, bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisSchema, usdToEur, type ClipAnalysis } from "@fauve/agent";
+import { accessMessage, bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisRequestSchema, clipAnalysisSchema, usdToEur, type ClipAnalysis } from "@fauve/agent";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { studioAccess } from "@/lib/billing/access";
@@ -30,11 +30,13 @@ function toGeminiSchema(value: unknown): unknown {
   );
 }
 // Gemini rejects some schemas with a bare "invalid argument": ask for the full
-// analysis with word timings first (no size bound on the list), then without words.
+// analysis (the look of every shot, the clip's correction, word timings with no
+// size bound on the list) first, then without words, then the plain analysis.
 const wordsSchema = z.array(z.object({ w: z.string(), start: z.number(), end: z.number() }));
 const RESPONSE_SCHEMAS = [
-  toGeminiSchema(z.toJSONSchema(clipAnalysisSchema.extend({ words: wordsSchema.optional() }))),
-  toGeminiSchema(z.toJSONSchema(clipAnalysisSchema.omit({ words: true }))),
+  toGeminiSchema(z.toJSONSchema(clipAnalysisRequestSchema.extend({ words: wordsSchema.optional() }))),
+  toGeminiSchema(z.toJSONSchema(clipAnalysisRequestSchema.omit({ words: true }))),
+  toGeminiSchema(z.toJSONSchema(clipAnalysisSchema.omit({ words: true, correction: true }))),
 ];
 
 export type StoredAnalysis = { media_id: string; analysis: ClipAnalysis };

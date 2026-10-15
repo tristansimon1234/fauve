@@ -1,4 +1,4 @@
-import { isClipSegment, isMotionSegment, segmentSeconds, type ClipAnalysis, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
+import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
 import type { Adjust, ClipBlur, PhotoEdit } from "./retouch.ts";
 import { brandPalette, resolveBrandLook, type BrandPalette, type Bullet, type ListItem, type TextLook } from "./text-look.ts";
 import type { LogoOnDark } from "./logo.ts";
@@ -26,13 +26,37 @@ const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> 
   collage: { display: "Bricolage Grotesque", body: "Space Mono" },
 };
 
+/** Footage that keeps playing under an animation: a passage of a clip, or a photo. */
+export type ReelUnder =
+  | { type: "clip"; src: string; startFrom: number; adjust?: Adjust; aspect?: number }
+  | { type: "image"; src: string; edit?: PhotoEdit };
+
 export type ReelSegment =
-  /** speech: someone speaks in this passage, its sound is kept (the other clips play muted). */
-  | { type: "clip"; src: string; startFrom: number; startAt: number; durationInFrames: number; zoom: boolean; adjust?: Adjust; blur?: ClipBlur; speech?: boolean; accent?: "punch" | "wipe" }
+  /**
+   * speech: someone speaks in this passage, its sound is kept (the other clips play muted).
+   * move: the camera's move on the shot; speed: playback rate (startFrom stays a frame of the clip).
+   */
+  | {
+      type: "clip";
+      src: string;
+      startFrom: number;
+      startAt: number;
+      durationInFrames: number;
+      zoom: boolean;
+      move?: CameraMove;
+      speed?: number;
+      /** The clip's width / height, to frame its subject in the vertical crop. */
+      aspect?: number;
+      adjust?: Adjust;
+      blur?: ClipBlur;
+      speech?: boolean;
+      accent?: "punch" | "wipe";
+    }
   /** A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move). */
-  | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; accent?: "punch" | "wipe" }
-  | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number }
-  | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number };
+  | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; move?: CameraMove; accent?: "punch" | "wipe" }
+  /** Animations play over her footage when there is some (`under`), else on the studio's colours. */
+  | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
+  | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder };
 export type ReelText = {
   text: string;
   style: "hook" | "band" | "caption";
@@ -116,6 +140,8 @@ export type ReelInputs = {
   clipUrls: Record<string, string>;
   /** The clips that are photos (shown still with a slow zoom). */
   photoIds?: string[];
+  /** Each clip's width / height when known (from its analysis), to frame its subject in the vertical crop. */
+  aspects?: Record<string, number>;
   /** Word timings from the clip analyses, by clip_id (for subtitles). */
   words?: Record<string, ClipAnalysis["words"]>;
   /** fonts: the studio's brand fonts (display first); the plan's fonts win over them. */
@@ -181,31 +207,51 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const brand = resolveReelBrand(plan, inputs.template, inputs.brand);
   const { lengths, fadeFrames } = frameLengths(plan);
 
+  // The footage under an animation: the passage of her clip (or the photo) the plan names.
+  const underOf = (over: { clip_id: string; in?: number } | undefined): ReelUnder | undefined => {
+    const src = over ? inputs.clipUrls[over.clip_id] : undefined;
+    if (!over || !src) return undefined;
+    const kept = plan.segments.find((x) => isClipSegment(x) && x.clip_id === over.clip_id);
+    const retouch = kept && isClipSegment(kept) ? kept : undefined;
+    if (inputs.photoIds?.includes(over.clip_id)) return { type: "image", src, ...(retouch?.photo ? { edit: retouch.photo } : {}) };
+    const aspect = inputs.aspects?.[over.clip_id];
+    return { type: "clip", src, startFrom: toFrames(over.in ?? 0), ...(retouch?.adjust ? { adjust: retouch.adjust } : {}), ...(aspect ? { aspect } : {}) };
+  };
+
   let cursor = 0;
   const segments: ReelSegment[] = plan.segments.map((s, i) => {
     const startAt = cursor;
     cursor += lengths[i]! - fadeFrames;
     if (isMotionSegment(s)) {
       const fallback = s.motion.fallback ?? { kind: "title" as const, title: inputs.brand.name || " ", background: "accent" as const };
+      const under = underOf(s.over);
       // Without generated code, the motion segment is just its fixed fallback scene.
       return s.motion.js
-        ? { type: "motion", js: s.motion.js, fallback, texts: s.motion.texts ?? {}, startAt, durationInFrames: lengths[i]! }
-        : { type: "scene", scene: fallback, startAt, durationInFrames: lengths[i]! };
+        ? { type: "motion", js: s.motion.js, fallback, texts: s.motion.texts ?? {}, startAt, durationInFrames: lengths[i]!, ...(under ? { under } : {}) }
+        : { type: "scene", scene: fallback, startAt, durationInFrames: lengths[i]!, ...(under ? { under } : {}) };
     }
     if (!isClipSegment(s)) return { type: "scene", scene: s.scene, startAt, durationInFrames: lengths[i]! };
     const src = inputs.clipUrls[s.clip_id];
     if (!src) throw new Error(`No URL for clip ${s.clip_id}`);
-    // Someone speaks in this passage: its sound stays (unless her voice is over the Reel).
-    const speech = !plan.voice && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out);
-    // A photo in a Reel: still, with a slow zoom so it lives.
-    if (inputs.photoIds?.includes(s.clip_id)) return { type: "image", src, startAt, durationInFrames: lengths[i]!, zoom: true, ...(s.photo ? { edit: s.photo } : {}), ...(s.accent ? { accent: s.accent } : {}) };
+    const speed = s.speed && Math.abs(s.speed - 1) > 0.01 ? s.speed : undefined;
+    // Someone speaks in this passage: its sound stays (unless her voice is over the Reel, or the shot plays at another speed).
+    const speech = !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out);
+    const zoom = s.zoom === "light" || plan.transitions === "light_zoom";
+    const move: CameraMove = s.move ?? (zoom ? "in" : "none");
+    // A photo in a Reel: still, with a slow zoom so it lives (or the move the editor chose).
+    if (inputs.photoIds?.includes(s.clip_id)) {
+      return { type: "image", src, startAt, durationInFrames: lengths[i]!, zoom: true, ...(s.move ? { move: s.move } : {}), ...(s.photo ? { edit: s.photo } : {}), ...(s.accent ? { accent: s.accent } : {}) };
+    }
     return {
       type: "clip",
       src,
       startFrom: toFrames(s.in),
       startAt,
       durationInFrames: lengths[i]!,
-      zoom: s.zoom === "light" || plan.transitions === "light_zoom",
+      zoom,
+      ...(move !== "none" ? { move } : {}),
+      ...(speed ? { speed } : {}),
+      ...(inputs.aspects?.[s.clip_id] ? { aspect: inputs.aspects[s.clip_id] } : {}),
       ...(s.adjust ? { adjust: s.adjust } : {}),
       ...(s.blur ? { blur: s.blur } : {}),
       ...(speech ? { speech: true } : {}),
@@ -235,10 +281,11 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   } else if (plan.subtitles) {
     plan.segments.forEach((s, i) => {
       if (!isClipSegment(s)) return;
+      const speed = s.speed ?? 1;
       for (const word of inputs.words?.[s.clip_id] ?? []) {
         if (word.start < s.in || word.end > s.out) continue;
-        const from = segments[i]!.startAt + toFrames(word.start - s.in);
-        const to = segments[i]!.startAt + toFrames(word.end - s.in);
+        const from = segments[i]!.startAt + toFrames((word.start - s.in) / speed);
+        const to = segments[i]!.startAt + toFrames((word.end - s.in) / speed);
         if (from < durationInFrames) words.push({ w: word.w, from, to: Math.max(to, from + 3) });
       }
     });
