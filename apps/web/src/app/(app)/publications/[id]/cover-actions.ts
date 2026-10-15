@@ -49,7 +49,7 @@ export async function setShareToFeed(postId: string, shareToFeed: boolean): Prom
   return { ok: true };
 }
 
-/** « Je publie moi-même » : at its time she gets the Reel and its caption on WhatsApp, to add Instagram's music herself. */
+/** « Je publie moi-même » : at its time she gets the Reel and its caption (to add Instagram's music), or the story and her link (to add the link sticker), on WhatsApp. */
 export async function setPublishByHand(postId: string, byHand: boolean): Promise<{ ok: boolean }> {
   if (!z.uuid().safeParse(postId).success) return { ok: false };
   const { db, member } = await getStudioContext();
@@ -59,7 +59,7 @@ export async function setPublishByHand(postId: string, byHand: boolean): Promise
     .update({ publish_by_hand: Boolean(byHand), handoff_at: null, handoff_via: null })
     .eq("id", postId)
     .eq("studio_id", member.studio.id)
-    .eq("kind", "reel")
+    .in("kind", ["reel", "story"])
     .not("status", "in", "(published,measured)")
     .select("id");
   if (error || !data.length) return { ok: false };
