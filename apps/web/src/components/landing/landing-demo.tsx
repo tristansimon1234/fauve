@@ -80,7 +80,7 @@ export function LandingDemo() {
               </span>
             </span>
             <span className="mt-2.5 flex flex-wrap gap-1.5">
-              {["Ça me ressemble", "Plus chaleureux", "Plus sobre"].map((label) => (
+              {["Ça me ressemble", "Plus rapide", "Moins de texte"].map((label) => (
                 <span key={label} className="rounded-full border border-line bg-white px-3 py-1.5 text-[12px] font-bold text-violet">
                   {label}
                 </span>

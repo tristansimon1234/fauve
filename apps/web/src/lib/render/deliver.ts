@@ -93,7 +93,7 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const after = [
     !unlocked
       ? `Pour le voir en entier et le publier, démarre ton essai : ${TRIAL_DAYS} jours offerts, sans engagement.`
-      : styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus chaleureux, plus sobre, plus pêchu ou autrement : je retiens ton style pour tous les prochains." : "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
+      : styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus rapide, avec moins de texte, plus chaleureux ou autrement : je retiens ton style pour tous les prochains." : "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
     target.offerVariant === false || styleCheck || !unlocked
       ? ""
       : `Je peux aussi te faire une variante (autre style, autre accroche) pour ${CREDIT_PRICES.variant} crédit${CREDIT_PRICES.variant > 1 ? "s" : ""}.`,

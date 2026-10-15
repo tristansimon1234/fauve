@@ -228,7 +228,7 @@ export default function LandingPage() {
             </StyleStep>
             <StyleStep n={3} title="Tes retours">
               <span className="flex flex-col gap-1.5">
-                {["Plus chaleureux", "Plus sobre", "Plus pêchu"].map((l) => (
+                {["Plus rapide", "Moins de texte", "Plus chaleureux"].map((l) => (
                   <span key={l} className="rounded-full border border-line bg-white px-2.5 py-1 text-center text-[12px] font-bold text-violet">
                     {l}
                   </span>

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AMBIANCES,
   buildSlideProps,
   MAX_ELEMENTS,
   placeElement,
@@ -33,11 +34,8 @@ import { saveSlidesPlan } from "./actions";
 // photo: its texts with quick colours, size and place, retouch, logo, and what
 // applies to the whole carousel.
 
-const templates = [
-  { value: "doux", label: "Doux" },
-  { value: "dynamique", label: "Dynamique" },
-  { value: "chic", label: "Chic" },
-] as const;
+/** On photos only the texts change: each ambiance named by its texts. */
+const templates = (["doux", "dynamique", "chic"] as const).map((value) => ({ value, label: AMBIANCES[value].photo }));
 const logoPlaces = [
   { value: null, label: "Aucun" },
   { value: "top", label: "En haut" },
@@ -478,14 +476,14 @@ export function CarouselEditor({
         <section aria-label="Tout le carrousel" className="flex flex-col gap-3 rounded-[20px] border border-line bg-white p-5">
           <h2 className="text-[16px] font-bold">Tout le carrousel</h2>
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[12px] font-semibold text-muted">Ambiance</span>
+            <span className="mr-1 text-[12px] font-semibold text-muted">Textes</span>
             {templates.map((t) => (
               <button key={t.value} type="button" aria-pressed={plan.template === t.value} onClick={() => edit({ ...plan, template: t.value })} className={chip(plan.template === t.value)}>
                 {t.label}
               </button>
             ))}
           </div>
-          <p className="text-[12px] leading-snug text-muted">L’ambiance donne les polices et les couleurs des textes en style « Simple ».</p>
+          <p className="text-[12px] leading-snug text-muted">Les textes en style « Simple » suivent ce choix, dans les polices et les couleurs de ta charte.</p>
         </section>
       </aside>
     </>

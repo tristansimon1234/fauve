@@ -1,29 +1,31 @@
 // « Ça te ressemble ? » under the first Reel: three buttons that tune the style
-// on the manager's own video instead of asking her to describe it. A click keeps
-// the adjustment in her art direction (every next montage follows it) and makes
-// a corrected version of that Reel at once.
+// on the manager's own video instead of asking her to describe it, each a concrete
+// change she can picture (faster, fewer words, warmer), never a designer's adjective.
+// A click keeps the adjustment in her art direction (every next montage follows it)
+// and makes a corrected version of that Reel at once. The keys stay as stored.
 
-export const RESTYLES = ["warmer", "sober", "punchier"] as const;
+/** In the order of the buttons. */
+export const RESTYLES = ["punchier", "sober", "warmer"] as const;
 export type Restyle = (typeof RESTYLES)[number];
 
 export const RESTYLE: Record<Restyle, { button: string; direction: string; brief: string }> = {
   warmer: {
     button: "Plus chaleureux",
-    direction: "Plus chaleureux : tons chauds, lumière douce, textes proches et accueillants, rythme posé.",
+    direction: "Plus chaleureux : tons chauds, lumière douce, textes proches et accueillants, des visages et des sourires, rythme posé.",
     brief:
       "La gérante veut ce Reel plus chaleureux. Garde le même sujet et les mêmes plans, mais réchauffe tout : mêmes messages dits de façon plus proche et accueillante (tutoiement, une touche d'émotion), apparitions douces, rythme un peu plus posé, scènes animées aux tons chauds de sa charte.",
   },
   sober: {
-    button: "Plus sobre",
-    direction: "Plus sobre : moins de texte et d'effets, typographie fine, beaucoup d'air, fondus lents.",
+    button: "Moins de texte",
+    direction: "Moins de texte : l'accroche et l'invitation seulement, les images parlent, peu d'animations.",
     brief:
-      "La gérante veut ce Reel plus sobre. Garde le même sujet et les mêmes plans, mais épure : moins de texte (les mots les plus forts de ses messages seulement), typographie fine, plus d'espace, fondus lents, animations discrètes et élégantes.",
+      "La gérante veut moins de texte sur ce Reel. Garde le même sujet et les mêmes plans, mais laisse parler les images : seulement l'accroche (4 mots au plus) et l'invitation de la fin, les autres textes et animations retirés, sauf une offre qu'elle a donnée.",
   },
   punchier: {
-    button: "Plus pêchu",
-    direction: "Plus pêchu : coupes rapides, textes qui claquent, accroche forte, rythme soutenu.",
+    button: "Plus rapide",
+    direction: "Plus rapide : plans plus courts, accroche dès la première image, coupes sur le temps, un coup de zoom pour appuyer.",
     brief:
-      "La gérante veut ce Reel plus pêchu. Garde le même sujet, mais donne de l'énergie : accroche plus forte dès la première seconde, coupes plus rapides, textes courts qui claquent (capitales, mots en valeur), animations plus dynamiques.",
+      "La gérante veut ce Reel plus rapide. Garde le même sujet, mais accélère : son meilleur plan dès la première image, des plans plus courts qui raccourcissent encore vers le moment fort, un coup de zoom (punch) sur un temps fort, un plan long accéléré (speed 1,5), le Reel plus court au total.",
   },
 };
 
@@ -43,6 +45,12 @@ const PREFIX = "Ajustement demandé — ";
 /** The first wording, still in older art directions. */
 const OLD_PREFIX = "Ajustement de la gérante — ";
 const isAdjustment = (l: string) => l.startsWith(PREFIX) || l.startsWith(OLD_PREFIX);
+/** An adjustment's kind: its words before « : » (« Plus chaleureux »), so a reworded button still replaces its line. */
+const kindOf = (l: string) => {
+  const body = l.startsWith(PREFIX) ? l.slice(PREFIX.length) : l.startsWith(OLD_PREFIX) ? l.slice(OLD_PREFIX.length) : l;
+  const colon = body.indexOf(" : ");
+  return (colon > 0 ? body.slice(0, colon) : body).trim().toLowerCase();
+};
 /** Adjustments kept in the art direction: the latest ones, one per kind. */
 const KEPT = 3;
 
@@ -55,7 +63,7 @@ export function withAdjustment(artDirection: string | undefined, restyle: Restyl
   const line = `${PREFIX}${typeof restyle === "string" ? RESTYLE[restyle].direction : customRestyle(restyle.wish).direction}`;
   const lines = (artDirection ?? "").split("\n").filter((l) => l.trim());
   const own = lines.filter((l) => !isAdjustment(l));
-  let adjustments = [...lines.filter((l) => isAdjustment(l) && l !== line), line].slice(-KEPT);
+  let adjustments = [...lines.filter((l) => isAdjustment(l) && kindOf(l) !== kindOf(line)), line].slice(-KEPT);
   const join = () => [...own, ...adjustments].join("\n");
   while (join().length > max && adjustments.length > 1) adjustments = adjustments.slice(1);
   return join().slice(0, max);
