@@ -1,6 +1,6 @@
 import "server-only";
 import { FileState, GoogleGenAI } from "@google/genai";
-import { CLIP_ANALYSIS_PROMPT, clipAnalysisSchema, usdToEur, type ClipAnalysis } from "@fauve/agent";
+import { bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisSchema, usdToEur, type ClipAnalysis } from "@fauve/agent";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -134,7 +134,7 @@ async function runAnalysis(asset: { id: string; studio_id: string; storage_path:
     if (insert.error) throw new Error(insert.error.message);
     await db
       .from("media_assets")
-      .update({ analysis_status: "done", duration: analysis.duration })
+      .update({ analysis_status: "done", duration: analysis.duration, bank: bankWorthy(analysis) })
       .eq("id", asset.id);
     return { media_id: asset.id, analysis };
   } finally {

@@ -97,11 +97,15 @@ export const toolSpecs = {
   },
   list_media: {
     description:
-      "La médiathèque du studio : les photos et vidéos déjà reçues (WhatsApp, app, médiathèque), les plus récentes d'abord, avec leur media_id, leur date, leur format et ce qu'on y voit quand c'est connu. À regarder dès que la gérante parle de photos ou de vidéos déjà envoyées (« celles de ce matin », « regarde dans la médiathèque », « les 4 photos que j'ai prises ») : ne lui demande jamais de les renvoyer.",
+      "La médiathèque du studio : les photos et vidéos déjà reçues (WhatsApp, app, médiathèque), les plus récentes d'abord, avec leur media_id, leur date, leur format et ce qu'on y voit quand c'est connu. À regarder dès que la gérante parle de photos ou de vidéos déjà envoyées (« celles de ce matin », « regarde dans la médiathèque », « les 4 photos que j'ai prises ») : ne lui demande jamais de les renvoyer. Avant de lui demander de filmer pour un Reel, regarde sa banque de plans (bank: true).",
     input: z.object({
       kind: z.enum(["image", "video", "all"]).default("all").describe("image pour les photos, video pour les vidéos"),
       days: z.number().int().min(1).max(90).default(14).describe("Jusqu'à combien de jours en arrière"),
       limit: z.number().int().min(1).max(30).default(20),
+      bank: z
+        .boolean()
+        .default(false)
+        .describe("true : seulement sa banque de plans (ses bonnes vidéos gardées jusqu'à 6 mois, nettes et vivantes), sans limite de date"),
     }),
   },
   get_calendar: {

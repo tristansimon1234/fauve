@@ -1265,3 +1265,14 @@ test("turn: a step that only adds buttons or a reaction ends the turn", async ()
   assert.equal(endsTurn(["update_post", "reply_with"], true), false);
   assert.equal(endsTurn([], true), false);
 });
+
+test("bank: a clean shot that moves or hooks is kept, a dark or shaky clip is not", async () => {
+  const { bankWorthy } = await import("./bank.ts");
+  const shot = { start: 0, end: 3, energy: 4, hook_score: 2, quality: { blurry: false, dark: false, shaky: false } };
+  assert.equal(bankWorthy({ lighting: "good", shots: [shot] } as never), true);
+  assert.equal(bankWorthy({ lighting: "poor", shots: [shot] } as never), false);
+  assert.equal(bankWorthy({ lighting: "ok", shots: [{ ...shot, quality: { ...shot.quality, shaky: true } }] } as never), false);
+  // Too short, or still and without a hook.
+  assert.equal(bankWorthy({ lighting: "ok", shots: [{ ...shot, end: 1 }] } as never), false);
+  assert.equal(bankWorthy({ lighting: "ok", shots: [{ ...shot, energy: 1, hook_score: 2 }] } as never), false);
+});
