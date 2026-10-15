@@ -17,10 +17,12 @@ const SIZES: Record<EditPlan["format"], { width: number; height: number }> = {
   "4:5": { width: 1080, height: 1350 },
 };
 
+/** Fonts of each template when the studio has none: current pairings, not the classics of ten years ago. */
 const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> = {
-  doux: { display: "Instrument Serif", body: "Plus Jakarta Sans" },
-  dynamique: { display: "Poppins", body: "Poppins" },
-  chic: { display: "Cormorant Garamond", body: "Plus Jakarta Sans" },
+  doux: { display: "Instrument Serif", body: "Inter Tight" },
+  dynamique: { display: "Bricolage Grotesque", body: "Bricolage Grotesque" },
+  chic: { display: "Bodoni Moda", body: "Inter Tight" },
+  collage: { display: "Bricolage Grotesque", body: "Space Mono" },
 };
 
 export type ReelSegment =

@@ -1,9 +1,9 @@
 // Constants and types of the Style page, shared by the server loader, the server
 // actions and the client form (keep it free of server-only imports).
 
-export const TEMPLATES = ["doux", "dynamique", "chic"] as const;
+export const TEMPLATES = ["doux", "dynamique", "chic", "collage"] as const;
 export type Template = (typeof TEMPLATES)[number];
-export const TEMPLATE_LABELS: Record<Template, string> = { doux: "Doux", dynamique: "Dynamique", chic: "Chic" };
+export const TEMPLATE_LABELS: Record<Template, string> = { doux: "Doux", dynamique: "Dynamique", chic: "Chic", collage: "Collage" };
 
 export const CAPTION_LENGTHS = ["short", "medium", "long"] as const;
 export const EMOJI_LEVELS = ["none", "few", "many"] as const;
@@ -34,9 +34,10 @@ export const DEFAULT_ACCENT = "#5b3fd9";
 
 /** Fonts each template falls back to (mirror of TEMPLATE_FONTS in packages/agent/src/motion.ts). */
 export const TEMPLATE_FONTS: Record<Template, { display: string; body: string }> = {
-  doux: { display: "Instrument Serif", body: "Plus Jakarta Sans" },
-  dynamique: { display: "Poppins", body: "Poppins" },
-  chic: { display: "Cormorant Garamond", body: "Plus Jakarta Sans" },
+  doux: { display: "Instrument Serif", body: "Inter Tight" },
+  dynamique: { display: "Bricolage Grotesque", body: "Bricolage Grotesque" },
+  chic: { display: "Bodoni Moda", body: "Inter Tight" },
+  collage: { display: "Bricolage Grotesque", body: "Space Mono" },
 };
 
 /** What the form edits; saved into brand_profiles.profile by the server action. */

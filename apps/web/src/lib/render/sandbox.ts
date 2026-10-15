@@ -160,7 +160,7 @@ export async function renderReelInSandbox(job: { id: string; props: ReelProps })
     await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(props) }]);
     await bash(
       sandbox,
-      `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=4 --codec=h264 --crf=19 --pixel-format=yuv420p --enforce-audio-track --log=error`,
+      `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=4 --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --enforce-audio-track --log=error`,
       [dir],
     );
     const mp4 = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });

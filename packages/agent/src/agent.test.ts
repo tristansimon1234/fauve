@@ -327,7 +327,8 @@ test("variants: same cut, next template and a new hook, priced as a render", asy
   assert.deepEqual(variant.segments, plan.segments); // same cut
   assert.equal(variant.texts[0]!.text, "Respire. Tout part de là.");
   assert.equal(variantPlan(plan, { template: "chic" }).texts[0]!.text, plan.texts[0]!.text); // hook kept when not given
-  assert.equal(variantPlan(editPlanSchema.parse({ ...validPlan, template: "chic" }), {}).template, "doux"); // wraps around
+  assert.equal(variantPlan(editPlanSchema.parse({ ...validPlan, template: "chic" }), {}).template, "collage");
+  assert.equal(variantPlan(editPlanSchema.parse({ ...validPlan, template: "collage" }), {}).template, "doux"); // wraps around
   assert.equal(quoteVariant().max, CREDIT_PRICES.variant);
 });
 

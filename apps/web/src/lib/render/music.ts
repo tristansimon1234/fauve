@@ -43,6 +43,7 @@ const MOODS: Record<string, { words: string; tags: string[] }> = {
   doux: { words: "soft, warm and elegant, gentle energy that builds slightly", tags: ["warm", "elegant", "soft"] },
   dynamique: { words: "upbeat, punchy and feel-good, with a clear groove", tags: ["upbeat", "energetic", "feel-good"] },
   chic: { words: "minimal, chic and modern, refined and confident", tags: ["chic", "minimal", "modern"] },
+  collage: { words: "playful, quirky and trendy, lo-fi indie pop with handclaps and a bouncy groove", tags: ["playful", "indie", "lo-fi"] },
 };
 
 /** What the composer is asked for: the business, the mood of the template, and the art direction adjustments. */

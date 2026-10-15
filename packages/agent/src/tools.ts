@@ -178,7 +178,7 @@ export const toolSpecs = {
         ),
       variant: z
         .object({
-          template: motionTemplateSchema.optional().describe("Style de la variante ; par défaut le suivant (doux → dynamique → chic)"),
+          template: motionTemplateSchema.optional().describe("Style de la variante ; par défaut le suivant (doux → dynamique → chic → collage)"),
           hook: z.string().max(80).optional().describe("Nouvelle accroche, courte et différente de l'actuelle"),
         })
         .optional()
@@ -213,7 +213,7 @@ export const toolSpecs = {
       "Écrit du texte par-dessus les photos d'un carrousel ou d'un post photo, à la charte du studio (mêmes polices et styles que les montages). Rendu en images en une minute environ, gratuit ; le lien vers le résultat est envoyé automatiquement à la gérante quand c'est prêt. Une entrée par photo, dans l'ordre des photos de la publication (texts vide = photo sans texte). Court et lisible : une accroche sur la 1re photo (hook), puis un message par photo (band ou caption), 6 textes au plus par photo. Une liste (checklist, planning, étapes, tarifs) est un seul texte avec items (titre + détail facultatif par élément). Pour refaire la mise en page d'un exemple copié (copy_text_style), reprends un texte par bloc avec son look_name. Remplace le texte déjà posé ; la gérante peut ensuite déplacer ou corriger chaque texte elle-même.",
     input: z.object({
       post_id: z.string().uuid(),
-      template: motionTemplateSchema.optional().describe("doux, dynamique ou chic ; par défaut celui déjà choisi, sinon doux"),
+      template: motionTemplateSchema.optional().describe("doux, dynamique, chic ou collage ; par défaut celui déjà choisi, sinon doux"),
       slides: z
         .array(
           z.object({

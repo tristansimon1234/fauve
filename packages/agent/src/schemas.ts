@@ -125,14 +125,14 @@ export const editPlanTextSchema = z.object({
 });
 
 /** Motion templates rendered by Remotion (apps/render); any other template uses the ffmpeg engine. */
-export const MOTION_TEMPLATES = ["doux", "dynamique", "chic"] as const;
+export const MOTION_TEMPLATES = ["doux", "dynamique", "chic", "collage"] as const;
 export const motionTemplateSchema = z.enum(MOTION_TEMPLATES);
 export type MotionTemplate = z.infer<typeof motionTemplateSchema>;
 
 /** What Fauve proposes before a montage, shown on the quote and followed by the editor. */
 export const montagePlanSchema = z.object({
   duration: z.number().min(5).max(60).describe("Durée visée, en secondes"),
-  style: motionTemplateSchema.optional().describe("Gabarit visé : doux (élégant), dynamique (qui claque), chic (minimal)"),
+  style: motionTemplateSchema.optional().describe("Gabarit visé : doux (élégant), dynamique (qui claque), chic (minimal), collage (fait main, photos découpées, à la mode)"),
   scenes: z
     .array(
       z.object({
