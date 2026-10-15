@@ -580,9 +580,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async set_music({ post_id, mode }) {
       const post = unwrap(await db.from("posts").select("id, kind, status, edit_plan_id, music").eq("id", post_id).eq("studio_id", studioId).single());
-      if (post.kind !== "reel" || !post.edit_plan_id) return json({ error: "La musique se met sur un Reel monté." });
+      if (post.kind !== "reel") return json({ error: "La musique se met sur un Reel." });
       if (["published", "measured"].includes(post.status as string)) return json({ error: "Ce Reel est déjà en ligne." });
       check(await db.from("posts").update({ music: { ...readPostMusic(post.music), mode: mode === "off" ? "off" : "on" } }).eq("id", post_id));
+      // Not montaged yet: the choice is kept for the montage.
+      if (!post.edit_plan_id) return json({ ok: true, note: "C'est noté pour son montage. Continue sans le redire longuement." });
       ctx.afterReply.push(async () => {
         await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, freshMusic: mode === "another" });
       });

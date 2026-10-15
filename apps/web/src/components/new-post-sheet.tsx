@@ -65,6 +65,14 @@ const styleHints: Record<NonNullable<Style>, string> = {
   collage: "fait main, photos découpées, à la mode",
 };
 
+/** A Reel's sound (a story has no publishing by hand: only Simone's music or none). */
+const sounds = [
+  { value: "simone", label: "Musique de Simone", hint: "composée pour ce Reel, libre de droits", reel: false },
+  { value: "instagram", label: "Un son d’Instagram", hint: "tu publies toi-même, avec le son de ton choix", reel: true },
+  { value: "none", label: "Sans musique", hint: "la vidéo telle quelle", reel: false },
+] as const;
+type Sound = (typeof sounds)[number]["value"];
+
 type Step = "format" | "when" | "files" | "idea" | "inspiration";
 const stepTitles: Record<Step, string> = {
   format: "Quel format ?",
@@ -103,6 +111,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
   const [intention, setIntention] = useState("");
   const [style, setStyle] = useState<Style>(null);
   const [inspiration, setInspiration] = useState<InspirationItem | null>(null);
+  const [sound, setSound] = useState<Sound>("simone");
   const [kit, setKit] = useState<NewPostOptions["kits"][number] | null>(null);
   /** A picture of a post she likes: Fauve redraws the same layout on her photos. */
   const [example, setExample] = useState<Picked | null>(null);
@@ -191,6 +200,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
         template: video ? style : null,
         inspirationId: video ? (inspiration?.id ?? null) : null,
         mediaIds: chosen,
+        music: video ? sound : null,
       }).catch(() => ({ ok: false as const, error: "La publication n’a pas été créée. Réessaie." }));
       if (!res.ok) return setError(res.error);
       router.refresh();
@@ -202,6 +212,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
           video && (style || inspiration)
             ? [style ? `Style : ${styles.find((s) => s.value === style)!.label}.` : "", inspiration ? `Inspiration : « ${inspiration.title} ».` : ""].filter(Boolean).join(" ")
             : "",
+          video ? `Musique : ${sound === "instagram" ? "un son d’Instagram, je le publierai moi-même" : sound === "none" ? "sans musique" : "ta musique"}.` : "",
           kit ? `Composants à poser sur mes photos : le kit « ${kit.name} » (element_id ${kit.elements.map((e) => e.id).join(", ")}).` : "",
           chosen.length ? `Fichiers choisis dans la médiathèque (media_id, dans l’ordre) : ${chosen.join(", ")}.` : "",
           files.length ? "Voici mes nouveaux fichiers." : "",
@@ -501,6 +512,30 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
                   })}
                 </div>
                 <p className="text-[12px] text-muted">{style ? `${styles.find((s) => s.value === style)!.label} : ${styleHints[style]}.` : "Simone prend ton style habituel, ou celui de ton inspiration."}</p>
+              </fieldset>
+              <fieldset className="flex flex-col gap-2">
+                <legend className="mb-2 text-[13px] font-bold">La musique</legend>
+                <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Musique">
+                  {sounds
+                    .filter((s) => kind === "reel" || !s.reel)
+                    .map((s) => {
+                      const on = sound === s.value;
+                      return (
+                        <button
+                          key={s.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          onClick={() => setSound(s.value)}
+                          className={`${card(on)} relative flex flex-col items-start rounded-[14px] px-3.5 py-2.5 text-left`}
+                        >
+                          <span className="text-[14px] font-bold">{s.label}</span>
+                          <span className={`text-[12px] ${on ? "text-violet/80" : "text-muted"}`}>{s.hint}</span>
+                          {on && <Tick />}
+                        </button>
+                      );
+                    })}
+                </div>
               </fieldset>
               <div className="flex flex-col gap-2">
                 <span className="text-[13px] font-bold">Un Reel à suivre</span>

@@ -117,6 +117,8 @@ export async function createPost(input: {
   inspirationId?: string | null;
   /** Photos and videos picked in the library, in order. */
   mediaIds?: string[];
+  /** A Reel's sound: Simone's music, a sound of Instagram (she publishes it herself), or none. */
+  music?: "simone" | "instagram" | "none" | null;
 }): Promise<{ ok: true; id: string; title: string } | { ok: false; error: string }> {
   const kind = postKindSchema.safeParse(input.kind);
   const day = parseIsoDate(input.date);
@@ -140,6 +142,8 @@ export async function createPost(input: {
   const wanted = (input.mediaIds ?? []).filter((id) => z.uuid().safeParse(id).success).slice(0, 10);
   const owned = wanted.length ? new Set(((await db.from("media_assets").select("id").eq("studio_id", member.studio.id).in("id", wanted)).data ?? []).map((m) => m.id as string)) : new Set<string>();
   const mediaIds = wanted.filter((id) => owned.has(id));
+  const video = kind.data === "reel" || kind.data === "story";
+  const music = video && (input.music === "instagram" || input.music === "none") ? input.music : null;
   const { data, error } = await db
     .from("posts")
     .insert({
@@ -153,6 +157,9 @@ export async function createPost(input: {
       inspiration_id: inspiration?.id ?? null,
       media_ids: mediaIds,
       ...(mediaIds.length ? { status: "media_received" } : {}),
+      // A sound of Instagram: no music of Simone, and she publishes it herself (Instagram's sounds can only be added in its app).
+      ...(music ? { music: { mode: "off" } } : {}),
+      ...(music === "instagram" && kind.data === "reel" ? { publish_by_hand: true } : {}),
     })
     .select("id")
     .single();
