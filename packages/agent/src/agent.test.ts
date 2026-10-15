@@ -385,6 +385,16 @@ test("pricing: Gemini, the sandbox, the music and the transcriptions are priced"
   assert.ok(Math.abs(transcriptionCostUsd(3600) - 0.22) < 1e-9);
 });
 
+test("when a publication goes out, in her words", async () => {
+  const { publishWhen } = await import("./when.ts");
+  const now = new Date("2026-10-15T10:00:00Z"); // a Thursday, noon in Paris
+  assert.deepEqual(publishWhen("2026-10-16T16:00:00Z", "Europe/Paris", now), { full: "Vendredi 16 octobre à 18 h", short: "demain à 18 h" });
+  assert.equal(publishWhen("2026-10-15T16:30:00Z", "Europe/Paris", now).short, "aujourd’hui à 18 h 30");
+  assert.equal(publishWhen("2026-10-17T08:00:00Z", "Europe/Paris", now).short, "samedi à 10 h");
+  assert.equal(publishWhen("2026-10-24T16:00:00Z", "Europe/Paris", now).short, "le 24 octobre à 18 h");
+  assert.equal(publishWhen("2026-11-01T17:00:00Z", "Europe/Paris", now).full, "Dimanche 1er novembre à 18 h");
+});
+
 test("pricing: the chat model is priced", async () => {
   const { CHAT_MODEL, claudeCostUsd } = await import("./pricing.ts");
   assert.ok(claudeCostUsd(CHAT_MODEL, { input_tokens: 1_000_000, output_tokens: 100_000 }) > 0);
