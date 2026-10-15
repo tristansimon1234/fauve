@@ -1240,3 +1240,32 @@ test("reply: a paragraph said again after a tool call is kept once, in its last 
   assert.equal(mergeReplySteps(["Top !", "Top !"]), "Top !");
 });
 
+test("editor: the signature transition goes on the shot where the band appears, the schema stays small", async () => {
+  const { fromEditorPlan, signatureShot, editorOutputSchema } = await import("./editor.ts");
+  const { z } = await import("zod");
+  const base = {
+    format: "9:16" as const,
+    duration: 9,
+    template: "dynamique" as const,
+    images: [],
+    transitions: "cut" as const,
+    subtitles: false,
+    music: null,
+    segments: [
+      { clip_id: "a", in: 0, out: 3, zoom: "none" as const },
+      { clip_id: "b", in: 0, out: 3, zoom: "none" as const },
+      { clip_id: "c", in: 0, out: 3, zoom: "none" as const },
+    ],
+    texts: [
+      { text: "Le geste juste", from: 0, to: 2, style: "hook" as const },
+      { text: "Fait main", from: 6, to: 8, style: "band" as const },
+    ],
+  };
+  assert.equal(signatureShot(base), 2);
+  const plan = fromEditorPlan(base);
+  assert.deepEqual(plan.segments.map((s) => ("accent" in s ? s.accent : undefined)), [undefined, undefined, "punch"]);
+  assert.equal(signatureShot({ ...base, texts: [base.texts[0]!] }), null);
+  // The editor writes no accent: the structured-output grammar is at the API's limit.
+  assert.doesNotMatch(JSON.stringify(z.toJSONSchema(editorOutputSchema, { unrepresentable: "any" })), /"accent":/);
+});
+
