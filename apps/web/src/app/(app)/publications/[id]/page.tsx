@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import { env } from "@/lib/env";
 import { readPostMusic } from "@/lib/render/music";
-import { alignSlides, captionForInstagram, captionForTikTok, findVoice, readTikTokExternal, readTikTokSettings, tiktokStateLine, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
+import { alignSlides, captionForInstagram, findVoice, readTikTokExternal, tiktokStateLine, DEFAULT_COVER_SECONDS, platformSchema, postCoverSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -13,7 +13,6 @@ import { DeleteButton } from "@/components/delete-button";
 import { AskFauveButton } from "@/components/fauve-drawer";
 import { StatusPill } from "@/components/status-pill";
 import { formatDateTime, formatSeconds, kindLabels, platformLabels } from "@/lib/format";
-import { loadEditorData } from "@/lib/montage-editor-data";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { postSlides } from "@/lib/render/slides";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
@@ -27,50 +26,15 @@ import { deletePost } from "./actions";
 import { CoverPicker } from "@/components/montage/cover-picker";
 import { PublishByHand } from "@/components/montage/publish-by-hand";
 import { StoryLink } from "@/components/montage/story-link";
-import { WhereToPost, type TikTokPanel } from "@/components/montage/where-to-post";
-import { creatorInfo, tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
-import { tiktokAccount, tiktokCanTake } from "@/lib/social/tiktok-account";
-import { MontageEditor } from "./montage-editor";
+import { WhereToPost } from "@/components/montage/where-to-post";
+import { EditMontageButton } from "@/components/review/edit-montage-button";
+import { tiktokPanel } from "@/lib/social/tiktok-panel";
 import { PostReview } from "@/components/review/post-review";
 import { loadReview } from "@/lib/review";
 import { PostEditor } from "./post-editor";
 import { CarouselEditor } from "./carousel-editor";
 
 export const metadata: Metadata = { title: "Publication" };
-
-/** TikTok for this post: connected or not, her choices, and (direct posts) what TikTok offers her right now. */
-async function tiktokPanel(
-  studioId: string,
-  post: { kind: PostKind; platforms: string[]; caption: string | null; hashtags: string[]; tiktok: unknown; external_ids: unknown },
-  canEdit: boolean,
-): Promise<TikTokPanel | null> {
-  if (!tiktokEnabled() || !canEdit) return null;
-  const account = await tiktokAccount(studioId).catch(() => null);
-  const direct = tiktokDirectPost();
-  const info =
-    direct && account && post.platforms.includes("tiktok")
-      ? await creatorInfo(account.accessToken).catch(() => null)
-      : null;
-  const sent = readTikTokExternal(post.external_ids);
-  return {
-    connected: Boolean(account),
-    handle: account?.handle ?? null,
-    canTake: tiktokCanTake(post.kind),
-    direct,
-    settings: readTikTokSettings(post.tiktok),
-    options: info
-      ? {
-          privacy: info.privacy_level_options,
-          commentDisabled: info.comment_disabled,
-          duetDisabled: info.duet_disabled,
-          stitchDisabled: info.stitch_disabled,
-          nickname: info.creator_nickname ?? null,
-        }
-      : null,
-    state: sent ? tiktokStateLine(sent) : null,
-    caption: captionForTikTok(post.caption, post.hashtags),
-  };
-}
 
 const postSchema = z.object({
   id: z.uuid(),
@@ -131,21 +95,19 @@ async function loadVoice(db: Awaited<ReturnType<typeof getStudioContext>>["db"],
   return { who: "simone" as const, name: findVoice(voiceId)?.name ?? "Simone", text };
 }
 
-export default function PostPage({ params, searchParams }: PageProps<"/publications/[id]">) {
+export default function PostPage({ params }: PageProps<"/publications/[id]">) {
   return (
     <main className="flex min-w-0 flex-col gap-5 px-4 pt-5 pb-14 sm:px-8 sm:pt-6">
       <PageSuspense title="Publication">
-        <PostDetail params={params} searchParams={searchParams} />
+        <PostDetail params={params} />
       </PageSuspense>
     </main>
   );
 }
 
-async function PostDetail({ params, searchParams }: { params: PageProps<"/publications/[id]">["params"]; searchParams: PageProps<"/publications/[id]">["searchParams"] }) {
+async function PostDetail({ params }: { params: PageProps<"/publications/[id]">["params"] }) {
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
-  // « Tout régler moi-même »: the full editor instead of the simple page of a Reel.
-  const fullEditor = (await searchParams).editeur !== undefined;
 
   const { db, member } = await getStudioContext();
   if (!member) return <NoStudio />;
@@ -165,7 +127,7 @@ async function PostDetail({ params, searchParams }: { params: PageProps<"/public
   const post = postSchema.parse(data);
 
   // A Reel with its montage: the simple page (the video, when, one button, « Changer quelque chose »).
-  if (post.kind === "reel" && !fullEditor) {
+  if (post.kind === "reel") {
     const review = await loadReview(db, studioId, post, tz);
     if (review) {
       return (
@@ -186,7 +148,6 @@ async function PostDetail({ params, searchParams }: { params: PageProps<"/public
             key={`${review.version}-${review.renderId ?? ""}-${review.status}`}
             data={review}
             surface="app"
-            editorHref={`/publications/${post.id}?editeur=1`}
             cover={post.cover}
             shareToFeed={post.share_to_feed}
           />
@@ -213,11 +174,10 @@ async function PostDetail({ params, searchParams }: { params: PageProps<"/public
   const media = videoUrl ? [] : await loadPostMedia(db, studioId, post.media_ids);
 
   const canEdit = !LOCKED.includes(post.status);
-  const editor = canEdit && plan ? await loadEditorData(studioId, plan.id, post.media_ids).catch(() => null) : null;
   const isVideo = post.kind === "reel" || post.kind === "story";
   // Simone's music: offered on a Reel with a montage, when the service is set up.
   const postMusic = readPostMusic(post.music);
-  const musicState = post.kind === "reel" && editor && env("ELEVENLABS_API_KEY") ? { on: postMusic.mode === "on", made: Boolean(postMusic.track) } : undefined;
+  const musicState = post.kind === "reel" && plan && env("ELEVENLABS_API_KEY") ? { on: postMusic.mode === "on", made: Boolean(postMusic.track) } : undefined;
   // The voice over the Reel: Simone's (which voice, what it says) or her own voice note.
   const voiceState = post.kind === "reel" && canEdit ? await loadVoice(db, studioId, post.voice_media_id) : undefined;
   // The studio's text looks (copied by Fauve from examples, or kept by hand), offered on every text.
@@ -252,7 +212,7 @@ async function PostDetail({ params, searchParams }: { params: PageProps<"/public
           initial={post.cover}
           defaultAt={DEFAULT_COVER_SECONDS}
           initialShareToFeed={post.share_to_feed}
-          photos={(editor?.inputs.photoIds ?? []).flatMap((id) => (editor?.inputs.clipUrls[id] ? [{ id, url: editor.inputs.clipUrls[id]! }] : []))}
+          photos={[]}
         />
       )}
 
@@ -337,7 +297,12 @@ async function PostDetail({ params, searchParams }: { params: PageProps<"/public
 
       {!canEdit && tiktokLine && <p className="-mt-2 text-[13px] font-semibold">{tiktokLine}</p>}
 
-      {plan && !editor && <PlanSection plan={plan.view} clipLabels={clipLabels} />}
+      {plan && (
+        <>
+          {canEdit && <EditMontageButton postId={post.id} title={post.title} />}
+          <PlanSection plan={plan.view} clipLabels={clipLabels} />
+        </>
+      )}
 
     </>
   );
@@ -362,11 +327,6 @@ async function PostDetail({ params, searchParams }: { params: PageProps<"/public
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {post.kind === "reel" && fullEditor && (
-            <Link href={`/publications/${post.id}`} className="btn btn-secondary">
-              Vue simple
-            </Link>
-          )}
           <AskFauveButton topic={{ postId: post.id, title: post.title }} label="Demander une modif" />
           {canEdit && post.status === "draft" && (
             // Submits the caption form, so a caption being edited is saved with the validation.
@@ -395,23 +355,6 @@ async function PostDetail({ params, searchParams }: { params: PageProps<"/public
             {details}
           </div>
           <CarouselEditor key={versionKey(slides.plan)} postId={post.id} postTitle={post.title} initialPlan={slides.plan} photos={photos} brand={slides.brand} looks={looks} layouts={slides.layouts} bank={slides.bank} />
-        </div>
-      ) : editor ? (
-        // A video editor: the publication on the left, the montage in the middle, the selected scene on the right.
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(250px,290px)_minmax(0,1fr)_minmax(300px,340px)]">
-          <div className="order-3 flex min-w-0 flex-col gap-4 xl:order-none">
-            {details}
-          </div>
-          <MontageEditor
-            key={versionKey(editor.plan)}
-            postId={post.id}
-            postTitle={post.title}
-            initialPlan={editor.plan}
-            inputs={editor.inputs}
-            clipDurations={editor.clipDurations}
-            clipLabels={Object.fromEntries(clipLabels)}
-            looks={looks}
-          />
         </div>
       ) : (
         <div className="flex flex-wrap items-start gap-8">

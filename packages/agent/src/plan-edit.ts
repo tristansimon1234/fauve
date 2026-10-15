@@ -21,6 +21,14 @@ export function timeline(plan: Pick<EditPlan, "segments">): { start: number; end
   });
 }
 
+/**
+ * The moment that shows each scene in a strip of thumbnails (« Ta publication », its
+ * editor): its middle, when its text or its animation is in. Same order as the segments.
+ */
+export function sceneTimes(plan: Pick<EditPlan, "segments">): number[] {
+  return timeline(plan).map(({ start, end }) => Math.round(((start + end) / 2) * 100) / 100);
+}
+
 /** The segment a moment of the video falls in (the last one for the very end). */
 export function segmentAt(plan: Pick<EditPlan, "segments">, seconds: number): number {
   const spans = timeline(plan);

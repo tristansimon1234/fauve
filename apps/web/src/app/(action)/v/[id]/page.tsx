@@ -44,7 +44,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
 
   const { data: post } = await db
     .from("posts")
-    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides, agent_note, cover, share_to_feed, platforms, publish_by_hand, music, voice_media_id")
+    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides, agent_note, cover, share_to_feed, platforms, publish_by_hand, music, voice_media_id, tiktok, external_ids")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -68,6 +68,8 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
         publish_by_hand: post.publish_by_hand === true,
         music: post.music,
         voice_media_id: (post.voice_media_id as string | null) ?? null,
+        tiktok: post.tiktok,
+        external_ids: post.external_ids,
       },
       member.studio.timezone,
     );
@@ -83,7 +85,6 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
               key={`${review.version}-${review.renderId ?? ""}-${review.status}`}
               data={review}
               surface="whatsapp"
-              editorHref={`/publications/${post.id as string}?editeur=1`}
               whatsAppPrefix={`Pour « ${post.title as string} » : `}
               cover={postCoverSchema.nullable().catch(null).parse(post.cover ?? null)}
               shareToFeed={post.share_to_feed !== false}

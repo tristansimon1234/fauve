@@ -343,6 +343,37 @@ export async function videoFramesInSandbox(id: string, url: string, times: numbe
   }
 }
 
+/** One scene's thumbnail in the strip: the Reel at a tenth of its size. */
+const TILE = { width: 108, height: 192 };
+
+/**
+ * One small image per scene of a rendered Reel (at `times`), side by side in a single
+ * JPEG: the strip under the video. A moment past the end takes the image before it.
+ */
+export async function sceneSpriteInSandbox(id: string, url: string, times: number[]): Promise<Buffer | null> {
+  if (times.length < 2) return null;
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}-scenes`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await bash(sandbox, FETCH, [`${dir}/in.mp4`, url]);
+    await bash(
+      sandbox,
+      [
+        'cd "$1" && shift',
+        `${ROOT}/ffmpeg -loglevel error -y -f lavfi -i "color=c=black:s=${TILE.width}x${TILE.height}" -frames:v 1 blank.jpg`,
+        `i=0; prev=blank.jpg; for t in "$@"; do f=$(printf "f%03d.jpg" "$i"); ${ROOT}/ffmpeg -loglevel error -y -ss "$t" -i in.mp4 -frames:v 1 -vf "scale=${TILE.width}:${TILE.height}" -q:v 4 "$f" || true; [ -s "$f" ] || cp "$prev" "$f"; prev="$f"; i=$((i+1)); done`,
+        `${ROOT}/ffmpeg -loglevel error -y -framerate 1 -i f%03d.jpg -vf "tile=$#x1" -frames:v 1 -q:v 5 sprite.jpg`,
+      ].join("\n"),
+      [dir, ...times.map((t) => Math.max(0, t).toFixed(2))],
+    );
+    const jpeg = await sandbox.readFileToBuffer({ path: `${dir}/sprite.jpg` }).catch(() => null);
+    return jpeg?.length ? jpeg : null;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
 /** Bash function `loud <file>`: the integrated loudness (LUFS, EBU R128) of a file's sound, empty when it has none. */
 const LOUD = `loud() { ${ROOT}/ffmpeg -hide_banner -nostats -i "$1" -vn -af ebur128 -f null - 2>&1 | sed -n '/Summary:/,$p' | awk '/ I:/{print $2; exit}'; }`;
 

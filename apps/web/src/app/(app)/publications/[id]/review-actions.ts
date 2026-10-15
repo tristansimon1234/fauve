@@ -1,11 +1,13 @@
 "use server";
 
-import { DEFAULT_EFFORT, effortSchema, findVoice, readPostVoice, RESTYLE } from "@fauve/agent";
+import { DEFAULT_EFFORT, effortSchema, findVoice, readPostVoice, RESTYLE, type EditPlan, type ReelInputs, type SavedLook } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import { acceptQuote, createMontageQuote } from "@/lib/credits";
+import { loadEditorData } from "@/lib/montage-editor-data";
 import { startMontage } from "@/lib/montage-start";
+import { loadTextLooks } from "@/lib/text-looks";
 import { removeVoice } from "@/lib/voice-over";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -18,8 +20,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export type ReviewResult = { ok: true } | { ok: false; error: string };
 
 const LOCKED = ["published", "measured"];
-const UNKNOWN: ReviewResult = { ok: false, error: "Publication introuvable." };
-const ONLINE: ReviewResult = { ok: false, error: "Ce Reel est déjà en ligne : il ne peut plus changer." };
+const UNKNOWN: { ok: false; error: string } = { ok: false, error: "Publication introuvable." };
+const ONLINE: { ok: false; error: string } = { ok: false, error: "Ce Reel est déjà en ligne : il ne peut plus changer." };
 
 /** For this Reel only: her style for the next ones is learned elsewhere (« Ça te ressemble ? », Simone). */
 const REDO_BRIEFS = {
@@ -110,6 +112,28 @@ export async function putVoice(postId: string, voiceId: string, note?: string): 
     postId,
     `La gérante veut la voix off de ${voice.name} sur ce Reel.${extra ? ` Ce qu'elle veut que la voix dise : ${extra}.` : ""} Garde le même sujet, l'accroche et les plans, et cale le montage sur la voix.`,
   );
+}
+
+export type LiveMontage = { ok: true; plan: EditPlan; inputs: ReelInputs; looks: SavedLook[] } | { ok: false; error: string };
+
+/**
+ * What « Modifier » plays live in the browser (the same composition as the render): the
+ * montage as saved, its files signed, and the studio's text styles. Loaded when she opens
+ * it, so the page itself stays light.
+ */
+export async function liveMontage(postId: string): Promise<LiveMontage> {
+  const found = await reel(postId);
+  if (!found) return UNKNOWN;
+  if (LOCKED.includes(found.post.status as string)) return ONLINE;
+  const db = supabaseAdmin();
+  const planId =
+    (found.post.edit_plan_id as string | null) ??
+    ((await db.from("edit_plans").select("id").eq("post_id", postId).order("version", { ascending: false }).limit(1).maybeSingle()).data?.id as string | undefined) ??
+    null;
+  if (!planId) return { ok: false, error: "Ce Reel n’a pas encore de montage." };
+  const [editor, looks] = await Promise.all([loadEditorData(found.studioId, planId).catch(() => null), loadTextLooks(found.studioId).catch(() => [])]);
+  if (!editor) return { ok: false, error: "Ce montage ne se modifie pas ici : demande à Simone." };
+  return { ok: true, plan: editor.plan, inputs: editor.inputs, looks };
 }
 
 /** « Revenir à l'ancienne »: the version before, with its video, becomes the one that goes out. Free and instant. */
