@@ -344,7 +344,8 @@ function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][n
     return <C key={key} text={text} index={index} props={props} theme={theme} k={k} sides={sides(text, props, k)} />;
   }
   if (text.style === "hook") return <Hook key={key} text={text} index={index} props={props} theme={theme} k={k} />;
-  if (text.style === "band") return <Band key={key} text={text} index={index} props={props} theme={theme} k={k} />;
+  // While a voice speaks, its subtitles are the bare line: any other line goes in the apps' white box, to read on any wall.
+  if (text.style === "band" || (props.words.length && !text.backdrop)) return <Band key={key} text={text} index={index} props={props} theme={theme} k={k} />;
   return <Caption key={key} text={text} index={index} props={props} theme={theme} k={k} />;
 }
 

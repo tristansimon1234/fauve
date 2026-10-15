@@ -7,6 +7,7 @@ import {
   fromTtsAlignment,
   readMemory,
   spokenWords,
+  stripAudioTags,
   usdToEur,
   VOICE_MAX_SECONDS,
   VOICE_OVER_PROMPT,
@@ -98,8 +99,8 @@ export async function speak(text: string, voiceId = env("ELEVENLABS_VOICE_ID")):
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps?output_format=mp3_44100_128`, {
       method: "POST",
       headers: { "xi-api-key": key, "content-type": "application/json" },
-      // Multilingual v2 finds the language itself (it refuses language_code).
-      body: JSON.stringify({ text, model_id: model, ...(model === "eleven_multilingual_v2" ? {} : { language_code: "fr" }) }),
+      // Multilingual v2 finds the language itself (it refuses language_code) and would read the acting tags aloud.
+      body: JSON.stringify(model === "eleven_multilingual_v2" ? { text: stripAudioTags(text), model_id: model } : { text, model_id: model, language_code: "fr" }),
     });
     if (res.ok) {
       const body = (await res.json()) as { audio_base64?: string; alignment?: unknown; normalized_alignment?: unknown };
