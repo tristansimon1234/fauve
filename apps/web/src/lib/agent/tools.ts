@@ -238,15 +238,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({ url, expires_in_minutes: 15 });
     },
 
-    async list_media({ kind, days, limit }) {
+    async list_media({ kind, days, limit, bank }) {
       let query = db
         .from("media_assets")
-        .select("id, kind, source, mime_type, duration, width, height, created_at, regions, ai")
+        .select("id, kind, source, mime_type, duration, width, height, created_at, regions, ai, bank")
         .eq("studio_id", studioId)
         .neq("source", "render")
-        .gt("created_at", new Date(Date.now() - days * 24 * 3600_000).toISOString())
         .order("created_at", { ascending: false })
         .limit(limit);
+      query = bank ? query.eq("bank", true) : query.gt("created_at", new Date(Date.now() - days * 24 * 3600_000).toISOString());
       if (kind !== "all") query = query.eq("kind", kind);
       const { data, error } = await query;
       if (error) throw new Error(error.message);
@@ -277,12 +277,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             ...(r.duration ? { duree_s: Number(r.duration) } : {}),
             ...(summaries.get(r.id as string) ? { contenu: summaries.get(r.id as string) } : {}),
             ...((r.regions as { notes?: string } | null)?.notes ? { contenu: (r.regions as { notes: string }).notes } : {}),
+            ...(r.bank ? { banque: true } : {}),
             ...(ai ? { ia: ai.mode === "improve" ? `photo améliorée (${ai.instruction.slice(0, 80)})` : `image d'ambiance : ${ai.instruction.slice(0, 80)}` } : {}),
           };
         }),
         note: rows.length
           ? "Prends celles dont elle parle (souvent les plus récentes, envoyées ensemble) et enchaîne sans lui redemander : create_post avec ces media_ids, puis le texte (write_on_photos) ou le montage."
-          : "Rien dans la médiathèque sur cette période : dis-le simplement et propose de les glisser ici.",
+          : bank
+            ? "Sa banque de plans est vide : rien de vivant de côté pour l'instant."
+            : "Rien dans la médiathèque sur cette période : dis-le simplement et propose de les glisser ici.",
       });
     },
 

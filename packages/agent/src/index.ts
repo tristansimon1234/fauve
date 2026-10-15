@@ -25,6 +25,7 @@ export * from "./critic.ts";
 export * from "./emoji.ts";
 export * from "./tool-status.ts";
 export * from "./turn.ts";
+export * from "./bank.ts";
 export * from "./memory.ts";
 export * from "./jobs.ts";
 export * from "./onboarding.ts";
