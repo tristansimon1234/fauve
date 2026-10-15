@@ -64,6 +64,8 @@ export const photoDetectionSchema = z.object({
   }),
   subject: z.object({ x: z.number().min(0).max(1000), y: z.number().min(0).max(1000) }).describe("Centre du sujet principal, 0–1000"),
   notes: z.string().max(300),
+  /** Text already on the picture (a sign, a logo, a window lettering): a Reel's text never goes over it. */
+  text_boxes: z.array(box2d).max(8).optional(),
 });
 export type PhotoDetection = z.infer<typeof photoDetectionSchema>;
 
@@ -91,7 +93,8 @@ export const PHOTO_DETECT_PROMPT = `Tu prépares une photo pour Instagram, prise
    Boîtes serrées sur la zone. Rien n'est inventé : liste vide s'il n'y a rien.
 2. adjust : la retouche légère qui rendrait la photo plus belle et naturelle sur Instagram, comme un bon photographe (0 = ne rien changer, rester sobre : ±0,1 à ±0,4 en général) : exposure (luminosité), contrast, saturation, warmth (-1 froid, 1 chaud ; corrige une dominante), straighten (degrés pour remettre l'horizon ou les verticales droites, 0 si c'est déjà droit).
 3. subject : le centre du sujet principal (0–1000), pour recadrer sans le couper.
-4. notes : une phrase sur ce que tu as vu (lumière, cadrage).`;
+4. notes : une phrase sur ce que la photo montre (le sujet, le lieu, le détail), puis sa lumière et son cadrage.
+5. text_boxes : la boîte box_2d de chaque texte déjà visible sur la photo (enseigne, logo, lettrage sur une vitre, affiche, menu), lisible ou pas ; liste vide s'il n'y en a pas.`;
 
 export const CLIP_DETECT_PROMPT = `Tu prépares une vidéo pour un Reel Instagram, filmée dans un commerce de quartier. Repère les zones à flouter et suis-les dans le temps :
 - face : chaque visage humain (recognizable = true si on peut reconnaître la personne) ;
@@ -193,4 +196,35 @@ export function clipBlurFrom(detection: ClipDetection, aspect: number, kinds: Re
     .filter((t) => kinds.includes(t.kind) && t.keys.length)
     .map((t) => ({ kind: t.kind, keys: [...t.keys].sort((a, b) => a.t - b.t).slice(0, 240).map((k) => ({ t: k.t, ...boxFrom2d(k.box_2d, 0.2) })) }));
   return tracks.length ? { aspect, tracks } : null;
+}
+
+/** Where each text style sits by default (top of its box, share of the frame height) and roughly how tall it is. */
+const TEXT_ROWS = { hook: { y: 0.12, h: 0.16 }, band: { y: 0.37, h: 0.12 }, caption: { y: 0.63, h: 0.1 } } as const;
+const FREE_ROWS = [0.12, 0.37, 0.63, 0.24, 0.5];
+
+/**
+ * A Reel's texts never sit on text already in a photo (a sign, a logo on a window):
+ * a text shown over such a photo moves to the nearest free row. `photoText`: the text
+ * boxes of each photo (fractions of the photo; a portrait or a 3:4 photo fills the
+ * frame's height, so its rows are the frame's). Texts placed by hand stay put.
+ */
+export function avoidPhotoText<T extends { from: number; to: number; style: "hook" | "band" | "caption"; y?: number }>(
+  texts: T[],
+  shots: { start: number; length: number; clipId?: string }[],
+  photoText: Record<string, Box[]>,
+): T[] {
+  return texts.map((t) => {
+    if (t.y !== undefined) return t;
+    const boxes = shots
+      .filter((s) => s.clipId && s.start < t.to && s.start + s.length > t.from)
+      .flatMap((s) => photoText[s.clipId!] ?? [])
+      // A word too small to read under a text does not count.
+      .filter((b) => b.w > 0.12 || b.h > 0.04);
+    if (!boxes.length) return t;
+    const row = TEXT_ROWS[t.style];
+    const clear = (y: number) => boxes.every((b) => b.y > y + row.h + 0.02 || b.y + b.h < y - 0.02);
+    if (clear(row.y)) return t;
+    const free = FREE_ROWS.filter((y) => y + row.h <= 0.82 && clear(y)).sort((a, b) => Math.abs(a - row.y) - Math.abs(b - row.y))[0];
+    return free === undefined ? t : { ...t, y: Math.min(0.66, free) };
+  });
 }

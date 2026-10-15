@@ -2,6 +2,10 @@ import "server-only";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
+  avoidPhotoText,
+  boxFrom2d,
+  photoEditFrom,
+  planTimeline,
   carryRetouch,
   carryTextStyle,
   brandProfileSchema,
@@ -212,6 +216,20 @@ export async function designEdit(params: {
     ),
     base,
   );
+
+  // Her photos framed on their subject, light corrected (unless already retouched by hand),
+  // and the texts moved off any text already in a photo (a sign, a logo on a window).
+  const reads = new Map(photoIds.map((id, i) => [id, photoReads[i]] as const));
+  plan.segments = plan.segments.map((s) => {
+    const read = isClipSegment(s) && !s.photo ? reads.get(s.clip_id) : null;
+    return read ? { ...s, photo: photoEditFrom(read.detection, { width: read.width, height: read.height }, { retouch: true, blur: "none" }) } : s;
+  });
+  const shots = planTimeline(plan).segments.map((t, i) => {
+    const s = plan.segments[i]!;
+    return { ...t, clipId: isClipSegment(s) ? s.clip_id : undefined };
+  });
+  const photoText = Object.fromEntries(photoIds.map((id) => [id, (reads.get(id)?.detection.text_boxes ?? []).map((b) => boxFrom2d(b, 0.05))]));
+  plan.texts = avoidPhotoText(plan.texts, shots, photoText);
 
   // Her voice plays from VOICE_AT, with her words as subtitles; without it, the plan has no voice.
   if (voice && voiceId) {

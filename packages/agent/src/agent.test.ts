@@ -1254,13 +1254,14 @@ test("editor: the signature transition goes on the shot where the band appears, 
 });
 
 
-test("turn: a step that only adds buttons or a reaction ends the turn", async () => {
+test("turn: a step that closes her message with its own words ends the turn", async () => {
   const { endsTurn } = await import("./turn.ts");
-  // Her words, then buttons: no new model call, so no second copy of the answer.
+  // Her words with buttons or a reaction: no new model call, so no second copy of the answer.
   assert.equal(endsTurn(["reply_with"], true), true);
-  assert.equal(endsTurn(["react_to_message"], false), true);
-  // Buttons with no word yet: she still writes the message they sit under.
+  assert.equal(endsTurn(["react_to_message"], true), true);
+  // Buttons or a reaction alone: the answer is still to come (an earlier « je regarde » is no answer).
   assert.equal(endsTurn(["reply_with"], false), false);
+  assert.equal(endsTurn(["react_to_message"], false), false);
   // Any other tool needs its result read.
   assert.equal(endsTurn(["update_post", "reply_with"], true), false);
   assert.equal(endsTurn([], true), false);
@@ -1319,4 +1320,49 @@ test("access: the first publication is free, then nothing without a subscription
   assert.deepEqual([trial.create, trial.analyze, trial.unlock], [true, true, true]);
   const empty = accessOf({ subscription: "active", firstPostMade: true, credits: 0, analyses: 9 });
   assert.deepEqual([empty.create, empty.analyze, empty.unlock, empty.reason], [false, false, true, "credits"]);
+});
+
+test("photo text: a Reel's text moves off text already in the photo", async () => {
+  const { avoidPhotoText } = await import("./retouch.ts");
+  const shots = [{ start: 0, length: 2, clipId: "photo" }, { start: 2, length: 2, clipId: "clip" }];
+  // Lettering across the lower middle of the photo, where a caption sits by default.
+  const boxes = { photo: [{ x: 0.1, y: 0.6, w: 0.8, h: 0.1 }] };
+  const [caption, hook, later, placed] = avoidPhotoText(
+    [
+      { from: 0, to: 1.5, style: "caption" as const },
+      { from: 0, to: 1.5, style: "hook" as const },
+      { from: 2.5, to: 4, style: "caption" as const },
+      { from: 0, to: 1.5, style: "caption" as const, y: 0.6 },
+    ],
+    shots,
+    boxes,
+  );
+  assert.notEqual(caption!.y, undefined);
+  assert.ok(caption!.y! + 0.1 < 0.6 || caption!.y! > 0.7);
+  // Clear where it is, on another shot, or placed by hand: untouched.
+  assert.equal(hook!.y, undefined);
+  assert.equal(later!.y, undefined);
+  assert.equal(placed!.y, 0.6);
+});
+
+test("end card: the Reel ends on a real shot and no text runs under the card", async () => {
+  const { normalizeEditPlan } = await import("./editor.ts");
+  const plan = {
+    format: "9:16",
+    duration: 8,
+    template: "dynamique",
+    segments: [
+      { clip_id: "a", in: 0, out: 3, zoom: "none" },
+      { scene: { kind: "title", title: "Offre", background: "accent" }, duration: 2.5 },
+    ],
+    texts: [{ text: "Viens essayer", from: 0, to: 6, style: "hook", emphasis: [] }],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    end_card: { title: "indar" },
+  } as never;
+  const out = normalizeEditPlan(plan, { a: 9 });
+  assert.equal("clip_id" in out.segments.at(-1)!, true);
+  assert.ok(out.texts.every((t) => t.to <= out.duration - 1.6 + 0.001));
 });

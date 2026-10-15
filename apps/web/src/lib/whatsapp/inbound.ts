@@ -7,6 +7,7 @@ import { quoteButtons } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureTranscript } from "@/lib/voice";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { photoRegions } from "@/lib/video/regions";
 import { setReaction } from "@/lib/reactions";
 import { env } from "@/lib/env";
 import { downloadMedia, markReadAndTyping, sendReaction, sendReply, sendText } from "./client";
@@ -55,7 +56,7 @@ const extensionByMime: Record<string, string> = {
   "application/pdf": "pdf",
 };
 
-async function storeMedia(studioId: string, message: InboundMessage): Promise<{ id: string; isVideo: boolean } | null> {
+async function storeMedia(studioId: string, message: InboundMessage): Promise<{ id: string; isVideo: boolean; isImage: boolean } | null> {
   const ref = mediaOf(message);
   if (!ref) return null;
   const db = supabaseAdmin();
@@ -77,7 +78,7 @@ async function storeMedia(studioId: string, message: InboundMessage): Promise<{ 
     .select("id")
     .single();
   if (asset.error) throw new Error(asset.error.message);
-  return { id: asset.data.id as string, isVideo: ref.kind === "video" || file.mimeType.startsWith("video/") };
+  return { id: asset.data.id as string, isVideo: ref.kind === "video" || file.mimeType.startsWith("video/"), isImage: file.mimeType.startsWith("image/") };
 }
 
 export async function handleInboundMessage(message: InboundMessage, profileName?: string): Promise<void> {
@@ -148,7 +149,9 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   }
   const analysis = media?.isVideo
     ? ensureClipAnalysis(member.studio_id, media.id).catch((e) => console.error("clip analysis failed", e))
-    : null;
+    : media?.isImage
+      ? photoRegions(member.studio_id, media.id).catch((e) => console.warn("photo read failed", e))
+      : null;
 
   await new Promise((resolve) => setTimeout(resolve, BURST_DEBOUNCE_MS));
   const latest = await db
