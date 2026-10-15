@@ -4,6 +4,7 @@ import { defaultPostDays, MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STE
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { DropCard } from "@/app/(app)/fauve/drop-card";
 import { finishStep, onboardingView, saveRhythm, type OnboardingView } from "@/app/(app)/fauve/onboarding-actions";
 import { saveLogo, saveMoodboard } from "@/app/(app)/style/actions";
 import { LOGO_MAX_BYTES, LOGO_TYPES } from "@/app/(app)/style/style-options";
@@ -63,6 +64,7 @@ export function OnboardingCard({
   timezone,
   initial,
   onSend,
+  onFiles,
   className = "",
 }: {
   step: Step;
@@ -71,6 +73,8 @@ export function OnboardingCard({
   initial?: OnboardingView | null;
   /** Sends a message to Fauve (the website, « je n'ai pas de site »…). */
   onSend: (text: string) => void;
+  /** Her photos and videos, dropped on the card: they join the message she is about to send. */
+  onFiles?: (files: FileList | File[]) => void;
   className?: string;
 }) {
   const router = useRouter();
@@ -137,7 +141,16 @@ export function OnboardingCard({
         />
       )}
       {step === "connect" && view && <ConnectStep handle={view.instagram} onNext={() => next(view.instagram ? "Mon Instagram est connecté." : "Je brancherai Instagram plus tard.")} pending={pending} />}
-      {step === "first_post" && <FirstPostStep timezone={timezone} sitePhotos={Boolean(view?.moodboard.fromSite)} onLater={() => next("Je ferai ma première publication plus tard.")} pending={pending} />}
+      {step === "first_post" && (
+        <FirstPostStep
+          timezone={timezone}
+          sitePhotos={Boolean(view?.moodboard.fromSite)}
+          onFiles={onFiles}
+          onSite={() => onSend("Je n’ai rien sous la main : pars des photos de mon site.")}
+          onLater={() => next("Je ferai ma première publication plus tard.")}
+          pending={pending}
+        />
+      )}
       {!view && step !== "website" && step !== "first_post" && <Orb size={28} />}
       {error && (
         <p role="alert" className="text-[13px] font-semibold text-danger">
@@ -554,18 +567,40 @@ function ConnectStep({ handle, onNext, pending }: { handle: string | null; onNex
   );
 }
 
-function FirstPostStep({ timezone, sitePhotos, onLater, pending }: { timezone: string; sitePhotos: boolean; onLater: () => void; pending: boolean }) {
+function FirstPostStep({
+  timezone,
+  sitePhotos,
+  onFiles,
+  onSite,
+  onLater,
+  pending,
+}: {
+  timezone: string;
+  sitePhotos: boolean;
+  onFiles?: (files: FileList | File[]) => void;
+  onSite: () => void;
+  onLater: () => void;
+  pending: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <p className="text-[14px] leading-relaxed text-muted">
-        Une première publication pour l’essai : elle me sert à comprendre ta direction artistique, et on l’ajuste ensemble jusqu’à ce qu’elle te ressemble. Pars d’une inspiration (un post ou un Reel que tu aimerais refaire à ta façon).{sitePhotos ? " Les photos de ton site sont déjà dans ta médiathèque." : ""}
+        Une première publication pour l’essai, faite avec <strong className="text-ink">ta vraie matière</strong> : c’est elle qui donne envie de venir chez toi. Prends 3 à 10 photos ou vidéos dans
+        ta galerie : ton lieu, un plat ou un produit, un geste, ton équipe, des vidéos même courtes si tu en as. Je m’en sers pour te montrer ce que je sais faire, et on l’ajuste jusqu’à ce
+        qu’elle te ressemble.
       </p>
+      {onFiles ? <DropCard kind="any" onFiles={onFiles} /> : null}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => setOpen(true)} className="btn btn-primary h-11 px-5">
+        <button type="button" onClick={() => setOpen(true)} className={`btn ${onFiles ? "btn-secondary" : "btn-primary"} h-11 px-5`}>
           <PlusIcon size={17} />
           Créer ma première publication
         </button>
+        {sitePhotos ? (
+          <button type="button" disabled={pending} onClick={onSite} className="text-[13px] font-semibold text-muted hover:text-ink">
+            Je n’ai rien sous la main : les photos de mon site
+          </button>
+        ) : null}
         <button type="button" disabled={pending} onClick={onLater} className="text-[13px] font-semibold text-muted hover:text-ink">
           Plus tard
         </button>

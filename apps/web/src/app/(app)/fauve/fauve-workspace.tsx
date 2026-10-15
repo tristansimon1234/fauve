@@ -133,6 +133,12 @@ export function FauveWorkspace({
   // Photos and videos: uploaded to Storage as soon as they are added, sent with the message.
   const uploads = useChatUploads(studioId, setError);
   const { files, addFiles, removeFile, uploading } = uploads;
+  // Her photos dropped on an onboarding card: they join the message, with a first line she can change.
+  const cardFiles = (dropped: FileList | File[]) => {
+    addFiles(dropped);
+    setDraft((d) => d || "Voici mes photos et vidéos pour ma première publication.");
+    inputRef.current?.focus();
+  };
 
   // Keep the open conversation in the URL, so a reload lands on it.
   useEffect(() => {
@@ -538,7 +544,7 @@ export function FauveWorkspace({
                 </p>
               </div>
               <OnboardingStepper step={onboarding.step} />
-              <OnboardingCard key={onboarding.step} step={onboarding.step} timezone={timezone} initial={onboarding} onSend={(text) => send(text)} />
+              <OnboardingCard key={onboarding.step} step={onboarding.step} timezone={timezone} initial={onboarding} onSend={(text) => send(text)} onFiles={cardFiles} />
             </div>
           ) : fresh ? (
             <div className="mx-auto flex min-h-full w-full max-w-[820px] flex-col items-center justify-center gap-6 px-4 py-8 text-center">
@@ -610,7 +616,7 @@ export function FauveWorkspace({
               ))}
               {typing && <LiveTyping live={live} />}
               {/* Getting started: the current step's card always sits under Simone's latest message, even when she forgot to attach it. */}
-              {!typing && stepUnder && <OnboardingCard key={`under-${stepUnder}`} step={stepUnder} timezone={timezone} initial={onboarding} onSend={(text) => send(text)} className="fauve-enter" />}
+              {!typing && stepUnder && <OnboardingCard key={`under-${stepUnder}`} step={stepUnder} timezone={timezone} initial={onboarding} onSend={(text) => send(text)} onFiles={cardFiles} className="fauve-enter" />}
               <div ref={endRef} />
             </div>
           )}
