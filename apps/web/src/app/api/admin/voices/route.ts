@@ -2,10 +2,14 @@ import { z } from "zod";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { speak } from "@/lib/voice-over";
 
 // Voices for Simone, by ear. POST with CRON_SECRET, from the database (call_app):
 //   ?use_case=social_media|conversational|narrative_story&gender=female|male
 //     the most used French voices of the ElevenLabs library for that use, with their own sample;
+//   ?say=<voice id>,<voice id>…
+//     the same lines read by each voice (Simone's text for a pizzeria, with its acting tags),
+//     to compare them by ear: a signed link (24 h) per voice;
 //   ?clone=<name>&media=<uuid>,<uuid>…
 //     an instant clone of a person's voice from her voice notes (audio media of one studio,
 //     a minute or two in all, her own voice and with her consent): answers the new voice id.
@@ -48,11 +52,41 @@ async function clone(key: string, name: string, mediaIds: string[]) {
   return Response.json({ ok: true, studio: notes[0]!.studio_id, notes: notes.length, ...(JSON.parse(text) as Record<string, unknown>) });
 }
 
+/** What every voice reads to be compared: a voice-over Simone wrote, acting tags included. */
+const SAMPLE =
+  "[smiling] Cette pizza, on l'a commencée avant-hier. Ici, la pâte est pétrie le matin, puis elle repose quarante-huit heures. Le soir, on l'étire et elle file sur la pierre du four à bois. [laughs softly] Toi, t'as juste à attraper ta part. [warmly] Passe ce soir, on t'attend.";
+
+async function say(voiceIds: string[]) {
+  const db = supabaseAdmin();
+  const samples = await Promise.all(
+    voiceIds.map(async (id) => {
+      try {
+        const voice = await speak(SAMPLE, id);
+        const path = `lab/voices/${id}.mp3`;
+        const up = await db.storage.from("media").upload(path, voice.mp3, { contentType: "audio/mpeg", upsert: true });
+        if (up.error) throw new Error(up.error.message);
+        const signed = await db.storage.from("media").createSignedUrl(path, 86_400);
+        return { id, model: voice.model, seconds: voice.transcript.duration, url: signed.data?.signedUrl ?? null };
+      } catch (error) {
+        return { id, error: error instanceof Error ? error.message.slice(0, 300) : String(error) };
+      }
+    }),
+  );
+  return Response.json({ samples });
+}
+
 export async function POST(request: Request) {
   if (!cronAuthorized(request)) return new Response("unauthorized", { status: 401 });
   const key = env("ELEVENLABS_API_KEY");
   if (!key) return Response.json({ error: "ELEVENLABS_API_KEY missing" }, { status: 400 });
   const params = new URL(request.url).searchParams;
+
+  const voices = params.get("say");
+  if (voices) {
+    const ids = voices.split(",").filter((id) => /^[A-Za-z0-9]{10,40}$/.test(id)).slice(0, 8);
+    if (!ids.length) return Response.json({ error: "say=<voice id>,<voice id>" }, { status: 400 });
+    return say(ids);
+  }
 
   const name = params.get("clone");
   if (name) {
