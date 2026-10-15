@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
 import { snapToTempo } from "./tempo.ts";
 import {
@@ -44,7 +45,7 @@ Règles de montage :
 - Les mots à l'écran partent du commerce : « studio.facts » (son site, ce qu'elle a dit), le brief, son offre. Tu es libre d'inventer une accroche ou une formule quand elle sonne juste pour ce commerce, mais jamais un fait qu'il n'a pas (prix, offre, horaire, adresse, chiffre, récompense).
 - Ne superpose pas deux textes. Pas de texte pendant l'écran de fin.
 - Écran de fin (« end_card ») : le nom du studio en titre et un appel à l'action court en sous-titre, adapté à l'activité (« Réserve ton cours », « Prends rendez-vous », « Réserve ta table », « Passe nous voir »), pour les 1,6 dernières secondes. Prévois la durée en conséquence.
-- Transitions : « fade » pour doux et chic, « cut » pour dynamique et collage. « zoom » « light » (un zoom très lent) sur quelques plans calmes, pas tous. Une seule transition signature dans tout le Reel, sur le moment fort (souvent l'arrivée du résultat ou de l'offre), avec « accent » sur ce plan : « punch » (un bref zoom qui se pose, pour dynamique et collage) ou « wipe » (un panneau à la couleur de la marque qui glisse, pour doux et chic) ; partout ailleurs, des coupes nettes.
+- Transitions : « fade » pour doux et chic, « cut » pour dynamique et collage. « zoom » « light » (un zoom très lent) sur quelques plans calmes, pas tous. Une seule transition signature dans tout le Reel, posée par le moteur sur le plan où arrive ton bandeau (« band » : ce qui rend le commerce unique ou l'offre) : fais commencer le bandeau sur le plan du moment fort (souvent le résultat), au début de ce plan. Sa forme suit l'ambiance (un bref zoom qui se pose en dynamique et collage, un panneau à la couleur de la marque qui glisse en doux et chic). Partout ailleurs, des coupes nettes.
 - Jamais d'effet bon marché : pas de rotation, de flash, de glitch, de tremblement, de page qui tourne, d'emoji animé, pas plus de deux polices, pas de zoom marqué sur chaque plan. Haut de gamme = sobre, net, sur le temps.
 - Sous-titres mot à mot (« subtitles ») seulement si quelqu'un parle et que c'est utile (prof qui explique, témoignage). Le son des passages où quelqu'un parle est gardé dans le Reel : coupe-les sur ses phrases.
 - Jamais de musique (« music » vaut null) ; pas d'images (« images » vide).
@@ -101,10 +102,15 @@ export const editorOutputSchema = z.object({
     template: motionTemplateSchema,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
-    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
+    // No signature transition field here: the structured-output grammar is at the API's
+    // limit (400 « compiled grammar is too large »); the engine places it (signatureShot).
+    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
   }),
   rationale: z.string(),
 });
+
+/** The signature transition of an ambiance: a short zoom for the lively ones, a brand-colour wipe for the calm ones. */
+const SIGNATURE: Record<MotionTemplate, "punch" | "wipe"> = { dynamique: "punch", collage: "punch", doux: "wipe", chic: "wipe" };
 
 /** The retouch and blur of each clip in the previous version, kept on the same clip in the new one. */
 export function carryRetouch(plan: EditPlan, previous: EditPlan | null): EditPlan {
@@ -154,8 +160,24 @@ export function carryTextStyle(plan: EditPlan, previous: EditPlan | null): EditP
 const round = (n: number) => Math.round(n * 100) / 100;
 
 /** The editor's plan as an edit plan: template texts become the segment's `texts` record. */
+/**
+ * The shot that gets the Reel's one signature transition: where the band (what
+ * makes the business unique, or the offer) appears, the strong moment; none
+ * without a band, or when the band starts on the opening shot.
+ */
+export function signatureShot(plan: Pick<EditorOutput["plan"], "segments" | "texts" | "transitions">): number | null {
+  const band = plan.texts.find((t) => t.style === "band");
+  if (!band) return null;
+  // Lengths only: the editor's segments time like the plan's.
+  const timeline = planTimeline(plan as unknown as Pick<EditPlan, "segments" | "transitions">);
+  const i = timeline.segments.findIndex((s) => band.from >= s.start - 0.3 && band.from < s.start + s.length);
+  return i > 0 && "clip_id" in plan.segments[i]! ? i : null;
+}
+
 export function fromEditorPlan(plan: EditorOutput["plan"], looks: SavedLook[] = []): EditPlan {
   const byName = new Map(looks.map((l) => [l.name.toLowerCase(), l]));
+  const signature = SIGNATURE[plan.template];
+  const signatureAt = signatureShot(plan);
   return {
     ...plan,
     // A named look brings its style back (and, for a list, its details and bullets).
@@ -164,7 +186,9 @@ export function fromEditorPlan(plan: EditorOutput["plan"], looks: SavedLook[] = 
       if (!saved) return t;
       return { ...t, look: saved.look, ...(t.items?.length && saved.list?.detail_look ? { detail_look: saved.list.detail_look } : {}), ...(t.items?.length && !t.bullet && saved.list?.bullet ? { bullet: saved.list.bullet } : {}) };
     }),
-    segments: plan.segments.map((s): PlanSegment => {
+    segments: plan.segments.map((s, i): PlanSegment => {
+      // The one signature transition goes on the shot the editor named (a video or a photo).
+      if ("clip_id" in s) return i === signatureAt ? { ...s, accent: signature } : s;
       if (!("motion" in s)) return s;
       const { template_texts, template_id, ...motion } = s.motion;
       if (!template_id) return { ...s, motion };
