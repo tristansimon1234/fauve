@@ -221,8 +221,16 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         engine = "remotion";
         durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
       } catch (error) {
-        console.error("remotion render failed, falling back to ffmpeg", renderId, error);
-        mp4 = await ffmpegRender();
+        // Photos, blurred zones or her voice: the ffmpeg engine cannot render them, Remotion gets a second try.
+        if (needsBlur || photoIds.length || plan.voice) {
+          console.error("remotion render failed, trying again", renderId, error);
+          mp4 = await renderReelInSandbox({ id: `${renderId}-again`, props });
+          engine = "remotion";
+          durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
+        } else {
+          console.error("remotion render failed, falling back to ffmpeg", renderId, error);
+          mp4 = await ffmpegRender();
+        }
       }
     } else {
       mp4 = await ffmpegRender();

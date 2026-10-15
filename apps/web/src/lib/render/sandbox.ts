@@ -1,6 +1,6 @@
 import "server-only";
 import { APIError, Sandbox } from "@vercel/sandbox";
-import { MIX_CEILING, mixFilter, mixGains, RENDER_FONTS, SANDBOX_REGION, sandboxCostUsd, speechGain, usdToEur, type ReelProps } from "@fauve/agent";
+import { MIX_CEILING, mixFilter, mixGains, REEL_FPS, RENDER_FONTS, SANDBOX_REGION, sandboxCostUsd, speechGain, usdToEur, type ReelProps, type ReelUnder } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
 
@@ -34,11 +34,25 @@ const SETUP = [
  */
 const FETCH = 'curl -fsSL --http1.1 --retry 4 --retry-all-errors --retry-delay 1 --connect-timeout 15 -o "$1" "$2"';
 
+/**
+ * Downloads the video $2 and writes it to $1 at the Reel's frame rate, its last image held
+ * two more seconds. A phone video (variable frame rate, odd timestamps, a picture a little
+ * shorter than its sound) could stop Remotion on « No frame found at position »; this one
+ * always has a frame where the plan asks. If ffmpeg cannot read it, the file as it came.
+ */
+const NORMALIZE = [
+  "set -euo pipefail",
+  `${FETCH.replace('"$1"', '"$1.src"')}`,
+  `if ! ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "fps=${REEL_FPS},tpad=stop_mode=clone:stop_duration=2,format=yuv420p" -c:v libx264 -preset veryfast -crf 16 -c:a aac -b:a 192k -movflags +faststart "$1"; then cp "$1.src" "$1"; fi`,
+  'rm -f "$1.src"',
+].join("\n");
+
 async function bash(sandbox: Sandbox, script: string, args: string[] = []) {
   const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", script, "bash", ...args] });
   if (result.exitCode !== 0) {
-    const output = (await result.output("both").catch(() => "")).slice(-2000);
-    throw new Error(`sandbox command failed (${result.exitCode}): ${output}`);
+    // The cause is often on the first lines (a long stack follows): keep both ends.
+    const output = await result.output("both").catch(() => "");
+    throw new Error(`sandbox command failed (${result.exitCode}): ${output.length > 2400 ? `${output.slice(0, 1200)} … ${output.slice(-1200)}` : output}`);
   }
   return result;
 }
@@ -175,23 +189,33 @@ export function remotionSandbox(): Promise<Sandbox> {
 }
 
 /**
- * Copies the Reel's clips and photos into the bundle's public folder before the
- * render, which then reads local files (`/public/jobs/…`, served with the bundle)
- * instead of streaming each video from Storage frame after frame: a slow or broken
- * stream used to time the render out.
+ * Copies the Reel's clips and photos (and the footage under its animations) into the
+ * bundle's public folder before the render, which then reads local files (`/public/jobs/…`,
+ * served with the bundle) instead of streaming each video from Storage frame after frame:
+ * a slow or broken stream used to time the render out. Each file once, however many shots
+ * use it; videos re-encoded so that every frame the plan asks for exists (NORMALIZE).
  */
 async function localMedia(sandbox: Sandbox, id: string, props: ReelProps): Promise<ReelProps> {
-  const downloads: Promise<unknown>[] = [];
-  const segments = props.segments.map((segment, i) => {
-    if ((segment.type !== "clip" && segment.type !== "image") || !/^https?:/.test(segment.src)) return segment;
-    const ext = segment.type === "clip" ? "mp4" : (/\.(png|webp|jpe?g)(?:\?|$)/i.exec(segment.src)?.[1]?.toLowerCase() ?? "jpg");
-    const file = `jobs/${id}/m${i}.${ext}`;
-    downloads.push(bash(sandbox, FETCH, [`${REMOTION}/build/public/${file}`, segment.src]));
-    return { ...segment, src: `/public/${file}` };
+  const files = new Map<string, string>();
+  const work: Promise<unknown>[] = [];
+  const local = (src: string, video: boolean): string => {
+    if (!/^https?:/.test(src)) return src;
+    const known = files.get(src);
+    if (known) return known;
+    const ext = video ? "mp4" : (/\.(png|webp|jpe?g)(?:\?|$)/i.exec(src)?.[1]?.toLowerCase() ?? "jpg");
+    const file = `jobs/${id}/m${files.size}.${ext}`;
+    files.set(src, `/public/${file}`);
+    work.push(bash(sandbox, video ? NORMALIZE : FETCH, [`${REMOTION}/build/public/${file}`, src]));
+    return `/public/${file}`;
+  };
+  const under = (u: ReelUnder | undefined) => (u ? { ...u, src: local(u.src, u.type === "clip") } : u);
+  const segments = props.segments.map((segment) => {
+    if (segment.type === "clip" || segment.type === "image") return { ...segment, src: local(segment.src, segment.type === "clip") };
+    return segment.under ? { ...segment, under: under(segment.under) } : segment;
   });
-  if (!downloads.length) return props;
+  if (!work.length) return props;
   await bash(sandbox, 'mkdir -p "$1"', [`${REMOTION}/build/public/jobs/${id}`]);
-  await Promise.all(downloads);
+  await Promise.all(work);
   return { ...props, segments };
 }
 
