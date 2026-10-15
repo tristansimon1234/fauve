@@ -1,4 +1,5 @@
 import "server-only";
+import { assertCanCreate } from "@/lib/billing/access";
 import { CREDIT_PRICES, jobStepLabel } from "@fauve/agent";
 import { creditBalance } from "@/lib/credits";
 import { queueJob } from "@/lib/jobs";
@@ -27,6 +28,7 @@ export type ElementsStarted =
   | { status: "error"; error: string };
 
 export async function startElements(start: ElementsStart): Promise<ElementsStarted> {
+  await assertCanCreate(start.studioId);
   const credits = start.mode === "edit" ? CREDIT_PRICES.elementEdit : CREDIT_PRICES.textLayer;
   // The same component, or the same post, already being worked on: never a second time (it would be charged twice).
   const [running] =

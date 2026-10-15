@@ -1,4 +1,5 @@
 import "server-only";
+import { assertCanCreate } from "@/lib/billing/access";
 import { randomUUID } from "node:crypto";
 import { GoogleGenAI } from "@google/genai";
 import {
@@ -117,6 +118,7 @@ async function account(studioId: string, made: MadeImage, ai: AiImage, label: st
 
 /** A real photo improved as she asked; the original stays in her library. */
 export async function improvePhoto(studioId: string, mediaId: string, instruction: string, format: AiImageFormat): Promise<MadeImage> {
+  await assertCanCreate(studioId);
   const db = supabaseAdmin();
   const { data: asset } = await db.from("media_assets").select("kind, storage_path, consent_ok").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
   if (!asset || asset.kind !== "image") throw new AiImageError("Ce fichier n’est pas une photo.");
@@ -137,6 +139,7 @@ export async function improvePhoto(studioId: string, mediaId: string, instructio
 
 /** Ambiance images (1 to 4) in the studio's colours, made side by side; those that fail are skipped. */
 export async function makeAmbiance(studioId: string, description: string, format: AiImageFormat, count = 1): Promise<MadeImage[]> {
+  await assertCanCreate(studioId);
   const look = await studioLook(studioId);
   const n = Math.max(1, Math.min(MAX_AMBIANCE_IMAGES, Math.round(count)));
   // Each image its own call: the model gives one image per answer, and they come out varied.

@@ -14,6 +14,8 @@ import { loadTextLooks } from "@/lib/text-looks";
 import { instagramAccount } from "@/lib/social/publish";
 import { recentMedia } from "@/lib/social/instagram";
 import { ActionView, type ActionMedia } from "./action-view";
+import { Paywall } from "@/components/paywall";
+import { studioAccess } from "@/lib/billing/access";
 
 export const metadata: Metadata = { title: "Ta publication" };
 
@@ -34,6 +36,8 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
   const { db, member } = await getStudioContext();
   if (!member) redirect(`/connexion?next=/v/${id}`);
   const studioId = member.studio.id;
+  // Her first publication, before she subscribes: blurred, behind « Débloquer ».
+  if (!(await studioAccess(studioId)).unlock) return <Paywall db={db} studioId={studioId} postId={id} next={`/v/${id}`} />;
 
   const { data: post } = await db
     .from("posts")

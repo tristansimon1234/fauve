@@ -1,4 +1,5 @@
 import "server-only";
+import { studioAccess } from "@/lib/billing/access";
 import { captionForInstagram, DEFAULT_COVER_SECONDS, isInSessionWindow, postCoverSchema, type PostKind, type TikTokExternal } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
@@ -281,6 +282,9 @@ async function handOffWithTikTok(postId: string): Promise<PublishOutcome> {
 
 /** Claims and publishes one post if it is due (used right after a validation "now"); « je publie moi-même » hands it over instead. */
 export async function publishIfDue(postId: string): Promise<PublishOutcome | null> {
+  // Nothing goes out without a subscription: it waits, scheduled, until she subscribes.
+  const { data: owner } = await supabaseAdmin().from("posts").select("studio_id").eq("id", postId).single();
+  if (owner && !(await studioAccess(owner.studio_id as string)).unlock) return null;
   if (!(await claim(postId))) return null;
   const { data } = await supabaseAdmin().from("posts").select("publish_by_hand, handoff_at, platforms").eq("id", postId).single();
   if (data?.publish_by_hand && data.platforms?.includes("instagram")) return data.handoff_at ? null : handOffWithTikTok(postId);

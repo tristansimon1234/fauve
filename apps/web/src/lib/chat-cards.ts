@@ -1,4 +1,5 @@
 import "server-only";
+import { studioAccess } from "@/lib/billing/access";
 import { effortSchema, montagePlanSchema, replyExtrasSchema, type Effort, type MontagePlan, type PostKind, type PostStatus } from "@fauve/agent";
 import { creditBalance, quoteEfforts, type QuoteStage } from "@/lib/credits";
 import { signMediaUrls } from "@/lib/studio";
@@ -106,8 +107,10 @@ async function postAndGridCards(studioId: string, payloads: unknown[]): Promise<
   ]);
   const rows = [...(byId.data ?? []), ...(upcoming.data ?? [])];
 
-  // A montage shows its render; a photo post its first photo.
-  const renderIds = [...new Set(rows.flatMap((p) => (p.render_id ? [p.render_id as string] : [])))];
+  // A montage shows its render; a photo post its first photo. Before she subscribes,
+  // the finished render stays behind the paywall (its page shows it blurred).
+  const unlocked = (await studioAccess(studioId)).unlock;
+  const renderIds = !unlocked ? [] : [...new Set(rows.flatMap((p) => (p.render_id ? [p.render_id as string] : [])))];
   const firstMedia = [...new Set(rows.flatMap((p) => (!p.render_id && (p.media_ids as string[] | null)?.[0] ? [(p.media_ids as string[])[0]!] : [])))];
   const [renders, assets] = await Promise.all([
     renderIds.length ? db.from("renders").select("id, storage_path").eq("studio_id", studioId).in("id", renderIds) : Promise.resolve({ data: [] }),

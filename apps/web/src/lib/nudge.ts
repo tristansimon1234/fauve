@@ -1,4 +1,5 @@
 import "server-only";
+import { studioAccess } from "@/lib/billing/access";
 import { NUDGE_UPCOMING_DAYS, nudgeMessage, shouldNudge } from "@fauve/agent";
 import { messageOwner } from "@/lib/owner-message";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -42,6 +43,8 @@ async function unansweredNudges(studioId: string): Promise<number> {
 
 /** Sends the reminder if it is time; returns whether it was sent. */
 export async function nudgeIfQuiet(studioId: string, now = Date.now()): Promise<boolean> {
+  // Not subscribed: nothing she sends could be made, so no reminder.
+  if (!(await studioAccess(studioId)).unlock) return false;
   const db = supabaseAdmin();
   const [{ data: studio }, { data: rhythm }, { count: upcoming }, daysSince, { count: banked }] = await Promise.all([
     db.from("studios").select("nudged_at").eq("id", studioId).single(),

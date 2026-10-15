@@ -3,6 +3,7 @@ import { isInSessionWindow } from "@fauve/agent";
 import { after } from "next/server";
 import { env } from "@/lib/env";
 import { analyzePerformance } from "@/lib/performance";
+import { studioAccess } from "@/lib/billing/access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendTemplate, sendText } from "@/lib/whatsapp/client";
 
@@ -58,6 +59,7 @@ async function run() {
   for (const { studio_id } of accounts ?? []) {
     const studioId = studio_id as string;
     try {
+      if (!(await studioAccess(studioId)).unlock) continue;
       const report = await analyzePerformance(studioId);
       if ("error" in report) {
         results.push({ studio: studioId, ok: false, error: report.error });

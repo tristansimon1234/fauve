@@ -17,6 +17,8 @@ import { loadEditorData } from "@/lib/montage-editor-data";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { postSlides } from "@/lib/render/slides";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
+import { Paywall } from "@/components/paywall";
+import { studioAccess } from "@/lib/billing/access";
 import { listElements } from "@/lib/elements";
 import { layoutsForEditor } from "@/lib/text-layers";
 import { loadTextLooks } from "@/lib/text-looks";
@@ -133,6 +135,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   if (!member) return <NoStudio />;
   const studioId = member.studio.id;
   const tz = member.studio.timezone;
+  // Her first publication, before she subscribes: blurred, behind « Débloquer ».
+  if (!(await studioAccess(studioId)).unlock) return <Paywall db={db} studioId={studioId} postId={id} next={`/publications/${id}`} />;
 
   const { data, error } = await db
     .from("posts")

@@ -33,6 +33,8 @@ import {
   customRestyle,
   withAdjustment,
   VOICE_MAX_SECONDS,
+  accessMessage,
+  type ToolName,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -58,6 +60,7 @@ import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
+import { studioAccess } from "@/lib/billing/access";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
 import { readSiteLook } from "@/lib/site-look";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
@@ -134,6 +137,25 @@ function missingContent(kind: PostKind, hasRender: boolean, media: number): stri
   return null;
 }
 
+/** Tools that spend (models, renders, images): refused without a subscription or credits. */
+const COSTLY_TOOLS = [
+  "analyze_clips",
+  "quote_montage",
+  "montage",
+  "restyle_reel",
+  "render",
+  "write_on_photos",
+  "retouch_photos",
+  "make_image",
+  "blur_video",
+  "place_elements",
+  "design_elements",
+  "edit_element",
+  "copy_text_style",
+  "style_texts",
+  "analyze_performance",
+] as const satisfies readonly ToolName[];
+
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const db = supabaseAdmin();
   const json = jsonIn(ctx.timezone ?? "Europe/Paris");
@@ -149,7 +171,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     if ((data?.length ?? 0) !== new Set(ids).size) throw new Error("Un des media_id n'appartient pas à ce studio.");
   }
 
-  return {
+  const handlers: ToolHandlers = {
     async app_guide({ topic }) {
       return APP_GUIDES[topic];
     },
@@ -1214,4 +1236,16 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return "ok : affiché sous ton message.";
     },
   };
+
+  // Nothing costly starts without a subscription (past her first publication) or
+  // without credits: the tool answers what to tell her instead (lib/billing/access.ts).
+  for (const name of COSTLY_TOOLS) {
+    const run = handlers[name] as (input: unknown) => Promise<string>;
+    (handlers as Record<string, (input: unknown) => Promise<string>>)[name] = async (input) => {
+      const access = await studioAccess(studioId);
+      if (!access.create) return json({ refused: true, message: accessMessage(access.reason) });
+      return run(input);
+    };
+  }
+  return handlers;
 }
