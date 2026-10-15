@@ -11,7 +11,8 @@ import {
 } from "@/components/icons";
 import { LandingDemo } from "@/components/landing/landing-demo";
 import { PHOTOS, ReelMock, ReportMock, RetouchMock, unsplash, WeekMock } from "@/components/landing/mocks";
-import { CarouselShowcase, ReelsShowcase, SHOWCASE_SLIDES } from "@/components/landing/showcase";
+import { IdeaToPost } from "@/components/landing/idea-to-post";
+import { ReelsFeed } from "@/components/landing/showcase";
 import { Mascot } from "@/components/mascot";
 import { Logo } from "@/components/orb";
 import { whatsappLink } from "@/lib/public-env";
@@ -128,22 +129,43 @@ export default function LandingPage() {
         </ul>
       </section>
 
+      {/* Ta-da: her ideas, Simone does the rest (the real carousel) */}
+      <section className="mx-auto flex max-w-[1200px] flex-col gap-8 px-4 pb-24 sm:px-8">
+        <SectionTitle kicker="Ta-da !">
+          Toi, tu as les idées. <span className="accent">Moi, j’exécute.</span>
+        </SectionTitle>
+        <p className="-mt-4 max-w-[640px] text-[16px] leading-relaxed text-muted">
+          Une phrase suffit, sur WhatsApp ou dans l’app. Simone écrit les textes, les pose sur tes photos à tes couleurs, retouche ce qu’il faut et te montre le résultat. Tu n’as plus qu’à dire oui.
+        </p>
+        <IdeaToPost />
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[14px] font-semibold text-muted">Et toutes tes autres idées :</span>
+          {(
+            [
+              ["Le menu de la semaine", "Post"],
+              ["Un Reel du cours de 7 h", "Reel"],
+              ["Nos horaires de Noël", "Story"],
+              ["3 nouveautés en boutique", "Carrousel"],
+            ] as const
+          ).map(([idea, kind]) => (
+            <span key={idea} className="flex items-center gap-2 rounded-full border border-line bg-white py-1.5 pr-1.5 pl-3.5 text-[14px] font-semibold">
+              « {idea} »
+              <span className="rounded-full bg-violet-soft px-2.5 py-0.5 text-[12px] font-bold text-violet">{kind}</span>
+            </span>
+          ))}
+        </div>
+      </section>
+
       {/* Her real work */}
       <section id="ce-qu-elle-fait" className="mx-auto flex max-w-[1200px] scroll-mt-6 flex-col gap-8 px-4 pb-16 sm:px-8">
         <SectionTitle kicker="Fait par Simone">
           De vraies publications, <span className="accent">faites par l’app.</span>
         </SectionTitle>
         <p className="-mt-4 max-w-[640px] text-[16px] leading-relaxed text-muted">
-          Ces Reels et ce carrousel sortent tels quels de Simone, pour trois commerces d’exemple : elle a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
+          Ces Reels sortent tels quels de Simone, pour trois commerces d’exemple : elle a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
         </p>
-        <div className={`grid items-center gap-10 rounded-[28px] border border-line bg-[radial-gradient(ellipse_at_top,#fff_0%,#FBF7F4_70%)] px-4 py-8 sm:px-8 ${SHOWCASE_SLIDES.length ? "lg:grid-cols-[1.6fr_1fr]" : ""}`}>
-          <ReelsShowcase />
-          {SHOWCASE_SLIDES.length > 0 && (
-            <div className="flex flex-col items-center gap-3">
-              <CarouselShowcase />
-              <span className="text-center text-[13px] font-semibold text-muted">Carrousel · Salon de coiffure · Paris</span>
-            </div>
-          )}
+        <div className="rounded-[28px] border border-line bg-[radial-gradient(ellipse_at_top,#fff_0%,#FBF7F4_70%)] px-4 py-8 sm:px-8">
+          <ReelsFeed />
         </div>
       </section>
 
