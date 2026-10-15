@@ -17,6 +17,7 @@ import { ElementsPanel, type BankElementView } from "@/components/montage/elemen
 import { LayerFields } from "@/components/montage/layer-fields";
 import { LayerHandles } from "@/components/montage/layer-handles";
 import { PhotoAsk } from "@/components/montage/photo-ask";
+import { PhotoImprove } from "@/components/montage/photo-improve";
 import { LayoutPicker, layoutOn, type Layout } from "@/components/montage/layout-picker";
 import { ListItems } from "@/components/montage/list-items";
 import { StylePicker } from "@/components/montage/style-picker";
@@ -459,6 +460,7 @@ export function CarouselEditor({
                   return { ok: true, message: res.note };
                 }}
               />
+              <PhotoImprove key={`improve-${slide.media_id}`} postId={postId} mediaId={slide.media_id} url={url} disabled={dirty} />
               {brand.logoUrl && (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="mr-1 text-[12px] font-semibold text-muted">Logo</span>

@@ -95,6 +95,17 @@ export async function sendVideo(toWaId: string, link: string, caption?: string):
   return res.messages[0]?.id;
 }
 
+/** Sends an image by link (JPEG or PNG, max 5 MB) with a caption (max 1024 chars). */
+export async function sendImage(toWaId: string, link: string, caption?: string): Promise<string | undefined> {
+  const res = await sendMessage({
+    recipient_type: "individual",
+    to: toWaId,
+    type: "image",
+    image: { link, ...(caption ? { caption: caption.slice(0, 1024) } : {}) },
+  });
+  return res.messages[0]?.id;
+}
+
 export async function sendReaction(toWaId: string, messageId: string, emoji: string): Promise<void> {
   await sendMessage({
     recipient_type: "individual",

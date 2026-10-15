@@ -36,3 +36,4 @@ export * from "./plans.ts";
 export * from "./app-guide.ts";
 export * from "./caption-match.ts";
 export * from "./caption.ts";
+export * from "./ai-image.ts";

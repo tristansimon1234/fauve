@@ -35,6 +35,8 @@ export const CREDIT_PRICES = {
   fixRound: 3,
   /** A second version to compare (Max): the editor again and a render. */
   alternative: 3,
+  /** An image from the image model: a real photo improved, or an ambiance image. */
+  image: 1,
 } as const;
 
 /**

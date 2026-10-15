@@ -204,7 +204,7 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
           chosen.length ? `Fichiers choisis dans la médiathèque (media_id, dans l’ordre) : ${chosen.join(", ")}.` : "",
           files.length ? "Voici mes nouveaux fichiers." : "",
           example ? "La dernière image envoyée est une inspiration, un post que j’aime (pas une photo à publier) : crée mes composants à partir d’elle et pose-les sur mes photos." : "",
-          !count ? "Je n’ai pas encore de photos ni de vidéos : dis-moi quoi filmer." : "",
+          !count ? "Je n’ai pas encore de photos ni de vidéos : dis-moi quoi filmer, ou propose-moi des images d’ambiance." : "",
         ]
           .filter(Boolean)
           .join("\n\n");

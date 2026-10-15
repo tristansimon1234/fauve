@@ -4,7 +4,7 @@ import { createLoginLink } from "@/lib/auth/login-link";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isFirstReel } from "@/lib/onboarding";
-import { sendReply, sendText } from "@/lib/whatsapp/client";
+import { sendImage, sendReply, sendText } from "@/lib/whatsapp/client";
 import { renderPost } from "./render-post";
 import { renderSlides } from "./slides";
 
@@ -27,7 +27,7 @@ export type DeliveryTarget = {
   freshMusic?: boolean;
 };
 
-function store(target: DeliveryTarget, fields: { wa_message_id?: string; type: string; body: string; payload?: Record<string, unknown> }) {
+function store(target: DeliveryTarget, fields: { wa_message_id?: string; type: string; body: string; payload?: Record<string, unknown>; media_id?: string }) {
   return supabaseAdmin()
     .from("whatsapp_messages")
     .insert({
@@ -109,6 +109,43 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
     await store(target, { wa_message_id: id, type: "text", body: stored, payload });
   } else {
     await store(target, { type: "text", body: stored, payload });
+  }
+}
+
+/**
+ * Shows images Simone made (improved photo, ambiance images): each one in the
+ * conversation (an image on WhatsApp), the text on the first; with a post, its
+ * card (and on WhatsApp, a link to its page) after them.
+ */
+export async function deliverImages(
+  target: Pick<DeliveryTarget, "studioId" | "waId" | "replyTo"> & { postId?: string },
+  images: { mediaId: string; path: string }[],
+  text: string,
+): Promise<void> {
+  const db = supabaseAdmin();
+  const full = { ...target, postId: target.postId ?? "" };
+  for (const [i, image] of images.entries()) {
+    const body = i === 0 ? text : "";
+    let id: string | undefined;
+    if (target.waId) {
+      const signed = await db.storage.from("media").createSignedUrl(image.path, 3600);
+      if (signed.data) id = await sendImage(target.waId, signed.data.signedUrl, body || undefined).catch(() => undefined);
+    }
+    // The image itself shows in the app's conversation (media_id).
+    await store(full, { wa_message_id: id, type: "image", body, media_id: image.mediaId });
+  }
+  if (!target.postId) return;
+  const after =
+    images.length > 1
+      ? "Elles sont sur ta publication : regarde, et dis-moi si tu en veux d’autres ou quel texte poser dessus."
+      : "Elle est sur ta publication : regarde, et dis-moi si tu veux autre chose.";
+  const payload = { posts: [target.postId], open_post: target.postId };
+  if (target.waId) {
+    const link = await createLoginLink(`+${target.waId}`, `/v/${target.postId}`, "open_post");
+    const id = await sendText(target.waId, `${after}\n\nRegarde ici : ${link}`);
+    await store(full, { wa_message_id: id, type: "text", body: after, payload });
+  } else {
+    await store(full, { type: "text", body: after, payload });
   }
 }
 

@@ -11,6 +11,7 @@ import {
   slidesPlanSchema,
   textLookSchema,
   AUTO_START_MAX_CREDITS,
+  CREDIT_PRICES,
   DEFAULT_EFFORT,
   EFFORTS,
   MAX_FREE_SCENES,
@@ -37,9 +38,10 @@ import { montageStatus } from "@/lib/montage-status";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
-import { notifyFailure, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
+import { AiImageError, canAffordImages, improvePhoto, makeAmbiance, placeOnPost } from "@/lib/ai-images";
+import { deliverImages, notifyFailure, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
 import { readPostMusic } from "@/lib/render/music";
-import { saveSlides } from "@/lib/render/slides";
+import { renderSlides, saveSlides } from "@/lib/render/slides";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
@@ -233,7 +235,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     async list_media({ kind, days, limit }) {
       let query = db
         .from("media_assets")
-        .select("id, kind, source, mime_type, duration, width, height, created_at, regions")
+        .select("id, kind, source, mime_type, duration, width, height, created_at, regions, ai")
         .eq("studio_id", studioId)
         .neq("source", "render")
         .gt("created_at", new Date(Date.now() - days * 24 * 3600_000).toISOString())
@@ -254,11 +256,12 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (summary && !summaries.has(a.media_id as string)) summaries.set(a.media_id as string, summary);
       }
       const when = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: ctx.timezone ?? "Europe/Paris" });
-      const sources: Record<string, string> = { whatsapp: "WhatsApp", web_upload: "app", library: "médiathèque", website: "son site" };
+      const sources: Record<string, string> = { whatsapp: "WhatsApp", web_upload: "app", library: "médiathèque", website: "son site", ai: "Simone (image IA)" };
       return json({
         medias: rows.map((r) => {
           const w = r.width as number | null;
           const h = r.height as number | null;
+          const ai = r.ai as { mode: string; instruction: string } | null;
           return {
             media_id: r.id,
             type: r.kind === "video" ? "vidéo" : "photo",
@@ -268,6 +271,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             ...(r.duration ? { duree_s: Number(r.duration) } : {}),
             ...(summaries.get(r.id as string) ? { contenu: summaries.get(r.id as string) } : {}),
             ...((r.regions as { notes?: string } | null)?.notes ? { contenu: (r.regions as { notes: string }).notes } : {}),
+            ...(ai ? { ia: ai.mode === "improve" ? `photo améliorée (${ai.instruction.slice(0, 80)})` : `image d'ambiance : ${ai.instruction.slice(0, 80)}` } : {}),
           };
         }),
         note: rows.length
@@ -655,6 +659,44 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         status: "started",
         note: "Simone regarde les photos puis les retouche (une à deux minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase, en disant ce que tu fais (lumière, flou des visages…).",
+      });
+    },
+
+    async make_image({ mode, media_id, instruction, format, count, post_id }) {
+      if (mode === "improve" && !media_id) return json({ error: "Donne le media_id de la photo à améliorer (list_media)." });
+      if (media_id) await assertOwnMedia([media_id]);
+      const n = mode === "ambiance" ? count : 1;
+      const affordable = await canAffordImages(studioId, n);
+      if (!affordable.ok) return json({ error: `Solde insuffisant : ${affordable.error}` });
+      if (post_id) {
+        const post = unwrap(await db.from("posts").select("status").eq("id", post_id).eq("studio_id", studioId).single());
+        if (post.status === "published" || post.status === "measured") return json({ error: "Cette publication est déjà en ligne." });
+      }
+      const target = { studioId, waId: ctx.waId, replyTo: ctx.replyToMessageId, postId: post_id };
+      // The model takes 10 to 30 s per image: after the reply, then they are shown in the conversation.
+      ctx.afterReply.push(async () => {
+        try {
+          const made = mode === "improve" ? [await improvePhoto(studioId, media_id!, instruction, format)] : await makeAmbiance(studioId, instruction, format, n);
+          if (post_id) {
+            const { render } = await placeOnPost(studioId, post_id, made, mode === "improve" ? media_id : undefined);
+            if (render) await renderSlides(studioId, post_id);
+          }
+          const text =
+            mode === "improve"
+              ? "Voilà ta photo améliorée ✨ L’originale reste dans ta médiathèque."
+              : made.length > 1
+                ? `Voilà ${made.length} images d’ambiance ✨ Elles sont dans ta médiathèque.`
+                : "Voilà ton image d’ambiance ✨ Elle est dans ta médiathèque.";
+          await deliverImages(target, made, text);
+        } catch (error) {
+          const why = error instanceof AiImageError ? error.message : "Je n’ai pas réussi à faire cette image cette fois. Tu veux que je réessaie ?";
+          await notifyFailure({ ...target, postId: post_id ?? "" }, `${why} Aucun crédit n’a été débité.`, error);
+        }
+      });
+      return json({
+        status: "started",
+        prix: `${n * CREDIT_PRICES.image} crédit${n > 1 ? "s" : ""}, débité${n > 1 ? "s" : ""} une fois l'image faite`,
+        note: "L'image arrive dans la conversation dans moins d'une minute. Annonce-le en une phrase avec le prix, sans rien promettre de plus.",
       });
     },
 

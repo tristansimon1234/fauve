@@ -977,3 +977,26 @@ test("captions: 5 hashtags at most, marks of machine writing taken out", async (
   assert.equal(many, "#a #b #c #d #e fin");
   assert.equal(captionForInstagram(null, []), "");
 });
+
+test("ai images: real photos kept truthful, ambiance never her place, frames and price", async () => {
+  const { ambiancePrompt, closestFormat, cropsMuch, improvePrompt, PHOTO_IMPROVEMENTS } = await import("./ai-image.ts");
+  const { toolSpecs } = await import("./tools.ts");
+  const improve = improvePrompt(PHOTO_IMPROVEMENTS.background.instruction, "4:5", "salon de coiffure");
+  assert.match(improve, /salon de coiffure/);
+  assert.match(improve, /Keep everything real exactly as it is/);
+  assert.match(improve, /portrait 4:5/);
+  const ambiance = ambiancePrompt("des serviettes roulées sur du bois clair", "9:16", { colors: ["#7A1F2B", "not a colour"], mood: "chaleureux" });
+  assert.match(ambiance, /No people and no faces/);
+  assert.match(ambiance, /No text/);
+  assert.match(ambiance, /#7A1F2B/);
+  assert.doesNotMatch(ambiance, /not a colour/);
+  assert.equal(closestFormat(1080, 1350), "4:5");
+  assert.equal(closestFormat(1080, 1920), "9:16");
+  assert.equal(closestFormat(1200, 1150), "1:1");
+  // A landscape photo loses much of itself in 4:5 (worth extending), a 3:4 one does not.
+  assert.equal(cropsMuch(1600, 900, "4:5"), true);
+  assert.equal(cropsMuch(1200, 1600, "4:5"), false);
+  assert.equal(CREDIT_PRICES.image, 1);
+  assert.equal(toolSpecs.make_image.input.parse({ mode: "ambiance", instruction: "un fond de lin" }).format, "4:5");
+  assert.equal(toolSpecs.make_image.input.safeParse({ mode: "ambiance", instruction: "x", count: 9 }).success, false);
+});

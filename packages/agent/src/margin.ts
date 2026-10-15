@@ -38,6 +38,7 @@ export const TYPICAL_COST_EUR: Record<keyof typeof CREDIT_PRICES, number> = {
   review: 0.03, // the critic watching key frames
   fixRound: 0.11, // the editor, a render, the critic again
   alternative: 0.08, // the editor and a render
+  image: 0.05, // the image model at 2K (about $0.05), with the photo read in
 };
 
 /** Margin of one priced job: 1 − its cost / what its credits are worth (null when it is free). */

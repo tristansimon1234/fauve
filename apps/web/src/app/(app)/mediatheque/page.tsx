@@ -8,6 +8,7 @@ import Link from "next/link";
 import { formatDuration, formatShortDateTime } from "@/lib/format";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
 import { deleteMedia } from "./actions";
+import { AmbianceMaker } from "./ambiance-maker";
 import { SettingsTabs } from "@/components/settings-tabs";
 
 export const metadata: Metadata = { title: "Médiathèque" };
@@ -18,7 +19,8 @@ const assetSchema = z.object({
   id: z.uuid(),
   storage_path: z.string(),
   kind: z.enum(["video", "image", "audio", "document"]),
-  source: z.enum(["whatsapp", "web_upload", "render", "library", "website"]),
+  source: z.enum(["whatsapp", "web_upload", "render", "library", "website", "ai"]),
+  ai: z.object({ mode: z.enum(["improve", "ambiance"]) }).nullable().catch(null),
   duration: z.coerce.number().nullable(),
   created_at: z.string(),
   analysis_status: z.string().nullable(),
@@ -38,6 +40,7 @@ const sourceLabels: Record<Asset["source"], string> = {
   render: "Montage de Simone",
   library: "Bibliothèque",
   website: "Prise sur ton site",
+  ai: "Image de Simone (IA)",
 };
 
 export default function LibraryPage() {
@@ -61,7 +64,7 @@ async function Library() {
     assetSchema,
     await db
       .from("media_assets")
-      .select("id, storage_path, kind, source, duration, created_at, analysis_status")
+      .select("id, storage_path, kind, source, duration, created_at, analysis_status, ai")
       .eq("studio_id", studioId)
       .order("created_at", { ascending: false })
       .limit(LIMIT),
@@ -95,10 +98,13 @@ async function Library() {
       </div>
 
       {assets.length === 0 ? (
-        <EmptyState title="Pas encore de photo ni de vidéo" className="max-w-[760px]" cta="Envoyer mes vidéos à Simone">
+        <>
+          <EmptyState title="Pas encore de photo ni de vidéo" className="max-w-[760px]" cta="Envoyer mes vidéos à Simone">
           Glisse tes photos et vidéos dans la conversation avec Simone (en pleine qualité), ou envoie-les sur WhatsApp en
           tant que document. Elles apparaîtront ici, avec ce que Simone y a vu. Pense à avoir l’accord des personnes filmées.
-        </EmptyState>
+          </EmptyState>
+          <AmbianceMaker />
+        </>
       ) : (
         <>
           <div className="flex max-w-[860px] flex-wrap items-center gap-4 rounded-[20px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-5 py-4">
@@ -109,6 +115,7 @@ async function Library() {
             <Link href="/fauve" className="btn btn-primary h-11 text-sm">
               Ouvrir Simone
             </Link>
+            <AmbianceMaker />
           </div>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
             {assets.map((asset) => (
@@ -200,7 +207,7 @@ function AssetCard({
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-3.5">
         <span className="text-xs font-semibold text-muted">
-          {sourceLabels[asset.source]} · {formatShortDateTime(asset.created_at, tz)}
+          {asset.ai?.mode === "improve" ? "Améliorée par Simone (IA)" : sourceLabels[asset.source]} · {formatShortDateTime(asset.created_at, tz)}
         </span>
         {analysis ? (
           <>
