@@ -1303,3 +1303,20 @@ test("nudge: one short reminder when nothing went out for a while, never twice a
   assert.match(nudgeMessage(6, 0), /^Ça fait 6 jours sans publication 🙂 Envoie-moi les photos ou vidéos que tu as sous la main, je m'occupe du reste\.$/);
   assert.match(nudgeMessage(6, 2), /vidéos que j'ai gardées/);
 });
+
+test("access: the first publication is free, then nothing without a subscription, nothing without credits", async () => {
+  const { accessOf, FREE_ANALYSES } = await import("./access.ts");
+  // Onboarding: her first publication is made in full, but stays locked.
+  const first = accessOf({ subscription: null, firstPostMade: false, credits: 220, analyses: 0 });
+  assert.deepEqual([first.create, first.analyze, first.unlock], [true, true, false]);
+  assert.equal(accessOf({ subscription: null, firstPostMade: false, credits: 220, analyses: FREE_ANALYSES }).analyze, false);
+  // Made: nothing else until she subscribes.
+  const after = accessOf({ subscription: null, firstPostMade: true, credits: 220, analyses: 2 });
+  assert.deepEqual([after.create, after.analyze, after.unlock, after.reason], [false, false, false, "subscribe"]);
+  assert.equal(accessOf({ subscription: "canceled", firstPostMade: true, credits: 220, analyses: 2 }).create, false);
+  // Trial or active: everything, while there are credits.
+  const trial = accessOf({ subscription: "trialing", firstPostMade: true, credits: 40, analyses: 9 });
+  assert.deepEqual([trial.create, trial.analyze, trial.unlock], [true, true, true]);
+  const empty = accessOf({ subscription: "active", firstPostMade: true, credits: 0, analyses: 9 });
+  assert.deepEqual([empty.create, empty.analyze, empty.unlock, empty.reason], [false, false, true, "credits"]);
+});

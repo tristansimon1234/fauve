@@ -1,5 +1,7 @@
 import "server-only";
+import { studioAccess } from "@/lib/billing/access";
 import {
+  accessMessage,
   CREDIT_PRICES,
   EFFORTS,
   effortSchema,
@@ -215,6 +217,9 @@ export async function acceptQuote(
    */
   { immediate = false, effort }: { immediate?: boolean; effort?: Effort } = {},
 ): Promise<AcceptedQuote | { error: string }> {
+  // Nothing starts without a subscription (past her first publication) or credits.
+  const access = await studioAccess(studioId);
+  if (!access.create) return { error: accessMessage(access.reason) };
   const db = supabaseAdmin();
   const { data: q } = await db
     .from("credit_quotes")

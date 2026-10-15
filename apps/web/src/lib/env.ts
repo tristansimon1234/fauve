@@ -43,6 +43,8 @@ const schema = {
   TIKTOK_DIRECT_POST: z.stringbool().default(false),
   // Bearer secret for /api/cron/* (pg_cron sends it from Supabase Vault).
   CRON_SECRET: z.string().min(32),
+  // Stripe (subscriptions with a 3-day trial). Unset = billing off: every studio has full access.
+  STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
   // Google AI Studio key and model for video analysis.
   GEMINI_API_KEY: z.string().min(1),
   GEMINI_MODEL: z.string().default("gemini-3.7-flash"),

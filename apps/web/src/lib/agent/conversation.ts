@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
 import { presenceLines } from "@/lib/nudge";
+import { accessLine } from "@/lib/billing/access";
 
 // Shared by every channel (WhatsApp webhook, web test chat): rebuild the
 // conversation from stored messages and let Fauve answer the last one.
@@ -174,10 +175,13 @@ export async function replyInConversation(params: {
         memory: readMemory(studio.data.memory).map((f) => f.fact),
       },
       work: describeJobs(jobs.map((j) => ({ ...j, title: j.postId ? jobTitles.get(j.postId) : undefined }))),
-      routine: await presenceLines(params.studioId).catch((error) => {
-        console.warn("presence context failed", error);
-        return [];
-      }),
+      routine: await Promise.all([
+        accessLine(params.studioId).catch(() => null),
+        presenceLines(params.studioId).catch((error) => {
+          console.warn("presence context failed", error);
+          return [] as string[];
+        }),
+      ]).then(([access, presence]) => [...(access ? [access] : []), ...presence]),
     },
   });
 }

@@ -1,8 +1,9 @@
 import "server-only";
 import { FileState, GoogleGenAI } from "@google/genai";
-import { bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisSchema, usdToEur, type ClipAnalysis } from "@fauve/agent";
+import { accessMessage, bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisSchema, usdToEur, type ClipAnalysis } from "@fauve/agent";
 import { z } from "zod";
 import { env } from "@/lib/env";
+import { studioAccess } from "@/lib/billing/access";
 import { sortClip } from "@/lib/clip-sort";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -153,7 +154,7 @@ export async function ensureClipAnalysis(
   studioId: string,
   mediaId: string,
   { waitMs = 150_000 }: { waitMs?: number } = {},
-): Promise<StoredAnalysis | { media_id: string; status: "pending" | "failed" | "not_a_video"; error?: string }> {
+): Promise<StoredAnalysis | { media_id: string; status: "pending" | "failed" | "not_a_video" | "locked"; error?: string }> {
   const db = supabaseAdmin();
   const asset = await db
     .from("media_assets")
@@ -165,6 +166,11 @@ export async function ensureClipAnalysis(
   if (asset.data.kind !== "video" && !asset.data.mime_type?.startsWith("video/")) {
     return { media_id: mediaId, status: "not_a_video" };
   }
+  // Watching a video costs: not without a subscription (past her first publication) or credits.
+  const already = await existing(mediaId);
+  if (already) return already;
+  const access = await studioAccess(studioId);
+  if (!access.analyze) return { media_id: mediaId, status: "locked", error: accessMessage(access.reason) };
 
   const deadline = Date.now() + waitMs;
   for (;;) {

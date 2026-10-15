@@ -1,5 +1,6 @@
 import "server-only";
-import { CREDIT_PRICES, STYLE_CHECK_OPTIONS } from "@fauve/agent";
+import { CREDIT_PRICES, STYLE_CHECK_OPTIONS, TRIAL_DAYS } from "@fauve/agent";
+import { studioAccess } from "@/lib/billing/access";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -82,14 +83,18 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const seconds = Math.round(r.durationMs / 1000);
   // On a phone: the one-action page (watch, validate, move a text).
   const page = `/v/${target.postId}`;
+  // Before she subscribes, the page shows it blurred behind « Débloquer » (3 days of trial).
+  const unlocked = (await studioAccess(target.studioId)).unlock;
   // Her first Reel: « Ça te ressemble ? », her style is tuned on her own video (restyle_reel).
-  const styleCheck = await isFirstReel(target.studioId, target.postId);
+  const styleCheck = unlocked && (await isFirstReel(target.studioId, target.postId));
   // Short paragraphs, the link right under the first line: it is the one action.
   const intro = `Ton montage « ${r.title} » est prêt 🎬${seconds ? ` (${seconds} s)` : ""}.`;
   const notes = [target.rationale, target.care].filter(Boolean).join("\n\n");
   const after = [
-    styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus chaleureux, plus sobre, plus pêchu ou autrement : je retiens ton style pour tous les prochains." : "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
-    target.offerVariant === false || styleCheck
+    !unlocked
+      ? `Pour le voir en entier et le publier, démarre ton essai : ${TRIAL_DAYS} jours offerts, sans engagement.`
+      : styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus chaleureux, plus sobre, plus pêchu ou autrement : je retiens ton style pour tous les prochains." : "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
+    target.offerVariant === false || styleCheck || !unlocked
       ? ""
       : `Je peux aussi te faire une variante (autre style, autre accroche) pour ${CREDIT_PRICES.variant} crédit${CREDIT_PRICES.variant > 1 ? "s" : ""}.`,
   ]

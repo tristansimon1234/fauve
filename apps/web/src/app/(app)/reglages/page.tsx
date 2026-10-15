@@ -11,6 +11,8 @@ import { whatsappLink } from "@/lib/public-env";
 import { getContentPlan, getSocialAccounts, getStudioContext, type SocialAccount } from "@/lib/studio";
 import { signOut } from "../../(onboarding)/connexion/actions";
 import { EffortSetting } from "./effort-setting";
+import { SubscriptionButton } from "./subscription";
+import { billingEnabled } from "@/lib/billing/stripe";
 import { MemoryList } from "./memory-list";
 import { InstagramLinkCode } from "./instagram-link";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
@@ -75,9 +77,14 @@ async function Settings() {
     db.from("credit_ledger").select("id, delta, label, created_at").eq("studio_id", studio.id).order("created_at", { ascending: false }).limit(10),
     fauveAccount(),
     db.from("instagram_contacts").select("igsid").eq("studio_id", studio.id).limit(1).maybeSingle(),
-    db.from("studios").select("montage_effort, business_type, memory").eq("id", studio.id).maybeSingle(),
+    db.from("studios").select("montage_effort, business_type, memory, subscription_status, trial_ends_at").eq("id", studio.id).maybeSingle(),
   ]);
   const tiktokOn = tiktokEnabled();
+  const billing = billingEnabled();
+  const subscription = (care.data?.subscription_status as string | null | undefined) ?? null;
+  const trialEnd = care.data?.trial_ends_at
+    ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: studio.timezone }).format(new Date(care.data.trial_ends_at as string))
+    : null;
   const dateFormat = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: studio.timezone });
 
   return (
@@ -187,10 +194,15 @@ async function Settings() {
 
         <Section title="Abonnement">
           <p className="text-sm leading-normal">
-            {studio.plan === "trial"
-              ? `Période d’essai en cours, avec tout ${PLANS.pro.label}. Ensuite : ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € / mois, sans engagement.`
-              : `${PLANS[offer].label} : ${PLANS[offer].priceEur} € / mois, ${PLANS[offer].credits} crédits par mois (environ ${reelsPerMonth(offer)} Reels soignés, carrousels et photos en plus), sans engagement.`}
+            {subscription === "trialing"
+              ? `Essai en cours${trialEnd ? ` jusqu’au ${trialEnd}` : ""}, avec ${PLANS[offer].label}. Ensuite ${PLANS[offer].priceEur} € / mois, sans engagement : arrête avant la fin de l’essai et tu ne paies rien.`
+              : subscription === "active"
+                ? `${PLANS[offer].label} : ${PLANS[offer].priceEur} € / mois, ${PLANS[offer].credits} crédits par mois (environ ${reelsPerMonth(offer)} Reels soignés, carrousels et photos en plus), sans engagement.`
+                : billing
+                  ? `Pas encore d’abonnement. ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € / mois, avec 3 jours d’essai offerts, sans engagement.`
+                  : `Période d’essai en cours, avec tout ${PLANS.pro.label}. Ensuite : ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € / mois, sans engagement.`}
           </p>
+          {billing ? <SubscriptionButton subscribed={subscription === "trialing" || subscription === "active" || subscription === "past_due"} /> : null}
         </Section>
 
         <Section title="Crédits">
