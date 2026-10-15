@@ -4,6 +4,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { queueJob } from "@/lib/jobs";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
+import { makeVoiceOver } from "@/lib/voice-over";
 import { photoRegions } from "@/lib/video/regions";
 
 // A test bench for the whole montage chain in production: what Simone makes alone, on
@@ -15,7 +16,8 @@ import { photoRegions } from "@/lib/video/regions";
 //                        then starts the same montage job as a manager's Reel at the default
 //                        care (editor, motion designer, render with music, critic, corrections),
 //                        without a quote. Answers at once and works after the response.
-//                        reset=1 first removes the case's posts and scenes, for a new first Reel.
+//                        reset=1 first removes the case's posts and scenes, for a new first Reel;
+//                        voice=1 (or voice=<ElevenLabs voice id>) puts Simone's voice over it first.
 //   ?case=…&step=result  every version: its render (signed link, 24 h), the plan kept
 //                        (without the scenes' code), the delivered message and the costs.
 // Lab studios go with /api/admin/delete-studio.
@@ -156,7 +158,7 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
   return { videos, photos };
 }
 
-async function start(name: string, c: LabCase, reset: boolean) {
+async function start(name: string, c: LabCase, reset: boolean, voice: string | null) {
   const db = supabaseAdmin();
   const studioId = await labStudio(name, c);
   if (reset) {
@@ -180,6 +182,10 @@ async function start(name: string, c: LabCase, reset: boolean) {
     .select("id")
     .single();
   if (post.error) throw new Error(post.error.message);
+  if (voice) {
+    const spoken = await makeVoiceOver({ studioId, postId: post.data.id, voiceId: voice === "1" ? undefined : voice });
+    console.log("lab: voice", name, spoken.seconds, spoken.script);
+  }
   // The same chain as her first Reel at the default care, without a quote: two scenes of her own.
   await queueJob("montage", { step: "design", studioId, postId: post.data.id, mediaIds, brief: c.idea, maxNewScenes: 2, effort: "soigne" });
   console.log("lab: montage started", name, post.data.id);
@@ -190,12 +196,13 @@ async function result(name: string) {
   const studio = await db.from("studios").select("id").eq("website_url", labUrl(name)).maybeSingle();
   if (!studio.data) return { error: "case not set up" };
   const studioId = studio.data.id as string;
-  const post = await db.from("posts").select("id, title, status, agent_note, edit_plan_id, render_id, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const post = await db.from("posts").select("id, title, status, agent_note, edit_plan_id, render_id, voice_media_id, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!post.data) return { studioId, error: "no post" };
-  const [plans, message, costs] = await Promise.all([
+  const [plans, message, costs, voice] = await Promise.all([
     db.from("edit_plans").select("id, version, plan, created_at").eq("post_id", post.data.id).order("version"),
     db.from("whatsapp_messages").select("body, created_at").eq("studio_id", studioId).eq("direction", "outbound").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     db.from("cost_events").select("kind, cost_eur").eq("studio_id", studioId),
+    post.data.voice_media_id ? db.from("media_assets").select("transcript").eq("id", post.data.voice_media_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const planIds = (plans.data ?? []).map((p) => p.id as string);
   const renders = planIds.length
@@ -214,6 +221,7 @@ async function result(name: string) {
     plans: (plans.data ?? []).map((p) => ({ id: p.id, version: p.version, at: p.created_at })),
     renders: renders.map((r) => ({ plan: r.edit_plan_id, status: r.status, seconds: r.duration_ms ? Math.round((r.duration_ms as number) / 100) / 10 : null, error: r.error, url: r.storage_path ? url.get(r.storage_path as string) : null })),
     message: message.data?.body ?? null,
+    voice: (voice.data?.transcript as { text?: string; duration?: number } | null) ?? null,
     costs: byKind,
     // The plan kept, readable: the scenes' code left out.
     plan: plan.success
@@ -234,6 +242,6 @@ export async function POST(request: Request) {
   if (c.template && !motionTemplateSchema.safeParse(c.template).success) return Response.json({ error: "template" }, { status: 400 });
   if (params.get("step") === "result") return Response.json(await result(name));
   // call_app gives up after a few seconds: the work goes on after the answer.
-  after(() => start(name, c, params.get("reset") === "1").catch((error: unknown) => console.error("lab: case failed", name, error)));
+  after(() => start(name, c, params.get("reset") === "1", params.get("voice")).catch((error: unknown) => console.error("lab: case failed", name, error)));
   return Response.json({ ok: true, case: name, started: true });
 }
