@@ -20,7 +20,8 @@ export type OwnerMessage = {
   template?: { name: string; params: string[] };
 };
 
-export async function messageOwner(studioId: string, message: OwnerMessage): Promise<"whatsapp" | "template" | "app"> {
+/** The owner's WhatsApp, and whether a free message can reach her now (she wrote in the last 24 h). */
+export async function ownerWhatsApp(studioId: string): Promise<{ phone: string; waId: string; open: boolean } | null> {
   const db = supabaseAdmin();
   const { data: owner } = await db
     .from("members")
@@ -30,20 +31,28 @@ export async function messageOwner(studioId: string, message: OwnerMessage): Pro
     .limit(1)
     .maybeSingle();
   const phone = (owner?.phone_e164 as string | undefined) ?? null;
+  if (!phone) return null;
+  const { data: last } = await db
+    .from("whatsapp_messages")
+    .select("created_at")
+    .eq("studio_id", studioId)
+    .eq("channel", "whatsapp")
+    .eq("direction", "inbound")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return { phone, waId: phone.replace(/^\+/, ""), open: isInSessionWindow(last ? new Date(last.created_at as string) : null) };
+}
+
+export async function messageOwner(studioId: string, message: OwnerMessage): Promise<"whatsapp" | "template" | "app"> {
+  const db = supabaseAdmin();
+  const owner = await ownerWhatsApp(studioId);
+  const phone = owner?.phone ?? null;
   const payload = { ...(message.kind ? { kind: message.kind } : {}), ...(message.options?.length ? { options: message.options } : {}), ...(message.notes?.length ? { notes: message.notes } : {}) };
 
-  if (phone) {
-    const { data: last } = await db
-      .from("whatsapp_messages")
-      .select("created_at")
-      .eq("studio_id", studioId)
-      .eq("channel", "whatsapp")
-      .eq("direction", "inbound")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const waId = phone.replace(/^\+/, "");
-    if (isInSessionWindow(last ? new Date(last.created_at as string) : null)) {
+  if (owner) {
+    const waId = owner.waId;
+    if (owner.open) {
       const id = await sendReply(waId, message.text, message.options);
       await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "whatsapp", wa_message_id: id, direction: "outbound", phone_e164: phone, type: "text", body: message.text, payload });
       return "whatsapp";

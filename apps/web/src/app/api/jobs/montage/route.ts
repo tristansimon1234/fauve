@@ -57,6 +57,8 @@ const bodySchema = z.object({
   brief: z.string().max(4000).optional(),
   waId: z.string().regex(/^\d{6,16}$/).optional(),
   replyTo: z.string().max(200).optional(),
+  /** Started from the app (« Créer »): the delivery also reaches her on WhatsApp. */
+  notify: z.boolean().optional(),
   rationale: z.string().max(600).optional(),
   /** What Fauve says about the delivered version, kept on the post (else the rationale). */
   note: z.string().max(600).optional(),
@@ -132,7 +134,7 @@ export async function POST(request: Request) {
 const FAILED = "Je n’ai pas réussi à préparer le montage. Aucun crédit n’a été débité. Tu veux que je réessaie ?";
 
 async function run(job: Job) {
-  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo };
+  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify };
   const level = job.effort ? EFFORTS[job.effort] : null;
   // Rapide and older quotes: one version, delivered as soon as it is rendered.
   const reviewed = Boolean(level?.review && job.step !== "variant");
@@ -391,7 +393,7 @@ function careLine(compared: boolean, outcome: Care | null): string {
  * with what the review did; the quote is charged for what was really made.
  */
 async function deliver(job: Job, best: Version, outcome: Care | null): Promise<boolean> {
-  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo };
+  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify };
   const db = supabaseAdmin();
   await db.from("posts").update({ edit_plan_id: best.planId, render_id: best.renderId }).eq("id", job.postId).eq("studio_id", job.studioId);
   const [post, render] = await Promise.all([

@@ -1,225 +1,78 @@
 "use client";
 
-import { AMBIANCES, MOTION_TEMPLATES, type MotionTemplate, type PostKind } from "@fauve/agent";
+import { advisedFormat, creationSteps, formatBlocked, formatWhy, publishWhen, type Effort, type Picked, type PostKind } from "@fauve/agent";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ComponentType } from "react";
-import { createPost } from "@/app/(app)/calendrier/actions";
+import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
+import { creationProgress, launchCreation, type CreationProgress, type LaunchResult } from "@/app/(app)/create-actions";
+import { MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/chat-uploads";
 import { newPostOptions, type NewPostOptions } from "@/app/(app)/new-post-actions";
-import type { InspirationItem } from "@/lib/inspirations";
 import { useFauveDrawer } from "./fauve-drawer";
-import { ArrowLeftIcon, CheckIcon, FilmIcon, ImageIcon, LayersIcon, PlayIcon, PlusIcon, UploadIcon, XIcon } from "./icons";
-import { InspirationPicker } from "./inspiration-picker";
-import { buildSlideProps, CREDIT_PRICES, placeElement } from "@fauve/agent";
-import { SlidePreview } from "./montage/slide-preview";
-import { Orb } from "./orb";
+import { CheckIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
+import { Mascot } from "./mascot";
+import { nudgeWork } from "./work-pill";
 
-/** Where « Confier à Simone » goes: by default her panel; on the Simone page, its own conversation (no panel over the chat). */
+/** Where a carousel, a photo or a story goes on: by default Simone's panel; on the Simone page, its own conversation. */
 export type NewPostHandOff = (start: { postId: string; text: string; files: File[] }) => void;
 export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 
-// « Nouvelle publication », step by step: the format, then what matters most,
-// the inspiration (a Reel she likes; for photos, a kit of her components drawn
-// on a photo, or a post she likes that Fauve turns into components), a free day
-// Fauve suggests, photos and videos from the library (or new ones), and the
-// idea in a line. Then Fauve takes over in her panel, or it is kept as an idea.
+// « Nouvelle publication », in one screen: she gives her photos and videos (her library
+// or her phone), says what it is about if she wants, and Simone says what she will make
+// of them (« J'en fais un Reel, publié vendredi à 18 h »), both changeable in a tap.
+// « C'est parti »: a Reel starts at once and the screen follows it (« Je m'en occupe »);
+// a carousel, a photo or a story goes on with Simone in the chat, who writes the texts.
 
-const MAX_FILE_BYTES = 50 * 1024 * 1024;
-const MAX_FILES = 10;
-
-const formats: { value: PostKind; label: string; hint: string; Icon: ComponentType<{ size?: number }> }[] = [
-  { value: "reel", label: "Reel", hint: "Une vidéo montée", Icon: FilmIcon },
-  { value: "carousel", label: "Carrousel", hint: "2 à 10 photos", Icon: LayersIcon },
-  { value: "post", label: "Photo", hint: "Une photo", Icon: ImageIcon },
-  { value: "story", label: "Story", hint: "24 h", Icon: PlayIcon },
+const FORMATS: { kind: PostKind; title: string; phrase: string; hint: string; feminine?: boolean }[] = [
+  { kind: "reel", title: "Un Reel", phrase: "un Reel", hint: "Une vidéo montée, avec musique" },
+  { kind: "carousel", title: "Un carrousel", phrase: "un carrousel", hint: "Tes photos, à faire défiler" },
+  { kind: "post", title: "Une photo", phrase: "un post photo", hint: "Une seule image, dans ta grille" },
+  { kind: "story", title: "Une story", phrase: "une story", hint: "Visible 24 h, pour un rappel ou une info du jour", feminine: true },
 ];
 
-const placeholders: Record<PostKind, string> = {
-  reel: "Ex. le cours du samedi matin, ambiance énergique",
-  carousel: "Ex. 3 conseils pour bien commencer",
-  post: "Ex. nouvelle carte d’automne",
-  story: "Ex. il reste 2 places ce soir",
-};
+/** The first library items shown (with the upload tile, four rows of three). */
+const FIRST_TILES = 11;
 
-/** A few ideas to start from, by format, until the studio's own (by its kind of business) are loaded. */
-const fallbackIdeas: Record<PostKind, string[]> = {
-  reel: ["Les coulisses", "Un moment fort", "Une astuce", "Avant / après", "Une offre"],
-  carousel: ["3 conseils", "Le planning de la semaine", "Une nouveauté", "Un témoignage", "Les tarifs"],
-  post: ["Une nouveauté", "L’équipe", "Une offre", "Une citation"],
-  story: ["Places restantes", "Coulisses du jour", "Un sondage", "Un rappel"],
-};
+type When = { date: string; time: string; short: string; full: string };
+type Work = { postId: string; title: string; quoteId: string; effort: Effort; minutes: string; music: boolean; picked: Picked };
 
-const phrases: Record<PostKind, string> = { reel: "un Reel", carousel: "un carrousel", post: "un post photo", story: "une story" };
-
-/** The ambiances in plain words (what she will see), and Simone's own pick. */
-type Style = MotionTemplate | null;
-const styles: { value: Style; label: string }[] = [{ value: null, label: "Simone choisit" }, ...MOTION_TEMPLATES.map((t) => ({ value: t, label: AMBIANCES[t].label }))];
-
-/** A Reel's sound (a story has no publishing by hand: only Simone's music or none). */
-const sounds = [
-  { value: "simone", label: "Musique de Simone", hint: "composée pour ce Reel, libre de droits", reel: false },
-  { value: "instagram", label: "Un son d’Instagram", hint: "tu publies toi-même, avec le son de ton choix", reel: true },
-  { value: "none", label: "Sans musique", hint: "la vidéo telle quelle", reel: false },
-] as const;
-type Sound = (typeof sounds)[number]["value"];
-
-type Step = "format" | "when" | "files" | "idea" | "inspiration";
-const stepTitles: Record<Step, string> = {
-  format: "Quel format ?",
-  when: "Quand la publier ?",
-  files: "Avec quelles photos ou vidéos ?",
-  idea: "Qu’est-ce que tu veux dire ?",
-  inspiration: "Ton inspiration",
-};
-
-type Picked = { id: string; file: File; preview: string; video: boolean };
-
-/** A soft placeholder photo, to show the text layouts before any photo is chosen. */
-const PLACEHOLDER = `data:image/svg+xml,${encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9cfc4"/><stop offset="1" stop-color="#8c7f93"/></linearGradient></defs><rect width="1080" height="1350" fill="url(#g)"/></svg>',
-)}`;
-
-/** The day after `today` in the studio's time zone, as YYYY-MM-DD. */
-function tomorrow(timezone: string): string {
-  const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date()).split("-").map(Number);
-  return new Date(Date.UTC(y!, m! - 1, d! + 1)).toISOString().slice(0, 10);
+/** When a local date and time (the studio's) goes out, in her words, against the studio's local now. */
+function whenAt(local: string, nowLocal: string): When {
+  const w = publishWhen(`${local}:00Z`, "UTC", new Date(`${nowLocal}:00Z`));
+  return { date: local.slice(0, 10), time: local.slice(11, 16), short: w.short, full: w.full };
 }
 
-export function NewPostSheet({ date, timezone, onClose }: { date?: string; timezone: string; onClose: () => void }) {
-  const router = useRouter();
-  const openFauve = useFauveDrawer();
-  const handOff = useContext(NewPostHandOffContext);
+/** The first free day (or the day asked for, at her usual hour). */
+function defaultWhen(o: NewPostOptions | null, date?: string): When | null {
+  if (!o) return null;
+  const slot = date ? o.slots.find((s) => s.date === date) : o.slots[0];
+  if (slot) return { date: slot.date, time: slot.time, short: slot.short, full: slot.full };
+  const tomorrow = new Date(Date.parse(`${o.nowLocal.slice(0, 10)}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  return whenAt(`${date ?? tomorrow}T${o.slots[0]?.time ?? "18:00"}`, o.nowLocal);
+}
+
+const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
+
+export function NewPostSheet({ date, onClose }: { date?: string; timezone: string; onClose: () => void }) {
   const titleId = useId();
   const [options, setOptions] = useState<NewPostOptions | null>(null);
-  const [step, setStep] = useState<Step>("format");
-  const [kind, setKind] = useState<PostKind>("reel");
-  const [day, setDay] = useState(date ?? "");
-  const [time, setTime] = useState("18:00");
-  const [otherDate, setOtherDate] = useState(Boolean(date));
-  const [chosen, setChosen] = useState<string[]>([]);
-  const [files, setFiles] = useState<Picked[]>([]);
-  const [intention, setIntention] = useState("");
-  const [style, setStyle] = useState<Style>(null);
-  const [inspiration, setInspiration] = useState<InspirationItem | null>(null);
-  const [sound, setSound] = useState<Sound>("simone");
-  const [kit, setKit] = useState<NewPostOptions["kits"][number] | null>(null);
-  /** A picture of a post she likes: Fauve redraws the same layout on her photos. */
-  const [example, setExample] = useState<Picked | null>(null);
-  const exampleRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const [pending, start] = useTransition();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const [work, setWork] = useState<Work | null>(null);
 
-  // Everything the steps offer, loaded once when the sheet opens.
+  // Her library, free days and ideas, loaded once when the sheet opens.
   useEffect(() => {
     let live = true;
     newPostOptions()
-      .then((o) => {
-        if (!live || !o) return;
-        setOptions(o);
-        if (!date && o.slots[0]) {
-          setDay(o.slots[0].date);
-          setTime(o.slots[0].time);
-        }
-      })
+      .then((o) => live && o && setOptions(o))
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [date]);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  // The previews are freed when the panel goes (the files themselves travel to Fauve's panel).
-  const filesRef = useRef(files);
-  useEffect(() => {
-    filesRef.current = files;
-  }, [files]);
-  useEffect(() => () => filesRef.current.forEach((f) => URL.revokeObjectURL(f.preview)), []);
-
-  const video = kind === "reel" || kind === "story";
-  // The inspiration right after the format: it is what the rest is built on.
-  const steps: Step[] = ["format", "inspiration", "when", "files", "idea"];
-  const index = steps.indexOf(step);
-  const last = index === steps.length - 1;
-  const go = (to: number) => {
-    const next = steps[Math.max(0, Math.min(steps.length - 1, to))]!;
-    setStep(next);
-    setError(null);
-    panelRef.current?.scrollTo({ top: 0 });
-  };
-
-  const add = (list: FileList | File[]) => {
-    const picked = [...list].filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
-    if (picked.length < list.length) setError("Seules les photos et les vidéos passent ici.");
-    if (picked.some((f) => f.size > MAX_FILE_BYTES)) setError("Un fichier dépasse 50 Mo : envoie-le plutôt sur WhatsApp en tant que document.");
-    const kept = picked
-      .filter((f) => f.size <= MAX_FILE_BYTES)
-      .slice(0, MAX_FILES - files.length - chosen.length)
-      .map((file) => ({ id: `${file.name}-${file.size}-${file.lastModified}`, file, preview: URL.createObjectURL(file), video: file.type.startsWith("video/") }));
-    setFiles((current) => [...current, ...kept.filter((k) => !current.some((c) => c.id === k.id))]);
-  };
-  const remove = (id: string) =>
-    setFiles((current) => {
-      const gone = current.find((f) => f.id === id);
-      if (gone) URL.revokeObjectURL(gone.preview);
-      return current.filter((f) => f.id !== id);
-    });
-  const toggle = (id: string) =>
-    setChosen((current) => (current.includes(id) ? current.filter((c) => c !== id) : current.length + files.length >= MAX_FILES ? current : [...current, id]));
-
-  // The library, the format's files first (videos for a Reel, photos for a carousel).
-  const library = (options?.media ?? []).filter((m) => kind !== "post" || !m.video);
-  const sorted = [...library].sort((a, b) => Number(b.video === video) - Number(a.video === video));
-  const firstPhoto = options?.media.find((m) => chosen.includes(m.id) && !m.video)?.url ?? files.find((f) => !f.video)?.preview ?? PLACEHOLDER;
-  const count = chosen.length + files.length;
-
-  const submit = (toFauve: boolean) =>
-    start(async () => {
-      setError(null);
-      const res = await createPost({
-        kind,
-        date: day,
-        time,
-        intention,
-        template: video ? style : null,
-        inspirationId: video ? (inspiration?.id ?? null) : null,
-        mediaIds: chosen,
-        music: video ? sound : null,
-      }).catch(() => ({ ok: false as const, error: "La publication n’a pas été créée. Réessaie." }));
-      if (!res.ok) return setError(res.error);
-      router.refresh();
-      if (toFauve) {
-        const when = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`));
-        const text = [
-          `Nouvelle publication : ${phrases[kind]} pour ${when} à ${time.replace(":", " h ")}.`,
-          intention.trim() ? `L’idée : ${intention.trim()}` : "",
-          video && (style || inspiration)
-            ? [style ? `Style : ${AMBIANCES[style].label}.` : "", inspiration ? `Inspiration : « ${inspiration.title} ».` : ""].filter(Boolean).join(" ")
-            : "",
-          video ? `Musique : ${sound === "instagram" ? "un son d’Instagram, je le publierai moi-même" : sound === "none" ? "sans musique" : "ta musique"}.` : "",
-          kit ? `Composants à poser sur mes photos : le kit « ${kit.name} » (element_id ${kit.elements.map((e) => e.id).join(", ")}).` : "",
-          chosen.length ? `Fichiers choisis dans la médiathèque (media_id, dans l’ordre) : ${chosen.join(", ")}.` : "",
-          files.length ? "Voici mes nouveaux fichiers." : "",
-          example ? "La dernière image envoyée est une inspiration, un post que j’aime (pas une photo à publier) : crée mes composants à partir d’elle et pose-les sur mes photos." : "",
-          !count ? "Je n’ai pas encore de photos ni de vidéos : dis-moi quoi filmer, ou propose-moi des images d’ambiance." : "",
-        ]
-          .filter(Boolean)
-          .join("\n\n");
-        const handed = [...files.map((f) => f.file), ...(example ? [example.file] : [])];
-        if (handOff) handOff({ postId: res.id, text, files: handed });
-        else openFauve({ postId: res.id, title: res.title, start: { text, files: handed } });
-      }
-      onClose();
-    });
-
-  const card = (on: boolean) => `fauve-press border transition-colors ${on ? "border-violet bg-violet-soft text-violet" : "border-line bg-white text-ink hover:border-violet/40"}`;
-  const slot = options?.slots.find((s) => s.date === day && s.time === time);
-  const canNext = step !== "when" || Boolean(day && time);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
@@ -228,459 +81,662 @@ export function NewPostSheet({ date, timezone, onClose }: { date?: string; timez
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="fauve-enter relative flex max-h-[92dvh] w-full flex-col rounded-t-[22px] bg-white shadow-[0_-12px_40px_rgba(28,21,48,0.18)] sm:max-w-[560px] sm:rounded-[22px]"
+        className="fauve-enter relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:h-[min(860px,92dvh)] sm:max-w-[560px] sm:rounded-[22px] sm:shadow-[0_24px_60px_rgba(28,21,48,0.22)]"
       >
-        <header className="flex flex-col gap-3 px-5 pt-5 sm:px-6 sm:pt-6">
-          <div className="flex items-center gap-2">
-            {index > 0 && (
-              <button type="button" onClick={() => go(index - 1)} aria-label="Étape précédente" className="-ml-2 flex size-9 items-center justify-center rounded-full text-muted hover:bg-soft hover:text-ink">
-                <ArrowLeftIcon size={18} />
-              </button>
-            )}
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-[12px] font-semibold text-muted">
-                Nouvelle publication · {index + 1}/{steps.length}
-              </span>
-              <h2 id={titleId} className="text-[20px] leading-tight font-extrabold tracking-[-0.01em]">
-                {stepTitles[step]}
-              </h2>
-            </div>
-            <button type="button" onClick={onClose} aria-label="Fermer" className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-soft hover:text-ink">
-              <XIcon size={18} />
-            </button>
-          </div>
-          <div className="flex gap-1.5" aria-hidden>
-            {steps.map((s, i) => (
-              <span key={s} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${i <= index ? "bg-violet" : "bg-line"}`} />
-            ))}
-          </div>
-        </header>
-
-        <div ref={panelRef} key={step} className="fauve-fade flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-5 sm:px-6">
-          {step === "format" && (
-            <div className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Format">
-              {formats.map((f) => {
-                const on = kind === f.value;
-                return (
-                  <button
-                    key={f.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    onClick={() => {
-                      setKind(f.value);
-                      setKit(null);
-                      go(1);
-                    }}
-                    className={`${card(on)} flex flex-col items-start gap-2 rounded-[18px] p-4 text-left`}
-                  >
-                    <span className={`flex size-10 items-center justify-center rounded-full ${on ? "bg-white" : "bg-violet-soft text-violet"}`}>
-                      <f.Icon size={20} />
-                    </span>
-                    <span className="text-[15px] font-bold">{f.label}</span>
-                    <span className={`text-[12px] ${on ? "text-violet/80" : "text-muted"}`}>{f.hint}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {step === "when" && (
-            <>
-              <div className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Jours proposés">
-                {options === null &&
-                  [0, 1, 2, 3].map((i) => <span key={i} className="h-[68px] animate-pulse rounded-[16px] bg-soft" aria-hidden />)}
-                {options?.slots.map((s) => {
-                  const on = !otherDate && s.date === day && s.time === time;
-                  return (
-                    <button
-                      key={s.date}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => {
-                        setDay(s.date);
-                        setTime(s.time);
-                        setOtherDate(false);
-                      }}
-                      className={`${card(on)} relative flex flex-col items-start gap-0.5 rounded-[16px] px-3.5 py-3 text-left`}
-                    >
-                      <span className="text-[15px] font-bold first-letter:uppercase">
-                        {s.label} · {s.time.replace(":", " h ").replace(/ 00$/, "")}
-                      </span>
-                      <span className={`text-[12px] ${on ? "text-violet/80" : "text-muted"}`}>{s.hint}</span>
-                      {on && <Tick />}
-                    </button>
-                  );
-                })}
-              </div>
-              {options && !options.slots.length && <p className="text-[13px] text-muted">Tes deux prochaines semaines sont déjà bien remplies : choisis une date.</p>}
-              <button
-                type="button"
-                onClick={() => {
-                  setOtherDate(true);
-                  if (!day) setDay(tomorrow(timezone));
-                }}
-                className={`self-start text-[13px] font-bold ${otherDate ? "text-ink" : "text-violet hover:underline"}`}
-              >
-                Une autre date
-              </button>
-              {(otherDate || (options && !options.slots.length)) && (
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={day}
-                    onChange={(e) => setDay(e.target.value)}
-                    aria-label="Jour"
-                    className="h-11 min-w-0 flex-1 rounded-[12px] border border-line bg-white px-3 text-[15px] outline-none focus:border-violet"
-                  />
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    aria-label="Heure"
-                    className="h-11 w-[136px] rounded-[12px] border border-line bg-white px-3 text-[15px] outline-none focus:border-violet"
-                  />
-                </div>
-              )}
-              {slot && !otherDate && <p className="text-[12px] text-muted">Simone propose tes jours libres, à ton heure habituelle.</p>}
-            </>
-          )}
-
-          {step === "files" && (
-            <>
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragging(false);
-                  add(e.dataTransfer.files);
-                }}
-                className={`flex flex-col gap-3 rounded-[16px] border-[1.5px] border-dashed p-3 transition-colors ${dragging ? "border-violet bg-violet-soft" : "border-line bg-soft"}`}
-              >
-                {files.length > 0 && (
-                  <ul className="flex flex-wrap gap-2">
-                    {files.map((f) => (
-                      <li key={f.id} className="fauve-pop relative size-16 overflow-hidden rounded-xl bg-ink">
-                        {f.video ? (
-                          <video src={f.preview} muted playsInline preload="metadata" className="size-full object-cover" />
-                        ) : (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={f.preview} alt="" className="size-full object-cover" />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => remove(f.id)}
-                          aria-label={`Retirer ${f.file.name}`}
-                          className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-white/90 text-ink shadow-sm"
-                        >
-                          <XIcon size={12} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl py-2 text-[14px] font-bold text-violet hover:bg-white">
-                  <UploadIcon size={18} />
-                  {files.length ? "Ajouter d’autres fichiers" : "Ajouter depuis ton appareil"}
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  multiple
-                  accept="image/*,video/*"
-                  className="sr-only"
-                  onChange={(e) => {
-                    if (e.target.files) add(e.target.files);
-                    e.target.value = "";
-                  }}
-                />
-              </div>
-
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[13px] font-bold">Dans ta médiathèque</span>
-                {count > 0 && <span className="text-[12px] font-semibold text-violet">{count} choisi{count > 1 ? "s" : ""}</span>}
-              </div>
-              {options === null ? (
-                <div className="grid grid-cols-4 gap-2">
-                  {Array.from({ length: 8 }, (_, i) => (
-                    <span key={i} className="aspect-square animate-pulse rounded-xl bg-soft" aria-hidden />
-                  ))}
-                </div>
-              ) : sorted.length ? (
-                <ul className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-                  {sorted.map((m) => {
-                    const at = chosen.indexOf(m.id);
-                    const on = at >= 0;
-                    return (
-                      <li key={m.id}>
-                        <button
-                          type="button"
-                          aria-pressed={on}
-                          aria-label={`${m.video ? "Vidéo" : "Photo"} du ${new Date(m.at).toLocaleDateString("fr-FR")}`}
-                          onClick={() => toggle(m.id)}
-                          className={`relative block aspect-square w-full overflow-hidden rounded-xl bg-ink transition-shadow ${on ? "ring-2 ring-violet ring-offset-2" : "hover:opacity-90"}`}
-                        >
-                          {m.video ? (
-                            <video src={`${m.url}#t=0.5`} muted playsInline preload="metadata" className="size-full object-cover" />
-                          ) : (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={m.url} alt="" loading="lazy" className="size-full object-cover" />
-                          )}
-                          {m.video && (
-                            <span className="absolute bottom-1 left-1 flex size-5 items-center justify-center rounded-full bg-black/55 text-white">
-                              <PlayIcon size={10} />
-                            </span>
-                          )}
-                          {on && (
-                            <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-violet text-[11px] font-bold text-white">{at + 1}</span>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="text-[13px] text-muted">Ta médiathèque est vide pour l’instant.</p>
-              )}
-              {!count && <p className="text-[12px] text-muted">Rien sous la main ? Passe à la suite : Simone te dira quoi filmer.</p>}
-            </>
-          )}
-
-          {step === "idea" && (
-            <>
-              <textarea
-                value={intention}
-                onChange={(e) => setIntention(e.target.value)}
-                maxLength={300}
-                rows={3}
-                autoFocus
-                placeholder={placeholders[kind]}
-                className="rounded-[14px] border border-line bg-white px-3.5 py-3 text-[15px] leading-snug outline-none focus:border-violet"
-              />
-              <div className="flex flex-wrap gap-1.5" aria-label="Idées">
-                {(options?.ideas ?? fallbackIdeas)[kind].map((idea) => (
-                  <button
-                    key={idea}
-                    type="button"
-                    onClick={() => setIntention((v) => (v.trim() ? `${v.trim()}, ${idea.toLowerCase()}` : idea))}
-                    className="fauve-press inline-flex h-8 items-center gap-1 rounded-full border border-line bg-white px-3 text-[13px] font-semibold text-ink hover:border-violet/40"
-                  >
-                    <PlusIcon size={13} />
-                    {idea}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[12px] text-muted">En une ligne suffit. Simone connaît ton commerce et écrit la légende.</p>
-            </>
-          )}
-
-          {step === "inspiration" && video && (
-            <>
-              <fieldset className="flex flex-col gap-2">
-                <legend className="mb-2 text-[13px] font-bold">Style du montage</legend>
-                <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Style du montage">
-                  {styles.map((s) => {
-                    const on = style === s.value;
-                    return (
-                      <button
-                        key={s.label}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        onClick={() => setStyle(s.value)}
-                        className={`fauve-press h-9 rounded-full border px-3.5 text-[13px] font-semibold transition-colors ${on ? "border-violet bg-violet text-white" : "border-line bg-white text-ink hover:border-violet/40"}`}
-                      >
-                        {s.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-[12px] text-muted">{style ? `${AMBIANCES[style].label} : ${AMBIANCES[style].hint}.` : "Simone prend ton style habituel, ou celui de ton inspiration."}</p>
-              </fieldset>
-              <fieldset className="flex flex-col gap-2">
-                <legend className="mb-2 text-[13px] font-bold">La musique</legend>
-                <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Musique">
-                  {sounds
-                    .filter((s) => kind === "reel" || !s.reel)
-                    .map((s) => {
-                      const on = sound === s.value;
-                      return (
-                        <button
-                          key={s.value}
-                          type="button"
-                          role="radio"
-                          aria-checked={on}
-                          onClick={() => setSound(s.value)}
-                          className={`${card(on)} relative flex flex-col items-start rounded-[14px] px-3.5 py-2.5 text-left`}
-                        >
-                          <span className="text-[14px] font-bold">{s.label}</span>
-                          <span className={`text-[12px] ${on ? "text-violet/80" : "text-muted"}`}>{s.hint}</span>
-                          {on && <Tick />}
-                        </button>
-                      );
-                    })}
-                </div>
-              </fieldset>
-              <div className="flex flex-col gap-2">
-                <span className="text-[13px] font-bold">Un Reel à suivre</span>
-                <InspirationPicker
-                  value={inspiration?.id ?? null}
-                  onChange={setInspiration}
-                  initial={options ? { studioId: options.studioId, items: options.inspirations } : null}
-                />
-              </div>
-            </>
-          )}
-
-          {step === "inspiration" && !video && options && options.kits.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <span className="text-[13px] font-bold">Tes composants</span>
-              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Kits de composants">
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={kit === null && !example}
-                  onClick={() => setKit(null)}
-                  className={`${card(kit === null && !example)} relative flex aspect-[4/5] flex-col items-center justify-center gap-1.5 rounded-[14px] p-2 text-center`}
-                >
-                  <Orb size={26} still />
-                  <span className="text-[12px] font-bold">Simone choisit</span>
-                </button>
-                {options.kits.map((k) => {
-                  const on = kit?.id === k.id;
-                  const photo = firstPhoto === PLACEHOLDER ? (options.media.find((m) => !m.video)?.url ?? PLACEHOLDER) : firstPhoto;
-                  const props = buildSlideProps({ media_id: "00000000-0000-4000-8000-000000000000", texts: [], elements: k.elements.map((e) => placeElement(e)) }, { template: "doux", imageUrl: photo, brand: options.brand });
-                  return (
-                    <button
-                      key={k.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      title={k.name}
-                      onClick={() => {
-                        setKit(k);
-                        if (example) URL.revokeObjectURL(example.preview);
-                        setExample(null);
-                      }}
-                      className={`relative overflow-hidden rounded-[14px] transition-shadow ${on ? "ring-2 ring-violet ring-offset-2" : "hover:ring-2 hover:ring-violet/40"}`}
-                    >
-                      <SlidePreview props={props} />
-                      <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 pt-4 pb-1.5 text-left text-[11px] font-bold text-white">{k.name}</span>
-                      {on && <Tick />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {step === "inspiration" && !video && options && (
-            <div className="flex flex-col gap-2 rounded-[16px] bg-soft p-3">
-              <span className="text-[13px] font-bold">{options.kits.length ? "Ou une nouvelle inspiration" : "Montre un post qui te plaît"}</span>
-              {example ? (
-                <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={example.preview} alt="" className="h-20 w-16 rounded-lg object-cover" />
-                  <span className="min-w-0 flex-1 text-[13px] leading-snug text-muted">Simone en tire tes composants (titre, étiquette, liste…), les garde dans ta banque et les pose sur tes photos ({CREDIT_PRICES.textLayer} crédits).</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      URL.revokeObjectURL(example.preview);
-                      setExample(null);
-                    }}
-                    aria-label="Retirer l’exemple"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-white hover:text-ink"
-                  >
-                    <XIcon size={15} />
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <button type="button" onClick={() => exampleRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-[14px] font-bold text-violet hover:bg-violet-soft">
-                    <UploadIcon size={17} />
-                    Envoyer une capture d’un post
-                  </button>
-                  <span className="text-[12px] text-muted">Une capture d’écran d’un carrousel ou d’une affiche que tu aimes : Simone en tire des composants réutilisables, à tes couleurs.</span>
-                </>
-              )}
-              <input
-                ref={exampleRef}
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!file || !file.type.startsWith("image/") || file.size > MAX_FILE_BYTES) return;
-                  if (example) URL.revokeObjectURL(example.preview);
-                  setExample({ id: `example-${file.name}-${file.size}`, file, preview: URL.createObjectURL(file), video: false });
-                  setKit(null);
-                }}
-              />
-            </div>
-          )}
-
-          {error && (
-            <p role="alert" className="text-[13px] font-semibold text-danger">
-              {error}
-            </p>
-          )}
-        </div>
-
-        {step !== "format" && (
-          <footer className="flex flex-col-reverse gap-2 border-t border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-6">
-            {last ? (
-              <>
-                <button type="button" disabled={pending} onClick={() => submit(false)} className="btn btn-secondary">
-                  Garder comme idée
-                </button>
-                <button type="button" disabled={pending || !day} onClick={() => submit(true)} className="btn btn-primary">
-                  <Orb size={18} still />
-                  {pending ? "Un instant…" : "Confier à Simone"}
-                </button>
-              </>
-            ) : (
-              <>
-                {(step === "files" || (step === "idea" && !intention.trim())) && (
-                  <button type="button" onClick={() => go(index + 1)} className="btn btn-secondary">
-                    {step === "files" && !count ? "Je n’ai rien pour l’instant" : "Passer"}
-                  </button>
-                )}
-                <button type="button" disabled={!canNext} onClick={() => go(index + 1)} className="btn btn-primary">
-                  Continuer
-                </button>
-              </>
-            )}
-          </footer>
+        {work ? (
+          <Working work={work} titleId={titleId} onClose={onClose} />
+        ) : (
+          <Create date={date} options={options} titleId={titleId} onClose={onClose} onStarted={setWork} />
         )}
       </div>
     </div>
   );
 }
 
-function Tick() {
+function Create({
+  date,
+  options,
+  titleId,
+  onClose,
+  onStarted,
+}: {
+  date?: string;
+  options: NewPostOptions | null;
+  titleId: string;
+  onClose: () => void;
+  onStarted: (work: Work) => void;
+}) {
+  const router = useRouter();
+  const openFauve = useFauveDrawer();
+  const handOff = useContext(NewPostHandOffContext);
+  const [error, setError] = useState<string | null>(null);
+  const [locked, setLocked] = useState<"subscribe" | "credits" | null>(null);
+  const uploads = useChatUploads(options?.studioId ?? null, setError);
+  /** Picked, in order: « m:<media id> » from her library, « u:<draft id> » from her phone. */
+  const [order, setOrder] = useState<string[]>([]);
+  const [idea, setIdea] = useState("");
+  const [format, setFormat] = useState<PostKind | null>(null);
+  const [when, setWhen] = useState<When | null>(null);
+  const [other, setOther] = useState("");
+  const [sheet, setSheet] = useState<"format" | "date" | "nothing" | null>(null);
+  const [all, setAll] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [pending, start] = useTransition();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Escape closes a small sheet before the whole screen.
+  useEffect(() => {
+    if (!sheet) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      setSheet(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [sheet]);
+
+  // The previews of her new files are freed when the screen goes.
+  const filesRef = useRef<DraftFile[]>([]);
+  useEffect(() => {
+    filesRef.current = uploads.files;
+  }, [uploads.files]);
+  useEffect(() => () => filesRef.current.forEach((f) => URL.revokeObjectURL(f.preview)), []);
+
+  const library = options?.media ?? [];
+  const drafts = new Map(uploads.files.map((f) => [f.id, f]));
+  const videoOf = new Map(library.map((m) => [m.id, m.video]));
+  const picked = order.filter((k) => (k.startsWith("u:") ? drafts.has(k.slice(2)) : videoOf.has(k.slice(2))));
+  const counts: Picked = picked.reduce(
+    (c, k) => ((k.startsWith("u:") ? drafts.get(k.slice(2))?.video : videoOf.get(k.slice(2))) ? { ...c, videos: c.videos + 1 } : { ...c, photos: c.photos + 1 }),
+    { videos: 0, photos: 0 },
+  );
+  const advised = advisedFormat(counts);
+  const kind = format && !formatBlocked(format, counts) ? format : advised;
+  const meta = FORMATS.find((f) => f.kind === kind)!;
+  const chosenWhen = when ?? defaultWhen(options, date);
+  const sending = picked.some((k) => k.startsWith("u:") && drafts.get(k.slice(2))?.status === "uploading");
+  const broken = picked.some((k) => k.startsWith("u:") && drafts.get(k.slice(2))?.status === "error");
+  const ready = picked.length > 0 && Boolean(chosenWhen) && !sending && !broken;
+
+  const toggle = (key: string) => setOrder((o) => (o.includes(key) ? o.filter((k) => k !== key) : picked.length >= MAX_FILES ? o : [...o, key]));
+  const add = (list: FileList | File[]) => {
+    setError(null);
+    // New files are picked too, as long as there is room (10 at most).
+    const ids = uploads.addFiles(list).slice(0, Math.max(0, MAX_FILES - picked.length));
+    if (ids.length) setOrder((o) => [...o, ...ids.map((id) => `u:${id}`)]);
+  };
+  const remove = (id: string) => {
+    uploads.removeFile(id);
+    setOrder((o) => o.filter((k) => k !== `u:${id}`));
+  };
+
+  const launch = () =>
+    start(async () => {
+      if (!chosenWhen || !picked.length) return;
+      setError(null);
+      setLocked(null);
+      const items = picked.flatMap((k): ({ media: string } | { upload: { path: string; mime: string; size: number } })[] => {
+        if (k.startsWith("m:")) return [{ media: k.slice(2) }];
+        const f = drafts.get(k.slice(2));
+        return f?.path ? [{ upload: { path: f.path, mime: f.file.type, size: f.file.size } }] : [];
+      });
+      const res = await launchCreation({ kind, date: chosenWhen.date, time: chosenWhen.time, idea, items }).catch(
+        (): LaunchResult => ({ ok: false, error: "Ça n’est pas parti. Réessaie dans un instant." }),
+      );
+      if (!res.ok) {
+        setError(res.error);
+        setLocked(res.locked ?? null);
+        if (res.postId) router.refresh();
+        return;
+      }
+      router.refresh();
+      if (res.montage) {
+        nudgeWork();
+        onStarted({ postId: res.postId, title: res.title, ...res.montage, picked: counts });
+        return;
+      }
+      // A carousel, a photo or a story: Simone writes the texts, in the chat.
+      const text = [
+        `Nouvelle publication : ${meta.phrase} pour ${chosenWhen.full.charAt(0).toLowerCase()}${chosenWhen.full.slice(1)}.`,
+        idea.trim() ? `L’idée : ${idea.trim()}` : "",
+        `${counts.videos ? "Mes photos et vidéos" : "Mes photos"} (media_id, dans l’ordre) : ${res.mediaIds.join(", ")}.`,
+        "Choisis toi-même la mise en page et les textes, et lance-toi : je regarde le résultat après.",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      if (handOff) handOff({ postId: res.postId, text, files: [] });
+      else openFauve({ postId: res.postId, title: res.title, start: { text, files: [] } });
+      onClose();
+    });
+
+  const shownLibrary = all ? library : library.slice(0, Math.max(0, FIRST_TILES - uploads.files.length));
+  const ideas = (options?.ideas[kind] ?? []).slice(0, 4);
+  const linkish = "fauve-press text-violet font-extrabold underline decoration-2 underline-offset-4";
+
   return (
-    <span className="absolute top-2.5 right-2.5 flex size-5 items-center justify-center rounded-full bg-violet text-white">
-      <CheckIcon size={12} />
-    </span>
+    <>
+      <header className="flex shrink-0 items-center justify-between px-2 pt-2.5 pb-1">
+        <button type="button" onClick={onClose} aria-label="Fermer" className="flex size-11 items-center justify-center rounded-full text-ink hover:bg-soft">
+          <XIcon size={22} />
+        </button>
+        <h2 id={titleId} className="text-[16px] font-bold">
+          Nouvelle publication
+        </h2>
+        <span className="size-11" aria-hidden />
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-[22px] overflow-y-auto px-5 pt-1.5 pb-6">
+        <div className="flex items-end gap-2.5">
+          <Mascot size={46} still />
+          <p className="rounded-[20px_20px_20px_6px] bg-[#F3EEF8] px-[15px] py-3 text-[15.5px] leading-[1.4] font-medium">
+            Donne-moi tes photos ou vidéos, je m’occupe de tout le reste.
+          </p>
+        </div>
+
+        <section
+          aria-labelledby={`${titleId}-files`}
+          className={`flex flex-col gap-2.5 rounded-[18px] transition-colors ${dragging ? "bg-violet-soft outline-2 outline-offset-4 outline-violet outline-dashed" : ""}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            add(e.dataTransfer.files);
+          }}
+        >
+          <div className="flex items-baseline justify-between gap-2">
+            <h3 id={`${titleId}-files`} className="text-[17px] font-extrabold tracking-[-0.01em]">
+              Tes photos et vidéos
+            </h3>
+            <span className="text-[13px] font-semibold text-muted">
+              {picked.length === 0 ? "Touche pour choisir" : picked.length === 1 ? "1 choisie" : `${picked.length} choisies`}
+            </span>
+          </div>
+          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            <li>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={!options}
+                className="fauve-press flex aspect-square w-full flex-col items-center justify-center gap-1.5 rounded-[16px] border-[1.5px] border-dashed border-[#CFC6F7] bg-[#F6F2FF] p-1.5 text-violet disabled:opacity-60"
+              >
+                <PlusIcon size={24} />
+                <span className="text-center text-[12.5px] leading-tight font-bold">
+                  <span className="sm:hidden">Depuis ton téléphone</span>
+                  <span className="max-sm:hidden">Depuis ton ordinateur</span>
+                </span>
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                accept="image/*,video/*"
+                className="sr-only"
+                onChange={(e) => {
+                  if (e.target.files) add(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </li>
+            {uploads.files.map((f) => {
+              const at = picked.indexOf(`u:${f.id}`);
+              return (
+                <li key={f.id} className="relative">
+                  <Tile
+                    on={at >= 0}
+                    order={at + 1}
+                    label={`${f.video ? "Vidéo" : "Photo"} envoyée depuis ton appareil`}
+                    onClick={() => toggle(`u:${f.id}`)}
+                    media={f.video ? <video src={f.preview} muted playsInline preload="metadata" className="size-full object-cover" /> : <Img src={f.preview} />}
+                    badge={f.video ? <PlayIcon size={10} /> : null}
+                  >
+                    {f.status !== "ready" && (
+                      <span className={`absolute inset-0 flex items-center justify-center text-[12px] font-bold text-white ${f.status === "error" ? "bg-danger/70" : "bg-ink/45"}`}>
+                        {f.status === "error" ? "Pas envoyée" : <Spinner />}
+                      </span>
+                    )}
+                  </Tile>
+                  <button
+                    type="button"
+                    onClick={() => remove(f.id)}
+                    aria-label="Retirer ce fichier"
+                    className="absolute top-[7px] left-[7px] flex size-6 items-center justify-center rounded-full bg-ink/60 text-white hover:bg-ink/80"
+                  >
+                    <XIcon size={12} />
+                  </button>
+                </li>
+              );
+            })}
+            {options === null
+              ? Array.from({ length: 5 }, (_, i) => <li key={i} className="aspect-square animate-pulse rounded-[16px] bg-soft" aria-hidden />)
+              : shownLibrary.map((m) => {
+                  const at = picked.indexOf(`m:${m.id}`);
+                  return (
+                    <li key={m.id}>
+                      <Tile
+                        on={at >= 0}
+                        order={at + 1}
+                        label={`${m.video ? "Vidéo" : "Photo"} du ${new Date(m.at).toLocaleDateString("fr-FR")}`}
+                        onClick={() => toggle(`m:${m.id}`)}
+                        media={m.video ? <video src={`${m.url}#t=0.5`} muted playsInline preload="metadata" className="size-full object-cover" /> : <Img src={m.url} />}
+                        badge={
+                          m.video ? (
+                            <>
+                              <PlayIcon size={10} />
+                              {m.duration ? clock(m.duration) : null}
+                            </>
+                          ) : null
+                        }
+                      />
+                    </li>
+                  );
+                })}
+          </ul>
+          {!all && library.length > shownLibrary.length && (
+            <button type="button" onClick={() => setAll(true)} className="self-start text-[14px] font-bold text-violet">
+              Voir toute ta médiathèque ({library.length})
+            </button>
+          )}
+        </section>
+
+        <section className="flex flex-col gap-2.5">
+          <label htmlFor={`${titleId}-idea`} className="text-[17px] font-extrabold tracking-[-0.01em]">
+            De quoi ça parle ? <span className="text-[13px] font-semibold tracking-normal text-muted">facultatif</span>
+          </label>
+          <input
+            id={`${titleId}-idea`}
+            type="text"
+            value={idea}
+            maxLength={300}
+            onChange={(e) => setIdea(e.target.value)}
+            placeholder="Une nouveauté, une offre…"
+            className="h-[50px] w-full rounded-[14px] border-[1.5px] border-line bg-white px-3.5 text-[15.5px] outline-none focus:border-violet"
+          />
+          {ideas.length > 0 && (
+            <div className="flex flex-wrap gap-1.5" aria-label="Idées">
+              {ideas.map((it) => (
+                <button key={it} type="button" onClick={() => setIdea(it)} className="fauve-press h-[34px] rounded-full border border-line bg-soft px-[13px] text-[13.5px] font-semibold hover:border-violet/40">
+                  {it}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {error && (
+          <div role="alert" className="flex flex-col gap-2 rounded-[16px] bg-peach px-4 py-3 text-[14px] leading-snug text-peach-ink">
+            <p className="font-semibold">{error}</p>
+            {locked && (
+              <Link href="/abonnement" onClick={onClose} className="self-start font-bold underline underline-offset-2">
+                {locked === "subscribe" ? "Démarrer mon essai" : "Voir mon abonnement"}
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+
+      <footer className="flex shrink-0 flex-col items-stretch gap-1 border-t border-line bg-white px-5 pt-3 pb-[max(1.1rem,env(safe-area-inset-bottom))]">
+        {/* What will happen, right above the button that does it; each part changes in a tap. */}
+        {picked.length > 0 && chosenWhen && (
+          <p aria-live="polite" className="fauve-enter flex items-start gap-2 pb-2 text-[17px] leading-[1.45] font-semibold">
+            <Mascot size={28} mood="happy" still />
+            <span>
+              J’en fais{" "}
+              <button type="button" onClick={() => setSheet("format")} className={linkish}>
+                {meta.phrase}
+              </button>
+              , publié{meta.feminine ? "e" : ""}{" "}
+              <button type="button" onClick={() => setSheet("date")} className={linkish}>
+                {chosenWhen.short}
+              </button>
+              .
+            </span>
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={launch}
+          disabled={!ready || pending}
+          className="btn btn-primary h-[54px] text-[17px] font-extrabold shadow-[0_8px_22px_rgba(91,63,217,0.28)] disabled:bg-line disabled:text-muted disabled:shadow-none"
+        >
+          {pending ? <Spinner /> : null}
+          {pending ? "C’est parti…" : "C’est parti"}
+        </button>
+        {!picked.length ? (
+          <>
+            <p className="text-center text-[13px] text-muted">Choisis au moins une photo ou une vidéo.</p>
+            <button type="button" onClick={() => setSheet("nothing")} className="h-10 text-[14.5px] font-bold text-violet">
+              Je n’ai rien sous la main
+            </button>
+          </>
+        ) : sending ? (
+          <p className="pt-1 text-center text-[13px] text-muted">J’envoie tes fichiers…</p>
+        ) : broken ? (
+          <p className="pt-1 text-center text-[13px] text-danger">Un fichier n’est pas passé : retire-le ou ajoute-le à nouveau.</p>
+        ) : (
+          <p className="pt-1 text-center text-[12.5px] leading-snug text-muted">
+            {kind === "reel" ? "Le style, les textes et la musique, je les choisis." : "La mise en page et les textes, je les choisis."} Tu pourras tout changer après.
+          </p>
+        )}
+      </footer>
+
+      {sheet === "format" && (
+        <Sheet label="Le format" onClose={() => setSheet(null)}>
+          <SheetHead title="Quel format ?" hint={formatWhy(counts)} onClose={() => setSheet(null)} />
+          <div role="radiogroup" aria-label="Format" className="flex flex-col gap-2">
+            {FORMATS.map((f) => {
+              const blocked = formatBlocked(f.kind, counts);
+              return (
+                <Choice
+                  key={f.kind}
+                  on={f.kind === kind}
+                  disabled={Boolean(blocked)}
+                  title={f.title}
+                  hint={blocked ?? f.hint}
+                  badge={f.kind === advised ? "Conseillé" : null}
+                  onClick={() => {
+                    setFormat(f.kind);
+                    setSheet(null);
+                  }}
+                />
+              );
+            })}
+          </div>
+        </Sheet>
+      )}
+
+      {sheet === "date" && options && (
+        <Sheet label="La date" onClose={() => setSheet(null)}>
+          <SheetHead title="Quand le publier ?" hint="Tes prochains jours libres, à ton heure habituelle." onClose={() => setSheet(null)} />
+          <div role="radiogroup" aria-label="Date" className="flex flex-col gap-2">
+            {options.slots.map((s, i) => (
+              <Choice
+                key={s.iso}
+                on={chosenWhen?.date === s.date && chosenWhen.time === s.time}
+                title={s.full}
+                hint={i === 0 ? "Le prochain jour libre" : null}
+                onClick={() => {
+                  setWhen({ date: s.date, time: s.time, short: s.short, full: s.full });
+                  setSheet(null);
+                }}
+              />
+            ))}
+            <label className="flex flex-col gap-1.5 rounded-[18px] border-[1.5px] border-dashed border-line px-3.5 py-3">
+              <span className="text-[15px] font-bold text-violet">Une autre date</span>
+              <input
+                type="datetime-local"
+                value={other}
+                min={options.nowLocal}
+                onChange={(e) => setOther(e.target.value)}
+                className="h-11 rounded-[12px] border border-line bg-white px-3 text-[15px] outline-none focus:border-violet"
+              />
+            </label>
+            {other && (
+              <button
+                type="button"
+                disabled={other <= options.nowLocal}
+                onClick={() => {
+                  setWhen(whenAt(other.slice(0, 16), options.nowLocal));
+                  setSheet(null);
+                }}
+                className="btn btn-primary h-12 disabled:bg-line disabled:text-muted"
+              >
+                {other <= options.nowLocal ? "Choisis un moment à venir" : `Le publier ${whenAt(other.slice(0, 16), options.nowLocal).short}`}
+              </button>
+            )}
+          </div>
+        </Sheet>
+      )}
+
+      {sheet === "nothing" && (
+        <Sheet label="Des idées à filmer" onClose={() => setSheet(null)}>
+          <div className="flex items-center gap-3">
+            <Mascot size={52} mood="happy" still />
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <h3 className="text-[20px] font-extrabold tracking-[-0.01em]">Pas de souci</h3>
+              <p className="text-[14px] leading-[1.4] text-muted">3 idées faciles pour cette semaine. 10 secondes de vidéo suffisent.</p>
+            </div>
+          </div>
+          <ol className="flex flex-col gap-2">
+            {(options?.film ?? []).map((f, i) => (
+              <li key={f.idea} className="flex gap-3 rounded-[18px] bg-soft px-3.5 py-3">
+                <span className="w-[18px] font-serif text-[26px] leading-none text-coral italic" aria-hidden>
+                  {i + 1}
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[15px] font-extrabold">{f.idea}</span>
+                  <span className="text-[13.5px] text-muted">{f.how}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <button type="button" onClick={onClose} className="btn btn-primary h-[52px] text-[16px] font-extrabold">
+            Je filme et je reviens
+          </button>
+          <Link href="/fauve" onClick={onClose} className="self-center py-2 text-[14px] font-bold text-violet">
+            Ou demande une idée à Simone
+          </Link>
+        </Sheet>
+      )}
+    </>
   );
 }
 
-/** The button that opens the panel (calendar header). */
-export function NewPostButton({ timezone, className = "btn btn-primary" }: { timezone: string; className?: string }) {
-  const [open, setOpen] = useState(false);
+/** « Je m'en occupe »: the Reel in the making, step by step, until it is ready. */
+function Working({ work, titleId, onClose }: { work: Work; titleId: string; onClose: () => void }) {
+  const router = useRouter();
+  const openFauve = useFauveDrawer();
+  const handOff = useContext(NewPostHandOffContext);
+  const steps = creationSteps(work.effort, work.picked, work.music);
+  const [progress, setProgress] = useState<CreationProgress | null>(null);
+  /** The furthest step reached: a correction renders again, the list never steps back. */
+  const [reached, setReached] = useState(0);
+  const done = progress?.done ?? false;
+  const failed = progress?.failed ?? false;
+
+  useEffect(() => {
+    if (done || failed) return;
+    let live = true;
+    const phases = creationSteps(work.effort, work.picked, work.music).map((s) => s.phase);
+    const tick = () =>
+      creationProgress(work.quoteId, work.postId)
+        .then((p) => {
+          if (!live || !p) return;
+          setProgress(p);
+          setReached((r) => Math.max(r, phases.indexOf(p.phase)));
+          if (p.done) router.refresh();
+        })
+        .catch(() => {});
+    void tick();
+    const timer = setInterval(tick, 4000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [done, failed, work, router]);
+
+  const retry = () => {
+    const text = "Le montage de ce Reel n’a pas abouti. Tu peux réessayer ?";
+    if (handOff) handOff({ postId: work.postId, text, files: [] });
+    else openFauve({ postId: work.postId, title: work.title, start: { text, files: [] } });
+    onClose();
+  };
+
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>
-        <PlusIcon size={18} />
-        Nouvelle publication
-      </button>
-      {open && <NewPostSheet timezone={timezone} onClose={() => setOpen(false)} />}
+      <header className="flex shrink-0 justify-end px-2 pt-2.5">
+        <button type="button" onClick={onClose} aria-label="Fermer" className="flex size-11 items-center justify-center rounded-full text-ink hover:bg-soft">
+          <XIcon size={22} />
+        </button>
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col items-center gap-[18px] overflow-y-auto px-6 pt-4 pb-4 text-center">
+        <Mascot size={128} mood={failed ? "sad" : done ? "happy" : "thinking"} />
+        <div aria-live="polite" className="flex flex-col items-center gap-1.5">
+          <h2 id={titleId} className="text-[32px] leading-[1.1] font-extrabold tracking-[-0.02em]">
+            {failed ? (
+              <>
+                Ça n’a pas <span className="accent text-[38px]">marché</span>
+              </>
+            ) : done ? (
+              <>
+                C’est <span className="accent text-[38px]">prêt</span> !
+              </>
+            ) : (
+              <>
+                Je m’en <span className="accent text-[38px]">occupe</span>
+              </>
+            )}
+          </h2>
+          <p className="text-[16px] leading-[1.45] text-muted">
+            {failed
+              ? "Aucun crédit n’a été débité. Simone peut réessayer."
+              : done
+                ? progress?.seconds
+                  ? `Ton Reel de ${progress.seconds} secondes t’attend.`
+                  : "Ton Reel t’attend."
+                : `Ton Reel sera prêt dans ${work.minutes} minutes environ.`}
+          </p>
+        </div>
+        <ol aria-label="Ce que fait Simone" className="flex w-full flex-col rounded-[22px] border border-line bg-white px-[18px] py-2 text-left">
+          {steps.map((s, i) => {
+            const state = done || i < reached ? "done" : i === reached && !failed ? "now" : "later";
+            return (
+              <li key={s.phase} className="flex min-h-12 items-center gap-3">
+                {state === "done" ? (
+                  <span className="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-violet text-white">
+                    <CheckIcon size={14} />
+                  </span>
+                ) : state === "now" ? (
+                  <span className="flex size-[26px] shrink-0 items-center justify-center text-violet">
+                    <Spinner />
+                  </span>
+                ) : (
+                  <span className="size-[26px] shrink-0 rounded-full border-2 border-line" />
+                )}
+                <span className={`text-[15.5px] ${state === "now" ? "font-extrabold" : state === "done" ? "font-semibold" : "font-medium text-muted"}`}>{s.label}</span>
+              </li>
+            );
+          })}
+        </ol>
+        {!done && !failed && (
+          <div className="flex w-full items-start gap-3 rounded-[20px] bg-soft px-4 py-3.5 text-left">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-success-soft text-success">
+              <CheckIcon size={18} />
+            </span>
+            <p className="text-[14.5px] leading-[1.45]">
+              <strong className="font-extrabold">Tu peux fermer l’app.</strong> Je te préviens dès que c’est prêt.
+            </p>
+          </div>
+        )}
+      </div>
+      <footer className="flex shrink-0 flex-col gap-1.5 px-5 pt-3 pb-[max(1.4rem,env(safe-area-inset-bottom))]">
+        {done ? (
+          <Link href={`/publications/${work.postId}`} onClick={onClose} className="fauve-enter btn btn-primary h-[54px] text-[17px] font-extrabold shadow-[0_8px_22px_rgba(91,63,217,0.28)]">
+            Voir mon Reel
+          </Link>
+        ) : failed ? (
+          <button type="button" onClick={retry} className="btn btn-primary h-[54px] text-[17px] font-extrabold">
+            Demander à Simone de réessayer
+          </button>
+        ) : (
+          <button type="button" onClick={onClose} className="btn btn-secondary h-[54px] text-[16.5px] font-extrabold">
+            OK, préviens-moi
+          </button>
+        )}
+      </footer>
     </>
+  );
+}
+
+/** A photo or video to pick: its number in the order once picked. */
+function Tile({ on, order, label, onClick, media, badge, children }: { on: boolean; order: number; label: string; onClick: () => void; media: ReactNode; badge: ReactNode; children?: ReactNode }) {
+  return (
+    <button type="button" aria-pressed={on} aria-label={label} onClick={onClick} className="relative block aspect-square w-full overflow-hidden rounded-[16px] bg-line">
+      {media}
+      {badge && (
+        <span className="absolute bottom-[7px] left-[7px] flex items-center gap-[3px] rounded-full bg-ink/60 py-[3px] pr-[7px] pl-[5px] text-[11.5px] font-bold text-white">{badge}</span>
+      )}
+      {on && <span aria-hidden className="pointer-events-none absolute inset-0 rounded-[16px] ring-3 ring-violet ring-inset" />}
+      <span
+        aria-hidden
+        className={`absolute top-[7px] right-[7px] flex size-[26px] items-center justify-center rounded-full border-2 border-white text-[13px] font-extrabold ${on ? "fauve-pop bg-violet text-white" : "bg-ink/20"}`}
+      >
+        {on ? order : ""}
+      </span>
+      {children}
+    </button>
+  );
+}
+
+function Img({ src }: { src: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" loading="lazy" className="size-full object-cover" />;
+}
+
+function Spinner() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5 animate-spin motion-reduce:animate-none" aria-hidden>
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A small sheet over the screen (format, date, ideas to film). */
+function Sheet({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <>
+      <button type="button" aria-label="Fermer" onClick={onClose} className="fauve-fade absolute inset-0 z-10 bg-ink/40" />
+      <div
+        role="dialog"
+        aria-label={label}
+        className="fauve-enter absolute inset-x-0 bottom-0 z-20 flex max-h-[88%] flex-col gap-3.5 overflow-y-auto rounded-t-[26px] bg-white px-5 pt-2.5 pb-[max(1.6rem,env(safe-area-inset-bottom))] shadow-[0_-10px_40px_rgba(28,21,48,0.14)] [--fauve-y:40px]"
+      >
+        <span aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-line" />
+        {children}
+      </div>
+    </>
+  );
+}
+
+function SheetHead({ title, hint, onClose }: { title: string; hint: string; onClose: () => void }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <h3 className="text-[20px] font-extrabold tracking-[-0.01em]">{title}</h3>
+        <p className="text-[14px] leading-[1.45] text-muted">{hint}</p>
+      </div>
+      <button type="button" onClick={onClose} aria-label="Fermer" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F3F1F5] text-ink">
+        <XIcon size={16} />
+      </button>
+    </div>
+  );
+}
+
+function Choice({ on, disabled, title, hint, badge, onClick }: { on: boolean; disabled?: boolean; title: string; hint: string | null; badge?: string | null; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={on}
+      disabled={disabled}
+      onClick={onClick}
+      className={`fauve-press flex items-center gap-3 rounded-[18px] border-[1.5px] px-3.5 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${on ? "border-violet bg-[#F6F2FF]" : "border-line bg-white hover:border-violet/40"}`}
+    >
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex items-center gap-2 text-[16px] font-extrabold">
+          {title}
+          {badge && <span className="rounded-full bg-peach px-2 py-0.5 text-[11.5px] font-bold text-peach-ink">{badge}</span>}
+        </span>
+        {hint && <span className="text-[13.5px] text-muted">{hint}</span>}
+      </span>
+      <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border-2 ${on ? "border-violet" : "border-[#CFC6F7]"}`}>
+        {on && <span className="size-3 rounded-full bg-violet" />}
+      </span>
+    </button>
   );
 }
