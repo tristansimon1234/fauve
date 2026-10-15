@@ -1,6 +1,6 @@
 import "server-only";
 import { Sandbox } from "@vercel/sandbox";
-import { RENDER_FONTS, type ReelProps } from "@fauve/agent";
+import { MIX_CEILING, mixFilter, mixGains, RENDER_FONTS, speechGain, type ReelProps } from "@fauve/agent";
 import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
 
 // The render worker: a persistent Vercel Sandbox (Firecracker microVM) holding a
@@ -273,12 +273,24 @@ export async function videoFramesInSandbox(id: string, url: string, times: numbe
   }
 }
 
+/** Bash function `loud <file>`: the integrated loudness (LUFS, EBU R128) of a file's sound, empty when it has none. */
+const LOUD = `loud() { ${ROOT}/ffmpeg -hide_banner -nostats -i "$1" -vn -af ebur128 -f null - 2>&1 | sed -n '/Summary:/,$p' | awk '/ I:/{print $2; exit}'; }`;
+
+/** A value printed as `name=value` by a sandbox command, null when missing. */
+function printed(stdout: string, name: string): number | null {
+  const value = Number(new RegExp(`\\b${name}=(-?[0-9.]+)`).exec(stdout)?.[1] ?? Number.NaN);
+  return Number.isFinite(value) ? value : null;
+}
+
 /**
- * A rendered video with its soundtrack: the picture copied as it is, the music
- * in AAC under the video's own sound (ducked while someone speaks), faded out
- * over the last 0.8 s and cut at the end of the video.
+ * A rendered video with its soundtrack: the picture copied as it is, the music in
+ * AAC under the video's own sound, faded out over the last 0.8 s and cut at the
+ * end of the video. Both are measured first: what is said (her voice, Simone's,
+ * someone in a clip) is brought to the level of a voice, the music lies under it
+ * and ducks while it speaks (mixGains: well under a voice over the whole Reel,
+ * at its level around a few spoken shots). A video without sound just gets the music.
  */
-export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Array): Promise<Buffer> {
+export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Array, options: { voiceOver?: boolean } = {}): Promise<Buffer> {
   const sandbox = await renderSandbox();
   const dir = `${ROOT}/jobs/${id}-mux`;
   try {
@@ -287,20 +299,49 @@ export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Arr
       { path: `${dir}/in.mp4`, content: mp4 },
       { path: `${dir}/music.mp3`, content: audio },
     ]);
-    // The video's own sound (her voice, someone speaking in a clip) stays on top: the
-    // music ducks under it (sidechain), then fades out on the last 0.8 s. A video
-    // without sound (older engine) just gets the music.
+    const probe = await bash(
+      sandbox,
+      `cd "$1" && ${LOUD} && d=$(${ROOT}/ffmpeg -i in.mp4 2>&1 | sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' | awk -F: '{print $1*3600+$2*60+$3}'); echo "duration=$d speech=$(loud in.mp4) music=$(loud music.mp3)"`,
+      [dir],
+    );
+    const measured = await probe.stdout();
+    const gains = mixGains({ speech: printed(measured, "speech"), music: printed(measured, "music") }, Boolean(options.voiceOver));
+    console.info("mix", id, measured.trim(), gains);
     await bash(
       sandbox,
-      `cd "$1" && info=$(${ROOT}/ffmpeg -i in.mp4 2>&1 || true) && d=$(printf '%s' "$info" | sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' | awk -F: '{print $1*3600+$2*60+$3}') && st=$(awk -v d="$d" 'BEGIN{s=d-0.8; if(s<0)s=0; print s}') && ` +
-        `if printf '%s' "$info" | grep -q 'Audio:'; then ` +
-        `${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 -filter_complex "[0:a]aformat=sample_rates=44100:channel_layouts=stereo,asplit=2[key][own];[1:a]aformat=sample_rates=44100:channel_layouts=stereo[m];[m][key]sidechaincompress=threshold=0.02:ratio=12:attack=15:release=450[ducked];[ducked][own]amix=inputs=2:duration=first:normalize=0,afade=t=out:st=$st:d=0.8[a]" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4; ` +
-        `else ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -af "afade=t=out:st=$st:d=0.8" -shortest -movflags +faststart out.mp4; fi`,
-      [dir],
+      `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 -filter_complex "$2" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4`,
+      [dir, mixFilter(gains, printed(measured, "duration") ? printed(measured, "duration")! - 0.8 : null)],
     );
     const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
     if (!out?.length) throw new Error("mux produced no file");
     return out;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/**
+ * A voice brought to the level of a voice in a Reel (SPEECH_LUFS, a fixed gain,
+ * peaks held under -1 dBFS), as MP3 of the same length: ElevenLabs' voices come
+ * out 12 dB apart, and the live preview plays the file as it is. Unchanged when silent.
+ */
+export async function levelSpeechInSandbox(id: string, mp3: Buffer): Promise<{ mp3: Buffer; lufs: number | null }> {
+  const sandbox = await renderSandbox();
+  const dir = `${ROOT}/jobs/${id}-level`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await sandbox.writeFiles([{ path: `${dir}/in.mp3`, content: mp3 }]);
+    const lufs = printed(await (await bash(sandbox, `cd "$1" && ${LOUD} && echo "speech=$(loud in.mp3)"`, [dir])).stdout(), "speech");
+    const gain = speechGain(lufs);
+    if (gain === null || Math.abs(gain) < 0.5) return { mp3, lufs };
+    await bash(
+      sandbox,
+      `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp3 -af "volume=$2dB,alimiter=limit=${MIX_CEILING}:level=false" -c:a libmp3lame -b:a 160k out.mp3`,
+      [dir, String(gain)],
+    );
+    const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp3` });
+    if (!out?.length) throw new Error("leveling produced no file");
+    return { mp3: out, lufs };
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }

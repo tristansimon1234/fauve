@@ -1201,6 +1201,73 @@ test("voice: Scribe words, phrases on the Reel's clock, subtitles and speech", a
   assert.equal(plain.voice, undefined);
 });
 
+test("mix: what is said at the level of a voice, the music well under it", async () => {
+  const { mixGains, mixFilter, previewMusic, speechWindows, speechGain, SPEECH_LUFS } = await import("./mix.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  // A quiet ElevenLabs voice (-30 LUFS) over music as composed (-15): the voice comes up, the music goes under it.
+  const voiceOver = mixGains({ speech: -30, music: -15.7 }, true);
+  assert.equal(voiceOver.kind, "voice_over");
+  assert.equal(voiceOver.speechGain, 14);
+  assert.equal(voiceOver.musicGain, -7.3);
+  assert.ok(voiceOver.duck);
+  // Someone speaks in a shot: the music keeps its level and ducks harder under them.
+  const inClips = mixGains({ speech: -21, music: -15 }, false);
+  assert.equal(inClips.kind, "speech_in_clips");
+  assert.equal(inClips.musicGain, -1);
+  assert.ok(inClips.duck!.ratio > voiceOver.duck!.ratio);
+  // Nothing said (silence measures -70, or no sound track): the music alone, never ducked.
+  for (const speech of [-70, null]) {
+    const alone = mixGains({ speech, music: -15.3 }, true);
+    assert.equal(alone.kind, "music");
+    assert.equal(alone.duck, null);
+    assert.equal(alone.speechGain, 0);
+  }
+  // A whisper is not blown up, a shout is brought down.
+  assert.equal(speechGain(-44), 20);
+  assert.equal(speechGain(-4), SPEECH_LUFS + 4);
+  assert.equal(speechGain(-60), null);
+  // The filter graph: ducked under the leveled voice, peaks held, faded at the end; the music alone without a key.
+  const graph = mixFilter(voiceOver, 12.18);
+  assert.match(graph, /\[0:a\][^;]*volume=14dB,asplit=2\[key\]\[own\]/);
+  assert.match(graph, /\[m\]\[key\]sidechaincompress=threshold=0\.03:ratio=3/);
+  assert.match(graph, /alimiter=limit=0\.891:level=false,afade=t=out:st=12\.18:d=0\.8\[a\]$/);
+  assert.doesNotMatch(mixFilter(mixGains({ speech: null, music: -15 }, false), 10), /\[0:a\]/);
+  assert.doesNotMatch(mixFilter(voiceOver, null), /afade/);
+
+  // Pauses under half a second keep the music down.
+  assert.deepEqual(speechWindows([{ from: 30, to: 40 }, { from: 9, to: 20 }, { from: 22, to: 28 }], 15), [[9, 40]]);
+  assert.deepEqual(speechWindows([{ from: 9, to: 20 }, { from: 60, to: 70 }], 15), [[9, 20], [60, 70]]);
+  assert.deepEqual(previewMusic("music", []), { volume: 1 });
+  const preview = previewMusic("voice_over", [[9, 40]]);
+  assert.equal(preview.volume, 0.4);
+  assert.equal(preview.duck!.volume, 0.13);
+
+  // In the live preview: the music lower under her voice, and lower still while it speaks.
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 6,
+    subtitles: false,
+    segments: [{ clip_id: "a", in: 0, out: 6, zoom: "none" }],
+    texts: [],
+    images: [],
+    voice: { media_id: "v1", at: 0.3 },
+  });
+  const words = [
+    { w: "Le", start: 0.1, end: 0.2 },
+    { w: "secret.", start: 0.25, end: 0.7 },
+    { w: "Viens.", start: 3, end: 3.4 },
+  ];
+  const props = buildReelProps(plan, { template: "doux", clipUrls: { a: "https://x/a.mp4" }, voice: { src: "https://x/v.mp3", words }, soundtrack: "https://x/m.mp3", brand: { name: "Lune" } });
+  assert.deepEqual(props.soundtrack, { src: "https://x/m.mp3", volume: 0.4, duck: { volume: 0.13, windows: [[12, 30], [99, 111]] } });
+  // Without a voice nor anyone speaking: the music as it is.
+  const { voice: _v, ...noVoice } = plan;
+  const plain = buildReelProps(noVoice, { template: "doux", clipUrls: { a: "https://x/a.mp4" }, soundtrack: "https://x/m.mp3", brand: { name: "Lune" } });
+  assert.deepEqual(plain.soundtrack, { src: "https://x/m.mp3", volume: 1 });
+  // Someone speaks in the clip: the music at its level, down while they speak.
+  const talking = buildReelProps(noVoice, { template: "doux", clipUrls: { a: "https://x/a.mp4" }, words: { a: [{ w: "bonjour", start: 1, end: 1.5 }] }, soundtrack: "https://x/m.mp3", brand: { name: "Lune" } });
+  assert.deepEqual(talking.soundtrack, { src: "https://x/m.mp3", volume: 0.89, duck: { volume: 0.13, windows: [[30, 45]] } });
+});
+
 test("tempo: cuts and texts on the beats, one signature transition, the rhythm for the critic", async () => {
   const { snapToTempo, beatOf } = await import("./tempo.ts");
   const { normalizeEditPlan } = await import("./editor.ts");

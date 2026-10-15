@@ -18,6 +18,7 @@ import {
 } from "@fauve/agent";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { env } from "@/lib/env";
+import { levelSpeechInSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Simone's voice over a Reel: the script she writes from what the images show,
@@ -90,18 +91,30 @@ export async function writeVoiceScript(studioId: string, postId: string, wish?: 
 /** The models tried in turn: the one configured, then older ones whose word timings are documented. */
 const fallbackModels = () => [...new Set([env("ELEVENLABS_TTS_MODEL"), "eleven_v3", "eleven_multilingual_v2"])];
 
-/** ElevenLabs reads the script: the audio and the time of every word. */
+/** How many times a voice waits for its turn: the plan reads 5 texts at once, the others get 429. */
+const BUSY_RETRIES = 5;
+
+/**
+ * ElevenLabs reads the script: the audio (as it comes, its loudness varies by voice,
+ * see levelSpeech) and the time of every word.
+ */
 export async function speak(text: string, voiceId = env("ELEVENLABS_VOICE_ID")): Promise<{ mp3: Buffer; transcript: VoiceTranscript; model: string; voiceId: string }> {
   const key = env("ELEVENLABS_API_KEY");
   if (!key) throw new Error("ELEVENLABS_API_KEY missing");
   let failure = "";
   for (const model of fallbackModels()) {
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps?output_format=mp3_44100_128`, {
-      method: "POST",
-      headers: { "xi-api-key": key, "content-type": "application/json" },
-      // Multilingual v2 finds the language itself (it refuses language_code) and would read the acting tags aloud.
-      body: JSON.stringify(model === "eleven_multilingual_v2" ? { text: stripAudioTags(text), model_id: model } : { text, model_id: model, language_code: "fr" }),
-    });
+    let res: Response;
+    for (let attempt = 0; ; attempt++) {
+      res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps?output_format=mp3_44100_128`, {
+        method: "POST",
+        headers: { "xi-api-key": key, "content-type": "application/json" },
+        // Multilingual v2 finds the language itself (it refuses language_code) and would read the acting tags aloud.
+        body: JSON.stringify(model === "eleven_multilingual_v2" ? { text: stripAudioTags(text), model_id: model } : { text, model_id: model, language_code: "fr" }),
+      });
+      if (res.status !== 429 || attempt >= BUSY_RETRIES) break;
+      await res.text().catch(() => "");
+      await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1) + Math.random() * 1000));
+    }
     if (res.ok) {
       const body = (await res.json()) as { audio_base64?: string; alignment?: unknown; normalized_alignment?: unknown };
       if (!body.audio_base64 || !(body.alignment ?? body.normalized_alignment)) {
@@ -119,6 +132,20 @@ export async function speak(text: string, voiceId = env("ELEVENLABS_VOICE_ID")):
 }
 
 /**
+ * A voice at the level of a voice in a Reel (ElevenLabs' voices come out between
+ * -19 and -31 LUFS): set once, so the live preview and the mix hear it the same.
+ * As it came when the sandbox cannot do it.
+ */
+export async function levelSpeech(id: string, mp3: Buffer): Promise<{ mp3: Buffer; lufs: number | null }> {
+  try {
+    return await levelSpeechInSandbox(id, mp3);
+  } catch (error) {
+    console.warn("voice level unchanged", id, error);
+    return { mp3, lufs: null };
+  }
+}
+
+/**
  * Simone's voice on a Reel: the script, the voice, kept as an audio media with its
  * words, set on the post. The next montage of the post is cut on it.
  */
@@ -128,8 +155,9 @@ export async function makeVoiceOver(params: { studioId: string; postId: string; 
   const started = Date.now();
   const voice = await speak(script.script, params.voiceId);
   if (voice.transcript.duration > VOICE_MAX_SECONDS) throw new Error(`Voix trop longue (${voice.transcript.duration} s)`);
+  const leveled = await levelSpeech(`voice-${params.postId}`, voice.mp3);
   const path = `${params.studioId}/voice/${params.postId}-${Date.now()}.mp3`;
-  const upload = await db.storage.from("media").upload(path, voice.mp3, { contentType: "audio/mpeg", upsert: true });
+  const upload = await db.storage.from("media").upload(path, leveled.mp3, { contentType: "audio/mpeg", upsert: true });
   if (upload.error) throw new Error(upload.error.message);
   const asset = await db
     .from("media_assets")
@@ -139,10 +167,10 @@ export async function makeVoiceOver(params: { studioId: string; postId: string; 
       kind: "audio",
       source: "ai",
       mime_type: "audio/mpeg",
-      size_bytes: voice.mp3.length,
+      size_bytes: leveled.mp3.length,
       duration: voice.transcript.duration,
       transcript: voice.transcript,
-      ai: { mode: "voice", voice_id: voice.voiceId, model: voice.model },
+      ai: { mode: "voice", voice_id: voice.voiceId, model: voice.model, lufs: leveled.lufs },
       consent_ok: true,
     })
     .select("id")

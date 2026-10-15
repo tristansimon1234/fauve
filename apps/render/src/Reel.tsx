@@ -123,7 +123,7 @@ export function Reel(props: ReelProps) {
         </Sequence>
       )}
       {collage ? <Grain props={props} /> : null}
-      {props.soundtrack?.src ? <Audio src={props.soundtrack.src} /> : null}
+      {props.soundtrack?.src ? <Audio src={props.soundtrack.src} volume={(f) => musicVolume(props.soundtrack!, f)} /> : null}
       {props.voice?.src ? (
         <Sequence from={props.voice.from} layout="none">
           <Audio src={props.voice.src} />
@@ -131,6 +131,22 @@ export function Reel(props: ReelProps) {
       ) : null}
     </AbsoluteFill>
   );
+}
+
+/**
+ * The music's volume at a frame of the live preview (the render mixes it afterwards,
+ * measured): its level, and the lower one while someone speaks, reached in 3 frames
+ * and left over 15, like the render's ducking.
+ */
+function musicVolume(track: NonNullable<ReelProps["soundtrack"]>, frame: number): number {
+  const volume = track.volume ?? 1;
+  if (!track.duck) return volume;
+  let ducked = 0;
+  for (const [from, to] of track.duck.windows) {
+    if (frame < from - 3 || frame > to + 15) continue;
+    ducked = Math.max(ducked, frame < from ? (frame - from + 3) / 3 : frame > to ? 1 - (frame - to) / 15 : 1);
+  }
+  return volume + (track.duck.volume - volume) * ducked;
 }
 
 /**
