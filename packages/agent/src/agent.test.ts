@@ -1276,3 +1276,30 @@ test("bank: a clean shot that moves or hooks is kept, a dark or shaky clip is no
   assert.equal(bankWorthy({ lighting: "ok", shots: [{ ...shot, end: 1 }] } as never), false);
   assert.equal(bankWorthy({ lighting: "ok", shots: [{ ...shot, energy: 1, hook_score: 2 }] } as never), false);
 });
+
+test("clip sort: only a sure match on a known publication is kept", async () => {
+  const { acceptedSort } = await import("./clip-sort.ts");
+  const candidates = new Set(["p1"]);
+  assert.equal(acceptedSort({ post_id: "p1", sure: true, why: "" }, candidates), "p1");
+  assert.equal(acceptedSort({ post_id: "p1", sure: false, why: "" }, candidates), null);
+  assert.equal(acceptedSort({ post_id: "p2", sure: true, why: "" }, candidates), null);
+  assert.equal(acceptedSort({ post_id: null, sure: true, why: "" }, candidates), null);
+});
+
+test("nudge: one short reminder when nothing went out for a while, never twice a week", async () => {
+  const { nudgeAfterDays, shouldNudge, nudgeMessage } = await import("./nudge.ts");
+  assert.equal(nudgeAfterDays(3), 4);
+  assert.equal(nudgeAfterDays(2), 6);
+  assert.equal(nudgeAfterDays(7), 3);
+  const base = { daysSince: 6, upcoming: false, daysSinceNudge: null, unanswered: 0, postsPerWeek: 3 };
+  assert.equal(shouldNudge(base), true);
+  assert.equal(shouldNudge({ ...base, daysSince: 2 }), false);
+  assert.equal(shouldNudge({ ...base, upcoming: true }), false);
+  assert.equal(shouldNudge({ ...base, daysSinceNudge: 3 }), false);
+  assert.equal(shouldNudge({ ...base, daysSinceNudge: 8 }), true);
+  // Two reminders without an answer: no more until she writes.
+  assert.equal(shouldNudge({ ...base, daysSinceNudge: 8, unanswered: 1 }), true);
+  assert.equal(shouldNudge({ ...base, daysSinceNudge: 30, unanswered: 2 }), false);
+  assert.match(nudgeMessage(6, 0), /^Ça fait 6 jours sans publication 🙂 Envoie-moi les photos ou vidéos que tu as sous la main, je m'occupe du reste\.$/);
+  assert.match(nudgeMessage(6, 2), /vidéos que j'ai gardées/);
+});

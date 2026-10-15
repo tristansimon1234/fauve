@@ -241,7 +241,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     async list_media({ kind, days, limit, bank }) {
       let query = db
         .from("media_assets")
-        .select("id, kind, source, mime_type, duration, width, height, created_at, regions, ai, bank")
+        .select("id, kind, source, mime_type, duration, width, height, created_at, regions, ai, bank, sorted_post_id")
         .eq("studio_id", studioId)
         .neq("source", "render")
         .order("created_at", { ascending: false })
@@ -278,6 +278,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             ...(summaries.get(r.id as string) ? { contenu: summaries.get(r.id as string) } : {}),
             ...((r.regions as { notes?: string } | null)?.notes ? { contenu: (r.regions as { notes: string }).notes } : {}),
             ...(r.bank ? { banque: true } : {}),
+            ...(r.sorted_post_id ? { rangee_dans_post_id: r.sorted_post_id } : {}),
             ...(ai ? { ia: ai.mode === "improve" ? `photo améliorée (${ai.instruction.slice(0, 80)})` : `image d'ambiance : ${ai.instruction.slice(0, 80)}` } : {}),
           };
         }),
@@ -341,6 +342,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           .select("id, title, status, scheduled_at")
           .single(),
       );
+      // Her material arrived: the filming missions of this publication are done.
+      if (fields.media_ids?.length) {
+        await db.from("shot_requests").update({ done: true }).eq("post_id", post_id).eq("studio_id", studioId).eq("done", false);
+        if (!status && (current.status === "planned" || current.status === "content_requested")) {
+          await db.from("posts").update({ status: "media_received" }).eq("id", post_id).eq("studio_id", studioId);
+        }
+      }
       return json({ post });
     },
 
