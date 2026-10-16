@@ -612,12 +612,16 @@ function KeyMessage({ text, index, props, theme, k }: { text: ReelProps["texts"]
   );
 }
 
+/** The text that carries a marker signature's stroke: the first hook with a key word. */
+const markedHook = (props: ReelProps) => props.texts.findIndex((t) => t.style === "hook" && t.emphasis.length > 0);
+
 function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const exit = useExit(text.durationInFrames, theme);
   const emphasis = new Set(text.emphasis.flatMap((e) => e.split(SPACES)).map(normalize));
-  const h = theme.hook;
+  // The stroke drawn by hand is the brand's gesture, once in a Reel: on its first hook with a key word; a later one takes its colour.
+  const h = theme.hook.stress === "marker" && index !== markedHook(props) ? { ...theme.hook, stress: "color" as const } : theme.hook;
   const words = text.text.split(SPACES).filter(Boolean);
   // Opening the Reel, its entrance is already under way on the first frame: the feed shows it at once.
   const lead = text.from === 0 ? HOOK_LEAD : 0;

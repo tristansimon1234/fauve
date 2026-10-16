@@ -28,6 +28,30 @@ const OPENING_LEAD = 12;
 const ROTATIONS = [-3.2, 2.6, -1.8, 3.4, -2.6, 1.6];
 const FROM = [1, -1, 1, -1, -1, 1];
 
+/**
+ * How each print lands on the table, never twice the same way in a row: slid in from the
+ * side, dropped from above, slapped down, pushed up from below, tossed in from a corner.
+ * Every print slid in from the side read as the same animation over and over.
+ */
+const ENTRANCES = ["slide", "drop", "slap", "rise", "toss"] as const;
+
+/** Where a print is, `p` of the way into its place (0 → 1, a spring that may overshoot). */
+function entrance(index: number, p: number, rot: number, dir: number, props: Pick<ReelProps, "width" | "height">): string {
+  const q = 1 - p;
+  switch (ENTRANCES[index % ENTRANCES.length]) {
+    case "drop":
+      return `translateY(${-q * props.height * 0.75}px) rotate(${rot - q * dir * 7}deg)`;
+    case "slap":
+      return `rotate(${rot + q * dir * 4}deg) scale(${1 + q * 0.2})`;
+    case "rise":
+      return `translateY(${q * props.height * 0.7}px) rotate(${rot + q * dir * 6}deg)`;
+    case "toss":
+      return `translate(${q * dir * props.width * 0.6}px, ${-q * props.height * 0.3}px) rotate(${rot + q * dir * 28}deg) scale(${1 - q * 0.12})`;
+    default:
+      return `translateX(${q * dir * props.width * 0.7}px) rotate(${rot + q * dir * 9}deg) scale(${1 + q * 0.06})`;
+  }
+}
+
 /** Frames counted on twos: the stop-motion step. */
 export const onTwos = (frame: number) => Math.floor(frame / 2) * 2;
 
@@ -190,7 +214,7 @@ function StickerLayer({ sticker, k, size, lead = 0 }: { sticker: Sticker; k: num
 
 /**
  * A shot as a cut-out photo: a white edge, a tilt, tape on two corners, coloured
- * paper peeking behind, slapped in from the side on twos. A photo whose subject cuts
+ * paper peeking behind, landing on twos (ENTRANCES, a new way each time). A photo whose subject cuts
  * out cleanly gets it as a sticker over the print. `layer`: the whole card, the card
  * alone (its sticker drawn above the texts by another layer, from `stickerFrom` on in
  * the card again), or the sticker alone, in the card's place.
@@ -229,7 +253,7 @@ export function CollageCard({
     top,
     width: w,
     height: h,
-    transform: `translateX(${(1 - p) * dir * props.width * 0.7}px) rotate(${rot + (1 - p) * dir * 9}deg) scale(${1 + (1 - p) * 0.06})`,
+    transform: entrance(index, p, rot, dir, props),
   } as const;
   const stickerHere = sticker && (layer === "all" || layer === "sticker" || now >= stickerFrom);
   const stickerBox = stickerHere ? (

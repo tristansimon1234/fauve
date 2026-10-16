@@ -148,11 +148,13 @@ export function themeFor(template: MotionTemplate, signature: ReelSignature | un
       tilt: 0,
     },
     // Subtitles in its case, the word said standing out its way (a block is the pill); capitals read larger, so a touch smaller.
+    // A stroke drawn by hand under every word said was the same animation all over the Reel: the word said takes its colour,
+    // the stroke stays on the hook's key word.
     subtitle: {
       ...base.subtitle,
       size: upper ? Math.round(base.subtitle.size * 0.9) : base.subtitle.size,
       uppercase: upper,
-      highlight: signature.stress === "block" ? "pill" : signature.stress,
+      highlight: signature.stress === "block" ? "pill" : signature.stress === "marker" ? "color" : signature.stress,
     },
     grade: GRADES[signature.grade] ?? base.grade,
   };

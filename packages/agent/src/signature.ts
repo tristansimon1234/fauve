@@ -121,7 +121,13 @@ export const SIGNATURE_GUIDE = `Signature : les mêmes choix en réglages, que l
 export function signatureLines(signature: BrandSignature | undefined): string | undefined {
   if (!signature) return undefined;
   const t = signature.titles;
-  const stress = { color: "dans sa couleur", block: "sur un aplat de sa couleur", serif: "dans une serif italique", marker: "entouré ou souligné à la main" }[signature.stress];
+  // The hand-drawn stroke is its gesture, not a tic: on every word, it was the same animation all over the Reel.
+  const stress = {
+    color: "dans sa couleur",
+    block: "sur un aplat de sa couleur",
+    serif: "dans une serif italique",
+    marker: "entouré ou souligné à la main, une seule fois par Reel, sur le mot clé de l'accroche ; ailleurs, dans sa couleur",
+  }[signature.stress];
   return [
     `Titres : police ${t.font === "display" ? "des titres" : "du texte"}, ${t.case === "upper" ? "en capitales" : "en casse normale"}, ${{ regular: "graisse normale", bold: "gras", black: "très gras" }[t.weight]}, ${t.align === "left" ? "alignés à gauche" : "centrés"}`,
     `Mot clé : ${stress}`,

@@ -2109,7 +2109,7 @@ test("signature: plain lines for the editor, the designer and the critic", async
   });
   const lines = signatureLines(signature)!;
   assert.match(lines, /casse normale/);
-  assert.match(lines, /entouré ou souligné à la main/);
+  assert.match(lines, /entouré ou souligné à la main, une seule fois par Reel/);
   assert.match(lines, /aplat clair/);
   assert.match(lines, /musique : deep house/);
 });
