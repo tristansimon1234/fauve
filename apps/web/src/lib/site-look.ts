@@ -14,6 +14,7 @@ import {
 } from "@fauve/agent";
 import sharp from "sharp";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
+import { DEFAULT_TONE } from "@/app/(app)/style/style-profile";
 import { readSiteImages } from "@/lib/agent/moodboard";
 import { fetchPublicImage } from "@/lib/agent/website";
 import { googleFont } from "@/lib/fonts";
@@ -256,7 +257,8 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
       ...(fonts ? { fonts: fonts.fonts.slice(0, 2), font_twins: { ...(p.font_twins ?? {}), ...fonts.twins } } : p.fonts?.length ? {} : { fonts: [...new Set([reading.fonts.display, reading.fonts.body])] }),
       signature,
       ...(p.default_template ? {} : { default_template: signature.ambiance }),
-      ...(p.tone?.trim() ? {} : { tone: signature.voice }),
+      // How it talks, read in its site's words, unless someone already said it.
+      ...(p.tone?.trim() && p.tone !== DEFAULT_TONE ? {} : { tone: signature.voice }),
       moodboard: { ...(current ?? {}), items: items.length ? items : (current?.items ?? first), reading: reading.reading, palette: reading.palette, read_at: new Date().toISOString() },
     };
   });

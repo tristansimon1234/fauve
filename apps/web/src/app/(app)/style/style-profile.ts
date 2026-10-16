@@ -36,9 +36,12 @@ export type StyleProfile = z.infer<typeof styleProfileSchema>;
 /** Unknown keys are kept as they are: the agent may store more than this page edits. */
 export type StoredProfile = StyleProfile & Record<string, unknown>;
 
+/** The tone of a brand new profile, before anyone said how the business talks. */
+export const DEFAULT_TONE = "Chaleureux, simple et encourageant";
+
 /** Required fields of a brand new profile. */
 const DEFAULTS: Pick<BrandProfile, "tone" | "caption_length" | "emojis" | "hashtags" | "visual_notes" | "dos" | "donts"> = {
-  tone: "Chaleureux, simple et encourageant",
+  tone: DEFAULT_TONE,
   caption_length: "medium",
   emojis: "few",
   hashtags: [],
