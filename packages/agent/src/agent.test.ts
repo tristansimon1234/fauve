@@ -1348,6 +1348,26 @@ test("voice over: when Simone puts her voice on a Reel, and which voice", async 
   assert.deepEqual(readPostVoice({ mode: "on", wish: "parle de la promo" }), { mode: "on", wish: "parle de la promo" });
 });
 
+test("music: the composer's ending falls after the Reel, a beat that falls away inside it is found", async () => {
+  const { BASS_LEVELS_FILTER, grooveGaps, musicTail } = await import("./mix.ts");
+  // The composer watches the Reel then its first 6 s (all of a short one), as Instagram loops it.
+  assert.equal(musicTail(11.67), 6);
+  assert.equal(musicTail(4.2), 4.2);
+  assert.match(BASS_LEVELS_FILTER, /lowpass=f=150.*asetnsamples=n=4000:p=0.*RMS_level$/);
+  // Culte's collage, bass every half second: the groove (-15 dB) stops at 6.5 s, then the piece dies away.
+  const culte = [-15.3, -15.7, -15.1, -15.7, -15.1, -15.6, -15.2, -16.4, -18.2, -16.8, -15.7, -14.9, -15.8, -37.4, -37.8, -37.1, -39, -55.4, -45, -48.8, -54.4, -61.8, -73.5, -Infinity];
+  assert.deepEqual(grooveGaps(culte, 11.67), [{ from: 6.5, to: 10.5 }]);
+  // A groove that holds, a kick missing here and there: nothing.
+  const holds = Array.from({ length: 24 }, (_, i) => (i % 5 === 3 ? -21 : -15));
+  assert.deepEqual(grooveGaps(holds, 11.67), []);
+  // A break of a second in the middle is found; an ending inside the mix's own fade is not.
+  const broken = [...holds.slice(0, 10), -40, -40, ...holds.slice(12)];
+  assert.deepEqual(grooveGaps(broken, 11.67), [{ from: 5, to: 6 }]);
+  assert.deepEqual(grooveGaps([...holds.slice(0, 22), -60, -70], 11.67), []);
+  // A piece without a beat (all quiet alike) is not a break.
+  assert.deepEqual(grooveGaps(Array.from({ length: 20 }, () => -48), 10), []);
+});
+
 test("mix: what is said at the level of a voice, the music under it and still heard", async () => {
   const { mixGains, mixFilter, previewMusic, speechWindows, speechGain, SPEECH_LUFS } = await import("./mix.ts");
   const { buildReelProps } = await import("./motion.ts");

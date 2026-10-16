@@ -1,14 +1,28 @@
 import "server-only";
-import { isClipSegment, isMotionSegment, musicCostUsd, TEMPLATE_BPM, usdToEur, type EditPlan, type MotionTemplate, type PostKind } from "@fauve/agent";
+import {
+  grooveGaps,
+  isClipSegment,
+  isMotionSegment,
+  musicCostUsd,
+  musicTail,
+  TEMPLATE_BPM,
+  usdToEur,
+  type EditPlan,
+  type MotionTemplate,
+  type PostKind,
+} from "@fauve/agent";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { muxAudioInSandbox } from "./sandbox";
+import { bassLevelsInSandbox, loopedReelInSandbox, muxAudioInSandbox } from "./sandbox";
 
 // Simone's music on a Reel (ElevenLabs Music, « video to music »): the rendered
-// video is sent as it is, the model watches it and composes an instrumental piece
-// that follows its cuts, in the mood of the Reel and the business. The piece is
+// video is sent with its first seconds played again after it (as Instagram loops
+// it), the model watches it and composes an instrumental piece that follows its
+// cuts, in the mood of the Reel and the business; the mix cuts it at the end of
+// the Reel, before the ending the composer writes. A piece whose beat still falls
+// away inside the Reel is composed once more (grooveGaps). The piece is
 // kept on the post and reused while the cut stays the same (a text changed, a
 // style…), so a small retouch does not pay for a new one; « Une autre » asks for
 // a new one. Without ELEVENLABS_API_KEY, or turned off, the Reel stays silent.
@@ -68,12 +82,15 @@ function brief(plan: EditPlan, business: string | null, adjustments: string[], s
       // A voice never brings a sound of its own: the business's genre (else the ambiance's) stays under it.
       `Instrumental track for an Instagram Reel of ${where}, the kind of track a content creator picks, not advertising music: ${plan.voice ? underVoice(sound ? `${sound}: the sound of this business` : ambiance.words) : mood.words}. No vocals.${tempo} ` +
       `On the groove from the very first second (no intro, no fade-in), it holds the groove and ends cleanly on the last shot. ` +
-      // The composer watches the video and used to put a break at a cut (the beat stopped for most of a second): heard as the sound cutting out.
-      `One continuous groove: the beat never stops, no break, no drop, no pause and no silence at the video's cuts or scene changes. ` +
-      `Not corporate, not stock music, no inspirational build-up, no cinematic swells, no jingle, no cliché of the place.${notes}`.slice(0, 1000),
+      // The composer watches the video and used to put a break at a cut, or on a calm shot: heard as the sound cutting out.
+      `One continuous groove: the beat never stops, no break, no breakdown, no drop, no pause and no silence at the video's cuts, scene changes or calm shots. ` +
+      `Not corporate, not stock music, no inspirational build-up, no cinematic swells, no jingle, no cliché of the place.${notes}`.slice(0, 2000),
     tags: [...mood.tags, "instrumental", "modern"],
   };
 }
+
+/** A piece whose beat still falls away inside the Reel is composed once more; the more continuous one is kept. */
+const MUSIC_TAKES = 2;
 
 async function compose(mp4: Buffer, ask: { description: string; tags: string[] }): Promise<{ mp3: Uint8Array; songId: string | null; ms: number }> {
   const key = env("ELEVENLABS_API_KEY");
@@ -136,8 +153,46 @@ export async function withMusic(params: {
     const stored = profile.data?.profile as { art_direction?: string; signature?: { music?: string } } | null;
     const direction = (stored?.art_direction ?? "").split("\n").filter((l) => l.startsWith("Ajustement"));
     const sound = typeof stored?.signature?.music === "string" ? stored.signature.music.trim().slice(0, 80) : undefined;
-    const composed = await compose(params.mp4, brief(params.plan, (studio.data?.business_type as string | null) ?? null, direction, sound || undefined));
-    mp3 = composed.mp3;
+    const ask = brief(params.plan, (studio.data?.business_type as string | null) ?? null, direction, sound || undefined);
+    const duration = params.plan.duration;
+    // The composer writes its ending (the beat stops over the last seconds): it watches the Reel then
+    // its first seconds, as Instagram loops it, so that ending falls after the Reel and the mix cuts it off.
+    const tail = musicTail(duration);
+    const looped = await loopedReelInSandbox(params.renderId, params.mp4, duration, tail).catch((error: unknown) => {
+      console.warn("music: loop unavailable, the Reel alone", params.renderId, error);
+      return null;
+    });
+    const seconds = duration + (looped ? tail : 0);
+    let best: (Awaited<ReturnType<typeof compose>> & { lost: number }) | null = null;
+    for (let take = 1; take <= MUSIC_TAKES && (!best || best.lost > 0); take++) {
+      const composed = await compose(looped ?? params.mp4, ask).catch((error: unknown) => {
+        if (!best) throw error;
+        console.warn("music: another take failed, the first one stays", params.renderId, error);
+        return null;
+      });
+      if (!composed) break;
+      // Billed by the length of the track: the Reel and what the composer watched after it.
+      const usd = musicCostUsd(seconds);
+      await db.from("cost_events").insert({
+        studio_id: params.studioId,
+        kind: "music",
+        provider: "elevenlabs",
+        units: 1,
+        cost_eur: usdToEur(usd, env("USD_TO_EUR")),
+        meta: { post_id: params.postId, render_id: params.renderId, song_id: composed.songId, model: env("ELEVENLABS_MUSIC_MODEL"), signature, ms: composed.ms, seconds, take, cost_usd: usd },
+      });
+      // Where its beat falls away inside the Reel (a break on a calm shot, an ending too early): heard as the sound cutting out.
+      const gaps = await bassLevelsInSandbox(params.renderId, composed.mp3, duration)
+        .then((levels) => grooveGaps(levels, duration))
+        .catch((error: unknown) => {
+          console.warn("music: beat not measured", params.renderId, error);
+          return [];
+        });
+      const lost = gaps.reduce((sum, g) => sum + g.to - g.from, 0);
+      console.info("music", params.renderId, { take, seconds, gaps });
+      if (!best || lost < best.lost) best = { ...composed, lost };
+    }
+    mp3 = best!.mp3;
     made = "new";
     const path = `${params.studioId}/music/${params.postId}-${Date.now()}.mp3`;
     const { error } = await db.storage.from("media").upload(path, mp3, { contentType: "audio/mpeg", upsert: true });
@@ -145,18 +200,8 @@ export async function withMusic(params: {
     if (music.track?.path) await db.storage.from("media").remove([music.track.path]).catch(() => {});
     await db
       .from("posts")
-      .update({ music: { mode: "on", track: { path, signature, song_id: composed.songId, created_at: new Date().toISOString() } } })
+      .update({ music: { mode: "on", track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString() } } })
       .eq("id", params.postId);
-    // Billed by the length of the track, which is the Reel's.
-    const usd = musicCostUsd(params.plan.duration);
-    await db.from("cost_events").insert({
-      studio_id: params.studioId,
-      kind: "music",
-      provider: "elevenlabs",
-      units: 1,
-      cost_eur: usdToEur(usd, env("USD_TO_EUR")),
-      meta: { post_id: params.postId, render_id: params.renderId, song_id: composed.songId, model: env("ELEVENLABS_MUSIC_MODEL"), signature, ms: composed.ms, seconds: params.plan.duration, cost_usd: usd },
-    });
   }
   return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice) }), music: made };
 }
