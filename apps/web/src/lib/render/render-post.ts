@@ -16,6 +16,8 @@ import {
   editPlanSchema,
   postStatusSchema,
   renderDuration,
+  sceneShifts,
+  withShifts,
   type EditPlan,
   type PostKind,
   type PostStatus,
@@ -27,7 +29,7 @@ import { logoTone } from "./logo-tone";
 import { withMusic } from "./music";
 import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
-import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes } from "./sandbox";
+import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
@@ -214,15 +216,32 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       const checks = await smokeTestScenes(
         props.segments.flatMap((s, i) => (s.type === "motion" ? [{ id: `m${i}`, js: s.js, durationInFrames: s.durationInFrames, texts: s.texts }] : [])),
         props.brand,
-      ).catch((e: unknown): Record<string, string | null> => {
+      ).catch((e: unknown): SceneChecks => {
         console.warn("motion scenes: check unavailable", e);
-        return {};
+        return { errors: {}, bands: {} };
       });
       props.segments = props.segments.map((s, i) => {
-        if (s.type !== "motion" || !checks[`m${i}`]) return s;
-        console.warn("motion scene falls back to its fixed scene", renderId, checks[`m${i}`]);
+        if (s.type !== "motion" || !checks.errors[`m${i}`]) return s;
+        console.warn("motion scene falls back to its fixed scene", renderId, checks.errors[`m${i}`]);
         return { type: "scene", scene: s.fallback, startAt: s.startAt, durationInFrames: s.durationInFrames, ...(s.under ? { under: s.under } : {}) };
       });
+      // An animation over her footage never covers a face or a sign under it: where its texts sit
+      // was just measured, the whole scene moves to the free rows when they fall on them. The move
+      // is kept on the plan, so the live preview shows it where the video has it.
+      const shifts = sceneShifts(plan, checks.bands);
+      if (shifts.size) {
+        props.segments = props.segments.map((s, i) => {
+          if (s.type !== "motion" || !shifts.has(i)) return s;
+          // Measured now: this move replaces the one kept on the plan (none when the texts are clear).
+          return { ...s, shift: (s.under && shifts.get(i)) || undefined };
+        });
+        // Kept on the plan as it is stored (not its parsed copy), so nothing else of it changes.
+        const kept = withShifts(planRow.plan as EditPlan, shifts);
+        if (kept) {
+          const saved = await db.from("edit_plans").update({ plan: kept }).eq("id", planRow.id);
+          if (saved.error) console.warn("motion scenes: shift not kept on the plan", planRow.id, saved.error.message);
+        }
+      }
       try {
         mp4 = await renderReelInSandbox({ id: renderId, props });
         engine = "remotion";

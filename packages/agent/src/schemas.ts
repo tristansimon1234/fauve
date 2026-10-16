@@ -89,7 +89,7 @@ export const editPlanSegmentSchema = z.object({
   photo: photoEditSchema.optional(),
   /** The Reel's one signature transition into this shot (punch: a short zoom that settles; wipe: a panel in the brand colour sweeps away). At most one per Reel. */
   accent: z.enum(["punch", "wipe"]).optional(),
-  /** Where the subtitles sit while this shot plays (top, share of the frame height), moved off a face by the engine (finishPlan), never by the editor. */
+  /** Older plans: where the subtitles sat while this shot played (now one row for the whole Reel, the plan's `subtitle_y`). */
   subtitle_y: z.number().min(0.1).max(0.8).optional(),
 });
 
@@ -125,10 +125,21 @@ export const editPlanMotionSegmentSchema = z.object({
     template_id: z.uuid().optional(),
     /** Texts for the template's slots (the scene reads them from its `texts` prop). */
     texts: z.record(z.string().regex(SLOT_NAME), z.string().max(200)).optional(),
+    /** How far the render moves the scene down (or up, negative; share of the height) so its texts clear the faces under it: set by the engine at render time. */
+    shift: z.number().min(-0.75).max(0.75).optional(),
   }),
   duration: z.number().min(1).max(8),
-  /** The footage that keeps playing under the animation (a passage of one of her clips or a photo), from `in` seconds (chosen by the engine when missing). */
-  over: z.object({ clip_id: z.string().min(1), in: z.number().min(0).optional() }).optional(),
+  /**
+   * The footage that keeps playing under the animation (a passage of one of her clips or a photo), from `in` seconds (chosen by the engine when missing);
+   * `busy`: the rows of it that must stay seen (faces, lettering; top and height, shares of the frame), set by the engine.
+   */
+  over: z
+    .object({
+      clip_id: z.string().min(1),
+      in: z.number().min(0).optional(),
+      busy: z.array(z.object({ y: z.number().min(0).max(1), h: z.number().min(0).max(1) })).max(8).optional(),
+    })
+    .optional(),
 });
 
 export const editPlanTextSchema = z.object({
@@ -140,6 +151,8 @@ export const editPlanTextSchema = z.object({
   emphasis: z.array(z.string().min(1)).max(3).optional(),
   /** Set by hand in the scene editor: where the text sits (top edge, share of the height, inside the safe zone)… */
   y: z.number().min(0.05).max(0.66).optional(),
+  /** `y` was set by the engine (off a face or a sign), not by her hand: worked out again for each version. */
+  auto_y: z.boolean().optional(),
   /** …its horizontal centre (share of the width; the box narrows to stay in the safe zone)… */
   x: z.number().min(0.3).max(0.7).optional(),
   /** …its size (1 = the style's size)… */
@@ -222,6 +235,8 @@ export const editPlanObjectSchema = z.object({
   voice: z.object({ media_id: z.string().min(1), at: z.number().min(-30).max(10) }).optional(),
   /** An overlay over the whole video, under the texts: dust, film dust and a rare scratch (a key message, a vintage or night mood). */
   effect: z.enum(["dust"]).optional(),
+  /** Where a voice's subtitles sit for the whole Reel (top, share of the height), set by the engine off the faces: they never move from shot to shot. */
+  subtitle_y: z.number().min(0.1).max(0.8).optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {

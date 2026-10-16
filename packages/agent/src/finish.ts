@@ -1,4 +1,4 @@
-import { avoidPhotoText, boxFrom2d, headZone, photoBoxInFrame, photoEditFrom, subtitleRow, type Adjust, type Box, type PhotoDetection } from "./retouch.ts";
+import { avoidPhotoText, boxFrom2d, headZone, photoBoxInFrame, photoEditFrom, reelSubtitleRow, sceneShift, type Adjust, type Box, type PhotoDetection, type PhotoEdit } from "./retouch.ts";
 import { planTimeline } from "./motion.ts";
 import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type EditPlan, type PlanSegment } from "./schemas.ts";
 
@@ -170,42 +170,104 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
   });
   const finished = { ...plan, segments };
 
-  // What texts must not cover, shot by shot: lettering and faces in photos, faces in videos.
+  // What texts must not cover, shot by shot: lettering and faces in photos, faces in videos;
+  // and under each animation, the same in the footage that plays beneath it.
   const timeline = planTimeline(finished);
   const shots = segments.map((s, i) => {
     const at = timeline.segments[i]!;
-    const boxes: Box[] = [];
-    if (isClipSegment(s)) {
-      const photo = facts.photos[s.clip_id];
-      if (photo) {
-        // Read on the photo, placed where the vertical crop (and its slow zoom) shows them.
-        const shown = (b: Box) => (s.photo ? photoBoxInFrame(b, s.photo) : b);
-        const zones = [
-          ...(photo.detection.text_boxes ?? []).map((b) => boxFrom2d(b, 0.05)),
-          ...photo.detection.regions.filter((r) => r.kind === "face" && r.recognizable).map((r) => boxFrom2d(r.box_2d, 0.1)),
-        ];
-        boxes.push(...zones.flatMap((b) => shown(b) ?? []));
-      } else {
-        const analysis = facts.clips[s.clip_id];
-        const speed = s.speed ?? 1;
-        // Every shot of the clip this passage shows.
-        for (const shot of analysis?.shots ?? []) {
-          if (shot.end < s.in || shot.start > s.in + segmentSeconds(s) * speed) continue;
-          const head = shot.faces_visible ? headZone(shot.subject_box) : null;
-          if (head) boxes.push(head);
-        }
-      }
-    }
-    return { start: at.start, length: at.length, boxes };
+    const boxes = isClipSegment(s)
+      ? busyZones(facts, s.clip_id, s.in, segmentSeconds(s) * (s.speed ?? 1), s.photo)
+      : isMotionSegment(s) && s.over
+        ? busyZones(facts, s.over.clip_id, s.over.in ?? 0, s.duration, segments.find((x): x is Extract<PlanSegment, { clip_id: string }> => isClipSegment(x) && x.clip_id === s.over!.clip_id)?.photo)
+        : [];
+    return { start: at.start, length: at.length, boxes, motion: isMotionSegment(s) };
   });
-  // The voice's subtitles too: over a shot where a face sits on their row, they take a clear one.
   const placed = segments.map((s, i) => {
-    if (!isClipSegment(s)) return s;
-    const { subtitle_y: _old, ...rest } = s;
-    const row = subtitleRow(shots[i]!.boxes);
-    return row === null ? rest : { ...rest, subtitle_y: row };
+    if (isClipSegment(s)) {
+      const { subtitle_y: _old, ...rest } = s;
+      return rest;
+    }
+    if (!isMotionSegment(s) || !s.over) return s;
+    // The rows the animation leaves seen: its designer composes around them, the render moves it off them.
+    const { busy: _old, ...over } = s.over;
+    const busy = rowsOf(shots[i]!.boxes);
+    return { ...s, over: busy.length ? { ...over, busy } : over };
   });
-  return { ...finished, segments: placed, texts: avoidPhotoText(finished.texts, shots) };
+  // A voice's subtitles keep one place for the whole Reel, the one faces cover least (they never move from shot to shot).
+  const row = reelSubtitleRow(shots.filter((s) => !s.motion));
+  const { subtitle_y: _row, ...rest } = finished;
+  return { ...rest, ...(row !== null ? { subtitle_y: row } : {}), segments: placed, texts: avoidPhotoText(finished.texts, shots.filter((s) => !s.motion)) };
+}
+
+/**
+ * The zones of a passage that must stay seen, in shares of the vertical frame: in a photo,
+ * its lettering (a sign, a logo on a window) and every face, placed where the crop shows
+ * them; in a video, the head of the subject of each shot where faces are visible.
+ */
+function busyZones(facts: MediaFacts, mediaId: string, from: number, seconds: number, edit?: PhotoEdit): Box[] {
+  const photo = facts.photos[mediaId];
+  if (photo) {
+    const framed = edit ?? { source: { width: photo.width, height: photo.height } };
+    const zones = [
+      ...(photo.detection.text_boxes ?? []).map((b) => boxFrom2d(b, 0.05)),
+      // Every face, recognizable or not (sunglasses, a profile): a text on it reads as a mistake.
+      ...photo.detection.regions.filter((r) => r.kind === "face").map((r) => boxFrom2d(r.box_2d, 0.1)),
+    ];
+    return zones.flatMap((b) => photoBoxInFrame(b, framed) ?? []);
+  }
+  const boxes: Box[] = [];
+  for (const shot of facts.clips[mediaId]?.shots ?? []) {
+    if (shot.end < from || shot.start > from + seconds) continue;
+    const head = shot.faces_visible ? headZone(shot.subject_box) : null;
+    if (head) boxes.push(head);
+  }
+  return boxes;
+}
+
+/**
+ * How far each animation over her footage moves (share of the height), by segment index:
+ * the rows its texts cover (measured by the scene check, `bands` by `m<index>`) set clear
+ * of the faces and lettering under it (`over.busy`), 0 when they are clear already. An
+ * animation that was not measured keeps the move it has.
+ */
+export function sceneShifts(plan: Pick<EditPlan, "segments">, bands: Record<string, [number, number]>): Map<number, number> {
+  const shifts = new Map<number, number>();
+  plan.segments.forEach((s, i) => {
+    const band = bands[`m${i}`];
+    if (!isMotionSegment(s) || !s.over || !band) return;
+    shifts.set(i, sceneShift({ top: band[0], bottom: band[1] }, s.over.busy ?? []));
+  });
+  return shifts;
+}
+
+/** The plan with the animations' moves kept on them (null when none changes). */
+export function withShifts<P extends Pick<EditPlan, "segments">>(plan: P, shifts: Map<number, number>): P | null {
+  let changed = false;
+  const segments = plan.segments.map((s, i) => {
+    if (!isMotionSegment(s) || !shifts.has(i)) return s;
+    const shift = shifts.get(i)!;
+    if ((s.motion.shift ?? 0) === shift) return s;
+    changed = true;
+    const { shift: _old, ...motion } = s.motion;
+    return { ...s, motion: shift ? { ...motion, shift } : motion };
+  });
+  return changed ? { ...plan, segments } : null;
+}
+
+/** The rows of zones worth keeping clear (a tiny word does not count), merged when they touch. */
+function rowsOf(boxes: Box[]): { y: number; h: number }[] {
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  const rows = boxes
+    .filter((b) => b.w > 0.12 || b.h > 0.04)
+    .map((b) => ({ top: Math.max(0, b.y), bottom: Math.min(1, b.y + b.h) }))
+    .sort((a, b) => a.top - b.top);
+  const merged: { top: number; bottom: number }[] = [];
+  for (const r of rows) {
+    const last = merged.at(-1);
+    if (last && r.top <= last.bottom + 0.01) last.bottom = Math.max(last.bottom, r.bottom);
+    else merged.push({ ...r });
+  }
+  return merged.slice(0, 8).map((r) => ({ y: round(r.top), h: round(r.bottom - r.top) }));
 }
 
 /** Where the subject sits across the picture, in the editor's words. */

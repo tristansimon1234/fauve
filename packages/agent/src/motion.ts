@@ -63,7 +63,8 @@ export type ReelSegment =
   | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; move?: CameraMove; accent?: "punch" | "wipe"; subtitleY?: number }
   /** Animations play over her footage when there is some (`under`), else on the studio's colours. */
   | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
-  | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder };
+  /** shift: how far the scene is moved down (share of the height, up when negative), off the faces of the footage under it. */
+  | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder; shift?: number };
 export type ReelText = {
   text: string;
   style: "hook" | "band" | "caption";
@@ -124,6 +125,8 @@ export type ReelProps = {
   effect?: "dust" | null;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
+  /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
+  subtitleY?: number;
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
     js: string;
@@ -280,7 +283,16 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       const under = underOf(s.over);
       // Without generated code, the motion segment is just its fixed fallback scene.
       return s.motion.js
-        ? { type: "motion", js: s.motion.js, fallback, texts: s.motion.texts ?? {}, startAt, durationInFrames: lengths[i]!, ...(under ? { under } : {}) }
+        ? {
+            type: "motion",
+            js: s.motion.js,
+            fallback,
+            texts: s.motion.texts ?? {},
+            startAt,
+            durationInFrames: lengths[i]!,
+            ...(under ? { under } : {}),
+            ...(under && s.motion.shift ? { shift: s.motion.shift } : {}),
+          }
         : { type: "scene", scene: fallback, startAt, durationInFrames: lengths[i]!, ...(under ? { under } : {}) };
     }
     if (!isClipSegment(s)) return { type: "scene", scene: s.scene, startAt, durationInFrames: lengths[i]! };
@@ -402,6 +414,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack, ...music } } : {}),
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
     ...(plan.effect ? { effect: plan.effect } : {}),
+    ...(plan.subtitle_y !== undefined ? { subtitleY: plan.subtitle_y } : {}),
   };
 }
 

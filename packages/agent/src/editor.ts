@@ -223,7 +223,8 @@ export function carryTextStyle(plan: EditPlan, previous: EditPlan | null): EditP
         ...(t.look || !before.look ? {} : { look: before.look }),
         ...(t.detail_look || !before.detail_look ? {} : { detail_look: before.detail_look }),
         ...(before.x !== undefined ? { x: before.x } : {}),
-        ...(before.y !== undefined ? { y: before.y } : {}),
+        // Her hand's place stays; one the engine chose is worked out again for this version's shots.
+        ...(before.y !== undefined && !before.auto_y ? { y: before.y } : {}),
         ...(before.scale !== undefined ? { scale: before.scale } : {}),
         ...(before.backdrop !== undefined ? { backdrop: before.backdrop } : {}),
       };

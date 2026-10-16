@@ -341,7 +341,8 @@ export async function designEdit(params: {
   );
   const requests = plan.segments.flatMap((s, i) =>
     isMotionSegment(s) && !s.motion.js && !reusable.has(s.motion.brief)
-      ? [{ id: `s${i}`, brief: s.motion.brief, durationInFrames: Math.round(s.duration * 30) }]
+      ? // The faces and lettering of the footage under it: the designer composes around them.
+        [{ id: `s${i}`, brief: s.motion.brief, durationInFrames: Math.round(s.duration * 30), ...(s.over?.busy?.length ? { busy: s.over.busy } : {}) }]
       : [],
   );
   // Its motion kit: the business's latest scenes, whose language the new ones keep (a family from one Reel to the next).
