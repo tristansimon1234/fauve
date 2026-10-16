@@ -68,6 +68,8 @@ function brief(plan: EditPlan, business: string | null, adjustments: string[], s
       // A voice never brings a sound of its own: the business's genre (else the ambiance's) stays under it.
       `Instrumental track for an Instagram Reel of ${where}, the kind of track a content creator picks, not advertising music: ${plan.voice ? underVoice(sound ? `${sound}: the sound of this business` : ambiance.words) : mood.words}. No vocals.${tempo} ` +
       `On the groove from the very first second (no intro, no fade-in), it holds the groove and ends cleanly on the last shot. ` +
+      // The composer watches the video and used to put a break at a cut (the beat stopped for most of a second): heard as the sound cutting out.
+      `One continuous groove: the beat never stops, no break, no drop, no pause and no silence at the video's cuts or scene changes. ` +
       `Not corporate, not stock music, no inspirational build-up, no cinematic swells, no jingle, no cliché of the place.${notes}`.slice(0, 1000),
     tags: [...mood.tags, "instrumental", "modern"],
   };

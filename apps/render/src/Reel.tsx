@@ -11,7 +11,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, Grain, printSize, stickerTop, type Sticker } from "./Collage";
+import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, CollageMessage, Grain, printSize, stickerTop, type Sticker } from "./Collage";
 import { FilmDust } from "./FilmDust";
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
@@ -436,7 +436,11 @@ function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][n
   const key = `${text.text}|${text.style}|${text.scale ?? 1}|${text.x ?? ""}|${text.backdrop ?? false}|${text.look ? JSON.stringify(text.look) : ""}`;
   // A key message with its details (« Don't miss it ! », « OFFRE DE RENTRÉE », the codes): composed on three levels.
   // A message held on screen (title, subtitle, details): the hook of a key message, or any text of a Reel with items.
-  if ((text.style === "hook" || text.message) && text.items?.length && !text.look) return <KeyMessage key={`${key}|${JSON.stringify(text.items)}`} text={text} index={index} props={props} theme={theme} k={k} />;
+  if ((text.style === "hook" || text.message) && text.items?.length && !text.look) {
+    // A collage sets every word on paper: the message too, which reads on its light paper and prints.
+    if (props.template === "collage") return <CollageMessage key={`${key}|${JSON.stringify(text.items)}`} text={text} index={index} props={props} theme={theme} k={k} sides={sides(text, props, k)} />;
+    return <KeyMessage key={`${key}|${JSON.stringify(text.items)}`} text={text} index={index} props={props} theme={theme} k={k} />;
+  }
   if (text.look || text.items) return <LookText key={`${key}|${JSON.stringify([text.items, text.detail_look, text.bullet])}`} text={text} index={index} props={props} theme={theme} k={k} />;
   if (props.template === "collage") {
     const C = text.style === "hook" ? CollageHook : text.style === "band" ? CollageBand : CollageCaption;

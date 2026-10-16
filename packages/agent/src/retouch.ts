@@ -219,6 +219,8 @@ export function clipBlurFrom(detection: ClipDetection, aspect: number, kinds: Re
 
 /** Where each text style sits by default (top of its box, share of the frame height) and roughly how tall it is. Mirror of TEXT_Y in apps/render/src/theme.ts. */
 export const TEXT_ROWS = { hook: { y: 0.2, h: 0.2 }, band: { y: 0.47, h: 0.1 }, caption: { y: 0.62, h: 0.08 } } as const;
+/** A message (a text with items: its title, subtitle and details) takes a third of the frame. Mirror of the key messages' place in apps/render. */
+export const MESSAGE_ROW = { y: 0.42, h: 0.3 } as const;
 const FREE_ROWS = [0.2, 0.47, 0.62, 0.33, 0.12, 0.55];
 
 /**
@@ -228,7 +230,7 @@ const FREE_ROWS = [0.2, 0.47, 0.62, 0.33, 0.12, 0.55];
  * frame; only the rows matter, texts span the width). Texts placed by hand stay put;
  * a place the engine chose (`auto_y`) is worked out again, for the shots of this version.
  */
-export function avoidPhotoText<T extends { from: number; to: number; style: "hook" | "band" | "caption"; y?: number; auto_y?: boolean }>(
+export function avoidPhotoText<T extends { from: number; to: number; style: "hook" | "band" | "caption"; y?: number; auto_y?: boolean; items?: unknown[] }>(
   texts: T[],
   shots: { start: number; length: number; boxes: Box[] }[],
 ): T[] {
@@ -242,7 +244,7 @@ export function avoidPhotoText<T extends { from: number; to: number; style: "hoo
       // A word too small to read under a text does not count.
       .filter((b) => b.w > 0.12 || b.h > 0.04);
     if (!boxes.length) return unplaced;
-    const row = TEXT_ROWS[t.style];
+    const row = t.items?.length ? MESSAGE_ROW : TEXT_ROWS[t.style];
     const clear = (y: number) => boxes.every((b) => b.y > y + row.h + 0.02 || b.y + b.h < y - 0.02);
     if (clear(row.y)) return unplaced;
     const free = FREE_ROWS.filter((y) => y + row.h <= 0.82 && clear(y)).sort((a, b) => Math.abs(a - row.y) - Math.abs(b - row.y))[0];
