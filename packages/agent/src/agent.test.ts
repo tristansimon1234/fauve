@@ -1011,7 +1011,12 @@ test("post ideas follow the kind of business", () => {
   assert.equal(businessFamily("brasserie"), "food");
   assert.equal(businessFamily("fleuriste"), "shop");
   assert.equal(businessFamily(null), "other");
-  assert.ok(postIdeas("restaurant").reel.includes("Le plat du jour"));
+  // A short label on the button, a whole example request in the field: how it starts, how it ends.
+  const dish = postIdeas("restaurant").reel.find((i) => i.label === "Le plat du jour");
+  assert.ok(dish && /Commence par/.test(dish.prompt) && dish.prompt.length <= 500);
+  for (const kinds of ["studio de Pilates", "Salon de coiffure", "brasserie", "fleuriste", null].map((b) => postIdeas(b))) {
+    for (const list of Object.values(kinds)) assert.ok(list.length >= 4 && list.every((i) => i.label.length <= 34 && i.prompt.length <= 260));
+  }
   assert.equal(filmIdeas("Salon de coiffure").length, 3);
   assert.ok(filmIdeas(null).every((f) => f.idea && f.how));
 });
