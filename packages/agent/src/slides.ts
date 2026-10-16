@@ -53,6 +53,39 @@ export const slidesPlanSchema = z.object({
 });
 export type SlidesPlan = z.infer<typeof slidesPlanSchema>;
 
+/** The frame where a style preview is shown: the hook has come in, a hand-drawn circle is drawn. */
+export const STYLE_PREVIEW_FRAME = 48;
+
+/**
+ * Her style shown on one of her photos (the Style step): a Reel's first seconds, its hook and
+ * a line in her words, set her way (her signature, fonts and colours), still at STYLE_PREVIEW_FRAME.
+ */
+export function stylePreviewProps(inputs: {
+  template: MotionTemplate;
+  imageUrl: string;
+  brand: ReelInputs["brand"];
+  sample: { hook: string; key?: string; band: string };
+}): ReelProps {
+  const brand = resolveReelBrand({}, inputs.template, inputs.brand);
+  const frames = 90;
+  return {
+    template: inputs.template,
+    width: 1080,
+    height: 1920,
+    fps: REEL_FPS,
+    durationInFrames: frames,
+    fadeFrames: 0,
+    segments: [{ type: "image", src: inputs.imageUrl, startAt: 0, durationInFrames: frames }],
+    texts: [
+      { text: inputs.sample.hook, style: "hook", emphasis: inputs.sample.key ? [inputs.sample.key] : [], from: 0, durationInFrames: frames },
+      { text: inputs.sample.band, style: "band", emphasis: [], from: 0, durationInFrames: frames, y: 0.62 },
+    ],
+    words: [],
+    brand,
+    endCard: null,
+  };
+}
+
 /** Props of the Reel composition for one slide: its photo and its texts, captured at SLIDE_FRAME. */
 export function buildSlideProps(
   slide: Slide,

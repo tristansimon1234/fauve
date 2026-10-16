@@ -1,5 +1,5 @@
 import "server-only";
-import { CREDIT_PRICES, MOODBOARD_MAX_ITEMS, withArtDirection, type MoodboardReading } from "@fauve/agent";
+import { CREDIT_PRICES, findVoice, MOODBOARD_MAX_ITEMS, withArtDirection, type MoodboardReading } from "@fauve/agent";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
 import { readMoodboard } from "@/lib/agent/moodboard";
 import { chargeCredits, creditBalance } from "@/lib/credits";
@@ -47,7 +47,16 @@ export async function addToMoodboard(studioId: string, mediaIds: string[], optio
   await insertProfileVersion(studioId, (profile) => ({
     ...withArtDirection(profile as { art_direction?: unknown }, reading?.direction),
     // Her moodboard is her art direction: its settings (signature) follow its reading.
-    ...(reading ? { signature: reading.signature, ...((profile as { default_template?: string }).default_template ? {} : { default_template: reading.signature.ambiance }) } : {}),
+    ...(reading
+      ? {
+          signature: reading.signature,
+          ...((profile as { default_template?: string }).default_template ? {} : { default_template: reading.signature.ambiance }),
+          // The voice that sounds like it, unless she chose one.
+          ...((profile as { voice?: { voice_id?: string } }).voice?.voice_id || !findVoice(reading.signature.narrator.voice)
+            ? {}
+            : { voice: { use: (profile as { voice?: { use?: string } }).voice?.use ?? "auto", voice_id: findVoice(reading.signature.narrator.voice)!.id } }),
+        }
+      : {}),
     moodboard: { items, ...(reading ? { reading: reading.reading, palette: reading.palette, read_at: new Date().toISOString() } : {}) },
   }));
   return { added: added.length, reading: reading?.reading ?? null };

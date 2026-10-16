@@ -1,6 +1,6 @@
 "use server";
 
-import { CREDIT_PRICES, MOODBOARD_MAX_ITEMS, onboardingStepOf, withArtDirection, type MoodboardReading } from "@fauve/agent";
+import { CREDIT_PRICES, findVoice, MOODBOARD_MAX_ITEMS, onboardingStepOf, withArtDirection, type MoodboardReading } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { readMoodboard } from "@/lib/agent/moodboard";
@@ -140,6 +140,10 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
       if (reading) {
         next.signature = reading.signature;
         if (!next.default_template) next.default_template = reading.signature.ambiance;
+        // The voice that sounds like it, unless she chose one.
+        const voice = (next.voice ?? {}) as { use?: string; voice_id?: string };
+        const narrator = findVoice(reading.signature.narrator.voice);
+        if (!voice.voice_id && narrator) next.voice = { use: voice.use ?? "auto", voice_id: narrator.id };
       }
       if (!items.length) delete next.moodboard;
       else next.moodboard = { items, ...(reading ? { reading: reading.reading, palette: reading.palette, ...(reading.fonts ? { fonts: reading.fonts } : {}), read_at: new Date().toISOString() } : {}) };
@@ -185,5 +189,31 @@ export async function saveCustomFonts(input: unknown): Promise<SaveFontsResult> 
   } catch (error) {
     console.warn("saveCustomFonts failed", error);
     return { status: "error", message: FAILED };
+  }
+}
+
+const oneFont = z.object({ family: z.string().trim().regex(/^[A-Za-z0-9 ]{2,40}$/), path: z.string().max(300) });
+
+/**
+ * The file of one of her charter's fonts (Style step: « Ajouter ma police »): kept under the
+ * charter's own name, so her Reels use it instead of its free twin. Replaces a file of the same name.
+ */
+export async function addCharterFont(input: unknown): Promise<{ ok: boolean; message?: string }> {
+  const parsed = oneFont.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Police invalide." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, message: NO_STUDIO };
+  const studioId = member.studio.id;
+  if (!new RegExp(`^${studioId}/fonts/[a-z0-9-]{1,60}\\.(ttf|otf|woff2?)$`).test(parsed.data.path)) return { ok: false, message: "Fichier de police invalide." };
+  try {
+    await insertProfileVersion(studioId, (current) => {
+      const mine = ((current as { custom_fonts?: { family: string; path: string }[] }).custom_fonts ?? []).filter((f) => f.family.toLowerCase() !== parsed.data.family.toLowerCase());
+      return { ...current, custom_fonts: [...mine, parsed.data].slice(-6) };
+    });
+    revalidatePath("/style");
+    return { ok: true };
+  } catch (error) {
+    console.warn("addCharterFont failed", error);
+    return { ok: false, message: FAILED };
   }
 }

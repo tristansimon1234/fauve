@@ -77,6 +77,8 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
       reservation_en_ligne: Boolean(studio.data?.booking_url),
       ton: profile.tone,
     },
+    // How its voice plays (its signature): « cool et nonchalant, un brin rock ».
+    ...(profile.signature?.narrator ? { intonation: profile.signature.narrator.delivery } : {}),
     publication: { idee: post.data.title, angle: post.data.agent_note ?? undefined },
     images,
   };

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { brandSignatureSchema, SIGNATURE_GUIDE } from "./signature.ts";
+import { SIGNATURE_GUIDE, signatureReadingSchema } from "./signature.ts";
 
 // Moodboard reading: Fauve looks at the manager's inspiration images once and
 // turns them into a written art direction. The montage (editor and motion
@@ -35,12 +35,21 @@ export const moodboardReadingSchema = z.object({
       body: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).describe("Police du texte : la famille Google Fonts exacte, ou la plus proche, bien lisible"),
     })
     .describe("Les deux polices de la charte, en familles Google Fonts"),
-  signature: brandSignatureSchema.describe("La même direction en réglages, appliqués à chaque Reel et chaque photo"),
+  signature: signatureReadingSchema.describe("La même direction en réglages, appliqués à chaque Reel et chaque photo"),
 });
 export type MoodboardReading = z.infer<typeof moodboardReadingSchema>;
 
+/** A hook and a line in the business's own words, drawn in its signature on one of its photos (the Style step). */
+export const styleSampleSchema = z.object({
+  hook: z.string().max(60).describe("Une accroche de Reel courte, avec un verbe, comme ce commerce parle (6 mots au plus)"),
+  key: z.string().max(30).describe("Le mot de l'accroche qui ressort (un mot de hook, tel quel)"),
+  band: z.string().max(50).describe("Une phrase courte posée sur la vidéo : une offre, une adresse ou une invitation vraie, tirée du site"),
+});
+export type StyleSample = z.infer<typeof styleSampleSchema>;
+
 /** The reading of a site: the same, and which of its photos show the business itself. */
 export const siteLookSchema = moodboardReadingSchema.extend({
+  sample: styleSampleSchema.describe("Un exemple dans ses mots, pour lui montrer son style sur une de ses photos"),
   photos: z
     .array(z.number().int().min(1))
     .describe("Les numéros des photos du site (« photo N ») qui montrent vraiment le commerce, les plus belles et les plus parlantes d'abord, 8 au plus"),
