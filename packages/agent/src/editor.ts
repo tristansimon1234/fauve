@@ -188,6 +188,31 @@ export const editorOutputSchema = z.object({
 /** The signature transition of an ambiance: a short zoom for the lively ones, a brand-colour wipe for the calm ones. */
 const SIGNATURE: Record<MotionTemplate, "punch" | "wipe"> = { dynamique: "punch", collage: "punch", doux: "wipe", chic: "wipe" };
 
+/**
+ * In a correction, an animation whose brief did not change keeps its code, its photos and its
+ * library id before the budget of new animations is counted (a correction allows none): only
+ * the ones the editor rewrote are new. Without this, an animation over several shots, which
+ * the editor writes back as a brief, was counted as new and left out of every correction.
+ */
+export function keepWrittenAnimations(plan: EditPlan, previous: EditPlan | null): EditPlan {
+  if (!previous) return plan;
+  const written = new Map(
+    [...previous.segments.filter(isMotionSegment).map((s) => s.motion), ...(previous.layers ?? []).map((l) => l.motion)]
+      .filter((m) => m.js)
+      .map((m) => [m.brief, m] as const),
+  );
+  if (!written.size) return plan;
+  const keep = <M extends { brief: string; js?: string; template_id?: string }>(m: M): M => {
+    const kept = m.js || m.template_id ? undefined : written.get(m.brief);
+    return kept ? { ...m, code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}), ...(kept.template_id ? { template_id: kept.template_id } : {}) } : m;
+  };
+  return {
+    ...plan,
+    segments: plan.segments.map((s) => (isMotionSegment(s) ? { ...s, motion: keep(s.motion) } : s)),
+    ...(plan.layers ? { layers: plan.layers.map((l) => ({ ...l, motion: keep(l.motion) })) } : {}),
+  };
+}
+
 /** The retouch and blur of each clip in the previous version, kept on the same clip in the new one. */
 export function carryRetouch(plan: EditPlan, previous: EditPlan | null): EditPlan {
   if (!previous) return plan;
@@ -382,8 +407,9 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
         return scene ? [{ scene, duration }] : [];
       }
     }
-    // Free scenes are the costly part of a montage: past the cap, the fixed fallback plays instead.
-    if (isMotionSegment(s) && !s.motion.template_id && freeScenes++ >= maxFreeScenes && s.motion.fallback) {
+    // Free scenes are the costly part of a montage: past the cap, the fixed fallback plays instead
+    // (one already written, kept from the version corrected, is not new).
+    if (isMotionSegment(s) && !s.motion.template_id && !s.motion.js && freeScenes++ >= maxFreeScenes && s.motion.fallback) {
       return [{ scene: s.motion.fallback, duration: round(Math.min(6, Math.max(1, s.duration))) }];
     }
     if (isMotionSegment(s)) return [{ ...s, duration: round(Math.min(8, Math.max(1, s.duration))) }];
@@ -423,7 +449,10 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
   // No text under the end card, nor over an animation (it carries its own words).
   const textsEnd = plan.end_card ? duration - END_CARD_SECONDS : duration;
   const timeline = planTimeline(draft);
-  const animations = draft.segments.flatMap((s, i) => (isClipSegment(s) ? [] : [timeline.segments[i]!])).map((a) => ({ from: a.start, to: a.start + a.length }));
+  const animations = draft.segments.flatMap((s, i) => {
+    const at = timeline.segments[i]!;
+    return isClipSegment(s) ? [] : [{ from: at.start, to: at.start + at.length, words: animationWords(s) }];
+  });
   const texts = readableEnding(
     clearOfAnimations(
       // The hook is read from the first image, never after a blank half second.
@@ -468,20 +497,62 @@ export function readableEnding<T extends { from: number; to: number }>(texts: T[
   return [...sorted.slice(0, -1), { ...last, from: Math.min(last.from, from) }];
 }
 
+/** Words as compared: lower case, no accents, no punctuation. */
+const plainWords = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/** Every string in a value (a fixed scene's words). */
+const stringsIn = (v: unknown): string[] =>
+  typeof v === "string" ? [v] : Array.isArray(v) ? v.flatMap(stringsIn) : v && typeof v === "object" ? Object.values(v).flatMap(stringsIn) : [];
+
+/** The words an animation shows: its slots' texts and the words its brief quotes (« … »), or a fixed scene's words. */
+export function animationWords(s: PlanSegment): string {
+  if (isMotionSegment(s)) {
+    const quoted = [...(s.motion.brief ?? "").matchAll(/[«“"]\s*([^»”"]+?)\s*[»”"]/g)].map((m) => m[1]!);
+    return [...quoted, ...Object.values(s.motion.texts ?? {})].join(" | ");
+  }
+  if ("scene" in s) return stringsIn(s.scene).join(" | ");
+  return "";
+}
+
 /**
- * Texts moved off the animations, which carry their own words: one that starts during an
- * animation waits for its end, one that runs into it stops before it (if it still lasts
- * long enough to be read); otherwise it goes. Never over another text.
+ * Texts moved off the animations, which carry their own words: a text that only repeats
+ * the words of the animation it meets goes; one that starts during an animation waits for
+ * its end, one that runs into it stops before it (if it still lasts long enough to be
+ * read); otherwise it goes. Never over another text: one that starts while another shows
+ * waits for its end.
  */
-export function clearOfAnimations<T extends { from: number; to: number }>(texts: T[], animations: { from: number; to: number }[], end: number): T[] {
+export function clearOfAnimations<T extends { from: number; to: number; text?: string }>(
+  texts: T[],
+  animations: { from: number; to: number; words?: string }[],
+  end: number,
+): T[] {
   const kept: T[] = [];
   const free = (from: number, to: number) => to <= end + 0.001 && kept.every((k) => k.to <= from + 0.001 || k.from >= to - 0.001);
+  const repeats = (text: T, words: string | undefined) => {
+    const own = plainWords(text.text ?? "");
+    return own.split(" ").length >= 2 && Boolean(words) && ` ${plainWords(words!)} `.includes(` ${own} `);
+  };
   for (const text of [...texts].sort((a, b) => a.from - b.from)) {
     const hit = animations.find((a) => text.from < a.to - 0.05 && text.to > a.from + 0.05);
     if (!hit) {
-      kept.push(text);
+      if (free(text.from, text.to)) {
+        kept.push(text);
+        continue;
+      }
+      // Over a text shown before it: it waits for its end (the same end), if it still reads.
+      const from = round(Math.max(...kept.filter((k) => k.to > text.from + 0.001 && k.from < text.to - 0.001).map((k) => k.to)));
+      const clear = !animations.some((a) => from < a.to - 0.05 && text.to > a.from + 0.05);
+      if (text.to - from >= 1.2 && clear && free(from, text.to)) kept.push({ ...text, from });
       continue;
     }
+    // The animation already says it (an animated hook and the same words written after it).
+    if (repeats(text, hit.words)) continue;
     const length = text.to - text.from;
     // Starts before the animation: stops just before it, if that still reads.
     if (text.from < hit.from && hit.from - text.from >= 1.2 && free(text.from, hit.from)) {

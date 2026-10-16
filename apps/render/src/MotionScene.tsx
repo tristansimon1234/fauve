@@ -12,6 +12,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { Fit } from "./Fit";
+import { PaperCutout, type RimSpec } from "./PaperCutout";
 import { SceneView } from "./Scene";
 import type { Theme } from "./theme";
 import type { ReelProps, Scene, ScenePhoto } from "./types";
@@ -20,37 +21,30 @@ import type { ReelProps, Scene, ScenePhoto } from "./types";
 // smoke-rendered before reaching here). It only sees this scope; any error at
 // render time falls back to the fixed scene, so a video always goes out.
 
-/** A white scissor rim around a cut-out (drop-shadows of paper colour all around), then a warm shadow. */
-function scissorRim(rim: number, shadow: boolean): string {
-  const d = Math.round(rim * 0.7);
-  const paper = "#FBFAF7";
-  return [
-    ...(rim > 0 ? [[rim, 0], [-rim, 0], [0, rim], [0, -rim], [d, d], [-d, -d], [d, -d], [-d, d]].map(([x, y]) => `drop-shadow(${x}px ${y}px 0 ${paper})`) : []),
-    ...(shadow ? [`drop-shadow(0 ${Math.round(rim * 3 + 8)}px ${Math.round(rim * 3.5 + 10)}px rgba(40,26,10,0.32))`] : []),
-  ].join(" ");
-}
+/** A white scissor rim around a cut-out (shadows of paper colour all around), then a warm shadow. */
+const scissorRim = (rim: number, shadow: boolean): RimSpec => ({
+  rim: Math.max(0, rim),
+  diag: Math.round(Math.max(0, rim) * 0.7),
+  ...(shadow ? { shadow: { y: Math.round(Math.max(0, rim) * 3 + 8), blur: Math.round(Math.max(0, rim) * 3.5 + 10), color: "rgba(40,26,10,0.32)" } } : {}),
+});
 
 /**
  * A photo's subject, cut out: drawn so that the subject's box has its top-left corner
  * at (x, y) and is `height` px high (its width follows the photo); a white scissor rim
- * (`rim` px) and a warm shadow by default. Nothing when the photo has no clean cut-out.
+ * (`rim` px) and a warm shadow by default, drawn once (PaperCutout). Nothing when the
+ * photo has no clean cut-out.
  */
 function Cutout({ photo, x, y, height, rim = 10, shadow = true, style }: { photo?: ScenePhoto; x: number; y: number; height: number; rim?: number; shadow?: boolean; style?: CSSProperties }) {
   if (!photo?.cutout || !photo.subject || !(photo.subject.h > 0) || !(height > 0)) return null;
   const frameHeight = height / photo.subject.h;
   const frameWidth = frameHeight * photo.aspect;
   return (
-    <Img
+    <PaperCutout
       src={photo.cutout}
-      style={{
-        position: "absolute",
-        left: x - photo.subject.x * frameWidth,
-        top: y - photo.subject.y * frameHeight,
-        width: frameWidth,
-        height: frameHeight,
-        filter: scissorRim(rim, shadow) || undefined,
-        ...style,
-      }}
+      width={frameWidth}
+      height={frameHeight}
+      spec={scissorRim(rim, shadow)}
+      style={{ left: x - photo.subject.x * frameWidth, top: y - photo.subject.y * frameHeight, ...style }}
     />
   );
 }

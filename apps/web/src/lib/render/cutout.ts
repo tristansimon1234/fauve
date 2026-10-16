@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { CUTOUT_MODEL, cutoutSchema, stickerWorthy, type Cutout, type ReelInputs, type ScenePhoto } from "@fauve/agent";
+import { CUTOUT_MODEL, cutEdges, cutoutSchema, sceneWorthy, stickerWorthy, type Cutout, type ReelInputs, type ScenePhoto } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cutoutCostEur, cutoutsInSandbox } from "./sandbox";
 
@@ -60,9 +60,15 @@ export async function ensureCutouts(studioId: string, mediaIds: string[]): Promi
   }
 }
 
+/** A cut-out an animation can use (sceneWorthy: a clean edge, even cut by the photo's frame), kept for this studio. */
+function sceneCutout(studioId: string, raw: unknown): Cutout | null {
+  const cutout = cutoutSchema.safeParse(raw);
+  return cutout.success && sceneWorthy(cutout.data) && cutout.data.path.startsWith(`${studioId}/`) ? cutout.data : null;
+}
+
 /**
  * Her photos as an animation may compose with them, in the order given: what each shows,
- * its link (2 h) and shape, and its cut-out with the subject's box when the cut-out is clean.
+ * its link (2 h) and shape, and its cut-out with the subject's box and the edges that cut it.
  */
 export async function photoOffers(studioId: string, ids: string[]): Promise<{ id: string; shows: string; photo: ScenePhoto }[]> {
   if (!ids.length) return [];
@@ -71,8 +77,7 @@ export async function photoOffers(studioId: string, ids: string[]): Promise<{ id
   const photos = ids.flatMap((id) => {
     const a = (assets ?? []).find((x) => x.id === id && x.kind === "image" && x.storage_path);
     if (!a) return [];
-    const cutout = cutoutSchema.safeParse(a.cutout);
-    const clean = cutout.success && cutout.data.sticker && cutout.data.path.startsWith(`${studioId}/`) ? cutout.data : null;
+    const clean = sceneCutout(studioId, a.cutout);
     const read = (a.regions ?? {}) as { width?: number; height?: number; detection?: { notes?: string } };
     // Its shape from its reading, else from its cut-out (framed like the photo).
     const aspect = read.width && read.height ? read.width / read.height : clean ? clean.w / clean.h : 3 / 4;
@@ -86,8 +91,35 @@ export async function photoOffers(studioId: string, ids: string[]): Promise<{ id
     const src = url(p.path);
     if (!src) return [];
     const cut = p.clean ? url(p.clean.path) : null;
-    return [{ id: p.id, shows: p.shows, photo: { src, aspect: p.aspect, ...(cut && p.clean ? { cutout: cut, subject: p.clean.box } : {}) } }];
+    const edges = p.clean ? cutEdges(p.clean.touches) : [];
+    return [
+      {
+        id: p.id,
+        shows: p.shows,
+        photo: { src, aspect: p.aspect, ...(cut && p.clean ? { cutout: cut, subject: p.clean.box, ...(edges.length ? { cutEdges: edges } : {}) } : {}) },
+      },
+    ];
   });
+}
+
+/** The cut-outs the animations of a Reel compose with, signed for the render and the live preview, with the edges that cut them. */
+export async function sceneCutoutInputs(studioId: string, photoIds: string[]): Promise<NonNullable<ReelInputs["sceneCutouts"]>> {
+  if (!photoIds.length) return {};
+  const db = supabaseAdmin();
+  const { data: assets } = await db.from("media_assets").select("id, cutout").eq("studio_id", studioId).in("id", photoIds);
+  const usable = (assets ?? []).flatMap((a) => {
+    const cutout = sceneCutout(studioId, a.cutout);
+    return cutout ? [{ id: a.id as string, cutout }] : [];
+  });
+  if (!usable.length) return {};
+  const signed = await db.storage.from("media").createSignedUrls(usable.map((s) => s.cutout.path), 7200);
+  return Object.fromEntries(
+    usable.flatMap((s, i) => {
+      const src = signed.data?.[i]?.signedUrl;
+      const edges = cutEdges(s.cutout.touches);
+      return src ? [[s.id, { src, box: s.cutout.box, ...(edges.length ? { edges } : {}) }]] : [];
+    }),
+  );
 }
 
 /** The stickers of a collage: each photo whose cut-out makes one, signed for the render and the live preview. */

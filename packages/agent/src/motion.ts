@@ -96,7 +96,14 @@ export type ReelSegment =
  * and, when its subject cuts out cleanly, the cut-out (framed like the photo) and the
  * subject's box in it (shares of the photo). Mirrors apps/render/src/types.ts.
  */
-export type ScenePhoto = { src: string; aspect: number; cutout?: string; subject?: { x: number; y: number; w: number; h: number } };
+export type ScenePhoto = {
+  src: string;
+  aspect: number;
+  cutout?: string;
+  subject?: { x: number; y: number; w: number; h: number };
+  /** The edges of the photo that cut the subject (a bust at the bottom, a shoulder on the left): it comes in from there. */
+  cutEdges?: ("top" | "bottom" | "left" | "right")[];
+};
 export type ReelText = {
   text: string;
   style: "hook" | "band" | "caption";
@@ -219,6 +226,8 @@ export type ReelInputs = {
   cutouts?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
   /** Each photo's width / height (from its reading), for the free scenes that compose with it. */
   photoAspects?: Record<string, number>;
+  /** The cut-outs an animation can use (clean edge, even cut by the photo's frame), with the edges that cut them. */
+  sceneCutouts?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number }; edges?: ("top" | "bottom" | "left" | "right")[] }>;
 };
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
@@ -286,12 +295,20 @@ export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): 
 }
 
 /** The photos a free scene composes with, in its order: each one's link, shape and clean cut-out (a missing photo is left out). */
-export function scenePhotos(ids: string[], inputs: Pick<ReelInputs, "clipUrls" | "cutouts" | "photoAspects">): ScenePhoto[] {
+export function scenePhotos(ids: string[], inputs: Pick<ReelInputs, "clipUrls" | "cutouts" | "photoAspects" | "sceneCutouts">): ScenePhoto[] {
   return ids.flatMap((id) => {
     const src = inputs.clipUrls[id];
     if (!src) return [];
-    const cut = inputs.cutouts?.[id];
-    return [{ src, aspect: inputs.photoAspects?.[id] ?? 3 / 4, ...(cut ? { cutout: cut.src, subject: cut.box } : {}) }];
+    const loose = inputs.sceneCutouts?.[id];
+    const cut = loose ?? inputs.cutouts?.[id];
+    return [
+      {
+        src,
+        aspect: inputs.photoAspects?.[id] ?? 3 / 4,
+        ...(cut ? { cutout: cut.src, subject: cut.box } : {}),
+        ...(loose?.edges?.length ? { cutEdges: loose.edges } : {}),
+      },
+    ];
   });
 }
 

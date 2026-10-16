@@ -30,7 +30,7 @@ import { logoTone } from "./logo-tone";
 import { withMusic } from "./music";
 import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
-import { ensureCutouts, stickerInputs } from "./cutout";
+import { ensureCutouts, sceneCutoutInputs, stickerInputs } from "./cutout";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -121,8 +121,9 @@ export async function loadMontageInputs(
   // A collage lays the subject of a photo as a sticker when its cut-out is clean; in any Reel, an
   // animation composes with the photos it names, and their clean cut-outs.
   const withPhotos = scenePhotoIds(plan);
-  const cutFor = template === "collage" && plan.template === "collage" ? [...new Set([...photoIds, ...withPhotos])] : withPhotos;
-  const cutouts = cutFor.length ? await stickerInputs(studioId, cutFor).catch(() => ({})) : undefined;
+  const cutouts = template === "collage" && plan.template === "collage" ? await stickerInputs(studioId, photoIds).catch(() => ({})) : undefined;
+  // The animations' cut-outs: a clean edge is enough, even cut by the photo's frame (the animation brings the subject in from there).
+  const sceneCutouts = withPhotos.length ? await sceneCutoutInputs(studioId, withPhotos).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
   const photoAspects = Object.fromEntries(
     assets.flatMap((a) => {
@@ -159,6 +160,7 @@ export async function loadMontageInputs(
     studioName: (studio.data?.name as string | null) ?? "",
     voice,
     cutouts,
+    sceneCutouts,
     photoAspects,
   };
 }
@@ -200,7 +202,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   // and those an animation composes with (the design step has usually made them already).
   const toCut = plan.template === "collage" ? planMediaIds(plan) : scenePhotoIds(plan);
   if (toCut.length) await ensureCutouts(studioId, toCut);
-  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, signature, voice, cutouts, photoAspects } =
+  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, signature, voice, cutouts, sceneCutouts, photoAspects } =
     await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
@@ -234,6 +236,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         brand: { name: studioName, accent, logoUrl, logoOnDark, fonts, colors, customFonts, signature },
         ...(voice ? { voice } : {}),
         ...(cutouts ? { cutouts } : {}),
+        ...(sceneCutouts ? { sceneCutouts } : {}),
         photoAspects,
       });
       // Library scenes play with new texts, older plans predate the layout check: every

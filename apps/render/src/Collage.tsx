@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, Img, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { Fit } from "./Fit";
+import { PaperCutout, type RimSpec } from "./PaperCutout";
 import { coverLayout, cssFilter } from "./Retouch";
 import type { Theme } from "./theme";
 import type { Box, PhotoEdit, ReelProps } from "./types";
@@ -125,18 +126,21 @@ export function printSize(props: Pick<ReelProps, "width" | "height">): { width: 
   return { width: w - 2 * edge, height: h - 2 * edge };
 }
 
+/** Where a sticker's subject begins, from the top of the frame (px; its card upright, before it lifts). */
+export function stickerTop(props: Pick<ReelProps, "width" | "height">, sticker: Pick<Sticker, "box" | "edit">): number {
+  const k = props.width / 1080;
+  const { h, edge } = cardSize(props);
+  const layout = coverLayout(printSize(props), sticker.edit.source, sticker.edit.adjust);
+  return (props.height - h) / 2 + 30 * k + edge + layout.top + sticker.box.y * layout.height;
+}
+
 /**
  * The white scissor edge of a sticker, cut a few millimetres around its subject, and the
  * paper's warm shadow under it: shadows of the same white stacked in every direction.
  */
-function rim(k: number): string {
+function stickerRim(k: number): RimSpec {
   const w = Math.max(3, Math.round(5 * k));
-  const d = Math.round(w * 0.7);
-  const paper = "#FBFAF7";
-  return [
-    ...[[w, 0], [-w, 0], [0, w], [0, -w], [d, d], [-d, -d], [d, -d], [-d, d]].map(([x, y]) => `drop-shadow(${x}px ${y}px 0 ${paper})`),
-    `drop-shadow(0 ${Math.round(16 * k)}px ${Math.round(18 * k)}px rgba(40,26,10,0.32))`,
-  ].join(" ");
+  return { rim: w, diag: Math.round(w * 0.7), shadow: { y: Math.round(16 * k), blur: Math.round(18 * k), color: "rgba(40,26,10,0.32)" } };
 }
 
 /**
@@ -166,9 +170,17 @@ function StickerLayer({ sticker, k, size }: { sticker: Sticker; k: number; size:
           height: layout.height,
           transform: `translateY(${-(1 - p) * 30 * k - 8 * k}px) scale(${scale}) rotate(${(1 - p) * -3}deg)`,
           transformOrigin: origin,
+          willChange: "transform",
         }}
       >
-        <Img src={sticker.src} style={{ width: "100%", height: "100%", display: "block", filter: [sticker.grade, cssFilter(sticker.edit.adjust), rim(k)].filter(Boolean).join(" ") }} />
+        <PaperCutout
+          src={sticker.src}
+          width={layout.width}
+          height={layout.height}
+          spec={stickerRim(k)}
+          filter={[sticker.grade, cssFilter(sticker.edit.adjust)].filter(Boolean).join(" ") || undefined}
+          style={{ left: 0, top: 0 }}
+        />
       </div>
     </AbsoluteFill>
   );

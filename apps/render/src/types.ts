@@ -20,7 +20,14 @@ export type Box = { x: number; y: number; w: number; h: number };
  * and, when its subject cuts out cleanly, the cut-out (an image with transparency, framed
  * like the photo) and the subject's box in it (shares of the photo).
  */
-export type ScenePhoto = { src: string; aspect: number; cutout?: string; subject?: Box };
+export type ScenePhoto = {
+  src: string;
+  aspect: number;
+  cutout?: string;
+  subject?: Box;
+  /** The edges of the photo that cut the subject (a bust at the bottom, a shoulder on the left): it comes in from there. */
+  cutEdges?: ("top" | "bottom" | "left" | "right")[];
+};
 export type RegionKind = "face" | "plate" | "screen" | "document" | "other";
 export type PhotoEdit = { source: { width: number; height: number }; adjust?: Adjust; blur?: (Box & { kind: RegionKind; shape: "ellipse" | "rect" })[] };
 export type ClipBlur = { aspect: number; tracks: { kind: RegionKind; keys: (Box & { t: number })[] }[] };

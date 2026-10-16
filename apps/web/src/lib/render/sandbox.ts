@@ -109,7 +109,8 @@ async function withTimeLeft(sandbox: Sandbox): Promise<Sandbox> {
   if (sandbox.status !== "running") return sandbox;
   const left = (sandbox.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY) - Date.now();
   if (left < JOB_MS) {
-    await sandbox.extendTimeout(JOB_MS - Math.max(0, left)).catch((error: unknown) => console.warn("render sandbox: timeout not extended", error));
+    // At least a minute: the API refuses an extension under a second (a session just short of the job's time).
+    await sandbox.extendTimeout(Math.max(60_000, JOB_MS - Math.max(0, left))).catch((error: unknown) => console.warn("render sandbox: timeout not extended", error));
   }
   return sandbox;
 }
