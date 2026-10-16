@@ -16,7 +16,7 @@ import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
 import { Backdrop, SceneView } from "./Scene";
-import { ClipBlurLayer, cssFilter, Photo } from "./Retouch";
+import { ClipBlurLayer, cssFilter, ExposureFilters, Photo } from "./Retouch";
 import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
 import { TEXT_Y, themeFor, type Theme } from "./theme";
@@ -52,6 +52,7 @@ export function Reel(props: ReelProps) {
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
+      <ExposureFilters />
       {collage ? <CollageBackdrop props={props} /> : null}
       {props.segments.map((segment, i) => (
         <Sequence
@@ -881,8 +882,12 @@ function Logo({ props, k }: { props: ReelProps; k: number }) {
 /** Where the voice's subtitles sit: low, above the apps' buttons and caption (a line set meanwhile moves up). */
 const SUBTITLE_Y = 0.64;
 
-/** A tight dark halo and a soft shadow: subtitles stay sharp on a bright picture. */
-const SUBTITLE_SHADOW = "0 0 3px rgba(0,0,0,0.55), 0 2px 10px rgba(0,0,0,0.45)";
+/** A thin dark outline behind the letters and a short shadow, as native captions: sharp on a white wall, no grey veil. */
+const subtitleEdge = (k: number): CSSProperties => ({
+  WebkitTextStroke: `${(3 * k).toFixed(2)}px rgba(0,0,0,0.72)`,
+  paintOrder: "stroke fill",
+  textShadow: `0 ${(2 * k).toFixed(2)}px ${(4 * k).toFixed(2)}px rgba(0,0,0,0.35)`,
+});
 
 /** A phrase's end: the next words start a new line of subtitles. */
 const PHRASE_END = /[.,!?;:…]$/;
@@ -919,27 +924,15 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
         textTransform: s.uppercase ? "uppercase" : "none",
         lineHeight: 1.3,
         color: "#fff",
-        textShadow: SUBTITLE_SHADOW,
-        // Its own layer, so the shade sits behind the words and above the picture.
-        isolation: "isolate",
+        ...subtitleEdge(k),
       }}
     >
-      {/* A soft shade behind the words: they read on a white wall too. */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: `${-40 * k}px ${-30 * k}px`,
-          zIndex: -1,
-          background: "radial-gradient(ellipse 62% 58% at 50% 50%, rgba(10,8,18,0.42) 0%, rgba(10,8,18,0.18) 55%, rgba(10,8,18,0) 100%)",
-        }}
-      />
       {chunk.map((word, i) => {
         const active = frame >= word.from && frame <= word.to;
         const style: CSSProperties = !active
           ? {}
           : s.highlight === "pill"
-            ? { background: props.brand.accent, color: props.brand.accentInk, borderRadius: 10 * k, padding: `0 ${10 * k}px`, textShadow: "none" }
+            ? { background: props.brand.accent, color: props.brand.accentInk, borderRadius: 10 * k, padding: `0 ${10 * k}px`, textShadow: "none", WebkitTextStroke: 0 }
             : s.highlight === "serif"
               ? // Its display font's italic, a touch larger (serif faces run small), like the words its site sets apart.
                 { fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontWeight: 400, fontSize: "1.1em", textTransform: "none" }

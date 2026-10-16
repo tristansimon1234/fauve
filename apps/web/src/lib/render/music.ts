@@ -48,8 +48,9 @@ const MOODS: Record<string, { words: string; tags: string[] }> = {
   collage: { words: "a playful indie pop groove: handclaps, ukulele and glockenspiel, a bouncy bass, a whistled hook, quirky and fun", tags: ["indie pop", "playful", "lo-fi"] },
 };
 
-/** Under a voice: the groove stays, the melody steps back. */
-const UNDER_VOICE = "a sparse, mellow lo-fi groove that sits under a spoken voice-over: soft drums, a warm bass, a few chords, no lead melody competing with the voice";
+/** Under a voice: its own sound stays (the groove, the bass, the drums), only the melody steps back. */
+const underVoice = (sound: string) =>
+  `${sound}, arranged to sit under a spoken voice-over: the drums, the bass and the groove carry the track with the same energy, the lead melody steps back (sparse, no solo, nothing competing with the voice)`;
 
 /** What the composer is asked for: the business, its own sound (else the template's groove), and the art direction adjustments. */
 function brief(plan: EditPlan, business: string | null, adjustments: string[], sound?: string): { description: string; tags: string[] } {
@@ -58,15 +59,17 @@ function brief(plan: EditPlan, business: string | null, adjustments: string[], s
   const mood = sound ? { words: `${sound}: the sound of this business, played like a track a creator would pick, with one simple hook`, tags: [sound.slice(0, 40)] } : ambiance;
   const where = business ? `a ${business}` : "a neighbourhood business";
   const notes = adjustments.length ? ` Notes from the owner: ${adjustments.join("; ").slice(0, 300)}.` : "";
-  // The cuts sit on this tempo's beats (snapToTempo): the music keeps it, so they land on the beat. Over her voice there is no grid.
-  const bpm = plan.voice ? null : TEMPLATE_BPM[plan.template as MotionTemplate];
-  const tempo = bpm ? ` Steady tempo of ${bpm} BPM, the video's cuts fall on the beats.` : "";
+  // The cuts sit on this tempo's beats (snapToTempo): the music keeps it, so they land on the beat.
+  // Over a voice the cuts follow its phrases, the tempo only keeps the energy of the ambiance.
+  const bpm = TEMPLATE_BPM[plan.template as MotionTemplate];
+  const tempo = !bpm ? "" : plan.voice ? ` Around ${bpm} BPM.` : ` Steady tempo of ${bpm} BPM, the video's cuts fall on the beats.`;
   return {
     description:
-      `Instrumental track for an Instagram Reel of ${where}, the kind of track a content creator picks, not advertising music: ${plan.voice ? UNDER_VOICE : mood.words}. No vocals.${tempo} ` +
+      // A voice never brings a sound of its own: the business's genre (else the ambiance's) stays under it.
+      `Instrumental track for an Instagram Reel of ${where}, the kind of track a content creator picks, not advertising music: ${plan.voice ? underVoice(sound ? `${sound}: the sound of this business` : ambiance.words) : mood.words}. No vocals.${tempo} ` +
       `On the groove from the very first second (no intro, no fade-in), it holds the groove and ends cleanly on the last shot. ` +
       `Not corporate, not stock music, no inspirational build-up, no cinematic swells, no jingle, no cliché of the place.${notes}`.slice(0, 1000),
-    tags: [...(plan.voice ? ["lo-fi", "chillhop"] : mood.tags), "instrumental", "modern"],
+    tags: [...mood.tags, "instrumental", "modern"],
   };
 }
 

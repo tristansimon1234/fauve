@@ -52,8 +52,12 @@ const extensionByMime: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  "video/3gpp": "3gp",
   "audio/ogg": "ogg",
   "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/aac": "aac",
+  "audio/amr": "amr",
   "application/pdf": "pdf",
 };
 
@@ -62,7 +66,8 @@ async function storeMedia(studioId: string, message: InboundMessage): Promise<{ 
   if (!ref) return null;
   const db = supabaseAdmin();
   const file = await downloadMedia(ref.id);
-  const ext = extensionByMime[file.mimeType] ?? "bin";
+  // A voice note comes as « audio/ogg; codecs=opus »: the type without its parameters names the file.
+  const ext = extensionByMime[file.mimeType.split(";")[0]!.trim().toLowerCase()] ?? "bin";
   const path = `${studioId}/whatsapp/${message.id}.${ext}`;
   const upload = await db.storage.from("media").upload(path, file.bytes, { contentType: file.mimeType, upsert: true });
   if (upload.error) throw new Error(upload.error.message);

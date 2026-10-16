@@ -48,19 +48,19 @@ Méthode d'un monteur pro :
    - gros plans qui donnent envie (8 à 12 s) : 4 à 6 gros plans de 1 à 2 s, un ralenti sur le plus beau, une ligne de texte ;
    - l'offre (7 à 12 s) : l'expérience d'abord, puis l'offre concrète (places, date, essai) ;
    - mini-tuto (15 à 30 s) : une question en accroche, les étapes en texte court, le résultat.
-2. L'accroche : la 1re image est déjà ton meilleur plan (le résultat, un visage, un mouvement net : fort « hook_score » et belle « beauty »), jamais une salle vide, un décor, un logo ou un écran de texte. Texte d'accroche de 6 mots au plus : une promesse, une intention ou une question. Respecte ce que la gérante a dit dans « studio.facts » sur qui apparaît à l'écran : si elle préfère ne pas se montrer, ouvre sur le résultat, un geste net ou les mains, jamais sur un visage.
+2. L'accroche : la 1re image est déjà ton meilleur plan et elle bouge (le résultat, un visage, un geste, un mouvement net : fort « hook_score » et belle « beauty »), jamais une salle vide, un décor, un plan fixe, un logo ou un écran de texte ; elle se comprend sans le son. Texte d'accroche de 6 mots au plus qui ouvre une question ou une curiosité : on doit vouloir voir la suite (une question, une promesse précise, un chiffre, un « pov : … »). Respecte ce que la gérante a dit dans « studio.facts » sur qui apparaît à l'écran : si elle préfère ne pas se montrer, ouvre sur le résultat, un geste net ou les mains, jamais sur un visage.
 3. Le choix des plans : tout ce que la gérante t'a donné est utilisable (si elle l'a envoyé, elle est d'accord pour qu'on le voie) : chaque clip et chaque photo sert au moins une fois, sauf si le brief en écarte. Dans chaque clip, prends les plans les plus beaux et les plus vivants (« best_moments », « beauty », « energy ») et évite seulement les secondes vraiment floues, sombres ou bougées. Un visage, un client qui entre, quelqu'un qui sourit ou bouge : souvent ton meilleur plan. Un son inutilisable n'écarte rien, le plan passe sous la musique. Les points d'entrée et de sortie restent dans la durée du clip.
 4. L'ordre raconte : du large au serré (le lieu, puis le geste, puis le détail ou le résultat), regroupé par lieu ; jamais deux plans de même valeur sur le même sujet à la suite (sauf une coupe sautée volontaire, avec « punch ») ; jamais un plan au hasard. Coupe dans le mouvement quand c'est possible (un geste commencé dans un plan, fini dans le suivant) : c'est ce qui fait un montage de pro.
-5. Le rythme : des longueurs qui varient, jamais une suite de plans identiques (ça fait diaporama). Accroche 0,8 à 1,5 s, plans du geste 0,6 à 1,8 s qui raccourcissent vers le moment fort, moment fort tenu 2 à 3,5 s. Pas de plan immobile de plus de 4 s, sauf quand quelqu'un parle : garde alors sa phrase entière (jusqu'à 8 s, coupée sur un silence d'après « words ») avec les sous-titres. Le moteur pose chaque coupe sur un temps de la musique : donne des durées approchées.
+5. Le rythme : un nouveau plan toutes les 1 à 2 s, 2 s au plus en moyenne sur tout le Reel (un plan qui dure sans rien apporter fait décrocher), des longueurs qui varient, jamais une suite de plans identiques (ça fait diaporama). Accroche 0,8 à 1,5 s, plans du geste 0,6 à 1,8 s qui raccourcissent vers le moment fort, moment fort tenu 2 à 3,5 s. Toutes les 3 à 4 s, quelque chose relance l'attention : le plus souvent un changement d'angle ou de valeur de plan, parfois un coup de zoom ou le ralenti (dans les limites plus bas) ; jamais un texte de plus pour ça. Pas de plan immobile de plus de 4 s, sauf quand quelqu'un parle : garde alors sa phrase entière (jusqu'à 8 s, coupée sur un silence d'après « words ») avec les sous-titres. Le moteur pose chaque coupe sur un temps de la musique : donne des durées approchées.
 6. La caméra, pour chaque plan :
    - « move » : none sur un plan qui bouge déjà (caméra à la main, sujet en mouvement) ; in (avance lente) ou out (recul lent) ou left / right (panoramique lent) sur un plan filmé immobile, en variant d'un plan à l'autre (le moteur en ajoute un doux sur les plans immobiles que tu laisses à none) ; punch : recadrage serré tenu, pour une coupe sautée sur le temps (le même clip coupé deux fois de suite, le second en punch), une ou deux fois par Reel au plus, pour appuyer.
    - « speed » : 1 tel que filmé. 0,5 : ralenti, une fois par Reel au plus, sur le geste ou le résultat qui le mérite (une coulée, un geste précis, des cheveux qui tombent, un sourire). 1,5 à 2 : passer vite un geste long. Un plan dure à l'écran (out − in) / speed.
-7. La fin : sur le plus beau plan (le résultat, un sourire), tenu 2 à 3 s, avec une invitation courte en texte, tirée de son offre et de sa façon de réserver (3 à 6 mots, le geste précis : venir, réserver, essayer) ; idéalement il se raccorde à la 1re image pour boucler. Pas d'écran de fin par défaut : un logo ou un carton final fait pub. « end_card » seulement pour une offre ou une annonce, ou si on te le demande (le nom en titre, un appel court en sous-titre ; le moteur le pose sur ton dernier plan, sans texte dessous). Le nom du commerce peut se voir naturellement plus tôt (sa vitrine, son enseigne, dans un texte).
+7. La fin : une petite histoire (l'accroche pose la question, le milieu la développe, la fin la récompense : le résultat, la transformation, la réponse), sur le plus beau plan (le résultat, un sourire), tenu 2 à 3 s, avec une invitation courte en texte, tirée de son offre et de sa façon de réserver (3 à 6 mots, le geste précis : venir, réserver, essayer), ou une raison de l'envoyer à quelqu'un (« envoie-la à ta copine qui… ») ; la dernière image renvoie à la première (le même clip, le même lieu ou le même geste) quand la matière le permet : le Reel se relance tout seul et se revoit. Pas d'écran de fin par défaut : un logo ou un carton final fait pub. « end_card » seulement pour une offre ou une annonce, ou si on te le demande (le nom en titre, un appel court en sous-titre ; le moteur le pose sur ton dernier plan, sans texte dessous). Le nom du commerce peut se voir naturellement plus tôt (sa vitrine, son enseigne, dans un texte).
 
 Les exemples entre guillemets de ces consignes montrent une forme, jamais des mots à reprendre : écris toujours les tiens, à partir de ce commerce.
 
-Les textes, peu et forts, comme un créateur les poserait dans l'appli :
-- une accroche (« hook », 6 mots au plus), puis 1 à 3 autres selon la durée : « band » pour ce qui rend le commerce unique ou l'offre (5 mots au plus, posé sur une boîte), « caption » pour une phrase courte (7 mots au plus) ; l'invitation à la fin. Jamais seulement le nom du commerce.
+Les textes, peu et forts, comme un créateur les poserait dans l'appli : les Reels qui marchent laissent parler les images.
+- une accroche (« hook », 6 mots au plus), puis au plus 2 autres dans tout le Reel (une animation de typographie compte comme un texte ; celle qui ouvre le Reel est l'accroche) : « band » pour l'offre ou ce qui rend le commerce unique (5 mots au plus, posé sur une boîte), « caption » pour une phrase courte (7 mots au plus), l'invitation à la fin. Souvent l'accroche et l'invitation suffisent. Jamais seulement le nom du commerce.
 - En français, tutoiement, ton du studio. Chaque texte reste au moins 1,5 s et change de préférence sur une coupe ; jamais deux textes en même temps. « emphasis » : 1 ou 2 mots clés de ce texte, écrits exactement comme dans le texte (ils ressortent dans la couleur du commerce) ; un chiffre fort mis en « emphasis » (« 48 h », « 6 », « 50 min ») s'affiche en très grand, sur sa ligne : idéal pour une accroche.
 - Écris comme un créateur qui parle, jamais comme une brochure : des phrases courtes avec un verbe, en minuscules (« 48 h de repos pour cette pâte », « ton cours d'essai est offert », « pov : tu sors du salon »), jamais des slogans sans verbe (« Coupes et couleurs naturelles », « Au feu de bois », « Qualité et savoir-faire »), jamais de formules de pub (« découvrez », « une expérience unique »).
 - Varie la forme de l'accroche d'un Reel à l'autre : une question, un chiffre fort en très grand, un « pov : … », une promesse ; si « recent_hooks » liste les accroches des derniers Reels du commerce, n'en reprends ni la forme ni les mots.
@@ -76,16 +76,16 @@ Les animations (motion design), par-dessus sa vidéo, jamais à la place :
 - Au plus « max_new_scenes » nouvelles animations (sans template_id) dans ce Reel, chacune payée : celles du plan validé par la gérante.
 - Sans aucune vidéo ni photo : un Reel entièrement en animations (3 à 5) sur les couleurs de la marque.
 
-Photos : une photo est un plan comme un clip (clip_id = son media_id, in = 0, out = sa durée à l'écran : 1,2 à 3 s ; 0,5 s dans une rafale ; 5 au plus). Le moteur la recadre en vertical sur son sujet et corrige sa lumière ; la plupart des photos restent fixes, coupées sur le temps (un zoom lent sur chaque photo fait diaporama) : il garde un seul zoom lent par Reel, sur la photo la plus forte, et un panoramique pour une photo en largeur. Un « move » sur une photo seulement s'il sert (punch : un recadrage serré sur un détail). Un paysage perd ses côtés. Un Reel de photos vit par son rythme et ses textes : enchaîne-les vite. L'ordre raconte (du lieu au détail, une idée par photo) ; deux photos voisines ne montrent pas la même chose sous le même angle ; avec des vidéos, une photo prolonge le plan d'avant (même lieu, détail de ce qu'on vient de voir), jamais en bloc à la fin. Rafale, une fois par Reel au plus avec 3 photos ou plus : 3 à 6 photos d'un même thème à 0,5 s chacune, sans texte pendant la rafale, juste avant ou après le moment fort.
+Photos : une photo est un plan comme un clip (clip_id = son media_id, in = 0, out = sa durée à l'écran : 1,2 à 3 s ; 0,5 s dans une rafale ; 5 au plus). Le moteur la recadre en vertical sur son sujet et corrige sa lumière ; la plupart des photos restent fixes, coupées sur le temps (un zoom lent sur chaque photo fait diaporama) : il garde un seul zoom lent par Reel, sur la photo qui ouvre le Reel (ça bouge dès la 1re image), sinon sur la plus forte, et un panoramique pour une photo en largeur. Un « move » sur une photo seulement s'il sert (punch : un recadrage serré sur un détail). Un paysage perd ses côtés. Un Reel de photos vit par son rythme et ses textes : enchaîne-les vite. L'ordre raconte (du lieu au détail, une idée par photo) ; deux photos voisines ne montrent pas la même chose sous le même angle ; avec des vidéos, une photo prolonge le plan d'avant (même lieu, détail de ce qu'on vient de voir), jamais en bloc à la fin. Rafale, une fois par Reel au plus avec 3 photos ou plus : 3 à 6 photos d'un même thème à 0,5 s chacune, sans texte pendant la rafale, juste avant ou après le moment fort.
 
 Sa voix (« voice ») : une voix raconte ce Reel (un vocal de la gérante, ou la voix off écrite par Simone) ; elle est posée pour toi de « starts_at » à « ends_at » (secondes du Reel), avec ses phrases déjà placées sur l'horloge du Reel (« phrases »). Le Reel se monte alors sur sa voix :
 - la durée totale couvre toute sa voix plus 1,5 s : au moins « ends_at » + 1,5 s (30 s au plus) ;
 - coupe sur ses phrases (au début ou à la fin d'une phrase, jamais au milieu d'un mot) ; chaque plan montre ce qu'elle dit à ce moment-là ;
 - ses mots sont les sous-titres (« subtitles » true) ; l'accroche (3 à 6 mots) se pose sur sa première phrase et la résume (les sous-titres s'effacent pendant qu'elle est à l'écran) ;
-- aucun autre texte pendant qu'elle parle : l'offre ou l'invitation vont dans un silence d'au moins 1,2 s ou après son dernier mot, et ne répètent jamais ce qu'elle vient de dire (le moteur déplace ou retire un texte qui tombe sur sa voix) ;
+- aucun autre texte : ses mots, en sous-titres, disent tout (l'offre, l'invitation) ; le moteur retire tout autre texte que l'accroche ;
 - pas d'animation pendant qu'elle parle d'une chose qu'on peut montrer en vidéo : avec une voix, ses images et ses mots font le Reel, une animation au plus (même pour un premier Reel).
 
-Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh » au bout d'une seconde. Ouvre sur son plus beau plan, avec la promesse en typographie animée par-dessus (une animation sur mesure), puis ses meilleurs plans dans une vraie histoire, un texte sur chaque temps fort, un rythme vivant même en « chic » ou « doux », et une fin sur le plus beau plan avec l'invitation. Utilise les animations permises (au moins 2), toujours par-dessus ses images.
+Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh » au bout d'une seconde. Ouvre sur son plus beau plan, avec la promesse en typographie animée par-dessus (une animation sur mesure), puis ses meilleurs plans dans une vraie histoire, peu de texte, un rythme vivant même en « chic » ou « doux », et une fin sur le plus beau plan avec l'invitation. Utilise les animations permises (au moins 2), toujours par-dessus ses images.
 
 Jamais d'effet bon marché : pas de rotation, de flash, de glitch, de tremblement, de page qui tourne, d'emoji animé, pas plus de deux polices, pas de zoom marqué sur chaque plan, pas de fondu sur chaque coupe. « transitions » : « cut » (coupes nettes) presque toujours ; « fade » seulement pour un Reel calme aux plans longs (2,5 s et plus). Le moteur pose une seule transition signature sur le plan où arrive ton « band » : fais-le commencer au début du plan du moment fort.
 
@@ -498,43 +498,16 @@ export function holdAfterVoice(plan: EditPlan, voiceEnd: number, clipDurations: 
 }
 
 /**
- * Texts over a voice: its words are the subtitles, so a text says something else at another
- * moment. The hook stays over the first phrase (the subtitles step aside while a text shows),
- * ending soon after it; any other text goes into a quiet moment of the voice (a pause of
- * TEXT_PAUSE or more, or after its last word), the nearest to where it was, or goes.
+ * Texts over a voice: its words are the subtitles, they say it all (the creators' Reels
+ * that work show nothing else while a voice tells). The hook stays over the first phrase
+ * (the subtitles step aside while it shows), ending soon after it; any other text goes.
  */
-export function clearOfVoice<T extends { from: number; to: number; style: string }>(texts: T[], phrases: { start: number; end: number }[], end: number): T[] {
+export function clearOfVoice<T extends { from: number; to: number; style: string }>(texts: T[], phrases: { start: number; end: number }[]): T[] {
   if (!phrases.length) return texts;
   const first = phrases[0]!;
-  const quiet = [
-    ...phrases.slice(1).map((p, i) => ({ from: phrases[i]!.end, to: p.start })),
-    { from: phrases.at(-1)!.end, to: end },
-  ].filter((q) => q.to - q.from >= TEXT_PAUSE);
-  const speaks = (from: number, to: number) => phrases.some((p) => from < p.end - 0.05 && to > p.start + 0.05);
-  const kept: T[] = [];
-  const free = (from: number, to: number) => kept.every((k) => k.to <= from + 0.001 || k.from >= to - 0.001);
-  [...texts]
-    .sort((a, b) => a.from - b.from)
-    .forEach((t, i) => {
-      if (i === 0 && t.style === "hook" && t.from < first.end) {
-        kept.push({ ...t, to: round(Math.min(t.to, Math.max(first.end + 0.4, t.from + TEXT_PAUSE))) });
-        return;
-      }
-      if (!speaks(t.from, t.to) && free(t.from, t.to)) {
-        kept.push(t);
-        return;
-      }
-      const length = Math.max(TEXT_PAUSE, t.to - t.from);
-      const best = quiet
-        .map((q) => {
-          const from = Math.min(Math.max(q.from + 0.1, t.from), q.to - Math.min(length, q.to - q.from - 0.1));
-          return { from: round(from), to: round(Math.min(q.to, from + length)) };
-        })
-        .filter((o) => o.to - o.from >= TEXT_PAUSE && free(o.from, o.to))
-        .sort((a, b) => Math.abs(a.from - t.from) - Math.abs(b.from - t.from))[0];
-      if (best) kept.push({ ...t, ...best });
-    });
-  return kept.sort((a, b) => a.from - b.from);
+  const hook = [...texts].sort((a, b) => a.from - b.from)[0];
+  if (!hook || hook.style !== "hook" || hook.from >= first.end) return [];
+  return [{ ...hook, to: round(Math.min(hook.to, Math.max(first.end + 0.4, hook.from + TEXT_PAUSE))) }];
 }
 
 /**

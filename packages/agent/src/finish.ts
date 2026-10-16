@@ -104,8 +104,9 @@ function footageUnder(plan: EditPlan, i: number, facts: MediaFacts, clipDuration
 
 /**
  * How the photos of a Reel move, the way a good creator edits them: most are held still and
- * cut on the beat (a slow zoom on every photo reads as a slideshow); the strongest photo held
- * long enough gets the Reel's one slow push; a landscape photo too wide for the vertical frame
+ * cut on the beat (a slow zoom on every photo reads as a slideshow); the Reel's one slow push
+ * goes to the photo that opens it (it moves from the first image), else to the editor's own
+ * choice, else to the photo held longest; a landscape photo too wide for the vertical frame
  * a slow pan that shows more of it; never the same move on two photos in a row. A move the
  * editor chose stays, within the same limits. Returns each photo segment's move, by index.
  */
@@ -116,8 +117,9 @@ export function photoMoves(plan: Pick<EditPlan, "segments">, photos: MediaFacts[
   let pans = 0;
   let last: CameraMove = "none";
   const slow = (m: CameraMove) => m === "in" || m === "out";
-  // The one slow push: the editor's own, else the photo held longest (2 s at least).
-  const chosen = shown.find((p) => slow(p.s.move ?? "none"))?.i ?? [...shown].filter((p) => p.seconds >= 2).sort((a, b) => b.seconds - a.seconds)[0]?.i;
+  // The one slow push: the opening photo, else the editor's own, else the photo held longest (2 s at least).
+  const opening = shown[0]?.i === 0 ? 0 : undefined;
+  const chosen = opening ?? shown.find((p) => slow(p.s.move ?? "none"))?.i ?? [...shown].filter((p) => p.seconds >= 2).sort((a, b) => b.seconds - a.seconds)[0]?.i;
   for (const p of shown) {
     const wide = p.facts.width / Math.max(1, p.facts.height) > 1.25;
     let move: CameraMove = p.s.move ?? "none";

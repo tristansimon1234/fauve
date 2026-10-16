@@ -26,7 +26,9 @@ export async function ensureTranscript(studioId: string, mediaId: string): Promi
     if (file.error || !file.data) throw new Error(file.error?.message ?? "download failed");
     const form = new FormData();
     form.append("model_id", env("ELEVENLABS_STT_MODEL"));
-    form.append("file", new Blob([await file.data.arrayBuffer()], { type: (asset.mime_type as string | null) ?? "audio/ogg" }), "note");
+    // Named like its file (« ….ogg »): the format is told by its extension too.
+    const name = (asset.storage_path as string).split("/").pop() || "note.ogg";
+    form.append("file", new Blob([await file.data.arrayBuffer()], { type: (asset.mime_type as string | null) ?? "audio/ogg" }), name);
     form.append("timestamps_granularity", "word");
     form.append("tag_audio_events", "false");
     const started = Date.now();

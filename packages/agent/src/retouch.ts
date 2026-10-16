@@ -129,11 +129,30 @@ export function boxAt(keys: (Box & { t: number })[], t: number, hold = 0.4): Box
   return { x: mix(a.x, b.x), y: mix(a.y, b.y), w: mix(a.w, b.w), h: mix(a.h, b.h) };
 }
 
+/**
+ * Exposure as a photographer corrects it: a gamma curve on the mid-tones (the dark parts
+ * come out of the shadow, blacks stay black and whites are not burnt), where a plain
+ * brightness barely showed (+5 % for a dark clip) and burnt the whites. Steps of 0.05,
+ * from 0.6 (much lighter) to 1.4 (darker); null when it changes nothing.
+ */
+export function exposureGamma(exposure: number | undefined): number | null {
+  if (!exposure) return null;
+  const gamma = Math.round(Math.min(1.4, Math.max(0.6, 1 - exposure * 0.9)) * 20) / 20;
+  return Math.abs(gamma - 1) < 0.01 ? null : gamma;
+}
+
+/** The id of the SVG filter that applies a gamma step (the composition draws them all, ExposureFilters). */
+export const exposureFilterId = (gamma: number) => `fauve-exposure-${Math.round(gamma * 100)}`;
+
+/** Every gamma step a clip or a photo can ask for. */
+export const EXPOSURE_GAMMAS = Array.from({ length: 17 }, (_, i) => Math.round((0.6 + i * 0.05) * 100) / 100).filter((g) => g !== 1);
+
 /** CSS filter for an adjustment (light and colour only; framing is done by the layout). */
 export function cssFilter(a: Adjust | undefined): string | undefined {
   if (!a) return undefined;
   const parts: string[] = [];
-  if (a.exposure) parts.push(`brightness(${(1 + a.exposure * 0.35).toFixed(3)})`);
+  const gamma = exposureGamma(a.exposure);
+  if (gamma) parts.push(`url(#${exposureFilterId(gamma)})`);
   if (a.contrast) parts.push(`contrast(${(1 + a.contrast * 0.3).toFixed(3)})`);
   if (a.saturation) parts.push(`saturate(${(1 + a.saturation * 0.45).toFixed(3)})`);
   // Warmth: a touch of sepia for warm, a slight hue shift towards blue for cool.

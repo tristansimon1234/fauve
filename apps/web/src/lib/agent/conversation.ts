@@ -44,7 +44,9 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
   for (const row of rows) {
     const role = row.direction === "inbound" ? "user" : "assistant";
     const label = row.direction === "inbound" ? mediaLabels[row.type] : undefined;
-    const text = [label && `[${label}${row.media_id ? ` · media_id ${row.media_id}` : ""}]`, row.body]
+    // A voice note whose words could not be read: Simone says so instead of guessing.
+    const unheard = row.direction === "inbound" && row.type === "audio" && !row.body ? " · tu n'as pas pu l'écouter : dis-le-lui et demande-lui de l'écrire" : "";
+    const text = [label && `[${label}${row.media_id ? ` · media_id ${row.media_id}` : ""}${unheard}]`, row.body]
       .filter(Boolean)
       .join(" ");
     if (!text) continue;

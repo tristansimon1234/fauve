@@ -2,13 +2,13 @@
 // measured by ffmpeg on the rendered video and on the music), turned into fixed
 // gains: what is said (her voice note, Simone's voice, someone speaking in a clip)
 // is brought to SPEECH_LUFS, the music to the level of its case, then it ducks
-// under the speech (sidechain compressor). Set by ear and by measure on ElevenLabs
-// voices, which come out between -19 and -31 LUFS, over the music of a lab Reel
-// (about -15): before, the music could be 9 dB louder than a quiet voice; now it
-// sits about 17 dB under the voice while it speaks.
+// under the speech (sidechain compressor). Measured on creators' Reels that work
+// (about -14 LUFS overall, the music some 8 dB under the voice in its pauses and
+// still heard while it speaks) and on ElevenLabs voices, which come out between
+// -19 and -31 LUFS: before, the music fell 17 dB under the voice and vanished.
 
 /** What is said in a Reel, at the loudness of a voice in a creator's Reel. */
-export const SPEECH_LUFS = -16;
+export const SPEECH_LUFS = -14;
 
 /** A music track as ElevenLabs composes it (the live preview cannot measure it). */
 export const MUSIC_AS_COMPOSED_LUFS = -15;
@@ -18,12 +18,12 @@ export type MixCase = "music" | "voice_over" | "speech_in_clips";
 export type Ducking = { threshold: number; ratio: number; attack: number; release: number };
 
 export const MIX_CASES: Record<MixCase, { music: number; duck: Ducking | null; under: number }> = {
-  /** Nothing said: the music alone. */
-  music: { music: -15, duck: null, under: -15 },
-  /** A voice over the whole Reel: the music lies under it, and steps back again while the voice speaks. */
-  voice_over: { music: -23, duck: { threshold: 0.03, ratio: 3, attack: 20, release: 600 }, under: -33 },
-  /** Someone speaks in a few shots: the music keeps its level and ducks under them. */
-  speech_in_clips: { music: -16, duck: { threshold: 0.016, ratio: 8, attack: 20, release: 600 }, under: -33 },
+  /** Nothing said: the music alone, as loud as a creator's Reel. */
+  music: { music: -14, duck: null, under: -14 },
+  /** A voice over the whole Reel: the music lies under it and steps back a little while the voice speaks, never out of hearing. */
+  voice_over: { music: -20, duck: { threshold: 0.03, ratio: 1.6, attack: 20, release: 600 }, under: -26 },
+  /** Someone speaks in a few shots: the music keeps its level and ducks well under them. */
+  speech_in_clips: { music: -15, duck: { threshold: 0.016, ratio: 8, attack: 20, release: 600 }, under: -33 },
 };
 
 /** Peaks of the mix held under -1 dBFS. */

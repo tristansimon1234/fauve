@@ -71,7 +71,9 @@ export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Simone, 
 - l'image : pas de plan flou, trop sombre, mal cadré ou qui ne montre rien ;
 - le rythme et l'histoire : un ordre qui raconte (du large au serré, le geste puis le résultat), pas deux plans presque identiques à la suite, pas de scène inutile ou répétée, une fin claire (un dernier plan fort avec une invitation, ou le nom et l'appel à l'action), qui fait post natif et pas pub ; jamais un écran de fin par-dessus une animation ou un texte ; la ligne « Rythme » du plan te donne ce que les images ne montrent pas (longueur de chaque plan, coupes sur le temps, transition signature) : refuse un Reel mou (plans trop longs sans raison), haché (que des plans très courts) ou monotone (tous les plans de la même longueur) ;
 - jamais bon marché : pas d'effet gadget (rotation, flash, glitch, emoji animé, plus de deux polices, texte qui rebondit sans raison), pas de texte façon flyer (bloc ou surlignage penché, une pastille par mot, italique, effet machine à écrire, petite ligne fine illisible, slogan sans verbe comme « Coupes et couleurs naturelles »), au plus une transition signature ; un Reel qui fait « modèle gratuit » n'est pas ok, même s'il est lisible ; un texte posé sur un texte déjà dans l'image (enseigne, logo, lettrage) n'est pas ok ;
-- la marque : couleurs, polices et ton cohérents avec le commerce et avec ce que la gérante a demandé.
+- la marque : couleurs, polices et ton cohérents avec le commerce et avec ce que la gérante a demandé ;
+- peu de texte : les Reels qui marchent laissent parler les images (une accroche, parfois une ligne de plus) ; avec une voix, ses sous-titres disent tout : aucun autre texte que l'accroche n'est normal, ne demande jamais d'en ajouter un ;
+- la ligne « Contrôle qualité » vérifie sur le plan ce que les Reels qui marchent ont presque toujours (ça bouge dès la 1re image, une accroche écrite, des plans de 2 s au plus en moyenne hors phrases de quelqu'un qui parle, des coupes sur le temps, peu de texte) : chaque point « à revoir » devient une correction précise ; « à tenter » (une fin qui reboucle sur la 1re image) est un conseil à donner seulement si un de ses clips le permet, jamais une raison de refuser le Reel. Ces repères servent le Reel, pas l'inverse : un Reel juste pour ce commerce passe avant une case cochée.
 
 Ne relève que ce qui se voit vraiment sur les images et qui change le résultat, pas tes goûts. Une image est un instant : un texte en train d'apparaître ou une animation en mouvement n'est pas un défaut.
 
@@ -131,6 +133,7 @@ export function planDigest(plan: EditPlan): string {
     `Gabarit ${plan.template}, ${Math.round(timeline.duration)} s, ${plan.segments.length} scènes : ${plan.segments.map((s, i) => `${i + 1}. ${kindOf(s)}${isMotionSegment(s) ? ` (${s.motion.brief.slice(0, 80)})` : ""}`).join(" ; ")}.`,
     hook.length ? `Accroche : « ${hook.join(" / ")} ».` : "",
     rhythmLine(plan),
+    qualityLine(plan),
   ]
     .filter(Boolean)
     .join(" ");
@@ -165,6 +168,73 @@ export function rhythmLine(plan: EditPlan): string {
     .filter(Boolean)
     .join(" ; ")
     .concat(".");
+}
+
+/** Shots of 2 s or less on average: a new shot every 1 to 2 s keeps people watching. */
+export const MAX_AVERAGE_SHOT = 2;
+
+/** Longer, a shot is someone's sentence held whole: it is not counted in the pace. */
+const LONGEST_PACED_SHOT = 4;
+
+/** A check the Reel must pass, or one worth trying when the footage allows it. */
+export type QualityCheck = { key: "motion" | "hook" | "pace" | "beat" | "loop" | "texts"; ok: boolean; words: string; must: boolean };
+
+/**
+ * What the Reels that work almost always have, checked on the plan (the frames cannot
+ * show it all): movement from the first image, a written hook, shots of 2 s or less on
+ * average (someone's sentence on screen is left out: it keeps its length), cuts on the
+ * beat, few texts (an animation of typography counts as one, the opening one is the hook);
+ * an end that loops back to the first image is worth trying, when a clip allows it.
+ */
+export function qualityChecks(plan: EditPlan): QualityCheck[] {
+  const timeline = planTimeline(plan);
+  const first = plan.segments[0];
+  const clips = plan.segments.filter(isClipSegment);
+  // A still photo is the only first image that does not move: a video moves, or the engine gives a still shot a slow move.
+  const moves = !first || isMotionSegment(first) || !isClipSegment(first) || !first.photo || (first.move ?? (first.zoom === "light" ? "in" : "none")) !== "none" || (first.speed ?? 1) !== 1;
+  const hook = plan.texts.find((t) => t.from < 1);
+  // An opening animation is typography: the promise, written.
+  const animatedHook = Boolean(first && isMotionSegment(first));
+  // A video shot over 4 s is someone's whole sentence (the editor holds no other footage that long): it stays out of the pace.
+  const paced = timeline.segments.filter((x, i) => {
+    const segment = plan.segments[i]!;
+    return x.length <= LONGEST_PACED_SHOT || !isClipSegment(segment) || Boolean(segment.photo);
+  });
+  const average = paced.length ? paced.reduce((sum, x) => sum + x.length, 0) / paced.length : 0;
+  const beat = beatOf(plan.template);
+  const cuts = timeline.segments.slice(1).map((x) => x.start);
+  const onBeat = beat && !plan.voice && cuts.length ? cuts.filter((t) => Math.abs(t / beat - Math.round(t / beat)) * beat < 0.05).length : null;
+  const loops = clips.length >= 2 && clips[0]!.clip_id === clips.at(-1)!.clip_id;
+  // Besides the hook, every text and every animation of typography (the opening one is the hook).
+  const others = plan.texts.filter((t) => t !== hook).length + plan.segments.filter((x, i) => isMotionSegment(x) && i > 0).length;
+  return [
+    { key: "motion", must: true, ok: moves, words: moves ? "ça bouge dès la 1re image" : "la 1re image est une photo fixe" },
+    {
+      key: "hook",
+      must: true,
+      ok: Boolean(hook || animatedHook),
+      words: hook ? `accroche écrite dès la 1re seconde (« ${hook.text} »)` : animatedHook ? "accroche écrite dans l'animation d'ouverture" : "aucune accroche écrite dans la 1re seconde",
+    },
+    ...(paced.length ? [{ key: "pace" as const, must: true, ok: average <= MAX_AVERAGE_SHOT + 0.05, words: `plans de ${seconds(average)} s en moyenne (${MAX_AVERAGE_SHOT} s au plus)` }] : []),
+    ...(onBeat === null ? [] : [{ key: "beat" as const, must: true, ok: onBeat >= Math.ceil(cuts.length * 0.8), words: `${onBeat} coupes sur ${cuts.length} sur un temps de la musique` }]),
+    { key: "texts", must: true, ok: others <= 2, words: `${others} texte${others > 1 ? "s" : ""} ou animation${others > 1 ? "s" : ""} en plus de l'accroche${plan.subtitles ? " et des sous-titres" : ""} (2 au plus)` },
+    { key: "loop", must: false, ok: loops, words: loops ? "la fin reboucle sur la 1re image" : "la fin ne reboucle pas sur la 1re image" },
+  ];
+}
+
+/** The quality checks in one line for the critic: what is fine, what to look at again, what to try if the footage allows. */
+export function qualityLine(plan: EditPlan): string {
+  const checks = qualityChecks(plan);
+  const fine = checks.filter((c) => c.ok).map((c) => c.words);
+  const again = checks.filter((c) => !c.ok && c.must).map((c) => c.words);
+  const tryIt = checks.filter((c) => !c.ok && !c.must).map((c) => c.words);
+  return `Contrôle qualité : ${[
+    fine.length ? `ok : ${fine.join(", ")}` : "",
+    again.length ? `à revoir : ${again.join(", ")}` : "",
+    tryIt.length ? `à tenter si un clip le permet : ${tryIt.join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ; ")}.`;
 }
 
 /** The critic's corrections, as the brief of the editor's next version. */

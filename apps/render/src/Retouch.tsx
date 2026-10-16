@@ -7,10 +7,48 @@ import type { Adjust, Box, ClipBlur, PhotoEdit } from "./types";
 // straightening, and a backdrop blur over each sensitive zone. Mirrors
 // packages/agent/src/retouch.ts (this package ships alone to the sandbox).
 
+/**
+ * Exposure as a photographer corrects it: a gamma curve on the mid-tones (the dark parts
+ * come out of the shadow, blacks stay black and whites are not burnt), where a plain
+ * brightness barely showed (+5 % for a dark clip) and burnt the whites. Steps of 0.05,
+ * from 0.6 (much lighter) to 1.4 (darker); null when it changes nothing.
+ */
+export function exposureGamma(exposure: number | undefined): number | null {
+  if (!exposure) return null;
+  const gamma = Math.round(Math.min(1.4, Math.max(0.6, 1 - exposure * 0.9)) * 20) / 20;
+  return Math.abs(gamma - 1) < 0.01 ? null : gamma;
+}
+
+/** The id of the SVG filter that applies a gamma step (the composition draws them all, ExposureFilters). */
+export const exposureFilterId = (gamma: number) => `fauve-exposure-${Math.round(gamma * 100)}`;
+
+/** Every gamma step a clip or a photo can ask for. */
+export const EXPOSURE_GAMMAS = Array.from({ length: 17 }, (_, i) => Math.round((0.6 + i * 0.05) * 100) / 100).filter((g) => g !== 1);
+
+/** The gamma curves the exposure filters point to, drawn once in the composition (invisible). */
+export function ExposureFilters() {
+  return (
+    <svg aria-hidden width={0} height={0} style={{ position: "absolute" }}>
+      <defs>
+        {EXPOSURE_GAMMAS.map((gamma) => (
+          <filter key={gamma} id={exposureFilterId(gamma)} colorInterpolationFilters="sRGB">
+            <feComponentTransfer>
+              <feFuncR type="gamma" amplitude={1} exponent={gamma} offset={0} />
+              <feFuncG type="gamma" amplitude={1} exponent={gamma} offset={0} />
+              <feFuncB type="gamma" amplitude={1} exponent={gamma} offset={0} />
+            </feComponentTransfer>
+          </filter>
+        ))}
+      </defs>
+    </svg>
+  );
+}
+
 export function cssFilter(a: Adjust | undefined): string | undefined {
   if (!a) return undefined;
   const parts: string[] = [];
-  if (a.exposure) parts.push(`brightness(${(1 + a.exposure * 0.35).toFixed(3)})`);
+  const gamma = exposureGamma(a.exposure);
+  if (gamma) parts.push(`url(#${exposureFilterId(gamma)})`);
   if (a.contrast) parts.push(`contrast(${(1 + a.contrast * 0.3).toFixed(3)})`);
   if (a.saturation) parts.push(`saturate(${(1 + a.saturation * 0.45).toFixed(3)})`);
   if (a.warmth && a.warmth > 0) parts.push(`sepia(${(a.warmth * 0.22).toFixed(3)})`, `saturate(${(1 + a.warmth * 0.12).toFixed(3)})`);

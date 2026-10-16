@@ -12,7 +12,6 @@ import {
   carryRetouch,
   carryTextStyle,
   clearOfVoice,
-  END_CARD_SECONDS,
   holdAfterVoice,
   brandProfileSchema,
   CLAUDE_MODEL,
@@ -281,7 +280,7 @@ export async function designEdit(params: {
     // its silences (its words are the subtitles; the hook stays over its first phrase).
     const spoken = voiceForEditor(voice);
     Object.assign(plan, holdAfterVoice(plan, spoken.ends_at, durations));
-    plan.texts = clearOfVoice(plan.texts, spoken.phrases, plan.end_card ? plan.duration - END_CARD_SECONDS : plan.duration);
+    plan.texts = clearOfVoice(plan.texts, spoken.phrases);
   } else delete plan.voice;
 
   // Library scenes: their saved code, with the new texts. An unknown id becomes a new scene.

@@ -99,7 +99,7 @@ export function wantsVoiceOver(p: {
 }
 
 export const voiceOverScriptSchema = z.object({
-  hook: z.string().describe("La première phrase, celle qui arrête le pouce (moins de 2 secondes à l'oral)"),
+  hook: z.string().describe("La première phrase, celle qui arrête le pouce dès ses premiers mots"),
   script: z.string().describe("Tout ce que la voix dit, première phrase comprise, tel qu'il sera lu"),
 });
 export type VoiceOverScript = z.infer<typeof voiceOverScriptSchema>;
@@ -111,13 +111,14 @@ Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée 
 Les exemples entre guillemets ci-dessous montrent une forme, jamais des mots à reprendre : écris toujours les tiens, à partir de ce commerce et de ces images.
 
 Règles :
-- la longueur demandée, jamais plus : la voix ne dure pas plus longtemps que ce que ses images montrent (environ 2,6 mots par seconde) ; des phrases courtes, à l'oral (on peut commencer une phrase par « Et », dire « on ») ;
-- la première phrase accroche en moins de 2 secondes : une question sur un détail que seul ce commerce connaît, un détail surprenant de ses images ou une promesse précise ; jamais « Bienvenue chez… », jamais le nom du commerce en premier ;
-- suis ses images dans l'ordre, mais dis ce qu'elles font vivre (ce qu'on y ressent, ce qu'on y gagne, pourquoi venir), jamais l'inventaire de l'écran : pas de liste d'objets, de meubles ou de pièces (« douche, canapé, néon »), pas le décor pour le décor ; seulement des faits vrais (ceux qu'on te donne et ce que montrent les images), rien d'inventé : ni prix, ni chiffre, ni promesse qui ne sont pas dans ce qu'on te donne ;
+- la longueur demandée, jamais plus : la voix ne dure pas plus longtemps que ce que ses images montrent (environ 2,6 mots par seconde) ; des phrases entières et courtes, à l'oral, qui s'enchaînent (« Et », « Alors », « À ce stade », « Visiblement », dire « on ») ; jamais des bouts de phrase télégraphiques (« Et hop, au four. ») ;
+- une petite histoire, jamais une liste : (1) la première phrase accroche dès ses premiers mots en ouvrant une curiosité sur la première image (un mystère, un détail surprenant, la question qu'on se pose en la voyant) ; (2) la suivante y répond ou dévoile le commerce ; (3) le milieu monte d'un cran sur ce que montrent les images, avec un regard : une exagération juste, une image, de l'humour, ce qu'on se demande en le voyant ; (4) une chute qui fait sourire ou un fait qui marque ; (5) la fin. Formes seulement : « Si tu passes devant à 7 h, tu vas te demander ce qui se passe derrière cette vitrine… » puis « Ils préparent déjà la pâte de ce soir. » ; « À ce stade, la question n'est plus de savoir si c'est bon, mais comment le finir. » ; jamais le nom du commerce ni « Bienvenue chez… » en première phrase ;
+- suis ses images dans l'ordre et dis ce qu'on voit avec un regard : nommer un plat, un geste ou un détail est permis si la phrase y ajoute quelque chose (encore et encore, une quantité folle, presque trop) ; une suite de noms de plats, d'objets ou de pièces sans regard est interdite (« le croque qui file, la salade, le gâteau », « douche, canapé, néon »), pas le décor pour le décor ; seulement des faits vrais (ceux qu'on te donne et ce que montrent les images), rien d'inventé : ni prix, ni chiffre, ni promesse qui ne sont pas dans ce qu'on te donne ;
+- une preuve quand les images la montrent : la file devant, la salle pleine, quelqu'un qui goûte ou qui sourit, un habitué ;
 - son métier d'abord (le plat, la coupe, le cours, le soin) : un produit dérivé (vêtement, casquette, tote bag) n'est jamais le sujet, sauf si l'idée de la publication en parle ;
 - parle comme le commerce parle (« ton ») : ses mots, son humour, tutoiement ou vouvoiement comme lui ;
-- le commerce parle à la première personne (« chez nous », « ici », « je ») et tutoie la personne qui regarde, sauf si son ton vouvoie ;
-- finis par une invitation simple et concrète, qui dit quoi faire (venir, réserver, essayer : le geste précis pour ce commerce, et où le faire, par exemple « le lien est dans la bio ») ;
+- la voix est celle d'un créateur qui fait découvrir le commerce à ses abonnés : elle en parle (« ici », « chez Lina », « l'équipe »), jamais en son nom (pas de « chez nous » ni de « je » pour le commerce), et tutoie la personne qui regarde, sauf si le ton du commerce vouvoie ;
+- finis par une invitation simple et concrète, qui dit quoi faire (venir, réserver, essayer : le geste précis pour ce commerce, et où le faire, par exemple « le lien est dans la bio »), ou par une raison de l'envoyer à quelqu'un (« si tu as une gourmande autour de toi, tu sais à qui l'envoyer ») ;
 - interdit : les formules de pub (« découvrez », « n'hésitez pas », « une expérience unique », « de qualité », « savoureux », « au cœur de »), les superlatifs creux, les emojis, les hashtags, le tiret long, les parenthèses ;
 - écris les nombres en lettres quand ils se disent mal en chiffres (« dix-huit mois ») et la ponctuation d'une voix qui parle : des points, des virgules, des points de suspension pour une petite pause, une question au plus ;
 - « intonation » dit le rythme et l'attitude de la voix pour ce commerce (« cool et nonchalant, un brin rock », « posé et doux ») : écris pour elle (longueur des phrases, mots, pauses) et choisis tes balises de jeu pour la porter ; jamais un ton d'animatrice ni de pub ;
