@@ -724,6 +724,15 @@ test("retouch: boxes, tracking, cover layout without empty corners, edits from G
   assert.ok(l.left <= (frame.width - needW) / 2 + 0.01 && l.left + l.width >= (frame.width + needW) / 2 - 0.01);
   assert.ok(l.top <= (frame.height - needH) / 2 + 0.01 && l.top + l.height >= (frame.height + needH) / 2 - 0.01);
   assert.equal(cssFilter({}), undefined);
+  // Exposure is a gamma curve on the mid-tones: a dark clip (+0.3) comes out of the shadow, a bright one (-0.2) goes down.
+  const { exposureGamma, EXPOSURE_GAMMAS } = await import("./retouch.ts");
+  assert.equal(exposureGamma(0.3), 0.75);
+  assert.equal(exposureGamma(-0.2), 1.2);
+  assert.equal(exposureGamma(0.01), null);
+  assert.equal(exposureGamma(2), 0.6);
+  assert.match(cssFilter({ exposure: 0.15, contrast: 0.1 })!, /^url\(#fauve-exposure-85\) contrast\(1\.030\)$/);
+  // Every step the filter can point to is drawn.
+  for (const e of [-0.5, -0.1, 0.05, 0.2, 0.45]) assert.ok(EXPOSURE_GAMMAS.includes(exposureGamma(e)!), String(e));
 
   const detection = {
     regions: [

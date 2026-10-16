@@ -16,7 +16,7 @@ import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
 import { Backdrop, SceneView } from "./Scene";
-import { ClipBlurLayer, cssFilter, Photo } from "./Retouch";
+import { ClipBlurLayer, cssFilter, ExposureFilters, Photo } from "./Retouch";
 import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
 import { TEXT_Y, themeFor, type Theme } from "./theme";
@@ -52,6 +52,7 @@ export function Reel(props: ReelProps) {
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
+      <ExposureFilters />
       {collage ? <CollageBackdrop props={props} /> : null}
       {props.segments.map((segment, i) => (
         <Sequence
