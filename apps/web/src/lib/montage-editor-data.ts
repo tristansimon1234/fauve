@@ -26,6 +26,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
     segments: [...plan.data.segments, ...extraVideos.map((clip_id) => ({ clip_id, in: 0, out: 1, zoom: "none" as const }))],
     voice: plan.data.voice,
     template: plan.data.template,
+    layers: plan.data.layers,
   });
   // Simone's music plays in the live preview too (the piece kept for this post).
   const { data: post } = data?.post_id ? await db.from("posts").select("music").eq("id", data.post_id).maybeSingle() : { data: null };
@@ -44,8 +45,9 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts, signature: inputs.signature },
       ...(soundtrack ? { soundtrack } : {}),
       ...(inputs.voice ? { voice: inputs.voice } : {}),
-      // A collage's stickers, so the preview lays them where the video has them.
+      // A collage's stickers and the cut-outs its animations compose with, so the preview shows them as the video does.
       ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
+      photoAspects: inputs.photoAspects,
     } satisfies ReelInputs,
   };
 }

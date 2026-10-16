@@ -2385,6 +2385,73 @@ test("collages: a clean cut-out makes a sticker over its print, in a collage onl
   assert.equal("cutout" in buildReelProps({ ...plan, template: "doux" }, { template: "doux", ...inputs }).segments[0]!, false);
 });
 
+test("free animations: her photos, and an animation over several shots", async () => {
+  const { buildReelProps, scenePhotos } = await import("./motion.ts");
+  const { fromEditorPlan, normalizeEditPlan } = await import("./editor.ts");
+  const { planMediaIds, scenePhotoIds } = await import("./schemas.ts");
+
+  // The editor asks for one over the whole Reel (her cut-out saying hello on every shot); an empty brief goes.
+  const asked = fromEditorPlan({
+    duration: 6,
+    template: "doux",
+    transitions: "cut",
+    subtitles: false,
+    texts: [],
+    segments: [
+      { clip_id: "a", in: 0, out: 3, move: "none", speed: 1 },
+      { clip_id: "b", in: 0, out: 3, move: "none", speed: 1 },
+    ],
+    layers: [
+      { brief: "elle surgit à chaque plan pour dire coucou", from: 0, to: 9 },
+      { brief: " ", from: 0, to: 2 },
+    ],
+  } as never);
+  assert.deepEqual(asked.layers, [{ motion: { brief: "elle surgit à chaque plan pour dire coucou" }, from: 0, to: 9 }]);
+  // Inside the Reel, and a new animation within the budget: none without one.
+  const kept = normalizeEditPlan(asked, { a: 10, b: 10 });
+  assert.equal(kept.layers?.[0]?.to, kept.duration);
+  assert.equal(normalizeEditPlan(asked, { a: 10, b: 10 }, 0).layers, undefined);
+
+  // The photos her animations compose with count among the plan's media (the render loads them).
+  const scene = "function Scene(){return null}";
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 8,
+    template: "doux",
+    texts: [],
+    images: [],
+    segments: [
+      { clip_id: "a", in: 0, out: 3, zoom: "none" },
+      { motion: { brief: "sa photo détourée", js: scene, photos: ["p"] }, duration: 2 },
+      { clip_id: "b", in: 0, out: 3, zoom: "none" },
+    ],
+    layers: [{ motion: { brief: "coucou", js: scene, photos: ["p", "q"] }, from: 1, to: 7 }],
+  });
+  assert.deepEqual(scenePhotoIds(plan), ["p", "q"]);
+  assert.deepEqual(planMediaIds(plan).sort(), ["a", "b", "p", "q"]);
+  const subject = { x: 0.2, y: 0.1, w: 0.6, h: 0.9 };
+  const inputs = {
+    clipUrls: { a: "https://x/a.mp4", b: "https://x/b.mp4", p: "https://x/p.jpg" },
+    photoAspects: { p: 0.75 },
+    cutouts: { p: { src: "https://x/p.webp", box: subject } },
+    brand: { name: "Culte" },
+  };
+  // A photo without its link is left out; one with a clean cut-out brings it, with its subject.
+  assert.deepEqual(scenePhotos(["p", "q"], inputs), [{ src: "https://x/p.jpg", aspect: 0.75, cutout: "https://x/p.webp", subject }]);
+  const props = buildReelProps(plan, { template: "doux", ...inputs });
+  const motion = props.segments[1] as { type: string; photos?: unknown[] };
+  assert.equal(motion.type, "motion");
+  assert.equal(motion.photos?.length, 1);
+  // From 1 s to 7 s, with the cuts under it (at 3 s and 5 s), counted from its start.
+  assert.deepEqual(
+    props.layers?.map((l) => ({ from: l.from, length: l.durationInFrames, cuts: l.cuts, photos: l.photos?.length })),
+    [{ from: 30, length: 180, cuts: [60, 120], photos: 1 }],
+  );
+  // One the motion designer could not write is not drawn.
+  const unwritten = editPlanSchema.parse({ ...plan, layers: [{ motion: { brief: "coucou" }, from: 0, to: 4 }] });
+  assert.equal(buildReelProps(unwritten, { template: "doux", ...inputs }).layers, undefined);
+});
+
 test("readings that hold: a long line never loses a site's look", async () => {
   const { clampReading, clampSiteLook, siteLookSchema } = await import("./moodboard.ts");
   const { clip, brandSignatureSchema } = await import("./signature.ts");

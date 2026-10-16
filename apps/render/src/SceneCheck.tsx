@@ -21,6 +21,8 @@ export type SceneCheckProps = {
   texts: Record<string, string>;
   durationInFrames: number;
   brand: Parameters<SceneComponent>[0]["brand"];
+  photos?: Parameters<SceneComponent>[0]["photos"];
+  cuts?: number[];
 };
 
 const FrameContext = createContext(0);
@@ -107,7 +109,7 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
 
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
-export function SceneCheck({ js, texts, durationInFrames, brand }: SceneCheckProps) {
+export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [] }: SceneCheckProps) {
   const width = 1080;
   const height = 1920;
   loadFonts([brand.displayFont, brand.bodyFont]);
@@ -161,7 +163,7 @@ export function SceneCheck({ js, texts, durationInFrames, brand }: SceneCheckPro
         <div key={f} data-check-frame={f} style={{ position: "absolute", left: 0, top: 0, width, height }}>
           <Catch onError={(error) => cancelRender(new Error(`erreur à l'image ${f} : ${error instanceof Error ? error.message : String(error)}`))}>
             <FrameContext.Provider value={f}>
-              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} />
+              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} />
             </FrameContext.Provider>
           </Catch>
         </div>

@@ -113,6 +113,7 @@ export function Reel(props: ReelProps) {
                     k={k}
                     overlay={Boolean(segment.under)}
                     shift={segment.shift}
+                    photos={segment.photos}
                   />
                 ) : (
                   <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} overlay={Boolean(segment.under)} />
@@ -120,6 +121,12 @@ export function Reel(props: ReelProps) {
               </AbsoluteFill>
             )}
           </FadeIn>
+        </Sequence>
+      ))}
+      {/* Animations over several shots (a character on every shot, a counter that runs…), above the montage, under its texts. */}
+      {(props.layers ?? []).map((layer, i) => (
+        <Sequence key={`l${i}`} from={layer.from} durationInFrames={layer.durationInFrames} layout="none">
+          <MotionScene js={layer.js} texts={layer.texts} durationInFrames={layer.durationInFrames} props={props} theme={theme} k={k} overlay photos={layer.photos} cuts={layer.cuts} />
         </Sequence>
       ))}
       {props.effect === "dust" ? <FilmDust k={k} /> : null}

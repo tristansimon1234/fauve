@@ -79,13 +79,17 @@ async function Creations({ searchParams }: { searchParams: Promise<{ kit?: strin
   );
 }
 
-/** The studio's animated scenes, most used first. */
+/**
+ * The studio's animated scenes, most used first; not those made with her photos or over
+ * several shots, which only play in their Reel (drawn alone, they would show nothing).
+ */
 async function studioScenes(studioId: string): Promise<Creation[]> {
   const { data } = await supabaseAdmin()
     .from("motion_templates")
     .select("id, studio_id, name, js, uses")
     .eq("studio_id", studioId)
     .eq("kind", "scene")
+    .or("role.is.null,role.not.in.(photo,layer)")
     .is("archived_at", null)
     .order("uses", { ascending: false })
     .order("created_at", { ascending: false })
