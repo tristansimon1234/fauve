@@ -38,12 +38,19 @@ const FETCH = 'curl -fsSL --http1.1 --retry 4 --retry-all-errors --retry-delay 1
  * Downloads the video $2 and writes it to $1 at the Reel's frame rate, its last image held
  * two more seconds. A phone video (variable frame rate, odd timestamps, a picture a little
  * shorter than its sound) could stop Remotion on « No frame found at position »; this one
- * always has a frame where the plan asks. If ffmpeg cannot read it, the file as it came.
+ * always has a frame where the plan asks. An iPhone's HDR video (HLG or PQ, 10 bits) is
+ * tone-mapped to the SDR of a Reel on the way, else its colours come out washed out. If
+ * ffmpeg cannot read it, the file as it came.
  */
 const NORMALIZE = [
   "set -euo pipefail",
   `${FETCH.replace('"$1"', '"$1.src"')}`,
-  `if ! ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "fps=${REEL_FPS},tpad=stop_mode=clone:stop_duration=2,format=yuv420p" -c:v libx264 -preset veryfast -crf 16 -c:a aac -b:a 192k -movflags +faststart "$1"; then cp "$1.src" "$1"; fi`,
+  `tail="fps=${REEL_FPS},tpad=stop_mode=clone:stop_duration=2,format=yuv420p"`,
+  'enc="-c:v libx264 -preset veryfast -crf 16 -c:a aac -b:a 192k -movflags +faststart"',
+  `plain() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "$tail" $enc "$1"; }`,
+  `hdr() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,$tail" $enc -color_primaries bt709 -color_trc bt709 -colorspace bt709 "$1"; }`,
+  `info=$(${ROOT}/ffmpeg -hide_banner -i "$1.src" 2>&1 || true)`,
+  'if grep -qE "arib-std-b67|smpte2084" <<<"$info"; then hdr "$1" || plain "$1" || cp "$1.src" "$1"; else plain "$1" || cp "$1.src" "$1"; fi',
   'rm -f "$1.src"',
 ].join("\n");
 
