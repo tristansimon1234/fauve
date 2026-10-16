@@ -1,7 +1,16 @@
 "use server";
 
 import { completeFirstPost } from "@/lib/onboarding";
-import { motionTemplateSchema, postKindSchema, postStatusSchema, type PostKind, type PostStatus } from "@fauve/agent";
+import {
+  intentionTitle,
+  MAX_CAROUSEL_PHOTOS,
+  MAX_MONTAGE_FILES,
+  motionTemplateSchema,
+  postKindSchema,
+  postStatusSchema,
+  type PostKind,
+  type PostStatus,
+} from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { addDays, localDateOf, localInstant, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
@@ -127,10 +136,8 @@ export async function createPost(input: {
   if (!kind.success || !day || !time) return { ok: false, error: "Choisis un format, un jour et une heure." };
   const { member } = await getStudioContext();
   if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
-  const intention = input.intention.trim().replace(/\s+/g, " ").slice(0, 300);
   // The title: the intention, cut at a word; else the format and the day.
-  const cut = intention.length > 60 ? `${intention.slice(0, 60).replace(/\s+\S*$/, "")}…` : intention;
-  const title = cut || `${kindTitles[kind.data]} du ${new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(day.year, day.month - 1, day.day)))}`;
+  const title = intentionTitle(input.intention) || `${kindTitles[kind.data]} du ${new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(day.year, day.month - 1, day.day)))}`;
   const at = localInstant(day, Number(time[1]), Number(time[2]), member.studio.timezone);
   const db = supabaseAdmin();
   const template = motionTemplateSchema.safeParse(input.template);
@@ -140,7 +147,7 @@ export async function createPost(input: {
       ? (await db.from("inspirations").select("id").eq("id", input.inspirationId).eq("studio_id", member.studio.id).maybeSingle()).data
       : null;
   // Only this studio's media, in the order she picked them.
-  const wanted = (input.mediaIds ?? []).filter((id) => z.uuid().safeParse(id).success).slice(0, 10);
+  const wanted = (input.mediaIds ?? []).filter((id) => z.uuid().safeParse(id).success).slice(0, kind.data === "carousel" ? MAX_CAROUSEL_PHOTOS : MAX_MONTAGE_FILES);
   const owned = wanted.length ? new Set(((await db.from("media_assets").select("id").eq("studio_id", member.studio.id).in("id", wanted)).data ?? []).map((m) => m.id as string)) : new Set<string>();
   const mediaIds = wanted.filter((id) => owned.has(id));
   const video = kind.data === "reel" || kind.data === "story";

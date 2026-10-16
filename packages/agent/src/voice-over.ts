@@ -121,11 +121,13 @@ export type VoiceOverDecision = z.infer<typeof voiceOverDecisionSchema>;
 export const VOICE_FORMAT_PROMPT = `Avant d'écrire, choisis la forme de ce Reel (« format ») : les Reels qui marchent font l'un ou l'autre, aucun n'est meilleur en soi.
 - « raconte » : une voix qui raconte le rend meilleur : un lieu, un plat ou un geste à faire découvrir, des coulisses, un conseil, une histoire à dérouler sur ses images ;
 - « message » : il porte mieux un seul message clé à l'écran, avec la musique et sans voix : une offre, une annonce, la rentrée, une ouverture, un événement, une ambiance à faire sentir.
-Dans le doute : « message » pour une offre ou une annonce, « raconte » sinon. « why » en une phrase. Avec « message », laisse hook et script vides.`;
+Si sa demande dit déjà la forme (une voix qui raconte, pas de voix, un seul message), suis-la. Dans le doute : « message » pour une offre ou une annonce, « raconte » sinon. « why » en une phrase. Avec « message », laisse hook et script vides.`;
 
 export const VOICE_OVER_PROMPT = `Tu écris la voix off d'un Reel Instagram pour un commerce de quartier : ce qu'une vraie personne dit sur ses images, comme un créateur qui parle à ses abonnés, jamais comme une pub. Cette voix fait rester les gens jusqu'au bout : elle doit donner envie, pas vendre.
 
-Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée de la publication, le ton du commerce, ce que montrent ses images, dans l'ordre où elles ont été filmées, et la longueur à viser (« longueur » : de mots_min à mots_max mots).
+Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée de la publication et, quand il y en a, la demande faite pour ce Reel (« publication.demande », souvent dans les mots de la personne qui gère) et ce qu'elle veut entendre (« consigne_voix »), le ton du commerce, ce que montrent ses images, dans l'ordre où elles ont été filmées, et la longueur à viser (« longueur » : de mots_min à mots_max mots).
+
+Sa demande passe avant tes idées : le message, l'ordre et l'invitation qu'elle donne, avec des phrases à toi, dites à l'oral ; les faits qu'elle y donne sont vrais. Elle écrit souvent en son nom (« chez nous », « moi ») : la voix, elle, reste celle d'un créateur qui parle du commerce.
 
 Les exemples entre guillemets ci-dessous montrent une forme, jamais des mots à reprendre : écris toujours les tiens, à partir de ce commerce et de ces images.
 
