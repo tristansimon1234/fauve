@@ -1368,6 +1368,27 @@ test("music: the composer's ending falls after the Reel, a beat that falls away 
   assert.deepEqual(grooveGaps(Array.from({ length: 20 }, () => -48), 10), []);
 });
 
+test("music: the piece's beats are found and set on the cuts' grid", async () => {
+  const { BEAT_STEP, beatGrid, coarser } = await import("./mix.ts");
+  // Bass every 10 ms: a kick (-10 dB, then decaying) every `period` from `offset`, over a soft bed with some noise.
+  let seed = 7;
+  const noise = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 4;
+  const piece = (period: number, offset: number, seconds = 18) =>
+    Array.from({ length: Math.round(seconds / BEAT_STEP) }, (_, i) => {
+      const since = (i * BEAT_STEP - offset + period * 100) % period;
+      return since < 0.02 ? -10 : since < 0.1 ? -18 : -42 + noise();
+    });
+  // Asked at 108 BPM, played a hair slow with its first kick 40 ms in: found within a millisecond.
+  const grid = beatGrid(piece(0.5547, 0.04), 60 / 108)!;
+  assert.ok(Math.abs(grid.period - 0.5547) < 0.001);
+  assert.ok(Math.abs(grid.offset - 0.04) <= 0.011);
+  // Played at another tempo (120 BPM), or without a beat: left as it is.
+  assert.equal(beatGrid(piece(0.5, 0.1), 60 / 108), null);
+  assert.equal(beatGrid(Array.from({ length: 1800 }, () => -40 + noise()), 60 / 108), null);
+  // Every 10 ms read every half second: their mean power.
+  assert.deepEqual(coarser([-10, -10, -20, -20], 2).map(Math.round), [-10, -20]);
+});
+
 test("review: the sentence she reads is never cut in the middle of a word", async () => {
   const { shortSentence } = await import("./critic.ts");
   const said =

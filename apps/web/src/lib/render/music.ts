@@ -1,5 +1,10 @@
 import "server-only";
 import {
+  BEAT_STEP,
+  beatGrid,
+  beatOf,
+  coarser,
+  GROOVE_STEP,
   grooveGaps,
   isClipSegment,
   isMotionSegment,
@@ -15,14 +20,16 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { bassLevelsInSandbox, loopedReelInSandbox, muxAudioInSandbox } from "./sandbox";
+import { alignMusicInSandbox, bassLevelsInSandbox, loopedReelInSandbox, muxAudioInSandbox } from "./sandbox";
 
-// Simone's music on a Reel (ElevenLabs Music, « video to music »): the rendered
-// video is sent with its first seconds played again after it (as Instagram loops
-// it), the model watches it and composes an instrumental piece that follows its
-// cuts, in the mood of the Reel and the business; the mix cuts it at the end of
-// the Reel, before the ending the composer writes. A piece whose beat still falls
-// away inside the Reel is composed once more (grooveGaps). The piece is
+// Simone's music on a Reel (ElevenLabs Music): composed from its brief alone, in
+// the mood of the Reel and the business, as the looping track of a creator's Reel
+// at the ambiance's tempo, longer than the Reel so the ending it writes falls after
+// the cut. Composed watching the video, it stopped its beat before a cut to make it
+// hit, heard as the sound cutting out; that composer only steps in when the brief
+// alone fails. Its beats are then set on the cuts (beatGrid, alignMusicInSandbox),
+// and a piece whose beat still falls away inside the Reel is composed once more
+// (grooveGaps). The piece is
 // kept on the post and reused while the cut stays the same (a text changed, a
 // style…), so a small retouch does not pay for a new one; « Une autre » asks for
 // a new one. Without ELEVENLABS_API_KEY, or turned off, the Reel stays silent.
@@ -73,17 +80,19 @@ function brief(plan: EditPlan, business: string | null, adjustments: string[], s
   const mood = sound ? { words: `${sound}: the sound of this business, played like a track a creator would pick, with one simple hook`, tags: [sound.slice(0, 40)] } : ambiance;
   const where = business ? `a ${business}` : "a neighbourhood business";
   const notes = adjustments.length ? ` Notes from the owner: ${adjustments.join("; ").slice(0, 300)}.` : "";
-  // The cuts sit on this tempo's beats (snapToTempo): the music keeps it, so they land on the beat.
-  // Over a voice the cuts follow its phrases, the tempo only keeps the energy of the ambiance.
+  // The cuts sit on this tempo's beats (snapToTempo), and the piece is set on them after (beatGrid):
+  // it keeps the tempo exactly, its first beat at the start. Over a voice the cuts follow its
+  // phrases, the tempo only keeps the energy of the ambiance.
   const bpm = TEMPLATE_BPM[plan.template as MotionTemplate];
-  const tempo = !bpm ? "" : plan.voice ? ` Around ${bpm} BPM.` : ` Steady tempo of ${bpm} BPM, the video's cuts fall on the beats.`;
+  const tempo = !bpm ? "" : plan.voice ? ` Around ${bpm} BPM.` : ` ${bpm} BPM exactly, four beats to the bar, the first beat right at 0:00.`;
   return {
     description:
       // A voice never brings a sound of its own: the business's genre (else the ambiance's) stays under it.
       `Instrumental track for an Instagram Reel of ${where}, the kind of track a content creator picks, not advertising music: ${plan.voice ? underVoice(sound ? `${sound}: the sound of this business` : ambiance.words) : mood.words}. No vocals.${tempo} ` +
-      `On the groove from the very first second (no intro, no fade-in), it holds the groove and ends cleanly on the last shot. ` +
-      // The composer watches the video and used to put a break at a cut, or on a calm shot: heard as the sound cutting out.
-      `One continuous groove: the beat never stops, no break, no breakdown, no drop, no pause and no silence at the video's cuts, scene changes or calm shots. ` +
+      // A creator's Reel sits on one track that loops: the cuts fall on its beats, it never stops for them.
+      // Composed watching the video, the music stopped before a cut to make it hit, or on a calm shot: heard as the sound cutting out.
+      `One continuous loop: the full groove (drums and bass) from the very first beat to the very end, with the same energy all along. ` +
+      `No intro, no build-up, no break, no breakdown, no drop, no stop, no fill that stops the beat, no silence, no ending, no fade-out. ` +
       `Not corporate, not stock music, no inspirational build-up, no cinematic swells, no jingle, no cliché of the place.${notes}`.slice(0, 2000),
     tags: [...mood.tags, "instrumental", "modern"],
   };
@@ -92,23 +101,17 @@ function brief(plan: EditPlan, business: string | null, adjustments: string[], s
 /** A piece whose beat still falls away inside the Reel is composed once more; the more continuous one is kept. */
 const MUSIC_TAKES = 2;
 
-async function compose(mp4: Buffer, ask: { description: string; tags: string[] }): Promise<{ mp3: Uint8Array; songId: string | null; ms: number }> {
+type Composed = { mp3: Uint8Array; songId: string | null; ms: number; engine: "text" | "video" };
+
+/** A call to ElevenLabs Music. The plan allows 2 compositions at once: a third one waits and tries again. */
+async function musicCall(path: string, init: () => RequestInit, engine: Composed["engine"]): Promise<Composed> {
   const key = env("ELEVENLABS_API_KEY");
   if (!key) throw new Error("ELEVENLABS_API_KEY missing");
   const started = Date.now();
-  // The plan allows 2 compositions at once: a third one waits and tries again.
   for (let attempt = 0; ; attempt++) {
-    const form = new FormData();
-    form.append("videos", new Blob([new Uint8Array(mp4)], { type: "video/mp4" }), "reel.mp4");
-    form.append("description", ask.description);
-    for (const tag of ask.tags) form.append("tags", tag);
-    form.append("model_id", env("ELEVENLABS_MUSIC_MODEL"));
-    const res = await fetch("https://api.elevenlabs.io/v1/music/video-to-music?output_format=mp3_44100_128", {
-      method: "POST",
-      headers: { "xi-api-key": key },
-      body: form,
-    });
-    if (res.ok) return { mp3: new Uint8Array(await res.arrayBuffer()), songId: res.headers.get("song-id"), ms: Date.now() - started };
+    const request = init();
+    const res = await fetch(`https://api.elevenlabs.io${path}`, { ...request, method: "POST", headers: { ...request.headers, "xi-api-key": key } });
+    if (res.ok) return { mp3: new Uint8Array(await res.arrayBuffer()), songId: res.headers.get("song-id"), ms: Date.now() - started, engine };
     const body = await res.text().catch(() => "");
     if (res.status === 429 && attempt < 4) {
       await new Promise((resolve) => setTimeout(resolve, 6000 * (attempt + 1)));
@@ -117,6 +120,37 @@ async function compose(mp4: Buffer, ask: { description: string; tags: string[] }
     throw new Error(`ElevenLabs music ${res.status}: ${body.slice(0, 300)}`);
   }
 }
+
+/** The piece composed from its brief alone, `seconds` long: one loop that never reacts to a cut. */
+const composeFromText = (ask: { description: string; tags: string[] }, seconds: number) =>
+  musicCall(
+    "/v1/music?output_format=mp3_44100_128",
+    () => ({
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: `${ask.description} Style: ${ask.tags.join(", ")}.`,
+        music_length_ms: Math.round(seconds * 1000),
+        model_id: env("ELEVENLABS_MUSIC_MODEL"),
+        force_instrumental: true,
+      }),
+    }),
+    "text",
+  );
+
+/** The piece composed watching the video: kept for when the brief alone fails. */
+const composeFromVideo = (mp4: Buffer, ask: { description: string; tags: string[] }) =>
+  musicCall(
+    "/v1/music/video-to-music?output_format=mp3_44100_128",
+    () => {
+      const form = new FormData();
+      form.append("videos", new Blob([new Uint8Array(mp4)], { type: "video/mp4" }), "reel.mp4");
+      form.append("description", ask.description);
+      for (const tag of ask.tags) form.append("tags", tag);
+      form.append("model_id", env("ELEVENLABS_MUSIC_MODEL"));
+      return { body: form };
+    },
+    "video",
+  );
 
 /**
  * The rendered video with Simone's music, when the post wants some: the piece
@@ -155,23 +189,27 @@ export async function withMusic(params: {
     const sound = typeof stored?.signature?.music === "string" ? stored.signature.music.trim().slice(0, 80) : undefined;
     const ask = brief(params.plan, (studio.data?.business_type as string | null) ?? null, direction, sound || undefined);
     const duration = params.plan.duration;
-    // The composer writes its ending (the beat stops over the last seconds): it watches the Reel then
-    // its first seconds, as Instagram loops it, so that ending falls after the Reel and the mix cuts it off.
-    const tail = musicTail(duration);
-    const looped = await loopedReelInSandbox(params.renderId, params.mp4, duration, tail).catch((error: unknown) => {
-      console.warn("music: loop unavailable, the Reel alone", params.renderId, error);
-      return null;
-    });
-    const seconds = duration + (looped ? tail : 0);
-    let best: (Awaited<ReturnType<typeof compose>> & { lost: number }) | null = null;
+    // A piece is written with its ending (the beat stops over its last seconds): it is composed longer
+    // than the Reel, so that ending falls after it and the mix cuts it off.
+    const seconds = duration + musicTail(duration);
+    // The grid the cuts sit on (snapToTempo); none over a voice, whose phrases place the cuts.
+    const beat = params.plan.voice ? null : beatOf(params.plan.template);
+    let best: (Composed & { lost: number; grid: ReturnType<typeof beatGrid> }) | null = null;
     for (let take = 1; take <= MUSIC_TAKES && (!best || best.lost > 0); take++) {
-      const composed = await compose(looped ?? params.mp4, ask).catch((error: unknown) => {
-        if (!best) throw error;
-        console.warn("music: another take failed, the first one stays", params.renderId, error);
-        return null;
-      });
+      const composed = await composeFromText(ask, seconds)
+        .catch(async (error: unknown) => {
+          // The composer that watches the Reel, followed by its first seconds as Instagram loops it.
+          console.warn("music: from the brief failed, from the video", params.renderId, error);
+          const looped = await loopedReelInSandbox(params.renderId, params.mp4, duration, seconds - duration).catch(() => params.mp4);
+          return composeFromVideo(looped, ask);
+        })
+        .catch((error: unknown) => {
+          if (!best) throw error;
+          console.warn("music: another take failed, the first one stays", params.renderId, error);
+          return null;
+        });
       if (!composed) break;
-      // Billed by the length of the track: the Reel and what the composer watched after it.
+      // Billed by the length of the track: the Reel and the seconds composed after it.
       const usd = musicCostUsd(seconds);
       await db.from("cost_events").insert({
         studio_id: params.studioId,
@@ -179,20 +217,30 @@ export async function withMusic(params: {
         provider: "elevenlabs",
         units: 1,
         cost_eur: usdToEur(usd, env("USD_TO_EUR")),
-        meta: { post_id: params.postId, render_id: params.renderId, song_id: composed.songId, model: env("ELEVENLABS_MUSIC_MODEL"), signature, ms: composed.ms, seconds, take, cost_usd: usd },
+        meta: { post_id: params.postId, render_id: params.renderId, song_id: composed.songId, model: env("ELEVENLABS_MUSIC_MODEL"), engine: composed.engine, signature, ms: composed.ms, seconds, take, cost_usd: usd },
       });
-      // Where its beat falls away inside the Reel (a break on a calm shot, an ending too early): heard as the sound cutting out.
-      const gaps = await bassLevelsInSandbox(params.renderId, composed.mp3, duration)
-        .then((levels) => grooveGaps(levels, duration))
-        .catch((error: unknown) => {
-          console.warn("music: beat not measured", params.renderId, error);
-          return [];
-        });
+      // Its bass every 10 ms: where its beats land, and where its beat falls away inside the Reel
+      // (a break, a stop, an ending too early): heard as the sound cutting out.
+      const levels = await bassLevelsInSandbox(params.renderId, composed.mp3, seconds, BEAT_STEP).catch((error: unknown) => {
+        console.warn("music: beat not measured", params.renderId, error);
+        return null;
+      });
+      const reel = levels?.slice(0, Math.round(duration / BEAT_STEP));
+      const gaps = reel ? grooveGaps(coarser(reel, Math.round(GROOVE_STEP / BEAT_STEP)), duration) : [];
+      const grid = levels && beat ? beatGrid(levels, beat) : null;
       const lost = gaps.reduce((sum, g) => sum + g.to - g.from, 0);
-      console.info("music", params.renderId, { take, seconds, gaps });
-      if (!best || lost < best.lost) best = { ...composed, lost };
+      console.info("music", params.renderId, { take, engine: composed.engine, seconds, gaps, grid });
+      if (!best || lost < best.lost) best = { ...composed, lost, grid };
     }
     mp3 = best!.mp3;
+    // Its beats set on the cuts: the piece trimmed to its first beat and held to the grid's tempo (a hair).
+    if (best!.grid && beat) {
+      const { offset, period } = best!.grid;
+      mp3 = await alignMusicInSandbox(params.renderId, mp3, offset, period / beat).catch((error: unknown) => {
+        console.warn("music: not set on the beat", params.renderId, error);
+        return best!.mp3;
+      });
+    }
     made = "new";
     const path = `${params.studioId}/music/${params.postId}-${Date.now()}.mp3`;
     const { error } = await db.storage.from("media").upload(path, mp3, { contentType: "audio/mpeg", upsert: true });
