@@ -10,7 +10,9 @@ import { queueJob } from "@/lib/jobs";
 import { readSiteLook } from "@/lib/site-look";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
-import { makeVoiceOver } from "@/lib/voice-over";
+import { makeVoiceOver, speak, writeVoiceScript } from "@/lib/voice-over";
+import { ensureTranscript } from "@/lib/voice";
+import { voiceNoteInSandbox } from "@/lib/render/sandbox";
 import { photoRegions } from "@/lib/video/regions";
 
 // A test bench for the whole montage chain in production: what Simone makes alone, on
@@ -23,10 +25,14 @@ import { photoRegions } from "@/lib/video/regions";
 //                        care (editor, motion designer, render with music, critic, corrections),
 //                        without a quote. Answers at once and works after the response.
 //                        reset=1 first removes the case's posts and scenes, for a new first Reel;
-//                        voice=1 (or voice=<ElevenLabs voice id>) puts Simone's voice over it first.
+//                        voice=1 (or voice=<ElevenLabs voice id>) puts Simone's voice over it first;
+//                        own_voice=1 (or own_voice=<her words>) a voice note of hers instead, as one
+//                        comes from WhatsApp: words for the images (or hers) read by a voice of the
+//                        gallery, made a phone's OGG Opus note (16 kHz mono, quieter, band-limited),
+//                        kept as a WhatsApp audio and read by Scribe, then put on the Reel.
 //   ?case=…&step=result  every version: its render (signed link, 24 h), the plan kept
 //                        (without the scenes' code), the delivered message and the costs.
-//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&voice=…]
+//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&voice=…|&own_voice=…]
 //                        a real business from its website, as at onboarding: its site read
 //                        (facts and activity, colours and fonts of its code, logo), then its look
 //                        (its page read in the sandbox's browser: fonts and colours measured, captures;
@@ -259,7 +265,10 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
   return { videos, photos };
 }
 
-async function start(name: string, c: LabCase, reset: boolean, voice: string | null) {
+/** The voice over a lab Reel: Simone's (voice=), or a voice note of hers (own_voice=). */
+type LabVoice = { simone: string | null; hers: string | null };
+
+async function start(name: string, c: LabCase, reset: boolean, voice: LabVoice) {
   const studioId = await labStudio(name, c);
   if (reset) await clearPosts(studioId);
   const { videos, photos } = await labMedia(studioId, c);
@@ -277,7 +286,7 @@ async function clearPosts(studioId: string) {
 /** Without a kind: what any business would ask for its first Reel from its site. */
 const ANY_KIND: (typeof KINDS)[string] = { business: "commerce", title: "Premier Reel", idea: "Un Reel avec les photos de mon site, qui donne envie de venir." };
 
-async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: string | null) {
+async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice) {
   const kind = KINDS[kindName] ?? ANY_KIND;
   const studioId = await siteStudio(url, kind);
   if (reset) await clearPosts(studioId);
@@ -290,7 +299,7 @@ async function startSite(url: string, kindName: string, withClips: boolean, rese
   await montage(siteKey(url), studioId, { title: kind.title, idea: kind.idea }, videos, photos, voice);
 }
 
-async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template">, videos: string[], photos: string[], voice: string | null) {
+async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template">, videos: string[], photos: string[], voice: LabVoice) {
   const db = supabaseAdmin();
   // Everything read first, as when she sends them: Gemini watches each video, each photo is framed.
   const [analyses] = await Promise.all([
@@ -308,14 +317,45 @@ async function montage(name: string, studioId: string, c: Pick<LabCase, "title" 
     .select("id")
     .single();
   if (post.error) throw new Error(post.error.message);
-  if (voice) {
-    const spoken = await makeVoiceOver({ studioId, postId: post.data.id, voiceId: voice === "1" ? undefined : voice });
+  if (voice.hers) {
+    const note = await labVoiceNote(studioId, post.data.id, voice.hers === "1" ? undefined : voice.hers);
+    console.log("lab: her voice note", name, note.seconds, note.text);
+  } else if (voice.simone) {
+    const spoken = await makeVoiceOver({ studioId, postId: post.data.id, voiceId: voice.simone === "1" ? undefined : voice.simone });
     console.log("lab: voice", name, spoken.seconds, spoken.script);
   }
   // The same chain as her first Reel at the default care, without a quote: two scenes of her own.
   await queueJob("montage", { step: "design", studioId, postId: post.data.id, mediaIds, brief: c.idea, maxNewScenes: 2, effort: "soigne" });
   console.log("lab: montage started", name, post.data.id);
 }
+
+/**
+ * A voice note of hers as WhatsApp brings one: her words (or words written for the images)
+ * read by a voice of the gallery, then made what a phone records (OGG Opus, 16 kHz mono,
+ * quieter than a voice in a Reel, band-limited), kept as a WhatsApp audio, read by Scribe
+ * as hers would be, and put on the Reel. The montage then cuts on it as on hers.
+ */
+async function labVoiceNote(studioId: string, postId: string, words?: string): Promise<{ mediaId: string; text: string; seconds: number }> {
+  const db = supabaseAdmin();
+  const text = words?.trim() || (await writeVoiceScript(studioId, postId)).script;
+  const spoken = await speak(text);
+  const ogg = await voiceNoteInSandbox(`lab-note-${postId}`, spoken.mp3);
+  const path = `${studioId}/whatsapp/lab-${postId}-${Date.now()}.ogg`;
+  const upload = await db.storage.from("media").upload(path, ogg, { contentType: "audio/ogg; codecs=opus", upsert: true });
+  if (upload.error) throw new Error(upload.error.message);
+  const asset = await db
+    .from("media_assets")
+    .insert({ studio_id: studioId, storage_path: path, kind: "audio", source: "whatsapp", mime_type: "audio/ogg; codecs=opus", size_bytes: ogg.length, consent_ok: true })
+    .select("id")
+    .single();
+  if (asset.error) throw new Error(asset.error.message);
+  const transcript = await ensureTranscript(studioId, asset.data.id as string);
+  if (!transcript) throw new Error("lab: her voice note was not read");
+  await db.from("posts").update({ voice_media_id: asset.data.id }).eq("id", postId);
+  return { mediaId: asset.data.id as string, text: transcript.text, seconds: transcript.duration };
+}
+
+const voiceOf = (params: URLSearchParams): LabVoice => ({ simone: params.get("voice"), hers: params.get("own_voice") });
 
 async function result(key: string) {
   const db = supabaseAdmin();
@@ -404,7 +444,7 @@ export async function POST(request: Request) {
     if (params.get("step") === "result") return Response.json(await result(siteKey(url.href)));
     if (kind && !KINDS[kind]) return Response.json({ error: `kind=${Object.keys(KINDS).join("|")}` }, { status: 400 });
     after(() =>
-      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", params.get("voice")).catch((error: unknown) => console.error("lab: site failed", url.href, error)),
+      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params)).catch((error: unknown) => console.error("lab: site failed", url.href, error)),
     );
     return Response.json({ ok: true, site: url.href, kind, started: true });
   }
@@ -414,6 +454,6 @@ export async function POST(request: Request) {
   if (c.template && !motionTemplateSchema.safeParse(c.template).success) return Response.json({ error: "template" }, { status: 400 });
   if (params.get("step") === "result") return Response.json(await result(labUrl(name)));
   // call_app gives up after a few seconds: the work goes on after the answer.
-  after(() => start(name, c, params.get("reset") === "1", params.get("voice")).catch((error: unknown) => console.error("lab: case failed", name, error)));
+  after(() => start(name, c, params.get("reset") === "1", voiceOf(params)).catch((error: unknown) => console.error("lab: case failed", name, error)));
   return Response.json({ ok: true, case: name, started: true });
 }

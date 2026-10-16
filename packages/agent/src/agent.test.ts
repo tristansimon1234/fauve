@@ -1318,19 +1318,19 @@ test("voice over: when Simone puts her voice on a Reel, and which voice", async 
   assert.deepEqual(readPostVoice({ mode: "on", wish: "parle de la promo" }), { mode: "on", wish: "parle de la promo" });
 });
 
-test("mix: what is said at the level of a voice, the music well under it", async () => {
+test("mix: what is said at the level of a voice, the music under it and still heard", async () => {
   const { mixGains, mixFilter, previewMusic, speechWindows, speechGain, SPEECH_LUFS } = await import("./mix.ts");
   const { buildReelProps } = await import("./motion.ts");
   // A quiet ElevenLabs voice (-30 LUFS) over music as composed (-15): the voice comes up, the music goes under it.
   const voiceOver = mixGains({ speech: -30, music: -15.7 }, true);
   assert.equal(voiceOver.kind, "voice_over");
-  assert.equal(voiceOver.speechGain, 14);
-  assert.equal(voiceOver.musicGain, -7.3);
+  assert.equal(voiceOver.speechGain, 16);
+  assert.equal(voiceOver.musicGain, -4.3);
   assert.ok(voiceOver.duck);
   // Someone speaks in a shot: the music keeps its level and ducks harder under them.
   const inClips = mixGains({ speech: -21, music: -15 }, false);
   assert.equal(inClips.kind, "speech_in_clips");
-  assert.equal(inClips.musicGain, -1);
+  assert.equal(inClips.musicGain, 0);
   assert.ok(inClips.duck!.ratio > voiceOver.duck!.ratio);
   // Nothing said (silence measures -70, or no sound track): the music alone, never ducked.
   for (const speech of [-70, null]) {
@@ -1345,8 +1345,8 @@ test("mix: what is said at the level of a voice, the music well under it", async
   assert.equal(speechGain(-60), null);
   // The filter graph: ducked under the leveled voice, peaks held, faded at the end; the music alone without a key.
   const graph = mixFilter(voiceOver, 12.18);
-  assert.match(graph, /\[0:a\][^;]*volume=14dB,asplit=2\[key\]\[own\]/);
-  assert.match(graph, /\[m\]\[key\]sidechaincompress=threshold=0\.03:ratio=3/);
+  assert.match(graph, /\[0:a\][^;]*volume=16dB,asplit=2\[key\]\[own\]/);
+  assert.match(graph, /\[m\]\[key\]sidechaincompress=threshold=0\.03:ratio=1\.6/);
   assert.match(graph, /alimiter=limit=0\.891:level=false,afade=t=out:st=12\.18:d=0\.8\[a\]$/);
   assert.doesNotMatch(mixFilter(mixGains({ speech: null, music: -15 }, false), 10), /\[0:a\]/);
   assert.doesNotMatch(mixFilter(voiceOver, null), /afade/);
@@ -1356,8 +1356,8 @@ test("mix: what is said at the level of a voice, the music well under it", async
   assert.deepEqual(speechWindows([{ from: 9, to: 20 }, { from: 60, to: 70 }], 15), [[9, 20], [60, 70]]);
   assert.deepEqual(previewMusic("music", []), { volume: 1 });
   const preview = previewMusic("voice_over", [[9, 40]]);
-  assert.equal(preview.volume, 0.4);
-  assert.equal(preview.duck!.volume, 0.13);
+  assert.equal(preview.volume, 0.56);
+  assert.equal(preview.duck!.volume, 0.28);
 
   // In the live preview: the music lower under her voice, and lower still while it speaks.
   const plan = editPlanSchema.parse({
@@ -1375,14 +1375,14 @@ test("mix: what is said at the level of a voice, the music well under it", async
     { w: "Viens.", start: 3, end: 3.4 },
   ];
   const props = buildReelProps(plan, { template: "doux", clipUrls: { a: "https://x/a.mp4" }, voice: { src: "https://x/v.mp3", words }, soundtrack: "https://x/m.mp3", brand: { name: "Lune" } });
-  assert.deepEqual(props.soundtrack, { src: "https://x/m.mp3", volume: 0.4, duck: { volume: 0.13, windows: [[12, 30], [99, 111]] } });
+  assert.deepEqual(props.soundtrack, { src: "https://x/m.mp3", volume: 0.56, duck: { volume: 0.28, windows: [[12, 30], [99, 111]] } });
   // Without a voice nor anyone speaking: the music as it is.
   const { voice: _v, ...noVoice } = plan;
   const plain = buildReelProps(noVoice, { template: "doux", clipUrls: { a: "https://x/a.mp4" }, soundtrack: "https://x/m.mp3", brand: { name: "Lune" } });
   assert.deepEqual(plain.soundtrack, { src: "https://x/m.mp3", volume: 1 });
   // Someone speaks in the clip: the music at its level, down while they speak.
   const talking = buildReelProps(noVoice, { template: "doux", clipUrls: { a: "https://x/a.mp4" }, words: { a: [{ w: "bonjour", start: 1, end: 1.5 }] }, soundtrack: "https://x/m.mp3", brand: { name: "Lune" } });
-  assert.deepEqual(talking.soundtrack, { src: "https://x/m.mp3", volume: 0.89, duck: { volume: 0.13, windows: [[30, 45]] } });
+  assert.deepEqual(talking.soundtrack, { src: "https://x/m.mp3", volume: 1, duck: { volume: 0.13, windows: [[30, 45]] } });
 });
 
 test("tempo: cuts and texts on the beats, one signature transition, the rhythm for the critic", async () => {
@@ -1423,6 +1423,73 @@ test("tempo: cuts and texts on the beats, one signature transition, the rhythm f
   assert.equal(normalized.segments.filter((s) => "accent" in s && s.accent).length, 1);
   assert.match(rhythmLine(normalized), /2 coupes sur 2 sur un temps \(120 BPM\)/);
   assert.match(rhythmLine(normalized), /transition signature : punch à la scène 1/);
+});
+
+test("quality checks: what the Reels that work have, read on the plan for the critic", async () => {
+  const { qualityChecks, qualityLine } = await import("./critic.ts");
+  const { normalizeEditPlan } = await import("./editor.ts");
+  // A tight Reel: a video first, a hook in the first second, short shots on the beat, the last shot back on the first clip.
+  const good = normalizeEditPlan(
+    editPlanObjectSchema.parse({
+      ...validPlan,
+      template: "dynamique",
+      duration: 6,
+      images: [],
+      segments: [
+        { clip_id: "a", in: 0, out: 1.5, zoom: "none" },
+        { clip_id: "b", in: 0, out: 1.5, zoom: "none" },
+        { clip_id: "c", in: 0, out: 1.5, zoom: "none" },
+        { clip_id: "a", in: 3, out: 4.5, zoom: "none" },
+      ],
+      texts: [
+        { text: "6 h 45, personne ne sait", from: 0, to: 1.6, style: "hook" },
+        { text: "réserve ton essai", from: 4.5, to: 6, style: "caption" },
+      ],
+    }),
+    { a: 10, b: 10, c: 10 },
+  );
+  assert.ok(qualityChecks(good).every((c) => c.ok), qualityLine(good));
+  assert.doesNotMatch(qualityLine(good), /à revoir/);
+  // A still photo first, no hook, long shots off the beat, an end elsewhere, four texts: each one to look at again.
+  const slow = editPlanObjectSchema.parse({
+    ...validPlan,
+    template: "doux",
+    duration: 12,
+    images: [],
+    subtitles: false,
+    segments: [
+      { clip_id: "p1", in: 0, out: 4, zoom: "none", photo: { source: { width: 1080, height: 1350 } } },
+      { clip_id: "b", in: 0, out: 4, zoom: "none" },
+      { clip_id: "c", in: 0, out: 4, zoom: "none" },
+    ],
+    texts: [
+      { text: "un", from: 2, to: 4, style: "caption" },
+      { text: "deux", from: 4, to: 6, style: "caption" },
+      { text: "trois", from: 6, to: 8, style: "caption" },
+      { text: "quatre", from: 8, to: 10, style: "caption" },
+    ],
+  });
+  const failed = qualityChecks(slow).filter((c) => !c.ok).map((c) => c.key);
+  assert.deepEqual(failed.sort(), ["beat", "hook", "loop", "motion", "pace", "texts"]);
+  assert.match(qualityLine(slow), /à revoir : la 1re image est une photo fixe, aucune accroche écrite/);
+  // The same photo with a slow move: it moves.
+  const moving = { ...slow, segments: [{ ...slow.segments[0]!, move: "in" as const }, ...slow.segments.slice(1)] };
+  assert.equal(qualityChecks(moving).find((c) => c.key === "motion")!.ok, true);
+  // An end elsewhere is a tip, never a reason to refuse; someone's sentence held 7 s stays out of the pace.
+  assert.equal(qualityChecks(slow).find((c) => c.key === "loop")!.must, false);
+  assert.match(qualityLine(slow), /à tenter si un clip le permet : la fin ne reboucle pas/);
+  const talk = editPlanObjectSchema.parse({
+    ...validPlan,
+    template: "doux",
+    duration: 10,
+    images: [],
+    segments: [
+      { clip_id: "a", in: 0, out: 1.5, zoom: "none" },
+      { clip_id: "t", in: 0, out: 7, zoom: "none" },
+      { clip_id: "a", in: 2, out: 3.5, zoom: "none" },
+    ],
+  });
+  assert.equal(qualityChecks(talk).find((c) => c.key === "pace")!.ok, true);
 });
 
 test("editor: the signature transition goes on the shot where the band appears, the schema stays small", async () => {
@@ -1680,7 +1747,7 @@ test("acting tags are played, never read in the subtitles", async () => {
   assert.equal(stripAudioTags("Tu sais pourquoi ? [warmly] Viens."), "Tu sais pourquoi ? Viens.");
 });
 
-test("voice: the hook keeps the first phrase, other texts move to its silences", async () => {
+test("voice: the hook keeps the first phrase, its words say the rest", async () => {
   const { clearOfVoice } = await import("./editor.ts");
   const phrases = [
     { start: 0.3, end: 2.1 },
@@ -1692,18 +1759,16 @@ test("voice: the hook keeps the first phrase, other texts move to its silences",
     { text: "48 h de pousse", from: 3, to: 5, style: "band" },
     { text: "réserve ta table", from: 10, to: 13, style: "caption" },
   ];
-  const kept = clearOfVoice(texts, phrases, 13);
-  // The hook ends soon after the first phrase; the band waits for the pause; the invitation for the voice's end.
+  // The hook ends soon after the first phrase; the band and the invitation go (the subtitles say them).
   assert.deepEqual(
-    kept.map((t) => [t.text, t.from, t.to]),
-    [
-      ["ta pizza, sans raccourci", 0, 2.5],
-      ["48 h de pousse", 6.1, 7.6],
-      ["réserve ta table", 11.1, 13],
-    ],
+    clearOfVoice(texts, phrases).map((t) => [t.text, t.from, t.to]),
+    [["ta pizza, sans raccourci", 0, 2.5]],
   );
-  // No quiet moment long enough: the text goes.
-  assert.deepEqual(clearOfVoice([{ text: "x", from: 3, to: 5, style: "band" }], [{ start: 0.3, end: 12 }], 12.5), []);
+  // No hook on its first phrase: nothing but the subtitles.
+  assert.deepEqual(clearOfVoice([{ text: "x", from: 3, to: 5, style: "band" }], [{ start: 0.3, end: 12 }]), []);
+  assert.deepEqual(clearOfVoice([{ text: "y", from: 2.5, to: 4, style: "hook" }], phrases), []);
+  // No voice: the texts as they are.
+  assert.equal(clearOfVoice(texts, []).length, 3);
 });
 
 test("voice: the last shot holds after the last word when its clip has room", async () => {
@@ -1902,10 +1967,14 @@ test("photo moves: most photos held still, one slow push on the strongest, a pan
     d: { width: 1080, height: 1350, detection },
   };
   const seg = (clip_id: string, seconds: number, move?: string) => ({ clip_id, in: 0, out: seconds, zoom: "none" as const, ...(move ? { move } : {}) });
+  // A Reel that opens on a photo: the one push is on it (it moves from the first image); the wide photo pans; the rest stay still.
   const moves = photoMoves({ segments: [seg("a", 1.2), seg("b", 2.6), seg("c", 1.8), seg("d", 1.4, "in")] as never }, photos);
-  // The editor's own push wins and is the only one; the wide photo pans; the rest stay still.
-  assert.deepEqual([...moves.values()], ["none", "none", "left", "in"]);
-  const second = photoMoves({ segments: [seg("a", 1.2), seg("b", 2.6), seg("d", 1.4)] as never }, photos);
+  assert.deepEqual([...moves.values()], ["in", "none", "left", "none"]);
+  // Opening on a video: the editor's own push wins and is the only one.
+  const afterVideo = photoMoves({ segments: [seg("v", 1.5), seg("b", 2.6), seg("c", 1.8), seg("d", 1.4, "in")] as never }, photos);
+  assert.deepEqual([...afterVideo.entries()], [[1, "none"], [2, "left"], [3, "in"]]);
+  // Without one: the photo held longest.
+  const second = photoMoves({ segments: [seg("v", 1.5), seg("a", 1.2), seg("b", 2.6), seg("d", 1.4)] as never }, photos);
   assert.deepEqual([...second.values()], ["none", "in", "none"]);
 });
 

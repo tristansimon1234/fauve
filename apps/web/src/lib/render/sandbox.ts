@@ -449,6 +449,30 @@ export async function levelSpeechInSandbox(id: string, mp3: Buffer): Promise<{ m
 }
 
 /**
+ * A voice as a phone records a WhatsApp voice note: OGG Opus, 16 kHz mono, 24 kb/s,
+ * band-limited and 8 dB quieter than a voice in a Reel (the lab's stand-in for hers).
+ */
+export async function voiceNoteInSandbox(id: string, mp3: Buffer): Promise<Buffer> {
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await sandbox.writeFiles([{ path: `${dir}/in.mp3`, content: mp3 }]);
+    await bash(
+      sandbox,
+      // libopus as WhatsApp does; ffmpeg's own Opus encoder (48 kHz only) if the build lacks it.
+      `cd "$1" && f="highpass=f=90,lowpass=f=7000,volume=-8dB" && { ${ROOT}/ffmpeg -loglevel error -y -i in.mp3 -af "$f" -ac 1 -ar 16000 -c:a libopus -b:a 24k -application voip note.ogg || ${ROOT}/ffmpeg -loglevel error -y -i in.mp3 -af "$f" -ac 1 -ar 48000 -c:a opus -strict -2 -b:a 32k note.ogg; }`,
+      [dir],
+    );
+    const out = await sandbox.readFileToBuffer({ path: `${dir}/note.ogg` });
+    if (!out?.length) throw new Error("voice note produced no file");
+    return out;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/**
  * A business's home page as a visitor sees it, read in the sandbox's headless Chrome
  * (page.mjs): a capture of its top (1280 × 1800), the whole page at half size, and what
  * its styles really are (fonts of its titles and texts, colours of its blocks, texts and
