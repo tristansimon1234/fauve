@@ -2255,6 +2255,99 @@ test("lab fixes 2: a Reel's message shows its title, subtitles off faces read wh
   assert.equal(subtitleRow([{ x: 0, y: 0.05, w: 1, h: 0.8 }]), null);
 });
 
+test("off faces: one subtitle row for the Reel, animations moved off the faces under them, the engine's places worked out again", async () => {
+  const { finishPlan, sceneShifts, withShifts } = await import("./finish.ts");
+  const { avoidPhotoText, reelSubtitleRow, sceneShift, SUBTITLE_ROW } = await import("./retouch.ts");
+  const { carryTextStyle } = await import("./editor.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  const shot = (start: number, end: number, extra: object) => ({
+    start, end, description: "", subject: "", energy: 3, hook_score: 3, quality: { blurry: false, dark: false, shaky: false }, faces_visible: false, camera: "handheld", ...extra,
+  });
+  const analysis = (shots: object[]) => ({ duration: 10, orientation: "portrait", summary: "", setting: "", lighting: "ok", shots, best_moments: [], transcript: "", issues: [] });
+  const facts = {
+    clips: {
+      // Someone talking to the camera, the head right on the subtitles' usual row.
+      b: analysis([shot(0, 10, { faces_visible: true, subject_box: [500, 300, 1000, 700] })]),
+      c: analysis([shot(0, 10, {})]),
+    },
+    photos: {
+      // A face behind sunglasses: not recognizable, still a face no text may cover.
+      p: {
+        width: 1080,
+        height: 1920,
+        detection: { regions: [{ kind: "face", label: "visage", box_2d: [0, 200, 300, 800], recognizable: false }], adjust: { exposure: 0, contrast: 0, saturation: 0, warmth: 0, straighten: 0 }, subject: { x: 500, y: 400 }, notes: "" },
+      },
+    },
+  } as never;
+  const plan = {
+    format: "9:16", duration: 9.5, template: "doux", images: [], transitions: "cut", subtitles: true, music: null,
+    segments: [
+      { motion: { brief: "un grilled cheese et une coupe ?", fallback: { kind: "title", title: "x", background: "accent" } }, duration: 1.5, over: { clip_id: "p" } },
+      { clip_id: "b", in: 0, out: 6, zoom: "none", subtitle_y: 0.3 },
+      { clip_id: "c", in: 0, out: 2, zoom: "none" },
+    ],
+    texts: [
+      // Placed by the engine for an earlier version: worked out again (over shot c, nothing in the way).
+      { text: "Petits groupes", from: 7.6, to: 9, style: "band", y: 0.33, auto_y: true },
+      // Placed by her hand: it stays.
+      { text: "rue Charlot", from: 7.6, to: 9.4, style: "caption", y: 0.3 },
+    ],
+  } as never;
+  const out = finishPlan(plan, facts, { b: 10, c: 10, p: 5 });
+  const [motion, b] = out.segments as Record<string, unknown>[];
+  const busy = (motion!.over as { busy: { y: number; h: number }[] }).busy;
+  assert.equal(busy.length, 1);
+  assert.equal(busy[0]!.y, 0);
+  assert.ok(busy[0]!.h > 0.3 && busy[0]!.h < 0.4);
+  // One row for the whole Reel, not the usual one (the face of the long shot sits on it); none per shot.
+  assert.equal(typeof out.subtitle_y, "number");
+  assert.notEqual(out.subtitle_y, SUBTITLE_ROW.y);
+  assert.equal("subtitle_y" in b!, false);
+  assert.equal(out.texts[0]!.y, undefined);
+  assert.equal(out.texts[0]!.auto_y, undefined);
+  assert.equal(out.texts[1]!.y, 0.3);
+  // No face on the usual row anywhere: the usual row.
+  assert.equal(reelSubtitleRow([{ length: 3, boxes: [{ x: 0.3, y: 0.1, w: 0.4, h: 0.2 }] }]), null);
+  // A face on it for a moment of a long Reel is worth less than a face on another row for most of it.
+  assert.equal(
+    reelSubtitleRow([
+      { length: 1, boxes: [{ x: 0.3, y: SUBTITLE_ROW.y, w: 0.4, h: 0.06 }] },
+      { length: 8, boxes: [{ x: 0.3, y: 0.68, w: 0.4, h: 0.1 }] },
+    ]),
+    0.56,
+  );
+  // A text moved by the engine says so, and its place goes with the shots.
+  const band: { text: string; from: number; to: number; style: "band"; y?: number; auto_y?: boolean } = { text: "x", from: 0, to: 2, style: "band" };
+  const moved = avoidPhotoText([band], [{ start: 0, length: 2, boxes: [{ x: 0.2, y: 0.44, w: 0.6, h: 0.12 }] }]);
+  assert.equal(moved[0]!.auto_y, true);
+  assert.equal(typeof moved[0]!.y, "number");
+  // A correction keeps her hand's place, not the engine's.
+  const carried = carryTextStyle(
+    { ...(plan as object), texts: [{ text: "Petits groupes", from: 7, to: 9, style: "band" }, { text: "rue Charlot", from: 7, to: 9, style: "caption" }] } as never,
+    plan,
+  );
+  assert.equal(carried.texts[0]!.y, undefined);
+  assert.equal(carried.texts[1]!.y, 0.3);
+
+  // The opening animation's words sit on the sunglasses: they go under the face.
+  assert.equal(sceneShift({ top: 0.09, bottom: 0.36 }, busy), 0.29);
+  // A face low in the frame: they go above it (the bottom quarter stays free).
+  assert.equal(sceneShift({ top: 0.42, bottom: 0.68 }, [{ y: 0.5, h: 0.28 }]), -0.2);
+  assert.equal(sceneShift({ top: 0.42, bottom: 0.6 }, [{ y: 0.05, h: 0.2 }]), 0);
+  assert.equal(sceneShift({ top: 0.2, bottom: 0.6 }, [{ y: 0.05, h: 0.7 }]), 0);
+  const shifts = sceneShifts(out, { m0: [0.09, 0.36] });
+  assert.equal(shifts.get(0), 0.29);
+  const kept = withShifts(out, shifts)!;
+  assert.equal((kept.segments[0] as { motion: { shift: number } }).motion.shift, 0.29);
+  assert.equal(withShifts(kept, shifts), null);
+
+  // The render gets both: the scene's move, the subtitles' one row.
+  const withCode = { ...kept, segments: kept.segments.map((s) => ("motion" in s ? { ...s, motion: { ...s.motion, js: "function Scene(){return null}" } } : s)) };
+  const props = buildReelProps(editPlanSchema.parse(withCode), { template: "doux", clipUrls: { b: "https://x/b.mp4", c: "https://x/c.mp4", p: "https://x/p.jpg" }, photoIds: ["p"], brand: { name: "Mousse" } });
+  assert.equal((props.segments[0] as { shift?: number }).shift, 0.29);
+  assert.equal(props.subtitleY, out.subtitle_y);
+});
+
 test("readings that hold: a long line never loses a site's look", async () => {
   const { clampReading, clampSiteLook, siteLookSchema } = await import("./moodboard.ts");
   const { clip, brandSignatureSchema } = await import("./signature.ts");

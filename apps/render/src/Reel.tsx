@@ -105,6 +105,7 @@ export function Reel(props: ReelProps) {
                     theme={theme}
                     k={k}
                     overlay={Boolean(segment.under)}
+                    shift={segment.shift}
                   />
                 ) : (
                   <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} overlay={Boolean(segment.under)} />
@@ -1017,10 +1018,11 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
   const chunk = busy ? undefined : chunks.find((c) => frame >= c[0]!.from && frame <= c.at(-1)!.to + 6);
   if (!chunk) return null;
   const s = theme.subtitle;
-  // Over a shot where a face sits on their row, they take the clear row the engine chose (it holds for the whole phrase).
+  // One place for the whole Reel, off the faces (the engine's choice); older plans set a row per shot.
   const start = chunk[0]!.from;
   const shot = props.segments.find((seg) => start >= seg.startAt && start < seg.startAt + seg.durationInFrames);
-  const y = shot && (shot.type === "clip" || shot.type === "image") && shot.subtitleY !== undefined ? shot.subtitleY : SUBTITLE_Y;
+  const y =
+    props.subtitleY ?? (shot && (shot.type === "clip" || shot.type === "image") && shot.subtitleY !== undefined ? shot.subtitleY : SUBTITLE_Y);
   return (
     <div
       style={{

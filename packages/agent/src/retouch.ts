@@ -225,25 +225,28 @@ const FREE_ROWS = [0.2, 0.47, 0.62, 0.33, 0.12, 0.55];
  * A Reel's texts never sit on what must stay seen: text already in a photo (a sign, a
  * logo on a window) or a face in a shot. A text shown over such a shot moves to the
  * nearest free row. `shots`: when each shot plays and its busy zones (shares of the
- * frame; only the rows matter, texts span the width). Texts placed by hand stay put.
+ * frame; only the rows matter, texts span the width). Texts placed by hand stay put;
+ * a place the engine chose (`auto_y`) is worked out again, for the shots of this version.
  */
-export function avoidPhotoText<T extends { from: number; to: number; style: "hook" | "band" | "caption"; y?: number }>(
+export function avoidPhotoText<T extends { from: number; to: number; style: "hook" | "band" | "caption"; y?: number; auto_y?: boolean }>(
   texts: T[],
   shots: { start: number; length: number; boxes: Box[] }[],
 ): T[] {
-  return texts.map((t) => {
-    if (t.y !== undefined) return t;
+  return texts.map((given) => {
+    if (given.y !== undefined && !given.auto_y) return given;
+    const { y: _y, auto_y: _auto, ...t } = given;
+    const unplaced = t as T;
     const boxes = shots
       .filter((s) => s.boxes.length && s.start < t.to && s.start + s.length > t.from)
       .flatMap((s) => s.boxes)
       // A word too small to read under a text does not count.
       .filter((b) => b.w > 0.12 || b.h > 0.04);
-    if (!boxes.length) return t;
+    if (!boxes.length) return unplaced;
     const row = TEXT_ROWS[t.style];
     const clear = (y: number) => boxes.every((b) => b.y > y + row.h + 0.02 || b.y + b.h < y - 0.02);
-    if (clear(row.y)) return t;
+    if (clear(row.y)) return unplaced;
     const free = FREE_ROWS.filter((y) => y + row.h <= 0.82 && clear(y)).sort((a, b) => Math.abs(a - row.y) - Math.abs(b - row.y))[0];
-    return free === undefined ? t : { ...t, y: Math.min(0.66, free) };
+    return free === undefined ? unplaced : { ...unplaced, y: Math.min(0.66, free), auto_y: true };
   });
 }
 
@@ -267,6 +270,60 @@ export function subtitleRow(boxes: Box[]): number | null {
   // Nowhere clear (a face fills the picture): the row it covers least, when it beats the usual one.
   const least = [...SUBTITLE_ROWS].sort((a, b) => covered(a) - covered(b))[0]!;
   return covered(least) < covered(SUBTITLE_ROW.y) - 0.005 ? least : null;
+}
+
+/** How much of the subtitles' row at `y` the busy zones cover (0: clear). */
+const rowCovered = (boxes: Box[], y: number) =>
+  boxes
+    .filter((b) => b.w > 0.12 || b.h > 0.04)
+    .reduce((sum, b) => sum + Math.max(0, Math.min(y + SUBTITLE_ROW.h + 0.01, b.y + b.h) - Math.max(y - 0.01, b.y)), 0);
+
+/**
+ * One row for a voice's subtitles over the whole Reel, like the apps' own captions: they
+ * never move from shot to shot. Their usual row unless faces or lettering sit on it, else
+ * the row they cover least over the Reel (each shot weighed by how long it plays), the
+ * nearest to the usual one at equal cover; null for the usual row.
+ */
+export function reelSubtitleRow(shots: { length: number; boxes: Box[] }[]): number | null {
+  const cost = (y: number) => shots.reduce((sum, s) => sum + s.length * rowCovered(s.boxes, y), 0);
+  const usual = cost(SUBTITLE_ROW.y);
+  if (usual === 0) return null;
+  let best: number | null = null;
+  let lowest = usual;
+  for (const y of SUBTITLE_ROWS) {
+    const c = cost(y);
+    // A real gain only: a row barely better is not worth leaving the usual place.
+    if (c < lowest - 0.01) {
+      best = y;
+      lowest = c;
+    }
+  }
+  return best;
+}
+
+/** Where texts may go in a Reel: under the top margin, above the bottom quarter (the apps' buttons and caption). */
+const SCENE_TOP = 80 / 1920;
+const SCENE_BOTTOM = 0.75;
+
+/**
+ * How far to move an animation drawn over her footage (share of the height, down when
+ * positive) so its texts clear the faces and lettering under it: none when they are clear
+ * already, else the smallest move that sets its text band in a free stretch of the safe
+ * zone, none when no stretch can hold it. `band`: the rows its texts cover while they
+ * hold still; `busy`: the rows of the footage that must stay seen.
+ */
+export function sceneShift(band: { top: number; bottom: number }, busy: Pick<Box, "y" | "h">[]): number {
+  const margin = 0.02;
+  const rows = busy.filter((b) => b.h > 0.02).map((b) => ({ top: b.y - margin, bottom: b.y + b.h + margin }));
+  const hits = (top: number, bottom: number) => rows.some((r) => r.top < bottom && r.bottom > top);
+  if (!rows.length || band.bottom <= band.top || !hits(band.top, band.bottom)) return 0;
+  const height = band.bottom - band.top;
+  const tops = [SCENE_TOP, ...rows.map((r) => r.bottom), ...rows.map((r) => r.top - height), SCENE_BOTTOM - height].filter(
+    (top) => top >= SCENE_TOP - 1e-6 && top + height <= SCENE_BOTTOM + 1e-6 && !hits(top, top + height),
+  );
+  if (!tops.length) return 0;
+  const best = tops.sort((a, b) => Math.abs(a - band.top) - Math.abs(b - band.top))[0]!;
+  return Math.round((best - band.top) * 1000) / 1000;
 }
 
 /** The Reel's frame, which the shares of a photo's zones are mapped into. */

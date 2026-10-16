@@ -311,7 +311,8 @@ export function ActionView({
                   player={playerRef}
                   texts={plan.texts}
                   active={active}
-                  onMove={(i, place) => setText(i, place)}
+                  // Her hand's place: the engine leaves it where she put it from now on.
+                  onMove={(i, place) => setText(i, { ...place, auto_y: undefined })}
                   onEdit={(i, text) => setText(i, { text })}
                   onPick={pick}
                 />

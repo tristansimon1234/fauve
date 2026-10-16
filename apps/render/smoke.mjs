@@ -1,11 +1,14 @@
 // Smoke test for generated motion scenes, run in the render sandbox (never in the
-// web app). Usage: node smoke.mjs scenes.json [bundle-dir] → prints {"<id>": null | "error"}.
+// web app). Usage: node smoke.mjs scenes.json [bundle-dir] → prints
+// {"results": {"<id>": null | "error"}, "bands": {"<id>": [top, bottom]}}.
 // scenes.json: [{ id, js, durationInFrames, texts?, brand? }].
 // 1. Each scene is rendered at its first, middle and last frame with React's server
 //    renderer and minimal Remotion shims, which catches crashes and bad output early.
 // 2. The scenes that pass are laid out in Chrome (the SceneCheck composition of the
 //    bundle, default ./build) at many frames, with the studio's fonts: a text that
-//    leaves the frame or the safe zone fails the scene.
+//    leaves the frame or the safe zone fails the scene. A scene that passes says where
+//    its texts sit while it holds (shares of the height), so the render can move it off
+//    the faces of the footage under it.
 // BROWSER_EXECUTABLE overrides Remotion's own Chrome (local runs).
 import { existsSync, readFileSync } from "node:fs";
 import React from "react";
@@ -42,6 +45,7 @@ const defaultBrand = {
 
 const scenes = JSON.parse(readFileSync(process.argv[2], "utf8"));
 const results = {};
+const bands = {};
 for (const scene of scenes) {
   try {
     const factory = new Function(
@@ -96,6 +100,10 @@ if (browser) {
           browserExecutable,
           logLevel: "error",
           timeoutInMilliseconds: 60000,
+          onBrowserLog: (log) => {
+            const band = /^FAUVE_BAND (\[.*\])$/.exec(log.text)?.[1];
+            if (band) bands[scene.id] = JSON.parse(band);
+          },
         });
       } catch (error) {
         const message = String(error instanceof Error ? error.message : error);
@@ -109,4 +117,4 @@ if (browser) {
     await browser.close({ silent: true });
   }
 }
-console.log(JSON.stringify(results));
+console.log(JSON.stringify({ results, bands }));

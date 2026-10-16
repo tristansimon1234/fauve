@@ -10,7 +10,8 @@ import { anthropic, logClaudeCost } from "./run";
 // rendered in the sandbox; a failing scene gets one round of fixes, and if it
 // still fails the renderer uses the scene's fixed fallback.
 
-export type SceneRequest = { id: string; brief: string; durationInFrames: number; previousCode?: string };
+/** busy: the rows of the footage under the scene that must stay seen (faces, lettering; shares of the height). */
+export type SceneRequest = { id: string; brief: string; durationInFrames: number; previousCode?: string; busy?: { y: number; h: number }[] };
 export type SceneResult = {
   id: string;
   code: string | null;
@@ -48,6 +49,10 @@ async function writeScene(
         marque: brand,
         direction_artistique: artDirection,
         ...(kit.length ? { kit_du_commerce: kit } : {}),
+        // Faces and lettering of the picture under the scene, in px of the 1920 high frame: the words go around them.
+        ...(request.busy?.length
+          ? { sous_la_scene: request.busy.map((b) => ({ a_laisser_visible: `de y = ${Math.round(b.y * 1920)} à y = ${Math.round((b.y + b.h) * 1920)}` })) }
+          : {}),
         code_precedent: request.previousCode,
       });
   const response = await anthropic().beta.messages.parse({
@@ -88,7 +93,9 @@ export async function designMotionScenes(
     const smoke = await smokeTestScenes(
       results.filter((r) => r.js).map((r) => ({ id: r.id, js: r.js!, durationInFrames: requests.find((q) => q.id === r.id)!.durationInFrames })),
       brand,
-    ).catch((e: unknown) => Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])));
+    )
+      .then((checks) => checks.errors)
+      .catch((e: unknown) => Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])));
     results = results.map((r) => (r.js && smoke[r.id] ? { ...r, js: null, error: smoke[r.id]! } : r));
     const failed = results.filter((r) => !r.js && r.code);
     if (round === 1 || !failed.length) break;

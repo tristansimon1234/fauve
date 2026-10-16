@@ -63,8 +63,11 @@ class Catch extends Component<{ onError: (error: unknown) => void; children: Rea
 
 type Out = { text: string; frames: number[]; box: [number, number, number, number] };
 
-/** Visible texts outside the safe zone, per text, in one copy of the scene. */
-function measure(copy: HTMLElement, frame: number, width: number, height: number, out: Map<string, Out>) {
+/** The rows its texts cover while they hold still (the middle of the scene, entrances and exits aside), in px. */
+type Band = { top: number; bottom: number };
+
+/** Visible texts outside the safe zone, per text, in one copy of the scene; and the rows its texts cover when it holds (`band`). */
+function measure(copy: HTMLElement, frame: number, width: number, height: number, out: Map<string, Out>, band?: Band) {
   const origin = copy.getBoundingClientRect();
   const zone = {
     left: SAFE_ZONE.side - TOLERANCE,
@@ -89,6 +92,10 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
     for (const r of Array.from(range.getClientRects())) {
       if (r.width < 1 || r.height < 1) continue;
       const box: Out["box"] = [r.left - origin.left, r.top - origin.top, r.right - origin.left, r.bottom - origin.top];
+      if (band) {
+        band.top = Math.min(band.top, box[1]);
+        band.bottom = Math.max(band.bottom, box[3]);
+      }
       if (box[0] >= zone.left && box[2] <= zone.right && box[1] >= zone.top && box[3] <= zone.bottom) continue;
       const entry = out.get(text) ?? { text, frames: [], box };
       if (entry.frames.at(-1) !== frame) entry.frames.push(frame);
@@ -120,11 +127,18 @@ export function SceneCheck({ js, texts, durationInFrames, brand }: SceneCheckPro
       for (let i = 0; i < 300 && fitsPending() > 0; i++) await waitFrame();
       await waitFrame();
       const out = new Map<string, Out>();
+      const band: Band = { top: Infinity, bottom: -Infinity };
       document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
-        measure(copy, Number(copy.dataset.checkFrame), width, height, out);
+        const frame = Number(copy.dataset.checkFrame);
+        const settled = frame >= durationInFrames * 0.2 && frame <= durationInFrames * 0.8;
+        measure(copy, frame, width, height, out, settled ? band : undefined);
       });
       const failures = [...out.values()].filter((o) => o.frames.length * STEP > OUT_FRAMES);
-      if (!failures.length) return continueRender(handle);
+      if (!failures.length) {
+        // Read by smoke.mjs: where the texts sit, so the render can move the scene off the faces under it.
+        if (Number.isFinite(band.top)) console.log(`FAUVE_BAND ${JSON.stringify([Math.round(band.top) / height, Math.round(band.bottom) / height])}`);
+        return continueRender(handle);
+      }
       const r = (n: number) => Math.round(n);
       const detail = failures
         .slice(0, 3)

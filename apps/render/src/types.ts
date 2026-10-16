@@ -81,7 +81,8 @@ export type ReelProps = {
       }
     | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; move?: CameraMove; accent?: "punch" | "wipe"; subtitleY?: number }
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
-    | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder }
+    /** shift: how far the scene is moved down (share of the height, up when negative), off the faces of the footage under it. */
+    | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder; shift?: number }
   )[];
   texts: {
     text: string;
@@ -126,6 +127,8 @@ export type ReelProps = {
   /** An overlay over the whole video, under the texts: film dust. */
   effect?: "dust" | null;
   logo?: "top" | "bottom" | null;
+  /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
+  subtitleY?: number;
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
     js: string;

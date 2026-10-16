@@ -246,7 +246,8 @@ function Editor({
               player={playerRef}
               texts={plan.texts}
               active={text ? (selection?.index ?? null) : null}
-              onMove={(i, place) => setText(i, place)}
+              // Her hand's place: the engine leaves it where she put it from now on.
+              onMove={(i, place) => setText(i, { ...place, auto_y: undefined })}
               onPick={(i) => selectText(i, false)}
               onEdit={(i, words) => setText(i, { text: words })}
             />

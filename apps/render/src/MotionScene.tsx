@@ -72,6 +72,8 @@ export function MotionScene(p: {
   k: number;
   /** Played over her footage: the fixed fallback has no background either. */
   overlay?: boolean;
+  /** Moved down (share of the height, up when negative) so its texts clear the faces of the footage under it. */
+  shift?: number;
 }) {
   const { fps } = useVideoConfig();
   const Generated = useMemo(() => compileScene(p.js), [p.js]);
@@ -79,7 +81,7 @@ export function MotionScene(p: {
   if (!Generated) return fixed;
   return (
     <Fallback fallback={fixed}>
-      <AbsoluteFill>
+      <AbsoluteFill style={p.shift ? { transform: `translateY(${Math.round(p.shift * p.props.height)}px)` } : undefined}>
         <Generated
           width={p.props.width}
           height={p.props.height}
