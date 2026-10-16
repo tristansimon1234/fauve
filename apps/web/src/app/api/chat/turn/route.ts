@@ -11,7 +11,7 @@ export const maxDuration = 300;
 const bodySchema = z.object({
   text: z.string().max(4000),
   conversationId: z.uuid().nullable(),
-  attachments: z.array(z.object({ path: z.string().max(400), mime: z.string().max(100), size: z.number().int().positive() })).max(10).default([]),
+  attachments: z.array(z.object({ path: z.string().max(400), mime: z.string().max(100), size: z.number().int().positive() })).max(20).default([]),
   about: z.object({ postId: z.uuid(), scene: z.number().int().min(0).max(30).optional() }).optional(),
 });
 

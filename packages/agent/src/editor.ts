@@ -39,11 +39,13 @@ Les quatre ambiances (« template ») : le rythme, les entrées des textes et le
 - « collage » (108) : fait main et à la mode. Chaque plan en photo découpée scotchée sur du papier, mots découpés. Jeune, créatif.
 
 Méthode d'un monteur pro :
-1. Choisis l'histoire avant les plans, d'après la matière et la demande. Recettes qui marchent pour un commerce :
+1. Choisis l'histoire avant les plans, d'après la matière et la demande. Ces formes marchent toutes, chacune à sa place : prends celle qui sert ce Reel et ce commerce, et varie d'un Reel à l'autre (des points de départ, jamais des moules). Recettes qui marchent pour un commerce :
+   - raconté (15 à 30 s) : une voix raconte (« voice » est fourni) ; chaque idée de la voix a ses plans, courts, qui la montrent ; l'accroche seule en texte, ses mots en sous-titres ;
+   - message clé (10 à 20 s ; « post.format » = « message clé » quand Simone l'a choisi) : sans voix, un seul message posé à l'écran presque tout le Reel, au même endroit (l'offre, l'annonce, la rentrée : un titre court, une ligne, au plus deux détails dans « items »), sur des plans vivants coupés sur la musique (des gens qui sourient, qui bougent, le lieu qui vit) ; aucune animation par-dessus ; « effect » dust si ça va avec son ambiance ;
    - le geste → le résultat (12 à 18 s) : un aperçu du résultat dans la 1re seconde, 4 à 8 plans du geste de plus en plus courts, le résultat tenu 2,5 à 3,5 s (ralenti ou avance lente) avec l'invitation ;
    - avant / après (7 à 10 s) : l'avant 1,5 à 2 s, coupe sur le temps, l'après 3 à 4 s, deux détails ;
    - rafale de photos (6 à 12 s) : beaucoup de photos à un temps chacune, deux qui respirent ;
-   - POV / visite (15 à 25 s) : « POV : ton premier cours » ou « Viens, je te montre », plans de 1 à 2 s dans l'ordre d'une visite, fin sur un sourire ;
+   - POV / visite (15 à 25 s) : « POV : ton premier cours » ou « Viens, je te montre » en une petite ligne au début, puis des plans de 1 à 2 s dans l'ordre d'une visite, sans autre texte, fin sur un sourire ou sur son enseigne ;
    - la personne derrière (15 à 25 s) : elle qui parle ou qui travaille, ses mains en gros plan toutes les 3 à 4 s ;
    - gros plans qui donnent envie (8 à 12 s) : 4 à 6 gros plans de 1 à 2 s, un ralenti sur le plus beau, une ligne de texte ;
    - l'offre (7 à 12 s) : l'expérience d'abord, puis l'offre concrète (places, date, essai) ;
@@ -61,7 +63,7 @@ Les exemples entre guillemets de ces consignes montrent une forme, jamais des mo
 
 Les textes, peu et forts, comme un créateur les poserait dans l'appli : les Reels qui marchent laissent parler les images.
 - une accroche (« hook », 6 mots au plus), puis au plus 2 autres dans tout le Reel (une animation de typographie compte comme un texte ; celle qui ouvre le Reel est l'accroche) : « band » pour l'offre ou ce qui rend le commerce unique (5 mots au plus, posé sur une boîte), « caption » pour une phrase courte (7 mots au plus), l'invitation à la fin. Souvent l'accroche et l'invitation suffisent. Jamais seulement le nom du commerce.
-- En français, tutoiement, ton du studio. Chaque texte reste au moins 1,5 s et change de préférence sur une coupe ; jamais deux textes en même temps. « emphasis » : 1 ou 2 mots clés de ce texte, écrits exactement comme dans le texte (ils ressortent dans la couleur du commerce) ; un chiffre fort mis en « emphasis » (« 48 h », « 6 », « 50 min ») s'affiche en très grand, sur sa ligne : idéal pour une accroche.
+- En français, tutoiement, ton du studio. Chaque texte reste au moins 1,5 s et change de préférence sur une coupe (un message clé, lui, reste posé presque tout le Reel) ; jamais deux textes en même temps. « emphasis » : 1 ou 2 mots clés de ce texte, écrits exactement comme dans le texte (ils ressortent dans la couleur du commerce) ; un chiffre fort mis en « emphasis » (« 48 h », « 6 », « 50 min ») s'affiche en très grand, sur sa ligne : idéal pour une accroche.
 - Écris comme un créateur qui parle, jamais comme une brochure : des phrases courtes avec un verbe, en minuscules (« 48 h de repos pour cette pâte », « ton cours d'essai est offert », « pov : tu sors du salon »), jamais des slogans sans verbe (« Coupes et couleurs naturelles », « Au feu de bois », « Qualité et savoir-faire »), jamais de formules de pub (« découvrez », « une expérience unique »).
 - Varie la forme de l'accroche d'un Reel à l'autre : une question, un chiffre fort en très grand, un « pov : … », une promesse ; si « recent_hooks » liste les accroches des derniers Reels du commerce, n'en reprends ni la forme ni les mots.
 - Les mots partent du commerce : « studio.facts » (son site, ce qu'elle a dit), le brief, son offre. Libre à toi d'inventer une accroche qui sonne juste pour ce commerce, jamais un fait qu'il n'a pas (prix, offre, horaire, adresse, chiffre, récompense).
@@ -87,7 +89,7 @@ Sa voix (« voice ») : une voix raconte ce Reel (un vocal de la gérante, ou la
 
 Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh » au bout d'une seconde. Ouvre sur son plus beau plan, avec la promesse en typographie animée par-dessus (une animation sur mesure), puis ses meilleurs plans dans une vraie histoire, peu de texte, un rythme vivant même en « chic » ou « doux », et une fin sur le plus beau plan avec l'invitation. Utilise les animations permises (au moins 2), toujours par-dessus ses images.
 
-Jamais d'effet bon marché : pas de rotation, de flash, de glitch, de tremblement, de page qui tourne, d'emoji animé, pas plus de deux polices, pas de zoom marqué sur chaque plan, pas de fondu sur chaque coupe. « transitions » : « cut » (coupes nettes) presque toujours ; « fade » seulement pour un Reel calme aux plans longs (2,5 s et plus). Le moteur pose une seule transition signature sur le plan où arrive ton « band » : fais-le commencer au début du plan du moment fort.
+Jamais d'effet bon marché : pas de rotation, de flash, de glitch, de tremblement, de page qui tourne, d'emoji animé, pas plus de deux polices, pas de zoom marqué sur chaque plan, pas de fondu sur chaque coupe. Un seul effet possible, « effect » : « dust » pose une poussière de pellicule discrète sur toute la vidéo (des grains, une fibre, une rayure de temps en temps), comme les créateurs l'ajoutent dans l'appli, pour un message clé ou une ambiance rétro, de nuit ou faite main ; « none » le plus souvent. « transitions » : « cut » (coupes nettes) presque toujours ; « fade » seulement pour un Reel calme aux plans longs (2,5 s et plus). Le moteur pose une seule transition signature sur le plan où arrive ton « band » : fais-le commencer au début du plan du moment fort.
 
 Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. « lessons » résume ce qui marche sur son Instagram : applique-les quand elles concernent ce Reel. « inspirations » décrit des Reels qu'elle aime : reprends-en l'esprit (rythme, accroche, textes), jamais le contenu. « post.chosen_inspiration » est le Reel qu'elle a choisi pour celui-ci : il passe avant les autres inspirations et avant « default_template », toujours sans en copier le contenu. « post.chosen_template » est l'ambiance qu'elle a choisie : utilise-la. « text_looks » : ses styles de texte ; quand l'un convient au rôle d'un texte (hook, band, caption), mets son nom exact dans look_name, et garde-le pour tous les textes du même rôle. Sans text_looks, laisse look_name vide.
 
@@ -174,6 +176,7 @@ export const editorOutputSchema = z.object({
     subtitles: z.boolean(),
     fonts: z.object({ display: z.string().optional(), body: z.string().optional() }).optional(),
     end_card: z.object({ title: z.string(), subtitle: z.string().optional() }).optional(),
+    effect: z.enum(["none", "dust"]).optional(),
   }),
   rationale: z.string(),
 });
@@ -260,11 +263,14 @@ export function fromEditorPlan(plan: EditorOutput["plan"] | EditorOutputLegacy["
     : undefined;
   const endCard = plan.end_card?.title?.trim() ? { title: plan.end_card.title.trim().slice(0, 40), ...(plan.end_card.subtitle?.trim() ? { subtitle: plan.end_card.subtitle.trim().slice(0, 60) } : {}) } : undefined;
   const { end_card: _endCard, fonts: _fonts, ...rest } = plan;
+  const { effect: _effect, ...kept } = rest as typeof rest & { effect?: string };
   return {
-    ...rest,
+    ...kept,
     format: "9:16",
     images: [],
     music: null,
+    // Film dust over the whole video, when the editor asks for it.
+    ...("effect" in plan && plan.effect === "dust" ? { effect: "dust" as const } : {}),
     ...(fonts && Object.keys(fonts).length ? { fonts } : {}),
     ...(endCard ? { end_card: endCard } : {}),
     // A named look brings its style back (and, for a list, its details and bullets).

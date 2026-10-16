@@ -11,7 +11,8 @@ import type { Attachment } from "./chat-actions";
 
 export type DraftFile = { id: string; file: File; preview: string; video: boolean; status: "uploading" | "ready" | "error"; path?: string };
 
-export const MAX_FILES = 10;
+/** Files sent at once (a Reel takes up to 20 clips and photos; a carousel 10, Instagram's limit). */
+export const MAX_FILES = 20;
 // Supabase's default per-file limit; WhatsApp-quality phone clips fit well under it.
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 

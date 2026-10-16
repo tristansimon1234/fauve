@@ -163,7 +163,7 @@ export function CollageCard({ index, props, children }: { index: number; props: 
 const normalize = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 
 /** Where a text breaks into words: any space but the non-breaking ones, which hold a business's name together. */
-const SPACES = /[^\S\u00a0]+/;
+const SPACES = /[^\S\u00a0\u202f]+/;
 
 function useExit(durationInFrames: number, theme: Theme) {
   const frame = useCurrentFrame();

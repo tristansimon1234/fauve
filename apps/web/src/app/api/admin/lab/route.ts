@@ -1,7 +1,7 @@
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { after } from "next/server";
 import { z } from "zod";
-import { CHAT_MODEL, isMotionSegment, motionTemplateSchema, editPlanSchema, type MotionTemplate } from "@fauve/agent";
+import { CHAT_MODEL, isMotionSegment, MAX_MONTAGE_FILES, motionTemplateSchema, editPlanSchema, type MotionTemplate } from "@fauve/agent";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { readWebsite } from "@/lib/agent/website";
 import { cronAuthorized } from "@/lib/cron-auth";
@@ -44,7 +44,7 @@ import { photoRegions } from "@/lib/video/regions";
 export const maxDuration = 300;
 
 /** The files of one montage, as in the app (MAX_FILES) and the montage job. */
-const MAX_MEDIA = 10;
+const MAX_MEDIA = MAX_MONTAGE_FILES;
 
 type LabCase = {
   name: string;

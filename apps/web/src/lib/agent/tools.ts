@@ -524,9 +524,16 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async update_brand_profile(changes) {
-      // Only what changed: the moodboard, logo, fonts and saved text looks stay as they are.
-      const { version } = await insertProfileVersion(studioId, (profile) => ({ ...profile, ...changes }));
+    async update_brand_profile({ titles, ...changes }) {
+      // Only what changed: the moodboard, logo, fonts and saved text looks stay as they are; its titles' settings merge into its charter.
+      const { version } = await insertProfileVersion(studioId, (profile) => {
+        const signature = profile.signature as { titles?: Record<string, unknown> } | undefined;
+        return {
+          ...profile,
+          ...changes,
+          ...(titles && signature ? { signature: { ...signature, titles: { ...signature.titles, ...titles } } } : {}),
+        };
+      });
       // A font Google does not serve (a site's Adobe font): the Reels use its closest free twin; she can add her file.
       const fonts = Array.isArray(changes.fonts) ? changes.fonts.filter((f): f is string => typeof f === "string") : [];
       const { swaps } = fonts.length ? await usableFonts(fonts, [], "doux").catch(() => ({ swaps: [] })) : { swaps: [] };

@@ -1434,6 +1434,43 @@ test("tempo: cuts and texts on the beats, one signature transition, the rhythm f
   assert.match(rhythmLine(normalized), /transition signature : punch à la scène 1/);
 });
 
+test("formats: a key message held all along, film dust when the editor asks, French spaces on screen", async () => {
+  const { fromEditorPlan, editorOutputSchema } = await import("./editor.ts");
+  const { buildReelProps, frenchSpaces } = await import("./motion.ts");
+  const { qualityChecks } = await import("./critic.ts");
+  const { voiceOverDecisionSchema, reelFormatSchema } = await import("./voice-over.ts");
+  const output = {
+    duration: 12,
+    template: "dynamique" as const,
+    segments: [
+      { clip_id: "a", in: 0, out: 1.5, move: "none", speed: 1 },
+      { clip_id: "b", in: 0, out: 1.5, move: "none", speed: 1 },
+      { clip_id: "a", in: 3, out: 4.5, move: "none", speed: 1 },
+    ],
+    texts: [{ text: "offre de rentrée : -15 % sur les cours", from: 0, to: 4.5, style: "hook" as const, items: [{ title: "code CULTE1" }] }],
+    transitions: "cut" as const,
+    subtitles: false,
+    effect: "dust" as const,
+  };
+  assert.equal(editorOutputSchema.safeParse({ plan: output, rationale: "message clé" }).success, true);
+  const plan = fromEditorPlan(output as never);
+  assert.equal(plan.effect, "dust");
+  assert.equal(fromEditorPlan({ ...output, effect: "none" } as never).effect, undefined);
+  const parsed = editPlanSchema.parse(plan);
+  const props = buildReelProps(parsed, { template: "dynamique", clipUrls: { a: "https://x/a.mp4", b: "https://x/b.mp4" }, brand: { name: "Culte" } });
+  assert.equal(props.effect, "dust");
+  // « : » never starts a line.
+  assert.equal(props.texts[0]!.text, "offre de rentrée\u202f: -15\u202f% sur les cours");
+  assert.equal(frenchSpaces("Prête ? « Viens » !"), "Prête\u202f? «\u202fViens\u202f»\u202f!");
+  // One message held all along passes the checks: it is the hook, and the only text.
+  const checks = qualityChecks(parsed);
+  assert.equal(checks.find((c) => c.key === "hook")!.ok, true);
+  assert.equal(checks.find((c) => c.key === "texts")!.ok, true);
+  // The writer chooses the form first: a key message comes back with nothing to read.
+  assert.deepEqual(reelFormatSchema.options, ["raconte", "message"]);
+  assert.equal(voiceOverDecisionSchema.safeParse({ format: "message", why: "une offre", hook: "", script: "" }).success, true);
+});
+
 test("quality checks: what the Reels that work have, read on the plan for the critic", async () => {
   const { qualityChecks, qualityLine } = await import("./critic.ts");
   const { normalizeEditPlan } = await import("./editor.ts");

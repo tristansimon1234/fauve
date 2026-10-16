@@ -9,6 +9,7 @@ import {
   type EditorOutput,
   type EditorOutputLegacy,
   type MediaFacts,
+  type ReelFormat,
   carryRetouch,
   carryTextStyle,
   clearOfVoice,
@@ -92,6 +93,8 @@ export async function designEdit(params: {
   fromPlanId?: string;
   /** A new take, not a correction: the brief is the request, the previous plan is not shown. */
   fresh?: boolean;
+  /** Simone chose the form: « message », one key message with the music, no voice. */
+  format?: ReelFormat;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, recent, report, inspirations, hooks] = await Promise.all([
@@ -186,6 +189,8 @@ export async function designEdit(params: {
       voice_media_id: undefined,
       chosen_template: chosenTemplate.success ? chosenTemplate.data : undefined,
       chosen_inspiration: chosenInspiration ?? undefined,
+      // Simone chose this form: one key message held on screen, with the music, no voice.
+      format: params.format === "message" ? "message clé" : undefined,
     },
     // Every shot as an editor weighs it (size, camera, beauty, energy, hook, where the subject is).
     clips: clips.map((c) => editorClip(c.media_id, c.analysis)),

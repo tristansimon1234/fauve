@@ -12,7 +12,9 @@ import {
   reactionSchema,
   replyExtrasSchema,
 } from "./schemas.ts";
+import { MAX_MONTAGE_FILES } from "./creation.ts";
 import { effortSchema } from "./effort.ts";
+import { brandSignatureSchema } from "./signature.ts";
 import { ONBOARDING_STEPS } from "./onboarding.ts";
 import { slideTextSchema } from "./slides.ts";
 import { textLookSchema } from "./text-look.ts";
@@ -148,14 +150,14 @@ export const toolSpecs = {
   analyze_clips: {
     description:
       "Regarde les vidéos reçues (analyse Gemini) : plans horodatés, sujet, énergie, potentiel d'accroche, qualité, visages, meilleurs passages, paroles. À appeler avant tout plan de montage, avec les media_id indiqués dans la conversation. Peut prendre jusqu'à une minute par vidéo.",
-    input: z.object({ media_ids: z.array(z.string().uuid()).min(1).max(10) }),
+    input: z.object({ media_ids: z.array(z.string().uuid()).min(1).max(MAX_MONTAGE_FILES) }),
   },
   montage: {
     description:
       "Lance un montage ou une correction, tout de suite, dès qu'elle le demande en disant de quoi il parle, ou qu'elle a dit oui au sujet que tu lui as proposé (pas de devis : les crédits sont débités à la livraison pour ce qui a vraiment été fait, et le message de livraison dit combien). En tâche de fond : ton monteur regarde les clips, choisit le gabarit, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Simone la regarde et la fait corriger avant de l'envoyer (Rapide 2 à 4 min, Soigné 4 à 8, Max 8 à 15). Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent. Si le solde ne suffit pas, rien ne part : la réponse le dit.",
     input: z.object({
       post_id: z.string().uuid(),
-      media_ids: z.array(z.string().uuid()).max(10).optional().describe("Clips à monter (media_id). Facultatif pour une correction ou une vidéo 100 % motion design."),
+      media_ids: z.array(z.string().uuid()).max(MAX_MONTAGE_FILES).optional().describe("Clips et photos à monter (media_id), 20 au plus. Facultatif pour une correction ou une vidéo 100 % motion design."),
       brief: z.string().max(600).optional().describe("Intention ou correction, avec les textes exacts si besoin. Ex. « ouverture en motion design avec RENTRÉE en grand », « police Montserrat », « visages OK »"),
       correction: z.boolean().default(false).describe("true pour modifier le montage existant de cette publication"),
       plan: montagePlanSchema.optional().describe("Facultatif : ce qu'elle a demandé de précis (durée, style, scènes, textes exacts des animations) ; sinon le monteur décide"),
@@ -391,10 +393,11 @@ export const toolSpecs = {
   },
   update_brand_profile: {
     description:
-      "Change le profil de style du studio (à partir d'exemples ou d'une correction de la gérante) : donne seulement ce qui change, le reste est gardé.",
+      "Change le profil de style du studio (à partir d'exemples ou d'une correction de la gérante) : donne seulement ce qui change, le reste est gardé. « titles » règle ses titres à l'écran, pour tous ses prochains Reels : espacement des lettres (tracking : tight serré, normal, wide aéré), capitales ou non (case), graisse (weight), alignement (align) ; c'est son choix, jamais imposé.",
     input: brandProfileSchema
       .pick({ tone: true, caption_length: true, emojis: true, hashtags: true, visual_notes: true, colors: true, fonts: true, art_direction: true, default_template: true, dos: true, donts: true })
-      .partial(),
+      .partial()
+      .extend({ titles: brandSignatureSchema.shape.titles.partial().optional() }),
   },
   restyle_reel: {
     description:

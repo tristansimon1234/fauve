@@ -12,6 +12,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, Grain } from "./Collage";
+import { FilmDust } from "./FilmDust";
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
 import { MotionScene } from "./MotionScene";
@@ -32,7 +33,7 @@ const SAFE = { left: 140, right: 140 };
 const normalize = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 
 /** Where a text breaks into words: any space but the non-breaking ones, which hold a business's name together. */
-const SPACES = /[^\S\u00a0]+/;
+const SPACES = /[^\S\u00a0\u202f]+/;
 
 export function Reel(props: ReelProps) {
   // The ambiance's rhythm, set the business's way (its titles, key words, boxes and light).
@@ -110,6 +111,7 @@ export function Reel(props: ReelProps) {
           </FadeIn>
         </Sequence>
       ))}
+      {props.effect === "dust" ? <FilmDust k={k} /> : null}
 
       {props.texts.map((t, i) => (
         <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
@@ -361,6 +363,8 @@ function sides(text: ReelProps["texts"][number], props: ReelProps, k: number): {
 function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   // Remount when edited, so the fit is measured again (scene editor).
   const key = `${text.text}|${text.style}|${text.scale ?? 1}|${text.x ?? ""}|${text.backdrop ?? false}|${text.look ? JSON.stringify(text.look) : ""}`;
+  // A key message with its details (« Don't miss it ! », « OFFRE DE RENTRÉE », the codes): composed on three levels.
+  if (text.style === "hook" && text.items?.length && !text.look) return <KeyMessage key={`${key}|${JSON.stringify(text.items)}`} text={text} index={index} props={props} theme={theme} k={k} />;
   if (text.look || text.items) return <LookText key={`${key}|${JSON.stringify([text.items, text.detail_look, text.bullet])}`} text={text} index={index} props={props} theme={theme} k={k} />;
   if (props.template === "collage") {
     const C = text.style === "hook" ? CollageHook : text.style === "band" ? CollageBand : CollageCaption;
@@ -441,6 +445,86 @@ function Marker({ color, from, long, children }: { color: string; from: number; 
         </g>
       </svg>
     </span>
+  );
+}
+
+/** A key message's letter spacing (em) for each choice of its charter. */
+const KEY_SPACING = {
+  tight: { title: -0.035, subtitle: -0.01, details: -0.01 },
+  normal: { title: -0.01, subtitle: 0, details: 0 },
+  wide: { title: 0.02, subtitle: 0.05, details: 0.01 },
+} as const;
+
+/** How colourful a colour is (0 grey, 1 pure): a light brand colour worth showing on a title. */
+const chroma = ([r, g, b]: [number, number, number]) => (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(1, Math.max(r, g, b));
+
+/**
+ * One key message held over the Reel, composed like a creator's (« Don't miss it ! », then
+ * « OFFRE DE RENTRÉE », then its details): the title very big and heavy in the display font,
+ * in the brand's light colour when it has one; a subtitle in bold capitals; the details small
+ * and regular; aligned the business's way. Each level enters after the other, then stays put.
+ */
+function KeyMessage({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const exit = useExit(text.durationInFrames, theme);
+  const h = theme.hook;
+  const left = h.align === "left";
+  const size = h.size * k * (text.scale ?? 1);
+  const body = `"${MONOSPACE.test(props.brand.bodyFont) ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`;
+  // The spacing of its letters is the business's choice (its charter's titles: tight, normal, wide).
+  const spacing = KEY_SPACING[props.brand.signature?.titles.tracking ?? "normal"];
+  const emphasis = new Set(text.emphasis.flatMap((e) => e.split(SPACES)).map(normalize));
+  const light = props.brand.palette?.light ? hexRgb(props.brand.palette.light) : null;
+  const titleColor = light && rgbLuminance(light) > 0.55 && chroma(light) > 0.08 ? props.brand.palette!.light! : "#fff";
+  const [first, ...rest] = text.items!;
+  const details = [first!.detail, ...rest.flatMap((item) => [item.title, item.detail])].filter((d): d is string => Boolean(d?.trim()));
+  const enter = (i: number): CSSProperties => {
+    const p = spring({ frame: frame - i * 5, fps, config: theme.spring });
+    return { opacity: interpolate(p, [0, 0.5], [0, 1], clamp), transform: `translateY(${interpolate(p, [0, 1], [18 * k, 0])}px)` };
+  };
+  const box: CSSProperties = {
+    position: "absolute",
+    top: props.height * (text.y ?? 0.46),
+    height: props.height * 0.34,
+    ...sides(text, props, k),
+    opacity: exit.opacity,
+    transform: `translateY(${exit.translate * k}px)`,
+  };
+  return (
+    <Fit style={box} innerStyle={{ alignItems: left ? "flex-start" : "center", textAlign: left ? "left" : "center", justifyContent: "flex-start" }} marker={String(index)}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: left ? "flex-start" : "center", textShadow: TEXT_SHADOW }}>
+        <span
+          style={{
+            fontFamily: `"${props.brand.displayFont}", sans-serif`,
+            fontWeight: Math.max(800, h.weight),
+            fontSize: size * 1.05,
+            lineHeight: 0.98,
+            // A short title holds on one line (the block shrinks to fit rather than break it).
+            whiteSpace: text.text.length <= 22 ? "nowrap" : "normal",
+            letterSpacing: h.uppercase ? h.letterSpacing * k : `${spacing.title}em`,
+            textTransform: h.uppercase ? "uppercase" : "none",
+            color: titleColor,
+            ...enter(0),
+          }}
+        >
+          {text.text.split(SPACES).filter(Boolean).map((word, i) => (
+            <span key={i} style={emphasis.has(normalize(word)) ? { color: legible(props.brand.accent, "footage") } : undefined}>
+              {i ? " " : ""}
+              {word}
+            </span>
+          ))}
+        </span>
+        <span style={{ fontFamily: body, fontWeight: 800, fontSize: size * 0.46, letterSpacing: `${spacing.subtitle}em`, textTransform: "uppercase", color: "#fff", marginTop: size * 0.22, ...enter(1) }}>
+          {first!.title}
+        </span>
+        {details.map((line, i) => (
+          <span key={i} style={{ fontFamily: body, fontWeight: 500, fontSize: size * 0.27, lineHeight: 1.3, letterSpacing: `${spacing.details}em`, color: "#fff", marginTop: i ? 0 : size * 0.08, ...enter(2 + i) }}>
+            {line}
+          </span>
+        ))}
+      </div>
+    </Fit>
   );
 }
 

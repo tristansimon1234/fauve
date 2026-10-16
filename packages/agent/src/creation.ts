@@ -25,9 +25,15 @@ export function formatWhy(p: Picked): string {
 }
 
 /** Why a format does not fit these files (null: it does). A Reel takes anything. */
+/** Clips and photos in one Reel: a creator's tour often runs on 15 to 20 short clips. */
+export const MAX_MONTAGE_FILES = 20;
+
+/** Photos in a carousel: what Instagram's publishing API takes. */
+export const MAX_CAROUSEL_PHOTOS = 10;
+
 export function formatBlocked(kind: PostKind, p: Picked): string | null {
   const total = p.videos + p.photos;
-  if (kind === "carousel") return p.videos ? "Avec des photos seulement" : p.photos < 2 ? "Il faut au moins 2 photos" : null;
+  if (kind === "carousel") return p.videos ? "Avec des photos seulement" : p.photos < 2 ? "Il faut au moins 2 photos" : p.photos > MAX_CAROUSEL_PHOTOS ? `${MAX_CAROUSEL_PHOTOS} photos au plus` : null;
   if (kind === "post") return p.videos || p.photos !== 1 ? "Une seule photo" : null;
   if (kind === "story") return total !== 1 ? "Une seule photo ou vidéo" : null;
   return null;
