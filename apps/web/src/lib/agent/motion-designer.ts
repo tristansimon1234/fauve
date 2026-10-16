@@ -23,6 +23,9 @@ export type SceneResult = {
 
 type Brand = Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">;
 
+/** The business's motion kit: its latest scenes, whose language a new one keeps (never their code as such). */
+export type MotionKit = { name: string; code: string }[];
+
 function transpile(code: string): string {
   return transform(code, { transforms: ["typescript", "jsx"], jsxRuntime: "classic", production: true }).code;
 }
@@ -32,6 +35,7 @@ async function writeScene(
   request: SceneRequest,
   brand: Brand,
   artDirection: string | undefined,
+  kit: MotionKit,
   fix?: { code: string; error: string },
 ) {
   const content = fix
@@ -43,6 +47,7 @@ async function writeScene(
         format: "1080 × 1920",
         marque: brand,
         direction_artistique: artDirection,
+        ...(kit.length ? { kit_du_commerce: kit } : {}),
         code_precedent: request.previousCode,
       });
   const response = await anthropic().beta.messages.parse({
@@ -72,10 +77,11 @@ export async function designMotionScenes(
   requests: SceneRequest[],
   artDirection: string | undefined,
   brand: Brand,
+  kit: MotionKit = [],
 ): Promise<SceneResult[]> {
   if (!requests.length) return [];
   let results: SceneResult[] = await Promise.all(
-    requests.map(async (r) => ({ id: r.id, ...(await writeScene(studioId, r, brand, artDirection).catch((e: unknown) => ({ code: null, js: null, error: String(e) }))) })),
+    requests.map(async (r) => ({ id: r.id, ...(await writeScene(studioId, r, brand, artDirection, kit).catch((e: unknown) => ({ code: null, js: null, error: String(e) }))) })),
   );
 
   for (let round = 0; round < 2; round++) {
@@ -90,7 +96,7 @@ export async function designMotionScenes(
     const fixed = await Promise.all(
       failed.map(async (r) => ({
         id: r.id,
-        ...(await writeScene(studioId, requests.find((q) => q.id === r.id)!, brand, artDirection, { code: r.code!, error: r.error ?? "erreur" }).catch(
+        ...(await writeScene(studioId, requests.find((q) => q.id === r.id)!, brand, artDirection, kit, { code: r.code!, error: r.error ?? "erreur" }).catch(
           (e: unknown) => ({ code: r.code, js: null, error: String(e) }),
         )),
       })),
