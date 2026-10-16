@@ -870,7 +870,7 @@ test("critic: an overlong answer is clamped, not thrown away; lateness is measur
   assert.equal(review.issues.length, 4);
   assert.equal(review.issues[0]!.scene, 30);
   assert.equal(review.issues[0]!.problem.length, 200);
-  assert.equal(review.summary.length, 240);
+  assert.equal(review.summary.length, 300);
 
   const t0 = 0;
   const min = 60_000;
@@ -1366,6 +1366,20 @@ test("music: the composer's ending falls after the Reel, a beat that falls away 
   assert.deepEqual(grooveGaps([...holds.slice(0, 22), -60, -70], 11.67), []);
   // A piece without a beat (all quiet alike) is not a break.
   assert.deepEqual(grooveGaps(Array.from({ length: 20 }, () => -48), 10), []);
+});
+
+test("review: the sentence she reads is never cut in the middle of a word", async () => {
+  const { shortSentence } = await import("./critic.ts");
+  const said =
+    "J'ai vérifié que l'accroche était lisible dès la 1re image, que le collage respectait la charte et que le rythme était bon ; il restait à remplacer les plans vides ou sombres par des plans avec des gens, et à rendre l'appel final plus lisible.";
+  assert.equal(shortSentence(said, 300), said);
+  // Too long: cut on a word, with « … » (before, « plus lisib »).
+  const cut = shortSentence(said, 240);
+  assert.ok(cut.length <= 240);
+  assert.match(cut, / plus…$/);
+  // Two sentences: the first one whole.
+  assert.equal(shortSentence(`J'ai raccourci l'accroche. ${said}`, 120), "J'ai raccourci l'accroche.");
+  assert.equal(shortSentence("  deux   espaces  ", 50), "deux espaces");
 });
 
 test("mix: what is said at the level of a voice, the music under it and still heard", async () => {

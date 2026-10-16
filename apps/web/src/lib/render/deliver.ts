@@ -1,5 +1,5 @@
 import "server-only";
-import { CREDIT_PRICES, PUBLISH_OFFER_OPTIONS, publishQuestion, publishWhen, STYLE_CHECK_OPTIONS, TRIAL_DAYS } from "@fauve/agent";
+import { CREDIT_PRICES, PUBLISH_OFFER_OPTIONS, publishQuestion, publishWhen, shortSentence, STYLE_CHECK_OPTIONS, TRIAL_DAYS } from "@fauve/agent";
 import { studioAccess } from "@/lib/billing/access";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { env } from "@/lib/env";
@@ -156,7 +156,7 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const options = offer ? PUBLISH_OFFER_OPTIONS : styleCheck ? STYLE_CHECK_OPTIONS : undefined;
   const payload = { posts: [target.postId], open_post: target.postId, ...(options ? { options } : {}), ...(offer ? { publish_offer: target.postId } : {}) };
   if (target.note) {
-    const { error } = await supabaseAdmin().from("posts").update({ agent_note: target.note.slice(0, 600) }).eq("id", target.postId).eq("studio_id", target.studioId);
+    const { error } = await supabaseAdmin().from("posts").update({ agent_note: shortSentence(target.note, 600) }).eq("id", target.postId).eq("studio_id", target.studioId);
     if (error) console.warn("delivery: note not kept", error.message);
   }
   // Stored without the one-time link (Fauve's history must not reuse it).

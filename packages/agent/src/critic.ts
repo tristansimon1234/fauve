@@ -53,6 +53,20 @@ export type MontageReview = Omit<MontageReviewAnswer, "issues"> & { issues: Mont
 export const HOOK_PASS = 7;
 
 /**
+ * A line the manager reads, within `max` characters: cut after its last full sentence,
+ * else on a word with « … », never in the middle of a word (« plus lisib »).
+ */
+export function shortSentence(text: string, max: number): string {
+  const clean = text.trim().replace(/\s+/g, " ");
+  if (clean.length <= max) return clean;
+  const room = clean.slice(0, max + 1);
+  const end = Math.max(...[". ", "! ", "? ", "… "].map((mark) => room.lastIndexOf(mark)));
+  if (end > 0) return room.slice(0, end + 1);
+  const space = room.lastIndexOf(" ", max - 1);
+  return `${room.slice(0, space > 0 ? space : max - 1).replace(/[\s,;:(«]+$/, "")}…`;
+}
+
+/**
  * The critic's answer within bounds: at most 4 issues, short lines, scores 1–10, best within
  * the versions shown. A weak hook never lets the Reel go while there is a correction to make.
  */
@@ -67,10 +81,11 @@ export function normalizeReview(answer: MontageReviewAnswer, versions: number): 
     ok: answer.ok && !(hook < HOOK_PASS && answer.issues.length > 0),
     issues: answer.issues.slice(0, 4).map((i) => ({
       scene: i.scene === null ? null : clamp(i.scene, 1, 30),
-      problem: i.problem.slice(0, 200),
+      // The first one left is told to her as it is (« je peux encore corriger ceci : … »).
+      problem: shortSentence(i.problem, 200),
       fix: i.fix.slice(0, 240),
     })),
-    summary: answer.summary.slice(0, 240),
+    summary: shortSentence(answer.summary, 300),
   };
 }
 

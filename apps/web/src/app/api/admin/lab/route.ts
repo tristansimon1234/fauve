@@ -21,6 +21,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { speak, writeVoiceScript } from "@/lib/voice-over";
 import { ensureTranscript } from "@/lib/voice";
+import { renderPost } from "@/lib/render/render-post";
 import { voiceNoteInSandbox } from "@/lib/render/sandbox";
 import { photoRegions } from "@/lib/video/regions";
 
@@ -45,6 +46,8 @@ import { photoRegions } from "@/lib/video/regions";
 //                        kept as a WhatsApp audio and read by Scribe, then put on the Reel.
 //   ?case=…&step=result  every version: its render (signed link, 24 h), the plan kept
 //                        (without the scenes' code), the delivered message and the costs.
+//   ?case=…&step=music   the version kept rendered again with a newly composed piece, the
+//                        montage untouched: to hear a change to the music without a new montage.
 //   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&idea=…][&voice=…|&own_voice=…]
 //                        a real business from its website, as at onboarding: its site read
 //                        (facts and activity, colours and fonts of its code, logo), then its look
@@ -54,7 +57,8 @@ import { photoRegions } from "@/lib/video/regions";
 //                        from those photos (clips=1 adds the stock clips of the kind's trade; the
 //                        kind only sets the idea). Never published. step=result adds its brand.
 // Lab studios go with /api/admin/delete-studio.
-export const maxDuration = 300;
+// A render with its music (step=music) runs after the answer, as long as a montage job's step.
+export const maxDuration = 800;
 
 /** The files of one montage, as in the app (MAX_FILES) and the montage job. */
 const MAX_MEDIA = MAX_MONTAGE_FILES;
@@ -463,6 +467,17 @@ async function result(key: string) {
   };
 }
 
+/** The version kept of the case's latest post, rendered again with a newly composed piece. */
+async function newMusic(key: string) {
+  const db = supabaseAdmin();
+  const studio = await db.from("studios").select("id").eq("website_url", key).maybeSingle();
+  if (!studio.data) throw new Error("case not set up");
+  const post = await db.from("posts").select("id").eq("studio_id", studio.data.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (!post.data) throw new Error("no post");
+  const rendered = await renderPost(studio.data.id as string, post.data.id as string, { freshMusic: true });
+  console.log("lab: new music", key, rendered.renderId);
+}
+
 export async function POST(request: Request) {
   if (!cronAuthorized(request)) return new Response("unauthorized", { status: 401 });
   const params = new URL(request.url).searchParams;
@@ -477,6 +492,10 @@ export async function POST(request: Request) {
       return Response.json({ error: "site" }, { status: 400 });
     }
     if (params.get("step") === "result") return Response.json(await result(siteKey(url.href)));
+    if (params.get("step") === "music") {
+      after(() => newMusic(siteKey(url.href)).catch((error: unknown) => console.error("lab: new music failed", url.href, error)));
+      return Response.json({ ok: true, site: url.href, music: true });
+    }
     if (kind && !KINDS[kind]) return Response.json({ error: `kind=${Object.keys(KINDS).join("|")}` }, { status: 400 });
     // An ambiance chosen for the post (as she would pick « Façon collage »), else the editor's choice.
     const template = params.get("template") ? motionTemplateSchema.safeParse(params.get("template")) : null;
@@ -493,6 +512,10 @@ export async function POST(request: Request) {
   if (!c) return Response.json({ error: `case=${Object.keys(CASES).join("|")}` }, { status: 400 });
   if (c.template && !motionTemplateSchema.safeParse(c.template).success) return Response.json({ error: "template" }, { status: 400 });
   if (params.get("step") === "result") return Response.json(await result(labUrl(name)));
+  if (params.get("step") === "music") {
+    after(() => newMusic(labUrl(name)).catch((error: unknown) => console.error("lab: new music failed", name, error)));
+    return Response.json({ ok: true, case: name, music: true });
+  }
   // call_app gives up after a few seconds: the work goes on after the answer.
   after(() => start(name, c, params.get("reset") === "1", voiceOf(params), ideaOf(params)).catch((error: unknown) => console.error("lab: case failed", name, error)));
   return Response.json({ ok: true, case: name, started: true });
