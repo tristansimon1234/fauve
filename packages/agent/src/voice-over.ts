@@ -104,6 +104,25 @@ export const voiceOverScriptSchema = z.object({
 });
 export type VoiceOverScript = z.infer<typeof voiceOverScriptSchema>;
 
+/** The two ways a Reel without anyone speaking works: told by a voice, or one key message with the music. */
+export const reelFormatSchema = z.enum(["raconte", "message"]);
+export type ReelFormat = z.infer<typeof reelFormatSchema>;
+
+/** When Simone chooses (« auto »): the form first, then the words only if a voice tells it. */
+export const voiceOverDecisionSchema = z.object({
+  format: reelFormatSchema.describe("raconte : une voix qui raconte rend ce Reel meilleur ; message : un seul message clé à l'écran, avec la musique, sans voix"),
+  why: z.string().describe("Pourquoi, en une phrase"),
+  hook: z.string().describe("La première phrase, celle qui arrête le pouce dès ses premiers mots ; vide avec message"),
+  script: z.string().describe("Tout ce que la voix dit, première phrase comprise, tel qu'il sera lu ; vide avec message"),
+});
+export type VoiceOverDecision = z.infer<typeof voiceOverDecisionSchema>;
+
+/** Added to the writer's rules when it chooses the form (the business's setting is « auto »). */
+export const VOICE_FORMAT_PROMPT = `Avant d'écrire, choisis la forme de ce Reel (« format ») : les Reels qui marchent font l'un ou l'autre, aucun n'est meilleur en soi.
+- « raconte » : une voix qui raconte le rend meilleur : un lieu, un plat ou un geste à faire découvrir, des coulisses, un conseil, une histoire à dérouler sur ses images ;
+- « message » : il porte mieux un seul message clé à l'écran, avec la musique et sans voix : une offre, une annonce, la rentrée, une ouverture, un événement, une ambiance à faire sentir.
+Dans le doute : « message » pour une offre ou une annonce, « raconte » sinon. « why » en une phrase. Avec « message », laisse hook et script vides.`;
+
 export const VOICE_OVER_PROMPT = `Tu écris la voix off d'un Reel Instagram pour un commerce de quartier : ce qu'une vraie personne dit sur ses images, comme un créateur qui parle à ses abonnés, jamais comme une pub. Cette voix fait rester les gens jusqu'au bout : elle doit donner envie, pas vendre.
 
 Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée de la publication, le ton du commerce, ce que montrent ses images, dans l'ordre où elles ont été filmées, et la longueur à viser (« longueur » : de mots_min à mots_max mots).

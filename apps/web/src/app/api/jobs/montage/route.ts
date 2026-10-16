@@ -10,7 +10,9 @@ import {
   fixBrief,
   MAX_FREE_SCENES,
   montageIssueSchema,
+  MAX_MONTAGE_FILES,
   motionTemplateSchema,
+  reelFormatSchema,
   variantPlan,
   type MotionTemplate,
 } from "@fauve/agent";
@@ -52,7 +54,7 @@ const bodySchema = z.object({
   step: z.enum(["design", "alternative", "variant", "render", "review", "fix"]),
   studioId: z.uuid(),
   postId: z.uuid(),
-  mediaIds: z.array(z.uuid()).max(10).optional(),
+  mediaIds: z.array(z.uuid()).max(MAX_MONTAGE_FILES).optional(),
   /** The manager's request, with the plan she said yes to. */
   brief: z.string().max(4000).optional(),
   waId: z.string().regex(/^\d{6,16}$/).optional(),
@@ -89,6 +91,8 @@ const bodySchema = z.object({
   voice: z.string().max(40).optional(),
   /** The voice step is done: the design goes on (in its own invocation when a voice was recorded). */
   voiced: z.boolean().optional(),
+  /** Simone chose a key message with the music over a voice for this Reel (her setting is « auto »). */
+  format: reelFormatSchema.optional(),
 });
 type Job = z.infer<typeof bodySchema>;
 
@@ -199,7 +203,7 @@ const next = (job: Job, patch: Partial<Job>) => queueJob("montage", { ...job, ..
 
 /** What the editor is asked for: the clips, the request with the validated plan, the scenes allowed. */
 function designInput(job: Job) {
-  return { studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, maxNewScenes: job.maxNewScenes };
+  return { studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, maxNewScenes: job.maxNewScenes, format: job.format };
 }
 
 /** New animated scenes still allowed by the quote for the next version. */
@@ -215,7 +219,12 @@ async function voiceFirst(job: Job): Promise<boolean> {
   if (job.voiced) return false;
   const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction });
   if (!made) return false;
-  await next(job, { step: "design", voiced: true, voice: made.voice });
+  // A key message with the music suits it better: no voice, the editor knows it, the design goes on now.
+  if ("format" in made) {
+    Object.assign(job, { voiced: true, format: made.format });
+    return false;
+  }
+  await next(job, { step: "design", voiced: true, voice: made.voice, format: "raconte" });
   return true;
 }
 

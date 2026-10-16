@@ -16,9 +16,13 @@ import {
   stripAudioTags,
   usdToEur,
   VOICE_MAX_SECONDS,
+  VOICE_FORMAT_PROMPT,
   VOICE_OVER_PROMPT,
   voiceWordsFor,
+  voiceOverDecisionSchema,
   voiceOverScriptSchema,
+  type ReelFormat,
+  type VoiceOverDecision,
   type VoiceOverScript,
   type VoiceTranscript,
 } from "@fauve/agent";
@@ -84,8 +88,19 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
   };
 }
 
-/** Simone writes what the voice says (a creator talking over the images, not an ad). */
-export async function writeVoiceScript(studioId: string, postId: string, wish?: string, mediaIds?: string[], whispered = false): Promise<VoiceOverScript> {
+/**
+ * Simone writes what the voice says (a creator talking over the images, not an ad).
+ * `decide`: she first chooses the form (her setting is « auto »): a key message with the
+ * music comes back with its format and nothing to read.
+ */
+export async function writeVoiceScript(
+  studioId: string,
+  postId: string,
+  wish?: string,
+  mediaIds?: string[],
+  whispered = false,
+  decide = false,
+): Promise<VoiceOverScript & Partial<Pick<VoiceOverDecision, "format" | "why">>> {
   const input = {
     ...(await scriptInput(studioId, postId, mediaIds)),
     ...(wish ? { demande: wish } : {}),
@@ -95,13 +110,14 @@ export async function writeVoiceScript(studioId: string, postId: string, wish?: 
     const response = await anthropic().beta.messages.parse({
       model: CLAUDE_MODEL,
       max_tokens: 2000,
-      output_config: { effort: "medium", format: betaZodOutputFormat(voiceOverScriptSchema) },
-      system: VOICE_OVER_PROMPT,
+      output_config: { effort: "medium", format: betaZodOutputFormat(decide ? voiceOverDecisionSchema : voiceOverScriptSchema) },
+      system: decide ? `${VOICE_OVER_PROMPT}\n\n${VOICE_FORMAT_PROMPT}` : VOICE_OVER_PROMPT,
       messages: [{ role: "user", content: JSON.stringify(input) }],
     });
     await logClaudeCost(studioId, response.usage, "voice_script");
-    const script = response.parsed_output;
+    const script = response.parsed_output as (VoiceOverScript & Partial<Pick<VoiceOverDecision, "format" | "why">>) | null;
     if (!script) throw new Error("La voix off n'a pas pu être écrite");
+    if (script.format === "message") return script;
     const words = spokenWords(script.script);
     // Too long, it would not fit in a Reel; too short, it says nothing: once more.
     const { mots_min: min, mots_max: max } = input.longueur;
@@ -174,7 +190,12 @@ export async function levelSpeech(id: string, mp3: Buffer): Promise<{ mp3: Buffe
  * then cuts on it like on her own voice note. A failure leaves the Reel without a
  * voice rather than without a montage. Returns the voice's name when one was made.
  */
-export async function voiceOverIfWanted(params: { studioId: string; postId: string; mediaIds?: string[]; correction?: boolean }): Promise<{ mediaId: string; voice: string } | null> {
+export async function voiceOverIfWanted(params: {
+  studioId: string;
+  postId: string;
+  mediaIds?: string[];
+  correction?: boolean;
+}): Promise<{ mediaId: string; voice: string } | { format: Extract<ReelFormat, "message">; why: string } | null> {
   if (!env("ELEVENLABS_API_KEY")) return null;
   const db = supabaseAdmin();
   const [post, brand] = await Promise.all([
@@ -213,7 +234,11 @@ export async function voiceOverIfWanted(params: { studioId: string; postId: stri
   // A voice of the gallery, or one of her own (a clone made with her consent) kept as it is.
   const voiceId = choice?.voice_id ?? setting.voice_id ?? DEFAULT_VOICE_ID;
   try {
-    const made = await makeVoiceOver({ studioId: params.studioId, postId: params.postId, wish: choice?.wish, voiceId, mediaIds: ids });
+    // Her setting leaves it to Simone: told by a voice, or one key message with the music (then nothing is read nor paid).
+    const auto = choice?.mode !== "on" && !choice?.wish && setting.use === "auto";
+    const written = auto ? await writeVoiceScript(params.studioId, params.postId, undefined, ids, Boolean(findVoice(voiceId)?.asmr), true) : undefined;
+    if (written?.format === "message") return { format: "message", why: (written.why ?? "").slice(0, 300) };
+    const made = await makeVoiceOver({ studioId: params.studioId, postId: params.postId, wish: choice?.wish, voiceId, mediaIds: ids, script: written });
     // Her wish and the remake were for this voice: used once.
     if (choice?.wish || choice?.remake) await db.from("posts").update({ voice_over: { mode: choice.mode, ...(choice.voice_id ? { voice_id: choice.voice_id } : {}) } }).eq("id", params.postId);
     return { mediaId: made.mediaId, voice: findVoice(voiceId)?.name ?? "ta voix" };
@@ -256,9 +281,17 @@ export async function removeVoice(studioId: string, postId: string): Promise<boo
  * Simone's voice on a Reel: the script, the voice, kept as an audio media with its
  * words, set on the post. The next montage of the post is cut on it.
  */
-export async function makeVoiceOver(params: { studioId: string; postId: string; wish?: string; voiceId?: string; mediaIds?: string[] }): Promise<{ mediaId: string; script: string; seconds: number }> {
+export async function makeVoiceOver(params: {
+  studioId: string;
+  postId: string;
+  wish?: string;
+  voiceId?: string;
+  mediaIds?: string[];
+  /** Already written (when Simone chose the form first). */
+  script?: VoiceOverScript;
+}): Promise<{ mediaId: string; script: string; seconds: number }> {
   const db = supabaseAdmin();
-  const script = await writeVoiceScript(params.studioId, params.postId, params.wish, params.mediaIds, Boolean(findVoice(params.voiceId)?.asmr));
+  const script = params.script ?? (await writeVoiceScript(params.studioId, params.postId, params.wish, params.mediaIds, Boolean(findVoice(params.voiceId)?.asmr)));
   const started = Date.now();
   const voice = await speak(script.script, params.voiceId);
   if (voice.transcript.duration > VOICE_MAX_SECONDS) throw new Error(`Voix trop longue (${voice.transcript.duration} s)`);

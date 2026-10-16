@@ -7,6 +7,7 @@ import {
   effortSchema,
   findVoice,
   JOB_STALE_MINUTES,
+  MAX_MONTAGE_FILES,
   postKindSchema,
   TRIAL_DAYS,
   type CreationPhase,
@@ -39,7 +40,7 @@ const launchSchema = z.object({
   /** What she imagines (the scenario, an offer, a message), in her words. */
   idea: z.string().max(500),
   /** In the order she picked them: from her library, or just sent (already in Storage). */
-  items: z.array(z.union([z.object({ media: z.uuid() }), z.object({ upload: uploadSchema })])).min(1).max(10),
+  items: z.array(z.union([z.object({ media: z.uuid() }), z.object({ upload: uploadSchema })])).min(1).max(MAX_MONTAGE_FILES),
   /** A Reel's voice over: as the studio's setting (auto), none, or one of Simone's voices. */
   voice: z.union([z.literal("auto"), z.literal("off"), z.string().regex(/^[A-Za-z0-9]{10,40}$/)]).default("auto"),
   /** Where it goes (TikTok only takes a Reel); by default the usual places. */

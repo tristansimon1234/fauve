@@ -129,9 +129,11 @@ export function themeFor(template: MotionTemplate, signature: ReelSignature | un
     hook: {
       ...base.hook,
       family: t.font,
-      weight: t.weight === "black" ? 900 : t.weight === "bold" ? 700 : 500,
+      // A hook over video is never thin: « regular » on its site reads as the clean bold of native texts, bold and black go heavier.
+      weight: t.weight === "black" ? 900 : t.weight === "bold" ? 800 : 700,
       uppercase: upper,
-      letterSpacing: tracking(base.hook.size),
+      // Its spacing is its choice (tight, normal, wide); lower case only ever takes a little air.
+      letterSpacing: upper ? tracking(base.hook.size) : base.hook.size * (t.tracking === "tight" ? -0.03 : t.tracking === "wide" ? 0.01 : -0.01),
       // Capitals set tight read as one block; spaced ones need air between the lines.
       lineHeight: upper ? Math.min(base.hook.lineHeight, 1.0) : Math.max(base.hook.lineHeight, 1.04),
       stress: signature.stress === "block" ? "box" : signature.stress,

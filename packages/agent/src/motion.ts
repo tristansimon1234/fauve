@@ -116,6 +116,8 @@ export type ReelProps = {
   soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
   /** Her voice note over the Reel, from `from` (frames), in the render and the preview. */
   voice?: { src: string; from: number } | null;
+  /** An overlay over the whole video, under the texts: film dust. */
+  effect?: "dust" | null;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
@@ -197,6 +199,14 @@ export function keepName(text: string, name: string | undefined): string {
   if (parts.length < 2) return text;
   const escaped = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   return text.replace(new RegExp(escaped.join("[ \\t]+"), "giu"), (found) => found.replace(/[ \t]+/g, "\u00a0"));
+}
+
+/**
+ * French typography on screen: the space before « : ; ! ? % € » and inside « » never breaks
+ * (a narrow no-break space), so no line of a Reel starts with « : » or a lone « % ».
+ */
+export function frenchSpaces(text: string): string {
+  return text.replace(/[ \t\u00a0]+([:;!?»%€])/g, "\u202f$1").replace(/(«)[ \t\u00a0]+/g, "$1\u202f");
 }
 
 const toFrames = (seconds: number) => Math.max(0, Math.round(seconds * REEL_FPS));
@@ -301,9 +311,9 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       const to = Math.min(toFrames(t.to), durationInFrames);
       const name = inputs.brand.name;
       return {
-        text: keepName(t.text, name),
+        text: frenchSpaces(keepName(t.text, name)),
         style: t.style,
-        emphasis: (t.emphasis ?? []).map((e) => keepName(e, name)),
+        emphasis: (t.emphasis ?? []).map((e) => frenchSpaces(keepName(e, name))),
         from,
         durationInFrames: to - from,
         y: t.y,
@@ -366,10 +376,11 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     words,
     brand,
     endCard: plan.end_card
-      ? { title: keepName(plan.end_card.title, inputs.brand.name), subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, durationInFrames - endCardFrames) }
+      ? { title: frenchSpaces(keepName(plan.end_card.title, inputs.brand.name)), subtitle: plan.end_card.subtitle ? frenchSpaces(plan.end_card.subtitle) : null, from: Math.max(0, durationInFrames - endCardFrames) }
       : null,
     ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack, ...music } } : {}),
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
+    ...(plan.effect ? { effect: plan.effect } : {}),
   };
 }
 

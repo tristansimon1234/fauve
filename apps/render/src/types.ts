@@ -119,6 +119,8 @@ export type ReelProps = {
   soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
   /** Her voice note over the Reel, from `from` (frames). */
   voice?: { src: string; from: number } | null;
+  /** An overlay over the whole video, under the texts: film dust. */
+  effect?: "dust" | null;
   logo?: "top" | "bottom" | null;
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
