@@ -79,7 +79,19 @@ export type ReelProps = {
         /** Where the subtitles sit over this shot (top, share of the frame), off its faces. */
         subtitleY?: number;
       }
-    | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; move?: CameraMove; accent?: "punch" | "wipe"; subtitleY?: number }
+    | {
+        type: "image";
+        src: string;
+        startAt: number;
+        durationInFrames: number;
+        edit?: PhotoEdit;
+        zoom?: boolean;
+        move?: CameraMove;
+        accent?: "punch" | "wipe";
+        subtitleY?: number;
+        /** In a collage, its subject cut out (an image with transparency; its box in shares of the photo), laid as a sticker. */
+        cutout?: { src: string; box: Box };
+      }
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
     /** shift: how far the scene is moved down (share of the height, up when negative), off the faces of the footage under it. */
     | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder; shift?: number }

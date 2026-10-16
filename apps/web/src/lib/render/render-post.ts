@@ -29,6 +29,7 @@ import { logoTone } from "./logo-tone";
 import { withMusic } from "./music";
 import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
+import { ensureCutouts, stickerInputs } from "./cutout";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -113,6 +114,8 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   const { fonts } = await usableFonts(style.fonts, ownFonts.map((f) => f.family), template, style.font_twins);
   // Her voice note over the Reel: signed for the render and the preview, with her words.
   const voice = plan.voice ? await voiceInput(studioId, plan.voice.media_id) : undefined;
+  // A collage lays the subject of a photo as a sticker when its cut-out is clean.
+  const cutouts = template === "collage" && plan.template === "collage" ? await stickerInputs(studioId, photoIds).catch(() => ({})) : undefined;
   const words: Record<string, ClipAnalysis["words"]> = {};
   // Each clip's shape, to frame its subject in the vertical crop (phones film 16:9 or 9:16).
   const aspects: Record<string, number> = {};
@@ -141,6 +144,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
     signature: style.signature,
     studioName: (studio.data?.name as string | null) ?? "",
     voice,
+    cutouts,
   };
 }
 
@@ -177,7 +181,10 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, signature, voice } = await loadMontageInputs(studioId, plan);
+  // A collage's photos have their subject cut out once (an open model in the sandbox), before the render lays them as stickers.
+  if (plan.template === "collage") await ensureCutouts(studioId, planMediaIds(plan));
+  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, signature, voice, cutouts } =
+    await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
@@ -209,6 +216,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         aspects,
         brand: { name: studioName, accent, logoUrl, logoOnDark, fonts, colors, customFonts, signature },
         ...(voice ? { voice } : {}),
+        ...(cutouts ? { cutouts } : {}),
       });
       // Library scenes play with new texts, older plans predate the layout check: every
       // scene is checked before the render, and one whose text leaves the frame plays its

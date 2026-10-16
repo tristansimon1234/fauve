@@ -113,9 +113,13 @@ function BlurBox({ box, shape, size }: { box: Box; shape: "ellipse" | "rect"; si
   return <div style={style} />;
 }
 
-/** A photo with its retouch and blurred zones, covering the frame; `grade`: the Reel's light grade, before its own retouch. */
-export function Photo({ src, edit, grade }: { src: string; edit?: PhotoEdit; grade?: string }) {
-  const { width, height } = useVideoConfig();
+/**
+ * A photo with its retouch and blurred zones, covering the frame (or the box it is drawn in,
+ * `frame`: a collage's print); `grade`: the Reel's light grade, before its own retouch.
+ */
+export function Photo({ src, edit, grade, frame }: { src: string; edit?: PhotoEdit; grade?: string; frame?: { width: number; height: number } }) {
+  const video = useVideoConfig();
+  const { width, height } = frame ?? video;
   if (!edit) return <Img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", filter: grade }} />;
   const layout = coverLayout({ width, height }, edit.source, edit.adjust);
   return (

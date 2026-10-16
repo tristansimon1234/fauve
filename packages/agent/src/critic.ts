@@ -84,6 +84,7 @@ export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Simone, 
 - le rythme et l'histoire : un ordre qui raconte (du large au serré, le geste puis le résultat), pas deux plans presque identiques à la suite, pas de scène inutile ou répétée, une fin claire (un dernier plan fort avec une invitation, ou le nom et l'appel à l'action), qui fait post natif et pas pub ; jamais un écran de fin par-dessus une animation ou un texte ; la ligne « Rythme » du plan te donne ce que les images ne montrent pas (longueur de chaque plan, coupes sur le temps, transition signature) : refuse un Reel mou (plans trop longs sans raison), haché (que des plans très courts) ou monotone (tous les plans de la même longueur) ;
 - jamais bon marché : pas d'effet gadget (rotation, flash, glitch, emoji animé, plus de deux polices, texte qui rebondit sans raison), pas de texte façon flyer (bloc ou surlignage penché, une pastille par mot, italique, effet machine à écrire, petite ligne fine illisible, slogan sans verbe comme « Coupes et couleurs naturelles »), au plus une transition signature ; une poussière de pellicule discrète voulue (ligne « Rythme ») n'est ni un gadget ni une saleté de l'image ; un Reel qui fait « modèle gratuit » n'est pas ok, même s'il est lisible ; un texte posé sur un texte déjà dans l'image (enseigne, logo, lettrage) n'est pas ok ;
 - la marque : couleurs, polices et ton cohérents avec le commerce et avec ce que la gérante a demandé ;
+- sa demande (« Demande de la gérante ») est la règle, jamais un défaut : ce qu'elle impose (par quoi le Reel commence ou finit, l'ordre des moments, les mots ou l'offre à dire) reste, même pour une accroche plus forte ; juge seulement comment c'est fait et propose de le faire mieux sans y déroger (un autre passage du même moment, un cadrage plus serré, d'autres mots par-dessus) ;
 - peu de texte : les Reels qui marchent laissent parler les images (une accroche, parfois une ligne de plus) ; avec une voix, ses sous-titres disent tout : aucun autre texte que l'accroche n'est normal, ne demande jamais d'en ajouter un ;
 - la ligne « Contrôle qualité » vérifie sur le plan ce que les Reels qui marchent ont presque toujours (ça bouge dès la 1re image, une accroche écrite, des plans de 2 s au plus en moyenne hors phrases de quelqu'un qui parle, des coupes sur le temps, peu de texte) : chaque point « à revoir » devient une correction précise ; « à tenter » (une fin qui reboucle sur la 1re image) est un conseil à donner seulement si un de ses clips le permet, jamais une raison de refuser le Reel. Ces repères servent le Reel, pas l'inverse : un Reel juste pour ce commerce passe avant une case cochée.
 
@@ -297,7 +298,7 @@ export function fixBrief(review: Pick<MontageReview, "score" | "issues">, reques
   return [
     `Relecture de la vidéo rendue par la directrice artistique (note ${review.score}/10). Corrige seulement ces points, garde tout le reste :`,
     ...review.issues.map((issue, i) => `${i + 1}. ${issue.scene ? `Scène ${issue.scene} : ` : ""}${issue.problem} → ${issue.fix}`),
-    request ? `Rappel de la demande de la gérante : ${request}` : "",
+    request ? `Rappel de la demande de la gérante, qui passe avant ces points (ce qu'elle impose reste) : ${request}` : "",
   ]
     .filter(Boolean)
     .join("\n");

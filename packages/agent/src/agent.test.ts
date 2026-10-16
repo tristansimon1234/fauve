@@ -2348,6 +2348,43 @@ test("off faces: one subtitle row for the Reel, animations moved off the faces u
   assert.equal(props.subtitleY, out.subtitle_y);
 });
 
+test("collages: a clean cut-out makes a sticker over its print, in a collage only", async () => {
+  const { stickerWorthy, cutoutSchema } = await import("./cutout.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  const clean = { coverage: 0.315, parts: 1, touches: { top: 0, bottom: 0.2, left: 0, right: 0 }, unsure: 0.017 };
+  // A person standing in the photo (her legs cut by its bottom): a sticker.
+  assert.equal(stickerWorthy(clean), true);
+  // A close-up cut off by the top and a side, a speck, a room in pieces, a blurry edge: prints.
+  assert.equal(stickerWorthy({ ...clean, coverage: 0.66, touches: { top: 0.48, bottom: 0, left: 0.11, right: 0.57 } }), false);
+  assert.equal(stickerWorthy({ ...clean, coverage: 0.01 }), false);
+  assert.equal(stickerWorthy({ ...clean, parts: 5 }), false);
+  assert.equal(stickerWorthy({ ...clean, unsure: 0.3 }), false);
+  assert.equal(
+    cutoutSchema.safeParse({ path: "s/cutouts/p.webp", w: 1078, h: 1440, box: { x: 0.18, y: 0.15, w: 0.65, h: 0.85 }, ...clean, sticker: true, model: "birefnet-lite", at: "2026-10-16T12:00:00Z" }).success,
+    true,
+  );
+
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 6,
+    template: "collage",
+    segments: [
+      { clip_id: "p", in: 0, out: 3, zoom: "none", photo: { source: { width: 1497, height: 2000 } } },
+      { clip_id: "q", in: 0, out: 3, zoom: "none" },
+    ],
+    texts: [{ text: "back to culte", from: 0, to: 3, style: "hook" }],
+    images: [],
+  });
+  const sticker = { src: "https://x/p.webp", box: { x: 0.18, y: 0.15, w: 0.65, h: 0.85 } };
+  const inputs = { clipUrls: { p: "https://x/p.jpg", q: "https://x/q.jpg" }, photoIds: ["p", "q"], brand: { name: "Culte" }, cutouts: { p: sticker, q: sticker } };
+  const props = buildReelProps(plan, { template: "collage", ...inputs });
+  assert.deepEqual((props.segments[0] as { cutout?: unknown }).cutout, sticker);
+  // Laid where the print shows its subject: never without the photo's framing.
+  assert.equal("cutout" in props.segments[1]!, false);
+  // Another ambiance keeps its photos whole.
+  assert.equal("cutout" in buildReelProps({ ...plan, template: "doux" }, { template: "doux", ...inputs }).segments[0]!, false);
+});
+
 test("readings that hold: a long line never loses a site's look", async () => {
   const { clampReading, clampSiteLook, siteLookSchema } = await import("./moodboard.ts");
   const { clip, brandSignatureSchema } = await import("./signature.ts");
