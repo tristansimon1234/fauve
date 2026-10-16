@@ -11,7 +11,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, Grain, printSize, type Sticker } from "./Collage";
+import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, Grain, printSize, stickerTop, type Sticker } from "./Collage";
 import { FilmDust } from "./FilmDust";
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
@@ -131,18 +131,27 @@ export function Reel(props: ReelProps) {
       ))}
       {props.effect === "dust" ? <FilmDust k={k} /> : null}
 
-      {props.texts.map((t, i) => (
-        <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
-          <TextBeat text={t} index={i} props={props} theme={theme} k={k} />
-        </Sequence>
-      ))}
-      {/* A collage's opening subject in front of its hook: the words go behind the person, as if cut out with them. */}
+      {props.texts.map((t, i) =>
+        underStickers(props, t) ? (
+          <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
+            <TextBeat text={t} index={i} props={props} theme={theme} k={k} />
+          </Sequence>
+        ) : null,
+      )}
+      {/* A collage subject in front of its hook: the words go behind the person, as if cut out with them. */}
       {props.segments.map((segment, i) =>
         hookBehind(props, i) && segment.type === "image" ? (
           <Sequence key={`k${i}`} from={segment.startAt} durationInFrames={segment.durationInFrames} layout="none">
             <CollageCard index={i} props={props} sticker={stickerOf(segment, theme)} layer="sticker" />
           </Sequence>
         ) : null,
+      )}
+      {props.texts.map((t, i) =>
+        underStickers(props, t) ? null : (
+          <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
+            <TextBeat text={t} index={i} props={props} theme={theme} k={k} />
+          </Sequence>
+        ),
       )}
 
       {props.words.length > 0 && <Subtitles props={props} theme={theme} k={k} />}
@@ -172,12 +181,34 @@ function stickerOf(segment: ReelProps["segments"][number], theme: Theme): Sticke
   return segment.type === "image" && segment.cutout && segment.edit ? { src: segment.cutout.src, box: segment.cutout.box, edit: segment.edit, grade: theme.grade } : undefined;
 }
 
-/** A collage shot whose sticker stands in front of the hook (its words behind the subject): a photo with its cut-out while the hook shows. */
+/** The hooks that may pass behind a sticker: plain words (a styled or composed text stays in front). */
+const plainHook = (t: ReelProps["texts"][number]) => t.style === "hook" && !t.look && !t.items?.length;
+
+/**
+ * A collage hook that passes behind a sticker's subject: only when the subject rises into
+ * its words from below, like a magazine cover (the head over the bottom of the line). A
+ * subject standing over the whole line would hide it: then the words stay in front.
+ */
+function behindSubject(props: ReelProps, sticker: Pick<Sticker, "box" | "edit">, text: ReelProps["texts"][number]): boolean {
+  const top = props.height * (text.y ?? 0.08);
+  return stickerTop(props, sticker) > top + props.height * 0.24 * (text.scale ?? 1) * 0.6;
+}
+
+/** A collage shot whose sticker stands in front of the hook (its words behind the subject): a photo with its cut-out while such a hook shows. */
 function hookBehind(props: ReelProps, i: number): boolean {
   const segment = props.segments[i];
   if (props.template !== "collage" || !segment || segment.type !== "image" || !segment.cutout || !segment.edit) return false;
+  const sticker = { box: segment.cutout.box, edit: segment.edit };
   const end = segment.startAt + segment.durationInFrames;
-  return props.texts.some((t) => t.style === "hook" && !t.look && !t.items?.length && t.from < end && t.from + t.durationInFrames > segment.startAt);
+  return props.texts.some((t) => plainHook(t) && t.from < end && t.from + t.durationInFrames > segment.startAt && behindSubject(props, sticker, t));
+}
+
+/** A text drawn under the stickers that stand in front of the hook (every other text stays above them). */
+function underStickers(props: ReelProps, t: ReelProps["texts"][number]): boolean {
+  return (
+    plainHook(t) &&
+    props.segments.some((s, i) => hookBehind(props, i) && t.from < s.startAt + s.durationInFrames && t.from + t.durationInFrames > s.startAt)
+  );
 }
 
 /**
@@ -541,7 +572,8 @@ function KeyMessage({ text, index, props, theme, k }: { text: ReelProps["texts"]
   };
   return (
     <Fit style={box} innerStyle={{ alignItems: left ? "flex-start" : "center", textAlign: left ? "left" : "center", justifyContent: "flex-start" }} marker={String(index)}>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: left ? "flex-start" : "center", textShadow: TEXT_SHADOW }}>
+      {/* Bare over the footage for most of the Reel: the tight shadow that reads on a bright wall too (a light lilac title on a white studio). */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: left ? "flex-start" : "center", textShadow: LINE_SHADOW }}>
         <span
           style={{
             fontFamily: `"${props.brand.displayFont}", sans-serif`,

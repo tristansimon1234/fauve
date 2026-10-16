@@ -47,6 +47,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       ...(inputs.voice ? { voice: inputs.voice } : {}),
       // A collage's stickers and the cut-outs its animations compose with, so the preview shows them as the video does.
       ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
+      ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
       photoAspects: inputs.photoAspects,
     } satisfies ReelInputs,
   };

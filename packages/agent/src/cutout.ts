@@ -48,3 +48,17 @@ export function stickerWorthy(r: Pick<Cutout, "coverage" | "parts" | "touches" |
     r.unsure <= 0.15
   );
 }
+
+/**
+ * Whether an animation can use a cut-out: a subject in one to three pieces with a clean
+ * edge, even cut by the photo's frame (a chef seated at his table): the animation is told
+ * which edges cut it (`cutEdges`) and brings the subject in from there.
+ */
+export function sceneWorthy(r: Pick<Cutout, "coverage" | "parts" | "unsure">): boolean {
+  return r.coverage >= 0.03 && r.coverage <= 0.85 && r.parts <= 3 && r.unsure <= 0.15;
+}
+
+/** The edges of the photo the subject runs into (more than a sliver of it). */
+export function cutEdges(touches: Cutout["touches"]): ("top" | "bottom" | "left" | "right")[] {
+  return (["top", "bottom", "left", "right"] as const).filter((edge) => touches[edge] > 0.05);
+}

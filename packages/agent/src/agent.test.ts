@@ -1914,6 +1914,39 @@ test("ending: the last text cut by the end starts earlier, never over another on
   assert.deepEqual(readableEnding(texts, [{ from: 8, to: 9.2 }], 10).at(-1), { from: 9.3, to: 10 });
 });
 
+test("texts and animations: an animated hook is not written again after it, and two texts never show at once", async () => {
+  const { clearOfAnimations } = await import("./editor.ts");
+  const opening = { from: 0, to: 1.67, words: "alors, tu reviens quand ?" };
+  const texts = [
+    { text: "Alors, tu reviens quand ?", from: 0, to: 1.67 },
+    { text: "ton reformer t'attend pour la rentrée", from: 1.67, to: 12.2 },
+  ];
+  // The opening animation already says the hook: only the message stays (Culte's collage showed both, one over the other).
+  assert.deepEqual(clearOfAnimations(texts, [opening], 12.24), [texts[1]]);
+  // Another hook than the animation's words is moved after it, and the message waits for its end.
+  const other = [{ text: "la rentrée est là", from: 0, to: 1.5 }, texts[1]!];
+  assert.deepEqual(clearOfAnimations(other, [opening], 12.24), [
+    { text: "la rentrée est là", from: 1.67, to: 3.17 },
+    { text: "ton reformer t'attend pour la rentrée", from: 3.17, to: 12.2 },
+  ]);
+  // Two texts at once without any animation: the later one waits, or goes when it would not be read.
+  assert.deepEqual(
+    clearOfAnimations(
+      [
+        { text: "a", from: 0, to: 3 },
+        { text: "b", from: 1, to: 3.5 },
+        { text: "c", from: 2, to: 6 },
+      ],
+      [],
+      10,
+    ),
+    [
+      { text: "a", from: 0, to: 3 },
+      { text: "c", from: 3, to: 6 },
+    ],
+  );
+});
+
 test("signature transition: never on the last shot", async () => {
   const { signatureShot } = await import("./editor.ts");
   const segments = [
@@ -2450,6 +2483,53 @@ test("free animations: her photos, and an animation over several shots", async (
   // One the motion designer could not write is not drawn.
   const unwritten = editPlanSchema.parse({ ...plan, layers: [{ motion: { brief: "coucou" }, from: 0, to: 4 }] });
   assert.equal(buildReelProps(unwritten, { template: "doux", ...inputs }).layers, undefined);
+});
+
+test("free animations: a correction keeps the ones written, and a cut-out cut by its frame still serves", async () => {
+  const { keepWrittenAnimations, normalizeEditPlan } = await import("./editor.ts");
+  const { sceneWorthy, cutEdges } = await import("./cutout.ts");
+  const { scenePhotos } = await import("./motion.ts");
+  const scene = "function Scene(){return null}";
+  const previous = editPlanSchema.parse({
+    ...validPlan,
+    duration: 6,
+    template: "doux",
+    texts: [],
+    images: [],
+    segments: [
+      { clip_id: "a", in: 0, out: 3, zoom: "none" },
+      { motion: { brief: "la fin avec le chef", js: scene, photos: ["p"], fallback: { kind: "title", title: "Mousse", background: "accent" } }, duration: 2 },
+    ],
+    layers: [{ motion: { brief: "le chef dit coucou à chaque plan", js: scene, photos: ["p"] }, from: 0, to: 5 }],
+  });
+  // The editor writes them back as briefs: they keep their code and photos, a new brief stays new.
+  const rewritten = editPlanSchema.parse({
+    ...previous,
+    segments: [previous.segments[0], { motion: { brief: "la fin avec le chef", fallback: { kind: "title", title: "Mousse", background: "accent" } }, duration: 2 }],
+    layers: [{ motion: { brief: "le chef dit coucou à chaque plan" }, from: 0, to: 5 }, { motion: { brief: "un compteur" }, from: 0, to: 3 }],
+  });
+  const kept = keepWrittenAnimations(rewritten, previous);
+  assert.deepEqual(kept.layers?.map((l) => [l.motion.brief, Boolean(l.motion.js), l.motion.photos]), [
+    ["le chef dit coucou à chaque plan", true, ["p"]],
+    ["un compteur", false, undefined],
+  ]);
+  // A correction allows no new animation: the written ones stay, the new one goes, none turns into its fixed scene.
+  const corrected = normalizeEditPlan(kept, { a: 10 }, 0);
+  assert.deepEqual(corrected.layers?.map((l) => l.motion.brief), ["le chef dit coucou à chaque plan"]);
+  assert.equal(corrected.segments.some((s) => "motion" in s && s.motion.js === scene), true);
+  assert.equal(keepWrittenAnimations(rewritten, null), rewritten);
+
+  // A chef seated at his table runs into the top and the left: no sticker, but an animation can bring him in from there.
+  const chef = { coverage: 0.419, parts: 1, touches: { top: 0.17, bottom: 0, left: 0.21, right: 0.08 }, unsure: 0.016 };
+  assert.equal(sceneWorthy(chef), true);
+  assert.deepEqual(cutEdges(chef.touches), ["top", "left", "right"]);
+  assert.equal(sceneWorthy({ ...chef, parts: 5 }), false);
+  const photos = scenePhotos(["p"], {
+    clipUrls: { p: "https://x/p.jpg" },
+    sceneCutouts: { p: { src: "https://x/p.webp", box: { x: 0, y: 0, w: 0.8, h: 1 }, edges: ["top", "left"] } },
+  });
+  assert.deepEqual(photos[0]?.cutEdges, ["top", "left"]);
+  assert.equal(photos[0]?.cutout, "https://x/p.webp");
 });
 
 test("readings that hold: a long line never loses a site's look", async () => {

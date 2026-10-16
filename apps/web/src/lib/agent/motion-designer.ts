@@ -58,6 +58,8 @@ export type MotionKit = { name: string; code: string }[];
 /** The most photos one scene composes with. */
 const MAX_SCENE_PHOTOS = 4;
 
+const EDGE_WORDS = { top: "le haut", bottom: "le bas", left: "la gauche", right: "la droite" } as const;
+
 function transpile(code: string): string {
   return transform(code, { transforms: ["typescript", "jsx"], jsxRuntime: "classic", production: true }).code;
 }
@@ -89,7 +91,16 @@ async function writeScene(
           : {}),
         // Her photos it may compose with: their id, what they show, and whether their subject is cut out.
         ...(request.photos?.length
-          ? { photos_du_reel: request.photos.map((p) => ({ id: p.id, montre: p.shows, detouree: Boolean(p.photo.cutout), format: p.photo.aspect >= 1 ? "paysage" : "portrait" })) }
+          ? {
+              photos_du_reel: request.photos.map((p) => ({
+                id: p.id,
+                montre: p.shows,
+                detouree: Boolean(p.photo.cutout),
+                format: p.photo.aspect >= 1 ? "paysage" : "portrait",
+                // The edges of the photo that cut its subject: it comes in from there.
+                ...(p.photo.cutEdges?.length ? { sujet_coupe_par: p.photo.cutEdges.map((e) => EDGE_WORDS[e]) } : {}),
+              })),
+            }
           : {}),
         // An animation over several shots: the cuts under it.
         ...(request.cuts ? { plans_dessous: { plans: request.cuts.length + 1, coupes_images: request.cuts } } : {}),
