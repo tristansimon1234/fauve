@@ -3,6 +3,7 @@ import { insertPlanVersion } from "@/lib/edit-plans";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   editorClip,
+  signatureLines,
   editorOutputSchemaLegacy,
   finishPlan,
   type EditorOutput,
@@ -160,6 +161,8 @@ export async function designEdit(params: {
     brand: {
       tone: profile.tone,
       art_direction: profile.art_direction,
+      // The same direction as settings: the render already applies them (titles, key words, boxes, light).
+      signature: signatureLines(profile.signature),
       moodboard: profile.moodboard?.reading,
       // What worked on this studio's Instagram (weekly analysis): follow it when it applies.
       lessons: report?.lessons.map((l) => l.lesson),
@@ -323,11 +326,15 @@ export async function designEdit(params: {
     : [];
   const template = motionTemplateSchema.catch("doux").parse(plan.template);
   // Its fonts as the render loads them (a site's font Google does not serve gets its twin).
-  const { fonts: usable } = await usableFonts(profile.fonts, (profile.custom_fonts ?? []).map((f) => f.family), template).catch(() => ({ fonts: profile.fonts }));
+  const { fonts: usable } = await usableFonts(profile.fonts, (profile.custom_fonts ?? []).map((f) => f.family), template, profile.font_twins).catch(() => ({ fonts: profile.fonts }));
   const designed = await designMotionScenes(
     params.studioId,
     requests,
-    [profile.art_direction, profile.moodboard?.reading && `Lecture du moodboard de la gérante : ${profile.moodboard.reading}`]
+    [
+      profile.art_direction,
+      profile.signature && `Sa charte en réglages (ses titres, son mouvement, sa lumière) :\n${signatureLines(profile.signature)}`,
+      profile.moodboard?.reading && `Lecture du moodboard de la gérante : ${profile.moodboard.reading}`,
+    ]
       .filter(Boolean)
       .join("\n\n") || undefined,
     resolveReelBrand(plan, template, {

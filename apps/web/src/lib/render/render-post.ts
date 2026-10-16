@@ -91,7 +91,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
       : Promise.resolve({ data: [] as { media_id: string; analysis: unknown }[] }),
   ]);
   const style = brandProfileSchema
-    .pick({ colors: true, logo_url: true, logo_path: true, fonts: true, custom_fonts: true })
+    .pick({ colors: true, logo_url: true, logo_path: true, fonts: true, custom_fonts: true, font_twins: true, signature: true })
     .catch({})
     .parse(brand.data?.[0]?.profile ?? {});
   const accent = style.colors?.[0];
@@ -108,7 +108,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   const customFonts = ownFonts.flatMap((f, i) => (signedFonts[i]?.signedUrl ? [{ family: f.family, url: signedFonts[i]!.signedUrl }] : []));
   // Her fonts as the render can load them: a site's font Google does not serve gets its twin (or the ambiance's).
   const template = motionTemplateSchema.catch("doux").parse(plan.template);
-  const { fonts } = await usableFonts(style.fonts, ownFonts.map((f) => f.family), template);
+  const { fonts } = await usableFonts(style.fonts, ownFonts.map((f) => f.family), template, style.font_twins);
   // Her voice note over the Reel: signed for the render and the preview, with her words.
   const voice = plan.voice ? await voiceInput(studioId, plan.voice.media_id) : undefined;
   const words: Record<string, ClipAnalysis["words"]> = {};
@@ -135,6 +135,8 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
     fonts,
     colors: style.colors,
     customFonts,
+    // Her art direction as settings: the render's theme follows it.
+    signature: style.signature,
     studioName: (studio.data?.name as string | null) ?? "",
     voice,
   };
@@ -173,7 +175,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, voice } = await loadMontageInputs(studioId, plan);
+  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, signature, voice } = await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();
@@ -203,7 +205,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         photoIds,
         words,
         aspects,
-        brand: { name: studioName, accent, logoUrl, logoOnDark, fonts, colors, customFonts },
+        brand: { name: studioName, accent, logoUrl, logoOnDark, fonts, colors, customFonts, signature },
         ...(voice ? { voice } : {}),
       });
       // Library scenes play with new texts, older plans predate the layout check: every

@@ -142,7 +142,7 @@ export type StudioContextForPrompt = {
   /** The studio's default level of care for montages (Réglages). */
   montageEffort?: Effort;
   /** What Fauve already knows about the business: never asked again. */
-  known?: { website: string | null; booking: string | null; tone: string | null; memory: string[] };
+  known?: { website: string | null; booking: string | null; tone: string | null; fonts?: string | null; memory: string[] };
   /** What is running in the background right now (montages, text layers, components), one line each. */
   work?: string[];
   /** Her presence: days since her last publication, the last reminder, videos sorted lately. */
@@ -191,6 +191,7 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     ...(ctx.known?.website ? [`Site : ${ctx.known.website}.`] : []),
     ...(ctx.known?.booking ? [`Réservation : ${ctx.known.booking}.`] : []),
     ...(ctx.known?.tone ? [`Ton du commerce : ${ctx.known.tone}`] : []),
+    ...(ctx.known?.fonts ? [`Polices de sa charte : ${ctx.known.fonts}`] : []),
     ctx.known?.memory.length
       ? `Mémoire (ce que tu sais déjà du commerce, valable dans toutes les conversations ; ne le redemande jamais) :\n${ctx.known.memory.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
       : "Mémoire : vide pour l'instant.",

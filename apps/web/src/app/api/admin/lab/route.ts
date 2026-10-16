@@ -26,12 +26,14 @@ import { photoRegions } from "@/lib/video/regions";
 //                        voice=1 (or voice=<ElevenLabs voice id>) puts Simone's voice over it first.
 //   ?case=…&step=result  every version: its render (signed link, 24 h), the plan kept
 //                        (without the scenes' code), the delivered message and the costs.
-//   ?site=<url>&kind=coiffeur|restaurant|pilates[&clips=1][&reset=1][&voice=…]
+//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&voice=…]
 //                        a real business from its website, as at onboarding: its site read
-//                        (facts, colours and fonts of its code, logo), then its look (photos into
-//                        its moodboard and library, a capture read by Sonnet: art direction,
-//                        palette), then its first Reel from its site's photos (clips=1 adds the
-//                        stock clips of the same trade). Never published. step=result adds its brand.
+//                        (facts and activity, colours and fonts of its code, logo), then its look
+//                        (its page read in the sandbox's browser: fonts and colours measured, captures;
+//                        Sonnet writes its art direction and signature, gives its fonts their free
+//                        twins and keeps the photos that show the business), then its first Reel
+//                        from those photos (clips=1 adds the stock clips of the kind's trade; the
+//                        kind only sets the idea). Never published. step=result adds its brand.
 // Lab studios go with /api/admin/delete-studio.
 export const maxDuration = 300;
 
@@ -129,6 +131,7 @@ const siteKey = (url: string) => `lab://site/${new URL(url).hostname.replace(/^w
 
 const factsSchema = z.object({
   name: z.string().describe("Le nom du commerce, tel qu'il l'écrit"),
+  business: z.string().describe("Son activité en quelques mots, comme il la décrit (« coffee shop et salon de coiffure », « sandwicherie », « studio de Pilates Reformer »)"),
   facts: z.array(z.string()).describe("3 à 5 faits courts et vrais, tirés du site : ville ou quartier, spécialités, ce qui le rend unique, offre ou façon de réserver"),
 });
 
@@ -146,7 +149,7 @@ async function siteFacts(studioId: string, site: Awaited<ReturnType<typeof readW
 }
 
 /** The lab studio of a real business: created from its site once, then its look read (photos, capture). */
-async function siteStudio(url: string, kind: (typeof KINDS)[string]): Promise<string> {
+async function siteStudio(url: string, kind: { business: string }): Promise<string> {
   const db = supabaseAdmin();
   const key = siteKey(url);
   const found = await db.from("studios").select("id").eq("website_url", key).maybeSingle();
@@ -167,11 +170,15 @@ async function siteStudio(url: string, kind: (typeof KINDS)[string]): Promise<st
   });
   await db
     .from("studios")
-    .update({ ...(read?.name ? { name: read.name.slice(0, 80) } : {}), memory: [...(read?.facts ?? []).slice(0, 5), `Site : ${site.url}`].map((fact) => ({ fact, at })) })
+    .update({
+      ...(read?.name ? { name: read.name.slice(0, 80) } : {}),
+      // Its activity as its site says it (« coffee shop et salon de coiffure »), like Simone saves it at onboarding.
+      ...(read?.business ? { business_type: read.business.slice(0, 80) } : {}),
+      memory: [...(read?.facts ?? []).slice(0, 5), `Site : ${site.url}`].map((fact) => ({ fact, at })),
+    })
     .eq("id", studioId);
-  // As Simone saves it after reading the site: the colours and fonts of its code, its logo.
+  // As Simone saves it after reading the site: the colours and fonts of its code, its logo (its tone comes from the reading of its look).
   const profile = {
-    tone: "chaleureux, tutoiement",
     colors: site.style.colors.slice(0, 6),
     fonts: site.style.fonts.slice(0, 2),
     ...(site.logo ? { logo_url: site.logo } : {}),
@@ -267,8 +274,11 @@ async function clearPosts(studioId: string) {
 }
 
 /** A real business from its site: its site's photos (and the stock clips of its trade, if asked), then its first Reel. */
+/** Without a kind: what any business would ask for its first Reel from its site. */
+const ANY_KIND: (typeof KINDS)[string] = { business: "commerce", title: "Premier Reel", idea: "Un Reel avec les photos de mon site, qui donne envie de venir." };
+
 async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: string | null) {
-  const kind = KINDS[kindName]!;
+  const kind = KINDS[kindName] ?? ANY_KIND;
   const studioId = await siteStudio(url, kind);
   if (reset) await clearPosts(studioId);
   const db = supabaseAdmin();
@@ -322,8 +332,18 @@ async function result(key: string) {
     db.from("brand_profiles").select("version, profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
   ]);
   // Its charter as the Reel used it: colours, fonts (and the ones swapped for a free twin), art direction.
-  const profile = (brand.data?.profile ?? {}) as { colors?: string[]; fonts?: string[]; art_direction?: string; logo_url?: string; moodboard?: { reading?: string } };
-  const fonts = await usableFonts(profile.fonts, [], "doux").catch(() => ({ fonts: profile.fonts, swaps: [] }));
+  const profile = (brand.data?.profile ?? {}) as {
+    colors?: string[];
+    fonts?: string[];
+    font_twins?: Record<string, string>;
+    art_direction?: string;
+    logo_url?: string;
+    tone?: string;
+    default_template?: string;
+    signature?: unknown;
+    moodboard?: { reading?: string };
+  };
+  const fonts = await usableFonts(profile.fonts, [], "doux", profile.font_twins).catch(() => ({ fonts: profile.fonts, swaps: [] }));
   const planIds = (plans.data ?? []).map((p) => p.id as string);
   const renders = planIds.length
     ? ((await db.from("renders").select("id, edit_plan_id, status, storage_path, duration_ms, error, created_at").in("edit_plan_id", planIds).order("created_at")).data ?? [])
@@ -345,7 +365,11 @@ async function result(key: string) {
       fonts_used: fonts.fonts ?? [],
       font_swaps: fonts.swaps,
       logo: profile.logo_url ?? null,
+      font_twins: profile.font_twins ?? {},
       art_direction: profile.art_direction ?? null,
+      tone: profile.tone ?? null,
+      ambiance: profile.default_template ?? null,
+      signature: profile.signature ?? null,
       reading: profile.moodboard?.reading?.slice(0, 1200) ?? null,
     },
     post: post.data,
@@ -378,7 +402,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "site" }, { status: 400 });
     }
     if (params.get("step") === "result") return Response.json(await result(siteKey(url.href)));
-    if (!KINDS[kind]) return Response.json({ error: `kind=${Object.keys(KINDS).join("|")}` }, { status: 400 });
+    if (kind && !KINDS[kind]) return Response.json({ error: `kind=${Object.keys(KINDS).join("|")}` }, { status: 400 });
     after(() =>
       startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", params.get("voice")).catch((error: unknown) => console.error("lab: site failed", url.href, error)),
     );

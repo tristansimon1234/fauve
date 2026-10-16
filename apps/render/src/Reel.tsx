@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 import {
   AbsoluteFill,
   Audio,
@@ -19,7 +19,7 @@ import { Backdrop, SceneView } from "./Scene";
 import { ClipBlurLayer, cssFilter, Photo } from "./Retouch";
 import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
-import { TEXT_Y, THEMES, type Theme } from "./theme";
+import { TEXT_Y, themeFor, type Theme } from "./theme";
 import type { CameraMove, ReelProps, ReelUnder, TextLook } from "./types";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -35,7 +35,8 @@ const normalize = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu
 const SPACES = /[^\S\u00a0]+/;
 
 export function Reel(props: ReelProps) {
-  const theme = THEMES[props.template];
+  // The ambiance's rhythm, set the business's way (its titles, key words, boxes and light).
+  const theme = themeFor(props.template, props.brand.signature);
   // The studio's own fonts first, so their families are not asked of Google.
   loadCustomFonts(props.brand.customFonts);
   const collage = props.template === "collage";
@@ -401,6 +402,47 @@ function legible(hex: string, on: "footage" | "white"): string {
   return rgbHex(c);
 }
 
+/**
+ * A key word circled by hand, like the strokes on a business's site: an open loop drawn
+ * around the word in a few frames, its end running past its start; a long group gets a
+ * scribbled underline instead.
+ */
+function Marker({ color, from, long, children }: { color: string; from: number; long: boolean; children: ReactNode }) {
+  const frame = useCurrentFrame();
+  const clip = useId();
+  // Drawn by uncovering the stroke from left to right (a dash animation does not survive the non-scaling stroke).
+  const drawn = interpolate(frame, [from, from + (long ? 10 : 13)], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
+  const stroke = { fill: "none", stroke: color, strokeWidth: long ? 7 : 6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, vectorEffect: "non-scaling-stroke" as const };
+  return (
+    <span style={{ position: "relative", display: "inline-block" }}>
+      {children}
+      <svg
+        viewBox="0 0 200 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        style={
+          long
+            ? { position: "absolute", left: "-2%", width: "104%", top: "88%", height: "26%", overflow: "visible" }
+            : { position: "absolute", left: "-9%", width: "118%", top: "-4%", height: "112%", overflow: "visible" }
+        }
+      >
+        <defs>
+          <clipPath id={clip}>
+            <rect x={-20} y={-20} width={240 * drawn} height={140} />
+          </clipPath>
+        </defs>
+        <g clipPath={`url(#${clip})`}>
+          {long ? (
+            <path d="M 4 40 C 50 22, 120 30, 196 18 M 30 70 C 80 52, 140 58, 180 50" {...stroke} />
+          ) : (
+            <path d="M 28 20 C 78 0, 168 4, 193 38 C 207 68, 152 98, 94 96 C 36 94, 4 78, 7 50 C 10 26, 52 10, 118 9" {...stroke} />
+          )}
+        </g>
+      </svg>
+    </span>
+  );
+}
+
 function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][number]; index: number; props: ReelProps; theme: Theme; k: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -418,8 +460,10 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
     opacity: exit.opacity,
     transform: `translateY(${exit.translate * k}px)`,
   };
+  const left = h.align === "left";
   const style: CSSProperties = {
     display: "block",
+    ...(left ? { alignItems: "flex-start", textAlign: "left" } : {}),
     fontFamily: `"${h.family === "display" || MONOSPACE.test(props.brand.bodyFont) ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`,
     fontWeight: h.weight,
     fontStyle: h.italic ? "italic" : "normal",
@@ -437,6 +481,8 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
     if (h.stress === "italic") return { fontStyle: "italic" };
     // A serif accent in a sans hook: the display font's italic, a touch larger (serif faces run small).
     if (h.stress === "serif") return { fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontWeight: 400, fontSize: "1.12em", letterSpacing: 0 };
+    // Circled by hand: the word keeps its colour, the stroke is drawn around it (Marker).
+    if (h.stress === "marker") return { position: "relative" };
     return { color: legible(props.brand.accent, "footage") };
   };
 
@@ -471,7 +517,13 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
           }
           return (
             <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...enter }}>
-              <span style={{ display: "inline-block", ...group.stress }}>{group.words.join(" ")}</span>
+              {group.stress && h.stress === "marker" ? (
+                <Marker color={legible(props.brand.accent, "footage")} from={i * h.stagger + 5} long={group.words.join(" ").length > 12}>
+                  {group.words.join(" ")}
+                </Marker>
+              ) : (
+                <span style={{ display: "inline-block", ...group.stress }}>{group.words.join(" ")}</span>
+              )}
               {i < groups.length - 1 ? " " : ""}
             </span>
           );
@@ -494,10 +546,25 @@ function Band({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
   const reveal = spring({ frame, fps, config: { damping: 200, stiffness: 170, mass: 0.7 } });
   const emphasis = new Set(text.emphasis.flatMap((e) => e.split(SPACES)).map(normalize));
   const size = b.size * k * (text.scale ?? 1);
-  const onBox = b.box === "white" ? { bg: "#FFFFFF", fg: "#16121F" } : { bg: props.brand.accent, fg: props.brand.accentInk };
+  // The box: the apps' white one, or the business's own colours (its accent, its dark, its light).
+  const palette = props.brand.palette ?? { secondary: props.brand.accent, light: "#FFFFFF", dark: "#141414" };
+  const onBox =
+    b.box === "white"
+      ? { bg: "#FFFFFF", fg: "#16121F" }
+      : b.box === "dark"
+        ? { bg: palette.dark, fg: palette.light }
+        : b.box === "light"
+          ? { bg: palette.light, fg: palette.dark }
+          : { bg: props.brand.accent, fg: props.brand.accentInk };
   // A stressed word: in the brand colour (one that reads on its box), never a chip of its own.
   const stress = (word: string): CSSProperties | undefined =>
-    !emphasis.has(normalize(word)) ? undefined : b.box === "white" ? { color: legible(props.brand.accent, "white") } : { textDecoration: "underline", textDecorationThickness: `${3 * k}px`, textUnderlineOffset: `${6 * k}px` };
+    !emphasis.has(normalize(word))
+      ? undefined
+      : b.box === "white" || b.box === "light"
+        ? { color: legible(props.brand.accent, "white") }
+        : b.box === "dark"
+          ? { color: legible(props.brand.accent, "footage") }
+          : { textDecoration: "underline", textDecorationThickness: `${3 * k}px`, textUnderlineOffset: `${6 * k}px` };
   const words = text.text.split(SPACES).filter(Boolean);
   const type: CSSProperties = {
     fontFamily: `"${b.family === "display" || MONOSPACE.test(props.brand.bodyFont) ? props.brand.displayFont : props.brand.bodyFont}", sans-serif`,

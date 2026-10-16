@@ -113,8 +113,10 @@ Les exemples entre guillemets ci-dessous montrent une forme, jamais des mots à 
 Règles :
 - la longueur demandée, jamais plus : la voix ne dure pas plus longtemps que ce que ses images montrent (environ 2,6 mots par seconde) ; des phrases courtes, à l'oral (on peut commencer une phrase par « Et », dire « on ») ;
 - la première phrase accroche en moins de 2 secondes : une question sur un détail que seul ce commerce connaît, un détail surprenant de ses images ou une promesse précise ; jamais « Bienvenue chez… », jamais le nom du commerce en premier ;
-- raconte ce qu'on voit, dans l'ordre : un geste, un détail, un résultat ; seulement des faits vrais (ceux qu'on te donne et ce que montrent les images), rien d'inventé : ni prix, ni chiffre, ni promesse qui ne sont pas dans ce qu'on te donne ;
-- le commerce parle à la première personne (« chez nous », « ici », « je ») et tutoie la personne qui regarde ;
+- suis ses images dans l'ordre, mais dis ce qu'elles font vivre (ce qu'on y ressent, ce qu'on y gagne, pourquoi venir), jamais l'inventaire de l'écran : pas de liste d'objets, de meubles ou de pièces (« douche, canapé, néon »), pas le décor pour le décor ; seulement des faits vrais (ceux qu'on te donne et ce que montrent les images), rien d'inventé : ni prix, ni chiffre, ni promesse qui ne sont pas dans ce qu'on te donne ;
+- son métier d'abord (le plat, la coupe, le cours, le soin) : un produit dérivé (vêtement, casquette, tote bag) n'est jamais le sujet, sauf si l'idée de la publication en parle ;
+- parle comme le commerce parle (« ton ») : ses mots, son humour, tutoiement ou vouvoiement comme lui ;
+- le commerce parle à la première personne (« chez nous », « ici », « je ») et tutoie la personne qui regarde, sauf si son ton vouvoie ;
 - finis par une invitation simple et concrète, qui dit quoi faire (venir, réserver, essayer : le geste précis pour ce commerce, et où le faire, par exemple « le lien est dans la bio ») ;
 - interdit : les formules de pub (« découvrez », « n'hésitez pas », « une expérience unique », « de qualité », « savoureux », « au cœur de »), les superlatifs creux, les emojis, les hashtags, le tiret long, les parenthèses ;
 - écris les nombres en lettres quand ils se disent mal en chiffres (« dix-huit mois ») et la ponctuation d'une voix qui parle : des points, des virgules, des points de suspension pour une petite pause, une question au plus ;

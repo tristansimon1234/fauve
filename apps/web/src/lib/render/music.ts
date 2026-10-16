@@ -51,9 +51,11 @@ const MOODS: Record<string, { words: string; tags: string[] }> = {
 /** Under a voice: the groove stays, the melody steps back. */
 const UNDER_VOICE = "a sparse, mellow lo-fi groove that sits under a spoken voice-over: soft drums, a warm bass, a few chords, no lead melody competing with the voice";
 
-/** What the composer is asked for: the business, the groove of the template, and the art direction adjustments. */
-function brief(plan: EditPlan, business: string | null, adjustments: string[]): { description: string; tags: string[] } {
-  const mood = MOODS[plan.template] ?? MOODS.doux!;
+/** What the composer is asked for: the business, its own sound (else the template's groove), and the art direction adjustments. */
+function brief(plan: EditPlan, business: string | null, adjustments: string[], sound?: string): { description: string; tags: string[] } {
+  const ambiance = MOODS[plan.template] ?? MOODS.doux!;
+  // The sound read in its art direction (« deep house légère », « funk de quartier ») wins over the ambiance's genre.
+  const mood = sound ? { words: `${sound}, the sound of this business, groovy and modern, with one simple hook`, tags: [sound.slice(0, 40), "groovy"] } : ambiance;
   const where = business ? `a ${business}` : "a neighbourhood business";
   const notes = adjustments.length ? ` Notes from the owner: ${adjustments.join("; ").slice(0, 300)}.` : "";
   // The cuts sit on this tempo's beats (snapToTempo): the music keeps it, so they land on the beat. Over her voice there is no grid.
@@ -126,10 +128,10 @@ export async function withMusic(params: {
       db.from("studios").select("business_type").eq("id", params.studioId).single(),
       db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     ]);
-    const direction = ((profile.data?.profile as { art_direction?: string } | null)?.art_direction ?? "")
-      .split("\n")
-      .filter((l) => l.startsWith("Ajustement"));
-    const composed = await compose(params.mp4, brief(params.plan, (studio.data?.business_type as string | null) ?? null, direction));
+    const stored = profile.data?.profile as { art_direction?: string; signature?: { music?: string } } | null;
+    const direction = (stored?.art_direction ?? "").split("\n").filter((l) => l.startsWith("Ajustement"));
+    const sound = typeof stored?.signature?.music === "string" ? stored.signature.music.trim().slice(0, 80) : undefined;
+    const composed = await compose(params.mp4, brief(params.plan, (studio.data?.business_type as string | null) ?? null, direction, sound || undefined));
     mp3 = composed.mp3;
     made = "new";
     const path = `${params.studioId}/music/${params.postId}-${Date.now()}.mp3`;

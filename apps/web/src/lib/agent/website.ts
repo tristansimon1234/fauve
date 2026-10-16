@@ -103,5 +103,6 @@ export async function readWebsite(input: string): Promise<WebsiteReading> {
         .catch(() => ""),
     ),
   );
-  return { ...extractSiteInfo(page.body, page.url), style: extractBrandStyle(page.body, css), images: extractSiteImages(page.body, page.url) };
+  // Enough candidates for the reading to keep the ones that show the business (a shop often lists its merch first).
+  return { ...extractSiteInfo(page.body, page.url), style: extractBrandStyle(page.body, css), images: extractSiteImages(page.body, page.url, 20) };
 }

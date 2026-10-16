@@ -106,7 +106,7 @@ export async function replyInConversation(params: {
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
-    db.from("brand_profiles").select("profile->>tone, profile->voice").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+    db.from("brand_profiles").select("profile->>tone, profile->voice, profile->fonts, profile->font_twins, profile->custom_fonts").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     runningJobs(params.studioId).catch(() => []),
     db.from("social_accounts").select("handle, status").eq("studio_id", params.studioId).eq("platform", "tiktok").maybeSingle(),
   ]);
@@ -172,6 +172,7 @@ export async function replyInConversation(params: {
         website: (studio.data.website_url as string | null) ?? null,
         booking: (studio.data.booking_url as string | null) ?? null,
         tone: ((brand.data as { tone?: string | null } | null)?.tone ?? null)?.slice(0, 300) ?? null,
+        fonts: fontsLine(brand.data as { fonts?: unknown; font_twins?: unknown; custom_fonts?: unknown } | null),
         memory: readMemory(studio.data.memory).map((f) => f.fact),
       },
       work: describeJobs(jobs.map((j) => ({ ...j, title: j.postId ? jobTitles.get(j.postId) : undefined }))),
@@ -188,4 +189,22 @@ export async function replyInConversation(params: {
       ]).then(([access, presence]) => [...(access ? [access] : []), ...presence]),
     },
   });
+}
+
+/**
+ * Her charter's fonts for the chat: the ones her visuals cannot load (not free) say which
+ * twin replaces them, and Simone offers once to add the font file for the real one.
+ */
+function fontsLine(brand: { fonts?: unknown; font_twins?: unknown; custom_fonts?: unknown } | null): string | null {
+  const fonts = Array.isArray(brand?.fonts) ? brand.fonts.filter((f): f is string => typeof f === "string") : [];
+  if (!fonts.length) return null;
+  const twins = brand?.font_twins && typeof brand.font_twins === "object" ? (brand.font_twins as Record<string, unknown>) : {};
+  const own = new Set(
+    (Array.isArray(brand?.custom_fonts) ? brand.custom_fonts : []).flatMap((f: unknown) =>
+      f && typeof f === "object" && typeof (f as { family?: unknown }).family === "string" ? [(f as { family: string }).family.toLowerCase()] : [],
+    ),
+  );
+  const replaced = fonts.filter((f) => typeof twins[f] === "string" && !own.has(f.toLowerCase()));
+  const named = fonts.map((f) => (replaced.includes(f) ? `${f} (pas libre : ses visuels utilisent ${twins[f] as string}, qui lui ressemble)` : f));
+  return `${named.join(", ")}.${replaced.length ? " Propose-lui une fois, en une phrase, d'ajouter le fichier de sa police dans Style › Tes polices (.ttf, .otf, .woff) pour avoir la vraie sur ses Reels et ses photos." : ""}`;
 }

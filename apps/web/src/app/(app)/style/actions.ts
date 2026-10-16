@@ -1,6 +1,6 @@
 "use server";
 
-import { CREDIT_PRICES, MOODBOARD_MAX_ITEMS, onboardingStepOf, withArtDirection } from "@fauve/agent";
+import { CREDIT_PRICES, MOODBOARD_MAX_ITEMS, onboardingStepOf, withArtDirection, type MoodboardReading } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { readMoodboard } from "@/lib/agent/moodboard";
@@ -102,7 +102,7 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
   const expected = new RegExp(`^${studioId}/brand/mood-\\d{10,16}-[a-z0-9]{4,12}\\.jpg$`);
   if (items.some((item) => !expected.test(item.path))) return { status: "error", message: "Image invalide." };
 
-  let reading: { reading: string; direction?: string; palette: string[]; fonts?: { display: string; body: string } } | null = null;
+  let reading: MoodboardReading | null = null;
   let warning: string | undefined;
   if (items.length) {
     // Signed with the member's own client (storage RLS): also proves the files exist.
@@ -136,6 +136,11 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
   try {
     const { version } = await insertProfileVersion(studioId, (current) => {
       const next: Record<string, unknown> = withArtDirection({ ...current } as Record<string, unknown>, reading?.direction);
+      // Her moodboard is her art direction: its settings (signature) follow its reading.
+      if (reading) {
+        next.signature = reading.signature;
+        if (!next.default_template) next.default_template = reading.signature.ambiance;
+      }
       if (!items.length) delete next.moodboard;
       else next.moodboard = { items, ...(reading ? { reading: reading.reading, palette: reading.palette, ...(reading.fonts ? { fonts: reading.fonts } : {}), read_at: new Date().toISOString() } : {}) };
       return next;
