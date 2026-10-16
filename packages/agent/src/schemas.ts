@@ -2,6 +2,7 @@ import { z } from "zod";
 import { adjustSchema, clipBlurSchema, photoEditSchema } from "./retouch.ts";
 import { listFields, savedLookSchema, textLookSchema } from "./text-look.ts";
 import { brandSignatureSchema } from "./signature.ts";
+import { styleSampleSchema } from "./moodboard.ts";
 import { voiceSettingSchema } from "./voice-over.ts";
 
 // Mirrors the Postgres enums in supabase/migrations.
@@ -365,6 +366,8 @@ export const brandProfileSchema = z.object({
   default_template: motionTemplateSchema.optional().describe("Gabarit de montage préféré du studio"),
   /** The art direction as settings (read from her site or her moodboard): what every Reel and photo applies. */
   signature: brandSignatureSchema.optional(),
+  /** A hook and a line in her own words, to show her style on one of her photos (Style step). */
+  style_sample: styleSampleSchema.optional(),
   /** Inspiration images from the Style page, and Fauve's reading of them (what the montage follows). */
   moodboard: moodboardSchema.optional(),
   /** Text looks the manager keeps (copied from examples she sent, or set by hand). */

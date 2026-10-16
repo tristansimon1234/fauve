@@ -273,9 +273,9 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     const speech = !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out);
     const zoom = s.zoom === "light" || plan.transitions === "light_zoom";
     const move: CameraMove = s.move ?? (zoom ? "in" : "none");
-    // A photo in a Reel: still, with a slow zoom so it lives (or the move the editor chose).
+    // A photo in a Reel: the move the engine chose (photoMoves: most held still); a plan from before those moves keeps its slow zoom.
     if (inputs.photoIds?.includes(s.clip_id)) {
-      return { type: "image", src, startAt, durationInFrames: lengths[i]!, zoom: true, ...(s.move ? { move: s.move } : {}), ...(s.photo ? { edit: s.photo } : {}), ...(s.accent ? { accent: s.accent } : {}) };
+      return { type: "image", src, startAt, durationInFrames: lengths[i]!, zoom: s.move === undefined, ...(s.move ? { move: s.move } : {}), ...(s.photo ? { edit: s.photo } : {}), ...(s.accent ? { accent: s.accent } : {}) };
     }
     return {
       type: "clip",

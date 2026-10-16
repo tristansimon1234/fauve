@@ -55,7 +55,7 @@ const UNDER_VOICE = "a sparse, mellow lo-fi groove that sits under a spoken voic
 function brief(plan: EditPlan, business: string | null, adjustments: string[], sound?: string): { description: string; tags: string[] } {
   const ambiance = MOODS[plan.template] ?? MOODS.doux!;
   // The sound read in its art direction (« deep house légère », « funk de quartier ») wins over the ambiance's genre.
-  const mood = sound ? { words: `${sound}, the sound of this business, groovy and modern, with one simple hook`, tags: [sound.slice(0, 40), "groovy"] } : ambiance;
+  const mood = sound ? { words: `${sound}: the sound of this business, played like a track a creator would pick, with one simple hook`, tags: [sound.slice(0, 40)] } : ambiance;
   const where = business ? `a ${business}` : "a neighbourhood business";
   const notes = adjustments.length ? ` Notes from the owner: ${adjustments.join("; ").slice(0, 300)}.` : "";
   // The cuts sit on this tempo's beats (snapToTempo): the music keeps it, so they land on the beat. Over her voice there is no grid.

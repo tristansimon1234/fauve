@@ -10,7 +10,7 @@ import { useSyncExternalStore } from "react";
  * A carousel slide as it will be published: the Reel composition's still at
  * SLIDE_FRAME, drawn live in the browser (the same code renders the image).
  */
-export function SlidePreview({ props, className }: { props: ReelProps; className?: string }) {
+export function SlidePreview({ props, className, frame = SLIDE_FRAME }: { props: ReelProps; className?: string; frame?: number }) {
   // Browser only, like the montage player.
   const mounted = useSyncExternalStore(
     () => () => {},
@@ -27,7 +27,7 @@ export function SlidePreview({ props, className }: { props: ReelProps; className
       compositionHeight={props.height}
       durationInFrames={props.durationInFrames}
       fps={props.fps}
-      frameToDisplay={SLIDE_FRAME}
+      frameToDisplay={frame}
       className={className}
       style={style}
     />

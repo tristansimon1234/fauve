@@ -1891,3 +1891,29 @@ test("motion: the signature reaches the render's brand, only what the render app
   assert.deepEqual(brand.signature, { titles: signature.titles, stress: "block", band: "accent", grade: "flash", base: "light" });
   assert.equal(resolveReelBrand({}, "doux", { name: "Test" }).signature, undefined);
 });
+
+test("photo moves: most photos held still, one slow push on the strongest, a pan for a wide one, never twice the same in a row", async () => {
+  const { photoMoves } = await import("./finish.ts");
+  const detection = { regions: [], notes: "", subject: null } as never;
+  const photos = {
+    a: { width: 1080, height: 1350, detection },
+    b: { width: 1080, height: 1350, detection },
+    c: { width: 1920, height: 1080, detection },
+    d: { width: 1080, height: 1350, detection },
+  };
+  const seg = (clip_id: string, seconds: number, move?: string) => ({ clip_id, in: 0, out: seconds, zoom: "none" as const, ...(move ? { move } : {}) });
+  const moves = photoMoves({ segments: [seg("a", 1.2), seg("b", 2.6), seg("c", 1.8), seg("d", 1.4, "in")] as never }, photos);
+  // The editor's own push wins and is the only one; the wide photo pans; the rest stay still.
+  assert.deepEqual([...moves.values()], ["none", "none", "left", "in"]);
+  const second = photoMoves({ segments: [seg("a", 1.2), seg("b", 2.6), seg("d", 1.4)] as never }, photos);
+  assert.deepEqual([...second.values()], ["none", "in", "none"]);
+});
+
+test("signature: its narrators are the gallery's voices that are not whispered", async () => {
+  const { NARRATOR_NAMES, brandSignatureSchema } = await import("./signature.ts");
+  const { SIMONE_VOICES } = await import("./voice-over.ts");
+  assert.deepEqual([...NARRATOR_NAMES], SIMONE_VOICES.filter((v) => !v.asmr).map((v) => v.name));
+  // A signature saved before the narrator existed still reads.
+  const old = { ambiance: "doux", titles: { font: "display", case: "normal", weight: "bold", align: "center", tracking: "normal" }, stress: "color", band: "white", grade: "natural", base: "light", motion: "epure", music: "lo-fi", voice: "tutoiement" };
+  assert.equal(brandSignatureSchema.safeParse(old).success, true);
+});

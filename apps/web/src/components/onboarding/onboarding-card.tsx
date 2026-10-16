@@ -1,15 +1,16 @@
 "use client";
 
-import { MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STEPS, RHYTHM_PRESETS, sampleWeek, type OnboardingStep } from "@fauve/agent";
+import { MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STEPS, RHYTHM_PRESETS, sampleWeek, STYLE_PREVIEW_FRAME, type OnboardingStep } from "@fauve/agent";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { DropCard } from "@/app/(app)/fauve/drop-card";
 import { finishStep, onboardingView, saveRhythm, type OnboardingView } from "@/app/(app)/fauve/onboarding-actions";
-import { saveLogo, saveMoodboard } from "@/app/(app)/style/actions";
+import { addCharterFont, saveLogo, saveMoodboard } from "@/app/(app)/style/actions";
 import { LOGO_MAX_BYTES, LOGO_TYPES } from "@/app/(app)/style/style-options";
 import { CheckIcon, InstagramIcon, PlusIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
+import { SlidePreview } from "@/components/montage/slide-preview";
 import { NewPostSheet } from "@/components/new-post-sheet";
 import { Orb } from "@/components/orb";
 import { supabaseBrowser } from "@/lib/supabase/client";
@@ -283,12 +284,29 @@ function StyleStep({
               ))}
             </div>
           )}
-          {view.brand.fonts.length > 0 && <span className="text-[13px] text-muted">{view.brand.fonts.join(" · ")}</span>}
+          {view.fonts.length > 0 && <span className="text-[13px] text-muted">{view.fonts.map((f) => f.name).join(" · ")}</span>}
           <Link href="/style" className="ml-auto text-[13px] font-bold text-violet hover:underline">
             Corriger
           </Link>
         </div>
       )}
+      {view.preview && (
+        <div className="flex items-start gap-4 rounded-[16px] bg-soft p-3.5">
+          <div className="w-[118px] shrink-0 overflow-hidden rounded-[12px] shadow-sm sm:w-[132px]">
+            <SlidePreview props={view.preview} frame={STYLE_PREVIEW_FRAME} />
+          </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            <span className="text-[14px] font-bold">Tes Reels auront ce style</span>
+            {view.direction && <p className="text-[13px] leading-relaxed text-muted">{view.direction}</p>}
+            <span className="text-[12px] text-muted">Tes titres, tes couleurs et ta lumière, comme sur ton site. Tu peux tout changer dans Style.</span>
+          </div>
+        </div>
+      )}
+      {view.fonts
+        .filter((f) => f.twin && !f.own)
+        .map((f) => (
+          <CharterFontAsk key={f.name} studioId={studioId} font={f.name} twin={f.twin!} onSaved={onChange} setError={setError} />
+        ))}
       {!view.brand.logoUrl && <LogoAsk studioId={studioId} onSaved={onChange} setError={setError} />}
       <div className="flex flex-col gap-2">
         <span className="text-[14px] font-bold">Ton moodboard</span>
@@ -330,7 +348,7 @@ function StyleStep({
             </button>
           )}
         </div>
-        {view.moodboard.reading && <p className="rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[13px] leading-relaxed text-violet">{view.moodboard.reading}</p>}
+        {!view.preview && view.direction && <p className="rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[13px] leading-relaxed text-violet">{view.direction}</p>}
         <input ref={fileRef} type="file" accept="image/*" multiple className="sr-only" onChange={(e) => (void add([...(e.target.files ?? [])]), (e.target.value = ""))} />
       </div>
       {!items.length && !lookingAtSite && (
@@ -376,6 +394,47 @@ function StyleStep({
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * A font of her site that is not free: her videos use its look-alike until she adds the file,
+ * kept under the font's own name so her Reels and photos use it at once.
+ */
+function CharterFontAsk({ studioId, font, twin, onSaved, setError }: { studioId: string; font: string; twin: string; onSaved: () => void; setError: (e: string | null) => void }) {
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const upload = async (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!["ttf", "otf", "woff", "woff2"].includes(ext)) return setError("Ta police : un fichier .ttf, .otf, .woff ou .woff2.");
+    if (file.size > 8 * 1024 * 1024) return setError("Ce fichier dépasse 8 Mo.");
+    setError(null);
+    setBusy(true);
+    try {
+      const slug = `${font.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "police"}-${Date.now()}`;
+      const path = `${studioId}/fonts/${slug}.${ext}`;
+      const { error } = await supabaseBrowser().storage.from("media").upload(path, file, { contentType: file.type || `font/${ext}` });
+      if (error) throw error;
+      const res = await addCharterFont({ family: font, path });
+      if (!res.ok) setError(res.message ?? "Ta police n’a pas pu être ajoutée.");
+      onSaved();
+    } catch {
+      setError("Ta police n’a pas pu être ajoutée. Réessaie.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-[16px] border border-line bg-white px-3.5 py-3">
+      <span className="min-w-0 flex-1 text-[13px] leading-snug text-muted">
+        <b className="text-ink">{font}</b> n’est pas une police libre : tes vidéos utilisent <b className="text-ink">{twin}</b>, qui lui ressemble. Tu as son fichier ? Ajoute-le pour avoir la vraie.
+      </span>
+      <button type="button" disabled={busy} onClick={() => ref.current?.click()} className="btn btn-secondary h-10 px-4 text-[13px] disabled:opacity-50">
+        {busy ? <Orb size={18} /> : <PlusIcon size={16} />}
+        {busy ? "Envoi…" : "Ajouter ma police"}
+      </button>
+      <input ref={ref} type="file" accept=".ttf,.otf,.woff,.woff2" className="sr-only" onChange={(e) => (e.target.files?.[0] && void upload(e.target.files[0]), (e.target.value = ""))} />
+    </div>
   );
 }
 

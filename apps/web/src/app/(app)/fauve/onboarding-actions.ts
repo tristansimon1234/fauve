@@ -1,8 +1,9 @@
 "use server";
 
-import { brandProfileSchema, nextOnboardingStep, ONBOARDING_STEPS, onboardingStepOf, PLANS, planOf, reelsPerMonth, type OnboardingStep } from "@fauve/agent";
+import { brandProfileSchema, nextOnboardingStep, ONBOARDING_STEPS, onboardingStepOf, PLANS, planOf, reelsPerMonth, stylePreviewProps, type OnboardingStep, type ReelProps } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { loadMontageInputs } from "@/lib/render/render-post";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -15,6 +16,12 @@ export type OnboardingView = {
   website: string | null;
   businessType: string | null;
   brand: { colors: string[]; fonts: string[]; logoUrl: string | null };
+  /** Her fonts: the one her visuals use instead when it is not free (twin), and whether she added its file. */
+  fonts: { name: string; twin: string | null; own: boolean }[];
+  /** Her art direction in two or three plain sentences. */
+  direction: string | null;
+  /** Her style on one of her photos: the Reel composition's props, drawn live (null until her site is read). */
+  preview: ReelProps | null;
   /** fromSite: Simone took these photos from her website (she has not made her own moodboard yet). */
   moodboard: { items: { path: string; url: string }[]; reading: string | null; fromSite: boolean };
   rhythm: { posts: number; stories: number };
@@ -40,6 +47,23 @@ export async function onboardingView(): Promise<OnboardingView | null> {
   const items = profile.moodboard?.items ?? [];
   const paths = [...items.map((i) => i.path), ...(profile.logo_path ? [profile.logo_path] : [])];
   const urls = paths.length ? await signMediaUrls(db, studioId, paths) : new Map<string, string>();
+  const own = new Set((profile.custom_fonts ?? []).map((f) => f.family.toLowerCase()));
+  const twins = profile.font_twins ?? {};
+  // Her style on her first photo, once her site (or moodboard) has been read.
+  const photo = items[0] ? urls.get(items[0].path) : undefined;
+  const preview =
+    photo && profile.signature
+      ? await loadMontageInputs(studioId, { segments: [] })
+          .then((inputs) =>
+            stylePreviewProps({
+              template: profile.default_template ?? profile.signature!.ambiance,
+              imageUrl: photo,
+              brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts, signature: inputs.signature },
+              sample: profile.style_sample ?? { hook: "Ton prochain Reel, à ta façon", key: "ta façon", band: inputs.studioName || "Ton commerce" },
+            }),
+          )
+          .catch(() => null)
+      : null;
   return {
     studioId,
     step: onboardingStepOf(studio.data?.onboarding_step),
@@ -50,6 +74,9 @@ export async function onboardingView(): Promise<OnboardingView | null> {
       fonts: (profile.fonts ?? []).slice(0, 2),
       logoUrl: (profile.logo_path ? urls.get(profile.logo_path) : null) ?? profile.logo_url ?? null,
     },
+    fonts: (profile.fonts ?? []).slice(0, 2).map((name) => ({ name, twin: twins[name] ?? null, own: own.has(name.toLowerCase()) })),
+    direction: profile.art_direction?.trim() || null,
+    preview,
     moodboard: { items: items.flatMap((i) => (urls.get(i.path) ? [{ path: i.path, url: urls.get(i.path)! }] : [])), reading: profile.moodboard?.reading ?? null, fromSite: items.some((i) => i.note === "Photo de ton site") },
     rhythm: { posts: (plan.data?.posts_per_week as number | null) ?? offer.postsPerWeek, stories: (plan.data?.stories_per_week as number | null) ?? 4 },
     offer: { label: offer.label, credits: offer.credits, postsPerWeek: offer.postsPerWeek, reels: reelsPerMonth(offerId) },

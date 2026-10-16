@@ -11,6 +11,19 @@ import { z } from "zod";
 export const SIGNATURE_GRADES = ["natural", "warm", "bright", "flash", "film", "moody", "cool"] as const;
 /** The ambiances (MOTION_TEMPLATES in schemas.ts, which imports this file: written out here). */
 const AMBIANCE_KEYS = ["doux", "dynamique", "chic", "collage"] as const;
+/** The voices of Simone's gallery a business can sound like (SIMONE_VOICES without the whispered ones). */
+export const NARRATOR_NAMES = ["Eva", "Victoria", "Lucie", "Neto", "Antonin", "Jules"] as const;
+
+export const narratorSchema = z
+.object({
+    voice: z
+      .enum(NARRATOR_NAMES)
+      .describe(
+        "La voix de ses Reels qui sonne comme ce commerce : Eva (femme, douce et posée), Victoria (femme, jeune et souriante), Lucie (femme, naturelle et chaleureuse), Neto (homme, jeune et décontracté), Antonin (homme, calme et posé), Jules (homme, chaleureux, comme une conversation)",
+      ),
+    delivery: z.string().max(140).describe("Son rythme et son intonation : énergie, débit, attitude (« cool et nonchalant, un brin rock », « posé et doux », « enjoué et rapide »), jamais un ton de pub"),
+  })
+  .describe("La voix off de ses Reels");
 
 export const brandSignatureSchema = z.object({
   ambiance: z.enum(AMBIANCE_KEYS).describe(
@@ -44,13 +57,23 @@ export const brandSignatureSchema = z.object({
   motion: z
     .enum(["epure", "chaleureux", "energique", "fait_main"])
     .describe("Le mouvement de ses animations : epure (lent, aéré, lignes fines), chaleureux (mots sur le temps, formes rondes), energique (franc, gros mots), fait_main (tracés, découpes)"),
-  music: z.string().max(80).describe("La musique qui lui ressemble : un genre de créateur en quelques mots (« house légère », « funk de quartier », « lo-fi jazzy »…), jamais de la musique de pub"),
+  music: z
+    .string()
+    .max(80)
+    .describe(
+      "Le son de ses Reels, en anglais pour le compositeur : le genre précis qui colle à son univers, celui que son lieu passerait et que ses clients écoutent (rock, garage, indie, punk, hip-hop, house, French touch, soul, jazz, bossa, électro, lo-fi, pop…), avec un ou deux mots de texture ; jamais de la musique de pub ni un genre par défaut",
+    ),
+  // Optional in a stored profile (signatures saved before it existed); every reading writes it (signatureReadingSchema).
+  narrator: narratorSchema.optional(),
   voice: z
     .string()
     .max(200)
     .describe("Sa façon de parler, tirée des mots de son site : tutoiement ou vouvoiement, humour, longueur des phrases, ses mots à lui"),
 });
 export type BrandSignature = z.infer<typeof brandSignatureSchema>;
+
+/** What a reading (site or moodboard) writes: the signature with its voice. */
+export const signatureReadingSchema = brandSignatureSchema.extend({ narrator: narratorSchema });
 
 /** What the reading writes about the signature (moodboard or site), appended to its prompt. */
 export const SIGNATURE_GUIDE = `Signature : les mêmes choix en réglages, que le moteur applique à chaque Reel et à chaque photo sans qu'on le lui demande. Pars de ce que tu vois (et des mesures quand tu les as), jamais d'une habitude :
@@ -60,7 +83,8 @@ export const SIGNATURE_GUIDE = `Signature : les mêmes choix en réglages, que l
 - band : le fond qui ira sous une phrase posée sur une vidéo, dans ses couleurs (white si rien ne s'impose) ;
 - grade : la lumière de ses photos ;
 - base : clair ou sombre, comme les fonds de son site ;
-- motion, music, voice : son mouvement, sa musique et sa façon de parler.`;
+- motion, music, voice : son mouvement, sa musique et sa façon de parler ;
+- narrator : la voix off qui lui ressemble (un commerce rock n'a pas une voix douce de spa) et comment elle joue.`;
 
 /** The signature as a few plain lines, for the editor, the motion designer and the critic. */
 export function signatureLines(signature: BrandSignature | undefined): string | undefined {
@@ -74,5 +98,6 @@ export function signatureLines(signature: BrandSignature | undefined): string | 
     `Lumière : ${{ natural: "naturelle", warm: "chaude", bright: "claire et aérée", flash: "flash direct", film: "argentique", moody: "sombre et contrastée", cool: "froide" }[signature.grade]} ; écrans ${signature.base === "dark" ? "sombres" : "clairs"}`,
     `Mouvement : ${{ epure: "épuré", chaleureux: "chaleureux", energique: "énergique", fait_main: "fait main" }[signature.motion]} ; musique : ${signature.music}`,
     `Sa façon de parler : ${signature.voice}`,
+    ...(signature.narrator ? [`Voix off : ${signature.narrator.voice}, ${signature.narrator.delivery}`] : []),
   ].join("\n");
 }

@@ -102,8 +102,40 @@ function footageUnder(plan: EditPlan, i: number, facts: MediaFacts, clipDuration
   return any ? { clip_id: any.clip_id, in: Math.max(0, Math.min(facts.clips[any.clip_id]?.best_moments[0]?.start ?? 0, (clipDurations[any.clip_id] ?? length) - length)) } : undefined;
 }
 
+/**
+ * How the photos of a Reel move, the way a good creator edits them: most are held still and
+ * cut on the beat (a slow zoom on every photo reads as a slideshow); the strongest photo held
+ * long enough gets the Reel's one slow push; a landscape photo too wide for the vertical frame
+ * a slow pan that shows more of it; never the same move on two photos in a row. A move the
+ * editor chose stays, within the same limits. Returns each photo segment's move, by index.
+ */
+export function photoMoves(plan: Pick<EditPlan, "segments">, photos: MediaFacts["photos"]): Map<number, CameraMove> {
+  const moves = new Map<number, CameraMove>();
+  const shown = plan.segments.flatMap((s, i) => (isClipSegment(s) && photos[s.clip_id] ? [{ i, s, seconds: segmentSeconds(s), facts: photos[s.clip_id]! }] : []));
+  let pushed = false;
+  let pans = 0;
+  let last: CameraMove = "none";
+  const slow = (m: CameraMove) => m === "in" || m === "out";
+  // The one slow push: the editor's own, else the photo held longest (2 s at least).
+  const chosen = shown.find((p) => slow(p.s.move ?? "none"))?.i ?? [...shown].filter((p) => p.seconds >= 2).sort((a, b) => b.seconds - a.seconds)[0]?.i;
+  for (const p of shown) {
+    const wide = p.facts.width / Math.max(1, p.facts.height) > 1.25;
+    let move: CameraMove = p.s.move ?? "none";
+    if (slow(move) && (pushed || p.i !== chosen)) move = "none";
+    if (move === "none" && p.i === chosen && !pushed) move = "in";
+    if (move === "none" && wide && p.seconds >= 1.5 && pans < 2) move = pans % 2 === 0 ? "left" : "right";
+    if (move !== "none" && move === last) move = "none";
+    if (slow(move)) pushed = true;
+    if (move === "left" || move === "right") pans++;
+    moves.set(p.i, move);
+    last = move;
+  }
+  return moves;
+}
+
 export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Record<string, number> = {}): EditPlan {
   let still = 0;
+  const photoMove = photoMoves(plan, facts.photos);
   const segments = plan.segments.map((s, i): PlanSegment => {
     if (isMotionSegment(s)) {
       const over = footageUnder(plan, i, facts, clipDurations);
@@ -112,8 +144,9 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
     if (!isClipSegment(s)) return s;
     const photo = facts.photos[s.clip_id];
     if (photo) {
-      // A photo: framed on its subject, light corrected (unless retouched by hand already).
-      return s.photo ? s : { ...s, photo: photoEditFrom(photo.detection, { width: photo.width, height: photo.height }, { retouch: true, blur: "none" }) };
+      // A photo: framed on its subject, light corrected (unless retouched by hand already), and moving only when it serves.
+      const move = photoMove.get(i) ?? "none";
+      return { ...s, move, ...(s.photo ? {} : { photo: photoEditFrom(photo.detection, { width: photo.width, height: photo.height }, { retouch: true, blur: "none" }) }) };
     }
     const analysis = facts.clips[s.clip_id];
     if (!analysis) return s;
@@ -123,7 +156,9 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
     // the passage shown, so a correction that picks another passage is framed on its own subject.
     const adjust: Adjust = { ...correctionAdjust(analysis), ...(focus ? { focus } : {}) };
     const filmedStill = isStill(shot) && !s.speed;
-    const move: CameraMove | undefined = (s.move ?? (s.zoom === "light" ? "in" : "none")) === "none" && filmedStill ? (still++ % 2 === 0 ? "in" : "out") : s.move;
+    // A shot filmed still gets a slow move, one in two at most (in, then out): a push on every shot gets boring.
+    const move: CameraMove | undefined =
+      (s.move ?? (s.zoom === "light" ? "in" : "none")) === "none" && filmedStill && segmentSeconds(s) >= 1.5 ? (["in", "none", "out", "none"] as const)[still++ % 4] : s.move;
     const { adjust: _carried, ...rest } = s;
     return {
       ...rest,
