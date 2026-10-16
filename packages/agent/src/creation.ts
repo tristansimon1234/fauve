@@ -24,13 +24,13 @@ export function formatWhy(p: Picked): string {
   return "Avec une seule photo, un post photo suffit. Tu peux aussi en faire une story, ou un Reel qui la fait vivre.";
 }
 
-/** Why a format does not fit these files (null: it does). A Reel takes anything. */
 /** Clips and photos in one Reel: a creator's tour often runs on 15 to 20 short clips. */
 export const MAX_MONTAGE_FILES = 20;
 
 /** Photos in a carousel: what Instagram's publishing API takes. */
 export const MAX_CAROUSEL_PHOTOS = 10;
 
+/** Why a format does not fit these files (null: it does). A Reel takes anything. */
 export function formatBlocked(kind: PostKind, p: Picked): string | null {
   const total = p.videos + p.photos;
   if (kind === "carousel") return p.videos ? "Avec des photos seulement" : p.photos < 2 ? "Il faut au moins 2 photos" : p.photos > MAX_CAROUSEL_PHOTOS ? `${MAX_CAROUSEL_PHOTOS} photos au plus` : null;
@@ -44,6 +44,15 @@ export function mediaPhrase(p: Picked): string {
   const part = (n: number, one: string, many: string) => (n === 1 ? one : n > 1 ? `tes ${n} ${many}` : "");
   return [part(p.videos, "ta vidéo", "vidéos"), part(p.photos, "ta photo", "photos")].filter(Boolean).join(" et ") || "tes fichiers";
 }
+
+/** A publication's title from what she imagines, cut at a word (empty when she wrote nothing). */
+export function intentionTitle(intention: string): string {
+  const text = intention.trim().replace(/\s+/g, " ").slice(0, 300);
+  return text.length > 60 ? `${text.slice(0, 60).replace(/\s+\S*$/, "")}…` : text;
+}
+
+/** What she imagines, as the montage reads it, and the voice over written before it. */
+export const imaginedBrief = (idea: string): string | undefined => (idea.trim() ? `Ce que la gérante imagine : ${idea.trim()}` : undefined);
 
 export type CreationPhase = "watch" | "edit" | "second" | "render" | "review";
 

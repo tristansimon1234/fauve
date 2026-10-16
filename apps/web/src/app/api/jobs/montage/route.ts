@@ -217,7 +217,7 @@ const scenesLeft = (job: Job) => Math.max(0, (job.maxNewScenes ?? 2) - (job.newS
  */
 async function voiceFirst(job: Job): Promise<boolean> {
   if (job.voiced) return false;
-  const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction });
+  const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief });
   if (!made) return false;
   // A key message with the music suits it better: no voice, the editor knows it, the design goes on now.
   if ("format" in made) {

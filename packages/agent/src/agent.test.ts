@@ -418,6 +418,16 @@ test("créer: the format Simone advises, what fits, and the steps she shows", as
   assert.equal(creationPhase("fix", true), "review");
 });
 
+test("créer: what she imagines titles the post, and reaches the montage and the voice whole", async () => {
+  const { imaginedBrief, intentionTitle } = await import("./creation.ts");
+  const idea = "Montre la queue devant le samedi midi, puis comment on fait le sandwich, et finis sur moi. Dis qu'on est ouvert du mercredi au dimanche.";
+  assert.equal(intentionTitle(idea), "Montre la queue devant le samedi midi, puis comment on fait…");
+  assert.equal(intentionTitle("  Un Reel   pour la rentrée "), "Un Reel pour la rentrée");
+  assert.equal(intentionTitle(""), "");
+  assert.equal(imaginedBrief(idea), `Ce que la gérante imagine : ${idea}`);
+  assert.equal(imaginedBrief("   "), undefined);
+});
+
 test("créer: « Oui, publie-le » and « Je regarde d’abord » are answered without Simone", async () => {
   const { publishOfferAnswer, publishQuestion, PUBLISH_OFFER_OPTIONS } = await import("./creation.ts");
   assert.equal(publishOfferAnswer(PUBLISH_OFFER_OPTIONS[0]), "yes");
