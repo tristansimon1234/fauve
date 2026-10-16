@@ -20,6 +20,19 @@ export type VoiceTranscript = z.infer<typeof voiceTranscriptSchema>;
 /** Where her voice starts in the Reel (a breath before the first word). */
 export const VOICE_AT = 0.3;
 
+/** Where the first word is heard: at once, as a creator speaks from the first image. */
+export const VOICE_FIRST_WORD = 0.2;
+
+/**
+ * Where a voice starts on the Reel's clock so that its first word is heard at
+ * VOICE_FIRST_WORD: a voice note often opens on a second of silence, cut (the start is
+ * then negative); a voice that speaks at once keeps a breath before it.
+ */
+export function voiceAt(t: Pick<VoiceTranscript, "words">): number {
+  const first = t.words[0]?.start ?? 0;
+  return round(Math.min(VOICE_AT, Math.max(-VOICE_MAX_SECONDS, VOICE_FIRST_WORD - first)));
+}
+
 /** The longest voice note used on a Reel: past it, it would not fit (MAX_REEL_SECONDS with the end card). */
 export const VOICE_MAX_SECONDS = 27;
 
@@ -71,7 +84,8 @@ export function voicePhrases(t: VoiceTranscript, at = VOICE_AT): { text: string;
 export function voiceForEditor(t: VoiceTranscript, at = VOICE_AT) {
   const used = Math.min(t.duration, VOICE_MAX_SECONDS);
   return {
-    starts_at: at,
+    // Started before the Reel (its silence cut), it is heard from the first frame.
+    starts_at: round(Math.max(0, at)),
     ends_at: round(at + used),
     text: t.text,
     phrases: voicePhrases({ ...t, words: t.words.filter((w) => w.end <= used) }, at),

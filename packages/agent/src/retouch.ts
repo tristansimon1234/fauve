@@ -259,9 +259,40 @@ const SUBTITLE_ROWS = [0.71, 0.56, 0.48, 0.4, 0.3, 0.22];
  */
 export function subtitleRow(boxes: Box[]): number | null {
   const busy = boxes.filter((b) => b.w > 0.12 || b.h > 0.04);
-  const clear = (y: number) => busy.every((b) => b.y > y + SUBTITLE_ROW.h + 0.01 || b.y + b.h < y - 0.01);
-  if (!busy.length || clear(SUBTITLE_ROW.y)) return null;
-  return SUBTITLE_ROWS.find(clear) ?? null;
+  // How much of a row the zones cover (0: clear).
+  const covered = (y: number) => busy.reduce((sum, b) => sum + Math.max(0, Math.min(y + SUBTITLE_ROW.h + 0.01, b.y + b.h) - Math.max(y - 0.01, b.y)), 0);
+  if (!busy.length || covered(SUBTITLE_ROW.y) === 0) return null;
+  const clear = SUBTITLE_ROWS.find((y) => covered(y) === 0);
+  if (clear !== undefined) return clear;
+  // Nowhere clear (a face fills the picture): the row it covers least, when it beats the usual one.
+  const least = [...SUBTITLE_ROWS].sort((a, b) => covered(a) - covered(b))[0]!;
+  return covered(least) < covered(SUBTITLE_ROW.y) - 0.005 ? least : null;
+}
+
+/** The Reel's frame, which the shares of a photo's zones are mapped into. */
+const REEL_FRAME = { width: 1080, height: 1920 } as const;
+
+/** The slowest zoom a photo may get in a Reel (KenBurns), about the frame's centre. */
+const PHOTO_ZOOM = 1.16;
+
+/**
+ * A zone of a photo (shares of the photo) where it shows in the Reel's vertical frame (shares
+ * of the frame): framed as the render frames it (cover crop on its subject), widened by the
+ * slow zoom it may get, kept within the frame. Null when it falls outside.
+ */
+export function photoBoxInFrame(box: Box, edit: Pick<PhotoEdit, "source" | "adjust">, zoom = PHOTO_ZOOM): Box | null {
+  const layout = coverLayout(REEL_FRAME, edit.source, edit.adjust);
+  const x0 = (layout.left + box.x * layout.width) / REEL_FRAME.width;
+  const y0 = (layout.top + box.y * layout.height) / REEL_FRAME.height;
+  const x1 = x0 + (box.w * layout.width) / REEL_FRAME.width;
+  const y1 = y0 + (box.h * layout.height) / REEL_FRAME.height;
+  // Zoomed about the centre, a zone spreads out: its still and zoomed places both count.
+  const z = (v: number) => 0.5 + (v - 0.5) * zoom;
+  const left = Math.max(0, Math.min(x0, z(x0)));
+  const top = Math.max(0, Math.min(y0, z(y0)));
+  const right = Math.min(1, Math.max(x1, z(x1)));
+  const bottom = Math.min(1, Math.max(y1, z(y1)));
+  return right > left && bottom > top ? { x: left, y: top, w: right - left, h: bottom - top } : null;
 }
 
 /** Where a face is in a shot: the upper part of the subject's box, in shares of the frame (only the rows matter). */

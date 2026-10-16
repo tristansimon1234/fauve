@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { planTimeline } from "./motion.ts";
 import { isClipSegment, isMotionSegment, type EditPlan, type MotionTemplate } from "./schemas.ts";
+import { HOOK_LATEST, OPENING_MAX_SECONDS } from "./hook.ts";
+import { voicePhrases, type VoiceTranscript } from "./voice.ts";
 import { beatOf, TEMPLATE_BPM } from "./tempo.ts";
 import type { ReelFormat } from "./voice-over.ts";
 
@@ -27,6 +29,7 @@ export const montageReviewSchema = z.object({
   best: z.number().int().describe("Numéro de la version retenue (1 s'il n'y en a qu'une)"),
   why: z.string().describe("Pourquoi celle-ci plutôt que l'autre, en une phrase (vide s'il n'y a qu'une version)"),
   score: z.number().int().describe("Note de la version retenue, de 1 à 10"),
+  hook: z.number().int().describe("Force de son accroche, de 1 à 10 : la 1re image, le texte d'accroche et, avec une voix, sa première phrase"),
   ok: z.boolean().describe("true si la version retenue peut partir telle quelle"),
   issues: z
     .array(
@@ -46,14 +49,22 @@ export const montageReviewSchema = z.object({
 export type MontageReviewAnswer = z.infer<typeof montageReviewSchema>;
 export type MontageReview = Omit<MontageReviewAnswer, "issues"> & { issues: MontageIssue[] };
 
-/** The critic's answer within bounds: at most 4 issues, short lines, score 1–10, best within the versions shown. */
+/** Under this, the hook is too weak for the Reel to go: it is corrected first. */
+export const HOOK_PASS = 7;
+
+/**
+ * The critic's answer within bounds: at most 4 issues, short lines, scores 1–10, best within
+ * the versions shown. A weak hook never lets the Reel go while there is a correction to make.
+ */
 export function normalizeReview(answer: MontageReviewAnswer, versions: number): MontageReview {
   const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(n)));
+  const hook = clamp(answer.hook ?? 10, 1, 10);
   return {
     best: clamp(answer.best, 1, Math.max(1, versions)),
     why: answer.why.slice(0, 300),
     score: clamp(answer.score, 1, 10),
-    ok: answer.ok,
+    hook,
+    ok: answer.ok && !(hook < HOOK_PASS && answer.issues.length > 0),
     issues: answer.issues.slice(0, 4).map((i) => ({
       scene: i.scene === null ? null : clamp(i.scene, 1, 30),
       problem: i.problem.slice(0, 200),
@@ -64,11 +75,11 @@ export function normalizeReview(answer: MontageReviewAnswer, versions: number): 
 }
 
 export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Simone, une community manager IA pour les commerces de quartier (studio, salon, restaurant, boutique…). Avant qu'un Reel parte chez la gérante, tu le regardes à travers des images clés de la vidéo rendue (1080 × 1920), chacune avec son instant, sa scène et les textes prévus à l'écran. Tu juges comme une pro d'Instagram, exigeante mais juste. La barre : on doit croire qu'un excellent créateur l'a monté à la main, pour ce commerce ; un Reel qui fait pub, diaporama ou modèle n'est pas ok :
-- l'accroche : la 1re seconde donne envie de rester (une personne, un résultat ou un mouvement fort, jamais un plan vide, un décor, un logo ou un écran de texte) ; le texte d'accroche est court, gros, lisible ;
+- l'accroche d'abord, c'est elle qui décide si on reste (images « 1re image » et « Accroche ») : la 1re image arrête le pouce (une personne, un résultat, un geste ou un mouvement fort, net et bien cadré ; jamais un plan vide, un décor, un logo, un écran de texte ni une photo fixe et lointaine), le texte d'accroche est déjà là dès la 1re image, court, gros, lisible, et donne envie de voir la suite ; avec une voix, sa première phrase (ligne « Voix ») accroche dès ses premiers mots ; note-la à part (hook) : sous 7, elle n'est jamais ok et sa correction passe en premier : le plan d'ouverture à prendre à la place (le plus fort de ses clips, dis lequel), d'autres mots, ou les deux ;
 - natif et moderne : des images du commerce plein cadre du début à la fin, les textes posés dessus comme dans l'appli (gros, peu de mots) ; jamais un carton ou un fond de couleur plein écran à la place de la vidéo, jamais un écran de logo pour finir ;
 - le cadrage : le sujet (la personne, le geste, le plat, la coupe) est dans l'image, pas coupé par le recadrage vertical, et l'horizon est droit ;
 - la couleur : des plans qui ont l'air du même film (lumière et couleurs cohérentes), aucun trop sombre ou terne ;
-- la lisibilité : textes assez gros (une phrase se lit d'un coup d'œil sur un téléphone), contrastés sur l'image, jamais coupés ni collés au bord, hors des zones que l'interface d'Instagram recouvre (le bas et le bord droit), jamais posés sur un visage ni sur un texte déjà dans l'image ;
+- la lisibilité : textes assez gros (une phrase se lit d'un coup d'œil sur un téléphone), contrastés sur l'image, jamais coupés ni collés au bord, hors des zones que l'interface d'Instagram recouvre (le bas et le bord droit), jamais posés sur un visage ni sur un texte déjà dans l'image ; les sous-titres d'une voix ont le style natif voulu (petits, contour fin, le mot dit sur une pastille) que le monteur ne règle pas : ne demande jamais de les agrandir, de les poser sur un aplat ni d'en changer la couleur, seule leur place compte (jamais sur un visage) ;
 - l'image : pas de plan flou, trop sombre, mal cadré ou qui ne montre rien ;
 - le rythme et l'histoire : un ordre qui raconte (du large au serré, le geste puis le résultat), pas deux plans presque identiques à la suite, pas de scène inutile ou répétée, une fin claire (un dernier plan fort avec une invitation, ou le nom et l'appel à l'action), qui fait post natif et pas pub ; jamais un écran de fin par-dessus une animation ou un texte ; la ligne « Rythme » du plan te donne ce que les images ne montrent pas (longueur de chaque plan, coupes sur le temps, transition signature) : refuse un Reel mou (plans trop longs sans raison), haché (que des plans très courts) ou monotone (tous les plans de la même longueur) ;
 - jamais bon marché : pas d'effet gadget (rotation, flash, glitch, emoji animé, plus de deux polices, texte qui rebondit sans raison), pas de texte façon flyer (bloc ou surlignage penché, une pastille par mot, italique, effet machine à écrire, petite ligne fine illisible, slogan sans verbe comme « Coupes et couleurs naturelles »), au plus une transition signature ; une poussière de pellicule discrète voulue (ligne « Rythme ») n'est ni un gadget ni une saleté de l'image ; un Reel qui fait « modèle gratuit » n'est pas ok, même s'il est lisible ; un texte posé sur un texte déjà dans l'image (enseigne, logo, lettrage) n'est pas ok ;
@@ -112,16 +123,19 @@ export function reviewMoments(plan: EditPlan, max = 8): ReviewMoment[] {
     const i = timeline.segments.findIndex((s) => t >= s.start && t < s.start + s.length);
     return i < 0 ? plan.segments.length - 1 : i;
   };
-  const hook = Math.min(1, timeline.duration / 4);
+  // The first image as the feed shows it (the hook's text already in), then the hook at 1 s.
+  const first = Math.round(Math.min(0.3, timeline.duration / 8) * 100) / 100;
+  const hook = Math.round(Math.min(1, timeline.duration / 4) * 100) / 100;
   const middles = timeline.segments.map((s) => s.start + s.length / 2).filter((t) => t > hook + 0.4 && t < end - 0.4);
   // Even spread over the scenes when there are too many.
-  const room = Math.max(0, max - 2);
+  const room = Math.max(0, max - 3);
   const picked = middles.length <= room ? middles : Array.from({ length: room }, (_, k) => middles[Math.round((k * (middles.length - 1)) / Math.max(1, room - 1))]!);
-  const times = [...new Set([hook, ...picked, end].map((t) => Math.round(t * 100) / 100))].sort((a, b) => a - b);
+  const times = [...new Set([first, hook, ...picked, end].map((t) => Math.round(t * 100) / 100))].sort((a, b) => a - b);
   return times.map((t, k) => {
     const i = sceneAt(t);
     const segment = plan.segments[i]!;
-    const label = k === 0 ? `Accroche · scène ${i + 1} (${kindOf(segment)})` : k === times.length - 1 ? `Fin · scène ${i + 1} (${kindOf(segment)})` : `Scène ${i + 1} (${kindOf(segment)})`;
+    const where = `scène ${i + 1} (${kindOf(segment)})`;
+    const label = t === first ? `1re image · ${where}` : t === hook ? `Accroche · ${where}` : k === times.length - 1 ? `Fin · ${where}` : `Scène ${i + 1} (${kindOf(segment)})`;
     return { t, scene: i + 1, label, texts: textsAt(t) };
   });
 }
@@ -141,6 +155,13 @@ export function planDigest(plan: EditPlan): string {
 }
 
 const seconds = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(n);
+
+/** What the frames cannot let the critic hear: the voice's first sentence, and when it is said. */
+export function voiceLine(plan: Pick<EditPlan, "voice">, transcript: Pick<VoiceTranscript, "words"> | null): string | null {
+  if (!plan.voice || !transcript?.words.length) return null;
+  const first = voicePhrases({ text: "", duration: 0, words: transcript.words }, plan.voice.at)[0];
+  return first ? `Voix : sa première phrase « ${first.text} », dite de ${seconds(first.start)} à ${seconds(first.end)} s.` : null;
+}
 
 /**
  * The Reel's form, for the critic to judge it on its own terms: a key message held on
@@ -190,7 +211,7 @@ export const MAX_AVERAGE_SHOT = 2;
 const LONGEST_PACED_SHOT = 4;
 
 /** A check the Reel must pass, or one worth trying when the footage allows it. */
-export type QualityCheck = { key: "motion" | "hook" | "pace" | "beat" | "loop" | "texts"; ok: boolean; words: string; must: boolean };
+export type QualityCheck = { key: "motion" | "hook" | "opening" | "pace" | "beat" | "loop" | "texts"; ok: boolean; words: string; must: boolean };
 
 /**
  * What the Reels that work almost always have, checked on the plan (the frames cannot
@@ -205,9 +226,14 @@ export function qualityChecks(plan: EditPlan): QualityCheck[] {
   const clips = plan.segments.filter(isClipSegment);
   // A still photo is the only first image that does not move: a video moves, or the engine gives a still shot a slow move.
   const moves = !first || isMotionSegment(first) || !isClipSegment(first) || !first.photo || (first.move ?? (first.zoom === "light" ? "in" : "none")) !== "none" || (first.speed ?? 1) !== 1;
-  const hook = plan.texts.find((t) => t.from < 1);
+  // The hook is read from the first image (one that waits half a second has lost the eye).
+  const hook = plan.texts.find((t) => t.from <= 0.2);
+  const late = hook ? undefined : plan.texts.find((t) => t.from < HOOK_LATEST);
   // An opening animation is typography: the promise, written.
   const animatedHook = Boolean(first && isMotionSegment(first));
+  // The first shot holds the eye 2 s at most, then a cut relaunches it (over 4 s, it is someone's sentence, kept whole).
+  const opening = first && isClipSegment(first) ? timeline.segments[0] : undefined;
+  const quickOpening = !opening || opening.length <= OPENING_MAX_SECONDS + 0.05 || opening.length > LONGEST_PACED_SHOT;
   // A video shot over 4 s is someone's whole sentence (the editor holds no other footage that long): it stays out of the pace.
   const paced = timeline.segments.filter((x, i) => {
     const segment = plan.segments[i]!;
@@ -226,8 +252,24 @@ export function qualityChecks(plan: EditPlan): QualityCheck[] {
       key: "hook",
       must: true,
       ok: Boolean(hook || animatedHook),
-      words: hook ? `accroche écrite dès la 1re seconde (« ${hook.text} »)` : animatedHook ? "accroche écrite dans l'animation d'ouverture" : "aucune accroche écrite dans la 1re seconde",
+      words: hook
+        ? `accroche écrite dès la 1re image (« ${hook.text} »)`
+        : animatedHook
+          ? "accroche écrite dans l'animation d'ouverture"
+          : late
+            ? `accroche écrite seulement à ${seconds(late.from)} s : à poser dès la 1re image`
+            : "aucune accroche écrite dès la 1re image",
     },
+    ...(opening
+      ? [
+          {
+            key: "opening" as const,
+            must: true,
+            ok: quickOpening,
+            words: quickOpening ? `1er plan de ${seconds(opening.length)} s` : `1er plan de ${seconds(opening.length)} s : couper avant 1,5 s pour relancer l'œil (sauf si quelqu'un y parle)`,
+          },
+        ]
+      : []),
     ...(paced.length ? [{ key: "pace" as const, must: true, ok: average <= MAX_AVERAGE_SHOT + 0.05, words: `plans de ${seconds(average)} s en moyenne (${MAX_AVERAGE_SHOT} s au plus)` }] : []),
     ...(onBeat === null ? [] : [{ key: "beat" as const, must: true, ok: onBeat >= Math.ceil(cuts.length * 0.8), words: `${onBeat} coupes sur ${cuts.length} sur un temps de la musique` }]),
     { key: "texts", must: true, ok: others <= 2, words: `${others} texte${others > 1 ? "s" : ""} ou animation${others > 1 ? "s" : ""} en plus de l'accroche${plan.subtitles ? " et des sous-titres" : ""} (2 au plus)` },

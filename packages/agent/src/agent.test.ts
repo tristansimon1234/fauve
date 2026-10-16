@@ -827,13 +827,17 @@ test("critic: key frames at the hook, every scene and the end, with the texts on
   assert.ok(planTimeline({ ...plan, transitions: "fade" }).duration < 10);
 
   const moments = reviewMoments(plan);
-  assert.equal(moments[0]!.t, 1);
+  // The first image as the feed shows it, then the hook at 1 s.
+  assert.equal(moments[0]!.t, 0.3);
+  assert.match(moments[0]!.label, /^1re image/);
   assert.deepEqual(moments[0]!.texts, ["Le cours du matin"]);
+  assert.equal(moments[1]!.t, 1);
+  assert.match(moments[1]!.label, /^Accroche/);
   assert.equal(moments.at(-1)!.t, 9.5);
   assert.ok(moments.some((m) => m.scene === 2 && m.texts.includes("RENTRÉE"))); // the animation's slot text
   assert.ok(moments.every((m, i) => i === 0 || m.t > moments[i - 1]!.t));
 
-  // Many scenes: at most `max` frames, hook and end kept.
+  // Many scenes: at most `max` frames, the first image, the hook and the end kept.
   const long = editPlanSchema.parse({
     ...plan,
     duration: 30,
@@ -841,7 +845,7 @@ test("critic: key frames at the hook, every scene and the end, with the texts on
   });
   const few = reviewMoments(long, 6);
   assert.equal(few.length, 6);
-  assert.equal(few[0]!.t, 1);
+  assert.deepEqual([few[0]!.t, few[1]!.t], [0.3, 1]);
   assert.equal(few.at(-1)!.t, 29.5);
 
   const brief = fixBrief({ score: 6, issues: [{ scene: 1, problem: "accroche trop longue", fix: "la réduire à 3 mots" }] }, "Ouverture dynamique");
@@ -857,11 +861,12 @@ test("critic: an overlong answer is clamped, not thrown away; lateness is measur
   const { effortPitch, montageLate } = await import("./effort.ts");
   const long = "x".repeat(500);
   const review = normalizeReview(
-    { best: 5, why: long, score: 14, ok: false, summary: long, issues: Array.from({ length: 6 }, () => ({ scene: 99, problem: long, fix: long })) },
+    { best: 5, why: long, score: 14, hook: 0, ok: false, summary: long, issues: Array.from({ length: 6 }, () => ({ scene: 99, problem: long, fix: long })) },
     2,
   );
   assert.equal(review.best, 2); // within the versions shown
   assert.equal(review.score, 10);
+  assert.equal(review.hook, 1);
   assert.equal(review.issues.length, 4);
   assert.equal(review.issues[0]!.scene, 30);
   assert.equal(review.issues[0]!.problem.length, 200);
@@ -1484,7 +1489,7 @@ test("formats: a key message held all along, film dust when the editor asks, Fre
   assert.equal(checks.find((c) => c.key === "texts")!.ok, true);
   // The writer chooses the form first: a key message comes back with nothing to read.
   assert.deepEqual(reelFormatSchema.options, ["raconte", "message"]);
-  assert.equal(voiceOverDecisionSchema.safeParse({ format: "message", why: "une offre", hook: "", script: "" }).success, true);
+  assert.equal(voiceOverDecisionSchema.safeParse({ format: "message", why: "une offre", hooks: [], rest: "" }).success, true);
 });
 
 test("lab fixes: lines that hold together, a breath between sentences, subtitles off faces, the format told to the critic", async () => {
@@ -1574,7 +1579,7 @@ test("quality checks: what the Reels that work have, read on the plan for the cr
     ],
   });
   const failed = qualityChecks(slow).filter((c) => !c.ok).map((c) => c.key);
-  assert.deepEqual(failed.sort(), ["beat", "hook", "loop", "motion", "pace", "texts"]);
+  assert.deepEqual(failed.sort(), ["beat", "hook", "loop", "motion", "opening", "pace", "texts"]);
   assert.match(qualityLine(slow), /à revoir : la 1re image est une photo fixe, aucune accroche écrite/);
   // The same photo with a slow move: it moves.
   const moving = { ...slow, segments: [{ ...slow.segments[0]!, move: "in" as const }, ...slow.segments.slice(1)] };
@@ -2089,4 +2094,163 @@ test("signature: its narrators are the gallery's voices that are not whispered",
   // A signature saved before the narrator existed still reads.
   const old = { ambiance: "doux", titles: { font: "display", case: "normal", weight: "bold", align: "center", tracking: "normal" }, stress: "color", band: "white", grade: "natural", base: "light", motion: "epure", music: "lo-fi", voice: "tutoiement" };
   assert.equal(brandSignatureSchema.safeParse(old).success, true);
+});
+
+test("hooks: the strongest shot opens, the hook is read from the first image, the judge's pick holds, the voice speaks at once", async () => {
+  const { openingCandidates, hookAtStart, pickHook, planHook, hookWords } = await import("./hook.ts");
+  const { voiceAt, voiceForEditor, VOICE_FIRST_WORD } = await import("./voice.ts");
+  const { scriptFrom, voiceOverScriptSchema } = await import("./voice-over.ts");
+  const { qualityChecks, normalizeReview, voiceLine } = await import("./critic.ts");
+  const { normalizeEditPlan } = await import("./editor.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  type Look = Record<string, unknown>;
+  const shot = (start: number, end: number, look: Look = {}) => ({
+    start,
+    end,
+    description: `plan ${start}`,
+    subject: "plat",
+    energy: 3,
+    hook_score: 3,
+    quality: { blurry: false, dark: false, shaky: false },
+    faces_visible: false,
+    framing: "medium" as const,
+    camera: "handheld" as const,
+    subject_box: [0, 0, 1000, 1000],
+    beauty: 3,
+    ...look,
+  });
+  const analysis = (shots: ReturnType<typeof shot>[], best: { start: number; end: number; why: string }[] = []) =>
+    ({ duration: 10, orientation: "portrait", summary: "", setting: "", lighting: "good", shots, best_moments: best, transcript: "", issues: [] }) as never;
+  const clips = [
+    { media_id: "decor", analysis: analysis([shot(0, 3, { framing: "wide", camera: "static", hook_score: 2, description: "la salle vide" })]) },
+    {
+      media_id: "geste",
+      analysis: analysis([shot(0, 2), shot(2, 6, { hook_score: 5, beauty: 5, framing: "close", description: "le fromage qui file" })], [{ start: 3, end: 4.5, why: "le fromage file" }]),
+    },
+    { media_id: "flou", analysis: analysis([shot(0, 3, { hook_score: 5, beauty: 5, quality: { blurry: true, dark: false, shaky: false } })]) },
+  ];
+  // The strongest shot opens, where its best moment starts; a blurry one never comes before a clean one; a photo only without videos.
+  const openings = openingCandidates(clips, [{ media_id: "p", contenu: "la vitrine" }]);
+  assert.equal(openings[0]!.media_id, "geste");
+  assert.equal(openings[0]!.what, "le fromage qui file");
+  assert.deepEqual([openings[0]!.start, openings[0]!.end], [3, 4.5]);
+  assert.equal(openings[1]!.media_id, "geste");
+  assert.ok(openings.every((o) => o.kind === "video"));
+  assert.deepEqual(openingCandidates([], [{ media_id: "p1" }, { media_id: "p2" }]).map((o) => o.media_id), ["p1", "p2"]);
+
+  // The hook is on screen from the first image; a caption first, or a hook that comes late, is left alone.
+  const texts = [
+    { text: "pourquoi cette file ?", from: 0.56, to: 2, style: "hook" },
+    { text: "réserve", from: 5, to: 7, style: "caption" },
+  ];
+  assert.equal(hookAtStart(texts)[0]!.from, 0);
+  assert.equal(hookAtStart(texts)[1]!.from, 5);
+  assert.equal(hookAtStart([{ ...texts[1]!, from: 0.5 }])[0]!.from, 0.5);
+  assert.equal(hookAtStart([{ ...texts[0]!, from: 2 }])[0]!.from, 2);
+  const normalized = normalizeEditPlan(
+    editPlanObjectSchema.parse({
+      ...validPlan,
+      template: "dynamique",
+      images: [],
+      segments: [
+        { clip_id: "a", in: 0, out: 1.5, zoom: "none" },
+        { clip_id: "b", in: 0, out: 3, zoom: "none" },
+      ],
+      texts: [{ text: "pourquoi cette file ?", from: 0.4, to: 2, style: "hook" }],
+    }),
+    { a: 10, b: 10 },
+  );
+  assert.equal(normalized.texts[0]!.from, 0);
+  assert.equal(planHook(normalized)!.text.text, "pourquoi cette file ?");
+
+  // The judge's pick holds when it is short enough; else the best scored one that holds; the emphasis keeps its own words.
+  const given = ["Cette file rue Charlot, personne ne la regrette."];
+  const answer = {
+    ideas: [
+      { text: "Pourquoi tout le monde fait la queue ici ?", emphasis: ["la queue", "ailleurs"] },
+      { text: "Une file de vingt minutes pour un sandwich, et personne ne repart sans le sien, même sous la pluie", emphasis: [] },
+    ],
+    scores: [
+      { index: 0, score: 5, why: "plat" },
+      { index: 1, score: 8, why: "une vraie question" },
+      { index: 2, score: 9, why: "fort mais long" },
+    ],
+    best: 2,
+  };
+  const voice = pickHook(given, answer, "voix");
+  assert.equal(voice.text, "Pourquoi tout le monde fait la queue ici ?");
+  assert.equal(voice.index, 1);
+  assert.equal(voice.score, 8);
+  // A written hook is read at a glance: 7 words at most (the 8-word question stays a voice's).
+  assert.equal(pickHook(given, answer, "texte").index, 0);
+  const written = pickHook(["La file de la rue Charlot"], { ideas: [{ text: "40 minutes pour un sandwich ?", emphasis: ["40 minutes", "toaster"] }], scores: [{ index: 1, score: 9, why: "un chiffre" }], best: 1 }, "texte");
+  assert.deepEqual([written.text, written.emphasis], ["40 minutes pour un sandwich ?", ["40 minutes"]]);
+  assert.equal(pickHook(given, { ideas: [], scores: [], best: 7 }, "voix").text, given[0]);
+  assert.equal(hookWords("[casually] Pourquoi cette file ?"), 3);
+
+  // The voice: its first sentence chosen, then all that follows; written as hooks and the rest.
+  assert.equal(scriptFrom(" Pourquoi cette file ? ", "Ici, tout passe au toaster.").script, "Pourquoi cette file ? Ici, tout passe au toaster.");
+  assert.equal(voiceOverScriptSchema.safeParse({ hooks: ["a", "b"], rest: "c" }).success, true);
+
+  // A voice note that opens on silence: its first word is heard at once (the silence is cut).
+  const note = { text: "Pourquoi cette file ?", duration: 3, words: [{ w: "Pourquoi", start: 0.9, end: 1.3 }, { w: "cette", start: 1.3, end: 1.5 }, { w: "file ?", start: 1.5, end: 1.9 }] };
+  const at = voiceAt(note);
+  assert.equal(at, -0.7);
+  assert.equal(voiceForEditor(note, at).phrases[0]!.start, VOICE_FIRST_WORD);
+  assert.equal(voiceAt({ words: [{ w: "Alors", start: 0.05, end: 0.3 }] }), 0.15);
+  const spokenPlan = editPlanSchema.parse({ ...validPlan, duration: 6, segments: [{ clip_id: "a", in: 0, out: 6, zoom: "none" }], texts: [], images: [], voice: { media_id: "v", at } });
+  const props = buildReelProps(spokenPlan, { template: "doux", clipUrls: { a: "https://x/a.mp4" }, voice: { src: "https://x/v.ogg", words: note.words }, brand: { name: "Lune" } });
+  assert.equal(props.voice!.from, -21); // the render cuts the 0.7 s before it
+  assert.equal(props.words[0]!.from, 6); // its first word at 0.2 s
+  assert.match(voiceLine(spokenPlan, note)!, /« Pourquoi cette file \? », dite de 0,2 à 1,2 s/);
+
+  // The checks: a hook that waits, a first shot held too long.
+  const late = editPlanObjectSchema.parse({
+    ...validPlan,
+    template: "doux",
+    images: [],
+    segments: [
+      { clip_id: "a", in: 0, out: 2.8, zoom: "none" },
+      { clip_id: "b", in: 0, out: 1.5, zoom: "none" },
+    ],
+    texts: [{ text: "pourquoi cette file ?", from: 0.6, to: 2.5, style: "hook" }],
+  });
+  const checks = qualityChecks(late);
+  assert.match(checks.find((c) => c.key === "hook")!.words, /seulement à 0,6 s/);
+  assert.equal(checks.find((c) => c.key === "opening")!.ok, false);
+  assert.equal(qualityChecks({ ...late, segments: [{ clip_id: "a", in: 0, out: 1.2, zoom: "none" }, late.segments[1]!] }).find((c) => c.key === "opening")!.ok, true);
+
+  // A weak hook never lets the Reel go while there is something to correct.
+  const review = (hook: number, issues: { scene: number | null; problem: string; fix: string }[]) => normalizeReview({ best: 1, why: "", score: 8, hook, ok: true, issues, summary: "" }, 1);
+  assert.equal(review(5, [{ scene: 1, problem: "1re image : une salle vide", fix: "ouvrir sur le fromage qui file" }]).ok, false);
+  assert.equal(review(5, []).ok, true);
+  assert.equal(review(8, [{ scene: 2, problem: "x", fix: "y" }]).ok, true);
+});
+
+test("lab fixes 2: a Reel's message shows its title, subtitles off faces read where the photo shows them", async () => {
+  const { buildReelProps } = await import("./motion.ts");
+  const { photoBoxInFrame, subtitleRow } = await import("./retouch.ts");
+  // A band with items in a Reel is a message: its own words are its title (on a photo, a list's text only names it).
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 6,
+    segments: [{ clip_id: "a", in: 0, out: 6, zoom: "none" }],
+    texts: [{ text: "3 cours pour 65 €", from: 1, to: 5, style: "band", items: [{ title: "pack découverte" }, { title: "tous niveaux" }] }],
+    images: [],
+  });
+  const props = buildReelProps(plan, { template: "doux", clipUrls: { a: "https://x/a.mp4" }, brand: { name: "Culte" } });
+  assert.equal(props.texts[0]!.message, true);
+  assert.equal(buildReelProps({ ...plan, texts: [{ ...plan.texts[0]!, items: undefined }] }, { template: "doux", clipUrls: { a: "https://x/a.mp4" }, brand: { name: "Culte" } }).texts[0]!.message, undefined);
+
+  // A 4:5 photo fills the vertical frame by its height: a face keeps its rows, widened by the slow zoom about the centre.
+  const face = { x: 0.3, y: 0.1, w: 0.4, h: 0.55 };
+  const shown = photoBoxInFrame(face, { source: { width: 1280, height: 1600 } })!;
+  assert.ok(shown.y < 0.1 && shown.y > 0.03);
+  assert.ok(shown.y + shown.h > 0.65 && shown.y + shown.h < 0.7);
+  // Under the face, the subtitles drop to the row below it; a face filling the frame takes the row it covers least.
+  assert.equal(subtitleRow([shown]), 0.71);
+  const big = { x: 0, y: 0.05, w: 1, h: 0.69 };
+  assert.equal(subtitleRow([big]), 0.71);
+  // Covering every row alike, no row is better: the usual one stays.
+  assert.equal(subtitleRow([{ x: 0, y: 0.05, w: 1, h: 0.8 }]), null);
 });

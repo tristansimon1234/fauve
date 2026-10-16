@@ -17,6 +17,8 @@ import {
   type MontageIssue,
   type MontageReview,
   type ReelFormat,
+  voiceLine,
+  voiceTranscriptSchema,
 } from "@fauve/agent";
 import { videoFramesInSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -46,6 +48,11 @@ async function loadVersion(studioId: string, version: ReviewedVersion) {
   ]);
   const parsed = editPlanSchema.safeParse(plan.data?.plan);
   if (!parsed.success || render.data?.status !== "done" || !render.data.storage_path) return null;
+  // The voice's first sentence, which the frames cannot let the critic hear.
+  const transcript = parsed.data.voice
+    ? voiceTranscriptSchema.safeParse((await db.from("media_assets").select("transcript").eq("id", parsed.data.voice.media_id).eq("studio_id", studioId).maybeSingle()).data?.transcript)
+    : null;
+  const voice = voiceLine(parsed.data, transcript?.success ? transcript.data : null);
   const signed = await db.storage.from("media").createSignedUrl(render.data.storage_path as string, 900);
   if (!signed.data) return null;
   // A video shorter than its plan came from the ffmpeg fallback, which keeps only the clips:
@@ -62,7 +69,7 @@ async function loadVersion(studioId: string, version: ReviewedVersion) {
     console.warn("critic: no frames for", version.renderId, error);
     return [];
   });
-  return { plan: shown, moments, frames, fallback };
+  return { plan: shown, moments, frames, fallback, voice };
 }
 
 const quote = (texts: string[]) => texts.map((t) => `« ${t.slice(0, 120)} »`).join(", ");
@@ -115,7 +122,7 @@ export async function reviewMontage(input: {
     }
     content.push({
       type: "text",
-      text: `Version ${i + 1}${correction ? ` (correction de la version ${i})` : ""} : ${planDigest(version.plan as EditPlan)}${
+      text: `Version ${i + 1}${correction ? ` (correction de la version ${i})` : ""} : ${planDigest(version.plan as EditPlan)}${version.voice ? ` ${version.voice}` : ""}${
         version.fallback ? " Rendue par le moteur de secours, sans les animations : leur absence n'est pas un défaut à corriger." : ""
       }`,
     });

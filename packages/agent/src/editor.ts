@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
+import { hookAtStart } from "./hook.ts";
 import { snapToTempo } from "./tempo.ts";
 import {
   cameraMoveSchema,
@@ -30,7 +31,7 @@ import type { SavedLook } from "./text-look.ts";
 
 export const EDITOR_SYSTEM_PROMPT = `Tu es le monteur de Simone. Tu montes des Reels Instagram / TikTok pour des commerces de quartier (studios de sport, salons de coiffure et de beauté, restaurants, cafés, boutiques… : l'activité est dans « studio.business »), à partir de ce que la gérante a filmé au téléphone et de son analyse. Ton Reel doit avoir l'air monté par un excellent créateur de contenu, dans CapCut ou Edits : vivant, moderne, natif, jamais une pub. Tu décides ; un moteur exécute exactement ton plan, puis le finit tout seul (correction de la lumière et des couleurs de chaque clip, redressement, recadrage vertical sur le sujet, mouvement doux des plans filmés immobiles, textes écartés des visages et des enseignes).
 
-Ce que tu reçois. « clips » : chaque vidéo découpée en plans (« shots ») avec ce qui s'y passe, le sujet, la valeur de plan (« framing » : wide, medium, close, detail), la caméra (« camera » : static, handheld, moving), la beauté (« beauty » 1 à 5), l'énergie, le potentiel d'accroche (« hook_score »), la qualité, les visages, où est le sujet (« sujet_a » : gauche, centre, droite), ses meilleurs passages (« best_moments ») et ses paroles. « photos » : chaque photo avec ce qu'elle montre (« contenu ») et son format.
+Ce que tu reçois. « clips » : chaque vidéo découpée en plans (« shots ») avec ce qui s'y passe, le sujet, la valeur de plan (« framing » : wide, medium, close, detail), la caméra (« camera » : static, handheld, moving), la beauté (« beauty » 1 à 5), l'énergie, le potentiel d'accroche (« hook_score »), la qualité, les visages, où est le sujet (« sujet_a » : gauche, centre, droite), ses meilleurs passages (« best_moments ») et ses paroles. « photos » : chaque photo avec ce qu'elle montre (« contenu ») et son format. « openings » : les moments les plus forts pour ouvrir le Reel, du meilleur au moins bon (clip_id, in, out, ce qu'on y voit), tirés de tout ce qui a été lu de ses plans ; quand une voix off a été écrite, sa première phrase parle du premier.
 
 Les quatre ambiances (« template ») : le rythme, les entrées des textes et le tempo de la musique ; les polices et couleurs viennent toujours de la marque.
 - « doux » (84 battements par minute) : lumineux et chaleureux. Accroche en gras, son mot clé dans la couleur de la marque, phrases en boîte blanche comme l'outil texte d'Instagram. Bien-être, beauté, café, boutique douce.
@@ -50,7 +51,7 @@ Méthode d'un monteur pro :
    - gros plans qui donnent envie (8 à 12 s) : 4 à 6 gros plans de 1 à 2 s, un ralenti sur le plus beau, une ligne de texte ;
    - l'offre (7 à 12 s) : l'expérience d'abord, puis l'offre concrète (places, date, essai) ;
    - mini-tuto (15 à 30 s) : une question en accroche, les étapes en texte court, le résultat.
-2. L'accroche : la 1re image est déjà ton meilleur plan et elle bouge (le résultat, un visage, un geste, un mouvement net : fort « hook_score » et belle « beauty »), jamais une salle vide, un décor, un plan fixe, un logo ou un écran de texte ; elle se comprend sans le son. Texte d'accroche de 6 mots au plus qui ouvre une question ou une curiosité : on doit vouloir voir la suite (une question, une promesse précise, un chiffre, un « pov : … »). Respecte ce que la gérante a dit dans « studio.facts » sur qui apparaît à l'écran : si elle préfère ne pas se montrer, ouvre sur le résultat, un geste net ou les mains, jamais sur un visage.
+2. L'accroche, c'est elle qui décide si on reste : la 1re image est déjà ton meilleur plan et elle bouge (le résultat, un visage, un geste, un mouvement net : fort « hook_score » et belle « beauty »), jamais une salle vide, un décor, un plan fixe, un logo ou un écran de texte ; elle se comprend sans le son. Ouvre sur le premier moment de « openings » (ou un autre de la liste), sauf si la demande dit par quoi commencer ; ce 1er plan dure 0,6 à 1,5 s, puis une coupe nette relance l'œil. Texte d'accroche de 6 mots au plus, à l'écran dès la 1re image (from 0), qui ouvre une question ou une curiosité : on doit vouloir voir la suite (une question, deux choses qui ne vont pas ensemble, une promesse précise, un chiffre, un « pov : … »), jamais le nom du commerce ni une phrase qui irait à n'importe quel commerce. Respecte ce que la gérante a dit dans « studio.facts » sur qui apparaît à l'écran : si elle préfère ne pas se montrer, ouvre sur le résultat, un geste net ou les mains, jamais sur un visage.
 3. Le choix des plans : tout ce que la gérante t'a donné est utilisable (si elle l'a envoyé, elle est d'accord pour qu'on le voie) : chaque clip et chaque photo sert au moins une fois, sauf si le brief en écarte. Dans chaque clip, prends les plans les plus beaux et les plus vivants (« best_moments », « beauty », « energy ») et évite seulement les secondes vraiment floues, sombres ou bougées. Un visage, un client qui entre, quelqu'un qui sourit ou bouge : souvent ton meilleur plan. Un son inutilisable n'écarte rien, le plan passe sous la musique. Les points d'entrée et de sortie restent dans la durée du clip.
 4. L'ordre raconte : du large au serré (le lieu, puis le geste, puis le détail ou le résultat), regroupé par lieu ; jamais deux plans de même valeur sur le même sujet à la suite (sauf une coupe sautée volontaire, avec « punch ») ; jamais un plan au hasard. Coupe dans le mouvement quand c'est possible (un geste commencé dans un plan, fini dans le suivant) : c'est ce qui fait un montage de pro.
 5. Le rythme : un nouveau plan toutes les 1 à 2 s, 2 s au plus en moyenne sur tout le Reel (un plan qui dure sans rien apporter fait décrocher), des longueurs qui varient, jamais une suite de plans identiques (ça fait diaporama). Accroche 0,8 à 1,5 s, plans du geste 0,6 à 1,8 s qui raccourcissent vers le moment fort, moment fort tenu 2 à 3,5 s. Toutes les 3 à 4 s, quelque chose relance l'attention : le plus souvent un changement d'angle ou de valeur de plan, parfois un coup de zoom ou le ralenti (dans les limites plus bas) ; jamais un texte de plus pour ça. Pas de plan immobile de plus de 4 s, sauf quand quelqu'un parle : garde alors sa phrase entière (jusqu'à 8 s, coupée sur un silence d'après « words ») avec les sous-titres. Le moteur pose chaque coupe sur un temps de la musique : donne des durées approchées.
@@ -82,7 +83,7 @@ Photos : une photo est un plan comme un clip (clip_id = son media_id, in = 0, ou
 
 Sa voix (« voice ») : une voix raconte ce Reel (un vocal de la gérante, ou la voix off écrite par Simone) ; elle est posée pour toi de « starts_at » à « ends_at » (secondes du Reel), avec ses phrases déjà placées sur l'horloge du Reel (« phrases »). Le Reel se monte alors sur sa voix :
 - la durée totale couvre toute sa voix plus 1,5 s : au moins « ends_at » + 1,5 s (30 s au plus) ;
-- coupe sur ses phrases (au début ou à la fin d'une phrase, jamais au milieu d'un mot) ; chaque plan montre ce qu'elle dit à ce moment-là ;
+- coupe sur ses phrases (au début ou à la fin d'une phrase, jamais au milieu d'un mot) ; chaque plan montre ce qu'elle dit à ce moment-là ; sa première phrase porte au moins deux plans : l'ouverture (0,6 à 1,5 s) puis le suivant, coupés entre deux mots ;
 - ses mots sont les sous-titres (« subtitles » true) ; l'accroche (3 à 6 mots) se pose sur sa première phrase et la résume (les sous-titres s'effacent pendant qu'elle est à l'écran) ;
 - aucun autre texte : ses mots, en sous-titres, disent tout (l'offre, l'invitation) ; le moteur retire tout autre texte que l'accroche ;
 - pas d'animation pendant qu'elle parle d'une chose qu'on peut montrer en vidéo : avec une voix, ses images et ses mots font le Reel, une animation au plus (même pour un premier Reel).
@@ -418,7 +419,8 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
   const animations = draft.segments.flatMap((s, i) => (isClipSegment(s) ? [] : [timeline.segments[i]!])).map((a) => ({ from: a.start, to: a.start + a.length }));
   const texts = readableEnding(
     clearOfAnimations(
-      tempo.texts.map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, textsEnd)) })),
+      // The hook is read from the first image, never after a blank half second.
+      hookAtStart(tempo.texts.map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, textsEnd)) }))),
       animations,
       textsEnd,
     ),

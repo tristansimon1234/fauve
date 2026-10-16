@@ -81,6 +81,8 @@ export type ReelText = {
   items?: ListItem[];
   detail_look?: TextLook;
   bullet?: Bullet;
+  /** In a Reel, a text with items is a message: its own words are its title, its items under it (on a photo, a list's text is only its name). */
+  message?: boolean;
 };
 export type ReelWord = { w: string; from: number; to: number };
 
@@ -338,6 +340,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         scale: t.scale,
         backdrop: t.backdrop,
         ...brandLooks(t, brand),
+        ...(t.items?.length ? { message: true } : {}),
       };
     })
     .filter((t) => t.durationInFrames > 0);
@@ -345,12 +348,13 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   // Spoken words: her voice note's (moved to where it plays), else the clips' (moved
   // from clip time to output time, for the segments that keep them).
   const words: ReelWord[] = [];
-  const voice = plan.voice && inputs.voice ? { ...inputs.voice, from: toFrames(plan.voice.at) } : null;
+  // A voice may start before the Reel (negative): the silence before its first word is cut.
+  const voice = plan.voice && inputs.voice ? { ...inputs.voice, from: Math.round(plan.voice.at * REEL_FPS) } : null;
   if (plan.subtitles && voice) {
     for (const word of voice.words) {
       const from = voice.from + toFrames(word.start);
       const to = voice.from + toFrames(word.end);
-      if (from < durationInFrames) words.push({ w: word.w, from, to: Math.max(to, from + 3) });
+      if (from >= 0 && from < durationInFrames) words.push({ w: word.w, from, to: Math.max(to, from + 3) });
     }
   } else if (plan.subtitles) {
     plan.segments.forEach((s, i) => {

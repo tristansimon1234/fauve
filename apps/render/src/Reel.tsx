@@ -135,8 +135,9 @@ export function Reel(props: ReelProps) {
       {collage ? <Grain props={props} /> : null}
       {props.soundtrack?.src ? <Audio src={props.soundtrack.src} volume={(f) => musicVolume(props.soundtrack!, f)} /> : null}
       {props.voice?.src ? (
-        <Sequence from={props.voice.from} layout="none">
-          <Audio src={props.voice.src} />
+        // A voice that starts before the Reel (negative from): its silence before the first word is cut.
+        <Sequence from={Math.max(0, props.voice.from)} layout="none">
+          <Audio src={props.voice.src} trimBefore={Math.max(0, -props.voice.from)} />
         </Sequence>
       ) : null}
     </AbsoluteFill>
@@ -367,7 +368,8 @@ function TextBeat({ text, index, props, theme, k }: { text: ReelProps["texts"][n
   // Remount when edited, so the fit is measured again (scene editor).
   const key = `${text.text}|${text.style}|${text.scale ?? 1}|${text.x ?? ""}|${text.backdrop ?? false}|${text.look ? JSON.stringify(text.look) : ""}`;
   // A key message with its details (« Don't miss it ! », « OFFRE DE RENTRÉE », the codes): composed on three levels.
-  if (text.style === "hook" && text.items?.length && !text.look) return <KeyMessage key={`${key}|${JSON.stringify(text.items)}`} text={text} index={index} props={props} theme={theme} k={k} />;
+  // A message held on screen (title, subtitle, details): the hook of a key message, or any text of a Reel with items.
+  if ((text.style === "hook" || text.message) && text.items?.length && !text.look) return <KeyMessage key={`${key}|${JSON.stringify(text.items)}`} text={text} index={index} props={props} theme={theme} k={k} />;
   if (text.look || text.items) return <LookText key={`${key}|${JSON.stringify([text.items, text.detail_look, text.bullet])}`} text={text} index={index} props={props} theme={theme} k={k} />;
   if (props.template === "collage") {
     const C = text.style === "hook" ? CollageHook : text.style === "band" ? CollageBand : CollageCaption;
@@ -451,6 +453,12 @@ function Marker({ color, from, long, children }: { color: string; from: number; 
   );
 }
 
+/** A key message's title this short stays on one line (« Don't miss it ! »). */
+const KEY_TITLE_ONE_LINE = 12;
+
+/** Frames of its entrance a hook that opens the Reel has already played on the first frame. */
+const HOOK_LEAD = 4;
+
 /** A key message's letter spacing (em) for each choice of its charter. */
 const KEY_SPACING = {
   tight: { title: -0.035, subtitle: -0.01, details: -0.01 },
@@ -482,8 +490,9 @@ function KeyMessage({ text, index, props, theme, k }: { text: ReelProps["texts"]
   const titleColor = light && rgbLuminance(light) > 0.55 && chroma(light) > 0.08 ? props.brand.palette!.light! : "#fff";
   const [first, ...rest] = text.items!;
   const details = [first!.detail, ...rest.flatMap((item) => [item.title, item.detail])].filter((d): d is string => Boolean(d?.trim()));
+  const lead = text.from === 0 ? HOOK_LEAD : 0;
   const enter = (i: number): CSSProperties => {
-    const p = spring({ frame: frame - i * 5, fps, config: theme.spring });
+    const p = spring({ frame: frame + lead - i * 5, fps, config: theme.spring });
     return { opacity: interpolate(p, [0, 0.5], [0, 1], clamp), transform: `translateY(${interpolate(p, [0, 1], [18 * k, 0])}px)` };
   };
   const box: CSSProperties = {
@@ -503,9 +512,8 @@ function KeyMessage({ text, index, props, theme, k }: { text: ReelProps["texts"]
             fontWeight: Math.max(800, h.weight),
             fontSize: size * 1.05,
             lineHeight: 0.98,
-            // A short title holds on one line (the block shrinks to fit rather than break it); a long one breaks into even lines.
-            whiteSpace: text.text.length <= 22 ? "nowrap" : "normal",
-            textWrap: "balance",
+            // A very short title holds on one line; a longer one breaks into even lines rather than shrink the whole message.
+            ...(text.text.length <= KEY_TITLE_ONE_LINE ? { whiteSpace: "nowrap" as const } : { textWrap: "balance" as const }),
             letterSpacing: h.uppercase ? h.letterSpacing * k : `${spacing.title}em`,
             textTransform: h.uppercase ? "uppercase" : "none",
             color: titleColor,
@@ -519,11 +527,11 @@ function KeyMessage({ text, index, props, theme, k }: { text: ReelProps["texts"]
             </span>
           ))}
         </span>
-        <span style={{ fontFamily: body, fontWeight: 800, fontSize: size * 0.46, letterSpacing: `${spacing.subtitle}em`, textTransform: "uppercase", color: "#fff", marginTop: size * 0.22, ...enter(1) }}>
+        <span style={{ fontFamily: body, fontWeight: 800, fontSize: size * 0.46, letterSpacing: `${spacing.subtitle}em`, textTransform: "uppercase", color: "#fff", marginTop: size * 0.22, textWrap: "balance", ...enter(1) }}>
           {first!.title}
         </span>
         {details.map((line, i) => (
-          <span key={i} style={{ fontFamily: body, fontWeight: 500, fontSize: size * 0.27, lineHeight: 1.3, letterSpacing: `${spacing.details}em`, color: "#fff", marginTop: i ? 0 : size * 0.08, ...enter(2 + i) }}>
+          <span key={i} style={{ fontFamily: body, fontWeight: 500, fontSize: size * 0.27, lineHeight: 1.3, letterSpacing: `${spacing.details}em`, color: "#fff", marginTop: i ? 0 : size * 0.08, textWrap: "balance", ...enter(2 + i) }}>
             {line}
           </span>
         ))}
@@ -539,6 +547,8 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
   const emphasis = new Set(text.emphasis.flatMap((e) => e.split(SPACES)).map(normalize));
   const h = theme.hook;
   const words = text.text.split(SPACES).filter(Boolean);
+  // Opening the Reel, its entrance is already under way on the first frame: the feed shows it at once.
+  const lead = text.from === 0 ? HOOK_LEAD : 0;
 
   // The hook sits in the upper third, big, where the eye lands first; a long one shrinks to its box.
   const box: CSSProperties = {
@@ -591,7 +601,7 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
     <Fit style={box} innerStyle={style} marker={String(index)}>
       <span style={text.backdrop ? { ...backdrop(text, k), lineHeight: 1.3 } : undefined}>
         {groups.map((group, i) => {
-          const p = spring({ frame: frame - i * h.stagger, fps, config: theme.spring });
+          const p = spring({ frame: frame + lead - i * h.stagger, fps, config: theme.spring });
           const enter: CSSProperties =
             h.enter === "pop"
               ? { transform: `scale(${interpolate(p, [0, 1], [0.6, 1])})`, opacity: interpolate(p, [0, 0.35], [0, 1], clamp) }
@@ -609,7 +619,7 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
           return (
             <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...enter }}>
               {group.stress && h.stress === "marker" ? (
-                <Marker color={legible(props.brand.accent, "footage")} from={i * h.stagger + 5} long={group.words.join(" ").length > 12}>
+                <Marker color={legible(props.brand.accent, "footage")} from={Math.max(0, i * h.stagger + 5 - lead)} long={group.words.join(" ").length > 12}>
                   {group.words.join(" ")}
                 </Marker>
               ) : (
@@ -876,13 +886,14 @@ function LookText({ text, index, props, theme, k }: { text: ReelProps["texts"][n
     textAlign: look.align,
   };
 
-  // Entrances play in a video; a still (carousel) is captured once they are over.
+  // Entrances play in a video; a still (carousel) is captured once they are over. Opening the Reel, already under way.
+  const lead = text.from === 0 ? HOOK_LEAD : 0;
   const enterOf = (i: number): CSSProperties => {
-    const p = spring({ frame: frame - i * 3, fps, config: theme.spring });
+    const p = spring({ frame: frame + lead - i * 3, fps, config: theme.spring });
     if (look.enter === "pop") return { transform: `scale(${interpolate(p, [0, 1], [0.55, 1])})`, opacity: interpolate(p, [0, 0.4], [0, 1], clamp) };
     if (look.enter === "rise") return { transform: `translateY(${interpolate(p, [0, 1], [30 * k, 0])}px)`, opacity: p };
     if (look.enter === "slide") return { transform: `translateX(${interpolate(p, [0, 1], [-40 * k, 0])}px)`, opacity: p };
-    if (look.enter === "fade" || look.enter === "typewriter") return { opacity: interpolate(frame, [i * 2, i * 2 + 10], [0, 1], clamp) };
+    if (look.enter === "fade" || look.enter === "typewriter") return { opacity: interpolate(frame + lead, [i * 2, i * 2 + 10], [0, 1], clamp) };
     return {};
   };
 
@@ -901,6 +912,12 @@ function LookText({ text, index, props, theme, k }: { text: ReelProps["texts"][n
     return (
       <Fit style={box} innerStyle={inner} marker={String(index)}>
         <div style={{ display: "flex", flexDirection: "column", gap: size * 0.85, alignItems: inner.alignItems, transform: look.rotate ? `rotate(${look.rotate}deg)` : undefined }}>
+          {/* In a Reel, its own words head the list (on a photo, they only name it). */}
+          {text.message ? (
+            <span style={{ ...lookBlock(look, props, k), ...enterOf(0) }}>
+              <span style={{ ...lookType(look, props, k, scale * 1.3), ...lookLine(look, props, k) }}>{text.text}</span>
+            </span>
+          ) : null}
           {text.items.map((item, n) => (
             <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: size * 0.42, textAlign: look.align, ...enterOf(n * 2) }}>
               {text.bullet ? <BulletMark bullet={text.bullet} n={n} size={size * 0.95} props={props} /> : null}

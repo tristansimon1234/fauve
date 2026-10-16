@@ -29,7 +29,9 @@ import {
   readMemory,
   resolveReelBrand,
   type EditPlan,
-  VOICE_AT,
+  openingCandidates,
+  planHook,
+  voiceAt,
   voiceForEditor,
 } from "@fauve/agent";
 import { usableFonts } from "@/lib/fonts";
@@ -38,6 +40,7 @@ import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { ensureTranscript } from "@/lib/voice";
 import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
+import { judgeHooks } from "./hook-judge";
 import { designMotionScenes } from "./motion-designer";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { isFirstReel } from "@/lib/onboarding";
@@ -144,8 +147,15 @@ export async function designEdit(params: {
   });
 
   // Her voice note over the Reel: read once (her words with their timings), the editor cuts on her phrases.
+  // Its first word is heard at once: the silence a voice note opens on is cut.
   const voiceId = post.data.voice_media_id as string | null;
   const voice = voiceId ? await ensureTranscript(params.studioId, voiceId) : null;
+  const voiceStart = voice ? voiceAt(voice) : 0;
+  const spoken = voice ? voiceForEditor(voice, voiceStart) : null;
+  // The strongest moments to open on, best first (a voice over was written for the first one).
+  const openings = openingCandidates(clips, photos);
+  // A correction keeps what was asked; a new Reel (or a new take) has its hook weighed.
+  const correction = Boolean(params.brief && !params.fresh && previousPlan.success);
 
   // The inspiration she picked for this post (read now if it was just added in the app).
   const inspirationId = post.data.inspiration_id as string | null;
@@ -195,7 +205,9 @@ export async function designEdit(params: {
     // Every shot as an editor weighs it (size, camera, beauty, energy, hook, where the subject is).
     clips: clips.map((c) => editorClip(c.media_id, c.analysis)),
     // Her voice over the Reel: her phrases on the Reel's clock (the voice is placed for you).
-    voice: voice ? voiceForEditor(voice) : undefined,
+    voice: spoken ?? undefined,
+    // Where the Reel opens best: the strongest shots for its first image.
+    openings: openings.length ? openings.map((o) => ({ clip_id: o.media_id, in: o.start, out: o.end, what: o.what })) : undefined,
     // Her photos: each one a still shot with a slow zoom (clip_id = media_id, in 0, out = how long it shows).
     photos: photos.length ? photos : undefined,
     // Scenes already made: reusing one costs nothing.
@@ -204,7 +216,7 @@ export async function designEdit(params: {
     recent_hooks: hooks.length ? hooks : undefined,
     // Motion code stays out of the editor's context: it only needs the briefs.
     previous_plan:
-      params.brief && !params.fresh && previousPlan.success
+      correction && previousPlan.success
         ? {
             ...previousPlan.data,
             segments: previousPlan.data.segments.map((s) =>
@@ -267,6 +279,27 @@ export async function designEdit(params: {
     base,
   );
 
+  // The hook's words decide whether anyone stays: a new Reel's written hook is weighed against
+  // other forms by the hook judge, who keeps the strongest (an opening animation is its own hook).
+  const hook = planHook(plan);
+  const opener = plan.segments[0];
+  if (hook && !hook.text.items?.length && opener && isClipSegment(opener) && !correction) {
+    const clip = clips.find((c) => c.media_id === opener.clip_id);
+    const firstImage = clip
+      ? (clip.analysis.shots.find((shot) => opener.in >= shot.start && opener.in < shot.end)?.description ?? clip.analysis.summary)
+      : photos.find((p) => p.media_id === opener.clip_id)?.contenu;
+    const judged = await judgeHooks(params.studioId, {
+      type: "texte",
+      commerce: { nom: studio.data?.name ?? undefined, activite: studio.data?.business_type ?? undefined, ce_qu_on_sait: input.studio.facts, ton: profile.tone },
+      demande: params.brief,
+      premiere_image: firstImage,
+      voix_premiere_phrase: spoken?.phrases[0]?.text,
+      recentes: hooks.length ? hooks : undefined,
+      accroches: [hook.text.text],
+    });
+    if (judged && judged.index > 0) plan.texts[hook.index] = { ...hook.text, text: judged.text, emphasis: judged.emphasis };
+  }
+
   // The finishing touches of a professional editor, from what Gemini read: each clip's
   // light, colour and tilt corrected when it needs it, the vertical crop framed on its
   // subject, a slow move on shots filmed still, her footage under every animation, texts
@@ -277,13 +310,12 @@ export async function designEdit(params: {
   };
   Object.assign(plan, finishPlan(plan, facts, durations));
 
-  // Her voice plays from VOICE_AT, with her words as subtitles; without it, the plan has no voice.
-  if (voice && voiceId) {
-    plan.voice = { media_id: voiceId, at: VOICE_AT };
+  // Her voice plays with its first word at once, her words as subtitles; without it, the plan has no voice.
+  if (voice && voiceId && spoken) {
+    plan.voice = { media_id: voiceId, at: voiceStart };
     plan.subtitles = true;
     // Her voice leads: the Reel holds a moment after its last word, and the other texts keep to
     // its silences (its words are the subtitles; the hook stays over its first phrase).
-    const spoken = voiceForEditor(voice);
     Object.assign(plan, holdAfterVoice(plan, spoken.ends_at, durations));
     plan.texts = clearOfVoice(plan.texts, spoken.phrases);
   } else delete plan.voice;
