@@ -10,7 +10,9 @@ import {
   fromTtsAlignment,
   readPostVoice,
   readVoiceSetting,
+  sentencePauses,
   wantsVoiceOver,
+  withPauses,
   readMemory,
   spokenWords,
   stripAudioTags,
@@ -183,12 +185,12 @@ export async function speak(text: string, voiceId = env("ELEVENLABS_VOICE_ID")):
  * -19 and -31 LUFS): set once, so the live preview and the mix hear it the same.
  * As it came when the sandbox cannot do it.
  */
-export async function levelSpeech(id: string, mp3: Buffer): Promise<{ mp3: Buffer; lufs: number | null }> {
+export async function levelSpeech(id: string, mp3: Buffer, pauses: { at: number; add: number }[] = []): Promise<{ mp3: Buffer; lufs: number | null; paused: boolean }> {
   try {
-    return await levelSpeechInSandbox(id, mp3);
+    return await levelSpeechInSandbox(id, mp3, pauses);
   } catch (error) {
     console.warn("voice level unchanged", id, error);
-    return { mp3, lufs: null };
+    return { mp3, lufs: null, paused: false };
   }
 }
 
@@ -312,7 +314,11 @@ export async function makeVoiceOver(params: {
   const started = Date.now();
   const voice = await speak(script.script, params.voiceId);
   if (voice.transcript.duration > VOICE_MAX_SECONDS) throw new Error(`Voix trop longue (${voice.transcript.duration} s)`);
-  const leveled = await levelSpeech(`voice-${params.postId}`, voice.mp3);
+  // A breath between two sentences read in one go, while it still fits a Reel.
+  const breaths = sentencePauses(voice.transcript.words);
+  const pauses = voice.transcript.duration + breaths.reduce((sum, p) => sum + p.add, 0) <= VOICE_MAX_SECONDS ? breaths : [];
+  const leveled = await levelSpeech(`voice-${params.postId}`, voice.mp3, pauses);
+  const transcript = leveled.paused ? withPauses(voice.transcript, pauses) : voice.transcript;
   const path = `${params.studioId}/voice/${params.postId}-${Date.now()}.mp3`;
   const upload = await db.storage.from("media").upload(path, leveled.mp3, { contentType: "audio/mpeg", upsert: true });
   if (upload.error) throw new Error(upload.error.message);
@@ -325,8 +331,8 @@ export async function makeVoiceOver(params: {
       source: "ai",
       mime_type: "audio/mpeg",
       size_bytes: leveled.mp3.length,
-      duration: voice.transcript.duration,
-      transcript: voice.transcript,
+      duration: transcript.duration,
+      transcript,
       ai: { mode: "voice", voice_id: voice.voiceId, model: voice.model, lufs: leveled.lufs },
       consent_ok: true,
     })
@@ -342,8 +348,8 @@ export async function makeVoiceOver(params: {
       provider: "elevenlabs",
       units: script.script.length,
       cost_eur: usdToEur((script.script.length / 1000) * env("ELEVENLABS_TTS_USD_PER_KCHAR"), env("USD_TO_EUR")),
-      meta: { post_id: params.postId, model: voice.model, voice_id: voice.voiceId, seconds: voice.transcript.duration, ms: Date.now() - started },
+      meta: { post_id: params.postId, model: voice.model, voice_id: voice.voiceId, seconds: transcript.duration, ms: Date.now() - started },
     }),
   ]);
-  return { mediaId: asset.data.id as string, script: script.script, seconds: voice.transcript.duration };
+  return { mediaId: asset.data.id as string, script: script.script, seconds: transcript.duration };
 }

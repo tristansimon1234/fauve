@@ -1,4 +1,4 @@
-import { avoidPhotoText, boxFrom2d, headZone, photoEditFrom, type Adjust, type Box, type PhotoDetection } from "./retouch.ts";
+import { avoidPhotoText, boxFrom2d, headZone, photoEditFrom, subtitleRow, type Adjust, type Box, type PhotoDetection } from "./retouch.ts";
 import { planTimeline } from "./motion.ts";
 import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type EditPlan, type PlanSegment } from "./schemas.ts";
 
@@ -193,7 +193,14 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
     }
     return { start: at.start, length: at.length, boxes };
   });
-  return { ...finished, texts: avoidPhotoText(finished.texts, shots) };
+  // The voice's subtitles too: over a shot where a face sits on their row, they take a clear one.
+  const placed = segments.map((s, i) => {
+    if (!isClipSegment(s)) return s;
+    const { subtitle_y: _old, ...rest } = s;
+    const row = subtitleRow(shots[i]!.boxes);
+    return row === null ? rest : { ...rest, subtitle_y: row };
+  });
+  return { ...finished, segments: placed, texts: avoidPhotoText(finished.texts, shots) };
 }
 
 /** Where the subject sits across the picture, in the editor's words. */

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { planTimeline } from "./motion.ts";
 import { isClipSegment, isMotionSegment, type EditPlan, type MotionTemplate } from "./schemas.ts";
 import { beatOf, TEMPLATE_BPM } from "./tempo.ts";
+import type { ReelFormat } from "./voice-over.ts";
 
 // The critic: before a Soigné or Max montage goes out, Opus watches key frames
 // of the rendered video (the hook, every scene, the end), picks the best
@@ -140,6 +141,17 @@ export function planDigest(plan: EditPlan): string {
 }
 
 const seconds = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(n);
+
+/**
+ * The Reel's form, for the critic to judge it on its own terms: a key message held on
+ * screen is the point of the format, not too much text to lighten.
+ */
+export function formatLine(format: ReelFormat | undefined): string | null {
+  if (format === "message")
+    return "Format : message clé, sans voix. Un seul message (titre, sous-titre, détails) reste posé presque tout le Reel, au même endroit, pendant que les plans défilent sur la musique : c'est voulu. Ne demande jamais de le raccourcir, de le retirer d'une partie du Reel ni de le remplacer par d'autres textes ; juge sa lisibilité, ses coupures de lignes, sa composition et sa place. Il passe forcément sur des corps : seuls les visages comptent.";
+  if (format === "raconte") return "Format : raconté par une voix. Ses sous-titres portent tout ; l'accroche est le seul texte posé.";
+  return null;
+}
 
 /** The rhythm the frames cannot show: each shot's length, the cuts on the beat, the signature transitions. */
 export function rhythmLine(plan: EditPlan): string {

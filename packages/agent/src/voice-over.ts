@@ -132,7 +132,7 @@ Sa demande passe avant tes idées : le message, l'ordre et l'invitation qu'elle 
 Les exemples entre guillemets ci-dessous montrent une forme, jamais des mots à reprendre : écris toujours les tiens, à partir de ce commerce et de ces images.
 
 Règles :
-- la longueur demandée, jamais plus : la voix ne dure pas plus longtemps que ce que ses images montrent (environ 2,6 mots par seconde) ; des phrases entières et courtes, à l'oral, qui s'enchaînent (« Et », « Alors », « À ce stade », « Visiblement », dire « on ») ; jamais des bouts de phrase télégraphiques (« Et hop, au four. ») ;
+- la longueur demandée, jamais plus : la voix ne dure pas plus longtemps que ce que ses images montrent (environ 2,6 mots par seconde) ; des phrases entières et courtes, à l'oral, qui s'enchaînent (« Et », « Alors », « À ce stade », « Visiblement », dire « on ») ; jamais des bouts de phrase télégraphiques (« Et hop, au four. ») ; chaque phrase apporte quelque chose de nouveau : ne redis jamais avec d'autres mots une idée déjà dite ;
 - une petite histoire, jamais une liste : (1) la première phrase accroche dès ses premiers mots en ouvrant une curiosité sur la première image (un mystère, un détail surprenant, la question qu'on se pose en la voyant) ; (2) la suivante y répond ou dévoile le commerce ; (3) le milieu monte d'un cran sur ce que montrent les images, avec un regard : une exagération juste, une image, de l'humour, ce qu'on se demande en le voyant ; (4) une chute qui fait sourire ou un fait qui marque ; (5) la fin. Formes seulement : « Si tu passes devant à 7 h, tu vas te demander ce qui se passe derrière cette vitrine… » puis « Ils préparent déjà la pâte de ce soir. » ; « À ce stade, la question n'est plus de savoir si c'est bon, mais comment le finir. » ; jamais le nom du commerce ni « Bienvenue chez… » en première phrase ;
 - suis ses images dans l'ordre et dis ce qu'on voit avec un regard : nommer un plat, un geste ou un détail est permis si la phrase y ajoute quelque chose (encore et encore, une quantité folle, presque trop) ; une suite de noms de plats, d'objets ou de pièces sans regard est interdite (« le croque qui file, la salade, le gâteau », « douche, canapé, néon »), pas le décor pour le décor ; seulement des faits vrais (ceux qu'on te donne et ce que montrent les images), rien d'inventé : ni prix, ni chiffre, ni promesse qui ne sont pas dans ce qu'on te donne ;
 - une preuve quand les images la montrent : la file devant, la salle pleine, quelqu'un qui goûte ou qui sourit, un habitué ;
@@ -163,6 +163,43 @@ const alignmentSchema = z.object({
 export type TtsAlignment = z.infer<typeof alignmentSchema>;
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * The least silence between two sentences of Simone's voice (s): read in one breath,
+ * the end of one sentence is heard as the start of the next.
+ */
+export const SENTENCE_GAP = 0.35;
+
+/** A spoken word that closes a sentence (its punctuation stays on it: « maître. », « toi\u202f? »). */
+const SENTENCE_END = /[.!?…]["»]?$/;
+
+/**
+ * Where a voice needs a breath between two sentences, and how much silence to open
+ * there (cut in the middle of the gap it left), so the sentences are heard as two.
+ */
+export function sentencePauses(words: VoiceTranscript["words"], gap = SENTENCE_GAP): { at: number; add: number }[] {
+  const pauses: { at: number; add: number }[] = [];
+  for (let i = 0; i < words.length - 1; i++) {
+    const word = words[i]!;
+    const next = words[i + 1]!;
+    if (!SENTENCE_END.test(word.w)) continue;
+    const silence = next.start - word.end;
+    if (silence >= gap - 0.02) continue;
+    pauses.push({ at: round(silence > 0 ? word.end + silence / 2 : next.start), add: round(gap - Math.max(0, silence)) });
+  }
+  return pauses;
+}
+
+/** A voice's words once those silences are opened: each word later by the silences before it. */
+export function withPauses(transcript: VoiceTranscript, pauses: { at: number; add: number }[]): VoiceTranscript {
+  if (!pauses.length) return transcript;
+  const shift = (t: number) => round(t + pauses.reduce((sum, p) => (p.at <= t ? sum + p.add : sum), 0));
+  return {
+    ...transcript,
+    duration: round(transcript.duration + pauses.reduce((sum, p) => sum + p.add, 0)),
+    words: transcript.words.map((w) => ({ ...w, start: shift(w.start), end: shift(w.end) })),
+  };
+}
 
 /**
  * ElevenLabs' timing of every character → the voice's words with their times,

@@ -5,6 +5,7 @@ import {
   signatureLines,
   CRITIC_MODEL,
   editPlanSchema,
+  formatLine,
   MONTAGE_CRITIC_PROMPT,
   montageReviewSchema,
   normalizeReview,
@@ -15,6 +16,7 @@ import {
   type EditPlan,
   type MontageIssue,
   type MontageReview,
+  type ReelFormat,
 } from "@fauve/agent";
 import { videoFramesInSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -75,6 +77,8 @@ export async function reviewMontage(input: {
   versions: ReviewedVersion[];
   request?: string | null;
   asked?: MontageIssue[];
+  /** The Reel's form (a key message held on screen, a told one): judged on its own terms. */
+  format?: ReelFormat;
 }): Promise<CriticVerdict | null> {
   if (!input.versions.length) return null;
   const db = supabaseAdmin();
@@ -92,6 +96,7 @@ export async function reviewMontage(input: {
     profile.art_direction ? `Direction artistique : ${profile.art_direction.slice(0, 600)}` : "",
     profile.signature ? `Sa charte en réglages (le Reel doit la porter : on doit reconnaître ce commerce sans voir son nom) :\n${signatureLines(profile.signature)}` : "",
     input.request ? `Demande de la gérante : ${input.request.slice(0, 1500)}` : "",
+    formatLine(input.format) ?? "",
     `${input.versions.length} version${input.versions.length > 1 ? "s" : ""} à regarder.`,
   ]
     .filter(Boolean)

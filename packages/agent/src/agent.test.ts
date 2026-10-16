@@ -596,7 +596,8 @@ test("lists: a checklist text with items, details and bullets reaches the render
   });
   const props = buildSlideProps(plan.slides[0]!, { template: "chic", imageUrl: "https://example.com/a.jpg", brand: { name: "Studio" } });
   assert.equal(props.logo, "bottom");
-  assert.deepEqual(props.texts[1]?.items?.map((i) => i.title), ["Arriver 10 minutes avant", "Une gourde"]);
+  // A number keeps its word on the same line (« 10 minutes »).
+  assert.deepEqual(props.texts[1]?.items?.map((i) => i.title), ["Arriver 10\u00a0minutes avant", "Une gourde"]);
   assert.equal(props.texts[1]?.bullet?.kind, "check");
   assert.equal(savedLookSchema.safeParse({ name: "Checklist", role: "band", look, list: { bullet: { kind: "check", color: "#ffffff" } }, y: 0.3 }).success, true);
 });
@@ -1481,6 +1482,48 @@ test("formats: a key message held all along, film dust when the editor asks, Fre
   assert.equal(voiceOverDecisionSchema.safeParse({ format: "message", why: "une offre", hook: "", script: "" }).success, true);
 });
 
+test("lab fixes: lines that hold together, a breath between sentences, subtitles off faces, the format told to the critic", async () => {
+  const { frenchSpaces } = await import("./motion.ts");
+  const { sentencePauses, withPauses, SENTENCE_GAP } = await import("./voice-over.ts");
+  const { pauseFilter } = await import("./mix.ts");
+  const { subtitleRow, SUBTITLE_ROW } = await import("./retouch.ts");
+  const { formatLine } = await import("./critic.ts");
+  // A number never ends a line apart from the word it counts; « 65 € » stays together as before.
+  assert.equal(frenchSpaces("ta rentrée : 3 cours à 65 €"), "ta rentrée\u202f: 3\u00a0cours à 65\u202f€");
+  assert.equal(frenchSpaces("ouvert dès 7 h"), "ouvert dès 7\u00a0h");
+  assert.equal(frenchSpaces("le 12 mars, 2 places"), "le 12\u00a0mars, 2\u00a0places");
+  // Two sentences read in one breath get a silence between them; a real pause is left alone.
+  const words = [
+    { w: "Voilà", start: 7.6, end: 7.84 },
+    { w: "le", start: 7.92, end: 8 },
+    { w: "maître.", start: 8.04, end: 8.8 },
+    { w: "Du", start: 8.84, end: 8.88 },
+    { w: "dimanche.", start: 8.96, end: 9.4 },
+    { w: "Viens", start: 10, end: 10.3 },
+  ];
+  const pauses = sentencePauses(words);
+  assert.deepEqual(pauses, [{ at: 8.82, add: Math.round((SENTENCE_GAP - 0.04) * 100) / 100 }]);
+  const paused = withPauses({ text: "", duration: 10.5, words, language: "fr" }, pauses);
+  assert.equal(paused.words[2]!.end, 8.8);
+  assert.equal(paused.words[3]!.start, 9.15);
+  assert.equal(paused.duration, 10.81);
+  assert.equal(withPauses(paused, []), paused);
+  const graph = pauseFilter(pauses, "volume=2dB");
+  assert.match(graph, /asplit=2\[a0\]\[a1\]/);
+  assert.match(graph, /\[a0\]atrim=end=8\.820/);
+  assert.match(graph, /aevalsrc=0:c=mono:s=44100:d=0\.310/);
+  assert.match(graph, /concat=n=3:v=0:a=1,volume=2dB\[out\]$/);
+  // A face on the subtitles' row sends them to the nearest clear row; a clear row stays.
+  assert.equal(subtitleRow([]), null);
+  assert.equal(subtitleRow([{ x: 0.3, y: 0.2, w: 0.4, h: 0.2 }]), null);
+  const moved = subtitleRow([{ x: 0.3, y: SUBTITLE_ROW.y - 0.05, w: 0.4, h: 0.12 }]);
+  assert.ok(moved !== null && (moved + SUBTITLE_ROW.h < SUBTITLE_ROW.y - 0.05 || moved > SUBTITLE_ROW.y + 0.07));
+  // The critic judges a key message held on screen as the point of the format.
+  assert.match(formatLine("message")!, /message clé/);
+  assert.match(formatLine("raconte")!, /voix/);
+  assert.equal(formatLine(undefined), null);
+});
+
 test("quality checks: what the Reels that work have, read on the plan for the critic", async () => {
   const { qualityChecks, qualityLine } = await import("./critic.ts");
   const { normalizeEditPlan } = await import("./editor.ts");
@@ -1885,7 +1928,7 @@ test("brand: ink on a mid-tone accent, the business's name on one line", async (
 
 test("fonts: a well-known family Google does not serve gets its free twin", async () => {
   const { fontTwin, googleFamilyName } = await import("./fonts.ts");
-  assert.equal(fontTwin("fairplex"), "Lora");
+  assert.equal(fontTwin("Gotham Rounded"), "Montserrat");
   assert.equal(fontTwin("Proxima-Nova Soft W01"), "Montserrat");
   assert.equal(fontTwin("futura_pt_book"), "Jost");
   assert.equal(fontTwin("Canela Deck"), "Fraunces");

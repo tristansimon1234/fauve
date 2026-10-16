@@ -247,6 +247,23 @@ export function avoidPhotoText<T extends { from: number; to: number; style: "hoo
   });
 }
 
+/** Where the subtitles of a voice sit (top, share of the frame) and how tall a line is. Mirror of SUBTITLE_Y in apps/render/src/Reel.tsx. */
+export const SUBTITLE_ROW = { y: 0.64, h: 0.06 } as const;
+/** Other rows for them, nearest first; never lower than 0.72, where Instagram's caption starts. */
+const SUBTITLE_ROWS = [0.71, 0.56, 0.48, 0.4, 0.3, 0.22];
+
+/**
+ * Where a voice's subtitles go over a shot so they never sit on a face or on the
+ * lettering of a photo: their row when it is clear, else the nearest clear one; null
+ * when their row will do (or nothing is clear).
+ */
+export function subtitleRow(boxes: Box[]): number | null {
+  const busy = boxes.filter((b) => b.w > 0.12 || b.h > 0.04);
+  const clear = (y: number) => busy.every((b) => b.y > y + SUBTITLE_ROW.h + 0.01 || b.y + b.h < y - 0.01);
+  if (!busy.length || clear(SUBTITLE_ROW.y)) return null;
+  return SUBTITLE_ROWS.find(clear) ?? null;
+}
+
 /** Where a face is in a shot: the upper part of the subject's box, in shares of the frame (only the rows matter). */
 export function headZone(subjectBox: number[] | undefined): Box | null {
   if (!subjectBox || subjectBox.length !== 4) return null;
