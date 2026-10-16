@@ -31,7 +31,8 @@ export type Theme = {
   band: { family: "display" | "body"; weight: number; size: number; uppercase: boolean; letterSpacing: number; radius: number; box: "white" | "accent" | "dark" | "light" | "outline"; tilt: number };
   /** box: on a dark box (the apps' native text style); else bare with a soft shadow. */
   caption: { weight: number; size: number; box?: boolean };
-  subtitle: { weight: number; size: number; uppercase: boolean; highlight: "color" | "pill" };
+  /** The word being said: on a pill in the brand colour, in the brand colour, in the display font's italic, or underlined by hand. */
+  subtitle: { weight: number; size: number; uppercase: boolean; highlight: "color" | "pill" | "serif" | "marker" };
   /** Slow push-in / pull-out amplitude (scale at the end of the shot). */
   zoomTo: number;
   /** A tighter crop held on a shot (jump cut on the beat). */
@@ -143,6 +144,12 @@ export function themeFor(template: MotionTemplate, signature: ReelSignature | un
       letterSpacing: upper ? tracking(base.band.size) : base.band.letterSpacing,
       radius: signature.band === "outline" ? 0 : base.band.radius,
       tilt: 0,
+    },
+    // Subtitles in its case, the word said standing out its way (a block is the pill).
+    subtitle: {
+      ...base.subtitle,
+      uppercase: upper,
+      highlight: signature.stress === "block" ? "pill" : signature.stress,
     },
     grade: GRADES[signature.grade] ?? base.grade,
   };
