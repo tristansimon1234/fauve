@@ -1,13 +1,15 @@
-// Cut-outs for the collages, run in the render sandbox (never in the web app): the
+// Cut-outs for the collages, run in their own sandbox (never in the web app): the
 // subject of each photo cut out pixel-exact by an open model (BiRefNet lite, MIT,
 // rembg's ONNX export) on the CPU, never redrawn. The model and onnxruntime-node are
-// installed apart from Remotion, in CUTOUT_HOME; ffmpeg (FFMPEG) reads and writes images.
+// installed in CUTOUT_HOME; ffmpeg (FFMPEG) reads and writes images. The model needs
+// about 6.5 GB at its 1024 px input: the sandbox has 16 GB.
 // Usage: node cutout.mjs jobs.json → prints {"<id>": { file, w, h, coverage, parts, box, touches, unsure } | { error }}.
 // jobs.json: [{ id, src (a local image), out (the file to write, without extension: a WebP with
 // transparency, about 20 times lighter than a PNG, else a PNG) }].
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { availableParallelism } from "node:os";
 
 const HOME = process.env.CUTOUT_HOME;
 const FFMPEG = process.env.FFMPEG ?? "ffmpeg";
@@ -172,7 +174,13 @@ async function cut(session, job) {
 
 const jobs = JSON.parse(readFileSync(process.argv[2], "utf8"));
 const results = {};
-const session = await ort.InferenceSession.create(`${HOME}/model.onnx`, { intraOpNumThreads: 4, graphOptimizationLevel: "all" });
+// Every core; no memory arena nor pattern, which held about one more GB at the peak.
+const session = await ort.InferenceSession.create(`${HOME}/model.onnx`, {
+  intraOpNumThreads: availableParallelism(),
+  graphOptimizationLevel: "all",
+  enableCpuMemArena: false,
+  enableMemPattern: false,
+});
 for (const job of jobs) {
   try {
     results[job.id] = await cut(session, job);

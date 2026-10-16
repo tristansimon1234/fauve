@@ -9,6 +9,7 @@ import {
   motionTemplateSchema,
   planMediaIds,
   PHOTO_MAX_SECONDS,
+  scenePhotoIds,
   withoutScenes,
   type ClipAnalysis,
   buildFfmpegArgs,
@@ -63,11 +64,14 @@ export function towardsDraft(status: PostStatus): PostStatus[] {
  * for subtitles, the brand (accent, logo, fonts, name) and each clip's length.
  * Shared by the render and the live editor.
  */
-export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"] }) {
+export async function loadMontageInputs(
+  studioId: string,
+  plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"]; layers?: EditPlan["layers"] },
+) {
   const db = supabaseAdmin();
   const clipIds = planMediaIds(plan);
   const assets = clipIds.length
-    ? check(await db.from("media_assets").select("id, storage_path, mime_type, duration, kind").eq("studio_id", studioId).in("id", clipIds)).data!
+    ? check(await db.from("media_assets").select("id, storage_path, mime_type, duration, kind, regions").eq("studio_id", studioId).in("id", clipIds)).data!
     : [];
   const clipFiles: Record<string, string> = {};
   const clips: Record<string, string> = {};
@@ -114,8 +118,18 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
   const { fonts } = await usableFonts(style.fonts, ownFonts.map((f) => f.family), template, style.font_twins);
   // Her voice note over the Reel: signed for the render and the preview, with her words.
   const voice = plan.voice ? await voiceInput(studioId, plan.voice.media_id) : undefined;
-  // A collage lays the subject of a photo as a sticker when its cut-out is clean.
-  const cutouts = template === "collage" && plan.template === "collage" ? await stickerInputs(studioId, photoIds).catch(() => ({})) : undefined;
+  // A collage lays the subject of a photo as a sticker when its cut-out is clean; in any Reel, an
+  // animation composes with the photos it names, and their clean cut-outs.
+  const withPhotos = scenePhotoIds(plan);
+  const cutFor = template === "collage" && plan.template === "collage" ? [...new Set([...photoIds, ...withPhotos])] : withPhotos;
+  const cutouts = cutFor.length ? await stickerInputs(studioId, cutFor).catch(() => ({})) : undefined;
+  // Each photo's shape, from its reading.
+  const photoAspects = Object.fromEntries(
+    assets.flatMap((a) => {
+      const read = (a.kind === "image" ? a.regions : null) as { width?: number; height?: number } | null;
+      return read?.width && read.height ? [[a.id as string, read.width / read.height]] : [];
+    }),
+  );
   const words: Record<string, ClipAnalysis["words"]> = {};
   // Each clip's shape, to frame its subject in the vertical crop (phones film 16:9 or 9:16).
   const aspects: Record<string, number> = {};
@@ -145,6 +159,7 @@ export async function loadMontageInputs(studioId: string, plan: Pick<EditPlan, "
     studioName: (studio.data?.name as string | null) ?? "",
     voice,
     cutouts,
+    photoAspects,
   };
 }
 
@@ -181,9 +196,11 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  // A collage's photos have their subject cut out once (an open model in the sandbox), before the render lays them as stickers.
-  if (plan.template === "collage") await ensureCutouts(studioId, planMediaIds(plan));
-  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, signature, voice, cutouts } =
+  // Photos have their subject cut out once (an open model in its own sandbox): a collage's, laid as stickers,
+  // and those an animation composes with (the design step has usually made them already).
+  const toCut = plan.template === "collage" ? planMediaIds(plan) : scenePhotoIds(plan);
+  if (toCut.length) await ensureCutouts(studioId, toCut);
+  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, signature, voice, cutouts, photoAspects } =
     await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
@@ -217,12 +234,19 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         brand: { name: studioName, accent, logoUrl, logoOnDark, fonts, colors, customFonts, signature },
         ...(voice ? { voice } : {}),
         ...(cutouts ? { cutouts } : {}),
+        photoAspects,
       });
       // Library scenes play with new texts, older plans predate the layout check: every
       // scene is checked before the render, and one whose text leaves the frame plays its
-      // fixed scene. If the check is unavailable, the scenes stay.
+      // fixed scene (an animation over several shots, which has none, is left out). If the
+      // check is unavailable, the scenes stay.
       const checks = await smokeTestScenes(
-        props.segments.flatMap((s, i) => (s.type === "motion" ? [{ id: `m${i}`, js: s.js, durationInFrames: s.durationInFrames, texts: s.texts }] : [])),
+        [
+          ...props.segments.flatMap((s, i) =>
+            s.type === "motion" ? [{ id: `m${i}`, js: s.js, durationInFrames: s.durationInFrames, texts: s.texts, ...(s.photos ? { photos: s.photos } : {}) }] : [],
+          ),
+          ...(props.layers ?? []).map((l, i) => ({ id: `l${i}`, js: l.js, durationInFrames: l.durationInFrames, texts: l.texts, cuts: l.cuts, ...(l.photos ? { photos: l.photos } : {}) })),
+        ],
         props.brand,
       ).catch((e: unknown): SceneChecks => {
         console.warn("motion scenes: check unavailable", e);
@@ -233,6 +257,15 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         console.warn("motion scene falls back to its fixed scene", renderId, checks.errors[`m${i}`]);
         return { type: "scene", scene: s.fallback, startAt: s.startAt, durationInFrames: s.durationInFrames, ...(s.under ? { under: s.under } : {}) };
       });
+      // An animation over several shots has no fixed version: one whose text leaves the frame is left out.
+      if (props.layers) {
+        const layers = props.layers.filter((_, i) => {
+          const error = checks.errors[`l${i}`];
+          if (error) console.warn("animation over several shots left out", renderId, error);
+          return !error;
+        });
+        props.layers = layers.length ? layers : undefined;
+      }
       // An animation over her footage never covers a face or a sign under it: where its texts sit
       // was just measured, the whole scene moves to the free rows when they fall on them. The move
       // is kept on the plan, so the live preview shows it where the video has it.

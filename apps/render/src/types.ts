@@ -14,6 +14,13 @@ export type Adjust = {
   zoom?: number;
 };
 export type Box = { x: number; y: number; w: number; h: number };
+
+/**
+ * A photo a free scene composes with (collages): its link, its shape (width / height),
+ * and, when its subject cuts out cleanly, the cut-out (an image with transparency, framed
+ * like the photo) and the subject's box in it (shares of the photo).
+ */
+export type ScenePhoto = { src: string; aspect: number; cutout?: string; subject?: Box };
 export type RegionKind = "face" | "plate" | "screen" | "document" | "other";
 export type PhotoEdit = { source: { width: number; height: number }; adjust?: Adjust; blur?: (Box & { kind: RegionKind; shape: "ellipse" | "rect" })[] };
 export type ClipBlur = { aspect: number; tracks: { kind: RegionKind; keys: (Box & { t: number })[] }[] };
@@ -94,7 +101,18 @@ export type ReelProps = {
       }
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
     /** shift: how far the scene is moved down (share of the height, up when negative), off the faces of the footage under it. */
-    | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder; shift?: number }
+    | {
+        type: "motion";
+        js: string;
+        fallback: Scene;
+        texts: Record<string, string>;
+        startAt: number;
+        durationInFrames: number;
+        under?: ReelUnder;
+        shift?: number;
+        /** The photos a free scene composes with (a collage), in the order its code reads them. */
+        photos?: ScenePhoto[];
+      }
   )[];
   texts: {
     text: string;
@@ -141,6 +159,11 @@ export type ReelProps = {
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
   subtitleY?: number;
+  /**
+   * Animations over several shots, above the montage and under its texts: from `from`
+   * (frames) for `durationInFrames`, with the frames where the shot changes under them (`cuts`, from their start).
+   */
+  layers?: { js: string; texts: Record<string, string>; from: number; durationInFrames: number; cuts: number[]; photos?: ScenePhoto[] }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
     js: string;

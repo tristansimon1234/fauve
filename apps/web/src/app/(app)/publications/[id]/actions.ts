@@ -1,7 +1,7 @@
 "use server";
 
 import { insertPlanVersion } from "@/lib/edit-plans";
-import { assertTransition, editPlanSchema, isClipSegment, postStatusSchema, slidesPlanSchema, type PostStatus } from "@fauve/agent";
+import { assertTransition, editPlanSchema, planMediaIds, postStatusSchema, slidesPlanSchema, type PostStatus } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
@@ -163,20 +163,22 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   if (!post) return { ok: false, error: "Publication introuvable." };
   if (LOCKED.includes(postStatusSchema.parse(post.status))) return { ok: false, error: "Cette publication est déjà en ligne." };
 
-  // Clips: the studio's own media only.
-  const clipIds = [...new Set(plan.segments.filter(isClipSegment).map((s) => s.clip_id))];
+  // Clips, the footage under animations and the photos they compose with: the studio's own media only.
+  const clipIds = planMediaIds(plan);
   if (clipIds.length) {
     const { data } = await db.from("media_assets").select("id").eq("studio_id", studioId).in("id", clipIds);
     if ((data?.length ?? 0) !== clipIds.length) return { ok: false, error: "Une des vidéos n’est plus dans ta médiathèque." };
   }
-  // Animations: code already made for this post (by Fauve), never new code from the browser.
+  // Animations (scenes and animations over several shots): code already made for this post (by Fauve), never new code from the browser.
   const { data: versions } = await db.from("edit_plans").select("version, plan").eq("post_id", postId);
+  type Coded = { motion?: { js?: string } };
   const knownCode = new Set(
-    (versions ?? []).flatMap((v) =>
-      ((v.plan as { segments?: { motion?: { js?: string } }[] } | null)?.segments ?? []).flatMap((s) => (s.motion?.js ? [s.motion.js] : [])),
-    ),
+    (versions ?? []).flatMap((v) => {
+      const kept = v.plan as { segments?: Coded[]; layers?: Coded[] } | null;
+      return [...(kept?.segments ?? []), ...(kept?.layers ?? [])].flatMap((s) => (s.motion?.js ? [s.motion.js] : []));
+    }),
   );
-  const unknown = plan.segments.some((s) => "motion" in s && s.motion.js && !knownCode.has(s.motion.js));
+  const unknown = [...plan.segments, ...(plan.layers ?? [])].some((s) => "motion" in s && s.motion.js && !knownCode.has(s.motion.js));
   if (unknown) return { ok: false, error: "Une animation a été modifiée d’une façon que l’éditeur ne permet pas." };
 
   let row: { id: string; version: number };

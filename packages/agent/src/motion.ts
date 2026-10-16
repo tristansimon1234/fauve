@@ -78,7 +78,25 @@ export type ReelSegment =
   /** Animations play over her footage when there is some (`under`), else on the studio's colours. */
   | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
   /** shift: how far the scene is moved down (share of the height, up when negative), off the faces of the footage under it. */
-  | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder; shift?: number };
+  | {
+      type: "motion";
+      js: string;
+      fallback: Scene;
+      texts: Record<string, string>;
+      startAt: number;
+      durationInFrames: number;
+      under?: ReelUnder;
+      shift?: number;
+      /** The photos a free scene composes with (a collage), in the order its code reads them. */
+      photos?: ScenePhoto[];
+    };
+
+/**
+ * A photo a free scene composes with (collages): its link, its shape (width / height),
+ * and, when its subject cuts out cleanly, the cut-out (framed like the photo) and the
+ * subject's box in it (shares of the photo). Mirrors apps/render/src/types.ts.
+ */
+export type ScenePhoto = { src: string; aspect: number; cutout?: string; subject?: { x: number; y: number; w: number; h: number } };
 export type ReelText = {
   text: string;
   style: "hook" | "band" | "caption";
@@ -141,6 +159,11 @@ export type ReelProps = {
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
   subtitleY?: number;
+  /**
+   * Animations over several shots, above the montage and under its texts: from `from`
+   * (frames) for `durationInFrames`, with the frames where the shot changes under them (`cuts`, from their start).
+   */
+  layers?: { js: string; texts: Record<string, string>; from: number; durationInFrames: number; cuts: number[]; photos?: ScenePhoto[] }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
     js: string;
@@ -194,6 +217,8 @@ export type ReelInputs = {
   voice?: { src: string; words: VoiceWord[] };
   /** In a collage, the photos whose subject makes a sticker: the cut-out's signed link and the subject's box (shares of the photo). */
   cutouts?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
+  /** Each photo's width / height (from its reading), for the free scenes that compose with it. */
+  photoAspects?: Record<string, number>;
 };
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
@@ -260,6 +285,16 @@ export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): 
   return { segments, duration: (cursor + fadeFrames) / REEL_FPS };
 }
 
+/** The photos a free scene composes with, in its order: each one's link, shape and clean cut-out (a missing photo is left out). */
+export function scenePhotos(ids: string[], inputs: Pick<ReelInputs, "clipUrls" | "cutouts" | "photoAspects">): ScenePhoto[] {
+  return ids.flatMap((id) => {
+    const src = inputs.clipUrls[id];
+    if (!src) return [];
+    const cut = inputs.cutouts?.[id];
+    return [{ src, aspect: inputs.photoAspects?.[id] ?? 3 / 4, ...(cut ? { cutout: cut.src, subject: cut.box } : {}) }];
+  });
+}
+
 /** A text's looks and bullet with the brand's fonts and colours named by role made real. */
 export function brandLooks(
   t: { look?: TextLook; items?: ListItem[]; detail_look?: TextLook; bullet?: Bullet },
@@ -308,6 +343,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
             durationInFrames: lengths[i]!,
             ...(under ? { under } : {}),
             ...(under && s.motion.shift ? { shift: s.motion.shift } : {}),
+            ...(s.motion.photos?.length ? { photos: scenePhotos(s.motion.photos, inputs) } : {}),
           }
         : { type: "scene", scene: fallback, startAt, durationInFrames: lengths[i]!, ...(under ? { under } : {}) };
     }
@@ -416,6 +452,25 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
 
   const endCardFrames = toFrames(END_CARD_SECONDS);
 
+  // Animations over several shots: their span in frames and the cuts under them (from their start).
+  const starts = segments.slice(1).map((s) => s.startAt);
+  const layers = (plan.layers ?? []).flatMap((l) => {
+    if (!l.motion.js) return [];
+    const from = Math.min(durationInFrames - 1, toFrames(l.from));
+    const length = Math.min(durationInFrames - from, toFrames(l.to) - from);
+    if (length < fps) return [];
+    return [
+      {
+        js: l.motion.js,
+        texts: l.motion.texts ?? {},
+        from,
+        durationInFrames: length,
+        cuts: starts.filter((f) => f > from && f < from + length).map((f) => f - from),
+        ...(l.motion.photos?.length ? { photos: scenePhotos(l.motion.photos, inputs) } : {}),
+      },
+    ];
+  });
+
   return {
     template: inputs.template,
     ...SIZES[plan.format],
@@ -433,6 +488,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
     ...(plan.effect ? { effect: plan.effect } : {}),
     ...(plan.subtitle_y !== undefined ? { subtitleY: plan.subtitle_y } : {}),
+    ...(layers.length ? { layers } : {}),
   };
 }
 

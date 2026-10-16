@@ -452,7 +452,12 @@ async function result(key: string) {
     plan: plan.success
       ? {
           ...plan.data,
-          segments: plan.data.segments.map((s) => (isMotionSegment(s) ? { motion: { brief: s.motion.brief, template_id: s.motion.template_id, coded: Boolean(s.motion.js) }, duration: s.duration, over: s.over } : s)),
+          segments: plan.data.segments.map((s) =>
+            isMotionSegment(s)
+              ? { motion: { brief: s.motion.brief, template_id: s.motion.template_id, coded: Boolean(s.motion.js), photos: s.motion.photos }, duration: s.duration, over: s.over }
+              : s,
+          ),
+          layers: plan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, coded: Boolean(l.motion.js), photos: l.motion.photos })),
         }
       : null,
   };

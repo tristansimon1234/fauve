@@ -31,9 +31,11 @@ import {
   type EditPlan,
   openingCandidates,
   planHook,
+  planTimeline,
   voiceAt,
   voiceForEditor,
 } from "@fauve/agent";
+import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
 import { usableFonts } from "@/lib/fonts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
@@ -41,10 +43,10 @@ import { ensureTranscript } from "@/lib/voice";
 import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
-import { designMotionScenes } from "./motion-designer";
+import { designMotionScenes, type SceneRequest } from "./motion-designer";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { isFirstReel } from "@/lib/onboarding";
-import { markTemplatesUsed, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
+import { LAYER_ROLE, markTemplatesUsed, OVERLAY_ROLE, PHOTO_ROLE, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { anthropic, logClaudeCost } from "./run";
 
 /** The hooks of the studio's latest other Reels: the next one takes another form and other words. */
@@ -67,6 +69,9 @@ async function recentHooks(studioId: string, postId: string): Promise<string[]> 
     return plan.success ? plan.data.texts.filter((t) => t.style === "hook").map((t) => t.text) : [];
   });
 }
+
+/** The most of her photos the animations of one Reel compose with (each is cut out first, 10 to 30 s). */
+const MAX_OFFERED_PHOTOS = 8;
 
 export type DesignedEdit = {
   editPlanId: string;
@@ -161,6 +166,11 @@ export async function designEdit(params: {
   const inspirationId = post.data.inspiration_id as string | null;
   const chosenInspiration = inspirationId ? await ensureInspirationRead(params.studioId, inspirationId).catch(() => null) : null;
   const chosenTemplate = motionTemplateSchema.safeParse(post.data.template);
+  // A collage composes with her photos' cut-outs: they are made while the editor works (their own sandbox).
+  const earlyCutouts =
+    chosenTemplate.success && chosenTemplate.data === "collage" && photoIds.length
+      ? ensureCutouts(params.studioId, photoIds.slice(0, MAX_OFFERED_PHOTOS)).catch((e: unknown) => console.warn("cut-outs: not ready", e))
+      : null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
   const input = {
     studio: {
@@ -232,6 +242,8 @@ export async function designEdit(params: {
                   }
                 : s,
             ),
+            // Its animations over several shots, by their brief and span.
+            layers: previousPlan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to })),
           }
         : undefined,
     request: params.brief ?? "Premier montage de cette publication.",
@@ -320,6 +332,12 @@ export async function designEdit(params: {
     plan.texts = clearOfVoice(plan.texts, spoken.phrases);
   } else delete plan.voice;
 
+  // The animations of the version corrected: a scene kept by its id keeps the photos it composes with.
+  const previousMotions = previousPlan.success
+    ? [...previousPlan.data.segments.filter(isMotionSegment).map((s) => s.motion), ...(previousPlan.data.layers ?? []).map((l) => l.motion)]
+    : [];
+  const photosOfTemplate = new Map(previousMotions.flatMap((m) => (m.template_id && m.photos?.length ? [[m.template_id, m.photos] as const] : [])));
+
   // Library scenes: their saved code, with the new texts. An unknown id becomes a new scene.
   const reused = await templateCode(
     params.studioId,
@@ -328,39 +346,67 @@ export async function designEdit(params: {
   plan.segments = plan.segments.map((s) => {
     if (!isMotionSegment(s) || !s.motion.template_id) return s;
     const template = reused.get(s.motion.template_id);
-    if (template) return { ...s, motion: { ...s.motion, code: template.code, js: template.js } };
+    const photos = photosOfTemplate.get(s.motion.template_id);
+    if (template) return { ...s, motion: { ...s.motion, code: template.code, js: template.js, ...(photos ? { photos } : {}) } };
     return { ...s, motion: { ...s.motion, template_id: undefined, texts: undefined } };
   });
 
-  // Free scenes: reuse the code of unchanged briefs, have the motion designer write the others.
-  const reusable = new Map(
-    (previousPlan.success ? previousPlan.data.segments : [])
-      .filter(isMotionSegment)
-      .filter((s) => s.motion.js)
-      .map((s) => [s.motion.brief, s.motion] as const),
-  );
-  const requests = plan.segments.flatMap((s, i) =>
-    isMotionSegment(s) && !s.motion.js && !reusable.has(s.motion.brief)
-      ? // The faces and lettering of the footage under it: the designer composes around them.
-        [{ id: `s${i}`, brief: s.motion.brief, durationInFrames: Math.round(s.duration * 30), ...(s.over?.busy?.length ? { busy: s.over.busy } : {}) }]
+  // Free scenes and animations over several shots: reuse the code of unchanged briefs, have the motion designer write the others.
+  const reusable = new Map(previousMotions.filter((m) => m.js).map((m) => [m.brief, m] as const));
+  const layers = plan.layers ?? [];
+  const toWrite = [
+    ...plan.segments.flatMap((s, i) => (isMotionSegment(s) && !s.motion.js && !reusable.has(s.motion.brief) ? [{ id: `s${i}`, brief: s.motion.brief }] : [])),
+    ...layers.flatMap((l, i) => (!l.motion.js && !reusable.has(l.motion.brief) ? [{ id: `l${i}`, brief: l.motion.brief }] : [])),
+  ];
+  // Her photos an animation may compose with: in a collage, every photo of the Reel; elsewhere, those its brief
+  // names (by media_id). Each is cut out first (their own sandbox); one without a clean cut-out comes whole.
+  const collage = plan.template === "collage";
+  const named = (brief: string) => photoIds.filter((id) => brief.includes(id));
+  const wanted = [...new Set(toWrite.flatMap((w) => (collage ? photoIds : named(w.brief))))].slice(0, MAX_OFFERED_PHOTOS);
+  await earlyCutouts;
+  if (wanted.length) await ensureCutouts(params.studioId, wanted);
+  const offers = wanted.length ? await photoOffers(params.studioId, wanted).catch(() => []) : [];
+  const offersFor = (brief: string) => (collage ? offers : offers.filter((o) => brief.includes(o.id)));
+  // The cuts under an animation over several shots, in frames from its start.
+  const starts = planTimeline(plan).segments.slice(1).map((t) => t.start);
+  const cutsUnder = (from: number, to: number) => starts.filter((t) => t > from && t < to).map((t) => Math.round((t - from) * 30));
+  const requests: SceneRequest[] = toWrite.map((w) => {
+    const photos = offersFor(w.brief);
+    const layer = w.id.startsWith("l") ? layers[Number(w.id.slice(1))]! : null;
+    const found = layer ? null : plan.segments[Number(w.id.slice(1))];
+    const segment = found && isMotionSegment(found) ? found : null;
+    return {
+      id: w.id,
+      brief: w.brief,
+      durationInFrames: Math.round((layer ? layer.to - layer.from : (segment?.duration ?? 2)) * 30),
+      // The faces and lettering of the footage under a scene: the designer composes around them.
+      ...(segment?.over?.busy?.length ? { busy: segment.over.busy } : {}),
+      ...(layer ? { cuts: cutsUnder(layer.from, layer.to) } : {}),
+      ...(photos.length ? { photos } : {}),
+    };
+  });
+  // Its motion kit: the business's latest scenes, whose language the new ones keep (a family from one Reel to the next);
+  // their names, and those of the Reel's kept animations, say which ideas are already taken.
+  const latest = requests.length
+    ? ((
+        await supabaseAdmin()
+          .from("motion_templates")
+          .select("id, name, code")
+          .eq("studio_id", params.studioId)
+          .eq("kind", "scene")
+          .in("role", [OVERLAY_ROLE, PHOTO_ROLE, LAYER_ROLE])
+          .is("archived_at", null)
+          .order("created_at", { ascending: false })
+          .limit(6)
+      ).data ?? [])
+    : [];
+  const kit = latest.slice(0, 2).flatMap((t) => (t.code ? [{ name: (t.name as string | null) ?? "", code: (t.code as string).slice(0, 6000) }] : []));
+  const keptScenes = plan.segments.flatMap((s) =>
+    isMotionSegment(s) && (s.motion.js || reusable.has(s.motion.brief))
+      ? [latest.find((t) => t.id === s.motion.template_id)?.name ?? s.motion.brief]
       : [],
   );
-  // Its motion kit: the business's latest scenes, whose language the new ones keep (a family from one Reel to the next).
-  const kit = requests.length
-    ? (
-        (
-          await supabaseAdmin()
-            .from("motion_templates")
-            .select("name, code")
-            .eq("studio_id", params.studioId)
-            .eq("kind", "scene")
-            .eq("role", "overlay")
-            .is("archived_at", null)
-            .order("created_at", { ascending: false })
-            .limit(2)
-        ).data ?? []
-      ).flatMap((t) => (t.code ? [{ name: (t.name as string | null) ?? "", code: (t.code as string).slice(0, 6000) }] : []))
-    : [];
+  const done = latest.filter((t) => t.name && !plan.segments.some((s) => isMotionSegment(s) && s.motion.template_id === t.id)).map((t) => t.name as string);
   const template = motionTemplateSchema.catch("doux").parse(plan.template);
   // Its fonts as the render loads them (a site's font Google does not serve gets its twin).
   const { fonts: usable } = await usableFonts(profile.fonts, (profile.custom_fonts ?? []).map((f) => f.family), template, profile.font_twins).catch(() => ({ fonts: profile.fonts }));
@@ -382,30 +428,59 @@ export async function designEdit(params: {
       fonts: usable,
     }),
     kit,
+    { kept: keptScenes.map((name) => `déjà dans ce Reel : ${name}`), done },
   );
+  const resultOf = (id: string) => designed.find((d) => d.id === id);
   plan.segments = plan.segments.map((s, i) => {
     if (!isMotionSegment(s) || s.motion.js) return s;
     const kept = reusable.get(s.motion.brief);
-    if (kept) return { ...s, motion: { ...s.motion, code: kept.code, js: kept.js } };
-    const result = designed.find((d) => d.id === `s${i}`);
+    if (kept) return { ...s, motion: { ...s.motion, code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}) } };
+    const result = resultOf(`s${i}`);
     if (result?.error) console.warn("motion scene falls back to its fixed scene", s.motion.brief.slice(0, 80), result.error);
-    return { ...s, motion: { ...s.motion, code: result?.code ?? undefined, js: result?.js ?? undefined } };
+    return { ...s, motion: { ...s.motion, code: result?.code ?? undefined, js: result?.js ?? undefined, ...(result?.js && result.photos?.length ? { photos: result.photos } : {}) } };
   });
+  // An animation over several shots has no fixed version: one that could not be written is left out.
+  const written = layers.flatMap((l, i) => {
+    if (l.motion.js) return [l];
+    const kept = reusable.get(l.motion.brief);
+    if (kept?.js) return [{ ...l, motion: { ...l.motion, code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}), ...(kept.template_id ? { template_id: kept.template_id } : {}) } }];
+    const result = resultOf(`l${i}`);
+    if (!result?.js) {
+      console.warn("animation over several shots left out", l.motion.brief.slice(0, 80), result?.error);
+      return [];
+    }
+    return [{ ...l, motion: { ...l.motion, code: result.code ?? undefined, js: result.js, ...(result.photos?.length ? { photos: result.photos } : {}) } }];
+  });
+  if (written.length) plan.layers = written;
+  else delete plan.layers;
 
-  // Every new scene that works joins the studio's library, so the next Reels can reuse it.
+  // Every new scene that works joins the studio's library: an animation over her footage can be reused by the
+  // next Reels; one made with her photos or over several shots belongs to its Reel (kept for its kit and its name).
   const fresh = designed.filter((d) => d.js && d.code);
   const savedIds = await saveTemplates(
     params.studioId,
     fresh.map((d) => {
       const request = requests.find((r) => r.id === d.id)!;
-      return { name: d.name ?? "", description: request.brief, slots: d.slots ?? [], code: d.code!, js: d.js!, durationSeconds: request.durationInFrames / 30 };
+      const role = d.id.startsWith("l") ? LAYER_ROLE : d.photos?.length ? PHOTO_ROLE : OVERLAY_ROLE;
+      return { name: d.name ?? "", description: request.brief, slots: d.slots ?? [], code: d.code!, js: d.js!, durationSeconds: request.durationInFrames / 30, role };
     }),
   );
+  const savedId = (id: string) => {
+    const index = fresh.findIndex((d) => d.id === id);
+    return index >= 0 ? savedIds[index] : null;
+  };
   plan.segments = plan.segments.map((s, i) => {
-    const index = fresh.findIndex((d) => d.id === `s${i}`);
-    const id = index >= 0 ? savedIds[index] : null;
+    const id = savedId(`s${i}`);
     return id && isMotionSegment(s) ? { ...s, motion: { ...s.motion, template_id: id } } : s;
   });
+  if (plan.layers) {
+    // A layer's index in its request is the one before the failed ones were left out: matched by brief.
+    plan.layers = plan.layers.map((l) => {
+      const i = layers.findIndex((x) => x.motion.brief === l.motion.brief);
+      const id = i >= 0 ? savedId(`l${i}`) : null;
+      return id ? { ...l, motion: { ...l.motion, template_id: id } } : l;
+    });
+  }
   await markTemplatesUsed([...reused.keys()]).catch((e: unknown) => console.warn("motion_templates: usage count failed", e));
 
   const row = await insertPlanVersion(params.studioId, params.postId, plan);

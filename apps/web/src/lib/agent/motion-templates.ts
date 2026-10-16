@@ -47,6 +47,10 @@ export async function recentlyShownTemplates(studioId: string, exceptPostId: str
  * role; the older ones filled the frame like a slide, which reads as an ad: not offered again.
  */
 export const OVERLAY_ROLE = "overlay";
+/** A scene made with her photos (a collage, her cut-out): it belongs to its Reel, never offered to another. */
+export const PHOTO_ROLE = "photo";
+/** An animation over several shots (a layer above the montage): it belongs to its Reel too. */
+export const LAYER_ROLE = "layer";
 
 /** The library as the editor sees it (no code), without the scenes held back. */
 export async function templatesForEditor(studioId: string, holdBack: Set<string> = new Set()): Promise<TemplateSummary[]> {
@@ -106,7 +110,7 @@ export async function markTemplatesUsed(ids: string[]) {
 /** Saves new scenes that passed the smoke test; returns their ids in the same order (null if not saved). */
 export async function saveTemplates(
   studioId: string,
-  scenes: { name: string; description: string; slots: MotionSlot[]; code: string; js: string; durationSeconds: number }[],
+  scenes: { name: string; description: string; slots: MotionSlot[]; code: string; js: string; durationSeconds: number; role?: string }[],
 ): Promise<(string | null)[]> {
   if (!scenes.length) return [];
   const { data, error } = await supabaseAdmin()
@@ -120,7 +124,7 @@ export async function saveTemplates(
         code: s.code,
         js: s.js,
         duration_seconds: s.durationSeconds,
-        role: OVERLAY_ROLE,
+        role: s.role ?? OVERLAY_ROLE,
         uses: 1,
         last_used_at: new Date().toISOString(),
       })),

@@ -127,6 +127,8 @@ export const editPlanMotionSegmentSchema = z.object({
     texts: z.record(z.string().regex(SLOT_NAME), z.string().max(200)).optional(),
     /** How far the render moves the scene down (or up, negative; share of the height) so its texts clear the faces under it: set by the engine at render time. */
     shift: z.number().min(-0.75).max(0.75).optional(),
+    /** The photos a free scene composes with (a collage), in the order its code reads them (`photos[0]`…): media ids, from the motion designer's answer. */
+    photos: z.array(z.string().min(1)).max(4).optional(),
   }),
   duration: z.number().min(1).max(8),
   /**
@@ -214,6 +216,19 @@ export const editPlanImageSchema = z.object({
   to: z.number().positive(),
 });
 
+/**
+ * An animation over several shots: a layer above the montage, under its texts (a
+ * character who comes back on every shot, a counter that runs, a frame…), from `from`
+ * to `to` seconds of the Reel. Written by the motion designer like a scene; its code
+ * is given the cuts it spans. It has no fixed fallback: if its code cannot run, it is left out.
+ */
+export const editPlanLayerSchema = z.object({
+  motion: editPlanMotionSegmentSchema.shape.motion.omit({ fallback: true, shift: true }),
+  from: z.number().min(0),
+  to: z.number().min(0),
+});
+export type PlanLayer = z.infer<typeof editPlanLayerSchema>;
+
 export const editPlanObjectSchema = z.object({
   format: z.enum(["9:16", "1:1", "4:5"]),
   duration: z.number().min(3).max(90),
@@ -237,6 +252,8 @@ export const editPlanObjectSchema = z.object({
   effect: z.enum(["dust"]).optional(),
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height), set by the engine off the faces: they never move from shot to shot. */
   subtitle_y: z.number().min(0.1).max(0.8).optional(),
+  /** Animations over several shots (see editPlanLayerSchema). */
+  layers: z.array(editPlanLayerSchema).max(3).optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {
@@ -264,8 +281,20 @@ export const isMotionSegment = (s: PlanSegment): s is MotionSegment => "motion" 
 export const segmentSeconds = (s: PlanSegment) => (isClipSegment(s) ? (s.out - s.in) / (s.speed ?? 1) : s.duration);
 
 /** Every clip or photo a plan plays: its shots and the footage under its animations. */
-export function planMediaIds(plan: Pick<EditPlan, "segments">): string[] {
-  return [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : isMotionSegment(s) && s.over ? [s.over.clip_id] : [])))];
+export function planMediaIds(plan: Pick<EditPlan, "segments"> & { layers?: EditPlan["layers"] }): string[] {
+  return [
+    ...new Set(
+      [
+        ...plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : isMotionSegment(s) ? [...(s.over ? [s.over.clip_id] : []), ...(s.motion.photos ?? [])] : [])),
+        ...(plan.layers ?? []).flatMap((l) => l.motion.photos ?? []),
+      ],
+    ),
+  ];
+}
+
+/** The photos the plan's animations compose with (scenes and animations over several shots). */
+export function scenePhotoIds(plan: Pick<EditPlan, "segments"> & { layers?: EditPlan["layers"] }): string[] {
+  return [...new Set([...plan.segments.flatMap((s) => (isMotionSegment(s) ? (s.motion.photos ?? []) : [])), ...(plan.layers ?? []).flatMap((l) => l.motion.photos ?? [])])];
 }
 
 /** The plan with its motion-design scenes removed (what the ffmpeg engine can render). */

@@ -72,9 +72,11 @@ Les textes, peu et forts, comme un créateur les poserait dans l'appli : les Ree
 - Sous-titres mot à mot (« subtitles ») seulement si quelqu'un parle et que c'est utile (prof qui explique, témoignage). Le son des passages où quelqu'un parle est gardé.
 
 Les animations (motion design), par-dessus sa vidéo, jamais à la place :
-- Une animation est de la typographie cinétique posée sur un passage de ses images qui continue de jouer dessous (« over_clip » : le media_id de la vidéo ou de la photo à garder sous l'animation ; le moteur choisit le passage, sinon il prolonge le plan d'avant). Jamais un carton plein écran, une diapositive ou un fond de couleur : ça fait pub.
-- 0 à 2 par Reel, sur le moment où les mots comptent (la promesse, l'offre, un chiffre, une liste courte), 1,5 à 3 s chacune. Un Reel peut très bien n'en avoir aucune.
-- « motion » sur mesure : dans « brief » (600 caractères au plus), dis le message, les mots exacts, le moment fort et l'énergie (calme, franche, joyeuse) ; le motion designer choisit lui-même les mouvements dans la charte du commerce. N'impose jamais une apparition lettre par lettre ou machine à écrire, de l'italique, un voile ou un fond (la vidéo se voit sous l'animation). Donne aussi « fallback », la version fixe (title, list, quote, number) au cas où. Les textes restent entiers dans le cadre : ne demande jamais qu'un texte déborde ou sorte de l'écran.
+- Une animation se pose sur un passage de ses images qui continue de jouer dessous (« over_clip » : le media_id de la vidéo ou de la photo à garder sous l'animation ; le moteur choisit le passage, sinon il prolonge le plan d'avant). Sa forme est libre : le motion designer l'invente (typographie animée, un chiffre, des formes, du collage…).
+- 0 à 2 par Reel, sur le moment où les mots comptent (la promesse, l'offre, un chiffre, une liste courte), 1,5 à 3 s chacune. Un Reel peut très bien n'en avoir aucune. Sa demande passe avant : si elle veut plus d'animations, ou une idée précise (elle-même détourée qui apparaît, un compteur, un personnage…), fais-le, dans la limite de « max_new_scenes ».
+- Ses photos dans une animation : une animation peut mettre en scène une de ses photos (la personne ou l'objet détouré au ciseau, la photo en papier découpé, un texte qui passe derrière la personne…) : écris le media_id de la photo dans le brief, le moteur la détoure.
+- « layers » : une animation par-dessus plusieurs plans (from et to en secondes du Reel), quand l'idée court sur le Reel (elle qui surgit à chaque plan pour dire coucou, un compteur qui avance, un cadre) ; ses plans continuent dessous, le motion designer connaît les coupes. Chacune compte comme une nouvelle animation ; sans une telle idée, aucune.
+- « motion » sur mesure : dans « brief » (600 caractères au plus), dis le message, les mots exacts, le moment fort et l'énergie (calme, franche, joyeuse), jamais la forme ni les mouvements : le motion designer les choisit dans la charte du commerce, et deux animations d'un Reel ne se ressemblent jamais. Donne aussi « fallback », la version fixe (title, list, quote, number) au cas où. Les textes restent entiers dans le cadre : ne demande jamais qu'un texte déborde ou sorte de l'écran.
 - Bibliothèque (« templates ») : des animations déjà faites, réutilisables avec d'autres textes, gratuites et instantanées, chacune au plus une fois par Reel. Si l'une convient, réutilise-la : motion { template_id, template_texts : un texte par slot (respecte max_chars), brief : une phrase sur ce qu'elle montre ici, fallback }. Ne commande une nouvelle animation que si aucune ne convient.
 - Au plus « max_new_scenes » nouvelles animations (sans template_id) dans ce Reel, chacune payée : celles du plan validé par la gérante.
 - Sans aucune vidéo ni photo : un Reel entièrement en animations (3 à 5) sur les couleurs de la marque.
@@ -128,7 +130,7 @@ const editorTextSchema = editPlanTextSchema.omit({ look: true, detail_look: true
  * refuses the current schema (structured-output grammars have limits of their own).
  */
 export const editorOutputSchemaLegacy = z.object({
-  plan: editPlanObjectSchema.omit({ voice: true }).extend({
+  plan: editPlanObjectSchema.omit({ voice: true, layers: true }).extend({
     template: motionTemplateSchema,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
@@ -178,6 +180,7 @@ export const editorOutputSchema = z.object({
     fonts: z.object({ display: z.string().optional(), body: z.string().optional() }).optional(),
     end_card: z.object({ title: z.string(), subtitle: z.string().optional() }).optional(),
     effect: z.enum(["none", "dust"]).optional(),
+    layers: z.array(z.object({ brief: z.string(), from: z.number(), to: z.number() })).optional(),
   }),
   rationale: z.string(),
 });
@@ -265,9 +268,12 @@ export function fromEditorPlan(plan: EditorOutput["plan"] | EditorOutputLegacy["
     : undefined;
   const endCard = plan.end_card?.title?.trim() ? { title: plan.end_card.title.trim().slice(0, 40), ...(plan.end_card.subtitle?.trim() ? { subtitle: plan.end_card.subtitle.trim().slice(0, 60) } : {}) } : undefined;
   const { end_card: _endCard, fonts: _fonts, ...rest } = plan;
-  const { effect: _effect, ...kept } = rest as typeof rest & { effect?: string };
+  const { effect: _effect, layers: asked, ...kept } = rest as typeof rest & { effect?: string; layers?: { brief: string; from: number; to: number }[] };
+  // Animations over several shots: a brief and a span, the code comes later (like a scene's).
+  const layers = (asked ?? []).filter((l) => l.brief?.trim() && Number.isFinite(l.from) && Number.isFinite(l.to)).slice(0, 3);
   return {
     ...kept,
+    ...(layers.length ? { layers: layers.map((l) => ({ motion: { brief: l.brief.trim().slice(0, 4000) }, from: l.from, to: l.to })) } : {}),
     format: "9:16",
     images: [],
     music: null,
@@ -431,7 +437,15 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
     .filter((t) => t.to - t.from >= MIN_TEXT_SECONDS)
     .map((t) => ({ ...t, emphasis: t.emphasis?.filter((e) => t.text.toLowerCase().includes(e.toLowerCase())) }));
 
-  return editPlanSchema.parse({ ...draft, duration, texts });
+  // Animations over several shots: inside the Reel, a second at least, each a new animation within the budget.
+  const layers = (plan.layers ?? []).flatMap((l) => {
+    const from = round(Math.max(0, l.from));
+    const to = round(Math.min(duration, l.to));
+    if (to - from < 1 || (!l.motion.js && freeScenes++ >= maxFreeScenes)) return [];
+    return [{ ...l, from, to }];
+  });
+
+  return editPlanSchema.parse({ ...draft, duration, texts, layers: layers.length ? layers : undefined });
 }
 
 /** A text on screen for less than this is not read: it goes. */
