@@ -1,6 +1,7 @@
 import "server-only";
 import { APIError, Sandbox } from "@vercel/sandbox";
 import {
+  BASS_LEVELS_FILTER,
   MIX_CEILING,
   mixFilter,
   mixGains,
@@ -413,8 +414,49 @@ export async function sceneSpriteInSandbox(id: string, url: string, times: numbe
   }
 }
 
-/** Bash function `loud <file>`: the integrated loudness (LUFS, EBU R128) of a file's sound, empty when it has none. */
-const LOUD = `loud() { ${ROOT}/ffmpeg -hide_banner -nostats -i "$1" -vn -af ebur128 -f null - 2>&1 | sed -n '/Summary:/,$p' | awk '/ I:/{print $2; exit}'; }`;
+/** Bash function `loud <file> [seconds]`: the integrated loudness (LUFS, EBU R128) of a file's sound (of its start), empty when it has none. */
+const LOUD = `loud() { ${ROOT}/ffmpeg -hide_banner -nostats \${2:+-t "$2"} -i "$1" -vn -af ebur128 -f null - 2>&1 | sed -n '/Summary:/,$p' | awk '/ I:/{print $2; exit}'; }`;
+
+/**
+ * A Reel followed by its own first `tail` seconds, as Instagram loops it, copied
+ * as they are: what the composer watches, so the ending it writes falls after the Reel.
+ */
+export async function loopedReelInSandbox(id: string, mp4: Buffer, duration: number, tail: number): Promise<Buffer> {
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}-loop`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await sandbox.writeFiles([{ path: `${dir}/in.mp4`, content: mp4 }]);
+    await bash(sandbox, `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -stream_loop 1 -i in.mp4 -t "$2" -c copy looped.mp4`, [dir, (duration + tail).toFixed(2)]);
+    const out = await sandbox.readFileToBuffer({ path: `${dir}/looped.mp4` });
+    if (!out?.length) throw new Error("loop produced no file");
+    return out;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/** The bass level (dB) of each half second over the first `seconds` of a piece of music: where its beat holds (grooveGaps). */
+export async function bassLevelsInSandbox(id: string, audio: Uint8Array, seconds: number): Promise<number[]> {
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}-bass`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await sandbox.writeFiles([{ path: `${dir}/music.mp3`, content: audio }]);
+    const run = await bash(
+      sandbox,
+      `cd "$1" && ${ROOT}/ffmpeg -hide_banner -nostats -t "$2" -i music.mp3 -vn -af "$3" -f null - 2>&1 | grep -o 'RMS_level=[^ ]*' | cut -d= -f2`,
+      [dir, seconds.toFixed(2), BASS_LEVELS_FILTER],
+    );
+    // Silence prints -inf.
+    return (await run.stdout())
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((v) => (Number.isFinite(Number(v)) ? Number(v) : -120));
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
 
 /** A value printed as `name=value` by a sandbox command, null when missing. */
 function printed(stdout: string, name: string): number | null {
@@ -441,7 +483,8 @@ export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Arr
     ]);
     const probe = await bash(
       sandbox,
-      `cd "$1" && ${LOUD} && d=$(${ROOT}/ffmpeg -i in.mp4 2>&1 | sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' | awk -F: '{print $1*3600+$2*60+$3}'); echo "duration=$d speech=$(loud in.mp4) music=$(loud music.mp3)"`,
+      // The music is measured over the Reel only: the composer's ending after it is cut off.
+      `cd "$1" && ${LOUD} && d=$(${ROOT}/ffmpeg -i in.mp4 2>&1 | sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' | awk -F: '{print $1*3600+$2*60+$3}'); echo "duration=$d speech=$(loud in.mp4) music=$(loud music.mp3 "$d")"`,
       [dir],
     );
     const measured = await probe.stdout();

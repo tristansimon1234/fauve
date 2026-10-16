@@ -109,6 +109,54 @@ export function pauseFilter(pauses: { at: number; add: number }[], after: string
   return graph.join(";");
 }
 
+/**
+ * The composer writes a whole piece for the video it watches, its ending included:
+ * over the last 2 to 5 s the beat stops and the sound dies away (10 of the lab's
+ * 11 Reels), heard as the sound cutting out on the last shots. It watches the Reel
+ * followed by its own first seconds, as Instagram loops it, so that ending falls
+ * after the Reel, where the mix cuts the music.
+ */
+export const MUSIC_TAIL_SECONDS = 6;
+
+/** Seconds of the Reel's start the composer watches after its end. */
+export const musicTail = (duration: number): number => round1(clamp(duration, 0, MUSIC_TAIL_SECONDS));
+
+/** The beat is read in the bass (30–150 Hz) every half second; a groove has a kick or a bass note in every second. */
+export const GROOVE_STEP = 0.5;
+
+/** A second this far under the music's loud level has lost its beat: a groove stays within 5 dB of it. */
+export const GROOVE_DROP_DB = 10;
+
+/** The ffmpeg filter that prints the bass level (RMS, dB) of each GROOVE_STEP of a track. */
+export const BASS_LEVELS_FILTER =
+  `highpass=f=30,lowpass=f=150,lowpass=f=150,aresample=8000,asetnsamples=n=${8000 * GROOVE_STEP}:p=0,` +
+  "astats=metadata=1:reset=1,ametadata=mode=print:key=lavfi.astats.Overall.RMS_level";
+
+/**
+ * Where the beat falls away in a Reel's music (seconds), from its bass levels
+ * every GROOVE_STEP: a second or more that stays GROOVE_DROP_DB under the loud
+ * level of the music, before the mix's fade on its last 0.8 s. A break on a calm
+ * shot or an ending that comes too early: heard as the sound cutting out.
+ */
+export function grooveGaps(levels: number[], duration: number): { from: number; to: number }[] {
+  const power = levels.map((db) => 10 ** ((Number.isFinite(db) ? db : -120) / 10));
+  // Seconds read every half second: a beat every 0.8 s still lands in each one.
+  const seconds = power.slice(0, -1).map((p, i) => 10 * Math.log10((p + power[i + 1]!) / 2));
+  if (seconds.length < 3) return [];
+  const loud = [...seconds].sort((a, b) => a - b)[Math.floor(0.9 * (seconds.length - 1))]!;
+  const fade = duration - 0.8;
+  const gaps: { from: number; to: number }[] = [];
+  seconds.forEach((level, i) => {
+    const from = i * GROOVE_STEP;
+    const to = from + 2 * GROOVE_STEP;
+    if (level >= loud - GROOVE_DROP_DB || to > fade + 1e-6) return;
+    const last = gaps.at(-1);
+    if (last && from <= last.to) last.to = to;
+    else gaps.push({ from, to });
+  });
+  return gaps;
+}
+
 /** Volume (0–1) of a level in the live preview, for music as composed. */
 const previewVolume = (lufs: number) => round2(clamp(10 ** ((lufs - MUSIC_AS_COMPOSED_LUFS) / 20), 0, 1));
 const round2 = (n: number) => Math.round(n * 100) / 100;
