@@ -587,8 +587,8 @@ const CUTOUT_SETUP = [
 
 let cutoutReady: Promise<Sandbox> | undefined;
 
-/** The render sandbox with the cut-out model installed (slow only the first time). */
-function cutoutSandbox(): Promise<Sandbox> {
+/** The render sandbox with the cut-out model installed (slow only the first time; the warm-up installs it ahead). */
+export function cutoutSandbox(): Promise<Sandbox> {
   cutoutReady ??= (async () => {
     const sandbox = await remotionSandbox();
     await bash(sandbox, CUTOUT_SETUP);

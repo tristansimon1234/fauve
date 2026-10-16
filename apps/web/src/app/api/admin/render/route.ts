@@ -2,7 +2,7 @@ import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
 import { renderPost } from "@/lib/render/render-post";
-import { dropSandbox, remotionSandbox } from "@/lib/render/sandbox";
+import { cutoutSandbox, dropSandbox, remotionSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isValidTestKey } from "@/lib/test-studio";
 
@@ -11,7 +11,8 @@ import { isValidTestKey } from "@/lib/test-studio";
 //   ?cle=…&action=warm     installs the Remotion templates in the sandbox ahead of the first render.
 //   ?cle=…&post=…&design=1[&brief=…]  has the editor (Opus) write a new plan first, then renders it.
 // And POST ?action=warm with CRON_SECRET, from the database (call_app): the same warm-up,
-// in the background (a new sandbox installs everything once, a few minutes). And POST
+// in the background (a new sandbox installs everything once, a few minutes, the collages'
+// cut-out model included). And POST
 // ?action=drop&sandbox=<name>: deletes an old render sandbox (never the one in service).
 
 export const maxDuration = 800;
@@ -33,6 +34,8 @@ export async function POST(request: NextRequest) {
     const started = Date.now();
     try {
       await remotionSandbox();
+      // The collages' cut-out model too (onnxruntime-node and 224 MB of weights, once).
+      await cutoutSandbox();
       console.log("render sandbox warm", { elapsedMs: Date.now() - started });
     } catch (error) {
       console.error("render sandbox warm-up failed", error);
