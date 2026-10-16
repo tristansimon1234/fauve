@@ -43,6 +43,9 @@ import { photoRegions } from "@/lib/video/regions";
 // Lab studios go with /api/admin/delete-studio.
 export const maxDuration = 300;
 
+/** The files of one montage, as in the app (MAX_FILES) and the montage job. */
+const MAX_MEDIA = 10;
+
 type LabCase = {
   name: string;
   business: string;
@@ -308,7 +311,8 @@ async function montage(name: string, studioId: string, c: Pick<LabCase, "title" 
   ]);
   const unread = analyses.filter((a) => !("analysis" in a));
   if (unread.length) console.warn("lab: videos not read", JSON.stringify(unread));
-  const mediaIds = [...videos, ...photos];
+  // A montage takes 10 files at most, as in the app: the videos first, then the photos.
+  const mediaIds = [...videos, ...photos].slice(0, MAX_MEDIA);
   const tomorrow = new Date(Date.now() + 86_400_000);
   tomorrow.setUTCHours(17, 0, 0, 0);
   const post = await db
