@@ -1,6 +1,7 @@
 import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
+  ambianceLine,
   brandProfileSchema,
   signatureLines,
   CRITIC_MODEL,
@@ -89,9 +90,11 @@ export async function reviewMontage(input: {
 }): Promise<CriticVerdict | null> {
   if (!input.versions.length) return null;
   const db = supabaseAdmin();
-  const [studio, brand, loaded] = await Promise.all([
+  const [studio, brand, post, loaded] = await Promise.all([
     db.from("studios").select("name, business_type").eq("id", input.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", input.studioId).order("version", { ascending: false }).limit(1),
+    // The ambiance she chose for this Reel (none: the editor's choice, judged like the rest).
+    db.from("posts").select("template").eq("id", input.postId).maybeSingle(),
     Promise.all(input.versions.map((v) => loadVersion(input.studioId, v))),
   ]);
   if (!loaded.some((v) => v?.frames.length)) return null;
@@ -103,6 +106,7 @@ export async function reviewMontage(input: {
     profile.art_direction ? `Direction artistique : ${profile.art_direction.slice(0, 600)}` : "",
     profile.signature ? `Sa charte en réglages (le Reel doit la porter : on doit reconnaître ce commerce sans voir son nom) :\n${signatureLines(profile.signature)}` : "",
     input.request ? `Demande de la gérante : ${input.request.slice(0, 1500)}` : "",
+    ambianceLine(post.data?.template as string | null | undefined) ?? "",
     formatLine(input.format) ?? "",
     `${input.versions.length} version${input.versions.length > 1 ? "s" : ""} à regarder.`,
   ]

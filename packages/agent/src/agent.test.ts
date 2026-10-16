@@ -1528,6 +1528,11 @@ test("lab fixes: lines that hold together, a breath between sentences, subtitles
   assert.equal(subtitleRow([{ x: 0.3, y: 0.2, w: 0.4, h: 0.2 }]), null);
   const moved = subtitleRow([{ x: 0.3, y: SUBTITLE_ROW.y - 0.05, w: 0.4, h: 0.12 }]);
   assert.ok(moved !== null && (moved + SUBTITLE_ROW.h < SUBTITLE_ROW.y - 0.05 || moved > SUBTITLE_ROW.y + 0.07));
+  // The ambiance she chose is judged as hers: a collage stays a collage after the review.
+  const { ambianceLine } = await import("./critic.ts");
+  assert.match(ambianceLine("collage")!, /Façon collage.*jamais l'ambiance elle-même/);
+  assert.equal(ambianceLine(null), null);
+  assert.equal(ambianceLine("class_of_the_day"), null);
   // The critic judges a key message held on screen as the point of the format.
   assert.match(formatLine("message")!, /message clé/);
   assert.match(formatLine("raconte")!, /voix/);
@@ -2354,6 +2359,18 @@ test("off faces: one subtitle row for the Reel, animations moved off the faces u
   const moved = avoidPhotoText([band], [{ start: 0, length: 2, boxes: [{ x: 0.2, y: 0.44, w: 0.6, h: 0.12 }] }]);
   assert.equal(moved[0]!.auto_y, true);
   assert.equal(typeof moved[0]!.y, "number");
+  // A message (title, subtitle, details) is a third of the frame tall: it clears the whole face, not one line's height.
+  const message: { text: string; from: number; to: number; style: "caption"; items: { title: string }[]; y?: number; auto_y?: boolean } = {
+    text: "ton reformer t'attend",
+    from: 0,
+    to: 6,
+    style: "caption",
+    items: [{ title: "3 cours à 65 €" }],
+  };
+  const face = [{ start: 0, length: 6, boxes: [{ x: 0.3, y: 0.45, w: 0.4, h: 0.15 }] }];
+  assert.equal(avoidPhotoText([message], face)[0]!.y, 0.12);
+  // A face high in the frame leaves its row free.
+  assert.equal(avoidPhotoText([message], [{ start: 0, length: 6, boxes: [{ x: 0.3, y: 0.2, w: 0.4, h: 0.15 }] }])[0]!.y, undefined);
   // A correction keeps her hand's place, not the engine's.
   const carried = carryTextStyle(
     { ...(plan as object), texts: [{ text: "Petits groupes", from: 7, to: 9, style: "band" }, { text: "rue Charlot", from: 7, to: 9, style: "caption" }] } as never,

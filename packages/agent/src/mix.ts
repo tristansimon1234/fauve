@@ -81,6 +81,9 @@ export function mixFilter(gains: ReturnType<typeof mixGains>, fadeAt: number | n
   );
 }
 
+/** How long each edge of a cut in a voice fades (s): long enough to never click, too short to hear. */
+const EDGE_FADE = 0.012;
+
 /**
  * The ffmpeg filter graph that opens a breath of silence in a voice at each pause
  * (sentencePauses), then goes on with `after` (its level), out as [out].
@@ -91,8 +94,11 @@ export function pauseFilter(pauses: { at: number; add: number }[], after: string
   const graph = [`[0:a]aformat=sample_rates=44100:channel_layouts=mono,asplit=${n + 1}${Array.from({ length: n + 1 }, (_, i) => `[a${i}]`).join("")}`];
   let order = "";
   for (let i = 0; i <= n; i++) {
-    const trim = [i ? `start=${s(pauses[i - 1]!.at)}` : "", i < n ? `end=${s(pauses[i]!.at)}` : ""].filter(Boolean).join(":");
-    graph.push(`[a${i}]atrim=${trim},asetpts=N/SR/TB[p${i}]`);
+    const from = i ? pauses[i - 1]!.at : 0;
+    const trim = [i ? `start=${s(from)}` : "", i < n ? `end=${s(pauses[i]!.at)}` : ""].filter(Boolean).join(":");
+    // Each edge of a cut fades over a few milliseconds: a raw cut clicked, or chopped a breath, right where the shot changes.
+    const fades = [i ? `afade=t=in:st=0:d=${s(EDGE_FADE)}` : "", i < n ? `afade=t=out:st=${s(Math.max(0, pauses[i]!.at - from - EDGE_FADE))}:d=${s(EDGE_FADE)}` : ""].filter(Boolean);
+    graph.push(`[a${i}]atrim=${trim},asetpts=N/SR/TB${fades.length ? `,${fades.join(",")}` : ""}[p${i}]`);
     order += `[p${i}]`;
     if (i < n) {
       graph.push(`aevalsrc=0:c=mono:s=44100:d=${s(pauses[i]!.add)}[s${i}]`);

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { planTimeline } from "./motion.ts";
-import { isClipSegment, isMotionSegment, type EditPlan, type MotionTemplate } from "./schemas.ts";
+import { AMBIANCES, isClipSegment, isMotionSegment, motionTemplateSchema, type EditPlan, type MotionTemplate } from "./schemas.ts";
 import { HOOK_LATEST, OPENING_MAX_SECONDS } from "./hook.ts";
 import { voicePhrases, type VoiceTranscript } from "./voice.ts";
 import { beatOf, TEMPLATE_BPM } from "./tempo.ts";
@@ -175,6 +175,17 @@ export function formatLine(format: ReelFormat | undefined): string | null {
     return "Format : message clé, sans voix. Un seul message (titre, sous-titre, détails) reste posé presque tout le Reel, au même endroit, pendant que les plans défilent sur la musique : c'est voulu. Ne demande jamais de le raccourcir, de le retirer d'une partie du Reel ni de le remplacer par d'autres textes ; juge sa lisibilité, ses coupures de lignes, sa composition et sa place. Il passe forcément sur des corps : seuls les visages comptent.";
   if (format === "raconte") return "Format : raconté par une voix. Ses sous-titres portent tout ; l'accroche est le seul texte posé.";
   return null;
+}
+
+/**
+ * The ambiance the manager chose for this Reel (Créer, or Simone at her request): it is
+ * her choice, like her request. Without this line the critic judged the collage itself
+ * (its paper and its prints) as far from a night-club brand, and asked to drop it.
+ */
+export function ambianceLine(template: string | null | undefined): string | null {
+  const chosen = motionTemplateSchema.safeParse(template);
+  if (!chosen.success) return null;
+  return `Ambiance choisie pour ce Reel : « ${AMBIANCES[chosen.data].label} » (${AMBIANCES[chosen.data].hint}). C'est son choix : juge le Reel dans cette ambiance, ce qui fait son style en fait partie ; jamais l'ambiance elle-même, ni une autre à la place.`;
 }
 
 /** The rhythm the frames cannot show: each shot's length, the cuts on the beat, the signature transitions. */
