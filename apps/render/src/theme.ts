@@ -1,4 +1,4 @@
-import type { MotionTemplate } from "./types";
+import type { MotionTemplate, ReelSignature } from "./types";
 
 // One visual system, four temperaments (collage draws its own texts, Collage.tsx). Sizes are for a 1080-wide frame.
 // Modern and native-looking: texts are big and few, set where a creator would put them in
@@ -20,12 +20,15 @@ export type Theme = {
     enter: "rise" | "pop" | "fade";
     /**
      * How a stressed word stands out: on a box in the brand colour, in italic, in the brand
-     * colour, or in the display font's italic (a serif accent in a sans hook: one or two words, never the whole line).
+     * colour, in the display font's italic (a serif accent in a sans hook: one or two words,
+     * never the whole line), or circled by a stroke drawn by hand (« marker »).
      */
-    stress: "box" | "italic" | "color" | "serif";
+    stress: "box" | "italic" | "color" | "serif" | "marker";
+    /** Where its lines align (a business whose site sets its titles flush left). */
+    align?: "center" | "left";
   };
   /** The statement (« band »): words on a box hugging each line, like the text tool of the apps, or an outlined frame. */
-  band: { family: "display" | "body"; weight: number; size: number; uppercase: boolean; letterSpacing: number; radius: number; box: "white" | "accent" | "outline"; tilt: number };
+  band: { family: "display" | "body"; weight: number; size: number; uppercase: boolean; letterSpacing: number; radius: number; box: "white" | "accent" | "dark" | "light" | "outline"; tilt: number };
   /** box: on a dark box (the apps' native text style); else bare with a soft shadow. */
   caption: { weight: number; size: number; box?: boolean };
   subtitle: { weight: number; size: number; uppercase: boolean; highlight: "color" | "pill" };
@@ -94,3 +97,53 @@ export const THEMES: Record<MotionTemplate, Theme> = {
     vignette: 0,
   },
 };
+
+/**
+ * The light of a business's pictures, on every shot instead of the ambiance's: sober CSS
+ * grades, never a filter you notice (natural keeps the ambiance's own).
+ */
+const GRADES: Record<ReelSignature["grade"], string | null> = {
+  natural: null,
+  warm: "brightness(1.03) contrast(1.04) saturate(1.06) sepia(0.12)",
+  bright: "brightness(1.07) contrast(1.02) saturate(1.03)",
+  flash: "contrast(1.13) saturate(1.1) brightness(1.03)",
+  film: "contrast(0.96) saturate(0.86) sepia(0.14) brightness(1.03)",
+  moody: "contrast(1.12) brightness(0.94) saturate(0.95)",
+  cool: "contrast(1.05) saturate(0.94) brightness(1.02) hue-rotate(-6deg)",
+};
+
+/**
+ * The ambiance's theme set the business's way: its titles (font, case, weight, alignment,
+ * spacing), how its key words stand out, the box under a statement and the light of its
+ * pictures. The ambiance keeps its sizes, rhythm, springs and entrances.
+ */
+export function themeFor(template: MotionTemplate, signature: ReelSignature | undefined): Theme {
+  const base = THEMES[template];
+  if (!signature) return base;
+  const t = signature.titles;
+  const upper = t.case === "upper";
+  const tracking = (size: number) => (t.tracking === "wide" ? size * (upper ? 0.06 : 0.03) : t.tracking === "tight" ? -size * 0.025 : 0);
+  return {
+    ...base,
+    hook: {
+      ...base.hook,
+      family: t.font,
+      weight: t.weight === "black" ? 900 : t.weight === "bold" ? 700 : 500,
+      uppercase: upper,
+      letterSpacing: tracking(base.hook.size),
+      // Capitals set tight read as one block; spaced ones need air between the lines.
+      lineHeight: upper ? Math.min(base.hook.lineHeight, 1.0) : Math.max(base.hook.lineHeight, 1.04),
+      stress: signature.stress === "block" ? "box" : signature.stress,
+      align: t.align,
+    },
+    band: {
+      ...base.band,
+      box: signature.band,
+      uppercase: upper && signature.band !== "white",
+      letterSpacing: upper ? tracking(base.band.size) : base.band.letterSpacing,
+      radius: signature.band === "outline" ? 0 : base.band.radius,
+      tilt: 0,
+    },
+    grade: GRADES[signature.grade] ?? base.grade,
+  };
+}

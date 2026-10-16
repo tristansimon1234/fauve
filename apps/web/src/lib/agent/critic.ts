@@ -2,6 +2,7 @@ import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   brandProfileSchema,
+  signatureLines,
   CRITIC_MODEL,
   editPlanSchema,
   MONTAGE_CRITIC_PROMPT,
@@ -89,6 +90,7 @@ export async function reviewMontage(input: {
     `Commerce : ${(studio.data?.name as string | null) ?? "?"}${studio.data?.business_type ? ` (${studio.data.business_type as string})` : ""}.`,
     profile.tone ? `Ton de la marque : ${profile.tone}.` : "",
     profile.art_direction ? `Direction artistique : ${profile.art_direction.slice(0, 600)}` : "",
+    profile.signature ? `Sa charte en réglages (le Reel doit la porter : on doit reconnaître ce commerce sans voir son nom) :\n${signatureLines(profile.signature)}` : "",
     input.request ? `Demande de la gérante : ${input.request.slice(0, 1500)}` : "",
     `${input.versions.length} version${input.versions.length > 1 ? "s" : ""} à regarder.`,
   ]

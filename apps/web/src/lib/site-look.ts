@@ -1,21 +1,39 @@
 import "server-only";
-import { brandColorsFromLook, CHAT_MODEL, withArtDirection } from "@fauve/agent";
+import {
+  brandColorsFromLook,
+  CHAT_MODEL,
+  measuredTitles,
+  pageFacts,
+  pageFonts,
+  pageMeasureSchema,
+  snapPalette,
+  withArtDirection,
+  type BrandSignature,
+  type PageMeasure,
+  type SiteLookReading,
+} from "@fauve/agent";
 import sharp from "sharp";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
-import { readMoodboard } from "@/lib/agent/moodboard";
+import { readSiteImages } from "@/lib/agent/moodboard";
 import { fetchPublicImage } from "@/lib/agent/website";
-import { screenshotInSandbox } from "@/lib/render/sandbox";
+import { googleFont } from "@/lib/fonts";
+import { pageInSandbox, screenshotInSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-// The look of the studio's website, read once while it gets started, in two steps
-// so she never waits long: first its best photos land in her moodboard and her
-// media library (a few seconds; she can make her first post with them), then
-// Simone reads them with a capture of the home page (light, colours, typography,
-// layout, mood) and the montage follows that reading. Never over a moodboard the
-// manager already made.
+// The look of the studio's website, read once while it gets started, in two steps so she
+// never waits long: first its photos land in her moodboard (a few seconds), then Simone
+// reads the site as a visitor sees it: captures of its home page with what was measured
+// on it (the fonts its titles and texts really use, the colours that fill it), and its
+// photos. She writes its art direction and its signature (the same direction as settings
+// every Reel applies), keeps the photos that show the business itself (its place, its
+// work, its products, not its merch nor its press) for her media library, and gives each
+// of its fonts that Google does not serve its closest free twin. Never over a moodboard
+// the manager already made.
 
-/** Photos kept from the site. */
+/** Photos kept for her moodboard and her library; candidates shown to the reading. */
 const MAX_PHOTOS = 6;
+const MAX_LIBRARY = 8;
+const MAX_CANDIDATES = 14;
 const SITE_NOTE = "Photo de ton site";
 
 /** A real photo: large enough, not a banner strip nor a sliver. */
@@ -37,8 +55,75 @@ async function toPhoto(bytes: Buffer): Promise<{ jpeg: Buffer; width: number; he
   return { jpeg: data, width: info.width, height: info.height };
 }
 
-type MoodItems = { items?: { note?: string }[] } | undefined;
+const hex = (r: number, g: number, b: number) => `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
+
+/**
+ * The colours that fill a page, counted on its pixels: flat areas only (a pixel the same
+ * colour as its right and lower neighbours), so the page's own colours count and a photo
+ * hardly does. Close shades are merged; each share is of the whole page.
+ */
+export async function pageColors(jpeg: Buffer): Promise<{ color: string; share: number }[]> {
+  const { data, info } = await sharp(jpeg).resize({ width: 320 }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: w, height: h } = info;
+  const key = (i: number) => ((data[i]! >> 3) << 10) | ((data[i + 1]! >> 3) << 5) | (data[i + 2]! >> 3);
+  const counts = new Map<number, { n: number; r: number; g: number; b: number }>();
+  for (let y = 0; y < h - 1; y++) {
+    for (let x = 0; x < w - 1; x++) {
+      const i = (y * w + x) * 3;
+      const c = key(i);
+      if (c !== key(i + 3) || c !== key(i + w * 3)) continue;
+      const e = counts.get(c) ?? { n: 0, r: 0, g: 0, b: 0 };
+      e.n++;
+      e.r += data[i]!;
+      e.g += data[i + 1]!;
+      e.b += data[i + 2]!;
+      counts.set(c, e);
+    }
+  }
+  const merged: { r: number; g: number; b: number; n: number }[] = [];
+  for (const e of [...counts.values()].sort((a, b) => b.n - a.n)) {
+    const [r, g, b] = [e.r / e.n, e.g / e.n, e.b / e.n];
+    const near = merged.find((m) => Math.hypot(m.r - r, m.g - g, m.b - b) < 26);
+    if (near) near.n += e.n;
+    else merged.push({ r, g, b, n: e.n });
+  }
+  const total = w * h;
+  return merged
+    .filter((m) => m.n / total >= 0.01)
+    .slice(0, 8)
+    .map((m) => ({ color: hex(m.r, m.g, m.b), share: Math.round((m.n / total) * 1000) / 1000 }));
+}
+
+type MoodItems = { items?: { note?: string; path?: string }[] } | undefined;
 const hersOwn = (moodboard: MoodItems) => (moodboard?.items ?? []).some((i) => i.note !== SITE_NOTE);
+const smaller = (jpeg: Buffer, width: number) => sharp(jpeg).resize({ width, withoutEnlargement: true }).jpeg({ quality: 78 }).toBuffer();
+const key = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+/**
+ * Its fonts as the business names them, and, for each one Google does not serve, the
+ * twin the reading chose by looking at it (when Google serves that one).
+ */
+async function siteFonts(page: PageMeasure | null, reading: SiteLookReading): Promise<{ fonts: string[]; twins: Record<string, string> } | null> {
+  const measured = page ? pageFonts(page) : { display: null, body: null };
+  const roles = [
+    { font: measured.display, twin: reading.fonts.display },
+    { font: measured.body, twin: reading.fonts.body },
+  ];
+  if (!roles.some((r) => r.font)) return null;
+  const fonts: string[] = [];
+  const twins: Record<string, string> = {};
+  for (const { font, twin } of roles) {
+    if (!font) continue;
+    const served = (await googleFont(font.raw)) ?? (await googleFont(font.name));
+    const name = served ?? font.name;
+    if (!fonts.includes(name)) fonts.push(name);
+    if (!served) {
+      const free = await googleFont(twin);
+      if (free) twins[name] = free;
+    }
+  }
+  return { fonts, twins };
+}
 
 export async function readSiteLook(studioId: string, pageUrl: string, imageUrls: string[]): Promise<{ photos: number; reading: boolean }> {
   const db = supabaseAdmin();
@@ -52,99 +137,130 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
   // Read once: her own moodboard wins, and a second reading of the same site adds nothing.
   if ((moodboard?.items?.length ?? 0) > 0 || (fromSite ?? 0) > 0) return { photos: 0, reading: false };
 
-  // The capture takes the longest (the sandbox's browser): it runs while the photos come in.
-  const capturing = screenshotInSandbox(`site-${studioId.slice(0, 8)}-${Date.now()}`, pageUrl).catch(() => null);
+  // The page takes the longest (the sandbox's browser): it is read while the photos come in.
+  const reading$ = pageInSandbox(`site-${studioId.slice(0, 8)}-${Date.now()}`, pageUrl).catch(() => null);
   const signal = AbortSignal.timeout(12_000);
   const downloads = await Promise.all(
-    imageUrls.slice(0, 10).map((url) =>
+    imageUrls.slice(0, 20).map((url) =>
       fetchPublicImage(url, signal)
         .then(toPhoto)
         .catch(() => null),
     ),
   );
-  const photos = downloads.filter((p) => p !== null).slice(0, MAX_PHOTOS);
+  const photos = downloads.filter((p) => p !== null).slice(0, MAX_CANDIDATES);
 
-  // Step 1: the photos, at once. In her moodboard (brand/) and her media library
-  // (site/, a copy: the library's files expire, the moodboard's stay).
-  const items: { path: string; note: string }[] = [];
-  for (const photo of photos) {
-    const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const mood = `${studioId}/brand/mood-${key}.jpg`;
-    const media = `${studioId}/site/site-${key}.jpg`;
-    const [a, b] = await Promise.all([
-      db.storage.from("media").upload(mood, photo.jpeg, { contentType: "image/jpeg" }),
-      db.storage.from("media").upload(media, photo.jpeg, { contentType: "image/jpeg" }),
-    ]);
-    if (!a.error) items.push({ path: mood, note: SITE_NOTE });
-    if (!b.error) {
-      await db.from("media_assets").insert({
-        studio_id: studioId,
-        storage_path: media,
-        kind: "image",
-        source: "website",
-        mime_type: "image/jpeg",
-        size_bytes: photo.jpeg.length,
-        width: photo.width,
-        height: photo.height,
-        consent_ok: true,
-      });
-    }
-  }
-  if (items.length) {
+  // Step 1: the first photos in her moodboard, at once (brand/, kept).
+  const moodItem = async (photo: { jpeg: Buffer }) => {
+    const path = `${studioId}/brand/mood-${key()}.jpg`;
+    const { error } = await db.storage.from("media").upload(path, photo.jpeg, { contentType: "image/jpeg" });
+    return error ? null : { path, note: SITE_NOTE };
+  };
+  // One slot per photo (null when its upload failed), so a photo finds its moodboard file again.
+  const slots = await Promise.all(photos.slice(0, MAX_PHOTOS).map(moodItem));
+  const first = slots.filter((i) => i !== null);
+  if (first.length) {
     await insertProfileVersion(studioId, (profile) =>
       // She made her own moodboard meanwhile: hers wins.
-      hersOwn((profile as { moodboard?: MoodItems }).moodboard) ? profile : { ...profile, moodboard: { items } },
+      hersOwn((profile as { moodboard?: MoodItems }).moodboard) ? profile : { ...profile, moodboard: { items: first } },
     );
   }
   const photosAt = Date.now() - started;
 
-  // Step 2: the reading (capture + photos), then her colours as seen on the page.
-  const capture = await capturing;
-  const page = capture ? await sharp(capture).resize({ width: 1000 }).jpeg({ quality: 80 }).toBuffer().catch(() => null) : null;
-  if (!photos.length && !page) return { photos: 0, reading: false };
-  const name = (studio?.name as string | null) ?? "ce commerce";
-  // Her site's fonts, as saved from its CSS by now (read_website): the reading names them, not look-alikes.
-  const { data: current } = await db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle();
-  const siteFonts = ((current?.profile as { fonts?: unknown } | null)?.fonts as string[] | undefined)?.filter((f) => typeof f === "string").slice(0, 3) ?? [];
-  // Her theme's colours, as found in the site's code: the palette starts from them.
-  const siteColors = ((current?.profile as { colors?: unknown } | null)?.colors as string[] | undefined)?.filter((c) => typeof c === "string").slice(0, 6) ?? [];
-  const business = (studio?.business_type as string | null) ?? null;
-  let reading: { reading: string; direction?: string; palette: string[]; fonts?: { display: string; body: string } } | null = null;
-  try {
-    reading = await readMoodboard(
-      studioId,
-      name,
-      [
-        ...(page ? [{ jpeg: page, note: "capture de la page d'accueil de son site, telle qu'un visiteur la voit (mise en page, typographie, couleurs)" }] : []),
-        ...photos.map((p) => ({ jpeg: p.jpeg, note: "photo de son site" })),
-      ],
-      {
-        model: CHAT_MODEL,
-        intro: `Le site de « ${name} »${business ? ` (${business})` : ""} : la gérante n'a pas encore fait de moodboard, son site est le meilleur indice de son style. Lis-en la direction artistique comme pour un moodboard (lumière, couleurs, typographie, cadrages, mise en page, ambiance), pour que ses Reels et ses visuels lui ressemblent.${siteColors.length ? ` Les couleurs du thème de son site (dans son code) sont ${siteColors.join(", ")} : ta palette part d'elles.` : ""} La palette est celle de sa charte (fonds, titres, boutons, logo, aplats), jamais la couleur d'un objet photographié (plat, produit, vêtement, fleur, décor).${siteFonts.length ? ` Les polices de son site sont ${siteFonts.join(", ")} : ce sont elles que ses visuels utilisent ; pour la typographie, décris comment elles sont employées (graisse, capitales, espacement, taille) sans proposer d'autres polices.` : ""}`,
-      },
-    );
-  } catch (error) {
-    console.warn("site look reading failed", error);
-  }
-  console.info("site look timing", { studioId, photos: items.length, photosMs: photosAt, capture: Boolean(page), totalMs: Date.now() - started });
-  if (!reading) return { photos: items.length, reading: false };
+  // Step 2: the page as a visitor sees it, what was measured on it, and its photos.
+  const page = await reading$;
+  const measured = pageMeasureSchema.safeParse(page?.measured);
+  const measures = measured.success ? measured.data : null;
+  const capture = page?.capture ?? (await screenshotInSandbox(`site-${studioId.slice(0, 8)}-${Date.now()}`, pageUrl).catch(() => null));
+  const pages = (
+    await Promise.all([
+      capture ? smaller(capture, 1000).catch(() => null) : null,
+      page?.full ? sharp(page.full).resize({ width: 560, withoutEnlargement: true }).jpeg({ quality: 76 }).toBuffer().catch(() => null) : null,
+    ])
+  ).filter((p) => p !== null);
+  const pixels = page?.full ? await pageColors(page.full).catch(() => []) : [];
 
+  const name = (studio?.name as string | null) ?? "ce commerce";
+  const business = (studio?.business_type as string | null) ?? null;
+  let reading: SiteLookReading | null = null;
+  if (pages.length || photos.length) {
+    const fonts = measures ? pageFonts(measures) : { display: null, body: null };
+    const intro = [
+      `Le site de « ${name} »${business ? ` (${business})` : ""} : la gérante n'a pas encore fait de moodboard, son site est le meilleur indice de son style. Lis-en la direction artistique comme pour un moodboard (lumière, couleurs, typographie, cadrages, mise en page, ambiance) : ses Reels et ses visuels doivent lui ressembler au point qu'on reconnaisse son commerce sans voir son nom.`,
+      measures ? `Mesuré sur sa page (des faits, pas des suppositions) :\n${pageFacts(measures, pixels)}` : "",
+      "La palette de sa charte vient de ce qu'on voit : les couleurs mesurées, son logo, son enseigne et ce qui porte son nom ; la principale en premier (celle qui la signe, pas forcément la plus étendue) ; jamais la couleur d'un objet photographié par hasard (un plat, le vêtement d'un client, une fleur).",
+      fonts.display
+        ? `Ses polices sont celles mesurées : « ${fonts.display.raw} » pour les titres${fonts.body && fonts.body.raw !== fonts.display.raw ? `, « ${fonts.body.raw} » pour le texte` : ""}. Dans « fonts », donne pour chacune la famille Google Fonts qui lui ressemble le plus à l'œil (même largeur, mêmes formes, même contraste, avec ou sans empattements), ou la même si Google Fonts la sert. Décris dans ta lecture comment elles sont employées (graisse, capitales, espacement, taille).`
+        : "",
+      photos.length
+        ? `Ses ${photos.length} photos suivent les captures. Dans « photos », garde celles qui montrent vraiment le commerce (son lieu, son travail, ses produits, son équipe, ses clients), les plus belles et les plus parlantes d'abord, ${MAX_LIBRARY} au plus : jamais un logo, une affiche, un article de presse, ni un objet dérivé (sweat, tote bag, casquette) qui n'est pas son métier.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    try {
+      reading = await readSiteImages(studioId, intro, pages, await Promise.all(photos.map((p) => smaller(p.jpeg, 768))), CHAT_MODEL);
+    } catch (error) {
+      console.warn("site look reading failed", error);
+    }
+  }
+
+  // Her media library: the photos that show the business (all of the first ones without a reading).
+  const chosen = reading?.photos.length ? reading.photos.map((n) => photos[n - 1]!).filter(Boolean) : photos.slice(0, MAX_PHOTOS);
+  for (const photo of chosen.slice(0, MAX_LIBRARY)) {
+    const path = `${studioId}/site/site-${key()}.jpg`;
+    const { error } = await db.storage.from("media").upload(path, photo.jpeg, { contentType: "image/jpeg" });
+    if (error) continue;
+    await db.from("media_assets").insert({
+      studio_id: studioId,
+      storage_path: path,
+      kind: "image",
+      source: "website",
+      mime_type: "image/jpeg",
+      size_bytes: photo.jpeg.length,
+      width: photo.width,
+      height: photo.height,
+      consent_ok: true,
+    });
+  }
+  console.info("site look timing", { studioId, photos: chosen.length, photosMs: photosAt, page: Boolean(page), measured: Boolean(measures), totalMs: Date.now() - started });
+  if (!reading) return { photos: chosen.length, reading: false };
+
+  // Her moodboard: the photos that show the business, in the reading's order.
+  const keep = new Set(chosen.slice(0, MAX_PHOTOS));
+  const items = (
+    await Promise.all(
+      chosen.slice(0, MAX_PHOTOS).map(async (photo) => {
+        return slots[photos.indexOf(photo)] ?? (await moodItem(photo));
+      }),
+    )
+  ).filter((i) => i !== null);
+  const dropped = slots.flatMap((slot, i) => (slot && !keep.has(photos[i]!) ? [slot] : []));
+  const fonts = await siteFonts(measures, reading);
+  const seen = [...pixels, ...(measures?.areas ?? []), ...(measures?.texts ?? []), ...(measures?.buttons ?? [])].map((c) => c.color);
+  const palette = snapPalette(reading.palette, seen);
+  const signature: BrandSignature = measures ? { ...reading.signature, titles: measuredTitles(measures, reading.signature.titles) } : reading.signature;
+
+  let saved = false;
   await insertProfileVersion(studioId, (profile) => {
     const current = (profile as { moodboard?: MoodItems & Record<string, unknown> }).moodboard;
     if (hersOwn(current)) return profile;
-    // What she sees on her site beats the CSS: its palette becomes the brand's colours (the first is the accent).
-    const colors = reading.palette.length ? brandColorsFromLook(reading.palette) : null;
-    // Her fonts: the ones found in the site's CSS, else the closest Google fonts to what the reading saw.
-    const known = (profile as { fonts?: string[] }).fonts;
-    const fonts = known?.length ? null : reading.fonts ? [...new Set([reading.fonts.display, reading.fonts.body])] : null;
-    const look = { reading: reading.reading, palette: reading.palette };
+    saved = true;
+    const p = profile as { fonts?: string[]; default_template?: string; tone?: string; font_twins?: Record<string, string> };
+    // What she sees on her site beats the CSS: the palette becomes the brand's colours (the first is the accent).
+    const colors = palette.length ? brandColorsFromLook(palette) : null;
     return {
       // Her « Direction artistique » too, when she has not written one.
       ...withArtDirection(profile as { art_direction?: unknown }, reading.direction),
       ...(colors?.length ? { colors } : {}),
-      ...(fonts?.length ? { fonts } : {}),
-      moodboard: { ...(current ?? {}), items: current?.items ?? items, ...look, read_at: new Date().toISOString() },
+      // The fonts measured on her pages (their twins for the render), else the reading's look-alikes.
+      ...(fonts ? { fonts: fonts.fonts.slice(0, 2), font_twins: { ...(p.font_twins ?? {}), ...fonts.twins } } : p.fonts?.length ? {} : { fonts: [...new Set([reading.fonts.display, reading.fonts.body])] }),
+      signature,
+      ...(p.default_template ? {} : { default_template: signature.ambiance }),
+      ...(p.tone?.trim() ? {} : { tone: signature.voice }),
+      moodboard: { ...(current ?? {}), items: items.length ? items : (current?.items ?? first), reading: reading.reading, palette: reading.palette, read_at: new Date().toISOString() },
     };
   });
-  return { photos: items.length, reading: true };
+  // The site's photos her moodboard no longer shows (they were not about the business).
+  if (saved && dropped.length) await db.storage.from("media").remove(dropped.map((d) => d.path)).catch(() => undefined);
+  return { photos: chosen.length, reading: true };
 }

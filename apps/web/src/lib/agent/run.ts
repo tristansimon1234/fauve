@@ -60,7 +60,7 @@ export type RunFauveInput = ToolContext & {
     /** Default level of care for montages (Réglages). */
     montageEffort?: Effort;
     /** What Fauve knows about the business (site, tone, memory). */
-    known?: { website: string | null; booking: string | null; tone: string | null; memory: string[] };
+    known?: { website: string | null; booking: string | null; tone: string | null; fonts?: string | null; memory: string[] };
     work?: string[];
     routine?: string[];
     voice?: StudioContextForPrompt["voice"];

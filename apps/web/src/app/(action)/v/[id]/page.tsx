@@ -131,7 +131,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
       ? {
           plan: postSlides({ slides: post.slides, media_ids: ids }) ?? alignSlides({ template: "doux", slides: [] }, ids),
           photos,
-          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, logoOnDark: i.logoOnDark, fonts: i.fonts, colors: i.colors, customFonts: i.customFonts })),
+          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, logoOnDark: i.logoOnDark, fonts: i.fonts, colors: i.colors, customFonts: i.customFonts, signature: i.signature })),
         }
       : null;
   const media: ActionMedia[] = ids.flatMap((mid) => {

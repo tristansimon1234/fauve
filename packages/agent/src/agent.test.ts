@@ -1773,3 +1773,121 @@ test("fonts: a well-known family Google does not serve gets its free twin", asyn
   assert.equal(googleFamilyName("playfair  display"), "Playfair Display");
   assert.equal(googleFamilyName("DM Sans"), "DM Sans");
 });
+
+test("site page: a site builder's interface font and icon fonts are never a business's", async () => {
+  const { isBrandFont } = await import("./site-page.ts");
+  assert.equal(isBrandFont("squarespace-ui-font"), false);
+  assert.equal(isBrandFont("Clarkson"), false);
+  assert.equal(isBrandFont("Font Awesome 6 Free"), false);
+  assert.equal(isBrandFont("wfont_6f0a8a_3b1"), false);
+  assert.equal(isBrandFont("-apple-system"), false);
+  assert.equal(isBrandFont("obviously"), true);
+  assert.equal(isBrandFont("Poppins"), true);
+});
+
+test("site page: fonts are named as the business would name them, their weight read from the name", async () => {
+  const { brandFontName, fontNameStyle } = await import("./site-page.ts");
+  assert.equal(brandFontName("acumin-pro"), "Acumin Pro");
+  assert.equal(brandFontName("Domainesemibolditalic"), "Domaine");
+  assert.equal(brandFontName("American Grotesk Bold"), "American Grotesk");
+  assert.equal(brandFontName("obviously"), "Obviously");
+  assert.equal(brandFontName("Sebenta Heavy"), "Sebenta");
+  assert.deepEqual(fontNameStyle("Domainesemibolditalic"), { weight: 700, italic: true });
+  assert.deepEqual(fontNameStyle("Sebenta Heavy"), { weight: 900, italic: false });
+  assert.deepEqual(fontNameStyle("obviously"), { weight: null, italic: false });
+});
+
+const measuredPage = {
+  display: [
+    { family: "squarespace-ui-font", share: 0.5, uppercase: 1, bold: 1, size: 14, letter_spacing: 0, centered: 0 },
+    { family: "obviously", share: 0.3, uppercase: 0, bold: 0, size: 38, letter_spacing: 0, centered: 0.9, sample: "Pilates Reformer Hot Pilates" },
+  ],
+  middle: [],
+  body: [{ family: "Clarkson", share: 0.2, uppercase: 0, bold: 0, size: 15, letter_spacing: 0, centered: 0 }],
+  loaded_fonts: ["obviously"],
+  areas: [
+    { color: "#e6d8f9", share: 0.3 },
+    { color: "photo", share: 0.2 },
+    { color: "#000000", share: 0.29 },
+  ],
+  texts: [{ color: "#ffffff", share: 0.6 }],
+  buttons: [{ color: "#000000", share: 0.8 }],
+};
+
+test("site page: its titles' font is the one its titles use, never the builder's", async () => {
+  const { pageFonts, pageMeasureSchema } = await import("./site-page.ts");
+  const page = pageMeasureSchema.parse(measuredPage);
+  const { display, body } = pageFonts(page);
+  assert.equal(display?.raw, "obviously");
+  assert.equal(display?.name, "Obviously");
+  // No brand font for the body text: its titles' font takes it.
+  assert.equal(body?.raw, "obviously");
+});
+
+test("site page: the facts the reading gets name its fonts and the colours on screen, without photos", async () => {
+  const { pageFacts, pageMeasureSchema } = await import("./site-page.ts");
+  const facts = pageFacts(pageMeasureSchema.parse(measuredPage), [{ color: "#e6d8f9", share: 0.28 }]);
+  assert.match(facts, /titres en « obviously » \(en casse normale, centrée, 38 px/);
+  assert.match(facts, /#e6d8f9 28 %/);
+  assert.match(facts, /photos et vidéos : 20 %/);
+  assert.doesNotMatch(facts, /squarespace-ui-font|Clarkson/);
+});
+
+test("site page: what was measured settles the titles' case and alignment", async () => {
+  const { measuredTitles, pageMeasureSchema } = await import("./site-page.ts");
+  const page = pageMeasureSchema.parse(measuredPage);
+  const read = { font: "display" as const, case: "upper" as const, weight: "black" as const, align: "left" as const, tracking: "normal" as const };
+  // The reading thought « bold capitals, flush left »: the page says normal case, centred.
+  assert.deepEqual(measuredTitles(page, read), { ...read, case: "normal", align: "center" });
+});
+
+test("site page: the palette takes the exact colours measured, keeps the ones seen elsewhere", async () => {
+  const { snapPalette } = await import("./site-page.ts");
+  assert.deepEqual(snapPalette(["#FF6410", "#e5d9f8", "#aa0000"], ["#ff6200", "#e6d8f9", "#000000"]), ["#ff6200", "#e6d8f9", "#aa0000"]);
+  assert.deepEqual(snapPalette(["#ff6200", "#ff6201"], ["#ff6200"]), ["#ff6200"]);
+});
+
+test("signature: plain lines for the editor, the designer and the critic", async () => {
+  const { signatureLines, brandSignatureSchema } = await import("./signature.ts");
+  assert.equal(signatureLines(undefined), undefined);
+  const signature = brandSignatureSchema.parse({
+    ambiance: "dynamique",
+    titles: { font: "display", case: "normal", weight: "regular", align: "center", tracking: "normal" },
+    stress: "marker",
+    band: "light",
+    grade: "moody",
+    base: "dark",
+    motion: "energique",
+    music: "deep house",
+    voice: "tutoiement, phrases courtes",
+  });
+  const lines = signatureLines(signature)!;
+  assert.match(lines, /casse normale/);
+  assert.match(lines, /entouré ou souligné à la main/);
+  assert.match(lines, /aplat clair/);
+  assert.match(lines, /musique : deep house/);
+});
+
+test("signature: its ambiances are the montage templates", async () => {
+  const { brandSignatureSchema } = await import("./signature.ts");
+  const { MOTION_TEMPLATES } = await import("./schemas.ts");
+  assert.deepEqual([...brandSignatureSchema.shape.ambiance.options], [...MOTION_TEMPLATES]);
+});
+
+test("motion: the signature reaches the render's brand, only what the render applies", async () => {
+  const { resolveReelBrand } = await import("./motion.ts");
+  const signature = {
+    ambiance: "doux" as const,
+    titles: { font: "body" as const, case: "upper" as const, weight: "black" as const, align: "left" as const, tracking: "wide" as const },
+    stress: "block" as const,
+    band: "accent" as const,
+    grade: "flash" as const,
+    base: "light" as const,
+    motion: "fait_main" as const,
+    music: "funk",
+    voice: "vouvoiement",
+  };
+  const brand = resolveReelBrand({}, "doux", { name: "Test", accent: "#aa0000", signature });
+  assert.deepEqual(brand.signature, { titles: signature.titles, stress: "block", band: "accent", grade: "flash", base: "light" });
+  assert.equal(resolveReelBrand({}, "doux", { name: "Test" }).signature, undefined);
+});

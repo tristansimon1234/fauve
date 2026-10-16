@@ -111,6 +111,8 @@ export type ReelProps = {
     logoOnDark?: "as_is" | "white" | "plate";
     /** The studio's own fonts (uploaded files), loaded by URL instead of from Google Fonts. */
     customFonts?: { family: string; url: string }[];
+    /** Its art direction as settings (mirror of BrandSignature): its titles, key words, boxes and light. */
+    signature?: ReelSignature;
   };
   endCard: { title: string; subtitle: string | null; from: number } | null;
   /** Simone's music in the live preview (the render gets it mixed in afterwards). */
@@ -141,4 +143,13 @@ export type ReelProps = {
     /** Its accent colour, instead of the studio's. */
     accent?: string;
   } | null;
+};
+
+/** What the render applies of a business's signature (packages/agent/src/signature.ts). */
+export type ReelSignature = {
+  titles: { font: "display" | "body"; case: "upper" | "normal"; weight: "regular" | "bold" | "black"; align: "center" | "left"; tracking: "tight" | "normal" | "wide" };
+  stress: "color" | "block" | "serif" | "marker";
+  band: "white" | "accent" | "dark" | "light" | "outline";
+  grade: "natural" | "warm" | "bright" | "flash" | "film" | "moody" | "cool";
+  base: "light" | "dark";
 };

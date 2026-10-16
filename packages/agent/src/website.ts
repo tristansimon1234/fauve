@@ -1,5 +1,6 @@
 // Turns a studio's web page into the facts Fauve needs during onboarding.
 // Pure functions only: fetching (and its safety checks) lives in apps/web.
+import { isBrandFont } from "./site-page.ts";
 
 export type SiteInfo = {
   url: string;
@@ -304,7 +305,7 @@ export function extractBrandStyle(rawHtml: string, cssTexts: string[] = []): Bra
   const fontScores = new Map<string, number>();
   const addFont = (name: string, weight: number) => {
     const font = name.trim().replace(/^["']|["']$/g, "").trim();
-    if (!font || font.length > 60 || GENERIC_FONTS.has(font.toLowerCase()) || /icon|awesome|var\(/i.test(font)) return;
+    if (!font || font.length > 60 || GENERIC_FONTS.has(font.toLowerCase()) || !isBrandFont(font) || /var\(/i.test(font)) return;
     fontScores.set(font, (fontScores.get(font) ?? 0) + weight);
   };
   for (const m of css.matchAll(/font-family\s*:\s*([^;{}]+)/gi)) {

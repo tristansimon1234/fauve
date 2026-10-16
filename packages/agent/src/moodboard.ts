@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { brandSignatureSchema, SIGNATURE_GUIDE } from "./signature.ts";
 
 // Moodboard reading: Fauve looks at the manager's inspiration images once and
 // turns them into a written art direction. The montage (editor and motion
@@ -19,7 +20,8 @@ Sois concrète et directive, sans généralités ni paraphrase des images une pa
 Si les images partent dans des directions opposées, dis-le et propose la ligne qui les réunit.
 Texte en français, 900 caractères au maximum, en phrases courtes ou tirets.
 Palette : 3 à 5 couleurs hex tirées des images, la principale en premier.
-Direction : la même chose en 2 ou 3 phrases simples, à la deuxième personne ou sans sujet, comme une note qu'elle pourrait avoir écrite (« Minimaliste et lumineux, tons terracotta et crème, typographie éditoriale, mouvements lents. Jamais de néon. »), 300 caractères au maximum.`;
+Direction : la même chose en 2 ou 3 phrases simples, à la deuxième personne ou sans sujet, comme une note qu'elle pourrait avoir écrite (« Minimaliste et lumineux, tons terracotta et crème, typographie éditoriale, mouvements lents. Jamais de néon. »), 300 caractères au maximum.
+${SIGNATURE_GUIDE}`;
 
 export const moodboardReadingSchema = z.object({
   reading: z.string().describe("La direction artistique tirée du moodboard, 900 caractères au maximum"),
@@ -33,8 +35,17 @@ export const moodboardReadingSchema = z.object({
       body: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).describe("Police du texte : la famille Google Fonts exacte, ou la plus proche, bien lisible"),
     })
     .describe("Les deux polices de la charte, en familles Google Fonts"),
+  signature: brandSignatureSchema.describe("La même direction en réglages, appliqués à chaque Reel et chaque photo"),
 });
 export type MoodboardReading = z.infer<typeof moodboardReadingSchema>;
+
+/** The reading of a site: the same, and which of its photos show the business itself. */
+export const siteLookSchema = moodboardReadingSchema.extend({
+  photos: z
+    .array(z.number().int().min(1))
+    .describe("Les numéros des photos du site (« photo N ») qui montrent vraiment le commerce, les plus belles et les plus parlantes d'abord, 8 au plus"),
+});
+export type SiteLookReading = z.infer<typeof siteLookSchema>;
 
 /**
  * Her « Direction artistique » (Style) stays hers: Simone only fills it when it

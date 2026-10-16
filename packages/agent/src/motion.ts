@@ -3,6 +3,7 @@ import type { Adjust, ClipBlur, PhotoEdit } from "./retouch.ts";
 import { brandPalette, resolveBrandLook, type BrandPalette, type Bullet, type ListItem, type TextLook } from "./text-look.ts";
 import type { LogoOnDark } from "./logo.ts";
 import type { VoiceWord } from "./voice.ts";
+import type { BrandSignature } from "./signature.ts";
 import { previewMusic, speechWindows, type MixCase } from "./mix.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
@@ -104,6 +105,8 @@ export type ReelProps = {
     logoOnDark?: LogoOnDark;
     /** The studio's own fonts (uploaded files), loaded by URL instead of from Google Fonts. */
     customFonts?: { family: string; url: string }[];
+    /** Its art direction as settings: its titles, key words, boxes and light (the render's theme follows them). */
+    signature?: ReelSignature;
   };
   endCard: { title: string; subtitle: string | null; from: number } | null;
   /**
@@ -152,7 +155,16 @@ export type ReelInputs = {
   /** Word timings from the clip analyses, by clip_id (for subtitles). */
   words?: Record<string, ClipAnalysis["words"]>;
   /** fonts: the studio's brand fonts (display first); the plan's fonts win over them. */
-  brand: { name: string; accent?: string | null; logoUrl?: string | null; logoOnDark?: LogoOnDark; fonts?: string[]; colors?: string[]; customFonts?: { family: string; url: string }[] };
+  brand: {
+    name: string;
+    accent?: string | null;
+    logoUrl?: string | null;
+    logoOnDark?: LogoOnDark;
+    fonts?: string[];
+    colors?: string[];
+    customFonts?: { family: string; url: string }[];
+    signature?: BrandSignature;
+  };
   /** Signed link of the music kept for the post: the editors play it with the preview. */
   soundtrack?: string;
   /** Her voice note (plan.voice): its signed link and her words (for the subtitles). */
@@ -375,5 +387,10 @@ export function resolveReelBrand(plan: Pick<EditPlan, "fonts">, template: Motion
     logoUrl: brand.logoUrl ?? null,
     ...(brand.logoUrl && brand.logoOnDark && brand.logoOnDark !== "as_is" ? { logoOnDark: brand.logoOnDark } : {}),
     ...(brand.customFonts?.length ? { customFonts: brand.customFonts } : {}),
+    ...(brand.signature ? { signature: reelSignature(brand.signature) } : {}),
   };
 }
+
+/** What the render applies of a signature (the rest guides the editor, the music and the animations). */
+export type ReelSignature = Pick<BrandSignature, "titles" | "stress" | "band" | "grade" | "base">;
+const reelSignature = ({ titles, stress, band, grade, base }: BrandSignature): ReelSignature => ({ titles, stress, band, grade, base });

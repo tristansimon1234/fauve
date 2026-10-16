@@ -36,18 +36,27 @@ export async function googleFont(family: string): Promise<string | null> {
 
 export type FontSwap = { from: string; to: string };
 
-/** The charter's fonts, each one loadable: hers (a file she added), Google's, its twin, or the ambiance's for that role. */
-export async function usableFonts(fonts: string[] | undefined, own: string[], template: MotionTemplate): Promise<{ fonts: string[] | undefined; swaps: FontSwap[] }> {
+/**
+ * The charter's fonts, each one loadable: hers (a file she added), Google's, the twin Simone
+ * chose by looking at her site (`twins`), a well-known twin, or the ambiance's for that role.
+ */
+export async function usableFonts(
+  fonts: string[] | undefined,
+  own: string[],
+  template: MotionTemplate,
+  twins: Record<string, string> = {},
+): Promise<{ fonts: string[] | undefined; swaps: FontSwap[] }> {
   if (!fonts?.length) return { fonts, swaps: [] };
   const roles = templateFonts(template);
   const mine = new Set(own.map((f) => f.toLowerCase()));
+  const chosen = new Map(Object.entries(twins).map(([from, to]) => [from.toLowerCase(), to]));
   const swaps: FontSwap[] = [];
   const usable = await Promise.all(
     fonts.map(async (family, i) => {
       if (mine.has(family.toLowerCase())) return family;
       const served = await googleFont(family);
       if (served) return served;
-      const twin = fontTwin(family);
+      const twin = chosen.get(family.toLowerCase()) ?? fontTwin(family);
       const to = (twin && (await googleFont(twin))) || (i === 0 ? roles.display : roles.body);
       swaps.push({ from: family, to });
       return to;

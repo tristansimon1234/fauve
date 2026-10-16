@@ -449,6 +449,54 @@ export async function levelSpeechInSandbox(id: string, mp3: Buffer): Promise<{ m
 }
 
 /**
+ * A business's home page as a visitor sees it, read in the sandbox's headless Chrome
+ * (page.mjs): a capture of its top (1280 × 1800), the whole page at half size, and what
+ * its styles really are (fonts of its titles and texts, colours of its blocks, texts and
+ * buttons). The URL was checked to be public before; null when the page could not be read.
+ */
+export async function pageInSandbox(id: string, url: string): Promise<{ capture: Buffer; full: Buffer | null; measured: unknown } | null> {
+  const sandbox = await withTimeLeft(await remotionSandbox());
+  const dir = `${ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    const result = await sandbox.runCommand({
+      cmd: "bash",
+      args: [
+        "-c",
+        `chrome=$(find ${REMOTION}/node_modules/.remotion -type f -name chrome-headless-shell 2>/dev/null | head -1)
+[ -n "$chrome" ] || { echo "no chrome"; exit 3; }
+cd ${REMOTION} && BROWSER_EXECUTABLE="$chrome" timeout 75 node page.mjs "$2" "$1"`,
+        "bash",
+        dir,
+        url,
+      ],
+    });
+    if (result.exitCode !== 0) {
+      console.warn("site page reading failed", url, result.exitCode, (await result.output("both").catch(() => "")).slice(-400));
+      return null;
+    }
+    const [capture, full, json] = await Promise.all([
+      sandbox.readFileToBuffer({ path: `${dir}/page.png` }),
+      sandbox.readFileToBuffer({ path: `${dir}/full.jpg` }).catch(() => null),
+      sandbox.readFileToBuffer({ path: `${dir}/page.json` }),
+    ]);
+    if (!capture?.length || !json?.length) return null;
+    let measured: unknown = null;
+    try {
+      measured = JSON.parse(json.toString("utf8"));
+    } catch {
+      measured = null;
+    }
+    return { capture, full: full?.length ? full : null, measured };
+  } catch (error) {
+    console.warn("site page reading failed", url, error instanceof Error ? error.message.slice(0, 300) : error);
+    return null;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/**
  * A capture of a public web page as a visitor sees it (1280 × 1600, the top of
  * the page), with the headless Chrome the Remotion templates already installed.
  * The URL was checked to be public before; null when the capture fails.

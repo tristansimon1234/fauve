@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { adjustSchema, clipBlurSchema, photoEditSchema } from "./retouch.ts";
 import { listFields, savedLookSchema, textLookSchema } from "./text-look.ts";
+import { brandSignatureSchema } from "./signature.ts";
 import { voiceSettingSchema } from "./voice-over.ts";
 
 // Mirrors the Postgres enums in supabase/migrations.
@@ -345,6 +346,8 @@ export const brandProfileSchema = z.object({
     .optional()
     .describe("Couleurs de la charte, la principale en premier (ex. tirées du site web)"),
   fonts: z.array(z.string().max(60)).max(3).optional().describe("Polices de la charte (Google Fonts) : titres d'abord, puis texte"),
+  /** Her site's fonts that Google does not serve, and the free twin Simone chose for each by looking at it (the render loads the twin). */
+  font_twins: z.record(z.string().max(60), z.string().regex(/^[A-Za-z0-9 ]{2,40}$/)).optional(),
   logo_url: z.url().optional(),
   /** The studio's own fonts (files uploaded in Style, private bucket): usable by name like any Google font. */
   custom_fonts: z
@@ -360,6 +363,8 @@ export const brandProfileSchema = z.object({
     .optional()
     .describe("Direction artistique libre : ambiance, couleurs, typographie, rythme, ce qu'on aime et ce qu'on évite"),
   default_template: motionTemplateSchema.optional().describe("Gabarit de montage préféré du studio"),
+  /** The art direction as settings (read from her site or her moodboard): what every Reel and photo applies. */
+  signature: brandSignatureSchema.optional(),
   /** Inspiration images from the Style page, and Fauve's reading of them (what the montage follows). */
   moodboard: moodboardSchema.optional(),
   /** Text looks the manager keeps (copied from examples she sent, or set by hand). */
