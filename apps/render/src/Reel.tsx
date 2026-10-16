@@ -936,15 +936,23 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
       />
       {chunk.map((word, i) => {
         const active = frame >= word.from && frame <= word.to;
-        const style: CSSProperties =
-          active && s.highlight === "pill"
+        const style: CSSProperties = !active
+          ? {}
+          : s.highlight === "pill"
             ? { background: props.brand.accent, color: props.brand.accentInk, borderRadius: 10 * k, padding: `0 ${10 * k}px`, textShadow: "none" }
-            : active
-              ? { color: legible(props.brand.accent, "footage") }
-              : {};
+            : s.highlight === "serif"
+              ? // Its display font's italic, a touch larger (serif faces run small), like the words its site sets apart.
+                { fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontWeight: 400, fontSize: "1.1em", textTransform: "none" }
+              : { color: legible(props.brand.accent, "footage") };
         return (
           <span key={i} style={{ display: "inline-block", margin: `0 ${8 * k}px`, ...style }}>
-            {word.w}
+            {active && s.highlight === "marker" ? (
+              <Marker color={legible(props.brand.accent, "footage")} from={word.from} long>
+                {word.w}
+              </Marker>
+            ) : (
+              word.w
+            )}
           </span>
         );
       })}
