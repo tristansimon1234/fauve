@@ -218,7 +218,8 @@ export const editPlanObjectSchema = z.object({
   /** Closing card over the last ~1.6 s: studio name or logo, plus a call to action. */
   end_card: z.object({ title: z.string().min(1).max(40), subtitle: z.string().max(60).optional() }).optional(),
   /** Her own voice over the Reel: a voice note (media_assets, with its transcript), from `at` seconds. Set from the post, never written by the editor. */
-  voice: z.object({ media_id: z.string().min(1), at: z.number().min(0).max(10) }).optional(),
+  // `at`: where the recording starts on the Reel's clock; negative, the silence before its first word is cut.
+  voice: z.object({ media_id: z.string().min(1), at: z.number().min(-30).max(10) }).optional(),
   /** An overlay over the whole video, under the texts: dust, film dust and a rare scratch (a key message, a vintage or night mood). */
   effect: z.enum(["dust"]).optional(),
 });

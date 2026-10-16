@@ -9,6 +9,9 @@ import { z } from "zod";
 // ambiance (template) only keeps the rhythm, the transitions and the entrances.
 
 export const SIGNATURE_GRADES = ["natural", "warm", "bright", "flash", "film", "moody", "cool"] as const;
+
+/** The longest words of a signature: a stored profile keeps them within these. */
+const SIGNATURE_CHARS = { music: 80, voice: 200, delivery: 140 } as const;
 /** The ambiances (MOTION_TEMPLATES in schemas.ts, which imports this file: written out here). */
 const AMBIANCE_KEYS = ["doux", "dynamique", "chic", "collage"] as const;
 /** The voices of Simone's gallery a business can sound like (SIMONE_VOICES without the whispered ones). */
@@ -21,7 +24,7 @@ export const narratorSchema = z
       .describe(
         "La voix de ses Reels qui sonne comme ce commerce : Eva (femme, douce et posée), Victoria (femme, jeune et souriante), Lucie (femme, naturelle et chaleureuse), Neto (homme, jeune et décontracté), Antonin (homme, calme et posé), Jules (homme, chaleureux, comme une conversation)",
       ),
-    delivery: z.string().max(140).describe("Son rythme et son intonation : énergie, débit, attitude (« cool et nonchalant, un brin rock », « posé et doux », « enjoué et rapide »), jamais un ton de pub"),
+    delivery: z.string().max(SIGNATURE_CHARS.delivery).describe("Son rythme et son intonation : énergie, débit, attitude (« cool et nonchalant, un brin rock », « posé et doux », « enjoué et rapide »), jamais un ton de pub"),
   })
   .describe("La voix off de ses Reels");
 
@@ -59,7 +62,7 @@ export const brandSignatureSchema = z.object({
     .describe("Le mouvement de ses animations : epure (lent, aéré, lignes fines), chaleureux (mots sur le temps, formes rondes), energique (franc, gros mots), fait_main (tracés, découpes)"),
   music: z
     .string()
-    .max(80)
+    .max(SIGNATURE_CHARS.music)
     .describe(
       "Le son de ses Reels, en anglais pour le compositeur : le genre précis qui colle à son univers, celui que son lieu passerait et que ses clients écoutent (rock, garage, indie, punk, hip-hop, house, French touch, soul, jazz, bossa, électro, lo-fi, pop…), avec un ou deux mots de texture ; jamais de la musique de pub ni un genre par défaut",
     ),
@@ -67,13 +70,41 @@ export const brandSignatureSchema = z.object({
   narrator: narratorSchema.optional(),
   voice: z
     .string()
-    .max(200)
+    .max(SIGNATURE_CHARS.voice)
     .describe("Sa façon de parler, tirée des mots de son site : tutoiement ou vouvoiement, humour, longueur des phrases, ses mots à lui"),
 });
 export type BrandSignature = z.infer<typeof brandSignatureSchema>;
 
-/** What a reading (site or moodboard) writes: the signature with its voice. */
-export const signatureReadingSchema = brandSignatureSchema.extend({ narrator: narratorSchema });
+/**
+ * What a reading (site or moodboard) writes: the signature with its voice. Structured outputs
+ * do not enforce lengths: its words are taken as written, then clamped (clampSignature), so one
+ * long line never loses the whole reading (a 90-character music brief lost a site's whole look).
+ */
+export const signatureReadingSchema = brandSignatureSchema.extend({
+  music: z.string().describe(brandSignatureSchema.shape.music.description ?? ""),
+  voice: z.string().describe(brandSignatureSchema.shape.voice.description ?? ""),
+  narrator: narratorSchema.extend({ delivery: z.string().describe(narratorSchema.shape.delivery.description ?? "") }).describe(narratorSchema.description ?? ""),
+});
+export type SignatureReading = z.infer<typeof signatureReadingSchema>;
+
+/** A text cut to `max` characters at a word, without a dangling comma. */
+export function clip(text: string, max: number): string {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (t.length <= max) return t;
+  // At the last space that fits: a word is not cut in two when it can be helped.
+  const space = t.lastIndexOf(" ", max);
+  return (space >= max / 2 ? t.slice(0, space) : t.slice(0, max)).replace(/[\s,;:–-]+$/, "");
+}
+
+/** A reading's signature within the lengths a stored profile keeps. */
+export function clampSignature<T extends SignatureReading>(signature: T): T {
+  return {
+    ...signature,
+    music: clip(signature.music, SIGNATURE_CHARS.music),
+    voice: clip(signature.voice, SIGNATURE_CHARS.voice),
+    narrator: { ...signature.narrator, delivery: clip(signature.narrator.delivery, SIGNATURE_CHARS.delivery) },
+  };
+}
 
 /** What the reading writes about the signature (moodboard or site), appended to its prompt. */
 export const SIGNATURE_GUIDE = `Signature : les mêmes choix en réglages, que le moteur applique à chaque Reel et à chaque photo sans qu'on le lui demande. Pars de ce que tu vois (et des mesures quand tu les as), jamais d'une habitude :

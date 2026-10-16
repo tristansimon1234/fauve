@@ -1,4 +1,4 @@
-import { avoidPhotoText, boxFrom2d, headZone, photoEditFrom, subtitleRow, type Adjust, type Box, type PhotoDetection } from "./retouch.ts";
+import { avoidPhotoText, boxFrom2d, headZone, photoBoxInFrame, photoEditFrom, subtitleRow, type Adjust, type Box, type PhotoDetection } from "./retouch.ts";
 import { planTimeline } from "./motion.ts";
 import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type EditPlan, type PlanSegment } from "./schemas.ts";
 
@@ -178,8 +178,13 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
     if (isClipSegment(s)) {
       const photo = facts.photos[s.clip_id];
       if (photo) {
-        boxes.push(...(photo.detection.text_boxes ?? []).map((b) => boxFrom2d(b, 0.05)));
-        boxes.push(...photo.detection.regions.filter((r) => r.kind === "face" && r.recognizable).map((r) => boxFrom2d(r.box_2d, 0.1)));
+        // Read on the photo, placed where the vertical crop (and its slow zoom) shows them.
+        const shown = (b: Box) => (s.photo ? photoBoxInFrame(b, s.photo) : b);
+        const zones = [
+          ...(photo.detection.text_boxes ?? []).map((b) => boxFrom2d(b, 0.05)),
+          ...photo.detection.regions.filter((r) => r.kind === "face" && r.recognizable).map((r) => boxFrom2d(r.box_2d, 0.1)),
+        ];
+        boxes.push(...zones.flatMap((b) => shown(b) ?? []));
       } else {
         const analysis = facts.clips[s.clip_id];
         const speed = s.speed ?? 1;

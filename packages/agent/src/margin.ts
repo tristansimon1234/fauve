@@ -25,7 +25,7 @@ export const MONTHLY_COST_BUDGET_EUR = monthlyCostBudget("pro");
  * Update when a model, an effort or a price changes: the test checks the margin of each.
  */
 export const TYPICAL_COST_EUR: Record<keyof typeof CREDIT_PRICES, number> = {
-  montage: 0.06, // the editor, effort high
+  montage: 0.1, // the editor, effort high, and the judge of its hooks (voice and text)
   clip: 0.01, // Gemini Flash watching one clip
   correction: 0.06, // the editor again
   newScene: 0.11, // the motion designer, with its sandbox test

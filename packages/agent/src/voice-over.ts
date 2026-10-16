@@ -98,11 +98,20 @@ export function wantsVoiceOver(p: {
   return !p.speechInClips && p.footageSeconds + p.photos * 3 >= VOICE_MIN_FOOTAGE_SECONDS;
 }
 
-export const voiceOverScriptSchema = z.object({
-  hook: z.string().describe("La première phrase, celle qui arrête le pouce dès ses premiers mots"),
-  script: z.string().describe("Tout ce que la voix dit, première phrase comprise, tel qu'il sera lu"),
-});
-export type VoiceOverScript = z.infer<typeof voiceOverScriptSchema>;
+const hooksField = z
+  .array(z.string())
+  .describe("4 premières phrases possibles, de formes différentes, 9 mots au plus chacune, qui mènent toutes à la suite ; ta préférée d'abord");
+const restField = z.string().describe("Tout ce que la voix dit après la première phrase, tel qu'il sera lu, balises comprises");
+
+/** What the writer answers: first sentences to choose from (the hook is judged), then all that follows. */
+export const voiceOverScriptSchema = z.object({ hooks: hooksField, rest: restField });
+export type VoiceOverDraft = z.infer<typeof voiceOverScriptSchema>;
+
+/** The voice's text once its first sentence is chosen: the hook, and all it says from the hook on. */
+export type VoiceOverScript = { hook: string; script: string };
+
+/** The text read from a chosen first sentence and what follows it. */
+export const scriptFrom = (hook: string, rest: string): VoiceOverScript => ({ hook: hook.trim(), script: `${hook.trim()} ${rest.trim()}`.trim() });
 
 /** The two ways a Reel without anyone speaking works: told by a voice, or one key message with the music. */
 export const reelFormatSchema = z.enum(["raconte", "message"]);
@@ -112,8 +121,8 @@ export type ReelFormat = z.infer<typeof reelFormatSchema>;
 export const voiceOverDecisionSchema = z.object({
   format: reelFormatSchema.describe("raconte : une voix qui raconte rend ce Reel meilleur ; message : un seul message clé à l'écran, avec la musique, sans voix"),
   why: z.string().describe("Pourquoi, en une phrase"),
-  hook: z.string().describe("La première phrase, celle qui arrête le pouce dès ses premiers mots ; vide avec message"),
-  script: z.string().describe("Tout ce que la voix dit, première phrase comprise, tel qu'il sera lu ; vide avec message"),
+  hooks: hooksField.describe(`${hooksField.description} ; vide avec message`),
+  rest: restField.describe(`${restField.description} ; vide avec message`),
 });
 export type VoiceOverDecision = z.infer<typeof voiceOverDecisionSchema>;
 
@@ -121,11 +130,11 @@ export type VoiceOverDecision = z.infer<typeof voiceOverDecisionSchema>;
 export const VOICE_FORMAT_PROMPT = `Avant d'écrire, choisis la forme de ce Reel (« format ») : les Reels qui marchent font l'un ou l'autre, aucun n'est meilleur en soi.
 - « raconte » : une voix qui raconte le rend meilleur : un lieu, un plat ou un geste à faire découvrir, des coulisses, un conseil, une histoire à dérouler sur ses images ;
 - « message » : il porte mieux un seul message clé à l'écran, avec la musique et sans voix : une offre, une annonce, la rentrée, une ouverture, un événement, une ambiance à faire sentir.
-Si sa demande dit déjà la forme (une voix qui raconte, pas de voix, un seul message), suis-la. Dans le doute : « message » pour une offre ou une annonce, « raconte » sinon. « why » en une phrase. Avec « message », laisse hook et script vides.`;
+Si sa demande dit déjà la forme (une voix qui raconte, pas de voix, un seul message), suis-la. Dans le doute : « message » pour une offre ou une annonce, « raconte » sinon. « why » en une phrase. Avec « message », laisse hooks et rest vides.`;
 
 export const VOICE_OVER_PROMPT = `Tu écris la voix off d'un Reel Instagram pour un commerce de quartier : ce qu'une vraie personne dit sur ses images, comme un créateur qui parle à ses abonnés, jamais comme une pub. Cette voix fait rester les gens jusqu'au bout : elle doit donner envie, pas vendre.
 
-Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée de la publication et, quand il y en a, la demande faite pour ce Reel (« publication.demande », souvent dans les mots de la personne qui gère) et ce qu'elle veut entendre (« consigne_voix »), le ton du commerce, ce que montrent ses images, dans l'ordre où elles ont été filmées, et la longueur à viser (« longueur » : de mots_min à mots_max mots).
+Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée de la publication et, quand il y en a, la demande faite pour ce Reel (« publication.demande », souvent dans les mots de la personne qui gère) et ce qu'elle veut entendre (« consigne_voix »), le ton du commerce, ce que montrent ses images, dans l'ordre où elles ont été filmées, l'image sur laquelle le Reel s'ouvre (« ouverture », le plan le plus fort pour accrocher) et la longueur à viser (« longueur » : de mots_min à mots_max mots).
 
 Sa demande passe avant tes idées : le message, l'ordre et l'invitation qu'elle donne, avec des phrases à toi, dites à l'oral ; les faits qu'elle y donne sont vrais. Elle écrit souvent en son nom (« chez nous », « moi ») : la voix, elle, reste celle d'un créateur qui parle du commerce.
 
@@ -133,8 +142,9 @@ Les exemples entre guillemets ci-dessous montrent une forme, jamais des mots à 
 
 Règles :
 - la longueur demandée, jamais plus : la voix ne dure pas plus longtemps que ce que ses images montrent (environ 2,6 mots par seconde) ; des phrases entières et courtes, à l'oral, qui s'enchaînent (« Et », « Alors », « À ce stade », « Visiblement », dire « on ») ; jamais des bouts de phrase télégraphiques (« Et hop, au four. ») ; chaque phrase apporte quelque chose de nouveau : ne redis jamais avec d'autres mots une idée déjà dite ;
-- une petite histoire, jamais une liste : (1) la première phrase accroche dès ses premiers mots en ouvrant une curiosité sur la première image (un mystère, un détail surprenant, la question qu'on se pose en la voyant) ; (2) la suivante y répond ou dévoile le commerce ; (3) le milieu monte d'un cran sur ce que montrent les images, avec un regard : une exagération juste, une image, de l'humour, ce qu'on se demande en le voyant ; (4) une chute qui fait sourire ou un fait qui marque ; (5) la fin. Formes seulement : « Si tu passes devant à 7 h, tu vas te demander ce qui se passe derrière cette vitrine… » puis « Ils préparent déjà la pâte de ce soir. » ; « À ce stade, la question n'est plus de savoir si c'est bon, mais comment le finir. » ; jamais le nom du commerce ni « Bienvenue chez… » en première phrase ;
-- suis ses images dans l'ordre et dis ce qu'on voit avec un regard : nommer un plat, un geste ou un détail est permis si la phrase y ajoute quelque chose (encore et encore, une quantité folle, presque trop) ; une suite de noms de plats, d'objets ou de pièces sans regard est interdite (« le croque qui file, la salade, le gâteau », « douche, canapé, néon »), pas le décor pour le décor ; seulement des faits vrais (ceux qu'on te donne et ce que montrent les images), rien d'inventé : ni prix, ni chiffre, ni promesse qui ne sont pas dans ce qu'on te donne ;
+- la première phrase décide si on reste : elle se dit en moins de trois secondes (9 mots au plus) et accroche dès ses trois premiers mots, sur l'image qui ouvre le Reel (« ouverture », sauf si sa demande dit par quoi commencer). Ce qui accroche : une question qu'on veut voir résolue, deux choses qui ne vont pas ensemble, un chiffre précis, ce qu'on ne voit pas d'habitude, un défi, la personne qui regarde mise dans la scène (« tu ») ; ce qui fait passer : le nom du commerce, « bienvenue », « aujourd'hui », « voici », « découvrez », une question molle (« tu connais… ? »), une promesse vague (« tu vas adorer »), une phrase qui irait à n'importe quel commerce. Écris 4 premières phrases de formes différentes (hooks), ta préférée d'abord, qui mènent toutes à ta deuxième phrase : la plus forte sera gardée ;
+- une petite histoire, jamais une liste : (1) la première phrase ouvre la curiosité ; (2) la suivante y répond ou dévoile le commerce ; (3) le milieu monte d'un cran sur ce que montrent les images, avec un regard : une exagération juste, une image, de l'humour, ce qu'on se demande en le voyant ; (4) une chute qui fait sourire ou un fait qui marque ; (5) la fin. Formes seulement : « À 7 h, ça s'agite déjà derrière cette vitrine… » puis « Ils préparent la pâte de ce soir. » ; « À ce stade, la question n'est plus de savoir si c'est bon, mais comment le finir. » ;
+- après l'ouverture, suis ses images dans l'ordre et dis ce qu'on voit avec un regard : nommer un plat, un geste ou un détail est permis si la phrase y ajoute quelque chose (encore et encore, une quantité folle, presque trop) ; une suite de noms de plats, d'objets ou de pièces sans regard est interdite (« le croque qui file, la salade, le gâteau », « douche, canapé, néon »), pas le décor pour le décor ; seulement des faits vrais (ceux qu'on te donne et ce que montrent les images), rien d'inventé : ni prix, ni chiffre, ni promesse qui ne sont pas dans ce qu'on te donne ;
 - une preuve quand les images la montrent : la file devant, la salle pleine, quelqu'un qui goûte ou qui sourit, un habitué ;
 - son métier d'abord (le plat, la coupe, le cours, le soin) : un produit dérivé (vêtement, casquette, tote bag) n'est jamais le sujet, sauf si l'idée de la publication en parle ;
 - parle comme le commerce parle (« ton ») : ses mots, son humour, tutoiement ou vouvoiement comme lui ;
@@ -142,11 +152,12 @@ Règles :
 - finis par une invitation simple et concrète, qui dit quoi faire (venir, réserver, essayer : le geste précis pour ce commerce, et où le faire, par exemple « le lien est dans la bio »), ou par une raison de l'envoyer à quelqu'un (« si tu as une gourmande autour de toi, tu sais à qui l'envoyer ») ;
 - interdit : les formules de pub (« découvrez », « n'hésitez pas », « une expérience unique », « de qualité », « savoureux », « au cœur de »), les superlatifs creux, les emojis, les hashtags, le tiret long, les parenthèses ;
 - écris les nombres en lettres quand ils se disent mal en chiffres (« dix-huit mois ») et la ponctuation d'une voix qui parle : des points, des virgules, des points de suspension pour une petite pause, une question au plus ;
+- ça s'écoute comme quelqu'un qui parle, jamais comme une pub lue au micro : écris comme on parle à un ami dans une note vocale ou face caméra, avec les tournures de l'oral (« t'as », « y a », « c'est », « franchement », « en vrai », « du coup », « bref ») quand elles collent au ton du commerce, une phrase qui se reprend ou une petite hésitation de temps en temps (« enfin… »), des phrases qui ne sont pas toutes parfaites ; relis-la dans ta tête : si on dirait une annonce, une plaquette ou un spot radio, réécris-la ;
 - « intonation » dit le rythme et l'attitude de la voix pour ce commerce (« cool et nonchalant, un brin rock », « posé et doux ») : écris pour elle (longueur des phrases, mots, pauses) et choisis tes balises de jeu pour la porter ; jamais un ton d'animatrice ni de pub ;
 - pour une voix humaine, glisse 1 ou 2 balises de jeu entre crochets, en anglais, juste avant la phrase qu'elles colorent : [warmly], [smiling], [softly], [excited], [casually], [confident], [playful], [deadpan], [laughs softly], [whispers], [sighs] ; par exemple « [casually] » devant une phrase lâchée l'air de rien ; jamais plus de 2, jamais au milieu d'un mot, jamais d'autres crochets ;
 - si on te dit que la voix est chuchotée (ASMR), écris pour un murmure tout près de l'oreille : des phrases encore plus courtes et lentes, des points de suspension, ce qu'on entend et ce qu'on sent (le bruit des ciseaux, la mousse, la croûte qui craque, la chaleur d'une serviette), aucune question qui claque ni point d'exclamation, [whispers] ou [softly] comme balises.
 
-Réponds avec hook (la première phrase) et script (tout le texte, première phrase comprise, balises comprises).`;
+Réponds avec hooks (les 4 premières phrases possibles) et rest (tout ce qui suit la première phrase, balises comprises).`;
 
 /** Acting tags (« [warmly] »): played by the voice, never read, never shown in the subtitles. */
 const TAG = /\[[^\]]*\]/g;

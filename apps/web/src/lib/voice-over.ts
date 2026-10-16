@@ -8,6 +8,8 @@ import {
   editPlanSchema,
   findVoice,
   fromTtsAlignment,
+  openingCandidates,
+  scriptFrom,
   readPostVoice,
   readVoiceSetting,
   sentencePauses,
@@ -25,9 +27,11 @@ import {
   voiceOverScriptSchema,
   type ReelFormat,
   type VoiceOverDecision,
+  type VoiceOverDraft,
   type VoiceOverScript,
   type VoiceTranscript,
 } from "@fauve/agent";
+import { judgeHooks } from "@/lib/agent/hook-judge";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { env } from "@/lib/env";
 import { levelSpeechInSandbox } from "@/lib/render/sandbox";
@@ -65,6 +69,15 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
     const a = read.get(id);
     return a?.success ? [{ video: a.data.summary, plans: a.data.shots.slice(0, 6).map((s) => s.description) }] : [];
   });
+  // The image the Reel opens on (its strongest shot): the first sentence is written for it, the editor opens on it.
+  const opening = openingCandidates(
+    ids.flatMap((id) => {
+      const a = read.get(id);
+      return kinds.get(id)?.kind !== "image" && a?.success ? [{ media_id: id, analysis: a.data }] : [];
+    }),
+    ids.flatMap((id) => (kinds.get(id)?.kind === "image" ? [{ media_id: id, contenu: (kinds.get(id)!.regions as { detection?: { notes?: string } } | null)?.detection?.notes }] : [])),
+    1,
+  )[0];
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.profile ?? {});
   // What there is to show: the videos' length, a photo about 2 s.
   const footage = ids.reduce((sum, id) => {
@@ -88,6 +101,7 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
     // Her whole request (the title keeps only its first words): what she imagines, or Simone's brief from the chat.
     publication: { idee: post.data.title, angle: post.data.agent_note ?? undefined, ...(brief ? { demande: brief.slice(0, 1500) } : {}) },
     images,
+    ...(opening?.what ? { ouverture: opening.what } : {}),
   };
 }
 
@@ -117,6 +131,7 @@ export async function writeVoiceScript(
     ...(wish ? { consigne_voix: wish } : {}),
     ...(whispered ? { voix: "chuchotée (ASMR)" } : {}),
   };
+  let draft: VoiceOverDraft & Partial<Pick<VoiceOverDecision, "format" | "why">>;
   for (let attempt = 0; ; attempt++) {
     const response = await anthropic().beta.messages.parse({
       model: CLAUDE_MODEL,
@@ -126,15 +141,31 @@ export async function writeVoiceScript(
       messages: [{ role: "user", content: JSON.stringify(input) }],
     });
     await logClaudeCost(studioId, response.usage, "voice_script");
-    const script = response.parsed_output as (VoiceOverScript & Partial<Pick<VoiceOverDecision, "format" | "why">>) | null;
-    if (!script) throw new Error("La voix off n'a pas pu être écrite");
-    if (script.format === "message") return script;
-    const words = spokenWords(script.script);
+    const parsed = response.parsed_output as (VoiceOverDraft & Partial<Pick<VoiceOverDecision, "format" | "why">>) | null;
+    if (!parsed) throw new Error("La voix off n'a pas pu être écrite");
+    if (parsed.format === "message") return { format: "message", why: parsed.why, hook: "", script: "" };
+    draft = { ...parsed, hooks: parsed.hooks.map((h) => h.trim()).filter(Boolean) };
+    const words = spokenWords(scriptFrom(draft.hooks[0] ?? "", draft.rest).script);
     // Too long, it would not fit in a Reel; too short, it says nothing: once more.
     const { mots_min: min, mots_max: max } = input.longueur;
-    if ((words >= min - 6 && words <= max + 4) || attempt >= 1) return script;
+    if ((words >= min - 6 && words <= max + 4) || attempt >= 1) break;
     input.publication = { ...input.publication, angle: `${input.publication.angle ?? ""} La version précédente faisait ${words} mots : vise ${min} à ${max}.`.trim() };
   }
+  // Its first sentence decides whether anyone stays: the strongest of its hooks (and the judge's own), for the image it opens on.
+  const next = stripAudioTags(draft.rest).split(/(?<=[.!?…])\s+/)[0];
+  const chosen =
+    draft.hooks.length > 0
+      ? await judgeHooks(studioId, {
+          type: "voix",
+          commerce: { nom: input.commerce.nom, activite: input.commerce.activite, ce_qu_on_sait: input.commerce.ce_qu_on_sait, ton: input.commerce.ton },
+          demande: input.publication.demande,
+          premiere_image: input.ouverture,
+          suite: next || undefined,
+          chuchotee: whispered || undefined,
+          accroches: draft.hooks,
+        })
+      : null;
+  return { ...scriptFrom(chosen?.text ?? draft.hooks[0] ?? "", draft.rest), format: draft.format, why: draft.why };
 }
 
 /** The models tried in turn: the one configured, then older ones whose word timings are documented. */
@@ -158,6 +189,7 @@ export async function speak(text: string, voiceId = env("ELEVENLABS_VOICE_ID")):
         method: "POST",
         headers: { "xi-api-key": key, "content-type": "application/json" },
         // Multilingual v2 finds the language itself (it refuses language_code) and would read the acting tags aloud.
+        // Each voice keeps its own tone (its library settings): Tristan picked them by ear as they are.
         body: JSON.stringify(model === "eleven_multilingual_v2" ? { text: stripAudioTags(text), model_id: model } : { text, model_id: model, language_code: "fr" }),
       });
       if (res.status !== 429 || attempt >= BUSY_RETRIES) break;

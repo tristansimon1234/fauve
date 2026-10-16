@@ -98,6 +98,8 @@ export type ReelProps = {
     items?: { title: string; detail?: string }[];
     detail_look?: TextLook;
     bullet?: { kind: "check" | "box" | "dot" | "dash" | "number" | "arrow"; color: string };
+    /** In a Reel, a text with items is a message: its own words are its title (on a photo, a list's text is only its name). */
+    message?: boolean;
   }[];
   words: { w: string; from: number; to: number }[];
   brand: {

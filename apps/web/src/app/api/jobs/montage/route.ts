@@ -306,6 +306,7 @@ async function review(job: Job) {
     asked: round > 0 ? job.issues : undefined,
     format: job.format,
   });
+  if (verdict) console.log("montage: review", job.postId, `score ${verdict.review.score}, hook ${verdict.review.hook}`, verdict.review.ok ? "ok" : verdict.review.issues.map((i) => i.problem).join(" | "));
   // Without a verdict: the first take on Max (it follows the plan the manager saw), the correction afterwards.
   const best = rendered[verdict?.best ?? (round === 0 ? 0 : rendered.length - 1)]!;
   const compared = job.compared || (Boolean(verdict) && round === 0 && rendered.length > 1);
