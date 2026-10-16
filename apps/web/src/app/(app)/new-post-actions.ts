@@ -1,6 +1,6 @@
 "use server";
 
-import { filmIdeas, postIdeas, publishWhen, readVoiceSetting } from "@fauve/agent";
+import { filmIdeas, postIdeas, publishWhen, readVoiceSetting, type PostIdea } from "@fauve/agent";
 import { localInstant, localDateOf, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
 import { freeSlots, type Slot } from "@/lib/slots";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
@@ -21,8 +21,8 @@ export type NewPostOptions = {
   /** Things easy to film this week, when she has nothing at hand. */
   film: { idea: string; how: string }[];
   media: LibraryItem[];
-  /** One-tap ideas by format, for this kind of business. */
-  ideas: Record<"reel" | "carousel" | "post" | "story", string[]>;
+  /** One-tap ideas by format, for this kind of business: a label, and the request it fills in. */
+  ideas: Record<"reel" | "carousel" | "post" | "story", PostIdea[]>;
   /** Her voice-over setting (Style), the first choice for a Reel. */
   voice: { use: "auto" | "always" | "never"; voiceId: string | null };
   /** TikTok connected: a Reel goes there too, unless she says otherwise. */

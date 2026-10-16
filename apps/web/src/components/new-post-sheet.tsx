@@ -402,6 +402,7 @@ function Create({
           <label htmlFor={`${titleId}-idea`} className="text-[17px] font-extrabold tracking-[-0.01em]">
             Ce que tu imagines <span className="text-[13px] font-semibold tracking-normal text-muted">facultatif</span>
           </label>
+          <p className="-mt-1 text-[13.5px] leading-snug text-muted">Par quoi commencer, comment finir, ce que les gens doivent faire. Avec une voix, ou juste un message à l’écran.</p>
           <textarea
             id={`${titleId}-idea`}
             value={idea}
@@ -411,17 +412,17 @@ function Create({
             placeholder={SCENARIO_EXAMPLE[kind]}
             className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-3 text-[15.5px] leading-snug outline-none focus:border-violet"
           />
-          {/* Ideas only while she has written nothing: a tap fills the field, which she then edits. */}
+          {/* Ideas only while she has written nothing: a tap fills in a whole example request, which she then edits. */}
           {ideas.length > 0 && !idea.trim() && (
-            <div className="flex flex-wrap gap-1.5" aria-label="Idées">
+            <div className="flex flex-wrap gap-1.5" aria-label="Exemples de demandes">
               {ideas.map((it) => (
                 <button
-                  key={it}
+                  key={it.label}
                   type="button"
-                  onClick={() => setIdea(it)}
+                  onClick={() => setIdea(it.prompt)}
                   className="fauve-press h-[34px] rounded-full border border-line bg-soft px-[13px] text-[13.5px] font-semibold hover:border-violet/40"
                 >
-                  {it}
+                  {it.label}
                 </button>
               ))}
             </div>
