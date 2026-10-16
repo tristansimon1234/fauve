@@ -110,15 +110,15 @@ export function pauseFilter(pauses: { at: number; add: number }[], after: string
 }
 
 /**
- * The composer writes a whole piece for the video it watches, its ending included:
- * over the last 2 to 5 s the beat stops and the sound dies away (10 of the lab's
- * 11 Reels), heard as the sound cutting out on the last shots. It watches the Reel
- * followed by its own first seconds, as Instagram loops it, so that ending falls
- * after the Reel, where the mix cuts the music.
+ * A composer writes a whole piece, its ending included: over the last 2 to 5 s the
+ * beat stops and the sound dies away (10 of the lab's 11 Reels), heard as the sound
+ * cutting out on the last shots. The piece is composed this much longer than the
+ * Reel (the one that watches the video sees the Reel then its first seconds, as
+ * Instagram loops it), so that ending falls after the Reel, where the mix cuts it.
  */
 export const MUSIC_TAIL_SECONDS = 6;
 
-/** Seconds of the Reel's start the composer watches after its end. */
+/** Seconds composed after the end of the Reel. */
 export const musicTail = (duration: number): number => round1(clamp(duration, 0, MUSIC_TAIL_SECONDS));
 
 /** The beat is read in the bass (30–150 Hz) every half second; a groove has a kick or a bass note in every second. */
@@ -127,10 +127,73 @@ export const GROOVE_STEP = 0.5;
 /** A second this far under the music's loud level has lost its beat: a groove stays within 5 dB of it. */
 export const GROOVE_DROP_DB = 10;
 
-/** The ffmpeg filter that prints the bass level (RMS, dB) of each GROOVE_STEP of a track. */
-export const BASS_LEVELS_FILTER =
-  `highpass=f=30,lowpass=f=150,lowpass=f=150,aresample=8000,asetnsamples=n=${8000 * GROOVE_STEP}:p=0,` +
+/** The ffmpeg filter that prints the bass level (RMS, dB) of each `step` seconds of a track. */
+export const bassLevelsFilter = (step: number) =>
+  `highpass=f=30,lowpass=f=150,lowpass=f=150,aresample=8000,asetnsamples=n=${Math.round(8000 * step)}:p=0,` +
   "astats=metadata=1:reset=1,ametadata=mode=print:key=lavfi.astats.Overall.RMS_level";
+
+/** Every GROOVE_STEP: where the beat holds (grooveGaps). */
+export const BASS_LEVELS_FILTER = bassLevelsFilter(GROOVE_STEP);
+
+/** Every 10 ms: where each beat lands (beatGrid). */
+export const BEAT_STEP = 0.01;
+
+const toPower = (db: number) => 10 ** ((Number.isFinite(db) ? db : -120) / 10);
+
+/** Levels (dB) every `step` read as levels every `step × factor` (their mean power). */
+export function coarser(levels: number[], factor: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i + factor <= levels.length; i += factor) {
+    const mean = levels.slice(i, i + factor).reduce((sum, db) => sum + toPower(db), 0) / factor;
+    out.push(10 * Math.log10(mean));
+  }
+  return out;
+}
+
+/**
+ * The beat grid of a piece asked at `beat` seconds a beat, from its bass levels every
+ * BEAT_STEP: its real beat (within 6 %) and when its first beat falls (s, under one
+ * beat). The kicks are where the bass jumps up. Null when no steady beat stands out
+ * (a soft piece, or one that does not keep the asked tempo): it is then left as it is.
+ */
+export function beatGrid(levels: number[], beat: number): { period: number; offset: number } | null {
+  const power = levels.map(toPower);
+  const onset = power.map((p, i) => (i ? Math.max(0, p - power[i - 1]!) : 0));
+  // A kick read within one step either side.
+  const at = (t: number) => {
+    const i = Math.round(t / BEAT_STEP);
+    return Math.max(onset[i - 1] ?? 0, onset[i] ?? 0, onset[i + 1] ?? 0);
+  };
+  const length = levels.length * BEAT_STEP;
+  let best: { period: number; offset: number; score: number; mean: number } | null = null;
+  const [low, high] = [beat * 0.94, beat * 1.06];
+  for (let period = low; period <= high; period += 0.0005) {
+    const scores: { offset: number; score: number }[] = [];
+    for (let offset = 0; offset < period; offset += BEAT_STEP) {
+      let score = 0;
+      let beats = 0;
+      for (let t = offset; t < length - BEAT_STEP; t += period) {
+        score += at(t);
+        beats++;
+      }
+      scores.push({ offset, score: beats ? score / beats : 0 });
+    }
+    const top = scores.reduce((a, b) => (b.score > a.score ? b : a));
+    const mean = scores.reduce((sum, s) => sum + s.score, 0) / scores.length;
+    if (!best || top.score > best.score) best = { period, offset: top.offset, score: top.score, mean };
+  }
+  // One found at the edge of the search is another tempo reaching in.
+  if (!best || !best.mean || best.score < 2 * best.mean || best.period < low + 0.001 || best.period > high - 0.001) return null;
+  // A steady beat: a kick on at least every other beat of the grid (the strong jumps, as many as it has beats).
+  // Another tempo only meets a kick now and then.
+  const strongest = [...onset].sort((a, b) => b - a).slice(0, Math.max(1, Math.floor(length / beat)));
+  const strong = strongest.reduce((sum, o) => sum + o, 0) / strongest.length;
+  let hits = 0;
+  let beats = 0;
+  for (let t = best.offset; t < length - BEAT_STEP; t += best.period, beats++) if (at(t) >= 0.3 * strong) hits++;
+  if (!beats || hits / beats < 0.5) return null;
+  return { period: Math.round(best.period * 10000) / 10000, offset: Math.round(best.offset * 1000) / 1000 };
+}
 
 /**
  * Where the beat falls away in a Reel's music (seconds), from its bass levels
@@ -139,7 +202,7 @@ export const BASS_LEVELS_FILTER =
  * shot or an ending that comes too early: heard as the sound cutting out.
  */
 export function grooveGaps(levels: number[], duration: number): { from: number; to: number }[] {
-  const power = levels.map((db) => 10 ** ((Number.isFinite(db) ? db : -120) / 10));
+  const power = levels.map(toPower);
   // Seconds read every half second: a beat every 0.8 s still lands in each one.
   const seconds = power.slice(0, -1).map((p, i) => 10 * Math.log10((p + power[i + 1]!) / 2));
   if (seconds.length < 3) return [];

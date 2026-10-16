@@ -1,7 +1,8 @@
 import "server-only";
 import { APIError, Sandbox } from "@vercel/sandbox";
 import {
-  BASS_LEVELS_FILTER,
+  bassLevelsFilter,
+  GROOVE_STEP,
   MIX_CEILING,
   mixFilter,
   mixGains,
@@ -436,8 +437,11 @@ export async function loopedReelInSandbox(id: string, mp4: Buffer, duration: num
   }
 }
 
-/** The bass level (dB) of each half second over the first `seconds` of a piece of music: where its beat holds (grooveGaps). */
-export async function bassLevelsInSandbox(id: string, audio: Uint8Array, seconds: number): Promise<number[]> {
+/**
+ * The bass level (dB) of each `step` seconds over the first `seconds` of a piece of music:
+ * where its beat holds (grooveGaps, every half second), where its beats land (beatGrid, every 10 ms).
+ */
+export async function bassLevelsInSandbox(id: string, audio: Uint8Array, seconds: number, step = GROOVE_STEP): Promise<number[]> {
   const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${id}-bass`;
   try {
@@ -446,13 +450,38 @@ export async function bassLevelsInSandbox(id: string, audio: Uint8Array, seconds
     const run = await bash(
       sandbox,
       `cd "$1" && ${ROOT}/ffmpeg -hide_banner -nostats -t "$2" -i music.mp3 -vn -af "$3" -f null - 2>&1 | grep -o 'RMS_level=[^ ]*' | cut -d= -f2`,
-      [dir, seconds.toFixed(2), BASS_LEVELS_FILTER],
+      [dir, seconds.toFixed(2), bassLevelsFilter(step)],
     );
     // Silence prints -inf.
     return (await run.stdout())
       .split(/\s+/)
       .filter(Boolean)
       .map((v) => (Number.isFinite(Number(v)) ? Number(v) : -120));
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/**
+ * A piece of music set on a Reel's beat grid (beatGrid): started on its first beat
+ * (`offset` s cut off) and its tempo moved by `tempo` (its beat / the grid's, a few
+ * percent at most, the pitch kept), so every cut falls on one of its beats.
+ */
+export async function alignMusicInSandbox(id: string, audio: Uint8Array, offset: number, tempo: number): Promise<Uint8Array> {
+  const filters = [
+    ...(offset >= 0.015 ? [`atrim=start=${offset.toFixed(3)}`, "asetpts=PTS-STARTPTS"] : []),
+    ...(Math.abs(tempo - 1) >= 0.001 ? [`atempo=${tempo.toFixed(4)}`] : []),
+  ];
+  if (!filters.length) return audio;
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}-align`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await sandbox.writeFiles([{ path: `${dir}/music.mp3`, content: audio }]);
+    await bash(sandbox, `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i music.mp3 -vn -af "$2" -c:a libmp3lame -b:a 192k aligned.mp3`, [dir, filters.join(",")]);
+    const out = await sandbox.readFileToBuffer({ path: `${dir}/aligned.mp3` });
+    if (!out?.length) throw new Error("alignment produced no file");
+    return new Uint8Array(out);
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }
