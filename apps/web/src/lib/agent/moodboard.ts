@@ -1,6 +1,6 @@
 import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { CLAUDE_MODEL, MOODBOARD_PROMPT, moodboardReadingSchema, siteLookSchema, type MoodboardReading, type SiteLookReading } from "@fauve/agent";
+import { clampReading, clampSiteLook, CLAUDE_MODEL, MOODBOARD_PROMPT, moodboardReadingSchema, siteLookSchema, type MoodboardReading, type SiteLookReading } from "@fauve/agent";
 import { anthropic, logClaudeCost } from "./run";
 
 type ReadImage = { url: string; note?: string } | { jpeg: Buffer; note?: string };
@@ -17,13 +17,6 @@ function imagesMessage(intro: string, images: ReadImage[], label: (i: number, im
     ]),
   ];
 }
-
-const tidy = <T extends MoodboardReading>(r: T): T => ({
-  ...r,
-  reading: r.reading.slice(0, 2000),
-  direction: r.direction.slice(0, 600),
-  palette: [...new Set(r.palette.map((c) => c.toLowerCase()))].slice(0, 6),
-});
 
 /**
  * Fauve reads the studio's moodboard (signed image URLs + the manager's notes)
@@ -49,7 +42,7 @@ export async function readMoodboard(studioId: string, studioName: string, images
   });
   await logClaudeCost(studioId, response.usage, "moodboard", CLAUDE_MODEL);
   if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error(`moodboard reading failed (${response.stop_reason})`);
-  return tidy(response.parsed_output);
+  return clampReading(response.parsed_output);
 }
 
 /**
@@ -81,6 +74,6 @@ export async function readSiteImages(studioId: string, intro: string, pages: Buf
   });
   await logClaudeCost(studioId, response.usage, "site_look", model);
   if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error(`site look reading failed (${response.stop_reason})`);
-  const read = tidy(response.parsed_output);
+  const read = clampSiteLook(response.parsed_output);
   return { ...read, photos: [...new Set(read.photos.filter((n) => n >= 1 && n <= photos.length))].slice(0, 8) };
 }

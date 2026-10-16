@@ -2254,3 +2254,42 @@ test("lab fixes 2: a Reel's message shows its title, subtitles off faces read wh
   // Covering every row alike, no row is better: the usual one stays.
   assert.equal(subtitleRow([{ x: 0, y: 0.05, w: 1, h: 0.8 }]), null);
 });
+
+test("readings that hold: a long line never loses a site's look", async () => {
+  const { clampReading, clampSiteLook, siteLookSchema } = await import("./moodboard.ts");
+  const { clip, brandSignatureSchema } = await import("./signature.ts");
+  const asReading = (r: unknown) => r as Parameters<typeof clampSiteLook>[0];
+
+  // A reading taken as written, then clamped: a 120-character music brief, an odd font name, a bad colour.
+  const long = "underground club techno with neon synths, deep pulsing bass, sweaty basement energy and sharp hi-hats all night long";
+  const reading = {
+    reading: "x",
+    direction: "y",
+    palette: ["#FF6200", "orange", "#e6d8f9", "#ff6200"],
+    fonts: { display: "Obviously-Wide!", body: "" },
+    signature: {
+      ambiance: "dynamique",
+      titles: { font: "display", case: "upper", weight: "black", align: "center", tracking: "tight" },
+      stress: "block",
+      band: "accent",
+      grade: "moody",
+      base: "dark",
+      motion: "energique",
+      music: long,
+      narrator: { voice: "Neto", delivery: "z".repeat(200) },
+      voice: "tutoiement",
+    },
+    sample: { hook: "h".repeat(80), key: "k", band: "b".repeat(70) },
+    photos: [1, 2],
+  };
+  assert.equal(siteLookSchema.safeParse(reading).success, true); // the long brief no longer throws the reading away
+  const kept = clampSiteLook(asReading(reading));
+  assert.ok(kept.signature.music.length <= 80 && kept.signature.music.startsWith("underground club techno"));
+  assert.doesNotMatch(kept.signature.music, /[,\s]$/);
+  assert.equal(brandSignatureSchema.safeParse(kept.signature).success, true); // what a profile keeps
+  assert.deepEqual(kept.palette, ["#ff6200", "#e6d8f9"]);
+  assert.deepEqual(kept.fonts, { display: "Obviously Wide", body: "Obviously Wide" });
+  assert.equal(kept.sample.hook.length, 60);
+  assert.equal(clampReading(asReading({ ...reading, fonts: { display: "", body: "" } })).fonts.display, "Inter");
+  assert.equal(clip("une phrase assez longue pour être coupée", 20), "une phrase assez");
+});

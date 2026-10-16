@@ -189,6 +189,7 @@ export async function speak(text: string, voiceId = env("ELEVENLABS_VOICE_ID")):
         method: "POST",
         headers: { "xi-api-key": key, "content-type": "application/json" },
         // Multilingual v2 finds the language itself (it refuses language_code) and would read the acting tags aloud.
+        // Each voice keeps its own tone (its library settings): Tristan picked them by ear as they are.
         body: JSON.stringify(model === "eleven_multilingual_v2" ? { text: stripAudioTags(text), model_id: model } : { text, model_id: model, language_code: "fr" }),
       });
       if (res.status !== 429 || attempt >= BUSY_RETRIES) break;
