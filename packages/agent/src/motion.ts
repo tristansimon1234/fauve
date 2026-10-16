@@ -56,9 +56,11 @@ export type ReelSegment =
       blur?: ClipBlur;
       speech?: boolean;
       accent?: "punch" | "wipe";
+      /** Where the subtitles sit over this shot (top, share of the frame), off its faces. */
+      subtitleY?: number;
     }
   /** A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move). */
-  | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; move?: CameraMove; accent?: "punch" | "wipe" }
+  | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; move?: CameraMove; accent?: "punch" | "wipe"; subtitleY?: number }
   /** Animations play over her footage when there is some (`under`), else on the studio's colours. */
   | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
   | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder };
@@ -203,10 +205,14 @@ export function keepName(text: string, name: string | undefined): string {
 
 /**
  * French typography on screen: the space before « : ; ! ? % € » and inside « » never breaks
- * (a narrow no-break space), so no line of a Reel starts with « : » or a lone « % ».
+ * (a narrow no-break space), so no line of a Reel starts with « : » or a lone « % »; nor
+ * does the one between a number and the word it counts (« 3 cours », « 7 h », « 2 places »).
  */
 export function frenchSpaces(text: string): string {
-  return text.replace(/[ \t\u00a0]+([:;!?»%€])/g, "\u202f$1").replace(/(«)[ \t\u00a0]+/g, "$1\u202f");
+  return text
+    .replace(/[ \t\u00a0]+([:;!?»%€])/g, "\u202f$1")
+    .replace(/(«)[ \t\u00a0]+/g, "$1\u202f")
+    .replace(/(\d)[ \t]+(?=\p{L})/gu, "$1\u00a0");
 }
 
 const toFrames = (seconds: number) => Math.max(0, Math.round(seconds * REEL_FPS));
@@ -241,7 +247,7 @@ export function brandLooks(
   const named = (c: string) => (c === "secondary" || c === "light" || c === "dark" ? (brand.palette?.[c] ?? c) : c);
   return {
     look: resolveBrandLook(t.look, brand),
-    items: t.items,
+    items: t.items?.map((item) => ({ ...item, title: frenchSpaces(item.title), ...(item.detail ? { detail: frenchSpaces(item.detail) } : {}) })),
     detail_look: resolveBrandLook(t.detail_look, brand),
     bullet: t.bullet ? { ...t.bullet, color: named(t.bullet.color) } : undefined,
   };
@@ -285,7 +291,17 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     const move: CameraMove = s.move ?? (zoom ? "in" : "none");
     // A photo in a Reel: the move the engine chose (photoMoves: most held still); a plan from before those moves keeps its slow zoom.
     if (inputs.photoIds?.includes(s.clip_id)) {
-      return { type: "image", src, startAt, durationInFrames: lengths[i]!, zoom: s.move === undefined, ...(s.move ? { move: s.move } : {}), ...(s.photo ? { edit: s.photo } : {}), ...(s.accent ? { accent: s.accent } : {}) };
+      return {
+        type: "image",
+        src,
+        startAt,
+        durationInFrames: lengths[i]!,
+        zoom: s.move === undefined,
+        ...(s.move ? { move: s.move } : {}),
+        ...(s.photo ? { edit: s.photo } : {}),
+        ...(s.accent ? { accent: s.accent } : {}),
+        ...(s.subtitle_y !== undefined ? { subtitleY: s.subtitle_y } : {}),
+      };
     }
     return {
       type: "clip",
@@ -301,6 +317,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       ...(s.blur ? { blur: s.blur } : {}),
       ...(speech ? { speech: true } : {}),
       ...(s.accent ? { accent: s.accent } : {}),
+      ...(s.subtitle_y !== undefined ? { subtitleY: s.subtitle_y } : {}),
     };
   });
   const durationInFrames = cursor + fadeFrames;

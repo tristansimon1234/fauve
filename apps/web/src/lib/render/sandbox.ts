@@ -1,6 +1,6 @@
 import "server-only";
 import { APIError, Sandbox } from "@vercel/sandbox";
-import { MIX_CEILING, mixFilter, mixGains, REEL_FPS, RENDER_FONTS, SANDBOX_REGION, sandboxCostUsd, speechGain, usdToEur, type ReelProps, type ReelUnder } from "@fauve/agent";
+import { MIX_CEILING, mixFilter, mixGains, pauseFilter, REEL_FPS, RENDER_FONTS, SANDBOX_REGION, sandboxCostUsd, speechGain, usdToEur, type ReelProps, type ReelUnder } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
 
@@ -433,7 +433,11 @@ export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Arr
  * peaks held under -1 dBFS), as MP3 of the same length: ElevenLabs' voices come
  * out 12 dB apart, and the live preview plays the file as it is. Unchanged when silent.
  */
-export async function levelSpeechInSandbox(id: string, mp3: Buffer): Promise<{ mp3: Buffer; lufs: number | null }> {
+export async function levelSpeechInSandbox(
+  id: string,
+  mp3: Buffer,
+  pauses: { at: number; add: number }[] = [],
+): Promise<{ mp3: Buffer; lufs: number | null; paused: boolean }> {
   const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${id}-level`;
   try {
@@ -441,15 +445,14 @@ export async function levelSpeechInSandbox(id: string, mp3: Buffer): Promise<{ m
     await sandbox.writeFiles([{ path: `${dir}/in.mp3`, content: mp3 }]);
     const lufs = printed(await (await bash(sandbox, `cd "$1" && ${LOUD} && echo "speech=$(loud in.mp3)"`, [dir])).stdout(), "speech");
     const gain = speechGain(lufs);
-    if (gain === null || Math.abs(gain) < 0.5) return { mp3, lufs };
-    await bash(
-      sandbox,
-      `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp3 -af "volume=$2dB,alimiter=limit=${MIX_CEILING}:level=false" -c:a libmp3lame -b:a 160k out.mp3`,
-      [dir, String(gain)],
-    );
+    const level = gain !== null && Math.abs(gain) >= 0.5 ? `volume=${gain}dB,alimiter=limit=${MIX_CEILING}:level=false` : null;
+    if (!level && !pauses.length) return { mp3, lufs, paused: false };
+    // A breath opened between two sentences read in one go, then the level.
+    const filter = pauses.length ? ["-filter_complex", pauseFilter(pauses, level), "-map", "[out]"] : ["-af", level!];
+    await bash(sandbox, `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp3 "$2" "$3" ${pauses.length ? '"$4" "$5"' : ""} -c:a libmp3lame -b:a 160k out.mp3`, [dir, ...filter]);
     const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp3` });
     if (!out?.length) throw new Error("leveling produced no file");
-    return { mp3: out, lufs };
+    return { mp3: out, lufs, paused: pauses.length > 0 };
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }

@@ -89,6 +89,8 @@ export const editPlanSegmentSchema = z.object({
   photo: photoEditSchema.optional(),
   /** The Reel's one signature transition into this shot (punch: a short zoom that settles; wipe: a panel in the brand colour sweeps away). At most one per Reel. */
   accent: z.enum(["punch", "wipe"]).optional(),
+  /** Where the subtitles sit while this shot plays (top, share of the frame height), moved off a face by the engine (finishPlan), never by the editor. */
+  subtitle_y: z.number().min(0.1).max(0.8).optional(),
 });
 
 /** Full motion-design screen (animated typography in the studio's colours, no video). */

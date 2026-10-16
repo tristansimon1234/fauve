@@ -76,8 +76,10 @@ export type ReelProps = {
         blur?: ClipBlur;
         speech?: boolean;
         accent?: "punch" | "wipe";
+        /** Where the subtitles sit over this shot (top, share of the frame), off its faces. */
+        subtitleY?: number;
       }
-    | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; move?: CameraMove; accent?: "punch" | "wipe" }
+    | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; move?: CameraMove; accent?: "punch" | "wipe"; subtitleY?: number }
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
     | { type: "motion"; js: string; fallback: Scene; texts: Record<string, string>; startAt: number; durationInFrames: number; under?: ReelUnder }
   )[];

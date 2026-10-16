@@ -45,8 +45,6 @@ const TWINS: Record<string, string> = {
   "freight display": "Lora",
   "freight text": "Lora",
   "freight big": "Lora",
-  fairplex: "Lora",
-  "fairplex wide": "Lora",
   didot: "Bodoni Moda",
   bodoni: "Bodoni Moda",
   garamond: "EB Garamond",

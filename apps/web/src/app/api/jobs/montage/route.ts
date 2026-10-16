@@ -304,6 +304,7 @@ async function review(job: Job) {
     versions: rendered,
     request: job.brief,
     asked: round > 0 ? job.issues : undefined,
+    format: job.format,
   });
   // Without a verdict: the first take on Max (it follows the plan the manager saw), the correction afterwards.
   const best = rendered[verdict?.best ?? (round === 0 ? 0 : rendered.length - 1)]!;

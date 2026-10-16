@@ -31,6 +31,9 @@ const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const SAFE = { left: 140, right: 140 };
 
 const normalize = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+/** A word of a text is stressed when the plan names it, or names a part of it (« 3 » in « 3 cours », held together on one line). */
+const stressedIn = (emphasis: Set<string>, word: string) =>
+  emphasis.has(normalize(word)) || word.split(/[\u00a0\u202f]/).some((part) => normalize(part).length > 0 && emphasis.has(normalize(part)));
 
 /** Where a text breaks into words: any space but the non-breaking ones, which hold a business's name together. */
 const SPACES = /[^\S\u00a0\u202f]+/;
@@ -500,8 +503,9 @@ function KeyMessage({ text, index, props, theme, k }: { text: ReelProps["texts"]
             fontWeight: Math.max(800, h.weight),
             fontSize: size * 1.05,
             lineHeight: 0.98,
-            // A short title holds on one line (the block shrinks to fit rather than break it).
+            // A short title holds on one line (the block shrinks to fit rather than break it); a long one breaks into even lines.
             whiteSpace: text.text.length <= 22 ? "nowrap" : "normal",
+            textWrap: "balance",
             letterSpacing: h.uppercase ? h.letterSpacing * k : `${spacing.title}em`,
             textTransform: h.uppercase ? "uppercase" : "none",
             color: titleColor,
@@ -509,7 +513,7 @@ function KeyMessage({ text, index, props, theme, k }: { text: ReelProps["texts"]
           }}
         >
           {text.text.split(SPACES).filter(Boolean).map((word, i) => (
-            <span key={i} style={emphasis.has(normalize(word)) ? { color: legible(props.brand.accent, "footage") } : undefined}>
+            <span key={i} style={stressedIn(emphasis, word) ? { color: legible(props.brand.accent, "footage") } : undefined}>
               {i ? " " : ""}
               {word}
             </span>
@@ -558,10 +562,12 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
     textTransform: h.uppercase ? "uppercase" : "none",
     color: "#fff",
     textShadow: text.backdrop ? "none" : TEXT_SHADOW,
+    // Lines of even length: never one word left alone at the top or the end.
+    textWrap: "balance",
   };
   // A stressed word: on a box in the brand colour (like a creator highlights it), in italic, or in the brand colour.
   const stressed = (word: string): CSSProperties | undefined => {
-    if (!emphasis.has(normalize(word))) return undefined;
+    if (!stressedIn(emphasis, word)) return undefined;
     if (h.stress === "box") return { background: props.brand.accent, color: props.brand.accentInk, borderRadius: 12 * k, padding: `0 ${14 * k}px`, textShadow: "none" };
     if (h.stress === "italic") return { fontStyle: "italic" };
     // A serif accent in a sans hook: the display font's italic, a touch larger (serif faces run small).
@@ -643,7 +649,7 @@ function Band({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
           : { bg: props.brand.accent, fg: props.brand.accentInk };
   // A stressed word: in the brand colour (one that reads on its box), never a chip of its own.
   const stress = (word: string): CSSProperties | undefined =>
-    !emphasis.has(normalize(word))
+    !stressedIn(emphasis, word)
       ? undefined
       : b.box === "white" || b.box === "light"
         ? { color: legible(props.brand.accent, "white") }
@@ -688,7 +694,7 @@ function Band({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
           {text.text}
         </div>
       ) : (
-        <div data-fauve-text={index} style={{ textAlign: "center", lineHeight: 1.42 }}>
+        <div data-fauve-text={index} style={{ textAlign: "center", lineHeight: 1.42, textWrap: "balance" }}>
           <span
             style={{
               ...type,
@@ -736,7 +742,7 @@ function Caption({ text, index, props, theme, k }: { text: ReelProps["texts"][nu
         transform: `translateY(${(1 - p) * 14 * k + exit.translate * k}px)`,
       }}
     >
-      <div style={{ lineHeight: boxed ? 1.42 : 1.2 }}>
+      <div style={{ lineHeight: boxed ? 1.42 : 1.2, textWrap: "balance" }}>
         <span
           style={{
             color: "#fff",
@@ -924,7 +930,7 @@ function LookText({ text, index, props, theme, k }: { text: ReelProps["texts"][n
             const start = shown;
             shown += word.length + 1;
             const visible = look.enter === "typewriter" ? word.slice(0, Math.max(0, typed - start)) : word;
-            const e = emphasis.has(normalize(word)) ? look.emphasis : undefined;
+            const e = stressedIn(emphasis, word) ? look.emphasis : undefined;
             const stress: CSSProperties | undefined = e
               ? {
                   color: e.color ? lookColor(e.color, props) : undefined,
@@ -994,11 +1000,15 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
   const chunk = busy ? undefined : chunks.find((c) => frame >= c[0]!.from && frame <= c.at(-1)!.to + 6);
   if (!chunk) return null;
   const s = theme.subtitle;
+  // Over a shot where a face sits on their row, they take the clear row the engine chose (it holds for the whole phrase).
+  const start = chunk[0]!.from;
+  const shot = props.segments.find((seg) => start >= seg.startAt && start < seg.startAt + seg.durationInFrames);
+  const y = shot && (shot.type === "clip" || shot.type === "image") && shot.subtitleY !== undefined ? shot.subtitleY : SUBTITLE_Y;
   return (
     <div
       style={{
         position: "absolute",
-        top: props.height * SUBTITLE_Y,
+        top: props.height * y,
         left: SAFE.left * k,
         right: SAFE.right * k,
         textAlign: "center",

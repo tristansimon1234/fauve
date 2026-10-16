@@ -161,6 +161,9 @@ export function CollageCard({ index, props, children }: { index: number; props: 
 }
 
 const normalize = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+/** A word of a text is stressed when the plan names it, or names a part of it (« 3 » in « 3 cours », held together on one line). */
+const stressedIn = (emphasis: Set<string>, word: string) =>
+  emphasis.has(normalize(word)) || word.split(/[\u00a0\u202f]/).some((part) => normalize(part).length > 0 && emphasis.has(normalize(part)));
 
 /** Where a text breaks into words: any space but the non-breaking ones, which hold a business's name together. */
 const SPACES = /[^\S\u00a0\u202f]+/;
@@ -193,7 +196,7 @@ export function CollageHook({ text, index, props, theme, k, sides }: TextProps) 
     >
       {words.map((word, i) => {
         const p = spring({ frame: onTwos(frame - i * 3), fps, config: { damping: 12, stiffness: 210, mass: 0.6 } });
-        const serif = i % 2 === 1 || emphasis.has(normalize(word));
+        const serif = i % 2 === 1 || stressedIn(emphasis, word);
         const tilt = [-3, 2, -1.5, 3, -2.5][i % 5]!;
         const chip: CSSProperties = serif
           ? { background: c.accent, color: c.accentInk, fontFamily: `"${COLLAGE_SERIF}", serif`, fontStyle: "italic", fontWeight: 400, fontSize: size * 1.08, textTransform: "none", letterSpacing: 0 }

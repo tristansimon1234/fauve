@@ -81,6 +81,28 @@ export function mixFilter(gains: ReturnType<typeof mixGains>, fadeAt: number | n
   );
 }
 
+/**
+ * The ffmpeg filter graph that opens a breath of silence in a voice at each pause
+ * (sentencePauses), then goes on with `after` (its level), out as [out].
+ */
+export function pauseFilter(pauses: { at: number; add: number }[], after: string | null): string {
+  const n = pauses.length;
+  const s = (x: number) => x.toFixed(3);
+  const graph = [`[0:a]aformat=sample_rates=44100:channel_layouts=mono,asplit=${n + 1}${Array.from({ length: n + 1 }, (_, i) => `[a${i}]`).join("")}`];
+  let order = "";
+  for (let i = 0; i <= n; i++) {
+    const trim = [i ? `start=${s(pauses[i - 1]!.at)}` : "", i < n ? `end=${s(pauses[i]!.at)}` : ""].filter(Boolean).join(":");
+    graph.push(`[a${i}]atrim=${trim},asetpts=N/SR/TB[p${i}]`);
+    order += `[p${i}]`;
+    if (i < n) {
+      graph.push(`aevalsrc=0:c=mono:s=44100:d=${s(pauses[i]!.add)}[s${i}]`);
+      order += `[s${i}]`;
+    }
+  }
+  graph.push(`${order}concat=n=${2 * n + 1}:v=0:a=1${after ? `,${after}` : ""}[out]`);
+  return graph.join(";");
+}
+
 /** Volume (0–1) of a level in the live preview, for music as composed. */
 const previewVolume = (lufs: number) => round2(clamp(10 ** ((lufs - MUSIC_AS_COMPOSED_LUFS) / 20), 0, 1));
 const round2 = (n: number) => Math.round(n * 100) / 100;

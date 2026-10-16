@@ -11,7 +11,7 @@ La personne qui gère le commerce (femme ou homme : n'accorde rien de ce qui la 
 Écris ce que ce moodboard dit de l'identité visuelle à donner à ses Reels, pour un monteur et un motion designer qui ne verront jamais les images :
 - ambiance et énergie (calme, nerveux, luxe, brut, solaire…) ;
 - couleurs : dominantes, accents, contrastes (avec des codes hex) ;
-- typographie : familles (serif, grotesque, script…), graisse, casse, taille, placement ; cite 1 ou 2 Google Fonts proches ;
+- typographie : familles (serif, grotesque, script…), graisse, casse, taille, placement ; cite 1 ou 2 Google Fonts proches par le dessin de leurs lettres, pas seulement par leur largeur ou leur ambiance ;
 - composition : cadrages, espace vide, alignements, grain, textures, formes ;
 - mouvement et rythme suggérés : coupes, vitesse, transitions, animations du texte ;
 - ce qu'il faut éviter pour rester dans cet esprit.
@@ -31,8 +31,16 @@ export const moodboardReadingSchema = z.object({
   palette: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).describe("3 à 5 couleurs hex, la principale en premier"),
   fonts: z
     .object({
-      display: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).describe("Police des titres : la famille Google Fonts exacte, ou la plus proche de la typographie vue (logo, titres)"),
-      body: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).describe("Police du texte : la famille Google Fonts exacte, ou la plus proche, bien lisible"),
+      display: z
+        .string()
+        .regex(/^[A-Za-z0-9 ]{2,40}$/)
+        .describe(
+          "Police des titres : la famille Google Fonts exacte ; si celle du site n'y est pas, la plus proche par le dessin des lettres (structure grotesque, géométrique, humaniste ou serif à contraste, largeur, graisse, forme du a et du e), une famille sobre et bien dessinée ; une police aux formes inhabituelles seulement si celle du site en a",
+        ),
+      body: z
+        .string()
+        .regex(/^[A-Za-z0-9 ]{2,40}$/)
+        .describe("Police du texte : la famille Google Fonts exacte ; sinon la plus proche par le dessin des lettres, sobre et bien lisible en petit"),
     })
     .describe("Les deux polices de la charte, en familles Google Fonts"),
   signature: signatureReadingSchema.describe("La même direction en réglages, appliqués à chaque Reel et chaque photo"),
