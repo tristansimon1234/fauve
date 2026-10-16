@@ -217,6 +217,7 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps): Promi
   };
   const under = (u: ReelUnder | undefined) => (u ? { ...u, src: local(u.src, u.type === "clip") } : u);
   const segments = props.segments.map((segment) => {
+    if (segment.type === "image" && segment.cutout) return { ...segment, src: local(segment.src, false), cutout: { ...segment.cutout, src: local(segment.cutout.src, false) } };
     if (segment.type === "clip" || segment.type === "image") return { ...segment, src: local(segment.src, segment.type === "clip") };
     return segment.under ? { ...segment, under: under(segment.under) } : segment;
   });
@@ -560,6 +561,98 @@ timeout 60 "$chrome" --headless --no-sandbox --disable-gpu --hide-scrollbars --m
   } catch (error) {
     console.warn("site screenshot failed", url, error instanceof Error ? error.message.slice(0, 300) : error);
     return null;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Cut-outs (collages): the subject of a photo cut out pixel-exact by an open model
+// (BiRefNet lite, MIT, rembg's ONNX export) on the CPU, with onnxruntime-node, apart
+// from Remotion (its CUDA files are skipped: the CPU ones come with the package).
+// Installed once in the persistent sandbox, the model checked by its hash.
+// ---------------------------------------------------------------------------
+
+const CUTOUT = `${ROOT}/cutout`;
+const CUTOUT_MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx";
+const CUTOUT_MODEL_SHA256 = "5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333";
+const CUTOUT_SETUP = [
+  "set -euo pipefail",
+  `mkdir -p ${CUTOUT} && cd ${CUTOUT}`,
+  `[ -f package.json ] || echo '{"name":"cutout","private":true}' > package.json`,
+  "[ -d node_modules/onnxruntime-node ] || npm i onnxruntime-node@1.30.0 --ignore-scripts --no-audit --no-fund --loglevel=error",
+  `echo "${CUTOUT_MODEL_SHA256}  model.onnx" > model.sha256`,
+  "sha256sum -c --status model.sha256 2>/dev/null || { curl -fsSL --retry 3 -o model.tmp '" + CUTOUT_MODEL_URL + "' && mv model.tmp model.onnx && sha256sum -c --status model.sha256; }",
+].join("\n");
+
+let cutoutReady: Promise<Sandbox> | undefined;
+
+/** The render sandbox with the cut-out model installed (slow only the first time; the warm-up installs it ahead). */
+export function cutoutSandbox(): Promise<Sandbox> {
+  cutoutReady ??= (async () => {
+    const sandbox = await remotionSandbox();
+    await bash(sandbox, CUTOUT_SETUP);
+    return sandbox;
+  })().catch((error: unknown) => {
+    cutoutReady = undefined;
+    throw error;
+  });
+  return cutoutReady;
+}
+
+/** What the cut-out of a photo is like (shares of the photo; `touches`: how much of each edge the subject runs into). */
+export type CutoutReading = {
+  w: number;
+  h: number;
+  coverage: number;
+  parts: number;
+  box: { x: number; y: number; w: number; h: number };
+  touches: { top: number; bottom: number; left: number; right: number };
+  unsure: number;
+};
+
+/**
+ * Cuts the subject out of each photo (signed URL): its image with transparency (WebP,
+ * else PNG) and what it is like, or the error. One model load for all of them; each
+ * photo takes 10 to 30 s on the sandbox's CPUs.
+ */
+export async function cutoutsInSandbox(
+  id: string,
+  photos: { id: string; url: string }[],
+): Promise<{ results: Record<string, { image: Buffer; type: "image/webp" | "image/png"; reading: CutoutReading } | Error>; seconds: number }> {
+  if (!photos.length) return { results: {}, seconds: 0 };
+  const started = Date.now();
+  const sandbox = await withTimeLeft(await cutoutSandbox());
+  const dir = `${ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await Promise.all(photos.map((p, i) => bash(sandbox, FETCH, [`${dir}/in${i}`, p.url])));
+    const jobs = photos.map((p, i) => ({ id: p.id, src: `${dir}/in${i}`, out: `${dir}/out${i}` }));
+    await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
+    const run = await sandbox.runCommand({
+      cmd: "bash",
+      args: ["-c", `cd ${REMOTION} && CUTOUT_HOME=${CUTOUT} FFMPEG=${ROOT}/ffmpeg timeout 600 node cutout.mjs "$1/jobs.json"`, "bash", dir],
+    });
+    const lastLine = (await run.stdout()).trim().split("\n").at(-1) ?? "";
+    let readings: Record<string, (CutoutReading & { file: string }) | { error: string }>;
+    try {
+      readings = JSON.parse(lastLine);
+    } catch {
+      const output = (await run.output("both").catch(() => "")).slice(-400);
+      throw new Error(`cut-out failed: ${output}`);
+    }
+    const results: Record<string, { image: Buffer; type: "image/webp" | "image/png"; reading: CutoutReading } | Error> = {};
+    for (const p of photos) {
+      const r = readings[p.id];
+      if (!r || "error" in r) {
+        results[p.id] = new Error(r && "error" in r ? r.error : "no cut-out");
+        continue;
+      }
+      const { file, ...reading } = r;
+      const image = await sandbox.readFileToBuffer({ path: file }).catch(() => null);
+      results[p.id] = image?.length ? { image, type: file.endsWith(".webp") ? "image/webp" : "image/png", reading } : new Error("cut-out file missing");
+    }
+    return { results, seconds: (Date.now() - started) / 1000 };
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }

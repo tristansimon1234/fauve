@@ -302,7 +302,7 @@ async function clearPosts(studioId: string) {
 /** Without a kind: what any business would ask for its first Reel from its site. */
 const ANY_KIND: (typeof KINDS)[string] = { business: "commerce", title: "Premier Reel", idea: "Un Reel avec les photos de mon site, qui donne envie de venir." };
 
-async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice, idea: string | null) {
+async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice, idea: string | null, template?: MotionTemplate) {
   const kind = KINDS[kindName] ?? ANY_KIND;
   const studioId = await siteStudio(url, kind);
   if (reset) await clearPosts(studioId);
@@ -312,7 +312,7 @@ async function startSite(url: string, kindName: string, withClips: boolean, rese
   const { videos } = stock ? await labMedia(studioId, { ...stock, photosOf: undefined }) : { videos: [] as string[] };
   const photos = (site ?? []).map((m) => m.id as string);
   if (!photos.length && !videos.length) throw new Error("lab: no photo on the site, try clips=1");
-  await montage(siteKey(url), studioId, { title: kind.title, idea: idea ?? kind.idea }, videos, photos, voice);
+  await montage(siteKey(url), studioId, { title: kind.title, idea: idea ?? kind.idea, template }, videos, photos, voice);
 }
 
 async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template">, videos: string[], photos: string[], voice: LabVoice) {
@@ -473,8 +473,11 @@ export async function POST(request: Request) {
     }
     if (params.get("step") === "result") return Response.json(await result(siteKey(url.href)));
     if (kind && !KINDS[kind]) return Response.json({ error: `kind=${Object.keys(KINDS).join("|")}` }, { status: 400 });
+    // An ambiance chosen for the post (as she would pick « Façon collage »), else the editor's choice.
+    const template = params.get("template") ? motionTemplateSchema.safeParse(params.get("template")) : null;
+    if (template && !template.success) return Response.json({ error: "template" }, { status: 400 });
     after(() =>
-      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params)).catch((error: unknown) =>
+      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params), template?.data).catch((error: unknown) =>
         console.error("lab: site failed", url.href, error),
       ),
     );

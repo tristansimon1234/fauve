@@ -11,7 +11,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, Grain } from "./Collage";
+import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, Grain, printSize, type Sticker } from "./Collage";
 import { FilmDust } from "./FilmDust";
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
@@ -72,8 +72,15 @@ export function Reel(props: ReelProps) {
         >
           <FadeIn frames={i > 0 && !collage ? props.fadeFrames : 0}>
             {collage && (segment.type === "clip" || segment.type === "image") ? (
-              <CollageCard index={i} props={props}>
-                {segment.type === "clip" ? <Shot segment={segment} theme={theme} /> : <Photo src={segment.src} edit={segment.edit} grade={theme.grade} />}
+              // Over the opening shot, its sticker is drawn above the texts (the hook behind the subject), back in its card for the overlap.
+              <CollageCard
+                index={i}
+                props={props}
+                sticker={stickerOf(segment, theme)}
+                layer={hookBehind(props, i) ? "print" : "all"}
+                stickerFrom={segment.durationInFrames}
+              >
+                {segment.type === "clip" ? <Shot segment={segment} theme={theme} /> : <Photo src={segment.src} edit={segment.edit} grade={theme.grade} frame={printSize(props)} />}
               </CollageCard>
             ) : segment.type === "clip" || segment.type === "image" ? (
               <Accent kind={segment.accent} color={props.brand.accent}>
@@ -122,6 +129,14 @@ export function Reel(props: ReelProps) {
           <TextBeat text={t} index={i} props={props} theme={theme} k={k} />
         </Sequence>
       ))}
+      {/* A collage's opening subject in front of its hook: the words go behind the person, as if cut out with them. */}
+      {props.segments.map((segment, i) =>
+        hookBehind(props, i) && segment.type === "image" ? (
+          <Sequence key={`k${i}`} from={segment.startAt} durationInFrames={segment.durationInFrames} layout="none">
+            <CollageCard index={i} props={props} sticker={stickerOf(segment, theme)} layer="sticker" />
+          </Sequence>
+        ) : null,
+      )}
 
       {props.words.length > 0 && <Subtitles props={props} theme={theme} k={k} />}
       {props.layer ? <TextLayer props={props} /> : null}
@@ -143,6 +158,19 @@ export function Reel(props: ReelProps) {
       ) : null}
     </AbsoluteFill>
   );
+}
+
+/** A collage photo's sticker: its cut-out with the photo's framing and the Reel's light (none without a clean cut-out). */
+function stickerOf(segment: ReelProps["segments"][number], theme: Theme): Sticker | undefined {
+  return segment.type === "image" && segment.cutout && segment.edit ? { src: segment.cutout.src, box: segment.cutout.box, edit: segment.edit, grade: theme.grade } : undefined;
+}
+
+/** A collage shot whose sticker stands in front of the hook (its words behind the subject): a photo with its cut-out while the hook shows. */
+function hookBehind(props: ReelProps, i: number): boolean {
+  const segment = props.segments[i];
+  if (props.template !== "collage" || !segment || segment.type !== "image" || !segment.cutout || !segment.edit) return false;
+  const end = segment.startAt + segment.durationInFrames;
+  return props.texts.some((t) => t.style === "hook" && !t.look && !t.items?.length && t.from < end && t.from + t.durationInFrames > segment.startAt);
 }
 
 /**

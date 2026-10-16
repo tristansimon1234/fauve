@@ -54,6 +54,15 @@ function store(
 }
 
 /** Tells the manager something went wrong, on the channel she uses. */
+/** A model's sentence as plain text for a chat bubble: markup it may slip in (« </br> », « <p> ») removed, its spaces tidied. */
+export function plainText(text: string | undefined): string {
+  return (text ?? "")
+    .replace(/<\/?[a-z][^<>]*>/gi, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s*\n\s*/g, "\n")
+    .trim();
+}
+
 export async function notifyFailure(target: DeliveryTarget, text: string, detail: unknown) {
   // Started from the app: she may have closed it, WhatsApp tells her while it can (24 h window).
   const owner = !target.waId && target.notify ? await ownerWhatsApp(target.studioId).catch(() => null) : null;
@@ -129,7 +138,8 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
     : "";
   // No quote before: what it used is said once it is there.
   const costLine = unlocked && target.cost?.credits ? `Ça a utilisé ${target.cost.credits} crédit${target.cost.credits > 1 ? "s" : ""}, il t’en reste ${target.cost.left}.` : "";
-  const notes = [target.rationale, target.care, voiceLine, offer ? "" : costLine].filter(Boolean).join("\n\n");
+  // The editor's and the critic's words are the model's: no stray markup (« </br> ») reaches her.
+  const notes = [plainText(target.rationale), plainText(target.care), voiceLine, offer ? "" : costLine].filter(Boolean).join("\n\n");
   // One question at the end: publish it, or (first Reel) does it look like her.
   const after = offer
     ? [offer.question, costLine].filter(Boolean).join("\n")

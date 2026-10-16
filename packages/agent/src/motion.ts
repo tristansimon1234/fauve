@@ -59,8 +59,22 @@ export type ReelSegment =
       /** Where the subtitles sit over this shot (top, share of the frame), off its faces. */
       subtitleY?: number;
     }
-  /** A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move). */
-  | { type: "image"; src: string; startAt: number; durationInFrames: number; edit?: PhotoEdit; zoom?: boolean; move?: CameraMove; accent?: "punch" | "wipe"; subtitleY?: number }
+  /**
+   * A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move).
+   * cutout: in a collage, its subject cut out (an image with transparency, the subject's box in shares of the photo), laid as a sticker.
+   */
+  | {
+      type: "image";
+      src: string;
+      startAt: number;
+      durationInFrames: number;
+      edit?: PhotoEdit;
+      zoom?: boolean;
+      move?: CameraMove;
+      accent?: "punch" | "wipe";
+      subtitleY?: number;
+      cutout?: { src: string; box: { x: number; y: number; w: number; h: number } };
+    }
   /** Animations play over her footage when there is some (`under`), else on the studio's colours. */
   | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
   /** shift: how far the scene is moved down (share of the height, up when negative), off the faces of the footage under it. */
@@ -178,6 +192,8 @@ export type ReelInputs = {
   soundtrack?: string;
   /** Her voice note (plan.voice): its signed link and her words (for the subtitles). */
   voice?: { src: string; words: VoiceWord[] };
+  /** In a collage, the photos whose subject makes a sticker: the cut-out's signed link and the subject's box (shares of the photo). */
+  cutouts?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
 };
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
@@ -315,6 +331,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         ...(s.photo ? { edit: s.photo } : {}),
         ...(s.accent ? { accent: s.accent } : {}),
         ...(s.subtitle_y !== undefined ? { subtitleY: s.subtitle_y } : {}),
+        // A collage lays its subject over its print as a sticker (placed by the photo's framing, so only with it).
+        ...(inputs.template === "collage" && s.photo && inputs.cutouts?.[s.clip_id] ? { cutout: inputs.cutouts[s.clip_id] } : {}),
       };
     }
     return {

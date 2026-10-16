@@ -1,14 +1,18 @@
 import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, Img, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { Fit } from "./Fit";
+import { coverLayout, cssFilter } from "./Retouch";
 import type { Theme } from "./theme";
-import type { ReelProps } from "./types";
+import type { Box, PhotoEdit, ReelProps } from "./types";
 
 // « Collage »: the handmade look of today's Reels. Each shot is a photo cut out
 // with a white edge, taped on a paper background in the studio's colours, and
-// slapped on top of the previous one; a hand-drawn mark draws itself next to it;
-// texts are cut-out labels (two typefaces mixed) and strips of torn paper; it all
-// moves on twos (12 images a second) like stop-motion, under a film grain.
+// slapped on top of the previous one; a photo whose subject (a person, a dish, a
+// product) was cut out cleanly in the sandbox gets it as a sticker coming out of
+// its print, with a white scissor edge, the hook behind it on the opening shot; a
+// hand-drawn mark draws itself next to it; texts are cut-out labels (two typefaces
+// mixed) and strips of torn paper; it all moves on twos (12 images a second) like
+// stop-motion, under a film grain.
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -105,11 +109,93 @@ function Doodle({ index, color, size, style }: { index: number; color: string; s
   );
 }
 
+/** A photo's subject cut out (an image with transparency), with the photo's framing to lay it where the print shows it. */
+export type Sticker = { src: string; box: Box; edit: PhotoEdit; grade?: string };
+
+/** A print's size on the paper and its white edge. */
+function cardSize(props: Pick<ReelProps, "width" | "height">) {
+  const k = props.width / 1080;
+  const w = props.width * 0.84;
+  return { w, h: Math.min(props.height * 0.66, w * 1.32), edge: 16 * k };
+}
+
+/** The picture inside a print (its white edge aside): a photo is framed for it, and its sticker with it. */
+export function printSize(props: Pick<ReelProps, "width" | "height">): { width: number; height: number } {
+  const { w, h, edge } = cardSize(props);
+  return { width: w - 2 * edge, height: h - 2 * edge };
+}
+
+/**
+ * The white scissor edge of a sticker, cut a few millimetres around its subject, and the
+ * paper's warm shadow under it: shadows of the same white stacked in every direction.
+ */
+function rim(k: number): string {
+  const w = Math.max(3, Math.round(5 * k));
+  const d = Math.round(w * 0.7);
+  const paper = "#FBFAF7";
+  return [
+    ...[[w, 0], [-w, 0], [0, w], [0, -w], [d, d], [-d, -d], [d, -d], [-d, d]].map(([x, y]) => `drop-shadow(${x}px ${y}px 0 ${paper})`),
+    `drop-shadow(0 ${Math.round(16 * k)}px ${Math.round(18 * k)}px rgba(40,26,10,0.32))`,
+  ].join(" ");
+}
+
+/**
+ * A photo's subject as a sticker over its print: drawn exactly where the print shows it,
+ * it pops a beat after the print lands (on twos) and comes out of it a little, so a head
+ * the print cuts off comes out above it; then it keeps moving a touch more than the
+ * print, for depth.
+ */
+function StickerLayer({ sticker, k, size }: { sticker: Sticker; k: number; size: { width: number; height: number } }) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  // The same framing as the photo in the print.
+  const layout = coverLayout(size, sticker.edit.source, sticker.edit.adjust);
+  const p = spring({ frame: onTwos(frame - 6), fps, config: { damping: 11, stiffness: 190, mass: 0.6 } });
+  const push = interpolate(frame, [8, 90], [0, 0.03], clamp);
+  const scale = interpolate(p, [0, 1], [0.94, 1.06]) + push;
+  // It grows from its feet: a person stands on the print and rises out of it.
+  const origin = `${(sticker.box.x + sticker.box.w / 2) * layout.width}px ${(sticker.box.y + sticker.box.h) * layout.height}px`;
+  return (
+    <AbsoluteFill style={{ transform: sticker.edit.adjust?.straighten ? `rotate(${sticker.edit.adjust.straighten}deg)` : undefined, opacity: interpolate(p, [0, 0.25], [0, 1], clamp) }}>
+      <div
+        style={{
+          position: "absolute",
+          left: layout.left,
+          top: layout.top,
+          width: layout.width,
+          height: layout.height,
+          transform: `translateY(${-(1 - p) * 30 * k - 8 * k}px) scale(${scale}) rotate(${(1 - p) * -3}deg)`,
+          transformOrigin: origin,
+        }}
+      >
+        <Img src={sticker.src} style={{ width: "100%", height: "100%", display: "block", filter: [sticker.grade, cssFilter(sticker.edit.adjust), rim(k)].filter(Boolean).join(" ") }} />
+      </div>
+    </AbsoluteFill>
+  );
+}
+
 /**
  * A shot as a cut-out photo: a white edge, a tilt, tape on two corners, coloured
- * paper peeking behind, slapped in from the side on twos.
+ * paper peeking behind, slapped in from the side on twos. A photo whose subject cuts
+ * out cleanly gets it as a sticker over the print. `layer`: the whole card, the card
+ * alone (its sticker drawn above the texts by another layer, from `stickerFrom` on in
+ * the card again), or the sticker alone, in the card's place.
  */
-export function CollageCard({ index, props, children }: { index: number; props: ReelProps; children: ReactNode }) {
+export function CollageCard({
+  index,
+  props,
+  children,
+  sticker,
+  layer = "all",
+  stickerFrom = 0,
+}: {
+  index: number;
+  props: ReelProps;
+  children?: ReactNode;
+  sticker?: Sticker;
+  layer?: "all" | "print" | "sticker";
+  stickerFrom?: number;
+}) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const k = props.width / 1080;
@@ -117,23 +203,33 @@ export function CollageCard({ index, props, children }: { index: number; props: 
   const p = spring({ frame: onTwos(frame), fps, config: { damping: 14, stiffness: 170, mass: 0.7 } });
   const rot = ROTATIONS[index % ROTATIONS.length]!;
   const dir = FROM[index % FROM.length]!;
-  const w = props.width * 0.84;
-  const h = Math.min(props.height * 0.66, w * 1.32);
+  const { w, h, edge } = cardSize(props);
   const left = (props.width - w) / 2 + dir * 10 * k;
   const top = (props.height - h) / 2 + 30 * k;
-  const edge = 16 * k;
+  const place = {
+    position: "absolute",
+    left,
+    top,
+    width: w,
+    height: h,
+    transform: `translateX(${(1 - p) * dir * props.width * 0.7}px) rotate(${rot + (1 - p) * dir * 9}deg) scale(${1 + (1 - p) * 0.06})`,
+  } as const;
+  const stickerHere = sticker && (layer === "all" || layer === "sticker" || frame >= stickerFrom);
+  const stickerBox = stickerHere ? (
+    <div style={{ position: "absolute", inset: edge }}>
+      <StickerLayer sticker={sticker!} k={k} size={printSize(props)} />
+    </div>
+  ) : null;
+  if (layer === "sticker") {
+    return (
+      <AbsoluteFill>
+        <div style={place}>{stickerBox}</div>
+      </AbsoluteFill>
+    );
+  }
   return (
     <AbsoluteFill>
-      <div
-        style={{
-          position: "absolute",
-          left,
-          top,
-          width: w,
-          height: h,
-          transform: `translateX(${(1 - p) * dir * props.width * 0.7}px) rotate(${rot + (1 - p) * dir * 9}deg) scale(${1 + (1 - p) * 0.06})`,
-        }}
-      >
+      <div style={place}>
         {/* Coloured paper behind, torn a little, for depth. */}
         <div style={{ position: "absolute", inset: `${-26 * k}px ${-18 * k}px`, background: index % 2 ? c.second : c.accent, opacity: 0.9, transform: `rotate(${-rot * 1.6}deg)`, clipPath: "polygon(2% 3%, 30% 0%, 62% 2%, 98% 0%, 100% 40%, 97% 72%, 100% 98%, 64% 100%, 30% 97%, 0% 100%, 2% 60%, 0% 30%)" }} />
         <div
@@ -155,6 +251,7 @@ export function CollageCard({ index, props, children }: { index: number; props: 
           size={190 * k}
           style={index % 2 ? { left: -70 * k, bottom: -80 * k } : { right: -64 * k, top: -86 * k }}
         />
+        {stickerBox}
       </div>
     </AbsoluteFill>
   );
