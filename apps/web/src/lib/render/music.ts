@@ -101,6 +101,9 @@ function brief(plan: EditPlan, business: string | null, adjustments: string[], s
 /** A piece whose beat still falls away inside the Reel is composed once more; the more continuous one is kept. */
 const MUSIC_TAKES = 2;
 
+/** A piece set on the cuts is cut this long (s) before its first attack: the attack stays whole and lands on the cut. */
+const ATTACK_LEAD = 0.005;
+
 type Composed = { mp3: Uint8Array; songId: string | null; ms: number; engine: "text" | "video" };
 
 /** A call to ElevenLabs Music. The plan allows 2 compositions at once: a third one waits and tries again. */
@@ -236,7 +239,7 @@ export async function withMusic(params: {
     // Its beats set on the cuts: the piece trimmed to its first beat and held to the grid's tempo (a hair).
     if (best!.grid && beat) {
       const { offset, period } = best!.grid;
-      mp3 = await alignMusicInSandbox(params.renderId, mp3, offset, period / beat).catch((error: unknown) => {
+      mp3 = await alignMusicInSandbox(params.renderId, mp3, Math.max(0, offset - ATTACK_LEAD), period / beat).catch((error: unknown) => {
         console.warn("music: not set on the beat", params.renderId, error);
         return best!.mp3;
       });

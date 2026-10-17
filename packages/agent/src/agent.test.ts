@@ -1370,18 +1370,26 @@ test("music: the composer's ending falls after the Reel, a beat that falls away 
 
 test("music: the piece's beats are found and set on the cuts' grid", async () => {
   const { BEAT_STEP, beatGrid, coarser } = await import("./mix.ts");
-  // Bass every 10 ms: a kick (-10 dB, then decaying) every `period` from `offset`, over a soft bed with some noise.
+  // Bass every 10 ms, each step the mean power of what it holds (an attack starts inside a step):
+  // a kick (-10 dB, then decaying) every `period` from `offset`, over a soft bed with some noise.
   let seed = 7;
   const noise = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 4;
-  const piece = (period: number, offset: number, seconds = 18) =>
+  const kick = (since: number) => (since < 0.02 ? -10 : since < 0.1 ? -18 : -42 + noise());
+  const piece = (period: number, offset: number, seconds = 18, level = kick) =>
     Array.from({ length: Math.round(seconds / BEAT_STEP) }, (_, i) => {
-      const since = (i * BEAT_STEP - offset + period * 100) % period;
-      return since < 0.02 ? -10 : since < 0.1 ? -18 : -42 + noise();
+      let power = 0;
+      for (let j = 0; j < 10; j++) power += 10 ** (level((i * BEAT_STEP + (j * BEAT_STEP) / 10 - offset + period * 100) % period) / 10) / 10;
+      return 10 * Math.log10(power);
     });
-  // Asked at 108 BPM, played a hair slow with its first kick 40 ms in: found within a millisecond.
+  // Asked at 108 BPM, played a hair slow with its first kick 40 ms in: found within a few milliseconds.
   const grid = beatGrid(piece(0.5547, 0.04), 60 / 108)!;
-  assert.ok(Math.abs(grid.period - 0.5547) < 0.001);
-  assert.ok(Math.abs(grid.offset - 0.04) <= 0.011);
+  assert.ok(Math.abs(grid.period - 0.5547) < 0.0005, `${grid.period}`);
+  assert.ok(Math.abs(grid.offset - 0.04) <= 0.005, `${grid.offset}`);
+  // A bass that never stops (Culte's): a short dip before each beat, then it swells back over 30 ms. Its
+  // biggest jump in power comes 20 ms after the beat starts; the beat is still found where it starts.
+  const swell = (since: number) => (since > 0.5347 ? -28 : since < 0.01 ? -19 : since < 0.02 ? -16 : since < 0.03 ? -14 : -13 + noise() / 4);
+  const swelling = beatGrid(piece(0.5547, 0.06, 18, swell), 60 / 108)!;
+  assert.ok(Math.abs(swelling.offset - 0.06) <= 0.005, `${swelling.offset}`);
   // Played at another tempo (120 BPM), or without a beat: left as it is.
   assert.equal(beatGrid(piece(0.5, 0.1), 60 / 108), null);
   assert.equal(beatGrid(Array.from({ length: 1800 }, () => -40 + noise()), 60 / 108), null);
