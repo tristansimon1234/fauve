@@ -423,7 +423,9 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         ...target,
         rationale: best.rationale,
         care: care || undefined,
-        note: [best.rationale, care].filter(Boolean).join(" ").slice(0, 600) || undefined,
+        // Kept on the post within 600 characters, cut after a whole sentence (shortSentence in deliver.ts), never mid-word:
+        // a slice here left Simone's note ending on « Si tu veux, je peux encore ».
+        note: [best.rationale, care].filter(Boolean).join(" ") || undefined,
         // Two versions were already compared: no variant offered on top.
         offerVariant: !job.compared,
         voice: job.voice,
