@@ -7,13 +7,15 @@ import {
   motionSceneOutputSchema,
   type ComposeShot,
   type CompositionShot,
+  type DesignerMoves,
   type MotionSlot,
   type ReelProps,
   type ScenePhoto,
   type TextBand,
+  type TrackPiece,
 } from "@fauve/agent";
 import { transform } from "sucrase";
-import { smokeTestScenes } from "@/lib/render/sandbox";
+import { smokeTestScenes, type SmokeScene } from "@/lib/render/sandbox";
 import { anthropic, logClaudeCost } from "./run";
 
 // The motion designer: one Opus call per free scene, which writes the component.
@@ -31,6 +33,7 @@ export type OfferedPhoto = { id: string; shows: string; photo: ScenePhoto };
  * photos: her photos it may compose with; cuts: for an animation over several shots, where the shot changes under it (frames from its start);
  * compose: a collage's composition, which lays the Reel's shots itself: what each one shows and when (plans), where the
  * Reel's texts go over it (texts), and each shot's span and shape for its test render (shots).
+ * track / moves: what moves in the footage under it, for its test render and for the designer.
  */
 export type SceneRequest = {
   id: string;
@@ -41,6 +44,9 @@ export type SceneRequest = {
   photos?: OfferedPhoto[];
   cuts?: number[];
   compose?: { plans: CompositionShot[]; texts: TextBand[]; shots: ComposeShot[] };
+  /** What moves in the footage under it: the pieces its `track` reads (its test render follows them), and what the designer is told of them. */
+  track?: TrackPiece[];
+  moves?: DesignerMoves | { par_plan: ({ plan: number } & DesignerMoves)[] };
 };
 export type SceneResult = {
   id: string;
@@ -116,6 +122,8 @@ async function writeScene(
               })),
             }
           : {}),
+        // What moves in the footage under it (hands, faces, bodies, the gestures seen): its code follows it with `track`.
+        ...(request.moves ? { ce_qui_bouge: request.moves } : {}),
         // A collage's composition lays the shots itself (nothing plays under it); another animation over several shots, the cuts under it.
         ...(request.compose
           ? { composition_du_reel: { plans: request.compose.plans, textes_par_dessus: request.compose.texts, coupes_images: request.cuts ?? [] } }
@@ -168,7 +176,7 @@ export async function designMotionScenes(
   artDirection: string | undefined,
   brand: Brand,
   kit: MotionKit = [],
-  context: { kept?: string[]; done?: string[] } = {},
+  context: { kept?: string[]; done?: string[]; look?: SmokeScene["look"] } = {},
 ): Promise<SceneResult[]> {
   if (!requests.length) return [];
   const requestOf = (id: string) => requests.find((q) => q.id === id)!;
@@ -200,6 +208,8 @@ export async function designMotionScenes(
             ...(photos.length ? { photos } : {}),
             ...(request.cuts ? { cuts: request.cuts } : {}),
             ...(request.compose ? { shots: request.compose.shots } : {}),
+            // A scene that follows what moves is checked where it goes, with the Reel's camera moves.
+            ...(request.track?.length || request.compose?.shots.some((x) => x.track) ? { ...(request.track?.length ? { track: request.track } : {}), look: context.look } : {}),
           };
         }),
       brand,

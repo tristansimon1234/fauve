@@ -17,6 +17,8 @@ import {
   type ReelProps,
   type ReelUnder,
   type ScenePhoto,
+  type MotionTemplate,
+  type TrackPiece,
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
@@ -284,6 +286,9 @@ export type SmokeScene = {
   cuts?: number[];
   /** A collage's composition: the shots it lays (each one a grey card in the check). */
   shots?: ComposeShot[];
+  /** What moves in the footage under it, so a text that follows a hand is checked where it goes; with the Reel's rhythm and look (its camera moves). */
+  track?: TrackPiece[];
+  look?: { template?: MotionTemplate; tempo?: number; signature?: ReelProps["brand"]["signature"] };
 };
 
 /** What the scene check found: the error per scene id (null when it passes), and where a passing scene's texts sit while it holds (top, bottom: shares of the height). */
@@ -774,6 +779,116 @@ export async function cutoutsInSandbox(
       const { file, ...reading } = r;
       const image = await sandbox.readFileToBuffer({ path: file }).catch(() => null);
       results[p.id] = image?.length ? { image, type: file.endsWith(".webp") ? "image/webp" : "image/png", reading } : new Error("cut-out file missing");
+    }
+    return { results, seconds: (Date.now() - started) / 1000 };
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+// ---------------------------------------------------------------------------
+// What moves in her videos: hands (21 points each), faces and bodies, image by image, read
+// by open models (MediaPipe Tasks, Apache 2.0) on the CPU, in the cut-out sandbox (its 8
+// vCPUs), with Python. Each clip once (apps/render/track.py); the animations over it follow
+// what was read. MediaPipe links the EGL and GLES libraries even on the CPU (it never draws
+// on a GPU here): their dispatchers, from the system's packages, are enough.
+// ---------------------------------------------------------------------------
+
+const TRACK_ROOT = `${CUTOUT_ROOT}/track`;
+/** Each model pinned by its checksum. */
+const TRACK_MODELS: { file: string; url: string; sha256: string }[] = [
+  {
+    file: "hand_landmarker.task",
+    url: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+    sha256: "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1",
+  },
+  {
+    file: "pose_landmarker_full.task",
+    url: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
+    sha256: "5134a3aad27a58b93da0088d431f366da362b44e3ccfbe3462b3827a839011b1",
+  },
+  {
+    file: "blaze_face_short_range.tflite",
+    url: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+    sha256: "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f",
+  },
+];
+/** The system's part, as root: Python and the two libraries MediaPipe links. */
+const TRACK_SYSTEM = ["install", "-y", "-q", "python3.13", "python3.13-pip", "libglvnd-egl", "libglvnd-gles"];
+const TRACK_SETUP = [
+  "set -euo pipefail",
+  `mkdir -p ${TRACK_ROOT}/models ${TRACK_ROOT}/jobs && cd ${TRACK_ROOT}`,
+  // Pinned. The vision tasks import OpenCV and matplotlib for drawing helpers they never use here: headless builds.
+  'py/bin/python -c "import mediapipe, cv2, matplotlib" 2>/dev/null || { rm -rf py && python3.13 -m venv py && py/bin/pip install -q --no-cache-dir --no-deps mediapipe==1.1.1 && py/bin/pip install -q --no-cache-dir numpy==2.5.4 absl-py==2.5.1 flatbuffers==25.12.19 certifi==2026.7.22 opencv-python-headless==5.0.0.93 matplotlib==3.11.2; }',
+  ...TRACK_MODELS.map(
+    (m) =>
+      `echo "${m.sha256}  models/${m.file}" | sha256sum -c --status 2>/dev/null || { curl -fsSL --retry 3 -o models/${m.file}.tmp '${m.url}' && mv models/${m.file}.tmp models/${m.file} && echo "${m.sha256}  models/${m.file}" | sha256sum -c --status; }`,
+  ),
+].join("\n");
+
+let trackReady: Promise<Sandbox> | undefined;
+
+/** The cut-out sandbox with the tracker installed (slow only the first time: the warm-up installs it ahead). */
+export function trackSandbox(): Promise<Sandbox> {
+  trackReady ??= (async () => {
+    const sandbox = await withTimeLeft(await cutoutSandbox());
+    const ready = await sandbox.runCommand({ cmd: "bash", args: ["-c", "[ -x /usr/bin/python3.13 ] && [ -e /usr/lib64/libEGL.so.1 ] && [ -e /usr/lib64/libGLESv2.so.2 ]"] });
+    if (ready.exitCode !== 0) {
+      const system = await sandbox.runCommand({ cmd: "dnf", args: TRACK_SYSTEM, sudo: true });
+      if (system.exitCode !== 0) throw new Error(`tracker: system packages not installed (${system.exitCode}): ${(await system.output("both").catch(() => "")).slice(-600)}`);
+    }
+    await bash(sandbox, TRACK_SETUP);
+    // The script ships with the render source (apps/render/track.py), written as this deploy has it.
+    const script = REMOTION_SOURCE_FILES["track.py"];
+    if (!script) throw new Error("track.py is missing from the render source");
+    await sandbox.writeFiles([{ path: `${TRACK_ROOT}/track.py`, content: script }]);
+    return sandbox;
+  })().catch((error: unknown) => {
+    trackReady = undefined;
+    throw error;
+  });
+  return trackReady;
+}
+
+/** What the tracker found in a clip: its file (JSON) and how many hands, faces and bodies it followed. */
+export type TrackReading = { file: Buffer; frames: number; hands: number; faces: number; bodies: number };
+
+/**
+ * Follows what moves in each video (signed URL), up to a minute of each: its tracks file, or
+ * the error. Four clips at a time on the sandbox's CPUs, about 2.5 s of work per second of video.
+ */
+export async function tracksInSandbox(id: string, videos: { id: string; url: string }[]): Promise<{ results: Record<string, TrackReading | Error>; seconds: number }> {
+  if (!videos.length) return { results: {}, seconds: 0 };
+  const started = Date.now();
+  const sandbox = await withTimeLeft(await trackSandbox());
+  const dir = `${TRACK_ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await withTimeLeft(sandbox);
+    await Promise.all(videos.map((v, i) => bash(sandbox, FETCH, [`${dir}/in${i}`, v.url])));
+    const jobs = videos.map((v, i) => ({ id: v.id, src: `${dir}/in${i}`, out: `${dir}/out${i}.json` }));
+    await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
+    const run = await sandbox.runCommand({
+      cmd: "bash",
+      args: ["-c", `cd ${TRACK_ROOT} && TRACK_MODELS=${TRACK_ROOT}/models FFMPEG=${CUTOUT_ROOT}/ffmpeg timeout 480 py/bin/python -I track.py "$1/jobs.json"`, "bash", dir],
+    });
+    const lastLine = (await run.stdout()).trim().split("\n").at(-1) ?? "";
+    let readings: Record<string, { file: string; frames: number; hands: number; faces: number; bodies: number } | { error: string }>;
+    try {
+      readings = JSON.parse(lastLine);
+    } catch {
+      const output = (await run.output("both").catch(() => "")).slice(-400);
+      throw new Error(`tracking failed (${run.exitCode}): ${output}`);
+    }
+    const results: Record<string, TrackReading | Error> = {};
+    for (const v of videos) {
+      const r = readings[v.id];
+      if (!r || "error" in r) {
+        results[v.id] = new Error(r && "error" in r ? r.error : "nothing tracked");
+        continue;
+      }
+      const file = await sandbox.readFileToBuffer({ path: r.file }).catch(() => null);
+      results[v.id] = file?.length ? { file, frames: r.frames, hands: r.hands, faces: r.faces, bodies: r.bodies } : new Error("tracks file missing");
     }
     return { results, seconds: (Date.now() - started) / 1000 };
   } finally {

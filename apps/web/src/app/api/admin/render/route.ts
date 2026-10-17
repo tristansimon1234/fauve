@@ -2,7 +2,7 @@ import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
 import { renderPost } from "@/lib/render/render-post";
-import { cutoutSandbox, dropSandbox, remotionSandbox } from "@/lib/render/sandbox";
+import { dropSandbox, remotionSandbox, trackSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isValidTestKey } from "@/lib/test-studio";
 
@@ -12,7 +12,7 @@ import { isValidTestKey } from "@/lib/test-studio";
 //   ?cle=…&post=…&design=1[&brief=…]  has the editor (Opus) write a new plan first, then renders it.
 // And POST ?action=warm with CRON_SECRET, from the database (call_app): the same warm-up,
 // in the background (a new sandbox installs everything once, a few minutes, the collages'
-// cut-out model included). And POST
+// cut-out model and the tracker included). And POST
 // ?action=drop&sandbox=<name>: deletes an old render sandbox (never the one in service).
 
 export const maxDuration = 800;
@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
     const started = Date.now();
     try {
       await remotionSandbox();
-      // The collages' cut-out model too (onnxruntime-node and 224 MB of weights, once).
-      await cutoutSandbox();
+      // The cut-out model too (onnxruntime-node and 224 MB of weights, once), and the tracker in the same sandbox (Python, MediaPipe and its models).
+      await trackSandbox();
       console.log("render sandbox warm", { elapsedMs: Date.now() - started });
     } catch (error) {
       console.error("render sandbox warm-up failed", error);

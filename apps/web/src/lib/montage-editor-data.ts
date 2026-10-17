@@ -49,6 +49,8 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
       ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
       photoAspects: inputs.photoAspects,
+      // What moves under its animations, so an animation that follows a hand follows it in the preview too.
+      ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),
     } satisfies ReelInputs,
   };
 }

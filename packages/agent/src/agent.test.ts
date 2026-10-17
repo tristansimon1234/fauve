@@ -2831,3 +2831,79 @@ test("collage: one free composition lays the Reel's shots, never a paid animatio
     ],
   );
 });
+
+test("what moves: the tracks under each animation, placed as the Reel draws the footage", async () => {
+  const { buildReelProps, clipAspect } = await import("./motion.ts");
+  const { clipsUnderAnimations, movesForDesigner, sliceTracks, trackWorthy } = await import("./tracking.ts");
+  const { MOTION_DESIGNER_PROMPT } = await import("./motion-scene.ts");
+  const { EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
+
+  // Someone in the clip: a gesture Gemini noted, a face, hands at work. A plate alone has nothing to follow.
+  const shot = { start: 0, end: 4, description: "", subject: "plat", energy: 3, hook_score: 3, quality: { blurry: false, dark: false, shaky: false }, faces_visible: false };
+  assert.equal(trackWorthy({ shots: [shot], actions: [] }), false);
+  assert.equal(trackWorthy({ shots: [shot], actions: [{ start: 1, end: 2, what: "elle montre la vitrine" }] }), true);
+  assert.equal(trackWorthy({ shots: [{ ...shot, faces_visible: true }] }), true);
+  assert.equal(trackWorthy({ shots: [{ ...shot, subject: "mains" }] }), true);
+  assert.equal(clipAspect({ orientation: "landscape" }), 16 / 9);
+
+  // A vertical clip: one hand at the centre during its first 4 s, nothing after.
+  const hand = [0, ...Array.from({ length: 21 }, (_, k) => [500 + k, 500 + k]).flat()];
+  const frames = Array.from({ length: 180 }, (_, i) => (i < 120 ? { h: [hand] } : {}));
+  const file = { v: 1, fps: 30, w: 540, h: 960, from: 0, n: 180, frames };
+  const slice = sliceTracks(file, 30, 60);
+  assert.equal(slice?.from, 30);
+  assert.equal(slice?.frames.length, 30);
+  assert.equal(slice?.aspect, 0.5625);
+  // A passage where nothing is seen gives nothing.
+  assert.equal(sliceTracks(file, 130, 170), null);
+
+  const js = "function Scene(){return null}";
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 6,
+    template: "libre",
+    texts: [],
+    images: [],
+    segments: [
+      { clip_id: "a", in: 1, out: 3, zoom: "none" },
+      { motion: { brief: "le mot part de sa main", js }, duration: 2, over: { clip_id: "a", in: 2 } },
+      { clip_id: "b", in: 0, out: 2, zoom: "none" },
+    ],
+    layers: [{ motion: { brief: "suit sa main", js }, from: 0, to: 2 }],
+  });
+  assert.deepEqual(clipsUnderAnimations(plan).sort(), ["a", "b"]);
+  assert.deepEqual(clipsUnderAnimations({ ...plan, layers: undefined }), ["a"]);
+
+  const props = buildReelProps(plan, {
+    template: "libre",
+    clipUrls: { a: "https://x/a.mp4", b: "https://x/b.mp4" },
+    aspects: { a: 9 / 16, b: 9 / 16 },
+    brand: { name: "Culte" },
+    tracks: { a: file },
+  });
+  // The scene over her passage reads it from that passage's first image, with the slow push-in under it.
+  const scene = props.segments[1] as { type: string; track?: { at: number; startFrom: number; look: { move?: string }; tracks: { from: number } }[] };
+  assert.equal(scene.type, "motion");
+  assert.deepEqual(scene.track?.map((p) => ({ at: p.at, startFrom: p.startFrom, move: p.look.move, from: p.tracks.from })), [{ at: 0, startFrom: 60, move: "in", from: 60 }]);
+  // The animation over the montage reads the shot under it from its in point; a clip without tracks gives nothing.
+  const layer = props.layers?.[0];
+  assert.deepEqual(layer?.track?.map((p) => ({ at: p.at, startFrom: p.startFrom, length: p.length, clip: p.clip })), [{ at: 0, startFrom: 30, length: 60, clip: "a" }]);
+  // Without tracks, nothing is added.
+  const bare = buildReelProps(plan, { template: "libre", clipUrls: { a: "https://x/a.mp4", b: "https://x/b.mp4" }, brand: { name: "Culte" } });
+  assert.equal((bare.segments[1] as { track?: unknown }).track, undefined);
+  assert.equal(bare.layers?.[0]?.track, undefined);
+
+  // The motion designer is told where the hand is (px of the frame) and the gesture, on its own frames.
+  const moves = movesForDesigner(layer!.track!, 60, { a: [{ start: 1.5, end: 2, what: "elle pince l'air" }] });
+  assert.deepEqual(moves?.gestes, [{ de: 15, a: 30, quoi: "elle pince l'air" }]);
+  const first = moves?.mains?.[0]?.trajet?.[0];
+  assert.ok(first && Math.abs(first.paume[0] - 550) <= 2 && Math.abs(first.paume[1] - 977) <= 2, JSON.stringify(first));
+  assert.equal(moves?.mains?.[0]?.vue, "images 0 à 55");
+  // In a composition, only when things are seen (the shot is laid in a box of its own).
+  assert.equal(movesForDesigner(layer!.track!, 60, {}, { positions: false })?.mains?.[0]?.trajet, undefined);
+
+  // The contract says how to read it, without naming any effect; the editor knows the gestures.
+  assert.match(MOTION_DESIGNER_PROMPT, /track\(frame\)/);
+  assert.match(MOTION_DESIGNER_PROMPT, /function Scene\(\{[^}]*track \}\)/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /« actions »/);
+});

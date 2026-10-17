@@ -116,6 +116,16 @@ const CASES: Record<string, LabCase> = {
     idea: "Un Reel avec mes photos du salon, pour faire découvrir l'ambiance.",
     photosOf: { studio: "Maison Maya", max: 8 },
   },
+  boutique: {
+    name: "Maison Lou",
+    business: "boutique de mode femme",
+    facts: ["Concept store de mode femme à Lille, pièces choisies une à une", "Nouvelle sélection chaque mois", "-20 % sur toute la boutique ce week-end"],
+    brand: { colors: ["#E4572E", "#FFF4EC", "#1F1A3A"], fonts: ["Syne", "Inter Tight"], tone: "pétillant, complice, tutoiement" },
+    title: "Ce week-end",
+    idea: "Un Reel où je parle à la caméra, pour faire venir à la boutique ce week-end.",
+    // She films herself, talking and moving her hands (vertical clips).
+    clips: [42323, 42283, 42308],
+  },
   trattoria: {
     name: "Trattoria Sole",
     business: "restaurant italien",

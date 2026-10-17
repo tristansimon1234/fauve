@@ -16,6 +16,7 @@ import { Fit } from "./Fit";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
 import { SceneView } from "./Scene";
 import type { Theme } from "./theme";
+import { footageTrack, type TrackFn, type TrackPiece } from "./track";
 import type { ComposeShot, ReelProps, Scene, ScenePhoto } from "./types";
 
 // Free motion-design scene: plain JS written by the motion designer (checked and
@@ -107,6 +108,8 @@ export type SceneComponent = (props: {
   cuts: number[];
   /** For a collage's composition: the shots it lays (Footage), in the order of the montage. */
   shots: ComposeShot[];
+  /** What is seen in the footage at one of its frames (hands, faces, bodies, in px of the frame); in a composition, in the box a shot was laid in. */
+  track: TrackFn;
 }) => ReactNode;
 
 /** The component a generated code defines (`Scene` for a motion scene, `Layer` for a text layer), or null. */
@@ -157,9 +160,16 @@ export function MotionScene(p: {
   footage?: FootageSource;
   /** What plays when the code cannot run, other than a fixed scene (a collage's prints). */
   fallbackNode?: ReactNode;
+  /** What moves in the footage under it, piece by piece (a composition's shots carry their own). */
+  track?: TrackPiece[];
 }) {
   const { fps } = useVideoConfig();
   const Generated = useMemo(() => compileScene(p.js), [p.js]);
+  // Where things are in the footage at a frame of the scene, as this Reel draws it (its moves; the scene's own shift taken back).
+  const track = useMemo(
+    () => footageTrack(p.track, p.theme, { width: p.props.width, height: p.props.height }, { shiftY: (p.shift ?? 0) * p.props.height, shots: p.footage?.shots }),
+    [p.track, p.theme, p.props.width, p.props.height, p.shift, p.footage?.shots],
+  );
   const fixed = p.fallback ? <SceneView scene={p.fallback} durationInFrames={p.durationInFrames} props={p.props} theme={p.theme} k={p.k} overlay={p.overlay} /> : (p.fallbackNode ?? null);
   if (!Generated) return fixed;
   const scene = (
@@ -173,6 +183,7 @@ export function MotionScene(p: {
       photos={p.photos ?? []}
       cuts={p.cuts ?? []}
       shots={p.footage?.shots ?? []}
+      track={track}
     />
   );
   return (

@@ -5,6 +5,7 @@ import type { LogoOnDark } from "./logo.ts";
 import type { VoiceWord } from "./voice.ts";
 import type { BrandSignature } from "./signature.ts";
 import { previewMusic, speechWindows, type MixCase } from "./mix.ts";
+import { layerTrack, sceneTrack, shotTrack, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -90,6 +91,8 @@ export type ReelSegment =
       shift?: number;
       /** The photos a free scene composes with (a collage), in the order its code reads them. */
       photos?: ScenePhoto[];
+      /** What moves in the footage under it (hands, faces, bodies), read by its `track`. */
+      track?: TrackPiece[];
     };
 
 /**
@@ -109,6 +112,8 @@ export type ComposeShot = ScenePhoto & {
   durationInFrames: number;
   kind: "video" | "photo";
   focus?: { x: number; y: number };
+  /** What was tracked in a video shot and how it is drawn: track(frame, box) places it in the box it is laid in. */
+  track?: ShotTrack;
 };
 
 export type ScenePhoto = {
@@ -198,6 +203,8 @@ export type ReelProps = {
     compose?: boolean;
     /** The shots it lays, in the order of the montage. */
     shots?: ComposeShot[];
+    /** What moves in the shots under it (hands, faces, bodies), read by its `track`. */
+    track?: TrackPiece[];
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
@@ -256,7 +263,13 @@ export type ReelInputs = {
   photoAspects?: Record<string, number>;
   /** The cut-outs an animation can use (clean edge, even cut by the photo's frame), with the edges that cut them. */
   sceneCutouts?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number }; edges?: ("top" | "bottom" | "left" | "right")[] }>;
+  /** What was tracked in her clips (hands, faces, bodies), by clip_id: the animations over them can follow it. */
+  tracks?: TracksByClip;
 };
+
+/** A clip's width / height as the Reel frames it, from its analysis (phones film 16:9 or 9:16). */
+export const clipAspect = (analysis: Pick<ClipAnalysis, "orientation">) =>
+  analysis.orientation === "landscape" ? 16 / 9 : analysis.orientation === "square" ? 1 : 9 / 16;
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
 
@@ -434,6 +447,15 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     };
   });
   const durationInFrames = cursor + fadeFrames;
+  // What moves in the footage under each animation, cut to its passage: its code follows it with `track`.
+  const tracks = inputs.tracks ?? {};
+  if (Object.keys(tracks).length) {
+    segments.forEach((segment, i) => {
+      if (segment.type !== "motion") return;
+      const track = sceneTrack(plan, segments, i, tracks);
+      if (track.length) segment.track = track;
+    });
+  }
 
   const texts: ReelText[] = plan.texts
     .map((t) => {
@@ -509,7 +531,17 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         const focus = s.photo?.adjust?.focus;
         return [{ ...(photo ?? { src: segment.src }), aspect, ...span, kind: "photo" as const, ...(focus ? { focus } : {}) }];
       }
-      return [{ src: segment.src, aspect: inputs.aspects?.[s.clip_id] ?? 9 / 16, ...span, kind: "video" as const, ...(s.adjust?.focus ? { focus: s.adjust.focus } : {}) }];
+      const track = shotTrack(plan, segments, i, tracks);
+      return [
+        {
+          src: segment.src,
+          aspect: inputs.aspects?.[s.clip_id] ?? 9 / 16,
+          ...span,
+          kind: "video" as const,
+          ...(s.adjust?.focus ? { focus: s.adjust.focus } : {}),
+          ...(track ? { track } : {}),
+        },
+      ];
     });
 
   // Animations over several shots: their span in frames and the cuts under them (from their start).
@@ -519,6 +551,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     const from = Math.min(durationInFrames - 1, toFrames(l.from));
     const length = Math.min(durationInFrames - from, toFrames(l.to) - from);
     if (length < fps) return [];
+    // A composition lays its shots itself: each shot carries what moves in it; another animation sees the montage under it.
+    const track = l.compose ? [] : layerTrack(plan, segments, from, length, tracks);
     return [
       {
         js: l.motion.js,
@@ -528,6 +562,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         cuts: starts.filter((f) => f > from && f < from + length).map((f) => f - from),
         ...(l.motion.photos?.length ? { photos: scenePhotos(l.motion.photos, inputs) } : {}),
         ...(l.compose ? { compose: true, shots: composeShots(from) } : {}),
+        ...(track.length ? { track } : {}),
       },
     ];
   });
