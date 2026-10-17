@@ -344,17 +344,49 @@ export function subjectPlace(box: number[] | undefined): "gauche" | "centre" | "
   return focus.x < 0.38 ? "gauche" : focus.x > 0.62 ? "droite" : "centre";
 }
 
+/** The Reel's frame (width over height): a picture filmed wider shows only a window of its width. */
+const REEL_ASPECT = 9 / 16;
+
+/**
+ * How much of a gesture [start, end] of a clip shows a hand inside the Reel's vertical frame,
+ * as a share of its images, from the tracks: the window the crop keeps around the shot's
+ * subject, a hand counted when its wrist and the tips of its thumb and index are in it. Null
+ * when the tracks do not cover the gesture. A boutique's « -20 % » was caught on a raised arm
+ * whose hand had left the frame: nothing to catch it with.
+ */
+export function handsInFrame(file: TracksFile, analysis: ClipAnalysis, start: number, end: number): number | null {
+  const first = Math.max(0, Math.floor(start * file.fps) - file.from);
+  const last = Math.min(file.frames.length, Math.ceil(end * file.fps) - file.from);
+  if (last <= first) return null;
+  const visible = Math.min(1, REEL_ASPECT / (file.w / file.h));
+  const focus = subjectFocus(shotAt(analysis, (start + end) / 2)?.subject_box)?.x ?? 0.5;
+  const left = Math.min(1 - visible, Math.max(0, focus - visible / 2)) * 1000;
+  const inside = (x: number | undefined, y: number | undefined) => x !== undefined && y !== undefined && x >= left && x <= left + visible * 1000 && y >= 0 && y <= 1000;
+  let seen = 0;
+  for (let k = first; k < last; k++) {
+    // A hand: [id, x0, y0 … x20, y20]; its wrist (0), thumb tip (4) and index tip (8).
+    if ((file.frames[k]?.h ?? []).some((h) => [0, 4, 8].every((p) => inside(h[1 + 2 * p], h[2 + 2 * p])))) seen++;
+  }
+  return seen / (last - first);
+}
+
 /**
  * A clip's analysis as the editor reads it: every shot with what a professional editor
  * weighs (size, camera, beauty, energy, hook, where the subject is), without the raw
- * coordinates and retouch values the engine uses on its own.
+ * coordinates and retouch values the engine uses on its own; with its tracks, whether
+ * the hands of each gesture show in the vertical frame.
  */
-export function editorClip(mediaId: string, analysis: ClipAnalysis) {
-  const { correction: _correction, words, shots, ...rest } = analysis;
+export function editorClip(mediaId: string, analysis: ClipAnalysis, tracks?: TracksFile) {
+  const { correction: _correction, words, shots, actions, ...rest } = analysis;
+  const hands = (a: { start: number; end: number }) => {
+    const share = tracks ? handsInFrame(tracks, analysis, a.start, a.end) : null;
+    return share === null ? {} : { mains: share >= 0.75 ? "dans le cadre" : share >= 0.3 ? "en partie" : "hors du cadre" };
+  };
   return {
     media_id: mediaId,
     ...rest,
     shots: shots.map(({ subject_box, ...shot }) => ({ ...shot, ...(subjectPlace(subject_box) ? { sujet_a: subjectPlace(subject_box) } : {}) })),
     words: words?.length ? words : undefined,
+    actions: actions?.length ? actions.map((a) => ({ ...a, ...hands(a) })) : undefined,
   };
 }

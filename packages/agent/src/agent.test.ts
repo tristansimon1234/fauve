@@ -1929,6 +1929,30 @@ test("finish: clips corrected and framed, still shots move, animations play over
   assert.notEqual(out.texts[0]!.y, undefined);
 });
 
+test("editor: each gesture says whether her hands show in the vertical frame", async () => {
+  const { editorClip, handsInFrame } = await import("./finish.ts");
+  const shot = { start: 0, end: 10, description: "", subject: "", energy: 3, hook_score: 3, quality: { blurry: false, dark: false, shaky: false }, faces_visible: true, subject_box: [100, 400, 1000, 600] };
+  const analysis = {
+    duration: 10, orientation: "portrait", summary: "", setting: "", lighting: "ok", shots: [shot], best_moments: [], transcript: "", issues: [],
+    actions: [
+      { start: 0, end: 1, what: "elle pointe la caméra" },
+      { start: 2, end: 3, what: "elle lève le bras sur le côté" },
+    ],
+  } as never;
+  // A hand: id, then 21 points (x, y) in thousandths; wrist, thumb tip and index tip near the middle.
+  const hand = (x: number) => [0, ...Array.from({ length: 21 }, () => [x, 500]).flat()];
+  const frames = (x: number) => Array.from({ length: 120 }, (_, k) => (k < 30 ? { h: [hand(x)] } : {}));
+  // Filmed upright: the whole width shows. Her hand in the first second, none when the arm leaves the frame.
+  const upright = { fps: 30, w: 540, h: 960, from: 0, n: 120, frames: frames(500) };
+  const clip = editorClip("v", analysis, upright as never);
+  assert.deepEqual(clip.actions?.map((a) => (a as { mains?: string }).mains), ["dans le cadre", "hors du cadre"]);
+  // Filmed wide: the vertical frame keeps a window around her (centre); a hand at the far left is out of it.
+  assert.equal(handsInFrame({ ...upright, w: 960, h: 540, frames: frames(100) } as never, analysis, 0, 1), 0);
+  assert.equal(handsInFrame({ ...upright, w: 960, h: 540, frames: frames(500) } as never, analysis, 0, 1), 1);
+  // Without tracks, the gestures as Gemini read them.
+  assert.equal("mains" in (editorClip("v", analysis).actions?.[0] ?? {}), false);
+});
+
 test("finish: texts keep off the faces tracked image by image, moment by moment", async () => {
   const { finishPlan, trackedFaces } = await import("./finish.ts");
   // Gemini saw a face at the top of her box (rows 0.1 to 0.3); she leans in: the tracker sees it at 0.35 to 0.6.
