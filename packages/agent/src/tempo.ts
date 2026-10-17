@@ -3,17 +3,29 @@ import { FADE, usesFades } from "./render.ts";
 const REEL_FPS = 30;
 import { isClipSegment, isMotionSegment, segmentSeconds, type EditPlan, type MotionTemplate } from "./schemas.ts";
 
-// The rhythm of a Reel: each ambiance has a tempo, and the cuts land on its beats
-// (the music is then composed at that tempo, over those cuts). Deterministic: the
-// editor chooses the shots and their rough lengths, this puts them on the grid.
-// Over her voice, the cuts follow her phrases instead: no grid.
+// The rhythm of a Reel: its tempo, chosen by the editor for this Reel (`plan.tempo`;
+// before, each ambiance had one), and the cuts land on its beats (the music is then
+// composed at that tempo, over those cuts). Deterministic: the editor chooses the shots
+// and their rough lengths, this puts them on the grid. Over her voice, the cuts follow
+// her phrases instead: no grid.
 
-/** Beats per minute of each ambiance. */
-export const TEMPLATE_BPM: Record<MotionTemplate, number> = { doux: 84, chic: 76, dynamique: 120, collage: 108 };
+/** Beats per minute of each template: the Reels made before a Reel had its own tempo (« libre » without one). */
+export const TEMPLATE_BPM: Record<MotionTemplate, number> = { doux: 84, chic: 76, dynamique: 120, collage: 108, libre: 100 };
 
 /** Seconds per beat of a template, null for a template without a tempo. */
 export function beatOf(template: string): number | null {
   const bpm = TEMPLATE_BPM[template as MotionTemplate];
+  return bpm ? 60 / bpm : null;
+}
+
+/** A Reel's beats per minute: its own tempo, else its template's (null for a template without one). */
+export function planBpm(plan: Pick<EditPlan, "template" | "tempo">): number | null {
+  return plan.tempo ?? TEMPLATE_BPM[plan.template as MotionTemplate] ?? null;
+}
+
+/** Seconds per beat of a Reel: its own tempo, else its template's. */
+export function planBeat(plan: Pick<EditPlan, "template" | "tempo">): number | null {
+  const bpm = planBpm(plan);
   return bpm ? 60 / bpm : null;
 }
 
@@ -31,7 +43,7 @@ const MOTION_MAX = 8;
  * her voice or for a template without a tempo.
  */
 export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number>): EditPlan {
-  const beat = beatOf(plan.template);
+  const beat = planBeat(plan);
   if (!beat || plan.voice || !plan.segments.length) return plan;
   // Worked in frames, as the composition plays it (a crossfade overlaps whole frames).
   const frames = (t: number) => Math.round(t * REEL_FPS);

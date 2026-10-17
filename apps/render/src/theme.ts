@@ -1,6 +1,8 @@
 import type { MotionTemplate, ReelSignature } from "./types";
 
-// One visual system, four temperaments (collage draws its own texts, Collage.tsx). Sizes are for a 1080-wide frame.
+// One visual system. A Reel has no ambiance any more (« libre »): one native look set the
+// business's way (its signature), its motion from its own tempo. The four temperaments below
+// are the Reels made before (collage draws its own texts, Collage.tsx). Sizes are for a 1080-wide frame.
 // Modern and native-looking: texts are big and few, set where a creator would put them in
 // the Instagram or TikTok app (the hook in the upper third, a statement in the apps' white
 // box, a line lower down), every shot gets the same light grade, and the camera keeps moving
@@ -47,6 +49,9 @@ export type Theme = {
 
 /** Where each text sits by default (top edge of its box, share of the height). Mirror of TEXT_ROWS in packages/agent/src/retouch.ts. */
 export const TEXT_Y = { hook: 0.2, band: 0.47, caption: 0.62 } as const;
+
+/** The tempo of a « libre » Reel that has none (mirror of TEMPLATE_BPM.libre in packages/agent/src/tempo.ts). */
+export const LIBRE_TEMPO = 100;
 
 export const THEMES: Record<MotionTemplate, Theme> = {
   doux: {
@@ -97,7 +102,33 @@ export const THEMES: Record<MotionTemplate, Theme> = {
     grade: "saturate(1.05) sepia(0.05) contrast(1.02)",
     vignette: 0,
   },
+  libre: liveTheme(LIBRE_TEMPO),
 };
+
+/**
+ * A Reel's motion from its own tempo, on one native look (a clean bold sentence, its key
+ * word in the brand colour, a statement in the apps' white box; the business's signature
+ * sets its case, fonts, stress and light): a calm Reel (76 BPM) has its words rise one after
+ * the other and a camera that barely moves, a fast one (120) has them pop in and lands its
+ * zooms harder.
+ */
+export function liveTheme(tempo: number): Theme {
+  const e = Math.min(1, Math.max(0, (tempo - 76) / 44));
+  const mix = (calm: number, lively: number) => calm + (lively - calm) * e;
+  const lively = e >= 0.55;
+  return {
+    hook: { family: "body", weight: 700, italic: false, size: Math.round(mix(96, 112)), uppercase: false, letterSpacing: -1.5, lineHeight: 1.06, stagger: e < 0.3 ? 2 : 1, enter: lively ? "pop" : "rise", stress: "color" },
+    band: { family: "body", weight: 700, size: Math.round(mix(60, 64)), uppercase: false, letterSpacing: -0.5, radius: 14, box: "white", tilt: 0 },
+    caption: { weight: lively ? 800 : 700, size: 60 },
+    subtitle: { weight: 800, size: Math.round(mix(52, 56)), uppercase: false, highlight: "pill" },
+    zoomTo: Math.round(mix(1.05, 1.09) * 1000) / 1000,
+    punch: Math.round(mix(1.1, 1.15) * 1000) / 1000,
+    spring: lively ? { damping: 14, stiffness: 210, mass: 0.6 } : e < 0.3 ? { damping: 200, stiffness: 160, mass: 0.9 } : { damping: 200, stiffness: 220, mass: 0.7 },
+    exitFrames: Math.round(mix(6, 4)),
+    grade: "brightness(1.02) contrast(1.06) saturate(1.06) sepia(0.05)",
+    vignette: Math.round(mix(0.1, 0.14) * 100) / 100,
+  };
+}
 
 /**
  * The light of a business's pictures, on every shot instead of the ambiance's: sober CSS
@@ -114,12 +145,12 @@ const GRADES: Record<ReelSignature["grade"], string | null> = {
 };
 
 /**
- * The ambiance's theme set the business's way: its titles (font, case, weight, alignment,
+ * The Reel's theme set the business's way: its titles (font, case, weight, alignment,
  * spacing), how its key words stand out, the box under a statement and the light of its
- * pictures. The ambiance keeps its sizes, rhythm, springs and entrances.
+ * pictures. Its tempo (an older Reel: its ambiance) keeps the sizes, rhythm, springs and entrances.
  */
-export function themeFor(template: MotionTemplate, signature: ReelSignature | undefined): Theme {
-  const base = THEMES[template];
+export function themeFor(template: MotionTemplate, signature: ReelSignature | undefined, tempo?: number): Theme {
+  const base = template === "libre" ? liveTheme(tempo ?? LIBRE_TEMPO) : THEMES[template];
   if (!signature) return base;
   const t = signature.titles;
   const upper = t.case === "upper";

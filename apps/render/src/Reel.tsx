@@ -39,8 +39,8 @@ const stressedIn = (emphasis: Set<string>, word: string) =>
 const SPACES = /[^\S\u00a0\u202f]+/;
 
 export function Reel(props: ReelProps) {
-  // The ambiance's rhythm, set the business's way (its titles, key words, boxes and light).
-  const theme = themeFor(props.template, props.brand.signature);
+  // The Reel's rhythm (its tempo; an older Reel: its ambiance), set the business's way (its titles, key words, boxes and light).
+  const theme = themeFor(props.template, props.brand.signature, props.tempo);
   // The studio's own fonts first, so their families are not asked of Google.
   loadCustomFonts(props.brand.customFonts);
   const collage = props.template === "collage";

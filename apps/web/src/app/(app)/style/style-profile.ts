@@ -1,10 +1,11 @@
 // Pure logic of the Style page's brand profile (no I/O, unit tested): reading a
 // stored profile, validating the form, applying it to the profile.
-import { brandProfileSchema, DEFAULT_VOICE_ID, motionTemplateSchema, readVoiceSetting, type BrandProfile } from "@fauve/agent";
+import { brandProfileSchema, DEFAULT_VOICE_ID, readVoiceSetting, type BrandProfile } from "@fauve/agent";
 import { z } from "zod";
 import {
   ART_DIRECTION_MAX,
   CAPTION_LENGTHS,
+  DEFAULT_FONTS,
   EMOJI_LEVELS,
   FONT_NAME,
   HASHTAG,
@@ -13,8 +14,6 @@ import {
   MAX_COLORS,
   RULE_MAX,
   RULES_MAX,
-  TEMPLATE_FONTS,
-  TEMPLATES,
   TONE_MAX,
   VOICE_USES,
   type StyleForm,
@@ -29,7 +28,6 @@ export const styleProfileSchema = brandProfileSchema.extend({
   /** Logo uploaded here (path in the private media bucket); wins over logo_url. */
   logo_path: z.string().max(300).optional(),
   art_direction: z.string().max(ART_DIRECTION_MAX).optional(),
-  default_template: motionTemplateSchema.optional(),
 });
 export type StyleProfile = z.infer<typeof styleProfileSchema>;
 
@@ -70,7 +68,6 @@ export function toStyleForm(profile: StyleProfile): StyleForm {
     colors: (profile.colors ?? []).map((c) => c.toLowerCase()),
     display_font: validFont(profile.fonts?.[0]),
     body_font: validFont(profile.fonts?.[1]),
-    default_template: profile.default_template ?? null,
     tone: profile.tone,
     caption_length: profile.caption_length,
     emojis: profile.emojis,
@@ -108,7 +105,6 @@ export const styleFormSchema = z.object({
     .transform((colors) => [...new Set(colors)]),
   display_font: fontInput,
   body_font: fontInput,
-  default_template: z.enum(TEMPLATES).nullable(),
   tone: z.string().trim().max(TONE_MAX, `Le ton dépasse ${TONE_MAX} caractères.`),
   caption_length: z.enum(CAPTION_LENGTHS),
   emojis: z.enum(EMOJI_LEVELS),
@@ -144,8 +140,8 @@ export function applyStyleForm(current: StoredProfile, form: z.output<typeof sty
     if (value === undefined) delete next[key];
     else next[key] = value;
   };
-  // fonts is positional ([display, body]): a missing one takes the template's font.
-  const fallback = TEMPLATE_FONTS[form.default_template ?? "doux"];
+  // fonts is positional ([display, body]): a missing one takes the default font.
+  const fallback = DEFAULT_FONTS;
   set("art_direction", form.art_direction || undefined);
   set("colors", form.colors.length ? form.colors : undefined);
   set(
@@ -154,7 +150,8 @@ export function applyStyleForm(current: StoredProfile, form: z.output<typeof sty
       ? [form.display_font ?? fallback.display, form.body_font ?? fallback.body]
       : undefined,
   );
-  set("default_template", form.default_template ?? undefined);
+  // A Reel has no ambiance any more (each one its own rhythm): an older default goes.
+  set("default_template", undefined);
   return next;
 }
 

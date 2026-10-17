@@ -247,7 +247,7 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
     const current = (profile as { moodboard?: MoodItems & Record<string, unknown> }).moodboard;
     if (hersOwn(current)) return profile;
     saved = true;
-    const p = profile as { fonts?: string[]; default_template?: string; tone?: string; font_twins?: Record<string, string>; voice?: { use?: string; voice_id?: string } };
+    const p = profile as { fonts?: string[]; tone?: string; font_twins?: Record<string, string>; voice?: { use?: string; voice_id?: string } };
     // The voice that sounds like it, unless she chose one (Style › Voix off).
     const narrator = findVoice(signature.narrator?.voice);
     // What she sees on her site beats the CSS: the palette becomes the brand's colours (the first is the accent).
@@ -261,7 +261,6 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
       signature,
       // A hook and a line in her words: her style shown on one of her photos at the Style step.
       style_sample: reading.sample,
-      ...(p.default_template ? {} : { default_template: signature.ambiance }),
       ...(p.voice?.voice_id || !narrator ? {} : { voice: { use: p.voice?.use ?? "auto", voice_id: narrator.id } }),
       // How it talks, read in its site's words, unless someone already said it.
       ...(p.tone?.trim() && p.tone !== DEFAULT_TONE ? {} : { tone: signature.voice }),

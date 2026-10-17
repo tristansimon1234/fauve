@@ -14,7 +14,6 @@ import {
   motionTemplateSchema,
   reelFormatSchema,
   variantPlan,
-  type MotionTemplate,
 } from "@fauve/agent";
 import { reviewMontage } from "@/lib/agent/critic";
 import { designEdit } from "@/lib/agent/editor";
@@ -69,7 +68,7 @@ const bodySchema = z.object({
   maxNewScenes: z.number().int().min(0).max(MAX_FREE_SCENES).optional(),
   newScenes: z.number().int().min(0).max(10).optional(),
   title: z.string().max(200).optional(),
-  /** Variant step: the template and hook to change. */
+  /** Variant step: the hook to change (an older quote may still name a template: no longer switched). */
   variant: z.object({ template: motionTemplateSchema.optional(), hook: z.string().max(120).optional() }).optional(),
   /** Level of care; absent: one version, no review (older quotes). */
   effort: effortSchema.optional(),
@@ -96,8 +95,8 @@ const bodySchema = z.object({
 });
 type Job = z.infer<typeof bodySchema>;
 
-/** A new version of the post's plan: same cut, another template and hook (no editor call). */
-async function createVariant(studioId: string, postId: string, change: { template?: MotionTemplate; hook?: string }) {
+/** A new version of the post's plan: same cut and rhythm, another hook (no editor call). */
+async function createVariant(studioId: string, postId: string, change: { hook?: string }) {
   const db = supabaseAdmin();
   const [post, latest] = await Promise.all([
     db.from("posts").select("edit_plan_id").eq("id", postId).eq("studio_id", studioId).single(),
@@ -145,8 +144,8 @@ async function run(job: Job) {
 
   if (job.step === "variant") {
     try {
-      const plan = await createVariant(job.studioId, job.postId, job.variant ?? {});
-      const what = `Variante en style « ${plan.template} »${job.variant?.hook ? ", avec une autre accroche" : ""}`;
+      await createVariant(job.studioId, job.postId, job.variant ?? {});
+      const what = job.variant?.hook ? "Variante avec une autre accroche" : "Variante";
       await queueJob("montage", { ...target, step: "render", rationale: `${what} : dis-moi laquelle tu préfères.`, note: `${what}.`, quoteId: job.quoteId, newScenes: 0 });
     } catch (error) {
       console.error("variant failed", job.postId, error);

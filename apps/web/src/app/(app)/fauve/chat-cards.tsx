@@ -80,7 +80,7 @@ function PlanList({ plan }: { plan: NonNullable<CardQuote["plan"]> }) {
     <div className="flex flex-col gap-3">
       <span className="text-[13px] font-semibold text-muted">
         ~{Math.round(plan.duration)} s · {plan.scenes.length} scène{plan.scenes.length > 1 ? "s" : ""}
-        {plan.style ? ` · ${AMBIANCES[plan.style].label.toLowerCase()}` : ""}
+        {plan.style === "collage" ? " · en collage" : plan.style && plan.style !== "libre" ? ` · ${AMBIANCES[plan.style].label.toLowerCase()}` : ""}
       </span>
       <ol className="flex flex-col gap-2.5">{plan.scenes.slice(0, FIRST_SCENES).map(scene)}</ol>
       {rest.length > 0 && (

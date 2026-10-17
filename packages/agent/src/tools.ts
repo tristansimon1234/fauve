@@ -154,7 +154,7 @@ export const toolSpecs = {
   },
   montage: {
     description:
-      "Lance un montage ou une correction, tout de suite, dès qu'elle le demande en disant de quoi il parle, ou qu'elle a dit oui au sujet que tu lui as proposé (pas de devis : les crédits sont débités à la livraison pour ce qui a vraiment été fait, et le message de livraison dit combien). En tâche de fond : ton monteur regarde les clips, choisit le gabarit, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Simone la regarde et la fait corriger avant de l'envoyer (Rapide 2 à 4 min, Soigné 4 à 8, Max 8 à 15). Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus doux », « enlève le texte », « change la police ») part du montage précédent. Si le solde ne suffit pas, rien ne part : la réponse le dit.",
+      "Lance un montage ou une correction, tout de suite, dès qu'elle le demande en disant de quoi il parle, ou qu'elle a dit oui au sujet que tu lui as proposé (pas de devis : les crédits sont débités à la livraison pour ce qui a vraiment été fait, et le message de livraison dit combien). En tâche de fond : ton monteur regarde les clips, choisit le rythme et la forme, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Simone la regarde et la fait corriger avant de l'envoyer (Rapide 2 à 4 min, Soigné 4 à 8, Max 8 à 15). Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus calme », « plus rythmé », « en collage », « enlève le texte », « change la police ») part du montage précédent. Si le solde ne suffit pas, rien ne part : la réponse le dit.",
     input: z.object({
       post_id: z.string().uuid(),
       media_ids: z.array(z.string().uuid()).max(MAX_MONTAGE_FILES).optional().describe("Clips et photos à monter (media_id), 20 au plus. Facultatif pour une correction ou une vidéo 100 % motion design."),
@@ -174,11 +174,10 @@ export const toolSpecs = {
         ),
       variant: z
         .object({
-          template: motionTemplateSchema.optional().describe("Style de la variante ; par défaut le suivant (doux → dynamique → chic → collage)"),
-          hook: z.string().max(80).optional().describe("Nouvelle accroche, courte et différente de l'actuelle"),
+          hook: z.string().min(2).max(80).describe("Nouvelle accroche, courte et différente de l'actuelle"),
         })
         .optional()
-        .describe("Variante du montage livré (1 crédit, sans nouveau montage) : même découpage, autre style et autre accroche"),
+        .describe("Variante du montage livré (1 crédit, sans nouveau montage) : même découpage et même rythme, une autre accroche. Pour un autre rythme ou le collage : une correction"),
     }),
   },
   montage_status: {
@@ -201,7 +200,7 @@ export const toolSpecs = {
       "Écrit du texte par-dessus les photos d'un carrousel ou d'un post photo, à la charte du studio (mêmes polices et styles que les montages). Rendu en images en une minute environ, gratuit ; le lien vers le résultat est envoyé automatiquement à la gérante quand c'est prêt. Une entrée par photo, dans l'ordre des photos de la publication (texts vide = photo sans texte). Court et lisible : une accroche sur la 1re photo (hook), puis un message par photo (band ou caption), 6 textes au plus par photo. Une liste (checklist, planning, étapes, tarifs) est un seul texte avec items (titre + détail facultatif par élément). Pour refaire la mise en page d'un exemple copié (copy_text_style), reprends un texte par bloc avec son look_name. Remplace le texte déjà posé ; la gérante peut ensuite déplacer ou corriger chaque texte elle-même.",
     input: z.object({
       post_id: z.string().uuid(),
-      template: motionTemplateSchema.optional().describe("doux, dynamique, chic ou collage ; par défaut celui déjà choisi, sinon doux"),
+      template: motionTemplateSchema.optional().describe("Style des textes : doux (textes légers), dynamique (gros titres) ou chic (italique élégant) ; par défaut celui déjà choisi, sinon doux"),
       slides: z
         .array(
           z.object({
@@ -395,7 +394,7 @@ export const toolSpecs = {
     description:
       "Change le profil de style du studio (à partir d'exemples ou d'une correction de la gérante) : donne seulement ce qui change, le reste est gardé. « titles » règle ses titres à l'écran, pour tous ses prochains Reels : espacement des lettres (tracking : tight serré, normal, wide aéré), capitales ou non (case), graisse (weight), alignement (align) ; c'est son choix, jamais imposé.",
     input: brandProfileSchema
-      .pick({ tone: true, caption_length: true, emojis: true, hashtags: true, visual_notes: true, colors: true, fonts: true, art_direction: true, default_template: true, dos: true, donts: true })
+      .pick({ tone: true, caption_length: true, emojis: true, hashtags: true, visual_notes: true, colors: true, fonts: true, art_direction: true, dos: true, donts: true })
       .partial()
       .extend({ titles: brandSignatureSchema.shape.titles.partial().optional() }),
   },

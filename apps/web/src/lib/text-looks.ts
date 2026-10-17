@@ -77,7 +77,7 @@ export async function keepTextLooks(studioId: string, looks: SavedLook[]): Promi
 /** Fonts a hand-made look starts from: the studio's, or its template's. */
 export async function lookDefaults(studioId: string, template: string | undefined, role: Role): Promise<TextLook> {
   const profile = await latestProfile(studioId);
-  const t = motionTemplateSchema.catch(profile.default_template ?? "doux").parse(template);
+  const t = motionTemplateSchema.catch("doux").parse(template);
   const brand = resolveReelBrand({}, t, { name: "", fonts: profile.fonts });
   return defaultLook(role, { display: brand.displayFont, body: brand.bodyFont });
 }

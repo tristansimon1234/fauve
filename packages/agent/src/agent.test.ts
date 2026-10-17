@@ -328,18 +328,55 @@ test("credits: a montage is quoted before it runs and never charged above the qu
   assert.equal(simple.max, 3);
 });
 
-test("variants: same cut, next template and a new hook, priced as a render", async () => {
+test("variants: same cut and rhythm with a new hook, priced as a render", async () => {
   const { variantPlan } = await import("./editor.ts");
   const { quoteVariant, CREDIT_PRICES } = await import("./credits.ts");
-  const plan = editPlanSchema.parse({ ...validPlan, template: "doux" });
+  const plan = editPlanSchema.parse({ ...validPlan, template: "libre", tempo: 92 });
   const variant = variantPlan(plan, { hook: "Respire. Tout part de là." });
-  assert.equal(variant.template, "dynamique"); // next template by default
+  assert.equal(variant.template, "libre"); // no ambiance to switch any more
+  assert.equal(variant.tempo, 92);
   assert.deepEqual(variant.segments, plan.segments); // same cut
   assert.equal(variant.texts[0]!.text, "Respire. Tout part de là.");
-  assert.equal(variantPlan(plan, { template: "chic" }).texts[0]!.text, plan.texts[0]!.text); // hook kept when not given
-  assert.equal(variantPlan(editPlanSchema.parse({ ...validPlan, template: "chic" }), {}).template, "collage");
-  assert.equal(variantPlan(editPlanSchema.parse({ ...validPlan, template: "collage" }), {}).template, "doux"); // wraps around
+  // An older quote asking for another template: the cut, the rhythm and the form stay.
+  const old = variantPlan(editPlanSchema.parse({ ...validPlan, template: "collage" }), { template: "doux" } as { hook?: string });
+  assert.equal(old.template, "collage");
+  assert.equal(old.texts[0]!.text, validPlan.texts[0]!.text); // hook kept when not given
   assert.equal(quoteVariant().max, CREDIT_PRICES.variant);
+});
+
+test("the editor chooses each Reel's tempo and the collage form, no ambiance", async () => {
+  const { fromEditorPlan, signatureTransition, EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
+  const base = {
+    duration: 6,
+    segments: [
+      { clip_id: "a", in: 0, out: 2, move: "none", speed: 1 },
+      { clip_id: "b", in: 0, out: 2, move: "none", speed: 1 },
+      { clip_id: "c", in: 0, out: 2, move: "none", speed: 1 },
+    ],
+    texts: [
+      { text: "le geste juste", from: 0, to: 1.8, style: "hook" as const },
+      { text: "essai offert", from: 2.1, to: 3.9, style: "band" as const },
+    ],
+    transitions: "cut" as const,
+    subtitles: false,
+  };
+  const calm = fromEditorPlan({ ...base, tempo: 82, collage: false });
+  assert.equal(calm.template, "libre");
+  assert.equal(calm.tempo, 82);
+  assert.equal(calm.segments.find((s) => "accent" in s && s.accent)?.["accent" as never], "wipe"); // a calm Reel's signature: the wipe
+  const lively = fromEditorPlan({ ...base, tempo: 124, collage: false });
+  assert.equal(lively.segments.find((s) => "accent" in s && s.accent)?.["accent" as never], "punch");
+  assert.equal(fromEditorPlan({ ...base, tempo: 400, collage: false }).tempo, 130); // kept in its range
+  assert.equal(fromEditorPlan({ ...base, tempo: 20, collage: false }).tempo, 70);
+  const collage = fromEditorPlan({ ...base, tempo: 104, collage: true });
+  assert.equal(collage.template, "collage");
+  assert.equal(collage.tempo, 104);
+  // A plan written with a template (older callers) keeps it.
+  assert.equal(fromEditorPlan({ ...base, template: "chic" }).template, "chic");
+  assert.equal(signatureTransition("libre"), "punch"); // 100 BPM by default
+  assert.equal(signatureTransition("doux"), "wipe");
+  assert.doesNotMatch(EDITOR_SYSTEM_PROMPT, /quatre ambiances|default_template/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /« tempo »/);
 });
 
 test("motion scenes: generated code is checked before it runs", async () => {
@@ -469,7 +506,9 @@ test("montage plan: shown on the quote and read by the editor", async () => {
     ],
   });
   const brief = planBrief(plan);
-  assert.match(brief, /~15 s, gabarit dynamique/);
+  assert.match(brief, /~15 s, coupes rapides\./); // an older style: its energy in words
+  assert.match(planBrief({ ...plan, style: "collage" }), /~15 s, en collage\./);
+  assert.match(planBrief({ ...plan, style: undefined }), /~15 s\./);
   assert.match(brief, /1\. animation : Ouverture/);
   assert.match(brief, /3\. fin : Logo/);
   assert.equal(montagePlanSchema.safeParse({ duration: 15, scenes: [] }).success, false);
@@ -962,8 +1001,9 @@ test("the first Reel's buttons and the ambiances speak plain words", async () =>
     assert.ok(label && hint && photo, t);
     assert.doesNotMatch(`${label} ${hint} ${photo}`, /dynamique|pêchu|doux\b|chic\b/i, "no designer's adjective on screen");
   }
+  // No ambiance to choose any more: each Reel its own rhythm, in the look of her charter.
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
-  assert.ok(FAUVE_SYSTEM_PROMPT.includes("« Coupes rapides »") && !FAUVE_SYSTEM_PROMPT.includes("« Dynamique »"));
+  assert.ok(FAUVE_SYSTEM_PROMPT.includes("chaque Reel à son rythme") && !FAUVE_SYSTEM_PROMPT.includes("« Coupes rapides »"));
 });
 
 test("the site's photos: share image first, big images, no logos or icons", async () => {
@@ -1516,6 +1556,14 @@ test("tempo: cuts and texts on the beats, one signature transition, the rhythm f
   assert.equal(normalized.segments.filter((s) => "accent" in s && s.accent).length, 1);
   assert.match(rhythmLine(normalized), /2 coupes sur 2 sur un temps \(120 BPM\)/);
   assert.match(rhythmLine(normalized), /transition signature : punch à la scène 1/);
+
+  // A Reel's own tempo (no ambiance): its cuts on its beats, its BPM told to the critic.
+  const own = snapToTempo({ ...plan, template: "libre", tempo: 90 }, { a: 10, b: 10 });
+  const ninety = 60 / 90;
+  for (const t of planTimeline(own).segments.map((s) => s.start)) assert.ok(Math.abs(t - Math.round(t / ninety) * ninety) < 0.025, `own-tempo cut at ${t}`);
+  assert.match(rhythmLine(normalizeEditPlan({ ...plan, template: "libre", tempo: 90 }, { a: 10, b: 10 })), /\(90 BPM\)/);
+  // A « libre » plan without a tempo: 100 BPM.
+  assert.match(rhythmLine(normalizeEditPlan({ ...plan, template: "libre" }, { a: 10, b: 10 })), /\(100 BPM\)/);
 });
 
 test("formats: a key message held all along, film dust when the editor asks, French spaces on screen", async () => {
@@ -1525,7 +1573,8 @@ test("formats: a key message held all along, film dust when the editor asks, Fre
   const { voiceOverDecisionSchema, reelFormatSchema } = await import("./voice-over.ts");
   const output = {
     duration: 12,
-    template: "dynamique" as const,
+    tempo: 118,
+    collage: false,
     segments: [
       { clip_id: "a", in: 0, out: 1.5, move: "none", speed: 1 },
       { clip_id: "b", in: 0, out: 1.5, move: "none", speed: 1 },
@@ -1591,9 +1640,11 @@ test("lab fixes: lines that hold together, a breath between sentences, subtitles
   assert.equal(subtitleRow([{ x: 0.3, y: 0.2, w: 0.4, h: 0.2 }]), null);
   const moved = subtitleRow([{ x: 0.3, y: SUBTITLE_ROW.y - 0.05, w: 0.4, h: 0.12 }]);
   assert.ok(moved !== null && (moved + SUBTITLE_ROW.h < SUBTITLE_ROW.y - 0.05 || moved > SUBTITLE_ROW.y + 0.07));
-  // The ambiance she chose is judged as hers: a collage stays a collage after the review.
+  // The form she chose is judged as hers: a collage stays a collage after the review.
   const { ambianceLine } = await import("./critic.ts");
-  assert.match(ambianceLine("collage")!, /Façon collage.*jamais l'ambiance elle-même/);
+  assert.match(ambianceLine("collage")!, /le collage.*jamais le collage lui-même/);
+  assert.match(ambianceLine("chic")!, /Sobre et élégant/); // a Reel made before keeps its ambiance
+  assert.equal(ambianceLine("libre"), null); // its own rhythm: nothing to hold the critic to
   assert.equal(ambianceLine(null), null);
   assert.equal(ambianceLine("class_of_the_day"), null);
   // The critic judges a key message held on screen as the point of the format.
@@ -2143,10 +2194,24 @@ test("signature: plain lines for the editor, the designer and the critic", async
   assert.match(lines, /musique : deep house/);
 });
 
-test("signature: its ambiances are the montage templates", async () => {
-  const { brandSignatureSchema } = await import("./signature.ts");
-  const { MOTION_TEMPLATES } = await import("./schemas.ts");
-  assert.deepEqual([...brandSignatureSchema.shape.ambiance.options], [...MOTION_TEMPLATES]);
+test("signature: no ambiance any more, an older one is left out", async () => {
+  const { brandSignatureSchema, SIGNATURE_GUIDE } = await import("./signature.ts");
+  assert.equal("ambiance" in brandSignatureSchema.shape, false);
+  assert.doesNotMatch(SIGNATURE_GUIDE, /ambiance/);
+  const old = brandSignatureSchema.parse({
+    ambiance: "chic",
+    titles: { font: "display", case: "normal", weight: "regular", align: "center", tracking: "normal" },
+    stress: "color",
+    band: "white",
+    grade: "natural",
+    base: "light",
+    motion: "epure",
+    music: "lo-fi",
+    voice: "tutoiement",
+  });
+  assert.equal("ambiance" in old, false);
+  const { brandProfileSchema } = await import("./schemas.ts");
+  assert.equal("default_template" in brandProfileSchema.partial().parse({ default_template: "chic" }), false);
 });
 
 test("motion: the signature reaches the render's brand, only what the render applies", async () => {

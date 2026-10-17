@@ -139,7 +139,6 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
       // Her moodboard is her art direction: its settings (signature) follow its reading.
       if (reading) {
         next.signature = reading.signature;
-        if (!next.default_template) next.default_template = reading.signature.ambiance;
         // The voice that sounds like it, unless she chose one.
         const voice = (next.voice ?? {}) as { use?: string; voice_id?: string };
         const narrator = findVoice(reading.signature.narrator.voice);
