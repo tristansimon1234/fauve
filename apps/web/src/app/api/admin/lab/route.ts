@@ -47,7 +47,8 @@ import { photoRegions } from "@/lib/video/regions";
 //                        gallery, made a phone's OGG Opus note (16 kHz mono, quieter, band-limited),
 //                        kept as a WhatsApp audio and read by Scribe, then put on the Reel.
 //   ?case=…&step=result  every version: its render (signed link, 24 h), the plan kept
-//                        (without the scenes' code), the delivered message and the costs.
+//                        (without the scenes' code), the delivered message, what this Reel cost
+//                        (costs) and what the lab studio has spent over all its runs (studio_costs).
 //   ?case=…&step=music   the version kept rendered again with a newly composed piece, the
 //                        montage untouched: to hear a change to the music without a new montage.
 //   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&idea=…][&voice=…|&own_voice=…]
@@ -411,7 +412,7 @@ async function result(key: string) {
   const [plans, message, costs, voice, brand] = await Promise.all([
     db.from("edit_plans").select("id, version, plan, created_at").eq("post_id", post.data.id).order("version"),
     db.from("whatsapp_messages").select("body, created_at").eq("studio_id", studioId).eq("direction", "outbound").order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    db.from("cost_events").select("kind, cost_eur").eq("studio_id", studioId),
+    db.from("cost_events").select("kind, cost_eur, created_at").eq("studio_id", studioId),
     post.data.voice_media_id ? db.from("media_assets").select("transcript").eq("id", post.data.voice_media_id).maybeSingle() : Promise.resolve({ data: null }),
     db.from("brand_profiles").select("version, profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
   ]);
@@ -436,8 +437,16 @@ async function result(key: string) {
   const url = new Map(signed.flatMap((s) => (s.path && s.signedUrl ? [[s.path, s.signedUrl] as const] : [])));
   const kept = (plans.data ?? []).find((p) => p.id === post.data!.edit_plan_id);
   const plan = editPlanSchema.safeParse(kept?.plan);
-  const byKind: Record<string, number> = {};
-  for (const c of costs.data ?? []) byKind[c.kind as string] = Math.round(((byKind[c.kind as string] ?? 0) + Number(c.cost_eur)) * 1000) / 1000;
+  // What this Reel cost (from its post's creation: montage, animations, review, renders, music), and what
+  // the lab studio has spent over all its runs (with the one-time reading of its media).
+  const byKind = (since?: string) => {
+    const sums: Record<string, number> = {};
+    for (const c of costs.data ?? []) {
+      if (since && new Date(c.created_at as string) < new Date(since)) continue;
+      sums[c.kind as string] = Math.round(((sums[c.kind as string] ?? 0) + Number(c.cost_eur)) * 1000) / 1000;
+    }
+    return sums;
+  };
   return {
     studioId,
     studio: { name: studio.data.name, business: studio.data.business_type, facts: studio.data.memory },
@@ -459,7 +468,8 @@ async function result(key: string) {
     renders: renders.map((r) => ({ plan: r.edit_plan_id, status: r.status, seconds: r.duration_ms ? Math.round((r.duration_ms as number) / 100) / 10 : null, error: r.error, url: r.storage_path ? url.get(r.storage_path as string) : null })),
     message: message.data?.body ?? null,
     voice: (voice.data?.transcript as { text?: string; duration?: number } | null) ?? null,
-    costs: byKind,
+    costs: byKind(post.data.created_at as string),
+    studio_costs: byKind(),
     // The plan kept, readable: the scenes' code left out.
     plan: plan.success
       ? {
