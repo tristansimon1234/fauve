@@ -496,6 +496,13 @@ const rgbLuminance = ([r, g, b]: [number, number, number]) => {
 const rgbHex = (c: number[]) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 
 /**
+ * Over footage, the luminance a brand colour needs to read against the dark shadow under the
+ * letters: 3:1, the bar for large bold type. At 0.3, a pizzeria's deep red (#C8102E) was lifted
+ * to a pale pink that no longer looked like its brand; a navy or a burgundy is still lifted.
+ */
+const FOOTAGE_LUMINANCE = 0.1;
+
+/**
  * The brand colour as it reads where it is set: over footage a dark colour is lifted toward
  * white (same hue) until the word stands out; on a white box a pale one is taken down toward ink.
  */
@@ -504,7 +511,7 @@ function legible(hex: string, on: "footage" | "white"): string {
   if (!c) return hex;
   for (let i = 0; i < 8; i++) {
     const l = rgbLuminance(c);
-    if (on === "footage" ? l >= 0.3 : l <= 0.3) break;
+    if (on === "footage" ? l >= FOOTAGE_LUMINANCE : l <= 0.3) break;
     c = c.map((v) => (on === "footage" ? v + (255 - v) * 0.2 : v * 0.8)) as [number, number, number];
   }
   return rgbHex(c);
