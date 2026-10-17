@@ -2124,6 +2124,31 @@ test("texts and animations: an animated hook is not written again after it, and 
   );
 });
 
+test("texts and animations over several shots: one that writes words keeps texts off it, a silent one does not", async () => {
+  const { normalizeEditPlan } = await import("./editor.ts");
+  const scene = "function Scene(){return null}";
+  // A boutique Reel opened on an animated hook over her shots and a written hook, one over the other.
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 12,
+    template: "libre",
+    images: [],
+    segments: [
+      { clip_id: "a", in: 0, out: 6 },
+      { clip_id: "b", in: 0, out: 6 },
+    ],
+    texts: [{ text: "Lille, ce week-end c'est -20 %", from: 0, to: 2.5, style: "hook" }],
+    layers: [{ motion: { brief: "Accroche : « lille, tu fais quoi ce week-end ? »", js: scene }, from: 0, to: 1.5 }],
+  });
+  // The written hook waits for the animated one to end, about as long as it was.
+  const out = normalizeEditPlan(plan, { a: 10, b: 10 });
+  assert.deepEqual(out.texts.map((t) => t.from), [1.5]);
+  assert.ok(out.texts[0]!.to - out.texts[0]!.from > 2.3);
+  // An animation without words (a frame, her cut-out saying hi) leaves the texts where they are.
+  const silent = normalizeEditPlan(editPlanSchema.parse({ ...plan, layers: [{ motion: { brief: "un cadre qui suit son visage", js: scene }, from: 0, to: 1.5 }] }), { a: 10, b: 10 });
+  assert.deepEqual(silent.texts.map((t) => t.from), [0]);
+});
+
 test("signature transition: never on the last shot", async () => {
   const { signatureShot } = await import("./editor.ts");
   const segments = [
