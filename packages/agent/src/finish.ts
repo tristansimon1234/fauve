@@ -1,6 +1,7 @@
 import { avoidPhotoText, boxFrom2d, headZone, photoBoxInFrame, photoEditFrom, reelSubtitleRow, sceneShift, type Adjust, type Box, type PhotoDetection, type PhotoEdit } from "./retouch.ts";
 import { planTimeline } from "./motion.ts";
 import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type EditPlan, type PlanSegment } from "./schemas.ts";
+import type { TracksByClip, TracksFile } from "./tracking.ts";
 
 // The finishing touches a professional editor gives every cut, decided by the engine from
 // what Gemini read in her photos and videos (never left to chance, never written by the
@@ -15,7 +16,43 @@ export type MediaFacts = {
   clips: Record<string, ClipAnalysis>;
   /** Photo readings by media_id. */
   photos: Record<string, PhotoFacts>;
+  /** What was tracked in her videos, by media_id: where the faces really are, image by image. */
+  tracks?: TracksByClip;
 };
+
+/** The tracker's face box is tight: a text keeps off the hair above it, the chin below it and a little on its sides (shares of the face's size). */
+const FACE_PAD = { above: 0.35, below: 0.2, sides: 0.15 };
+/** The most a shot is zoomed in a Reel (a punch, a slow push): a zone spreads out about the centre. */
+const SHOT_ZOOM = 1.12;
+/** How finely a tracked passage is weighed for the texts over it (seconds of the clip). */
+const FACE_WINDOW = 0.5;
+
+/**
+ * Where the faces tracked in a clip are over [from, from + seconds] of it, in shares of the
+ * picture (the rows of a picture filmed upright or wider are the vertical frame's): one zone
+ * per face, padded, widened by a zoom the shot may get. Null when no face was tracked there.
+ */
+export function trackedFaces(file: TracksFile, from: number, seconds: number): Box[] | null {
+  const first = Math.max(0, Math.floor(from * file.fps) - file.from);
+  const end = Math.min(file.frames.length, Math.ceil((from + seconds) * file.fps) - file.from);
+  const faces = new Map<number, { x0: number; y0: number; x1: number; y1: number }>();
+  for (let k = first; k < end; k++) {
+    for (const [id, x, y, w, h] of file.frames[k]?.f ?? []) {
+      if (id === undefined || x === undefined || y === undefined || !w || !h) continue;
+      const box = { x0: (x - w * FACE_PAD.sides) / 1000, y0: (y - h * FACE_PAD.above) / 1000, x1: (x + w * (1 + FACE_PAD.sides)) / 1000, y1: (y + h * (1 + FACE_PAD.below)) / 1000 };
+      const seen = faces.get(id);
+      faces.set(id, seen ? { x0: Math.min(seen.x0, box.x0), y0: Math.min(seen.y0, box.y0), x1: Math.max(seen.x1, box.x1), y1: Math.max(seen.y1, box.y1) } : box);
+    }
+  }
+  if (!faces.size) return null;
+  const zoomed = (v: number) => 0.5 + (v - 0.5) * SHOT_ZOOM;
+  const clamp = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
+  return [...faces.values()].map((b) => {
+    const left = clamp(Math.min(b.x0, zoomed(b.x0)));
+    const top = clamp(Math.min(b.y0, zoomed(b.y0)));
+    return { x: left, y: top, w: clamp(Math.max(b.x1, zoomed(b.x1))) - left, h: clamp(Math.max(b.y1, zoomed(b.y1))) - top };
+  });
+}
 
 type Shot = ClipAnalysis["shots"][number];
 
@@ -180,7 +217,9 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
       : isMotionSegment(s) && s.over
         ? busyZones(facts, s.over.clip_id, s.over.in ?? 0, s.duration, segments.find((x): x is Extract<PlanSegment, { clip_id: string }> => isClipSegment(x) && x.clip_id === s.over!.clip_id)?.photo)
         : [];
-    return { start: at.start, length: at.length, boxes, motion: isMotionSegment(s) };
+    // A tracked passage is weighed window by window: a text meets the faces of its own moments.
+    const windows = isClipSegment(s) ? busyWindows(facts, s.clip_id, s.in, segmentSeconds(s) * (s.speed ?? 1), at) : null;
+    return { start: at.start, length: at.length, boxes, windows: windows ?? [{ start: at.start, length: at.length, boxes }], motion: isMotionSegment(s) };
   });
   const placed = segments.map((s, i) => {
     if (isClipSegment(s)) {
@@ -200,15 +239,34 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
     return { ...rest, segments: placed, texts: finished.texts.map(({ auto_y, y, ...t }) => (auto_y ? t : { ...t, ...(y !== undefined ? { y } : {}) })) };
   }
   // A voice's subtitles keep one place for the whole Reel, the one faces cover least (they never move from shot to shot).
-  const row = reelSubtitleRow(shots.filter((s) => !s.motion));
+  const windows = shots.filter((s) => !s.motion).flatMap((s) => s.windows);
+  const row = reelSubtitleRow(windows);
   const { subtitle_y: _row, ...rest } = finished;
-  return { ...rest, ...(row !== null ? { subtitle_y: row } : {}), segments: placed, texts: avoidPhotoText(finished.texts, shots.filter((s) => !s.motion)) };
+  return { ...rest, ...(row !== null ? { subtitle_y: row } : {}), segments: placed, texts: avoidPhotoText(finished.texts, windows) };
+}
+
+/**
+ * A tracked passage window by window, in the Reel's time, with the faces of each: a text is
+ * weighed against the faces of its own moments (a face that comes close at the end of a shot
+ * does not take the whole shot). Null when no face was tracked in it.
+ */
+function busyWindows(facts: MediaFacts, mediaId: string, from: number, seconds: number, at: { start: number; length: number }): { start: number; length: number; boxes: Box[] }[] | null {
+  const file = facts.photos[mediaId] ? undefined : facts.tracks?.[mediaId];
+  if (!file || !trackedFaces(file, from, seconds)) return null;
+  const n = Math.max(1, Math.round(seconds / FACE_WINDOW));
+  return Array.from({ length: n }, (_, k) => ({
+    start: at.start + (k * at.length) / n,
+    length: at.length / n,
+    boxes: trackedFaces(file, from + (k * seconds) / n, seconds / n) ?? [],
+  }));
 }
 
 /**
  * The zones of a passage that must stay seen, in shares of the vertical frame: in a photo,
  * its lettering (a sign, a logo on a window) and every face, placed where the crop shows
- * them; in a video, the head of the subject of each shot where faces are visible.
+ * them; in a video, its faces where they were tracked, else the head of the subject of
+ * each shot where Gemini saw faces (the top of her box, too rough for a face that comes
+ * close: the hook of a boutique Reel sat on her mouth).
  */
 function busyZones(facts: MediaFacts, mediaId: string, from: number, seconds: number, edit?: PhotoEdit): Box[] {
   const photo = facts.photos[mediaId];
@@ -221,6 +279,9 @@ function busyZones(facts: MediaFacts, mediaId: string, from: number, seconds: nu
     ];
     return zones.flatMap((b) => photoBoxInFrame(b, framed) ?? []);
   }
+  const file = facts.tracks?.[mediaId];
+  const tracked = file ? trackedFaces(file, from, seconds) : null;
+  if (tracked) return tracked;
   const boxes: Box[] = [];
   for (const shot of facts.clips[mediaId]?.shots ?? []) {
     if (shot.end < from || shot.start > from + seconds) continue;
