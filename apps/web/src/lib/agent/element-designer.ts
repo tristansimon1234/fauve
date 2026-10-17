@@ -138,7 +138,7 @@ async function loadContext(input: ElementsRequest) {
   const brandIn = { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts };
   const { data: profileRow } = await db.from("brand_profiles").select("profile").eq("studio_id", input.studioId).order("version", { ascending: false }).limit(1);
   const profile = brandProfileSchema.partial().catch({}).parse(profileRow?.[0]?.profile ?? {});
-  const template = (target.template ?? profile.default_template ?? "doux") as "doux";
+  const template = (target.template ?? "doux") as "doux";
   const brand = resolveReelBrand({}, template, brandIn);
   return { photos: target.photos, exampleUrl, element, brandIn, brand, template, artDirection: profile.art_direction ?? profile.moodboard?.reading };
 }

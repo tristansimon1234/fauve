@@ -3,7 +3,7 @@ import { planTimeline } from "./motion.ts";
 import { AMBIANCES, isClipSegment, isMotionSegment, motionTemplateSchema, type EditPlan, type MotionTemplate } from "./schemas.ts";
 import { HOOK_LATEST, OPENING_MAX_SECONDS } from "./hook.ts";
 import { voicePhrases, type VoiceTranscript } from "./voice.ts";
-import { beatOf, TEMPLATE_BPM } from "./tempo.ts";
+import { planBeat, planBpm } from "./tempo.ts";
 import type { ReelFormat } from "./voice-over.ts";
 
 // The critic: before a Soigné or Max montage goes out, Opus watches key frames
@@ -156,12 +156,19 @@ export function reviewMoments(plan: EditPlan, max = 8): ReviewMoment[] {
   });
 }
 
+/** A Reel's form and rhythm in words: a collage or not, its tempo (an older Reel: its ambiance). */
+function formWords(plan: EditPlan): string {
+  const bpm = planBpm(plan);
+  const form = plan.template === "collage" ? "Collage" : plan.template === "libre" ? "Reel" : `Ambiance ${plan.template}`;
+  return bpm ? `${form} à ${bpm} BPM` : form;
+}
+
 /** A plan in a few lines, for the critic and for the second version's editor. */
 export function planDigest(plan: EditPlan): string {
   const timeline = planTimeline(plan);
   const hook = plan.texts.filter((t) => t.from < 1.5).map((t) => t.text);
   return [
-    `Gabarit ${plan.template}, ${Math.round(timeline.duration)} s, ${plan.segments.length} scènes : ${plan.segments.map((s, i) => `${i + 1}. ${kindOf(s)}${isMotionSegment(s) ? ` (${s.motion.brief.slice(0, 80)})` : ""}`).join(" ; ")}.`,
+    `${formWords(plan)}, ${Math.round(timeline.duration)} s, ${plan.segments.length} scènes : ${plan.segments.map((s, i) => `${i + 1}. ${kindOf(s)}${isMotionSegment(s) ? ` (${s.motion.brief.slice(0, 80)})` : ""}`).join(" ; ")}.`,
     hook.length ? `Accroche : « ${hook.join(" / ")} ».` : "",
     // An animation over several shots comes back on purpose (asked for): not a repeat.
     ...(plan.layers ?? []).map((l) => `Animation par-dessus les plans de ${seconds(l.from)} à ${seconds(l.to)} s, voulue : ${l.motion.brief.slice(0, 120)}.`),
@@ -193,20 +200,22 @@ export function formatLine(format: ReelFormat | undefined): string | null {
 }
 
 /**
- * The ambiance the manager chose for this Reel (Créer, or Simone at her request): it is
- * her choice, like her request. Without this line the critic judged the collage itself
- * (its paper and its prints) as far from a night-club brand, and asked to drop it.
+ * The form the manager chose for this Reel (the collage; an older Reel: its ambiance), at
+ * her request: it is her choice, like her request. Without this line the critic judged the
+ * collage itself (its paper and its prints) as far from a night-club brand, and asked to drop it.
  */
 export function ambianceLine(template: string | null | undefined): string | null {
   const chosen = motionTemplateSchema.safeParse(template);
-  if (!chosen.success) return null;
+  if (!chosen.success || chosen.data === "libre") return null;
+  if (chosen.data === "collage")
+    return "Forme choisie pour ce Reel : le collage (ses images composées à la main). C'est son choix : juge le Reel en collage, ce qui fait son style en fait partie ; jamais le collage lui-même, ni une autre forme à la place.";
   return `Ambiance choisie pour ce Reel : « ${AMBIANCES[chosen.data].label} » (${AMBIANCES[chosen.data].hint}). C'est son choix : juge le Reel dans cette ambiance, ce qui fait son style en fait partie ; jamais l'ambiance elle-même, ni une autre à la place.`;
 }
 
 /** The rhythm the frames cannot show: each shot's length, the cuts on the beat, the signature transitions. */
 export function rhythmLine(plan: EditPlan): string {
   const timeline = planTimeline(plan);
-  const beat = beatOf(plan.template);
+  const beat = planBeat(plan);
   const cuts = timeline.segments.slice(1).map((s) => s.start);
   const onBeat = beat && !plan.voice ? cuts.filter((t) => Math.abs(t / beat - Math.round(t / beat)) * beat < 0.05).length : null;
   const accents = plan.segments.flatMap((s, i) => (isClipSegment(s) && s.accent ? [`${s.accent} à la scène ${i + 1}`] : []));
@@ -224,7 +233,7 @@ export function rhythmLine(plan: EditPlan): string {
   return [
     `Rythme : plans de ${timeline.segments.map((s) => seconds(s.length)).join(" / ")} s`,
     camera.length ? `caméra : ${camera.join(", ")}` : "",
-    plan.voice ? "coupes sur les phrases de sa voix" : onBeat !== null ? `${onBeat} coupes sur ${cuts.length} sur un temps (${TEMPLATE_BPM[plan.template as MotionTemplate]} BPM)` : "",
+    plan.voice ? "coupes sur les phrases de sa voix" : onBeat !== null ? `${onBeat} coupes sur ${cuts.length} sur un temps (${planBpm(plan)} BPM)` : "",
     accents.length ? `transition signature : ${accents.join(", ")}` : "aucune transition signature",
     plan.effect === "dust" ? "effet voulu : poussière de pellicule sur toute la vidéo" : "",
   ]
@@ -269,7 +278,7 @@ export function qualityChecks(plan: EditPlan): QualityCheck[] {
     return x.length <= LONGEST_PACED_SHOT || !isClipSegment(segment) || Boolean(segment.photo);
   });
   const average = paced.length ? paced.reduce((sum, x) => sum + x.length, 0) / paced.length : 0;
-  const beat = beatOf(plan.template);
+  const beat = planBeat(plan);
   const cuts = timeline.segments.slice(1).map((x) => x.start);
   const onBeat = beat && !plan.voice && cuts.length ? cuts.filter((t) => Math.abs(t / beat - Math.round(t / beat)) * beat < 0.05).length : null;
   const loops = clips.length >= 2 && clips[0]!.clip_id === clips.at(-1)!.clip_id;
@@ -336,7 +345,7 @@ export function fixBrief(review: Pick<MontageReview, "score" | "issues">, reques
 export function alternativeBrief(first: EditPlan, request?: string | null): string {
   return [
     request ?? "",
-    `Deuxième version, pour comparer avec une première déjà faite : propose une autre approche, aussi forte, sans copier la première. Respecte ce que la gérante a demandé ou validé (plan, textes exacts) ; change le reste : l'accroche visuelle, le choix des passages, le rythme, les animations, et le gabarit si la marque le permet. Première version : ${planDigest(first)}`,
+    `Deuxième version, pour comparer avec une première déjà faite : propose une autre approche, aussi forte, sans copier la première. Respecte ce que la gérante a demandé ou validé (plan, textes exacts) ; change le reste : l'accroche visuelle, le choix des passages, le rythme (son tempo), les animations, et la forme (en collage ou non) si ça sert sa marque. Première version : ${planDigest(first)}`,
   ]
     .filter(Boolean)
     .join("\n\n");

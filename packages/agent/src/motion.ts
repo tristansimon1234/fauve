@@ -26,6 +26,7 @@ const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> 
   dynamique: { display: "Bricolage Grotesque", body: "Bricolage Grotesque" },
   chic: { display: "Bodoni Moda", body: "Inter Tight" },
   collage: { display: "Bricolage Grotesque", body: "Space Mono" },
+  libre: { display: "Instrument Serif", body: "Inter Tight" },
 };
 
 /** The fonts an ambiance uses when the studio has none (or one a Reel cannot load). */
@@ -142,6 +143,8 @@ export type ReelWord = { w: string; from: number; to: number };
 
 export type ReelProps = {
   template: MotionTemplate;
+  /** The Reel's own tempo (beats per minute): how lively its texts and camera move (a « libre » Reel). */
+  tempo?: number;
   width: number;
   height: number;
   fps: number;
@@ -531,6 +534,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
 
   return {
     template: inputs.template,
+    ...(plan.tempo ? { tempo: plan.tempo } : {}),
     ...SIZES[plan.format],
     fps,
     durationInFrames,

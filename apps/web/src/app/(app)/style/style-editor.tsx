@@ -10,7 +10,7 @@ import { FontsSection } from "./fonts-section";
 import { OwnFonts } from "./own-fonts";
 import { LogoSection } from "./logo-section";
 import { MoodboardSection } from "./moodboard-section";
-import { MAX_COLORS, TEMPLATE_FONTS, fontStylesheet, type Logo, type MoodboardView, type StyleForm } from "./style-options";
+import { DEFAULT_FONTS, MAX_COLORS, fontStylesheet, type Logo, type MoodboardView, type StyleForm } from "./style-options";
 import { ToneSection } from "./tone-section";
 import { VoiceSection } from "./voice-section";
 import { useStylesheets } from "./use-stylesheet";
@@ -59,9 +59,8 @@ export function StyleEditor({
     setSaveState({ status: "idle" });
   };
 
-  const template = form.default_template ?? "doux";
-  const displayFont = form.display_font ?? TEMPLATE_FONTS[template].display;
-  const bodyFont = form.body_font ?? TEMPLATE_FONTS[template].body;
+  const displayFont = form.display_font ?? DEFAULT_FONTS.display;
+  const bodyFont = form.body_font ?? DEFAULT_FONTS.body;
   useStylesheets([...new Set([fontStylesheet(displayFont), fontStylesheet(bodyFont)])]);
 
   // Warn before leaving with unsaved changes.
@@ -121,7 +120,7 @@ export function StyleEditor({
       <FontsSection
         display={form.display_font}
         body={form.body_font}
-        templateFonts={TEMPLATE_FONTS[template]}
+        templateFonts={DEFAULT_FONTS}
         onChange={update}
         own={<OwnFonts studioId={studioId} initial={ownFonts} display={form.display_font} body={form.body_font} onUse={update} />}
       />

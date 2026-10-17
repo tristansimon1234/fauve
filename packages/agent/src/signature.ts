@@ -5,15 +5,13 @@ import { z } from "zod";
 // same direction as settings, read once from its site or its moodboard, that every Reel and
 // every photo follows without having to be asked: its titles set like its site's titles, its
 // key words standing out its way, the box under a statement, the light of its pictures, its
-// screens light or dark, the movement of its animations, its music and the way it talks. The
-// ambiance (template) only keeps the rhythm, the transitions and the entrances.
+// screens light or dark, the movement of its animations, its music and the way it talks. A
+// Reel's rhythm is chosen for that Reel (its tempo): a business has no ambiance to keep to.
 
 export const SIGNATURE_GRADES = ["natural", "warm", "bright", "flash", "film", "moody", "cool"] as const;
 
 /** The longest words of a signature: a stored profile keeps them within these. */
 const SIGNATURE_CHARS = { music: 80, voice: 200, delivery: 140 } as const;
-/** The ambiances (MOTION_TEMPLATES in schemas.ts, which imports this file: written out here). */
-const AMBIANCE_KEYS = ["doux", "dynamique", "chic", "collage"] as const;
 /** The voices of Simone's gallery a business can sound like (SIMONE_VOICES without the whispered ones). */
 export const NARRATOR_NAMES = ["Eva", "Victoria", "Lucie", "Neto", "Antonin", "Jules"] as const;
 
@@ -28,10 +26,8 @@ export const narratorSchema = z
   })
   .describe("La voix off de ses Reels");
 
+// A signature read before kept its « ambiance »: an unknown key, left out when it is parsed.
 export const brandSignatureSchema = z.object({
-  ambiance: z.enum(AMBIANCE_KEYS).describe(
-    "L'ambiance de ses Reels (le rythme) : doux (calme et lumineux, coupes posées), dynamique (coupes rapides, énergie), chic (sobre et élégant, lent), collage (fait main, papier, créatif)",
-  ),
   titles: z
     .object({
       font: z
@@ -108,7 +104,6 @@ export function clampSignature<T extends SignatureReading>(signature: T): T {
 
 /** What the reading writes about the signature (moodboard or site), appended to its prompt. */
 export const SIGNATURE_GUIDE = `Signature : les mêmes choix en réglages, que le moteur applique à chaque Reel et à chaque photo sans qu'on le lui demande. Pars de ce que tu vois (et des mesures quand tu les as), jamais d'une habitude :
-- ambiance : le rythme qui lui ressemble ;
 - titles : la police (display ou body), la casse, la graisse, l'alignement et l'interlettrage de ses vrais titres ;
 - stress : comment ses mots importants ressortent sur son site (marker seulement s'il y a des traits dessinés à la main, serif seulement s'il mêle une serif italique) ;
 - band : le fond qui ira sous une phrase posée sur une vidéo, dans ses couleurs (white si rien ne s'impose) ;

@@ -2,7 +2,6 @@ import "server-only";
 import {
   BEAT_STEP,
   beatGrid,
-  beatOf,
   coarser,
   GROOVE_STEP,
   grooveGaps,
@@ -10,10 +9,10 @@ import {
   isMotionSegment,
   musicCostUsd,
   musicTail,
-  TEMPLATE_BPM,
+  planBeat,
+  planBpm,
   usdToEur,
   type EditPlan,
-  type MotionTemplate,
   type PostKind,
 } from "@fauve/agent";
 import { createHash } from "node:crypto";
@@ -24,7 +23,7 @@ import { alignMusicInSandbox, bassLevelsInSandbox, loopedReelInSandbox, muxAudio
 
 // Simone's music on a Reel (ElevenLabs Music): composed from its brief alone, in
 // the mood of the Reel and the business, as the looping track of a creator's Reel
-// at the ambiance's tempo, longer than the Reel so the ending it writes falls after
+// at the Reel's tempo, longer than the Reel so the ending it writes falls after
 // the cut. Composed watching the video, it stopped its beat before a cut to make it
 // hit, heard as the sound cutting out; that composer only steps in when the brief
 // alone fails. Its beats are then set on the cuts (beatGrid, alignMusicInSandbox),
@@ -53,11 +52,15 @@ export type PostMusic = z.infer<typeof postMusicSchema>;
 export const readPostMusic = (value: unknown): PostMusic => postMusicSchema.catch({ mode: "on" }).parse(value ?? {});
 
 /** The cut of a montage: what the music follows (the clips, scenes and their lengths), not the texts. */
-export function cutSignature(plan: Pick<EditPlan, "segments" | "template" | "transitions"> & { voice?: EditPlan["voice"] }): string {
+export function cutSignature(plan: Pick<EditPlan, "segments" | "template" | "transitions"> & { voice?: EditPlan["voice"]; tempo?: number }): string {
   const cut = plan.segments.map((s) =>
     isClipSegment(s) ? ["c", s.clip_id, s.in, s.out] : isMotionSegment(s) ? ["m", s.duration] : ["s", s.duration],
   );
-  return createHash("sha1").update(JSON.stringify([plan.template, plan.transitions, cut, ...(plan.voice ? [plan.voice.media_id] : [])])).digest("hex").slice(0, 16);
+  // A Reel's own tempo counts (the music is composed at it); a plan without one keeps the signature it had.
+  return createHash("sha1")
+    .update(JSON.stringify([plan.template, ...(plan.tempo ? [plan.tempo] : []), plan.transitions, cut, ...(plan.voice ? [plan.voice.media_id] : [])]))
+    .digest("hex")
+    .slice(0, 16);
 }
 
 // A genre with a character, like the track a creator picks for a Reel: adjectives
@@ -67,27 +70,38 @@ const MOODS: Record<string, { words: string; tags: string[] }> = {
   dynamique: { words: "a funky nu-disco groove: punchy four-on-the-floor kick, slap bass, bright clean guitar licks, a catchy hook from the first bar", tags: ["nu-disco", "funk", "groovy"] },
   chic: { words: "a jazzy downtempo groove: upright bass, brushed drums, smoky Rhodes chords, a touch of trip-hop, sleek and confident", tags: ["downtempo", "jazzy", "trip-hop"] },
   collage: { words: "a playful indie pop groove: handclaps, ukulele and glockenspiel, a bouncy bass, a whistled hook, quirky and fun", tags: ["indie pop", "playful", "lo-fi"] },
+  vivant: { words: "a feel-good indie funk groove: tight drums, a warm electric bass, clean rhythm guitar, a catchy hook from the first bar", tags: ["indie funk", "groovy", "feel-good"] },
 };
+
+/**
+ * The genre of a Reel without a sound of its business: by its energy (its tempo; a Reel
+ * has no ambiance any more), else its ambiance's (a Reel made before).
+ */
+function moodOf(plan: EditPlan): { words: string; tags: string[] } {
+  if (plan.template !== "libre") return MOODS[plan.template] ?? MOODS.doux!;
+  const bpm = planBpm(plan) ?? 100;
+  return bpm < 82 ? MOODS.chic! : bpm < 100 ? MOODS.doux! : bpm < 113 ? MOODS.vivant! : MOODS.dynamique!;
+}
 
 /** Under a voice: its own sound stays (the groove, the bass, the drums), only the melody steps back. */
 const underVoice = (sound: string) =>
   `${sound}, arranged to sit under a spoken voice-over: the drums, the bass and the groove carry the track with the same energy, the lead melody steps back (sparse, no solo, nothing competing with the voice)`;
 
-/** What the composer is asked for: the business, its own sound (else the template's groove), and the art direction adjustments. */
+/** What the composer is asked for: the business, its own sound (else a groove for the Reel's energy), and the art direction adjustments. */
 function brief(plan: EditPlan, business: string | null, adjustments: string[], sound?: string): { description: string; tags: string[] } {
-  const ambiance = MOODS[plan.template] ?? MOODS.doux!;
-  // The sound read in its art direction (« deep house légère », « funk de quartier ») wins over the ambiance's genre.
+  const ambiance = moodOf(plan);
+  // The sound read in its art direction (« deep house légère », « funk de quartier ») wins over the energy's genre.
   const mood = sound ? { words: `${sound}: the sound of this business, played like a track a creator would pick, with one simple hook`, tags: [sound.slice(0, 40)] } : ambiance;
   const where = business ? `a ${business}` : "a neighbourhood business";
   const notes = adjustments.length ? ` Notes from the owner: ${adjustments.join("; ").slice(0, 300)}.` : "";
   // The cuts sit on this tempo's beats (snapToTempo), and the piece is set on them after (beatGrid):
   // it keeps the tempo exactly, its first beat at the start. Over a voice the cuts follow its
-  // phrases, the tempo only keeps the energy of the ambiance.
-  const bpm = TEMPLATE_BPM[plan.template as MotionTemplate];
+  // phrases, the tempo only keeps the energy of the Reel.
+  const bpm = planBpm(plan);
   const tempo = !bpm ? "" : plan.voice ? ` Around ${bpm} BPM.` : ` ${bpm} BPM exactly, four beats to the bar, the first beat right at 0:00.`;
   return {
     description:
-      // A voice never brings a sound of its own: the business's genre (else the ambiance's) stays under it.
+      // A voice never brings a sound of its own: the business's genre (else the energy's) stays under it.
       `Instrumental track for an Instagram Reel of ${where}, the kind of track a content creator picks, not advertising music: ${plan.voice ? underVoice(sound ? `${sound}: the sound of this business` : ambiance.words) : mood.words}. No vocals.${tempo} ` +
       // A creator's Reel sits on one track that loops: the cuts fall on its beats, it never stops for them.
       // Composed watching the video, the music stopped before a cut to make it hit, or on a calm shot: heard as the sound cutting out.
@@ -196,7 +210,7 @@ export async function withMusic(params: {
     // than the Reel, so that ending falls after it and the mix cuts it off.
     const seconds = duration + musicTail(duration);
     // The grid the cuts sit on (snapToTempo); none over a voice, whose phrases place the cuts.
-    const beat = params.plan.voice ? null : beatOf(params.plan.template);
+    const beat = params.plan.voice ? null : planBeat(params.plan);
     let best: (Composed & { lost: number; grid: ReturnType<typeof beatGrid> }) | null = null;
     for (let take = 1; take <= MUSIC_TAKES && (!best || best.lost > 0); take++) {
       const composed = await composeFromText(ask, seconds)

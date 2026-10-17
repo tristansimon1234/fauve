@@ -1,7 +1,7 @@
 // Mirror of ReelProps in packages/agent/src/motion.ts (the web app builds them).
 // This package is shipped alone to the render sandbox, so it cannot import it.
 
-export type MotionTemplate = "doux" | "dynamique" | "chic" | "collage";
+export type MotionTemplate = "doux" | "dynamique" | "chic" | "collage" | "libre";
 
 /** Mirror of the retouch types in packages/agent/src/retouch.ts. */
 export type Adjust = {
@@ -81,6 +81,8 @@ export type ReelUnder =
 
 export type ReelProps = {
   template: MotionTemplate;
+  /** The Reel's own tempo (beats per minute), chosen by the editor: how lively its texts and camera move (a « libre » Reel). */
+  tempo?: number;
   width: number;
   height: number;
   fps: number;

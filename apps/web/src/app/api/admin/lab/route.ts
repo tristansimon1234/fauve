@@ -68,6 +68,7 @@ type LabCase = {
   business: string;
   facts: string[];
   brand: { colors: string[]; fonts: [string, string]; tone: string };
+  /** A form she asks for (« collage »); none: the editor chooses the rhythm and the form, as for her. */
   template?: MotionTemplate;
   title: string;
   /** What she asks for: the post's idea and the editor's request. */
@@ -84,7 +85,6 @@ const CASES: Record<string, LabCase> = {
     business: "pizzeria",
     facts: ["Pizzeria napolitaine au feu de bois, Paris 11e", "Pâte maturée 48 h, pétrie chaque matin", "Ouvert tous les soirs, terrasse aux beaux jours"],
     brand: { colors: ["#C8102E", "#F4EDE1", "#1E5631"], fonts: ["Anton", "Space Mono"], tone: "chaleureux, tutoiement, une pointe d'humour" },
-    template: "dynamique",
     title: "Dîner ce soir",
     idea: "Un Reel qui donne envie de venir dîner ce soir.",
     clips: [42484, 42465, 42469, 42481, 42480, 44007, 2597],
@@ -94,7 +94,6 @@ const CASES: Record<string, LabCase> = {
     business: "studio de Pilates Reformer",
     facts: ["Studio de Pilates Reformer à Lyon", "6 reformers, cours de 50 minutes, 8 personnes au plus", "Premier cours d'essai offert"],
     brand: { colors: ["#B4532A", "#EFE6DA", "#2F3B2F"], fonts: ["Instrument Serif", "Inter Tight"], tone: "doux, motivant, tutoiement" },
-    template: "doux",
     title: "Cours d'essai",
     idea: "Un Reel qui donne envie de réserver un cours d'essai.",
     clips: [48562, 48547, 48553, 48558, 48548, 48560, 48552],
@@ -104,7 +103,6 @@ const CASES: Record<string, LabCase> = {
     business: "barbier",
     facts: ["Barbier à Bordeaux, coupe et barbe à l'ancienne", "Serviette chaude à chaque rasage", "Barbe et coupe en 45 minutes"],
     brand: { colors: ["#B08D57", "#F3EEE6", "#1B1B1B"], fonts: ["Playfair Display", "Inter Tight"], tone: "posé, précis, tutoiement" },
-    template: "chic",
     title: "Coupe et barbe",
     idea: "Un Reel qui montre le soin d'une coupe et barbe.",
     clips: [43233, 43240, 43232, 43241, 43279, 43226],
@@ -413,7 +411,6 @@ async function result(key: string) {
     art_direction?: string;
     logo_url?: string;
     tone?: string;
-    default_template?: string;
     signature?: unknown;
     moodboard?: { reading?: string };
   };
@@ -442,7 +439,6 @@ async function result(key: string) {
       font_twins: profile.font_twins ?? {},
       art_direction: profile.art_direction ?? null,
       tone: profile.tone ?? null,
-      ambiance: profile.default_template ?? null,
       signature: profile.signature ?? null,
       reading: profile.moodboard?.reading?.slice(0, 1200) ?? null,
     },

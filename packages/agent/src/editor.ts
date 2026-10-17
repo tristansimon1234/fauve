@@ -3,7 +3,7 @@ import { composedLayers } from "./compose.ts";
 import { planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
 import { hookAtStart } from "./hook.ts";
-import { snapToTempo } from "./tempo.ts";
+import { snapToTempo, TEMPLATE_BPM } from "./tempo.ts";
 import {
   cameraMoveSchema,
   MAX_SPEED,
@@ -16,7 +16,6 @@ import {
   editPlanTextSchema,
   isClipSegment,
   isMotionSegment,
-  MOTION_TEMPLATES,
   motionTemplateSchema,
   sceneSchema,
   SLOT_NAME,
@@ -34,11 +33,9 @@ export const EDITOR_SYSTEM_PROMPT = `Tu es le monteur de Simone. Tu montes des R
 
 Ce que tu reçois. « clips » : chaque vidéo découpée en plans (« shots ») avec ce qui s'y passe, le sujet, la valeur de plan (« framing » : wide, medium, close, detail), la caméra (« camera » : static, handheld, moving), la beauté (« beauty » 1 à 5), l'énergie, le potentiel d'accroche (« hook_score »), la qualité, les visages, où est le sujet (« sujet_a » : gauche, centre, droite), ses meilleurs passages (« best_moments ») et ses paroles. « photos » : chaque photo avec ce qu'elle montre (« contenu ») et son format. « openings » : les moments les plus forts pour ouvrir le Reel, du meilleur au moins bon (clip_id, in, out, ce qu'on y voit), tirés de tout ce qui a été lu de ses plans ; quand une voix off a été écrite, sa première phrase parle du premier.
 
-Les quatre ambiances (« template ») : le rythme, les entrées des textes et le tempo de la musique ; les polices et couleurs viennent toujours de la marque.
-- « doux » (84 battements par minute) : lumineux et chaleureux. Accroche en gras, son mot clé dans la couleur de la marque, phrases en boîte blanche comme l'outil texte d'Instagram. Bien-être, beauté, café, boutique douce.
-- « dynamique » (120) : énergique. Grosse typo en capitales, mot clé sur un bloc à la couleur de la marque, coupes serrées sur le temps, coups de zoom. Sport, restaurant, barbier, tout ce qui a du rythme.
-- « chic » (76) : sobre et haut de gamme. Peu de mots, typographie fine, phrase dans un cadre filet. Luxe, épuré.
-- « collage » (108) : fait main et à la mode, et libre. Le motion designer compose tout le Reel comme un collage, avec ses plans (plein écran, en tirage scotché, découpés, plusieurs à la fois, sur du papier, avec de petits dessins…), à sa façon et autrement à chaque Reel ; mots découpés. Tu montes comme d'habitude (plans, ordre, durées, textes) et tu écris la composition dans « layers », de 0 à la fin du Reel : son brief dit ce que le collage raconte, ses moments forts et son énergie, et ce qu'elle a demandé de la forme s'il y a lieu ; la forme est au motion designer. Elle ne compte pas dans « max_new_scenes ». En correction, garde la composition (« composition_du_collage ») avec le même brief, sauf si la demande touche au collage lui-même. Jeune, créatif.
+Le rythme (« tempo », en battements par minute, de 70 à 130) : tu le choisis pour ce Reel, d'après sa demande, ses images et son commerce, jamais par habitude. Le moteur pose chaque coupe sur un de ses temps, la musique est composée à ce tempo, et les textes et la caméra suivent son énergie : lent, les mots montent un à un et la caméra bouge à peine ; rapide, ils claquent et les coups de zoom appuient. Repères : 76 à 90 pour un Reel posé (un soin, un lieu calme, de beaux gestes lents), 95 à 110 pour un Reel vivant, 115 à 128 pour un Reel qui claque (un cours intense, le coup de feu en cuisine, une rafale). Si elle le veut « plus calme » ou « plus rythmé », change-le franchement (15 au moins). Le look (polices, couleurs, casse des titres, mot clé, boîte des phrases, lumière) vient de sa charte (« brand ») et le moteur l'applique : tu ne le choisis pas.
+
+La forme collage (« collage » : true), quand elle le demande ou quand ça sert ce Reel et sa direction artistique (faite main, jeune, créative) : le motion designer compose tout le Reel comme un collage, avec ses plans (plein écran, en tirage scotché, découpés, plusieurs à la fois, sur du papier, avec de petits dessins…), à sa façon et autrement à chaque Reel ; mots découpés. Tu montes comme d'habitude (plans, ordre, durées, textes, tempo) et tu écris la composition dans « layers », de 0 à la fin du Reel : son brief dit ce que le collage raconte, ses moments forts et son énergie, et ce qu'elle a demandé de la forme s'il y a lieu ; la forme est au motion designer. Elle ne compte pas dans « max_new_scenes ». En correction, garde la composition (« composition_du_collage ») avec le même brief, sauf si la demande touche au collage lui-même. Le collage va avec chacune des recettes plus bas (raconté, message clé, visite…). Sinon, « collage » : false.
 
 Méthode d'un monteur pro :
 1. Choisis l'histoire avant les plans, d'après la matière et la demande. Ces formes marchent toutes, chacune à sa place : prends celle qui sert ce Reel et ce commerce, et varie d'un Reel à l'autre (des points de départ, jamais des moules). Recettes qui marchent pour un commerce :
@@ -91,11 +88,11 @@ Sa voix (« voice ») : une voix raconte ce Reel (un vocal de la gérante, ou la
 - aucun autre texte : ses mots, en sous-titres, disent tout (l'offre, l'invitation) ; le moteur retire tout autre texte que l'accroche ;
 - pas d'animation pendant qu'elle parle d'une chose qu'on peut montrer en vidéo : avec une voix, ses images et ses mots font le Reel, une animation au plus (même pour un premier Reel).
 
-Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh » au bout d'une seconde. Ouvre sur son plus beau plan, avec la promesse en typographie animée par-dessus (une animation sur mesure), puis ses meilleurs plans dans une vraie histoire, peu de texte, un rythme vivant même en « chic » ou « doux », et une fin sur le plus beau plan avec l'invitation. Utilise les animations permises (au moins 2), toujours par-dessus ses images.
+Premier Reel (« first_reel ») : c'est le tout premier que la gérante voit de toi, il doit lui faire dire « waouh » au bout d'une seconde. Ouvre sur son plus beau plan, avec la promesse en typographie animée par-dessus (une animation sur mesure), puis ses meilleurs plans dans une vraie histoire, peu de texte, un rythme vivant même pour un commerce posé, et une fin sur le plus beau plan avec l'invitation. Utilise les animations permises (au moins 2), toujours par-dessus ses images.
 
 Jamais d'effet bon marché : pas de rotation, de flash, de glitch, de tremblement, de page qui tourne, d'emoji animé, pas plus de deux polices, pas de zoom marqué sur chaque plan, pas de fondu sur chaque coupe. Un seul effet possible, « effect » : « dust » pose une poussière de pellicule discrète sur toute la vidéo (des grains, une fibre, une rayure de temps en temps), comme les créateurs l'ajoutent dans l'appli, pour un message clé ou une ambiance rétro, de nuit ou faite main ; « none » le plus souvent. « transitions » : « cut » (coupes nettes) presque toujours ; « fade » seulement pour un Reel calme aux plans longs (2,5 s et plus). Le moteur pose une seule transition signature sur le plan où arrive ton « band » : fais-le commencer au début du plan du moment fort.
 
-Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (en cas de conflit, « art_direction » gagne) et utilise « default_template » sauf demande contraire. « lessons » résume ce qui marche sur son Instagram : applique-les quand elles concernent ce Reel. « inspirations » décrit des Reels qu'elle aime : reprends-en l'esprit (rythme, accroche, textes), jamais le contenu. « post.chosen_inspiration » est le Reel qu'elle a choisi pour celui-ci : il passe avant les autres inspirations et avant « default_template », toujours sans en copier le contenu. « post.chosen_template » est l'ambiance qu'elle a choisie : utilise-la. « text_looks » : ses styles de texte ; quand l'un convient au rôle d'un texte (hook, band, caption), mets son nom exact dans look_name, et garde-le pour tous les textes du même rôle. Sans text_looks, laisse look_name vide.
+Direction artistique du studio (« brand ») : suis son « art_direction » et son « moodboard » (en cas de conflit, « art_direction » gagne). « lessons » résume ce qui marche sur son Instagram : applique-les quand elles concernent ce Reel. « inspirations » décrit des Reels qu'elle aime : reprends-en l'esprit (rythme, accroche, textes), jamais le contenu. « post.chosen_inspiration » est le Reel qu'elle a choisi pour celui-ci : il passe avant les autres inspirations, toujours sans en copier le contenu (son rythme te guide pour le tempo). « post.chosen_template » : « collage » si elle a choisi la forme collage pour ce Reel ; un ancien choix (doux, dynamique, chic) dit seulement l'énergie qu'elle veut (posée, rythmée, sobre). « text_looks » : ses styles de texte ; quand l'un convient au rôle d'un texte (hook, band, caption), mets son nom exact dans look_name, et garde-le pour tous les textes du même rôle. Sans text_looks, laisse look_name vide.
 
 Polices : « fonts » (display pour l'accroche et les titres, body pour le reste), des polices Google Fonts au nom exact ou celles de la gérante (brand.own_fonts), seulement si la demande en cours en réclame d'autres que celles de la charte. Sinon laisse « fonts » vide.
 
@@ -123,16 +120,26 @@ const editorMotionSegmentSchema = z.object({
  * structured-output grammar too large for the API; the look is put back after.
  */
 const editorTextSchema = editPlanTextSchema.omit({ look: true, detail_look: true, x: true, y: true, scale: true, backdrop: true }).extend({
-  look_name: z.string().optional().describe("Nom d'un style de brand.text_looks à appliquer à ce texte, recopié exactement ; sinon rien (le gabarit s'en charge)"),
+  look_name: z.string().optional().describe("Nom d'un style de brand.text_looks à appliquer à ce texte, recopié exactement ; sinon rien (sa charte s'en charge)"),
 });
+
+/**
+ * The Reel's rhythm as the editor chooses it for each Reel (no ambiance any more): its tempo,
+ * and the collage form when it serves. No bounds here (structured output does not enforce them):
+ * fromEditorPlan keeps the tempo between 70 and 130.
+ */
+const editorRhythm = {
+  tempo: z.number().describe("Tempo de ce Reel en battements par minute : 70 (posé) à 130 (qui claque)"),
+  collage: z.boolean().describe("true : la forme collage (le motion designer compose tout le Reel, écrite dans layers)"),
+};
 
 /**
  * The editor's answer before the camera work came in: kept as the fallback if the API
  * refuses the current schema (structured-output grammars have limits of their own).
  */
 export const editorOutputSchemaLegacy = z.object({
-  plan: editPlanObjectSchema.omit({ voice: true, layers: true }).extend({
-    template: motionTemplateSchema,
+  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true }).extend({
+    ...editorRhythm,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
     // No signature transition field here: the structured-output grammar is at the API's
@@ -173,7 +180,7 @@ const editorAnimationSchema = z.object({
 export const editorOutputSchema = z.object({
   plan: z.object({
     duration: z.number(),
-    template: motionTemplateSchema,
+    ...editorRhythm,
     segments: z.array(z.union([editorShotSchema, editorAnimationSchema])).min(1),
     texts: z.array(editorTextSchema),
     transitions: z.enum(["cut", "fade", "light_zoom"]),
@@ -186,8 +193,18 @@ export const editorOutputSchema = z.object({
   rationale: z.string(),
 });
 
-/** The signature transition of an ambiance: a short zoom for the lively ones, a brand-colour wipe for the calm ones. */
-const SIGNATURE: Record<MotionTemplate, "punch" | "wipe"> = { dynamique: "punch", collage: "punch", doux: "wipe", chic: "wipe" };
+/**
+ * The Reel's signature transition: a short zoom for a lively Reel (and a collage), a
+ * brand-colour wipe for a calm one (100 BPM and up is lively; an older Reel: by its ambiance).
+ */
+export function signatureTransition(template: MotionTemplate, tempo?: number): "punch" | "wipe" {
+  if (template === "libre") return (tempo ?? TEMPLATE_BPM.libre) >= 100 ? "punch" : "wipe";
+  return template === "dynamique" || template === "collage" ? "punch" : "wipe";
+}
+
+/** The tempo the editor may choose (beats per minute). */
+export const MIN_TEMPO = 70;
+export const MAX_TEMPO = 130;
 
 /**
  * In a correction, an animation whose brief did not change keeps its code, its photos and its
@@ -285,9 +302,17 @@ export function signatureShot(plan: { segments: object[]; texts: { style: string
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
 
-export function fromEditorPlan(plan: EditorOutput["plan"] | EditorOutputLegacy["plan"], looks: SavedLook[] = []): EditPlan {
+/** The editor's plan: its rhythm (tempo, collage), or a template (a plan written before a Reel had its own tempo). */
+type Written<P> = Omit<P, "tempo" | "collage"> & { template: MotionTemplate; tempo?: number };
+type EditorPlanIn = EditorOutput["plan"] | EditorOutputLegacy["plan"] | Written<EditorOutput["plan"]> | Written<EditorOutputLegacy["plan"]>;
+
+export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): EditPlan {
+  // Its form: the collage, else « libre » (its own tempo, the look of its charter).
+  const { tempo: chosen, collage, template: written, ...plan } = input as EditorOutput["plan"] & { template?: MotionTemplate };
+  const template: MotionTemplate = motionTemplateSchema.safeParse(written).success ? written! : collage ? "collage" : "libre";
+  const tempo = typeof chosen === "number" && Number.isFinite(chosen) ? Math.round(Math.min(MAX_TEMPO, Math.max(MIN_TEMPO, chosen))) : undefined;
   const byName = new Map(looks.map((l) => [l.name.toLowerCase(), l]));
-  const signature = SIGNATURE[plan.template];
+  const signature = signatureTransition(template, tempo);
   const signatureAt = signatureShot(plan);
   // Fonts are only names here: a malformed one is dropped, the brand's fonts are used.
   const fonts = plan.fonts
@@ -303,6 +328,8 @@ export function fromEditorPlan(plan: EditorOutput["plan"] | EditorOutputLegacy["
   const layers = (asked ?? []).filter((l) => l.brief?.trim() && Number.isFinite(l.from) && Number.isFinite(l.to)).slice(0, 3);
   return {
     ...kept,
+    template,
+    ...(tempo ? { tempo } : {}),
     ...(layers.length ? { layers: layers.map((l) => ({ motion: { brief: l.brief.trim().slice(0, 4000) }, from: l.from, to: l.to })) } : {}),
     format: "9:16",
     images: [],
@@ -612,12 +639,10 @@ export function clearOfVoice<T extends { from: number; to: number; style: string
 }
 
 /**
- * A variant of a delivered montage, without the editor: the same cut with
- * another template (the next one by default) and, if given, another hook.
+ * A variant of a delivered montage, without the editor: the same cut and rhythm with
+ * another hook (a Reel has no ambiance to switch any more).
  */
-export function variantPlan(plan: EditPlan, change: { template?: MotionTemplate; hook?: string }): EditPlan {
-  const current = motionTemplateSchema.safeParse(plan.template);
-  const next = change.template ?? MOTION_TEMPLATES[((current.success ? MOTION_TEMPLATES.indexOf(current.data) : -1) + 1) % MOTION_TEMPLATES.length]!;
+export function variantPlan(plan: EditPlan, change: { hook?: string }): EditPlan {
   const hook = change.hook?.trim();
   let replaced = false;
   const texts = plan.texts.map((t) => {
@@ -625,5 +650,5 @@ export function variantPlan(plan: EditPlan, change: { template?: MotionTemplate;
     replaced = true;
     return { ...t, text: hook.slice(0, 120), emphasis: [] };
   });
-  return editPlanSchema.parse({ ...plan, template: next, texts });
+  return editPlanSchema.parse({ ...plan, texts });
 }

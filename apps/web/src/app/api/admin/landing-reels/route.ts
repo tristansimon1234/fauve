@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { editPlanSchema, motionTemplateSchema, variantPlan, type MotionTemplate } from "@fauve/agent";
+import { editPlanSchema, motionTemplateSchema, type MotionTemplate } from "@fauve/agent";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { env } from "@/lib/env";
 import { renderPost } from "@/lib/render/render-post";
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const { data: post } = await db.from("posts").select("id, edit_plan_id").eq("studio_id", studio!.id).eq("kind", "reel").order("created_at").limit(1).single();
     const { data: row } = await db.from("edit_plans").select("plan").eq("id", post!.edit_plan_id).single();
     const current = editPlanSchema.parse(row!.plan);
-    const plan = editPlanSchema.parse({ ...variantPlan(current, { template }), transitions: template === "doux" || template === "chic" ? "fade" : "cut", fonts: reel.fonts });
+    const plan = editPlanSchema.parse({ ...current, ...(template ? { template } : {}), transitions: template === "doux" || template === "chic" ? "fade" : "cut", fonts: reel.fonts });
     const inserted = await insertPlanVersion(studio!.id, post!.id, plan);
     await db.from("posts").update({ edit_plan_id: inserted.id, template }).eq("id", post!.id);
     const result = await renderPost(studio!.id, post!.id, { editPlanId: inserted.id, freshMusic: true });

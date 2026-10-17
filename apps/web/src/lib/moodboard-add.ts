@@ -50,7 +50,6 @@ export async function addToMoodboard(studioId: string, mediaIds: string[], optio
     ...(reading
       ? {
           signature: reading.signature,
-          ...((profile as { default_template?: string }).default_template ? {} : { default_template: reading.signature.ambiance }),
           // The voice that sounds like it, unless she chose one.
           ...((profile as { voice?: { voice_id?: string } }).voice?.voice_id || !findVoice(reading.signature.narrator.voice)
             ? {}

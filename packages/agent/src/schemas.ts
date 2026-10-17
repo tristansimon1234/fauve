@@ -166,8 +166,14 @@ export const editPlanTextSchema = z.object({
   ...listFields,
 });
 
-/** Motion templates rendered by Remotion (apps/render); any other template uses the ffmpeg engine. */
-export const MOTION_TEMPLATES = ["doux", "dynamique", "chic", "collage"] as const;
+/**
+ * Motion templates rendered by Remotion (apps/render); any other template uses the ffmpeg engine.
+ * A Reel has no ambiance any more (Tristan: « les ambiances, je comprends pas l'utilité à part
+ * cloisonner l'outil »): « libre » is its rhythm (its own tempo, `plan.tempo`) with the look of
+ * its charter, « collage » its collage form. doux, dynamique and chic stay for the Reels made
+ * before, and name the text styles of a carousel.
+ */
+export const MOTION_TEMPLATES = ["doux", "dynamique", "chic", "collage", "libre"] as const;
 export const motionTemplateSchema = z.enum(MOTION_TEMPLATES);
 export type MotionTemplate = z.infer<typeof motionTemplateSchema>;
 
@@ -181,12 +187,13 @@ export const AMBIANCES: Record<MotionTemplate, { label: string; hint: string; ph
   dynamique: { label: "Coupes rapides", hint: "des plans courts calés sur la musique, de gros titres, des coups de zoom", photo: "Gros titres" },
   chic: { label: "Sobre et élégant", hint: "peu de texte, de l'italique, un rythme lent", photo: "Italique élégant" },
   collage: { label: "Façon collage", hint: "ses photos et vidéos composées à la main, avec du papier, du scotch, des découpes et de petits dessins", photo: "Papier découpé" },
+  libre: { label: "Sur mesure", hint: "le rythme de sa demande et de ses images, le look de sa charte", photo: "Textes légers" },
 };
 
 /** What Fauve proposes before a montage, shown on the quote and followed by the editor. */
 export const montagePlanSchema = z.object({
   duration: z.number().min(5).max(30).describe("Durée visée en secondes : 7 à 15 pour une annonce ou une ambiance, 20 à 30 pour une histoire (quelqu'un qui parle, un conseil, un avant/après)"),
-  style: motionTemplateSchema.optional().describe("Ambiance visée : doux (calme et lumineux), dynamique (coupes rapides), chic (sobre et élégant), collage (façon collage : photos découpées, à la mode)"),
+  style: motionTemplateSchema.optional().describe("collage si elle veut la forme collage (ses images composées à la main) ; sinon rien : le rythme se décide pour chaque Reel"),
   scenes: z
     .array(
       z.object({
@@ -203,7 +210,7 @@ export type MontagePlan = z.infer<typeof montagePlanSchema>;
 export function planBrief(plan: MontagePlan): string {
   const kinds = { clip: "vidéo", animation: "animation", end: "fin" } as const;
   return [
-    `Plan validé par la gérante (respecte l'ordre, le nombre de scènes et les textes) : ~${Math.round(plan.duration)} s${plan.style ? `, gabarit ${plan.style}` : ""}.`,
+    `Plan validé par la gérante (respecte l'ordre, le nombre de scènes et les textes) : ~${Math.round(plan.duration)} s${plan.style === "collage" ? ", en collage" : plan.style && plan.style !== "libre" ? `, ${AMBIANCES[plan.style].label.toLowerCase()}` : ""}.`,
     ...plan.scenes.map((s, i) => `${i + 1}. ${kinds[s.kind]} : ${s.what}`),
   ].join("\n");
 }
@@ -235,6 +242,8 @@ export const editPlanObjectSchema = z.object({
   format: z.enum(["9:16", "1:1", "4:5"]),
   duration: z.number().min(3).max(90),
   template: z.string().min(1),
+  /** The Reel's rhythm, in beats per minute, chosen by the editor for this Reel: its cuts, its music and how its words move. Without it, the template's. */
+  tempo: z.number().min(60).max(140).optional(),
   segments: z.array(z.union([editPlanSegmentSchema, editPlanSceneSegmentSchema, editPlanMotionSegmentSchema])).min(1),
   texts: z.array(editPlanTextSchema),
   images: z.array(editPlanImageSchema),
@@ -414,7 +423,6 @@ export const brandProfileSchema = z.object({
     .max(1500)
     .optional()
     .describe("Direction artistique libre : ambiance, couleurs, typographie, rythme, ce qu'on aime et ce qu'on évite"),
-  default_template: motionTemplateSchema.optional().describe("Gabarit de montage préféré du studio"),
   /** The art direction as settings (read from her site or her moodboard): what every Reel and photo applies. */
   signature: brandSignatureSchema.optional(),
   /** A hook and a line in her own words, to show her style on one of her photos (Style step). */

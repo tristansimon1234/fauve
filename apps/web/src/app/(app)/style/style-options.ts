@@ -1,10 +1,6 @@
 // Constants and types of the Style page, shared by the server loader, the server
 // actions and the client form (keep it free of server-only imports).
 
-export const TEMPLATES = ["doux", "dynamique", "chic", "collage"] as const;
-export type Template = (typeof TEMPLATES)[number];
-export const TEMPLATE_LABELS: Record<Template, string> = { doux: "Doux", dynamique: "Dynamique", chic: "Chic", collage: "Collage" };
-
 export const CAPTION_LENGTHS = ["short", "medium", "long"] as const;
 export const EMOJI_LEVELS = ["none", "few", "many"] as const;
 
@@ -32,23 +28,16 @@ export const LOGO_MAX_BYTES = 5 * 1024 * 1024;
 /** The Reel's accent when the studio has no colour (packages/agent/src/motion.ts). */
 export const DEFAULT_ACCENT = "#5b3fd9";
 
-/** Fonts each template falls back to (mirror of TEMPLATE_FONTS in packages/agent/src/motion.ts). */
-export const TEMPLATE_FONTS: Record<Template, { display: string; body: string }> = {
-  doux: { display: "Instrument Serif", body: "Inter Tight" },
-  dynamique: { display: "Bricolage Grotesque", body: "Bricolage Grotesque" },
-  chic: { display: "Bodoni Moda", body: "Inter Tight" },
-  collage: { display: "Bricolage Grotesque", body: "Space Mono" },
-};
+/** The fonts of a Reel when the studio has none (mirror of TEMPLATE_FONTS.libre in packages/agent/src/motion.ts). */
+export const DEFAULT_FONTS = { display: "Instrument Serif", body: "Inter Tight" } as const;
 
 /** What the form edits; saved into brand_profiles.profile by the server action. */
 export type StyleForm = {
   art_direction: string;
   colors: string[];
-  /** null: the template's font. */
+  /** null: the default font. */
   display_font: string | null;
   body_font: string | null;
-  /** null: Fauve picks the template for each montage. */
-  default_template: Template | null;
   tone: string;
   caption_length: (typeof CAPTION_LENGTHS)[number];
   emojis: (typeof EMOJI_LEVELS)[number];

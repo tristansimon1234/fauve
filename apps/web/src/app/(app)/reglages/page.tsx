@@ -163,7 +163,7 @@ async function Settings() {
 
         <Section title="Style des vidéos">
           <p className="text-sm leading-normal">
-            Direction artistique, couleurs, polices, logo et ambiance que Simone applique à chaque publication.{" "}
+            Direction artistique, couleurs, polices et logo que Simone applique à chaque publication.{" "}
             <Link href="/style" className="font-bold text-violet">
               Régler mon style
             </Link>

@@ -8,7 +8,6 @@ const form = {
   colors: ["#C2410C", "#fbf7f4", "#c2410c"],
   display_font: "Fraunces",
   body_font: null,
-  default_template: "chic" as const,
   tone: "Doux",
   caption_length: "short" as const,
   emojis: "none" as const,
@@ -30,7 +29,7 @@ test("style: a missing or broken profile gets the required defaults", () => {
   assert.equal(form.display_font, null);
   assert.equal(form.body_font, "Inter");
   assert.deepEqual(form.colors, ["#abcdef"]);
-  assert.equal(form.default_template, null);
+  assert.equal("default_template" in form, false);
   // No voice set yet: Simone puts one when it tells something, with her first voice.
   assert.equal(form.voice_use, "auto");
   assert.equal(form.voice_id, "D6VK2PsbVdaFL5aALfRc");
@@ -48,18 +47,18 @@ test("style: the form is normalized and applied over the current profile", () =>
   assert.equal(next.visual_notes, "Lumière");
   assert.equal(next.logo_path, "s/brand/logo-1.png");
   assert.deepEqual(next.extra, { kept: true });
-  assert.equal(next.default_template, "chic");
-  // The missing body font takes the template's.
+  // The missing body font takes the default one.
   assert.deepEqual(next.fonts, ["Fraunces", "Inter Tight"]);
   assert.deepEqual(next.voice, { use: "always", voice_id: "8qnuneLiGjGrT4A62CCe" });
   assert.equal(toStyleForm(next).voice_use, "always");
 });
 
 test("style: emptied optional fields are removed", () => {
-  const parsed = styleFormSchema.parse({ ...form, art_direction: "", colors: [], display_font: null, default_template: null });
+  const parsed = styleFormSchema.parse({ ...form, art_direction: "", colors: [], display_font: null });
   const next = nextProfile({ art_direction: "old", colors: ["#000000"], fonts: ["Inter", "Inter"], default_template: "doux" }, (p) =>
     applyStyleForm(p, parsed),
   );
+  // An older ambiance goes too: a Reel has its own rhythm now.
   for (const key of ["art_direction", "colors", "fonts", "default_template"]) assert.equal(key in next, false, key);
 });
 
@@ -69,7 +68,6 @@ test("style: invalid input is rejected", () => {
   assert.equal(styleFormSchema.safeParse({ ...form, art_direction: "a".repeat(1501) }).success, false);
   assert.equal(styleFormSchema.safeParse({ ...form, colors: Array(7).fill("#000000") }).success, false);
   assert.equal(styleFormSchema.safeParse({ ...form, hashtags: ["deux mots"] }).success, false);
-  assert.equal(styleFormSchema.safeParse({ ...form, default_template: "neon" }).success, false);
   assert.equal(styleFormSchema.safeParse({ ...form, voice_use: "sometimes" }).success, false);
   assert.equal(styleFormSchema.safeParse({ ...form, voice_id: "../voices" }).success, false);
 });

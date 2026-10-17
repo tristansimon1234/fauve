@@ -169,9 +169,11 @@ export async function designEdit(params: {
   const inspirationId = post.data.inspiration_id as string | null;
   const chosenInspiration = inspirationId ? await ensureInspirationRead(params.studioId, inspirationId).catch(() => null) : null;
   const chosenTemplate = motionTemplateSchema.safeParse(post.data.template);
-  // A collage composes with her photos' cut-outs: they are made while the editor works (their own sandbox).
+  // A collage composes with her photos' cut-outs: for one she chose for this post or asks for now (« en collage »), they are
+  // made while the editor works (their own sandbox); one the editor chooses itself has them made after it.
+  const askedCollage = (chosenTemplate.success && chosenTemplate.data === "collage") || /\bcollage\b/i.test(params.brief ?? "");
   const earlyCutouts =
-    chosenTemplate.success && chosenTemplate.data === "collage" && photoIds.length
+    askedCollage && photoIds.length
       ? ensureCutouts(params.studioId, photoIds.slice(0, MAX_OFFERED_PHOTOS)).catch((e: unknown) => console.warn("cut-outs: not ready", e))
       : null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
@@ -193,7 +195,6 @@ export async function designEdit(params: {
       lessons: report?.lessons.map((l) => l.lesson),
       // Reels the manager shared with Fauve on Instagram, as read by Gemini.
       inspirations: (inspirations.data ?? []).map((i) => i.analysis as string).filter((a) => a !== chosenInspiration),
-      default_template: profile.default_template,
       visual_notes: profile.visual_notes,
       colors: profile.colors,
       fonts: profile.fonts,
@@ -210,7 +211,8 @@ export async function designEdit(params: {
       template: undefined,
       inspiration_id: undefined,
       voice_media_id: undefined,
-      chosen_template: chosenTemplate.success ? chosenTemplate.data : undefined,
+      // The collage form she chose for this Reel (or an older Reel's ambiance); « libre » says nothing.
+      chosen_template: chosenTemplate.success && chosenTemplate.data !== "libre" ? chosenTemplate.data : undefined,
       chosen_inspiration: chosenInspiration ?? undefined,
       // Simone chose this form: one key message held on screen, with the music, no voice.
       format: params.format === "message" ? "message clé" : undefined,

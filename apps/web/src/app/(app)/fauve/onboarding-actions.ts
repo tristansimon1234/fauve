@@ -56,7 +56,8 @@ export async function onboardingView(): Promise<OnboardingView | null> {
       ? await loadMontageInputs(studioId, { segments: [] })
           .then((inputs) =>
             stylePreviewProps({
-              template: profile.default_template ?? profile.signature!.ambiance,
+              // No ambiance any more: her charter on a Reel of its own rhythm.
+              template: "libre",
               imageUrl: photo,
               brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts, signature: inputs.signature },
               sample: profile.style_sample ?? { hook: "Ton prochain Reel, à ta façon", key: "ta façon", band: inputs.studioName || "Ton commerce" },
