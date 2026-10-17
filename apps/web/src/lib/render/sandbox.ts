@@ -13,6 +13,7 @@ import {
   sandboxCostUsd,
   speechGain,
   usdToEur,
+  type ComposeShot,
   type ReelProps,
   type ReelUnder,
   type ScenePhoto,
@@ -281,6 +282,8 @@ export type SmokeScene = {
   /** The photos it composes with (signed links), and for an animation over several shots, its cuts. */
   photos?: ScenePhoto[];
   cuts?: number[];
+  /** A collage's composition: the shots it lays (each one a grey card in the check). */
+  shots?: ComposeShot[];
 };
 
 /** What the scene check found: the error per scene id (null when it passes), and where a passing scene's texts sit while it holds (top, bottom: shares of the height). */

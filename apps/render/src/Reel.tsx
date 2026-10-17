@@ -53,82 +53,98 @@ export function Reel(props: ReelProps) {
     ...(props.elements ?? []).flatMap((e) => e.fonts),
   ]);
   const k = props.width / 1080;
+  // A free collage: its composition lays the shots on the paper (the fixed prints only if its code cannot run).
+  const compose = collage ? props.layers?.find((l) => l.compose) : undefined;
+  const isShot = (segment: ReelProps["segments"][number]) => segment.type === "clip" || segment.type === "image";
+  // A collage's print of a shot: a card that stays a little under the next one sliding over it.
+  const print = (segment: ReelProps["segments"][number], i: number, from = 0) =>
+    segment.type === "clip" || segment.type === "image" ? (
+      <Sequence key={i} from={segment.startAt - from} durationInFrames={Math.min(segment.durationInFrames + COLLAGE_OVERLAP, props.durationInFrames - segment.startAt)} layout="none">
+        {/* Over the opening shot, its sticker is drawn above the texts (the hook behind the subject), back in its card for the overlap. */}
+        <CollageCard index={i} props={props} sticker={stickerOf(segment, theme)} layer={hookBehind(props, i) ? "print" : "all"} stickerFrom={segment.durationInFrames}>
+          {segment.type === "clip" ? <Shot segment={segment} theme={theme} /> : <Photo src={segment.src} edit={segment.edit} grade={theme.grade} frame={printSize(props)} />}
+        </CollageCard>
+      </Sequence>
+    ) : null;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       <ExposureFilters />
       {collage ? <CollageBackdrop props={props} /> : null}
-      {props.segments.map((segment, i) => (
-        <Sequence
-          key={i}
-          from={segment.startAt}
-          // Collage: a card stays a little under the next one sliding over it.
-          durationInFrames={
-            collage && (segment.type === "clip" || segment.type === "image")
-              ? Math.min(segment.durationInFrames + COLLAGE_OVERLAP, props.durationInFrames - segment.startAt)
-              : segment.durationInFrames
-          }
-          layout="none"
-        >
-          <FadeIn frames={i > 0 && !collage ? props.fadeFrames : 0}>
-            {collage && (segment.type === "clip" || segment.type === "image") ? (
-              // Over the opening shot, its sticker is drawn above the texts (the hook behind the subject), back in its card for the overlap.
-              <CollageCard
-                index={i}
-                props={props}
-                sticker={stickerOf(segment, theme)}
-                layer={hookBehind(props, i) ? "print" : "all"}
-                stickerFrom={segment.durationInFrames}
-              >
-                {segment.type === "clip" ? <Shot segment={segment} theme={theme} /> : <Photo src={segment.src} edit={segment.edit} grade={theme.grade} frame={printSize(props)} />}
-              </CollageCard>
-            ) : segment.type === "clip" || segment.type === "image" ? (
-              <Accent kind={segment.accent} color={props.brand.accent}>
-                {segment.type === "clip" ? (
-                  <Shot segment={segment} theme={theme} />
-                ) : (
-                  <KenBurns on={Boolean(segment.zoom)} move={segment.move} index={i} durationInFrames={segment.durationInFrames} theme={theme}>
-                    <Photo src={segment.src} edit={segment.edit} grade={theme.grade} />
-                  </KenBurns>
-                )}
-                <Legibility theme={theme} />
-              </Accent>
-            ) : (
-              // Animations play over her footage (the passage the plan names), else on the studio's colours.
-              <AbsoluteFill>
-                {segment.under ? (
-                  <Under under={segment.under} durationInFrames={segment.durationInFrames} theme={theme} />
-                ) : segment.type === "motion" ? (
-                  // No footage to play over: the studio's colours (new scenes are transparent).
-                  <Backdrop background={segment.fallback.background} props={props} k={k} />
-                ) : null}
-                {segment.type === "motion" ? (
-                  <MotionScene
-                    js={segment.js}
-                    texts={segment.texts ?? {}}
-                    fallback={segment.fallback}
-                    durationInFrames={segment.durationInFrames}
-                    props={props}
-                    theme={theme}
-                    k={k}
-                    overlay={Boolean(segment.under)}
-                    shift={segment.shift}
-                    photos={segment.photos}
-                  />
-                ) : (
-                  <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} overlay={Boolean(segment.under)} />
-                )}
-              </AbsoluteFill>
-            )}
-          </FadeIn>
+      {compose ? (
+        <Sequence from={compose.from} durationInFrames={compose.durationInFrames} layout="none">
+          <MotionScene
+            js={compose.js}
+            texts={compose.texts}
+            durationInFrames={compose.durationInFrames}
+            props={props}
+            theme={theme}
+            k={k}
+            overlay
+            photos={compose.photos}
+            cuts={compose.cuts}
+            footage={{ shots: compose.shots ?? [], draw: (shot, size) => drawShot(props.segments[shot.segment], theme, size) }}
+            fallbackNode={<>{props.segments.map((segment, i) => print(segment, i, compose.from))}</>}
+          />
         </Sequence>
-      ))}
+      ) : null}
+      {props.segments.map((segment, i) =>
+        collage && isShot(segment) ? (
+          // A collage's shots: laid by its composition, else each one a print.
+          compose ? null : print(segment, i)
+        ) : (
+          <Sequence key={i} from={segment.startAt} durationInFrames={segment.durationInFrames} layout="none">
+            <FadeIn frames={i > 0 && !collage ? props.fadeFrames : 0}>
+              {segment.type === "clip" || segment.type === "image" ? (
+                <Accent kind={segment.accent} color={props.brand.accent}>
+                  {segment.type === "clip" ? (
+                    <Shot segment={segment} theme={theme} />
+                  ) : (
+                    <KenBurns on={Boolean(segment.zoom)} move={segment.move} index={i} durationInFrames={segment.durationInFrames} theme={theme}>
+                      <Photo src={segment.src} edit={segment.edit} grade={theme.grade} />
+                    </KenBurns>
+                  )}
+                  <Legibility theme={theme} />
+                </Accent>
+              ) : (
+                // Animations play over her footage (the passage the plan names), else on the studio's colours.
+                <AbsoluteFill>
+                  {segment.under ? (
+                    <Under under={segment.under} durationInFrames={segment.durationInFrames} theme={theme} />
+                  ) : segment.type === "motion" ? (
+                    // No footage to play over: the studio's colours (new scenes are transparent).
+                    <Backdrop background={segment.fallback.background} props={props} k={k} />
+                  ) : null}
+                  {segment.type === "motion" ? (
+                    <MotionScene
+                      js={segment.js}
+                      texts={segment.texts ?? {}}
+                      fallback={segment.fallback}
+                      durationInFrames={segment.durationInFrames}
+                      props={props}
+                      theme={theme}
+                      k={k}
+                      overlay={Boolean(segment.under)}
+                      shift={segment.shift}
+                      photos={segment.photos}
+                    />
+                  ) : (
+                    <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} overlay={Boolean(segment.under)} />
+                  )}
+                </AbsoluteFill>
+              )}
+            </FadeIn>
+          </Sequence>
+        ),
+      )}
       {/* Animations over several shots (a character on every shot, a counter that runs…), above the montage, under its texts. */}
-      {(props.layers ?? []).map((layer, i) => (
-        <Sequence key={`l${i}`} from={layer.from} durationInFrames={layer.durationInFrames} layout="none">
-          <MotionScene js={layer.js} texts={layer.texts} durationInFrames={layer.durationInFrames} props={props} theme={theme} k={k} overlay photos={layer.photos} cuts={layer.cuts} />
-        </Sequence>
-      ))}
+      {(props.layers ?? []).map((layer, i) =>
+        layer.compose ? null : (
+          <Sequence key={`l${i}`} from={layer.from} durationInFrames={layer.durationInFrames} layout="none">
+            <MotionScene js={layer.js} texts={layer.texts} durationInFrames={layer.durationInFrames} props={props} theme={theme} k={k} overlay photos={layer.photos} cuts={layer.cuts} />
+          </Sequence>
+        ),
+      )}
       {props.effect === "dust" ? <FilmDust k={k} /> : null}
 
       {props.texts.map((t, i) =>
@@ -176,6 +192,13 @@ export function Reel(props: ReelProps) {
   );
 }
 
+/** One of her shots in a box of that size, as the Reel draws it (its retouch, its camera move, its light): for a collage's composition. */
+function drawShot(segment: ReelProps["segments"][number] | undefined, theme: Theme, size: { width: number; height: number }): ReactNode {
+  if (segment?.type === "clip") return <Shot segment={segment} theme={theme} frame={size} />;
+  if (segment?.type === "image") return <Photo src={segment.src} edit={segment.edit} grade={theme.grade} frame={size} />;
+  return null;
+}
+
 /** A collage photo's sticker: its cut-out with the photo's framing and the Reel's light (none without a clean cut-out). */
 function stickerOf(segment: ReelProps["segments"][number], theme: Theme): Sticker | undefined {
   return segment.type === "image" && segment.cutout && segment.edit ? { src: segment.cutout.src, box: segment.cutout.box, edit: segment.edit, grade: theme.grade } : undefined;
@@ -197,6 +220,8 @@ function behindSubject(props: ReelProps, sticker: Pick<Sticker, "box" | "edit">,
 /** A collage shot whose sticker stands in front of the hook (its words behind the subject): a photo with its cut-out while such a hook shows. */
 function hookBehind(props: ReelProps, i: number): boolean {
   const segment = props.segments[i];
+  // A composed collage lays its own subjects (and its fallback prints keep their stickers in their cards).
+  if (props.layers?.some((l) => l.compose)) return false;
   if (props.template !== "collage" || !segment || segment.type !== "image" || !segment.cutout || !segment.edit) return false;
   const sticker = { box: segment.cutout.box, edit: segment.edit };
   const end = segment.startAt + segment.durationInFrames;
@@ -343,9 +368,11 @@ function straighten(degrees: number | undefined, frameAspect: number): string | 
   return `rotate(${degrees}deg) scale(${scale.toFixed(4)})`;
 }
 
-function Shot({ segment, theme }: { segment: ClipSegment; theme: Theme }) {
+/** A clip as filmed and retouched, covering the frame, or the box it is drawn in (`frame`: a collage's composition). */
+function Shot({ segment, theme, frame: box }: { segment: ClipSegment; theme: Theme; frame?: { width: number; height: number } }) {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
+  const video = useVideoConfig();
+  const { width, height } = box ?? video;
   const move = segment.move ?? (segment.zoom ? "in" : "none");
   const frameAspect = width / height;
   return (
@@ -366,7 +393,7 @@ function Shot({ segment, theme }: { segment: ClipSegment; theme: Theme }) {
           }}
         />
         {segment.blur?.tracks.length ? (
-          <ClipBlurLayer blur={segment.blur} startFrom={segment.startFrom} focus={segment.adjust?.focus} speed={segment.speed} />
+          <ClipBlurLayer blur={segment.blur} startFrom={segment.startFrom} focus={segment.adjust?.focus} speed={segment.speed} size={box} />
         ) : null}
       </AbsoluteFill>
     </AbsoluteFill>

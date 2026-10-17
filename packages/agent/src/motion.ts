@@ -96,6 +96,20 @@ export type ReelSegment =
  * and, when its subject cuts out cleanly, the cut-out (framed like the photo) and the
  * subject's box in it (shares of the photo). Mirrors apps/render/src/types.ts.
  */
+/**
+ * One of her shots as a collage's composition lays it (Footage): the segment it is, when it
+ * plays (frames from the composition's start), a video or a photo, its shape (width / height),
+ * the centre of its subject (shares of the picture) and, for a photo cut out cleanly, its
+ * cut-out and the subject's box, like a ScenePhoto (Cutout can lift it). Mirrors apps/render/src/types.ts.
+ */
+export type ComposeShot = ScenePhoto & {
+  segment: number;
+  from: number;
+  durationInFrames: number;
+  kind: "video" | "photo";
+  focus?: { x: number; y: number };
+};
+
 export type ScenePhoto = {
   src: string;
   aspect: number;
@@ -170,7 +184,18 @@ export type ReelProps = {
    * Animations over several shots, above the montage and under its texts: from `from`
    * (frames) for `durationInFrames`, with the frames where the shot changes under them (`cuts`, from their start).
    */
-  layers?: { js: string; texts: Record<string, string>; from: number; durationInFrames: number; cuts: number[]; photos?: ScenePhoto[] }[];
+  layers?: {
+    js: string;
+    texts: Record<string, string>;
+    from: number;
+    durationInFrames: number;
+    cuts: number[];
+    photos?: ScenePhoto[];
+    /** A collage's composition: it lays the Reel's shots itself (Footage), nothing plays under it. */
+    compose?: boolean;
+    /** The shots it lays, in the order of the montage. */
+    shots?: ComposeShot[];
+  }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
     js: string;
@@ -469,6 +494,21 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
 
   const endCardFrames = toFrames(END_CARD_SECONDS);
 
+  // A collage's composition lays her shots itself: each one's segment, span, shape and subject (a photo's cut-out too).
+  const composeShots = (from: number): ComposeShot[] =>
+    plan.segments.flatMap((s, i): ComposeShot[] => {
+      const segment = segments[i];
+      if (!isClipSegment(s) || !segment || (segment.type !== "clip" && segment.type !== "image")) return [];
+      const span = { segment: i, from: segment.startAt - from, durationInFrames: segment.durationInFrames };
+      if (segment.type === "image") {
+        const photo = scenePhotos([s.clip_id], inputs)[0];
+        const aspect = segment.edit ? segment.edit.source.width / segment.edit.source.height : (photo?.aspect ?? 3 / 4);
+        const focus = s.photo?.adjust?.focus;
+        return [{ ...(photo ?? { src: segment.src }), aspect, ...span, kind: "photo" as const, ...(focus ? { focus } : {}) }];
+      }
+      return [{ src: segment.src, aspect: inputs.aspects?.[s.clip_id] ?? 9 / 16, ...span, kind: "video" as const, ...(s.adjust?.focus ? { focus: s.adjust.focus } : {}) }];
+    });
+
   // Animations over several shots: their span in frames and the cuts under them (from their start).
   const starts = segments.slice(1).map((s) => s.startAt);
   const layers = (plan.layers ?? []).flatMap((l) => {
@@ -484,6 +524,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         durationInFrames: length,
         cuts: starts.filter((f) => f > from && f < from + length).map((f) => f - from),
         ...(l.motion.photos?.length ? { photos: scenePhotos(l.motion.photos, inputs) } : {}),
+        ...(l.compose ? { compose: true, shots: composeShots(from) } : {}),
       },
     ];
   });

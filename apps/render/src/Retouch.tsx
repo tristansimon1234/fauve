@@ -136,10 +136,12 @@ export function Photo({ src, edit, grade, frame }: { src: string; edit?: PhotoEd
   );
 }
 
-/** Blurred zones over a clip, at the clip's own time (they follow faces as Gemini tracked them). */
-export function ClipBlurLayer({ blur, startFrom, focus, speed = 1 }: { blur: ClipBlur; startFrom: number; focus?: { x: number; y: number }; speed?: number }) {
+/** Blurred zones over a clip, at the clip's own time (they follow faces as Gemini tracked them); `size`: the box the clip is drawn in, else the frame. */
+export function ClipBlurLayer({ blur, startFrom, focus, speed = 1, size }: { blur: ClipBlur; startFrom: number; focus?: { x: number; y: number }; speed?: number; size?: { width: number; height: number } }) {
   const frame = useCurrentFrame();
-  const { width, height, fps } = useVideoConfig();
+  const video = useVideoConfig();
+  const { width, height } = size ?? video;
+  const { fps } = video;
   const t = (startFrom + frame * speed) / fps;
   // The clip covers the frame like object-fit: cover, anchored on its subject like the video.
   const layout = coverLayout({ width, height }, { width: blur.aspect * 1000, height: 1000 }, focus ? { focus } : undefined);

@@ -28,6 +28,18 @@ export type ScenePhoto = {
   /** The edges of the photo that cut the subject (a bust at the bottom, a shoulder on the left): it comes in from there. */
   cutEdges?: ("top" | "bottom" | "left" | "right")[];
 };
+/**
+ * One of her shots as a collage's composition lays it (Footage): the segment it is, when it
+ * plays (frames from the composition's start), a video or a photo, its shape, the centre of
+ * its subject and, for a photo cut out cleanly, its cut-out and the subject's box (Cutout can lift it).
+ */
+export type ComposeShot = ScenePhoto & {
+  segment: number;
+  from: number;
+  durationInFrames: number;
+  kind: "video" | "photo";
+  focus?: { x: number; y: number };
+};
 export type RegionKind = "face" | "plate" | "screen" | "document" | "other";
 export type PhotoEdit = { source: { width: number; height: number }; adjust?: Adjust; blur?: (Box & { kind: RegionKind; shape: "ellipse" | "rect" })[] };
 export type ClipBlur = { aspect: number; tracks: { kind: RegionKind; keys: (Box & { t: number })[] }[] };
@@ -170,7 +182,18 @@ export type ReelProps = {
    * Animations over several shots, above the montage and under its texts: from `from`
    * (frames) for `durationInFrames`, with the frames where the shot changes under them (`cuts`, from their start).
    */
-  layers?: { js: string; texts: Record<string, string>; from: number; durationInFrames: number; cuts: number[]; photos?: ScenePhoto[] }[];
+  layers?: {
+    js: string;
+    texts: Record<string, string>;
+    from: number;
+    durationInFrames: number;
+    cuts: number[];
+    photos?: ScenePhoto[];
+    /** A collage's composition: it lays the Reel's shots itself (Footage), nothing plays under it. */
+    compose?: boolean;
+    /** The shots it lays, in the order of the montage. */
+    shots?: ComposeShot[];
+  }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
     js: string;

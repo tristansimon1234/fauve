@@ -57,3 +57,4 @@ export * from "./fonts.ts";
 export * from "./signature.ts";
 export * from "./site-page.ts";
 export * from "./cutout.ts";
+export * from "./compose.ts";
