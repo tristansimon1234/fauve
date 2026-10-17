@@ -97,7 +97,7 @@ export type DesignedEdit = {
   reusedScenes: number;
 };
 
-/** How long the montage waits, past the editor, for what moves in her videos (its faces, its gestures). */
+/** How long the montage waits for what moves in her videos (its faces, its hands) before the editor cuts. */
 const TRACKS_WAIT_MS = 180_000;
 
 /**
@@ -160,8 +160,8 @@ export async function designEdit(params: {
   ]);
   const clips = analyses.flatMap((a) => ("analysis" in a ? [{ media_id: a.media_id, analysis: a.analysis }] : []));
   if (videoIds.length && !clips.length && !photoIds.length) throw new Error("Les vidéos ne sont pas encore analysées, réessaie dans une minute");
-  // What moves in her videos (hands, faces, bodies), followed once per clip with someone in it, while the editor works
-  // (the cut-out sandbox): an animation can then start from a gesture, hold on to it or follow it.
+  // What moves in her videos (hands, faces, bodies), followed once per clip with someone in it (the cut-out sandbox),
+  // started now so it runs while the rest is read: an animation can then start from a gesture, hold on to it or follow it.
   const earlyTracks = clips.length
     ? ensureTracks(params.studioId, clips.map((c) => c.media_id)).catch((e: unknown) => console.warn("tracks: not ready", e))
     : null;
@@ -196,6 +196,12 @@ export async function designEdit(params: {
       ? ensureCutouts(params.studioId, photoIds.slice(0, MAX_OFFERED_PHOTOS)).catch((e: unknown) => console.warn("cut-outs: not ready", e))
       : null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
+  // What moves in her videos, followed before the editor cuts: which gestures show their hands in the vertical
+  // frame (the editor puts an animation that hangs on a gesture where it can be seen), where the faces really are
+  // (the texts keep off them) and what the animations follow. Never more than a few minutes of waiting (a sandbox
+  // installing the tracker for the first time): without them, the faces are Gemini's and the animations follow nothing.
+  if (earlyTracks) await Promise.race([earlyTracks, new Promise((resolve) => setTimeout(resolve, TRACKS_WAIT_MS))]);
+  const tracks: TracksByClip = clips.length ? await loadTracks(params.studioId, clips.map((c) => c.media_id)).catch(() => ({})) : {};
   const input = {
     studio: {
       name: studio.data?.name,
@@ -237,7 +243,7 @@ export async function designEdit(params: {
       format: params.format === "message" ? "message clé" : undefined,
     },
     // Every shot as an editor weighs it (size, camera, beauty, energy, hook, where the subject is).
-    clips: clips.map((c) => editorClip(c.media_id, c.analysis)),
+    clips: clips.map((c) => editorClip(c.media_id, c.analysis, tracks[c.media_id])),
     // Her voice over the Reel: her phrases on the Reel's clock (the voice is placed for you).
     voice: spoken ?? undefined,
     // Where the Reel opens best: the strongest shots for its first image.
@@ -333,12 +339,6 @@ export async function designEdit(params: {
     });
     if (judged && judged.index > 0) plan.texts[hook.index] = { ...hook.text, text: judged.text, emphasis: judged.emphasis };
   }
-
-  // What moves in her videos, followed while the editor worked: where the faces really are (the texts keep off
-  // them) and what the animations follow. Never more than a few minutes of waiting (a sandbox installing the
-  // tracker for the first time): without them, the faces are Gemini's and the animations follow nothing.
-  if (earlyTracks) await Promise.race([earlyTracks, new Promise((resolve) => setTimeout(resolve, TRACKS_WAIT_MS))]);
-  const tracks: TracksByClip = clips.length ? await loadTracks(params.studioId, clips.map((c) => c.media_id)).catch(() => ({})) : {};
 
   // The finishing touches of a professional editor, from what Gemini read: each clip's
   // light, colour and tilt corrected when it needs it, the vertical crop framed on its
