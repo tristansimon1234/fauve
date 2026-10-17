@@ -1,8 +1,9 @@
 // Smoke test for generated motion scenes, run in the render sandbox (never in the
 // web app). Usage: node smoke.mjs scenes.json [bundle-dir] → prints
 // {"results": {"<id>": null | "error"}, "bands": {"<id>": [top, bottom]}}.
-// scenes.json: [{ id, js, durationInFrames, texts?, brand?, photos?, cuts? }] (photos: the ones
-// the scene composes with, with their links; cuts: for an animation over several shots).
+// scenes.json: [{ id, js, durationInFrames, texts?, brand?, photos?, cuts?, shots? }] (photos: the ones
+// the scene composes with, with their links; cuts: for an animation over several shots; shots: the
+// shots a collage's composition lays, each one a grey card here).
 // 1. Each scene is rendered at its first, middle and last frame with React's server
 //    renderer and minimal Remotion shims, which catches crashes and bad output early.
 // 2. The scenes that pass are laid out in Chrome (the SceneCheck composition of the
@@ -33,6 +34,8 @@ const scope = {
   FitText: ({ style, innerStyle, children }) => React.createElement("div", { style }, React.createElement("div", { style: innerStyle }, children)),
   Cutout: ({ photo, x, y, height, style }) =>
     photo?.cutout && photo.subject ? React.createElement("img", { src: photo.cutout, style: { position: "absolute", left: x, top: y, height, ...style } }) : null,
+  // One of her shots in a collage's composition: a grey card stands in.
+  Footage: ({ style }) => React.createElement("div", { style: { position: "absolute", background: "#777", ...style } }),
 };
 
 const defaultBrand = {
@@ -72,6 +75,7 @@ for (const scene of scenes) {
           texts: scene.texts ?? {},
           photos: scene.photos ?? [],
           cuts: scene.cuts ?? [],
+          shots: scene.shots ?? [],
         }),
       );
       if (html.length < 20) throw new Error(`empty output at frame ${f}`);
@@ -105,6 +109,7 @@ if (browser) {
         brand: { ...defaultBrand, ...scene.brand },
         photos: scene.photos ?? [],
         cuts: scene.cuts ?? [],
+        shots: scene.shots ?? [],
       };
       try {
         const composition = await selectComposition({ serveUrl: bundle, id: "SceneCheck", inputProps, puppeteerInstance: browser, browserExecutable, logLevel: "error" });

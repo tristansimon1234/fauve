@@ -248,7 +248,15 @@ export async function renderPost(studioId: string, postId: string, options: { ed
           ...props.segments.flatMap((s, i) =>
             s.type === "motion" ? [{ id: `m${i}`, js: s.js, durationInFrames: s.durationInFrames, texts: s.texts, ...(s.photos ? { photos: s.photos } : {}) }] : [],
           ),
-          ...(props.layers ?? []).map((l, i) => ({ id: `l${i}`, js: l.js, durationInFrames: l.durationInFrames, texts: l.texts, cuts: l.cuts, ...(l.photos ? { photos: l.photos } : {}) })),
+          ...(props.layers ?? []).map((l, i) => ({
+            id: `l${i}`,
+            js: l.js,
+            durationInFrames: l.durationInFrames,
+            texts: l.texts,
+            cuts: l.cuts,
+            ...(l.photos ? { photos: l.photos } : {}),
+            ...(l.shots ? { shots: l.shots } : {}),
+          })),
         ],
         props.brand,
       ).catch((e: unknown): SceneChecks => {
@@ -291,10 +299,13 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         engine = "remotion";
         durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
       } catch (error) {
-        // Photos, blurred zones or her voice: the ffmpeg engine cannot render them, Remotion gets a second try.
-        if (needsBlur || photoIds.length || plan.voice) {
-          console.error("remotion render failed, trying again", renderId, error);
-          mp4 = await renderReelInSandbox({ id: `${renderId}-again`, props });
+        // A collage's composition that broke the render gives way to the printed collage; photos, blurred
+        // zones or her voice: the ffmpeg engine cannot render them, Remotion gets a second try.
+        const composed = Boolean(props.layers?.some((l) => l.compose));
+        if (composed || needsBlur || photoIds.length || plan.voice) {
+          console.error("remotion render failed, trying again", renderId, composed ? "without its composition" : "", error);
+          const layers = props.layers?.filter((l) => !l.compose);
+          mp4 = await renderReelInSandbox({ id: `${renderId}-again`, props: { ...props, layers: layers?.length ? layers : undefined } });
           engine = "remotion";
           durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
         } else {

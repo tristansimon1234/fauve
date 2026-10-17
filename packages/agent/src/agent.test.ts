@@ -2650,3 +2650,100 @@ test("readings that hold: a long line never loses a site's look", async () => {
   assert.equal(clampReading(asReading({ ...reading, fonts: { display: "", body: "" } })).fonts.display, "Inter");
   assert.equal(clip("une phrase assez longue pour être coupée", 20), "une phrase assez");
 });
+
+test("collage: one free composition lays the Reel's shots, never a paid animation", async () => {
+  const { fromEditorPlan, keepWrittenAnimations, normalizeEditPlan } = await import("./editor.ts");
+  const { compositionShots, textBands } = await import("./compose.ts");
+  const { finishPlan } = await import("./finish.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  const durations = { a: 10, p: 5 };
+  const editor = (layers: { brief: string; from: number; to: number }[]) =>
+    fromEditorPlan({
+      duration: 5,
+      template: "collage",
+      transitions: "cut",
+      subtitles: false,
+      texts: [{ text: "back to culte", from: 0, to: 1.5, style: "hook", emphasis: [] }],
+      segments: [
+        { clip_id: "a", in: 0, out: 3, move: "none", speed: 1 },
+        { clip_id: "p", in: 0, out: 2, move: "none", speed: 1 },
+      ],
+      layers,
+    } as never);
+
+  // The editor forgot it: the engine adds it over the whole Reel, even with no animation left in the budget.
+  const added = normalizeEditPlan(editor([]), durations, 0);
+  assert.equal(added.layers?.length, 1);
+  assert.deepEqual([added.layers![0]!.compose, added.layers![0]!.from, added.layers![0]!.to], [true, 0, added.duration]);
+  assert.match(added.layers![0]!.motion.brief, /back to culte/);
+  // Its own animation over the whole Reel becomes the composition; another one is counted as usual.
+  const asked = editor([
+    { brief: "un mur de tirages qui se remplit, elle détourée qui sort du papier à la fin", from: 0, to: 5 },
+    { brief: "un compteur", from: 1, to: 3 },
+  ]);
+  const one = normalizeEditPlan(asked, durations, 1);
+  assert.deepEqual(one.layers?.map((l) => [l.motion.brief.slice(0, 13), Boolean(l.compose)]), [
+    ["un mur de tir", true],
+    ["un compteur", false],
+  ]);
+  assert.deepEqual(normalizeEditPlan(asked, durations, 0).layers?.map((l) => Boolean(l.compose)), [true]);
+  // Another ambiance has none.
+  assert.equal(normalizeEditPlan(editPlanSchema.parse({ ...one, template: "doux", layers: [one.layers![0]] }), durations).layers, undefined);
+
+  // A correction that leaves it out keeps it, with its code.
+  const scene = "function Scene(){return null}";
+  const previous = editPlanSchema.parse({ ...one, layers: [{ ...one.layers![0]!, motion: { ...one.layers![0]!.motion, js: scene } }] });
+  const carried = keepWrittenAnimations(editor([]), previous);
+  assert.deepEqual(carried.layers?.map((l) => [Boolean(l.compose), l.motion.js]), [[true, scene]]);
+
+  // Its texts keep their usual rows: the composition keeps faces off them (an engine's place goes, a hand-placed one stays).
+  const facts = {
+    clips: {
+      a: {
+        duration: 10, orientation: "portrait", summary: "", setting: "", lighting: "ok", best_moments: [], transcript: "", issues: [],
+        shots: [{ start: 0, end: 10, description: "elle pousse sur le reformer", subject: "cliente", energy: 4, hook_score: 4, quality: { blurry: false, dark: false, shaky: false }, faces_visible: true, subject_box: [100, 600, 900, 950] }],
+      },
+    },
+    photos: {
+      p: { width: 1200, height: 1600, detection: { regions: [{ kind: "face", label: "visage", box_2d: [100, 300, 300, 600], recognizable: true }], adjust: { exposure: 0, contrast: 0, saturation: 0, warmth: 0, straighten: 0 }, subject: { x: 450, y: 500 }, notes: "l'équipe en rang" } },
+    },
+  } as never;
+  const placed = editPlanSchema.parse({ ...previous, texts: [{ text: "back to culte", from: 0, to: 1.5, style: "hook", y: 0.5, auto_y: true }, { text: "rue de culte", from: 2, to: 4, style: "caption", y: 0.3 }] });
+  const finished = finishPlan(placed, facts, durations);
+  assert.deepEqual(finished.texts.map((t) => t.y), [undefined, 0.3]);
+  assert.equal(finished.subtitle_y, undefined);
+
+  // What the designer reads: each shot, when, what it shows; and where the texts go over it (px of 1920).
+  assert.deepEqual(
+    compositionShots(finished, facts, {}, new Set(["p"])).map((s) => [s.shot, s.de, s.a, s.type, s.format, s.sujet_a, s.visages, s.detouree]),
+    [
+      // The cut on the collage's beat (108 BPM): 2.78 s.
+      [0, 0, 83, "vidéo", "portrait", "droite", true, undefined],
+      [1, 83, 150, "photo", "portrait", undefined, true, true],
+    ],
+  );
+  assert.deepEqual(textBands(finished)[0], { de: 0, a: 45, y_haut: 384, y_bas: 768, texte: "back to culte" });
+
+  // The render gets the shots it lays: segment, span, shape, subject, and the photo's cut-out.
+  const props = buildReelProps(
+    editPlanSchema.parse({ ...finished, layers: [{ ...finished.layers![0]!, motion: { ...finished.layers![0]!.motion, js: scene } }] }),
+    {
+      template: "collage",
+      clipUrls: { a: "https://x/a.mp4", p: "https://x/p.jpg" },
+      photoIds: ["p"],
+      aspects: { a: 0.5625 },
+      photoAspects: { p: 0.75 },
+      cutouts: { p: { src: "https://x/p.webp", box: { x: 0.2, y: 0.1, w: 0.5, h: 0.8 } } },
+      brand: { name: "Culte" },
+    },
+  );
+  const layer = props.layers![0]!;
+  assert.equal(layer.compose, true);
+  assert.deepEqual(
+    layer.shots?.map((s) => [s.segment, s.from, s.durationInFrames, s.kind, s.cutout ?? null]),
+    [
+      [0, 0, 83, "video", null],
+      [1, 83, 67, "photo", "https://x/p.webp"],
+    ],
+  );
+});

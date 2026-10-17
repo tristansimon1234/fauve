@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { composedLayers } from "./compose.ts";
 import { planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
 import { hookAtStart } from "./hook.ts";
@@ -37,7 +38,7 @@ Les quatre ambiances (« template ») : le rythme, les entrées des textes et le
 - « doux » (84 battements par minute) : lumineux et chaleureux. Accroche en gras, son mot clé dans la couleur de la marque, phrases en boîte blanche comme l'outil texte d'Instagram. Bien-être, beauté, café, boutique douce.
 - « dynamique » (120) : énergique. Grosse typo en capitales, mot clé sur un bloc à la couleur de la marque, coupes serrées sur le temps, coups de zoom. Sport, restaurant, barbier, tout ce qui a du rythme.
 - « chic » (76) : sobre et haut de gamme. Peu de mots, typographie fine, phrase dans un cadre filet. Luxe, épuré.
-- « collage » (108) : fait main et à la mode. Chaque plan en photo découpée scotchée sur du papier, mots découpés. Jeune, créatif.
+- « collage » (108) : fait main et à la mode, et libre. Le motion designer compose tout le Reel comme un collage, avec ses plans (plein écran, en tirage scotché, découpés, plusieurs à la fois, sur du papier, avec de petits dessins…), à sa façon et autrement à chaque Reel ; mots découpés. Tu montes comme d'habitude (plans, ordre, durées, textes) et tu écris la composition dans « layers », de 0 à la fin du Reel : son brief dit ce que le collage raconte, ses moments forts et son énergie, et ce qu'elle a demandé de la forme s'il y a lieu ; la forme est au motion designer. Elle ne compte pas dans « max_new_scenes ». En correction, garde la composition (« composition_du_collage ») avec le même brief, sauf si la demande touche au collage lui-même. Jeune, créatif.
 
 Méthode d'un monteur pro :
 1. Choisis l'histoire avant les plans, d'après la matière et la demande. Ces formes marchent toutes, chacune à sa place : prends celle qui sert ce Reel et ce commerce, et varie d'un Reel à l'autre (des points de départ, jamais des moules). Recettes qui marchent pour un commerce :
@@ -75,7 +76,7 @@ Les animations (motion design), par-dessus sa vidéo, jamais à la place :
 - Une animation se pose sur un passage de ses images qui continue de jouer dessous (« over_clip » : le media_id de la vidéo ou de la photo à garder sous l'animation ; le moteur choisit le passage, sinon il prolonge le plan d'avant). Sa forme est libre : le motion designer l'invente (typographie animée, un chiffre, des formes, du collage…).
 - 0 à 2 par Reel, sur le moment où les mots comptent (la promesse, l'offre, un chiffre, une liste courte), 1,5 à 3 s chacune. Un Reel peut très bien n'en avoir aucune. Sa demande passe avant : si elle veut plus d'animations, ou une idée précise (elle-même détourée qui apparaît, un compteur, un personnage…), fais-le, dans la limite de « max_new_scenes ».
 - Ses photos dans une animation : une animation peut mettre en scène une de ses photos (la personne ou l'objet détouré au ciseau, la photo en papier découpé, un texte qui passe derrière la personne…) : écris le media_id de la photo dans le brief, le moteur la détoure.
-- « layers » : une animation par-dessus plusieurs plans (from et to en secondes du Reel), quand l'idée court sur le Reel (elle qui surgit à chaque plan pour dire coucou, un compteur qui avance, un cadre) ; ses plans continuent dessous, le motion designer connaît les coupes. Chacune compte comme une nouvelle animation ; sans une telle idée, aucune.
+- « layers » : une animation par-dessus plusieurs plans (from et to en secondes du Reel), quand l'idée court sur le Reel (elle qui surgit à chaque plan pour dire coucou, un compteur qui avance, un cadre) ; ses plans continuent dessous, le motion designer connaît les coupes. Chacune compte comme une nouvelle animation (sauf la composition d'un collage) ; sans une telle idée, aucune.
 - « motion » sur mesure : dans « brief » (600 caractères au plus), dis le message, les mots exacts, le moment fort et l'énergie (calme, franche, joyeuse), jamais la forme ni les mouvements : le motion designer les choisit dans la charte du commerce, et deux animations d'un Reel ne se ressemblent jamais. Donne aussi « fallback », la version fixe (title, list, quote, number) au cas où. Les textes restent entiers dans le cadre : ne demande jamais qu'un texte déborde ou sorte de l'écran.
 - Bibliothèque (« templates ») : des animations déjà faites, réutilisables avec d'autres textes, gratuites et instantanées, chacune au plus une fois par Reel. Si l'une convient, réutilise-la : motion { template_id, template_texts : un texte par slot (respecte max_chars), brief : une phrase sur ce qu'elle montre ici, fallback }. Ne commande une nouvelle animation que si aucune ne convient.
 - Au plus « max_new_scenes » nouvelles animations (sans template_id) dans ce Reel, chacune payée : celles du plan validé par la gérante.
@@ -206,10 +207,14 @@ export function keepWrittenAnimations(plan: EditPlan, previous: EditPlan | null)
     const kept = m.js || m.template_id ? undefined : written.get(m.brief);
     return kept ? { ...m, code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}), ...(kept.template_id ? { template_id: kept.template_id } : {}) } : m;
   };
+  // A collage's composition the editor left out of a correction stays as it was (none of its animations spans the Reel).
+  const composition = previous.layers?.find((l) => l.compose && l.motion.js);
+  const spans = (plan.layers ?? []).some((l) => l.from <= 0.5 && l.to >= plan.duration - 0.5);
+  const layers = plan.template === "collage" && composition && !spans ? [composition, ...(plan.layers ?? [])] : plan.layers;
   return {
     ...plan,
     segments: plan.segments.map((s) => (isMotionSegment(s) ? { ...s, motion: keep(s.motion) } : s)),
-    ...(plan.layers ? { layers: plan.layers.map((l) => ({ ...l, motion: keep(l.motion) })) } : {}),
+    ...(layers ? { layers: layers.map((l) => ({ ...l, motion: keep(l.motion) })) } : {}),
   };
 }
 
@@ -466,8 +471,10 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
     .filter((t) => t.to - t.from >= MIN_TEXT_SECONDS)
     .map((t) => ({ ...t, emphasis: t.emphasis?.filter((e) => t.text.toLowerCase().includes(e.toLowerCase())) }));
 
-  // Animations over several shots: inside the Reel, a second at least, each a new animation within the budget.
-  const layers = (plan.layers ?? []).flatMap((l) => {
+  // Animations over several shots: inside the Reel, a second at least, each a new animation within the budget;
+  // a collage's composition is the ambiance itself, over the whole Reel, never counted.
+  const layers = composedLayers(plan, duration).flatMap((l) => {
+    if (l.compose) return [l];
     const from = round(Math.max(0, l.from));
     const to = round(Math.min(duration, l.to));
     if (to - from < 1 || (!l.motion.js && freeScenes++ >= maxFreeScenes)) return [];

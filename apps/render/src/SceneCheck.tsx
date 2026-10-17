@@ -15,6 +15,8 @@ export const SAFE_ZONE = { side: 140, top: 80, bottom: 0.75 };
 const TOLERANCE = 12; // px: glyph boxes are a little wider than the ink
 const OUT_FRAMES = 12; // 0.4 s at 30 fps
 const STEP = 2; // frames between two samples
+/** At most this many copies laid out at once: a collage's composition runs the whole Reel. */
+const MAX_COPIES = 120;
 
 export type SceneCheckProps = {
   js: string;
@@ -23,6 +25,8 @@ export type SceneCheckProps = {
   brand: Parameters<SceneComponent>[0]["brand"];
   photos?: Parameters<SceneComponent>[0]["photos"];
   cuts?: number[];
+  /** A collage's composition: the shots it lays (each one a grey card here). */
+  shots?: Parameters<SceneComponent>[0]["shots"];
 };
 
 const FrameContext = createContext(0);
@@ -42,11 +46,15 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
     const content = <FrameContext.Provider value={frame - from}>{children}</FrameContext.Provider>;
     return layout === "none" ? content : <AbsoluteFill style={style}>{content}</AbsoluteFill>;
   };
+  // A cut-out as a plain image: only the texts are measured, and a rim drawn in a canvas in every copy is slow.
+  const Cutout = ({ photo, x, y, height: h, style }: Parameters<typeof SCOPE.Cutout>[0]) =>
+    photo?.cutout && photo.subject ? <img src={photo.cutout} style={{ position: "absolute", left: x, top: y, height: h, ...style }} /> : null;
   return {
     ...SCOPE,
     useCurrentFrame,
     useVideoConfig: () => ({ ...SCOPE.useVideoConfig(), width, height, durationInFrames }),
     Sequence: Sequence as unknown as typeof SCOPE.Sequence,
+    Cutout: Cutout as typeof SCOPE.Cutout,
   };
 }
 
@@ -109,14 +117,15 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
 
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
-export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [] }: SceneCheckProps) {
+export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [] }: SceneCheckProps) {
   const width = 1080;
   const height = 1920;
   loadFonts([brand.displayFont, brand.bodyFont]);
   const [handle] = useState(() => delayRender("scene check", { timeoutInMilliseconds: 60000 }));
   const [Scene] = useState(() => compileScene(js, checkScope(width, height, durationInFrames)));
+  const step = Math.max(STEP, Math.ceil(durationInFrames / MAX_COPIES));
   const frames: number[] = [];
-  for (let f = 0; f < durationInFrames; f += STEP) frames.push(f);
+  for (let f = 0; f < durationInFrames; f += step) frames.push(f);
 
   useEffect(() => {
     if (!Scene) {
@@ -135,7 +144,7 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         const settled = frame >= durationInFrames * 0.2 && frame <= durationInFrames * 0.8;
         measure(copy, frame, width, height, out, settled ? band : undefined);
       });
-      const failures = [...out.values()].filter((o) => o.frames.length * STEP > OUT_FRAMES);
+      const failures = [...out.values()].filter((o) => o.frames.length * step > OUT_FRAMES);
       if (!failures.length) {
         // Read by smoke.mjs: where the texts sit, so the render can move the scene off the faces under it.
         if (Number.isFinite(band.top)) console.log(`FAUVE_BAND ${JSON.stringify([Math.round(band.top) / height, Math.round(band.bottom) / height])}`);
@@ -163,7 +172,7 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         <div key={f} data-check-frame={f} style={{ position: "absolute", left: 0, top: 0, width, height }}>
           <Catch onError={(error) => cancelRender(new Error(`erreur à l'image ${f} : ${error instanceof Error ? error.message : String(error)}`))}>
             <FrameContext.Provider value={f}>
-              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} />
+              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} shots={shots} />
             </FrameContext.Provider>
           </Catch>
         </div>

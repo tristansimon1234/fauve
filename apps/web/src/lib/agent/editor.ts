@@ -13,6 +13,8 @@ import {
   carryRetouch,
   carryTextStyle,
   clearOfVoice,
+  compositionShots,
+  textBands,
   holdAfterVoice,
   keepWrittenAnimations,
   brandProfileSchema,
@@ -243,8 +245,8 @@ export async function designEdit(params: {
                   }
                 : s,
             ),
-            // Its animations over several shots, by their brief and span.
-            layers: previousPlan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to })),
+            // Its animations over several shots, by their brief and span (a collage's composition named as such).
+            layers: previousPlan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, ...(l.compose ? { composition_du_collage: true } : {}) })),
           }
         : undefined,
     request: params.brief ?? "Premier montage de cette publication.",
@@ -365,8 +367,29 @@ export async function designEdit(params: {
   const offers = wanted.length ? await photoOffers(params.studioId, wanted).catch(() => []) : [];
   const offersFor = (brief: string) => (collage ? offers : offers.filter((o) => brief.includes(o.id)));
   // The cuts under an animation over several shots, in frames from its start.
-  const starts = planTimeline(plan).segments.slice(1).map((t) => t.start);
+  const timeline = planTimeline(plan);
+  const starts = timeline.segments.slice(1).map((t) => t.start);
   const cutsUnder = (from: number, to: number) => starts.filter((t) => t > from && t < to).map((t) => Math.round((t - from) * 30));
+  // A collage's composition lays the shots itself: what each one shows and when, where the texts go over it,
+  // and for its test render, each shot's span and shape (a photo with its cut-out).
+  const composition = (): NonNullable<SceneRequest["compose"]> => ({
+    plans: compositionShots(plan, facts, Object.fromEntries(offers.map((o) => [o.id, o.shows])), new Set(offers.filter((o) => o.photo.cutout).map((o) => o.id))),
+    texts: textBands(plan),
+    shots: plan.segments.flatMap((s, i) => {
+      if (!isClipSegment(s)) return [];
+      const at = timeline.segments[i]!;
+      const offer = offers.find((o) => o.id === s.clip_id);
+      return [
+        {
+          ...(offer?.photo ?? { src: "", aspect: 9 / 16 }),
+          segment: i,
+          from: Math.round(at.start * 30),
+          durationInFrames: Math.round(at.length * 30),
+          kind: facts.photos[s.clip_id] ? ("photo" as const) : ("video" as const),
+        },
+      ];
+    }),
+  });
   const requests: SceneRequest[] = toWrite.map((w) => {
     const photos = offersFor(w.brief);
     const layer = w.id.startsWith("l") ? layers[Number(w.id.slice(1))]! : null;
@@ -379,6 +402,7 @@ export async function designEdit(params: {
       // The faces and lettering of the footage under a scene: the designer composes around them.
       ...(segment?.over?.busy?.length ? { busy: segment.over.busy } : {}),
       ...(layer ? { cuts: cutsUnder(layer.from, layer.to) } : {}),
+      ...(layer?.compose ? { compose: composition() } : {}),
       ...(photos.length ? { photos } : {}),
     };
   });
@@ -488,7 +512,8 @@ export async function designEdit(params: {
     version,
     plan,
     rationale: response.parsed_output.rationale,
-    newScenes: requests.length,
+    // A collage's composition is the ambiance itself, never a paid animation.
+    newScenes: requests.filter((r) => !r.compose).length,
     reusedScenes: reused.size,
   };
 }

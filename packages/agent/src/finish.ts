@@ -193,6 +193,12 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
     const busy = rowsOf(shots[i]!.boxes);
     return { ...s, over: busy.length ? { ...over, busy } : over };
   });
+  // A collage that composes its own shots puts their faces where it likes: its texts keep their usual rows,
+  // and its composition keeps faces off them (it is told where they are).
+  if (finished.layers?.some((l) => l.compose)) {
+    const { subtitle_y: _row, ...rest } = finished;
+    return { ...rest, segments: placed, texts: finished.texts.map(({ auto_y, y, ...t }) => (auto_y ? t : { ...t, ...(y !== undefined ? { y } : {}) })) };
+  }
   // A voice's subtitles keep one place for the whole Reel, the one faces cover least (they never move from shot to shot).
   const row = reelSubtitleRow(shots.filter((s) => !s.motion));
   const { subtitle_y: _row, ...rest } = finished;

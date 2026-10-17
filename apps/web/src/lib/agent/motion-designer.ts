@@ -1,6 +1,17 @@
 import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { CLAUDE_MODEL, checkMotionCode, MOTION_DESIGNER_PROMPT, motionSceneOutputSchema, type MotionSlot, type ReelProps, type ScenePhoto } from "@fauve/agent";
+import {
+  CLAUDE_MODEL,
+  checkMotionCode,
+  MOTION_DESIGNER_PROMPT,
+  motionSceneOutputSchema,
+  type ComposeShot,
+  type CompositionShot,
+  type MotionSlot,
+  type ReelProps,
+  type ScenePhoto,
+  type TextBand,
+} from "@fauve/agent";
 import { transform } from "sucrase";
 import { smokeTestScenes } from "@/lib/render/sandbox";
 import { anthropic, logClaudeCost } from "./run";
@@ -17,7 +28,9 @@ export type OfferedPhoto = { id: string; shows: string; photo: ScenePhoto };
 
 /**
  * busy: the rows of the footage under the scene that must stay seen (faces, lettering; shares of the height);
- * photos: her photos it may compose with; cuts: for an animation over several shots, where the shot changes under it (frames from its start).
+ * photos: her photos it may compose with; cuts: for an animation over several shots, where the shot changes under it (frames from its start);
+ * compose: a collage's composition, which lays the Reel's shots itself: what each one shows and when (plans), where the
+ * Reel's texts go over it (texts), and each shot's span and shape for its test render (shots).
  */
 export type SceneRequest = {
   id: string;
@@ -27,6 +40,7 @@ export type SceneRequest = {
   busy?: { y: number; h: number }[];
   photos?: OfferedPhoto[];
   cuts?: number[];
+  compose?: { plans: CompositionShot[]; texts: TextBand[]; shots: ComposeShot[] };
 };
 export type SceneResult = {
   id: string;
@@ -102,8 +116,12 @@ async function writeScene(
               })),
             }
           : {}),
-        // An animation over several shots: the cuts under it.
-        ...(request.cuts ? { plans_dessous: { plans: request.cuts.length + 1, coupes_images: request.cuts } } : {}),
+        // A collage's composition lays the shots itself (nothing plays under it); another animation over several shots, the cuts under it.
+        ...(request.compose
+          ? { composition_du_reel: { plans: request.compose.plans, textes_par_dessus: request.compose.texts, coupes_images: request.cuts ?? [] } }
+          : request.cuts
+            ? { plans_dessous: { plans: request.cuts.length + 1, coupes_images: request.cuts } }
+            : {}),
         code_precedent: request.previousCode,
       });
   const response = await anthropic().beta.messages.parse({
@@ -175,7 +193,14 @@ export async function designMotionScenes(
         .map((r) => {
           const request = requestOf(r.id);
           const photos = photosOf(r, request);
-          return { id: r.id, js: r.js!, durationInFrames: request.durationInFrames, ...(photos.length ? { photos } : {}), ...(request.cuts ? { cuts: request.cuts } : {}) };
+          return {
+            id: r.id,
+            js: r.js!,
+            durationInFrames: request.durationInFrames,
+            ...(photos.length ? { photos } : {}),
+            ...(request.cuts ? { cuts: request.cuts } : {}),
+            ...(request.compose ? { shots: request.compose.shots } : {}),
+          };
         }),
       brand,
     )
