@@ -152,13 +152,21 @@ export function coarser(levels: number[], factor: number): number[] {
 
 /**
  * The beat grid of a piece asked at `beat` seconds a beat, from its bass levels every
- * BEAT_STEP: its real beat (within 6 %) and when its first beat falls (s, under one
- * beat). The kicks are where the bass jumps up. Null when no steady beat stands out
- * (a soft piece, or one that does not keep the asked tempo): it is then left as it is.
+ * BEAT_STEP: its real beat (within 6 %) and when its first beat starts (s, under one
+ * beat). The kicks are where the bass rises, read in dB: the biggest jump in power is
+ * the loudest step of an attack, 20 to 50 ms after it starts (the cuts of Culte's
+ * collage fell 50 ms after its beats). A first grid within a step, then each kick
+ * found near it and a line drawn through them, to a few milliseconds. Null when no
+ * steady beat stands out (a soft piece, or one that does not keep the asked tempo):
+ * it is then left as it is.
  */
 export function beatGrid(levels: number[], beat: number): { period: number; offset: number } | null {
-  const power = levels.map(toPower);
-  const onset = power.map((p, i) => (i ? Math.max(0, p - power[i - 1]!) : 0));
+  if (!levels.length) return null;
+  // Silence held 40 dB under the loud level, and a rise counted 12 dB at most: the first
+  // sound after a silent start is not worth ten kicks.
+  const loud = [...levels].sort((a, b) => a - b)[Math.floor(0.9 * (levels.length - 1))]!;
+  const db = levels.map((v) => Math.max(Number.isFinite(v) ? v : -120, loud - 40));
+  const onset = db.map((v, i) => (i ? Math.min(12, Math.max(0, v - db[i - 1]!)) : 0));
   // A kick read within one step either side.
   const at = (t: number) => {
     const i = Math.round(t / BEAT_STEP);
@@ -192,7 +200,28 @@ export function beatGrid(levels: number[], beat: number): { period: number; offs
   let beats = 0;
   for (let t = best.offset; t < length - BEAT_STEP; t += best.period, beats++) if (at(t) >= 0.3 * strong) hits++;
   if (!beats || hits / beats < 0.5) return null;
-  return { period: Math.round(best.period * 10000) / 10000, offset: Math.round(best.offset * 1000) / 1000 };
+  // Each kick near that grid: the step where the bass rises most within 30 ms (its attack starts
+  // in it, half a step in on average), when it rises half as much as the strong kicks.
+  const kicks: [number, number][] = [];
+  for (let n = 0, t = best.offset; t < length - BEAT_STEP; n++, t += best.period) {
+    const center = Math.round(t / BEAT_STEP);
+    let top = 0;
+    for (let i = Math.max(1, center - 3); i <= Math.min(onset.length - 1, center + 3); i++) if (!top || onset[i]! > onset[top]!) top = i;
+    if (top && onset[top]! >= 0.5 * strong) kicks.push([n, (top + 0.5) * BEAT_STEP]);
+  }
+  let { period, offset } = best;
+  if (kicks.length >= 4 && kicks.at(-1)![0] - kicks[0]![0] >= 4) {
+    const mean = (f: (kick: [number, number]) => number) => kicks.reduce((sum, kick) => sum + f(kick), 0) / kicks.length;
+    const [n0, t0] = [mean(([n]) => n), mean(([, t]) => t)];
+    const slope = mean(([n, t]) => (n - n0) * (t - t0)) / mean(([n]) => (n - n0) ** 2);
+    const start = t0 - slope * n0;
+    // A line far from the first grid is drawn through other hits: the first grid holds.
+    if (Math.abs(slope - period) < 0.002 && Math.abs(start - offset) < 0.03) [period, offset] = [slope, start];
+  }
+  if (offset >= period) offset -= period;
+  // A first beat a hair before the start of the file is on it; further back, the next one is the first.
+  if (offset < 0) offset = offset > -2 * BEAT_STEP ? 0 : offset + period;
+  return { period: Math.round(period * 10000) / 10000, offset: Math.round(offset * 1000) / 1000 };
 }
 
 /**
