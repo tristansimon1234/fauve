@@ -226,8 +226,9 @@ const FREE_ROWS = [0.2, 0.47, 0.62, 0.33, 0.12, 0.55];
 /**
  * A Reel's texts never sit on what must stay seen: text already in a photo (a sign, a
  * logo on a window) or a face in a shot. A text shown over such a shot moves to the
- * nearest free row. `shots`: when each shot plays and its busy zones (shares of the
- * frame; only the rows matter, texts span the width). Texts placed by hand stay put;
+ * nearest free row; when none is free, to the row covered least while it shows.
+ * `shots`: when each shot (or window of a tracked shot) plays and its busy zones (shares
+ * of the frame; only the rows matter, texts span the width). Texts placed by hand stay put;
  * a place the engine chose (`auto_y`) is worked out again, for the shots of this version.
  */
 export function avoidPhotoText<T extends { from: number; to: number; style: "hook" | "band" | "caption"; y?: number; auto_y?: boolean; items?: unknown[] }>(
@@ -238,17 +239,25 @@ export function avoidPhotoText<T extends { from: number; to: number; style: "hoo
     if (given.y !== undefined && !given.auto_y) return given;
     const { y: _y, auto_y: _auto, ...t } = given;
     const unplaced = t as T;
-    const boxes = shots
-      .filter((s) => s.boxes.length && s.start < t.to && s.start + s.length > t.from)
-      .flatMap((s) => s.boxes)
-      // A word too small to read under a text does not count.
-      .filter((b) => b.w > 0.12 || b.h > 0.04);
+    // A word too small to read under a text does not count.
+    const shown = shots
+      .filter((s) => s.start < t.to && s.start + s.length > t.from)
+      .map((s) => ({ seconds: Math.min(t.to, s.start + s.length) - Math.max(t.from, s.start), boxes: s.boxes.filter((b) => b.w > 0.12 || b.h > 0.04) }))
+      .filter((s) => s.boxes.length);
+    const boxes = shown.flatMap((s) => s.boxes);
     if (!boxes.length) return unplaced;
     const row = t.items?.length ? MESSAGE_ROW : TEXT_ROWS[t.style];
     const clear = (y: number) => boxes.every((b) => b.y > y + row.h + 0.02 || b.y + b.h < y - 0.02);
     if (clear(row.y)) return unplaced;
-    const free = FREE_ROWS.filter((y) => y + row.h <= 0.82 && clear(y)).sort((a, b) => Math.abs(a - row.y) - Math.abs(b - row.y))[0];
-    return free === undefined ? unplaced : { ...unplaced, y: Math.min(0.66, free), auto_y: true };
+    const rows = FREE_ROWS.filter((y) => y + row.h <= 0.82);
+    const free = rows.filter(clear).sort((a, b) => Math.abs(a - row.y) - Math.abs(b - row.y))[0];
+    if (free !== undefined) return { ...unplaced, y: Math.min(0.66, free), auto_y: true };
+    // Nowhere clear (a face that fills the picture, or comes close while the text shows): the row
+    // faces cover least, for as long as the text shows, when it beats its usual one.
+    const covered = (y: number) =>
+      shown.reduce((sum, s) => sum + s.seconds * s.boxes.reduce((m, b) => m + Math.max(0, Math.min(y + row.h, b.y + b.h) - Math.max(y, b.y)), 0), 0);
+    const least = [...rows].sort((a, b) => covered(a) - covered(b) || Math.abs(a - row.y) - Math.abs(b - row.y))[0];
+    return least !== undefined && covered(least) < covered(row.y) - 0.001 ? { ...unplaced, y: Math.min(0.66, least), auto_y: true } : unplaced;
   });
 }
 

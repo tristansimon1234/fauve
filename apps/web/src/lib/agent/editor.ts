@@ -40,7 +40,6 @@ import {
   voiceForEditor,
   buildReelProps,
   clipAspect,
-  clipsUnderAnimations,
   layerTrack,
   movesForDesigner,
   planMediaIds,
@@ -98,7 +97,7 @@ export type DesignedEdit = {
   reusedScenes: number;
 };
 
-/** How long the motion designer waits, past the editor, for what moves in her videos. */
+/** How long the montage waits, past the editor, for what moves in her videos (its faces, its gestures). */
 const TRACKS_WAIT_MS = 180_000;
 
 /**
@@ -335,6 +334,12 @@ export async function designEdit(params: {
     if (judged && judged.index > 0) plan.texts[hook.index] = { ...hook.text, text: judged.text, emphasis: judged.emphasis };
   }
 
+  // What moves in her videos, followed while the editor worked: where the faces really are (the texts keep off
+  // them) and what the animations follow. Never more than a few minutes of waiting (a sandbox installing the
+  // tracker for the first time): without them, the faces are Gemini's and the animations follow nothing.
+  if (earlyTracks) await Promise.race([earlyTracks, new Promise((resolve) => setTimeout(resolve, TRACKS_WAIT_MS))]);
+  const tracks: TracksByClip = clips.length ? await loadTracks(params.studioId, clips.map((c) => c.media_id)).catch(() => ({})) : {};
+
   // The finishing touches of a professional editor, from what Gemini read: each clip's
   // light, colour and tilt corrected when it needs it, the vertical crop framed on its
   // subject, a slow move on shots filmed still, her footage under every animation, texts
@@ -342,6 +347,7 @@ export async function designEdit(params: {
   const facts: MediaFacts = {
     clips: Object.fromEntries(clips.map((c) => [c.media_id, c.analysis])),
     photos: Object.fromEntries(photoIds.flatMap((id, i) => (photoReads[i] ? [[id, photoReads[i]!]] : []))),
+    tracks,
   };
   Object.assign(plan, finishPlan(plan, facts, durations));
 
@@ -391,12 +397,9 @@ export async function designEdit(params: {
   const offers = wanted.length ? await photoOffers(params.studioId, wanted).catch(() => []) : [];
   const offersFor = (brief: string) => (collage ? offers : offers.filter((o) => brief.includes(o.id)));
   // What moves under each animation: the tracks of the clips it plays over, placed as the Reel draws them (the
-  // Reel's own segments, built without links), and the gestures Gemini saw in them. Never more than a few minutes
-  // of waiting (a sandbox installing the tracker for the first time): without them, the animations follow nothing.
-  if (earlyTracks && toWrite.length) await Promise.race([earlyTracks, new Promise((resolve) => setTimeout(resolve, TRACKS_WAIT_MS))]);
-  const tracks: TracksByClip = toWrite.length ? await loadTracks(params.studioId, clipsUnderAnimations(plan)).catch(() => ({})) : {};
+  // Reel's own segments, built without links), and the gestures Gemini saw in them.
   let reel: ReelProps | null = null;
-  if (Object.keys(tracks).length) {
+  if (toWrite.length && Object.keys(tracks).length) {
     try {
       reel = buildReelProps(plan, {
         template: motionTemplateSchema.catch("libre").parse(plan.template),

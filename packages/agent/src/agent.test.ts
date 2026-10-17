@@ -1929,6 +1929,34 @@ test("finish: clips corrected and framed, still shots move, animations play over
   assert.notEqual(out.texts[0]!.y, undefined);
 });
 
+test("finish: texts keep off the faces tracked image by image, moment by moment", async () => {
+  const { finishPlan, trackedFaces } = await import("./finish.ts");
+  // Gemini saw a face at the top of her box (rows 0.1 to 0.3); she leans in: the tracker sees it at 0.35 to 0.6.
+  const shot = { start: 0, end: 10, description: "", subject: "", energy: 3, hook_score: 3, quality: { blurry: false, dark: false, shaky: false }, faces_visible: true, camera: "handheld", subject_box: [100, 200, 600, 800] };
+  const clips = { v: { duration: 10, orientation: "portrait", summary: "", setting: "", lighting: "ok", shots: [shot], best_moments: [], transcript: "", issues: [] } };
+  const face = [0, 300, 350, 380, 250];
+  const tracks = (seen: (k: number) => boolean) => ({ v: { fps: 30, w: 540, h: 960, from: 0, n: 90, frames: Array.from({ length: 90 }, (_, k) => (seen(k) ? { f: [face] } : {})) } });
+  const plan = {
+    format: "9:16", duration: 3, template: "libre", images: [], transitions: "cut", subtitles: false, music: null,
+    segments: [{ clip_id: "v", in: 0, out: 3, zoom: "none", move: "none" }],
+    texts: [{ text: "Petits groupes", from: 0, to: 1.5, style: "band" }],
+  } as never;
+  const band = (facts: object) => (finishPlan(plan, facts as never, { v: 10 }).texts[0] as { y?: number; auto_y?: boolean });
+  // Gemini's face is above the band's row: it stays, on her face.
+  assert.equal(band({ clips, photos: {} }).y, undefined);
+  // Tracked: padded (hair, chin), widened for a zoom; nowhere fully clear, the row her face covers least.
+  const always = tracks(() => true);
+  const [zone] = trackedFaces(always.v as never, 0, 3)!;
+  assert.ok(zone!.y < 0.27 && zone!.y + zone!.h > 0.65);
+  const moved = band({ clips, photos: {}, tracks: always });
+  assert.equal(moved.y, 0.12);
+  assert.equal(moved.auto_y, true);
+  // She comes close only at the end of the shot: a text before it keeps its row.
+  assert.equal(band({ clips, photos: {}, tracks: tracks((k) => k >= 60) }).y, undefined);
+  // No face tracked in the passage: Gemini's reading again.
+  assert.equal(trackedFaces(tracks(() => false).v as never, 0, 3), null);
+});
+
 test("editor: the answer's camera, speed and footage under animations become the plan", async () => {
   const { z } = await import("zod");
   const { fromEditorPlan, editorOutputSchema } = await import("./editor.ts");
