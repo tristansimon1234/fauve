@@ -15,7 +15,7 @@ import {
   type TrackPiece,
 } from "@fauve/agent";
 import { transform } from "sucrase";
-import { smokeTestScenes, type SmokeScene } from "@/lib/render/sandbox";
+import { smokeTestScenes, type SceneChecks, type SmokeScene } from "@/lib/render/sandbox";
 import { anthropic, logClaudeCost } from "./run";
 
 // The motion designer: one Opus call per free scene, which writes the component.
@@ -194,8 +194,11 @@ export async function designMotionScenes(
     results.push({ id: r.id, ...(await writeScene(studioId, r, brand, artDirection, kit, existing).catch((e: unknown) => ({ code: null, js: null, error: String(e) }))) });
   }
 
+  // Scenes that passed the check but leave a text on a face of the footage they follow: kept as they
+  // are if their fix fails (a scene that works beats none).
+  const working = new Map<string, SceneResult>();
   for (let round = 0; round < 2; round++) {
-    const smoke = await smokeTestScenes(
+    const checks = await smokeTestScenes(
       results
         .filter((r) => r.js)
         .map((r) => {
@@ -213,24 +216,31 @@ export async function designMotionScenes(
           };
         }),
       brand,
-    )
-      .then((checks) => checks.errors)
-      .catch((e: unknown) => Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])));
-    results = results.map((r) => (r.js && smoke[r.id] ? { ...r, js: null, error: smoke[r.id]! } : r));
-    const failed = results.filter((r) => !r.js && r.code);
-    if (round === 1 || !failed.length) break;
-    // One round of fixes, with the error, for the scenes that failed (they keep their photos).
+    ).catch((e: unknown): SceneChecks => ({ errors: Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])), bands: {}, faces: {} }));
+    results = results.map((r) => {
+      if (!r.js || !checks.errors[r.id]) return r;
+      return working.get(r.id) ?? { ...r, js: null, error: checks.errors[r.id]! };
+    });
+    if (round === 1) break;
+    for (const r of results) if (r.js && checks.faces[r.id]) working.set(r.id, r);
+    const toFix = results.filter((r) => (!r.js && r.code) || working.has(r.id));
+    if (!toFix.length) break;
+    // One round of fixes, with the error (or the text to move off a face), for those scenes (they keep their photos).
     const fixed = await Promise.all(
-      failed.map(async (r) => ({
+      toFix.map(async (r) => ({
         id: r.id,
-        ...(await writeScene(studioId, requestOf(r.id), brand, artDirection, kit, { reel: [], done: [] }, { code: r.code!, error: r.error ?? "erreur", photos: r.photos }).catch(
-          (e: unknown) => ({ code: r.code, js: null, error: String(e) }),
-        )),
+        ...(await writeScene(studioId, requestOf(r.id), brand, artDirection, kit, { reel: [], done: [] }, {
+          code: r.code!,
+          error: r.error ?? checks.faces[r.id] ?? "erreur",
+          photos: r.photos,
+        }).catch((e: unknown) => ({ code: r.code, js: null, error: String(e) }))),
       })),
     );
     results = results.map((r) => {
       const f = fixed.find((x) => x.id === r.id);
       if (!f) return r;
+      // A fix that does not even compile: the scene that worked stays.
+      if (!f.js && working.has(r.id)) return working.get(r.id)!;
       return { ...f, photos: "photos" in f && f.photos?.length ? f.photos : r.photos };
     });
   }

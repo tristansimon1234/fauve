@@ -273,7 +273,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         props.brand,
       ).catch((e: unknown): SceneChecks => {
         console.warn("motion scenes: check unavailable", e);
-        return { errors: {}, bands: {} };
+        return { errors: {}, bands: {}, faces: {} };
       });
       props.segments = props.segments.map((s, i) => {
         if (s.type !== "motion" || !checks.errors[`m${i}`]) return s;
