@@ -891,8 +891,27 @@ test("critic: key frames at the hook, every scene and the end, with the texts on
   assert.match(brief, /6\/10/);
   assert.match(brief, /Scène 1 : accroche trop longue → la réduire à 3 mots/);
   assert.match(brief, /Ouverture dynamique/);
+  // A face under a text: the text moves, the shot stays; a collage keeps its form and its richness.
+  assert.match(brief, /le plan reste/);
+  assert.match(brief, /jamais une forme à prendre/);
   assert.match(alternativeBrief(plan, null), /Deuxième version/);
   assert.match(planDigest(plan), /Accroche : « Le cours du matin »/);
+});
+
+test("critic: the manager's line never says what is left to do", async () => {
+  const { managerLine, normalizeReview } = await import("./critic.ts");
+  // Culte's free collage was delivered with « Il reste à dégager les visages… ».
+  assert.equal(
+    managerLine("J'ai vérifié l'accroche, les coupes sur la musique et la fin avec l'offre. Il reste à dégager les visages de l'accroche et à mettre plus de monde dans le collage."),
+    "J'ai vérifié l'accroche, les coupes sur la musique et la fin avec l'offre.",
+  );
+  assert.equal(managerLine("J'ai raccourci l'accroche et retiré un plan flou."), "J'ai raccourci l'accroche et retiré un plan flou.");
+  assert.equal(managerLine("Il faudrait encore resserrer la fin."), "");
+  const review = normalizeReview({ best: 1, why: "", score: 8, hook: 8, ok: true, issues: [], summary: "J'ai vérifié les coupes. Il reste à éclaircir la scène 2." }, 1);
+  assert.equal(review.summary, "J'ai vérifié les coupes.");
+  const { MONTAGE_CRITIC_PROMPT } = await import("./critic.ts");
+  assert.match(MONTAGE_CRITIC_PROMPT, /jamais de changer le plan/);
+  assert.match(MONTAGE_CRITIC_PROMPT, /jamais une forme à prendre/);
 });
 
 test("critic: an overlong answer is clamped, not thrown away; lateness is measured from the last step", async () => {

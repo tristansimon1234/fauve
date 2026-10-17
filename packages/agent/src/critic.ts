@@ -43,7 +43,7 @@ export const montageReviewSchema = z.object({
   summary: z
     .string()
     .describe(
-      "Pour la gérante, une phrase simple au passé, lue avec la vidéo finie : ce que tu as vérifié si elle peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. »)",
+      "Pour la gérante, une phrase simple au passé, lue avec la vidéo finie : ce que tu as vérifié si elle peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. »), jamais ce qui resterait à faire",
     ),
 });
 export type MontageReviewAnswer = z.infer<typeof montageReviewSchema>;
@@ -85,8 +85,20 @@ export function normalizeReview(answer: MontageReviewAnswer, versions: number): 
       problem: shortSentence(i.problem, 200),
       fix: i.fix.slice(0, 240),
     })),
-    summary: shortSentence(answer.summary, 300),
+    summary: managerLine(answer.summary),
   };
+}
+
+/** A sentence that tells her what is still to do (« il reste à… »): she receives a finished video. */
+const LEFT_TO_DO = /\b(il reste|reste à|il faudrait|il faut encore|à revoir|à corriger|à reprendre|pas encore)\b/i;
+
+/**
+ * The critic's line for the manager, without what would still be to do: told with the finished
+ * video, « Il reste à dégager les visages » read as a Reel not done (Culte's free collage).
+ */
+export function managerLine(summary: string): string {
+  const sentences = summary.trim().replace(/\s+/g, " ").match(/[^.!?…]+[.!?…]*/g) ?? [];
+  return shortSentence(sentences.map((x) => x.trim()).filter((x) => x && !LEFT_TO_DO.test(x)).join(" "), 300);
 }
 
 export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Simone, une community manager IA pour les commerces de quartier (studio, salon, restaurant, boutique…). Avant qu'un Reel parte chez la gérante, tu le regardes à travers des images clés de la vidéo rendue (1080 × 1920), chacune avec son instant, sa scène et les textes prévus à l'écran. Tu juges comme une pro d'Instagram, exigeante mais juste. La barre : on doit croire qu'un excellent créateur l'a monté à la main, pour ce commerce ; un Reel qui fait pub, diaporama ou modèle n'est pas ok :
@@ -110,8 +122,8 @@ Plusieurs versions : compare-les et retiens la meilleure (best = son numéro, wh
 Pour la version retenue :
 - score de 1 à 10 ;
 - ok = true si elle peut partir telle quelle (8 ou plus, aucun défaut gênant) ;
-- issues : chaque défaut, avec la scène, le problème et la correction précise à demander au monteur, qui connaît les clips et les gabarits (ex. « accroche trop longue : la réduire à 3 mots », « scène 3 sombre et floue : la remplacer par un meilleur passage du même clip », « texte de la scène 2 collé au bord droit : le recentrer ») ; 4 au plus, les plus importants d'abord ;
-- summary : une phrase pour la gérante, au tutoiement, sans jargon, au passé, car elle la lit avec la vidéo finie : ce que tu as vérifié si la version peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. »).`;
+- issues : chaque défaut, avec la scène, le problème et la correction précise à demander au monteur, qui connaît les clips et les gabarits (ex. « accroche trop longue : la réduire à 3 mots », « scène 3 sombre et floue : la remplacer par un meilleur passage du même clip », « texte de la scène 2 collé au bord droit : le recentrer ») ; 4 au plus, les plus importants d'abord. Un texte ou une animation sur un visage : demande de les déplacer, jamais de changer le plan (son plus beau plan, ses sourires, restent). Dans une animation ou un collage, un texte masqué ou un plan caché : dis ce qui doit rester lisible ou visible, jamais une forme à prendre (pas « un seul tirage à la fois », « ne plus superposer », « aligner ») : la forme et sa richesse restent au motion designer ;
+- summary : une phrase pour la gérante, au tutoiement, sans jargon, au passé, car elle la lit avec la vidéo finie : ce que tu as vérifié si la version peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. ») ; jamais ce qui resterait à faire (« il reste à… ») : la vidéo qu'elle reçoit est finie.`;
 
 export type ReviewMoment = { t: number; scene: number | null; label: string; texts: string[] };
 
@@ -335,6 +347,8 @@ export function fixBrief(review: Pick<MontageReview, "score" | "issues">, reques
   return [
     `Relecture de la vidéo rendue par la directrice artistique (note ${review.score}/10). Corrige seulement ces points, garde tout le reste :`,
     ...review.issues.map((issue, i) => `${i + 1}. ${issue.scene ? `Scène ${issue.scene} : ` : ""}${issue.problem} → ${issue.fix}`),
+    // Culte's free collage: to clear faces the editor dropped her best photo, and « the prints cover the message » became one small print at a time.
+    "Un texte ou une animation sur un visage se déplace, le plan reste : ne retire jamais un plan fort pour ça. Pour une animation ou un collage, dis au motion designer ce qui doit rester lisible ou visible, jamais une forme à prendre, et garde sa richesse.",
     request ? `Rappel de la demande de la gérante, qui passe avant ces points (ce qu'elle impose reste) : ${request}` : "",
   ]
     .filter(Boolean)
