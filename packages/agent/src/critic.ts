@@ -132,13 +132,17 @@ const MOVE_WORDS: Record<string, string> = { in: "avance lente", out: "recul len
 const kindOf = (s: EditPlan["segments"][number]) => (isClipSegment(s) ? "vidéo" : isMotionSegment(s) ? "animation" : "écran de texte");
 
 /**
- * The instants the critic looks at: the hook (1 s), the middle of every scene,
- * the end; at most `max`, the hook and the end always kept. Each with the
- * texts the plan puts on screen at that instant.
+ * The instants the critic looks at: the hook (1 s), the middle of every animation over
+ * several shots, the middle of every scene, the end; at most `max`, the hook, the end and
+ * the animations always kept. Each with the texts the plan puts on screen at that instant.
+ * Without the animations' own instants, the critic judged the « -20 % » a manager asked
+ * for missing: no scene's middle fell on it.
  */
 export function reviewMoments(plan: EditPlan, max = 8): ReviewMoment[] {
   const timeline = planTimeline(plan);
   const end = Math.max(0, timeline.duration - 0.5);
+  const at2 = (t: number) => Math.round(t * 100) / 100;
+  const layers = (plan.layers ?? []).filter((l) => !l.compose);
   const textsAt = (t: number) => [
     ...plan.texts.filter((x) => x.from <= t && t < x.to).map((x) => (x.items?.length ? `${x.text} (${x.items.map((i) => i.title).join(", ")})` : x.text)),
     ...plan.segments.flatMap((s, i) => {
@@ -146,24 +150,36 @@ export function reviewMoments(plan: EditPlan, max = 8): ReviewMoment[] {
       if (!isMotionSegment(s) || t < at.start || t >= at.start + at.length) return [];
       return Object.values(s.motion.texts ?? {});
     }),
+    ...layers.flatMap((l) => (t >= l.from && t < l.to ? Object.values(l.motion.texts ?? {}) : [])),
   ];
   const sceneAt = (t: number) => {
     const i = timeline.segments.findIndex((s) => t >= s.start && t < s.start + s.length);
     return i < 0 ? plan.segments.length - 1 : i;
   };
   // The first image as the feed shows it (the hook's text already in), then the hook at 1 s.
-  const first = Math.round(Math.min(0.3, timeline.duration / 8) * 100) / 100;
-  const hook = Math.round(Math.min(1, timeline.duration / 4) * 100) / 100;
-  const middles = timeline.segments.map((s) => s.start + s.length / 2).filter((t) => t > hook + 0.4 && t < end - 0.4);
+  const first = at2(Math.min(0.3, timeline.duration / 8));
+  const hook = at2(Math.min(1, timeline.duration / 4));
+  const animations = layers.map((l) => at2((l.from + l.to) / 2)).filter((t) => t > hook + 0.2 && t < end - 0.2);
+  const middles = timeline.segments.map((s) => s.start + s.length / 2).filter((t) => t > hook + 0.4 && t < end - 0.4 && animations.every((a) => Math.abs(a - t) > 0.4));
   // Even spread over the scenes when there are too many.
-  const room = Math.max(0, max - 3);
+  const room = Math.max(0, max - 3 - animations.length);
   const picked = middles.length <= room ? middles : Array.from({ length: room }, (_, k) => middles[Math.round((k * (middles.length - 1)) / Math.max(1, room - 1))]!);
-  const times = [...new Set([first, hook, ...picked, end].map((t) => Math.round(t * 100) / 100))].sort((a, b) => a - b);
+  const times = [...new Set([first, hook, ...animations, ...picked, end].map(at2))].sort((a, b) => a - b);
   return times.map((t, k) => {
     const i = sceneAt(t);
     const segment = plan.segments[i]!;
     const where = `scène ${i + 1} (${kindOf(segment)})`;
-    const label = t === first ? `1re image · ${where}` : t === hook ? `Accroche · ${where}` : k === times.length - 1 ? `Fin · ${where}` : `Scène ${i + 1} (${kindOf(segment)})`;
+    const layer = animations.includes(t) ? layers.find((l) => t >= l.from && t < l.to) : undefined;
+    const label =
+      t === first
+        ? `1re image · ${where}`
+        : t === hook
+          ? `Accroche · ${where}`
+          : k === times.length - 1
+            ? `Fin · ${where}`
+            : layer
+              ? `Animation sur plusieurs plans (de ${seconds(layer.from)} à ${seconds(layer.to)} s) · ${where}`
+              : `Scène ${i + 1} (${kindOf(segment)})`;
     return { t, scene: i + 1, label, texts: textsAt(t) };
   });
 }
