@@ -35,6 +35,8 @@ import { photoRegions } from "@/lib/video/regions";
 //                        care (editor, motion designer, render with music, critic, corrections),
 //                        without a quote. Answers at once and works after the response.
 //                        reset=1 first removes the case's posts and scenes, for a new first Reel;
+//                        stock=<id>,… other free stock clips (Mixkit ids) for this run, to try a
+//                        clip without a new deploy;
 //                        idea=<her words> is what she writes in « Ce que tu imagines » (else the
 //                        case's idea), sent as the Créer screen sends it: the post's title, and
 //                        « Ce que la gérante imagine : … » for the editor and the voice;
@@ -522,7 +524,11 @@ export async function POST(request: Request) {
     after(() => newMusic(labUrl(name)).catch((error: unknown) => console.error("lab: new music failed", name, error)));
     return Response.json({ ok: true, case: name, music: true });
   }
+  // Other free stock clips for this run, as many as a montage takes.
+  const stock = params.get("stock");
+  if (stock && !new RegExp(`^\\d{1,7}(,\\d{1,7}){0,${MAX_MEDIA - 1}}$`).test(stock)) return Response.json({ error: "stock=<mixkit id>,…" }, { status: 400 });
+  const run = stock ? { ...c, clips: stock.split(",").map(Number) } : c;
   // call_app gives up after a few seconds: the work goes on after the answer.
-  after(() => start(name, c, params.get("reset") === "1", voiceOf(params), ideaOf(params)).catch((error: unknown) => console.error("lab: case failed", name, error)));
+  after(() => start(name, run, params.get("reset") === "1", voiceOf(params), ideaOf(params)).catch((error: unknown) => console.error("lab: case failed", name, error)));
   return Response.json({ ok: true, case: name, started: true });
 }
