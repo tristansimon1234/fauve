@@ -17,6 +17,7 @@ import {
   textBands,
   holdAfterVoice,
   keepWrittenAnimations,
+  replacedAnimations,
   brandProfileSchema,
   CLAUDE_MODEL,
   EDITOR_SYSTEM_PROMPT,
@@ -307,9 +308,11 @@ export async function designEdit(params: {
   // Retouch and blur stay on their clips from one version to the next.
   // A correction also keeps the texts' styles and places (the editor names looks, it does not copy them).
   const base = previousPlan.success ? previousPlan.data : null;
-  // Its animations whose brief did not change keep their code before the new ones are counted.
+  // Its animations whose brief did not change keep their code before the new ones are counted;
+  // one rewritten (its shots changed, or the request touched it) takes the place of the one it replaces.
   const drafted = keepWrittenAnimations(fromEditorPlan(response.parsed_output.plan, profile.text_looks ?? []), params.fresh ? null : base);
-  const plan = carryRetouch(carryTextStyle(normalizeEditPlan(drafted, durations, params.maxNewScenes ?? MAX_FREE_SCENES), params.fresh ? null : base), base);
+  const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
+  const plan = carryRetouch(carryTextStyle(normalizeEditPlan(drafted, durations, allowed), params.fresh ? null : base), base);
 
   // The hook's words decide whether anyone stays: a new Reel's written hook is weighed against
   // other forms by the hook judge, who keeps the strongest (an opening animation is its own hook).

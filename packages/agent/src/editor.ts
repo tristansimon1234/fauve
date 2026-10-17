@@ -98,7 +98,7 @@ Polices : « fonts » (display pour l'accroche et les titres, body pour le reste
 
 « duration » : la somme des durées des plans à l'écran.
 
-Correction : si un plan précédent et une demande de changement sont fournis, pars du plan précédent et applique exactement ce qui est demandé, sans changer le reste. Une demande de style change surtout la forme (rythme, caméra, textes, animations) ; garde l'idée des messages.
+Correction : si un plan précédent et une demande de changement sont fournis, pars du plan précédent et applique exactement ce qui est demandé, sans changer le reste. Une demande de style change surtout la forme (rythme, caméra, textes, animations) ; garde l'idée des messages. Ses animations (dans le plan précédent, par leur brief) : une animation qui reste comme elle est garde son brief mot pour mot (et son code) ; celle que la demande touche, ou dont les plans ou les moments changent, se réécrit avec un nouveau brief : elle remplace l'ancienne et ne compte pas dans « max_new_scenes ». Une animation qu'elle a demandée ne disparaît jamais d'une correction : si elle ne se voit pas assez, refais-la pour qu'elle se voie.
 
 « rationale » : une seule phrase pour la gérante, en français, tutoiement, qui explique ton choix principal (ex. « J'ouvre sur la pizza qui sort du four, puis je remonte au geste du pizzaiolo, et je finis sur la tablée. »).`;
 
@@ -233,6 +233,22 @@ export function keepWrittenAnimations(plan: EditPlan, previous: EditPlan | null)
     segments: plan.segments.map((s) => (isMotionSegment(s) ? { ...s, motion: keep(s.motion) } : s)),
     ...(layers ? { layers: layers.map((l) => ({ ...l, motion: keep(l.motion) })) } : {}),
   };
+}
+
+/**
+ * In a correction, how many animations of the version corrected the new plan no longer keeps
+ * as they were (their brief rewritten, or left out; a collage's composition aside): each one
+ * rewritten takes the place of one of them, on top of the budget of new animations. Without
+ * this, an animation rewritten for its new shots was dropped from the correction: the « -20 % »
+ * a manager asked to catch between her fingers vanished from the version that fixed the rest.
+ */
+export function replacedAnimations(plan: EditPlan, previous: EditPlan | null): number {
+  if (!previous) return 0;
+  const motions = (p: EditPlan) => [...p.segments.filter(isMotionSegment).map((s) => s.motion), ...(p.layers ?? []).filter((l) => !l.compose).map((l) => l.motion)];
+  const now = motions(plan).filter((m) => m.js || m.template_id);
+  const briefs = new Set(now.map((m) => m.brief));
+  const ids = new Set(now.flatMap((m) => (m.template_id ? [m.template_id] : [])));
+  return motions(previous).filter((m) => m.js && !briefs.has(m.brief) && !(m.template_id && ids.has(m.template_id))).length;
 }
 
 /** The retouch and blur of each clip in the previous version, kept on the same clip in the new one. */

@@ -887,6 +887,17 @@ test("critic: key frames at the hook, every scene and the end, with the texts on
   assert.deepEqual([few[0]!.t, few[1]!.t], [0.3, 1]);
   assert.equal(few.at(-1)!.t, 29.5);
 
+  // An animation over several shots is looked at in its middle, with its words, whatever the scenes (a
+  // boutique's « -20 % » caught between her fingers was judged missing: no scene's middle fell on it).
+  const layered = editPlanSchema.parse({ ...plan, layers: [{ motion: { brief: "le -20 % attrapé puis lancé", texts: { promo: "-20 %" } }, from: 2, to: 5.5 }] });
+  const caught = reviewMoments(layered).find((m) => m.t === 3.75);
+  assert.match(caught!.label, /^Animation sur plusieurs plans \(de 2 à 5,5 s\)/);
+  assert.ok(caught!.texts.includes("-20 %"));
+  // Kept when the scenes leave no room.
+  const counted = reviewMoments(editPlanSchema.parse({ ...long, layers: [{ motion: { brief: "un compteur" }, from: 10, to: 14 }] }), 6);
+  assert.equal(counted.length, 6);
+  assert.ok(counted.some((m) => m.t === 12 && m.label.startsWith("Animation")));
+
   const brief = fixBrief({ score: 6, issues: [{ scene: 1, problem: "accroche trop longue", fix: "la réduire à 3 mots" }] }, "Ouverture dynamique");
   assert.match(brief, /6\/10/);
   assert.match(brief, /Scène 1 : accroche trop longue → la réduire à 3 mots/);
@@ -2682,6 +2693,17 @@ test("free animations: a correction keeps the ones written, and a cut-out cut by
   assert.deepEqual(corrected.layers?.map((l) => l.motion.brief), ["le chef dit coucou à chaque plan"]);
   assert.equal(corrected.segments.some((s) => "motion" in s && s.motion.js === scene), true);
   assert.equal(keepWrittenAnimations(rewritten, null), rewritten);
+
+  // One rewritten for its new shots takes the place of the one it replaces: a correction keeps it (the
+  // boutique's « -20 % » caught between her fingers vanished from the version that fixed the rest).
+  const { replacedAnimations } = await import("./editor.ts");
+  const moved = keepWrittenAnimations(editPlanSchema.parse({ ...previous, layers: [{ motion: { brief: "le chef dit coucou, sur les nouveaux plans" }, from: 0, to: 4 }] }), previous);
+  assert.equal(replacedAnimations(moved, previous), 1);
+  assert.deepEqual(normalizeEditPlan(moved, { a: 10 }, replacedAnimations(moved, previous)).layers?.map((l) => l.motion.brief), ["le chef dit coucou, sur les nouveaux plans"]);
+  assert.equal(normalizeEditPlan(moved, { a: 10 }, 0).layers, undefined);
+  // Nothing replaced when the written ones are kept as they were, nor on a new montage.
+  assert.equal(replacedAnimations(kept, previous), 0);
+  assert.equal(replacedAnimations(moved, null), 0);
 
   // A chef seated at his table runs into the top and the left: no sticker, but an animation can bring him in from there.
   const chef = { coverage: 0.419, parts: 1, touches: { top: 0.17, bottom: 0, left: 0.21, right: 0.08 }, unsure: 0.016 };
