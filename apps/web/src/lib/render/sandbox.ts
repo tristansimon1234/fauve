@@ -291,20 +291,24 @@ export type SmokeScene = {
   look?: { template?: MotionTemplate; tempo?: number; signature?: ReelProps["brand"]["signature"] };
 };
 
-/** What the scene check found: the error per scene id (null when it passes), and where a passing scene's texts sit while it holds (top, bottom: shares of the height). */
-export type SceneChecks = { errors: Record<string, string | null>; bands: Record<string, [number, number]> };
+/**
+ * What the scene check found: the error per scene id (null when it passes), where a passing scene's
+ * texts sit while it holds (top, bottom: shares of the height), and, for a passing scene, its texts
+ * that stay on a face of the footage under it (what to move, for the motion designer).
+ */
+export type SceneChecks = { errors: Record<string, string | null>; bands: Record<string, [number, number]>; faces: Record<string, string> };
 
 /**
  * Runs generated motion scenes outside the video: a server render (first, middle,
  * last frame), then a layout check in Chrome with the studio's fonts, which
- * rejects a scene whose text leaves the frame or the safe zone, and measures the
- * rows its texts cover.
+ * rejects a scene whose text leaves the frame or the safe zone, measures the
+ * rows its texts cover and finds the texts that stay on a face it follows.
  */
 export async function smokeTestScenes(
   scenes: SmokeScene[],
   brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">,
 ): Promise<SceneChecks> {
-  if (!scenes.length) return { errors: {}, bands: {} };
+  if (!scenes.length) return { errors: {}, bands: {}, faces: {} };
   const sandbox = await withTimeLeft(await remotionSandbox());
   const file = `${ROOT}/jobs/smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
   try {
@@ -312,13 +316,17 @@ export async function smokeTestScenes(
     const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 150 node smoke.mjs "$1"`, "bash", file] });
     const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
     try {
-      const parsed = JSON.parse(lastLine) as { results?: Record<string, string | null>; bands?: Record<string, [number, number]> } & Record<string, unknown>;
+      const parsed = JSON.parse(lastLine) as {
+        results?: Record<string, string | null>;
+        bands?: Record<string, [number, number]>;
+        faces?: Record<string, string>;
+      } & Record<string, unknown>;
       // A workshop still on the previous checker prints the errors alone.
-      if (parsed.results && typeof parsed.results === "object") return { errors: parsed.results, bands: parsed.bands ?? {} };
-      return { errors: parsed as Record<string, string | null>, bands: {} };
+      if (parsed.results && typeof parsed.results === "object") return { errors: parsed.results, bands: parsed.bands ?? {}, faces: parsed.faces ?? {} };
+      return { errors: parsed as Record<string, string | null>, bands: {}, faces: {} };
     } catch {
       const output = (await result.output("both").catch(() => "")).slice(-400);
-      return { errors: Object.fromEntries(scenes.map((s) => [s.id, `smoke test failed: ${output}`])), bands: {} };
+      return { errors: Object.fromEntries(scenes.map((s) => [s.id, `smoke test failed: ${output}`])), bands: {}, faces: {} };
     }
   } finally {
     await bash(sandbox, 'rm -f "$1"', [file]).catch(() => {});
