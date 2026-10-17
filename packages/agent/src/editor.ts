@@ -494,13 +494,31 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
 
   const draft = { ...plan, transitions, segments, images: [], music: null };
   const duration = Math.max(3, renderDuration(draft));
-  // No text under the end card, nor over an animation (it carries its own words).
+
+  // Animations over several shots: inside the Reel, a second at least, each a new animation within the budget;
+  // a collage's composition is the ambiance itself, over the whole Reel, never counted.
+  const layers = composedLayers(plan, duration).flatMap((l) => {
+    if (l.compose) return [l];
+    const from = round(Math.max(0, l.from));
+    const to = round(Math.min(duration, l.to));
+    if (to - from < 1 || (!l.motion.js && freeScenes++ >= maxFreeScenes)) return [];
+    return [{ ...l, from, to }];
+  });
+
+  // No text under the end card, nor over an animation (it carries its own words): a scene, or one over
+  // several shots that writes some (an animated hook and a written one showed together, one over the other).
   const textsEnd = plan.end_card ? duration - END_CARD_SECONDS : duration;
   const timeline = planTimeline(draft);
-  const animations = draft.segments.flatMap((s, i) => {
-    const at = timeline.segments[i]!;
-    return isClipSegment(s) ? [] : [{ from: at.start, to: at.start + at.length, words: animationWords(s) }];
-  });
+  const animations = [
+    ...draft.segments.flatMap((s, i) => {
+      const at = timeline.segments[i]!;
+      return isClipSegment(s) ? [] : [{ from: at.start, to: at.start + at.length, words: animationWords(s) }];
+    }),
+    ...layers.flatMap((l) => {
+      const words = l.compose ? "" : motionWords(l.motion);
+      return words ? [{ from: l.from, to: l.to, words }] : [];
+    }),
+  ];
   const texts = readableEnding(
     clearOfAnimations(
       // The hook is read from the first image, never after a blank half second.
@@ -513,16 +531,6 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
   )
     .filter((t) => t.to - t.from >= MIN_TEXT_SECONDS)
     .map((t) => ({ ...t, emphasis: t.emphasis?.filter((e) => t.text.toLowerCase().includes(e.toLowerCase())) }));
-
-  // Animations over several shots: inside the Reel, a second at least, each a new animation within the budget;
-  // a collage's composition is the ambiance itself, over the whole Reel, never counted.
-  const layers = composedLayers(plan, duration).flatMap((l) => {
-    if (l.compose) return [l];
-    const from = round(Math.max(0, l.from));
-    const to = round(Math.min(duration, l.to));
-    if (to - from < 1 || (!l.motion.js && freeScenes++ >= maxFreeScenes)) return [];
-    return [{ ...l, from, to }];
-  });
 
   return editPlanSchema.parse({ ...draft, duration, texts, layers: layers.length ? layers : undefined });
 }
@@ -562,12 +570,15 @@ const stringsIn = (v: unknown): string[] =>
 
 /** The words an animation shows: its slots' texts and the words its brief quotes (« … »), or a fixed scene's words. */
 export function animationWords(s: PlanSegment): string {
-  if (isMotionSegment(s)) {
-    const quoted = [...(s.motion.brief ?? "").matchAll(/[«“"]\s*([^»”"]+?)\s*[»”"]/g)].map((m) => m[1]!);
-    return [...quoted, ...Object.values(s.motion.texts ?? {})].join(" | ");
-  }
+  if (isMotionSegment(s)) return motionWords(s.motion);
   if ("scene" in s) return stringsIn(s.scene).join(" | ");
   return "";
+}
+
+/** The words an animation writes: its slots, and the words its brief quotes. */
+function motionWords(motion: { brief?: string; texts?: Record<string, string> }): string {
+  const quoted = [...(motion.brief ?? "").matchAll(/[«“"]\s*([^»”"]+?)\s*[»”"]/g)].map((m) => m[1]!);
+  return [...quoted, ...Object.values(motion.texts ?? {})].join(" | ");
 }
 
 /**
