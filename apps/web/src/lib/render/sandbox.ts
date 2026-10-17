@@ -813,13 +813,29 @@ const TRACK_MODELS: { file: string; url: string; sha256: string }[] = [
     sha256: "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f",
   },
 ];
-/** The system's part, as root: Python and the two libraries MediaPipe links. */
-const TRACK_SYSTEM = ["install", "-y", "-q", "python3.13", "python3.13-pip", "libglvnd-egl", "libglvnd-gles"];
+/** uv, pinned (a single binary, taken from its wheel on PyPI): it brings its own Python, whatever the image has. */
+const UV_WHEEL = {
+  url: "https://files.pythonhosted.org/packages/e5/83/85a6c63c24905af4924fddb11a499b934913f59a134248367a1ef1a4716f/uv-0.12.23-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+  sha256: "565c6e2874dbeae86c02f3dea97255e878fec672659a73d4930c6b93fcab2fff",
+};
+/**
+ * The tracker's packages, all of them pinned and installed without dependencies. The vision
+ * tasks import OpenCV and matplotlib for drawing helpers they never use here: headless builds.
+ */
+const TRACK_PACKAGES = [
+  "mediapipe==1.1.1", "numpy==2.5.4", "absl-py==2.5.1", "flatbuffers==25.12.19", "certifi==2026.7.22",
+  "opencv-python-headless==5.0.0.93", "matplotlib==3.11.2", "contourpy==1.4.0", "cycler==0.12.1", "fonttools==4.67.0",
+  "kiwisolver==1.5.1", "packaging==26.3", "pillow==13.0.0", "pyparsing==3.3.3", "python-dateutil==2.9.0.post0", "six==1.17.0",
+];
 const TRACK_SETUP = [
   "set -euo pipefail",
-  `mkdir -p ${TRACK_ROOT}/models ${TRACK_ROOT}/jobs && cd ${TRACK_ROOT}`,
-  // Pinned. The vision tasks import OpenCV and matplotlib for drawing helpers they never use here: headless builds.
-  'py/bin/python -c "import mediapipe, cv2, matplotlib" 2>/dev/null || { rm -rf py && python3.13 -m venv py && py/bin/pip install -q --no-cache-dir --no-deps mediapipe==1.1.1 && py/bin/pip install -q --no-cache-dir numpy==2.5.4 absl-py==2.5.1 flatbuffers==25.12.19 certifi==2026.7.22 opencv-python-headless==5.0.0.93 matplotlib==3.11.2; }',
+  `mkdir -p ${TRACK_ROOT}/models ${TRACK_ROOT}/jobs ${TRACK_ROOT}/bin && cd ${TRACK_ROOT}`,
+  // The two libraries MediaPipe links, from the image's packages (Ubuntu; dnf on an Amazon Linux image).
+  "libs=$(/sbin/ldconfig -p 2>/dev/null || true)",
+  'if [[ "$libs" != *"libEGL.so.1 "* || "$libs" != *"libGLESv2.so.2 "* ]]; then if command -v apt-get >/dev/null; then sudo apt-get update -qq && sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends libegl1 libgles2 >/dev/null; else sudo dnf install -y -q libglvnd-egl libglvnd-gles; fi; fi',
+  `[ -x bin/uv ] || { curl -fsSL --retry 3 -o uv.whl '${UV_WHEEL.url}' && echo "${UV_WHEEL.sha256}  uv.whl" | sha256sum -c --status && { python3 -c 'import sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); sys.stdout.buffer.write(z.read(next(n for n in z.namelist() if n.endswith("/scripts/uv"))))' uv.whl || unzip -p uv.whl '*/scripts/uv'; } > bin/uv.tmp && chmod +x bin/uv.tmp && mv bin/uv.tmp bin/uv && rm uv.whl; }`,
+  `export UV_PYTHON_INSTALL_DIR=${TRACK_ROOT}/python UV_PYTHON_PREFERENCE=only-managed UV_NO_CACHE=1`,
+  `py/bin/python -c "import mediapipe, cv2, matplotlib" 2>/dev/null || { rm -rf py && bin/uv venv -q --python 3.13 py && bin/uv pip install -q --python py/bin/python --no-deps ${TRACK_PACKAGES.join(" ")}; }`,
   ...TRACK_MODELS.map(
     (m) =>
       `echo "${m.sha256}  models/${m.file}" | sha256sum -c --status 2>/dev/null || { curl -fsSL --retry 3 -o models/${m.file}.tmp '${m.url}' && mv models/${m.file}.tmp models/${m.file} && echo "${m.sha256}  models/${m.file}" | sha256sum -c --status; }`,
@@ -832,11 +848,6 @@ let trackReady: Promise<Sandbox> | undefined;
 export function trackSandbox(): Promise<Sandbox> {
   trackReady ??= (async () => {
     const sandbox = await withTimeLeft(await cutoutSandbox());
-    const ready = await sandbox.runCommand({ cmd: "bash", args: ["-c", "[ -x /usr/bin/python3.13 ] && [ -e /usr/lib64/libEGL.so.1 ] && [ -e /usr/lib64/libGLESv2.so.2 ]"] });
-    if (ready.exitCode !== 0) {
-      const system = await sandbox.runCommand({ cmd: "dnf", args: TRACK_SYSTEM, sudo: true });
-      if (system.exitCode !== 0) throw new Error(`tracker: system packages not installed (${system.exitCode}): ${(await system.output("both").catch(() => "")).slice(-600)}`);
-    }
     await bash(sandbox, TRACK_SETUP);
     // The script ships with the render source (apps/render/track.py), written as this deploy has it.
     const script = REMOTION_SOURCE_FILES["track.py"];
