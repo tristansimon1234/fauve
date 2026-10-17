@@ -3,6 +3,9 @@ import { AbsoluteFill, cancelRender, continueRender, delayRender } from "remotio
 import { fitsPending } from "./Fit";
 import { fontsLoaded, loadFonts } from "./fonts";
 import { compileScene, SCOPE, type SceneComponent } from "./MotionScene";
+import { themeFor } from "./theme";
+import { footageTrack, type TrackPiece } from "./track";
+import type { MotionTemplate, ReelProps } from "./types";
 
 // Layout check of a generated motion scene, run by smoke.mjs before the scene
 // reaches a video: the scene is laid out at many frames at once in a real browser,
@@ -27,6 +30,10 @@ export type SceneCheckProps = {
   cuts?: number[];
   /** A collage's composition: the shots it lays (each one a grey card here). */
   shots?: Parameters<SceneComponent>[0]["shots"];
+  /** What moves in the footage under it (its `track` reads the real places, so a text that follows a hand is checked where it goes). */
+  track?: TrackPiece[];
+  /** The Reel's rhythm and look, for its camera moves (the same theme as the render). */
+  look?: { template?: MotionTemplate; tempo?: number; signature?: ReelProps["brand"]["signature"] };
 };
 
 const FrameContext = createContext(0);
@@ -117,9 +124,10 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
 
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
-export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [] }: SceneCheckProps) {
+export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look }: SceneCheckProps) {
   const width = 1080;
   const height = 1920;
+  const [track] = useState(() => footageTrack(pieces, themeFor(look?.template ?? "libre", look?.signature, look?.tempo), { width, height }, { shots }));
   loadFonts([brand.displayFont, brand.bodyFont]);
   const [handle] = useState(() => delayRender("scene check", { timeoutInMilliseconds: 60000 }));
   const [Scene] = useState(() => compileScene(js, checkScope(width, height, durationInFrames)));
@@ -172,7 +180,7 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         <div key={f} data-check-frame={f} style={{ position: "absolute", left: 0, top: 0, width, height }}>
           <Catch onError={(error) => cancelRender(new Error(`erreur à l'image ${f} : ${error instanceof Error ? error.message : String(error)}`))}>
             <FrameContext.Provider value={f}>
-              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} shots={shots} />
+              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} shots={shots} track={track} />
             </FrameContext.Provider>
           </Catch>
         </div>

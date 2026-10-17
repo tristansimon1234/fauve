@@ -21,6 +21,7 @@ import { ClipBlurLayer, cssFilter, ExposureFilters, Photo } from "./Retouch";
 import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
 import { TEXT_Y, themeFor, type Theme } from "./theme";
+import { cameraMotion, framingPercent, punchScale, straightening } from "./track";
 import type { CameraMove, ReelProps, ReelUnder, TextLook } from "./types";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -127,6 +128,7 @@ export function Reel(props: ReelProps) {
                       overlay={Boolean(segment.under)}
                       shift={segment.shift}
                       photos={segment.photos}
+                      track={segment.track}
                     />
                   ) : (
                     <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} overlay={Boolean(segment.under)} />
@@ -141,7 +143,18 @@ export function Reel(props: ReelProps) {
       {(props.layers ?? []).map((layer, i) =>
         layer.compose ? null : (
           <Sequence key={`l${i}`} from={layer.from} durationInFrames={layer.durationInFrames} layout="none">
-            <MotionScene js={layer.js} texts={layer.texts} durationInFrames={layer.durationInFrames} props={props} theme={theme} k={k} overlay photos={layer.photos} cuts={layer.cuts} />
+            <MotionScene
+              js={layer.js}
+              texts={layer.texts}
+              durationInFrames={layer.durationInFrames}
+              props={props}
+              theme={theme}
+              k={k}
+              overlay
+              photos={layer.photos}
+              cuts={layer.cuts}
+              track={layer.track}
+            />
           </Sequence>
         ),
       )}
@@ -261,8 +274,7 @@ function musicVolume(track: NonNullable<ReelProps["soundtrack"]>, frame: number)
 function Accent({ kind, color, children }: { kind?: "punch" | "wipe"; color: string; children: ReactNode }) {
   const frame = useCurrentFrame();
   if (kind === "punch") {
-    const scale = interpolate(frame, [0, 8], [1.12, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
-    return <AbsoluteFill style={{ transform: `scale(${scale})` }}>{children}</AbsoluteFill>;
+    return <AbsoluteFill style={{ transform: `scale(${punchScale(frame)})` }}>{children}</AbsoluteFill>;
   }
   if (kind === "wipe") {
     // A band a third of the frame wide, from the right edge out past the left one.
@@ -305,17 +317,10 @@ function Legibility({ theme }: { theme: Theme }) {
  * or pull-out, a slow pan, or a tighter crop held (a jump cut on the beat).
  */
 function cameraTransform(move: CameraMove, frame: number, durationInFrames: number, theme: Theme): string | undefined {
-  const p = interpolate(frame, [0, Math.max(1, durationInFrames)], [0, 1], { ...clamp, easing: Easing.inOut(Easing.sin) });
-  const z = theme.zoomTo - 1;
-  if (move === "in") return `scale(${1 + z * p})`;
-  if (move === "out") return `scale(${1 + z - z * p})`;
-  if (move === "left" || move === "right") {
-    // A pan needs room on both sides: slightly enlarged, it slides by a few percent.
-    const way = move === "left" ? 1 : -1;
-    return `scale(${1.02 + z}) translateX(${way * (2.6 * p - 1.3)}%)`;
-  }
-  if (move === "punch") return `scale(${theme.punch})`;
-  return undefined;
+  // The same move places what is tracked in the footage (track.ts): a word on a fingertip stays on it.
+  const motion = cameraMotion(move, frame, durationInFrames, theme);
+  if (!motion) return undefined;
+  return motion.shift !== undefined ? `scale(${motion.scale}) translateX(${motion.shift}%)` : `scale(${motion.scale})`;
 }
 
 /** A photo in a Reel: the move the editor chose, else a slow zoom with a slight drift, one way then the other from a photo to the next. */
@@ -351,21 +356,14 @@ type ClipSegment = Extract<ReelProps["segments"][number], { type: "clip" }>;
  * the picture) stays in view: object-position puts that share of the overflow on the left.
  */
 function framing(focus: { x: number; y: number } | undefined, aspect: number | undefined, frameAspect: number): string | undefined {
-  if (!focus || !aspect) return undefined;
-  const at = (f: number, ratio: number) => {
-    // The picture is `ratio` times the frame along this side: the subject at the centre when the edges allow.
-    if (ratio <= 1.001) return 50;
-    return Math.round(Math.min(100, Math.max(0, ((f * ratio - 0.5) / (ratio - 1)) * 100)));
-  };
-  return `${at(focus.x, aspect / frameAspect)}% ${at(focus.y, frameAspect / aspect)}%`;
+  const at = framingPercent(focus, aspect, frameAspect);
+  return at ? `${at[0]}% ${at[1]}%` : undefined;
 }
 
 /** A tilted picture rotated straight, enlarged just enough that no corner shows. */
 function straighten(degrees: number | undefined, frameAspect: number): string | undefined {
-  if (!degrees) return undefined;
-  const a = (Math.abs(degrees) * Math.PI) / 180;
-  const scale = Math.max(Math.cos(a) + Math.sin(a) / frameAspect, Math.cos(a) + Math.sin(a) * frameAspect);
-  return `rotate(${degrees}deg) scale(${scale.toFixed(4)})`;
+  const straight = straightening(degrees, frameAspect);
+  return straight ? `rotate(${straight.degrees}deg) scale(${straight.scale.toFixed(4)})` : undefined;
 }
 
 /** A clip as filmed and retouched, covering the frame, or the box it is drawn in (`frame`: a collage's composition). */

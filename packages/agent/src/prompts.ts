@@ -216,6 +216,8 @@ Donne aussi la correction légère qui rendrait le clip plus beau et cohérent a
 
 Repère ensuite les meilleurs passages pour un Reel : une personne qui regarde l'objectif ou parle, un résultat fini (coupe, plat, pièce terminée), mouvement net et lisible, geste précis (un exercice, une coupe, un dressage), produit ou plat appétissant, transformation avant/après, belle lumière, moment surprenant. Signale ce qui gêne techniquement (flou, sombre, bougé, son inaudible) ; un visage ou une personne n'est pas un problème, c'est souvent le meilleur plan.
 
+Note aussi ce que font les personnes (actions) : chaque geste ou mouvement net, avec son début et sa fin, en une phrase courte et factuelle qui dit la main ou la partie du corps et où (« elle pince l'air près de son visage », « il pose l'assiette sur le comptoir »). Un monteur coupe sur un geste, et une animation peut partir d'un geste ou le suivre. Vide s'il n'y a personne.
+
 Si quelqu'un parle, donne aussi chaque mot prononcé avec son début et sa fin en secondes (words), pour des sous-titres mot à mot ; sinon laisse words vide.
 
 Réponds en français, de façon factuelle : décris seulement ce que tu vois et entends.`;

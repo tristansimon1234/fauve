@@ -5,6 +5,8 @@ import {
   buildAss,
   buildReelProps,
   clipAnalysisSchema,
+  clipAspect,
+  clipsUnderAnimations,
   isClipSegment,
   motionTemplateSchema,
   planMediaIds,
@@ -31,6 +33,7 @@ import { withMusic } from "./music";
 import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
 import { ensureCutouts, sceneCutoutInputs, stickerInputs } from "./cutout";
+import { loadTracks } from "./tracks";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -131,6 +134,8 @@ export async function loadMontageInputs(
       return read?.width && read.height ? [[a.id as string, read.width / read.height]] : [];
     }),
   );
+  // What moves in the footage under its animations (hands, faces, bodies, read once per clip): their code follows it.
+  const tracks = await loadTracks(studioId, clipsUnderAnimations(plan)).catch(() => ({}));
   const words: Record<string, ClipAnalysis["words"]> = {};
   // Each clip's shape, to frame its subject in the vertical crop (phones film 16:9 or 9:16).
   const aspects: Record<string, number> = {};
@@ -138,7 +143,7 @@ export async function loadMontageInputs(
     const parsed = clipAnalysisSchema.safeParse(row.analysis);
     if (!parsed.success || row.media_id in words) continue;
     words[row.media_id as string] = parsed.data.words;
-    aspects[row.media_id as string] = parsed.data.orientation === "landscape" ? 16 / 9 : parsed.data.orientation === "square" ? 1 : 9 / 16;
+    aspects[row.media_id as string] = clipAspect(parsed.data);
   }
   return {
     clipIds,
@@ -162,6 +167,7 @@ export async function loadMontageInputs(
     cutouts,
     sceneCutouts,
     photoAspects,
+    tracks,
   };
 }
 
@@ -202,7 +208,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   // and those an animation composes with (the design step has usually made them already).
   const toCut = plan.template === "collage" ? planMediaIds(plan) : scenePhotoIds(plan);
   if (toCut.length) await ensureCutouts(studioId, toCut);
-  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, signature, voice, cutouts, sceneCutouts, photoAspects } =
+  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, signature, voice, cutouts, sceneCutouts, photoAspects, tracks } =
     await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 
@@ -238,15 +244,20 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         ...(cutouts ? { cutouts } : {}),
         ...(sceneCutouts ? { sceneCutouts } : {}),
         photoAspects,
+        ...(Object.keys(tracks).length ? { tracks } : {}),
       });
       // Library scenes play with new texts, older plans predate the layout check: every
       // scene is checked before the render, and one whose text leaves the frame plays its
       // fixed scene (an animation over several shots, which has none, is left out). If the
       // check is unavailable, the scenes stay.
+      // A scene that follows what moves is checked where it goes: with the footage's tracks and the Reel's camera moves.
+      const look = { template: props.template, ...(props.tempo ? { tempo: props.tempo } : {}), ...(props.brand.signature ? { signature: props.brand.signature } : {}) };
       const checks = await smokeTestScenes(
         [
           ...props.segments.flatMap((s, i) =>
-            s.type === "motion" ? [{ id: `m${i}`, js: s.js, durationInFrames: s.durationInFrames, texts: s.texts, ...(s.photos ? { photos: s.photos } : {}) }] : [],
+            s.type === "motion"
+              ? [{ id: `m${i}`, js: s.js, durationInFrames: s.durationInFrames, texts: s.texts, ...(s.photos ? { photos: s.photos } : {}), ...(s.track ? { track: s.track, look } : {}) }]
+              : [],
           ),
           ...(props.layers ?? []).map((l, i) => ({
             id: `l${i}`,
@@ -256,6 +267,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
             cuts: l.cuts,
             ...(l.photos ? { photos: l.photos } : {}),
             ...(l.shots ? { shots: l.shots } : {}),
+            ...(l.track || l.shots?.some((x) => x.track) ? { look, ...(l.track ? { track: l.track } : {}) } : {}),
           })),
         ],
         props.brand,

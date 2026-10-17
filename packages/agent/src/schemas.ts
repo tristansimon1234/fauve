@@ -339,6 +339,14 @@ export const clipCorrectionSchema = z.object({
   straighten: z.number().min(-10).max(10).describe("Degrés pour remettre l'horizon ou les verticales droites, 0 si c'est droit"),
 });
 
+/** What the people in a clip do, moment by moment: an editor cuts on a gesture, an animation can start from one or follow it. */
+const clipActionsSchema = z
+  .array(z.object({ start: seconds, end: seconds, what: z.string() }))
+  .max(16)
+  .describe(
+    "Chaque geste ou mouvement net d'une personne, daté (début et fin), en une phrase courte et factuelle qui dit la main ou la partie du corps et où (« elle montre la vitrine de la main droite », « il lance la pâte en l'air », « elle se retourne vers la caméra ») ; vide s'il n'y a personne",
+  );
+
 const clipShotBase = z.object({
   start: seconds,
   end: seconds,
@@ -369,6 +377,8 @@ export const clipAnalysisSchema = z.object({
     .optional()
     .describe("Chaque mot prononcé avec son début et sa fin, pour les sous-titres mot à mot ; vide s'il n'y a pas de voix"),
   issues: z.array(z.string()).describe("Problèmes techniques à signaler : flou, contre-jour, bougé, son inaudible…"),
+  // Came later: older analyses do not have them.
+  actions: clipActionsSchema.optional(),
   correction: clipCorrectionSchema.optional().describe("La retouche légère qui rendrait le clip plus beau et naturel sur Instagram, comme un bon étalonneur : ±0,1 à ±0,3 en général, 0 pour ne rien changer"),
 });
 export type ClipAnalysis = z.infer<typeof clipAnalysisSchema>;
@@ -376,6 +386,7 @@ export type ClipAnalysis = z.infer<typeof clipAnalysisSchema>;
 /** What Gemini is asked for: the same, with the look of every shot and the clip's correction required. */
 export const clipAnalysisRequestSchema = clipAnalysisSchema.extend({
   shots: z.array(clipShotBase.extend(shotLookSchema.shape)).describe("Plans successifs, sans trou ni chevauchement"),
+  actions: clipActionsSchema,
   correction: clipCorrectionSchema.describe("La retouche légère qui rendrait le clip plus beau et naturel sur Instagram, comme un bon étalonneur : ±0,1 à ±0,3 en général, 0 pour ne rien changer"),
 });
 

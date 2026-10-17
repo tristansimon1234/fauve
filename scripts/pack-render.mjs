@@ -16,7 +16,7 @@ function walk(dir) {
 }
 
 const files = Object.fromEntries(
-  ["package.json", "package-lock.json", "tsconfig.json", "smoke.mjs", "stills.mjs", "page.mjs", "cutout.mjs", ...walk(join(root, "src")).map((p) => relative(root, p))]
+  ["package.json", "package-lock.json", "tsconfig.json", "smoke.mjs", "stills.mjs", "page.mjs", "cutout.mjs", "track.py", ...walk(join(root, "src")).map((p) => relative(root, p))]
     .sort()
     .map((path) => [path, readFileSync(join(root, path), "utf8")]),
 );

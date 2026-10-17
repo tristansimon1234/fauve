@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 import { cutoutPath } from "@/lib/render/cutout";
+import { tracksPath } from "@/lib/render/tracks";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Media retention, called every hour by pg_cron with CRON_SECRET: the photos and
@@ -30,10 +31,10 @@ async function handle(request: Request) {
   for (let i = 0; i < expired.length; i += BATCH) {
     const batch = expired.slice(i, i + BATCH);
     // Files first: a row is only removed once its file is gone (a failed batch is retried next hour).
-    // A photo's cut-out (collages) goes with it; a path with nothing there is simply skipped.
+    // A photo's cut-out (collages) and what was tracked in a video go with it; a path with nothing there is simply skipped.
     const removed = await db.storage
       .from("media")
-      .remove(batch.flatMap((m) => [m.storage_path, cutoutPath(m.studio_id, m.id, "webp"), cutoutPath(m.studio_id, m.id, "png")]));
+      .remove(batch.flatMap((m) => [m.storage_path, cutoutPath(m.studio_id, m.id, "webp"), cutoutPath(m.studio_id, m.id, "png"), tracksPath(m.studio_id, m.id)]));
     if (removed.error) {
       console.error("retention: files not removed", removed.error.message);
       continue;

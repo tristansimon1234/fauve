@@ -1,5 +1,6 @@
 // Mirror of ReelProps in packages/agent/src/motion.ts (the web app builds them).
 // This package is shipped alone to the render sandbox, so it cannot import it.
+import type { TrackPiece } from "./track";
 
 export type MotionTemplate = "doux" | "dynamique" | "chic" | "collage" | "libre";
 
@@ -39,6 +40,8 @@ export type ComposeShot = ScenePhoto & {
   durationInFrames: number;
   kind: "video" | "photo";
   focus?: { x: number; y: number };
+  /** What was tracked in a video shot (hands, faces, bodies) and how it is drawn: track(frame, box) places it in the box it is laid in. */
+  track?: Omit<TrackPiece, "at" | "length">;
 };
 export type RegionKind = "face" | "plate" | "screen" | "document" | "other";
 export type PhotoEdit = { source: { width: number; height: number }; adjust?: Adjust; blur?: (Box & { kind: RegionKind; shape: "ellipse" | "rect" })[] };
@@ -133,6 +136,8 @@ export type ReelProps = {
         shift?: number;
         /** The photos a free scene composes with (a collage), in the order its code reads them. */
         photos?: ScenePhoto[];
+        /** What moves in the footage under it (hands, faces, bodies), read by its `track`. */
+        track?: TrackPiece[];
       }
   )[];
   texts: {
@@ -195,6 +200,8 @@ export type ReelProps = {
     compose?: boolean;
     /** The shots it lays, in the order of the montage. */
     shots?: ComposeShot[];
+    /** What moves in the shots under it (hands, faces, bodies), read by its `track`. */
+    track?: TrackPiece[];
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {

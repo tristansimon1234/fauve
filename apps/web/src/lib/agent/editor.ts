@@ -37,8 +37,19 @@ import {
   planTimeline,
   voiceAt,
   voiceForEditor,
+  buildReelProps,
+  clipAspect,
+  clipsUnderAnimations,
+  layerTrack,
+  movesForDesigner,
+  planMediaIds,
+  sceneTrack,
+  shotTrack,
+  type ReelProps,
+  type TracksByClip,
 } from "@fauve/agent";
 import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
+import { ensureTracks, loadTracks } from "@/lib/render/tracks";
 import { usableFonts } from "@/lib/fonts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
@@ -85,6 +96,9 @@ export type DesignedEdit = {
   newScenes: number;
   reusedScenes: number;
 };
+
+/** How long the motion designer waits, past the editor, for what moves in her videos. */
+const TRACKS_WAIT_MS = 180_000;
 
 /**
  * Fauve's editor: watches the analyses, picks a motion template and writes the
@@ -146,6 +160,11 @@ export async function designEdit(params: {
   ]);
   const clips = analyses.flatMap((a) => ("analysis" in a ? [{ media_id: a.media_id, analysis: a.analysis }] : []));
   if (videoIds.length && !clips.length && !photoIds.length) throw new Error("Les vidéos ne sont pas encore analysées, réessaie dans une minute");
+  // What moves in her videos (hands, faces, bodies), followed once per clip with someone in it, while the editor works
+  // (the cut-out sandbox): an animation can then start from a gesture, hold on to it or follow it.
+  const earlyTracks = clips.length
+    ? ensureTracks(params.studioId, clips.map((c) => c.media_id)).catch((e: unknown) => console.warn("tracks: not ready", e))
+    : null;
   const photos = photoIds.map((id, i) => {
     const read = photoReads[i];
     return {
@@ -368,6 +387,26 @@ export async function designEdit(params: {
   if (wanted.length) await ensureCutouts(params.studioId, wanted);
   const offers = wanted.length ? await photoOffers(params.studioId, wanted).catch(() => []) : [];
   const offersFor = (brief: string) => (collage ? offers : offers.filter((o) => brief.includes(o.id)));
+  // What moves under each animation: the tracks of the clips it plays over, placed as the Reel draws them (the
+  // Reel's own segments, built without links), and the gestures Gemini saw in them. Never more than a few minutes
+  // of waiting (a sandbox installing the tracker for the first time): without them, the animations follow nothing.
+  if (earlyTracks && toWrite.length) await Promise.race([earlyTracks, new Promise((resolve) => setTimeout(resolve, TRACKS_WAIT_MS))]);
+  const tracks: TracksByClip = toWrite.length ? await loadTracks(params.studioId, clipsUnderAnimations(plan)).catch(() => ({})) : {};
+  let reel: ReelProps | null = null;
+  if (Object.keys(tracks).length) {
+    try {
+      reel = buildReelProps(plan, {
+        template: motionTemplateSchema.catch("libre").parse(plan.template),
+        clipUrls: Object.fromEntries(planMediaIds(plan).map((id) => [id, "about:blank"])),
+        photoIds,
+        aspects: Object.fromEntries(clips.map((c) => [c.media_id, clipAspect(c.analysis)])),
+        brand: { name: "" },
+      });
+    } catch (error) {
+      console.warn("tracks: the Reel's timing could not be built", error);
+    }
+  }
+  const actions = Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.actions]));
   // The cuts under an animation over several shots, in frames from its start.
   const timeline = planTimeline(plan);
   const starts = timeline.segments.slice(1).map((t) => t.start);
@@ -381,6 +420,7 @@ export async function designEdit(params: {
       if (!isClipSegment(s)) return [];
       const at = timeline.segments[i]!;
       const offer = offers.find((o) => o.id === s.clip_id);
+      const track = reel ? shotTrack(plan, reel.segments, i, tracks) : undefined;
       return [
         {
           ...(offer?.photo ?? { src: "", aspect: 9 / 16 }),
@@ -388,6 +428,7 @@ export async function designEdit(params: {
           from: Math.round(at.start * 30),
           durationInFrames: Math.round(at.length * 30),
           kind: facts.photos[s.clip_id] ? ("photo" as const) : ("video" as const),
+          ...(track ? { track } : {}),
         },
       ];
     }),
@@ -397,15 +438,34 @@ export async function designEdit(params: {
     const layer = w.id.startsWith("l") ? layers[Number(w.id.slice(1))]! : null;
     const found = layer ? null : plan.segments[Number(w.id.slice(1))];
     const segment = found && isMotionSegment(found) ? found : null;
+    const durationInFrames = Math.round((layer ? layer.to - layer.from : (segment?.duration ?? 2)) * 30);
+    const compose = layer?.compose ? composition() : undefined;
+    // What moves under it: the footage of its passage (a scene), the shots under it (an animation over the montage),
+    // or, in a composition, each shot it lays (its code places them in the box it gives the shot).
+    const track = !reel || compose
+      ? []
+      : layer
+        ? layerTrack(plan, reel.segments, Math.round(layer.from * 30), durationInFrames, tracks)
+        : sceneTrack(plan, reel.segments, Number(w.id.slice(1)), tracks);
+    const moves = compose
+      ? compose.shots.flatMap((shot, k) => {
+          const seen = shot.track ? movesForDesigner([{ at: shot.from, length: shot.durationInFrames, ...shot.track }], durationInFrames, actions, { positions: false }) : null;
+          return seen ? [{ plan: k, ...seen }] : [];
+        })
+      : track.length
+        ? movesForDesigner(track, durationInFrames, actions)
+        : null;
     return {
       id: w.id,
       brief: w.brief,
-      durationInFrames: Math.round((layer ? layer.to - layer.from : (segment?.duration ?? 2)) * 30),
+      durationInFrames,
       // The faces and lettering of the footage under a scene: the designer composes around them.
       ...(segment?.over?.busy?.length ? { busy: segment.over.busy } : {}),
       ...(layer ? { cuts: cutsUnder(layer.from, layer.to) } : {}),
-      ...(layer?.compose ? { compose: composition() } : {}),
+      ...(compose ? { compose } : {}),
       ...(photos.length ? { photos } : {}),
+      ...(track.length ? { track } : {}),
+      ...(Array.isArray(moves) ? (moves.length ? { moves: { par_plan: moves } } : {}) : moves ? { moves } : {}),
     };
   });
   // Its motion kit: the business's latest scenes, whose language the new ones keep (a family from one Reel to the next);
@@ -451,7 +511,16 @@ export async function designEdit(params: {
       fonts: usable,
     }),
     kit,
-    { kept: keptScenes.map((name) => `déjà dans ce Reel : ${name}`), done },
+    {
+      kept: keptScenes.map((name) => `déjà dans ce Reel : ${name}`),
+      done,
+      // The Reel's rhythm and look: its test render moves the footage like the video does (what a scene follows stays under it).
+      look: {
+        template,
+        ...(plan.tempo ? { tempo: plan.tempo } : {}),
+        ...(profile.signature ? { signature: resolveReelBrand(plan, template, { name: "", signature: profile.signature }).signature } : {}),
+      },
+    },
   );
   const resultOf = (id: string) => designed.find((d) => d.id === id);
   plan.segments = plan.segments.map((s, i) => {
