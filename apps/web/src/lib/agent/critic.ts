@@ -1,5 +1,6 @@
 import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { z } from "zod";
 import {
   ambianceLine,
   brandProfileSchema,
@@ -11,6 +12,9 @@ import {
   CRITIC_MODEL,
   editPlanSchema,
   formatLine,
+  gestureMoments,
+  isClipSegment,
+  isMotionSegment,
   MONTAGE_CRITIC_PROMPT,
   montageReviewSchema,
   normalizeReview,
@@ -19,6 +23,7 @@ import {
   planDigest,
   reviewMoments,
   type EditPlan,
+  type GestureMoment,
   type MontageIssue,
   type MontageReview,
   type ReelFormat,
@@ -66,7 +71,9 @@ async function loadVersion(studioId: string, version: ReviewedVersion) {
   const planned = planTimeline(parsed.data).duration * 1000;
   const fallback = typeof render.data.duration_ms === "number" && render.data.duration_ms < planned - 100;
   const shown = fallback ? withoutScenes(parsed.data) : parsed.data;
-  const moments = shown.segments.length ? reviewMoments(shown) : [];
+  // Her gestures under the animations: an effect that hangs on a gesture is looked at while it happens.
+  const gestures = await gesturesUnder(shown).catch(() => []);
+  const moments = shown.segments.length ? reviewMoments(shown, 8, gestures) : [];
   const frames = await videoFramesInSandbox(
     `review-${version.renderId.slice(0, 8)}-${Date.now()}`,
     signed.data.signedUrl,
@@ -79,6 +86,17 @@ async function loadVersion(studioId: string, version: ReviewedVersion) {
 }
 
 const quote = (texts: string[]) => texts.map((t) => `« ${t.slice(0, 120)} »`).join(", ");
+
+const actionsSchema = z.array(z.object({ start: z.number(), end: z.number(), what: z.string() })).catch([]);
+
+/** The gestures Gemini saw in a plan's clips, where they play under its animations (each clip's latest reading). */
+async function gesturesUnder(plan: EditPlan): Promise<GestureMoment[]> {
+  const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : isMotionSegment(s) && s.over ? [s.over.clip_id] : [])))];
+  if (!ids.length) return [];
+  const { data } = await supabaseAdmin().from("clip_analyses").select("media_id, actions:analysis->actions").in("media_id", ids).order("created_at");
+  const actions = Object.fromEntries((data ?? []).map((row) => [row.media_id as string, actionsSchema.parse(row.actions ?? [])]));
+  return gestureMoments(plan, actions);
+}
 
 /**
  * Has the rendered versions reviewed. `asked`: the corrections the last version
