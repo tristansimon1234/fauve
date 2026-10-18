@@ -808,7 +808,7 @@ export async function cutoutsInSandbox(
 
 const TRACK_ROOT = `${CUTOUT_ROOT}/track`;
 /** Each model pinned by its checksum. */
-const TRACK_MODELS: { file: string; url: string; sha256: string }[] = [
+export const TRACK_MODELS: { file: string; url: string; sha256: string }[] = [
   {
     file: "hand_landmarker.task",
     url: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",

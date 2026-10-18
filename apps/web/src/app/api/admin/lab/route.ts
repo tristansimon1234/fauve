@@ -26,6 +26,7 @@ import { ensureTranscript } from "@/lib/voice";
 import { renderPost } from "@/lib/render/render-post";
 import { voiceNoteInSandbox } from "@/lib/render/sandbox";
 import { photoRegions } from "@/lib/video/regions";
+import { effectsAgentResult, startEffectsAgent } from "./agent";
 
 // A test bench for the whole montage chain in production: what Simone makes alone, on
 // the same media as hand-made references. Each case is a lab studio of its own (its
@@ -62,6 +63,10 @@ import { photoRegions } from "@/lib/video/regions";
 //                        (costs) and what the lab studio has spent over all its runs (studio_costs).
 //   ?case=…&step=music   the version kept rendered again with a newly composed piece, the
 //                        montage untouched: to hear a change to the music without a new montage.
+//   ?case=…&step=agent&file=<file>[&ref=<file>][&idea=…]  the agent mode, an experiment (./agent.ts):
+//                        one Opus agent in a container of its own (Managed Agents) makes the effect
+//                        she imagines on her uploaded video (ref: the Reel she copies), alone, with a
+//                        grader; step=agent_result: its status, cost, verdicts and outputs.
 //   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&idea=…][&voice=…|&own_voice=…]
 //                        a real business from its website, as at onboarding: its site read
 //                        (facts and activity, colours and fonts of its code, logo), then its look
@@ -614,6 +619,17 @@ export async function POST(request: Request) {
     if (signed.error) return Response.json({ error: signed.error.message }, { status: 500 });
     return Response.json({ path: signed.data.path, url: signed.data.signedUrl });
   }
+  // The agent mode, an experiment: one Opus agent in a container of its own makes the effect on her video.
+  if (params.get("step") === "agent") {
+    const file = params.get("file") ?? "";
+    const ref = params.get("ref");
+    if (!LAB_FILE.test(file) || (ref && !LAB_FILE.test(ref))) return Response.json({ error: "file=<file>[&ref=<file>]" }, { status: 400 });
+    const studioId = await labStudio(name, c);
+    const studio = { name: c.name, business: c.business, facts: c.facts, colors: c.brand.colors, fonts: c.brand.fonts };
+    after(() => startEffectsAgent(studioId, studio, ideaOf(params) ?? c.idea, file, ref).catch((error: unknown) => console.error("lab: agent failed", name, error)));
+    return Response.json({ ok: true, case: name, agent: true });
+  }
+  if (params.get("step") === "agent_result") return Response.json(await effectsAgentResult(await labStudio(name, c)));
   // Other free stock clips for this run, as many as a montage takes; or her own uploaded videos instead.
   const stock = params.get("stock");
   if (stock && !new RegExp(`^\\d{1,7}(,\\d{1,7}){0,${MAX_MEDIA - 1}}$`).test(stock)) return Response.json({ error: "stock=<mixkit id>,…" }, { status: 400 });
