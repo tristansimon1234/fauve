@@ -265,7 +265,17 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         [
           ...props.segments.flatMap((s, i) =>
             s.type === "motion"
-              ? [{ id: `m${i}`, js: s.js, durationInFrames: s.durationInFrames, texts: s.texts, ...(s.photos ? { photos: s.photos } : {}), ...(s.track ? { track: s.track, look } : {}) }]
+              ? [
+                  {
+                    id: `m${i}`,
+                    js: s.js,
+                    durationInFrames: s.durationInFrames,
+                    texts: s.texts,
+                    ...(s.photos ? { photos: s.photos } : {}),
+                    ...(s.track ? { track: s.track, look } : {}),
+                    ...(s.fonts ? { fonts: s.fonts } : {}),
+                  },
+                ]
               : [],
           ),
           ...(props.layers ?? []).map((l, i) => ({
@@ -277,6 +287,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
             ...(l.photos ? { photos: l.photos } : {}),
             ...(l.shots ? { shots: l.shots } : {}),
             ...(l.track || l.shots?.some((x) => x.track) ? { look, ...(l.track ? { track: l.track } : {}) } : {}),
+            ...(l.fonts ? { fonts: l.fonts } : {}),
           })),
         ],
         props.brand,

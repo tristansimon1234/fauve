@@ -93,6 +93,8 @@ export type ReelSegment =
       photos?: ScenePhoto[];
       /** What moves in the footage under it (hands, faces, bodies), read by its `track`. */
       track?: TrackPiece[];
+      /** Google Fonts families its code uses besides the Reel's two, loaded with it. */
+      fonts?: string[];
     };
 
 /**
@@ -205,6 +207,8 @@ export type ReelProps = {
     shots?: ComposeShot[];
     /** What moves in the shots under it (hands, faces, bodies), read by its `track`. */
     track?: TrackPiece[];
+    /** Google Fonts families its code uses besides the Reel's two, loaded with it. */
+    fonts?: string[];
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
@@ -402,6 +406,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
             ...(under ? { under } : {}),
             ...(under && s.motion.shift ? { shift: s.motion.shift } : {}),
             ...(s.motion.photos?.length ? { photos: scenePhotos(s.motion.photos, inputs) } : {}),
+            ...(s.motion.fonts?.length ? { fonts: s.motion.fonts } : {}),
           }
         : { type: "scene", scene: fallback, startAt, durationInFrames: lengths[i]!, ...(under ? { under } : {}) };
     }
@@ -563,6 +568,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         ...(l.motion.photos?.length ? { photos: scenePhotos(l.motion.photos, inputs) } : {}),
         ...(l.compose ? { compose: true, shots: composeShots(from) } : {}),
         ...(track.length ? { track } : {}),
+        ...(l.motion.fonts?.length ? { fonts: l.motion.fonts } : {}),
       },
     ];
   });
@@ -589,15 +595,19 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   };
 }
 
-/** Colours and fonts a Reel uses: the plan's fonts, then the studio's, then the template's. */
-export function resolveReelBrand(plan: Pick<EditPlan, "fonts">, template: MotionTemplate, brand: ReelInputs["brand"]): ReelProps["brand"] {
-  const accent = /^#[0-9a-f]{6}$/i.test(brand.accent ?? "") ? brand.accent! : DEFAULT_ACCENT;
+/**
+ * Colours and fonts a Reel uses: the plan's (its own, over her charter: the Reel she copies, a
+ * request that needs them), then the studio's, then the template's.
+ */
+export function resolveReelBrand(plan: Pick<EditPlan, "fonts" | "colors">, template: MotionTemplate, brand: ReelInputs["brand"]): ReelProps["brand"] {
+  const own = (plan.colors ?? []).filter((c) => /^#[0-9a-f]{6}$/i.test(c));
+  const accent = own[0] ?? (/^#[0-9a-f]{6}$/i.test(brand.accent ?? "") ? brand.accent! : DEFAULT_ACCENT);
   const brandFonts = (brand.fonts ?? []).filter((f) => FONT_NAME.test(f));
   return {
     name: brand.name,
     accent,
     accentInk: inkOn(accent),
-    palette: brandPalette(brand.colors, accent),
+    palette: brandPalette(own.length ? [...own, ...(brand.colors ?? [])] : brand.colors, accent),
     displayFont: plan.fonts?.display ?? brandFonts[0] ?? TEMPLATE_FONTS[template].display,
     bodyFont: plan.fonts?.body ?? brandFonts[1] ?? TEMPLATE_FONTS[template].body,
     logoUrl: brand.logoUrl ?? null,

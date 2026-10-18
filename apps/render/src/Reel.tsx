@@ -52,6 +52,9 @@ export function Reel(props: ReelProps) {
     ...props.texts.flatMap((t) => [t.look, t.detail_look].flatMap((l) => (l ? [l.font, ...(l.emphasis?.font ? [l.emphasis.font] : [])] : []))),
     ...(props.layer?.fonts ?? []),
     ...(props.elements ?? []).flatMap((e) => e.fonts),
+    // The fonts an animation brings for itself (a universe she names, the Reel she copies).
+    ...props.segments.flatMap((s) => (s.type === "motion" ? (s.fonts ?? []) : [])),
+    ...(props.layers ?? []).flatMap((l) => l.fonts ?? []),
   ]);
   const k = props.width / 1080;
   // A free collage: its composition lays the shots on the paper (the fixed prints only if its code cannot run).

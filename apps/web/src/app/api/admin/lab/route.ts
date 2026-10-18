@@ -547,10 +547,10 @@ async function result(key: string) {
           ...plan.data,
           segments: plan.data.segments.map((s) =>
             isMotionSegment(s)
-              ? { motion: { brief: s.motion.brief, template_id: s.motion.template_id, coded: Boolean(s.motion.js), photos: s.motion.photos }, duration: s.duration, over: s.over }
+              ? { motion: { brief: s.motion.brief, template_id: s.motion.template_id, coded: Boolean(s.motion.js), photos: s.motion.photos, fonts: s.motion.fonts }, duration: s.duration, over: s.over }
               : s,
           ),
-          layers: plan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, coded: Boolean(l.motion.js), photos: l.motion.photos })),
+          layers: plan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, coded: Boolean(l.motion.js), photos: l.motion.photos, fonts: l.motion.fonts })),
         }
       : null,
   };

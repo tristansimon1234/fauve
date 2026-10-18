@@ -12,11 +12,12 @@ import { archiveCreation } from "./actions";
 // and a way to its components for photos (their own page). Each one is drawn live by the render composition,
 // so the manager sees it rather than reads a technical description.
 
-export type Creation = { id: string; name: string; js: string; uses: number; house: boolean };
+/** fonts: the Google Fonts families its code brings besides the Reel's two. */
+export type Creation = { id: string; name: string; js: string; fonts: string[]; uses: number; house: boolean };
 
 const SCENE_FRAMES = 90;
 
-function sceneProps(js: string, name: string, brand: ReelProps["brand"]): ReelProps {
+function sceneProps(js: string, name: string, brand: ReelProps["brand"], fonts: string[]): ReelProps {
   return {
     template: "doux",
     width: 1080,
@@ -24,7 +25,9 @@ function sceneProps(js: string, name: string, brand: ReelProps["brand"]): ReelPr
     fps: REEL_FPS,
     durationInFrames: SCENE_FRAMES,
     fadeFrames: 0,
-    segments: [{ type: "motion", js, fallback: { kind: "title", title: name, background: "accent" }, texts: {}, startAt: 0, durationInFrames: SCENE_FRAMES }],
+    segments: [
+      { type: "motion", js, fallback: { kind: "title", title: name, background: "accent" }, texts: {}, startAt: 0, durationInFrames: SCENE_FRAMES, ...(fonts.length ? { fonts } : {}) },
+    ],
     texts: [],
     words: [],
     brand,
@@ -98,7 +101,7 @@ export function CreationsSection({ scenes, brand }: { scenes: Creation[]; brand:
     <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
       {scenes.map((s) => (
         <Card key={s.id} creation={s} ratio="aspect-[9/16]">
-          <LivePreview props={sceneProps(s.js, s.name, brand)} frame={Math.round(SCENE_FRAMES * 0.6)} />
+          <LivePreview props={sceneProps(s.js, s.name, brand, s.fonts)} frame={Math.round(SCENE_FRAMES * 0.6)} />
         </Card>
       ))}
     </ul>

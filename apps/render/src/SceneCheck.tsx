@@ -39,6 +39,8 @@ export type SceneCheckProps = {
   track?: TrackPiece[];
   /** The Reel's rhythm and look, for its camera moves (the same theme as the render). */
   look?: { template?: MotionTemplate; tempo?: number; signature?: ReelProps["brand"]["signature"] };
+  /** The fonts its code brings besides the Reel's two: checked with them, as the render draws it. */
+  fonts?: string[];
 };
 
 const FrameContext = createContext(0);
@@ -145,11 +147,11 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
 
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
-export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look }: SceneCheckProps) {
+export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [] }: SceneCheckProps) {
   const width = 1080;
   const height = 1920;
   const [track] = useState(() => footageTrack(pieces, themeFor(look?.template ?? "libre", look?.signature, look?.tempo), { width, height }, { shots }));
-  loadFonts([brand.displayFont, brand.bodyFont]);
+  loadFonts([brand.displayFont, brand.bodyFont, ...fonts]);
   const [handle] = useState(() => delayRender("scene check", { timeoutInMilliseconds: 60000 }));
   const [Scene] = useState(() => compileScene(js, checkScope(width, height, durationInFrames)));
   const step = Math.max(STEP, Math.ceil(durationInFrames / MAX_COPIES));

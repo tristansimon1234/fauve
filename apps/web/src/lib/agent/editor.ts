@@ -5,6 +5,7 @@ import {
   editorClip,
   signatureLines,
   followedForEditor,
+  followedLook,
   signatureOf,
   editorOutputSchemaLegacy,
   finishPlan,
@@ -331,6 +332,8 @@ export async function designEdit(params: {
   const drafted = keepWrittenAnimations(fromEditorPlan(response.parsed_output.plan, profile.text_looks ?? []), params.fresh ? null : base);
   const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
   const plan = carryRetouch(carryTextStyle(normalizeEditPlan(drafted, durations, allowed), params.fresh ? null : base), base);
+  // The Reel she copies takes its own font and colours over her charter's when they make its style (the animations get them too).
+  Object.assign(plan, followedLook(plan, followed));
 
   // The hook's words decide whether anyone stays: a new Reel's written hook is weighed against
   // other forms by the hook judge, who keeps the strongest (an opening animation is its own hook).
@@ -389,7 +392,9 @@ export async function designEdit(params: {
     if (!isMotionSegment(s) || !s.motion.template_id) return s;
     const template = reused.get(s.motion.template_id);
     const photos = photosOfTemplate.get(s.motion.template_id);
-    if (template) return { ...s, motion: { ...s.motion, code: template.code, js: template.js, ...(photos ? { photos } : {}) } };
+    if (template) {
+      return { ...s, motion: { ...s.motion, code: template.code, js: template.js, ...(photos ? { photos } : {}), ...(template.fonts.length ? { fonts: template.fonts } : {}) } };
+    }
     return { ...s, motion: { ...s.motion, template_id: undefined, texts: undefined } };
   });
 
@@ -555,22 +560,48 @@ export async function designEdit(params: {
   plan.segments = plan.segments.map((s, i) => {
     if (!isMotionSegment(s) || s.motion.js) return s;
     const kept = reusable.get(s.motion.brief);
-    if (kept) return { ...s, motion: { ...s.motion, code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}) } };
+    if (kept) return { ...s, motion: { ...s.motion, code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}), ...(kept.fonts ? { fonts: kept.fonts } : {}) } };
     const result = resultOf(`s${i}`);
     if (result?.error) console.warn("motion scene falls back to its fixed scene", s.motion.brief.slice(0, 80), result.error);
-    return { ...s, motion: { ...s.motion, code: result?.code ?? undefined, js: result?.js ?? undefined, ...(result?.js && result.photos?.length ? { photos: result.photos } : {}) } };
+    return {
+      ...s,
+      motion: {
+        ...s.motion,
+        code: result?.code ?? undefined,
+        js: result?.js ?? undefined,
+        ...(result?.js && result.photos?.length ? { photos: result.photos } : {}),
+        ...(result?.js && result.fonts?.length ? { fonts: result.fonts } : {}),
+      },
+    };
   });
   // An animation over several shots has no fixed version: one that could not be written is left out.
   const written = layers.flatMap((l, i) => {
     if (l.motion.js) return [l];
     const kept = reusable.get(l.motion.brief);
-    if (kept?.js) return [{ ...l, motion: { ...l.motion, code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}), ...(kept.template_id ? { template_id: kept.template_id } : {}) } }];
+    if (kept?.js) {
+      const motion = {
+        ...l.motion,
+        code: kept.code,
+        js: kept.js,
+        ...(kept.photos ? { photos: kept.photos } : {}),
+        ...(kept.fonts ? { fonts: kept.fonts } : {}),
+        ...(kept.template_id ? { template_id: kept.template_id } : {}),
+      };
+      return [{ ...l, motion }];
+    }
     const result = resultOf(`l${i}`);
     if (!result?.js) {
       console.warn("animation over several shots left out", l.motion.brief.slice(0, 80), result?.error);
       return [];
     }
-    return [{ ...l, motion: { ...l.motion, code: result.code ?? undefined, js: result.js, ...(result.photos?.length ? { photos: result.photos } : {}) } }];
+    const motion = {
+      ...l.motion,
+      code: result.code ?? undefined,
+      js: result.js,
+      ...(result.photos?.length ? { photos: result.photos } : {}),
+      ...(result.fonts?.length ? { fonts: result.fonts } : {}),
+    };
+    return [{ ...l, motion }];
   });
   if (written.length) plan.layers = written;
   else delete plan.layers;
@@ -583,7 +614,7 @@ export async function designEdit(params: {
     fresh.map((d) => {
       const request = requests.find((r) => r.id === d.id)!;
       const role = d.id.startsWith("l") ? LAYER_ROLE : d.photos?.length ? PHOTO_ROLE : OVERLAY_ROLE;
-      return { name: d.name ?? "", description: request.brief, slots: d.slots ?? [], code: d.code!, js: d.js!, durationSeconds: request.durationInFrames / 30, role };
+      return { name: d.name ?? "", description: request.brief, slots: d.slots ?? [], code: d.code!, js: d.js!, fonts: d.fonts ?? [], durationSeconds: request.durationInFrames / 30, role };
     }),
   );
   const savedId = (id: string) => {

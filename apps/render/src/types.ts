@@ -138,6 +138,8 @@ export type ReelProps = {
         photos?: ScenePhoto[];
         /** What moves in the footage under it (hands, faces, bodies), read by its `track`. */
         track?: TrackPiece[];
+        /** Google Fonts families its code uses besides the Reel's two, loaded with it. */
+        fonts?: string[];
       }
   )[];
   texts: {
@@ -202,6 +204,8 @@ export type ReelProps = {
     shots?: ComposeShot[];
     /** What moves in the shots under it (hands, faces, bodies), read by its `track`. */
     track?: TrackPiece[];
+    /** Google Fonts families its code uses besides the Reel's two, loaded with it. */
+    fonts?: string[];
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {

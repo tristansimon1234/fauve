@@ -86,7 +86,7 @@ async function Creations({ searchParams }: { searchParams: Promise<{ kit?: strin
 async function studioScenes(studioId: string): Promise<Creation[]> {
   const { data } = await supabaseAdmin()
     .from("motion_templates")
-    .select("id, studio_id, name, js, uses")
+    .select("id, studio_id, name, js, fonts, uses")
     .eq("studio_id", studioId)
     .eq("kind", "scene")
     .or("role.is.null,role.not.in.(photo,layer)")
@@ -94,7 +94,14 @@ async function studioScenes(studioId: string): Promise<Creation[]> {
     .order("uses", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(48);
-  return (data ?? []).map((t) => ({ id: t.id as string, name: t.name as string, js: t.js as string, uses: (t.uses as number) ?? 0, house: t.studio_id === null }));
+  return (data ?? []).map((t) => ({
+    id: t.id as string,
+    name: t.name as string,
+    js: t.js as string,
+    fonts: Array.isArray(t.fonts) ? (t.fonts as string[]) : [],
+    uses: (t.uses as number) ?? 0,
+    house: t.studio_id === null,
+  }));
 }
 
 async function Bank({ studioId, brand, kit }: { studioId: string; brand: ReturnType<typeof resolveReelBrand>; kit?: string }) {

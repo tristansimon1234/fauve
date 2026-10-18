@@ -11,6 +11,7 @@ import {
   type FollowedStyle,
   type StolenStyle,
 } from "@fauve/agent";
+import { googleFont } from "@/lib/fonts";
 import { cutoutPath } from "@/lib/render/cutout";
 import { sandboxCostEur, stealReelInSandbox, type StealMiss } from "@/lib/render/sandbox";
 import { tracksPath } from "@/lib/render/tracks";
@@ -175,7 +176,10 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     return null;
   });
   if (!look) return missed("unreadable");
-  const style: StolenStyle = { look, measures };
+  // A font that makes its style, by the name Google Fonts serves it under (the render loads it from there); else hers stay.
+  const { font: named, ...text } = look.text;
+  const font = named ? await googleFont(named).catch(() => null) : null;
+  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures };
   // Its three lines also stand as its reading (the inspirations list, the editor's chosen inspiration).
   const analysis = stolenStyleLines(style).join(" ");
   await db
