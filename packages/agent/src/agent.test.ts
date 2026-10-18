@@ -1990,6 +1990,69 @@ test("editor: each gesture says whether her hands show in the vertical frame", a
   assert.equal("mains" in (editorClip("v", analysis).actions?.[0] ?? {}), false);
 });
 
+test("what the hands do: spreads from a pinch, a pinch held, a hand toward the camera, measured on the tracks", async () => {
+  const { handMoves, movesForDesigner, sliceTracks } = await import("./tracking.ts");
+  const { editorClip } = await import("./finish.ts");
+  const { reviewMoments } = await import("./critic.ts");
+  // A hand in thousandths of a square picture: wrist under the middle knuckle (its size), thumb and index tips `gap` apart.
+  const hand = (id: number, { x = 500, y = 500, size = 100, gap = 10 } = {}) => {
+    const points = Array.from({ length: 21 }, (): [number, number] => [x, y]);
+    points[0] = [x, y + size / 2];
+    points[4] = [x - gap / 2, y - size / 4];
+    points[8] = [x + gap / 2, y - size / 4];
+    return [id, ...points.flat()];
+  };
+  // Pinched 1.3 s, then three spreads, each wider (0.25, 0.45, 0.9 of the hand), pinched again in between.
+  const openAt = (k: number) => (k >= 40 && k < 50 ? 0.25 : k >= 65 && k < 75 ? 0.45 : k >= 90 && k < 100 ? 0.9 : 0.05);
+  const frames = Array.from({ length: 120 }, (_, k) => ({ h: [hand(1, { gap: openAt(k) * 100 })] }));
+  const file = { fps: 30, w: 1000, h: 1000, from: 0, n: 120, frames };
+  const moves = handMoves({ fps: 30, from: 0, frames, aspect: 1 });
+  assert.deepEqual(
+    moves.map((m) => m.what),
+    [
+      "le pouce et l'index restent pincés",
+      "le pouce et l'index s'écartent un peu puis se referment",
+      "le pouce et l'index s'écartent puis se referment",
+      "le pouce et l'index s'écartent grand puis se referment",
+    ],
+  );
+  assert.deepEqual(moves.slice(1).map((m) => [m.start, m.end]), [[1.3, 1.7], [2.1, 2.5], [3, 3.3]]);
+  // A second id on the same hand (found twice) tells nothing more.
+  const twice = frames.map((f, k) => (k > 20 && k < 110 ? { h: [...f.h, hand(2, { x: 510, gap: 80 })] } : f));
+  assert.deepEqual(handMoves({ fps: 30, from: 0, frames: twice, aspect: 1 }).map((m) => m.what), moves.map((m) => m.what));
+  // A hand that comes toward the camera (twice as big in a third of a second), then goes up.
+  const near = Array.from({ length: 40 }, (_, k) => ({ h: [hand(1, { size: k < 10 ? 60 : k < 20 ? 60 + 6 * (k - 10) : 120, y: k < 25 ? 700 : 400 })] }));
+  assert.deepEqual(handMoves({ fps: 30, from: 0, frames: near, aspect: 1 }).map((m) => m.what), ["la main avance vers la caméra", "la main monte"]);
+  // A relaxed open hand is no spread.
+  assert.deepEqual(handMoves({ fps: 30, from: 0, frames: Array.from({ length: 60 }, () => ({ h: [hand(1, { gap: 45 })] })), aspect: 1 }), []);
+
+  // The editor reads them with the clip, with whether the hands show in the vertical frame.
+  const shot = { start: 0, end: 4, description: "", subject: "", energy: 3, hook_score: 3, quality: { blurry: false, dark: false, shaky: false }, faces_visible: true };
+  const analysis = { duration: 4, orientation: "portrait", summary: "", setting: "", lighting: "ok", shots: [shot], best_moments: [], transcript: "", issues: [] } as never;
+  const clip = editorClip("v", analysis, file as never);
+  assert.equal(clip.mains_suivies?.length, 4);
+  assert.deepEqual(clip.mains_suivies?.[3], { start: 3, end: 3.3, what: "le pouce et l'index s'écartent grand puis se referment", mains: "dans le cadre" });
+  // The motion designer, on its scene's frames: the passage from 1 s plays from the scene's first image.
+  const piece = { at: 0, length: 90, startFrom: 30, look: { aspect: 1 }, tracks: sliceTracks(file, 30, 121)!, clip: "v" };
+  const seen = movesForDesigner([piece], 90);
+  assert.deepEqual(seen?.gestes_mesures?.map((g) => [g.de, g.a]), [[9, 21], [33, 45], [60, 69]]);
+
+  // The critic looks at her first spread and her widest, not the first two.
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    duration: 12,
+    segments: [{ clip_id: "v", in: 0, out: 12 }],
+    texts: [],
+    layers: [{ motion: { brief: "le texte grossit entre ses doigts" }, from: 0, to: 12 }],
+  });
+  const looked = reviewMoments(plan, 8, [
+    { t: 3, what: "s'écartent un peu" },
+    { t: 4.2, what: "s'écartent" },
+    { t: 9, what: "s'écartent grand" },
+  ]).filter((m) => m.label.startsWith("Pendant un geste"));
+  assert.deepEqual(looked.map((m) => m.t), [3, 9]);
+});
+
 test("finish: texts keep off the faces tracked image by image, moment by moment", async () => {
   const { finishPlan, trackedFaces } = await import("./finish.ts");
   // Gemini saw a face at the top of her box (rows 0.1 to 0.3); she leans in: the tracker sees it at 0.35 to 0.6.

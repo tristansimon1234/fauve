@@ -183,6 +183,153 @@ export function shotTrack(plan: Pick<EditPlan, "segments">, segments: ReelSegmen
 }
 
 // ---------------------------------------------------------------------------
+// What the hands do, measured: the tracker's points read over time. Gemini's reading of a clip
+// can miss a gesture (Tristan spreads his thumb and index three times; it read « un cercle avec
+// les doigts, une seule fois »); the points do not. General moves only, never an effect: the
+// thumb and index that open and close, a pinch held, a hand that comes toward the camera or
+// moves away, a hand that goes up, down or across.
+// ---------------------------------------------------------------------------
+
+/** A move of one hand, measured on the tracks, in seconds of the clip. */
+export type HandMove = { start: number; end: number; what: string };
+
+/** How open a hand is: the gap between the tips of its thumb and index over its size (twice wrist to middle knuckle); 0 pinched, about 1 spread wide. */
+const PINCHED = 0.15;
+/** A spread counts from this much more open than the pinch before it (a relaxed hand drifts by less). */
+const SPREAD_RISE = 0.12;
+/** A hand this much bigger (or smaller) within half a second comes toward the camera (or moves away). */
+const APPROACH = 1.4;
+/** A palm that crosses this share of the picture within 0.4 s goes up, down or across. */
+const SWEEP = 0.22;
+/** The most moves told for one clip. */
+const MAX_HAND_MOVES = 16;
+
+type HandSample = { frame: number; open: number; size: number; x: number; y: number };
+
+/** The median of the values around each one (`radius` on each side): a blurred image does not make a move. */
+function smooth(values: number[], radius = 2): number[] {
+  return values.map((_, i) => {
+    const window = values.slice(Math.max(0, i - radius), i + radius + 1).sort((a, b) => a - b);
+    return window[Math.floor(window.length / 2)]!;
+  });
+}
+
+/**
+ * Each hand's samples by id: openness, size and palm (shares of the picture). A hand found twice
+ * (a second id on the same hand, its palm on the other's most of the time they are both seen)
+ * is left out: its fingers, fitted again, would tell moves the hand never made.
+ */
+function handSeries(t: Pick<FootageTracks, "frames" | "aspect">): HandSample[][] {
+  const byId = new Map<number, HandSample[]>();
+  t.frames.forEach((row, frame) => {
+    for (const h of row.h ?? []) {
+      const at = (k: number): [number, number] => [((h[1 + 2 * k] ?? 0) / 1000) * t.aspect, (h[2 + 2 * k] ?? 0) / 1000];
+      const dist = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+      const size = 2 * dist(at(0), at(9));
+      if (size <= 0) continue;
+      const palm = [0, 5, 9, 13, 17].map(at);
+      const list = byId.get(h[0]!) ?? [];
+      list.push({ frame, open: dist(at(4), at(8)) / size, size, x: palm.reduce((s, p) => s + p[0], 0) / 5 / t.aspect, y: palm.reduce((s, p) => s + p[1], 0) / 5 });
+      byId.set(h[0]!, list);
+    }
+  });
+  const hands = [...byId.values()].sort((a, b) => b.length - a.length);
+  return hands.filter((hand, k) =>
+    hands.slice(0, k).every((longer) => {
+      const there = new Map(longer.map((s) => [s.frame, s]));
+      const both = hand.filter((s) => there.has(s.frame));
+      const close = both.filter((s) => Math.hypot(s.x - there.get(s.frame)!.x, s.y - there.get(s.frame)!.y) < 0.12);
+      return both.length < hand.length / 2 || close.length < both.length * 0.6;
+    }),
+  );
+}
+
+/**
+ * What each hand does in a clip's tracks (or a passage of them), measured on its points: its thumb
+ * and index that spread from a pinch and close again (how wide), a pinch held a while, the hand
+ * that comes toward the camera or moves away, that goes up, down or across. In seconds of the
+ * clip, in order; one move a hand makes twice in a row is told twice.
+ */
+export function handMoves(t: Pick<FootageTracks, "fps" | "from" | "frames" | "aspect">): HandMove[] {
+  const moves: (HandMove & { x: number; y: number })[] = [];
+  const time = (frame: number) => Math.round(((t.from + frame) / t.fps) * 10) / 10;
+  const near = Math.round(t.fps * 0.67);
+  for (const samples of handSeries(t)) {
+    if (samples.length < 6) continue;
+    const open = smooth(samples.map((s) => s.open));
+    const size = smooth(samples.map((s) => s.size));
+    const at = (i: number) => samples[i]!;
+    const add = (from: number, to: number, what: string) => moves.push({ start: time(at(from).frame), end: time(at(to).frame), what, x: at(to).x, y: at(to).y });
+    // Thumb and index that spread from a pinch: a peak well over the pinch just before it (since
+    // the last spread: the fall after a wide one is not a new one).
+    let last = -1;
+    for (let i = 0; i < open.length; i++) {
+      const peak = open[i]!;
+      const span = (lo: number, hi: number) => open.slice(Math.max(0, lo), Math.max(0, hi));
+      if (span(i - 4, i + 5).some((v) => v > peak)) continue;
+      if (i > 0 && open[i - 1] === peak) continue;
+      const before = span(Math.max(last + 1, i - near), i);
+      const after = span(i + 1, i + near + 1);
+      const low = before.length ? Math.min(...before) : peak;
+      if (low > PINCHED || peak - low < SPREAD_RISE) continue;
+      const lowAfter = after.length ? Math.min(...after) : peak;
+      const closes = peak - lowAfter >= SPREAD_RISE * 0.8;
+      // From where it starts opening to where it is pinched again (or the hand leaves), across the time it stays open.
+      let from = i;
+      while (from > 0 && from > i - near && open[from - 1]! <= open[from]! && open[from - 1]! > low + 0.02) from--;
+      let to = i;
+      while (to < open.length - 1 && to < i + near && open[to + 1]! <= open[to]! && open[to + 1]! > lowAfter + 0.02) to++;
+      const wide = peak >= 0.6 ? " grand" : peak < 0.3 ? " un peu" : "";
+      add(Math.max(0, from - 1), Math.min(open.length - 1, to + (closes ? 1 : 0)), `le pouce et l'index s'écartent${wide}${closes ? " puis se referment" : " et restent ouverts"}`);
+      last = i;
+    }
+    // A pinch held a second or more (something small held between the fingers, an « ok »).
+    for (let i = 0; i < open.length; ) {
+      if (open[i]! >= PINCHED) {
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j + 1 < open.length && open[j + 1]! < PINCHED && at(j + 1).frame - at(j).frame <= 3) j++;
+      if (at(j).frame - at(i).frame >= t.fps) add(i, j, "le pouce et l'index restent pincés");
+      i = j + 1;
+    }
+    // Toward the camera or away, up, down or across: within half a second.
+    for (let i = 0; i < samples.length; ) {
+      let found = false;
+      for (let j = i + 1; j < samples.length && at(j).frame - at(i).frame <= Math.round(t.fps * 0.5); j++) {
+        const grow = size[j]! / size[i]!;
+        const dx = at(j).x - at(i).x;
+        const dy = at(j).y - at(i).y;
+        const what =
+          grow >= APPROACH
+            ? "la main avance vers la caméra"
+            : grow <= 1 / APPROACH
+              ? "la main recule"
+              : at(j).frame - at(i).frame <= Math.round(t.fps * 0.4) && Math.hypot(dx, dy) >= SWEEP
+                ? Math.abs(dy) >= Math.abs(dx)
+                  ? dy < 0
+                    ? "la main monte"
+                    : "la main descend"
+                  : `la main part vers la ${dx > 0 ? "droite" : "gauche"} de l'image`
+                : null;
+        if (!what) continue;
+        add(i, j, what);
+        i = j + 1;
+        found = true;
+        break;
+      }
+      if (!found) i++;
+    }
+  }
+  // One move seen on two ids of the same hand (a hand found twice) is told once.
+  const told = moves
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+    .filter((m, k, list) => !list.slice(0, k).some((o) => o.what === m.what && o.end >= m.start && Math.hypot(o.x - m.x, o.y - m.y) < 0.2));
+  return told.slice(0, MAX_HAND_MOVES).map(({ start, end, what }) => ({ start, end: Math.max(end, Math.round((start + 0.1) * 10) / 10), what }));
+}
+
+// ---------------------------------------------------------------------------
 // The motion designer's summary: where things are, now and then, and the gestures Gemini saw.
 // ---------------------------------------------------------------------------
 
@@ -244,6 +391,8 @@ const words = (list: [number, number][]) => list.map(([a, b]) => (a === b ? `ima
 
 export type DesignerMoves = {
   gestes?: { de: number; a: number; quoi: string }[];
+  /** What the hands do, measured on their points (handMoves): surer than the gestures read. */
+  gestes_mesures?: { de: number; a: number; quoi: string }[];
   mains?: { id: number; vue: string; trajet?: { image: number; paume: [number, number]; pouce: [number, number]; index: [number, number]; taille: number }[] }[];
   visages?: { id: number; vu: string; boites?: { image: number; centre: [number, number]; largeur: number; hauteur: number }[] }[];
   corps?: { id: number; vu: string; reperes?: { image: number; tete: [number, number]; epaules?: [[number, number], [number, number]]; poignets?: [number, number][] }[] }[];
@@ -318,19 +467,21 @@ export function movesForDesigner(
       ];
     }),
   }));
-  // The gestures Gemini saw in these passages, on the scene's frames.
-  const gestes = pieces.flatMap((p) =>
-    (p.clip ? (actions[p.clip] ?? []) : []).flatMap((a) => {
-      const de = Math.round(p.at + (a.start * TRACK_FPS - p.startFrom) / (p.speed ?? 1));
-      const fin = Math.round(p.at + (a.end * TRACK_FPS - p.startFrom) / (p.speed ?? 1));
-      const from = Math.max(de, p.at, 0);
-      const to = Math.min(fin, p.at + p.length - 1, length - 1);
-      return to >= from ? [{ de: from, a: to, quoi: a.what }] : [];
-    }),
-  );
-  if (!mains.length && !visages.length && !corps.length && !gestes.length) return null;
+  // A move of the clip (seconds), on the scene's frames, cut to the piece that plays it.
+  const onScene = (p: TrackPiece, m: { start: number; end: number; what: string }) => {
+    const de = Math.round(p.at + (m.start * TRACK_FPS - p.startFrom) / (p.speed ?? 1));
+    const fin = Math.round(p.at + (m.end * TRACK_FPS - p.startFrom) / (p.speed ?? 1));
+    const from = Math.max(de, p.at, 0);
+    const to = Math.min(fin, p.at + p.length - 1, length - 1);
+    return to >= from ? [{ de: from, a: to, quoi: m.what }] : [];
+  };
+  // The gestures Gemini saw in these passages, and what the hands do there, measured on their points.
+  const gestes = pieces.flatMap((p) => (p.clip ? (actions[p.clip] ?? []) : []).flatMap((a) => onScene(p, a)));
+  const gestes_mesures = pieces.flatMap((p) => handMoves(p.tracks).flatMap((m) => onScene(p, m)));
+  if (!mains.length && !visages.length && !corps.length && !gestes.length && !gestes_mesures.length) return null;
   return {
     ...(gestes.length ? { gestes } : {}),
+    ...(gestes_mesures.length ? { gestes_mesures } : {}),
     ...(mains.length ? { mains } : {}),
     ...(visages.length ? { visages } : {}),
     ...(corps.length ? { corps } : {}),

@@ -1,7 +1,7 @@
 import { avoidPhotoText, boxFrom2d, headZone, photoBoxInFrame, photoEditFrom, reelSubtitleRow, sceneShift, type Adjust, type Box, type PhotoDetection, type PhotoEdit } from "./retouch.ts";
 import { planTimeline } from "./motion.ts";
 import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type EditPlan, type PlanSegment } from "./schemas.ts";
-import type { TracksByClip, TracksFile } from "./tracking.ts";
+import { handMoves, type TracksByClip, type TracksFile } from "./tracking.ts";
 
 // The finishing touches a professional editor gives every cut, decided by the engine from
 // what Gemini read in her photos and videos (never left to chance, never written by the
@@ -375,7 +375,8 @@ export function handsInFrame(file: TracksFile, analysis: ClipAnalysis, start: nu
  * A clip's analysis as the editor reads it: every shot with what a professional editor
  * weighs (size, camera, beauty, energy, hook, where the subject is), without the raw
  * coordinates and retouch values the engine uses on its own; with its tracks, whether
- * the hands of each gesture show in the vertical frame.
+ * the hands of each gesture show in the vertical frame, and what the hands really do,
+ * measured on their points (`mains_suivies`: the gestures read can miss one).
  */
 export function editorClip(mediaId: string, analysis: ClipAnalysis, tracks?: TracksFile) {
   const { correction: _correction, words, shots, actions, ...rest } = analysis;
@@ -383,11 +384,13 @@ export function editorClip(mediaId: string, analysis: ClipAnalysis, tracks?: Tra
     const share = tracks ? handsInFrame(tracks, analysis, a.start, a.end) : null;
     return share === null ? {} : { mains: share >= 0.75 ? "dans le cadre" : share >= 0.3 ? "en partie" : "hors du cadre" };
   };
+  const measured = tracks ? handMoves({ fps: tracks.fps, from: tracks.from, frames: tracks.frames, aspect: tracks.w / tracks.h }) : [];
   return {
     media_id: mediaId,
     ...rest,
     shots: shots.map(({ subject_box, ...shot }) => ({ ...shot, ...(subjectPlace(subject_box) ? { sujet_a: subjectPlace(subject_box) } : {}) })),
     words: words?.length ? words : undefined,
     actions: actions?.length ? actions.map((a) => ({ ...a, ...hands(a) })) : undefined,
+    mains_suivies: measured.length ? measured.map((m) => ({ start: m.start, end: m.end, what: m.what, ...hands(m) })) : undefined,
   };
 }
