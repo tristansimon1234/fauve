@@ -117,9 +117,11 @@ export async function stealStyle(studioId: string, source: StealSource): Promise
   const started = Date.now();
   const reel = await stealReelInSandbox(`steal-${randomUUID()}`, take);
   const seconds = "miss" in reel ? (Date.now() - started) / 1000 : reel.seconds;
+  // A miss is kept with what yt-dlp or curl said (links without their query: no signed token in it).
+  const why = "miss" in reel ? { miss: reel.miss, detail: reel.detail.replace(/\?[^\s"']*/g, "").slice(-400) } : {};
   await db
     .from("cost_events")
-    .insert({ studio_id: studioId, kind: "steal", provider: "vercel_sandbox", units: Math.round(seconds), cost_eur: sandboxCostEur(seconds), meta: { link: "link" in take } });
+    .insert({ studio_id: studioId, kind: "steal", provider: "vercel_sandbox", units: Math.round(seconds), cost_eur: sandboxCostEur(seconds), meta: { link: "link" in take, ...why } });
   if ("miss" in reel) {
     console.warn("steal: not taken", reel.miss, reel.detail.slice(-500));
     return { ok: false, miss: reel.miss };
