@@ -50,8 +50,13 @@ import { photoRegions } from "@/lib/video/regions";
 //                        kept as a WhatsApp audio and read by Scribe, then put on the Reel;
 //                        steal=<url> (« Steal ») first has the style of a Reel read, from its link
 //                        (Instagram, TikTok, a Short) or a video file's URL, and the lab Reel copies it
-//                        (one shot, as when she sends Simone a Reel to copy); with steal_only=1,
-//                        nothing more (no montage): step=result shows what was read.
+//                        (one shot, as when she sends Simone a Reel to copy); steal=lab:<file> a video
+//                        uploaded to the lab studio, read as a video she sent in the chat (it leaves
+//                        the library once read); with steal_only=1, nothing more (no montage):
+//                        step=result shows what was read;
+//                        own=<file>,… videos of hers uploaded to the lab studio, instead of the stock clips.
+//   ?case=…&step=upload&file=<name>.mp4|mov  a signed upload URL (2 h) for a file of hers into the
+//                        lab studio ({studio}/lab/<name>), for own= and steal=lab:.
 //   ?case=…&step=result  every version: its render (signed link, 24 h), the plan kept
 //                        (without the scenes' code), the delivered message, what this Reel cost
 //                        (costs) and what the lab studio has spent over all its runs (studio_costs).
@@ -84,6 +89,8 @@ type LabCase = {
   idea: string;
   /** Free stock clips (Mixkit licence), in 720p. */
   clips?: number[];
+  /** Videos of hers uploaded to the lab studio (step=upload), by file name. */
+  own?: string[];
   /** The vertical photos of a demo studio. */
   photosOf?: { studio: string; max: number };
 };
@@ -267,7 +274,16 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
     return inserted.data.id as string;
   };
 
-  const videos = await Promise.all(
+  // Her own videos, uploaded with step=upload.
+  const own = await Promise.all(
+    (c.own ?? []).map((file) =>
+      add(`${studioId}/lab/${file}`, { kind: "video", mime_type: videoMime(file) }, async () => {
+        const found = await db.storage.from("media").createSignedUrl(`${studioId}/lab/${file}`, 60);
+        return { error: found.error ? { message: `not uploaded (step=upload&file=${file})` } : null };
+      }),
+    ),
+  );
+  const stock = await Promise.all(
     (c.clips ?? []).map((clip) =>
       add(`${studioId}/lab/${clip}.mp4`, { kind: "video", mime_type: "video/mp4" }, async () => {
         const res = await fetch(`https://assets.mixkit.co/videos/${clip}/${clip}-720.mp4`, { headers: { "user-agent": "Mozilla/5.0 (compatible; SimoneLab/1.0)" } });
@@ -277,6 +293,7 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
       }),
     ),
   );
+  const videos = [...own, ...stock];
 
   let photos: string[] = [];
   if (c.photosOf) {
@@ -321,10 +338,21 @@ async function clearPosts(studioId: string) {
   await db.from("motion_templates").delete().eq("studio_id", studioId);
 }
 
-/** « Steal » in the lab: a Reel's style read (from its link, or a video file's URL), for the lab Reel to copy. */
+/** « Steal » in the lab: a Reel's style read (from its link, a video file's URL, or a video uploaded to the lab studio), for the lab Reel to copy. */
 async function labSteal(studioId: string, url: string): Promise<string> {
   let outcome: Awaited<ReturnType<typeof stealStyle>>;
-  if (reelLink(url)) outcome = await stealNow(studioId, { link: url });
+  if (url.startsWith("lab:")) {
+    // As a video she sends Simone in the chat: in her library first, then read (and out of it once read).
+    const file = url.slice(4);
+    const path = `${studioId}/lab/${file}`;
+    const db = supabaseAdmin();
+    const { data: known } = await db.from("media_assets").select("id").eq("studio_id", studioId).eq("storage_path", path).maybeSingle();
+    const media =
+      known ??
+      (await db.from("media_assets").insert({ studio_id: studioId, storage_path: path, kind: "video", source: "web_upload", mime_type: videoMime(file) }).select("id").single()).data;
+    if (!media) throw new Error(`lab: ${file} not kept`);
+    outcome = await stealNow(studioId, { mediaId: media.id as string });
+  } else if (reelLink(url)) outcome = await stealNow(studioId, { link: url });
   else {
     const { data: row, error } = await supabaseAdmin().from("inspirations").insert({ studio_id: studioId, source: "link", kind: "reel", url }).select("id").single();
     if (error || !row) throw new Error(`lab: inspiration not kept: ${error?.message ?? "no row"}`);
@@ -434,6 +462,10 @@ async function labVoiceNote(studioId: string, postId: string, words?: string, br
 }
 
 const voiceOf = (params: URLSearchParams): LabVoice => ({ simone: params.get("voice"), hers: params.get("own_voice") });
+
+/** A file of hers uploaded to the lab studio: a plain name, a video. */
+const LAB_FILE = /^[\w-][\w.-]{0,79}\.(mp4|mov|m4v|webm)$/i;
+const videoMime = (file: string) => (/\.mov$/i.test(file) ? "video/quicktime" : /\.webm$/i.test(file) ? "video/webm" : "video/mp4");
 
 /** What she writes in « Ce que tu imagines » (500 characters at most, as on the screen). */
 const ideaOf = (params: URLSearchParams) => params.get("idea")?.trim().slice(0, 500) || null;
@@ -573,13 +605,26 @@ export async function POST(request: Request) {
     after(() => newMusic(labUrl(name)).catch((error: unknown) => console.error("lab: new music failed", name, error)));
     return Response.json({ ok: true, case: name, music: true });
   }
-  // Other free stock clips for this run, as many as a montage takes.
+  // A file of hers (a video she filmed, a Reel to copy) uploaded straight to the lab studio's storage.
+  if (params.get("step") === "upload") {
+    const file = params.get("file") ?? "";
+    if (!LAB_FILE.test(file)) return Response.json({ error: "file=<name>.mp4|mov" }, { status: 400 });
+    const studioId = await labStudio(name, c);
+    const signed = await supabaseAdmin().storage.from("media").createSignedUploadUrl(`${studioId}/lab/${file}`, { upsert: true });
+    if (signed.error) return Response.json({ error: signed.error.message }, { status: 500 });
+    return Response.json({ path: signed.data.path, url: signed.data.signedUrl });
+  }
+  // Other free stock clips for this run, as many as a montage takes; or her own uploaded videos instead.
   const stock = params.get("stock");
   if (stock && !new RegExp(`^\\d{1,7}(,\\d{1,7}){0,${MAX_MEDIA - 1}}$`).test(stock)) return Response.json({ error: "stock=<mixkit id>,…" }, { status: 400 });
-  const run = stock ? { ...c, clips: stock.split(",").map(Number) } : c;
-  // « Steal »: a Reel's link or a video file's URL (https).
+  const own = params.get("own")?.split(",");
+  if (own && (own.length > MAX_MEDIA || !own.every((f) => LAB_FILE.test(f)))) return Response.json({ error: "own=<file>,…" }, { status: 400 });
+  const run = own ? { ...c, clips: [], own } : stock ? { ...c, clips: stock.split(",").map(Number) } : c;
+  // « Steal »: a Reel's link, a video file's URL (https), or a video uploaded to the lab studio (lab:<file>).
   const steal = params.get("steal");
-  if (steal && !/^https:\/\/\S{8,500}$/.test(steal)) return Response.json({ error: "steal=<https url>" }, { status: 400 });
+  if (steal && !/^https:\/\/\S{8,500}$/.test(steal) && !(steal.startsWith("lab:") && LAB_FILE.test(steal.slice(4)))) {
+    return Response.json({ error: "steal=<https url>|lab:<file>" }, { status: 400 });
+  }
   const stealing = { url: steal, only: params.get("steal_only") === "1" };
   // call_app gives up after a few seconds: the work goes on after the answer.
   after(() => start(name, run, params.get("reset") === "1", voiceOf(params), ideaOf(params), stealing).catch((error: unknown) => console.error("lab: case failed", name, error)));
