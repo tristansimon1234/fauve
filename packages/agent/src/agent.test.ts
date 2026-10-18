@@ -3373,3 +3373,130 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
   assert.match(EDITOR_SYSTEM_PROMPT, /point de départ, pas une cage/);
   assert.match(MONTAGE_CRITIC_PROMPT, /est voulue, jamais un défaut/);
 });
+
+test("effects agent: its video's length, its plan of one shot, its price once made, its budget", async () => {
+  const { effectBlurBrief, effectCredits, effectPlan, effectsBudgetCents, effectsMessage, effectsRubric, effectsTask, EFFECT_MAX_CREDITS, isBaked, mp4Duration, quoteEffect } =
+    await import("./effects.ts");
+  const { creationPhase, creationSteps } = await import("./creation.ts");
+  const { CREDIT_VALUE_EUR } = await import("./margin.ts");
+
+  // An MP4's length is read in its movie header (moov › mvhd), version 0 or 1, wherever the box sits.
+  const concat = (...parts: Uint8Array[]) => {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let at = 0;
+    for (const p of parts) {
+      out.set(p, at);
+      at += p.length;
+    }
+    return out;
+  };
+  const box = (type: string, payload: Uint8Array) => {
+    const out = new Uint8Array(8 + payload.length);
+    new DataView(out.buffer).setUint32(0, out.length);
+    out.set([...type].map((c) => c.charCodeAt(0)), 4);
+    out.set(payload, 8);
+    return out;
+  };
+  const mvhd = (version: 0 | 1, timescale: number, duration: number) => {
+    const payload = new Uint8Array(100);
+    const view = new DataView(payload.buffer);
+    payload[0] = version;
+    if (version === 0) {
+      view.setUint32(12, timescale);
+      view.setUint32(16, duration);
+    } else {
+      view.setUint32(20, timescale);
+      view.setBigUint64(24, BigInt(duration));
+    }
+    return box("mvhd", payload);
+  };
+  const ftyp = box("ftyp", new Uint8Array(16));
+  const v0 = concat(ftyp, box("mdat", new Uint8Array(40)), box("moov", concat(mvhd(0, 1000, 11530), box("trak", new Uint8Array(8)))));
+  assert.equal(mp4Duration(v0), 11.53);
+  assert.equal(mp4Duration(concat(ftyp, box("moov", mvhd(1, 600, 5940)))), 9.9);
+  // A Buffer from Node's pool starts inside a bigger one.
+  assert.equal(mp4Duration(Buffer.concat([Buffer.alloc(3), Buffer.from(v0)]).subarray(3)), 11.53);
+  // Still being written (no movie header yet), or cut short: no length.
+  assert.equal(mp4Duration(concat(ftyp, box("mdat", new Uint8Array(40)))), null);
+  assert.equal(mp4Duration(v0.subarray(0, v0.length - 20)), null);
+
+  // Its video is the Reel: one shot, its texts in the image, played as it is.
+  const plan = effectPlan({ mediaId: "11111111-1111-4111-8111-111111111111", seconds: 9.9, session: "sesn_1" });
+  assert.equal(editPlanSchema.safeParse(plan).success, true);
+  assert.equal(isBaked(plan), true);
+  assert.equal(isBaked(validPlan as never), false);
+  assert.deepEqual(plan.segments, [{ clip_id: "11111111-1111-4111-8111-111111111111", in: 0, out: 9.9, zoom: "none" }]);
+  assert.deepEqual(plan.texts, []);
+  // Her voice is in the video already: the plan names it (the music goes under a voice).
+  const voiced = effectPlan({ mediaId: "11111111-1111-4111-8111-111111111111", seconds: 14, session: "sesn_1", voice: { media_id: "22222222-2222-4222-8222-222222222222", at: 0.3 } });
+  assert.equal(voiced.voice?.media_id, "22222222-2222-4222-8222-222222222222");
+  assert.equal(editPlanSchema.safeParse(voiced).success, true);
+
+  // Charged once made, on what it really cost, the margin kept: the lab's fingers and kamehameha.
+  const fingers = 1.65 * 0.86;
+  const kamehameha = 3.99 * 0.86;
+  assert.equal(effectCredits({ agentEur: fingers, floor: 11, ceiling: 40 }), 14);
+  assert.equal(effectCredits({ agentEur: kamehameha, floor: 11, ceiling: 40 }), 32);
+  // Never under what the chain would have charged, never over the ceiling held; a cost not read is a typical one.
+  assert.equal(effectCredits({ agentEur: 0.1, floor: 11, ceiling: 40 }), 11);
+  assert.equal(effectCredits({ agentEur: 20, floor: 11, ceiling: 40 }), 40);
+  assert.equal(effectCredits({ agentEur: null, floor: 11, ceiling: 40 }), 23);
+  for (const eur of [0.5, 1, 1.42, 2.4, 3.43, 4]) {
+    const credits = effectCredits({ agentEur: eur, floor: 0, ceiling: 1000 });
+    assert.ok(credits * CREDIT_VALUE_EUR * 0.5 >= eur, `${eur} €: ${credits} crédits`);
+  }
+
+  // The session's spending limit follows the ceiling, so what it can spend always keeps the margin.
+  for (const ceiling of [EFFECT_MAX_CREDITS.reel, EFFECT_MAX_CREDITS.fix, 20]) {
+    const cents = effectsBudgetCents(ceiling, 0.86);
+    assert.ok(cents > 0 && cents <= 600);
+    assert.ok(effectCredits({ agentEur: (cents / 100) * 0.86, floor: 0, ceiling: 1000 }) <= ceiling, `${ceiling} crédits : ${cents} cents`);
+  }
+  assert.equal(effectsBudgetCents(EFFECT_MAX_CREDITS.reel, 0.86), 509);
+  assert.equal(effectsBudgetCents(500, 0.86), 600);
+  assert.equal(effectsBudgetCents(0, 0.86), 0);
+
+  // Priced when the agent takes the Reel: the chain's price as its floor, a ceiling within what she can spend.
+  assert.deepEqual(quoteEffect({ correction: false, floor: 11, available: 220 }), {
+    lines: [{ label: "Effet image par image", credits: 11 }],
+    base: 11,
+    max: EFFECT_MAX_CREDITS.reel,
+    maxNewScenes: 0,
+    fixRounds: 0,
+  });
+  assert.equal(quoteEffect({ correction: false, floor: 11, available: 25 })?.max, 25);
+  assert.equal(quoteEffect({ correction: false, floor: 11, available: 15 }), null);
+  assert.equal(quoteEffect({ correction: true, floor: 4, available: 100 })?.max, EFFECT_MAX_CREDITS.fix);
+  assert.equal(quoteEffect({ correction: true, floor: 4, available: 11 }), null);
+
+  // Her working screen: the effect, then the music.
+  assert.deepEqual(creationSteps("max", { videos: 1, photos: 0 }, true, true).map((s) => s.phase), ["watch", "edit", "render"]);
+  assert.equal(creationPhase("effects", false), "edit");
+
+  // The task gives its budget and the voice only when there is one; the grader checks the voice only then.
+  const task = effectsTask({
+    request: "le texte « -20 % » grossit entre mes doigts",
+    studio: { name: "Atelier Lune", business: "boutique", facts: ["ouvert le dimanche"], tone: null },
+    brand: { colors: ["#5B3FD9"], fonts: ["Fraunces", "Inter"] },
+    files: [{ name: "video1.mov", kind: "video", seconds: 11.2, about: "elle parle à la caméra" }],
+    voice: null,
+    models: ["hand_landmarker.task"],
+    budgetUsd: 5.09,
+  });
+  assert.match(task, /5,09 \$/);
+  assert.match(task, /n'en mets pas/);
+  assert.doesNotMatch(task, /Sa voix off/);
+  const bare = { request: "x", studio: { name: "A", business: null, facts: [], tone: null }, brand: { colors: [], fonts: [] }, files: [], models: [], budgetUsd: 3 };
+  assert.match(effectsTask({ ...bare, voice: { name: "voix.ogg", words: "voix.json", seconds: 12, text: "salut" } }), /Sa voix off/);
+  assert.match(effectsRubric({ voice: true }), /voix off/);
+  assert.doesNotMatch(effectsRubric({ voice: false }), /voix off/);
+
+  // Her two sentences, cleaned and bounded.
+  assert.equal(effectsMessage("**J'ai fait** ton effet.\n\nFilme-le de face."), "J'ai fait ton effet. Filme-le de face.");
+  assert.equal(effectsMessage("   "), null);
+  assert.ok((effectsMessage(`${"Une phrase assez longue pour remplir. ".repeat(20)}`) ?? "").length <= 500);
+
+  // Her blur, drawn by the agent on its own video.
+  assert.match(effectBlurBrief(["face", "plate"]), /les visages, les plaques d'immatriculation/);
+  assert.match(effectBlurBrief([]), /Retire le flou/);
+});

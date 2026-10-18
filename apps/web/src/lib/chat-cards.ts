@@ -1,7 +1,7 @@
 import "server-only";
 import { studioAccess } from "@/lib/billing/access";
 import { effortSchema, montagePlanSchema, replyExtrasSchema, type Effort, type MontagePlan, type PostKind, type PostStatus } from "@fauve/agent";
-import { creditBalance, quoteEfforts, type QuoteStage } from "@/lib/credits";
+import { creditBalance, pricedAsEffect, quoteEfforts, type QuoteStage } from "@/lib/credits";
 import { signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -47,6 +47,8 @@ export type CardQuote = {
   failed: boolean;
   /** What the delivered montage really cost (null before delivery). */
   charged: number | null;
+  /** The effects agent makes it (an effect drawn image by image): its own steps and time. */
+  effect: boolean;
 };
 
 /** What a quote card can show of a quote, from its row. */
@@ -199,6 +201,7 @@ async function quoteCards(studioId: string, payloads: unknown[]): Promise<(ChatC
           startedAt: (q.used_at as string | null) ?? null,
           failed: quoteFailed(q),
           charged: charges.get(q.id as string) ?? null,
+          effect: pricedAsEffect(q.params),
         },
       ];
     }),

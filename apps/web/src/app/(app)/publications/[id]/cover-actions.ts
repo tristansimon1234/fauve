@@ -1,8 +1,9 @@
 "use server";
 
-import { postCoverSchema, type PostCover } from "@fauve/agent";
+import { EFFECT_VOICE_OUT, postCoverSchema, type PostCover } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
+import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { readPostMusic } from "@/lib/render/music";
 import { renderPost } from "@/lib/render/render-post";
 import { removeVoice } from "@/lib/voice-over";
@@ -113,7 +114,12 @@ export async function setVoiceOff(postId: string): Promise<{ ok: boolean }> {
     return null;
   });
   if (again === null) return { ok: false };
-  if (again) {
+  if (again === "agent") {
+    // The voice is drawn in the effect's video: the agent makes it again without it (a correction, charged on delivery).
+    const accepted = await correctionQuote(studioId, postId, EFFECT_VOICE_OUT);
+    if ("error" in accepted) return { ok: false };
+    after(() => startMontage(studioId, accepted));
+  } else if (again) {
     after(() =>
       renderPost(studioId, postId).then(
         () => revalidatePath(`/publications/${postId}`),

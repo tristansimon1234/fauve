@@ -3,6 +3,7 @@ import {
   captionForInstagram,
   editPlanSchema,
   findVoice,
+  isBaked,
   postStatusSchema,
   publishWhen,
   type EditPlan,
@@ -48,6 +49,8 @@ export type ReviewData = {
   scenes: { url: string; count: number } | null;
   /** The plan shown, whose texts she edits. */
   plan: EditPlan;
+  /** Made by the effects agent: its texts are in the image, a change is asked of Simone. */
+  baked: boolean;
   version: number;
   /** The version before, when its video exists: « Revenir à l'ancienne ». */
   previous: number | null;
@@ -154,6 +157,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     downloadUrl: download?.data?.signedUrl ?? null,
     scenes: spriteUrl ? { url: spriteUrl, count: plan.data.segments.length } : null,
     plan: plan.data,
+    baked: isBaked(plan.data),
     version: current.version as number,
     previous: previous ? (previous.version as number) : null,
     scheduledAt: post.scheduled_at,

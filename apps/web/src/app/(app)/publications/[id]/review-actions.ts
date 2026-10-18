@@ -1,12 +1,11 @@
 "use server";
 
-import { DEFAULT_EFFORT, effortSchema, findVoice, readPostVoice, RESTYLE, type EditPlan, type ReelInputs, type SavedLook } from "@fauve/agent";
+import { findVoice, isBaked, readPostVoice, RESTYLE, type EditPlan, type ReelInputs, type SavedLook } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
-import { acceptQuote, createMontageQuote } from "@/lib/credits";
 import { loadEditorData } from "@/lib/montage-editor-data";
-import { startMontage } from "@/lib/montage-start";
+import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { loadTextLooks } from "@/lib/text-looks";
 import { removeVoice } from "@/lib/voice-over";
 import { getStudioContext } from "@/lib/studio";
@@ -55,11 +54,7 @@ const touched = (postId: string) => {
 
 /** A corrected version of the montage, started at once (her tap is her yes). */
 async function correct(studioId: string, postId: string, brief: string): Promise<ReviewResult> {
-  const studio = await supabaseAdmin().from("studios").select("montage_effort").eq("id", studioId).single();
-  const effort = effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);
-  const quote = await createMontageQuote({ studioId, postId, mediaIds: [], brief, correction: true, maxNewScenes: 0, effort });
-  if ("error" in quote) return { ok: false, error: "Il ne te reste pas assez de crédits pour refaire la vidéo." };
-  const accepted = await acceptQuote(studioId, quote.id, new Date(), { immediate: true });
+  const accepted = await correctionQuote(studioId, postId, brief);
   if ("error" in accepted) return { ok: false, error: accepted.error };
   after(() => startMontage(studioId, accepted));
   touched(postId);
@@ -133,6 +128,8 @@ export async function liveMontage(postId: string): Promise<LiveMontage> {
   if (!planId) return { ok: false, error: "Ce Reel n’a pas encore de montage." };
   const [editor, looks] = await Promise.all([loadEditorData(found.studioId, planId).catch(() => null), loadTextLooks(found.studioId).catch(() => [])]);
   if (!editor) return { ok: false, error: "Ce montage ne se modifie pas ici : demande à Simone." };
+  // Its effect and its texts are drawn in the image: only Simone remakes them.
+  if (isBaked(editor.plan)) return { ok: false, error: "Ce Reel a un effet dessiné image par image : dis à Simone ce que tu veux changer." };
   return { ok: true, plan: editor.plan, inputs: editor.inputs, looks };
 }
 

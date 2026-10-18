@@ -1,4 +1,4 @@
-import { AMBIANCES, effortPitch, EFFORTS, montageLate, type Effort } from "@fauve/agent";
+import { AMBIANCES, EFFECT_MINUTES, effortPitch, EFFORTS, montageLate, type Effort } from "@fauve/agent";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { CheckIcon, ClockIcon, LayersIcon, PlayIcon } from "@/components/icons";
@@ -397,11 +397,21 @@ function QuoteCard({
 
 type StepKey = "design" | "alternative" | "render" | "review" | "delivered";
 
-/** The steps of a launched montage, as its level runs them (a correction never has a 2nd version, a variant is only a render). */
-function stepsFor(kind: CardQuote["kind"], effort: Effort | null): { key: StepKey; label: string }[] {
+/**
+ * The steps of a launched montage, as its level runs them (a correction never has a 2nd version, a variant is only a render);
+ * an effect made by the effects agent: the effect (its own checks), then the music.
+ */
+function stepsFor(kind: CardQuote["kind"], effort: Effort | null, effect = false): { key: StepKey; label: string }[] {
   if (kind === "variant") {
     return [
       { key: "render", label: "Rendu" },
+      { key: "delivered", label: "Livrée" },
+    ];
+  }
+  if (effect) {
+    return [
+      { key: "design", label: "Effet" },
+      { key: "render", label: "Musique" },
       { key: "delivered", label: "Livrée" },
     ];
   }
@@ -414,16 +424,16 @@ function stepsFor(kind: CardQuote["kind"], effort: Effort | null): { key: StepKe
   ];
 }
 
-/** Where a recorded stage sits in the steps: a correction (fix) belongs to the review. */
+/** Where a recorded stage sits in the steps: a correction (fix) belongs to the review, the effect to the montage. */
 function stepAt(steps: { key: StepKey }[], stage: CardQuote["stage"]): number {
   if (!stage) return 0;
-  const i = steps.findIndex((s) => s.key === (stage === "fix" ? "review" : stage));
+  const i = steps.findIndex((s) => s.key === (stage === "fix" ? "review" : stage === "effects" ? "design" : stage));
   return Math.max(0, i);
 }
 
 /** The current step's label, for a short reminder elsewhere (the Fauve page, the drawer's header). */
 export function montageStep(quote: CardQuote): string {
-  const steps = stepsFor(quote.kind, quote.effort);
+  const steps = stepsFor(quote.kind, quote.effort, quote.effect);
   return steps[stepAt(steps, quote.stage)]!.label;
 }
 
@@ -448,7 +458,7 @@ function useNow(every: number): number | null {
  * correction rendered after the review stays on « Relecture ».
  */
 function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live: boolean; focus: boolean; onAsk?: (text: string) => void }) {
-  const steps = stepsFor(quote.kind, quote.effort);
+  const steps = stepsFor(quote.kind, quote.effort, quote.effect);
   // Every stage seen while the card is open: the furthest step, and whether a review or a correction happened.
   const [seen, setSeen] = useState<string[]>(() => (quote.stage ? [quote.stage] : []));
   if (quote.stage && !seen.includes(quote.stage)) setSeen([...seen, quote.stage]);
@@ -457,12 +467,16 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
   const max = quote.effort === "max" && quote.kind === "montage";
   const reviewed = seen.includes("review") || seen.includes("fix");
   const text =
-    quote.stage === "alternative"
+    quote.stage === "effects"
+      ? "Simone fait l’effet image par image et vérifie chaque geste"
+      : quote.stage === "alternative"
       ? "Une 2e version, pour comparer"
       : quote.stage === "render"
         ? quote.kind === "variant"
           ? "La variante se fabrique"
-          : reviewed
+          : quote.effect
+            ? "Simone pose la musique"
+            : reviewed
             ? "La version corrigée se fabrique"
             : max
               ? "Les deux versions se fabriquent"
@@ -554,7 +568,7 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
         <p className="flex items-start gap-1.5 text-[12px] leading-[16px] text-muted tabular-nums">
           <ClockIcon size={14} className="mt-px shrink-0" />
           {minutes === null ? "" : minutes < 1 ? "À l’instant · " : `Depuis ${minutes} min · `}
-          {level.minutes} min en tout
+          {quote.effect ? EFFECT_MINUTES : level.minutes} min en tout
         </p>
       )}
       <p className="text-[12px] leading-snug text-muted tabular-nums">

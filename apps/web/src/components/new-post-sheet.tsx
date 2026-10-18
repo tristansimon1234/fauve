@@ -3,6 +3,7 @@
 import {
   advisedFormat,
   creationSteps,
+  EFFECT_MINUTES,
   findVoice,
   formatBlocked,
   formatWhy,
@@ -72,7 +73,8 @@ const placeLabel = (platforms: string[]) => platforms.map((p) => (p === "tiktok"
 const FIRST_TILES = 11;
 
 type When = { date: string; time: string; short: string; full: string };
-type Work = { postId: string; title: string; quoteId: string; effort: Effort; minutes: string; music: boolean; picked: Picked };
+/** effect: the effects agent makes it (decided at launch; its steps and its time). */
+type Work = { postId: string; title: string; quoteId: string; effort: Effort; minutes: string; music: boolean; effect: boolean; picked: Picked };
 
 /** When a local date and time (the studio's) goes out, in her words, against the studio's local now. */
 function whenAt(local: string, nowLocal: string): When {
@@ -660,8 +662,10 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
   const router = useRouter();
   const openFauve = useFauveDrawer();
   const handOff = useContext(NewPostHandOffContext);
-  const steps = creationSteps(work.effort, work.picked, work.music);
   const [progress, setProgress] = useState<CreationProgress | null>(null);
+  // The effects agent makes the Reel (decided at launch, or once it takes it): its own steps, and its own time.
+  const effect = work.effect || Boolean(progress?.effect);
+  const steps = creationSteps(work.effort, work.picked, work.music, effect);
   /** The furthest step reached: a correction renders again, the list never steps back. */
   const [reached, setReached] = useState(0);
   const done = progress?.done ?? false;
@@ -670,12 +674,12 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
   useEffect(() => {
     if (done || failed) return;
     let live = true;
-    const phases = creationSteps(work.effort, work.picked, work.music).map((s) => s.phase);
     const tick = () =>
       creationProgress(work.quoteId, work.postId)
         .then((p) => {
           if (!live || !p) return;
           setProgress(p);
+          const phases = creationSteps(work.effort, work.picked, work.music, work.effect || p.effect).map((s) => s.phase);
           setReached((r) => Math.max(r, phases.indexOf(p.phase)));
           if (p.done) router.refresh();
         })
@@ -727,7 +731,7 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
                 ? progress?.seconds
                   ? `Ton Reel de ${progress.seconds} secondes t’attend.`
                   : "Ton Reel t’attend."
-                : `Ton Reel sera prêt dans ${work.minutes} minutes environ.`}
+                : `Ton Reel sera prêt dans ${effect ? EFFECT_MINUTES : work.minutes} minutes environ.`}
           </p>
         </div>
         <ol aria-label="Ce que fait Simone" className="flex w-full flex-col rounded-[22px] border border-line bg-white px-[18px] py-2 text-left">

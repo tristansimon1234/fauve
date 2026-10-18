@@ -4,6 +4,7 @@ import {
   alignSlides,
   clipBlurFrom,
   editPlanSchema,
+  isBaked,
   isClipSegment,
   photoEditFrom,
   slidesPlanSchema,
@@ -84,6 +85,8 @@ export async function blurMontage(studioId: string, postId: string, kinds: Regio
     : await base.order("version", { ascending: false }).limit(1).maybeSingle();
   const plan = editPlanSchema.safeParse(row?.plan);
   if (!plan.success) throw new Error("Cette publication n'a pas encore de montage");
+  // Drawn image by image by the effects agent: the engine's blur would not reach its video (a correction of the effect does it).
+  if (isBaked(plan.data)) throw new Error("Ce Reel a un effet dessiné image par image : le flou se fait par une correction de l'effet");
 
   const clipIds = [...new Set(plan.data.segments.filter(isClipSegment).map((s) => s.clip_id))];
   const skipped: string[] = [];

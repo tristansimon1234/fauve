@@ -1,6 +1,6 @@
 "use server";
 
-import { insertPlanVersion } from "@/lib/edit-plans";
+import { bakedReel, insertPlanVersion } from "@/lib/edit-plans";
 import { assertTransition, editPlanSchema, planMediaIds, postStatusSchema, slidesPlanSchema, type PostStatus } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -162,6 +162,8 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   const { data: post } = await db.from("posts").select("id, status").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   if (!post) return { ok: false, error: "Publication introuvable." };
   if (LOCKED.includes(postStatusSchema.parse(post.status))) return { ok: false, error: "Cette publication est déjà en ligne." };
+  // A video the effects agent drew is never changed by hand (nor marked as one from the browser).
+  if (plan.baked || (await bakedReel(studioId, postId))) return { ok: false, error: "Ce Reel a un effet dessiné image par image : dis à Simone ce que tu veux changer." };
 
   // Clips, the footage under animations and the photos they compose with: the studio's own media only.
   const clipIds = planMediaIds(plan);

@@ -6,6 +6,7 @@ export type JobKind = "montage" | "text_layer" | "elements";
 export const JOB_STEPS: Record<JobKind, { stage: string; label: string }[]> = {
   montage: [
     { stage: "design", label: "Montage" },
+    { stage: "effects", label: "Effet" },
     { stage: "alternative", label: "2e version" },
     { stage: "render", label: "Rendu" },
     { stage: "review", label: "Relecture" },

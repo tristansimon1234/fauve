@@ -66,6 +66,8 @@ async function Library() {
       .from("media_assets")
       .select("id, storage_path, kind, source, duration, created_at, analysis_status, ai")
       .eq("studio_id", studioId)
+      // Simone's own montages (an effect's video) are not her photos and videos.
+      .neq("source", "render")
       .order("created_at", { ascending: false })
       .limit(LIMIT),
     "media_assets",

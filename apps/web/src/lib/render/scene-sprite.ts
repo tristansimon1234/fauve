@@ -36,7 +36,8 @@ export async function ensureSceneSprite(studioId: string, renderId: string): Pro
   const { data } = await db.from("renders").select("status, storage_path, scenes_path, edit_plan_id, duration_ms").eq("id", renderId).eq("studio_id", studioId).maybeSingle();
   if (!data || data.status !== "done" || !data.storage_path || data.scenes_path || !data.edit_plan_id) return;
   const plan = editPlanSchema.safeParse((await db.from("edit_plans").select("plan").eq("id", data.edit_plan_id).maybeSingle()).data?.plan);
-  if (!plan.success) return;
+  // The effects agent's video is one shot: no strip of scenes.
+  if (!plan.success || plan.data.baked) return;
   const end = timeline(plan.data).at(-1)?.end ?? 0;
   const aligned = plan.data.segments.every(isClipSegment) || Math.abs((data.duration_ms ?? 0) / 1000 - end) < 0.5;
   if (!aligned) return;
