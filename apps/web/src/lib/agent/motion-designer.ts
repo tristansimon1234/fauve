@@ -48,6 +48,8 @@ export type SceneRequest = {
   /** What moves in the footage under it: the pieces its `track` reads (its test render follows them), and what the designer is told of them. */
   track?: TrackPiece[];
   moves?: DesignerMoves | { par_plan: ({ plan: number } & DesignerMoves)[] };
+  /** A correction: the animation it reworks as it was rendered on her images (frames with their instant), its code, what the review found. */
+  seen?: { code: string; review: string; frames: { label: string; jpeg: Buffer }[] };
 };
 export type SceneResult = {
   id: string;
@@ -99,7 +101,9 @@ async function writeScene(
   fix?: { code: string; error: string; photos?: string[]; fonts?: string[] },
 ) {
   const kept = [fix?.photos?.length && `les mêmes photos (${fix.photos.join(", ")})`, fix?.fonts?.length && `les mêmes polices (${fix.fonts.join(", ")})`].filter(Boolean);
-  const content = fix
+  // A correction looks at its earlier render first: each image with its instant, then the request.
+  const seen = !fix && request.seen?.frames.length ? request.seen : undefined;
+  const text = fix
     ? `Ce code a échoué : ${fix.error}\nCorrige-le en gardant la même intention${kept.length ? ` et ${kept.join(" et ")}` : ""}.\n\nBrief : ${request.brief}\n\nCode :\n${fix.code}`
     : JSON.stringify({
         brief: request.brief,
@@ -136,8 +140,20 @@ async function writeScene(
           : request.cuts
             ? { plans_dessous: { plans: request.cuts.length + 1, coupes_images: request.cuts } }
             : {}),
-        code_precedent: request.previousCode,
+        ...(seen ? { version_precedente: { relecture: seen.review.slice(0, 1500), images: `${seen.frames.length} images jointes, au-dessus` } } : {}),
+        code_precedent: seen?.code ?? request.previousCode,
       });
+  type Block = { type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: "image/jpeg"; data: string } };
+  const content: string | Block[] = seen
+    ? [
+        { type: "text", text: "Ton animation d'avant, rendue sur ses images :" },
+        ...seen.frames.flatMap((f): Block[] => [
+          { type: "text", text: f.label },
+          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: f.jpeg.toString("base64") } },
+        ]),
+        { type: "text", text },
+      ]
+    : text;
   const response = await anthropic().beta.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: 16000,
