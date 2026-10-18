@@ -249,8 +249,8 @@ const scenesLeft = (job: Job) => Math.max(0, (job.maxNewScenes ?? 2) - (job.newS
  */
 async function voiceFirst(job: Job): Promise<boolean> {
   if (job.voiced) return false;
-  // A Reel with an effect takes a voice only when she chose one.
-  const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief, explicitOnly: job.route === "agent" });
+  // A Reel with an effect too, as any Reel (Tristan: « oui »): her choice, else her business's, else Simone's.
+  const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief });
   if (!made) return false;
   // A key message with the music suits it better: no voice, the editor knows it, the design goes on now.
   if ("format" in made) {
@@ -263,8 +263,8 @@ async function voiceFirst(job: Job): Promise<boolean> {
 
 /**
  * The design step of a Reel the effects agent makes (the route is decided once, when the montage
- * starts, else here: effectRoute): her voice first when she chose one (the agent sets its cuts on
- * it), then the session, started in its own invocation. False: the chain makes it.
+ * starts, else here: effectRoute): its voice over first when it takes one, as any Reel (the agent sets
+ * its cuts on it), then the session, started in its own invocation. False: the chain makes it.
  */
 async function effectsFirst(job: Job): Promise<boolean> {
   try {

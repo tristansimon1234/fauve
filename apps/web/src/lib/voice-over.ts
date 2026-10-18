@@ -241,8 +241,6 @@ export async function voiceOverIfWanted(params: {
   correction?: boolean;
   /** Her request for the Reel, read by the voice too. */
   brief?: string;
-  /** Only the voice she chose (for this Reel, or « always » for her business), never Simone's own choice: a Reel with an effect. */
-  explicitOnly?: boolean;
 }): Promise<{ mediaId: string; voice: string } | { format: Extract<ReelFormat, "message">; why: string } | null> {
   if (!env("ELEVENLABS_API_KEY")) return null;
   const db = supabaseAdmin();
@@ -253,7 +251,6 @@ export async function voiceOverIfWanted(params: {
   if (post.error || post.data.kind !== "reel") return null;
   const choice = readPostVoice(post.data.voice_over);
   const setting = readVoiceSetting((brand.data?.profile as { voice?: unknown } | null)?.voice);
-  if (params.explicitOnly && choice?.mode !== "on" && !choice?.remake && setting.use !== "always") return null;
   const ids = params.mediaIds?.length ? params.mediaIds : ((post.data.media_ids as string[] | null) ?? []);
   const { data: media } = ids.length
     ? await db.from("media_assets").select("id, kind, duration").eq("studio_id", params.studioId).in("id", ids)
