@@ -4,6 +4,9 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   editorClip,
   signatureLines,
+  followedForEditor,
+  followedOf,
+  signatureOf,
   editorOutputSchemaLegacy,
   finishPlan,
   type EditorOutput,
@@ -196,6 +199,8 @@ export async function designEdit(params: {
       ? ensureCutouts(params.studioId, photoIds.slice(0, MAX_OFFERED_PHOTOS)).catch((e: unknown) => console.warn("cut-outs: not ready", e))
       : null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
+  // A Reel she likes whose style her Reels follow (« Steal »): its form and pace, its look over her charter.
+  const followed = followedOf(brand.data?.[0]?.profile);
   // What moves in her videos, followed before the editor cuts: which gestures show their hands in the vertical
   // frame (the editor puts an animation that hangs on a gesture where it can be seen), where the faces really are
   // (the texts keep off them) and what the animations follow. Never more than a few minutes of waiting (a sandbox
@@ -214,7 +219,8 @@ export async function designEdit(params: {
       tone: profile.tone,
       art_direction: profile.art_direction,
       // The same direction as settings: the render already applies them (titles, key words, boxes, light).
-      signature: signatureLines(profile.signature),
+      signature: signatureLines(signatureOf({ signature: profile.signature, followed })),
+      style_suivi: followed ? followedForEditor(followed) : undefined,
       moodboard: profile.moodboard?.reading,
       // What worked on this studio's Instagram (weekly analysis): follow it when it applies.
       lessons: report?.lessons.map((l) => l.lesson),
@@ -499,12 +505,14 @@ export async function designEdit(params: {
   const template = motionTemplateSchema.catch("doux").parse(plan.template);
   // Its fonts as the render loads them (a site's font Google does not serve gets its twin).
   const { fonts: usable } = await usableFonts(profile.fonts, (profile.custom_fonts ?? []).map((f) => f.family), template, profile.font_twins).catch(() => ({ fonts: profile.fonts }));
+  // Her charter, under the style she follows: the animations move as its Reels do.
+  const signature = signatureOf({ signature: profile.signature, followed });
   const designed = await designMotionScenes(
     params.studioId,
     requests,
     [
       profile.art_direction,
-      profile.signature && `Sa charte en réglages (ses titres, son mouvement, sa lumière) :\n${signatureLines(profile.signature)}`,
+      signature && `Sa charte en réglages (ses titres, son mouvement, sa lumière) :\n${signatureLines(signature)}`,
       profile.moodboard?.reading && `Lecture du moodboard de la gérante : ${profile.moodboard.reading}`,
     ]
       .filter(Boolean)
@@ -524,7 +532,7 @@ export async function designEdit(params: {
       look: {
         template,
         ...(plan.tempo ? { tempo: plan.tempo } : {}),
-        ...(profile.signature ? { signature: resolveReelBrand(plan, template, { name: "", signature: profile.signature }).signature } : {}),
+        ...(signature ? { signature: resolveReelBrand(plan, template, { name: "", signature }).signature } : {}),
       },
     },
   );

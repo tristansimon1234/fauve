@@ -33,6 +33,9 @@ import {
   readPostVoice,
   readVoiceSetting,
   SIMONE_VOICES,
+  reelLink,
+  STEAL_OPTIONS,
+  stolenStyleMessage,
   type ToolName,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
@@ -44,7 +47,8 @@ import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
 import { AiImageError, canAffordImages, improvePhoto, makeAmbiance, placeOnPost } from "@/lib/ai-images";
-import { deliverImages, notifyFailure, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
+import { askStudio, deliverImages, notifyFailure, notifyStudio, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
+import { followStyle, missMessage, stealStyle } from "@/lib/steal";
 import { readPostMusic } from "@/lib/render/music";
 import { removeVoice } from "@/lib/voice-over";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
@@ -154,6 +158,7 @@ const COSTLY_TOOLS = [
   "copy_text_style",
   "style_texts",
   "analyze_performance",
+  "steal_style",
 ] as const satisfies readonly ToolName[];
 
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
@@ -777,6 +782,44 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         inspirations: items.map((i) => ({ inspiration_id: i.id, titre: i.title, a_reprendre: i.summary ?? (i.reading ? "en cours de lecture" : undefined), source: i.source })),
         note: items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration : elle peut partager un Reel à Simone sur Instagram ou en ajouter un dans l'app.",
       });
+    },
+
+    async steal_style({ link, media_id, inspiration_id }) {
+      const source = link ? { link } : media_id ? { mediaId: media_id } : inspiration_id ? { inspirationId: inspiration_id } : null;
+      if (!source) return json({ error: "Donne le lien du Reel, le media_id de la vidéo ou l'inspiration_id." });
+      if (link && !reelLink(link)) return json({ error: "Ce n'est pas le lien d'un Reel, d'un TikTok ou d'un Short : demande-lui ce lien, ou la vidéo elle-même." });
+      if (media_id) await assertOwnMedia([media_id]);
+      const target = { studioId, waId: ctx.waId, replyTo: ctx.replyToMessageId };
+      // Taken, measured and read after the reply (about a minute), then her two buttons.
+      ctx.afterReply.push(async () => {
+        try {
+          const outcome = await stealStyle(studioId, source);
+          if (!outcome.ok) return void (await notifyStudio(target, await missMessage(outcome.miss)));
+          const { data: brand } = await db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle();
+          const followed = brandProfileSchema.shape.followed.safeParse((brand?.profile as { followed?: unknown } | null)?.followed);
+          if (followed.success && followed.data?.inspiration_id === outcome.inspirationId) {
+            return void (await notifyStudio(target, `Tes Reels suivent déjà ce style (« ${outcome.style.look.name} ») ✅`));
+          }
+          await askStudio(target, stolenStyleMessage(outcome.style), STEAL_OPTIONS, { steal_offer: outcome.inspirationId });
+        } catch (error) {
+          await notifyFailure({ ...target, postId: "" }, "Je n’ai pas réussi à regarder ce Reel cette fois. Tu veux que je réessaie ?", error);
+        }
+      });
+      return json({
+        status: "started",
+        note: "Tu le regardes après ta réponse (environ une minute), puis tu lui envoies tout seul ce que tu en reprendrais, avec deux boutons. Annonce-le en une phrase, sans rien décrire de ce Reel avant de l'avoir vu.",
+      });
+    },
+
+    async follow_style({ mode, inspiration_id }) {
+      if (mode === "off") {
+        await followStyle(studioId, null);
+        return json({ ok: true, note: "Ses prochains Reels ne suivent plus ce style : ils reviennent à sa charte seule. Dis-le en une phrase." });
+      }
+      if (!inspiration_id) return json({ error: "Donne l'inspiration_id du style à suivre (list_inspirations)." });
+      const followed = await followStyle(studioId, inspiration_id);
+      if (!followed) return json({ error: "Cette inspiration n'a pas encore de style lu : lance steal_style dessus d'abord." });
+      return json({ ok: true, style: followed.look.name, note: "Ses prochains Reels suivent ce style, avec ses couleurs et ses polices. Dis-le en une phrase." });
     },
 
     async add_to_moodboard({ media_ids }) {

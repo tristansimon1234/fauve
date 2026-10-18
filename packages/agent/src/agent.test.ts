@@ -3006,3 +3006,157 @@ test("what moves: the tracks under each animation, placed as the Reel draws the 
   assert.match(MOTION_DESIGNER_PROMPT, /function Scene\(\{[^}]*track \}\)/);
   assert.match(EDITOR_SYSTEM_PROMPT, /« actions »/);
 });
+
+test("steal: a Reel's style read, measured, summed up and followed over her charter", async () => {
+  const {
+    reelLink,
+    parseSceneCuts,
+    tempoOf,
+    clampLook,
+    stolenStyleLines,
+    followedFrom,
+    followedOf,
+    followedSignature,
+    signatureOf,
+    followedForEditor,
+    followedLine,
+    followedTempo,
+    paceCeiling,
+    stolenLookSchema,
+    followedStyleSchema,
+    measuresLine,
+    stealOfferAnswer,
+    STEAL_OPTIONS,
+    stolenStyleMessage,
+    stealMissMessage,
+  } = await import("./steal.ts");
+  const { BEAT_STEP } = await import("./mix.ts");
+  const { brandProfileSchema } = await import("./schemas.ts");
+
+  // Links from a message: Instagram, TikTok, YouTube Shorts; punctuation after the link is left out.
+  assert.deepEqual(reelLink("regarde ça https://www.instagram.com/reel/DAbc_12-x/?igsh=xyz, trop bien"), { url: "https://www.instagram.com/reel/DAbc_12-x/", platform: "instagram" });
+  assert.deepEqual(reelLink("https://www.tiktok.com/@chez.lou/video/7412?is_from_webapp=1&sender_device=pc."), { url: "https://www.tiktok.com/@chez.lou/video/7412", platform: "tiktok" });
+  assert.deepEqual(reelLink("(https://vm.tiktok.com/ZMabc123/)"), { url: "https://vm.tiktok.com/ZMabc123/", platform: "tiktok" });
+  assert.deepEqual(reelLink("https://youtube.com/shorts/aBc-123"), { url: "https://youtube.com/shorts/aBc-123", platform: "youtube" });
+  assert.equal(reelLink("mon site https://maisonlou.fr"), null);
+
+  // Hard cuts from ffmpeg's scene detection: in order, apart, inside the Reel.
+  const log = "[scdet @ 0x1] lavfi.scd.score: 30.1, lavfi.scd.time: 2.5\n[scdet @ 0x1] lavfi.scd.score: 22, lavfi.scd.time: 1.2\nlavfi.scd.time: 1.3\nlavfi.scd.time: 9.95";
+  assert.deepEqual(parseSceneCuts(log, 10), [1.2, 2.5]);
+
+  // Its tempo from the bass: kicks every 0.5 s are 120 BPM, every 0.75 s 80; a flat bass has none.
+  const kicks = (period: number, seconds: number) => {
+    const levels = Array.from({ length: Math.round(seconds / BEAT_STEP) }, () => -60);
+    for (let t = 0.1; t < seconds; t += period) for (let k = 0; k < 4; k++) levels[Math.round(t / BEAT_STEP) + k] = -12 - 4 * k;
+    return levels;
+  };
+  assert.equal(tempoOf(kicks(0.5, 12)), 120);
+  assert.equal(tempoOf(kicks(0.75, 12)), 80);
+  // Kicks at 140 BPM: twice as slow meets the same kicks, the faster one is kept.
+  assert.ok(Math.abs((tempoOf(kicks(60 / 140, 12)) ?? 0) - 140) <= 1);
+  assert.equal(tempoOf(Array.from({ length: 1200 }, () => -30)), null);
+  assert.equal(tempoOf(kicks(0.5, 2)), null);
+  // Syllables of a voice at random: attacks that never come back on one period.
+  let seed = 7919;
+  const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const voice: number[] = [];
+  while (voice.length < 1500) {
+    const syllable = 8 + Math.floor(random() * 30);
+    const level = random() < 0.3 ? -70 : -35 + random() * 20;
+    for (let k = 0; k < syllable; k++) voice.push(level + random() * 4);
+  }
+  assert.equal(tempoOf(voice.slice(0, 1500)), null);
+
+  // Gemini's words taken as written, then kept within their lengths.
+  const look = clampLook({
+    name: "message clé rétro",
+    format: "message",
+    voice: "aucune",
+    hook: { kind: "chiffre", what: "un grand chiffre posé dès la première image" },
+    text: { amount: "un message tenu", composition: "un titre très grand en capitales, un sous-titre en petit dessous, centré au tiers haut. ".repeat(5), case: "upper", weight: "black", tracking: "tight", align: "center", stress: "block", band: "none", subtitles: false },
+    effect: "dust",
+    grade: "film",
+    motion: "energique",
+    camera: "à la main",
+    transitions: "coupes nettes",
+    music: "upbeat french house, warm bass, claps",
+    ending: "il reboucle sur la première image",
+    why: "Un seul message lisible et des plans vivants coupés sur le temps.",
+  });
+  assert.ok(look.text.composition.length <= 240);
+  assert.ok(stolenLookSchema.safeParse(look).success);
+
+  const style = { look, measures: { duration: 12, cuts: [1.5, 3, 4.5, 6, 7.5, 9, 10.5], bpm: 118.4, lufs: -14 } };
+  // Three lines for her: the form and its pace, the text, the mood.
+  const lines = stolenStyleLines(style);
+  assert.equal(lines.length, 3);
+  assert.match(lines[0]!, /message clé.*un plan toutes les 1,5 s, coupé sur une musique à 118 BPM/);
+  assert.match(lines[2]!, /french house.*poussière de pellicule/);
+
+  // Followed: kept in her profile with its pace.
+  const followed = followedFrom("11111111-2222-4333-8444-555555555555", style);
+  assert.equal(followed.average_shot, 1.5);
+  assert.equal(followed.bpm, 118);
+  assert.ok(followedStyleSchema.safeParse(followed).success);
+  assert.ok(brandProfileSchema.partial().safeParse({ followed }).success);
+
+  // Its look goes over her charter; her fonts, her screens and her voice stay hers.
+  const charter = {
+    titles: { font: "body" as const, case: "normal" as const, weight: "regular" as const, align: "left" as const, tracking: "wide" as const },
+    stress: "serif" as const,
+    band: "light" as const,
+    grade: "bright" as const,
+    base: "dark" as const,
+    motion: "epure" as const,
+    music: "soft bossa nova",
+    voice: "tutoiement, phrases courtes",
+  };
+  const over = followedSignature(charter, look);
+  assert.deepEqual(over.titles, { font: "body", case: "upper", weight: "black", align: "center", tracking: "tight" });
+  assert.equal(over.stress, "block");
+  assert.equal(over.band, "light", "a style with bare text keeps her box");
+  assert.equal(over.grade, "film");
+  assert.equal(over.motion, "energique");
+  assert.equal(over.music, "upbeat french house, warm bass, claps");
+  assert.equal(over.base, "dark");
+  assert.equal(over.voice, charter.voice);
+  assert.equal(signatureOf({ signature: charter }), charter);
+  assert.deepEqual(signatureOf({ signature: charter, followed }), over);
+  assert.equal(signatureOf({ followed })?.titles.case, "upper", "without a charter, the style alone");
+
+  // The editor reads its form and pace; the critic its line; a posed style raises the pace ceiling.
+  const forEditor = followedForEditor(followed);
+  assert.equal(forEditor.plan_moyen_s, 1.5);
+  assert.equal(forEditor.tempo_bpm, 118);
+  assert.match(forEditor.effet ?? "", /poussière/);
+  assert.match(followedLine(followed), /Style suivi .*message clé.*1,5 s/);
+  assert.equal(paceCeiling(2, followed), 2);
+  assert.equal(paceCeiling(2, { ...followed, average_shot: 3 }), 3.8);
+  assert.equal(paceCeiling(2, undefined), 2);
+  // A beat faster than a plan's tempo is cut at half time; a single long shot counts as 30 s.
+  assert.equal(followedTempo(150), 75);
+  assert.equal(followedTempo(118), 118);
+  assert.equal(followedFrom(followed.inspiration_id, { look, measures: { duration: 170, cuts: [], bpm: null, lufs: null } }).average_shot, 30);
+  // Read back from a stored profile; anything broken is no style.
+  assert.deepEqual(followedOf({ tone: "doux", followed }), followed);
+  assert.equal(followedOf({ followed: { inspiration_id: "x" } }), undefined);
+  assert.equal(followedOf(null), undefined);
+
+  // What Gemini is told as facts, and what she reads.
+  assert.match(measuresLine(style.measures), /durée 12 s ; 7 coupes franches \(un plan toutes les 1,5 s\) ; un rythme régulier à 118 BPM ; volume -14 LUFS/);
+  assert.match(measuresLine({ duration: 9, cuts: [], bpm: null, lufs: null }), /aucune coupe franche.*pas de rythme régulier.*pas de son/);
+  const message = stolenStyleMessage(style);
+  assert.match(message, /^J’ai regardé ce Reel/);
+  assert.equal(message.split("\n").filter((l) => l.startsWith("• ")).length, 3);
+  assert.match(message, /jamais ses images ni ses mots/);
+  // Her two buttons fit WhatsApp's (20 characters), and are read back from her words only.
+  assert.ok(STEAL_OPTIONS.every((o) => o.length <= 20));
+  assert.equal(stealOfferAnswer("Suivre ce style"), "follow");
+  assert.equal(stealOfferAnswer(" suivre ce style ! "), "follow");
+  assert.equal(stealOfferAnswer("Non merci"), "skip");
+  assert.equal(stealOfferAnswer("oui mais plus lent"), null);
+  // A link that does not open: the other ways in, with Simone's account when there is one.
+  assert.match(stealMissMessage("unreachable", "simone.studio"), /envoie-moi la vidéo ici, ou partage-le à @simone\.studio/);
+  assert.doesNotMatch(stealMissMessage("unreachable", null), /@/);
+  assert.match(stealMissMessage("not_video"), /carrousel.*capture/);
+});

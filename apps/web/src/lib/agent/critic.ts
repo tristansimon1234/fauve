@@ -3,7 +3,12 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   ambianceLine,
   brandProfileSchema,
+  followedLine,
+  followedOf,
+  MAX_AVERAGE_SHOT,
+  paceCeiling,
   signatureLines,
+  signatureOf,
   CRITIC_MODEL,
   editPlanSchema,
   formatLine,
@@ -99,12 +104,17 @@ export async function reviewMontage(input: {
   ]);
   if (!loaded.some((v) => v?.frames.length)) return null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
+  // A Reel she likes whose style her Reels follow (« Steal »): the Reel is compared with it, its pace included.
+  const followed = followedOf(brand.data?.[0]?.profile);
+  const signature = signatureOf({ signature: profile.signature, followed });
+  const ceiling = paceCeiling(MAX_AVERAGE_SHOT, followed);
 
   const context = [
     `Commerce : ${(studio.data?.name as string | null) ?? "?"}${studio.data?.business_type ? ` (${studio.data.business_type as string})` : ""}.`,
     profile.tone ? `Ton de la marque : ${profile.tone}.` : "",
     profile.art_direction ? `Direction artistique : ${profile.art_direction.slice(0, 600)}` : "",
-    profile.signature ? `Sa charte en réglages (le Reel doit la porter : on doit reconnaître ce commerce sans voir son nom) :\n${signatureLines(profile.signature)}` : "",
+    signature ? `Sa charte en réglages (le Reel doit la porter : on doit reconnaître ce commerce sans voir son nom) :\n${signatureLines(signature)}` : "",
+    followed ? `${followedLine(followed)}. Le Reel doit le suivre (sa forme, son rythme, son texte), avec ses images et ses mots à elle.` : "",
     input.request ? `Demande de la gérante : ${input.request.slice(0, 1500)}` : "",
     ambianceLine(post.data?.template as string | null | undefined) ?? "",
     formatLine(input.format) ?? "",
@@ -126,7 +136,7 @@ export async function reviewMontage(input: {
     }
     content.push({
       type: "text",
-      text: `Version ${i + 1}${correction ? ` (correction de la version ${i})` : ""} : ${planDigest(version.plan as EditPlan)}${version.voice ? ` ${version.voice}` : ""}${
+      text: `Version ${i + 1}${correction ? ` (correction de la version ${i})` : ""} : ${planDigest(version.plan as EditPlan, { paceCeiling: ceiling })}${version.voice ? ` ${version.voice}` : ""}${
         version.fallback ? " Rendue par le moteur de secours, sans les animations : leur absence n'est pas un défaut à corriger." : ""
       }`,
     });

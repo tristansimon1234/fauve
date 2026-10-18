@@ -13,6 +13,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { geminiSchema } from "./gemini-schema";
 
 // What Gemini sees in a photo or a clip for retouching and blurring: sensitive
 // zones (faces, plates, screens) with their boxes, a suggested light and
@@ -24,20 +25,6 @@ const DETECT_EDGE = 1536;
 
 let client: GoogleGenAI | undefined;
 const gemini = () => (client ??= new GoogleGenAI({ apiKey: env("GEMINI_API_KEY") }));
-
-/** Gemini accepts a subset of JSON Schema. */
-function geminiSchema(schema: z.ZodType): unknown {
-  const strip = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(strip);
-    if (!value || typeof value !== "object") return value;
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([key]) => key !== "$schema" && key !== "additionalProperties")
-        .map(([key, v]) => [key, strip(v)]),
-    );
-  };
-  return strip(z.toJSONSchema(schema));
-}
 
 const storedSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("photo"), width: z.number(), height: z.number(), detection: photoDetectionSchema, model: z.string() }),

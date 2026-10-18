@@ -1,8 +1,11 @@
 import "server-only";
 import { randomInt } from "node:crypto";
+import { STEAL_OPTIONS } from "@fauve/agent";
 import { z } from "zod";
 import { replyInConversation } from "@/lib/agent/conversation";
+import { answerOffer } from "@/lib/publish-offer";
 import { InstagramError, sendDirectMessage } from "@/lib/social/instagram";
+import { stealStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { readInspiration } from "@/lib/video/inspiration";
 
@@ -94,23 +97,35 @@ export async function handleDm(event: DmEvent): Promise<void> {
   }
   const studioId = contact.studio_id as string;
 
-  // Shared Reels and posts: inspirations, read once by Gemini.
+  // Shared Reels and posts: inspirations. A video has its style measured and read once (« Steal »),
+  // then she is asked whether her Reels follow it; anything else, Gemini's words about it.
   const shares = (message.attachments ?? []).filter((a) => SHARE_TYPES.has(a.type) && a.payload?.url);
   if (shares.length) {
     const { data: seen } = await db.from("inspirations").select("id").eq("studio_id", studioId).eq("external_id", message.mid).limit(1);
     if (seen?.length) return; // retried delivery
     let reading: string | null = null;
+    let stolen: { id: string; line: string } | null = null;
     for (const share of shares.slice(0, 3)) {
+      const { data: row } = await db
+        .from("inspirations")
+        .insert({ studio_id: studioId, kind: share.type, url: share.payload!.url, title: share.payload!.title ?? null, external_id: message.mid })
+        .select("id")
+        .single();
+      const style = row && share.type !== "image" ? await stealStyle(studioId, { inspirationId: row.id as string }).catch((e: unknown) => (console.warn("shared Reel: style not read", e), null)) : null;
+      if (style?.ok) {
+        stolen ??= { id: style.inspirationId, line: style.lines[0] ?? "" };
+        continue;
+      }
       const analysis = await readInspiration(studioId, share.payload!.url!).catch((e: unknown) => (console.warn("inspiration reading failed", e), null));
       reading ??= analysis;
-      await db.from("inspirations").insert({
-        studio_id: studioId,
-        kind: share.type,
-        url: share.payload!.url,
-        title: share.payload!.title ?? null,
-        external_id: message.mid,
-        analysis,
-      });
+      if (row) await db.from("inspirations").update({ analysis }).eq("id", row.id);
+    }
+    if (stolen) {
+      const text = `Noté ✨ ${stolen.line} Tu veux que tes prochains Reels suivent ce style ? Réponds « ${STEAL_OPTIONS[0]} » ou « ${STEAL_OPTIONS[1]} ».`;
+      await reply(text);
+      // Her answer is read against it (answerOffer).
+      await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "instagram", direction: "outbound", type: "text", body: text, payload: { steal_offer: stolen.id, options: STEAL_OPTIONS } });
+      return;
     }
     const firstLine = reading?.split(/(?<=\.)\s/)[0];
     await reply(firstLine ? `Noté pour ton style ✨ ${firstLine}` : "Noté pour ton style ✨ Je m’en inspire pour tes prochains montages.");
@@ -127,6 +142,22 @@ export async function handleDm(event: DmEvent): Promise<void> {
     )
     .select("id");
   if (!inserted.data?.length) return; // retried delivery
+  // « Suivre ce style » / « Non merci » under a shared Reel: answered at once.
+  const { data: last } = await db
+    .from("whatsapp_messages")
+    .select("payload")
+    .eq("studio_id", studioId)
+    .eq("channel", "instagram")
+    .eq("direction", "outbound")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const offer = await answerOffer(studioId, message.text, last, {}).catch((e: unknown) => (console.error("DM offer answer failed", e), null));
+  if (offer) {
+    await reply(offer.reply);
+    await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "instagram", direction: "outbound", type: "text", body: offer.body, payload: offer.payload });
+    return;
+  }
   const { data: owner } = await db.from("members").select("id").eq("studio_id", studioId).eq("role", "owner").limit(1).maybeSingle();
   if (!owner) return;
   const result = await replyInConversation({ studioId, memberId: owner.id as string, reactToRowId: inserted.data[0]!.id as string, channel: "instagram" });

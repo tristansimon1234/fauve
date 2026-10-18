@@ -1,6 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import { NoStudio } from "@/components/empty-state";
+import { followedOf } from "@fauve/agent";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { sanitizeProfile, toStyleForm } from "./style-profile";
 import { fauveAccount } from "@/lib/instagram-dm";
@@ -10,8 +11,9 @@ import type { Logo, MoodboardView } from "./style-options";
 import { SettingsTabs } from "@/components/settings-tabs";
 
 export const metadata: Metadata = { title: "Style" };
-// Reading a moodboard (Fauve looks at every image) can take a minute.
-export const maxDuration = 120;
+// Reading a moodboard (Fauve looks at every image) can take a minute; a Reel added to the
+// inspirations is taken, measured and read after the answer (« Steal »), up to a few minutes.
+export const maxDuration = 300;
 
 export default function StylePage() {
   return (
@@ -76,9 +78,11 @@ async function StyleLoader() {
   });
 
   const [{ data: shared }, fauve] = await Promise.all([
-    db.from("inspirations").select("id, title, url, analysis, storage_path, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(12),
+    db.from("inspirations").select("id, title, url, analysis, storage_path, created_at, styled:style->look->>name").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(12),
     fauveAccount(),
   ]);
+  // The Reel whose style her Reels follow (« Steal »).
+  const followed = followedOf(data?.profile)?.inspiration_id ?? null;
   const inspirations: Inspiration[] = (shared ?? []).map((i) => ({
     id: i.id as string,
     title: (i.title as string | null) ?? null,
@@ -86,6 +90,8 @@ async function StyleLoader() {
     analysis: (i.analysis as string | null) ?? null,
     at: i.created_at as string,
     reading: !i.analysis && Boolean(i.storage_path),
+    styled: Boolean(i.styled),
+    followed: i.id === followed,
   }));
 
   return (

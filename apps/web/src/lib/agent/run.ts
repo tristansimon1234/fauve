@@ -64,6 +64,7 @@ export type RunFauveInput = ToolContext & {
     work?: string[];
     routine?: string[];
     voice?: StudioContextForPrompt["voice"];
+    followed?: string;
   };
   /** Live: what Fauve is doing, and her words as she writes them (the app's chat). */
   onEvent?: (event: ChatEvent) => void;
@@ -145,6 +146,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           work: input.studio.work,
           routine: input.studio.routine,
           voice: input.studio.voice,
+          followed: input.studio.followed,
         }),
       },
     ],
