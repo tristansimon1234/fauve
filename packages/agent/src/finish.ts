@@ -295,13 +295,14 @@ function busyZones(facts: MediaFacts, mediaId: string, from: number, seconds: nu
  * How far each animation over her footage moves (share of the height), by segment index:
  * the rows its texts cover (measured by the scene check, `bands` by `m<index>`) set clear
  * of the faces and lettering under it (`over.busy`), 0 when they are clear already. An
- * animation that was not measured keeps the move it has.
+ * animation that was not measured keeps the move it has; one that follows what is tracked
+ * under it (its code reads `track`) is never moved: it would leave the hand it follows.
  */
 export function sceneShifts(plan: Pick<EditPlan, "segments">, bands: Record<string, [number, number]>): Map<number, number> {
   const shifts = new Map<number, number>();
   plan.segments.forEach((s, i) => {
     const band = bands[`m${i}`];
-    if (!isMotionSegment(s) || !s.over || !band) return;
+    if (!isMotionSegment(s) || !s.over || !band || /\btrack\s*\(/.test(s.motion.js ?? "")) return;
     shifts.set(i, sceneShift({ top: band[0], bottom: band[1] }, s.over.busy ?? []));
   });
   return shifts;

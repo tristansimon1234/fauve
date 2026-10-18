@@ -512,14 +512,22 @@ export async function designEdit(params: {
   const template = motionTemplateSchema.catch("doux").parse(plan.template);
   // Its fonts as the render loads them (a site's font Google does not serve gets its twin).
   const { fonts: usable } = await usableFonts(profile.fonts, (profile.custom_fonts ?? []).map((f) => f.family), template, profile.font_twins).catch(() => ({ fonts: profile.fonts }));
-  // Her charter, under the style of the Reel this one copies: the animations move as that Reel does.
+  // Her charter, under the style of the Reel this one copies: the animations move as that Reel does,
+  // and set its words as it does (bare words there keep no box of her charter).
   const signature = signatureOf({ signature: profile.signature, followed });
+  const bare = followed?.look.text.band === "none";
+  const charter = signatureLines(signature)
+    ?.split("\n")
+    .filter((line) => !(bare && line.startsWith("Phrases sur la vidéo")))
+    .join("\n");
   const designed = await designMotionScenes(
     params.studioId,
     requests,
     [
       profile.art_direction,
-      signature && `Sa charte en réglages (ses titres, son mouvement, sa lumière) :\n${signatureLines(signature)}`,
+      charter && `Sa charte en réglages (ses titres, son mouvement, sa lumière) :\n${charter}`,
+      followed &&
+        `Le Reel qu'elle t'a envoyé à recopier, pour ses mots : ${followed.look.text.composition}${bare ? " Ses mots y sont nus, sans boîte ni aplat (une ombre légère les fait lire) : fais de même." : ""}`,
       profile.moodboard?.reading && `Lecture du moodboard de la gérante : ${profile.moodboard.reading}`,
     ]
       .filter(Boolean)

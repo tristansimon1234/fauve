@@ -122,7 +122,7 @@ Plusieurs versions : compare-les et retiens la meilleure (best = son numéro, wh
 Pour la version retenue :
 - score de 1 à 10 ;
 - ok = true si elle peut partir telle quelle (8 ou plus, aucun défaut gênant) ;
-- issues : chaque défaut, avec la scène, le problème et la correction précise à demander au monteur, qui connaît les clips et les gabarits (ex. « accroche trop longue : la réduire à 3 mots », « scène 3 sombre et floue : la remplacer par un meilleur passage du même clip », « texte de la scène 2 collé au bord droit : le recentrer ») ; 4 au plus, les plus importants d'abord. Un texte ou une animation sur un visage : demande de les déplacer, jamais de changer le plan (son plus beau plan, ses sourires, restent). Dans une animation ou un collage, un texte masqué ou un plan caché : dis ce qui doit rester lisible ou visible, jamais une forme à prendre (pas « un seul tirage à la fois », « ne plus superposer », « aligner ») : la forme et sa richesse restent au motion designer ;
+- issues : chaque défaut, avec la scène, le problème et la correction précise à demander au monteur, qui connaît les clips et les gabarits (ex. « accroche trop longue : la réduire à 3 mots », « scène 3 sombre et floue : la remplacer par un meilleur passage du même clip », « texte de la scène 2 collé au bord droit : le recentrer ») ; 4 au plus, les plus importants d'abord. Un texte ou une animation sur un visage : demande de les déplacer, jamais de changer le plan (son plus beau plan, ses sourires, restent), sauf si l'effet qu'elle a demandé a besoin d'être devant un visage (un mot tenu entre ses doigts, un message posé sur elle comme dans le Reel qu'elle recopie) : sa demande l'autorise. Dans une animation ou un collage, un texte masqué ou un plan caché : dis ce qui doit rester lisible ou visible, jamais une forme à prendre (pas « un seul tirage à la fois », « ne plus superposer », « aligner ») : la forme et sa richesse restent au motion designer ;
 - summary : une phrase pour la gérante, au tutoiement, sans jargon, au passé, car elle la lit avec la vidéo finie : ce que tu as vérifié si la version peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. ») ; jamais ce qui resterait à faire (« il reste à… ») : la vidéo qu'elle reçoit est finie.`;
 
 export type ReviewMoment = { t: number; scene: number | null; label: string; texts: string[] };
@@ -131,14 +131,57 @@ const MOVE_WORDS: Record<string, string> = { in: "avance lente", out: "recul len
 
 const kindOf = (s: EditPlan["segments"][number]) => (isClipSegment(s) ? "vidéo" : isMotionSegment(s) ? "animation" : "écran de texte");
 
+/** A gesture of her videos that plays under an animation, on the Reel's clock (seconds). */
+export type GestureMoment = { t: number; what: string };
+
+/** At most this many gestures are looked at on top of the other instants. */
+const MAX_GESTURE_MOMENTS = 2;
+
+/**
+ * Where the gestures Gemini saw in her clips play under an animation (one over several shots,
+ * or a scene over her footage), on the Reel's clock: the middle of each one, earliest first.
+ * An effect that hangs on a gesture is judged at the gesture: judged at its animation's middle
+ * only, a text born between the fingers that then settled looked like it was never in her hand,
+ * and the correction undid the effect that worked.
+ */
+export function gestureMoments(plan: EditPlan, actions: Record<string, { start: number; end: number; what: string }[] | undefined>): GestureMoment[] {
+  const timeline = planTimeline(plan);
+  const layers = (plan.layers ?? []).filter((l) => !l.compose);
+  const found: GestureMoment[] = [];
+  const keep = (from: number, to: number, what: string, spans: [number, number][]) => {
+    for (const [a, b] of spans) {
+      const lo = Math.max(from, a);
+      const hi = Math.min(to, b);
+      if (hi > lo) found.push({ t: Math.round(((lo + hi) / 2) * 100) / 100, what });
+    }
+  };
+  plan.segments.forEach((s, i) => {
+    const at = timeline.segments[i]!;
+    const end = at.start + at.length;
+    if (isClipSegment(s)) {
+      const speed = s.speed ?? 1;
+      // Under the animations over several shots that play during this shot.
+      const spans = layers.flatMap((l): [number, number][] => (l.to > at.start && l.from < end ? [[Math.max(l.from, at.start), Math.min(l.to, end)]] : []));
+      if (!spans.length) return;
+      for (const g of actions[s.clip_id] ?? []) keep(at.start + (g.start - s.in) / speed, at.start + (g.end - s.in) / speed, g.what, spans);
+    } else if (isMotionSegment(s) && s.over?.in !== undefined) {
+      // Under a scene drawn over her footage, which plays on from `in`.
+      const from = s.over.in;
+      for (const g of actions[s.over.clip_id] ?? []) keep(at.start + (g.start - from), at.start + (g.end - from), g.what, [[at.start, end]]);
+    }
+  });
+  return found.sort((a, b) => a.t - b.t).filter((g, k, list) => k === 0 || g.t - list[k - 1]!.t > 0.4);
+}
+
 /**
  * The instants the critic looks at: the hook (1 s), the middle of every animation over
- * several shots, the middle of every scene, the end; at most `max`, the hook, the end and
- * the animations always kept. Each with the texts the plan puts on screen at that instant.
+ * several shots, the gestures under the animations (`gestures`, two at most, on top of
+ * `max`), the middle of every scene, the end; at most `max`, the hook, the end and the
+ * animations always kept. Each with the texts the plan puts on screen at that instant.
  * Without the animations' own instants, the critic judged the « -20 % » a manager asked
  * for missing: no scene's middle fell on it.
  */
-export function reviewMoments(plan: EditPlan, max = 8): ReviewMoment[] {
+export function reviewMoments(plan: EditPlan, max = 8, gestures: GestureMoment[] = []): ReviewMoment[] {
   const timeline = planTimeline(plan);
   const end = Math.max(0, timeline.duration - 0.5);
   const at2 = (t: number) => Math.round(t * 100) / 100;
@@ -160,16 +203,23 @@ export function reviewMoments(plan: EditPlan, max = 8): ReviewMoment[] {
   const first = at2(Math.min(0.3, timeline.duration / 8));
   const hook = at2(Math.min(1, timeline.duration / 4));
   const animations = layers.map((l) => at2((l.from + l.to) / 2)).filter((t) => t > hook + 0.2 && t < end - 0.2);
-  const middles = timeline.segments.map((s) => s.start + s.length / 2).filter((t) => t > hook + 0.4 && t < end - 0.4 && animations.every((a) => Math.abs(a - t) > 0.4));
+  const gestured = gestures
+    .map((g) => ({ ...g, t: at2(g.t) }))
+    .filter((g) => g.t > hook + 0.2 && g.t < end - 0.2 && animations.every((a) => Math.abs(a - g.t) > 0.3))
+    .slice(0, MAX_GESTURE_MOMENTS);
+  const middles = timeline.segments
+    .map((s) => s.start + s.length / 2)
+    .filter((t) => t > hook + 0.4 && t < end - 0.4 && animations.every((a) => Math.abs(a - t) > 0.4) && gestured.every((g) => Math.abs(g.t - t) > 0.4));
   // Even spread over the scenes when there are too many.
   const room = Math.max(0, max - 3 - animations.length);
   const picked = middles.length <= room ? middles : Array.from({ length: room }, (_, k) => middles[Math.round((k * (middles.length - 1)) / Math.max(1, room - 1))]!);
-  const times = [...new Set([first, hook, ...animations, ...picked, end].map(at2))].sort((a, b) => a - b);
+  const times = [...new Set([first, hook, ...animations, ...gestured.map((g) => g.t), ...picked, end].map(at2))].sort((a, b) => a - b);
   return times.map((t, k) => {
     const i = sceneAt(t);
     const segment = plan.segments[i]!;
     const where = `scène ${i + 1} (${kindOf(segment)})`;
     const layer = animations.includes(t) ? layers.find((l) => t >= l.from && t < l.to) : undefined;
+    const gesture = gestured.find((g) => g.t === t);
     const label =
       t === first
         ? `1re image · ${where}`
@@ -179,7 +229,9 @@ export function reviewMoments(plan: EditPlan, max = 8): ReviewMoment[] {
             ? `Fin · ${where}`
             : layer
               ? `Animation sur plusieurs plans (de ${seconds(layer.from)} à ${seconds(layer.to)} s) · ${where}`
-              : `Scène ${i + 1} (${kindOf(segment)})`;
+              : gesture
+                ? `Pendant un geste sous une animation (« ${gesture.what.slice(0, 100)} ») · ${where}`
+                : `Scène ${i + 1} (${kindOf(segment)})`;
     return { t, scene: i + 1, label, texts: textsAt(t) };
   });
 }

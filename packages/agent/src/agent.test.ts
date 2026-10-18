@@ -898,6 +898,43 @@ test("critic: key frames at the hook, every scene and the end, with the texts on
   assert.equal(counted.length, 6);
   assert.ok(counted.some((m) => m.t === 12 && m.label.startsWith("Animation")));
 
+  // Her gestures under an animation are looked at while they happen, on the Reel's clock: the
+  // text born between his fingers was judged only after it had settled, and the fix undid it.
+  const { gestureMoments } = await import("./critic.ts");
+  const pinched = editPlanSchema.parse({
+    ...plan,
+    segments: [
+      { clip_id: "a", in: 0, out: 2 },
+      { clip_id: "b", in: 3, out: 9, speed: 0.5 },
+      { motion: { brief: "un titre" }, duration: 2, over: { clip_id: "c", in: 4 } },
+    ],
+    layers: [{ motion: { brief: "le texte grossit entre ses doigts" }, from: 3, to: 12 }],
+  });
+  const actions = {
+    a: [{ start: 0.5, end: 1.5, what: "il marche" }],
+    b: [
+      { start: 3.5, end: 4.5, what: "il pince les doigts" },
+      { start: 6, end: 7, what: "il écarte les doigts" },
+    ],
+    c: [{ start: 4.5, end: 5, what: "il sourit" }],
+  };
+  const gestures = gestureMoments(pinched, actions);
+  // Shot b plays from 2 s at half speed: 3.5 → 3 s, 4.5 → 5 s (its middle, 4); 6 → 8 s, 7 → 10 s (9).
+  // Shot a has no animation over it; the scene over clip c plays it from 4 s, at 14 s: 4.5 → 14.5, 5 → 15.
+  assert.deepEqual(
+    gestures.map((g) => [g.t, g.what]),
+    [
+      [4, "il pince les doigts"],
+      [9, "il écarte les doigts"],
+      [14.75, "il sourit"],
+    ],
+  );
+  const watched = reviewMoments(pinched, 8, gestures);
+  const atGesture = watched.filter((m) => m.label.startsWith("Pendant un geste"));
+  assert.equal(atGesture.length, 2);
+  assert.match(atGesture[0]!.label, /il pince les doigts/);
+  assert.ok(watched.some((m) => m.label.startsWith("Animation sur plusieurs plans")));
+
   const brief = fixBrief({ score: 6, issues: [{ scene: 1, problem: "accroche trop longue", fix: "la réduire à 3 mots" }] }, "Ouverture dynamique");
   assert.match(brief, /6\/10/);
   assert.match(brief, /Scène 1 : accroche trop longue → la réduire à 3 mots/);
@@ -2625,6 +2662,9 @@ test("off faces: one subtitle row for the Reel, animations moved off the faces u
   const kept = withShifts(out, shifts)!;
   assert.equal((kept.segments[0] as { motion: { shift: number } }).motion.shift, 0.29);
   assert.equal(withShifts(kept, shifts), null);
+  // An animation that follows a hand (its code reads track) is never slid: it would leave the hand.
+  const following = { ...out, segments: out.segments.map((s, i) => (i === 0 && "motion" in s ? { ...s, motion: { ...s.motion, js: "const h = track(frame).hands[0];" } } : s)) };
+  assert.equal(sceneShifts(following, { m0: [0.09, 0.36] }).has(0), false);
 
   // The render gets both: the scene's move, the subtitles' one row.
   const withCode = { ...kept, segments: kept.segments.map((s) => ("motion" in s ? { ...s, motion: { ...s.motion, js: "function Scene(){return null}" } } : s)) };
