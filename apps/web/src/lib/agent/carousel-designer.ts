@@ -28,6 +28,7 @@ import { ensureCutouts } from "@/lib/render/cutout";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { renderStillsInSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { photoRegions } from "@/lib/video/regions";
 import { anthropic, logClaudeCost } from "./run";
 
 // The carousel designer: from her photos, her charter and her words, Opus composes the
@@ -69,7 +70,27 @@ export type CarouselRound =
 
 type Context = Awaited<ReturnType<typeof loadContext>>;
 
-async function loadContext(input: CarouselRequest, options: { cutouts: boolean }) {
+/** Her photos for the carousel: images only, in her order (default: the post's), 10 at most. */
+async function carouselPhotoIds(input: CarouselRequest): Promise<string[]> {
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("media_ids").eq("id", input.postId).eq("studio_id", input.studioId).single();
+  const ids = (input.mediaIds?.length ? input.mediaIds : ((post?.media_ids as string[] | null) ?? [])).slice(0, 10);
+  if (!ids.length) return [];
+  const { data: kinds } = await db.from("media_assets").select("id, kind").eq("studio_id", input.studioId).in("id", ids);
+  return ids.filter((id) => kinds?.some((k) => k.id === id && k.kind === "image"));
+}
+
+/**
+ * Before the designer: her photos read and their subjects cut out (their own sandbox, a few
+ * minutes when it starts cold), in a step of their own so the designer's step keeps its time.
+ */
+export async function prepareCarousel(input: CarouselRequest): Promise<void> {
+  const ids = await carouselPhotoIds(input);
+  if (!ids.length) return;
+  await Promise.all([ensureCutouts(input.studioId, ids), ...ids.map((id) => photoRegions(input.studioId, id).catch((e: unknown) => console.warn("carousel: photo not read", id, e)))]);
+}
+
+async function loadContext(input: CarouselRequest) {
   const db = supabaseAdmin();
   const [post, studio, profileRow] = await Promise.all([
     db.from("posts").select("id, title, kind, media_ids, slides").eq("id", input.postId).eq("studio_id", input.studioId).single(),
@@ -78,11 +99,7 @@ async function loadContext(input: CarouselRequest, options: { cutouts: boolean }
   ]);
   if (post.error) throw new Error("Publication introuvable");
   const plan = slidesPlanSchema.safeParse(post.data.slides);
-  const ids = (input.mediaIds?.length ? input.mediaIds : ((post.data.media_ids as string[] | null) ?? [])).slice(0, 10);
-  const { data: kinds } = await db.from("media_assets").select("id, kind").eq("studio_id", input.studioId).in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
-  const photoIds = ids.filter((id) => kinds?.some((k) => k.id === id && k.kind === "image"));
-  // Her subjects cut out once (their own sandbox), before the designer decides what to do with them.
-  if (options.cutouts && photoIds.length) await ensureCutouts(input.studioId, photoIds);
+  const photoIds = await carouselPhotoIds(input);
   // The zones she asked to blur on a photo (its slide's retouch) stay blurred in the design.
   const blur: Record<string, PhotoEdit["blur"]> = Object.fromEntries(plan.success ? plan.data.slides.flatMap((s) => (s.edit?.blur?.length ? [[s.media_id, s.edit.blur]] : [])) : []);
   const [photos, inputs] = await Promise.all([carouselPhotos(input.studioId, photoIds, blur), loadMontageInputs(input.studioId, { segments: [] })]);
@@ -260,11 +277,9 @@ export async function carouselRound(
   input: CarouselRequest,
   round: number,
   previous?: CarouselPrevious & { fixed?: boolean },
-  onStage?: (stage: "design" | "review") => Promise<void>,
+  onStage?: (stage: "review") => Promise<void>,
 ): Promise<CarouselRound> {
-  const ctx = await loadContext(input, { cutouts: round === 0 });
-  // Its subjects cut out (a few minutes on a cold sandbox): the job is still alive.
-  await onStage?.("design");
+  const ctx = await loadContext(input);
   let output: CarouselOutput;
   try {
     output = await design(input, ctx, previous);

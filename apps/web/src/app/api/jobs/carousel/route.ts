@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { z } from "zod";
 import { carouselOutputSchema, CREDIT_PRICES } from "@fauve/agent";
-import { carouselRound } from "@/lib/agent/carousel-designer";
+import { carouselRound, prepareCarousel } from "@/lib/agent/carousel-designer";
 import { storeCarousel } from "@/lib/carousels";
 import { chargeCredits } from "@/lib/credits";
 import { env } from "@/lib/env";
@@ -28,6 +28,8 @@ const bodySchema = z.object({
   /** Images of carousels she likes (her media), shown to the designer. */
   examples: z.array(z.uuid()).max(3).optional(),
   round: z.number().int().min(0).max(5).default(0),
+  /** Her photos are read and cut out (the first step); then the designer's rounds. */
+  prepared: z.boolean().default(false),
   previous: z
     .object({
       output: carouselOutputSchema,
@@ -74,7 +76,12 @@ export async function POST(request: Request) {
     try {
       await setJobStage(job.jobId, job.previous?.fixed ? "fix" : "design");
       const input = { studioId: job.studioId, postId: job.postId, request: job.request, mediaIds: job.mediaIds, fresh: job.fresh, examples: job.examples };
-      const result = await carouselRound(input, job.round, job.previous, (stage) => setJobStage(job.jobId, stage === "design" && job.previous?.fixed ? "fix" : stage));
+      if (!job.prepared) {
+        await prepareCarousel(input);
+        await queueJob("carousel", { ...job, prepared: true });
+        return;
+      }
+      const result = await carouselRound(input, job.round, job.previous, (stage) => setJobStage(job.jobId, stage));
       if (result.status === "retry") {
         // A version that passed its test render is kept now: if the correction fails, it is the one delivered.
         if (result.design && result.stills) await storeCarousel(job.studioId, job.postId, result.design, result.stills);
