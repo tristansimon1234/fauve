@@ -14,7 +14,7 @@ import type { EditPlan } from "./schemas.ts";
 // voice over, the page and the publishing stay the chain's for both.
 
 /** No session may spend more than this at list prices, in cents, whatever she can pay: the lab's kamehameha took $3.99 with one revision. */
-export const EFFECTS_MAX_CENTS = 800;
+export const EFFECTS_MAX_CENTS = 600;
 /** The grader's rounds: a first take and one revision (each one about ten minutes). */
 export const EFFECTS_MAX_ITERATIONS = 2;
 /** Longest a session is waited for before the chain takes the Reel back. */
@@ -27,11 +27,8 @@ export const EFFECTS_TIMEOUT_MINUTES = 60;
 
 /** What one credit pays of an effect's real cost, the margin kept (on the plan where a credit is worth least). */
 export const EFFECT_EUR_PER_CREDIT = CREDIT_VALUE_EUR * (1 - TARGET_MARGIN);
-/**
- * The most an effect is charged, a new Reel or a correction (from the version she saw: usually one take). Raised a notch
- * (Tristan: « relève un poil le budget ») once the agent, told a budget of $5.09, spent $1.24 and $2.03 on the fingers and the kamehameha.
- */
-export const EFFECT_MAX_CREDITS = { reel: 50, fix: 30 } as const;
+/** The most an effect is charged, a new Reel or a correction (from the version she saw: usually one take). */
+export const EFFECT_MAX_CREDITS = { reel: 40, fix: 25 } as const;
 /** Below this ceiling (her credits are running out), the session's budget is too small for an effect: the chain makes it. */
 export const EFFECT_MIN_CREDITS = { reel: 20, fix: 12 } as const;
 /** Besides the agent: the render of its video with Simone's music (render-post). */
@@ -144,7 +141,7 @@ export function effectsTask(input: EffectsTaskInput): string {
       ? ["", `C'est une correction : la version qu'elle a vue est ${UPLOADS}/${input.previous.name}. Garde ce qui marche, change ce qu'elle demande, et rien d'autre.`]
       : []),
     "",
-    `Ton budget : ${input.budgetUsd.toFixed(2).replace(".", ",")} $ pour tout le Reel, à prix catalogue (chaque appel compte, chaque image regardée aussi) ; à la limite, la session s'arrête net. Il est là pour que l'effet soit juste : prends le temps de regarder, de mesurer et de corriger autant qu'il le faut, sans gaspiller (des planches de petites images plutôt qu'une image à la fois, tes essais en petit, 540×960 sur le passage du geste, le 1080×1920 pour les versions à garder). Dès que tu as une version finie, garde-la dans ${OUTPUTS}/reel.mp4 avec message.txt, puis améliore-la.`,
+    `Ton budget : ${input.budgetUsd.toFixed(2).replace(".", ",")} $ pour tout le Reel, à prix catalogue (chaque appel compte, chaque image regardée aussi) ; à la limite, la session s'arrête net. Dès que tu as une version finie, garde-la dans ${OUTPUTS}/reel.mp4 avec message.txt, puis améliore-la. Pour tenir : regarde des planches de petites images plutôt qu'une image à la fois, fais tes essais en petit (540×960, sur le passage du geste) et ne rends en 1080×1920 que les versions à garder.`,
     ...(voice
       ? [
           "",
