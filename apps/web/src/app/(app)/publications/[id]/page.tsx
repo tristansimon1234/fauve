@@ -33,6 +33,8 @@ import { PostReview } from "@/components/review/post-review";
 import { loadReview } from "@/lib/review";
 import { PostEditor } from "./post-editor";
 import { CarouselEditor } from "./carousel-editor";
+import { DesignedCarousel } from "@/components/montage/designed-carousel";
+import { carouselPhotos } from "@/lib/render/carousel";
 
 export const metadata: Metadata = { title: "Publication" };
 
@@ -194,6 +196,17 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         }
       : null;
 
+  // A carousel Simone composed: its slides drawn live from its code, its words editable here.
+  const plannedSlides = post.kind === "carousel" || post.kind === "post" ? postSlides({ slides: post.slides, media_ids: post.media_ids }) : null;
+  const composed = plannedSlides?.design
+    ? {
+        design: plannedSlides.design,
+        template: plannedSlides.template,
+        photos: (await carouselPhotos(studioId, plannedSlides.design.photos, Object.fromEntries(plannedSlides.slides.flatMap((s) => (s.edit?.blur?.length ? [[s.media_id, s.edit.blur]] : []))))).map((p) => p.photo),
+        brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, logoOnDark: i.logoOnDark, fonts: i.fonts, colors: i.colors, customFonts: i.customFonts, signature: i.signature })),
+      }
+    : null;
+
   const tiktok = await tiktokPanel(studioId, post, canEdit);
   // A story with a link: her booking link goes with it on WhatsApp.
   const bookingUrl =
@@ -348,7 +361,15 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         </div>
       </div>
 
-      {slides ? (
+      {composed ? (
+        // A composed carousel: the publication, the slide as it will be published, its words.
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(250px,290px)_minmax(0,1fr)_minmax(300px,360px)]">
+          <div className="order-3 flex min-w-0 flex-col gap-4 xl:order-none">
+            {details}
+          </div>
+          <DesignedCarousel key={versionKey(composed.design)} postId={post.id} design={composed.design} template={composed.template} photos={composed.photos} brand={composed.brand} canEdit={canEdit} />
+        </div>
+      ) : slides ? (
         // Text over the photos, laid out like the montage editor: the publication, the photo, the selected photo's texts.
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(250px,290px)_minmax(0,1fr)_minmax(300px,360px)]">
           <div className="order-3 flex min-w-0 flex-col gap-4 xl:order-none">

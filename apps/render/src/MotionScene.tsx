@@ -24,7 +24,7 @@ import type { ComposeShot, ReelProps, Scene, ScenePhoto } from "./types";
 // render time falls back to the fixed scene, so a video always goes out.
 
 /** A white scissor rim around a cut-out (shadows of paper colour all around), then a warm shadow. */
-const scissorRim = (rim: number, shadow: boolean): RimSpec => ({
+export const scissorRim = (rim: number, shadow: boolean): RimSpec => ({
   rim: Math.max(0, rim),
   diag: Math.round(Math.max(0, rim) * 0.7),
   ...(shadow ? { shadow: { y: Math.round(Math.max(0, rim) * 3 + 8), blur: Math.round(Math.max(0, rim) * 3.5 + 10), color: "rgba(40,26,10,0.32)" } } : {}),
@@ -112,8 +112,8 @@ export type SceneComponent = (props: {
   track: TrackFn;
 }) => ReactNode;
 
-/** The component a generated code defines (`Scene` for a motion scene, `Layer` for a text layer), or null. */
-export function compileComponent<C>(js: string, name: "Scene" | "Layer" | "Element", scope: typeof SCOPE = SCOPE): C | null {
+/** The component a generated code defines (`Scene` for a motion scene, `Layer` for a text layer, `Carousel` for a whole carousel…), or null. */
+export function compileComponent<C>(js: string, name: "Scene" | "Layer" | "Element" | "Carousel", scope: Record<string, unknown> = SCOPE): C | null {
   try {
     const factory = new Function(
       "React",

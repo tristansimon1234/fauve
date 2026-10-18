@@ -4,6 +4,7 @@ import {
   cleanCaption,
   periodTotals,
   weeklyGrowth,
+  type CarouselDesign,
   type DailyRow,
   assertTransition,
   postStatusSchema,
@@ -64,6 +65,7 @@ import { ensureTranscript } from "@/lib/voice";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { elementInstance, listElements, loadElement, markElementsUsed, placeElements } from "@/lib/elements";
 import { startElements } from "@/lib/elements-start";
+import { startCarousel } from "@/lib/carousels";
 import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
 import { listInspirations } from "@/lib/inspirations";
@@ -96,6 +98,8 @@ export type ToolContext = {
   notes: string[];
   /** The studio's time zone, for the local dates in tool results. */
   timezone?: string;
+  /** The app's conversation being answered: work started from it is delivered in it. */
+  conversationId?: string;
 };
 
 /**
@@ -146,12 +150,25 @@ function missingContent(kind: PostKind, hasRender: boolean, media: number): stri
   return null;
 }
 
+/** A composed carousel as Simone reads it: what each slide says, and its words slot by slot. */
+function composedLines(design: CarouselDesign) {
+  const words = (slide: number) => design.slots.filter((s) => s.slide === slide).map((s) => ({ slot: s.name, texte: design.texts[s.name] ?? "", max: s.max_chars }));
+  return {
+    nom: design.name,
+    diapositives: Array.from({ length: design.count }, (_, i) => ({ diapositive: i + 1, dit: design.outline[i], textes: words(i + 1) })),
+    ...(words(0).length ? { sur_toutes: words(0) } : {}),
+    note: "Ses mots : carousel_texts (gratuit). Sa mise en page, l'ordre, une diapositive de plus : design_carousel (une correction).",
+  };
+}
+
 /** Tools that spend (models, renders, images): refused without a subscription or credits. */
 const COSTLY_TOOLS = [
   "analyze_clips",
   "montage",
   "restyle_reel",
   "render",
+  "design_carousel",
+  "carousel_texts",
   "write_on_photos",
   "retouch_photos",
   "make_image",
@@ -179,6 +196,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     const { data } = await db.from("media_assets").select("id").eq("studio_id", studioId).in("id", ids);
     if ((data?.length ?? 0) !== new Set(ids).size) throw new Error("Un des media_id n'appartient pas à ce studio.");
   }
+
+  /** A carousel composed by the carousel designer: its words and its layout change their own way. */
+  async function designedCarousel(postId: string): Promise<boolean> {
+    const { data } = await db.from("posts").select("slides").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+    return Boolean(slidesPlanSchema.safeParse(data?.slides).data?.design);
+  }
+  const DESIGNED =
+    "Ce carrousel est composé par Simone (design_carousel) : ses mots se changent avec carousel_texts (gratuit), sa mise en page ou son style avec design_carousel (une correction, avec le changement demandé et l'exemple s'il y en a un).";
 
   /**
    * A change to a Reel the effects agent drew (its voice, its blur): the agent makes the effect again
@@ -661,10 +686,50 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
+    async design_carousel({ post_id, request, media_ids, fresh, example_media_ids }) {
+      const post = unwrap(await db.from("posts").select("id, kind, status, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
+      if (post.kind !== "carousel" && post.kind !== "post") return json({ error: "Un carrousel composé est pour un carrousel ou un post photo (create_post kind carousel). Pour un Reel, c'est un montage." });
+      if (post.status === "published" || post.status === "measured") return json({ error: "Cette publication est déjà en ligne." });
+      if (media_ids?.length) await assertOwnMedia(media_ids);
+      if (example_media_ids?.length) {
+        const { data: examples } = await db.from("media_assets").select("id, kind").eq("studio_id", studioId).in("id", example_media_ids);
+        if ((examples ?? []).filter((e) => e.kind === "image").length !== new Set(example_media_ids).size) return json({ error: "Un exemple doit être une image de sa médiathèque (photo ou capture d'écran)." });
+      }
+      const started = await startCarousel({ studioId, postId: post_id, request, mediaIds: media_ids, fresh, examples: example_media_ids, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
+      if (started.status === "already_running") {
+        return json({ status: "already_running", etape: started.stage, depuis_minutes: started.minutes, note: "Ce carrousel est déjà en cours : ne relance rien. Dis où il en est ; le message arrive tout seul." });
+      }
+      if (started.status === "error") return json({ error: started.error });
+      ctx.notes.push(`carrousel en cours pour la publication ${post_id}`);
+      return json({
+        status: "started",
+        credits: started.credits,
+        note: "Simone compose le carrousel, en fait un rendu d'essai, le relit et le corrige : 3 à 6 minutes. Les crédits sont débités une fois livré et le lien part tout seul. Annonce-le en une phrase (délai et coût), sans lien.",
+      });
+    },
+
+    async carousel_texts({ post_id, texts }) {
+      const post = unwrap(await db.from("posts").select("id, status, slides").eq("id", post_id).eq("studio_id", studioId).single());
+      if (post.status === "published" || post.status === "measured") return json({ error: "Cette publication est déjà en ligne." });
+      const plan = slidesPlanSchema.safeParse(post.slides);
+      const design = plan.success ? plan.data.design : undefined;
+      if (!plan.success || !design) return json({ error: "Ce n'est pas un carrousel composé : pour ses textes, write_on_photos ; pour le composer, design_carousel." });
+      const known = new Set(design.slots.map((s) => s.name));
+      const unknown = texts.filter((t) => !known.has(t.slot)).map((t) => t.slot);
+      if (unknown.length) return json({ error: `Slots inconnus : ${unknown.join(", ")}. Ceux de ce carrousel : ${[...known].join(", ")} (read_post).` });
+      const next = { ...design, texts: { ...design.texts, ...Object.fromEntries(texts.map((t) => [t.slot, t.text])) } };
+      await saveSlides(studioId, post_id, plan.data, { design: next });
+      ctx.afterReply.push(async () => {
+        await renderSlidesAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
+      });
+      return json({ status: "started", note: "Les nouveaux mots sont posés après ta réponse (environ une minute) et le lien part tout seul. Annonce-le en une phrase." });
+    },
+
     async write_on_photos({ post_id, template, slides }) {
       const post = unwrap(
         await db.from("posts").select("id, kind, status, media_ids, slides").eq("id", post_id).eq("studio_id", studioId).single(),
       );
+      if (slidesPlanSchema.safeParse(post.slides).data?.design) return json({ error: DESIGNED });
       if (post.kind !== "carousel" && post.kind !== "post") {
         return json({ error: "Le texte sur photos est pour un carrousel ou un post photo. Pour un Reel, les textes font partie du montage." });
       }
@@ -884,6 +949,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async place_elements({ post_id, photos, mode }) {
+      if (await designedCarousel(post_id)) return json({ error: DESIGNED });
       const bank = new Map((await listElements(studioId)).map((e) => [e.id, e]));
       const missing = new Set<string>();
       const unknownSlots = new Set<string>();
@@ -926,6 +992,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (post_id) {
         const post = unwrap(await db.from("posts").select("kind, status, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
         if (post.kind !== "carousel" && post.kind !== "post") return json({ error: "Les composants se posent sur les photos d'un carrousel ou d'un post photo. Pour un Reel, les textes font partie du montage." });
+        if (await designedCarousel(post_id)) return json({ error: DESIGNED });
         if (post.status === "published" || post.status === "measured") return json({ error: "Cette publication est déjà en ligne." });
         if (!((post.media_ids as string[] | null) ?? []).length) return json({ error: "Cette publication n'a pas encore de photos : ajoute-les d'abord (update_post media_ids)." });
       }
@@ -1063,6 +1130,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
               gabarit_photos: slides.data.template,
             }
           : {}),
+        ...(slides.success && slides.data.design ? { carrousel_compose: composedLines(slides.data.design) } : {}),
         ...(montage ? { montage } : {}),
       });
     },
@@ -1075,6 +1143,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
       const { data: post } = await db.from("posts").select("slides").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
       const slidesTemplate = slidesPlanSchema.safeParse(post?.slides);
+      if (slidesTemplate.data?.design) return json({ error: DESIGNED });
       const starts = new Map<string, TextLook>();
       const startFor = async (role: "hook" | "band" | "caption") => {
         if (!starts.has(role)) starts.set(role, await lookDefaults(studioId, slidesTemplate.success ? slidesTemplate.data.template : undefined, role));

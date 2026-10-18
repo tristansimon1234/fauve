@@ -2,14 +2,18 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import {
   alignSlides,
+  buildCarouselProps,
   buildSlideProps,
   postStatusSchema,
   SLIDE_FRAME,
   slidesPlanSchema,
+  type CarouselDesign,
+  type ReelInputs,
   type SlidesPlan,
 } from "@fauve/agent";
 import { jpegPath } from "@/lib/social/media-urls";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { carouselPhotos } from "./carousel";
 import { loadMontageInputs, towardsDraft } from "./render-post";
 import { renderStillsInSandbox, sandboxCostEur } from "./sandbox";
 
@@ -20,7 +24,7 @@ import { renderStillsInSandbox, sandboxCostEur } from "./sandbox";
 export type SlidesRender = {
   /** Key of the plan the paths were rendered from. */
   key: string | null;
-  /** One rendered image per photo of the post, or null (a video, or a photo left as is). */
+  /** One rendered image per photo of the post, or null (a video, or a photo left as is); for a designed carousel, one per slide. */
   paths: (string | null)[];
   /** Key being rendered, and since when (publishing waits for it). */
   pending?: string | null;
@@ -29,7 +33,7 @@ export type SlidesRender = {
 };
 
 export const slidesKey = (plan: SlidesPlan) => createHash("sha256").update(JSON.stringify(plan)).digest("hex").slice(0, 16);
-export const hasTexts = (plan: SlidesPlan) => plan.slides.some((s) => s.texts.length > 0 || s.layer || s.elements?.length || s.logo || s.edit);
+export const hasTexts = (plan: SlidesPlan) => Boolean(plan.design) || plan.slides.some((s) => s.texts.length > 0 || s.layer || s.elements?.length || s.logo || s.edit);
 
 /** A post's slides plan, one slide per photo in order; null without one. */
 export function postSlides(post: { slides: unknown; media_ids: string[] | null }): SlidesPlan | null {
@@ -39,17 +43,20 @@ export function postSlides(post: { slides: unknown; media_ids: string[] | null }
 
 /**
  * The rendered image to publish for each photo, by media id, when the render is
- * the current plan's. `state`: "ready" (nothing to render or rendered),
+ * the current plan's; for a designed carousel, its slides in order (`designed`), published
+ * instead of the photos. `state`: "ready" (nothing to render or rendered),
  * "rendering" (wait for it) or "failed".
  */
 export function slidesToPublish(post: { slides: unknown; slides_render: unknown; media_ids: string[] | null }): {
   state: "ready" | "rendering" | "failed";
   rendered: Record<string, string>;
+  designed?: string[];
 } {
   const plan = postSlides(post);
   if (!plan || !hasTexts(plan)) return { state: "ready", rendered: {} };
   const render = (post.slides_render ?? null) as SlidesRender | null;
   const key = slidesKey(plan);
+  if (render?.key === key && plan.design) return { state: "ready", rendered: {}, designed: render.paths.filter((p): p is string => Boolean(p)) };
   if (render?.key === key) {
     const rendered: Record<string, string> = {};
     plan.slides.forEach((s, i) => {
@@ -76,13 +83,20 @@ export async function knownLayerCode(studioId: string, postId: string): Promise<
   ]);
 }
 
-/** Saves a slides plan for the post (aligned with its photos) and marks it to render. */
-export async function saveSlides(studioId: string, postId: string, input: unknown): Promise<SlidesPlan> {
+/**
+ * Saves a slides plan for the post (aligned with its photos) and marks it to render. Its designed
+ * carousel stays the one kept on the post (its code never comes from a caller's plan) unless
+ * `design` sets a new one (the carousel designer) or null removes it.
+ */
+export async function saveSlides(studioId: string, postId: string, input: unknown, options: { design?: CarouselDesign | null } = {}): Promise<SlidesPlan> {
   const db = supabaseAdmin();
-  const { data: post, error } = await db.from("posts").select("media_ids, slides_render").eq("id", postId).eq("studio_id", studioId).single();
+  const { data: post, error } = await db.from("posts").select("media_ids, slides, slides_render").eq("id", postId).eq("studio_id", studioId).single();
   if (error) throw new Error(error.message);
-  const plan = alignSlides(slidesPlanSchema.parse(input), (post.media_ids as string[] | null) ?? []);
-  if (!plan.slides.length) throw new Error("Cette publication n'a pas encore de photos");
+  const kept = slidesPlanSchema.safeParse(post.slides).data?.design;
+  const design = options.design === undefined ? kept : (options.design ?? undefined);
+  const given = slidesPlanSchema.parse(input);
+  const plan = alignSlides({ template: given.template, slides: given.slides, ...(design ? { design } : {}) }, (post.media_ids as string[] | null) ?? []);
+  if (!plan.slides.length && !plan.design) throw new Error("Cette publication n'a pas encore de photos");
   const render = (post.slides_render ?? { key: null, paths: [] }) as SlidesRender;
   const { error: saveError } = await db
     .from("posts")
@@ -91,6 +105,33 @@ export async function saveSlides(studioId: string, postId: string, input: unknow
     .eq("studio_id", studioId);
   if (saveError) throw new Error(saveError.message);
   return plan;
+}
+
+type SlideJob = { id: string; frame: number; props: ReturnType<typeof buildSlideProps> };
+
+/** Every photo of the post through the render, texts or not: the slides share one 4:5 frame. */
+async function photoJobs(studioId: string, plan: SlidesPlan, brand: ReelInputs["brand"]): Promise<SlideJob[]> {
+  const db = supabaseAdmin();
+  const ids = plan.slides.map((s) => s.media_id);
+  const { data: assets } = await db.from("media_assets").select("id, storage_path, kind, mime_type").eq("studio_id", studioId).in("id", ids);
+  const byId = new Map((assets ?? []).map((a) => [a.id as string, a]));
+  const jobs: SlideJob[] = [];
+  for (const [i, slide] of plan.slides.entries()) {
+    const asset = byId.get(slide.media_id);
+    if (!asset || asset.kind === "video" || String(asset.mime_type ?? "").startsWith("video/")) continue;
+    const jpeg = await jpegPath(studioId, asset.storage_path as string, (asset.mime_type as string | null) ?? null);
+    const signed = await db.storage.from("media").createSignedUrl(jpeg, 3600);
+    if (!signed.data) throw new Error(`Photo ${slide.media_id} introuvable`);
+    jobs.push({ id: `s${i}`, frame: SLIDE_FRAME, props: buildSlideProps(slide, { template: plan.template, imageUrl: signed.data.signedUrl, brand }) });
+  }
+  return jobs;
+}
+
+/** The slides of a designed carousel, each a still of its code, with her photos in its order (and the zones she asked to blur). */
+async function designJobs(studioId: string, plan: SlidesPlan, design: CarouselDesign, brand: ReelInputs["brand"]): Promise<SlideJob[]> {
+  const blur = Object.fromEntries(plan.slides.flatMap((s) => (s.edit?.blur?.length ? [[s.media_id, s.edit.blur]] : [])));
+  const photos = (await carouselPhotos(studioId, design.photos, blur)).map((p) => p.photo);
+  return Array.from({ length: design.count }, (_, i) => ({ id: `s${i}`, frame: SLIDE_FRAME, props: buildCarouselProps(design, i, { template: plan.template, brand, photos }) }));
 }
 
 /** Renders the post's slides (photos with their texts) and stores the images. */
@@ -113,24 +154,14 @@ export async function renderSlides(studioId: string, postId: string): Promise<Sl
   try {
     let paths: (string | null)[] = plan.slides.map(() => null);
     if (hasTexts(plan)) {
-      const ids = plan.slides.map((s) => s.media_id);
-      const { data: assets } = await db.from("media_assets").select("id, storage_path, kind, mime_type").eq("studio_id", studioId).in("id", ids);
-      const byId = new Map((assets ?? []).map((a) => [a.id as string, a]));
       const inputs = await loadMontageInputs(studioId, { segments: [] });
       const brand = { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts, signature: inputs.signature };
-      // Every photo goes through the render, texts or not: the slides share one 4:5 frame.
-      const jobs = [];
-      for (const [i, slide] of plan.slides.entries()) {
-        const asset = byId.get(slide.media_id);
-        if (!asset || asset.kind === "video" || String(asset.mime_type ?? "").startsWith("video/")) continue;
-        const jpeg = await jpegPath(studioId, asset.storage_path as string, (asset.mime_type as string | null) ?? null);
-        const signed = await db.storage.from("media").createSignedUrl(jpeg, 3600);
-        if (!signed.data) throw new Error(`Photo ${slide.media_id} introuvable`);
-        jobs.push({ id: `s${i}`, frame: SLIDE_FRAME, props: buildSlideProps(slide, { template: plan.template, imageUrl: signed.data.signedUrl, brand }) });
-      }
+      const jobs = plan.design ? await designJobs(studioId, plan, plan.design, brand) : await photoJobs(studioId, plan, brand);
       const images = await renderStillsInSandbox(`slides-${randomUUID()}`, jobs);
+      // A designed carousel publishes its slides; else one image per photo.
+      const count = plan.design ? plan.design.count : plan.slides.length;
       paths = await Promise.all(
-        plan.slides.map(async (_, i) => {
+        Array.from({ length: count }, async (_, i) => {
           const image = images[`s${i}`];
           if (!image) return null;
           if (image instanceof Error) throw image;
@@ -147,7 +178,7 @@ export async function renderSlides(studioId: string, postId: string): Promise<Sl
         provider: "vercel_sandbox",
         units: seconds,
         cost_eur: sandboxCostEur(seconds),
-        meta: { post_id: postId, engine: "remotion_still", slides: jobs.length },
+        meta: { post_id: postId, engine: "remotion_still", slides: jobs.length, ...(plan.design ? { design: plan.design.name } : {}) },
       });
     }
     const render: SlidesRender = { key, paths, pending: null, pending_at: null, error: null };

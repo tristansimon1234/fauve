@@ -48,7 +48,9 @@ export async function postCovers(db: Db, studioId: string, posts: CoverPost[]): 
       continue;
     }
     const first = p.media_ids?.[0];
-    const rendered = first ? slidesToPublish(p).rendered[first] : undefined;
+    const slides = slidesToPublish(p);
+    // A designed carousel's cover is its first slide.
+    const rendered = slides.designed?.[0] ?? (first ? slides.rendered[first] : undefined);
     const asset = first ? byId.get(first) : undefined;
     if (rendered) paths.set(p.id, { path: rendered, video: false });
     else if (asset) paths.set(p.id, { path: asset.storage_path as string, video: isVideo(asset) });

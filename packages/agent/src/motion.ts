@@ -126,6 +126,8 @@ export type ScenePhoto = {
   /** The edges of the photo that cut the subject (a bust at the bottom, a shoulder on the left): it comes in from there. */
   cutEdges?: ("top" | "bottom" | "left" | "right")[];
 };
+/** One of her photos in a designed carousel: as a scene gets it, with its retouch (light, framing on its subject, blurred zones). */
+export type CarouselPhoto = ScenePhoto & { edit?: PhotoEdit };
 export type ReelText = {
   text: string;
   style: "hook" | "band" | "caption";
@@ -233,6 +235,22 @@ export type ReelProps = {
     place?: { x: number; y: number; scale: number };
     /** Its accent colour, instead of the studio's. */
     accent?: string;
+  } | null;
+  /**
+   * A whole carousel designed as code (carousel.ts): the slide drawn here (`slide`, from 0, of
+   * `count`), its slots' texts, the fonts it brings, her photos in the order its code reads them;
+   * `check` for the designer's test render. Drawn alone, on white.
+   */
+  carousel?: {
+    js: string;
+    texts: Record<string, string>;
+    fonts: string[];
+    slide: number;
+    count: number;
+    photos: CarouselPhoto[];
+    /** The slide each slot is on (from 1; 0: on every slide), for the plain slide drawn if the code fails. */
+    slotSlides?: Record<string, number>;
+    check?: boolean;
   } | null;
 };
 

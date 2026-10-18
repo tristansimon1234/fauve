@@ -11,6 +11,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import { CarouselDesign } from "./Carousel";
 import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, CollageMessage, Grain, printSize, stickerTop, type Sticker } from "./Collage";
 import { FilmDust } from "./FilmDust";
 import { Fit } from "./Fit";
@@ -44,6 +45,16 @@ export function Reel(props: ReelProps) {
   const theme = themeFor(props.template, props.brand.signature, props.tempo);
   // The studio's own fonts first, so their families are not asked of Google.
   loadCustomFonts(props.brand.customFonts);
+  if (props.carousel) {
+    // A designed carousel draws the whole slide itself, in every weight of its fonts.
+    loadFonts([props.brand.displayFont, props.brand.bodyFont, ...props.carousel.fonts], { wide: true });
+    return (
+      <AbsoluteFill style={{ backgroundColor: "#FFFFFF" }}>
+        <ExposureFilters />
+        <CarouselDesign props={props} theme={theme} />
+      </AbsoluteFill>
+    );
+  }
   const collage = props.template === "collage";
   loadFonts([
     ...(collage ? [COLLAGE_SERIF] : []),

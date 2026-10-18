@@ -1,5 +1,5 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { PublishItem } from "./instagram";
@@ -17,10 +17,13 @@ async function sign(path: string): Promise<string> {
   return data.signedUrl;
 }
 
-/** A JPEG copy of an image in storage (the original path if it already is one). */
+/** A JPEG copy of an image in storage (the original path if it already is one), made once per image. */
 export async function jpegPath(studioId: string, path: string, mimeType: string | null): Promise<string> {
   if (mimeType === "image/jpeg" || /\.jpe?g$/i.test(path)) return path;
   const db = supabaseAdmin();
+  // One copy per source: a page shown again, or a slide rendered again, reuses it.
+  const target = `${studioId}/publish/${createHash("sha1").update(path).digest("hex").slice(0, 24)}.jpg`;
+  if ((await db.storage.from("media").createSignedUrl(target, 60)).data) return target;
   const download = await db.storage.from("media").download(path);
   if (download.error) throw new Error(`Image illisible (${path})`);
   const jpeg = await sharp(Buffer.from(await download.data.arrayBuffer()))
@@ -29,10 +32,14 @@ export async function jpegPath(studioId: string, path: string, mimeType: string 
     .flatten({ background: "#ffffff" })
     .jpeg({ quality: 90, mozjpeg: true })
     .toBuffer();
-  const target = `${studioId}/publish/${randomUUID()}.jpg`;
-  const upload = await db.storage.from("media").upload(target, jpeg, { contentType: "image/jpeg" });
+  const upload = await db.storage.from("media").upload(target, jpeg, { contentType: "image/jpeg", upsert: true });
   if (upload.error) throw new Error(`Conversion en JPEG impossible : ${upload.error.message}`);
   return target;
+}
+
+/** A designed carousel's rendered slides, in order, as items Instagram can fetch (they replace its photos). */
+export async function designedItems(studioId: string, paths: string[]): Promise<PublishItem[]> {
+  return Promise.all(paths.filter((p) => p.startsWith(`${studioId}/`)).map(async (p) => ({ type: "image" as const, url: await sign(p) })));
 }
 
 /**

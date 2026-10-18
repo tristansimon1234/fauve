@@ -9,11 +9,13 @@ const loaded = new Set<string>();
 // Settles when every family asked so far is loaded or given up on (text is measured after it).
 let settled: Promise<void> = Promise.resolve();
 
-const variants = (family: string) => {
+const variants = (family: string, wide = false) => {
   const name = family.trim().replace(/ +/g, "+");
   // Many families only have regular and bold (Space Mono, DM Mono…): asking for more fails the
   // whole request, so the bold pair is tried before falling back to the regular weight alone.
   return [
+    // A carousel's typography goes from light to black: every weight the family has (the API serves only those that exist).
+    ...(wide ? [`${name}:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400;1,700;1,900`] : []),
     `${name}:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,700`,
     `${name}:wght@400;500;600;700;800`,
     `${name}:ital,wght@0,400;0,700;1,400;1,700`,
@@ -37,12 +39,14 @@ function loadStylesheet(href: string): Promise<boolean> {
   });
 }
 
-async function loadFamily(family: string): Promise<void> {
-  for (const variant of variants(family)) {
+async function loadFamily(family: string, wide = false): Promise<void> {
+  for (const variant of variants(family, wide)) {
     if (await loadStylesheet(`https://fonts.googleapis.com/css2?family=${variant}&display=block`)) break;
   }
   await Promise.all(
-    ["400", "italic 400", "700", "800"].map((w) => document.fonts.load(`${w} 64px "${family}"`).catch(() => undefined)),
+    (wide ? ["300", "400", "italic 400", "500", "600", "700", "italic 700", "800", "900"] : ["400", "italic 400", "700", "800"]).map((w) =>
+      document.fonts.load(`${w} 64px "${family}"`).catch(() => undefined),
+    ),
   );
 }
 
@@ -66,7 +70,8 @@ export function loadCustomFonts(fonts: { family: string; url: string }[] | undef
   settled = Promise.all([settled, finished]).then(() => undefined);
 }
 
-export function loadFonts(families: string[]): void {
+/** `wide`: every weight from light to black (a carousel), not only the regular to extra-bold ones. */
+export function loadFonts(families: string[], { wide = false }: { wide?: boolean } = {}): void {
   const wanted = [...new Set(families)].filter((f) => /^[A-Za-z0-9 ]{2,40}$/.test(f) && !loaded.has(f));
   if (!wanted.length || typeof document === "undefined") return;
   wanted.forEach((f) => loaded.add(f));
@@ -82,7 +87,7 @@ export function loadFonts(families: string[]): void {
     resolve();
   };
   settled = Promise.all([settled, finished]).then(() => undefined);
-  Promise.all(wanted.map(loadFamily)).finally(finish);
+  Promise.all(wanted.map((family) => loadFamily(family, wide))).finally(finish);
   setTimeout(finish, 15000);
 }
 

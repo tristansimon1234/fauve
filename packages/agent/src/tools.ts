@@ -204,6 +204,33 @@ export const toolSpecs = {
       "Refait seulement le rendu vidéo de la dernière version du plan (sans le modifier), puis l'envoie à la gérante. Normalement inutile : montage fait déjà tout.",
     input: z.object({ post_id: z.string().uuid() }),
   },
+  design_carousel: {
+    description:
+      "Compose tout un carrousel, ou un post d'une seule image, comme un graphiste : avec ses photos (media_ids dans l'ordre ; ses sujets détourés quand la découpe est nette), sa charte et ses mots : une couverture qui arrête le pouce, une idée par diapositive, des diapositives de texte, des photos qui passent d'une diapositive à l'autre, un appel concret à la fin. Simone le compose, en fait un rendu d'essai, le relit et le corrige une fois (3 à 6 minutes), puis le lien part tout seul. 9 crédits, débités une fois livré. C'est la façon de faire un carrousel : dès qu'elle en demande un, ou pour ses photos sans demande précise (propose-le en une phrase). Sur un carrousel déjà composé, une demande de changement (« la 3e plus aérée », « une diapo de plus », « change l'ordre », « plus de place aux photos ») est une correction : request dit le changement. fresh : un tout nouveau carrousel à la place. Changer seulement des mots : carousel_texts (gratuit).",
+    input: z.object({
+      post_id: z.string().uuid(),
+      request: z
+        .string()
+        .min(1)
+        .max(2000)
+        .describe("Ce qu'elle veut dire et montrer, avec ses mots exacts quand elle en a donné (offre, prix, dates, adresse), et ce qu'elle a dit du style ; pour une correction, le changement demandé"),
+      media_ids: z.array(z.string().uuid()).max(10).optional().describe("Ses photos, dans l'ordre ; par défaut celles de la publication"),
+      example_media_ids: z
+        .array(z.string().uuid())
+        .max(3)
+        .optional()
+        .describe("Les captures d'un carrousel qu'elle aime (« fais comme ça ») : Simone suit sa forme, sa typographie et son rythme, jamais ses mots ni ses images"),
+      fresh: z.boolean().default(false).describe("true : un nouveau carrousel, pas une correction de celui qu'elle a"),
+    }),
+  },
+  carousel_texts: {
+    description:
+      "Change des mots d'un carrousel composé (design_carousel), gratuit : slot par slot, avec leurs noms (read_post les montre diapositive par diapositive). La mise en page ne bouge pas ; le rendu part après ta réponse et le lien est envoyé tout seul. Un texte beaucoup plus long que l'ancien rétrécit : pour plus de place, une correction (design_carousel).",
+    input: z.object({
+      post_id: z.string().uuid(),
+      texts: z.array(z.object({ slot: z.string().max(24), text: z.string().max(400) })).min(1).max(40),
+    }),
+  },
   write_on_photos: {
     description:
       "Écrit du texte par-dessus les photos d'un carrousel ou d'un post photo, à la charte du studio (mêmes polices et styles que les montages). Rendu en images en une minute environ, gratuit ; le lien vers le résultat est envoyé automatiquement à la gérante quand c'est prêt. Une entrée par photo, dans l'ordre des photos de la publication (texts vide = photo sans texte). Court et lisible : une accroche sur la 1re photo (hook), puis un message par photo (band ou caption), 6 textes au plus par photo. Une liste (checklist, planning, étapes, tarifs) est un seul texte avec items (titre + détail facultatif par élément). Pour refaire la mise en page d'un exemple copié (copy_text_style), reprends un texte par bloc avec son look_name. Remplace le texte déjà posé ; la gérante peut ensuite déplacer ou corriger chaque texte elle-même.",

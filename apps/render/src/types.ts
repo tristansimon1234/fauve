@@ -45,6 +45,8 @@ export type ComposeShot = ScenePhoto & {
 };
 export type RegionKind = "face" | "plate" | "screen" | "document" | "other";
 export type PhotoEdit = { source: { width: number; height: number }; adjust?: Adjust; blur?: (Box & { kind: RegionKind; shape: "ellipse" | "rect" })[] };
+/** One of her photos in a designed carousel: as a scene gets it, with its retouch (light, framing on its subject, blurred zones). */
+export type CarouselPhoto = ScenePhoto & { edit?: PhotoEdit };
 export type ClipBlur = { aspect: number; tracks: { kind: RegionKind; keys: (Box & { t: number })[] }[] };
 
 export type Scene = {
@@ -229,6 +231,23 @@ export type ReelProps = {
     place?: { x: number; y: number; scale: number };
     /** Its accent colour, instead of the studio's. */
     accent?: string;
+  } | null;
+  /**
+   * A whole carousel designed as code (the carousel designer): the slide drawn here (`slide`,
+   * from 0, of `count`), its slots' texts, the fonts it brings, her photos in the order its code
+   * reads them; `check` for the designer's test render (a text cut by an edge or too small, a
+   * photo that does not exist, a broken code fail it). Drawn alone, on white.
+   */
+  carousel?: {
+    js: string;
+    texts: Record<string, string>;
+    fonts: string[];
+    slide: number;
+    count: number;
+    photos: CarouselPhoto[];
+    /** The slide each slot is on (from 1; 0: on every slide), for the plain slide drawn if the code fails. */
+    slotSlides?: Record<string, number>;
+    check?: boolean;
   } | null;
 };
 

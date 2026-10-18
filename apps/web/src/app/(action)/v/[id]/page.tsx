@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { z } from "zod";
 import { formatDateTime } from "@/lib/format";
 import { loadEditorData } from "@/lib/montage-editor-data";
+import { carouselPhotos } from "@/lib/render/carousel";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { postSlides } from "@/lib/render/slides";
 import { whatsappLink } from "@/lib/public-env";
@@ -126,12 +127,21 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
     const url = a ? signed.get(a.storage_path as string) : undefined;
     if (a && url && a.kind !== "video" && !String(a.mime_type ?? "").startsWith("video/")) photos[mid] = url;
   }
+  const planned = post.kind === "carousel" || post.kind === "post" ? postSlides({ slides: post.slides, media_ids: ids }) : null;
   const slides =
-    (post.kind === "carousel" || post.kind === "post") && Object.keys(photos).length
+    (post.kind === "carousel" || post.kind === "post") && (Object.keys(photos).length || planned?.design)
       ? {
-          plan: postSlides({ slides: post.slides, media_ids: ids }) ?? alignSlides({ template: "doux", slides: [] }, ids),
+          plan: planned ?? alignSlides({ template: "doux", slides: [] }, ids),
           photos,
           brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, logoOnDark: i.logoOnDark, fonts: i.fonts, colors: i.colors, customFonts: i.customFonts, signature: i.signature })),
+          // A carousel Simone composed: her photos as its code lays them (retouched, cut out), its zones blurred.
+          ...(planned?.design
+            ? {
+                carousel: (
+                  await carouselPhotos(studioId, planned.design.photos, Object.fromEntries(planned.slides.flatMap((s) => (s.edit?.blur?.length ? [[s.media_id, s.edit.blur]] : []))))
+                ).map((p) => p.photo),
+              }
+            : {}),
         }
       : null;
   const media: ActionMedia[] = ids.flatMap((mid) => {

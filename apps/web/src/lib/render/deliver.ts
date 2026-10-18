@@ -34,6 +34,8 @@ export type DeliveryTarget = {
   cost?: { credits: number; left: number } | null;
   /** Started from the app (« Créer »): she is told on WhatsApp too, so she can close the app. */
   notify?: boolean;
+  /** The conversation she asked in (the app): the message lands there, not in the latest automatic one. */
+  conversationId?: string;
 };
 
 function store(
@@ -48,6 +50,7 @@ function store(
       channel: waId ? "whatsapp" : "web",
       direction: "outbound",
       phone_e164: waId ? `+${waId}` : null,
+      ...(target.conversationId && !waId ? { conversation_id: target.conversationId } : {}),
       ...fields,
       payload: { reply_to: target.replyTo, ...fields.payload },
     });
@@ -246,6 +249,25 @@ export async function deliverImages(
 }
 
 /** Renders the text over a carousel's photos, then points the manager to the post, like a montage. */
+/**
+ * A designed carousel, already rendered by its last test: the manager is pointed to it, to
+ * swipe through it, change its words and validate (WhatsApp: a sign-in link to /v/{id}; the
+ * app: the post's card in the conversation she asked in).
+ */
+export async function deliverCarousel(target: DeliveryTarget, made: { count: number; note?: string }): Promise<void> {
+  const { data: post } = await supabaseAdmin().from("posts").select("title").eq("id", target.postId).single();
+  const intro = `Ton carrousel « ${(post?.title as string | null) ?? ""} » est prêt ✨ ${made.count} diapositive${made.count > 1 ? "s" : ""}.`;
+  const after = [plainText(made.note), "Fais défiler pour tout voir : tu peux changer chaque texte, puis valider."].filter(Boolean).join("\n\n");
+  const payload = { posts: [target.postId], open_post: target.postId };
+  if (target.waId) {
+    const link = await createLoginLink(`+${target.waId}`, `/v/${target.postId}`, "open_post");
+    const id = await sendText(target.waId, `${intro}\n\nRegarde ici : ${link}\n\n${after}`);
+    await store(target, { wa_message_id: id, type: "text", body: `${intro}\n\n${after}`, payload });
+  } else {
+    await store(target, { type: "text", body: `${intro}\n\n${after}`, payload });
+  }
+}
+
 export async function renderSlidesAndDeliver(target: DeliveryTarget): Promise<boolean> {
   try {
     await renderSlides(target.studioId, target.postId);

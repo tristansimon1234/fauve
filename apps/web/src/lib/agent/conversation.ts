@@ -150,6 +150,8 @@ export async function replyInConversation(params: {
     waId: params.waId,
     replyToMessageId: params.replyToMessageId,
     reactToRowId: params.reactToRowId,
+    // In the app, what she starts here is delivered here (WhatsApp delivers on WhatsApp).
+    conversationId: params.waId ? undefined : conversation?.id,
     timezone: studio.data.timezone,
     reactions: [],
     extras: {},
