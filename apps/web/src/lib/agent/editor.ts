@@ -48,10 +48,14 @@ import {
   planMediaIds,
   sceneTrack,
   shotTrack,
+  earlierLooks,
+  gestureMoments,
+  handMoves,
   type ReelProps,
   type TracksByClip,
 } from "@fauve/agent";
 import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
+import { videoFramesInSandbox } from "@/lib/render/sandbox";
 import { ensureTracks, loadTracks } from "@/lib/render/tracks";
 import { usableFonts } from "@/lib/fonts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -90,6 +94,48 @@ async function recentHooks(studioId: string, postId: string): Promise<string[]> 
 
 /** The most of her photos the animations of one Reel compose with (each is cut out first, 10 to 30 s). */
 const MAX_OFFERED_PHOTOS = 8;
+
+/**
+ * A correction's animations to rewrite look at their earlier version first: the frames of the
+ * version corrected, rendered on her images where that animation played (its start, the gestures
+ * under it, its middle, its end), with its code and what the review found (`seen`).
+ */
+async function lookAtEarlierRender(
+  studioId: string,
+  postId: string,
+  planId: string,
+  previous: EditPlan,
+  plan: EditPlan,
+  requests: SceneRequest[],
+  review: string,
+  actions: Record<string, { start: number; end: number; what: string }[]>,
+): Promise<void> {
+  const looks = earlierLooks(previous, plan, requests.map((r) => r.id), gestureMoments(previous, actions));
+  if (!looks.size) return;
+  const db = supabaseAdmin();
+  const { data: render } = await db
+    .from("renders")
+    .select("storage_path")
+    .eq("edit_plan_id", planId)
+    .eq("studio_id", studioId)
+    .eq("status", "done")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!render?.storage_path) return;
+  const signed = await db.storage.from("media").createSignedUrl(render.storage_path as string, 900);
+  if (!signed.data) return;
+  const times = [...new Set([...looks.values()].flatMap((l) => l.times.map((x) => x.t)))];
+  const frames = await videoFramesInSandbox(`rework-${postId.slice(0, 8)}-${Date.now()}`, signed.data.signedUrl, times);
+  for (const request of requests) {
+    const look = looks.get(request.id);
+    const shown = look?.times.flatMap((x) => {
+      const frame = frames.find((f) => f.t === x.t);
+      return frame ? [{ label: x.label, jpeg: frame.jpeg }] : [];
+    });
+    if (look && shown?.length) request.seen = { code: look.code, review, frames: shown };
+  }
+}
 
 export type DesignedEdit = {
   editPlanId: string;
@@ -492,6 +538,18 @@ export async function designEdit(params: {
       ...(Array.isArray(moves) ? (moves.length ? { moves: { par_plan: moves } } : {}) : moves ? { moves } : {}),
     };
   });
+  // A correction: each animation rewritten first looks at how its earlier version came out on her images.
+  if (correction && previousPlan.success && baseId && requests.length) {
+    await lookAtEarlierRender(params.studioId, params.postId, baseId, previousPlan.data, plan, requests, params.brief ?? "", {
+      ...Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.actions ?? []])),
+      ...Object.fromEntries(
+        Object.entries(tracks).map(([id, file]) => [
+          id,
+          [...(clips.find((c) => c.media_id === id)?.analysis.actions ?? []), ...handMoves({ fps: file.fps, from: file.from, frames: file.frames, aspect: file.w / file.h })],
+        ]),
+      ),
+    }).catch((error: unknown) => console.warn("motion: the earlier render could not be looked at", error));
+  }
   // Its motion kit: the business's latest scenes, whose language the new ones keep (a family from one Reel to the next);
   // their names, and those of the Reel's kept animations, say which ideas are already taken.
   const latest = requests.length

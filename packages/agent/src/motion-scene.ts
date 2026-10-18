@@ -58,6 +58,8 @@ Ta liberté :
 - « kit_du_commerce » (s'il y en a) : ses dernières animations. Garde leur langage (polices, formes, couleurs) pour qu'on reconnaisse le commerce d'un Reel à l'autre, avec une idée nouvelle ; jamais une copie de leur code.
 - Jamais deux fois la même idée : « autres_animations_du_reel » (les autres animations de ce Reel) et « deja_faites » (les dernières de ce commerce) disent ce qui existe déjà. La tienne est différente : une autre mise en page, un autre mouvement, une autre façon d'entrer et de sortir, un autre nombre de lignes.
 
+Une correction : « version_precedente » (s'il est fourni) montre ton animation d'avant rendue sur ses images, aux instants listés (les images jointes, chacune avec son instant), ce que la relecture du Reel a relevé et ton code d'avant (« code_precedent »). Regarde-la comme un motion designer regarde son rendu avant de le reprendre : ce que dit le brief s'y voit-il vraiment (ce qui doit suivre une main la suit, grandit avec ses doigts quand il les écarte ; l'effet part de ses mains ; tout se lit, rien n'est coupé ni trop gros) ? Garde ce qui marche, change ce qui ne marche pas, et réponds avec le code entier.
+
 Réponds avec le code dans "code", une phrase sur ton intention dans "notes", un nom court et parlant dans "name" (ex. « Titre serif qui se dessine »), la liste des slots dans "slots", les id des photos utilisées dans "photos" (vide sans photo) et les familles Google Fonts que ton code ajoute aux deux siennes dans "fonts" (vide le plus souvent).`;
 
 export const motionSlotSchema = z.object({

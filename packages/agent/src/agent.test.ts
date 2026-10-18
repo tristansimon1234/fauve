@@ -3264,6 +3264,33 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   assert.match(stealMissMessage("not_video"), /carrousel.*capture/);
 });
 
+test("rework: an animation a correction rewrites looks at its earlier render, during her gestures too", async () => {
+  const { earlierLooks, MAX_EARLIER_FRAMES } = await import("./rework.ts");
+  const { MOTION_DESIGNER_PROMPT } = await import("./motion-scene.ts");
+  const shots = [
+    { clip_id: "a", in: 0, out: 2 },
+    { clip_id: "b", in: 0, out: 6 },
+  ];
+  const previous = editPlanSchema.parse({ ...validPlan, duration: 8, texts: [], images: [], segments: shots, layers: [{ motion: { brief: "le texte grossit entre ses doigts", code: "function Scene(){}" }, from: 1, to: 5 }] });
+  const plan = editPlanSchema.parse({ ...validPlan, duration: 8, texts: [], images: [], segments: shots, layers: [{ motion: { brief: "le texte grossit chaque fois qu'il écarte les doigts" }, from: 1, to: 5 }, { motion: { brief: "un cadre" }, from: 6, to: 8 }] });
+  const looks = earlierLooks(previous, plan, ["l0", "l1"], [
+    { t: 2.5, what: "le pouce et l'index s'écartent" },
+    { t: 3.5, what: "le pouce et l'index s'écartent grand" },
+    { t: 7, what: "il sourit" },
+  ]);
+  // The animation it reworks: its code, its start, the gestures under it, its middle, its end, on its own frames.
+  assert.equal(looks.get("l0")?.code, "function Scene(){}");
+  assert.deepEqual(looks.get("l0")?.times.map((x) => x.t), [1.2, 2.5, 3, 3.5, 4.65]);
+  assert.match(looks.get("l0")!.times[1]!.label, /^image 45 de ton animation \(pendant un geste : le pouce et l'index s'écartent\)$/);
+  // A new animation where none played before has nothing to look at.
+  assert.equal(looks.has("l1"), false);
+  // Many gestures: its start and its end always, the rest spread.
+  const busy = earlierLooks(previous, plan, ["l0"], Array.from({ length: 9 }, (_, k) => ({ t: 1.6 + k * 0.35, what: `geste ${k}` })));
+  assert.equal(busy.get("l0")?.times.length, MAX_EARLIER_FRAMES);
+  assert.match(busy.get("l0")!.times.at(-1)!.label, /sa fin/);
+  assert.match(MOTION_DESIGNER_PROMPT, /version_precedente/);
+});
+
 test("DA liberties: the copied Reel's font and colours when they make its style, an animation's own fonts", async () => {
   const { clampLook, followedFrom, followedLook, followedForEditor, followedLine, stolenLookSchema, stolenStyleMessage } = await import("./steal.ts");
   const { buildReelProps, resolveReelBrand } = await import("./motion.ts");
