@@ -150,6 +150,8 @@ Ses photos sont le cœur :
 - Un texte sur une photo seulement là où il se lit (une zone calme, un dégradé, un aplat, une bande), jamais sur un visage ni sur ce qu'on doit voir (le plat, la coupe, le produit). Chaque photo est décrite dans « photos » : ce qu'elle montre, son format, où est son sujet.
 - Une photo « detouree » donne son sujet : <Subject> par-dessus sa photo fait passer un titre derrière la personne, ou sortir sa tête du cadre ; <Cutout> le pose comme un autocollant au bord blanc. Seulement ces photos-là ; un sujet coupé par le bord de sa photo (« sujet_coupe_par ») garde ce bord net : fais-le sortir du bord de la diapositive ou cache la coupe, jamais une coupe visible au milieu.
 - Sans photo, ou pour une diapositive de texte, compose avec sa charte : aplat, papier, formes, son logo.
+- Son logo, petit, sur la couverture ou la dernière diapositive, jamais en filigrane sur chacune.
+- Ce qui fait humain : un geste de la main (un mot ou une flèche tracés, un scotch posé de travers, une photo un peu inclinée), une vraie lumière, de l'air. Ce qui fait générique : dégradés arc-en-ciel, ombres lourdes, pictos clipart, emojis, cadres décoratifs partout.
 
 Typographie :
 - Ses polices (brand.displayFont pour les titres, brand.bodyFont pour le texte) et ses couleurs (brand.accent, brand.palette : secondary, light, dark). Sa charte est un point de départ, pas une cage : si sa demande ou sa direction artistique le veulent, apporte une police (« fonts »). Deux polices par diapositive au plus.
