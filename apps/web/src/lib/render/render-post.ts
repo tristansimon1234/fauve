@@ -17,8 +17,10 @@ import {
   buildFfmpegArgs,
   canTransition,
   editPlanSchema,
+  followedOf,
   postStatusSchema,
   renderDuration,
+  signatureOf,
   sceneShifts,
   withShifts,
   type EditPlan,
@@ -104,6 +106,8 @@ export async function loadMontageInputs(
     .pick({ colors: true, logo_url: true, logo_path: true, fonts: true, custom_fonts: true, font_twins: true, signature: true })
     .catch({})
     .parse(brand.data?.[0]?.profile ?? {});
+  // A Reel she likes whose style her Reels follow (« Steal »): its look goes over her charter.
+  const followed = followedOf(brand.data?.[0]?.profile);
   const accent = style.colors?.[0];
   // An uploaded logo (private bucket) wins over one found on the website.
   const logoUrl = style.logo_path?.startsWith(`${studioId}/`)
@@ -160,8 +164,11 @@ export async function loadMontageInputs(
     fonts,
     colors: style.colors,
     customFonts,
-    // Her art direction as settings: the render's theme follows it.
+    // Her art direction as settings: the render's theme follows it (her photos, her own charter;
+    // her Reels, the style she follows over it).
     signature: style.signature,
+    reelSignature: signatureOf({ signature: style.signature, followed }),
+    followed,
     studioName: (studio.data?.name as string | null) ?? "",
     voice,
     cutouts,
@@ -208,7 +215,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   // and those an animation composes with (the design step has usually made them already).
   const toCut = plan.template === "collage" ? planMediaIds(plan) : scenePhotoIds(plan);
   if (toCut.length) await ensureCutouts(studioId, toCut);
-  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, signature, voice, cutouts, sceneCutouts, photoAspects, tracks } =
+  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, photoAspects, tracks } =
     await loadMontageInputs(studioId, plan);
   const motion = motionTemplateSchema.safeParse(plan.template);
 

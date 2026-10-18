@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { scheduleValidated } from "@/lib/posts";
 import { instagramAccount } from "@/lib/social/publish";
+import { answerStealOffer } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // « Je le publie vendredi à 18 h ? » under a delivered montage (lib/render/deliver.ts),
@@ -29,7 +30,17 @@ export function offeredPost(payload: unknown): string | null {
 
 const where = (platforms: string[]) => (platforms.includes("tiktok") ? "sur Instagram et TikTok" : "sur Instagram");
 
-export async function answerPublishOffer(
+/** A tap on the buttons under Simone's last message, answered at once: a Reel to publish, or a style to follow (lib/steal.ts). */
+export async function answerOffer(
+  studioId: string,
+  text: string | null | undefined,
+  lastOutbound: { payload: unknown } | null,
+  channel: { waId?: string },
+): Promise<OfferReply | null> {
+  return (await answerStealOffer(studioId, text, lastOutbound)) ?? answerPublishOffer(studioId, text, lastOutbound, channel);
+}
+
+async function answerPublishOffer(
   studioId: string,
   text: string | null | undefined,
   lastOutbound: { payload: unknown } | null,

@@ -191,8 +191,11 @@ function formWords(plan: EditPlan): string {
   return bpm ? `${form} à ${bpm} BPM` : form;
 }
 
-/** A plan in a few lines, for the critic and for the second version's editor. */
-export function planDigest(plan: EditPlan): string {
+/**
+ * A plan in a few lines, for the critic and for the second version's editor. `paceCeiling`: the
+ * longest average shot it may have (a followed style that takes its time raises it).
+ */
+export function planDigest(plan: EditPlan, options: { paceCeiling?: number } = {}): string {
   const timeline = planTimeline(plan);
   const hook = plan.texts.filter((t) => t.from < 1.5).map((t) => t.text);
   return [
@@ -201,7 +204,7 @@ export function planDigest(plan: EditPlan): string {
     // An animation over several shots comes back on purpose (asked for): not a repeat.
     ...(plan.layers ?? []).map((l) => `Animation par-dessus les plans de ${seconds(l.from)} à ${seconds(l.to)} s, voulue : ${l.motion.brief.slice(0, 120)}.`),
     rhythmLine(plan),
-    qualityLine(plan),
+    qualityLine(plan, options),
   ]
     .filter(Boolean)
     .join(" ");
@@ -286,7 +289,8 @@ export type QualityCheck = { key: "motion" | "hook" | "opening" | "pace" | "beat
  * beat, few texts (an animation of typography counts as one, the opening one is the hook);
  * an end that loops back to the first image is worth trying, when a clip allows it.
  */
-export function qualityChecks(plan: EditPlan): QualityCheck[] {
+export function qualityChecks(plan: EditPlan, options: { paceCeiling?: number } = {}): QualityCheck[] {
+  const ceiling = options.paceCeiling ?? MAX_AVERAGE_SHOT;
   const timeline = planTimeline(plan);
   const first = plan.segments[0];
   const clips = plan.segments.filter(isClipSegment);
@@ -336,7 +340,7 @@ export function qualityChecks(plan: EditPlan): QualityCheck[] {
           },
         ]
       : []),
-    ...(paced.length ? [{ key: "pace" as const, must: true, ok: average <= MAX_AVERAGE_SHOT + 0.05, words: `plans de ${seconds(average)} s en moyenne (${MAX_AVERAGE_SHOT} s au plus)` }] : []),
+    ...(paced.length ? [{ key: "pace" as const, must: true, ok: average <= ceiling + 0.05, words: `plans de ${seconds(average)} s en moyenne (${seconds(ceiling)} s au plus)` }] : []),
     ...(onBeat === null ? [] : [{ key: "beat" as const, must: true, ok: onBeat >= Math.ceil(cuts.length * 0.8), words: `${onBeat} coupes sur ${cuts.length} sur un temps de la musique` }]),
     { key: "texts", must: true, ok: others <= 2, words: `${others} texte${others > 1 ? "s" : ""} ou animation${others > 1 ? "s" : ""} en plus de l'accroche${plan.subtitles ? " et des sous-titres" : ""} (2 au plus)` },
     { key: "loop", must: false, ok: loops, words: loops ? "la fin reboucle sur la 1re image" : "la fin ne reboucle pas sur la 1re image" },
@@ -344,8 +348,8 @@ export function qualityChecks(plan: EditPlan): QualityCheck[] {
 }
 
 /** The quality checks in one line for the critic: what is fine, what to look at again, what to try if the footage allows. */
-export function qualityLine(plan: EditPlan): string {
-  const checks = qualityChecks(plan);
+export function qualityLine(plan: EditPlan, options: { paceCeiling?: number } = {}): string {
+  const checks = qualityChecks(plan, options);
   const fine = checks.filter((c) => c.ok).map((c) => c.words);
   const again = checks.filter((c) => !c.ok && c.must).map((c) => c.words);
   const tryIt = checks.filter((c) => !c.ok && !c.must).map((c) => c.words);

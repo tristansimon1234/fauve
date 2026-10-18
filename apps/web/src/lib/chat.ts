@@ -5,7 +5,7 @@ import { replyInConversation } from "@/lib/agent/conversation";
 import { reactTo, type Reaction } from "@/lib/agent/mood";
 import type { ChatEvent } from "@/lib/agent/run";
 import { extrasOf, resolveCards, type ChatCard } from "@/lib/chat-cards";
-import { answerPublishOffer } from "@/lib/publish-offer";
+import { answerOffer } from "@/lib/publish-offer";
 import { setReaction, type Reactions } from "@/lib/reactions";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -304,7 +304,7 @@ export async function chatTurn(
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const offer = await answerPublishOffer(ctx.studioId, body, last, {}).catch((e) => {
+    const offer = await answerOffer(ctx.studioId, body, last, {}).catch((e) => {
       console.error("chat: publish offer answer failed", e);
       return null;
     });

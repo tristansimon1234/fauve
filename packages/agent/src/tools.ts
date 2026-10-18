@@ -97,6 +97,23 @@ export const toolSpecs = {
       "Les inspirations de la gérante : des Reels qu'elle aime, partagés sur Instagram ou ajoutés dans l'app, avec ce qu'on peut en reprendre (accroche, rythme, textes). À regarder avant de proposer un nouveau Reel, pour lui demander s'il doit suivre l'une d'elles.",
     input: z.object({}),
   },
+  steal_style: {
+    description:
+      "Reprend la DA d'un Reel qu'elle aime (« fais comme ça », « je veux ce style », un lien de Reel, de TikTok ou de Short, ou une vidéo qu'elle t'envoie comme exemple) : après ta réponse, Simone le regarde (une minute), en mesure le rythme et lit sa forme, ses textes, sa lumière, son mouvement et sa musique, puis lui envoie en trois lignes ce qu'elle reprendrait, avec « Suivre ce style » et « Non merci ». Jamais ses images, ses mots ni sa musique : ses couleurs, ses polices et ses images restent les siennes. Un carrousel : demande une capture de la photo qui lui plaît, puis copy_text_style.",
+    input: z.object({
+      link: z.string().url().max(500).optional().describe("Le lien du Reel, du TikTok ou du Short, tel qu'elle l'a envoyé"),
+      media_id: z.string().uuid().optional().describe("Une vidéo qu'elle a envoyée comme exemple, le Reel d'un autre compte : elle sort de sa médiathèque une fois regardée, jamais un de ses plans"),
+      inspiration_id: z.string().uuid().optional().describe("Une de ses inspirations (list_inspirations)"),
+    }),
+  },
+  follow_style: {
+    description:
+      "Ses prochains Reels suivent le style d'une de ses inspirations lue par steal_style (on, avec son inspiration_id), ou plus aucun (off). Le bouton « Suivre ce style » le fait tout seul : à appeler quand elle le dit avec ses mots (« oui suis-le », « arrête ce style »).",
+    input: z.object({
+      mode: z.enum(["on", "off"]),
+      inspiration_id: z.string().uuid().optional().describe("Pour on : l'inspiration dont le style est suivi"),
+    }),
+  },
   list_media: {
     description:
       "La médiathèque du studio : les photos et vidéos déjà reçues (WhatsApp, app, médiathèque), les plus récentes d'abord, avec leur media_id, leur date, leur format et ce qu'on y voit quand c'est connu. À regarder dès que la gérante parle de photos ou de vidéos déjà envoyées (« celles de ce matin », « regarde dans la médiathèque », « les 4 photos que j'ai prises ») : ne lui demande jamais de les renvoyer. Avant de lui demander de filmer pour un Reel, regarde sa banque de plans (bank: true).",

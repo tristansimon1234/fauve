@@ -1,12 +1,23 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { BulbIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { BulbIcon, CheckIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { addInspiration, removeInspiration } from "../inspiration-actions";
+import { addInspiration, followInspiration, removeInspiration } from "../inspiration-actions";
 import { Section } from "./ui";
 
-export type Inspiration = { id: string; title: string | null; url: string | null; analysis: string | null; at: string; reading?: boolean };
+export type Inspiration = {
+  id: string;
+  title: string | null;
+  url: string | null;
+  analysis: string | null;
+  at: string;
+  reading?: boolean;
+  /** Its style was read (« Steal »): her Reels can follow it. */
+  styled?: boolean;
+  /** Her Reels follow its style. */
+  followed?: boolean;
+};
 
 const MAX_BYTES = 50 * 1024 * 1024;
 
@@ -45,11 +56,23 @@ export function InspirationsSection({ items: initial, fauveHandle, studioId }: {
       if (!(await removeInspiration(id).catch(() => false))) setItems(before);
     });
 
+  // One style followed at a time: following one stops the other.
+  const follow = (id: string, on: boolean) =>
+    start(async () => {
+      const before = items;
+      setError(null);
+      setItems((list) => list.map((i) => ({ ...i, followed: on ? i.id === id : false })));
+      if (!(await followInspiration(on ? id : null).catch(() => false))) {
+        setItems(before);
+        setError("Le changement n’a pas abouti. Réessaie.");
+      }
+    });
+
   return (
     <Section
       id="style-inspirations"
       title="Tes inspirations"
-      hint={`Des Reels qui te plaisent : Simone en reprend le rythme, l’accroche et les textes pour tes montages, sans jamais les copier. Enregistre-les et ajoute-les ici${fauveHandle ? `, ou partage-les à @${fauveHandle} sur Instagram` : ""}. En créant un Reel, tu peux en choisir une.`}
+      hint={`Des Reels qui te plaisent : Simone en mesure le rythme et en lit la forme, les textes et la lumière, sans jamais copier leurs images ni leurs mots. Ajoute-les ici${fauveHandle ? `, partage-les à @${fauveHandle} sur Instagram` : ""} ou envoie leur lien à Simone ; « Suivre ce style » et tes prochains Reels le reprennent, avec tes couleurs et tes polices.`}
     >
       {items.length > 0 && (
         <ul className="flex flex-col divide-y divide-line">
@@ -63,6 +86,28 @@ export function InspirationsSection({ items: initial, fauveHandle, studioId }: {
                 <span className="text-[13px] leading-relaxed text-muted">
                   {item.analysis ?? (item.reading ? "Simone la regarde, sa lecture arrive dans une minute." : "Pas encore lue.")}
                 </span>
+                {item.styled &&
+                  (item.followed ? (
+                    <span className="flex flex-wrap items-center gap-2 pt-1">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-soft px-2.5 py-1 text-[12px] font-bold text-violet">
+                        <CheckIcon size={13} />
+                        Tes Reels suivent ce style
+                      </span>
+                      <button type="button" onClick={() => follow(item.id, false)} className="text-[12px] font-semibold text-muted underline-offset-2 hover:underline">
+                        Ne plus le suivre
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => follow(item.id, true)}
+                        className="rounded-full border-[1.5px] border-violet/40 px-3 py-1 text-[12px] font-bold text-violet hover:bg-violet-soft"
+                      >
+                        Suivre ce style
+                      </button>
+                    </span>
+                  ))}
               </div>
               <button
                 type="button"

@@ -3,6 +3,7 @@ import {
   BEAT_STEP,
   beatGrid,
   coarser,
+  followedOf,
   GROOVE_STEP,
   grooveGaps,
   isClipSegment,
@@ -203,7 +204,9 @@ export async function withMusic(params: {
     ]);
     const stored = profile.data?.profile as { art_direction?: string; signature?: { music?: string } } | null;
     const direction = (stored?.art_direction ?? "").split("\n").filter((l) => l.startsWith("Ajustement"));
-    const sound = typeof stored?.signature?.music === "string" ? stored.signature.music.trim().slice(0, 80) : undefined;
+    // The music of the Reel whose style she follows (« Steal »), else her charter's.
+    const followed = followedOf(stored)?.look.music.trim();
+    const sound = followed || (typeof stored?.signature?.music === "string" ? stored.signature.music.trim().slice(0, 80) : undefined);
     const ask = brief(params.plan, (studio.data?.business_type as string | null) ?? null, direction, sound || undefined);
     const duration = params.plan.duration;
     // A piece is written with its ending (the beat stops over its last seconds): it is composed longer

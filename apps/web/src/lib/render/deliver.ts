@@ -83,6 +83,18 @@ export async function notifyStudio(target: Pick<DeliveryTarget, "studioId" | "wa
   }
 }
 
+/** A question with its buttons on the channel she uses (reply buttons on WhatsApp); `payload` says what the buttons answer. */
+export async function askStudio(target: Pick<DeliveryTarget, "studioId" | "waId" | "replyTo">, text: string, options: string[], payload: Record<string, unknown> = {}) {
+  const full = { ...target, postId: "" };
+  const stored = { type: "text", body: text, payload: { options, ...payload } };
+  if (target.waId) {
+    const id = await sendReply(target.waId, text, options);
+    await store(full, { wa_message_id: id, ...stored });
+  } else {
+    await store(full, stored);
+  }
+}
+
 /**
  * Renders the post and points the manager to it, to watch the video, read the
  * caption and validate. On WhatsApp: a sign-in link to the mobile page `/v/{id}`;

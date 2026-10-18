@@ -42,7 +42,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       photoIds: inputs.photoIds,
       words: inputs.words,
       aspects: inputs.aspects,
-      brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts, signature: inputs.signature },
+      brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts, signature: inputs.reelSignature },
       ...(soundtrack ? { soundtrack } : {}),
       ...(inputs.voice ? { voice: inputs.voice } : {}),
       // A collage's stickers and the cut-outs its animations compose with, so the preview shows them as the video does.

@@ -1,4 +1,5 @@
 import "server-only";
+import { stealStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { readInspiration } from "@/lib/video/inspiration";
 
@@ -40,9 +41,14 @@ export async function listInspirations(studioId: string, limit = 8): Promise<Ins
  */
 export async function ensureInspirationRead(studioId: string, id: string): Promise<string | null> {
   const db = supabaseAdmin();
-  const { data } = await db.from("inspirations").select("analysis, storage_path").eq("id", id).eq("studio_id", studioId).maybeSingle();
+  const { data } = await db.from("inspirations").select("analysis, storage_path, kind").eq("id", id).eq("studio_id", studioId).maybeSingle();
   if (!data) return null;
   if (data.analysis || !data.storage_path) return (data.analysis as string | null) ?? null;
+  // A video: its style measured and read (« Steal »), which her Reels can then follow.
+  if (data.kind === "video") {
+    const stolen = await stealStyle(studioId, { inspirationId: id }).catch((e: unknown) => (console.warn("inspiration: style not read", e), null));
+    if (stolen?.ok) return stolen.lines.join(" ");
+  }
   const path = data.storage_path as string;
   const signed = await db.storage.from("media").createSignedUrl(path, 600);
   const analysis = signed.data ? await readInspiration(studioId, signed.data.signedUrl).catch((e) => (console.error("inspiration reading failed", e), null)) : null;

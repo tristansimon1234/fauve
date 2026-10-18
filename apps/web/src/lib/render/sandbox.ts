@@ -2,10 +2,12 @@ import "server-only";
 import { APIError, Sandbox } from "@vercel/sandbox";
 import {
   bassLevelsFilter,
+  BEAT_STEP,
   GROOVE_STEP,
   MIX_CEILING,
   mixFilter,
   mixGains,
+  parseSceneCuts,
   pauseFilter,
   REEL_FPS,
   RENDER_FONTS,
@@ -826,6 +828,8 @@ const UV_WHEEL = {
   url: "https://files.pythonhosted.org/packages/e5/83/85a6c63c24905af4924fddb11a499b934913f59a134248367a1ef1a4716f/uv-0.12.23-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
   sha256: "565c6e2874dbeae86c02f3dea97255e878fec672659a73d4930c6b93fcab2fff",
 };
+/** Installs uv in `bin/uv` of the current directory, once (its wheel checked, the binary taken out of it). */
+const UV_INSTALL = `[ -x bin/uv ] || { curl -fsSL --retry 3 -o uv.whl '${UV_WHEEL.url}' && echo "${UV_WHEEL.sha256}  uv.whl" | sha256sum -c --status && { python3 -c 'import sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); sys.stdout.buffer.write(z.read(next(n for n in z.namelist() if n.endswith("/scripts/uv"))))' uv.whl || unzip -p uv.whl '*/scripts/uv'; } > bin/uv.tmp && chmod +x bin/uv.tmp && mv bin/uv.tmp bin/uv && rm uv.whl; }`;
 /**
  * The tracker's packages, all of them pinned and installed without dependencies. The vision
  * tasks import OpenCV and matplotlib for drawing helpers they never use here: headless builds.
@@ -841,7 +845,7 @@ const TRACK_SETUP = [
   // The two libraries MediaPipe links, from the image's packages (Ubuntu; dnf on an Amazon Linux image).
   "libs=$(/sbin/ldconfig -p 2>/dev/null || true)",
   'if [[ "$libs" != *"libEGL.so.1 "* || "$libs" != *"libGLESv2.so.2 "* ]]; then if command -v apt-get >/dev/null; then sudo apt-get update -qq && sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends libegl1 libgles2 >/dev/null; else sudo dnf install -y -q libglvnd-egl libglvnd-gles; fi; fi',
-  `[ -x bin/uv ] || { curl -fsSL --retry 3 -o uv.whl '${UV_WHEEL.url}' && echo "${UV_WHEEL.sha256}  uv.whl" | sha256sum -c --status && { python3 -c 'import sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); sys.stdout.buffer.write(z.read(next(n for n in z.namelist() if n.endswith("/scripts/uv"))))' uv.whl || unzip -p uv.whl '*/scripts/uv'; } > bin/uv.tmp && chmod +x bin/uv.tmp && mv bin/uv.tmp bin/uv && rm uv.whl; }`,
+  UV_INSTALL,
   `export UV_PYTHON_INSTALL_DIR=${TRACK_ROOT}/python UV_PYTHON_PREFERENCE=only-managed UV_NO_CACHE=1`,
   `py/bin/python -c "import mediapipe, cv2, matplotlib" 2>/dev/null || { rm -rf py && bin/uv venv -q --python 3.13 py && bin/uv pip install -q --python py/bin/python --no-deps ${TRACK_PACKAGES.join(" ")}; }`,
   ...TRACK_MODELS.map(
@@ -910,6 +914,134 @@ export async function tracksInSandbox(id: string, videos: { id: string; url: str
       results[v.id] = file?.length ? { file, frames: r.frames, hands: r.hands, faces: r.faces, bodies: r.bodies } : new Error("tracks file missing");
     }
     return { results, seconds: (Date.now() - started) / 1000 };
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+// ---------------------------------------------------------------------------
+// « Steal »: a Reel she likes, opened from its link (yt-dlp, for a public Reel, TikTok or
+// Short) or fetched as a file (one she sent, one shared with Simone on Instagram), then
+// measured: its hard cuts (ffmpeg's scene detection), its loudness and its bass every 10 ms
+// (its tempo). A small copy (720 px, 30 fps, its sound) comes back for Gemini; nothing is kept.
+// ---------------------------------------------------------------------------
+
+const STEAL = `${ROOT}/steal`;
+/** The longest Reel taken, in seconds (Instagram's Reels run up to 3 minutes). */
+const STEAL_MAX_SECONDS = 180;
+/** yt-dlp pinned (its wheel checked), with the packages its own « pin » extras pin, impersonation included. */
+const YT_DLP = {
+  file: "yt_dlp-2026.8.19-py3-none-any.whl",
+  url: "https://files.pythonhosted.org/packages/69/b2/8cd1613f56eed7ceb64fbd4df3f1c01246bfb098e6f398228bafda22b80b/yt_dlp-2026.8.19-py3-none-any.whl",
+  sha256: "1d57897e94c6665a0a6f9bc54b34e584284e32c034ffab3a7df25d8f7b24eedf",
+  packages: [
+    "certifi==2026.7.22", "brotli==1.2.0", "mutagen==1.48.1", "pycryptodomex==3.23.0", "requests==2.34.2", "urllib3==2.7.0",
+    "charset-normalizer==3.5.0", "idna==3.18", "websockets==17.0.1", "yt-dlp-ejs==0.8.0", "curl-cffi==0.16.0", "cffi==2.1.1", "pycparser==3.0",
+  ],
+};
+const STEAL_SETUP = [
+  "set -euo pipefail",
+  `mkdir -p ${STEAL}/bin && cd ${STEAL}`,
+  UV_INSTALL,
+  `echo "${YT_DLP.sha256}  ${YT_DLP.file}" | sha256sum -c --status 2>/dev/null || { curl -fsSL --retry 3 -o dl.tmp '${YT_DLP.url}' && mv dl.tmp ${YT_DLP.file} && echo "${YT_DLP.sha256}  ${YT_DLP.file}" | sha256sum -c --status; }`,
+  // Its own Python, whatever the image has (as the tracker's).
+  `export UV_PYTHON_INSTALL_DIR=${STEAL}/python UV_PYTHON_PREFERENCE=only-managed UV_NO_CACHE=1`,
+  `py/bin/python -I -c "import yt_dlp, curl_cffi" 2>/dev/null || { rm -rf py && bin/uv venv -q --python 3.13 py && bin/uv pip install -q --python py/bin/python --no-deps ./${YT_DLP.file} ${YT_DLP.packages.join(" ")}; }`,
+].join("\n");
+
+let stealReady: Promise<Sandbox> | undefined;
+
+/** The render sandbox with yt-dlp installed (slow only the first time). */
+function stealSandbox(): Promise<Sandbox> {
+  stealReady ??= (async () => {
+    const sandbox = await jobSandbox();
+    await bash(sandbox, STEAL_SETUP);
+    return sandbox;
+  })().catch((error: unknown) => {
+    stealReady = undefined;
+    throw error;
+  });
+  return stealReady;
+}
+
+/**
+ * One Reel taken and measured in `$1`: from the link `$2` (yt-dlp, its smallest version of
+ * 720 px or more, once more as a browser if refused) or the file at `$2` when `$3` is « file ».
+ * Exits 10 when it cannot be opened, 11 when it runs over STEAL_MAX_SECONDS, 12 when it is no video.
+ */
+const STEAL_JOB = [
+  "set -uo pipefail",
+  'cd "$1"',
+  'if [ "$3" = link ]; then',
+  `  dl() { timeout "$T" ${STEAL}/py/bin/python -I -m yt_dlp --ignore-config --no-playlist --no-progress --no-mtime --max-filesize 120M --match-filters "duration<=?${STEAL_MAX_SECONDS}" -S "res:720" -f "bv*+ba/b" --merge-output-format mp4 --ffmpeg-location ${ROOT}/ffmpeg --js-runtimes node --fixup never -o "in.%(ext)s" "$@" "$URL" >> fetch.log 2>&1; }`,
+  // Within a reply's 5 minutes: 90 s, then 60 s as a browser.
+  '  URL="$2"; T=90 dl || T=60 dl --impersonate chrome || true',
+  '  f=$(ls in.* 2>/dev/null | grep -vE "\\.(part|ytdl)$" | head -1); [ -n "$f" ] && mv "$f" in.src',
+  '  [ -s in.src ] || { grep -qE "does not pass filter|larger than max-filesize" fetch.log && exit 11; exit 10; }',
+  "else",
+  `  f() { ${FETCH}; }; f in.src "$2" >> fetch.log 2>&1 || exit 10`,
+  "fi",
+  `info=$(${ROOT}/ffmpeg -hide_banner -i in.src 2>&1 || true)`,
+  'grep -q "Video:" <<<"$info" || exit 12',
+  `d=$(sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' <<<"$info" | head -1 | awk -F: '{print $1*3600+$2*60+$3}')`,
+  'awk -v d="${d:-0}" \'BEGIN { exit !(d > 0.5) }\' || exit 12',
+  `awk -v d="$d" 'BEGIN { exit !(d <= ${STEAL_MAX_SECONDS}) }' || exit 11`,
+  `${ROOT}/ffmpeg -loglevel error -y -i in.src -map 0:v:0 -map "0:a:0?" -vf "scale='min(720,iw)':-2,fps=30,format=yuv420p" -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k -movflags +faststart reel.mp4 || exit 12`,
+  "rm -f in.src",
+  `${ROOT}/ffmpeg -hide_banner -nostats -i reel.mp4 -an -vf "scale=320:-2,scdet=threshold=12" -f null - 2> cuts.log || true`,
+  `${ROOT}/ffmpeg -hide_banner -nostats -i reel.mp4 -vn -af "$4" -f null - 2>&1 | grep -o 'RMS_level=[^ ]*' | cut -d= -f2 > bass.txt || true`,
+  LOUD,
+  'echo "duration=$d lufs=$(loud reel.mp4)"',
+].join("\n");
+
+/** Why a Reel could not be taken: its link or file did not open, it runs over 3 minutes, it is no video. */
+export type StealMiss = "unreachable" | "too_long" | "not_video";
+
+/** A Reel taken and measured: its small copy (for Gemini, never kept), its length, cuts, loudness and bass. */
+export type StolenReel = { video: Buffer; duration: number; cuts: number[]; lufs: number | null; levels: number[]; seconds: number };
+
+/**
+ * Takes a Reel from its link (a public Reel, TikTok or Short) or from a file (a signed URL)
+ * and measures it. A miss says why (and what yt-dlp or curl said); any other failure throws.
+ */
+export async function stealReelInSandbox(id: string, source: { link: string } | { file: string }): Promise<StolenReel | { miss: StealMiss; detail: string }> {
+  const started = Date.now();
+  const link = "link" in source;
+  const sandbox = await withTimeLeft(await (link ? stealSandbox() : renderSandbox()));
+  const dir = `${ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    const run = await sandbox.runCommand({
+      cmd: "bash",
+      args: ["-c", STEAL_JOB, "bash", dir, link ? source.link : source.file, link ? "link" : "file", bassLevelsFilter(BEAT_STEP)],
+    });
+    if (run.exitCode !== 0) {
+      const log = await sandbox.readFileToBuffer({ path: `${dir}/fetch.log` }).catch(() => null);
+      const detail = `${(await run.output("both").catch(() => "")).slice(-300)} ${log?.toString("utf8").slice(-600) ?? ""}`.trim();
+      const miss = ({ 10: "unreachable", 11: "too_long", 12: "not_video" } as const)[run.exitCode as 10 | 11 | 12];
+      if (miss) return { miss, detail };
+      throw new Error(`steal failed (${run.exitCode}): ${detail}`);
+    }
+    const out = await run.stdout();
+    const duration = printed(out, "duration") ?? 0;
+    const [video, cuts, bass] = await Promise.all([
+      sandbox.readFileToBuffer({ path: `${dir}/reel.mp4` }),
+      sandbox.readFileToBuffer({ path: `${dir}/cuts.log` }).catch(() => null),
+      sandbox.readFileToBuffer({ path: `${dir}/bass.txt` }).catch(() => null),
+    ]);
+    if (!video?.length) return { miss: "not_video", detail: "no copy" };
+    return {
+      video,
+      duration,
+      cuts: parseSceneCuts(cuts?.toString("utf8") ?? "", duration),
+      lufs: printed(out, "lufs"),
+      // Silence prints -inf.
+      levels: (bass?.toString("utf8") ?? "")
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((v) => (Number.isFinite(Number(v)) ? Number(v) : -120)),
+      seconds: (Date.now() - started) / 1000,
+    };
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }
