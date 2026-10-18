@@ -203,10 +203,14 @@ export function reviewMoments(plan: EditPlan, max = 8, gestures: GestureMoment[]
   const first = at2(Math.min(0.3, timeline.duration / 8));
   const hook = at2(Math.min(1, timeline.duration / 4));
   const animations = layers.map((l) => at2((l.from + l.to) / 2)).filter((t) => t > hook + 0.2 && t < end - 0.2);
-  const gestured = gestures
+  // Spread over the gestures when there are more (her first spread and her widest, three spreads apart).
+  const under = gestures
     .map((g) => ({ ...g, t: at2(g.t) }))
-    .filter((g) => g.t > hook + 0.2 && g.t < end - 0.2 && animations.every((a) => Math.abs(a - g.t) > 0.3))
-    .slice(0, MAX_GESTURE_MOMENTS);
+    .filter((g) => g.t > hook + 0.2 && g.t < end - 0.2 && animations.every((a) => Math.abs(a - g.t) > 0.3));
+  const gestured =
+    under.length <= MAX_GESTURE_MOMENTS
+      ? under
+      : [...new Set(Array.from({ length: MAX_GESTURE_MOMENTS }, (_, k) => Math.round((k * (under.length - 1)) / (MAX_GESTURE_MOMENTS - 1))))].map((k) => under[k]!);
   const middles = timeline.segments
     .map((s) => s.start + s.length / 2)
     .filter((t) => t > hook + 0.4 && t < end - 0.4 && animations.every((a) => Math.abs(a - t) > 0.4) && gestured.every((g) => Math.abs(g.t - t) > 0.4));

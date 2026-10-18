@@ -13,6 +13,7 @@ import {
   editPlanSchema,
   formatLine,
   gestureMoments,
+  handMoves,
   isClipSegment,
   isMotionSegment,
   MONTAGE_CRITIC_PROMPT,
@@ -27,10 +28,12 @@ import {
   type MontageIssue,
   type MontageReview,
   type ReelFormat,
+  type TracksByClip,
   voiceLine,
   voiceTranscriptSchema,
 } from "@fauve/agent";
 import { videoFramesInSandbox } from "@/lib/render/sandbox";
+import { loadTracks } from "@/lib/render/tracks";
 import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { anthropic, logClaudeCost } from "./run";
@@ -72,7 +75,7 @@ async function loadVersion(studioId: string, version: ReviewedVersion) {
   const fallback = typeof render.data.duration_ms === "number" && render.data.duration_ms < planned - 100;
   const shown = fallback ? withoutScenes(parsed.data) : parsed.data;
   // Her gestures under the animations: an effect that hangs on a gesture is looked at while it happens.
-  const gestures = await gesturesUnder(shown).catch(() => []);
+  const gestures = await gesturesUnder(studioId, shown).catch(() => []);
   const moments = shown.segments.length ? reviewMoments(shown, 8, gestures) : [];
   const frames = await videoFramesInSandbox(
     `review-${version.renderId.slice(0, 8)}-${Date.now()}`,
@@ -89,12 +92,23 @@ const quote = (texts: string[]) => texts.map((t) => `« ${t.slice(0, 120)} »`).
 
 const actionsSchema = z.array(z.object({ start: z.number(), end: z.number(), what: z.string() })).catch([]);
 
-/** The gestures Gemini saw in a plan's clips, where they play under its animations (each clip's latest reading). */
-async function gesturesUnder(plan: EditPlan): Promise<GestureMoment[]> {
+/**
+ * The gestures in a plan's clips, where they play under its animations: the ones Gemini saw (each
+ * clip's latest reading) and what the hands do, measured on their tracks (a gesture read can miss one).
+ */
+async function gesturesUnder(studioId: string, plan: EditPlan): Promise<GestureMoment[]> {
   const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : isMotionSegment(s) && s.over ? [s.over.clip_id] : [])))];
   if (!ids.length) return [];
-  const { data } = await supabaseAdmin().from("clip_analyses").select("media_id, actions:analysis->actions").in("media_id", ids).order("created_at");
-  const actions = Object.fromEntries((data ?? []).map((row) => [row.media_id as string, actionsSchema.parse(row.actions ?? [])]));
+  const [{ data }, tracks] = await Promise.all([
+    supabaseAdmin().from("clip_analyses").select("media_id, actions:analysis->actions").in("media_id", ids).order("created_at"),
+    loadTracks(studioId, ids).catch((): TracksByClip => ({})),
+  ]);
+  const actions: Record<string, { start: number; end: number; what: string }[]> = Object.fromEntries(
+    (data ?? []).map((row) => [row.media_id as string, actionsSchema.parse(row.actions ?? [])]),
+  );
+  for (const [id, file] of Object.entries(tracks)) {
+    actions[id] = [...(actions[id] ?? []), ...handMoves({ fps: file.fps, from: file.from, frames: file.frames, aspect: file.w / file.h })];
+  }
   return gestureMoments(plan, actions);
 }
 
