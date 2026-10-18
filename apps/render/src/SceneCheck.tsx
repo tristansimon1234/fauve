@@ -186,7 +186,7 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
             .slice(0, 3)
             .map((o) => `« ${o.text.slice(0, 40)} » (images ${o.frames[0]} à ${o.frames.at(-1)}, visage de x ${r(o.face[0])} à ${r(o.face[2])}, y ${r(o.face[1])} à ${r(o.face[3])})`)
             .join(" ; ");
-          const message = `texte sur un visage de la vidéo : ${detail}. Un texte ne se pose jamais sur les yeux, le nez ou la bouche de quelqu'un : lis track(frame).faces et pose-le du côté libre (de l'autre côté de la main, au-dessus de la tête ou plus bas), sans changer l'idée. Seul un mot qu'elle tient dans sa main pour l'effet demandé (entre ses doigts) peut passer devant son visage, le temps du geste : celui-là reste dans sa main.`;
+          const message = `texte sur un visage de la vidéo : ${detail}. Un texte ne se pose jamais sur les yeux, le nez ou la bouche de quelqu'un : lis track(frame).faces et pose-le du côté libre (de l'autre côté de la main, au-dessus de la tête ou plus bas), sans changer l'idée. Sauf si l'effet qu'elle a demandé a besoin d'être devant un visage (un mot tenu entre ses doigts, un message posé sur elle comme dans le Reel qu'elle recopie) : alors garde-le, sa demande l'autorise.`;
           console.log(`FAUVE_FACE ${JSON.stringify(message)}`);
         }
         return continueRender(handle);

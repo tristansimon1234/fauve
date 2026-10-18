@@ -2662,6 +2662,9 @@ test("off faces: one subtitle row for the Reel, animations moved off the faces u
   const kept = withShifts(out, shifts)!;
   assert.equal((kept.segments[0] as { motion: { shift: number } }).motion.shift, 0.29);
   assert.equal(withShifts(kept, shifts), null);
+  // An animation that follows a hand (its code reads track) is never slid: it would leave the hand.
+  const following = { ...out, segments: out.segments.map((s, i) => (i === 0 && "motion" in s ? { ...s, motion: { ...s.motion, js: "const h = track(frame).hands[0];" } } : s)) };
+  assert.equal(sceneShifts(following, { m0: [0.09, 0.36] }).has(0), false);
 
   // The render gets both: the scene's move, the subtitles' one row.
   const withCode = { ...kept, segments: kept.segments.map((s) => ("motion" in s ? { ...s, motion: { ...s.motion, js: "function Scene(){return null}" } } : s)) };
