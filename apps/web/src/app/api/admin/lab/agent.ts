@@ -23,15 +23,17 @@ const MANAGED_AGENTS = "managed-agents-2026-04-01";
 const MEDIA = "media";
 
 /**
- * The container: ffmpeg and the libraries MediaPipe links, the Python packages of our tracker
- * (pinned), and Google Fonts for the lettering. Nothing else on the network.
+ * The container: ffmpeg and the libraries MediaPipe links, MediaPipe, OpenCV and Pillow, and
+ * Google Fonts for the lettering. Nothing else on the network. The Python packages are not
+ * pinned: the container's own Python decides their versions (our tracker's pins, made for
+ * Python 3.13, failed there: « pip could not install numpy==2.5.4 »).
  */
 const CONFIG = {
   type: "cloud" as const,
   networking: { type: "limited" as const, allow_package_managers: true, allowed_hosts: ["fonts.googleapis.com", "fonts.gstatic.com"] },
   packages: {
     apt: ["ffmpeg", "libegl1", "libgles2", "libgl1", "fonts-dejavu-core"],
-    pip: ["mediapipe==1.1.1", "opencv-python-headless==5.0.0.93", "pillow==13.0.0", "numpy==2.5.4"],
+    pip: ["mediapipe", "opencv-python-headless", "pillow"],
   },
 };
 
@@ -81,14 +83,16 @@ async function writeRun(studioId: string, run: Run) {
   if (error) throw new Error(`lab agent: ${error.message}`);
 }
 
-/** The environment and the agent, created once and found again by name; the agent follows SYSTEM. */
+/** The environment and the agent, created once and found again by name; both follow CONFIG and SYSTEM. */
 async function setup(): Promise<{ environment: string; agent: string }> {
   const client = anthropic();
   let environment: string | undefined;
   for await (const e of client.beta.environments.list()) {
     if (e.name === NAME && !e.archived_at) environment = e.id;
   }
-  environment ??= (await client.beta.environments.create({ name: NAME, config: CONFIG })).id;
+  // An update only reaches new containers: the sessions already running keep theirs.
+  if (environment) await client.beta.environments.update(environment, { config: CONFIG });
+  else environment = (await client.beta.environments.create({ name: NAME, config: CONFIG })).id;
   const definition = {
     model: { id: CLAUDE_MODEL, effort: "high" as const },
     system: SYSTEM,
@@ -203,11 +207,16 @@ export async function effectsAgentResult(studioId: string) {
   for await (const e of client.beta.sessions.events.list(run.session, {
     order: "desc",
     limit: 50,
-    types: ["agent.message", "session.status_idle", "session.error", "span.outcome_evaluation_end"],
+    types: ["agent.message", "agent.tool_use", "session.status_idle", "session.error", "span.outcome_evaluation_end"],
   })) {
     events.push(e);
     if (events.length >= 50) break;
   }
+  // What it did last, oldest first: each tool and the start of what it ran or wrote.
+  const steps = events
+    .flatMap((e) => (e.type === "agent.tool_use" ? [`${e.name}: ${JSON.stringify(e.input).slice(0, 160)}`] : []))
+    .slice(0, 12)
+    .reverse();
   const idle = events.find((e) => e.type === "session.status_idle");
   const stopped = session.status === "idle" || session.status === "terminated";
   const usd = session.usage.list_cost ? Number(session.usage.list_cost.amount) / 100 : null;
@@ -255,6 +264,7 @@ export async function effectsAgentResult(studioId: string) {
       evaluations: session.outcome_evaluations.map((e) => ({ iteration: e.iteration, result: e.result, explanation: e.explanation })),
       errors: events.flatMap((e) => (e.type === "session.error" ? [e.error] : [])),
       said: events.flatMap((e) => (e.type === "agent.message" ? [textOf(e.content)] : [])).slice(0, 3),
+      steps,
       outputs,
     },
   };
