@@ -3375,7 +3375,7 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
 });
 
 test("effects agent: its video's length, its plan of one shot, its price once made, its budget", async () => {
-  const { effectBlurBrief, effectCredits, effectPlan, effectsBudgetCents, effectsMessage, effectsRubric, effectsTask, EFFECT_MAX_CREDITS, isBaked, mp4Duration, quoteEffect } =
+  const { effectBlurBrief, effectCredits, effectPlan, effectsBudgetCents, effectsMessage, effectsRubric, effectsTask, EFFECT_MAX_CREDITS, EFFECTS_MAX_CENTS, isBaked, mp4Duration, quoteEffect } =
     await import("./effects.ts");
   const { creationPhase, creationSteps } = await import("./creation.ts");
   const { CREDIT_VALUE_EUR } = await import("./margin.ts");
@@ -3449,11 +3449,11 @@ test("effects agent: its video's length, its plan of one shot, its price once ma
   // The session's spending limit follows the ceiling, so what it can spend always keeps the margin.
   for (const ceiling of [EFFECT_MAX_CREDITS.reel, EFFECT_MAX_CREDITS.fix, 20]) {
     const cents = effectsBudgetCents(ceiling, 0.86);
-    assert.ok(cents > 0 && cents <= 600);
+    assert.ok(cents > 0 && cents <= EFFECTS_MAX_CENTS);
     assert.ok(effectCredits({ agentEur: (cents / 100) * 0.86, floor: 0, ceiling: 1000 }) <= ceiling, `${ceiling} crédits : ${cents} cents`);
   }
-  assert.equal(effectsBudgetCents(EFFECT_MAX_CREDITS.reel, 0.86), 509);
-  assert.equal(effectsBudgetCents(500, 0.86), 600);
+  assert.equal(effectsBudgetCents(EFFECT_MAX_CREDITS.reel, 0.86), 639);
+  assert.equal(effectsBudgetCents(500, 0.86), EFFECTS_MAX_CENTS);
   assert.equal(effectsBudgetCents(0, 0.86), 0);
 
   // Priced when the agent takes the Reel: the chain's price as its floor, a ceiling within what she can spend.
