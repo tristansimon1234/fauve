@@ -34,12 +34,17 @@ import {
   readVoiceSetting,
   SIMONE_VOICES,
   reelLink,
+  EFFECT_MINUTES,
+  EFFECT_VOICE_OUT,
+  effectBlurBrief,
   type ToolName,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { acceptQuote, createMontageQuote } from "@/lib/credits";
-import { startMontage } from "@/lib/montage-start";
+import { correctionQuote, startMontage } from "@/lib/montage-start";
+import { bakedReel } from "@/lib/edit-plans";
+import { effectRoute } from "@/lib/agent/effects-agent";
 import { montageStatus } from "@/lib/montage-status";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
@@ -173,6 +178,22 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   async function assertOwnMedia(ids: string[]) {
     const { data } = await db.from("media_assets").select("id").eq("studio_id", studioId).in("id", ids);
     if ((data?.length ?? 0) !== new Set(ids).size) throw new Error("Un des media_id n'appartient pas à ce studio.");
+  }
+
+  /**
+   * A change to a Reel the effects agent drew (its voice, its blur): the agent makes the effect again
+   * from the version she saw, started after the reply (her request is her yes), charged on delivery.
+   */
+  async function effectCorrection(postId: string, brief: string, doing: string) {
+    const accepted = await correctionQuote(studioId, postId, brief);
+    if ("error" in accepted) return json({ error: accepted.error });
+    ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
+    ctx.extras.quote = accepted.id;
+    ctx.notes.push(`correction de l'effet lancée job=${accepted.id} post_id=${postId}`);
+    return json({
+      status: "started",
+      note: `${doing} : son effet est dessiné image par image, il se refait en entier (${EFFECT_MINUTES} min) ; débité à la livraison sur ce qu'il a coûté. Dis-le en une phrase, sans prix.`,
+    });
   }
 
   const handlers: ToolHandlers = {
@@ -413,6 +434,12 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         check(await db.from("posts").update({ inspiration_id }).eq("id", post_id).eq("studio_id", studioId));
       }
       if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : lance d'abord un montage (correction: false).";
+      // A variant of a Reel the effects agent drew: the agent makes another version of its effect (a correction).
+      if (variant && (await bakedReel(studioId, post_id))) {
+        brief = [variant.hook ? `Une variante de ce Reel, avec une autre accroche : « ${variant.hook} ».` : "Une variante de ce Reel.", brief].filter(Boolean).join(" ");
+        correction = true;
+        variant = undefined;
+      }
       // The level asked for, else the studio's default (Réglages).
       const studio = await db.from("studios").select("montage_effort").eq("id", studioId).single();
       const wanted = effort ?? effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);
@@ -435,18 +462,21 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       const accepted = await acceptQuote(studioId, job.id, turnStartedAt, { immediate: true });
       if ("error" in accepted) return json({ error: accepted.error });
-      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
+      // Who makes it, decided now so she hears the right time (the job keeps it): an effect drawn image by image takes longer.
+      const route = accepted.kind === "variant" ? "chain" : await effectRoute(studioId, { postId: post_id, correction: accepted.kind === "correction", brief: accepted.brief, mediaIds: accepted.mediaIds }).catch(() => undefined);
+      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, route }));
       // In the app, the card follows the montage step by step; on WhatsApp, cards become links, so the post's link stays.
       ctx.extras.quote = job.id;
       if (ctx.waId) ctx.extras.posts = [post_id];
       const level = job.effort ? EFFORTS[job.effort] : null;
-      ctx.notes.push(`montage lancé job=${job.id} pour « ${post.title as string} » post_id=${post_id}${level ? ` (${level.label})` : ""}`);
+      const minutes = route === "agent" ? EFFECT_MINUTES : (level?.minutes ?? "2 à 4");
+      ctx.notes.push(`montage lancé job=${job.id} pour « ${post.title as string} » post_id=${post_id}${route === "agent" ? " (effet image par image)" : level ? ` (${level.label})` : ""}`);
       return json({
         status: "started",
         publication: post.title,
-        ...(level ? { niveau: level.label, duree: `${level.minutes} min` } : {}),
-        ...(job.effort && job.effort !== wanted ? { attention: `Le solde ne permettait pas le niveau ${EFFORTS[wanted].label} : lancé en ${level?.label}.` } : {}),
-        note: `C'est lancé. Dis en une ou deux phrases ce que tu vas faire et quand la vidéo arrive (${level?.minutes ?? "2 à 4"} min). Ne parle pas de prix ni de devis : le message de livraison dira combien de crédits ont servi. Ne demande pas « je lance ? ».`,
+        ...(route === "agent" ? { atelier: "effet dessiné image par image, sur ce qui bouge dans sa vidéo", duree: `${minutes} min` } : level ? { niveau: level.label, duree: `${minutes} min` } : {}),
+        ...(job.effort && job.effort !== wanted && route !== "agent" ? { attention: `Le solde ne permettait pas le niveau ${EFFORTS[wanted].label} : lancé en ${level?.label}.` } : {}),
+        note: `C'est lancé. Dis en une ou deux phrases ce que tu vas faire et quand la vidéo arrive (${minutes} min). Ne parle pas de prix ni de devis : le message de livraison dira combien de crédits ont servi. Ne demande pas « je lance ? ».`,
       });
     },
 
@@ -598,6 +628,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (mode === "off") {
         const rerender = await removeVoice(studioId, post_id);
         if (!rerender) return json({ ok: true, note: "C'est noté : pas de voix sur ce Reel." });
+        // The voice is mixed into the video the effects agent drew: it makes the effect again without it.
+        if (rerender === "agent") return effectCorrection(post_id, EFFECT_VOICE_OUT, "Simone refait l'effet sans la voix");
         ctx.afterReply.push(async () => {
           await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
         });
@@ -741,6 +773,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async blur_video({ post_id, what }) {
+      // Drawn image by image by the effects agent: it blurs its own video.
+      if (await bakedReel(studioId, post_id)) return effectCorrection(post_id, effectBlurBrief(what), what.length ? "Simone floute la vidéo de l'effet" : "Simone retire le flou de l'effet");
       ctx.afterReply.push(async () => {
         try {
           await blurMontage(studioId, post_id, what);
@@ -999,6 +1033,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (plan.success) {
           montage = {
             version: row?.version,
+            ...(plan.data.baked ? { atelier_effets: "effet dessiné image par image : ses textes et son effet sont dans l'image ; un changement passe par montage avec correction: true" } : {}),
             gabarit: plan.data.template,
             duree_s: plan.data.duration,
             scenes: plan.data.segments.length,

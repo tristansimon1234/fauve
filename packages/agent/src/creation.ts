@@ -56,8 +56,21 @@ export const imaginedBrief = (idea: string): string | undefined => (idea.trim() 
 
 export type CreationPhase = "watch" | "edit" | "second" | "render" | "review";
 
-/** The steps of a Reel in the making, as she reads them, for this level of care. */
-export function creationSteps(effort: Effort, p: Picked, music: boolean): { phase: CreationPhase; label: string }[] {
+/** How long a Reel made by the effects agent takes, as she reads it. */
+export const EFFECT_MINUTES = "10 à 30";
+
+/**
+ * The steps of a Reel in the making, as she reads them, for this level of care. A Reel
+ * with an effect (the effects agent makes it, with its own checks): the effect, then the music.
+ */
+export function creationSteps(effort: Effort, p: Picked, music: boolean, effect = false): { phase: CreationPhase; label: string }[] {
+  if (effect) {
+    return [
+      { phase: "watch", label: `Je regarde ${mediaPhrase(p)}` },
+      { phase: "edit", label: "Je fais ton effet image par image et je vérifie chaque geste" },
+      { phase: "render", label: music ? "Je pose la musique" : "Je finis la vidéo" },
+    ];
+  }
   return [
     { phase: "watch" as const, label: `Je regarde ${mediaPhrase(p)}` },
     { phase: "edit" as const, label: p.videos ? "Je garde les plus beaux moments et j’écris les textes" : "Je choisis l’ordre et j’écris les textes" },
@@ -73,6 +86,7 @@ export function creationSteps(effort: Effort, p: Picked, music: boolean): { phas
  * A correction after the review renders again: the screen never steps back (it keeps the furthest step).
  */
 export function creationPhase(stage: string | null, watched: boolean): CreationPhase {
+  if (stage === "effects") return "edit";
   if (stage === "alternative") return "second";
   if (stage === "render") return "render";
   if (stage === "review" || stage === "fix") return "review";

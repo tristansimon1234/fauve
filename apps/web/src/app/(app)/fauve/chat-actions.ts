@@ -2,7 +2,7 @@
 
 import { EFFORTS, effortSchema, type Effort } from "@fauve/agent";
 import { quoteCharges, quoteFailed, quoteState, type CardQuote } from "@/lib/chat-cards";
-import { acceptQuote, type QuoteStage } from "@/lib/credits";
+import { acceptQuote, pricedAsEffect, type QuoteStage } from "@/lib/credits";
 import { startMontage } from "@/lib/montage-start";
 import { setReaction } from "@/lib/reactions";
 import { getStudioContext } from "@/lib/studio";
@@ -125,7 +125,7 @@ export async function launchQuote(quoteId: string, conversationId: string, effor
 }
 
 /** Where a quote card's montage is, without reloading the conversation (media links stay as they are). */
-export type QuoteProgress = Pick<CardQuote, "id" | "state" | "stage" | "stageAt" | "startedAt" | "effort" | "failed" | "charged">;
+export type QuoteProgress = Pick<CardQuote, "id" | "state" | "stage" | "stageAt" | "startedAt" | "effort" | "failed" | "charged" | "effect">;
 
 /** The launched montages the chat is showing, polled every few seconds while they run (use-quote-progress.ts). */
 export async function quoteProgress(ids: string[]): Promise<QuoteProgress[]> {
@@ -135,7 +135,7 @@ export async function quoteProgress(ids: string[]): Promise<QuoteProgress[]> {
   if (!ctx) return [];
   const { data } = await supabaseAdmin()
     .from("credit_quotes")
-    .select("id, effort, stage, stage_at, used_at, charged_at, expires_at")
+    .select("id, effort, stage, stage_at, used_at, charged_at, expires_at, params")
     .eq("studio_id", ctx.studioId)
     .in("id", wanted);
   const charges = await quoteCharges(
@@ -151,6 +151,7 @@ export async function quoteProgress(ids: string[]): Promise<QuoteProgress[]> {
     effort: effortSchema.nullable().catch(null).parse(q.effort ?? null),
     failed: quoteFailed(q),
     charged: charges.get(q.id as string) ?? null,
+    effect: pricedAsEffect(q.params),
   }));
 }
 

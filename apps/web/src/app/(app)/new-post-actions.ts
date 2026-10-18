@@ -41,7 +41,7 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
 
   const [slots, assets] = await Promise.all([
     freeSlots(studioId, tz, 4, now),
-    db.from("media_assets").select("id, storage_path, kind, created_at, duration").eq("studio_id", studioId).in("kind", ["image", "video"]).order("created_at", { ascending: false }).limit(40),
+    db.from("media_assets").select("id, storage_path, kind, created_at, duration").eq("studio_id", studioId).in("kind", ["image", "video"]).neq("source", "render").order("created_at", { ascending: false }).limit(40),
   ]);
   const [{ data: studio }, { data: brand }, { data: tiktok }, copy] = await Promise.all([
     db.from("studios").select("business_type").eq("id", studioId).maybeSingle(),
@@ -91,7 +91,7 @@ export async function libraryForPicker(kind: "photo" | "video" | "any"): Promise
   if (!member) return [];
   const studioId = member.studio.id;
   const kinds = kind === "photo" ? ["image"] : kind === "video" ? ["video"] : ["image", "video"];
-  const { data } = await db.from("media_assets").select("id, storage_path, kind, created_at").eq("studio_id", studioId).in("kind", kinds).order("created_at", { ascending: false }).limit(24);
+  const { data } = await db.from("media_assets").select("id, storage_path, kind, created_at").eq("studio_id", studioId).in("kind", kinds).neq("source", "render").order("created_at", { ascending: false }).limit(24);
   const media = (data ?? []).map((a) => ({ id: a.id as string, path: a.storage_path as string, video: a.kind === "video", at: a.created_at as string }));
   const urls = await signMediaUrls(db, studioId, media.map((m) => m.path));
   return media.flatMap((m) => {

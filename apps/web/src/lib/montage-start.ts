@@ -1,12 +1,31 @@
 import "server-only";
-import type { AcceptedQuote } from "@/lib/credits";
+import { DEFAULT_EFFORT, effortSchema } from "@fauve/agent";
+import { acceptQuote, createMontageQuote, type AcceptedQuote } from "@/lib/credits";
 import { queueJob } from "@/lib/jobs";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+
+/**
+ * A correction of a post's montage, priced and accepted at once (her request or her tap is her yes),
+ * at the studio's level of care; the caller starts it (startMontage) after its answer. Charged on delivery.
+ */
+export async function correctionQuote(studioId: string, postId: string, brief: string): Promise<AcceptedQuote | { error: string }> {
+  const studio = await supabaseAdmin().from("studios").select("montage_effort").eq("id", studioId).single();
+  const effort = effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);
+  const quote = await createMontageQuote({ studioId, postId, mediaIds: [], brief, correction: true, maxNewScenes: 0, effort });
+  if ("error" in quote) return { error: "Il ne te reste pas assez de crédits pour refaire la vidéo." };
+  return acceptQuote(studioId, quote.id, new Date(), { immediate: true });
+}
 
 /**
  * Starts the quoted work as a background job (it sends the video itself when
  * done). Shared by Fauve's montage tool and the « Lancer » button of the quote card.
  */
-export function startMontage(studioId: string, quote: AcceptedQuote, target: { waId?: string; replyTo?: string; notify?: boolean } = {}) {
+export function startMontage(
+  studioId: string,
+  quote: AcceptedQuote,
+  /** route: who makes it, when it was decided before (effectRoute), so the job does not decide again. */
+  target: { waId?: string; replyTo?: string; notify?: boolean; route?: "agent" | "chain" } = {},
+) {
   return queueJob("montage", {
     // A variant skips the editor: same cut, another style and hook, then the render.
     step: quote.kind === "variant" ? "variant" : "design",
@@ -23,5 +42,6 @@ export function startMontage(studioId: string, quote: AcceptedQuote, target: { w
     waId: target.waId,
     replyTo: target.replyTo,
     notify: target.notify || undefined,
+    route: target.route,
   });
 }

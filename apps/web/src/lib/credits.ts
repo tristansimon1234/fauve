@@ -3,6 +3,7 @@ import { studioAccess } from "@/lib/billing/access";
 import {
   accessMessage,
   CREDIT_PRICES,
+  effectCredits,
   EFFORTS,
   effortSchema,
   montageCharge,
@@ -11,6 +12,7 @@ import {
   planOf,
   otherEffort,
   planBrief,
+  quoteEffect,
   quoteMontage,
   quoteVariant,
   type Effort,
@@ -61,7 +63,46 @@ export type Quote = {
 };
 
 /** Where a launched montage is in the chain (montage_status, the quote card). */
-export type QuoteStage = "design" | "alternative" | "render" | "review" | "fix" | "delivered";
+export type QuoteStage = "design" | "effects" | "alternative" | "render" | "review" | "fix" | "delivered";
+
+/**
+ * Her Reel goes to the effects agent: the launched work is priced as one (quoteEffect: the chain's price
+ * as its floor, a ceiling held while it works, the real charge once it is made), the chain's price kept
+ * aside in case the chain takes it back. Returns the ceiling (the session's budget follows it); null when
+ * her credits leave too small a ceiling for an effect.
+ */
+export async function switchQuoteToEffect(quoteId: string, correction: boolean): Promise<number | null> {
+  const db = supabaseAdmin();
+  const { data: q } = await db.from("credit_quotes").select("studio_id, base, max, lines, params, charged_at").eq("id", quoteId).maybeSingle();
+  if (!q || q.charged_at) return null;
+  const params = (q.params ?? {}) as Record<string, unknown>;
+  if (params.chain) return q.max as number;
+  const effect = quoteEffect({ correction, floor: q.base as number, available: await availableCredits(q.studio_id as string, quoteId) });
+  if (!effect) return null;
+  const { error } = await db
+    .from("credit_quotes")
+    .update({ base: effect.base, max: effect.max, lines: effect.lines, params: { ...params, chain: { base: q.base, max: q.max, lines: q.lines } } })
+    .eq("id", quoteId)
+    .is("charged_at", null);
+  if (error) {
+    console.warn("credit_quotes: effect price not set", error.message);
+    return null;
+  }
+  return effect.max;
+}
+
+/** A launched quote the effects agent took (switchQuoteToEffect keeps the chain's price aside in its params). */
+export const pricedAsEffect = (params: unknown): boolean => Boolean((params as { chain?: unknown } | null)?.chain);
+
+/** The chain takes the Reel back from the effects agent: its own price again. */
+export async function restoreChainQuote(quoteId: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { data: q } = await db.from("credit_quotes").select("params, charged_at").eq("id", quoteId).maybeSingle();
+  const params = (q?.params ?? {}) as { chain?: { base: number; max: number; lines: QuoteLine[] } } & Record<string, unknown>;
+  if (!q || q.charged_at || !params.chain) return;
+  const { chain, ...rest } = params;
+  await db.from("credit_quotes").update({ base: chain.base, max: chain.max, lines: chain.lines, params: rest }).eq("id", quoteId).is("charged_at", null);
+}
 
 /**
  * What can still be spent: the balance minus the most each montage in flight
@@ -306,43 +347,52 @@ export async function setQuoteStage(quoteId: string | undefined, stage: QuoteSta
   else await setJobStage(quoteId, stage);
 }
 
-/** Work priced for a montage that did not happen: the review (the critic could not watch), the second take. */
-type Skipped = { skipReview?: boolean; skipAlternative?: boolean };
+/**
+ * What really happened, for the charge: work priced for a montage that did not happen (the review, when
+ * the critic could not watch; the second take), and an effect's real cost in euros (null: not read).
+ */
+type ChargeFacts = { skipReview?: boolean; skipAlternative?: boolean; effectEur?: number | null };
 
-/** The credits a delivered montage costs: its real new scenes and corrections, never above what was priced. */
-function chargeOf(q: { base: unknown; max: unknown; lines: unknown }, newScenes: number, fixRounds: number, { skipReview = false, skipAlternative = false }: Skipped): number {
-  const skipped = (skipReview ? CREDIT_PRICES.review : 0) + (skipAlternative ? CREDIT_PRICES.alternative : 0);
+/** The credits a delivered montage costs: its real new scenes and corrections, an effect its real cost, never above what was priced. */
+function chargeOf(q: { base: unknown; max: unknown; lines: unknown; params: unknown }, newScenes: number, fixRounds: number, facts: ChargeFacts): number {
+  if (pricedAsEffect(q.params)) return effectCredits({ agentEur: facts.effectEur ?? null, floor: q.base as number, ceiling: q.max as number });
+  const skipped = (facts.skipReview ? CREDIT_PRICES.review : 0) + (facts.skipAlternative ? CREDIT_PRICES.alternative : 0);
   return Math.max(0, montageCharge({ base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[] }, newScenes, fixRounds) - skipped);
 }
 
 /** What delivering a montage will cost, and what will be left, before it is charged (said in the delivery message). */
-export async function montageCost(quoteId: string, newScenes: number, fixRounds = 0, skipped: Skipped = {}): Promise<{ credits: number; left: number } | null> {
-  const { data: q } = await supabaseAdmin().from("credit_quotes").select("studio_id, base, max, lines, charged_at").eq("id", quoteId).maybeSingle();
+export async function montageCost(quoteId: string, newScenes: number, fixRounds = 0, facts: ChargeFacts = {}): Promise<{ credits: number; left: number } | null> {
+  const { data: q } = await supabaseAdmin().from("credit_quotes").select("studio_id, base, max, lines, params, charged_at").eq("id", quoteId).maybeSingle();
   if (!q || q.charged_at) return null;
-  const credits = chargeOf(q, newScenes, fixRounds, skipped);
+  const credits = chargeOf(q, newScenes, fixRounds, facts);
   return { credits, left: Math.max(0, (await creditBalance(q.studio_id as string)) - credits) };
 }
 
-/** Charges a delivered montage: its real new scenes and corrections, never above what was priced. Once per montage. */
-export async function chargeQuote(quoteId: string, newScenes: number, title: string, fixRounds = 0, skipped: Skipped = {}): Promise<void> {
+/** Charges a delivered montage: its real new scenes and corrections, an effect its real cost, never above what was priced. Once per montage. */
+export async function chargeQuote(quoteId: string, newScenes: number, title: string, fixRounds = 0, facts: ChargeFacts = {}): Promise<void> {
   const db = supabaseAdmin();
   const claimed = await db
     .from("credit_quotes")
     .update({ charged_at: new Date().toISOString() })
     .eq("id", quoteId)
     .is("charged_at", null)
-    .select("studio_id, post_id, kind, base, max, lines, effort")
+    .select("studio_id, post_id, kind, base, max, lines, effort, params")
     .maybeSingle();
   const q = claimed.data;
   if (!q) return;
-  const credits = chargeOf(q, newScenes, fixRounds, skipped);
+  const credits = chargeOf(q, newScenes, fixRounds, facts);
   const kind = q.kind as AcceptedQuote["kind"];
   const level = effortSchema.nullable().catch(null).parse(q.effort);
-  const label = `${{ montage: "Montage", correction: "Correction", variant: "Variante" }[kind]}${level && level !== "rapide" ? ` ${EFFORTS[level].label}` : ""}`;
+  const label = pricedAsEffect(q.params)
+    ? kind === "correction"
+      ? "Correction de l’effet"
+      : "Effet image par image"
+    : `${{ montage: "Montage", correction: "Correction", variant: "Variante" }[kind]}${level && level !== "rapide" ? ` ${EFFORTS[level].label}` : ""}`;
   await chargeCredits(q.studio_id as string, credits, kind, `${label} « ${title} »`, {
     quote_id: quoteId,
     post_id: q.post_id,
     new_scenes: newScenes,
     fix_rounds: fixRounds,
+    ...(facts.effectEur !== undefined ? { effect_eur: facts.effectEur } : {}),
   });
 }

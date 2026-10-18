@@ -272,6 +272,8 @@ export const editPlanObjectSchema = z.object({
   subtitle_y: z.number().min(0.1).max(0.8).optional(),
   /** Animations over several shots (see editPlanLayerSchema). */
   layers: z.array(editPlanLayerSchema).max(3).optional(),
+  /** A Reel made by the effects agent (effects.ts): its one shot is the finished video, played as it is. Set by the engine. */
+  baked: z.object({ by: z.literal("agent"), session: z.string().min(1).max(80) }).optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {

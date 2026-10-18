@@ -1,6 +1,6 @@
 "use client";
 
-import { timeline, type PostCover } from "@fauve/agent";
+import { EFFECT_MINUTES, timeline, type PostCover } from "@fauve/agent";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -26,6 +26,7 @@ const ReelEditor = dynamic(() => import("./reel-editor").then((m) => m.ReelEdito
 
 const STEPS: Record<string, string> = {
   montage: "Simone refait le montage",
+  effet: "Simone fait l’effet image par image",
   "2e version": "Simone essaie une autre version",
   rendu: "Simone fabrique la vidéo",
   relecture: "Simone relit tout",
@@ -238,7 +239,9 @@ export function PostReview({
                   <Mascot size={64} mood="thinking" />
                 </span>
                 <span className="text-[16px] font-extrabold">{data.making?.step ? (STEPS[data.making.step] ?? "Simone y travaille") : "La vidéo se met à jour"}</span>
-                <span className="text-[13px] leading-snug text-white/85">Ça prend une à deux minutes. Tu peux fermer, Simone te prévient.</span>
+                <span className="text-[13px] leading-snug text-white/85">
+                  {data.making?.step === "effet" ? `Ça prend ${EFFECT_MINUTES} minutes.` : "Ça prend une à deux minutes."} Tu peux fermer, Simone te prévient.
+                </span>
               </div>
             )}
           </div>

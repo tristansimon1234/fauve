@@ -5,6 +5,7 @@ import {
   CLAUDE_MODEL,
   defaultLook,
   editPlanSchema,
+  isBaked,
   motionTemplateSchema,
   resolveReelBrand,
   savedLookSchema,
@@ -130,6 +131,9 @@ export async function restyleTexts(studioId: string, postId: string, change: Loo
     : await base.order("version", { ascending: false }).limit(1).maybeSingle();
   const plan = editPlanSchema.safeParse(row?.plan);
   if (!plan.success) throw new Error("Cette publication n'a ni texte sur photos ni montage");
+  if (isBaked(plan.data)) {
+    throw new Error("Ce Reel a un effet dessiné image par image : ses textes sont dans l'image. Pour les changer, lance montage avec correction: true et dis le changement dans brief (police, couleur, taille, place).");
+  }
   if (!motionTemplateSchema.safeParse(plan.data.template).success) throw new Error("Ce montage ancien ne prend pas les styles de texte : refais-le d'abord");
   const next = { ...plan.data, texts: plan.data.texts.map((t) => apply(t, { min: 0.05, max: 0.66 })) };
   if (!changed) throw new Error("Ce montage n'a pas de texte à styler");

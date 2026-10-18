@@ -180,6 +180,17 @@ export async function loadMontageInputs(
   };
 }
 
+/** The finished video of a Reel the effects agent made: its one shot. */
+async function bakedVideo(studioId: string, plan: EditPlan): Promise<Buffer> {
+  const shot = plan.segments.find(isClipSegment);
+  if (!shot) throw new Error("Reel de l'atelier d'effets sans vidéo");
+  const db = supabaseAdmin();
+  const asset = check(await db.from("media_assets").select("storage_path").eq("id", shot.clip_id).eq("studio_id", studioId).single()).data!;
+  const { data, error } = await db.storage.from("media").download(asset.storage_path as string);
+  if (!data) throw new Error(`Vidéo de l'effet introuvable : ${error?.message ?? asset.storage_path}`);
+  return Buffer.from(await data.arrayBuffer());
+}
+
 /** A voice note as the composition plays it: its signed link and its words; undefined if it is gone or not read. */
 async function voiceInput(studioId: string, mediaId: string): Promise<ReelInputs["voice"]> {
   const db = supabaseAdmin();
@@ -237,10 +248,15 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       if (!clipsOnly.segments.length) throw new Error("Montage sans vidéo : le moteur de motion design est indisponible");
       return renderInSandbox({ id: renderId, clips, ass: buildAss(clipsOnly, accent), ffmpegArgs: buildFfmpegArgs(clipsOnly, { clipFiles }) });
     };
-    let engine: "remotion" | "ffmpeg" = "ffmpeg";
+    let engine: "remotion" | "ffmpeg" | "baked" = "ffmpeg";
     let mp4: Buffer;
     let durationMs = Math.round(renderDuration(withoutScenes(plan)) * 1000);
-    if (motion.success) {
+    if (plan.baked) {
+      // A Reel the effects agent made: its video plays as it is (its texts and its effect are in the image), the music goes on it.
+      mp4 = await bakedVideo(studioId, plan);
+      engine = "baked";
+      durationMs = Math.round(plan.duration * 1000);
+    } else if (motion.success) {
       // Motion templates (Remotion); the ffmpeg engine is the safety net.
       const props = buildReelProps(plan, {
         template: motion.data,
@@ -363,8 +379,9 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     check(await db.from("posts").update({ render_id: renderId, status, ...(options.editPlanId ? { edit_plan_id: planRow.id } : {}) }).eq("id", postId));
 
     const url = check(await db.storage.from("media").createSignedUrl(storagePath, 24 * 3600)).data!.signedUrl;
-    // The strip of scenes under the Reel, when the video follows the plan (the ffmpeg engine drops its animations).
-    if (engine === "remotion" || plan.segments.every(isClipSegment)) {
+    // The strip of scenes under the Reel, when the video follows the plan (the ffmpeg engine drops its animations;
+    // the effects agent's video is one shot: no strip).
+    if (engine === "remotion" || (engine === "ffmpeg" && plan.segments.every(isClipSegment))) {
       await makeSceneSprite({ studioId, renderId, videoUrl: url, plan }).catch((error: unknown) => console.warn("scenes strip failed", renderId, error));
     }
 

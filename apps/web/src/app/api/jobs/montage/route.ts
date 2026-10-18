@@ -3,6 +3,9 @@ import { after } from "next/server";
 import { z } from "zod";
 import {
   alternativeBrief,
+  EFFECT_MAX_CREDITS,
+  EFFECTS_TIMEOUT_MINUTES,
+  effectPlan,
   EFFORTS,
   effortSchema,
   effortVersions,
@@ -13,12 +16,24 @@ import {
   MAX_MONTAGE_FILES,
   motionTemplateSchema,
   reelFormatSchema,
+  usdToEur,
   variantPlan,
+  VOICE_AT,
 } from "@fauve/agent";
 import { reviewMontage } from "@/lib/agent/critic";
 import { designEdit } from "@/lib/agent/editor";
+import {
+  collectEffects,
+  effectRoute,
+  effectsState,
+  endEffectsSession,
+  logEffectsCost,
+  startEffectsSession,
+  type EffectsState,
+} from "@/lib/agent/effects-agent";
 import { voiceOverIfWanted } from "@/lib/voice-over";
-import { chargeQuote, montageCost, setQuoteStage } from "@/lib/credits";
+import { chargeQuote, montageCost, restoreChainQuote, setQuoteStage, switchQuoteToEffect } from "@/lib/credits";
+import { insertPlanVersion } from "@/lib/edit-plans";
 import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
 import { deliverMontage, notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
@@ -50,7 +65,7 @@ const versionSchema = z.object({
 type Version = z.infer<typeof versionSchema>;
 
 const bodySchema = z.object({
-  step: z.enum(["design", "alternative", "variant", "render", "review", "fix"]),
+  step: z.enum(["design", "effects", "effects_wait", "alternative", "variant", "render", "review", "fix"]),
   studioId: z.uuid(),
   postId: z.uuid(),
   mediaIds: z.array(z.uuid()).max(MAX_MONTAGE_FILES).optional(),
@@ -92,6 +107,12 @@ const bodySchema = z.object({
   voiced: z.boolean().optional(),
   /** Simone chose a key message with the music over a voice for this Reel (her setting is « auto »). */
   format: reelFormatSchema.optional(),
+  /** Who makes this Reel, decided once at its design: the effects agent or the chain. */
+  route: z.enum(["agent", "chain"]).optional(),
+  /** The agent's session at work: its id, the files it was given, its voice, when it started. */
+  effect: z
+    .object({ session: z.string().max(80), files: z.array(z.string().max(80)).max(40), voice: z.uuid().nullable(), started: z.string().max(40) })
+    .optional(),
 });
 type Job = z.infer<typeof bodySchema>;
 
@@ -139,6 +160,18 @@ const FAILED = "Je n’ai pas réussi à préparer le montage. Aucun crédit n�
 async function run(job: Job) {
   const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify };
   const level = job.effort ? EFFORTS[job.effort] : null;
+
+  // A Reel whose effect holds to what moves in her video: the effects agent makes it, whatever the level of care.
+  if (job.step === "effects" || job.step === "effects_wait") {
+    try {
+      if (job.step === "effects") await effects(job);
+      else await effectsWait(job);
+    } catch (error) {
+      await backToChain(job, error);
+    }
+    return;
+  }
+  if (job.step === "design" && (await effectsFirst(job))) return;
   // Rapide and older quotes: one version, delivered as soon as it is rendered.
   const reviewed = Boolean(level?.review && job.step !== "variant");
 
@@ -216,7 +249,8 @@ const scenesLeft = (job: Job) => Math.max(0, (job.maxNewScenes ?? 2) - (job.newS
  */
 async function voiceFirst(job: Job): Promise<boolean> {
   if (job.voiced) return false;
-  const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief });
+  // A Reel with an effect takes a voice only when she chose one.
+  const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief, explicitOnly: job.route === "agent" });
   if (!made) return false;
   // A key message with the music suits it better: no voice, the editor knows it, the design goes on now.
   if ("format" in made) {
@@ -225,6 +259,176 @@ async function voiceFirst(job: Job): Promise<boolean> {
   }
   await next(job, { step: "design", voiced: true, voice: made.voice, format: "raconte" });
   return true;
+}
+
+/**
+ * The design step of a Reel the effects agent makes (the route is decided once, when the montage
+ * starts, else here: effectRoute): her voice first when she chose one (the agent sets its cuts on
+ * it), then the session, started in its own invocation. False: the chain makes it.
+ */
+async function effectsFirst(job: Job): Promise<boolean> {
+  try {
+    if (job.route === "chain") return false;
+    if (!job.route) job.route = await effectRoute(job.studioId, { postId: job.postId, correction: Boolean(job.correction), brief: job.brief, mediaIds: job.mediaIds });
+    if (job.route !== "agent") return false;
+    await setQuoteStage(job.quoteId, "design");
+    if (await voiceFirst(job)) return true;
+    await next(job, { step: "effects" });
+    return true;
+  } catch (error) {
+    console.warn("effects: not started, the chain makes the Reel", job.postId, error);
+    job.route = "chain";
+    return false;
+  }
+}
+
+/** The effects agent cannot make this one, with what to tell her (a correction of her effect: the chain cannot take it). */
+class EffectUnavailable extends Error {}
+
+/**
+ * Starts the agent's session, priced as an effect: charged on its real cost once made, up to a ceiling
+ * held meanwhile, which its spending limit follows (the chain makes the Reel when her credits leave too little).
+ */
+async function effects(job: Job) {
+  await setQuoteStage(job.quoteId, "effects");
+  const ceiling = job.quoteId ? await switchQuoteToEffect(job.quoteId, Boolean(job.correction)) : EFFECT_MAX_CREDITS[job.correction ? "fix" : "reel"];
+  if (ceiling === null) {
+    // A correction of her effect cannot be made by the chain: it waits for her credits (nothing is charged).
+    if (job.correction) throw new EffectUnavailable("Il ne te reste pas assez de crédits pour refaire l’effet : ils reviennent le 1er du mois.");
+    console.log("effects: too few credits for an effect, the chain makes it", job.postId);
+    await next(job, { step: "design", route: "chain" });
+    return;
+  }
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("media_ids, render_id").eq("id", job.postId).eq("studio_id", job.studioId).single();
+  const mediaIds = job.mediaIds?.length ? job.mediaIds : ((post?.media_ids as string[] | null) ?? []);
+  // A correction reworks the video she saw.
+  const previous = job.correction && post?.render_id ? (await db.from("renders").select("storage_path").eq("id", post.render_id as string).maybeSingle()).data : null;
+  const started = await startEffectsSession({
+    studioId: job.studioId,
+    postId: job.postId,
+    mediaIds,
+    request: job.brief?.trim() || "Un Reel avec l’effet qu’elle imagine sur sa vidéo.",
+    previousRender: (previous?.storage_path as string | null) ?? null,
+    ceiling,
+  });
+  // On the job before the next call: if it cannot be queued, the session is ended with the rest.
+  job.effect = { ...started, started: new Date().toISOString() };
+  await next(job, { step: "effects_wait" });
+}
+
+/**
+ * How long one invocation waits on the session (the next one takes over), and how often it looks: the
+ * session can end on the last look, and its video, music and delivery need a few minutes of the 800 s.
+ */
+const EFFECTS_WAIT_MS = 8 * 60_000;
+const EFFECTS_POLL_MS = 20_000;
+
+/** Waits on the session, keeping the step fresh (a job without news for a while is dead), then delivers its video. */
+async function effectsWait(job: Job) {
+  const effect = job.effect;
+  if (!effect) throw new Error("effects: no session to wait on");
+  const until = Date.now() + EFFECTS_WAIT_MS;
+  let freshAt = 0;
+  let misses = 0;
+  for (;;) {
+    let state: EffectsState | null = null;
+    try {
+      state = await effectsState(effect.session);
+      misses = 0;
+    } catch (error) {
+      // A look that fails (the API, the network) is tried again: the session works on without us.
+      if (++misses >= 5) throw error;
+      console.warn("effects: session not read, trying again", job.postId, error);
+    }
+    if (state?.stopped) {
+      await effectsDone(job, effect, state);
+      return;
+    }
+    if (Date.now() - new Date(effect.started).getTime() > EFFECTS_TIMEOUT_MINUTES * 60_000) throw new Error("effects: the session took too long");
+    if (Date.now() - freshAt > 2 * 60_000) {
+      await setQuoteStage(job.quoteId, "effects");
+      freshAt = Date.now();
+    }
+    if (Date.now() > until) {
+      await next(job, { step: "effects_wait" });
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, EFFECTS_POLL_MS));
+  }
+}
+
+/**
+ * The session is over: its video becomes the Reel's new version (a plan of one shot, the music
+ * mixed on it by the render), goes to her like any montage, and nothing of hers stays at Anthropic.
+ */
+async function effectsDone(job: Job, effect: NonNullable<Job["effect"]>, state: EffectsState) {
+  const out = await collectEffects(effect.session, effect.files);
+  await logEffectsCost(job.studioId, job.postId, effect.session, state);
+  if (!out) throw new Error(`effects: no video out of the session (${state.stop ?? "stopped"})`);
+  await setQuoteStage(job.quoteId, "render");
+  const db = supabaseAdmin();
+  const path = `${job.studioId}/ai/effect-${job.postId}-${Date.now()}.mp4`;
+  const upload = await db.storage.from("media").upload(path, out.mp4, { contentType: "video/mp4", upsert: true });
+  if (upload.error) throw new Error(upload.error.message);
+  const asset = await db
+    .from("media_assets")
+    .insert({
+      studio_id: job.studioId,
+      storage_path: path,
+      kind: "video",
+      // Simone's montage, not one of her videos: left out of her library, the pickers and the clip sort.
+      source: "render",
+      mime_type: "video/mp4",
+      size_bytes: out.mp4.length,
+      duration: out.seconds,
+      ai: { mode: "effect", session: effect.session, notes: out.notes },
+      consent_ok: true,
+    })
+    .select("id")
+    .single();
+  if (asset.error) throw new Error(asset.error.message);
+  const plan = effectPlan({
+    mediaId: asset.data.id as string,
+    seconds: out.seconds,
+    session: effect.session,
+    // Her voice is in the video already: the plan names it for the music (under a voice) and the page.
+    ...(effect.voice ? { voice: { media_id: effect.voice, at: VOICE_AT } } : {}),
+  });
+  const row = await insertPlanVersion(job.studioId, job.postId, plan);
+  // Its video is made: a render that fails (the music's sandbox, the upload) is tried once more before the chain starts over.
+  const rendered = await renderPost(job.studioId, job.postId, { editPlanId: row.id }).catch((error: unknown) => {
+    console.warn("effects: render of the agent's video failed, trying again", job.postId, error);
+    return renderPost(job.studioId, job.postId, { editPlanId: row.id });
+  });
+  await endEffectsSession(effect.session, effect.files);
+  job.effect = undefined;
+  const costEur = state.costUsd === null ? null : usdToEur(state.costUsd, env("USD_TO_EUR"));
+  await deliver(job, { planId: row.id, renderId: rendered.renderId, rationale: out.message?.slice(0, 600) }, { reviewed: false, effect: { checked: state.satisfied, costEur } });
+}
+
+/**
+ * The agent could not make the Reel: a new one goes to the chain, at its own price; a correction of her
+ * effect fails without a charge (the chain cannot correct a video drawn image by image, she keeps hers).
+ * Nothing of hers stays at Anthropic.
+ */
+async function backToChain(job: Job, error: unknown) {
+  console.error(`montage ${job.step} failed, ${job.correction ? "the effect stays as it was" : "the chain takes the Reel back"}`, job.postId, error);
+  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify };
+  if (job.effect) await endEffectsSession(job.effect.session, job.effect.files).catch(() => {});
+  if (job.quoteId) await restoreChainQuote(job.quoteId);
+  if (job.correction) {
+    await reopenQuote(job.quoteId);
+    const said = error instanceof EffectUnavailable ? error.message : "Je n’ai pas réussi à refaire l’effet cette fois : ta version d’avant reste telle quelle. Aucun crédit n’a été débité. Tu veux que je réessaie ?";
+    await notifyFailure(target, said, error);
+    return;
+  }
+  try {
+    await next(job, { step: "design", route: "chain", effect: undefined });
+  } catch (e) {
+    await reopenQuote(job.quoteId);
+    await notifyFailure(target, FAILED, e);
+  }
 }
 
 async function design(job: Job) {
@@ -377,10 +581,14 @@ type Care = {
   line?: string;
   /** What the critic would still correct (the last round allowed found something). */
   left?: string;
+  /** Made by the effects agent: its grader passed it (checked) or not, and what its session cost (€, null: not read). */
+  effect?: { checked: boolean; costEur: number | null };
 };
 
 /** The care sentence of the delivery message, from what really happened. */
 function careLine(compared: boolean, outcome: Care | null): string {
+  // The agent says what it made in its own words (the rationale): only a check that really passed is added.
+  if (outcome?.effect) return outcome.effect.checked ? "J’ai vérifié l’effet image par image, à chaque geste, avant de te l’envoyer." : "";
   const left = outcome?.left?.trim().replace(/[\s.]+$/, "");
   return [
     compared ? "J’ai préparé deux versions et gardé la meilleure." : "",
@@ -413,10 +621,13 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
   const title = (post.data?.title as string | null) ?? "";
   const care = careLine(Boolean(job.compared), outcome);
   // The review priced is not charged when the critic could not watch the video, nor a second take never compared.
-  const skipped = {
-    skipReview: !outcome?.reviewed && Boolean(job.effort && EFFORTS[job.effort].review),
-    skipAlternative: Boolean(job.effort && effortVersions(job.effort, Boolean(job.correction)) > 1 && !job.compared),
-  };
+  // An effect is charged on what its session really cost (effectCredits).
+  const skipped = outcome?.effect
+    ? { effectEur: outcome.effect.costEur }
+    : {
+        skipReview: !outcome?.reviewed && Boolean(job.effort && EFFORTS[job.effort].review),
+        skipAlternative: Boolean(job.effort && effortVersions(job.effort, Boolean(job.correction)) > 1 && !job.compared),
+      };
   try {
     await deliverMontage(
       {
@@ -426,8 +637,8 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         // Kept on the post within 600 characters, cut after a whole sentence (shortSentence in deliver.ts), never mid-word:
         // a slice here left Simone's note ending on « Si tu veux, je peux encore ».
         note: [best.rationale, care].filter(Boolean).join(" ") || undefined,
-        // Two versions were already compared: no variant offered on top.
-        offerVariant: !job.compared,
+        // Two versions were already compared: no variant offered on top; an effect has no hook of the engine's to change.
+        offerVariant: !job.compared && !outcome?.effect,
         voice: job.voice,
         cost: job.quoteId ? await montageCost(job.quoteId, job.newScenes ?? 0, job.fixes ?? 0, skipped) : null,
       },

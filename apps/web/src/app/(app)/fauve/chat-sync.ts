@@ -72,7 +72,9 @@ function patchQuotes(list: ChatMessage[], rows: QuoteProgress[]): ChatMessage[] 
   const moved = (c: ChatCard) => {
     if (c.type !== "quote") return false;
     const r = byId.get(c.quote.id);
-    return Boolean(r && (r.state !== c.quote.state || r.stage !== c.quote.stage || r.failed !== c.quote.failed || r.charged !== c.quote.charged || r.effort !== c.quote.effort));
+    return Boolean(
+      r && (r.state !== c.quote.state || r.stage !== c.quote.stage || r.failed !== c.quote.failed || r.charged !== c.quote.charged || r.effort !== c.quote.effort || r.effect !== c.quote.effect),
+    );
   };
   if (!list.some((m) => m.cards.some(moved))) return list;
   return list.map((m) =>

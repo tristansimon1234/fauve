@@ -3,6 +3,7 @@
 import {
   creationPhase,
   DEFAULT_EFFORT,
+  EFFECT_MINUTES,
   EFFORTS,
   effortSchema,
   findVoice,
@@ -18,8 +19,9 @@ import {
 import { after } from "next/server";
 import { z } from "zod";
 import { createPost } from "@/app/(app)/calendrier/actions";
+import { effectRoute } from "@/lib/agent/effects-agent";
 import { studioAccess } from "@/lib/billing/access";
-import { acceptQuote, createMontageQuote } from "@/lib/credits";
+import { acceptQuote, createMontageQuote, pricedAsEffect } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { startMontage } from "@/lib/montage-start";
 import { isFirstReel } from "@/lib/onboarding";
@@ -60,8 +62,8 @@ export type LaunchResult =
       title: string;
       kind: PostKind;
       mediaIds: string[];
-      /** A Reel: the montage that started, to follow on the working screen. */
-      montage: { quoteId: string; effort: Effort; minutes: string; music: boolean } | null;
+      /** A Reel: the montage that started, to follow on the working screen (effect: the effects agent makes it). */
+      montage: { quoteId: string; effort: Effort; minutes: string; music: boolean; effect: boolean } | null;
     }
   | { ok: false; error: string; locked?: "subscribe" | "credits"; postId?: string };
 
@@ -138,21 +140,26 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
   }
   const accepted = await acceptQuote(studioId, quote.id, new Date(), { immediate: true });
   if ("error" in accepted) return { ok: false, postId: created.id, error: accepted.error };
+  // Who makes it, decided now so the working screen shows its steps and its time (the job keeps it).
+  const route = await effectRoute(studioId, { postId: created.id, correction: false, brief: accepted.brief, mediaIds }).catch(() => undefined);
   // Delivered in the app and on WhatsApp (she may close the app meanwhile).
-  after(() => startMontage(studioId, accepted, { notify: true }));
+  after(() => startMontage(studioId, accepted, { notify: true, route }));
   const level = quote.effort ?? effort;
+  const effect = route === "agent";
   return {
     ok: true,
     postId: created.id,
     title: created.title,
     kind,
     mediaIds,
-    montage: { quoteId: quote.id, effort: level, minutes: EFFORTS[level].minutes, music: Boolean(env("ELEVENLABS_API_KEY")) },
+    montage: { quoteId: quote.id, effort: level, minutes: effect ? EFFECT_MINUTES : EFFORTS[level].minutes, music: Boolean(env("ELEVENLABS_API_KEY")), effect },
   };
 }
 
 export type CreationProgress = {
   phase: CreationPhase;
+  /** The effects agent makes this Reel: its steps and its time (creationSteps with effect). */
+  effect: boolean;
   done: boolean;
   failed: boolean;
   /** The Reel's length once made. */
@@ -170,7 +177,7 @@ export async function creationProgress(quoteId: string, postId: string): Promise
   const studioId = member.studio.id;
   const db = supabaseAdmin();
   const [quote, job, post] = await Promise.all([
-    db.from("credit_quotes").select("stage, created_at").eq("id", quoteId).eq("studio_id", studioId).maybeSingle(),
+    db.from("credit_quotes").select("stage, created_at, params").eq("id", quoteId).eq("studio_id", studioId).maybeSingle(),
     db.from("studio_jobs").select("finished_at, failed, updated_at").eq("id", quoteId).eq("studio_id", studioId).maybeSingle(),
     db.from("posts").select("media_ids, render_id").eq("id", postId).eq("studio_id", studioId).maybeSingle(),
   ]);
@@ -188,6 +195,7 @@ export async function creationProgress(quoteId: string, postId: string): Promise
   const render = done && post.data.render_id ? (await db.from("renders").select("duration_ms").eq("id", post.data.render_id as string).maybeSingle()).data : null;
   return {
     phase: creationPhase(stage, watched),
+    effect: pricedAsEffect(quote.data.params),
     done,
     failed,
     seconds: render?.duration_ms ? Math.round((render.duration_ms as number) / 1000) : null,

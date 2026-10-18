@@ -1,6 +1,18 @@
 import "server-only";
-import type { EditPlan } from "@fauve/agent";
+import { isBaked, type EditPlan } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+
+/**
+ * The post's current version was made by the effects agent: its effect and its texts are in the image,
+ * so only a correction of the effect changes them (no text, style, blur or voice edit of the engine's).
+ */
+export async function bakedReel(studioId: string, postId: string): Promise<boolean> {
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("edit_plan_id").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  if (!post?.edit_plan_id) return false;
+  const { data } = await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id as string).maybeSingle();
+  return isBaked(data?.plan as EditPlan | null);
+}
 
 /**
  * Saves a new version of a post's montage under the next number. Two versions can
