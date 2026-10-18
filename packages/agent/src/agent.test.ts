@@ -3111,7 +3111,8 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
     format: "message",
     voice: "aucune",
     hook: { kind: "chiffre", what: "un grand chiffre posé dès la première image" },
-    text: { amount: "un message tenu", composition: "un titre très grand en capitales, un sous-titre en petit dessous, centré au tiers haut. ".repeat(5), case: "upper", weight: "black", tracking: "tight", align: "center", stress: "block", band: "none", subtitles: false },
+    text: { amount: "un message tenu", composition: "un titre très grand en capitales, un sous-titre en petit dessous, centré au tiers haut. ".repeat(5), case: "upper", weight: "black", tracking: "tight", align: "center", stress: "block", band: "none", subtitles: false, font: "" },
+    colors: [],
     effect: "dust",
     grade: "film",
     motion: "energique",
@@ -3123,6 +3124,9 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   });
   assert.ok(look.text.composition.length <= 240);
   assert.ok(stolenLookSchema.safeParse(look).success);
+  // An ordinary font and plain colours do not make its style: none is kept, hers stay.
+  assert.equal("font" in look.text, false);
+  assert.equal("colors" in look, false);
 
   const style = { look, measures: { duration: 12, cuts: [1.5, 3, 4.5, 6, 7.5, 9, 10.5], bpm: 118.4, lufs: -14 } };
   // Three lines for her: the form and its pace, the text, the mood.
@@ -3195,4 +3199,87 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   assert.match(stealMissMessage("unreachable", "simone.studio"), /envoie-moi la vidéo ici, ou partage-le à @simone\.studio/);
   assert.doesNotMatch(stealMissMessage("unreachable", null), /@/);
   assert.match(stealMissMessage("not_video"), /carrousel.*capture/);
+});
+
+test("DA liberties: the copied Reel's font and colours when they make its style, an animation's own fonts", async () => {
+  const { clampLook, followedFrom, followedLook, followedForEditor, followedLine, stolenLookSchema, stolenStyleMessage } = await import("./steal.ts");
+  const { buildReelProps, resolveReelBrand } = await import("./motion.ts");
+  const { keepWrittenAnimations } = await import("./editor.ts");
+  const { motionSceneOutputSchema, MOTION_DESIGNER_PROMPT } = await import("./motion-scene.ts");
+  const { MONTAGE_CRITIC_PROMPT } = await import("./critic.ts");
+  const { EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
+
+  const reading = {
+    name: "sous-titres jaunes",
+    format: "raconte" as const,
+    voice: "quelqu'un parle" as const,
+    hook: { kind: "promesse" as const, what: "une phrase en très gros dès la première image" },
+    text: { amount: "plusieurs" as const, composition: "des mots en capitales très grasses, un mot jaune", case: "upper" as const, weight: "black" as const, tracking: "tight" as const, align: "center" as const, stress: "color" as const, band: "none" as const, subtitles: true, font: " Anton " },
+    colors: ["#FD0", "jaune", "#FFFFFF", "#ffdd00", "#000000", "#ff3b30"],
+    effect: "none" as const,
+    grade: "natural" as const,
+    motion: "energique" as const,
+    camera: "à la main" as const,
+    transitions: "coupes nettes" as const,
+    music: "punchy hip hop beat",
+    ending: "une question à l'écran",
+    why: "Chaque mot claque.",
+  };
+  // Its font and colours make its style: kept as the render takes them (3 at most, valid hex, short ones spelled out).
+  const look = clampLook(reading);
+  assert.equal(look.text.font, "Anton");
+  assert.deepEqual(look.colors, ["#ffdd00", "#ffffff", "#000000"]);
+  assert.ok(stolenLookSchema.safeParse(look).success);
+  // A look read before fonts and colours were read still reads.
+  const { font: _font, ...oldText } = look.text;
+  const { colors: _colors, ...oldLook } = look;
+  assert.ok(stolenLookSchema.safeParse({ ...oldLook, text: oldText }).success);
+
+  const style = { look, measures: { duration: 10, cuts: [2, 4, 6, 8], bpm: null, lufs: -14 } };
+  const followed = followedFrom("11111111-2222-4333-8444-555555555555", style);
+  // Set on the plan for this Reel: its titles in that font, its key words in that colour; a font this request chose stays.
+  assert.deepEqual(followedLook({}, followed), { fonts: { display: "Anton" }, colors: ["#ffdd00", "#ffffff", "#000000"] });
+  assert.deepEqual(followedLook({ fonts: { display: "Bangers" }, colors: ["#123456"] }, followed), {});
+  assert.deepEqual(followedLook({ fonts: { body: "Inter" } }, followed).fonts, { body: "Inter", display: "Anton" });
+  assert.deepEqual(followedLook({}, undefined), {});
+  assert.deepEqual(followedLook({}, followedFrom(followed.inspiration_id, { ...style, look: clampLook({ ...reading, text: { ...reading.text, font: "" }, colors: [] }) })), {});
+  // The editor and the critic know they are wanted.
+  assert.match(followedForEditor(followed).police_et_couleurs ?? "", /Anton.*#ffdd00.*font son style/);
+  assert.match(followedLine(followed), /sa police \(Anton\) et ses couleurs/);
+  // She is told what her Reel takes from it.
+  assert.match(stolenStyleMessage(style, true), /une police et des couleurs comme les siennes \(elles font son style\)/);
+  assert.match(stolenStyleMessage({ ...style, look: { ...look, colors: undefined } }, true), /Avec tes couleurs et tes images, et une police comme la sienne/);
+  const plain = { ...look, text: { ...oldText }, colors: undefined };
+  assert.match(stolenStyleMessage({ ...style, look: plain }, false), /Avec tes couleurs, tes polices et tes images : sa façon de faire/);
+
+  // The Reel's own colours go over her charter's: the accent first, her colours after them in the palette.
+  const brand = resolveReelBrand({ fonts: { display: "Anton" }, colors: ["#ffdd00"] }, "libre", { name: "Lou", accent: "#5b3fd9", colors: ["#5b3fd9", "#fbf7f4"], fonts: ["Fraunces", "Inter"] });
+  assert.equal(brand.accent, "#ffdd00");
+  assert.equal(brand.displayFont, "Anton");
+  assert.equal(brand.bodyFont, "Inter");
+  assert.equal(resolveReelBrand({}, "libre", { name: "Lou", accent: "#5b3fd9" }).accent, "#5b3fd9");
+  assert.equal(editPlanSchema.safeParse({ ...validPlan, colors: ["jaune"] }).success, false);
+
+  // An animation's own fonts: in the designer's answer, kept on the plan, passed to the render and kept by a correction.
+  assert.equal(motionSceneOutputSchema.safeParse({ code: "function Scene(){}", notes: "", name: "x", slots: [], photos: [], fonts: ["Bangers"] }).success, true);
+  const motion = { brief: "le rayon en dessin animé", js: "function Scene(){ return null }", code: "function Scene(){ return null }", fonts: ["Bangers"] };
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    segments: [{ clip_id: "a", in: 1.2, out: 3, zoom: "none" }, { motion, duration: 2 }],
+    layers: [{ motion: { ...motion, brief: "les éclairs sur tout le Reel" }, from: 0, to: 3 }],
+  });
+  const props = buildReelProps(plan, { template: "libre", clipUrls: { a: "https://x/a.mp4" }, brand: { name: "Lou" } });
+  const scene = props.segments.find((s) => s.type === "motion");
+  assert.deepEqual(scene?.type === "motion" ? scene.fonts : null, ["Bangers"]);
+  assert.deepEqual(props.layers?.[0]?.fonts, ["Bangers"]);
+  assert.equal(editPlanSchema.safeParse({ ...validPlan, segments: [{ motion: { ...motion, fonts: ["<script>"] }, duration: 2 }] }).success, false);
+  const rewritten = editPlanSchema.parse({ ...validPlan, segments: [{ clip_id: "a", in: 1.2, out: 3, zoom: "none" }, { motion: { brief: motion.brief }, duration: 2 }] });
+  const kept = keepWrittenAnimations(rewritten, plan).segments[1];
+  assert.deepEqual(kept && "motion" in kept ? kept.motion.fonts : null, ["Bangers"]);
+
+  // The prompts give the liberty, and keep the charter as the starting point.
+  assert.match(MOTION_DESIGNER_PROMPT, /point de départ, pas une cage/);
+  assert.match(MOTION_DESIGNER_PROMPT, /nommée dans "fonts"/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /point de départ, pas une cage/);
+  assert.match(MONTAGE_CRITIC_PROMPT, /est voulue, jamais un défaut/);
 });

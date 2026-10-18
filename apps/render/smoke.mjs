@@ -1,10 +1,11 @@
 // Smoke test for generated motion scenes, run in the render sandbox (never in the
 // web app). Usage: node smoke.mjs scenes.json [bundle-dir] → prints
 // {"results": {"<id>": null | "error"}, "bands": {"<id>": [top, bottom]}, "faces": {"<id>": "what to move"}}.
-// scenes.json: [{ id, js, durationInFrames, texts?, brand?, photos?, cuts?, shots?, track?, look? }] (photos: the ones
+// scenes.json: [{ id, js, durationInFrames, texts?, brand?, photos?, cuts?, shots?, track?, look?, fonts? }] (photos: the ones
 // the scene composes with, with their links; cuts: for an animation over several shots; shots: the
 // shots a collage's composition lays, each one a grey card here; track: what moves in the footage under it,
-// read by its `track`, with look, the Reel's rhythm and look for the camera moves).
+// read by its `track`, with look, the Reel's rhythm and look for the camera moves; fonts: the Google Fonts
+// families its code brings besides the brand's two, laid out with them).
 // 1. Each scene is rendered at its first, middle and last frame with React's server
 //    renderer and minimal Remotion shims, which catches crashes and bad output early. Its `track` sees
 //    nothing there: a scene must stand without anyone in the picture (reused over other footage).
@@ -117,6 +118,7 @@ if (browser) {
         shots: scene.shots ?? [],
         ...(scene.track ? { track: scene.track } : {}),
         ...(scene.look ? { look: scene.look } : {}),
+        ...(scene.fonts?.length ? { fonts: scene.fonts } : {}),
       };
       try {
         const composition = await selectComposition({ serveUrl: bundle, id: "SceneCheck", inputProps, puppeteerInstance: browser, browserExecutable, logLevel: "error" });

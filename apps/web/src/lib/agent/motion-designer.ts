@@ -15,6 +15,7 @@ import {
   type TrackPiece,
 } from "@fauve/agent";
 import { transform } from "sucrase";
+import { googleFont } from "@/lib/fonts";
 import { smokeTestScenes, type SceneChecks, type SmokeScene } from "@/lib/render/sandbox";
 import { anthropic, logClaudeCost } from "./run";
 
@@ -60,6 +61,8 @@ export type SceneResult = {
   notes?: string;
   /** The photos its code reads, in order (media ids, among those offered). */
   photos?: string[];
+  /** The Google Fonts families its code brings besides the Reel's two (a universe she names, the Reel she copies). */
+  fonts?: string[];
 };
 
 /** What already exists, so that a new scene takes another idea. */
@@ -77,6 +80,8 @@ export type MotionKit = { name: string; code: string }[];
 
 /** The most photos one scene composes with. */
 const MAX_SCENE_PHOTOS = 4;
+/** The most fonts one scene brings besides the Reel's two. */
+const MAX_SCENE_FONTS = 2;
 
 const EDGE_WORDS = { top: "le haut", bottom: "le bas", left: "la gauche", right: "la droite" } as const;
 
@@ -91,10 +96,11 @@ async function writeScene(
   artDirection: string | undefined,
   kit: MotionKit,
   existing: Existing,
-  fix?: { code: string; error: string; photos?: string[] },
+  fix?: { code: string; error: string; photos?: string[]; fonts?: string[] },
 ) {
+  const kept = [fix?.photos?.length && `les mêmes photos (${fix.photos.join(", ")})`, fix?.fonts?.length && `les mêmes polices (${fix.fonts.join(", ")})`].filter(Boolean);
   const content = fix
-    ? `Ce code a échoué : ${fix.error}\nCorrige-le en gardant la même intention${fix.photos?.length ? ` et les mêmes photos (${fix.photos.join(", ")})` : ""}.\n\nBrief : ${request.brief}\n\nCode :\n${fix.code}`
+    ? `Ce code a échoué : ${fix.error}\nCorrige-le en gardant la même intention${kept.length ? ` et ${kept.join(" et ")}` : ""}.\n\nBrief : ${request.brief}\n\nCode :\n${fix.code}`
     : JSON.stringify({
         brief: request.brief,
         duree_images: request.durationInFrames,
@@ -147,7 +153,12 @@ async function writeScene(
   // Only photos it was offered, each once, in its order.
   const offered = new Set((request.photos ?? []).map((p) => p.id));
   const photos = [...new Set(response.parsed_output?.photos ?? [])].filter((id) => offered.has(id)).slice(0, MAX_SCENE_PHOTOS);
-  const meta = { name: response.parsed_output?.name ?? "", slots: response.parsed_output?.slots ?? [], notes: response.parsed_output?.notes ?? "", photos };
+  // The fonts it brings: only families Google Fonts serves, by the name it serves them under (the render loads them from there).
+  const named = [...new Set((response.parsed_output?.fonts ?? []).map((f) => f.trim()))]
+    .filter((f) => f && f !== brand.displayFont && f !== brand.bodyFont)
+    .slice(0, MAX_SCENE_FONTS);
+  const fonts = (await Promise.all(named.map((f) => googleFont(f).catch(() => null)))).filter((f): f is string => Boolean(f));
+  const meta = { name: response.parsed_output?.name ?? "", slots: response.parsed_output?.slots ?? [], notes: response.parsed_output?.notes ?? "", photos, fonts };
   const problems = checkMotionCode(code);
   if (problems.length) return { code, js: null, error: `code refusé : ${problems.join(", ")}`, ...meta };
   try {
@@ -209,6 +220,7 @@ export async function designMotionScenes(
             js: r.js!,
             durationInFrames: request.durationInFrames,
             ...(photos.length ? { photos } : {}),
+            ...(r.fonts?.length ? { fonts: r.fonts } : {}),
             ...(request.cuts ? { cuts: request.cuts } : {}),
             ...(request.compose ? { shots: request.compose.shots } : {}),
             // A scene that follows what moves is checked where it goes, with the Reel's camera moves.
@@ -233,6 +245,7 @@ export async function designMotionScenes(
           code: r.code!,
           error: r.error ?? checks.faces[r.id] ?? "erreur",
           photos: r.photos,
+          fonts: r.fonts,
         }).catch((e: unknown) => ({ code: r.code, js: null, error: String(e) }))),
       })),
     );
@@ -241,7 +254,11 @@ export async function designMotionScenes(
       if (!f) return r;
       // A fix that does not even compile: the scene that worked stays.
       if (!f.js && working.has(r.id)) return working.get(r.id)!;
-      return { ...f, photos: "photos" in f && f.photos?.length ? f.photos : r.photos };
+      return {
+        ...f,
+        photos: "photos" in f && f.photos?.length ? f.photos : r.photos,
+        fonts: "fonts" in f && f.fonts?.length ? f.fonts : r.fonts,
+      };
     });
   }
   return results;

@@ -170,16 +170,25 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
     if ((data?.length ?? 0) !== clipIds.length) return { ok: false, error: "Une des vidéos n’est plus dans ta médiathèque." };
   }
   // Animations (scenes and animations over several shots): code already made for this post (by Fauve), never new code from the browser.
+  // The fonts an animation loads follow its code, never the browser either.
   const { data: versions } = await db.from("edit_plans").select("version, plan").eq("post_id", postId);
-  type Coded = { motion?: { js?: string } };
-  const knownCode = new Set(
+  type Coded = { motion?: { js?: string; fonts?: string[] } };
+  const knownCode = new Map(
     (versions ?? []).flatMap((v) => {
       const kept = v.plan as { segments?: Coded[]; layers?: Coded[] } | null;
-      return [...(kept?.segments ?? []), ...(kept?.layers ?? [])].flatMap((s) => (s.motion?.js ? [s.motion.js] : []));
+      return [...(kept?.segments ?? []), ...(kept?.layers ?? [])].flatMap((s) => (s.motion?.js ? [[s.motion.js, s.motion.fonts] as const] : []));
     }),
   );
   const unknown = [...plan.segments, ...(plan.layers ?? [])].some((s) => "motion" in s && s.motion.js && !knownCode.has(s.motion.js));
   if (unknown) return { ok: false, error: "Une animation a été modifiée d’une façon que l’éditeur ne permet pas." };
+  const withKnownFonts = <M extends { js?: string; fonts?: string[] }>(motion: M): M => {
+    const fonts = motion.js ? knownCode.get(motion.js) : undefined;
+    const kept = { ...motion };
+    delete kept.fonts;
+    return fonts?.length ? { ...kept, fonts } : kept;
+  };
+  plan.segments = plan.segments.map((s) => ("motion" in s ? { ...s, motion: withKnownFonts(s.motion) } : s));
+  if (plan.layers) plan.layers = plan.layers.map((l) => ({ ...l, motion: withKnownFonts(l.motion) }));
 
   let row: { id: string; version: number };
   try {

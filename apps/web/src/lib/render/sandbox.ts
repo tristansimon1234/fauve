@@ -291,6 +291,8 @@ export type SmokeScene = {
   /** What moves in the footage under it, so a text that follows a hand is checked where it goes; with the Reel's rhythm and look (its camera moves). */
   track?: TrackPiece[];
   look?: { template?: MotionTemplate; tempo?: number; signature?: ReelProps["brand"]["signature"] };
+  /** The Google Fonts families its code brings besides the brand's two: laid out with them. */
+  fonts?: string[];
 };
 
 /**

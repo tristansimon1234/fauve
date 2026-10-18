@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { adjustSchema, clipBlurSchema, photoEditSchema } from "./retouch.ts";
-import { listFields, savedLookSchema, textLookSchema } from "./text-look.ts";
+import { listFields, LOOK_FONT, savedLookSchema, textLookSchema } from "./text-look.ts";
 import { brandSignatureSchema } from "./signature.ts";
 import { styleSampleSchema } from "./moodboard.ts";
 import { voiceSettingSchema } from "./voice-over.ts";
@@ -129,6 +129,11 @@ export const editPlanMotionSegmentSchema = z.object({
     shift: z.number().min(-0.75).max(0.75).optional(),
     /** The photos a free scene composes with (a collage), in the order its code reads them (`photos[0]`…): media ids, from the motion designer's answer. */
     photos: z.array(z.string().min(1)).max(4).optional(),
+    /**
+     * Google Fonts families its code uses besides the Reel's two (a universe she names, the Reel she
+     * copies): from the motion designer's answer, loaded with the scene. They follow its code.
+     */
+    fonts: z.array(z.string().regex(LOOK_FONT)).max(3).optional(),
   }),
   duration: z.number().min(1).max(8),
   /**
@@ -254,6 +259,8 @@ export const editPlanObjectSchema = z.object({
   fonts: z
     .object({ display: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).optional(), body: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).optional() })
     .optional(),
+  /** This Reel's own colours over her charter's, the main one first (the copied Reel's, when they make its style). Set by the engine. */
+  colors: z.array(z.string().regex(/^#[0-9a-f]{6}$/i)).min(1).max(3).optional(),
   /** Closing card over the last ~1.6 s: studio name or logo, plus a call to action. */
   end_card: z.object({ title: z.string().min(1).max(40), subtitle: z.string().max(60).optional() }).optional(),
   /** Her own voice over the Reel: a voice note (media_assets, with its transcript), from `at` seconds. Set from the post, never written by the editor. */

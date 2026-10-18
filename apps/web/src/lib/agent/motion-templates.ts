@@ -1,5 +1,5 @@
 import "server-only";
-import { motionSlotSchema, type MotionSlot } from "@fauve/agent";
+import { LOOK_FONT, motionSlotSchema, type MotionSlot } from "@fauve/agent";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -12,9 +12,11 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 const LIBRARY_SIZE = 24;
 
 export type TemplateSummary = { id: string; name: string; description: string; slots: MotionSlot[]; duration_seconds: number | null };
-export type TemplateCode = { id: string; code: string; js: string };
+/** A scene's code, and the Google Fonts families it brings besides the Reel's two. */
+export type TemplateCode = { id: string; code: string; js: string; fonts: string[] };
 
 const slots = (raw: unknown): MotionSlot[] => z.array(motionSlotSchema).catch([]).parse(raw);
+const fontsOf = (raw: unknown): string[] => z.array(z.string().regex(LOOK_FONT)).max(3).catch([]).parse(raw);
 
 /** Reels in a row never share a scene: the ones of the studio's last Reels are held back. */
 const RECENT_REELS = 2;
@@ -84,13 +86,13 @@ export async function templateCode(studioId: string, ids: string[]): Promise<Map
   if (!unique.length) return new Map();
   const { data, error } = await supabaseAdmin()
     .from("motion_templates")
-    .select("id, code, js")
+    .select("id, code, js, fonts")
     .eq("kind", "scene")
     .in("id", unique)
     .or(`studio_id.eq.${studioId},studio_id.is.null`)
     .is("archived_at", null);
   if (error) throw new Error(`motion_templates: ${error.message}`);
-  return new Map(data.map((t) => [t.id as string, { id: t.id as string, code: t.code as string, js: t.js as string }]));
+  return new Map(data.map((t) => [t.id as string, { id: t.id as string, code: t.code as string, js: t.js as string, fonts: fontsOf(t.fonts) }]));
 }
 
 /** Counts a reuse (feeds the library order). */
@@ -110,7 +112,7 @@ export async function markTemplatesUsed(ids: string[]) {
 /** Saves new scenes that passed the smoke test; returns their ids in the same order (null if not saved). */
 export async function saveTemplates(
   studioId: string,
-  scenes: { name: string; description: string; slots: MotionSlot[]; code: string; js: string; durationSeconds: number; role?: string }[],
+  scenes: { name: string; description: string; slots: MotionSlot[]; code: string; js: string; fonts?: string[]; durationSeconds: number; role?: string }[],
 ): Promise<(string | null)[]> {
   if (!scenes.length) return [];
   const { data, error } = await supabaseAdmin()
@@ -123,6 +125,7 @@ export async function saveTemplates(
         slots: s.slots,
         code: s.code,
         js: s.js,
+        fonts: s.fonts ?? [],
         duration_seconds: s.durationSeconds,
         role: s.role ?? OVERLAY_ROLE,
         uses: 1,

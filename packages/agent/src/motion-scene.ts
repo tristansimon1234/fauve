@@ -45,19 +45,20 @@ Ce qui est vérifié :
 - « sous_la_scene » (s'il est fourni) : les bandes de l'image qui joue sous ton animation et qui doivent rester visibles, un visage, une enseigne (de y à y, en pixels). Aucun texte ni aplat n'y passe pendant que les mots tiennent : compose dans la place libre au-dessus ou au-dessous, même si le brief propose une autre place. Si tes mots y tombent quand même, le rendu déplace toute l'animation vers la place libre.
 - Lisible sur un téléphone, sur n'importe quelle image : chaque texte se lit d'un coup d'œil (48 px au moins ; taille, graisse et contraste, une ombre, un aplat, un contour… à toi de choisir) et reste à l'écran assez longtemps pour être lu.
 - Natif, jamais une pub : rien qui fasse flyer de promo (étoile « promo », explosion, traits de vitesse, badge de soldes) ; on doit croire qu'un bon créateur l'a fait à la main. Un effet qu'elle a demandé elle-même (dans le brief : un rayon d'énergie de dessin animé, une explosion pour rire, un effet de film) n'est pas une pub : fais-le pour de vrai, aussi bien qu'un créateur avec ses outils, accroché à son geste quand il y en a un.
-- Polices : uniquement brand.displayFont et brand.bodyFont. Aucune autre police n'est chargée : elle serait remplacée par une police de secours, souvent plus large.
-- Couleurs : celles de la marque (accent, accentInk, ink, cream, blanc et leurs nuances en rgba), sauf indication du brief ou un univers qu'elle nomme.
+- Polices : brand.displayFont et brand.bodyFont. Une autre seulement quand le brief, un univers qu'elle nomme ou le Reel qu'elle recopie la demandent (le lettrage d'un dessin animé, la police d'une époque) : une famille Google Fonts au nom exact, nommée dans "fonts" (2 au plus), toujours suivie d'une des siennes en secours (fontFamily: \`"Nom de la famille", "\${brand.displayFont}"\`). Une police absente de "fonts" n'est pas chargée : elle serait remplacée par une police de secours, souvent plus large.
+- Couleurs : celles de la marque (accent, accentInk, ink, cream, blanc et leurs nuances en rgba), sauf quand le brief, un univers qu'elle nomme ou le Reel qu'elle recopie en demandent d'autres.
 - Les 10 dernières images : une sortie, à ta façon, sauf si le brief dit d'enchaîner sans sortie.
 - Textes en français, exactement ceux du brief.
 
 Ta liberté :
 - La forme est à toi : de la typographie cinétique, un mot géant qui remplit l'écran, un chiffre qui compte, des formes et des tracés, un masque qui révèle, des papiers découpés, une liste qui se coche, des étiquettes, un écran partagé, un défilement, des mots qui tombent sur le temps, ce qui vit avec la vidéo (accroché à une main, à un visage, parti d'un geste)… ou une idée qui n'est pas dans cette liste. Ce sont des pistes, jamais un modèle à suivre.
-- Un univers ou un style qu'elle nomme (un dessin animé, un manga, un film, un jeu vidéo) : ses codes visuels font ton animation, ses formes, ses couleurs, son rendu (un dessin animé : des contours épais, des aplats et des ombres franches, des lueurs nettes, des traits de vitesse et des images d'impact dessinés), refaits avec soin, comme son studio l'aurait dessiné ; jamais une version sage aux couleurs de la marque ni des formes génériques de motion design. Ses mots restent dans ses polices.
+- Un univers ou un style qu'elle nomme (un dessin animé, un manga, un film, un jeu vidéo) : ses codes visuels font ton animation, ses formes, ses couleurs, son rendu (un dessin animé : des contours épais, des aplats et des ombres franches, des lueurs nettes, des traits de vitesse et des images d'impact dessinés), refaits avec soin, comme son studio l'aurait dessiné ; jamais une version sage aux couleurs de la marque ni des formes génériques de motion design. Ses mots prennent le lettrage de cet univers quand ses polices le trahiraient (« fonts »).
 - Direction artistique : « direction_artistique » est la référence (ambiance, typographie, rythme, formes) ; elle décide aussi du langage du mouvement (un commerce épuré bouge lentement, avec de l'air ; un commerce énergique, franchement ; un commerce fait main, avec des tracés). Deux commerces différents ne reçoivent jamais la même animation.
+- Sa charte (direction artistique, couleurs, polices, kit) est ton point de départ, pas une cage : quand le brief, un univers qu'elle nomme ou le Reel qu'elle recopie ont besoin d'autre chose (une couleur, une police, une matière, un rendu), prends cette liberté pour cette animation, autant qu'il le faut, et garde sa charte pour le reste.
 - « kit_du_commerce » (s'il y en a) : ses dernières animations. Garde leur langage (polices, formes, couleurs) pour qu'on reconnaisse le commerce d'un Reel à l'autre, avec une idée nouvelle ; jamais une copie de leur code.
 - Jamais deux fois la même idée : « autres_animations_du_reel » (les autres animations de ce Reel) et « deja_faites » (les dernières de ce commerce) disent ce qui existe déjà. La tienne est différente : une autre mise en page, un autre mouvement, une autre façon d'entrer et de sortir, un autre nombre de lignes.
 
-Réponds avec le code dans "code", une phrase sur ton intention dans "notes", un nom court et parlant dans "name" (ex. « Titre serif qui se dessine »), la liste des slots dans "slots" et les id des photos utilisées dans "photos" (vide sans photo).`;
+Réponds avec le code dans "code", une phrase sur ton intention dans "notes", un nom court et parlant dans "name" (ex. « Titre serif qui se dessine »), la liste des slots dans "slots", les id des photos utilisées dans "photos" (vide sans photo) et les familles Google Fonts que ton code ajoute aux deux siennes dans "fonts" (vide le plus souvent).`;
 
 export const motionSlotSchema = z.object({
   name: z.string().regex(SLOT_NAME),
@@ -73,6 +74,8 @@ export const motionSceneOutputSchema = z.object({
   slots: z.array(motionSlotSchema).max(8),
   // The ids its code reads, in order; the engine keeps those it offered, 4 at most.
   photos: z.array(z.string()),
+  // Google Fonts families its code adds to the brand's two; the engine keeps those Google serves, 2 at most.
+  fonts: z.array(z.string()),
 });
 
 /** Patterns generated code may not contain (shared with the text layers). */
