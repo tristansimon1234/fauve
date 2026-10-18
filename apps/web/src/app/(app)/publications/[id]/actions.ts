@@ -247,3 +247,39 @@ export async function saveSlidesPlan(postId: string, input: unknown): Promise<Sa
   revalidatePath(`/publications/${postId}`);
   return { ok: true, version: 0 };
 }
+
+/**
+ * The words of a composed carousel, changed by hand slot by slot (its layout never comes from the
+ * browser): saved, then its slides are rendered again in the background (about a minute), free.
+ */
+export async function saveCarouselTexts(postId: string, texts: Record<string, string>): Promise<SavePlanResult> {
+  if (!z.uuid().safeParse(postId).success) return { ok: false, error: "Publication introuvable." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  const studioId = member.studio.id;
+  const { data: post } = await supabaseAdmin().from("posts").select("id, status, slides").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  if (!post) return { ok: false, error: "Publication introuvable." };
+  if (LOCKED.includes(postStatusSchema.parse(post.status))) return { ok: false, error: "Cette publication est déjà en ligne." };
+  const plan = slidesPlanSchema.safeParse(post.slides);
+  const design = plan.success ? plan.data.design : undefined;
+  if (!plan.success || !design) return { ok: false, error: "Ce carrousel n’a pas de textes à changer ici." };
+  const slots = new Map(design.slots.map((s) => [s.name, s]));
+  const given = Object.entries(texts);
+  if (given.some(([name, text]) => !slots.has(name) || typeof text !== "string")) return { ok: false, error: "Un des textes n’existe pas dans ce carrousel." };
+  const tooLong = given.find(([name, text]) => text.length > Math.max(slots.get(name)!.max_chars, 40) * 2 || text.length > 400);
+  if (tooLong) return { ok: false, error: "Un des textes est trop long pour sa place : raccourcis-le, ou demande à Simone de refaire la mise en page." };
+  try {
+    await saveSlides(studioId, postId, plan.data, { design: { ...design, texts: { ...design.texts, ...Object.fromEntries(given.map(([name, text]) => [name, text.trim()])) } } });
+  } catch (error) {
+    console.warn("saveCarouselTexts failed", error);
+    return { ok: false, error: "L’enregistrement a échoué. Réessaie dans un instant." };
+  }
+  after(() =>
+    renderSlides(studioId, postId).then(
+      () => revalidatePath(`/publications/${postId}`),
+      (e) => console.error("saveCarouselTexts: render failed", postId, e),
+    ),
+  );
+  revalidatePath(`/publications/${postId}`);
+  return { ok: true, version: 0 };
+}

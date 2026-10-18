@@ -35,6 +35,7 @@ export const TYPICAL_COST_EUR: Record<keyof typeof CREDIT_PRICES, number> = {
   variant: 0.02, // a render (same cut: the music is kept)
   textLayer: 0.4, // the component designer (one or two rounds) and its critic
   elementEdit: 0.2, // one round of the component designer on one component
+  carousel: 1.0, // the carousel designer twice (its photos seen, the correction sees its render), the critic, two test renders
   review: 0.03, // the critic watching key frames
   fixRound: 0.16, // the editor, a render with its new music, the critic again
   alternative: 0.13, // the editor and a render with its music

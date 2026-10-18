@@ -82,6 +82,7 @@ export const UploadIcon = make(
 export const CheckIcon = make(<path d="M20 6 9 17l-5-5" />, { strokeWidth: 2.2 });
 export const PlusIcon = make(<path d="M12 5v14M5 12h14" />);
 export const ArrowLeftIcon = make(<path d="M19 12H5M11 18l-6-6 6-6" />);
+export const ArrowRightIcon = make(<path d="M5 12h14M13 6l6 6-6 6" />);
 export const ArrowUpIcon = make(<path d="M12 19V5M5 12l7-7 7 7" />, { strokeWidth: 2.2 });
 export const ClockIcon = make(
   <>

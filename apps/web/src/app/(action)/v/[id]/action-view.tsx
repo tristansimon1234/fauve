@@ -3,6 +3,7 @@
 import { coverSrc } from "@/lib/cover-src";
 import { CoverPicker } from "@/components/montage/cover-picker";
 import {
+  buildCarouselProps,
   buildReelProps,
   buildSlideProps,
   DEFAULT_COVER_SECONDS,
@@ -15,6 +16,7 @@ import {
   type PostKind,
   type PostStatus,
   type ReelInputs,
+  type CarouselPhoto,
   type SavedLook,
   type SlidesPlan,
 } from "@fauve/agent";
@@ -22,13 +24,14 @@ import type { PlayerRef } from "@remotion/player";
 import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { CheckIcon, PenIcon, PlusIcon, WhatsAppIcon } from "@/components/icons";
 import { FormatBadge } from "@/components/format-badge";
+import { CarouselWords } from "@/components/montage/carousel-words";
 import { SlidePreview } from "@/components/montage/slide-preview";
 import { SlidesEditor } from "@/components/montage/slides-editor";
 import { TextBoxes } from "@/components/montage/text-boxes";
 import { TextSheet } from "@/components/montage/text-sheet";
 import { Orb } from "@/components/orb";
 import { ReelPlayer } from "@/components/reel-player";
-import { saveEditPlan, saveSlidesPlan, updatePost } from "@/app/(app)/publications/[id]/actions";
+import { saveCarouselTexts, saveEditPlan, saveSlidesPlan, updatePost } from "@/app/(app)/publications/[id]/actions";
 
 // The page a WhatsApp link opens, made for a phone: watch the montage, then one
 // thumb away from validating it, moving a text, or asking Fauve for a change.
@@ -74,8 +77,8 @@ export function ActionView({
   media: ActionMedia[];
   /** The latest Instagram posts, for the grid preview; null when it does not apply (story). */
   grid: GridTile[] | null;
-  /** Text over the photos (carousel or photo post): the plan, the photos by media id, the brand. */
-  slides: { plan: SlidesPlan; photos: Record<string, string>; brand: ReelInputs["brand"] } | null;
+  /** Text over the photos (carousel or photo post): the plan, the photos by media id, the brand; a composed carousel's photos in its order. */
+  slides: { plan: SlidesPlan; photos: Record<string, string>; brand: ReelInputs["brand"]; carousel?: CarouselPhoto[] } | null;
   changeHref: string;
   backHref: string;
   /** The studio's saved text looks (copied by Fauve from examples, or kept by hand). */
@@ -97,6 +100,11 @@ export function ActionView({
   const [plan, setPlan] = useState(editor?.plan ?? null);
   const [savedSlides, setSavedSlides] = useState(slides?.plan ?? null);
   const [slidePlan, setSlidePlan] = useState(slides?.plan ?? null);
+  // A carousel Simone composed: its words change here, slide by slide; its layout by asking her.
+  const design = slides?.plan.design ?? null;
+  const [savedWords, setSavedWords] = useState(design?.texts ?? {});
+  const [words, setWords] = useState(design?.texts ?? {});
+  const [wordsSlide, setWordsSlide] = useState(0);
   const [caption, setCaption] = useState(post.caption);
   const [savedCaption, setSavedCaption] = useState(post.caption);
   const [editingCaption, setEditingCaption] = useState(false);
@@ -114,7 +122,8 @@ export function ActionView({
   const valid = plan === null || editPlanSchema.safeParse(plan).success;
   const canValidate = status === "draft";
   const editable = (editor !== null || slides !== null) && status !== "published" && status !== "measured";
-  const slidesDirty = slidePlan !== null && JSON.stringify(slidePlan) !== JSON.stringify(savedSlides);
+  const slidesDirty = design ? JSON.stringify(words) !== JSON.stringify(savedWords) : slidePlan !== null && JSON.stringify(slidePlan) !== JSON.stringify(savedSlides);
+  const composedProps = (slide: number) => (design && slides ? buildCarouselProps({ ...design, texts: words }, slide, { template: slides.plan.template, brand: slides.brand, photos: slides.carousel ?? [] }) : null);
 
   const seek = (seconds: number) => props && playerRef.current?.seekTo(Math.round(seconds * props.fps));
   const setText = (i: number, patch: Partial<Text>) => {
@@ -150,11 +159,21 @@ export function ActionView({
   const cancelEdit = () => {
     setPlan(saved);
     setSlidePlan(savedSlides);
+    setWords(savedWords);
     setActive(null);
     setMode("view");
   };
   const saveEdit = () =>
     start(async () => {
+      if (design) {
+        const changed = Object.fromEntries(Object.entries(words).filter(([k, v]) => savedWords[k] !== v));
+        const res = await saveCarouselTexts(post.id, changed).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
+        if (!res.ok) return setToast({ ok: false, text: res.error });
+        setSavedWords(words);
+        setMode("view");
+        setToast({ ok: true, text: "C’est enregistré. Les images finales se mettent à jour en une minute environ." });
+        return;
+      }
       if (slides && slidePlan) {
         const res = await saveSlidesPlan(post.id, slidePlan).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
         if (!res.ok) return setToast({ ok: false, text: res.error });
@@ -212,9 +231,10 @@ export function ActionView({
 
   const editingSlides = mode === "edit" && slides !== null && slidePlan !== null;
   const editing = mode === "edit" && !editingSlides && plan !== null;
-  // The photos as published: with their texts when there are some (drawn live).
-  const slideNodes =
-    slides && slidePlan?.slides.some((s) => s.texts.length)
+  // The photos as published: with their texts when there are some (drawn live); a composed carousel, its slides.
+  const slideNodes = design
+    ? Array.from({ length: design.count }, (_, i): ReactNode => <SlidePreview key={i} props={composedProps(i)!} />)
+    : slides && slidePlan?.slides.some((s) => s.texts.length)
       ? slidePlan.slides.map((s, i): ReactNode => {
           const url = slides.photos[s.media_id];
           return url ? (
@@ -230,7 +250,9 @@ export function ActionView({
   const sceneTexts = editing && span ? plan.texts.map((t, i) => ({ t, i })).filter(({ t }) => t.from >= span.start && t.from < span.end) : [];
   // The preview leaves room for the controls under it, so everything fits one screen.
   // Photos keep the feed's 4:5, a montage or a story is 9:16.
-  const photos = !props && !videoUrl && media.length > 0 && post.kind !== "story";
+  // A composed carousel shows its slides (drawn live), not its photos.
+  const shown: ActionMedia[] = design ? Array.from({ length: design.count }, () => ({ url: "", video: false })) : media;
+  const photos = !props && !videoUrl && shown.length > 0 && post.kind !== "story";
   const ratio = photos ? 4 / 5 : 9 / 16;
   const mediaWidth = editing
     ? "min(100%, max(190px, calc((100dvh - 440px) * 9 / 16)))"
@@ -282,7 +304,40 @@ export function ActionView({
 
       {showGrid && <GridPreview cover={coverPhoto ? { url: coverPhoto.url, video: false } : videoUrl ? { url: videoUrl, video: true, at: cover && "at" in cover ? cover.at : DEFAULT_COVER_SECONDS } : (media[0] ?? null)} coverNode={slideNodes?.[0]} kind={post.kind} tiles={grid} />}
 
-      {editingSlides && (
+      {editingSlides && design && (
+        <section aria-label="Les textes du carrousel" className="mt-3 flex flex-col gap-3">
+          <div className="mx-auto overflow-hidden rounded-[18px]" style={{ width: "min(100%, max(200px, calc((100dvh - 520px) * 4 / 5)))" }}>
+            <SlidePreview props={composedProps(wordsSlide)!} />
+          </div>
+          {design.count > 1 && (
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+              {Array.from({ length: design.count }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setWordsSlide(i)}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${i === wordsSlide ? "bg-white text-ink" : "bg-white/10 text-white/80"}`}
+                >
+                  Image {i + 1}
+                </button>
+              ))}
+            </div>
+          )}
+          <CarouselWords
+            design={design}
+            slide={wordsSlide}
+            texts={words}
+            dark
+            onChange={(slot, text) => {
+              setWords((w) => ({ ...w, [slot]: text }));
+              setToast(null);
+            }}
+          />
+          <p className="text-[12px] leading-snug text-white/50">La mise en page ou une image de plus : demande-le à Simone sur WhatsApp.</p>
+        </section>
+      )}
+
+      {editingSlides && !design && (
         <section aria-label="Texte sur les photos" className="mt-3">
           <SlidesEditor
             plan={slidePlan}
@@ -320,8 +375,8 @@ export function ActionView({
             </>
           ) : videoUrl ? (
             <video src={videoUrl} controls playsInline loop className="aspect-[9/16] w-full object-cover" />
-          ) : media.length > 0 ? (
-            <MediaSlides media={media} nodes={slideNodes} ratio={post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]"} />
+          ) : shown.length > 0 ? (
+            <MediaSlides media={shown} nodes={slideNodes} ratio={post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]"} />
           ) : (
             <div className="flex aspect-[9/16] w-full items-center justify-center p-6 text-center text-[14px] text-white/60">
               Simone prépare encore cette publication.

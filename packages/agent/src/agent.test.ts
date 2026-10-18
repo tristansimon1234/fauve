@@ -3500,3 +3500,59 @@ test("effects agent: its video's length, its plan of one shot, its price once ma
   assert.match(effectBlurBrief(["face", "plate"]), /les visages, les plaques d'immatriculation/);
   assert.match(effectBlurBrief([]), /Retire le flou/);
 });
+
+test("designed carousels: the designer's answer bounded, its code checked, each slide a still with French spaces", async () => {
+  const { carouselFromOutput, checkCarouselCode, slideSlots, CAROUSEL_SCOPE } = await import("./carousel.ts");
+  const { buildCarouselProps, slidesPlanSchema } = await import("./slides.ts");
+  const [a, b] = ["00000000-0000-4000-8000-00000000000a", "00000000-0000-4000-8000-00000000000b"];
+
+  // Its scope: a scene's without Footage, with her photos in boxes and the strip of slides.
+  assert.ok(CAROUSEL_SCOPE.includes("Photo") && CAROUSEL_SCOPE.includes("Subject") && CAROUSEL_SCOPE.includes("Strip") && CAROUSEL_SCOPE.includes("Cutout"));
+  assert.ok(!CAROUSEL_SCOPE.includes("Footage"));
+  assert.deepEqual(checkCarouselCode("function Carousel({ slide }) { return <AbsoluteFill />; }"), []);
+  assert.ok(checkCarouselCode("function Scene() { return null; }").includes("il faut une fonction Carousel"));
+  assert.ok(checkCarouselCode('function Carousel() { fetch("https://x"); return <Footage shot={0} />; }').length >= 2);
+
+  const output = {
+    name: "Trois gestes",
+    count: 14,
+    outline: ["La promesse", "Geste 1"],
+    code: "function Carousel() { return null; }",
+    slots: [
+      { name: "s1_titre", slide: 1, role: "titre de la couverture", max_chars: 900, multiline: false },
+      { name: "s1_titre", slide: 2, role: "doublon", max_chars: 10, multiline: false },
+      { name: "Bad Name", slide: 1, role: "x", max_chars: 10, multiline: false },
+      { name: "pied", slide: 0, role: "pied de page", max_chars: 40, multiline: false },
+    ],
+    texts: [
+      { slot: "s1_titre", text: "Des cheveux qui brillent ?" },
+      { slot: "s3_detail", text: "10 minutes\nsur cheveux essorés" },
+      { slot: "pied", text: "pied de page" },
+    ],
+    fonts: ["Bodoni Moda", "bad;font", "Inter", "Fraunces", "Syne"],
+    photos: [b, a, "00000000-0000-4000-8000-0000000000ff"],
+  };
+  const { design, problems } = carouselFromOutput(output, "function Carousel() { return null; }", [a, b]);
+  assert.equal(design.count, 10);
+  assert.deepEqual(design.photos, [b, a]);
+  assert.deepEqual(design.fonts, ["Bodoni Moda", "Inter", "Fraunces"]);
+  // The first of a slot's names wins, bad names go; a text without its slot gets one, on the slide its name says.
+  assert.deepEqual(design.slots.map((s) => [s.name, s.slide]), [["s1_titre", 1], ["pied", 0], ["s3_detail", 3]]);
+  assert.equal(design.slots[0]!.max_chars, 400);
+  assert.equal(design.slots.find((s) => s.name === "s3_detail")!.multiline, true);
+  // An unknown photo, and a slot's description given as its words, go back to the designer.
+  assert.ok(problems.some((p) => p.includes("photos inconnues")));
+  assert.ok(problems.some((p) => p.includes("pied = « pied de page »")));
+  assert.deepEqual(slideSlots(design, 3).map((s) => s.name), ["pied", "s3_detail"]);
+
+  // Kept on the post's slides plan, even with no photo slide (a carousel of text slides).
+  assert.equal(slidesPlanSchema.safeParse({ template: "libre", slides: [], design }).success, true);
+  const props = buildCarouselProps(design, 2, { template: "libre", brand: { name: "Studio" }, photos: [{ src: "https://example.com/b.jpg", aspect: 0.8 }], check: true });
+  assert.deepEqual([props.width, props.height, props.segments.length, props.texts.length], [1080, 1350, 0, 0]);
+  assert.equal(props.carousel?.slide, 2);
+  assert.equal(props.carousel?.count, 10);
+  assert.equal(props.carousel?.check, true);
+  // Its words keep the French spaces unbreakable (no « ? » alone on its line).
+  assert.equal(props.carousel?.texts.s1_titre, "Des cheveux qui brillent ?");
+  assert.equal(props.carousel?.slotSlides?.s3_detail, 3);
+});

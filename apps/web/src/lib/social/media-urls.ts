@@ -35,6 +35,11 @@ export async function jpegPath(studioId: string, path: string, mimeType: string 
   return target;
 }
 
+/** A designed carousel's rendered slides, in order, as items Instagram can fetch (they replace its photos). */
+export async function designedItems(studioId: string, paths: string[]): Promise<PublishItem[]> {
+  return Promise.all(paths.filter((p) => p.startsWith(`${studioId}/`)).map(async (p) => ({ type: "image" as const, url: await sign(p) })));
+}
+
 /**
  * The post's media, in order, as items Instagram can fetch. `rendered`: a photo
  * with text over it (carousel slides) replaces the raw photo.

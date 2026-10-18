@@ -31,7 +31,7 @@ import { finishJob, setJobStage, startJob } from "@/lib/studio-jobs";
 
 const QUOTE_TTL_MS = 24 * 3600_000;
 
-export type Reason = "montage" | "correction" | "variant" | "moodboard" | "text_layer" | "image" | "adjustment";
+export type Reason = "montage" | "correction" | "variant" | "moodboard" | "text_layer" | "image" | "carousel" | "adjustment";
 export type VariantChange = { template?: MotionTemplate; hook?: string };
 
 /** The studio's balance, after this month's top-up. */

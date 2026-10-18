@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
 import { InstagramError, mediaInsights, publishMedia, refreshToken, type PublishRequest } from "./instagram";
 import { slidesToPublish } from "@/lib/render/slides";
-import { publishItems } from "./media-urls";
+import { designedItems, publishItems } from "./media-urls";
 import { handOff, matchHandPublished } from "./hand-off";
 import { TikTokError } from "./tiktok";
 import { captureTikTokMetrics, matchTikTokDrafts, refreshIdleTikTokTokens, sendToTikTok, tiktokCanTake, trackTikTok } from "./tiktok-account";
@@ -163,10 +163,12 @@ async function publishRequest(
   rendered: Record<string, string> = {},
   chosenCover: unknown = null,
   shareToFeed = true,
+  designed?: string[],
 ): Promise<PublishRequest> {
   if (kind === "reel") return { kind: "reel", videoUrl: await renderUrl(renderId), caption, cover: await reelCover(studioId, chosenCover), shareToFeed };
   if (kind === "story") return { kind: "story", item: await storyItem(studioId, renderId, mediaIds) };
-  const items = await publishItems(studioId, mediaIds, rendered);
+  // A designed carousel goes out as its slides, not as its photos.
+  const items = designed?.length ? await designedItems(studioId, designed) : await publishItems(studioId, mediaIds, rendered);
   if (kind === "carousel") {
     if (items.length < 2) throw new Error("Un carrousel demande au moins 2 photos ou vidéos");
     return { kind: "carousel", items: items.slice(0, 10), caption };
@@ -229,10 +231,10 @@ async function publishPost(postId: string): Promise<PublishOutcome> {
       try {
         const account = await instagramAccount(studioId);
         if (!account) throw new Error("Instagram n'est pas connecté");
-        const { rendered } = slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
+        const { rendered, designed } = slidesToPublish(post as { slides: unknown; slides_render: unknown; media_ids: string[] | null });
         // Cleaned, 5 hashtags at most (Instagram's cap).
         const caption = captionForInstagram(post.caption, post.hashtags);
-        const request = await publishRequest(studioId, kind, post.render_id, post.media_ids ?? [], caption, rendered, post.cover, post.share_to_feed !== false);
+        const request = await publishRequest(studioId, kind, post.render_id, post.media_ids ?? [], caption, rendered, post.cover, post.share_to_feed !== false, designed);
         const result = await publishMedia({ userId: account.userId, accessToken: account.accessToken, request });
         externalIds.instagram = { media_id: result.mediaId, permalink: result.permalink, published_at: new Date().toISOString() };
         permalink = result.permalink;

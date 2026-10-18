@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { brandLooks, REEL_FPS, resolveReelBrand, type ReelInputs, type ReelProps } from "./motion.ts";
+import { carouselDesignSchema, type CarouselDesign } from "./carousel.ts";
+import { brandLooks, frenchSpaces, REEL_FPS, resolveReelBrand, type CarouselPhoto, type ReelInputs, type ReelProps } from "./motion.ts";
 import { motionTemplateSchema, type MotionTemplate } from "./schemas.ts";
 import { photoEditSchema } from "./retouch.ts";
 import { MAX_ELEMENTS, slideElementSchema } from "./elements.ts";
@@ -49,7 +50,10 @@ export type Slide = z.infer<typeof slideSchema>;
 
 export const slidesPlanSchema = z.object({
   template: motionTemplateSchema,
-  slides: z.array(slideSchema).min(1).max(10),
+  /** One per photo of the post (none for a designed carousel made of text slides only). */
+  slides: z.array(slideSchema).max(10),
+  /** A whole carousel designed as code (carousel.ts): its slides are published instead of the photos and their texts. */
+  design: carouselDesignSchema.optional(),
 });
 export type SlidesPlan = z.infer<typeof slidesPlanSchema>;
 
@@ -126,6 +130,39 @@ export function buildSlideProps(
         }
       : null,
     elements: (slide.elements ?? []).map((e) => ({ js: e.js, texts: e.texts, fonts: e.fonts, base: e.base, box: e.box, ...(e.accent ? { accent: e.accent } : {}) })),
+  };
+}
+
+/**
+ * Props of the Reel composition for one slide of a designed carousel (`slide` from 0), captured
+ * at SLIDE_FRAME: its code, its words (French spaces made unbreakable), her photos in its order.
+ */
+export function buildCarouselProps(
+  design: CarouselDesign,
+  slide: number,
+  inputs: { template: MotionTemplate; brand: ReelInputs["brand"]; photos: CarouselPhoto[]; check?: boolean },
+): ReelProps {
+  return {
+    template: inputs.template,
+    ...SLIDE_SIZE,
+    fps: REEL_FPS,
+    durationInFrames: SLIDE_FRAMES,
+    fadeFrames: 0,
+    segments: [],
+    texts: [],
+    words: [],
+    brand: resolveReelBrand({}, inputs.template, inputs.brand),
+    endCard: null,
+    carousel: {
+      js: design.js,
+      texts: Object.fromEntries(Object.entries(design.texts).map(([slot, text]) => [slot, frenchSpaces(text)])),
+      fonts: design.fonts,
+      slide,
+      count: design.count,
+      photos: inputs.photos,
+      slotSlides: Object.fromEntries(design.slots.map((s) => [s.name, s.slide])),
+      ...(inputs.check ? { check: true } : {}),
+    },
   };
 }
 

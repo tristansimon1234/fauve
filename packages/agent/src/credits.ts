@@ -29,6 +29,8 @@ export const CREDIT_PRICES = {
   textLayer: 4,
   /** A change to one component of the studio's bank (a new version): a round of Opus. */
   elementEdit: 2,
+  /** A whole carousel composed by the carousel designer (Opus, a test render of every slide, a critic, one correction). */
+  carousel: 9,
   /** Fauve watching the rendered video before it goes out (Soigné, Max). */
   review: 1,
   /** A correction the critic asks for: the editor again, a render, a new look. */

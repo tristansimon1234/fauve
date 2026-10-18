@@ -10,6 +10,7 @@ import {
   MAX_MONTAGE_FILES,
   motionTemplateSchema,
   reelLink,
+  slidesPlanSchema,
   type MotionTemplate,
 } from "@fauve/agent";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
@@ -23,6 +24,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { speak, writeVoiceScript } from "@/lib/voice-over";
 import { ensureTranscript } from "@/lib/voice";
+import { startCarousel } from "@/lib/carousels";
 import { renderPost } from "@/lib/render/render-post";
 import { voiceNoteInSandbox } from "@/lib/render/sandbox";
 import { photoRegions } from "@/lib/video/regions";
@@ -62,7 +64,12 @@ import { photoRegions } from "@/lib/video/regions";
 //                        (costs) and what the lab studio has spent over all its runs (studio_costs).
 //   ?case=…&step=music   the version kept rendered again with a newly composed piece, the
 //                        montage untouched: to hear a change to the music without a new montage.
-//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&idea=…][&voice=…|&own_voice=…]
+//   ?case=…&format=carrousel  a carousel instead of a Reel, from the case's photos (coiffure, trattoria),
+//                        composed by the carousel designer as for her (her photos read and cut out,
+//                        a test render of every slide, the critic, one correction), never charged;
+//                        idea=<her words> what she asks for (else the case's carousel idea);
+//                        step=result then gives its slides (signed links, 24 h) and its outline.
+//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&idea=…][&voice=…|&own_voice=…][&format=carrousel]
 //                        a real business from its website, as at onboarding: its site read
 //                        (facts and activity, colours and fonts of its code, logo), then its look
 //                        (its page read in the sandbox's browser: fonts and colours measured, captures;
@@ -87,6 +94,8 @@ type LabCase = {
   title: string;
   /** What she asks for: the post's idea and the editor's request. */
   idea: string;
+  /** What she asks for as a carousel (format=carrousel), from the case's photos. */
+  carousel?: string;
   /** Free stock clips (Mixkit licence), in 720p. */
   clips?: number[];
   /** Videos of hers uploaded to the lab studio (step=upload), by file name. */
@@ -130,6 +139,7 @@ const CASES: Record<string, LabCase> = {
     brand: { colors: ["#C9898F", "#F7EFEA", "#3A2E2C"], fonts: ["Fraunces", "Inter Tight"], tone: "doux, chaleureux, tutoiement" },
     title: "L'ambiance du salon",
     idea: "Un Reel avec mes photos du salon, pour faire découvrir l'ambiance.",
+    carousel: "Un carrousel avec 3 conseils pour garder une couleur qui brille cet hiver, et qui donne envie de prendre rendez-vous pour un diagnostic.",
     photosOf: { studio: "Maison Maya", max: 8 },
   },
   boutique: {
@@ -149,6 +159,7 @@ const CASES: Record<string, LabCase> = {
     brand: { colors: ["#E07A1F", "#FBF3E4", "#23402E"], fonts: ["Bricolage Grotesque", "Inter Tight"], tone: "gourmand, joyeux, tutoiement" },
     title: "La terrasse ce week-end",
     idea: "Un Reel avec mes photos et mes vidéos pour remplir la terrasse ce week-end.",
+    carousel: "Un carrousel qui donne envie de venir manger en terrasse ce week-end : les pâtes fraîches, les pizzas, la vue sur le port.",
     clips: [42469, 42481, 42480, 42484],
     photosOf: { studio: "Chez Lino", max: 5 },
   },
@@ -157,22 +168,25 @@ const CASES: Record<string, LabCase> = {
 const labUrl = (name: string) => `lab://${name}`;
 
 /** A real business tested from its site: what it is, what it asks for, and stock clips of the same trade. */
-const KINDS: Record<string, { business: string; title: string; idea: string; clipsOf?: string }> = {
+const KINDS: Record<string, { business: string; title: string; idea: string; carousel: string; clipsOf?: string }> = {
   coiffeur: {
     business: "salon de coiffure",
     title: "Le salon",
     idea: "Un Reel avec les photos de mon site, qui fait découvrir le salon et donne envie de prendre rendez-vous.",
+    carousel: "Un carrousel avec les photos de mon site, qui fait découvrir le salon et donne envie de prendre rendez-vous.",
   },
   restaurant: {
     business: "restaurant",
     title: "Ce soir",
     idea: "Un Reel avec les photos de mon site, qui donne envie de venir manger ce soir.",
+    carousel: "Un carrousel avec les photos de mon site, qui donne envie de venir manger ce soir.",
     clipsOf: "pizzeria",
   },
   pilates: {
     business: "studio de Pilates",
     title: "Cours d'essai",
     idea: "Un Reel avec les photos de mon site, qui donne envie de réserver un cours d'essai.",
+    carousel: "Un carrousel avec les photos de mon site, qui donne envie de réserver un cours d'essai.",
     clipsOf: "pilates",
   },
 };
@@ -322,13 +336,32 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
 /** The voice over a lab Reel: Simone's (voice=), or a voice note of hers (own_voice=). */
 type LabVoice = { simone: string | null; hers: string | null };
 
-async function start(name: string, c: LabCase, reset: boolean, voice: LabVoice, idea: string | null, steal: { url: string | null; only: boolean }) {
+async function start(name: string, c: LabCase, reset: boolean, voice: LabVoice, idea: string | null, steal: { url: string | null; only: boolean }, asCarousel = false) {
   const studioId = await labStudio(name, c);
   if (reset) await clearPosts(studioId);
   const copy = steal.url ? await labSteal(studioId, steal.url) : null;
   if (steal.only) return;
   const { videos, photos } = await labMedia(studioId, c);
+  if (asCarousel) return carousel(name, studioId, idea ?? c.carousel ?? c.idea, photos);
   await montage(name, studioId, { ...c, idea: idea ?? c.idea }, videos, photos, voice, copy);
+}
+
+/** A carousel of the case's photos, as the chat starts one for her: her photos read, then the carousel designer (never charged). */
+async function carousel(name: string, studioId: string, idea: string, photos: string[]) {
+  if (!photos.length) throw new Error("lab: no photo for a carousel");
+  const db = supabaseAdmin();
+  await Promise.all(photos.map((id) => photoRegions(studioId, id).catch((error: unknown) => console.warn("lab: photo not read", id, error))));
+  const tomorrow = new Date(Date.now() + 86_400_000);
+  tomorrow.setUTCHours(17, 0, 0, 0);
+  const media = photos.slice(0, 10);
+  const post = await db
+    .from("posts")
+    .insert({ studio_id: studioId, kind: "carousel", title: intentionTitle(idea) || "Carrousel", status: "media_received", platforms: ["instagram"], scheduled_at: tomorrow.toISOString(), media_ids: media })
+    .select("id")
+    .single();
+  if (post.error) throw new Error(post.error.message);
+  const started = await startCarousel({ studioId, postId: post.data.id as string, request: idea, mediaIds: media, charge: false });
+  console.log("lab: carousel started", name, post.data.id, JSON.stringify(started));
 }
 
 /** A new first Reel: the studio's posts and scenes go (its media and brand stay). */
@@ -377,14 +410,20 @@ async function stolenStyles(studioId: string) {
 
 /** A real business from its site: its site's photos (and the stock clips of its trade, if asked), then its first Reel. */
 /** Without a kind: what any business would ask for its first Reel from its site. */
-const ANY_KIND: (typeof KINDS)[string] = { business: "commerce", title: "Premier Reel", idea: "Un Reel avec les photos de mon site, qui donne envie de venir." };
+const ANY_KIND: (typeof KINDS)[string] = {
+  business: "commerce",
+  title: "Premier Reel",
+  idea: "Un Reel avec les photos de mon site, qui donne envie de venir.",
+  carousel: "Un carrousel avec les photos de mon site, qui présente le commerce et donne envie de venir.",
+};
 
-async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice, idea: string | null, template?: MotionTemplate) {
+async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice, idea: string | null, template?: MotionTemplate, asCarousel = false) {
   const kind = KINDS[kindName] ?? ANY_KIND;
   const studioId = await siteStudio(url, kind);
   if (reset) await clearPosts(studioId);
   const db = supabaseAdmin();
-  const { data: site } = await db.from("media_assets").select("id").eq("studio_id", studioId).eq("source", "website").eq("kind", "image").order("created_at").limit(8);
+  const { data: site } = await db.from("media_assets").select("id").eq("studio_id", studioId).eq("source", "website").eq("kind", "image").order("created_at").limit(asCarousel ? 10 : 8);
+  if (asCarousel) return carousel(siteKey(url), studioId, idea ?? kind.carousel, (site ?? []).map((m) => m.id as string));
   const stock = withClips && kind.clipsOf ? CASES[kind.clipsOf] : undefined;
   const { videos } = stock ? await labMedia(studioId, { ...stock, photosOf: undefined }) : { videos: [] as string[] };
   const photos = (site ?? []).map((m) => m.id as string);
@@ -475,7 +514,13 @@ async function result(key: string) {
   const studio = await db.from("studios").select("id, name, business_type, memory").eq("website_url", key).maybeSingle();
   if (!studio.data) return { error: "case not set up" };
   const studioId = studio.data.id as string;
-  const post = await db.from("posts").select("id, title, status, agent_note, edit_plan_id, render_id, voice_media_id, inspiration_id, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const post = await db
+    .from("posts")
+    .select("id, title, kind, status, agent_note, edit_plan_id, render_id, voice_media_id, inspiration_id, created_at, slides, slides_render")
+    .eq("studio_id", studioId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   if (!post.data) {
     return { studioId, error: "no post", steal: await stolenStyles(studioId) };
   }
@@ -506,6 +551,10 @@ async function result(key: string) {
   const signed = paths.length ? ((await db.storage.from("media").createSignedUrls(paths, 86_400)).data ?? []) : [];
   const url = new Map(signed.flatMap((s) => (s.path && s.signedUrl ? [[s.path, s.signedUrl] as const] : [])));
   const kept = (plans.data ?? []).find((p) => p.id === post.data!.edit_plan_id);
+  // A designed carousel: its slides as rendered (and published), its outline and its words.
+  const design = slidesPlanSchema.safeParse(post.data.slides).data?.design;
+  const slidePaths = ((post.data.slides_render as { paths?: (string | null)[] } | null)?.paths ?? []).filter((p): p is string => Boolean(p));
+  const slideUrls = design && slidePaths.length ? ((await db.storage.from("media").createSignedUrls(slidePaths, 86_400)).data ?? []).map((s) => s.signedUrl) : [];
   const plan = editPlanSchema.safeParse(kept?.plan);
   // What this Reel cost (from its post's creation: montage, animations, review, renders, music), and what
   // the lab studio has spent over all its runs (with the one-time reading of its media).
@@ -533,7 +582,8 @@ async function result(key: string) {
       signature: profile.signature ?? null,
       reading: profile.moodboard?.reading?.slice(0, 1200) ?? null,
     },
-    post: post.data,
+    post: { ...post.data, slides: undefined, slides_render: undefined },
+    ...(design ? { carousel: { name: design.name, count: design.count, outline: design.outline, fonts: design.fonts, photos: design.photos, texts: design.texts, slides: slideUrls, code_chars: design.code?.length ?? design.js.length } } : {}),
     plans: (plans.data ?? []).map((p) => ({ id: p.id, version: p.version, at: p.created_at })),
     renders: renders.map((r) => ({ plan: r.edit_plan_id, status: r.status, seconds: r.duration_ms ? Math.round((r.duration_ms as number) / 100) / 10 : null, error: r.error, url: r.storage_path ? url.get(r.storage_path as string) : null })),
     message: message.data?.body ?? null,
@@ -589,12 +639,13 @@ export async function POST(request: Request) {
     // An ambiance chosen for the post (as she would pick « Façon collage »), else the editor's choice.
     const template = params.get("template") ? motionTemplateSchema.safeParse(params.get("template")) : null;
     if (template && !template.success) return Response.json({ error: "template" }, { status: 400 });
+    const asCarousel = params.get("format") === "carrousel";
     after(() =>
-      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params), template?.data).catch((error: unknown) =>
+      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params), template?.data, asCarousel).catch((error: unknown) =>
         console.error("lab: site failed", url.href, error),
       ),
     );
-    return Response.json({ ok: true, site: url.href, kind, started: true });
+    return Response.json({ ok: true, site: url.href, kind, started: true, ...(asCarousel ? { format: "carrousel" } : {}) });
   }
   const name = params.get("case") ?? "";
   const c = CASES[name];
@@ -626,7 +677,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "steal=<https url>|lab:<file>" }, { status: 400 });
   }
   const stealing = { url: steal, only: params.get("steal_only") === "1" };
+  const asCarousel = params.get("format") === "carrousel";
   // call_app gives up after a few seconds: the work goes on after the answer.
-  after(() => start(name, run, params.get("reset") === "1", voiceOf(params), ideaOf(params), stealing).catch((error: unknown) => console.error("lab: case failed", name, error)));
-  return Response.json({ ok: true, case: name, started: true, ...(steal ? { steal } : {}) });
+  after(() => start(name, run, params.get("reset") === "1", voiceOf(params), ideaOf(params), stealing, asCarousel).catch((error: unknown) => console.error("lab: case failed", name, error)));
+  return Response.json({ ok: true, case: name, started: true, ...(steal ? { steal } : {}), ...(asCarousel ? { format: "carrousel" } : {}) });
 }
