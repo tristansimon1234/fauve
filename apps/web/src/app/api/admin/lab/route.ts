@@ -4,7 +4,6 @@ import { z } from "zod";
 import {
   CHAT_MODEL,
   editPlanSchema,
-  followedOf,
   imaginedBrief,
   intentionTitle,
   isMotionSegment,
@@ -19,7 +18,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { usableFonts } from "@/lib/fonts";
 import { queueJob } from "@/lib/jobs";
 import { readSiteLook } from "@/lib/site-look";
-import { followStyle, missMessage, stealStyle } from "@/lib/steal";
+import { missMessage, stealNow, stealStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { speak, writeVoiceScript } from "@/lib/voice-over";
@@ -50,9 +49,9 @@ import { photoRegions } from "@/lib/video/regions";
 //                        gallery, made a phone's OGG Opus note (16 kHz mono, quieter, band-limited),
 //                        kept as a WhatsApp audio and read by Scribe, then put on the Reel;
 //                        steal=<url> (« Steal ») first has the style of a Reel read, from its link
-//                        (Instagram, TikTok, a Short) or a video file's URL, and the lab studio's Reels
-//                        follow it (steal=off: none; reset=1 without steal also stops it); with
-//                        steal_only=1, nothing more (no montage): step=result shows what was read.
+//                        (Instagram, TikTok, a Short) or a video file's URL, and the lab Reel copies it
+//                        (one shot, as when she sends Simone a Reel to copy); with steal_only=1,
+//                        nothing more (no montage): step=result shows what was read.
 //   ?case=…&step=result  every version: its render (signed link, 24 h), the plan kept
 //                        (without the scenes' code), the delivered message, what this Reel cost
 //                        (costs) and what the lab studio has spent over all its runs (studio_costs).
@@ -309,11 +308,10 @@ type LabVoice = { simone: string | null; hers: string | null };
 async function start(name: string, c: LabCase, reset: boolean, voice: LabVoice, idea: string | null, steal: { url: string | null; only: boolean }) {
   const studioId = await labStudio(name, c);
   if (reset) await clearPosts(studioId);
-  if (steal.url && steal.url !== "off") await labSteal(studioId, steal.url);
-  else if (steal.url === "off" || reset) await unfollow(studioId);
+  const copy = steal.url ? await labSteal(studioId, steal.url) : null;
   if (steal.only) return;
   const { videos, photos } = await labMedia(studioId, c);
-  await montage(name, studioId, { ...c, idea: idea ?? c.idea }, videos, photos, voice);
+  await montage(name, studioId, { ...c, idea: idea ?? c.idea }, videos, photos, voice, copy);
 }
 
 /** A new first Reel: the studio's posts and scenes go (its media and brand stay). */
@@ -323,29 +321,22 @@ async function clearPosts(studioId: string) {
   await db.from("motion_templates").delete().eq("studio_id", studioId);
 }
 
-/** « Steal » in the lab: a Reel's style read (from its link, or a video file's URL), then followed by the lab studio's Reels. */
-async function labSteal(studioId: string, url: string) {
-  const db = supabaseAdmin();
+/** « Steal » in the lab: a Reel's style read (from its link, or a video file's URL), for the lab Reel to copy. */
+async function labSteal(studioId: string, url: string): Promise<string> {
   let outcome: Awaited<ReturnType<typeof stealStyle>>;
-  if (reelLink(url)) outcome = await stealStyle(studioId, { link: url });
+  if (reelLink(url)) outcome = await stealNow(studioId, { link: url });
   else {
-    const { data: row, error } = await db.from("inspirations").insert({ studio_id: studioId, source: "link", kind: "reel", url }).select("id").single();
+    const { data: row, error } = await supabaseAdmin().from("inspirations").insert({ studio_id: studioId, source: "link", kind: "reel", url }).select("id").single();
     if (error || !row) throw new Error(`lab: inspiration not kept: ${error?.message ?? "no row"}`);
-    outcome = await stealStyle(studioId, { inspirationId: row.id as string });
+    outcome = await stealStyle(studioId, row.id as string);
   }
   if (!outcome.ok) throw new Error(`lab: style not read (${outcome.miss}): ${await missMessage(outcome.miss)}`);
-  await followStyle(studioId, outcome.inspirationId);
-  console.log("lab: style followed", outcome.style.look.name, JSON.stringify({ lines: outcome.lines, measures: { ...outcome.style.measures, cuts: outcome.style.measures.cuts.length } }));
+  console.log("lab: style read", outcome.style.look.name, JSON.stringify({ lines: outcome.lines, measures: { ...outcome.style.measures, cuts: outcome.style.measures.cuts.length } }));
+  return outcome.inspirationId;
 }
 
-/** The lab studio's Reels follow no Reel's style any more (only when they did). */
-async function unfollow(studioId: string) {
-  const { data: brand } = await supabaseAdmin().from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle();
-  if (followedOf(brand?.profile)) await followStyle(studioId, null);
-}
-
-/** The styles read for the lab studio (« Steal »): the latest, and the one its Reels follow. */
-async function stolenStyles(studioId: string, profile: unknown) {
+/** The styles read for the lab studio (« Steal »), the latest first. */
+async function stolenStyles(studioId: string) {
   const { data } = await supabaseAdmin()
     .from("inspirations")
     .select("id, url, title, style, created_at")
@@ -353,10 +344,7 @@ async function stolenStyles(studioId: string, profile: unknown) {
     .not("style", "is", null)
     .order("created_at", { ascending: false })
     .limit(3);
-  return {
-    followed: followedOf(profile) ?? null,
-    read: (data ?? []).map((i) => ({ id: i.id, url: i.url, title: i.title, at: i.created_at, style: i.style })),
-  };
+  return { read: (data ?? []).map((i) => ({ id: i.id, url: i.url, title: i.title, at: i.created_at, style: i.style })) };
 }
 
 /** A real business from its site: its site's photos (and the stock clips of its trade, if asked), then its first Reel. */
@@ -376,7 +364,7 @@ async function startSite(url: string, kindName: string, withClips: boolean, rese
   await montage(siteKey(url), studioId, { title: kind.title, idea: idea ?? kind.idea, template }, videos, photos, voice);
 }
 
-async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template">, videos: string[], photos: string[], voice: LabVoice) {
+async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template">, videos: string[], photos: string[], voice: LabVoice, copy: string | null = null) {
   const db = supabaseAdmin();
   // Everything read first, as when she sends them: Gemini watches each video, each photo is framed.
   const [analyses] = await Promise.all([
@@ -403,6 +391,8 @@ async function montage(name: string, studioId: string, c: Pick<LabCase, "title" 
       scheduled_at: tomorrow.toISOString(),
       template: c.template ?? null,
       media_ids: mediaIds,
+      // The Reel it copies (« Steal »), as when she sends Simone a Reel to copy.
+      inspiration_id: copy,
       ...(spoken ? { voice_over: spoken } : {}),
     })
     .select("id")
@@ -453,10 +443,9 @@ async function result(key: string) {
   const studio = await db.from("studios").select("id, name, business_type, memory").eq("website_url", key).maybeSingle();
   if (!studio.data) return { error: "case not set up" };
   const studioId = studio.data.id as string;
-  const post = await db.from("posts").select("id, title, status, agent_note, edit_plan_id, render_id, voice_media_id, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const post = await db.from("posts").select("id, title, status, agent_note, edit_plan_id, render_id, voice_media_id, inspiration_id, created_at").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!post.data) {
-    const { data: latest } = await db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle();
-    return { studioId, error: "no post", steal: await stolenStyles(studioId, latest?.profile) };
+    return { studioId, error: "no post", steal: await stolenStyles(studioId) };
   }
   const [plans, message, costs, voice, brand] = await Promise.all([
     db.from("edit_plans").select("id, version, plan, created_at").eq("post_id", post.data.id).order("version"),
@@ -519,7 +508,7 @@ async function result(key: string) {
     voice: (voice.data?.transcript as { text?: string; duration?: number } | null) ?? null,
     costs: byKind(post.data.created_at as string),
     studio_costs: byKind(),
-    steal: await stolenStyles(studioId, brand.data?.profile),
+    steal: await stolenStyles(studioId),
     // The plan kept, readable: the scenes' code left out.
     plan: plan.success
       ? {
@@ -588,9 +577,9 @@ export async function POST(request: Request) {
   const stock = params.get("stock");
   if (stock && !new RegExp(`^\\d{1,7}(,\\d{1,7}){0,${MAX_MEDIA - 1}}$`).test(stock)) return Response.json({ error: "stock=<mixkit id>,…" }, { status: 400 });
   const run = stock ? { ...c, clips: stock.split(",").map(Number) } : c;
-  // « Steal »: a Reel's link or a video file's URL (https), or off.
+  // « Steal »: a Reel's link or a video file's URL (https).
   const steal = params.get("steal");
-  if (steal && steal !== "off" && !/^https:\/\/\S{8,500}$/.test(steal)) return Response.json({ error: "steal=<https url>|off" }, { status: 400 });
+  if (steal && !/^https:\/\/\S{8,500}$/.test(steal)) return Response.json({ error: "steal=<https url>" }, { status: 400 });
   const stealing = { url: steal, only: params.get("steal_only") === "1" };
   // call_app gives up after a few seconds: the work goes on after the answer.
   after(() => start(name, run, params.get("reset") === "1", voiceOf(params), ideaOf(params), stealing).catch((error: unknown) => console.error("lab: case failed", name, error)));

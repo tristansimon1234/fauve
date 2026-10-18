@@ -1,12 +1,13 @@
 import "server-only";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, followedLine, followedOf, orderReplies, readMemory, readVoiceSetting, stableWindow } from "@fauve/agent";
+import { DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, readMemory, readVoiceSetting, stableWindow } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
 import { presenceLines } from "@/lib/nudge";
 import { accessLine } from "@/lib/billing/access";
+import { pendingSteal } from "@/lib/steal";
 
 // Shared by every channel (WhatsApp webhook, web test chat): rebuild the
 // conversation from stored messages and let Fauve answer the last one.
@@ -103,14 +104,16 @@ export async function replyInConversation(params: {
     .limit(ownThread ? HISTORY_READ : HISTORY_READ * 2);
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
-  const [studio, member, rows, instagram, brand, jobs, tiktok] = await Promise.all([
+  const [studio, member, rows, instagram, brand, jobs, tiktok, copying] = await Promise.all([
     db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
-    db.from("brand_profiles").select("profile->>tone, profile->voice, profile->fonts, profile->font_twins, profile->custom_fonts, profile->followed").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+    db.from("brand_profiles").select("profile->>tone, profile->voice, profile->fonts, profile->font_twins, profile->custom_fonts").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     runningJobs(params.studioId).catch(() => []),
     db.from("social_accounts").select("handle, status").eq("studio_id", params.studioId).eq("platform", "tiktok").maybeSingle(),
+    // The Reel she sent to copy (« Steal »), for her next Reel only.
+    pendingSteal(params.studioId).catch(() => null),
   ]);
   const jobTitles = jobs.length
     ? new Map(
@@ -182,10 +185,7 @@ export async function replyInConversation(params: {
         const setting = readVoiceSetting((brand.data as { voice?: unknown } | null)?.voice);
         return { use: setting.use, name: findVoice(setting.voice_id ?? DEFAULT_VOICE_ID)?.name ?? "sa voix" };
       })(),
-      followed: (() => {
-        const followed = followedOf(brand.data);
-        return followed ? `« ${followed.look.name} » : ${followedLine(followed).replace(/^[^:]+: /, "")}` : undefined;
-      })(),
+      copying: copying ? { inspirationId: copying.id, name: copying.name, lines: copying.lines } : undefined,
       routine: await Promise.all([
         accessLine(params.studioId).catch(() => null),
         presenceLines(params.studioId).catch((error) => {

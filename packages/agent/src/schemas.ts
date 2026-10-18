@@ -2,7 +2,6 @@ import { z } from "zod";
 import { adjustSchema, clipBlurSchema, photoEditSchema } from "./retouch.ts";
 import { listFields, savedLookSchema, textLookSchema } from "./text-look.ts";
 import { brandSignatureSchema } from "./signature.ts";
-import { followedStyleSchema } from "./steal.ts";
 import { styleSampleSchema } from "./moodboard.ts";
 import { voiceSettingSchema } from "./voice-over.ts";
 
@@ -437,8 +436,6 @@ export const brandProfileSchema = z.object({
     .describe("Direction artistique libre : ambiance, couleurs, typographie, rythme, ce qu'on aime et ce qu'on évite"),
   /** The art direction as settings (read from her site or her moodboard): what every Reel and photo applies. */
   signature: brandSignatureSchema.optional(),
-  /** A Reel she liked whose style her next Reels follow (« Steal »): its look over her signature, its pace for the editor and the critic. */
-  followed: followedStyleSchema.optional(),
   /** A hook and a line in her own words, to show her style on one of her photos (Style step). */
   style_sample: styleSampleSchema.optional(),
   /** Inspiration images from the Style page, and Fauve's reading of them (what the montage follows). */

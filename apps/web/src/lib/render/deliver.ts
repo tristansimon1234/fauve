@@ -83,12 +83,16 @@ export async function notifyStudio(target: Pick<DeliveryTarget, "studioId" | "wa
   }
 }
 
-/** A question with its buttons on the channel she uses (reply buttons on WhatsApp); `payload` says what the buttons answer. */
-export async function askStudio(target: Pick<DeliveryTarget, "studioId" | "waId" | "replyTo">, text: string, options: string[], payload: Record<string, unknown> = {}) {
+/** A message on the channel she uses, with what shows under it (`options`: buttons, on WhatsApp too; in the app, the media picker…). */
+export async function messageStudio(
+  target: Pick<DeliveryTarget, "studioId" | "waId" | "replyTo">,
+  text: string,
+  extras: { options?: string[] } & Record<string, unknown> = {},
+) {
   const full = { ...target, postId: "" };
-  const stored = { type: "text", body: text, payload: { options, ...payload } };
+  const stored = { type: "text", body: text, payload: extras };
   if (target.waId) {
-    const id = await sendReply(target.waId, text, options);
+    const id = await sendReply(target.waId, text, extras.options);
     await store(full, { wa_message_id: id, ...stored });
   } else {
     await store(full, stored);

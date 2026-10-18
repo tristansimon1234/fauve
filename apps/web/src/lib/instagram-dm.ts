@@ -1,9 +1,7 @@
 import "server-only";
 import { randomInt } from "node:crypto";
-import { STEAL_OPTIONS } from "@fauve/agent";
 import { z } from "zod";
 import { replyInConversation } from "@/lib/agent/conversation";
-import { answerOffer } from "@/lib/publish-offer";
 import { InstagramError, sendDirectMessage } from "@/lib/social/instagram";
 import { stealStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -70,6 +68,8 @@ async function linkWithCode(igsid: string, code: string): Promise<{ name: string
 }
 
 const SHARE_TYPES = new Set(["ig_reel", "reel", "share", "ig_post", "image", "video", "story_mention"]);
+/** Shares that can be the model of her next Reel (« Steal »): not a photo, nor a story mentioning Simone. */
+const MODEL_TYPES = new Set(["ig_reel", "reel", "share", "ig_post", "video"]);
 
 /** Handles one message sent to Fauve's Instagram account. */
 export async function handleDm(event: DmEvent): Promise<void> {
@@ -88,7 +88,7 @@ export async function handleDm(event: DmEvent): Promise<void> {
     const linked = code ? await linkWithCode(igsid, code) : null;
     await reply(
       linked
-        ? `C’est relié à ${linked.name} ! Partage-moi les Reels qui t’inspirent (bouton Partager → Simone) : je les garde pour ton style. Tu peux aussi m’écrire ici.`
+        ? `C’est relié à ${linked.name} ! Partage-moi un Reel qui te plaît (bouton Partager → Simone) : je fais ton prochain Reel comme lui. Tu peux aussi m’écrire ici.`
         : code
           ? "Ce code n’est plus valable. Récupère-en un nouveau dans l’app (Réglages → Instagram) et renvoie-le-moi."
           : "Hello, je suis Simone, l’IA qui gère les réseaux de ton studio. Pour relier ton compte, envoie-moi le code affiché dans l’app (Réglages → Instagram).",
@@ -97,35 +97,35 @@ export async function handleDm(event: DmEvent): Promise<void> {
   }
   const studioId = contact.studio_id as string;
 
-  // Shared Reels and posts: inspirations. A video has its style measured and read once (« Steal »),
-  // then she is asked whether her Reels follow it; anything else, Gemini's words about it.
-  const shares = (message.attachments ?? []).filter((a) => SHARE_TYPES.has(a.type) && a.payload?.url);
+  // Shared Reels and posts: inspirations. A shared Reel is the model of her next Reel (« Steal », one shot):
+  // its style measured and read once; anything else (a photo, a story), Gemini's words about it.
+  const shares = (message.attachments ?? []).filter((a) => SHARE_TYPES.has(a.type) && a.payload?.url).slice(0, 3);
   if (shares.length) {
     const { data: seen } = await db.from("inspirations").select("id").eq("studio_id", studioId).eq("external_id", message.mid).limit(1);
     if (seen?.length) return; // retried delivery
+    const keep = (share: (typeof shares)[number]) =>
+      db.from("inspirations").insert({ studio_id: studioId, kind: share.type, url: share.payload!.url, title: share.payload!.title ?? null, external_id: message.mid }).select("id").single();
+    const model = shares.find((s) => MODEL_TYPES.has(s.type));
     let reading: string | null = null;
-    let stolen: { id: string; line: string } | null = null;
-    for (const share of shares.slice(0, 3)) {
-      const { data: row } = await db
-        .from("inspirations")
-        .insert({ studio_id: studioId, kind: share.type, url: share.payload!.url, title: share.payload!.title ?? null, external_id: message.mid })
-        .select("id")
-        .single();
-      const style = row && share.type !== "image" ? await stealStyle(studioId, { inspirationId: row.id as string }).catch((e: unknown) => (console.warn("shared Reel: style not read", e), null)) : null;
-      if (style?.ok) {
-        stolen ??= { id: style.inspirationId, line: style.lines[0] ?? "" };
-        continue;
-      }
+    // The others first: the Reel to copy is the latest she sent.
+    for (const share of shares.filter((s) => s !== model)) {
+      const { data: row } = await keep(share);
       const analysis = await readInspiration(studioId, share.payload!.url!).catch((e: unknown) => (console.warn("inspiration reading failed", e), null));
       reading ??= analysis;
       if (row) await db.from("inspirations").update({ analysis }).eq("id", row.id);
     }
-    if (stolen) {
-      const text = `Noté ✨ ${stolen.line} Tu veux que tes prochains Reels suivent ce style ? Réponds « ${STEAL_OPTIONS[0]} » ou « ${STEAL_OPTIONS[1]} ».`;
-      await reply(text);
-      // Her answer is read against it (answerOffer).
-      await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "instagram", direction: "outbound", type: "text", body: text, payload: { steal_offer: stolen.id, options: STEAL_OPTIONS } });
-      return;
+    if (model) {
+      const { data: row } = await keep(model);
+      await reply("Je regarde ce Reel 👀 Je reviens vers toi dans une minute.");
+      const stolen = row ? await stealStyle(studioId, row.id as string).catch((e: unknown) => (console.warn("shared Reel: style not read", e), null)) : null;
+      if (stolen?.ok) {
+        await reply(`Noté ✨ ${stolen.lines[0] ?? ""} Envoie-moi tes vidéos ou tes photos (ici, sur WhatsApp ou dans l’app) et je fais ton prochain Reel comme ça.`);
+        return;
+      }
+      // Not readable as a Reel: Gemini's words about it, for her style.
+      const analysis = await readInspiration(studioId, model.payload!.url!).catch((e: unknown) => (console.warn("inspiration reading failed", e), null));
+      reading = analysis ?? reading;
+      if (row) await db.from("inspirations").update({ analysis }).eq("id", row.id);
     }
     const firstLine = reading?.split(/(?<=\.)\s/)[0];
     await reply(firstLine ? `Noté pour ton style ✨ ${firstLine}` : "Noté pour ton style ✨ Je m’en inspire pour tes prochains montages.");
@@ -142,22 +142,6 @@ export async function handleDm(event: DmEvent): Promise<void> {
     )
     .select("id");
   if (!inserted.data?.length) return; // retried delivery
-  // « Suivre ce style » / « Non merci » under a shared Reel: answered at once.
-  const { data: last } = await db
-    .from("whatsapp_messages")
-    .select("payload")
-    .eq("studio_id", studioId)
-    .eq("channel", "instagram")
-    .eq("direction", "outbound")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const offer = await answerOffer(studioId, message.text, last, {}).catch((e: unknown) => (console.error("DM offer answer failed", e), null));
-  if (offer) {
-    await reply(offer.reply);
-    await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "instagram", direction: "outbound", type: "text", body: offer.body, payload: offer.payload });
-    return;
-  }
   const { data: owner } = await db.from("members").select("id").eq("studio_id", studioId).eq("role", "owner").limit(1).maybeSingle();
   if (!owner) return;
   const result = await replyInConversation({ studioId, memberId: owner.id as string, reactToRowId: inserted.data[0]!.id as string, channel: "instagram" });

@@ -4,7 +4,6 @@ import {
   ambianceLine,
   brandProfileSchema,
   followedLine,
-  followedOf,
   MAX_AVERAGE_SHOT,
   paceCeiling,
   signatureLines,
@@ -27,6 +26,7 @@ import {
   voiceTranscriptSchema,
 } from "@fauve/agent";
 import { videoFramesInSandbox } from "@/lib/render/sandbox";
+import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { anthropic, logClaudeCost } from "./run";
 
@@ -104,8 +104,8 @@ export async function reviewMontage(input: {
   ]);
   if (!loaded.some((v) => v?.frames.length)) return null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
-  // A Reel she likes whose style her Reels follow (« Steal »): the Reel is compared with it, its pace included.
-  const followed = followedOf(brand.data?.[0]?.profile);
+  // The Reel this one copies (« Steal »): it is compared with it, its pace included.
+  const followed = await postStyle(input.studioId, input.postId).catch(() => undefined);
   const signature = signatureOf({ signature: profile.signature, followed });
   const ceiling = paceCeiling(MAX_AVERAGE_SHOT, followed);
 
@@ -114,7 +114,7 @@ export async function reviewMontage(input: {
     profile.tone ? `Ton de la marque : ${profile.tone}.` : "",
     profile.art_direction ? `Direction artistique : ${profile.art_direction.slice(0, 600)}` : "",
     signature ? `Sa charte en réglages (le Reel doit la porter : on doit reconnaître ce commerce sans voir son nom) :\n${signatureLines(signature)}` : "",
-    followed ? `${followedLine(followed)}. Le Reel doit le suivre (sa forme, son rythme, son texte), avec ses images et ses mots à elle.` : "",
+    followed ? `${followedLine(followed)}. Ce Reel le recopie : il doit en reprendre la forme, le rythme et le texte, avec ses images et ses mots à elle.` : "",
     input.request ? `Demande de la gérante : ${input.request.slice(0, 1500)}` : "",
     ambianceLine(post.data?.template as string | null | undefined) ?? "",
     formatLine(input.format) ?? "",

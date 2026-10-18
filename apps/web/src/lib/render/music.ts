@@ -3,7 +3,6 @@ import {
   BEAT_STEP,
   beatGrid,
   coarser,
-  followedOf,
   GROOVE_STEP,
   grooveGaps,
   isClipSegment,
@@ -21,6 +20,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { alignMusicInSandbox, bassLevelsInSandbox, loopedReelInSandbox, muxAudioInSandbox } from "./sandbox";
+import { postStyle } from "@/lib/steal";
 
 // Simone's music on a Reel (ElevenLabs Music): composed from its brief alone, in
 // the mood of the Reel and the business, as the looping track of a creator's Reel
@@ -204,8 +204,8 @@ export async function withMusic(params: {
     ]);
     const stored = profile.data?.profile as { art_direction?: string; signature?: { music?: string } } | null;
     const direction = (stored?.art_direction ?? "").split("\n").filter((l) => l.startsWith("Ajustement"));
-    // The music of the Reel whose style she follows (« Steal »), else her charter's.
-    const followed = followedOf(stored)?.look.music.trim();
+    // The music of the Reel this one copies (« Steal »), else her charter's.
+    const followed = (await postStyle(params.studioId, params.postId).catch(() => undefined))?.look.music.trim();
     const sound = followed || (typeof stored?.signature?.music === "string" ? stored.signature.music.trim().slice(0, 80) : undefined);
     const ask = brief(params.plan, (studio.data?.business_type as string | null) ?? null, direction, sound || undefined);
     const duration = params.plan.duration;

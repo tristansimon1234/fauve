@@ -1,10 +1,8 @@
 "use server";
 
-import { followedOf } from "@fauve/agent";
 import { after } from "next/server";
 import { z } from "zod";
 import { ensureInspirationRead, listInspirations, type InspirationItem } from "@/lib/inspirations";
-import { followStyle } from "@/lib/steal";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -48,22 +46,11 @@ export async function inspirationsRead(ids: string[]): Promise<InspirationItem[]
   return (await listInspirations(studioId, 20)).filter((i) => wanted.has(i.id));
 }
 
-/** Her Reels follow this inspiration's style (« Steal »), or none any more (null). */
-export async function followInspiration(id: string | null): Promise<boolean> {
-  const studioId = await studio();
-  if (!studioId || (id !== null && !z.uuid().safeParse(id).success)) return false;
-  const followed = await followStyle(studioId, id).catch((e: unknown) => (console.error("follow style failed", e), undefined));
-  return id === null ? followed === null : Boolean(followed);
-}
-
 export async function removeInspiration(id: string): Promise<boolean> {
   const studioId = await studio();
   if (!studioId || !z.uuid().safeParse(id).success) return false;
   const db = supabaseAdmin();
   const { data } = await db.from("inspirations").delete().eq("id", id).eq("studio_id", studioId).select("storage_path").maybeSingle();
   if (data?.storage_path) await db.storage.from("media").remove([data.storage_path as string]);
-  // The Reel her Reels followed: they follow none any more.
-  const { data: brand } = await db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle();
-  if (data && followedOf(brand?.profile)?.inspiration_id === id) await followStyle(studioId, null).catch((e: unknown) => console.error("unfollow failed", e));
   return Boolean(data);
 }

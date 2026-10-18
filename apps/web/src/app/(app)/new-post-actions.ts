@@ -3,6 +3,7 @@
 import { filmIdeas, postIdeas, publishWhen, readVoiceSetting, type PostIdea } from "@fauve/agent";
 import { localInstant, localDateOf, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
 import { freeSlots, type Slot } from "@/lib/slots";
+import { pendingSteal } from "@/lib/steal";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 
 // What the « Nouvelle publication » screen offers: the studio's photos and videos to
@@ -27,6 +28,8 @@ export type NewPostOptions = {
   voice: { use: "auto" | "always" | "never"; voiceId: string | null };
   /** TikTok connected: a Reel goes there too, unless she says otherwise. */
   tiktok: boolean;
+  /** The Reel she sent Simone to copy (« Steal »): her next Reel follows it, unless she says otherwise. */
+  copy: { name: string | null } | null;
 };
 
 export async function newPostOptions(): Promise<NewPostOptions | null> {
@@ -40,10 +43,11 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     freeSlots(studioId, tz, 4, now),
     db.from("media_assets").select("id, storage_path, kind, created_at, duration").eq("studio_id", studioId).in("kind", ["image", "video"]).order("created_at", { ascending: false }).limit(40),
   ]);
-  const [{ data: studio }, { data: brand }, { data: tiktok }] = await Promise.all([
+  const [{ data: studio }, { data: brand }, { data: tiktok }, copy] = await Promise.all([
     db.from("studios").select("business_type").eq("id", studioId).maybeSingle(),
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     db.from("social_accounts").select("status").eq("studio_id", studioId).eq("platform", "tiktok").maybeSingle(),
+    pendingSteal(studioId).catch(() => null),
   ]);
   const voice = readVoiceSetting((brand?.profile as { voice?: unknown } | null)?.voice);
 
@@ -77,6 +81,7 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     ideas: postIdeas(studio?.business_type as string | null),
     voice: { use: voice.use, voiceId: voice.voice_id ?? null },
     tiktok: tiktok?.status === "connected",
+    copy: copy ? { name: copy.name } : null,
   };
 }
 
