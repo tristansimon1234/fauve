@@ -223,6 +223,8 @@ export async function effectsAgentResult(studioId: string) {
   if (stopped && !run.saved) {
     run.saved = [];
     for await (const f of client.beta.files.list({ scope_id: run.session, betas: [MANAGED_AGENTS] })) {
+      // The session's scope also lists the files it was given, which cannot be downloaded back.
+      if (f.downloadable === false || run.files.includes(f.id)) continue;
       const name = f.filename.split("/").pop()!.replace(/[^\w.-]/g, "_");
       const bytes = Buffer.from(await (await client.files.download(f.id)).arrayBuffer());
       const path = `${studioId}/lab/agent/${run.session}/${name}`;
