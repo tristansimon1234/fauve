@@ -1,5 +1,5 @@
 import "server-only";
-import { stealStyle } from "@/lib/steal";
+import { READING_MS, SENT_TO_COPY, stealStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { readInspiration } from "@/lib/video/inspiration";
 
@@ -41,12 +41,14 @@ export async function listInspirations(studioId: string, limit = 8): Promise<Ins
  */
 export async function ensureInspirationRead(studioId: string, id: string): Promise<string | null> {
   const db = supabaseAdmin();
-  const { data } = await db.from("inspirations").select("analysis, storage_path, kind").eq("id", id).eq("studio_id", studioId).maybeSingle();
+  const { data } = await db.from("inspirations").select("analysis, storage_path, kind, source, created_at").eq("id", id).eq("studio_id", studioId).maybeSingle();
   if (!data) return null;
   if (data.analysis || !data.storage_path) return (data.analysis as string | null) ?? null;
-  // A video: its style measured and read (« Steal »), which her Reels can then follow.
+  // A Reel she sent to copy is read by its own job (/api/jobs/steal): never twice at once.
+  if (SENT_TO_COPY.includes(data.source as string) && Date.now() - Date.parse(data.created_at as string) < READING_MS) return null;
+  // A video: its style measured and read (« Steal »), which a Reel can then copy.
   if (data.kind === "video") {
-    const stolen = await stealStyle(studioId, { inspirationId: id }).catch((e: unknown) => (console.warn("inspiration: style not read", e), null));
+    const stolen = await stealStyle(studioId, id).catch((e: unknown) => (console.warn("inspiration: style not read", e), null));
     if (stolen?.ok) return stolen.lines.join(" ");
   }
   const path = data.storage_path as string;

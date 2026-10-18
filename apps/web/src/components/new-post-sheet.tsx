@@ -21,7 +21,7 @@ import { MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/cha
 import { newPostOptions, type NewPostOptions } from "@/app/(app)/new-post-actions";
 import { useFauveDrawer } from "./fauve-drawer";
 import { publicEnv } from "@/lib/public-env";
-import { CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, ImageIcon, LayersIcon, MicIcon, PauseIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
+import { CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, ImageIcon, LayersIcon, MicIcon, PaletteIcon, PauseIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
 import { Mascot } from "./mascot";
 import { nudgeWork } from "./work-pill";
 
@@ -160,7 +160,9 @@ function Create({
   /** Her choices, else the studio's (voice) and the usual places (platforms). */
   const [voice, setVoice] = useState<string | null>(null);
   const [platforms, setPlatforms] = useState<string[] | null>(null);
-  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "nothing" | null>(null);
+  /** Made like the Reel she sent Simone to copy (« Steal »), when there is one: yes unless she says otherwise. */
+  const [copyOn, setCopyOn] = useState(true);
+  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "copy" | "nothing" | null>(null);
   const [all, setAll] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
@@ -198,6 +200,7 @@ function Create({
   const meta = FORMATS.find((f) => f.kind === kind)!;
   const chosenWhen = when ?? defaultWhen(options, date);
   const chosenVoice = voice ?? defaultVoice(options);
+  const copying = kind === "reel" && Boolean(options?.copy) && copyOn;
   // TikTok only takes videos (a Reel here), and only once it is connected.
   const places = (platforms ?? (kind === "reel" && options?.tiktok ? ["instagram", "tiktok"] : ["instagram"])).filter(
     (p) => p === "instagram" || (p === "tiktok" && kind === "reel" && options?.tiktok),
@@ -237,6 +240,7 @@ function Create({
         items,
         voice: kind === "reel" ? chosenVoice : "auto",
         platforms: where.filter((p): p is "instagram" | "tiktok" => p === "instagram" || p === "tiktok"),
+        copy: copying,
       }).catch(
         (): LaunchResult => ({ ok: false, error: "Ça n’est pas parti. Réessaie dans un instant." }),
       );
@@ -447,6 +451,16 @@ function Create({
           <div aria-live="polite" className="fauve-enter grid grid-cols-2 gap-2 pb-2">
             <Field wide={kind !== "reel"} icon={<meta.Icon size={17} />} label="Format" value={meta.title} onClick={() => setSheet("format")} />
             {kind === "reel" && <Field icon={<MicIcon size={17} />} label="Voix off" value={voiceLabel(chosenVoice)} onClick={() => setSheet("voice")} />}
+            {kind === "reel" && options?.copy && (
+              <Field
+                wide
+                icon={<PaletteIcon size={17} />}
+                label="Style"
+                value={copying ? "Comme le Reel que tu m’as envoyé" : "Ton style"}
+                sub={copying ? (options.copy.name ?? undefined) : undefined}
+                onClick={() => setSheet("copy")}
+              />
+            )}
             <Field wide icon={<CalendarIcon size={17} />} label="Quand et où" value={chosenWhen.full} sub={placeLabel(where)} onClick={() => setSheet("date")} />
           </div>
         )}
@@ -574,6 +588,36 @@ function Create({
               setSheet(null);
             }}
           />
+        </Sheet>
+      )}
+
+      {sheet === "copy" && options?.copy && (
+        <Sheet label="Le style" onClose={() => setSheet(null)}>
+          <SheetHead
+            title="Comme le Reel que tu m’as envoyé ?"
+            hint="Je reprends sa façon de faire (le rythme, les textes, la lumière) pour ce Reel seulement, avec tes couleurs, tes polices et tes images."
+            onClose={() => setSheet(null)}
+          />
+          <div role="radiogroup" aria-label="Le style" className="flex flex-col gap-2">
+            <Choice
+              on={copyOn}
+              title="Comme le Reel envoyé"
+              hint={options.copy.name ? `« ${options.copy.name} »` : "Je le regarde encore"}
+              onClick={() => {
+                setCopyOn(true);
+                setSheet(null);
+              }}
+            />
+            <Choice
+              on={!copyOn}
+              title="Mon style"
+              hint="Ma charte, comme d’habitude"
+              onClick={() => {
+                setCopyOn(false);
+                setSheet(null);
+              }}
+            />
+          </div>
         </Sheet>
       )}
 

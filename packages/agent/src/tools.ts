@@ -99,19 +99,11 @@ export const toolSpecs = {
   },
   steal_style: {
     description:
-      "Reprend la DA d'un Reel qu'elle aime (« fais comme ça », « je veux ce style », un lien de Reel, de TikTok ou de Short, ou une vidéo qu'elle t'envoie comme exemple) : après ta réponse, Simone le regarde (une minute), en mesure le rythme et lit sa forme, ses textes, sa lumière, son mouvement et sa musique, puis lui envoie en trois lignes ce qu'elle reprendrait, avec « Suivre ce style » et « Non merci ». Jamais ses images, ses mots ni sa musique : ses couleurs, ses polices et ses images restent les siennes. Un carrousel : demande une capture de la photo qui lui plaît, puis copy_text_style.",
+      "Recopie la DA d'un Reel qu'elle aime pour UN Reel à elle, le prochain (« fais comme ça », « je veux ce style », un lien de Reel, de TikTok ou de Short, ou une vidéo qu'elle t'envoie comme exemple) : rend son inspiration_id tout de suite, puis après ta réponse Simone le regarde (une minute), en mesure le rythme, lit sa forme, ses textes, sa lumière, son mouvement et sa musique, et lui envoie en trois lignes ce que son Reel en reprend. Le Reel qui le recopie : montage avec cet inspiration_id (le monteur attend la lecture) ; ses Reels suivants restent sur sa charte. Jamais ses images, ses mots ni sa musique : ses couleurs, ses polices et ses images restent les siennes. Un carrousel : demande une capture de la photo qui lui plaît, puis copy_text_style sur la publication.",
     input: z.object({
       link: z.string().url().max(500).optional().describe("Le lien du Reel, du TikTok ou du Short, tel qu'elle l'a envoyé"),
       media_id: z.string().uuid().optional().describe("Une vidéo qu'elle a envoyée comme exemple, le Reel d'un autre compte : elle sort de sa médiathèque une fois regardée, jamais un de ses plans"),
       inspiration_id: z.string().uuid().optional().describe("Une de ses inspirations (list_inspirations)"),
-    }),
-  },
-  follow_style: {
-    description:
-      "Ses prochains Reels suivent le style d'une de ses inspirations lue par steal_style (on, avec son inspiration_id), ou plus aucun (off). Le bouton « Suivre ce style » le fait tout seul : à appeler quand elle le dit avec ses mots (« oui suis-le », « arrête ce style »).",
-    input: z.object({
-      mode: z.enum(["on", "off"]),
-      inspiration_id: z.string().uuid().optional().describe("Pour on : l'inspiration dont le style est suivi"),
     }),
   },
   list_media: {
@@ -182,7 +174,7 @@ export const toolSpecs = {
         .string()
         .uuid()
         .optional()
-        .describe("L'inspiration choisie par la gérante pour ce Reel (list_inspirations) : le monteur la suit en priorité. Inutile si elle l'a déjà choisie en créant la publication."),
+        .describe("Le Reel qu'elle t'a envoyé à recopier pour celui-ci (steal_style, ou la ligne « Reel à recopier » du contexte), ou l'inspiration qu'elle a choisie (list_inspirations) : le monteur le suit en priorité. Inutile si elle l'a déjà choisie en créant la publication."),
       max_new_scenes: z.number().int().min(0).max(8).optional().describe("Nouvelles animations sur mesure permises (3 crédits chacune, débitées seulement si elles sont créées). Par défaut : autant que d'animations dans le plan (au moins 2 pour le tout premier Reel) ; sans plan, 1 pour un nouveau montage et 0 pour une correction. 0 si elle veut économiser (le monteur réutilise sa bibliothèque)."),
       effort: effortSchema
         .optional()

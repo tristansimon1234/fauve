@@ -2,16 +2,17 @@ import { z } from "zod";
 import { BEAT_STEP } from "./mix.ts";
 import { clip, SIGNATURE_GRADES, type BrandSignature } from "./signature.ts";
 
-// « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA »): a Reel the
-// manager likes (a link sent in the chat or on WhatsApp, a video she sends) becomes a style
-// her next Reels follow. What the frames cannot show is measured in the sandbox (its cuts,
-// its tempo, its loudness); what they show is read once by Gemini (the form, the hook, the
-// texts and how they are set, the effect, the light, the movement, the music it calls for).
-// Simone sums it up in three lines and asks; once she says yes, the style is kept in her
-// brand profile (`followed`): its look goes over her charter (titles, key words, the box
-// under a phrase, the light, the movement, the music) and its pace guides the editor and
-// the critic (the form, a shot every so many seconds, the tempo, the amount of text, the
-// effect, the ending). Never the other Reel's images, words or music.
+// « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA », « c'est one
+// shot »): a Reel the manager likes (a link sent in the chat or on WhatsApp, a video she
+// sends, a share to Simone on Instagram) is the model of one Reel of hers, the one she makes
+// next, never a mode for all of them. What the frames cannot show is measured in the sandbox
+// (its cuts, its tempo, its loudness); what they show is read once by Gemini (the form, the
+// hook, the texts and how they are set, the effect, the light, the movement, the music it
+// calls for). The style is kept on its inspiration and that Reel copies it (posts.inspiration_id):
+// its look goes over her charter for that Reel only (titles, key words, the box under a phrase,
+// the light, the movement, the music) and its pace guides the editor and the critic (the form,
+// a shot every so many seconds, the tempo, the amount of text, the effect, the ending). Never
+// the other Reel's images, words or music.
 
 /** What the sandbox measures on the Reel (ffprobe, ffmpeg's scene detection, EBU R128, its bass). */
 export const reelMeasuresSchema = z.object({
@@ -109,7 +110,7 @@ export const STEAL_PROMPT = `Tu es la directrice artistique de Simone, qui monte
 Regarde tout le Reel, image par image, avec le son : la forme (raconté par une voix, un message clé tenu, une visite, du collage), l'accroche des 2 premières secondes, le texte posé sur la vidéo (combien, comment il est composé : niveaux, tailles, casse, graisse, espacement des lettres, mot clé, fond sous la phrase, place, alignement), les sous-titres, l'effet sur la vidéo (poussière de pellicule, grain), la lumière, le mouvement des textes, la caméra, les transitions, la musique (genre et énergie, pour un compositeur), la fin.
 Ne recopie ni ses mots, ni ses images, ni le nom de sa musique : décris une forme réutilisable par un autre commerce. N'accorde rien au féminin ou au masculin pour la personne qui gère. En français, sauf « music » en anglais.`;
 
-/** A followed style as it is kept in the brand profile (profile.followed): its look and its pace. */
+/** The style one Reel copies (from its inspiration's stolen style): its look and its pace. */
 export const followedStyleSchema = z.object({
   inspiration_id: z.uuid(),
   look: stolenLookSchema,
@@ -119,7 +120,7 @@ export const followedStyleSchema = z.object({
 });
 export type FollowedStyle = z.infer<typeof followedStyleSchema>;
 
-/** The style a profile follows, from a kept stolen style (a single shot of minutes counts as 30 s). */
+/** The style a Reel copies, from a kept stolen style (a single shot of minutes counts as 30 s). */
 export function followedFrom(inspirationId: string, style: StolenStyle): FollowedStyle {
   return {
     inspiration_id: inspirationId,
@@ -129,11 +130,6 @@ export function followedFrom(inspirationId: string, style: StolenStyle): Followe
   };
 }
 
-/** The style a stored profile follows, when there is a valid one. */
-export function followedOf(profile: unknown): FollowedStyle | undefined {
-  const parsed = followedStyleSchema.safeParse(profile && typeof profile === "object" ? (profile as { followed?: unknown }).followed : undefined);
-  return parsed.success ? parsed.data : undefined;
-}
 
 /** French words for the manager and the editor. */
 const FORMAT_WORDS: Record<StolenLook["format"], string> = {
@@ -178,28 +174,17 @@ export function measuresLine(measures: ReelMeasures): string {
   ].join(" ; ");
 }
 
-/** Under the three lines: her next Reels follow it, or it stays an inspiration. */
-export const STEAL_OPTIONS = ["Suivre ce style", "Non merci"];
-
-/** Her tap on one of them: their own words only, anything else goes to Simone. */
-export function stealOfferAnswer(text: string | null | undefined): "follow" | "skip" | null {
-  const said = (text ?? "")
-    .normalize("NFC")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/[\s!.]+$/, "")
-    .trim();
-  if (said === "suivre ce style") return "follow";
-  if (said === "non merci" || said === "non, merci") return "skip";
-  return null;
-}
-
-/** What Simone sends once she has read the Reel: what she takes from it, and the question. */
-export function stolenStyleMessage(style: StolenStyle): string {
+/**
+ * What Simone sends once she has read the Reel: what she takes from it for hers. `making`: her
+ * Reel is already on its way in this style; else she is asked for her videos or photos.
+ */
+export function stolenStyleMessage(style: StolenStyle, making: boolean): string {
   return [
-    "J’ai regardé ce Reel 👀 Voilà ce que je reprendrais pour les tiens :",
+    `J’ai regardé ce Reel 👀 Voilà ce que je reprends pour ${making ? "le tien" : "ton prochain Reel"} :`,
     stolenStyleLines(style).map((line) => `• ${line}`).join("\n"),
-    "Je garde tes couleurs, tes polices et tes images : je reprends sa façon de faire, jamais ses images ni ses mots. Tes prochains Reels suivent ce style ?",
+    making
+      ? "Avec tes couleurs, tes polices et tes images : sa façon de faire, jamais ses images ni ses mots. Ton Reel arrive dans quelques minutes."
+      : "Avec tes couleurs, tes polices et tes images : sa façon de faire, jamais ses images ni ses mots. Envoie-moi tes vidéos ou tes photos (ou dis-moi lesquelles prendre) et je te fais le tien comme ça.",
   ].join("\n\n");
 }
 
@@ -277,7 +262,7 @@ export function followedForEditor(followed: FollowedStyle) {
 export function followedLine(followed: FollowedStyle): string {
   const { look } = followed;
   return [
-    `Style suivi (un Reel qu'elle aime, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
+    `Reel à recopier (un Reel qu'elle a envoyé, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
     `accroche ${look.hook.kind}`,
     `texte : ${look.text.amount}`,
     ...(look.effect !== "none" ? [EFFECT_WORDS[look.effect]] : []),

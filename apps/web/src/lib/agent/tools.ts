@@ -34,8 +34,6 @@ import {
   readVoiceSetting,
   SIMONE_VOICES,
   reelLink,
-  STEAL_OPTIONS,
-  stolenStyleMessage,
   type ToolName,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
@@ -47,8 +45,9 @@ import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
 import { AiImageError, canAffordImages, improvePhoto, makeAmbiance, placeOnPost } from "@/lib/ai-images";
-import { askStudio, deliverImages, notifyFailure, notifyStudio, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
-import { followStyle, missMessage, stealStyle } from "@/lib/steal";
+import { deliverImages, notifyFailure, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
+import { queueJob } from "@/lib/jobs";
+import { missMessage, startSteal } from "@/lib/steal";
 import { readPostMusic } from "@/lib/render/music";
 import { removeVoice } from "@/lib/voice-over";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
@@ -789,37 +788,24 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (!source) return json({ error: "Donne le lien du Reel, le media_id de la vidéo ou l'inspiration_id." });
       if (link && !reelLink(link)) return json({ error: "Ce n'est pas le lien d'un Reel, d'un TikTok ou d'un Short : demande-lui ce lien, ou la vidéo elle-même." });
       if (media_id) await assertOwnMedia([media_id]);
-      const target = { studioId, waId: ctx.waId, replyTo: ctx.replyToMessageId };
-      // Taken, measured and read after the reply (about a minute), then her two buttons.
-      ctx.afterReply.push(async () => {
-        try {
-          const outcome = await stealStyle(studioId, source);
-          if (!outcome.ok) return void (await notifyStudio(target, await missMessage(outcome.miss)));
-          const { data: brand } = await db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle();
-          const followed = brandProfileSchema.shape.followed.safeParse((brand?.profile as { followed?: unknown } | null)?.followed);
-          if (followed.success && followed.data?.inspiration_id === outcome.inspirationId) {
-            return void (await notifyStudio(target, `Tes Reels suivent déjà ce style (« ${outcome.style.look.name} ») ✅`));
-          }
-          await askStudio(target, stolenStyleMessage(outcome.style), STEAL_OPTIONS, { steal_offer: outcome.inspirationId });
-        } catch (error) {
-          await notifyFailure({ ...target, postId: "" }, "Je n’ai pas réussi à regarder ce Reel cette fois. Tu veux que je réessaie ?", error);
-        }
-      });
+      // The model of one Reel of hers: an inspiration at once (its id for that Reel's montage),
+      // taken, measured and read in its own job after the reply, which then tells her what her Reel takes from it.
+      const started = await startSteal(studioId, source);
+      if ("miss" in started) {
+        return json({ error: started.miss === "not_found" ? "Cette vidéo ou cette inspiration est introuvable : demande-lui le lien du Reel, ou la vidéo elle-même." : await missMessage(started.miss) });
+      }
+      const job = { studioId, inspirationId: started.inspirationId, example: started.example, waId: ctx.waId, replyTo: ctx.replyToMessageId };
+      ctx.afterReply.push(() =>
+        queueJob("steal", job).catch((error: unknown) =>
+          notifyFailure({ studioId, postId: "", waId: ctx.waId, replyTo: ctx.replyToMessageId }, "Je n’ai pas réussi à regarder ce Reel cette fois. Tu veux que je réessaie ?", error),
+        ),
+      );
+      ctx.notes.push(`Reel à recopier pour son prochain Reel : inspiration_id=${started.inspirationId}`);
       return json({
         status: "started",
-        note: "Tu le regardes après ta réponse (environ une minute), puis tu lui envoies tout seul ce que tu en reprendrais, avec deux boutons. Annonce-le en une phrase, sans rien décrire de ce Reel avant de l'avoir vu.",
+        inspiration_id: started.inspirationId,
+        note: "Tu le regardes après ta réponse (environ une minute), puis tu lui envoies tout seul ce que son Reel en reprend. C'est le modèle d'un seul Reel, le prochain : si elle t'a déjà donné ses vidéos ou ses photos pour ce Reel (ou dit lesquelles prendre), crée la publication et lance montage tout de suite avec cet inspiration_id (le monteur attend la lecture) ; sinon ne les lui demande pas, ton message qui suit le fait. Annonce-le en une phrase, sans rien décrire de ce Reel avant de l'avoir vu.",
       });
-    },
-
-    async follow_style({ mode, inspiration_id }) {
-      if (mode === "off") {
-        await followStyle(studioId, null);
-        return json({ ok: true, note: "Ses prochains Reels ne suivent plus ce style : ils reviennent à sa charte seule. Dis-le en une phrase." });
-      }
-      if (!inspiration_id) return json({ error: "Donne l'inspiration_id du style à suivre (list_inspirations)." });
-      const followed = await followStyle(studioId, inspiration_id);
-      if (!followed) return json({ error: "Cette inspiration n'a pas encore de style lu : lance steal_style dessus d'abord." });
-      return json({ ok: true, style: followed.look.name, note: "Ses prochains Reels suivent ce style, avec ses couleurs et ses polices. Dis-le en une phrase." });
     },
 
     async add_to_moodboard({ media_ids }) {

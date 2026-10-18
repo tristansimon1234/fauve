@@ -5,7 +5,6 @@ import {
   editorClip,
   signatureLines,
   followedForEditor,
-  followedOf,
   signatureOf,
   editorOutputSchemaLegacy,
   finishPlan,
@@ -62,6 +61,7 @@ import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
 import { ensureInspirationRead } from "@/lib/inspirations";
+import { postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
 import { isFirstReel } from "@/lib/onboarding";
 import { LAYER_ROLE, markTemplatesUsed, OVERLAY_ROLE, PHOTO_ROLE, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { anthropic, logClaudeCost } from "./run";
@@ -132,10 +132,12 @@ export async function designEdit(params: {
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
     recentlyShownTemplates(params.studioId, params.postId),
     latestReport(params.studioId).catch(() => null),
-    db.from("inspirations").select("analysis").eq("studio_id", params.studioId).not("analysis", "is", null).order("created_at", { ascending: false }).limit(6),
+    db.from("inspirations").select("analysis, source, copied:style->look").eq("studio_id", params.studioId).not("analysis", "is", null).order("created_at", { ascending: false }).limit(12),
     recentHooks(params.studioId, params.postId).catch(() => []),
   ]);
   if (post.error) throw new Error("Publication introuvable");
+  // The Reel she sent to copy (« Steal »): its style, read after her message, is waited for while the rest is read.
+  const copying = post.data.inspiration_id ? postStyle(params.studioId, params.postId, { waitMs: STEAL_WAIT_MS }).catch(() => undefined) : Promise.resolve(undefined);
 
   // The version to correct: the one asked for, else the post's current one (a reviewed
   // montage keeps the version the critic chose, often not the highest number), else the latest.
@@ -187,8 +189,10 @@ export async function designEdit(params: {
   // A correction keeps what was asked; a new Reel (or a new take) has its hook weighed.
   const correction = Boolean(params.brief && !params.fresh && previousPlan.success);
 
-  // The inspiration she picked for this post (read now if it was just added in the app).
+  // The inspiration she picked for this post (read now if it was just added in the app), or the Reel
+  // she sent to copy: its form and pace, its look over her charter, for this Reel only.
   const inspirationId = post.data.inspiration_id as string | null;
+  const followed = await copying;
   const chosenInspiration = inspirationId ? await ensureInspirationRead(params.studioId, inspirationId).catch(() => null) : null;
   const chosenTemplate = motionTemplateSchema.safeParse(post.data.template);
   // A collage composes with her photos' cut-outs: for one she chose for this post or asks for now (« en collage »), they are
@@ -199,8 +203,6 @@ export async function designEdit(params: {
       ? ensureCutouts(params.studioId, photoIds.slice(0, MAX_OFFERED_PHOTOS)).catch((e: unknown) => console.warn("cut-outs: not ready", e))
       : null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
-  // A Reel she likes whose style her Reels follow (« Steal »): its form and pace, its look over her charter.
-  const followed = followedOf(brand.data?.[0]?.profile);
   // What moves in her videos, followed before the editor cuts: which gestures show their hands in the vertical
   // frame (the editor puts an animation that hangs on a gesture where it can be seen), where the faces really are
   // (the texts keep off them) and what the animations follow. Never more than a few minutes of waiting (a sandbox
@@ -220,12 +222,17 @@ export async function designEdit(params: {
       art_direction: profile.art_direction,
       // The same direction as settings: the render already applies them (titles, key words, boxes, light).
       signature: signatureLines(signatureOf({ signature: profile.signature, followed })),
-      style_suivi: followed ? followedForEditor(followed) : undefined,
+      reel_a_recopier: followed ? followedForEditor(followed) : undefined,
       moodboard: profile.moodboard?.reading,
       // What worked on this studio's Instagram (weekly analysis): follow it when it applies.
       lessons: report?.lessons.map((l) => l.lesson),
-      // Reels the manager shared with Fauve on Instagram, as read by Gemini.
-      inspirations: (inspirations.data ?? []).map((i) => i.analysis as string).filter((a) => a !== chosenInspiration),
+      // Reels she likes (added in Style, shared with Simone on Instagram), as read by Gemini; not a Reel she sent
+      // to copy (« Steal »): that one is the model of one Reel only.
+      inspirations: (inspirations.data ?? [])
+        .filter((i) => !(i.copied && SENT_TO_COPY.includes(i.source as string)))
+        .map((i) => i.analysis as string)
+        .filter((a) => a !== chosenInspiration)
+        .slice(0, 6),
       visual_notes: profile.visual_notes,
       colors: profile.colors,
       fonts: profile.fonts,
@@ -505,7 +512,7 @@ export async function designEdit(params: {
   const template = motionTemplateSchema.catch("doux").parse(plan.template);
   // Its fonts as the render loads them (a site's font Google does not serve gets its twin).
   const { fonts: usable } = await usableFonts(profile.fonts, (profile.custom_fonts ?? []).map((f) => f.family), template, profile.font_twins).catch(() => ({ fonts: profile.fonts }));
-  // Her charter, under the style she follows: the animations move as its Reels do.
+  // Her charter, under the style of the Reel this one copies: the animations move as that Reel does.
   const signature = signatureOf({ signature: profile.signature, followed });
   const designed = await designMotionScenes(
     params.studioId,

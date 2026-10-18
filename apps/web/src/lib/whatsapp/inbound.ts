@@ -1,7 +1,7 @@
 import "server-only";
 import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, replyExtrasSchema } from "@fauve/agent";
 import { claimPairing } from "@/lib/auth/pairing";
-import { answerOffer } from "@/lib/publish-offer";
+import { answerPublishOffer } from "@/lib/publish-offer";
 import { deliverPendingHandOffs } from "@/lib/social/hand-off";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { quoteButtons } from "@/lib/credits";
@@ -209,7 +209,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const offer = await answerOffer(member.studio_id, text, last, { waId: message.from }).catch((e) => {
+    const offer = await answerPublishOffer(member.studio_id, text, last, { waId: message.from }).catch((e) => {
       console.error("publish offer answer failed", e);
       return null;
     });

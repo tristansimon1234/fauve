@@ -17,7 +17,6 @@ import {
   buildFfmpegArgs,
   canTransition,
   editPlanSchema,
-  followedOf,
   postStatusSchema,
   renderDuration,
   signatureOf,
@@ -36,6 +35,7 @@ import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
 import { ensureCutouts, sceneCutoutInputs, stickerInputs } from "./cutout";
 import { loadTracks } from "./tracks";
+import { postStyle } from "@/lib/steal";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -67,11 +67,13 @@ export function towardsDraft(status: PostStatus): PostStatus[] {
 /**
  * What a montage needs besides its plan: signed clip links (1 h), word timings
  * for subtitles, the brand (accent, logo, fonts, name) and each clip's length.
- * Shared by the render and the live editor.
+ * Shared by the render and the live editor. With its post, a Reel's look also
+ * takes the style of the Reel it copies (« Steal », `reelSignature`).
  */
 export async function loadMontageInputs(
   studioId: string,
   plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"]; layers?: EditPlan["layers"] },
+  options: { postId?: string } = {},
 ) {
   const db = supabaseAdmin();
   const clipIds = planMediaIds(plan);
@@ -106,8 +108,8 @@ export async function loadMontageInputs(
     .pick({ colors: true, logo_url: true, logo_path: true, fonts: true, custom_fonts: true, font_twins: true, signature: true })
     .catch({})
     .parse(brand.data?.[0]?.profile ?? {});
-  // A Reel she likes whose style her Reels follow (« Steal »): its look goes over her charter.
-  const followed = followedOf(brand.data?.[0]?.profile);
+  // The Reel this one copies (« Steal »): its look goes over her charter, for this Reel only.
+  const followed = options.postId ? await postStyle(studioId, options.postId).catch(() => undefined) : undefined;
   const accent = style.colors?.[0];
   // An uploaded logo (private bucket) wins over one found on the website.
   const logoUrl = style.logo_path?.startsWith(`${studioId}/`)
@@ -165,7 +167,7 @@ export async function loadMontageInputs(
     colors: style.colors,
     customFonts,
     // Her art direction as settings: the render's theme follows it (her photos, her own charter;
-    // her Reels, the style she follows over it).
+    // a Reel that copies another, that one's style over it).
     signature: style.signature,
     reelSignature: signatureOf({ signature: style.signature, followed }),
     followed,
@@ -216,7 +218,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   const toCut = plan.template === "collage" ? planMediaIds(plan) : scenePhotoIds(plan);
   if (toCut.length) await ensureCutouts(studioId, toCut);
   const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, photoAspects, tracks } =
-    await loadMontageInputs(studioId, plan);
+    await loadMontageInputs(studioId, plan, { postId });
   const motion = motionTemplateSchema.safeParse(plan.template);
 
   const renderId = randomUUID();

@@ -23,6 +23,7 @@ import { acceptQuote, createMontageQuote } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { startMontage } from "@/lib/montage-start";
 import { isFirstReel } from "@/lib/onboarding";
+import { pendingSteal } from "@/lib/steal";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
@@ -46,6 +47,8 @@ const launchSchema = z.object({
   voice: z.union([z.literal("auto"), z.literal("off"), z.string().regex(/^[A-Za-z0-9]{10,40}$/)]).default("auto"),
   /** Where it goes (TikTok only takes a Reel); by default the usual places. */
   platforms: z.array(z.enum(["instagram", "tiktok"])).min(1).max(2).optional(),
+  /** A Reel made like the one she sent Simone to copy (« Steal »), when there is one: by default, yes. */
+  copy: z.boolean().default(true),
 });
 
 export type LaunchInput = z.input<typeof launchSchema>;
@@ -65,7 +68,7 @@ export type LaunchResult =
 export async function launchCreation(input: LaunchInput): Promise<LaunchResult> {
   const parsed = launchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Choisis au moins une photo ou une vidéo." };
-  const { kind, date, time, items, voice, platforms } = parsed.data;
+  const { kind, date, time, items, voice, platforms, copy } = parsed.data;
   const idea = parsed.data.idea.trim();
   const { member } = await getStudioContext();
   if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
@@ -103,7 +106,9 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     after(() => (video ? ensureClipAnalysis(studioId, mediaId) : photoRegions(studioId, mediaId)).then(() => undefined, (e: unknown) => console.warn("create: file read failed", e)));
   }
 
-  const created = await createPost({ kind, date, time, intention: idea, mediaIds });
+  // The Reel she sent to copy: the model of this Reel only (one shot).
+  const copying = kind === "reel" && copy ? await pendingSteal(studioId).catch(() => null) : null;
+  const created = await createPost({ kind, date, time, intention: idea, mediaIds, inspirationId: copying?.id });
   if (!created.ok) return created;
   // Her choices, before anything is made: where it goes, and the voice over of a Reel.
   const where = platforms ? [...new Set(platforms.filter((p) => p === "instagram" || kind === "reel"))] : [];
