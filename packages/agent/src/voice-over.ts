@@ -73,28 +73,43 @@ export const readPostVoice = (value: unknown): PostVoice | null => postVoiceSche
 /** Footage enough to show while a voice of 15 to 22 s speaks (a photo shows about 3 s). */
 export const VOICE_MIN_FOOTAGE_SECONDS = 12;
 
-/**
- * Whether a montage gets Simone's voice: never over her own voice note, nor over
- * the voice Simone made before unless the Reel asks for a new one (remake); the
- * Reel's own choice first, then the studio's. « auto » only for a new montage, when
- * it helps: nobody speaks in the shots, and there is enough to show while the voice
- * speaks. A correction gets a voice only when she asked for one on this Reel.
- */
-export function wantsVoiceOver(p: {
+/** Who speaks in a Reel she copies (its reading, « Steal »). */
+export type CopiedVoice = "voix off" | "quelqu'un parle" | "aucune";
+
+type VoiceChoice = {
   post: PostVoice | null;
   studio: VoiceSetting["use"];
   /** The voice on the Reel now: hers (a voice note), Simone's, or none. */
   onReel: "hers" | "simone" | null;
   correction: boolean;
-  speechInClips: boolean;
-  footageSeconds: number;
-  photos: number;
-}): boolean {
+};
+
+/** Simone decides (« auto »): a new montage, no voice on the Reel yet, no choice for it, her setting « auto ». */
+export const voiceLeftToSimone = (p: VoiceChoice): boolean => !p.onReel && !p.post && !p.correction && p.studio === "auto";
+
+/**
+ * Whether a montage gets Simone's voice: never over her own voice note, nor over
+ * the voice Simone made before unless the Reel asks for a new one (remake); the
+ * Reel's own choice first, then the studio's. « auto » only for a new montage, when
+ * it helps: the Reel she copies is told by a voice (one that is not gets none), nobody
+ * speaks in the shots, and there is enough to show while the voice speaks. A
+ * correction gets a voice only when she asked for one on this Reel.
+ */
+export function wantsVoiceOver(
+  p: VoiceChoice & {
+    speechInClips: boolean;
+    footageSeconds: number;
+    photos: number;
+    /** Who speaks in the Reel she copies: in « auto », its form decides. */
+    copied?: CopiedVoice;
+  },
+): boolean {
   if (p.onReel === "hers" || p.post?.mode === "off") return false;
   if (p.onReel === "simone") return Boolean(p.post?.remake);
   if (p.post?.mode === "on") return true;
   if (p.correction || p.studio === "never") return false;
   if (p.studio === "always") return true;
+  if (p.copied && p.copied !== "voix off") return false;
   return !p.speechInClips && p.footageSeconds + p.photos * 3 >= VOICE_MIN_FOOTAGE_SECONDS;
 }
 
@@ -134,9 +149,9 @@ Si sa demande dit déjà la forme (une voix qui raconte, pas de voix, un seul me
 
 export const VOICE_OVER_PROMPT = `Tu écris la voix off d'un Reel Instagram pour un commerce de quartier : ce qu'une vraie personne dit sur ses images, comme un créateur qui parle à ses abonnés, jamais comme une pub. Cette voix fait rester les gens jusqu'au bout : elle doit donner envie, pas vendre.
 
-Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée de la publication et, quand il y en a, la demande faite pour ce Reel (« publication.demande », souvent dans les mots de la personne qui gère) et ce qu'elle veut entendre (« consigne_voix »), le ton du commerce, ce que montrent ses images, dans l'ordre où elles ont été filmées, l'image sur laquelle le Reel s'ouvre (« ouverture », le plan le plus fort pour accrocher) et la longueur à viser (« longueur » : de mots_min à mots_max mots).
+Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée de la publication et, quand il y en a, la demande faite pour ce Reel (« publication.demande », souvent dans les mots de la personne qui gère) et ce qu'elle veut entendre (« consigne_voix »), le ton du commerce, ce que montrent ses images, dans l'ordre où elles ont été filmées, l'image sur laquelle le Reel s'ouvre (« ouverture », le plan le plus fort pour accrocher), la longueur à viser (« longueur » : de mots_min à mots_max mots) et, quand elle en recopie un, le Reel qu'elle a envoyé (« reel_a_recopier » : la forme de son accroche et sa fin).
 
-Sa demande passe avant tes idées : le message, l'ordre et l'invitation qu'elle donne, avec des phrases à toi, dites à l'oral ; les faits qu'elle y donne sont vrais. Elle écrit souvent en son nom (« chez nous », « moi ») : la voix, elle, reste celle d'un créateur qui parle du commerce.
+Sa demande passe avant tes idées et ces règles : le message, l'ordre et l'invitation qu'elle donne, avec des phrases à toi, dites à l'oral ; les faits qu'elle y donne sont vrais. Le Reel qu'elle recopie aussi : ta première phrase prend la forme de son accroche, et ta fin la sienne (une chute, une boucle sur la première image ; sans invitation s'il n'en a pas), jamais ses mots. Elle écrit souvent en son nom (« chez nous », « moi ») : la voix, elle, reste celle d'un créateur qui parle du commerce.
 
 Les exemples entre guillemets ci-dessous montrent une forme, jamais des mots à reprendre : écris toujours les tiens, à partir de ce commerce et de ces images.
 
@@ -149,7 +164,7 @@ Règles :
 - son métier d'abord (le plat, la coupe, le cours, le soin) : un produit dérivé (vêtement, casquette, tote bag) n'est jamais le sujet, sauf si l'idée de la publication en parle ;
 - parle comme le commerce parle (« ton ») : ses mots, son humour, tutoiement ou vouvoiement comme lui ;
 - la voix est celle d'un créateur qui fait découvrir le commerce à ses abonnés : elle en parle (« ici », « chez Lina », « l'équipe »), jamais en son nom (pas de « chez nous » ni de « je » pour le commerce), et tutoie la personne qui regarde, sauf si le ton du commerce vouvoie ;
-- finis par une invitation simple et concrète, qui dit quoi faire (venir, réserver, essayer : le geste précis pour ce commerce, et où le faire, par exemple « le lien est dans la bio »), ou par une raison de l'envoyer à quelqu'un (« si tu as une gourmande autour de toi, tu sais à qui l'envoyer ») ;
+- finis (sauf si sa demande ou le Reel qu'elle recopie finissent autrement) par une invitation simple et concrète, qui dit quoi faire (venir, réserver, essayer : le geste précis pour ce commerce, et où le faire, par exemple « le lien est dans la bio »), ou par une raison de l'envoyer à quelqu'un (« si tu as une gourmande autour de toi, tu sais à qui l'envoyer ») ;
 - interdit : les formules de pub (« découvrez », « n'hésitez pas », « une expérience unique », « de qualité », « savoureux », « au cœur de »), les superlatifs creux, les emojis, les hashtags, le tiret long, les parenthèses ;
 - écris les nombres en lettres quand ils se disent mal en chiffres (« dix-huit mois ») et la ponctuation d'une voix qui parle : des points, des virgules, des points de suspension pour une petite pause, une question au plus ;
 - ça s'écoute comme quelqu'un qui parle, jamais comme une pub lue au micro : écris comme on parle à un ami dans une note vocale ou face caméra, avec les tournures de l'oral (« t'as », « y a », « c'est », « franchement », « en vrai », « du coup », « bref ») quand elles collent au ton du commerce, une phrase qui se reprend ou une petite hésitation de temps en temps (« enfin… »), des phrases qui ne sont pas toutes parfaites ; relis-la dans ta tête : si on dirait une annonce, une plaquette ou un spot radio, réécris-la ;

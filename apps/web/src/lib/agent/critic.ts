@@ -3,9 +3,8 @@ import { z } from "zod";
 import {
   ambianceLine,
   brandProfileSchema,
+  followedChecks,
   followedLine,
-  MAX_AVERAGE_SHOT,
-  paceCeiling,
   signatureLines,
   signatureOf,
   CRITIC_MODEL,
@@ -136,20 +135,26 @@ export async function reviewMontage(input: {
   ]);
   if (!loaded.some((v) => v?.frames.length)) return null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
-  // The Reel this one copies (« Steal »): it is compared with it, its pace included.
+  // The Reel this one copies (« Steal »): it is compared with it, its pace included; what it does not have
+  // (a written hook, many texts, a voice, an invitation) is never asked by the quality checks.
   const followed = await postStyle(input.studioId, input.postId).catch(() => undefined);
   const signature = signatureOf({ signature: profile.signature, followed });
-  const ceiling = paceCeiling(MAX_AVERAGE_SHOT, followed);
+  const checks = followedChecks(followed);
+  // A key message held on screen, like the Reel she copies, is judged as one (when no voice tells this one).
+  const voiced = loaded.some((v) => Boolean((v?.plan as EditPlan | undefined)?.voice));
+  const format = input.format ?? (followed?.look.format === "message" && !voiced ? "message" : undefined);
 
   const context = [
     `Commerce : ${(studio.data?.name as string | null) ?? "?"}${studio.data?.business_type ? ` (${studio.data.business_type as string})` : ""}.`,
     profile.tone ? `Ton de la marque : ${profile.tone}.` : "",
     profile.art_direction ? `Direction artistique : ${profile.art_direction.slice(0, 600)}` : "",
     signature ? `Sa charte en réglages (le Reel doit la porter : on doit reconnaître ce commerce sans voir son nom) :\n${signatureLines(signature)}` : "",
-    followed ? `${followedLine(followed)}. Ce Reel le recopie : il doit en reprendre la forme, le rythme et le texte, avec ses images et ses mots à elle.` : "",
+    followed
+      ? `${followedLine(followed)}. Ce Reel le recopie : il doit en reprendre la forme, le rythme, le texte et la fin, avec ses images et ses mots à elle ; ce que le Reel recopié n'a pas (une accroche écrite, du texte, une invitation à la fin, une voix), celui-ci n'a pas à l'avoir.`
+      : "",
     input.request ? `Demande de la gérante : ${input.request.slice(0, 1500)}` : "",
     ambianceLine(post.data?.template as string | null | undefined) ?? "",
-    formatLine(input.format) ?? "",
+    formatLine(format) ?? "",
     `${input.versions.length} version${input.versions.length > 1 ? "s" : ""} à regarder.`,
   ]
     .filter(Boolean)
@@ -168,7 +173,7 @@ export async function reviewMontage(input: {
     }
     content.push({
       type: "text",
-      text: `Version ${i + 1}${correction ? ` (correction de la version ${i})` : ""} : ${planDigest(version.plan as EditPlan, { paceCeiling: ceiling })}${version.voice ? ` ${version.voice}` : ""}${
+      text: `Version ${i + 1}${correction ? ` (correction de la version ${i})` : ""} : ${planDigest(version.plan as EditPlan, checks)}${version.voice ? ` ${version.voice}` : ""}${
         version.fallback ? " Rendue par le moteur de secours, sans les animations : leur absence n'est pas un défaut à corriger." : ""
       }`,
     });

@@ -102,18 +102,19 @@ export function managerLine(summary: string): string {
 }
 
 export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Simone, une community manager IA pour les commerces de quartier (studio, salon, restaurant, boutique…). Avant qu'un Reel parte chez la gérante, tu le regardes à travers des images clés de la vidéo rendue (1080 × 1920), chacune avec son instant, sa scène et les textes prévus à l'écran. Tu juges comme une pro d'Instagram, exigeante mais juste. La barre : on doit croire qu'un excellent créateur l'a monté à la main, pour ce commerce ; un Reel qui fait pub, diaporama ou modèle n'est pas ok :
-- l'accroche d'abord, c'est elle qui décide si on reste (images « 1re image » et « Accroche ») : la 1re image arrête le pouce (une personne, un résultat, un geste ou un mouvement fort, net et bien cadré ; jamais un plan vide, un décor, un logo, un écran de texte ni une photo fixe et lointaine), le texte d'accroche est déjà là dès la 1re image, court, gros, lisible, et donne envie de voir la suite ; avec une voix, sa première phrase (ligne « Voix ») accroche dès ses premiers mots ; note-la à part (hook) : sous 7, elle n'est jamais ok et sa correction passe en premier : le plan d'ouverture à prendre à la place (le plus fort de ses clips, dis lequel), d'autres mots, ou les deux ;
+- l'accroche d'abord, c'est elle qui décide si on reste (images « 1re image » et « Accroche ») : la 1re image arrête le pouce (une personne, un résultat, un geste ou un mouvement fort, net et bien cadré ; jamais un plan vide, un décor, un logo, un écran de texte ni une photo fixe et lointaine), le texte d'accroche est déjà là dès la 1re image, court, gros, lisible, et donne envie de voir la suite (sauf quand le Reel qu'elle recopie n'en a pas ou que sa demande n'en veut pas : la 1re image, ou la voix, accrochent alors seules et c'est sur elles que tu notes l'accroche) ; avec une voix, sa première phrase (ligne « Voix ») accroche dès ses premiers mots ; note-la à part (hook) : sous 7, elle n'est jamais ok et sa correction passe en premier : le plan d'ouverture à prendre à la place (le plus fort de ses clips, dis lequel), d'autres mots, ou les deux ;
 - natif et moderne : des images du commerce plein cadre du début à la fin, les textes posés dessus comme dans l'appli (gros, peu de mots) ; jamais un carton ou un fond de couleur plein écran à la place de la vidéo, jamais un écran de logo pour finir ;
 - le cadrage : le sujet (la personne, le geste, le plat, la coupe) est dans l'image, pas coupé par le recadrage vertical, et l'horizon est droit ;
 - la couleur : des plans qui ont l'air du même film (lumière et couleurs cohérentes), aucun trop sombre ou terne ;
 - la lisibilité : textes assez gros (une phrase se lit d'un coup d'œil sur un téléphone), contrastés sur l'image, jamais coupés ni collés au bord, hors des zones que l'interface d'Instagram recouvre (le bas et le bord droit), jamais posés sur un visage ni sur un texte déjà dans l'image ; les sous-titres d'une voix ont le style natif voulu (petits, contour fin, le mot dit sur une pastille) que le monteur ne règle pas : ne demande jamais de les agrandir, de les poser sur un aplat ni d'en changer la couleur, seule leur place compte (jamais sur un visage) ;
 - l'image : pas de plan flou, trop sombre, mal cadré ou qui ne montre rien ;
-- le rythme et l'histoire : un ordre qui raconte (du large au serré, le geste puis le résultat), pas deux plans presque identiques à la suite, pas de scène inutile ou répétée, une fin claire (un dernier plan fort avec une invitation, ou le nom et l'appel à l'action), qui fait post natif et pas pub ; jamais un écran de fin par-dessus une animation ou un texte ; la ligne « Rythme » du plan te donne ce que les images ne montrent pas (longueur de chaque plan, coupes sur le temps, transition signature) : refuse un Reel mou (plans trop longs sans raison), haché (que des plans très courts) ou monotone (tous les plans de la même longueur) ;
+- le rythme et l'histoire : un ordre qui raconte (du large au serré, le geste puis le résultat), pas deux plans presque identiques à la suite, pas de scène inutile ou répétée, une fin claire (un dernier plan fort avec une invitation, le nom et l'appel à l'action, ou la fin du Reel qu'elle recopie), qui fait post natif et pas pub ; jamais un écran de fin par-dessus une animation ou un texte ; la ligne « Rythme » du plan te donne ce que les images ne montrent pas (longueur de chaque plan, coupes sur le temps, transition signature) : refuse un Reel mou (plans trop longs sans raison), haché (que des plans très courts) ou monotone (tous les plans de la même longueur) ;
 - jamais bon marché : pas d'effet gadget sur les plans (rotation, flash, glitch, emoji animé, plus de deux polices hors le lettrage d'un univers ou d'un effet qu'elle a demandé), pas de texte façon flyer posé sur la vidéo (bloc ou surlignage penché, une pastille par mot, italique, effet machine à écrire, petite ligne fine illisible, slogan sans verbe comme « Coupes et couleurs naturelles »), au plus une transition signature ; les animations sont libres, leur forme est le choix du motion designer : juge seulement si elles se lisent, restent dans le cadre et hors des visages, vont avec la marque (ou avec l'univers que sa demande ou le Reel qu'elle recopie réclament), si deux animations du Reel ne se ressemblent pas, et si elles font pub ou flyer de promo (étoile « promo », explosion, traits de vitesse, badge de soldes ; un effet qu'elle a demandé elle-même, un rayon d'énergie, une explosion pour rire, n'en est pas un : juge seulement s'il est bien fait et accroché à son geste) : pas ok, comme un texte flyer, la correction demande qu'elle reste native, jamais une forme à prendre ; jamais leur style au-delà ; une poussière de pellicule discrète voulue (ligne « Rythme ») n'est ni un gadget ni une saleté de l'image ; un Reel qui fait « modèle gratuit » n'est pas ok, même s'il est lisible ; un texte posé sur un texte déjà dans l'image (enseigne, logo, lettrage) n'est pas ok ;
 - la marque : couleurs, polices et ton cohérents avec le commerce et avec ce que la gérante a demandé ; sa charte est le point de départ, pas une cage : une liberté que sa demande ou le Reel qu'elle recopie réclament (un univers qu'elle nomme, d'autres couleurs, une autre police, celles du Reel recopié) est voulue, jamais un défaut : juge-la à son modèle (bien faite, au service de sa demande) ;
-- sa demande (« Demande de la gérante ») est la règle, jamais un défaut : ce qu'elle impose (par quoi le Reel commence ou finit, l'ordre des moments, les mots ou l'offre à dire) reste, même pour une accroche plus forte ; juge seulement comment c'est fait et propose de le faire mieux sans y déroger (un autre passage du même moment, un cadrage plus serré, d'autres mots par-dessus) ;
-- peu de texte : les Reels qui marchent laissent parler les images (une accroche, parfois une ligne de plus) ; avec une voix, ses sous-titres disent tout : aucun autre texte que l'accroche n'est normal, ne demande jamais d'en ajouter un ;
-- la ligne « Contrôle qualité » vérifie sur le plan ce que les Reels qui marchent ont presque toujours (ça bouge dès la 1re image, une accroche écrite, des plans de 2 s au plus en moyenne hors phrases de quelqu'un qui parle, des coupes sur le temps, peu de texte) : chaque point « à revoir » devient une correction précise ; « à tenter » (une fin qui reboucle sur la 1re image) est un conseil à donner seulement si un de ses clips le permet, jamais une raison de refuser le Reel. Ces repères servent le Reel, pas l'inverse : un Reel juste pour ce commerce passe avant une case cochée.
+- sa demande (« Demande de la gérante ») est la règle, jamais un défaut : ce qu'elle impose ou écarte (par quoi le Reel commence ou finit, l'ordre des moments, les mots ou l'offre à dire, pas de texte, pas de voix) reste, même pour une accroche plus forte ; juge seulement comment c'est fait et propose de le faire mieux sans y déroger (un autre passage du même moment, un cadrage plus serré, d'autres mots par-dessus) ;
+- le Reel qu'elle recopie (ligne « Reel à recopier ») passe aussi avant tes repères : ce qu'il n'a pas (une accroche écrite, du texte, une invitation à la fin, une voix, des animations), ce Reel n'a pas à l'avoir, et ce qu'il a (plus de texte, des plans plus longs, une fin sans appel), il le garde ; ne demande jamais de l'en écarter pour cocher un repère, juge s'il le refait bien, avec ses images et ses mots à elle ;
+- peu de texte : les Reels qui marchent laissent parler les images (une accroche, parfois une ligne de plus) ; avec une voix, ses sous-titres disent tout : aucun autre texte que l'accroche n'est normal, ne demande jamais d'en ajouter un ; un Reel qu'elle recopie garde la quantité de texte du sien ;
+- la ligne « Contrôle qualité » vérifie sur le plan ce que les Reels qui marchent ont presque toujours (ça bouge dès la 1re image, une accroche écrite, des plans de 2 s au plus en moyenne hors phrases de quelqu'un qui parle, des coupes sur le temps, peu de texte) : chaque point « à revoir » devient une correction précise ; « à tenter » (une fin qui reboucle sur la 1re image) est un conseil à donner seulement si un de ses clips le permet, jamais une raison de refuser le Reel. Ces repères servent le Reel, pas l'inverse (ils tiennent déjà compte du Reel qu'elle recopie) : un Reel juste pour ce commerce et pour sa demande passe avant une case cochée.
 
 Ne relève que ce qui se voit vraiment sur les images et qui change le résultat, pas tes goûts. Une image est un instant : un texte en train d'apparaître ou une animation en mouvement n'est pas un défaut.
 
@@ -248,10 +249,10 @@ function formWords(plan: EditPlan): string {
 }
 
 /**
- * A plan in a few lines, for the critic and for the second version's editor. `paceCeiling`: the
- * longest average shot it may have (a followed style that takes its time raises it).
+ * A plan in a few lines, for the critic and for the second version's editor. `options`: what the
+ * Reel she copies changes in the quality checks (its pace, a hook without words, several texts).
  */
-export function planDigest(plan: EditPlan, options: { paceCeiling?: number } = {}): string {
+export function planDigest(plan: EditPlan, options: QualityOptions = {}): string {
   const timeline = planTimeline(plan);
   const hook = plan.texts.filter((t) => t.from < 1.5).map((t) => t.text);
   return [
@@ -339,13 +340,22 @@ const LONGEST_PACED_SHOT = 4;
 export type QualityCheck = { key: "motion" | "hook" | "opening" | "pace" | "beat" | "loop" | "texts"; ok: boolean; words: string; must: boolean };
 
 /**
+ * What the Reel she copies changes in the checks (followedChecks): our defaults never ask a Reel
+ * to be what that Reel is not. `paceCeiling`: the longest average shot (and first shot) of a Reel
+ * that takes its time; `wordlessHook`: it opens without written words (a gesture, no text at all);
+ * `manyTexts`: several texts are its form.
+ */
+export type QualityOptions = { paceCeiling?: number; wordlessHook?: boolean; manyTexts?: boolean };
+
+/**
  * What the Reels that work almost always have, checked on the plan (the frames cannot
  * show it all): movement from the first image, a written hook, shots of 2 s or less on
  * average (someone's sentence on screen is left out: it keeps its length), cuts on the
  * beat, few texts (an animation of typography counts as one, the opening one is the hook);
- * an end that loops back to the first image is worth trying, when a clip allows it.
+ * an end that loops back to the first image is worth trying, when a clip allows it. The Reel
+ * she copies bends them (options): what it does not have is never asked.
  */
-export function qualityChecks(plan: EditPlan, options: { paceCeiling?: number } = {}): QualityCheck[] {
+export function qualityChecks(plan: EditPlan, options: QualityOptions = {}): QualityCheck[] {
   const ceiling = options.paceCeiling ?? MAX_AVERAGE_SHOT;
   const timeline = planTimeline(plan);
   const first = plan.segments[0];
@@ -357,9 +367,10 @@ export function qualityChecks(plan: EditPlan, options: { paceCeiling?: number } 
   const late = hook ? undefined : plan.texts.find((t) => t.from < HOOK_LATEST);
   // An opening animation is typography: the promise, written.
   const animatedHook = Boolean(first && isMotionSegment(first));
-  // The first shot holds the eye 2 s at most, then a cut relaunches it (over 4 s, it is someone's sentence, kept whole).
+  // The first shot holds the eye 2 s at most, then a cut relaunches it (over 4 s, it is someone's sentence, kept whole);
+  // a Reel she copies that takes its time opens on a longer one too.
   const opening = first && isClipSegment(first) ? timeline.segments[0] : undefined;
-  const quickOpening = !opening || opening.length <= OPENING_MAX_SECONDS + 0.05 || opening.length > LONGEST_PACED_SHOT;
+  const quickOpening = !opening || opening.length <= Math.max(OPENING_MAX_SECONDS, ceiling) + 0.05 || opening.length > LONGEST_PACED_SHOT;
   // A video shot over 4 s is someone's whole sentence (the editor holds no other footage that long): it stays out of the pace.
   const paced = timeline.segments.filter((x, i) => {
     const segment = plan.segments[i]!;
@@ -377,14 +388,16 @@ export function qualityChecks(plan: EditPlan, options: { paceCeiling?: number } 
     {
       key: "hook",
       must: true,
-      ok: Boolean(hook || animatedHook),
+      ok: Boolean(hook || animatedHook || options.wordlessHook),
       words: hook
         ? `accroche écrite dès la 1re image (« ${hook.text} »)`
         : animatedHook
           ? "accroche écrite dans l'animation d'ouverture"
-          : late
-            ? `accroche écrite seulement à ${seconds(late.from)} s : à poser dès la 1re image`
-            : "aucune accroche écrite dès la 1re image",
+          : options.wordlessHook
+            ? "pas d'accroche écrite dès la 1re image, comme le Reel qu'elle recopie"
+            : late
+              ? `accroche écrite seulement à ${seconds(late.from)} s : à poser dès la 1re image`
+              : "aucune accroche écrite dès la 1re image",
     },
     ...(opening
       ? [
@@ -398,13 +411,18 @@ export function qualityChecks(plan: EditPlan, options: { paceCeiling?: number } 
       : []),
     ...(paced.length ? [{ key: "pace" as const, must: true, ok: average <= ceiling + 0.05, words: `plans de ${seconds(average)} s en moyenne (${seconds(ceiling)} s au plus)` }] : []),
     ...(onBeat === null ? [] : [{ key: "beat" as const, must: true, ok: onBeat >= Math.ceil(cuts.length * 0.8), words: `${onBeat} coupes sur ${cuts.length} sur un temps de la musique` }]),
-    { key: "texts", must: true, ok: others <= 2, words: `${others} texte${others > 1 ? "s" : ""} ou animation${others > 1 ? "s" : ""} en plus de l'accroche${plan.subtitles ? " et des sous-titres" : ""} (2 au plus)` },
+    {
+      key: "texts",
+      must: true,
+      ok: others <= 2 || Boolean(options.manyTexts),
+      words: `${others} texte${others > 1 ? "s" : ""} ou animation${others > 1 ? "s" : ""} en plus de l'accroche${plan.subtitles ? " et des sous-titres" : ""} (${options.manyTexts ? "plusieurs, comme le Reel qu'elle recopie" : "2 au plus"})`,
+    },
     { key: "loop", must: false, ok: loops, words: loops ? "la fin reboucle sur la 1re image" : "la fin ne reboucle pas sur la 1re image" },
   ];
 }
 
 /** The quality checks in one line for the critic: what is fine, what to look at again, what to try if the footage allows. */
-export function qualityLine(plan: EditPlan, options: { paceCeiling?: number } = {}): string {
+export function qualityLine(plan: EditPlan, options: QualityOptions = {}): string {
   const checks = qualityChecks(plan, options);
   const fine = checks.filter((c) => c.ok).map((c) => c.words);
   const again = checks.filter((c) => !c.ok && c.must).map((c) => c.words);
@@ -432,10 +450,10 @@ export function fixBrief(review: Pick<MontageReview, "score" | "issues">, reques
 }
 
 /** The brief of the second version (Max): another take than the first one. */
-export function alternativeBrief(first: EditPlan, request?: string | null): string {
+export function alternativeBrief(first: EditPlan, request?: string | null, options: QualityOptions = {}): string {
   return [
     request ?? "",
-    `Deuxième version, pour comparer avec une première déjà faite : propose une autre approche, aussi forte, sans copier la première. Respecte ce que la gérante a demandé ou validé (plan, textes exacts) ; change le reste : l'accroche visuelle, le choix des passages, le rythme (son tempo), les animations, et la forme (en collage ou non) si ça sert sa marque. Première version : ${planDigest(first)}`,
+    `Deuxième version, pour comparer avec une première déjà faite : propose une autre approche, aussi forte, sans copier la première. Respecte ce que la gérante a demandé ou validé (plan, textes exacts) et le Reel qu'elle recopie s'il y en a un (« reel_a_recopier » : sa forme, son rythme, son texte et sa fin restent) ; change le reste : l'accroche visuelle, le choix des passages, le rythme (son tempo), les animations, et la forme (en collage ou non) si ça sert sa marque. Première version : ${planDigest(first, options)}`,
   ]
     .filter(Boolean)
     .join("\n\n");

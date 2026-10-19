@@ -13,6 +13,7 @@ import {
   readPostVoice,
   readVoiceSetting,
   sentencePauses,
+  voiceLeftToSimone,
   wantsVoiceOver,
   withPauses,
   readMemory,
@@ -36,6 +37,7 @@ import { judgeHooks } from "@/lib/agent/hook-judge";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { env } from "@/lib/env";
 import { levelSpeechInSandbox } from "@/lib/render/sandbox";
+import { postStyle, STEAL_WAIT_MS } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Simone's voice over a Reel: the script she writes from what the images show,
@@ -54,9 +56,11 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
   ]);
   if (post.error) throw new Error("Publication introuvable");
   const ids = mediaIds?.length ? mediaIds : ((post.data.media_ids as string[] | null) ?? []);
-  const [media, analyses] = await Promise.all([
+  const [media, analyses, copied] = await Promise.all([
     ids.length ? db.from("media_assets").select("id, kind, regions").eq("studio_id", studioId).in("id", ids) : Promise.resolve({ data: [] }),
     ids.length ? db.from("clip_analyses").select("media_id, analysis").in("media_id", ids) : Promise.resolve({ data: [] }),
+    // The Reel she copies (« Steal »): the form of its hook and its ending guide the voice's first sentence and its end.
+    postStyle(studioId, postId).catch(() => undefined),
   ]);
   const read = new Map((analyses.data ?? []).map((a) => [a.media_id as string, clipAnalysisSchema.safeParse(a.analysis)]));
   const kinds = new Map((media.data ?? []).map((m) => [m.id as string, m]));
@@ -103,6 +107,7 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
     publication: { idee: post.data.title, angle: post.data.agent_note ?? undefined, ...(brief ? { demande: brief.slice(0, 1500) } : {}) },
     images,
     ...(opening?.what ? { ouverture: opening.what } : {}),
+    ...(copied ? { reel_a_recopier: { accroche: `${copied.look.hook.kind} : ${copied.look.hook.what}`, fin: copied.look.ending } } : {}),
   };
 }
 
@@ -267,21 +272,28 @@ export async function voiceOverIfWanted(params: {
   const current = post.data.voice_media_id
     ? (await db.from("media_assets").select("source").eq("id", post.data.voice_media_id as string).maybeSingle()).data
     : null;
-  const wanted = wantsVoiceOver({
+  const choices = {
     post: choice,
     studio: setting.use,
-    onReel: post.data.voice_media_id ? (current?.source === "ai" ? "simone" : "hers") : null,
+    onReel: post.data.voice_media_id ? (current?.source === "ai" ? ("simone" as const) : ("hers" as const)) : null,
     correction: Boolean(params.correction),
+  };
+  // Left to Simone, the Reel she copies decides (told by a voice, or not): its reading is waited for, as the editor does.
+  const copied = voiceLeftToSimone(choices) ? await postStyle(params.studioId, params.postId, { waitMs: STEAL_WAIT_MS }).catch(() => undefined) : undefined;
+  const wanted = wantsVoiceOver({
+    ...choices,
     speechInClips,
     footageSeconds,
     photos: (media ?? []).filter((m) => m.kind === "image").length,
+    copied: copied?.look.voice,
   });
   if (!wanted) return null;
   // A voice of the gallery, or one of her own (a clone made with her consent) kept as it is.
   const voiceId = choice?.voice_id ?? setting.voice_id ?? DEFAULT_VOICE_ID;
   try {
-    // Her setting leaves it to Simone: told by a voice, or one key message with the music (then nothing is read nor paid).
-    const auto = choice?.mode !== "on" && !choice?.wish && setting.use === "auto";
+    // Her setting leaves it to Simone: told by a voice, or one key message with the music (then nothing is read nor paid);
+    // a Reel she copies told by a voice has its form already.
+    const auto = choice?.mode !== "on" && !choice?.wish && setting.use === "auto" && !copied;
     const written = auto
       ? await writeVoiceScript(params.studioId, params.postId, { mediaIds: ids, brief: params.brief, whispered: Boolean(findVoice(voiceId)?.asmr), decide: true })
       : undefined;
