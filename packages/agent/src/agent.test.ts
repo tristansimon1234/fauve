@@ -3973,3 +3973,14 @@ test("ready to go out: a carousel or a photo needs its photos, never a montage",
   assert.equal(missingContent("reel", true, 0), null);
   assert.equal(missingContent("story", false, 0), "media");
 });
+
+test("never constrained without knowing: Simone and the editor say what a real limit changed", async () => {
+  const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
+  const { EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
+  assert.match(FAUVE_SYSTEM_PROMPT, /jamais une contrainte qu'elle ne comprend pas/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /jamais un refus ni un changement en silence/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /Jamais contrainte sans le savoir/);
+  // Her request, then the Reel she copies, then the editor's defaults.
+  assert.ok(EDITOR_SYSTEM_PROMPT.indexOf("1. sa demande") < EDITOR_SYSTEM_PROMPT.indexOf("2. le Reel qu'elle recopie"));
+  assert.ok(EDITOR_SYSTEM_PROMPT.length < 17_000);
+});
