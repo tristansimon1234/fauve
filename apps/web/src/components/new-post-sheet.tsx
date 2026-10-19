@@ -18,10 +18,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { creationProgress, launchCreation, type CreationProgress, type LaunchResult } from "@/app/(app)/create-actions";
-import { MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/chat-uploads";
-import { newPostOptions, type NewPostOptions } from "@/app/(app)/new-post-actions";
+import { MAX_FILE_BYTES, MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/chat-uploads";
+import { copyReel, copyState, newPostOptions, type CopyState, type NewPostOptions } from "@/app/(app)/new-post-actions";
 import { useFauveDrawer } from "./fauve-drawer";
 import { publicEnv } from "@/lib/public-env";
+import { supabaseBrowser } from "@/lib/supabase/client";
 import { CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, ImageIcon, LayersIcon, MicIcon, PaletteIcon, PauseIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
 import { Mascot } from "./mascot";
 import { nudgeWork } from "./work-pill";
@@ -162,8 +163,10 @@ function Create({
   /** Her choices, else the studio's (voice) and the usual places (platforms). */
   const [voice, setVoice] = useState<string | null>(null);
   const [platforms, setPlatforms] = useState<string[] | null>(null);
-  /** Made like the Reel she sent Simone to copy (« Steal »), when there is one: yes unless she says otherwise. */
-  const [copyOn, setCopyOn] = useState(true);
+  /** Made like a Reel she likes (« Steal »): one she gives here, else the one she sent Simone (followed unless she says otherwise). */
+  const [given, setGiven] = useState<string | null>(null);
+  const [copyChoice, setCopyChoice] = useState<"mine" | "copy" | null>(null);
+  const [copyRead, setCopyRead] = useState<CopyState | null>(null);
   const [sheet, setSheet] = useState<"format" | "date" | "voice" | "copy" | "nothing" | null>(null);
   const [all, setAll] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -202,7 +205,31 @@ function Create({
   const meta = FORMATS.find((f) => f.kind === kind)!;
   const chosenWhen = when ?? defaultWhen(options, date);
   const chosenVoice = voice ?? defaultVoice(options);
-  const copying = kind === "reel" && Boolean(options?.copy) && copyOn;
+  const sent = options?.copy ?? null;
+  const model = given ?? sent?.id ?? null;
+  // Its reading: the one she sent Simone comes read (or still being read); one given here is followed below.
+  const reading: CopyState | null = copyRead ?? (sent && model === sent.id ? (sent.lines.length ? { state: "read", name: sent.name, lines: sent.lines } : { state: "reading" }) : null);
+  // A Reel that could not be read copies nothing: her own style, and the sheet says what to send instead.
+  const usable = model && reading?.state !== "missed" ? model : null;
+  const copying = kind === "reel" && usable && (copyChoice ?? (sent ? "copy" : "mine")) === "copy" ? usable : null;
+  // Its reading followed until it is done (about a minute): what her Reel takes from it, or why not.
+  const waiting = model && reading?.state !== "read" && reading?.state !== "missed" ? model : null;
+  useEffect(() => {
+    if (!waiting) return;
+    let live = true;
+    const tick = () =>
+      copyState(waiting)
+        .then((r) => {
+          if (live && r && r.state !== "reading") setCopyRead(r);
+        })
+        .catch(() => {});
+    void tick();
+    const timer = setInterval(tick, 3000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [waiting]);
   // TikTok only takes videos (a Reel here), and only once it is connected.
   const places = (platforms ?? (kind === "reel" && options?.tiktok ? ["instagram", "tiktok"] : ["instagram"])).filter(
     (p) => p === "instagram" || (p === "tiktok" && kind === "reel" && options?.tiktok),
@@ -242,7 +269,7 @@ function Create({
         items,
         voice: kind === "reel" ? chosenVoice : "auto",
         platforms: where.filter((p): p is "instagram" | "tiktok" => p === "instagram" || p === "tiktok"),
-        copy: copying,
+        copy: copying ?? false,
       }).catch(
         (): LaunchResult => ({ ok: false, error: "Ça n’est pas parti. Réessaie dans un instant." }),
       );
@@ -453,13 +480,13 @@ function Create({
           <div aria-live="polite" className="fauve-enter grid grid-cols-2 gap-2 pb-2">
             <Field wide={kind !== "reel"} icon={<meta.Icon size={17} />} label="Format" value={meta.title} onClick={() => setSheet("format")} />
             {kind === "reel" && <Field icon={<MicIcon size={17} />} label="Voix off" value={voiceLabel(chosenVoice)} onClick={() => setSheet("voice")} />}
-            {kind === "reel" && options?.copy && (
+            {kind === "reel" && (
               <Field
                 wide
                 icon={<PaletteIcon size={17} />}
                 label="Style"
-                value={copying ? "Comme le Reel que tu m’as envoyé" : "Ton style"}
-                sub={copying ? (options.copy.name ?? undefined) : undefined}
+                value={copying ? (given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé") : "Ton style"}
+                sub={copying ? readingLabel(reading) : "Ou celui d’un Reel que tu aimes"}
                 onClick={() => setSheet("copy")}
               />
             )}
@@ -593,33 +620,60 @@ function Create({
         </Sheet>
       )}
 
-      {sheet === "copy" && options?.copy && (
+      {sheet === "copy" && options && (
         <Sheet label="Le style" onClose={() => setSheet(null)}>
           <SheetHead
-            title="Comme le Reel que tu m’as envoyé ?"
-            hint="Je reprends sa façon de faire (le rythme, les textes, la lumière) pour ce Reel seulement, avec tes couleurs, tes polices et tes images."
+            title="Quel style pour ce Reel ?"
+            hint="Le tien, ou celui d’un Reel que tu aimes : j’en reprends la façon de faire (le rythme, les textes, la lumière), pour ce Reel seulement, avec tes images."
             onClose={() => setSheet(null)}
           />
           <div role="radiogroup" aria-label="Le style" className="flex flex-col gap-2">
             <Choice
-              on={copyOn}
-              title="Comme le Reel envoyé"
-              hint={options.copy.name ? `« ${options.copy.name} »` : "Je le regarde encore"}
+              on={!copying}
+              title="Ton style"
+              hint="Tes couleurs, tes polices, ta façon de faire"
               onClick={() => {
-                setCopyOn(true);
+                setCopyChoice("mine");
                 setSheet(null);
               }}
             />
-            <Choice
-              on={!copyOn}
-              title="Mon style"
-              hint="Ma charte, comme d’habitude"
-              onClick={() => {
-                setCopyOn(false);
-                setSheet(null);
-              }}
-            />
+            {usable && (
+              <Choice
+                on={Boolean(copying)}
+                title={given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé"}
+                hint={readingLabel(reading)}
+                onClick={() => {
+                  setCopyChoice("copy");
+                  setSheet(null);
+                }}
+              />
+            )}
           </div>
+          {copying && reading?.state === "read" && reading.lines.length > 0 && (
+            <div className="flex flex-col gap-1.5 rounded-[16px] bg-soft px-3.5 py-3">
+              <span className="text-[13px] font-bold">Ce que ton Reel en reprendra</span>
+              <ul className="flex flex-col gap-1 text-[13.5px] leading-snug text-muted">
+                {reading.lines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {copying && reading?.state === "reading" && (
+            <p className="flex items-center gap-2 text-[13.5px] text-muted">
+              <Spinner /> Je le regarde, environ une minute. Tu peux lancer ton Reel : il attendra.
+            </p>
+          )}
+          {model && reading?.state === "missed" && <p className="text-[13.5px] leading-snug text-danger">{reading.message}</p>}
+          <CopyGiver
+            studioId={options.studioId}
+            another={Boolean(usable)}
+            onGiven={(id) => {
+              setGiven(id);
+              setCopyRead({ state: "reading" });
+              setCopyChoice("copy");
+            }}
+          />
         </Sheet>
       )}
 
@@ -804,6 +858,88 @@ function Field({ icon, label, value, sub, wide, onClick }: { icon: ReactNode; la
         <ChevronRightIcon size={16} />
       </span>
     </button>
+  );
+}
+
+/** Under the Reel to copy: its name once read, or where its reading is. */
+function readingLabel(r: CopyState | null): string {
+  if (r?.state === "read") return r.name ? `« ${r.name} »` : "Je l’ai regardé";
+  if (r?.state === "missed") return "Je n’ai pas pu le regarder";
+  return "Je le regarde…";
+}
+
+/** A Reel she likes, given here: its link pasted, or its video chosen (Instagram does not always let a link be opened). */
+function CopyGiver({ studioId, another, onGiven }: { studioId: string; another: boolean; onGiven: (id: string) => void }) {
+  const [link, setLink] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const give = async (from: Parameters<typeof copyReel>[0]) => {
+    setBusy(true);
+    setError(null);
+    const res = await copyReel(from).catch(() => ({ ok: false as const, error: "Ça n’est pas passé. Réessaie dans un instant." }));
+    setBusy(false);
+    if (!res.ok) return setError(res.error);
+    setLink("");
+    onGiven(res.id);
+  };
+  const upload = async (file: File) => {
+    if (!file.type.startsWith("video/")) return setError("Choisis une vidéo.");
+    if (file.size > MAX_FILE_BYTES) return setError("Cette vidéo dépasse 50 Mo : garde juste le passage qui te plaît.");
+    setBusy(true);
+    setError(null);
+    const ext = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
+    const path = `${studioId}/chat/copy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error: failed } = await supabaseBrowser().storage.from("media").upload(path, file, { contentType: file.type });
+    if (failed) {
+      setBusy(false);
+      return setError("La vidéo n’est pas passée. Réessaie.");
+    }
+    await give({ upload: { path, mime: file.type, size: file.size } });
+  };
+
+  return (
+    <div className="flex flex-col gap-2 rounded-[18px] border-[1.5px] border-dashed border-line px-3.5 py-3">
+      <span className="text-[15px] font-bold text-violet">{another ? "Un autre Reel que tu aimes" : "Un Reel que tu aimes"}</span>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (link.trim() && !busy) void give({ link });
+        }}
+      >
+        <input
+          type="text"
+          inputMode="url"
+          autoComplete="off"
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+          placeholder="Colle son lien (Instagram, TikTok…)"
+          aria-label="Le lien du Reel"
+          className="h-11 min-w-0 flex-1 rounded-[12px] border border-line bg-white px-3 text-[15px] outline-none focus:border-violet"
+        />
+        <button type="submit" disabled={busy || !link.trim()} className="btn btn-primary h-11 px-4 disabled:bg-line disabled:text-muted">
+          {busy ? <Spinner /> : "OK"}
+        </button>
+      </form>
+      <button type="button" disabled={busy} onClick={() => fileRef.current?.click()} className="self-start py-1 text-[14px] font-bold text-violet disabled:opacity-50">
+        Ou choisis sa vidéo
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="video/*"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) void upload(file);
+        }}
+      />
+      {error && <p className="text-[13px] leading-snug text-danger">{error}</p>}
+      <p className="text-[12.5px] leading-snug text-muted">Je reprends sa façon de faire, jamais ses images ni ses mots.</p>
+    </div>
   );
 }
 

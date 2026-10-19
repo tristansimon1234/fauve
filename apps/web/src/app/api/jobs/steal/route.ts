@@ -20,6 +20,8 @@ const bodySchema = z.object({
   example: z.object({ id: z.uuid(), path: z.string().max(400) }).optional(),
   waId: z.string().regex(/^\d{6,16}$/).optional(),
   replyTo: z.string().max(200).optional(),
+  /** Given on the Créer screen, which shows its reading: told in the chat only when her Reel is already on its way. */
+  fromCreate: z.boolean().optional(),
 });
 type Job = z.infer<typeof bodySchema>;
 
@@ -38,6 +40,7 @@ async function run(job: Job) {
     // Her Reel may already be on its way (launched from the same message): it waits for this reading.
     const { count } = await supabaseAdmin().from("posts").select("id", { count: "exact", head: true }).eq("studio_id", job.studioId).eq("inspiration_id", job.inspirationId);
     const making = Boolean(count);
+    if (!making && job.fromCreate) return;
     // Not yet: her files are asked for (in the app, her library under the message).
     await messageStudio(target, stolenStyleMessage(outcome.style, making), making || job.waId ? {} : { pick_media: "any" });
   } catch (error) {
