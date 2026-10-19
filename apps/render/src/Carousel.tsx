@@ -159,6 +159,8 @@ export const COVER_SIDE = 76;
 /** The smallest type (px on a 1080-wide slide) that still reads on a phone. */
 export const MIN_TYPE = 26;
 const TOLERANCE = 6;
+/** A character shown as its code («   », « &nbsp; ») instead of itself. */
+const CODE_IN_TEXT = /\\u[0-9a-fA-F]{4}|\\n|&(?:nbsp|amp|rsquo|#\d+|#x[0-9a-fA-F]+);/;
 
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
@@ -224,6 +226,7 @@ function useSettled(root: React.RefObject<HTMLDivElement | null>, props: ReelPro
         const side = carousel.slide === 0 ? COVER_SIDE : CAROUSEL_MARGIN;
         const out: string[] = [];
         const small: string[] = [];
+        const codes: string[] = [];
         const ink = inkMeter();
         const range = document.createRange();
         const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
@@ -232,6 +235,7 @@ function useSettled(root: React.RefObject<HTMLDivElement | null>, props: ReelPro
           if (!text || !node.parentElement) continue;
           const style = getComputedStyle(node.parentElement);
           if (style.visibility === "hidden" || style.display === "none") continue;
+          if (CODE_IN_TEXT.test(text)) codes.push(`« ${text.slice(0, 40)} »`);
           range.selectNodeContents(node);
           for (const r of Array.from(range.getClientRects())) {
             if (r.width < 1 || r.height < 1) continue;
@@ -249,6 +253,7 @@ function useSettled(root: React.RefObject<HTMLDivElement | null>, props: ReelPro
             `texte coupé par un bord ou trop près : ${[...new Set(out)].slice(0, 3).join(" ; ")}. Sur la diapositive ${carousel.slide + 1}, chaque texte reste entier à ${side} px des côtés et ${CAROUSEL_MARGIN} px du haut et du bas (${props.width} × ${props.height})${carousel.slide === 0 ? ", la couverture garde plus de marge sur les côtés : la grille du profil la montre en 3:4" : ""} ; un texte ne passe jamais d'une diapositive à l'autre`,
           );
         if (small.length) problems.push(`texte trop petit pour un téléphone : ${[...new Set(small)].slice(0, 3).join(" ; ")}. ${MIN_TYPE} px de police au moins, même rétréci par FitText`);
+        if (codes.length) problems.push(`un code s'affiche à la place d'un caractère : ${[...new Set(codes)].slice(0, 3).join(" ; ")}. Écris le caractère lui-même, ou une espace ordinaire : le moteur pose les espaces insécables`);
       }
       if (!problems.length) return continueRender(handle);
       cancelRender(new Error(`diapositive ${carousel.slide + 1} : ${problems.join(" | ")}`));

@@ -333,6 +333,21 @@ export function frenchSpaces(text: string): string {
     .replace(/(\d)[ \t]+(?=\p{L})/gu, "$1\u00a0");
 }
 
+/**
+ * A carousel's words set like a graphic designer sets them: frenchSpaces, the apostrophe
+ * between two letters curly (« l’hiver »), and the narrow space a typed text leaves out
+ * before « ! ? ; » at the end of a word, or before « : » and a space (« chaud devant ! »).
+ * A link keeps its « ? » and its « : » (https://…).
+ */
+export function frenchTypography(text: string): string {
+  return frenchSpaces(
+    text
+      .replace(/(\p{L})'(?=\p{L})/gu, "$1’")
+      .replace(/([\p{L}\p{N}»)])([!?;]+)(?=$|[\s»)"’.,])/gu, "$1 $2")
+      .replace(/(\p{L})(:)(?=\s)/gu, "$1 $2"),
+  );
+}
+
 const toFrames = (seconds: number) => Math.max(0, Math.round(seconds * REEL_FPS));
 
 /** Each segment's length in frames, and the overlap of the fades between them. */

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { carouselDesignSchema, type CarouselDesign } from "./carousel.ts";
-import { brandLooks, frenchSpaces, REEL_FPS, resolveReelBrand, type CarouselPhoto, type ReelInputs, type ReelProps } from "./motion.ts";
+import { carouselDesignSchema, cleanSlotText, type CarouselDesign } from "./carousel.ts";
+import { brandLooks, frenchTypography, REEL_FPS, resolveReelBrand, type CarouselPhoto, type ReelInputs, type ReelProps } from "./motion.ts";
 import { motionTemplateSchema, type MotionTemplate } from "./schemas.ts";
 import { photoEditSchema } from "./retouch.ts";
 import { MAX_ELEMENTS, slideElementSchema } from "./elements.ts";
@@ -135,7 +135,7 @@ export function buildSlideProps(
 
 /**
  * Props of the Reel composition for one slide of a designed carousel (`slide` from 0), captured
- * at SLIDE_FRAME: its code, its words (French spaces made unbreakable), her photos in its order.
+ * at SLIDE_FRAME: its code, its words (set in French typography), her photos in its order.
  */
 export function buildCarouselProps(
   design: CarouselDesign,
@@ -155,7 +155,7 @@ export function buildCarouselProps(
     endCard: null,
     carousel: {
       js: design.js,
-      texts: Object.fromEntries(Object.entries(design.texts).map(([slot, text]) => [slot, frenchSpaces(text)])),
+      texts: Object.fromEntries(Object.entries(design.texts).map(([slot, text]) => [slot, frenchTypography(cleanSlotText(text))])),
       fonts: design.fonts,
       slide,
       count: design.count,

@@ -26,7 +26,7 @@ import { transform } from "sucrase";
 import { carouselPhotos, type CarouselSource } from "@/lib/render/carousel";
 import { ensureCutouts } from "@/lib/render/cutout";
 import { loadMontageInputs } from "@/lib/render/render-post";
-import { renderStillsInSandbox } from "@/lib/render/sandbox";
+import { renderStillsInSandbox, sandboxCostEur } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { photoRegions } from "@/lib/video/regions";
 import { anthropic, logClaudeCost } from "./run";
@@ -306,7 +306,17 @@ export async function carouselRound(
 
   // Test render of every slide, in check mode (errors, texts cut or too small, missing fonts or photos fail it).
   const jobs = Array.from({ length: made.count }, (_, i) => ({ id: `s${i}`, frame: SLIDE_FRAME, props: buildCarouselProps(made, i, { template: ctx.template, brand: ctx.brandIn, photos, check: true }) }));
-  const images = await renderStillsInSandbox(`carousel-${input.postId.slice(0, 8)}-${Date.now()}`, jobs);
+  const started = Date.now();
+  const images = await renderStillsInSandbox(`carousel-${input.postId.slice(0, 8)}-${started}`, jobs);
+  const seconds = Math.round((Date.now() - started) / 1000);
+  await supabaseAdmin().from("cost_events").insert({
+    studio_id: input.studioId,
+    kind: "render",
+    provider: "vercel_sandbox",
+    units: seconds,
+    cost_eur: sandboxCostEur(seconds),
+    meta: { post_id: input.postId, engine: "remotion_still", slides: made.count, purpose: "carousel_designer" },
+  });
   const errors = jobs.flatMap((j, i) => {
     const image = images[j.id];
     return image instanceof Error ? [`diapositive ${i + 1} : ${image.message.slice(0, 500)}`] : image ? [] : [`diapositive ${i + 1} : pas d'image`];

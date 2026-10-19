@@ -3556,3 +3556,32 @@ test("designed carousels: the designer's answer bounded, its code checked, each 
   assert.equal(props.carousel?.texts.s1_titre, "Des cheveux qui brillent ?");
   assert.equal(props.carousel?.slotSlides?.s3_detail, 3);
 });
+
+test("designed carousels: a character written as a code is that character, and the words are set in French typography", async () => {
+  const { cleanSlotText, carouselFromOutput } = await import("./carousel.ts");
+  const { frenchTypography } = await import("./motion.ts");
+  const { buildCarouselProps } = await import("./slides.ts");
+
+  // The lab's salon carousel showed « chaude : » on three slides.
+  assert.equal(cleanSlotText("douche trop chaude\\u00a0: les reflets s'éteignent"), "douche trop chaude : les reflets s'éteignent");
+  assert.equal(cleanSlotText("Rendez-vous&nbsp;: lien en bio"), "Rendez-vous : lien en bio");
+  assert.equal(cleanSlotText("Étape 1\\nÉtape 2"), "Étape 1\nÉtape 2");
+  assert.equal(cleanSlotText("Pâtes &amp; pizzas"), "Pâtes & pizzas");
+  const { design } = carouselFromOutput(
+    { name: "Hiver", count: 1, outline: ["Couverture"], code: "", slots: [{ name: "s1_titre", slide: 1, role: "titre", max_chars: 80, multiline: false }], texts: [{ slot: "s1_titre", text: "Rendez-vous\\u00a0: lien en bio" }], fonts: [], photos: [] },
+    "function Carousel() { return null; }",
+    [],
+  );
+  assert.equal(design.texts.s1_titre, "Rendez-vous : lien en bio");
+
+  // Curly apostrophes, and the narrow space a typed text leaves out; a link and a time stay as they are.
+  assert.equal(frenchTypography("Une couleur qui brille tout l'hiver"), "Une couleur qui brille tout l’hiver");
+  assert.equal(frenchTypography("chaud devant!"), "chaud devant !");
+  assert.equal(frenchTypography("Quoi?! Oui."), "Quoi ?! Oui.");
+  assert.equal(frenchTypography("Rendez-vous: lien en bio"), "Rendez-vous : lien en bio");
+  assert.equal(frenchTypography("Les pâtes ? Toujours fraîches."), "Les pâtes ? Toujours fraîches.");
+  assert.equal(frenchTypography("trattoria.fr/menu?jour=lundi, dès 18:30"), "trattoria.fr/menu?jour=lundi, dès 18:30");
+  // A design stored before the fix renders cleanly too.
+  const props = buildCarouselProps({ ...design, texts: { s1_titre: "Viens à l'atelier\\u00a0: c'est offert" } }, 0, { template: "libre", brand: { name: "Atelier" }, photos: [] });
+  assert.equal(props.carousel?.texts.s1_titre, "Viens à l’atelier : c’est offert");
+});
