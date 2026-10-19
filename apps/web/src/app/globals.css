@@ -413,6 +413,14 @@
   .fauve-sheet[data-closing] {
     animation: fauve-sheet-out 180ms var(--ease-fauve) forwards;
   }
+  /* The texts of a carousel slide, once when it opens: where a tap changes a text. */
+  .fauve-spot-hint {
+    animation: fauve-spot-hint 1.6s var(--ease-fauve) 0.3s 1 backwards;
+  }
+  /* « 3/7 » on a carousel: shown when the slide changes, then gone (it would hide the corner of the image). */
+  .fauve-counter {
+    animation: fauve-fade-out 0.4s var(--ease-fauve) 1.6s forwards;
+  }
   /* « Enregistré »: shows, stays a moment, fades away (the component removes it after 2.2 s). */
   .fauve-flash {
     animation: fauve-flash 2.2s var(--ease-fauve) forwards;
@@ -502,6 +510,10 @@
 @keyframes fauve-sheet-out {
   to { transform: translateX(var(--fauve-from, 100%)); }
 }
+@keyframes fauve-spot-hint {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0), 0 0 0 4px rgba(91, 63, 217, 0); }
+  25%, 70% { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #5b3fd9; }
+}
 @keyframes fauve-flash {
   0% { opacity: 0; transform: translateY(2px); }
   8%, 88% { opacity: 1; transform: none; }
@@ -519,6 +531,7 @@
   .fauve-pop,
   .fauve-fade,
   .fauve-sheet,
+  .fauve-spot-hint,
   .fauve-flash,
   .fauve-caret,
   .fauve-dots > span {

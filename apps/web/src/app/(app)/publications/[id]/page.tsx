@@ -367,7 +367,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           <div className="order-3 flex min-w-0 flex-col gap-4 xl:order-none">
             {details}
           </div>
-          <DesignedCarousel key={versionKey(composed.design)} postId={post.id} design={composed.design} template={composed.template} photos={composed.photos} brand={composed.brand} canEdit={canEdit} />
+          <DesignedCarousel key={versionKey(composed.design)} postId={post.id} postTitle={post.title} design={composed.design} template={composed.template} photos={composed.photos} brand={composed.brand} canEdit={canEdit} />
         </div>
       ) : slides ? (
         // Text over the photos, laid out like the montage editor: the publication, the photo, the selected photo's texts.

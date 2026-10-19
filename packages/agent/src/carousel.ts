@@ -26,6 +26,9 @@ export const carouselSlotSchema = z.object({
 });
 export type CarouselSlot = z.infer<typeof carouselSlotSchema>;
 
+/** The longest words a slot takes when she changes them: twice its room (its texts shrink to fit), 400 at most. */
+export const slotTextLimit = (slot: Pick<CarouselSlot, "max_chars">) => Math.min(400, 2 * Math.max(slot.max_chars, 40));
+
 /** A designed carousel as stored on the post (posts.slides.design): its code comes from Simone, never from the browser. */
 export const carouselDesignSchema = z.object({
   name: z.string().max(80),

@@ -1,6 +1,6 @@
 "use client";
 
-import type { CarouselDesign } from "@fauve/agent";
+import { slotTextLimit, type CarouselDesign } from "@fauve/agent";
 
 // The words of one slide of a composed carousel, field by field (its layout is Simone's:
 // it changes by asking her). A text on every slide (a footer) shows under each.
@@ -31,9 +31,9 @@ export function CarouselWords({
       <label key={s.name} className="flex flex-col gap-1">
         <span className={`text-[12px] font-semibold ${dark ? "text-white/60" : "text-muted"}`}>{s.role}</span>
         {long ? (
-          <textarea value={value} onChange={(e) => onChange(s.name, e.target.value)} rows={Math.min(5, Math.max(2, value.split("\n").length))} maxLength={400} className={`${field} resize-y`} />
+          <textarea value={value} onChange={(e) => onChange(s.name, e.target.value)} rows={Math.min(5, Math.max(2, value.split("\n").length))} maxLength={slotTextLimit(s)} className={`${field} resize-y`} />
         ) : (
-          <input value={value} onChange={(e) => onChange(s.name, e.target.value)} maxLength={400} className={field} />
+          <input value={value} onChange={(e) => onChange(s.name, e.target.value)} maxLength={slotTextLimit(s)} className={field} />
         )}
       </label>
     );
