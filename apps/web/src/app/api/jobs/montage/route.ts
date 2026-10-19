@@ -35,6 +35,7 @@ import {
 import { voiceOverIfWanted } from "@/lib/voice-over";
 import { chargeQuote, montageCost, restoreChainQuote, setQuoteStage, switchQuoteToEffect } from "@/lib/credits";
 import { insertPlanVersion } from "@/lib/edit-plans";
+import { keepKit } from "@/lib/effect-words";
 import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
 import { deliverMontage, notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
@@ -113,9 +114,15 @@ const bodySchema = z.object({
   format: reelFormatSchema.optional(),
   /** Who makes this Reel, decided once at its design: the effects agent or the chain. */
   route: z.enum(["agent", "chain"]).optional(),
-  /** The agent's session at work: its id, the files it was given, its voice, when it started. */
+  /** The agent's session at work: its id, the files it was given, its voice, when it started, her files by the names it knows them. */
   effect: z
-    .object({ session: z.string().max(80), files: z.array(z.string().max(80)).max(40), voice: z.uuid().nullable(), started: z.string().max(40) })
+    .object({
+      session: z.string().max(80),
+      files: z.array(z.string().max(80)).max(40),
+      voice: z.uuid().nullable(),
+      started: z.string().max(40),
+      names: z.array(z.object({ name: z.string().max(60), media_id: z.string().max(80) })).max(25).optional(),
+    })
     .optional(),
 });
 type Job = z.infer<typeof bodySchema>;
@@ -392,12 +399,15 @@ async function effectsDone(job: Job, effect: NonNullable<Job["effect"]>, state: 
     .select("id")
     .single();
   if (asset.error) throw new Error(asset.error.message);
+  // Its kit (its script and what it reads) and the texts it draws: she changes them herself, its script draws them again.
+  const kit = out.kit ? await keepKit(job.studioId, asset.data.id as string, out.kit.tar) : null;
   const plan = effectPlan({
     mediaId: asset.data.id as string,
     seconds: out.seconds,
     session: effect.session,
     // Her voice is in the video already: the plan names it for the music (under a voice) and the page.
     ...(effect.voice ? { voice: { media_id: effect.voice, at: VOICE_AT } } : {}),
+    kit: kit && out.kit ? { path: kit, words: out.kit.words, files: effect.names ?? [] } : null,
   });
   const row = await insertPlanVersion(job.studioId, job.postId, plan);
   // Its video is made: a render that fails (the music's sandbox, the upload) is tried once more before the chain starts over.

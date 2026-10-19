@@ -17,6 +17,7 @@ import { replyInConversation } from "@/lib/agent/conversation";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { readWebsite } from "@/lib/agent/website";
 import { cronAuthorized } from "@/lib/cron-auth";
+import { startEffectWords } from "@/lib/effect-words";
 import { usableFonts } from "@/lib/fonts";
 import { queueJob } from "@/lib/jobs";
 import { readSiteLook } from "@/lib/site-look";
@@ -70,6 +71,9 @@ import { photoRegions } from "@/lib/video/regions";
 //                        its cards and buttons; what Simone starts runs after. It waits for the answer
 //                        (call net.http_post with the Vault's secret and a minute: call_app gives up at 5 s).
 //                        Never on WhatsApp: a lab studio has no member.
+//   ?case=…&step=words&words=[{"id":…,"text":…}]  her own words on the lab Reel's effect (an effect the
+//                        agent made with its kit; the ids are in step=result's plan), as she saves them
+//                        on its page: its kit draws the effect again, then step=result shows the version.
 //   ?case=…&format=carrousel  a carousel instead of a Reel, from the case's photos (coiffure, trattoria),
 //                        composed by the carousel designer as for her (her photos read and cut out,
 //                        a test render of every slide, the critic, one correction), never charged;
@@ -653,6 +657,26 @@ async function labChat(key: string, params: URLSearchParams) {
 }
 
 /** The version kept of the case's latest post, rendered again with a newly composed piece. */
+/**
+ * Her own words on the lab Reel's effect (words=[{"id":…,"text":…}], the ids step=result shows), as she
+ * saves them on its page: its kit draws the effect again; step=result then shows the new version.
+ */
+async function labWords(key: string, params: URLSearchParams) {
+  const studioId = await labStudioId(key);
+  if (!studioId) return { error: "case not set up" };
+  const { data: post } = await supabaseAdmin().from("posts").select("id").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (!post) return { error: "no post" };
+  let given: unknown;
+  try {
+    given = JSON.parse(params.get("words") ?? "");
+  } catch {
+    given = null;
+  }
+  const changes = z.array(z.object({ id: z.string().max(40), text: z.string().max(400) })).min(1).max(12).safeParse(given);
+  if (!changes.success) return { error: 'words=[{"id":"…","text":"…"}]' };
+  return startEffectWords(studioId, post.id as string, changes.data);
+}
+
 async function newMusic(key: string) {
   const db = supabaseAdmin();
   const studio = await db.from("studios").select("id").eq("website_url", key).maybeSingle();
@@ -678,6 +702,7 @@ export async function POST(request: Request) {
     }
     if (params.get("step") === "result") return Response.json(await result(siteKey(url.href)));
     if (params.get("step") === "chat") return Response.json(await labChat(siteKey(url.href), params));
+    if (params.get("step") === "words") return Response.json(await labWords(siteKey(url.href), params));
     if (params.get("step") === "music") {
       after(() => newMusic(siteKey(url.href)).catch((error: unknown) => console.error("lab: new music failed", url.href, error)));
       return Response.json({ ok: true, site: url.href, music: true });
@@ -700,6 +725,7 @@ export async function POST(request: Request) {
   if (c.template && !motionTemplateSchema.safeParse(c.template).success) return Response.json({ error: "template" }, { status: 400 });
   if (params.get("step") === "result") return Response.json(await result(labUrl(name)));
   if (params.get("step") === "chat") return Response.json(await labChat(labUrl(name), params));
+  if (params.get("step") === "words") return Response.json(await labWords(labUrl(name), params));
   if (params.get("step") === "music") {
     after(() => newMusic(labUrl(name)).catch((error: unknown) => console.error("lab: new music failed", name, error)));
     return Response.json({ ok: true, case: name, music: true });
