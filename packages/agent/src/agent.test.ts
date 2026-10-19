@@ -3373,7 +3373,8 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   const next = stolenStyleMessage(style, false);
   assert.match(next, /^J’ai regardé ce Reel/);
   assert.match(next, /pour ton prochain Reel/);
-  assert.equal(next.split("\n").filter((l) => l.startsWith("• ")).length, 3);
+  assert.equal(next.split("\n").filter((l) => /^(La forme|Le texte|L'ambiance) : /.test(l)).length, 3);
+  assert.doesNotMatch(next, /• /);
   assert.match(next, /jamais ses images ni ses mots/);
   assert.match(next, /Envoie-moi tes vidéos ou tes photos/);
   const making = stolenStyleMessage(style, true);

@@ -555,8 +555,8 @@ function RhythmStep({
           )}
         </ul>
         <span className="text-[12px] leading-snug text-muted">
-          Environ {perMonth} publications par mois. Avec {offer.label} ({offer.credits} crédits), de quoi faire {offer.reels} Reels soignés par mois ; les carrousels et les photos avec leurs
-          textes ne coûtent rien.
+          Environ {perMonth} publications par mois. Avec {offer.label} ({offer.credits} crédits), de quoi faire {offer.reels} Reels soignés par mois ; les photos avec leurs textes ne coûtent
+          rien.
           {posts > offer.postsPerWeek + 1 && " À ce rythme, alterne les Reels avec des carrousels pour garder le même soin sur chacun."}
         </span>
       </div>

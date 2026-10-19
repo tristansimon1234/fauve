@@ -211,8 +211,8 @@ async function Settings() {
             <span className="text-sm font-semibold text-muted">crédits disponibles</span>
           </p>
           <p className="text-sm leading-normal text-muted">
-            Ton solde remonte à {PLANS[offer].credits} crédits le 1er de chaque mois. Avant chaque montage, Simone t’annonce ce
-            qu’elle va faire et ce que ça coûte ; tu ne paies jamais plus que l’annonce, et rien si le montage échoue.
+            Ton solde remonte à {PLANS[offer].credits} crédits le 1er de chaque mois. Un montage est débité après coup, pour ce qui a
+            vraiment été fait (le message de livraison le dit) ; rien si le montage échoue.
           </p>
           <ul className="grid gap-x-6 gap-y-1 text-[13px] sm:grid-cols-2">
             {CREDIT_LINES.map(([label, credits]) => (

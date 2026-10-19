@@ -89,7 +89,7 @@ export type RunFauveResult = {
   afterReply: (() => Promise<void>)[];
 };
 
-const FALLBACK_REPLY = "Je n’ai pas réussi à traiter ta demande, je regarde ça et je reviens vers toi.";
+const FALLBACK_REPLY = "Je n’ai pas réussi à traiter ta demande. Tu peux me la redire autrement ?";
 
 /** Cache breakpoint on the last history message, so the next turn starts from a cached prefix. */
 function withCacheBreakpoint(history: Anthropic.Beta.BetaMessageParam[]): Anthropic.Beta.BetaMessageParam[] {
