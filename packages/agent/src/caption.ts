@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 // Captions as they go out. Instagram caps hashtags at 5 per post or Reel (since
 // December 2025, caption and first comment together): the ones written in the
 // caption count first, then the post's own, the rest are dropped. And the marks
@@ -75,4 +77,40 @@ export function captionForTikTok(caption: string | null | undefined, hashtags: r
   }
   const full = [text, extra.join(" ")].filter(Boolean).join("\n\n");
   return full.length <= TIKTOK_CAPTION_MAX ? full : `${full.slice(0, TIKTOK_CAPTION_MAX - 1).trimEnd()}…`;
+}
+
+/** How a caption is written: Simone in the chat and the caption writer of a Reel made from « Créer » follow the same rules. */
+export const CAPTION_RULES = `- courtes et aérées : une accroche (80 caractères au maximum), une ou deux lignes utiles, un appel à l'action concret (réserver par le lien en bio, prendre rendez-vous, passer samedi) ; 300 caractères au maximum hors hashtags ;
+- qu'on la trouve : son métier, son quartier et sa ville écrits en toutes lettres quand tu les connais (« coiffeuse à la Croix-Rousse, Lyon ») : Instagram et TikTok lisent la légende pour proposer le post aux gens d'à côté ;
+- qu'on l'envoie : une raison de la partager ou de l'enregistrer (un conseil à garder, « à envoyer à celle qui… », une question à laquelle on répond en commentaire), sans forcer ;
+- 3 à 5 hashtags pertinents, 5 au plus en tout (limite d'Instagram, ceux écrits dans la légende comptent) ; jamais un mur de hashtags ;
+- écrites comme par la gérante, pas comme par une IA : jamais de tiret long (—), pas de formules toutes faites (« n'hésitez pas », « plongez dans », « véritable », « incontournable », « sublimer », « dans un monde où », « que vous soyez… ou… », trois adjectifs à la suite), pas un emoji au début de chaque ligne ; des mots concrets de son commerce (un prix, un horaire, un nom, un geste) ;
+- emojis avec parcimonie, selon le profil de style.`;
+
+// A Reel launched from « Créer » has no chat turn to write its caption: it is written at delivery,
+// when the post has none (her own caption, or Simone's from the chat, always stays).
+export const CAPTION_WRITER_PROMPT = `Tu écris la légende Instagram et TikTok d'une publication d'un commerce de quartier, comme la personne qui le gère l'écrirait elle-même. Tu reçois le commerce (nom, activité, ce qu'on sait de lui, son ton), ce qu'elle a demandé pour cette publication et ce que dit la vidéo (ses textes à l'écran, sa voix off).
+
+${CAPTION_RULES}
+
+Ce que tu ne sais pas (son quartier, un prix, un horaire), tu ne l'inventes jamais : tu t'en passes. Des mots qu'elle a écrits pour la légende dans sa demande, tu les reprends. La légende ne répète pas mot pour mot le texte de la vidéo. Réponds avec la légende sans ses hashtags, et ses hashtags à part, sans le #.`;
+
+export const captionDraftSchema = z.object({
+  caption: z.string().max(700).describe("La légende, sans les hashtags"),
+  hashtags: z.array(z.string().max(40)).max(MAX_HASHTAGS).describe("3 à 5 hashtags, sans le #"),
+});
+export type CaptionDraft = z.infer<typeof captionDraftSchema>;
+
+/** A written caption as it is kept on the post: cleaned, no hashtags in the text beyond the cap, tags without # nor duplicates. */
+export function keptCaption(draft: CaptionDraft): { caption: string; hashtags: string[] } | null {
+  const caption = capInlineHashtags(cleanCaption(draft.caption)).text;
+  if (!caption) return null;
+  const inline = new Set((caption.match(HASHTAG) ?? []).map((t) => t.slice(1).toLowerCase()));
+  const hashtags: string[] = [];
+  for (const raw of draft.hashtags) {
+    const tag = raw.replace(/^#+/, "").replace(/\s+/g, "").trim();
+    if (!tag || inline.has(tag.toLowerCase()) || hashtags.some((h) => h.toLowerCase() === tag.toLowerCase())) continue;
+    hashtags.push(tag);
+  }
+  return { caption, hashtags: hashtags.slice(0, Math.max(0, MAX_HASHTAGS - inline.size)) };
 }

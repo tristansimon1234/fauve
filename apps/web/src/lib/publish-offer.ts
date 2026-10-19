@@ -3,7 +3,6 @@ import { publishOfferAnswer, publishWhen } from "@fauve/agent";
 import { z } from "zod";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { scheduleValidated } from "@/lib/posts";
-import { instagramAccount } from "@/lib/social/publish";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // « Je le publie vendredi à 18 h ? » under a delivered montage (lib/render/deliver.ts),
@@ -62,7 +61,8 @@ export async function answerPublishOffer(
     const { data: moved } = await db.from("posts").update({ status: "validated" }).eq("id", postId).eq("studio_id", studioId).eq("status", "draft").select("id");
     if (!moved?.length) return null;
   }
-  const scheduled = status === "scheduled" ? "already" : await scheduleValidated(studioId, postId);
+  const result = status === "scheduled" ? null : await scheduleValidated(studioId, postId);
+  const scheduled = status === "scheduled" ? "already" : result && "when" in result ? result.when : null;
   const timezone = (studio?.timezone as string | undefined) ?? "Europe/Paris";
   const { data: now } = await db.from("posts").select("scheduled_at").eq("id", postId).maybeSingle();
   const at = (now?.scheduled_at as string | null) ?? null;
@@ -70,7 +70,8 @@ export async function answerPublishOffer(
   let line: string;
   if (scheduled === "now") line = `C’est parti ✅ Je le publie ${where(platforms)} maintenant.`;
   else if (scheduled && when) line = `${scheduled === "already" ? "Il est déjà programmé" : "C’est programmé ✅"} : il part ${when} ${where(platforms)}. Tu peux encore le changer d’ici là sur sa page.`;
-  else if (!(await instagramAccount(studioId))) line = "C’est validé ✅ Connecte ton Instagram dans Réglages pour que je le publie.";
+  else if (result && "blocked" in result && result.blocked === "instagram") line = "C’est validé ✅ Connecte ton Instagram dans Réglages pour que je le publie.";
+  else if (result && "blocked" in result && result.blocked === "tiktok") line = "C’est validé ✅ Reconnecte TikTok dans Réglages (ou retire-le de « Où publier ») pour que je le publie.";
   else line = "C’est validé ✅ Je le publie dès que la vidéo est prête.";
   return { reply: line, body: line, payload: card };
 }

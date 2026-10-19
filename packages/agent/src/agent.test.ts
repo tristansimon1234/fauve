@@ -1227,6 +1227,21 @@ test("captions: 5 hashtags at most, marks of machine writing taken out", async (
   assert.equal(captionForInstagram(null, []), "");
 });
 
+test("captions written at delivery: the chat's rules, cleaned and capped like hers", async () => {
+  const { CAPTION_RULES, CAPTION_WRITER_PROMPT, keptCaption } = await import("./caption.ts");
+  const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
+  // One set of rules for Simone in the chat and for a Reel launched from « Créer ».
+  assert.ok(FAUVE_SYSTEM_PROMPT.includes(CAPTION_RULES));
+  assert.ok(CAPTION_WRITER_PROMPT.includes(CAPTION_RULES));
+  assert.match(CAPTION_WRITER_PROMPT, /tu ne l'inventes jamais/);
+  // Long dashes out, hashtags without #, no duplicate of one already in the text, 5 in all.
+  assert.deepEqual(keptCaption({ caption: "Coupe du jour — à la Croix-Rousse #lyon", hashtags: ["#Lyon", "coiffure", "coiffure", "salon de coiffure", "a", "b", "c"] }), {
+    caption: "Coupe du jour, à la Croix-Rousse #lyon",
+    hashtags: ["coiffure", "salondecoiffure", "a", "b"],
+  });
+  assert.equal(keptCaption({ caption: "  ", hashtags: ["x"] }), null);
+});
+
 test("ai images: real photos kept truthful, ambiance never her place, frames and price", async () => {
   const { ambiancePrompt, closestFormat, cropsMuch, improvePrompt, PHOTO_IMPROVEMENTS } = await import("./ai-image.ts");
   const { toolSpecs } = await import("./tools.ts");
@@ -3946,4 +3961,14 @@ test("carousel editor: a tap on the image finds the text the slide drew there", 
   assert.equal(slotTextLimit({ max_chars: 2 }), 80);
   assert.equal(slotTextLimit({ max_chars: 55 }), 110);
   assert.equal(slotTextLimit({ max_chars: 300 }), 400);
+});
+
+test("ready to go out: a carousel or a photo needs its photos, never a montage", async () => {
+  const { missingContent } = await import("./status.ts");
+  assert.equal(missingContent("carousel", false, 3), null);
+  assert.equal(missingContent("post", false, 1), null);
+  assert.equal(missingContent("carousel", false, 1), "photos");
+  assert.equal(missingContent("reel", false, 4), "montage");
+  assert.equal(missingContent("reel", true, 0), null);
+  assert.equal(missingContent("story", false, 0), "media");
 });

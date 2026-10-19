@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import type { DeleteResult } from "@/components/delete-button";
-import { scheduleValidated } from "@/lib/posts";
+import { NOT_SCHEDULED, scheduleValidated } from "@/lib/posts";
 import { renderPost } from "@/lib/render/render-post";
 import { knownLayerCode, renderSlides, saveSlides } from "@/lib/render/slides";
 import { getStudioContext } from "@/lib/studio";
@@ -95,12 +95,13 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
   const scheduled = await scheduleValidated(member.studio.id, post.id);
   return {
     status: "ok",
-    message:
-      scheduled === "now"
-        ? "C’est validé : Simone le publie sur Instagram maintenant."
-        : scheduled
-          ? `C’est validé : Simone le publie sur Instagram le ${scheduled}.`
-          : "C’est validé. Connecte Instagram (Réglages) pour que Simone le publie.",
+    message: !scheduled
+      ? "C’est validé."
+      : "blocked" in scheduled
+        ? NOT_SCHEDULED[scheduled.blocked]
+        : scheduled.when === "now"
+          ? "C’est validé : Simone le publie maintenant."
+          : `C’est validé : Simone le publie le ${scheduled.when}.`,
   };
 }
 

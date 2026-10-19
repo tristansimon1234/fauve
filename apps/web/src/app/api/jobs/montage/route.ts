@@ -39,6 +39,7 @@ import { insertPlanVersion } from "@/lib/edit-plans";
 import { keepKit } from "@/lib/effect-words";
 import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
+import { ensureCaption } from "@/lib/agent/caption-writer";
 import { deliverMontage, notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
 import { renderPost } from "@/lib/render/render-post";
 import { postStyle } from "@/lib/steal";
@@ -643,6 +644,8 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
     db.from("renders").select("duration_ms").eq("id", best.renderId!).single(),
   ]);
   const title = (post.data?.title as string | null) ?? "";
+  // A Reel from « Créer » has no caption yet: written before she opens its page (never blocks the delivery).
+  await ensureCaption(job.studioId, job.postId, best.planId, job.brief).catch((error) => console.error("caption failed", job.postId, error));
   const care = careLine(Boolean(job.compared), outcome);
   // The review priced is not charged when the critic could not watch the video, nor a second take never compared.
   // An effect is charged on what its session really cost (effectCredits).

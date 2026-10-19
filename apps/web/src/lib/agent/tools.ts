@@ -17,6 +17,8 @@ import {
   DEFAULT_EFFORT,
   EFFORTS,
   MAX_FREE_SCENES,
+  missingContent,
+  type MissingContent,
   effortSchema,
   editPlanSchema,
   type TextLook,
@@ -142,14 +144,13 @@ async function nextVersion(table: "brand_profiles" | "edit_plans", column: "stud
 }
 
 /** Database-backed implementations of Fauve's tools, scoped to one studio. */
-/** What a post still needs before it can go out, per format (null when ready). */
-function missingContent(kind: PostKind, hasRender: boolean, media: number): string | null {
-  if (kind === "reel" && !hasRender) return "Pas encore de vidéo montée : fais d'abord le montage.";
-  if (kind === "post" && media < 1) return "Il faut une photo pour ce post : ajoute son media_id (update_post media_ids).";
-  if (kind === "carousel" && media < 2) return "Un carrousel demande 2 à 10 photos ou vidéos (update_post media_ids, dans l'ordre).";
-  if (kind === "story" && !hasRender && media < 1) return "Il faut une photo, une vidéo ou un montage pour cette story.";
-  return null;
-}
+/** What a post still needs before it can go out, per format, said to Simone (null when ready). */
+const MISSING_FOR_SIMONE: Record<MissingContent, string> = {
+  montage: "Pas encore de vidéo montée : fais d'abord le montage.",
+  photo: "Il faut une photo pour ce post : ajoute son media_id (update_post media_ids).",
+  photos: "Un carrousel demande 2 à 10 photos ou vidéos (update_post media_ids, dans l'ordre).",
+  media: "Il faut une photo, une vidéo ou un montage pour cette story.",
+};
 
 /** A composed carousel as Simone reads it: what each slide says, and its words slot by slot. */
 function composedLines(design: CarouselDesign) {
@@ -1122,7 +1123,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         await db.from("posts").select("id, kind, status, render_id, media_ids, scheduled_at, platforms").eq("id", post_id).eq("studio_id", studioId).single(),
       );
       const missing = missingContent(post.kind as PostKind, Boolean(post.render_id), ((post.media_ids as string[] | null) ?? []).length);
-      if (missing) return json({ error: missing });
+      if (missing) return json({ error: MISSING_FOR_SIMONE[missing] });
       const platforms = (post.platforms as string[] | null) ?? ["instagram"];
       if (platforms.includes("instagram") && !(await instagramAccount(studioId))) {
         return json({ error: "Instagram n'est pas connecté pour ce studio. Envoie le lien de connexion (get_connect_link)." });
