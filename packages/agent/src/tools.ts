@@ -258,64 +258,6 @@ export const toolSpecs = {
         .max(10),
     }),
   },
-  list_elements: {
-    description:
-      "La banque de composants du commerce (son design system pour le texte sur les photos) : titres, étiquettes, listes, prix, citations… chacun avec ses slots (les textes à remplir), ses textes d'exemple, et le kit (l'inspiration) d'où il vient. Les poser est gratuit et immédiat : regarde-la avant d'en créer.",
-    input: z.object({}),
-  },
-  place_elements: {
-    description:
-      "Pose des composants de la banque sur des photos d'un carrousel ou d'un post photo, avec les mots du commerce pour chaque slot (un slot multiline prend plusieurs lignes séparées par \n). Sans x/y/w, un composant reprend sa place sur son kit. replace (par défaut) retire les composants déjà sur ces photos ; add les ajoute. Gratuit ; le rendu part après ta réponse et le lien est envoyé tout seul.",
-    input: z.object({
-      post_id: z.string().uuid(),
-      photos: z
-        .array(
-          z.object({
-            photo: z.number().int().min(1).max(10).describe("Numéro de la photo, à partir de 1"),
-            elements: z
-              .array(
-                z.object({
-                  element_id: z.string().uuid(),
-                  texts: z.array(z.object({ slot: z.string(), text: z.string().max(400) })),
-                  x: z.number().min(0).max(1).optional().describe("Bord gauche, part de la largeur"),
-                  y: z.number().min(0).max(1).optional().describe("Bord haut, part de la hauteur"),
-                  w: z.number().min(0.06).max(1).optional().describe("Largeur, part de la largeur"),
-                  rotate: z.number().min(-45).max(45).optional(),
-                }),
-              )
-              .min(1)
-              .max(8),
-          }),
-        )
-        .min(1)
-        .max(10),
-      mode: z.enum(["replace", "add"]).default("replace"),
-    }),
-  },
-  design_elements: {
-    description:
-      "Simone crée de nouveaux composants pour la banque, comme un directeur artistique : à partir d'une inspiration (example_media_id, la capture d'un post qu'elle aime), il en sort chaque pièce réutilisable (titre, étiquette, checklist, prix dans un rond…), la code, la teste et la relit ; ou il crée les composants décrits dans request. Avec post_id, il les pose aussitôt sur les photos de la publication avec les mots du commerce. Prend 2 à 4 minutes et coûte 4 crédits, débités une fois livré ; un message part tout seul à la fin.",
-    input: z.object({
-      request: z
-        .string()
-        .min(1)
-        .max(4000)
-        .describe("Ce qu'il faut créer, et pour une publication ce qu'il faut écrire photo par photo, avec les mots exacts du commerce, et ce que la gérante a dit du style"),
-      example_media_id: z.string().uuid().optional().describe("media_id de l'image d'inspiration à décomposer"),
-      post_id: z.string().uuid().optional().describe("La publication où les poser (carrousel ou post photo), si c'est pour elle"),
-      photos: z.array(z.number().int().min(1).max(10)).max(10).optional().describe("Photos à couvrir (à partir de 1) ; par défaut toutes"),
-    }),
-  },
-  edit_element: {
-    description:
-      "Fait évoluer UN composant de la banque (« l'étiquette plus arrondie », « le titre en serif fin », « des cases plus grandes ») : une nouvelle version, l'ancienne est gardée. Avec post_id, la publication passe aussitôt à la nouvelle version et ses photos sont refaites. 2 crédits, une à deux minutes ; un message part tout seul à la fin. Pour changer seulement des mots ou une place sur une photo, utilise place_elements (gratuit).",
-    input: z.object({
-      element_id: z.string().uuid(),
-      change: z.string().min(1).max(2000).describe("Le changement demandé, précis"),
-      example_media_id: z.string().uuid().optional().describe("Une image jointe pour montrer le style voulu"),
-      post_id: z.string().uuid().optional(),
-    }),
-  },
   retouch_photos: {
     description:
       "Retouche et/ou floute les photos d'un carrousel ou d'un post photo, gratuit. Simone regarde chaque photo (visages, plaques, écrans, lumière, horizon, sujet) : light = retouche légère et naturelle (lumière, contraste, couleurs, horizon redressé, recadrage qui garde le sujet) ; blur = les zones à flouter (face : visages, plate : plaques, screen : écrans, document : papiers). L'original n'est jamais modifié ; light false et blur vide retirent la retouche. Le rendu part après ta réponse et le lien est envoyé tout seul.",

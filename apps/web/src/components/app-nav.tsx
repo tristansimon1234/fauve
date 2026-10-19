@@ -2,20 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartIcon, ChatIcon, FolderIcon, GridIcon, LayersIcon, PaletteIcon, SlidersIcon } from "./icons";
+import { ChartIcon, ChatIcon, FolderIcon, GridIcon, PaletteIcon, SlidersIcon } from "./icons";
 
 // The work (talk to Simone, the Instagram grid with every publication, the
-// results; no calendar: she does not plan, Simone does), the studio's material (media library, style) and the
-// settings. On a phone the bar keeps five places: Médiathèque, Créations and
-// Style open from Réglages' tabs.
+// results; no calendar: she does not plan, Simone does), the studio's material (media library,
+// her style with what Simone made for her) and the settings. On a phone the bar keeps four
+// places: Médiathèque and Ton style open from Réglages' tabs.
 // `also`: the pages that belong to a section, to highlight it.
 const nav = [
   { href: "/fauve", label: "Simone", icon: ChatIcon, also: [], group: "work" },
   { href: "/grille", label: "Grille", icon: GridIcon, also: ["/publications", "/calendrier"], group: "work" },
   { href: "/resultats", label: "Résultats", icon: ChartIcon, also: [], group: "work" },
   { href: "/mediatheque", label: "Médiathèque", icon: FolderIcon, also: [], group: "studio" },
-  { href: "/composants", label: "Créations", icon: LayersIcon, also: [], group: "studio" },
-  { href: "/style", label: "Style", icon: PaletteIcon, also: [], group: "studio" },
+  { href: "/style", label: "Ton style", icon: PaletteIcon, also: ["/composants"], group: "studio" },
   { href: "/reglages", label: "Réglages", icon: SlidersIcon, also: [], group: "settings" },
 ] as const;
 const barAlso: Record<string, string[]> = { "/reglages": ["/style", "/mediatheque", "/composants"] };

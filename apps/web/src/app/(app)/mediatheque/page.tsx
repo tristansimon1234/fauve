@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { z } from "zod";
 import { DeleteButton } from "@/components/delete-button";
 import { EmptyState, NoStudio } from "@/components/empty-state";
-import { FolderIcon, LayersIcon, MicIcon } from "@/components/icons";
+import { FolderIcon, MicIcon } from "@/components/icons";
 import Link from "next/link";
 import { formatDuration, formatShortDateTime } from "@/lib/format";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
@@ -133,16 +133,6 @@ async function Library() {
           </ul>
         </>
       )}
-
-      <Link href="/composants" className="flex max-w-[860px] items-center gap-4 rounded-[18px] border border-line bg-white p-4 hover:border-violet">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet">
-          <LayersIcon size={20} />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[15px] font-bold">Tes créations</span>
-          <span className="text-[13px] text-muted">Tes styles de texte, tes éléments pour photos et tes animations</span>
-        </span>
-      </Link>
     </>
   );
 }

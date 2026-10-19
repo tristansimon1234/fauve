@@ -8,7 +8,6 @@ import type { DeleteResult } from "@/components/delete-button";
 import { loadElement, refreshElementOnPosts, restoreElementVersion, saveKit } from "@/lib/elements";
 import { startElements } from "@/lib/elements-start";
 import { renderSlides } from "@/lib/render/slides";
-import { insertProfileVersion } from "@/app/(app)/style/profile";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -26,22 +25,6 @@ async function studioId(): Promise<string | null> {
 }
 
 const examplePathOf = (studio: string, path: string | undefined) => (path && path.startsWith(`${studio}/elements/`) ? path : undefined);
-
-/** New components from an inspiration (an image uploaded to `{studio}/elements/`) and/or a description. */
-export async function createComponents(input: { request: string; examplePath?: string }): Promise<BankResult> {
-  const parsed = z.object({ request: z.string().max(2000), examplePath: z.string().max(400).optional() }).safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Demande illisible." };
-  const studio = await studioId();
-  if (!studio) return NO_STUDIO;
-  const examplePath = examplePathOf(studio, parsed.data.examplePath);
-  const wish = parsed.data.request.trim();
-  if (!wish && !examplePath) return { ok: false, error: "Décris ce que tu veux, ou ajoute une inspiration." };
-  const request = wish || "Décompose cette inspiration en composants réutilisables, fidèles à l’exemple, avec des textes d’exemple adaptés à mon commerce.";
-  const started = await startElements({ studioId: studio, mode: "create", request, examplePath, origin: "app" });
-  if (started.status === "error") return { ok: false, error: started.error };
-  if (started.status === "already_running") return { ok: true, message: "Simone y travaille déjà." };
-  return { ok: true, message: `Simone s’y met : 2 à 4 minutes, ${started.credits} crédits une fois prêts.` };
-}
 
 /** A change to one component: a new version, the current one kept. */
 export async function changeComponent(id: string, input: { change: string; examplePath?: string }): Promise<BankResult> {
@@ -138,20 +121,4 @@ export async function duplicateComponent(id: string): Promise<BankResult & { id?
 export async function archiveComponent(id: string): Promise<DeleteResult> {
   const res = await patchElement(id, { archived_at: new Date().toISOString() });
   return res.ok ? { ok: true } : res;
-}
-
-/** Removes one of the studio's saved text styles (a new version of its brand profile). */
-export async function removeTextLook(name: string): Promise<DeleteResult> {
-  const { member } = await getStudioContext();
-  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
-  try {
-    await insertProfileVersion(member.studio.id, (current) => {
-      const looks = Array.isArray(current.text_looks) ? (current.text_looks as { name?: string }[]) : [];
-      return { ...current, text_looks: looks.filter((l) => l.name !== name) };
-    });
-    revalidatePath("/composants");
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Le style n’a pas pu être retiré. Réessaie." };
-  }
 }

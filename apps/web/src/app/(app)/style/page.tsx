@@ -1,15 +1,21 @@
 import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { resolveReelBrand } from "@fauve/agent";
 import { NoStudio } from "@/components/empty-state";
+import { studioScenes } from "@/lib/creations";
+import { loadMontageInputs } from "@/lib/render/render-post";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
+import { loadTextLooks } from "@/lib/text-looks";
 import { sanitizeProfile, toStyleForm } from "./style-profile";
 import { fauveAccount } from "@/lib/instagram-dm";
+import { CreatedSections } from "./created-section";
 import { InspirationsSection, type Inspiration } from "./inspirations-section";
 import { StyleEditor } from "./style-editor";
 import type { Logo, MoodboardView } from "./style-options";
 import { SettingsTabs } from "@/components/settings-tabs";
 
-export const metadata: Metadata = { title: "Style" };
+export const metadata: Metadata = { title: "Ton style" };
 // Reading a moodboard (Fauve looks at every image) can take a minute; a Reel added to the
 // inspirations is taken, measured and read after the answer (« Steal »), up to a few minutes.
 export const maxDuration = 300;
@@ -18,7 +24,7 @@ export default function StylePage() {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 sm:px-10 sm:pt-9">
       <SettingsTabs current="/style" />
-      <PageSuspense title="Style">
+      <PageSuspense title="Ton style">
         <StyleLoader />
       </PageSuspense>
     </main>
@@ -30,7 +36,7 @@ async function StyleLoader() {
   if (!member) {
     return (
       <>
-        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Style</h1>
+        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Ton style</h1>
         <NoStudio />
       </>
     );
@@ -94,6 +100,11 @@ async function StyleLoader() {
   return (
     <StyleEditor
       inspirations={<InspirationsSection items={inspirations} fauveHandle={fauve?.username ?? null} studioId={studioId} />}
+      created={
+        <Suspense fallback={null}>
+          <Created studioId={studioId} />
+        </Suspense>
+      }
       moodboard={moodboard}
       studioId={studioId}
       studioName={member.studio.name ?? "Ton studio"}
@@ -103,4 +114,12 @@ async function StyleLoader() {
       ownFonts={ownFonts}
     />
   );
+}
+
+/** What Simone made for the studio and reuses: its animations and saved text styles, drawn in its brand. */
+async function Created({ studioId }: { studioId: string }) {
+  const [inputs, scenes, looks] = await Promise.all([loadMontageInputs(studioId, { segments: [] }), studioScenes(studioId), loadTextLooks(studioId)]);
+  if (!scenes.length && !looks.length) return null;
+  const brand = resolveReelBrand({}, "doux", { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts });
+  return <CreatedSections scenes={scenes} looks={looks} brand={brand} />;
 }

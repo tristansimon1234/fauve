@@ -276,7 +276,8 @@ export function CarouselEditor({
           </div>
           {props && !dirty && <PhotoAsk key={index} postId={postId} postTitle={postTitle} photo={index + 1} total={plan.slides.length} />}
 
-          {props && (
+          {/* Components only on the carousels that have them: new ones are composed by Simone. */}
+          {props && (bank.length > 0 || elements.length > 0) && (
             <ElementsPanel
               bank={bank}
               placed={elements}
