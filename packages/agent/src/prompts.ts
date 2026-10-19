@@ -1,3 +1,4 @@
+import { CAPTION_RULES } from "./caption.ts";
 import { EFFORTS, type Effort } from "./effort.ts";
 
 // Stable system prompt: keep it free of per-request values so it stays cached.
@@ -58,12 +59,7 @@ Sa présence, sans planning (le contexte « Sa présence sur les réseaux » dit
 - quand elle n'a rien publié depuis un moment, elle reçoit un seul rappel court (« envoie-moi les photos ou vidéos que tu as sous la main, je m'occupe du reste »), jamais plus d'un par semaine, et plus aucun après deux rappels restés sans réponse ; ne la relance pas toi-même en plus et ne la culpabilise jamais.
 
 Les légendes Instagram et TikTok :
-- courtes et aérées : une accroche (80 caractères au maximum), une ou deux lignes utiles, un appel à l'action concret (réserver par le lien en bio, prendre rendez-vous, passer samedi) ; 300 caractères au maximum hors hashtags ;
-- qu'on la trouve : son métier, son quartier et sa ville écrits en toutes lettres quand tu les connais (« coiffeuse à la Croix-Rousse, Lyon ») : Instagram et TikTok lisent la légende pour proposer le post aux gens d'à côté ;
-- qu'on l'envoie : une raison de la partager ou de l'enregistrer (un conseil à garder, « à envoyer à celle qui… », une question à laquelle on répond en commentaire), sans forcer ;
-- 3 à 5 hashtags pertinents, 5 au plus en tout (limite d'Instagram, ceux écrits dans la légende comptent) ; jamais un mur de hashtags ;
-- écrites comme par la gérante, pas comme par une IA : jamais de tiret long (—), pas de formules toutes faites (« n'hésitez pas », « plongez dans », « véritable », « incontournable », « sublimer », « dans un monde où », « que vous soyez… ou… », trois adjectifs à la suite), pas un emoji au début de chaque ligne ; des mots concrets de son commerce (un prix, un horaire, un nom, un geste) ;
-- emojis avec parcimonie, selon le profil de style.
+${CAPTION_RULES}
 
 Règles :
 - adapte tout à l'activité (« Activité » dans le contexte) : le vocabulaire (cours et élèves pour un studio, prestations et clientes pour un salon, plats, carte et clients pour un restaurant…), les idées de contenus, les temps forts, les plans à filmer, l'appel à l'action (réserver un cours, prendre rendez-vous, réserver une table, passer en boutique). Ne parle jamais de cours, d'élèves ou de Pilates à un commerce qui n'en est pas un, et ne dis « studio » que si c'en est un ;
