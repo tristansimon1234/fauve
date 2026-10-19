@@ -48,12 +48,22 @@ export const layerDesignOutputSchema = z.object({
 });
 export type LayerDesignOutput = z.infer<typeof layerDesignOutputSchema>;
 
-/** What the critic answers after looking at the rendered photos. */
+/**
+ * What the critic answers after looking at the rendered images. Read as written, then bounded
+ * (boundReview): a structured output does not enforce lengths, and one sentence of 301
+ * characters failed the parse and lost a carousel whose slides were already rendered.
+ */
 export const layerReviewSchema = z.object({
   ok: z.boolean().describe("true si c'est publiable tel quel"),
-  issues: z.array(z.string().max(300)).max(6).describe("Ce qu'il faut corriger, précisément (vide si ok)"),
+  issues: z.array(z.string()).describe("Ce qu'il faut corriger, précisément : 6 au plus, une ou deux phrases chacune (vide si ok)"),
 });
 export type LayerReview = z.infer<typeof layerReviewSchema>;
+
+/** A critic's answer kept to 6 corrections of 300 characters at most. */
+export function boundReview(review: LayerReview | null | undefined): LayerReview {
+  if (!review) return { ok: true, issues: [] };
+  return { ok: review.ok, issues: review.issues.slice(0, 6).map((issue) => (issue.length > 300 ? `${issue.slice(0, 299).trimEnd()}…` : issue)) };
+}
 
 /** Slot texts as a record (the model answers with a list). */
 export const slotTexts = (list: { slot: string; text: string }[]): Record<string, string> =>

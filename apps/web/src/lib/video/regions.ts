@@ -8,6 +8,7 @@ import {
   type ClipDetection,
   type PhotoDetection,
 } from "@fauve/agent";
+import { readAnswer } from "@fauve/agent/answer";
 import sharp from "sharp";
 import { z } from "zod";
 import { env } from "@/lib/env";
@@ -72,7 +73,7 @@ export async function photoRegions(studioId: string, mediaId: string): Promise<E
     config: { responseMimeType: "application/json", responseJsonSchema: geminiSchema(photoDetectionSchema) },
   });
   await logGeminiCost({ studioId, kind: "region_detection", model, usage: response.usageMetadata as GeminiUsage });
-  const detection: PhotoDetection = photoDetectionSchema.parse(JSON.parse(response.text ?? ""));
+  const detection: PhotoDetection = readAnswer(photoDetectionSchema, JSON.parse(response.text ?? ""));
   const stored = { kind: "photo" as const, width, height, detection, model };
   await keep(mediaId, stored);
   return stored;
@@ -110,7 +111,7 @@ export async function clipRegions(studioId: string, mediaId: string): Promise<Ex
       config: { responseMimeType: "application/json", responseJsonSchema: geminiSchema(clipDetectionSchema) },
     });
     await logGeminiCost({ studioId, kind: "region_detection", model, usage: response.usageMetadata as GeminiUsage });
-    const detection: ClipDetection = clipDetectionSchema.parse(JSON.parse(response.text ?? ""));
+    const detection: ClipDetection = readAnswer(clipDetectionSchema, JSON.parse(response.text ?? ""));
     const stored = { kind: "clip" as const, aspect, detection, model };
     await keep(mediaId, stored);
     return stored;

@@ -1,5 +1,4 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   brandProfileSchema,
   buildCarouselProps,
@@ -10,6 +9,7 @@ import {
   checkCarouselCode,
   CLAUDE_MODEL,
   CRITIC_MODEL,
+  boundReview,
   layerReviewSchema,
   readMemory,
   resolveReelBrand,
@@ -21,6 +21,7 @@ import {
   type MotionTemplate,
   type PhotoEdit,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import sharp from "sharp";
 import { transform } from "sucrase";
 import { carouselPhotos, type CarouselSource } from "@/lib/render/carousel";
@@ -211,7 +212,7 @@ async function design(input: CarouselRequest, ctx: Context, previous?: CarouselP
     .beta.messages.stream({
       model: CLAUDE_MODEL,
       max_tokens: 48000,
-      output_config: { effort: "high", format: betaZodOutputFormat(carouselOutputSchema) },
+      output_config: { effort: "high", format: outputFormat(carouselOutputSchema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: [{ type: "text", text: CAROUSEL_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
@@ -244,14 +245,14 @@ async function review(input: CarouselRequest, ctx: Context, made: CarouselDesign
   const response = await anthropic().beta.messages.parse({
     model: CRITIC_MODEL,
     max_tokens: 4000,
-    output_config: { effort: "medium", format: betaZodOutputFormat(layerReviewSchema) },
+    output_config: { effort: "medium", format: outputFormat(layerReviewSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: CAROUSEL_CRITIC_PROMPT,
     messages: [{ role: "user", content }],
   });
   await logClaudeCost(input.studioId, response.usage, "carousel_critic", CRITIC_MODEL);
-  return response.parsed_output ?? { ok: true, issues: [] };
+  return boundReview(response.parsed_output);
 }
 
 /** Keeps a test render's slides (the next round looks at them; the delivered carousel is this render). */
@@ -328,7 +329,12 @@ export async function carouselRound(
   // The correction the critic asked for is delivered as it is (a second look would cost a third round).
   if (previous?.fixed) return { status: "done", design: made, stills: kept, review: null };
   await onStage?.("review");
-  const verdict = await review(input, ctx, made, stills);
+  // A critic that fails never loses a carousel that passed its test render: it goes out as rendered.
+  const verdict = await review(input, ctx, made, stills).catch((error: unknown) => {
+    console.warn("carousel: review failed, delivered as rendered", input.postId, error instanceof Error ? error.message : error);
+    return null;
+  });
+  if (!verdict) return { status: "done", design: made, stills: kept, review: null };
   if (!verdict.ok && verdict.issues.length && round + 1 < CAROUSEL_ROUNDS) {
     return { status: "retry", previous: { output, feedback: `relecture du rendu : ${verdict.issues.join(" ; ")}`, stills: kept }, design: made, stills: kept };
   }

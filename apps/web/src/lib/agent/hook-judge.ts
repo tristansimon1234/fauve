@@ -1,6 +1,6 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { CLAUDE_MODEL, HOOK_JUDGE_PROMPT, hookChoiceSchema, pickHook, type HookJudgeInput } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "./run";
 
 /**
@@ -14,7 +14,7 @@ export async function judgeHooks(studioId: string, input: HookJudgeInput): Promi
     const response = await anthropic().beta.messages.parse({
       model: CLAUDE_MODEL,
       max_tokens: 4000,
-      output_config: { effort: "medium", format: betaZodOutputFormat(hookChoiceSchema) },
+      output_config: { effort: "medium", format: outputFormat(hookChoiceSchema) },
       system: HOOK_JUDGE_PROMPT,
       messages: [{ role: "user", content: JSON.stringify(input) }],
     });

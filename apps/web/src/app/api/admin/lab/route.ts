@@ -1,4 +1,3 @@
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { after } from "next/server";
 import { z } from "zod";
 import {
@@ -13,6 +12,7 @@ import {
   slidesPlanSchema,
   type MotionTemplate,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { readWebsite } from "@/lib/agent/website";
 import { cronAuthorized } from "@/lib/cron-auth";
@@ -204,7 +204,7 @@ async function siteFacts(studioId: string, site: Awaited<ReturnType<typeof readW
   const response = await anthropic().beta.messages.parse({
     model: CHAT_MODEL,
     max_tokens: 1000,
-    output_config: { effort: "low", format: betaZodOutputFormat(factsSchema) },
+    output_config: { effort: "low", format: outputFormat(factsSchema) },
     system: "Tu lis le site d'un commerce de quartier. Réponds en français. Uniquement ce que le site dit, rien d'inventé.",
     messages: [{ role: "user", content: JSON.stringify({ titre: site.title, nom: site.siteName, description: site.description, texte: site.text.slice(0, 5000) }) }],
   });

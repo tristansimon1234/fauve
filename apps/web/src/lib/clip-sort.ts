@@ -1,6 +1,6 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { acceptedSort, ANALYST_MODEL, CLIP_SORT_PROMPT, clipSortSchema, SORT_DAYS_AHEAD, type ClipAnalysis } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -44,7 +44,7 @@ export async function sortClip(studioId: string, mediaId: string, analysis: Clip
   const response = await anthropic().beta.messages.parse({
     model: ANALYST_MODEL,
     max_tokens: 1500,
-    output_config: { effort: "low", format: betaZodOutputFormat(clipSortSchema) },
+    output_config: { effort: "low", format: outputFormat(clipSortSchema) },
     system: CLIP_SORT_PROMPT,
     messages: [
       {

@@ -1,5 +1,4 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   brandProfileSchema,
   CLAUDE_MODEL,
@@ -32,6 +31,7 @@ import {
   type VoiceOverScript,
   type VoiceTranscript,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { judgeHooks } from "@/lib/agent/hook-judge";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { env } from "@/lib/env";
@@ -137,7 +137,7 @@ export async function writeVoiceScript(
     const response = await anthropic().beta.messages.parse({
       model: CLAUDE_MODEL,
       max_tokens: 2000,
-      output_config: { effort: "medium", format: betaZodOutputFormat(decide ? voiceOverDecisionSchema : voiceOverScriptSchema) },
+      output_config: { effort: "medium", format: outputFormat(decide ? voiceOverDecisionSchema : voiceOverScriptSchema) },
       system: decide ? `${VOICE_OVER_PROMPT}\n\n${VOICE_FORMAT_PROMPT}` : VOICE_OVER_PROMPT,
       messages: [{ role: "user", content: JSON.stringify(input) }],
     });

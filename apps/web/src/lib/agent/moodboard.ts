@@ -1,6 +1,6 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { clampReading, clampSiteLook, CLAUDE_MODEL, MOODBOARD_PROMPT, moodboardReadingSchema, siteLookSchema, type MoodboardReading, type SiteLookReading } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "./run";
 
 type ReadImage = { url: string; note?: string } | { jpeg: Buffer; note?: string };
@@ -27,7 +27,7 @@ export async function readMoodboard(studioId: string, studioName: string, images
   const response = await anthropic().beta.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: 8000,
-    output_config: { effort: "medium", format: betaZodOutputFormat(moodboardReadingSchema) },
+    output_config: { effort: "medium", format: outputFormat(moodboardReadingSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: MOODBOARD_PROMPT,
@@ -55,7 +55,7 @@ export async function readSiteImages(studioId: string, intro: string, pages: Buf
   const response = await anthropic().beta.messages.parse({
     model,
     max_tokens: 9000,
-    output_config: { effort: "medium", format: betaZodOutputFormat(siteLookSchema) },
+    output_config: { effort: "medium", format: outputFormat(siteLookSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: MOODBOARD_PROMPT,

@@ -1,6 +1,7 @@
 import "server-only";
 import { FileState, GoogleGenAI, type File as GeminiFile } from "@google/genai";
-import { clampLook, measuresLine, STEAL_PROMPT, stolenLookReadingSchema, type ReelMeasures, type StolenLook } from "@fauve/agent";
+import { clampLook, measuresLine, STEAL_PROMPT, stolenLookReadingSchema, type ReelMeasures, type StolenLook, type StolenLookReading } from "@fauve/agent";
+import { readAnswer } from "@fauve/agent/answer";
 import { env } from "@/lib/env";
 import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
 import { geminiSchema } from "./gemini-schema";
@@ -87,12 +88,14 @@ export async function readStolenLook(studioId: string, video: Buffer, measures: 
       config: { responseMimeType: "application/json", responseJsonSchema: LOOK_SCHEMA },
     });
     await logGeminiCost({ studioId, kind: "video_analysis", model, usage: response.usageMetadata as GeminiUsage, meta: { purpose: "steal" } });
-    const parsed = stolenLookReadingSchema.safeParse(JSON.parse(response.text ?? "null"));
-    if (!parsed.success) {
-      console.warn("steal: reading refused", parsed.error.message.slice(0, 300));
+    let reading: StolenLookReading;
+    try {
+      reading = readAnswer(stolenLookReadingSchema, JSON.parse(response.text ?? "null"));
+    } catch (error) {
+      console.warn("steal: reading refused", (error instanceof Error ? error.message : String(error)).slice(0, 300));
       return null;
     }
-    return clampLook(parsed.data);
+    return clampLook(reading);
   } finally {
     await ai.files.delete({ name: uploaded.name! }).catch(() => {});
   }

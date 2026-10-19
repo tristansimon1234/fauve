@@ -1,5 +1,4 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   CLAUDE_MODEL,
   checkMotionCode,
@@ -14,6 +13,7 @@ import {
   type TextBand,
   type TrackPiece,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { transform } from "sucrase";
 import { googleFont } from "@/lib/fonts";
 import { smokeTestScenes, type SceneChecks, type SmokeScene } from "@/lib/render/sandbox";
@@ -158,7 +158,7 @@ async function writeScene(
     model: CLAUDE_MODEL,
     max_tokens: 16000,
     // Medium: the code needs care, not long deliberation; most of the cost was thinking tokens.
-    output_config: { effort: "medium", format: betaZodOutputFormat(motionSceneOutputSchema) },
+    output_config: { effort: "medium", format: outputFormat(motionSceneOutputSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: [{ type: "text", text: MOTION_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],

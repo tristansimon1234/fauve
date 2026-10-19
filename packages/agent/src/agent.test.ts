@@ -3557,6 +3557,19 @@ test("designed carousels: the designer's answer bounded, its code checked, each 
   assert.equal(props.carousel?.slotSlides?.s3_detail, 3);
 });
 
+test("a critic's answer is read as written, then bounded: a long sentence never fails the parse", async () => {
+  const { boundReview, layerReviewSchema } = await import("./text-layer.ts");
+  // The lab's salon carousel was lost to one correction of more than 300 characters.
+  const long = "diapositive 4 : ".padEnd(420, "le titre se perd sur le mur clair ");
+  const parsed = layerReviewSchema.parse({ ok: false, issues: [long, ...Array.from({ length: 7 }, (_, i) => `correction ${i + 2}`)] });
+  const bounded = boundReview(parsed);
+  assert.equal(bounded.ok, false);
+  assert.equal(bounded.issues.length, 6);
+  assert.equal(bounded.issues[0]!.length, 300);
+  assert.ok(bounded.issues[0]!.endsWith("…"));
+  assert.deepEqual(boundReview(null), { ok: true, issues: [] });
+});
+
 test("designed carousels: a character written as a code is that character, and the words are set in French typography", async () => {
   const { cleanSlotText, carouselFromOutput } = await import("./carousel.ts");
   const { frenchTypography } = await import("./motion.ts");
@@ -3584,4 +3597,129 @@ test("designed carousels: a character written as a code is that character, and t
   // A design stored before the fix renders cleanly too.
   const props = buildCarouselProps({ ...design, texts: { s1_titre: "Viens à l'atelier\\u00a0: c'est offert" } }, 0, { template: "libre", brand: { name: "Atelier" }, photos: [] });
   assert.equal(props.carousel?.texts.s1_titre, "Viens à l’atelier : c’est offert");
+});
+
+test("model answers: read as written, then brought within their schema's limits", async () => {
+  const { readAnswer, outputFormat, withinLimits } = await import("./answer.ts");
+  const { z } = await import("zod");
+  const look = z.object({ font: z.string().regex(/^[A-Za-z ]{2,20}$/).optional(), size: z.number().int().min(24).max(220) });
+  const schema = z.object({
+    name: z.string().max(20),
+    style: z.enum(["hook", "band", "caption"]),
+    mood: z.enum(["calm", "lively"]).optional(),
+    level: z.enum(["low", "high"]).default("low"),
+    tags: z.array(z.string().min(1).max(8)).max(3),
+    score: z.number().min(0).max(1),
+    count: z.number().int().min(1),
+    after: z.number().gt(0),
+    texts: z.record(z.string().regex(/^[a-z_]+$/), z.string().max(10)),
+    first: look,
+    second: look,
+    shot: z.discriminatedUnion("type", [z.object({ type: z.literal("clip"), out: z.number().max(5) }), z.object({ type: z.literal("photo"), seconds: z.number().max(5) })]),
+    note: z.string().max(5).nullable(),
+  });
+  const answer = {
+    name: "Une accroche bien trop longue pour tenir",
+    style: "Band",
+    mood: "joyeuse",
+    level: "medium",
+    tags: ["a", "", "verylongtag", "b", "c"],
+    score: 1.4,
+    count: 2.6,
+    after: 0,
+    texts: { titre: "un texte trop long", "Bad-Key": "x" },
+    first: { font: "Inter", size: 40 },
+    second: { font: "Font-With-Dashes", size: 300 },
+    shot: { type: "photo", seconds: 9 },
+    note: "abcdefgh",
+  };
+  assert.equal(schema.safeParse(answer).success, false);
+  assert.deepEqual(readAnswer(schema, answer), {
+    name: "Une accroche bien",
+    style: "band",
+    level: "low",
+    tags: ["a", "verylong", "b"],
+    score: 1,
+    count: 3,
+    after: 0.001,
+    texts: { titre: "un texte" },
+    first: { font: "Inter", size: 40 },
+    second: { size: 220 },
+    shot: { type: "photo", seconds: 5 },
+    note: "abcde",
+  });
+  // An answer that passes is read as written; the SDK's format reads the same way.
+  const valid = { ...readAnswer(schema, answer), note: null };
+  assert.deepEqual(readAnswer(schema, valid), valid);
+  assert.deepEqual(outputFormat(schema).parse(JSON.stringify(answer)), readAnswer(schema, answer));
+  // A required choice off its list takes the first of the list; what cannot be repaired still fails.
+  assert.equal(readAnswer(schema, { ...answer, style: "titre" }).style, "hook");
+  assert.throws(() => readAnswer(z.object({ id: z.string().regex(/^[0-9]+$/) }), { id: "abc" }));
+  assert.throws(() => readAnswer(schema, { ...answer, shot: { type: "video", out: 2 } }));
+  assert.equal(withinLimits(z.object({ id: z.string().regex(/^[0-9]+$/) }), { id: "abc" }), null);
+  // A union without a discriminator: the shape the answer has is the one repaired, never one it lacks fields of.
+  const segment = z.union([z.object({ clip_id: z.string(), out: z.number().max(5) }), z.object({ motion: z.object({ title: z.string().max(5) }), duration: z.number() })]);
+  assert.deepEqual(readAnswer(z.array(segment), [{ clip_id: "a", out: 9 }, { motion: { title: "un titre" }, duration: 2 }]), [
+    { clip_id: "a", out: 5 },
+    { motion: { title: "un" }, duration: 2 },
+  ]);
+  // A closed shape leaves out what it does not know.
+  assert.deepEqual(readAnswer(z.strictObject({ a: z.string().max(2) }), { a: "abc", b: 1 }), { a: "ab" });
+
+  // The real answers: a scene whose name and slots run over, a montage whose hook is too long.
+  const { motionSceneOutputSchema } = await import("./motion-scene.ts");
+  const slot = (name: string) => ({ name, role: "titre", max_chars: 40, multiline: false });
+  const scene = readAnswer(motionSceneOutputSchema, {
+    code: "function Scene() { return null; }",
+    notes: "",
+    name: "Le titre qui grossit entre ses doigts puis part en l'air, avec un rebond et une ombre portée",
+    slots: [slot("Titre-Principal"), ...Array.from({ length: 9 }, (_, i) => slot(`ligne_${i + 1}`))],
+    photos: [],
+    fonts: [],
+  });
+  assert.ok(scene.name.length <= 80);
+  assert.deepEqual(scene.slots.map((s) => s.name), ["ligne_1", "ligne_2", "ligne_3", "ligne_4", "ligne_5", "ligne_6", "ligne_7", "ligne_8"]);
+  const { editorOutputSchema } = await import("./editor.ts");
+  const hook = "offre de rentrée : -15 % sur les cours collectifs du matin, du midi et du soir, avec le code CULTE1, jusqu'à la fin du mois de septembre seulement";
+  const plan = {
+    duration: 12,
+    tempo: 118,
+    collage: false,
+    segments: [
+      { clip_id: "a", in: 0, out: 1.5, move: "none", speed: 1 },
+      { clip_id: "b", in: 0, out: 1.5, move: "none", speed: 1 },
+    ],
+    texts: [{ text: hook, from: 0, to: 3, style: "hook", emphasis: ["offre", "rentrée", "15", "code"] }],
+    transitions: "cut",
+    subtitles: false,
+    effect: "none",
+  };
+  assert.equal(editorOutputSchema.safeParse({ plan, rationale: "message clé" }).success, false);
+  const montage = readAnswer(editorOutputSchema, { plan, rationale: "message clé" });
+  assert.ok(montage.plan.texts[0]!.text.length <= 120 && hook.startsWith(montage.plan.texts[0]!.text));
+  assert.equal(montage.plan.texts[0]!.emphasis?.length, 3);
+
+  // Every answer read from a model has limits this reading understands.
+  const { editorOutputSchemaLegacy } = await import("./editor.ts");
+  const { kitDesignOutputSchema } = await import("./elements.ts");
+  const { hookChoiceSchema } = await import("./hook.ts");
+  const { moodboardReadingSchema, siteLookSchema } = await import("./moodboard.ts");
+  const { effectRouteSchema } = await import("./effects.ts");
+  const { montageReviewSchema } = await import("./critic.ts");
+  const { textExampleSchema } = await import("./text-look.ts");
+  const { clipSortSchema } = await import("./clip-sort.ts");
+  const { voiceOverDecisionSchema, voiceOverScriptSchema } = await import("./voice-over.ts");
+  const { performanceReportSchema } = await import("./performance.ts");
+  const { carouselOutputSchema } = await import("./carousel.ts");
+  const { layerReviewSchema } = await import("./text-layer.ts");
+  const { clipAnalysisSchema } = await import("./schemas.ts");
+  const { photoDetectionSchema, clipDetectionSchema } = await import("./retouch.ts");
+  const { stolenLookReadingSchema } = await import("./steal.ts");
+  for (const answerSchema of [
+    editorOutputSchema, editorOutputSchemaLegacy, kitDesignOutputSchema, hookChoiceSchema, motionSceneOutputSchema, moodboardReadingSchema, siteLookSchema,
+    effectRouteSchema, montageReviewSchema, textExampleSchema, clipSortSchema, voiceOverDecisionSchema, voiceOverScriptSchema, performanceReportSchema,
+    carouselOutputSchema, layerReviewSchema, clipAnalysisSchema, photoDetectionSchema, clipDetectionSchema, stolenLookReadingSchema,
+  ]) {
+    assert.doesNotThrow(() => withinLimits(answerSchema, {}));
+  }
 });

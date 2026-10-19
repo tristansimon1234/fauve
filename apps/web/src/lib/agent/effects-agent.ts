@@ -1,7 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { toFile } from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   ANALYST_MODEL,
   brandProfileSchema,
@@ -26,6 +25,7 @@ import {
   type EffectRoute,
   type EffectsTaskInput,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { env } from "@/lib/env";
 import { TRACK_MODELS } from "@/lib/render/sandbox";
@@ -74,7 +74,7 @@ export async function routeEffect(studioId: string, request: string | undefined,
     const response = await anthropic().beta.messages.parse({
       model: ANALYST_MODEL,
       max_tokens: 400,
-      output_config: { effort: "low", format: betaZodOutputFormat(effectRouteSchema) },
+      output_config: { effort: "low", format: outputFormat(effectRouteSchema) },
       system: EFFECT_ROUTER_PROMPT,
       messages: [{ role: "user", content: JSON.stringify({ demande: request.slice(0, 3000), videos: files.videos, photos: files.photos }) }],
     });

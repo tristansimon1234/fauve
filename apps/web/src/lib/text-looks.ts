@@ -1,5 +1,4 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   brandProfileSchema,
   CLAUDE_MODEL,
@@ -17,6 +16,7 @@ import {
   type TextExample,
   type TextLook,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { z } from "zod";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
@@ -35,7 +35,7 @@ export async function readTextExample(studioId: string, imageUrl: string, note?:
   const response = await anthropic().beta.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: 6000,
-    output_config: { effort: "medium", format: betaZodOutputFormat(textExampleSchema) },
+    output_config: { effort: "medium", format: outputFormat(textExampleSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: TEXT_EXAMPLE_PROMPT,

@@ -1,6 +1,5 @@
 import "server-only";
 import { insertPlanVersion } from "@/lib/edit-plans";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   editorClip,
   signatureLines,
@@ -54,6 +53,7 @@ import {
   type ReelProps,
   type TracksByClip,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
 import { videoFramesInSandbox } from "@/lib/render/sandbox";
 import { ensureTracks, loadTracks } from "@/lib/render/tracks";
@@ -347,7 +347,7 @@ export async function designEdit(params: {
     const response = await anthropic().beta.messages.parse({
       model: CLAUDE_MODEL,
       max_tokens: 16000,
-      output_config: { effort: params.effort ?? "high", format: betaZodOutputFormat(legacy ? editorOutputSchemaLegacy : editorOutputSchema) },
+      output_config: { effort: params.effort ?? "high", format: outputFormat(legacy ? editorOutputSchemaLegacy : editorOutputSchema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: [{ type: "text", text: EDITOR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
