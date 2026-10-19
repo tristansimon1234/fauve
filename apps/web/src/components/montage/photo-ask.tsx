@@ -7,11 +7,33 @@ import { Orb } from "@/components/orb";
 
 // « Que veux-tu sur cette photo ? »: Fauve, photo by photo. The manager says it
 // in her words (a checklist of what to bring, the week's hours…), can join a
-// picture she likes as an example, and Fauve does it in her panel.
+// picture she likes as an example, and Fauve does it in her panel. On a carousel
+// Simone composed, the same for one of its images (a bigger title, another photo).
 
 const IDEAS = ["Une checklist", "Un titre accrocheur", "Les horaires", "Une offre", "Un avis client"];
+/** What she may want changed on an image of a composed carousel. */
+export const IMAGE_IDEAS = ["Un titre plus gros", "Une autre photo", "Moins de texte", "Une autre mise en page"];
 
-export function PhotoAsk({ postId, postTitle, photo, total }: { postId: string; postTitle: string; photo: number; total: number }) {
+export function PhotoAsk({
+  postId,
+  postTitle,
+  photo,
+  total,
+  noun = "Photo",
+  heading = "Que veux-tu sur cette photo ?",
+  ideas = IDEAS,
+  placeholder = "Ex. une checklist de ce qu’il faut prendre pour venir au cours",
+}: {
+  postId: string;
+  postTitle: string;
+  photo: number;
+  total: number;
+  /** What one slide is called: « Photo », or « Image » on a composed carousel. */
+  noun?: string;
+  heading?: string;
+  ideas?: string[];
+  placeholder?: string;
+}) {
   const openFauve = useFauveDrawer();
   const [text, setText] = useState("");
   const [example, setExample] = useState<{ file: File; preview: string } | null>(null);
@@ -21,12 +43,12 @@ export function PhotoAsk({ postId, postTitle, photo, total }: { postId: string; 
     const wish = text.trim();
     if (!wish && !example) return;
     const message = [
-      `Photo ${photo} sur ${total} du carrousel : ${wish || "fais la même mise en page que mon exemple"}.`,
-      example ? "L’image jointe est un exemple de mise en page que j’aime (pas une photo à publier) : reprends-la sur cette photo." : "",
+      `${noun} ${photo} sur ${total} du carrousel : ${wish || "fais la même mise en page que mon exemple"}.`,
+      example ? `L’image jointe est un exemple de mise en page que j’aime (pas une photo à publier) : reprends-la sur cette ${noun.toLowerCase()}.` : "",
     ]
       .filter(Boolean)
       .join("\n\n");
-    openFauve({ postId, title: postTitle, sceneLabel: `Photo ${photo}`, start: { text: message, files: example ? [example.file] : [] } });
+    openFauve({ postId, title: postTitle, sceneLabel: `${noun} ${photo}`, start: { text: message, files: example ? [example.file] : [] } });
     setText("");
     if (example) URL.revokeObjectURL(example.preview);
     setExample(null);
@@ -36,7 +58,7 @@ export function PhotoAsk({ postId, postTitle, photo, total }: { postId: string; 
     <div className="flex flex-col gap-2.5 rounded-[16px] bg-violet-tint p-3">
       <span className="flex items-center gap-2 text-[13px] font-bold text-violet">
         <Orb size={18} still />
-        Que veux-tu sur cette photo ?
+        {heading}
       </span>
       <textarea
         value={text}
@@ -49,12 +71,12 @@ export function PhotoAsk({ postId, postTitle, photo, total }: { postId: string; 
         }}
         rows={2}
         maxLength={400}
-        placeholder="Ex. une checklist de ce qu’il faut prendre pour venir au cours"
+        placeholder={placeholder}
         className="resize-none rounded-[12px] border border-lilac bg-white px-3 py-2 text-[14px] leading-snug outline-none focus:border-violet"
       />
       {!text && (
         <div className="flex flex-wrap gap-1.5">
-          {IDEAS.map((idea) => (
+          {ideas.map((idea) => (
             <button key={idea} type="button" onClick={() => setText(idea)} className="h-7 rounded-full bg-white px-2.5 text-[12px] font-semibold text-ink hover:text-violet">
               {idea}
             </button>

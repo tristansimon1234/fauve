@@ -1,7 +1,7 @@
 "use server";
 
 import { bakedReel, insertPlanVersion } from "@/lib/edit-plans";
-import { assertTransition, editPlanSchema, planMediaIds, postStatusSchema, slidesPlanSchema, type PostStatus } from "@fauve/agent";
+import { assertTransition, editPlanSchema, planMediaIds, postStatusSchema, slidesPlanSchema, slotTextLimit, type PostStatus } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
@@ -266,7 +266,7 @@ export async function saveCarouselTexts(postId: string, texts: Record<string, st
   const slots = new Map(design.slots.map((s) => [s.name, s]));
   const given = Object.entries(texts);
   if (given.some(([name, text]) => !slots.has(name) || typeof text !== "string")) return { ok: false, error: "Un des textes n’existe pas dans ce carrousel." };
-  const tooLong = given.find(([name, text]) => text.length > Math.max(slots.get(name)!.max_chars, 40) * 2 || text.length > 400);
+  const tooLong = given.find(([name, text]) => text.length > slotTextLimit(slots.get(name)!));
   if (tooLong) return { ok: false, error: "Un des textes est trop long pour sa place : raccourcis-le, ou demande à Simone de refaire la mise en page." };
   try {
     await saveSlides(studioId, postId, plan.data, { design: { ...design, texts: { ...design.texts, ...Object.fromEntries(given.map(([name, text]) => [name, text.trim()])) } } });

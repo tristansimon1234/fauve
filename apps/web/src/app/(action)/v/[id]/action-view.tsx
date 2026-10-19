@@ -24,12 +24,13 @@ import type { PlayerRef } from "@remotion/player";
 import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { CheckIcon, PenIcon, PlusIcon, WhatsAppIcon } from "@/components/icons";
 import { FormatBadge } from "@/components/format-badge";
-import { CarouselWords } from "@/components/montage/carousel-words";
+import { CarouselStudio } from "@/components/montage/carousel-studio";
 import { SlidePreview } from "@/components/montage/slide-preview";
 import { SlidesEditor } from "@/components/montage/slides-editor";
 import { TextBoxes } from "@/components/montage/text-boxes";
 import { TextSheet } from "@/components/montage/text-sheet";
 import { Orb } from "@/components/orb";
+import { whatsappLink } from "@/lib/public-env";
 import { ReelPlayer } from "@/components/reel-player";
 import { saveCarouselTexts, saveEditPlan, saveSlidesPlan, updatePost } from "@/app/(app)/publications/[id]/actions";
 
@@ -304,36 +305,28 @@ export function ActionView({
 
       {showGrid && <GridPreview cover={coverPhoto ? { url: coverPhoto.url, video: false } : videoUrl ? { url: videoUrl, video: true, at: cover && "at" in cover ? cover.at : DEFAULT_COVER_SECONDS } : (media[0] ?? null)} coverNode={slideNodes?.[0]} kind={post.kind} tiles={grid} />}
 
-      {editingSlides && design && (
-        <section aria-label="Les textes du carrousel" className="mt-3 flex flex-col gap-3">
-          <div className="mx-auto overflow-hidden rounded-[18px]" style={{ width: "min(100%, max(200px, calc((100dvh - 520px) * 4 / 5)))" }}>
-            <SlidePreview props={composedProps(wordsSlide)!} />
+      {editingSlides && design && slides && (
+        <section aria-label="Les textes du carrousel" className="mt-3 flex flex-col items-center gap-2">
+          <div className="w-full" style={{ maxWidth: "min(100%, max(220px, calc((100dvh - 330px) * 4 / 5)))" }}>
+            <CarouselStudio
+              design={design}
+              texts={words}
+              onChange={(slot, text) => {
+                setWords((w) => ({ ...w, [slot]: text }));
+                setToast(null);
+              }}
+              template={slides.plan.template}
+              brand={slides.brand}
+              photos={slides.carousel ?? []}
+              slide={wordsSlide}
+              onSlide={setWordsSlide}
+              canEdit
+              dark
+            />
           </div>
-          {design.count > 1 && (
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-              {Array.from({ length: design.count }, (_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setWordsSlide(i)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${i === wordsSlide ? "bg-white text-ink" : "bg-white/10 text-white/80"}`}
-                >
-                  Image {i + 1}
-                </button>
-              ))}
-            </div>
-          )}
-          <CarouselWords
-            design={design}
-            slide={wordsSlide}
-            texts={words}
-            dark
-            onChange={(slot, text) => {
-              setWords((w) => ({ ...w, [slot]: text }));
-              setToast(null);
-            }}
-          />
-          <p className="text-[12px] leading-snug text-white/50">La mise en page ou une image de plus : demande-le à Simone sur WhatsApp.</p>
+          <a href={whatsappLink(`Pour « ${post.title} », image ${wordsSlide + 1} : `)} className="flex items-center justify-center gap-1.5 py-1 text-[13px] font-semibold text-white/65">
+            <WhatsAppIcon size={14} /> Demander à Simone pour cette image
+          </a>
         </section>
       )}
 

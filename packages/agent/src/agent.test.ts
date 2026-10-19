@@ -3723,3 +3723,56 @@ test("model answers: read as written, then brought within their schema's limits"
     assert.doesNotThrow(() => withinLimits(answerSchema, {}));
   }
 });
+
+test("carousel editor: a tap on the image finds the text the slide drew there", async () => {
+  const { slotBoxes, plainWords } = await import("./text-spots.ts");
+  const run = (text: string, left: number, top: number, right: number, bottom: number) => ({ text, left, top, right, bottom });
+  const texts = {
+    s1_surtitre: "Atelier Mila · Nantes",
+    s1_titre: "3 gestes pour une couleur qui brille cet hiver",
+    s3_numero: "1",
+    s3_titre: "Rince à l’eau tiède, puis fraîche.",
+    s7_signature: "Atelier Mila · Nantes",
+    footer: "Lien en bio",
+  };
+  assert.equal(plainWords("L’EAU chaude  "), "l'eau chaude");
+
+  // The title on three lines with a word set apart for its colour, the kicker in capitals by the code, an arrow beside the footer.
+  const cover = slotBoxes(
+    [
+      run("ATELIER MILA · NANTES", 20, 10, 200, 24),
+      run("3 gestes pour", 20, 40, 180, 70),
+      run("une couleur qui", 20, 72, 200, 102),
+      run("brille", 20, 104, 80, 134),
+      run("cet hiver", 84, 104, 180, 134),
+      run("Lien en bio", 20, 300, 120, 316),
+      run("→", 130, 300, 140, 316),
+    ],
+    texts,
+    ["s1_surtitre", "s1_titre", "footer"],
+  );
+  assert.deepEqual(cover, {
+    s1_surtitre: { left: 20, top: 10, right: 200, bottom: 24 },
+    s1_titre: { left: 20, top: 40, right: 200, bottom: 134 },
+    footer: { left: 20, top: 300, right: 120, bottom: 316 },
+  });
+
+  // French spaces and apostrophes as the slide sets them; a number alone is its own text.
+  const step = slotBoxes([run("1", 10, 10, 30, 60), run("Rince à l'eau", 40, 10, 200, 30), run("tiède, puis fraîche.", 40, 32, 220, 52)], texts, ["s3_numero", "s3_titre"]);
+  assert.deepEqual(step, { s3_numero: { left: 10, top: 10, right: 30, bottom: 60 }, s3_titre: { left: 40, top: 10, right: 220, bottom: 52 } });
+  // A line drawing the number with its title goes to the title.
+  assert.deepEqual(Object.keys(slotBoxes([run("1 — Rince à l’eau tiède, puis fraîche.", 10, 10, 300, 40)], texts, ["s3_numero", "s3_titre"])), ["s3_titre"]);
+
+  // A short word two texts hold joins the one drawn next to it; a slot of another slide is never found here.
+  const words = { a: "le froid et le chaud", b: "le soin et la couleur" };
+  const split = slotBoxes([run("le froid", 0, 0, 80, 20), run("et", 84, 0, 100, 20), run("le chaud", 104, 0, 180, 20), run("le soin", 0, 200, 70, 220), run("la couleur", 74, 200, 160, 220)], words, ["a", "b"]);
+  assert.deepEqual(split.a, { left: 0, top: 0, right: 180, bottom: 20 });
+  assert.deepEqual(split.b, { left: 0, top: 200, right: 160, bottom: 220 });
+  assert.equal(slotBoxes([run("Atelier Mila · Nantes", 0, 0, 100, 20)], texts, ["s1_surtitre"]).s7_signature, undefined);
+
+  // Her words take up to twice their room (40 characters at least), never more than 400.
+  const { slotTextLimit } = await import("./carousel.ts");
+  assert.equal(slotTextLimit({ max_chars: 2 }), 80);
+  assert.equal(slotTextLimit({ max_chars: 55 }), 110);
+  assert.equal(slotTextLimit({ max_chars: 300 }), 400);
+});
