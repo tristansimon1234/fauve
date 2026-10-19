@@ -389,7 +389,7 @@ export const toolSpecs = {
   },
   restyle_reel: {
     description:
-      "Sous son premier Reel, la gérante a les boutons « Ça me ressemble », « Plus rapide », « Moins de texte », « Plus chaleureux », « Autre chose ». Quand elle répond « Plus rapide » (punchier), « Moins de texte » (sober) ou « Plus chaleureux » (warmer), ou le dit avec ses mots, appelle restyle_reel avec ce style ; pour « Autre chose », demande-lui d'abord en une question ce qu'elle changerait, puis appelle restyle_reel avec style « custom » et wish (sa demande, avec ses mots, courte). Dans tous les cas, l'ajustement est gardé dans sa direction artistique pour tous les prochains montages, et une version corrigée de ce Reel part aussitôt (son clic vaut accord : pas de devis à présenter). Le coût est celui d'une correction, débité à la livraison. Annonce-le en une phrase, avec le coût.",
+      "Sous son premier Reel, la gérante a les boutons « Ça me ressemble », « Plus rapide », « Moins de texte », « Plus chaleureux », « Autre chose ». Quand elle répond « Plus rapide » (punchier), « Moins de texte » (sober) ou « Plus chaleureux » (warmer), ou le dit avec ses mots, appelle restyle_reel avec ce style ; pour « Autre chose », demande-lui d'abord en une question ce qu'elle changerait, puis appelle restyle_reel avec style « custom » et wish (sa demande, avec ses mots, courte). Dans tous les cas, l'ajustement est gardé dans sa direction artistique pour tous les prochains montages, et une version corrigée de ce Reel part aussitôt (son clic vaut accord : pas de devis à présenter). Le coût est celui d'une correction, débité à la livraison, qui le dit. Annonce en une phrase ce qui part.",
     input: z.object({
       post_id: z.uuid(),
       style: z.enum([...RESTYLES, "custom"]),

@@ -45,8 +45,10 @@ export default function PrivacyPage() {
         <li>Vercel (hébergement du site et des traitements) : exécution en France (Paris).</li>
         <li>Meta Platforms (WhatsApp Business) : messagerie.</li>
         <li>Anthropic (modèle d’IA Claude) : rédaction, planification et plans de montage.</li>
-        <li>Google (modèle d’IA Gemini) : analyse des vidéos.</li>
-        <li>Prestataire de publication (Ayrshare) : connexion et publication sur Instagram et TikTok.</li>
+        <li>Google (modèle d’IA Gemini) : lecture des vidéos et des photos, images par IA.</li>
+        <li>ElevenLabs : voix off, lecture des messages vocaux et musique des Reels.</li>
+        <li>TypeSafe : choix de la réaction de Simone aux messages écrits dans l’application.</li>
+        <li>Meta Platforms (Instagram) et TikTok : publication sur tes comptes, à ta demande.</li>
         <li>Stripe : paiement de l’abonnement.</li>
       </ul>
       <p>
@@ -57,7 +59,8 @@ export default function PrivacyPage() {
       <h2>Durées de conservation</h2>
       <ul>
         <li>Données du studio, conversations et médias : pendant l’abonnement, puis supprimées sous 30 jours après la résiliation.</li>
-        <li>Codes et liens de connexion : 15 minutes maximum.</li>
+        <li>Photos et vidéos envoyées : supprimées 24 h après la mise en ligne de la publication qui les utilise, ou 7 jours après leur envoi si aucune ne les utilise (jusqu’à 6 mois pour les meilleures vidéos, gardées pour tes prochains Reels).</li>
+        <li>Codes et liens de connexion : à usage unique, 15 minutes maximum (24 heures pour le lien d’une publication envoyé sur WhatsApp).</li>
         <li>Factures : 10 ans (obligation légale).</li>
       </ul>
 

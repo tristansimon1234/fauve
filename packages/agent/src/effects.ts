@@ -157,14 +157,14 @@ export function effectsTask(input: EffectsTaskInput): string {
       ? [
           "",
           `Sa voix off : ${UPLOADS}/${voice.name} (${Math.round(voice.seconds * 10) / 10} s ; ses mots et leurs temps dans ${UPLOADS}/${voice.words}). Ce qu'elle dit : « ${voice.text.trim()} »`,
-          "Pose-la entière et telle quelle, son premier mot vers 0,2 s, sans la couper, la ralentir ni la retoucher ; le Reel dure la voix plus 1 à 2 s. Cale tes coupes et ton effet sur ses phrases. Écris ses mots en sous-titres, 2 ou 3 mots à la fois, petits et lisibles comme les sous-titres d'Instagram, dans le style du Reel, au-dessus des 320 px du bas ; la voix porte le message, peu d'autre texte.",
+          "Pose-la entière et telle quelle, son premier mot vers 0,2 s, sans la couper, la ralentir ni la retoucher ; le Reel dure la voix plus 1 à 2 s. Cale tes coupes et ton effet sur ses phrases. Écris ses mots en sous-titres, 2 ou 3 mots à la fois, petits et lisibles comme les sous-titres d'Instagram, dans le style du Reel, au-dessus du quart bas de l'image (480 px) ; la voix porte le message, peu d'autre texte.",
         ]
       : []),
     "",
     "Le Reel :",
     `- 1080×1920, recadré sur ce qui compte, sans bandes ; 30 i/s ; H.264 yuv420p (CRF 18) avec une piste son AAC ; 7 à ${MAX_REEL_SECONDS} s (7 à 15 s pour un effet ou une annonce, plus quand une voix raconte) ;`,
     "- il accroche dès la première image : l'effet, ou ce qui intrigue, commence tout de suite ; coupe les secondes d'attente avant le geste et ce qui ne sert pas ;",
-    "- les textes se lisent sur un téléphone et restent dans la zone sûre d'Instagram : rien d'important dans les 320 px du bas ni les 140 px de droite. Peu de texte, des phrases courtes de créateur, en français, avec les espaces insécables avant : ; ! ? % ; jamais une pub ni un flyer ;",
+    "- les textes se lisent sur un téléphone et restent dans la zone sûre d'Instagram : rien d'important dans le quart bas (480 px), à moins de 140 px des côtés ni dans les 80 px du haut, comme le reste de nos Reels. Peu de texte, des phrases courtes de créateur, en français, avec les espaces insécables avant : ; ! ? % ; jamais une pub ni un flyer ;",
     "- un visage reste dégagé, sauf quand l'effet le demande (un texte né entre ses doigts devant son visage, un effet posé sur elle) ;",
     // The mix that lays the music brings the video's own sound to a voice's level: a quiet room tone left in would come up with it.
     `- le son : ${voice ? "sa voix off" : "la voix de quelqu'un qui parle dans ses vidéos"} reste claire ; le reste du son d'origine se coupe : une musique est posée sous le Reel après toi, n'en mets pas. Des bruitages seulement quand l'effet les appelle (un dessin animé, une explosion), discrets.`,
@@ -189,9 +189,9 @@ export function effectsRubric({ voice }: { voice: boolean }): string {
     "L'effet suit ce à quoi il est accroché dans sa vidéo, à chaque image où il en dépend (place, taille, angle ou timing) : vérifié sur les images des moments où ça bouge.",
     "Il se passe quelque chose dès la première seconde : l'effet ou ce qui intrigue, pas des secondes d'attente.",
     "6 à 10 images frame-<temps>.jpg du Reel final, qui couvrent chaque moment de l'effet.",
-    "Sur ces images, chaque texte est entier dans le cadre, lisible à la taille d'un téléphone, et hors des 320 px du bas et des 140 px de droite.",
+    "Sur ces images, chaque texte est entier dans le cadre, lisible à la taille d'un téléphone, et hors du quart bas (480 px), à 140 px au moins des côtés.",
     "Le style va avec sa demande, ou avec le Reel qu'elle recopie : rien qui fasse pub ou flyer (étoile promo, badge de soldes), sauf si elle l'a demandé ou si l'univers qu'elle nomme le fait lui-même (des traits de vitesse dans un manga, une explosion dans un dessin animé).",
-    ...(voice ? ["Sa voix off est entière et intacte, son premier mot vers 0,2 s, et ses mots sont sous-titrés, lisibles, hors des 320 px du bas."] : []),
+    ...(voice ? ["Sa voix off est entière et intacte, son premier mot vers 0,2 s, et ses mots sont sous-titrés, lisibles, hors du quart bas (480 px)."] : []),
     `${WORDS_FILE} liste chaque texte écrit à l'écran (hors sous-titres) avec un libellé pour elle, son texte et sa longueur maximale ; ${KIT_FILE} contient render.py, qui refait reel.mp4 à partir de ${WORDS_FILE} et de ses fichiers, sans rien télécharger.`,
     "notes.md dit ce qui a été mesuré, comment l'effet suit la vidéo et ce qui a été corrigé après avoir regardé ; message.txt lui parle en deux phrases.",
   ];

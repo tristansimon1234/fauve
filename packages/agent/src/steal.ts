@@ -223,7 +223,7 @@ function keptWords(look: StolenLook): string {
 export function stolenStyleMessage(style: StolenStyle, making: boolean): string {
   return [
     `J’ai regardé ce Reel 👀 Voilà ce que je reprends pour ${making ? "le tien" : "ton prochain Reel"} :`,
-    stolenStyleLines(style).map((line) => `• ${line}`).join("\n"),
+    stolenStyleLines(style).join("\n"),
     `${keptWords(style.look)} : sa façon de faire, jamais ses images ni ses mots. ${
       making ? "Ton Reel arrive dans quelques minutes." : "Envoie-moi tes vidéos ou tes photos (ou dis-moi lesquelles prendre) et je te fais le tien comme ça."
     }`,

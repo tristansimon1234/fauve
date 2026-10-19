@@ -8,7 +8,8 @@ import { z } from "zod";
 import type { DeleteResult } from "@/components/delete-button";
 import { NOT_SCHEDULED, scheduleValidated } from "@/lib/posts";
 import { renderPost } from "@/lib/render/render-post";
-import { knownLayerCode, renderSlides, saveSlides } from "@/lib/render/slides";
+import { readPostMusic } from "@/lib/render/music";
+import { knownLayerCode, renderSlides, saveSlides, type SlidesRender } from "@/lib/render/slides";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -116,7 +117,7 @@ export async function deletePost(postId: string): Promise<DeleteResult> {
   const studioId = member.studio.id;
   const db = supabaseAdmin();
 
-  const { data: post } = await db.from("posts").select("id, status, publish_started_at").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  const { data: post } = await db.from("posts").select("id, status, publish_started_at, slides_render, music").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   if (!post) return { ok: false, error: "Publication introuvable." };
   if (post.status === "scheduled" && post.publish_started_at) {
     return { ok: false, error: "Elle est en train de partir sur Instagram : réessaie dans une minute." };
@@ -126,7 +127,10 @@ export async function deletePost(postId: string): Promise<DeleteResult> {
   const { data: plans } = await db.from("edit_plans").select("id").eq("post_id", postId);
   const planIds = (plans ?? []).map((p) => p.id as string);
   const { data: renders } = planIds.length ? await db.from("renders").select("storage_path").in("edit_plan_id", planIds) : { data: [] };
-  const files = (renders ?? []).map((r) => r.storage_path as string | null).filter((p): p is string => Boolean(p?.startsWith(`${studioId}/`)));
+  // Its rendered carousel images and its music piece too: they stayed in storage after the post was gone.
+  const slides = ((post.slides_render as SlidesRender | null)?.paths ?? []) as (string | null)[];
+  const music = readPostMusic(post.music).track?.path ?? null;
+  const files = [...(renders ?? []).map((r) => r.storage_path as string | null), ...slides, music].filter((p): p is string => Boolean(p?.startsWith(`${studioId}/`)));
 
   const { error } = await db.from("posts").delete().eq("id", postId).eq("studio_id", studioId);
   if (error) {

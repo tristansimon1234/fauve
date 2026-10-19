@@ -1,5 +1,5 @@
 import "server-only";
-import { awaitsAnswer, echoFor, emojiOnly, segmentKind, editPlanSchema } from "@fauve/agent";
+import { awaitsAnswer, echoFor, emojiOnly, segmentKind, editPlanSchema, MAX_MONTAGE_FILES } from "@fauve/agent";
 import { after } from "next/server";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { reactTo, type Reaction } from "@/lib/agent/mood";
@@ -184,7 +184,8 @@ export type SendResult =
 /** A photo or video the browser already uploaded to Storage under `<studio>/chat/`. */
 export type Attachment = { path: string; mime: string; size: number };
 
-const MAX_ATTACHMENTS = 10;
+// As many as the drop zone takes (chat-uploads.tsx, MAX_FILES): the 11th to 20th files were dropped without a word.
+const MAX_ATTACHMENTS = MAX_MONTAGE_FILES;
 
 /**
  * Sends a message to Fauve: in `conversationId`, or in a new conversation when
