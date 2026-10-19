@@ -78,6 +78,24 @@ export function checkCarouselCode(code: string): string[] {
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n).trimEnd() : s);
 
 /**
+ * The designer's words as they will read: a character written as a code (a JSON string escaped
+ * twice gave « chaude : » on a slide) becomes that character. The engine sets the French
+ * spaces itself (frenchTypography).
+ */
+export function cleanSlotText(text: string): string {
+  const char = (code: number) => (code >= 32 ? String.fromCharCode(code) : " ");
+  return text
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => char(parseInt(hex, 16)))
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&rsquo;/gi, "’")
+    .replace(/&#(\d{2,5});/g, (_, n: string) => char(Number(n)))
+    .replace(/&#x([0-9a-fA-F]{2,4});/gi, (_, hex: string) => char(parseInt(hex, 16)))
+    .replace(/&amp;/gi, "&");
+}
+
+/**
  * The designer's answer as a carousel (its code already transpiled), bounded: its slots,
  * their words, its fonts, the photos its code reads (only those she was offered). The
  * problems go back to the designer.
@@ -99,7 +117,7 @@ export function carouselFromOutput(output: CarouselOutput, js: string, offered: 
   const texts: Record<string, string> = {};
   for (const t of output.texts) {
     if (!SLOT_NAME.test(t.slot)) continue;
-    texts[t.slot] = clip(t.text, 400);
+    texts[t.slot] = clip(cleanSlotText(t.text), 400);
     // A text without its slot is still hers to edit: its slide from its name (s3_… is on slide 3).
     if (!slots.has(t.slot)) {
       const slide = Number(/^s(\d{1,2})_/.exec(t.slot)?.[1] ?? 0);
@@ -158,7 +176,7 @@ Typographie :
 - Une vraie hiérarchie : un titre très grand (souvent 120 à 240 px), un texte de 34 à 44 px, rien sous 26 px.
 - Lignes équilibrées (textWrap: "balance"), jamais un mot seul sur sa ligne, interlignage serré sur les grands titres.
 - Contraste fort : encre sur clair, blanc cassé sur sombre ou sur une photo assombrie. Jamais un jaune ou un pastel saturé sur un grand titre.
-- Les espaces de la typographie française (avant : ; ! ? et dans « ») arrivent insécables dans texts : garde-les.
+- La typographie française est posée par le moteur : dans le code, texts arrive avec ses espaces fines insécables (avant : ; ! ? et dans « ») et ses apostrophes ’, ne coupe jamais un texte sur ces espaces. Dans « texts », écris des espaces et des apostrophes ordinaires, jamais un code d'échappement.
 
 Les mots :
 - Les siens : vrais, concrets, tirés de sa demande et des faits du commerce. N'invente jamais un prix, un horaire, une offre, un chiffre ou un avis de client qu'on ne t'a pas donnés.
@@ -187,7 +205,7 @@ Regarde :
 - la couverture : elle arrête le pouce, se lit en petit, et tient recadrée en 3:4 ;
 - l'histoire : la 2e diapositive tient seule, une idée par diapositive, une progression, un appel concret à la fin ;
 - la lisibilité sur un téléphone : le contraste (un texte sur une zone chargée ou de la même valeur que lui, c'est non), les tailles, rien de coupé, rien qui se chevauche sans le vouloir, aucun visage ni le sujet couvert par un texte ;
-- la typographie : la hiérarchie, les alignements, des marges régulières, aucun mot seul sur sa ligne, aucun « ? » seul, aucune police de secours ;
+- la typographie : la hiérarchie, les alignements, des marges régulières, aucun mot seul sur sa ligne, aucun « ? » seul, aucune police de secours, aucun code affiché à la place d'un caractère (« \\u00a0 », « &nbsp; ») ;
 - les photos : assez grandes, bien cadrées, jamais déformées ; un détourage propre ;
 - la série : on reconnaît le commerce d'un bout à l'autre et les mises en page varient ; ni modèle tout fait, ni pub, ni flyer ; sa charte suivie (une liberté que sa demande veut n'est pas un défaut) ;
 - les mots : vrais, courts, les siens, sans formule de pub ni tiret long.
