@@ -177,7 +177,7 @@ export function effectsTask(input: EffectsTaskInput): string {
     `- ${KIT_FILE} : render.py et tout ce qu'il lit (mesures, masques, polices…), sans ses fichiers à elle ;`,
     "- 6 à 10 images JPEG du Reel final aux moments qui comptent, nommées par leur temps : frame-03.40s.jpg… ;",
     "- notes.md : ce que tu as mesuré, comment l'effet suit la vidéo, ce que tu as corrigé après avoir regardé, en quelques lignes ;",
-    "- message.txt : deux phrases pour elle, en la tutoyant, sans jargon : ce que tu as fait de son idée, et, si un moment manquait dans ses vidéos pour que l'effet soit parfait, ce qu'elle peut filmer en quelques secondes.",
+    "- message.txt : deux phrases pour elle, en la tutoyant, sans jargon : ce que tu as fait de son idée, et, si un moment manquait dans ses vidéos pour que l'effet soit parfait, ce qu'elle peut filmer en quelques secondes. Jamais le nom d'un de tes fichiers ni comment changer ses mots : l'app le lui dit.",
   ].join("\n");
 }
 
@@ -277,12 +277,28 @@ export function effectsReplayTask(files: string[]): string {
   ].join("\n");
 }
 
-/** Her two sentences from message.txt, cleaned and bounded (null when the agent wrote none). */
+/** One of the agent's files (words.json, render.py, kit.tar.gz…): never named to her. */
+const AGENT_FILE = /\b[\w-]+\.(?:json|py|txt|md|tar|gz|zip|mp4|mov|png|jpe?g|webp)\b/i;
+
+/**
+ * Her two sentences from message.txt, cleaned and bounded (null when the agent wrote none). A clause that
+ * names one of its files goes, from its colon, semicolon, dash or bracket (else its sentence): the agent
+ * once told her « tu peux changer ces mots toi-même dans words.json »; the delivery says where she does it.
+ */
 export function effectsMessage(text: string | null | undefined): string | null {
   const clean = (text ?? "")
     .replace(/[#*_`>]+/g, "")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .split(/(?<=[.!?…])\s+/)
+    .map((sentence) => {
+      const at = sentence.search(AGENT_FILE);
+      if (at < 0) return sentence;
+      const cut = Math.max(...[" : ", " ; ", " — ", " – ", " ("].map((mark) => sentence.lastIndexOf(mark, at)));
+      return cut > 0 ? `${sentence.slice(0, cut).replace(/[\s,]+$/, "")}.` : "";
+    })
+    .filter(Boolean)
+    .join(" ");
   if (!clean) return null;
   if (clean.length <= 500) return clean;
   const cut = clean.slice(0, 500);
