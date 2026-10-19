@@ -1790,6 +1790,110 @@ test("quality checks: what the Reels that work have, read on the plan for the cr
   assert.equal(qualityChecks(talk).find((c) => c.key === "pace")!.ok, true);
 });
 
+test("copy first: what the Reel she copies (or her request) does not have is never asked", async () => {
+  const { qualityChecks, qualityLine, planDigest, alternativeBrief, MONTAGE_CRITIC_PROMPT } = await import("./critic.ts");
+  const { followedChecks, followedFrom, followedLine, clampLook } = await import("./steal.ts");
+  const { wantsVoiceOver, voiceLeftToSimone, VOICE_OVER_PROMPT } = await import("./voice-over.ts");
+  const { EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
+  const { CAROUSEL_DESIGNER_PROMPT, CAROUSEL_CRITIC_PROMPT } = await import("./carousel.ts");
+
+  // The Reel she copies: no text at all, it opens on a gesture, a shot every 3 s, nobody speaks, a quiet end.
+  const look = clampLook({
+    name: "geste sans texte",
+    format: "autre",
+    voice: "aucune",
+    hook: { kind: "geste", what: "une main qui pose une tasse" },
+    text: { amount: "aucun", composition: "aucun texte", case: "normal", weight: "regular", tracking: "normal", align: "center", stress: "none", band: "none", subtitles: false, font: "" },
+    colors: [],
+    effect: "none",
+    grade: "natural",
+    motion: "epure",
+    camera: "fixe",
+    transitions: "coupes nettes",
+    music: "slow lo-fi piano",
+    ending: "un plan fixe tenu sur la tasse, sans texte.",
+    why: "Le calme et le geste.",
+  });
+  const followed = followedFrom("11111111-2222-4333-8444-555555555555", { look, measures: { duration: 12, cuts: [3, 6, 9], bpm: null, lufs: null } });
+  const options = followedChecks(followed);
+  assert.deepEqual(options, { paceCeiling: 3.8, wordlessHook: true, manyTexts: false });
+  assert.deepEqual(followedChecks(undefined), {});
+  // The critic knows how it ends and who speaks in it.
+  assert.match(followedLine(followed), /voix : aucune ; .*fin : un plan fixe tenu sur la tasse, sans texte$/);
+
+  // Its copy: no text, slow shots, a first shot of 3 s. Our defaults would ask a hook, a cut before 2 s and a faster pace.
+  const calm = editPlanObjectSchema.parse({
+    ...validPlan,
+    template: "libre",
+    duration: 12,
+    images: [],
+    subtitles: false,
+    segments: [
+      { clip_id: "a", in: 0, out: 3, zoom: "none" },
+      { clip_id: "b", in: 0, out: 3, zoom: "none" },
+      { clip_id: "c", in: 0, out: 3, zoom: "none" },
+      { clip_id: "d", in: 0, out: 3, zoom: "none" },
+    ],
+    texts: [],
+  });
+  assert.deepEqual(
+    qualityChecks(calm)
+      .filter((c) => !c.ok && c.must)
+      .map((c) => c.key)
+      .sort(),
+    ["hook", "opening", "pace"],
+  );
+  assert.deepEqual(qualityChecks(calm, options).filter((c) => !c.ok && c.must), []);
+  assert.match(qualityLine(calm, options), /pas d'accroche écrite dès la 1re image, comme le Reel qu'elle recopie/);
+  assert.doesNotMatch(planDigest(calm, options), /à revoir/);
+  // The second take (Max) keeps the copied form too.
+  assert.doesNotMatch(alternativeBrief(calm, null, options), /à revoir/);
+  assert.match(alternativeBrief(calm, null, options), /le Reel qu'elle recopie s'il y en a un/);
+
+  // A copied Reel with several texts (steps, a mini-tutorial): more than two are its form.
+  const many = followedChecks({ ...followed, look: { ...look, hook: { ...look.hook, kind: "question" }, text: { ...look.text, amount: "plusieurs" } } });
+  assert.deepEqual(many, { paceCeiling: 3.8, wordlessHook: false, manyTexts: true });
+  const steps = {
+    ...calm,
+    texts: [
+      { text: "3 gestes pour ta peau", from: 0, to: 2.5, style: "hook" as const },
+      { text: "un", from: 3, to: 5, style: "caption" as const },
+      { text: "deux", from: 6, to: 8, style: "caption" as const },
+      { text: "trois", from: 9, to: 11, style: "caption" as const },
+    ],
+  };
+  assert.equal(qualityChecks(steps).find((c) => c.key === "texts")!.ok, false);
+  const texts = qualityChecks(steps, many).find((c) => c.key === "texts")!;
+  assert.equal(texts.ok, true);
+  assert.match(texts.words, /plusieurs, comme le Reel qu'elle recopie/);
+
+  // The voice: left to Simone, the Reel she copies decides; her own choices stay hers.
+  const base = { post: null, studio: "auto" as const, onReel: null, correction: false, speechInClips: false, footageSeconds: 14, photos: 0 };
+  assert.equal(voiceLeftToSimone(base), true);
+  assert.equal(wantsVoiceOver({ ...base, copied: "aucune" }), false);
+  assert.equal(wantsVoiceOver({ ...base, copied: "quelqu'un parle" }), false);
+  assert.equal(wantsVoiceOver({ ...base, copied: "voix off" }), true);
+  assert.equal(wantsVoiceOver({ ...base, copied: "voix off", footageSeconds: 6 }), false, "too little to show while a voice speaks");
+  assert.equal(voiceLeftToSimone({ ...base, post: { mode: "on" } }), false);
+  assert.equal(wantsVoiceOver({ ...base, post: { mode: "on" }, copied: "aucune" }), true);
+  assert.equal(voiceLeftToSimone({ ...base, studio: "always" }), false);
+  assert.equal(wantsVoiceOver({ ...base, studio: "always", copied: "aucune" }), true);
+  assert.equal(voiceLeftToSimone({ ...base, correction: true }), false);
+  assert.equal(voiceLeftToSimone({ ...base, onReel: "simone" }), false);
+
+  // Every model is told: her request and the Reel or carousel she copies come before our defaults.
+  assert.match(EDITOR_SYSTEM_PROMPT, /sa demande pour ce Reel et le Reel qu'elle recopie \(« reel_a_recopier »\) passent avant/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /aucun texte d'accroche quand « reel_a_recopier » n'en a pas .* ou que sa demande n'en veut pas/);
+  // What her request does not mention is still decided by the defaults: only what she sets aside falls.
+  assert.match(EDITOR_SYSTEM_PROMPT, /Ce que sa demande ne dit pas, tes repères le décident/);
+  assert.match(CAROUSEL_DESIGNER_PROMPT, /Ce que sa demande ne dit pas, ces repères le décident/);
+  assert.doesNotMatch(EDITOR_SYSTEM_PROMPT, /\(au moins 2\)/);
+  assert.match(MONTAGE_CRITIC_PROMPT, /le Reel qu'elle recopie \(ligne « Reel à recopier »\) passe aussi avant tes repères/);
+  assert.match(VOICE_OVER_PROMPT, /sans invitation s'il n'en a pas/);
+  assert.match(CAROUSEL_DESIGNER_PROMPT, /l'exemple qu'elle aime \(« Exemple qu'elle aime »\) passent avant/);
+  assert.match(CAROUSEL_CRITIC_PROMPT, /l'exemple qu'elle aime, quand il y en a un, passent avant ces repères/);
+});
+
 test("editor: the signature transition goes on the shot where the band appears, the schema stays small", async () => {
   const { fromEditorPlan, signatureShot, editorOutputSchema } = await import("./editor.ts");
   const { z } = await import("zod");

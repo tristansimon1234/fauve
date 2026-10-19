@@ -226,7 +226,12 @@ async function design(input: CarouselRequest, ctx: Context, previous?: CarouselP
 
 async function review(input: CarouselRequest, ctx: Context, made: CarouselDesign, stills: Buffer[]) {
   const slides = (await Promise.all(stills.map((jpeg) => seen(jpeg)))).flatMap((image, i) => (image ? [{ type: "text" as const, text: `Diapositive ${i + 1} :` }, image] : []));
+  // The carousel she likes: its form is the model, so the critic compares with it (never its words nor its pictures).
+  const examples = (await Promise.all((await exampleUrls(input)).map((url) => seen(url)))).flatMap((image, i) =>
+    image ? [{ type: "text" as const, text: `Exemple qu'elle aime ${i + 1} (sa forme est le modèle ; jamais ses mots, ses images ni sa marque) :` }, image] : [],
+  );
   const content = [
+    ...examples,
     ...slides,
     {
       type: "text" as const,

@@ -414,13 +414,14 @@ export async function designEdit(params: {
   Object.assign(plan, finishPlan(plan, facts, durations));
 
   // Her voice plays with its first word at once, her words as subtitles; without it, the plan has no voice.
+  // The Reel she copies wins over these defaults: a voice it speaks without subtitles, several texts it sets over its voice.
   if (voice && voiceId && spoken) {
     plan.voice = { media_id: voiceId, at: voiceStart };
-    plan.subtitles = true;
+    plan.subtitles = !followed || followed.look.voice === "aucune" || followed.look.text.subtitles;
     // Her voice leads: the Reel holds a moment after its last word, and the other texts keep to
     // its silences (its words are the subtitles; the hook stays over its first phrase).
     Object.assign(plan, holdAfterVoice(plan, spoken.ends_at, durations));
-    plan.texts = clearOfVoice(plan.texts, spoken.phrases);
+    if (followed?.look.text.amount !== "plusieurs") plan.texts = clearOfVoice(plan.texts, spoken.phrases);
   } else delete plan.voice;
 
   // The animations of the version corrected: a scene kept by its id keeps the photos it composes with.

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_AVERAGE_SHOT, type QualityOptions } from "./critic.ts";
 import { BEAT_STEP } from "./mix.ts";
 import { clip, SIGNATURE_GRADES, type BrandSignature } from "./signature.ts";
 
@@ -324,17 +325,35 @@ export function followedForEditor(followed: FollowedStyle) {
   };
 }
 
-/** The followed style in one line, for the critic: the Reel must follow it. */
+/** The followed style in one line, for the critic: the Reel must follow it, its ending and its voice too. */
 export function followedLine(followed: FollowedStyle): string {
   const { look } = followed;
   return [
     `Reel à recopier (un Reel qu'elle a envoyé, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
     `accroche ${look.hook.kind}`,
     `texte : ${look.text.amount}`,
+    // With a voice, whether its words are written on screen: a copy may speak without subtitles.
+    look.voice === "aucune" ? "voix : aucune" : `voix : ${look.voice}, ${look.text.subtitles ? "avec" : "sans"} sous-titres`,
     ...(takenLook(look) ? [takenLook(look)!] : []),
     ...(look.effect !== "none" ? [EFFECT_WORDS[look.effect]] : []),
     `transitions : ${look.transitions}`,
+    `fin : ${look.ending.replace(/[.\s]+$/, "")}`,
   ].join(" ; ");
+}
+
+/**
+ * What the Reel she copies changes in the quality checks (Tristan: « mais si par exemple elle
+ * veut copier un autre reel ? »): its pace, a hook without written words (it opens on a gesture,
+ * or has no text at all), several texts. Our defaults never ask a Reel to be what it copies is not.
+ */
+export function followedChecks(followed: FollowedStyle | undefined): QualityOptions {
+  if (!followed) return {};
+  const { text, hook } = followed.look;
+  return {
+    paceCeiling: paceCeiling(MAX_AVERAGE_SHOT, followed),
+    wordlessHook: text.amount === "aucun" || hook.kind === "geste" || hook.kind === "aucun",
+    manyTexts: text.amount === "plusieurs",
+  };
 }
 
 /** The longest average shot a Reel may have, with a followed style that takes its time (a posed Reel, a told one). */

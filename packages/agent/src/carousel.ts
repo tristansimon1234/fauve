@@ -163,6 +163,7 @@ Ce qui fait un carrousel qui marche :
 - Une série : les mêmes polices, couleurs, marges et la même grille d'un bout à l'autre, pour qu'on reconnaisse le commerce ; mais la mise en page change d'une diapositive à l'autre (la même boîte sur chaque photo fait modèle gratuit).
 - De la continuité quand elle sert : une photo, un trait, une forme qui passe d'une diapositive à la suivante (Strip) donne envie de glisser.
 - Souvent 6 à 8 diapositives ; sa demande et ses photos décident (3 au moins, 10 au plus).
+- Ces repères sont des réglages par défaut, jamais des obligations face à elle : sa demande et l'exemple qu'elle aime (« Exemple qu'elle aime ») passent avant. Ce que l'exemple n'a pas, ou que sa demande écarte (une diapositive d'appel à la fin, un logo, une promesse en titre sur la couverture, du texte sur chaque photo), son carrousel ne l'a pas ; ce qu'ils ont ou demandent, il le prend (leur nombre de diapositives, une couverture sans texte, de longs textes, une grille de photos) ; toujours avec ses photos et ses mots à elle. Ce que sa demande ne dit pas, ces repères le décident.
 
 Les formes sont des pistes, jamais un modèle : éditorial (une grande photo, peu de texte, beaucoup d'air) ; typographie forte sur un aplat de sa couleur (une diapositive de texte, sans photo) ; collage fait main (photos qui se chevauchent, scotch, notes et flèches tracées à la main en SVG, papier, grain, sujets détourés en autocollants) ; couverture de magazine (le titre derrière la personne) ; un sujet qui sort de son cadre ; avant/après ; étapes numérotées ; les mots d'une cliente ; menu ou tarifs ; grille de photos. Choisis ce qui sert son message et sa direction artistique, et fais-les vivre ensemble dans la série. Quand sa demande décrit une forme, un univers ou un carrousel qu'elle aime, c'est lui qui décide.
 
@@ -171,7 +172,7 @@ Ses photos sont le cœur :
 - Un texte sur une photo seulement là où il se lit (une zone calme, un dégradé, un aplat, une bande), jamais sur un visage ni sur ce qu'on doit voir (le plat, la coupe, le produit). Chaque photo est décrite dans « photos » : ce qu'elle montre, son format, où est son sujet.
 - Une photo « detouree » donne son sujet : <Subject> par-dessus sa photo fait passer un titre derrière la personne, ou sortir sa tête du cadre ; <Cutout> le pose comme un autocollant au bord blanc. Seulement ces photos-là ; un sujet coupé par le bord de sa photo (« sujet_coupe_par ») garde ce bord net : fais-le sortir du bord de la diapositive ou cache la coupe, jamais une coupe visible au milieu.
 - Sans photo, ou pour une diapositive de texte, compose avec sa charte : aplat, papier, formes, son logo.
-- Son logo, petit, sur la couverture ou la dernière diapositive, jamais en filigrane sur chacune.
+- Son logo, petit, sur la couverture ou la dernière diapositive (sauf si l'exemple qu'elle aime n'en a pas), jamais en filigrane sur chacune.
 - Ce qui fait humain : un geste de la main (un mot ou une flèche tracés, un scotch posé de travers, une photo un peu inclinée), une vraie lumière, de l'air. Ce qui fait générique : dégradés arc-en-ciel, ombres lourdes, pictos clipart, emojis, cadres décoratifs partout.
 
 Typographie :
@@ -206,10 +207,11 @@ Réponds avec : name (court et parlant), count, outline (ce que dit chaque diapo
 export const CAROUSEL_CRITIC_PROMPT = `Tu es directeur artistique. On te montre toutes les diapositives d'un carrousel Instagram fait pour un commerce de quartier, dans l'ordre, avec ce qu'elle a demandé et sa charte. Dis si un graphiste exigeant le publierait tel quel.
 Regarde :
 - la couverture : elle arrête le pouce, se lit en petit, et tient recadrée en 3:4 ;
-- l'histoire : la 2e diapositive tient seule, une idée par diapositive, une progression, un appel concret à la fin ;
+- l'histoire : la 2e diapositive tient seule, une idée par diapositive, une progression, un appel concret à la fin (sauf si sa demande ou l'exemple qu'elle aime finissent autrement) ;
 - la lisibilité sur un téléphone : le contraste (un texte sur une zone chargée ou de la même valeur que lui, c'est non), les tailles, rien de coupé, rien qui se chevauche sans le vouloir, aucun visage ni le sujet couvert par un texte ;
 - la typographie : la hiérarchie, les alignements, des marges régulières, aucun mot seul sur sa ligne, aucun « ? » seul, aucune police de secours, aucun code affiché à la place d'un caractère (« \\u00a0 », « &nbsp; ») ;
 - les photos : assez grandes, bien cadrées, jamais déformées ; un détourage propre ;
 - la série : on reconnaît le commerce d'un bout à l'autre et les mises en page varient ; ni modèle tout fait, ni pub, ni flyer ; sa charte suivie (une liberté que sa demande veut n'est pas un défaut) ;
+- sa demande et l'exemple qu'elle aime, quand il y en a un, passent avant ces repères : ce que l'exemple n'a pas, ou que sa demande écarte (un appel à la fin, un logo, un titre en couverture), son carrousel n'a pas à l'avoir ; juge s'il en reprend bien la forme, avec ses photos et ses mots à elle ;
 - les mots : vrais, courts, les siens, sans formule de pub ni tiret long.
 ok = true s'il est publiable tel quel. Sinon, les corrections précises, diapositive par diapositive (« diapositive 3 : le titre blanc se perd sur le mur clair : pose-le sur un aplat ou assombris le haut de la photo »), 6 au plus, les plus importantes d'abord. Dis ce qui doit se lire ou se voir, jamais une forme toute faite.`;

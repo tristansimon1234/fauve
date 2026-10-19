@@ -11,6 +11,7 @@ import {
   effortVersions,
   editPlanSchema,
   fixBrief,
+  followedChecks,
   MAX_FREE_SCENES,
   montageIssueSchema,
   MAX_MONTAGE_FILES,
@@ -38,6 +39,7 @@ import { env } from "@/lib/env";
 import { queueJob } from "@/lib/jobs";
 import { deliverMontage, notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
 import { renderPost } from "@/lib/render/render-post";
+import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { finishJob } from "@/lib/studio-jobs";
 
@@ -452,7 +454,8 @@ async function alternative(job: Job) {
     const plan = editPlanSchema.parse(first.data?.plan);
     const edit = await designEdit({
       ...designInput(job),
-      brief: alternativeBrief(plan, job.brief),
+      // The Reel she copies stays the model of the second take too: what it does not have is not asked.
+      brief: alternativeBrief(plan, job.brief, followedChecks(await postStyle(job.studioId, job.postId).catch(() => undefined))),
       maxNewScenes: scenesLeft(job),
       effort: EFFORTS[job.effort!].editorEffort,
       fresh: true,
