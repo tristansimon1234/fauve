@@ -3557,6 +3557,19 @@ test("designed carousels: the designer's answer bounded, its code checked, each 
   assert.equal(props.carousel?.slotSlides?.s3_detail, 3);
 });
 
+test("a critic's answer is read as written, then bounded: a long sentence never fails the parse", async () => {
+  const { boundReview, layerReviewSchema } = await import("./text-layer.ts");
+  // The lab's salon carousel was lost to one correction of more than 300 characters.
+  const long = "diapositive 4 : ".padEnd(420, "le titre se perd sur le mur clair ");
+  const parsed = layerReviewSchema.parse({ ok: false, issues: [long, ...Array.from({ length: 7 }, (_, i) => `correction ${i + 2}`)] });
+  const bounded = boundReview(parsed);
+  assert.equal(bounded.ok, false);
+  assert.equal(bounded.issues.length, 6);
+  assert.equal(bounded.issues[0]!.length, 300);
+  assert.ok(bounded.issues[0]!.endsWith("…"));
+  assert.deepEqual(boundReview(null), { ok: true, issues: [] });
+});
+
 test("designed carousels: a character written as a code is that character, and the words are set in French typography", async () => {
   const { cleanSlotText, carouselFromOutput } = await import("./carousel.ts");
   const { frenchTypography } = await import("./motion.ts");

@@ -11,6 +11,7 @@ import {
   ELEMENTS_DESIGNER_PROMPT,
   kitDesignOutputSchema,
   LAYER_CRITIC_PROMPT,
+  boundReview,
   layerReviewSchema,
   layerSlotSchema,
   resolveReelBrand,
@@ -222,7 +223,7 @@ async function review(input: ElementsRequest, ctx: Context, stills: { index: num
     messages: [{ role: "user", content }],
   });
   await logClaudeCost(input.studioId, response.usage, "element_critic");
-  return response.parsed_output ?? { ok: true, issues: [] };
+  return boundReview(response.parsed_output);
 }
 
 /** The components placed on one photo, as stored on a slide (element_id once they are in the bank). */

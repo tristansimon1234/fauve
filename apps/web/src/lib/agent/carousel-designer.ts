@@ -10,6 +10,7 @@ import {
   checkCarouselCode,
   CLAUDE_MODEL,
   CRITIC_MODEL,
+  boundReview,
   layerReviewSchema,
   readMemory,
   resolveReelBrand,
@@ -251,7 +252,7 @@ async function review(input: CarouselRequest, ctx: Context, made: CarouselDesign
     messages: [{ role: "user", content }],
   });
   await logClaudeCost(input.studioId, response.usage, "carousel_critic", CRITIC_MODEL);
-  return response.parsed_output ?? { ok: true, issues: [] };
+  return boundReview(response.parsed_output);
 }
 
 /** Keeps a test render's slides (the next round looks at them; the delivered carousel is this render). */
@@ -328,7 +329,12 @@ export async function carouselRound(
   // The correction the critic asked for is delivered as it is (a second look would cost a third round).
   if (previous?.fixed) return { status: "done", design: made, stills: kept, review: null };
   await onStage?.("review");
-  const verdict = await review(input, ctx, made, stills);
+  // A critic that fails never loses a carousel that passed its test render: it goes out as rendered.
+  const verdict = await review(input, ctx, made, stills).catch((error: unknown) => {
+    console.warn("carousel: review failed, delivered as rendered", input.postId, error instanceof Error ? error.message : error);
+    return null;
+  });
+  if (!verdict) return { status: "done", design: made, stills: kept, review: null };
   if (!verdict.ok && verdict.issues.length && round + 1 < CAROUSEL_ROUNDS) {
     return { status: "retry", previous: { output, feedback: `relecture du rendu : ${verdict.issues.join(" ; ")}`, stills: kept }, design: made, stills: kept };
   }
