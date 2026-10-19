@@ -1,5 +1,5 @@
 import "server-only";
-import { awaitsAnswer, echoFor, emojiOnly, segmentKind, editPlanSchema } from "@fauve/agent";
+import { awaitsAnswer, echoFor, emojiOnly, segmentKind, editPlanSchema, type BriefQuestion } from "@fauve/agent";
 import { after } from "next/server";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { reactTo, type Reaction } from "@/lib/agent/mood";
@@ -37,6 +37,8 @@ export type ChatMessage = {
   pickMedia: "video" | "photo" | "any" | null;
   /** The card of an onboarding step Fauve offered (reply_with step_card). */
   stepCard?: "website" | "style" | "rhythm" | "connect" | "first_post" | null;
+  /** Simone's questions before she makes something (reply_with questions), each with answers to tap. */
+  questions?: BriefQuestion[];
   /** Post and grid cards under the message. */
   cards: ChatCard[];
   /** A delivered montage: the app opens this post's page when the message arrives. */
@@ -142,6 +144,7 @@ export async function messagesOf(studioId: string, conversationId: string): Prom
       upload: r.direction === "outbound" ? (extrasOf(r.payload).upload ?? null) : null,
       pickMedia: r.direction === "outbound" ? (extrasOf(r.payload).pick_media ?? null) : null,
       stepCard: r.direction === "outbound" ? (extrasOf(r.payload).step_card ?? null) : null,
+      questions: r.direction === "outbound" ? (extrasOf(r.payload).questions ?? []) : [],
       cards: cards[i] ?? [],
       openPost: r.direction === "outbound" ? ((r.payload as { open_post?: string } | null)?.open_post ?? null) : null,
     };

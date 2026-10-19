@@ -8,6 +8,7 @@ import { ChatCards } from "./chat-cards";
 import { DropCard } from "./drop-card";
 import { OnboardingCard } from "@/components/onboarding/onboarding-card";
 import { MediaPickCard } from "./media-pick-card";
+import { QuestionsCard } from "./questions-card";
 
 // One message of the conversation with Fauve: text, media, cards, answer
 // buttons and reactions. Shared by the Fauve page and the chat drawer.
@@ -94,7 +95,9 @@ export function Bubble({
   if (!message.body && !message.videoUrl && !media && !message.cards.length) return null;
   // A quote card carries its own buttons.
   const hasQuote = message.cards.some((c) => c.type === "quote");
-  const options = onChoose && !mine && !hasQuote ? message.options : [];
+  // Her questions carry their own answers: never buttons beside them.
+  const questions = onChoose && !mine && !hasQuote ? (message.questions ?? []) : [];
+  const options = onChoose && !mine && !hasQuote && !questions.length ? message.options : [];
   const reactions = [message.reactions.fauve, message.reactions.me].filter((e): e is string => Boolean(e));
   // Reacting is for Fauve's messages (the manager's own messages get Fauve's reactions).
   const canReact = !mine && !message.id.startsWith("local-");
@@ -209,6 +212,7 @@ export function Bubble({
       )}
       {/* The step card has its own drop zone: never a second one under it. */}
       {onFiles && !mine && message.upload && !message.pickMedia && !message.stepCard && <DropCard kind={message.upload} onFiles={onFiles} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />}
+      {questions.length > 0 && <QuestionsCard key={message.id} questions={questions} onSend={(text) => onChoose?.(text)} className={enter ? "fauve-enter [--fauve-delay:140ms]" : ""} />}
       {options.length > 0 && (
         <div className={`flex flex-wrap gap-2 pt-0.5 ${enter ? "fauve-enter [--fauve-delay:140ms]" : ""}`} role="group" aria-label="Réponses proposées">
           {options.map((option) => (

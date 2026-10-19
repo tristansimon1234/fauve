@@ -56,6 +56,7 @@ export * from "./tempo.ts";
 export * from "./mix.ts";
 export * from "./when.ts";
 export * from "./creation.ts";
+export * from "./brief.ts";
 export * from "./fonts.ts";
 export * from "./signature.ts";
 export * from "./steal.ts";

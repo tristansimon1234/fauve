@@ -1,5 +1,5 @@
 import "server-only";
-import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, replyExtrasSchema } from "@fauve/agent";
+import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, questionsAsText, replyExtrasSchema } from "@fauve/agent";
 import { claimPairing } from "@/lib/auth/pairing";
 import { answerPublishOffer } from "@/lib/publish-offer";
 import { deliverPendingHandOffs } from "@/lib/social/hand-off";
@@ -245,18 +245,20 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   }
 
   if (result.reply) {
-    const { posts, grid, quote } = result.extras;
+    const { posts, grid, quote, questions } = result.extras;
     // A quote gets its yes / other level / no buttons, unless Fauve chose others.
     // The quote's own buttons win over the model's (they carry the other level).
     // (none for a montage already launched).
     const buttons = quote ? await quoteButtons(member.studio_id, quote).catch(() => []) : [];
-    const options = buttons.length ? buttons : result.extras.options;
+    // Her brief's questions: no card on WhatsApp, they follow the reply (one short question keeps its buttons).
+    const asked = questions?.length ? questionsAsText(questions) : null;
+    const options = buttons.length ? buttons : asked ? asked.options : result.extras.options;
     // Cards are app-only: on WhatsApp they become links to the app.
     const links = [
       ...(posts ?? []).map((id) => `${env("APP_URL")}/publications/${id}`),
       ...(grid ? [`Ta grille : ${env("APP_URL")}/grille`] : []),
     ];
-    const waMessageId = await sendReply(message.from, result.reply, options, links);
+    const waMessageId = await sendReply(message.from, asked ? `${result.reply}\n\n${asked.text}` : result.reply, options, links);
     await db.from("whatsapp_messages").insert({
       studio_id: member.studio_id,
       wa_message_id: waMessageId,

@@ -346,7 +346,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           };
         }),
         note: rows.length
-          ? "Prends celles dont elle parle (souvent les plus récentes, envoyées ensemble) et enchaîne sans lui redemander : create_post avec ces media_ids, puis le texte (write_on_photos) ou le montage."
+          ? "Prends celles dont elle parle (souvent les plus récentes, envoyées ensemble), sans lui redemander ses fichiers ; puis ton brief s'il manque l'essentiel (à quoi sert la publication, son message, la fin), create_post avec ces media_ids, et le montage ou le carrousel."
           : bank
             ? "Sa banque de plans est vide : rien de vivant de côté pour l'instant."
             : "Rien dans la médiathèque sur cette période : dis-le simplement et propose de les glisser ici.",
@@ -894,7 +894,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         status: "started",
         inspiration_id: started.inspirationId,
-        note: "Tu le regardes après ta réponse (environ une minute), puis tu lui envoies tout seul ce que son Reel en reprend. C'est le modèle d'un seul Reel, le prochain : si elle t'a déjà donné ses vidéos ou ses photos pour ce Reel (ou dit lesquelles prendre), crée la publication et lance montage tout de suite avec cet inspiration_id (le monteur attend la lecture) ; sinon ne les lui demande pas, ton message qui suit le fait. Annonce-le en une phrase, sans rien décrire de ce Reel avant de l'avoir vu.",
+        note: "Tu le regardes après ta réponse (environ une minute), puis tu lui envoies tout seul ce que son Reel en reprend. C'est le modèle d'un seul Reel, le prochain : si elle t'a déjà donné ses vidéos ou ses photos pour ce Reel (ou dit lesquelles prendre), fais ton brief s'il manque son message ou la fin (jamais le style : c'est celui de ce Reel), puis crée la publication et lance montage avec cet inspiration_id (le monteur attend la lecture) ; sinon ne les lui demande pas, ton message qui suit le fait. Annonce-le en une phrase, sans rien décrire de ce Reel avant de l'avoir vu.",
       });
     },
 
@@ -1226,7 +1226,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return "ok";
     },
 
-    async reply_with({ options, posts, grid, upload, pick_media, step_card }) {
+    async reply_with({ options, posts, grid, upload, pick_media, step_card, questions }) {
       let own: string[] = [];
       if (posts?.length) {
         const { data } = await db.from("posts").select("id").eq("studio_id", studioId).in("id", posts);
@@ -1247,7 +1247,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         }
       }
       ctx.extras.step_card = card;
-      ctx.extras.options = answers;
+      // Her brief's questions carry their own answers: no buttons beside them.
+      ctx.extras.questions = questions?.length ? questions : undefined;
+      ctx.extras.options = questions?.length ? undefined : answers;
       ctx.extras.posts = own.length ? own : undefined;
       ctx.extras.grid = grid || undefined;
       // The drop zone is the app's: WhatsApp has its own paperclip.

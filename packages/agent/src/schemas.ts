@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { briefQuestionsSchema } from "./brief.ts";
 import { adjustSchema, clipBlurSchema, photoEditSchema } from "./retouch.ts";
 import { listFields, LOOK_FONT, savedLookSchema, textLookSchema } from "./text-look.ts";
 import { brandSignatureSchema } from "./signature.ts";
@@ -48,6 +49,8 @@ export const replyExtrasSchema = z.object({
   pick_media: z.enum(["video", "photo", "any"]).optional(),
   /** The card of an onboarding step under the message (app only). */
   step_card: z.enum(["website", "style", "rhythm", "connect", "first_post"]).optional(),
+  /** Simone's brief before she makes something: a few questions, each with answers to tap (a card in the app; text on WhatsApp). */
+  questions: briefQuestionsSchema.optional(),
   /** A montage under way, shown as a card that follows its steps (set by the montage tools, not by the model). */
   quote: z.uuid().optional(),
 });

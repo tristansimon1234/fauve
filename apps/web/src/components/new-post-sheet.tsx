@@ -2,14 +2,18 @@
 
 import {
   advisedFormat,
+  answersText,
   creationSteps,
   EFFECT_MINUTES,
+  fallbackQuestions,
   findVoice,
   formatBlocked,
   formatWhy,
   publishWhen,
   SIMONE_VOICES,
   voiceSamplePath,
+  type BriefAnswer,
+  type BriefQuestion,
   type Effort,
   type Picked,
   type PostKind,
@@ -17,9 +21,10 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
-import { creationProgress, launchCreation, type CreationProgress, type LaunchResult } from "@/app/(app)/create-actions";
+import { creationProgress, creationQuestions, launchCreation, type CreationProgress, type LaunchResult } from "@/app/(app)/create-actions";
 import { MAX_FILE_BYTES, MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/chat-uploads";
 import { copyReel, copyState, newPostOptions, type CopyState, type NewPostOptions } from "@/app/(app)/new-post-actions";
+import { BriefFields, briefAnswers, emptyPicks, type BriefPick } from "./brief-fields";
 import { useFauveDrawer } from "./fauve-drawer";
 import { publicEnv } from "@/lib/public-env";
 import { supabaseBrowser } from "@/lib/supabase/client";
@@ -34,6 +39,7 @@ export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 // « Nouvelle publication », in one screen: she gives her photos and videos (her library
 // or her phone), says what it is about if she wants, and Simone says what she will make
 // of them (« J'en fais un Reel, publié vendredi à 18 h »), both changeable in a tap.
+// « Continuer »: Simone asks the few questions that change the result (her brief), then
 // « C'est parti »: a Reel starts at once and the screen follows it (« Je m'en occupe »);
 // a carousel, a photo or a story goes on with Simone in the chat, who writes the texts.
 
@@ -167,7 +173,13 @@ function Create({
   const [given, setGiven] = useState<string | null>(null);
   const [copyChoice, setCopyChoice] = useState<"mine" | "copy" | null>(null);
   const [copyRead, setCopyRead] = useState<CopyState | null>(null);
-  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "copy" | "nothing" | null>(null);
+  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "copy" | "nothing" | "brief" | null>(null);
+  /** Simone's questions before she starts (null while she writes them), kept while nothing she chose changes. */
+  const [brief, setBrief] = useState<{ key: string; questions: BriefQuestion[] | null; picks: BriefPick[] } | null>(null);
+  const sheetRef = useRef(sheet);
+  useEffect(() => {
+    sheetRef.current = sheet;
+  }, [sheet]);
   const [all, setAll] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
@@ -251,7 +263,7 @@ function Create({
     setOrder((o) => o.filter((k) => k !== `u:${id}`));
   };
 
-  const launch = () =>
+  const launch = (answers: BriefAnswer[]) =>
     start(async () => {
       if (!chosenWhen || !picked.length) return;
       setError(null);
@@ -270,6 +282,7 @@ function Create({
         voice: kind === "reel" ? chosenVoice : "auto",
         platforms: where.filter((p): p is "instagram" | "tiktok" => p === "instagram" || p === "tiktok"),
         copy: copying ?? false,
+        answers,
       }).catch(
         (): LaunchResult => ({ ok: false, error: "Ça n’est pas parti. Réessaie dans un instant." }),
       );
@@ -285,10 +298,12 @@ function Create({
         onStarted({ postId: res.postId, title: res.title, ...res.montage, picked: counts });
         return;
       }
-      // A carousel, a photo or a story: Simone writes the texts, in the chat.
+      // A carousel, a photo or a story: Simone writes the texts, in the chat, with the brief she already has.
+      const said = answers.filter((a) => a.answer.trim());
       const text = [
         `Nouvelle publication : ${meta.phrase} pour ${chosenWhen.full.charAt(0).toLowerCase()}${chosenWhen.full.slice(1)}.`,
         idea.trim() ? `Ce que j’imagine : ${idea.trim()}` : "",
+        said.length ? `Mes réponses à tes questions :\n${answersText(said)}` : "",
         `${counts.videos ? "Mes photos et vidéos" : "Mes photos"} (media_id, dans l’ordre) : ${res.mediaIds.join(", ")}.`,
         "Choisis toi-même la mise en page et les textes, et lance-toi : je regarde le résultat après.",
       ]
@@ -298,6 +313,41 @@ function Create({
       else openFauve({ postId: res.postId, title: res.title, start: { text, files: [] } });
       onClose();
     });
+
+  // « Continuer »: her brief first. Simone writes her questions from what she picked and wrote
+  // (kept while none of it changes); none to ask, it starts at once.
+  const briefKey = JSON.stringify([kind, picked, idea.trim(), chosenVoice, copying]);
+  const go = (answers: BriefAnswer[]) => {
+    setSheet(null);
+    launch(answers);
+  };
+  const ask = () => {
+    if (!ready || pending || !chosenWhen) return;
+    setError(null);
+    setLocked(null);
+    setSheet("brief");
+    if (brief?.key === briefKey && brief.questions) return;
+    const key = briefKey;
+    setBrief({ key, questions: null, picks: [] });
+    const sent = picked.reduce((c, k) => (!k.startsWith("u:") ? c : drafts.get(k.slice(2))?.video ? { ...c, videos: c.videos + 1 } : { ...c, photos: c.photos + 1 }), { videos: 0, photos: 0 });
+    creationQuestions({
+      kind,
+      idea,
+      media: picked.filter((k) => k.startsWith("m:")).map((k) => k.slice(2)),
+      sent,
+      chosen: {
+        format: meta.title,
+        ...(kind === "reel" ? { voice: voiceLabel(chosenVoice), style: copying ? "Comme un Reel qu’elle aime" : "Son style" } : {}),
+        when: `${chosenWhen.full}, sur ${placeLabel(where)}`,
+      },
+    })
+      .catch(() => ({ questions: fallbackQuestions(kind === "reel") }))
+      .then(({ questions }) => {
+        setBrief((b) => (b?.key === key ? { key, questions, picks: emptyPicks(questions) } : b));
+        // Her request says it all: nothing to ask, it starts (unless she closed the sheet meanwhile).
+        if (!questions.length && sheetRef.current === "brief") go([]);
+      });
+  };
 
   const shownLibrary = all ? library : library.slice(0, Math.max(0, FIRST_TILES - uploads.files.length));
   const ideas = (options?.ideas[kind] ?? []).slice(0, 4);
@@ -495,12 +545,12 @@ function Create({
         )}
         <button
           type="button"
-          onClick={launch}
+          onClick={ask}
           disabled={!ready || pending}
           className="btn btn-primary h-[54px] text-[17px] font-extrabold shadow-[0_8px_22px_rgba(91,63,217,0.28)] disabled:bg-line disabled:text-muted disabled:shadow-none"
         >
           {pending ? <Spinner /> : null}
-          {pending ? "C’est parti…" : "C’est parti"}
+          {pending ? "C’est parti…" : "Continuer"}
         </button>
         {!picked.length ? (
           <>
@@ -515,7 +565,7 @@ function Create({
           <p className="pt-1 text-center text-[13px] text-danger">Un fichier n’est pas passé : retire-le ou ajoute-le à nouveau.</p>
         ) : (
           <p className="pt-1 text-center text-[12.5px] leading-snug text-muted">
-            {kind === "reel" ? "Le style, les textes et la musique, je les choisis." : "La mise en page et les textes, je les choisis."} Tu pourras tout changer après.
+            Je te pose deux ou trois questions, puis {kind === "reel" ? "les textes et la musique" : "la mise en page et les textes"}, je m’en occupe. Tu pourras tout changer après.
           </p>
         )}
       </footer>
@@ -674,6 +724,52 @@ function Create({
               setCopyChoice("copy");
             }}
           />
+        </Sheet>
+      )}
+
+      {sheet === "brief" && brief && (
+        <Sheet label="Avant que je commence" onClose={() => setSheet(null)}>
+          <div className="flex items-start gap-3">
+            <Mascot size={52} mood={brief.questions ? "happy" : "thinking"} still={Boolean(brief.questions)} />
+            <div aria-live="polite" className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <h3 className="text-[20px] font-extrabold tracking-[-0.01em]">{brief.questions ? "Avant que je commence" : "Je prépare mes questions…"}</h3>
+              <p className="text-[14px] leading-[1.4] text-muted">
+                {brief.questions ? "Quelques questions pour que ce soit vraiment toi. Sans réponse, je choisis pour toi." : "Je regarde ce que tu m’as donné et ce qu’il me manque."}
+              </p>
+            </div>
+            <button type="button" onClick={() => setSheet(null)} aria-label="Fermer" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F3F1F5] text-ink">
+              <XIcon size={16} />
+            </button>
+          </div>
+          {brief.questions ? (
+            <BriefFields questions={brief.questions} picks={brief.picks} onChange={(picks) => setBrief((b) => (b ? { ...b, picks } : b))} />
+          ) : (
+            <div className="flex flex-col gap-4" aria-hidden>
+              {[0, 1].map((i) => (
+                <div key={i} className="flex flex-col gap-2">
+                  <span className="h-5 w-3/5 animate-pulse rounded-full bg-soft" />
+                  <div className="flex gap-1.5">
+                    <span className="h-9 w-28 animate-pulse rounded-full bg-soft" />
+                    <span className="h-9 w-24 animate-pulse rounded-full bg-soft" />
+                    <span className="h-9 w-20 animate-pulse rounded-full bg-soft" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            disabled={!brief.questions || pending}
+            onClick={() => brief.questions && go(briefAnswers(brief.questions, brief.picks))}
+            className="btn btn-primary h-[54px] text-[17px] font-extrabold shadow-[0_8px_22px_rgba(91,63,217,0.28)] disabled:bg-line disabled:text-muted disabled:shadow-none"
+          >
+            C’est parti
+          </button>
+          {!brief.questions && (
+            <button type="button" onClick={() => go([])} className="h-10 text-[14.5px] font-bold text-violet">
+              Passer, lance-toi
+            </button>
+          )}
         </Sheet>
       )}
 

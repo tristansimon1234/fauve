@@ -1,6 +1,7 @@
 import "server-only";
 import { randomInt } from "node:crypto";
 import { z } from "zod";
+import { questionsAsText } from "@fauve/agent";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { InstagramError, sendDirectMessage } from "@/lib/social/instagram";
 import { stealStyle } from "@/lib/steal";
@@ -146,7 +147,9 @@ export async function handleDm(event: DmEvent): Promise<void> {
   if (!owner) return;
   const result = await replyInConversation({ studioId, memberId: owner.id as string, reactToRowId: inserted.data[0]!.id as string, channel: "instagram" });
   if (result.reply) {
-    await reply(result.reply);
+    // No card in a DM: her brief's questions follow the reply as text.
+    const asked = result.extras.questions?.length ? questionsAsText(result.extras.questions) : null;
+    await reply(asked ? `${result.reply}\n\n${asked.text}${asked.options ? `\n${asked.options.join(" · ")}` : ""}` : result.reply);
     await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "instagram", direction: "outbound", type: "text", body: result.reply, payload: { ...result.extras, notes: result.notes } });
   }
   for (const job of result.afterReply) await job().catch((e) => console.error("DM after-reply job failed", e));
