@@ -2,11 +2,13 @@ import "server-only";
 import {
   captionForInstagram,
   editPlanSchema,
+  effectWords,
   findVoice,
   isBaked,
   postStatusSchema,
   publishWhen,
   type EditPlan,
+  type EffectWord,
   type PostStatus,
   type PublishWhen,
 } from "@fauve/agent";
@@ -21,6 +23,7 @@ import { freeSlots } from "@/lib/slots";
 import { instagramAccount } from "@/lib/social/publish";
 import { tiktokPanel } from "@/lib/social/tiktok-panel";
 import { signMediaUrls, type Db } from "@/lib/studio";
+import { runningJobs } from "@/lib/studio-jobs";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // « Ta publication », the simple page of a Reel: the video as it will go out, its scenes,
@@ -51,6 +54,8 @@ export type ReviewData = {
   plan: EditPlan;
   /** Made by the effects agent: its texts are in the image, a change is asked of Simone. */
   baked: boolean;
+  /** The texts of its effect she changes herself (its kit draws them again); none without a kit. */
+  words: EffectWord[];
   version: number;
   /** The version before, when its video exists: « Revenir à l'ancienne ». */
   previous: number | null;
@@ -126,8 +131,10 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     after(() => ensureSceneSprite(studioId, renderId));
   }
   const fileName = `${post.title.replace(/[^\p{L}\p{N} _-]+/gu, "").trim() || "reel"}.mp4`;
-  const [jobs, account, slots, voice, tiktok, download] = await Promise.all([
+  const [jobs, replays, account, slots, voice, tiktok, download] = await Promise.all([
     locked ? Promise.resolve([]) : montageStatus(studioId, post.id),
+    // Her new words on its effect, drawn again by its own script.
+    locked || !isBaked(plan.data) ? Promise.resolve([]) : runningJobs(studioId, { postId: post.id, kind: "effect_words" }),
     instagramAccount(studioId),
     locked ? Promise.resolve([]) : freeSlots(studioId, timezone, 4),
     loadVoice(studioId, post.voice_media_id),
@@ -138,7 +145,11 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
   const latest = (renders.data ?? []).find((r) => r.edit_plan_id === current.id);
   const rendering = !done(current.id as string) && (latest?.status === "rendering" || latest?.status === "queued");
   const failed = !shown && !running && latest?.status === "failed";
-  const making = running ? { kind: "montage" as const, step: running.step } : rendering || (!shown && !locked && !failed) ? { kind: "render" as const, step: null } : null;
+  const making = running
+    ? { kind: "montage" as const, step: running.step }
+    : replays.length || rendering || (!shown && !locked && !failed)
+      ? { kind: "render" as const, step: null }
+      : null;
 
   // The version before this one that has its video.
   const previous = list.find((p) => (p.version as number) < (current.version as number) && done(p.id as string));
@@ -158,6 +169,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     scenes: spriteUrl ? { url: spriteUrl, count: plan.data.segments.length } : null,
     plan: plan.data,
     baked: isBaked(plan.data),
+    words: effectWords(plan.data),
     version: current.version as number,
     previous: previous ? (previous.version as number) : null,
     scheduledAt: post.scheduled_at,

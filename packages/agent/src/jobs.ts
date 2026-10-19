@@ -1,7 +1,7 @@
 // The work Fauve does in the background (studio_jobs): its steps, as the
 // manager reads them in the app's progress pill and as Fauve reports them.
 
-export type JobKind = "montage" | "text_layer" | "elements" | "carousel";
+export type JobKind = "montage" | "text_layer" | "elements" | "carousel" | "effect_words";
 
 export const JOB_STEPS: Record<JobKind, { stage: string; label: string }[]> = {
   montage: [
@@ -30,9 +30,17 @@ export const JOB_STEPS: Record<JobKind, { stage: string; label: string }[]> = {
     { stage: "review", label: "Relecture" },
     { stage: "fix", label: "Correction" },
   ],
+  // Her words on an effect: its own script draws it again, then the music goes on it.
+  effect_words: [{ stage: "render", label: "Tes mots sur l’effet" }],
 };
 
-export const JOB_KIND_LABELS: Record<JobKind, string> = { montage: "Montage vidéo", text_layer: "Texte sur photo", elements: "Composants", carousel: "Carrousel" };
+export const JOB_KIND_LABELS: Record<JobKind, string> = {
+  montage: "Montage vidéo",
+  text_layer: "Texte sur photo",
+  elements: "Composants",
+  carousel: "Carrousel",
+  effect_words: "Texte de l’effet",
+};
 
 /** No news for this long: the work most likely died (a step never takes this long). */
 export const JOB_STALE_MINUTES = 12;

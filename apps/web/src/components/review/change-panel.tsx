@@ -1,10 +1,10 @@
 "use client";
 
-import { DEFAULT_COVER_SECONDS, EFFECT_MINUTES, SIMONE_VOICES, voiceSamplePath, type PostCover } from "@fauve/agent";
+import { DEFAULT_COVER_SECONDS, EFFECT_MINUTES, EFFECT_WORDS_MINUTES, SIMONE_VOICES, voiceSamplePath, type PostCover } from "@fauve/agent";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { setMusic, setPublishByHand, setVoiceOff } from "@/app/(app)/publications/[id]/cover-actions";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
-import { putVoice, redoReel, reschedule } from "@/app/(app)/publications/[id]/review-actions";
+import { putVoice, redoReel, reschedule, saveEffectWords } from "@/app/(app)/publications/[id]/review-actions";
 import { CoverPicker } from "@/components/montage/cover-picker";
 import { WhereToPost } from "@/components/montage/where-to-post";
 import {
@@ -31,7 +31,7 @@ import type { EditStart } from "./reel-editor";
 // Simone remakes starts on a tap: each view says what will happen, takes a précision
 // if she wants, and asks to confirm.
 
-export type ChangeView = "menu" | "caption" | "cover" | "date" | "shorter" | "punchier" | "music" | "voice";
+export type ChangeView = "menu" | "caption" | "cover" | "date" | "shorter" | "punchier" | "music" | "voice" | "words";
 
 const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
 
@@ -71,6 +71,7 @@ export function ChangePanel(props: Props) {
       {(view === "shorter" || view === "punchier") && <RedoView {...props} kind={view} />}
       {view === "music" && <MusicView {...props} />}
       {view === "voice" && <VoiceView {...props} />}
+      {view === "words" && <WordsView {...props} />}
     </div>
   );
 }
@@ -83,6 +84,7 @@ const TITLES: Record<Exclude<ChangeView, "menu">, string> = {
   punchier: "Plus rythmé",
   music: "La musique",
   voice: "Une voix off",
+  words: "Le texte à l’écran",
 };
 
 function Tile({ icon, label, onClick, tone, disabled }: { icon: React.ReactNode; label: string; onClick: () => void; tone: "violet" | "peach"; disabled?: boolean }) {
@@ -117,8 +119,11 @@ function Menu({ data, onView, onEdit, ask }: Props) {
       <h2 className="text-[19px] font-extrabold tracking-[-0.01em]">Qu’est-ce qu’on change ?</h2>
       <h3 className="text-[13.5px] font-bold text-muted">Change-le toi-même, c’est immédiat</h3>
       <div className="grid grid-cols-2 gap-2">
-        {/* A Reel made by the effects agent has its texts in the image: changed by asking Simone. */}
+        {/* A Reel made by the effects agent has its texts in the image: its kit draws them again with her words; without one, she asks Simone. */}
         {!data.baked && <Tile tone="violet" icon={<TypeIcon size={18} />} label="Le texte à l’écran" onClick={() => onEdit({ text: 0 })} disabled={data.making !== null} />}
+        {data.baked && data.words.length > 0 && (
+          <Tile tone="violet" icon={<TypeIcon size={18} />} label="Le texte à l’écran" onClick={() => onView("words")} disabled={data.making !== null} />
+        )}
         <Tile tone="violet" icon={<CaptionIcon size={18} />} label="La légende" onClick={() => onView("caption")} />
         <Tile tone="violet" icon={<ImageIcon size={18} />} label="La couverture" onClick={() => onView("cover")} disabled={!data.videoUrl} />
         <Tile tone="violet" icon={<CalendarIcon size={18} />} label="Le jour et l’heure" onClick={() => onView("date")} />
@@ -231,6 +236,69 @@ function RedoView({ data, onDone, kind }: Props & { kind: "shorter" | "punchier"
       )}
       <Done onClick={go} pending={pending} disabled={data.making !== null}>
         {text.button}
+      </Done>
+    </div>
+  );
+}
+
+/**
+ * The texts of an effect, changed in her words: each one where it is in the Reel (its label), as long as
+ * it fits its place. The effect is drawn again with them by its own script: free, a few minutes.
+ */
+function WordsView({ data, onDone }: Props) {
+  const [texts, setTexts] = useState(() => Object.fromEntries(data.words.map((w) => [w.id, w.text])));
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const changed = data.words.filter((w) => (texts[w.id] ?? "").trim() !== w.text.trim());
+  // Longer than its place, it would not fit: said under the field, never cut while she types.
+  const tooLong = data.words.filter((w) => (texts[w.id] ?? "").trim().length > w.max);
+  const save = () =>
+    start(async () => {
+      setError(null);
+      if (!changed.length) return onDone("");
+      const result = await saveEffectWords(
+        data.postId,
+        changed.map((w) => ({ id: w.id, text: texts[w.id] ?? "" })),
+      );
+      if (!result.ok) return setError(result.error);
+      onDone(`C’est parti : Simone pose tes mots sur l’effet, ${EFFECT_WORDS_MINUTES} minutes. Tu peux fermer, ta vidéo se met à jour toute seule.`);
+    });
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[14px] leading-snug text-muted">Change les mots, l’effet reste le même.</p>
+      {data.words.map((w) => {
+        const value = texts[w.id] ?? "";
+        const multiline = w.text.includes("\n") || w.max > 40;
+        const over = value.trim().length > w.max;
+        const field = {
+          id: `word-${data.postId}-${w.id}`,
+          value,
+          "aria-invalid": over,
+          onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setTexts((t) => ({ ...t, [w.id]: e.target.value })),
+          className:
+            "w-full rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-2.5 text-[15px] leading-snug outline-none focus:border-violet",
+        };
+        return (
+          <div key={w.id} className="flex flex-col gap-1.5">
+            <label htmlFor={field.id} className="flex items-baseline justify-between gap-2 text-[13.5px] font-bold">
+              <span className="first-letter:uppercase">{w.label}</span>
+              <span className={`shrink-0 text-[12px] font-semibold ${over ? "text-danger" : "text-muted"}`}>
+                {value.trim().length}/{w.max}
+              </span>
+            </label>
+            {multiline ? <textarea {...field} rows={2} className={`${field.className} resize-none`} /> : <input {...field} />}
+            {over && <p className="text-[12.5px] font-semibold text-danger">{w.max} caractères au plus, pour tenir à sa place.</p>}
+          </div>
+        );
+      })}
+      <p className="text-[12.5px] leading-snug text-muted">Gratuit. {EFFECT_WORDS_MINUTES} minutes : Simone redessine l’effet avec tes mots. Ta version actuelle reste, tu pourras y revenir.</p>
+      {error && (
+        <p role="alert" className="text-[13.5px] font-semibold text-danger">
+          {error}
+        </p>
+      )}
+      <Done onClick={save} pending={pending} disabled={data.making !== null || !changed.length || tooLong.length > 0 || changed.some((w) => !(texts[w.id] ?? "").trim())}>
+        Enregistrer mes mots
       </Done>
     </div>
   );

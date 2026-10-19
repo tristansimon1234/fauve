@@ -28,6 +28,7 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   render: "Je lance le rendu…",
   design_carousel: "Je lance ton carrousel…",
   carousel_texts: "Je change les mots du carrousel…",
+  effect_words: "Je pose tes mots sur l’effet…",
   write_on_photos: "J’écris sur tes photos…",
   add_to_moodboard: "J’ajoute tes images au moodboard…",
   set_logo: "J’enregistre ton logo…",

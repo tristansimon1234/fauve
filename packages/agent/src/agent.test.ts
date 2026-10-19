@@ -3608,6 +3608,63 @@ test("effects agent: its video's length, its plan of one shot, its price once ma
   assert.match(effectBlurBrief([]), /Retire le flou/);
 });
 
+test("effect words: she changes the texts of an effect herself, its own script draws them again", async () => {
+  const { readEffectWords, editEffectWords, effectWords, effectPlan, effectsTask, effectsRubric, effectsReplayTask, KIT_FILE, WORDS_FILE } = await import("./effects.ts");
+
+  // words.json as the agent wrote it: kept within bounds, never under its own length, unreadable texts left out.
+  const words = readEffectWords(
+    JSON.stringify([
+      { id: "mot1", label: "le mot qui grandit entre tes doigts", text: "-20\u202f%", max: 12 },
+      { id: "accroche", label: "  l'accroche  ", text: "  pov :   tu   craques  ", max: 4 },
+      { id: "mot1", label: "doublon", text: "x", max: 5 },
+      { id: "bad id", label: "x", text: "x", max: 5 },
+      { id: "vide", label: "x", text: "   ", max: 5 },
+      { id: "deux", text: "3 cours\n pour 65 €", max: "40" },
+    ]),
+  );
+  assert.deepEqual(words, [
+    { id: "mot1", label: "le mot qui grandit entre tes doigts", text: "-20\u202f%", max: 12 },
+    { id: "accroche", label: "l'accroche", text: "pov : tu craques", max: 16 },
+    { id: "deux", label: "Texte 3", text: "3 cours\npour 65 €", max: 40 },
+  ]);
+  assert.deepEqual(readEffectWords(JSON.stringify({ words: [{ id: "a", label: "a", text: "b", max: 3 }] })), [{ id: "a", label: "a", text: "b", max: 3 }]);
+  assert.equal(readEffectWords("pas du json"), null);
+  assert.deepEqual(readEffectWords("[]"), []);
+
+  // Her edits: French spaces set, the others kept; empty, too long, unknown or unchanged: what to tell her.
+  const edited = editEffectWords(words!, [{ id: "mot1", text: "-30 %" }]);
+  assert.ok(Array.isArray(edited));
+  assert.equal(edited[0]!.text, "-30\u202f%");
+  assert.equal(edited[1]!.text, "pov : tu craques");
+  assert.match((editEffectWords(words!, [{ id: "mot1", text: "  " }]) as { error: string }).error, /ne peut pas être vide/);
+  assert.match((editEffectWords(words!, [{ id: "mot1", text: "beaucoup trop long" }]) as { error: string }).error, /12 caractères au plus/);
+  assert.match((editEffectWords(words!, [{ id: "inconnu", text: "x" }]) as { error: string }).error, /pas dans ce Reel/);
+  assert.match((editEffectWords(words!, [{ id: "mot1", text: "-20 %" }]) as { error: string }).error, /n’ont pas changé/);
+
+  // On the plan: her texts only with a kit to draw them again.
+  const files = [{ name: "video1.mov", media_id: "33333333-3333-4333-8333-333333333333" }];
+  const plan = effectPlan({ mediaId: "11111111-1111-4111-8111-111111111111", seconds: 9.9, session: "sesn_1", kit: { path: "s/effects/p/kit.tar.gz", words: words!, files } });
+  assert.equal(editPlanSchema.safeParse(plan).success, true);
+  assert.deepEqual(effectWords(plan), words);
+  assert.deepEqual(effectWords(effectPlan({ mediaId: "11111111-1111-4111-8111-111111111111", seconds: 9.9, session: "sesn_1" })), []);
+  // A kit without her files (a session started before they were named) cannot draw them again.
+  assert.deepEqual(effectWords(effectPlan({ mediaId: "11111111-1111-4111-8111-111111111111", seconds: 9.9, session: "sesn_1", kit: { path: "k", words: words!, files: [] } })), []);
+  assert.deepEqual(effectWords(validPlan as never), []);
+
+  // The agent is asked for its kit and its words, the grader checks them; a correction starts from its kit.
+  const bare = { request: "x", studio: { name: "A", business: null, facts: [], tone: null }, brand: { colors: [], fonts: [] }, files: [], models: [], budgetUsd: 3 };
+  assert.match(effectsTask(bare), /python3 render\.py words\.json reel\.mp4/);
+  assert.match(effectsTask(bare), new RegExp(`- ${WORDS_FILE.replace(".", "\\.")} :`));
+  assert.match(effectsTask(bare), new RegExp(KIT_FILE.replace(".", "\\.")));
+  assert.match(effectsRubric({ voice: false }), /render\.py, qui refait reel\.mp4/);
+  assert.match(effectsTask({ ...bare, previous: { name: "avant.mp4", kit: true } }), /pars de son render\.py/);
+  assert.doesNotMatch(effectsTask({ ...bare, previous: { name: "avant.mp4" } }), /pars de son render\.py/);
+  // The replay runs its script with her words, and says why when it cannot.
+  const replay = effectsReplayTask(["video1.mov", "voix.ogg"]);
+  assert.match(replay, /\/mnt\/session\/uploads\/video1\.mov, \/mnt\/session\/uploads\/voix\.ogg/);
+  assert.match(replay, /erreur\.txt/);
+});
+
 test("designed carousels: the designer's answer bounded, its code checked, each slide a still with French spaces", async () => {
   const { carouselFromOutput, checkCarouselCode, slideSlots, CAROUSEL_SCOPE } = await import("./carousel.ts");
   const { buildCarouselProps, slidesPlanSchema } = await import("./slides.ts");

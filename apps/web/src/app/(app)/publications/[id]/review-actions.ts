@@ -1,9 +1,11 @@
 "use server";
 
-import { findVoice, isBaked, readPostVoice, RESTYLE, type EditPlan, type ReelInputs, type SavedLook } from "@fauve/agent";
+import { findVoice, isBaked, readPostVoice, RESTYLE, TRIAL_DAYS, type EditPlan, type ReelInputs, type SavedLook } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
+import { studioAccess } from "@/lib/billing/access";
+import { startEffectWords } from "@/lib/effect-words";
 import { loadEditorData } from "@/lib/montage-editor-data";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { loadTextLooks } from "@/lib/text-looks";
@@ -57,6 +59,25 @@ async function correct(studioId: string, postId: string, brief: string): Promise
   const accepted = await correctionQuote(studioId, postId, brief);
   if ("error" in accepted) return { ok: false, error: accepted.error };
   after(() => startMontage(studioId, accepted));
+  touched(postId);
+  return { ok: true };
+}
+
+/** Her own words on the texts of an effect: its kit draws the effect again with them, free; the page follows the new version. */
+export async function saveEffectWords(postId: string, changes: { id: string; text: string }[]): Promise<ReviewResult> {
+  const parsed = z
+    .array(z.object({ id: z.string().max(40), text: z.string().max(400) }))
+    .min(1)
+    .max(12)
+    .safeParse(changes);
+  if (!parsed.success) return { ok: false, error: "Tes mots n’ont pas pu être lus." };
+  const found = await reel(postId);
+  if (!found) return UNKNOWN;
+  if (LOCKED.includes(found.post.status as string)) return ONLINE;
+  // She sees the Reel before she changes it (its page waits for her subscription).
+  if (!(await studioAccess(found.studioId)).unlock) return { ok: false, error: `Pour voir ce Reel et changer ses mots, démarre ton essai : ${TRIAL_DAYS} jours offerts.` };
+  const started = await startEffectWords(found.studioId, postId, parsed.data);
+  if (!started.ok) return started;
   touched(postId);
   return { ok: true };
 }

@@ -231,6 +231,17 @@ export const toolSpecs = {
       texts: z.array(z.object({ slot: z.string().max(24), text: z.string().max(400) })).min(1).max(40),
     }),
   },
+  effect_words: {
+    description:
+      "Change les mots écrits sur un Reel de l'atelier d'effets, gratuit : texte par texte, avec leurs id (read_post les montre dans mots_de_l_effet, avec leur place et leur longueur maximale). L'effet ne bouge pas : son propre script le redessine avec ces mots (2 à 5 min), puis la vidéo est livrée toute seule. Tout autre changement de l'effet : montage (une correction).",
+    input: z.object({
+      post_id: z.string().uuid(),
+      words: z
+        .array(z.object({ id: z.string().max(40), text: z.string().max(400) }))
+        .min(1)
+        .max(12),
+    }),
+  },
   write_on_photos: {
     description:
       "Écrit du texte par-dessus les photos d'un carrousel ou d'un post photo, à la charte du studio (mêmes polices et styles que les montages). Rendu en images en une minute environ, gratuit ; le lien vers le résultat est envoyé automatiquement à la gérante quand c'est prêt. Une entrée par photo, dans l'ordre des photos de la publication (texts vide = photo sans texte). Court et lisible : une accroche sur la 1re photo (hook), puis un message par photo (band ou caption), 6 textes au plus par photo. Une liste (checklist, planning, étapes, tarifs) est un seul texte avec items (titre + détail facultatif par élément). Pour refaire la mise en page d'un exemple copié (copy_text_style), reprends un texte par bloc avec son look_name. Remplace le texte déjà posé ; la gérante peut ensuite déplacer ou corriger chaque texte elle-même.",

@@ -37,7 +37,9 @@ import {
   reelLink,
   EFFECT_MINUTES,
   EFFECT_VOICE_OUT,
+  EFFECT_WORDS_MINUTES,
   effectBlurBrief,
+  effectWords,
   type ToolName,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
@@ -46,6 +48,7 @@ import { acceptQuote, createMontageQuote } from "@/lib/credits";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { bakedReel } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
+import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus } from "@/lib/montage-status";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
@@ -167,6 +170,7 @@ const COSTLY_TOOLS = [
   "render",
   "design_carousel",
   "carousel_texts",
+  "effect_words",
   "write_on_photos",
   "retouch_photos",
   "make_image",
@@ -716,6 +720,17 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({ status: "started", note: "Les nouveaux mots sont posés après ta réponse (environ une minute) et le lien part tout seul. Annonce-le en une phrase." });
     },
 
+    async effect_words({ post_id, words }) {
+      // Started now, free for her: its own script draws the effect again, then the video is delivered here.
+      const started = await startEffectWords(studioId, post_id, words, { conversationId: ctx.conversationId, waId: ctx.waId, replyTo: ctx.replyToMessageId, tell: true });
+      if (!started.ok) return json({ error: started.error });
+      ctx.notes.push(`mots de l'effet en cours post_id=${post_id}`);
+      return json({
+        status: "started",
+        note: `Ses mots se posent sur l'effet (${EFFECT_WORDS_MINUTES} min, gratuit) et la vidéo part toute seule une fois prête. Dis-le en une phrase.`,
+      });
+    },
+
     async write_on_photos({ post_id, template, slides }) {
       const post = unwrap(
         await db.from("posts").select("id, kind, status, media_ids, slides").eq("id", post_id).eq("studio_id", studioId).single(),
@@ -1000,7 +1015,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (plan.success) {
           montage = {
             version: row?.version,
-            ...(plan.data.baked ? { atelier_effets: "effet dessiné image par image : ses textes et son effet sont dans l'image ; un changement passe par montage avec correction: true" } : {}),
+            ...(plan.data.baked
+              ? {
+                  atelier_effets: effectWords(plan.data).length
+                    ? "effet dessiné image par image : ses mots (mots_de_l_effet) se changent avec effect_words (gratuit) ; tout autre changement passe par montage avec correction: true"
+                    : "effet dessiné image par image : ses textes et son effet sont dans l'image ; un changement passe par montage avec correction: true",
+                  ...(effectWords(plan.data).length ? { mots_de_l_effet: effectWords(plan.data).map((w) => ({ id: w.id, place: w.label, texte: w.text, max: w.max })) } : {}),
+                }
+              : {}),
             gabarit: plan.data.template,
             duree_s: plan.data.duration,
             scenes: plan.data.segments.length,

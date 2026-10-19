@@ -243,6 +243,22 @@ export const editPlanLayerSchema = z.object({
 });
 export type PlanLayer = z.infer<typeof editPlanLayerSchema>;
 
+/** The most words an effect's kit lists for her to change. */
+export const EFFECT_WORDS_MAX = 12;
+
+/**
+ * A text the effects agent drew in its video (words.json of its kit): she changes it herself and its
+ * render script draws the effect again with it. `label` says which text it is in her words, `max` how
+ * long it may get and still fit its place.
+ */
+export const effectWordSchema = z.object({
+  id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
+  label: z.string().min(1).max(80),
+  text: z.string().min(1).max(200),
+  max: z.number().int().min(1).max(200),
+});
+export type EffectWord = z.infer<typeof effectWordSchema>;
+
 export const editPlanObjectSchema = z.object({
   format: z.enum(["9:16", "1:1", "4:5"]),
   duration: z.number().min(3).max(90),
@@ -273,7 +289,21 @@ export const editPlanObjectSchema = z.object({
   /** Animations over several shots (see editPlanLayerSchema). */
   layers: z.array(editPlanLayerSchema).max(3).optional(),
   /** A Reel made by the effects agent (effects.ts): its one shot is the finished video, played as it is. Set by the engine. */
-  baked: z.object({ by: z.literal("agent"), session: z.string().min(1).max(80) }).optional(),
+  baked: z
+    .object({
+      by: z.literal("agent"),
+      session: z.string().min(1).max(80),
+      /** Its kit in Storage (its render script and what it reads): the video redone with other words, without the agent. */
+      kit: z.string().min(1).max(300).optional(),
+      /** The words drawn in its image, as she can change them. */
+      words: z.array(effectWordSchema).max(EFFECT_WORDS_MAX).optional(),
+      /** Her files as the kit names them (video1.mov…, voix.ogg), given back under the same names. */
+      files: z
+        .array(z.object({ name: z.string().regex(/^[A-Za-z0-9._-]{1,60}$/), media_id: z.string().min(1).max(80) }))
+        .max(25)
+        .optional(),
+    })
+    .optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {
