@@ -13,6 +13,7 @@ import {
   type MotionTemplate,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
+import { replyInConversation } from "@/lib/agent/conversation";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { readWebsite } from "@/lib/agent/website";
 import { cronAuthorized } from "@/lib/cron-auth";
@@ -64,6 +65,11 @@ import { photoRegions } from "@/lib/video/regions";
 //                        (costs) and what the lab studio has spent over all its runs (studio_costs).
 //   ?case=…&step=music   the version kept rendered again with a newly composed piece, the
 //                        montage untouched: to hear a change to the music without a new montage.
+//   ?case=…&step=chat&text=…[&c=<conversation>]  one message of hers to Simone in the app (a web
+//                        conversation of the lab studio, made or continued), and Simone's answer with
+//                        its cards and buttons; what Simone starts runs after. It waits for the answer
+//                        (call net.http_post with the Vault's secret and a minute: call_app gives up at 5 s).
+//                        Never on WhatsApp: a lab studio has no member.
 //   ?case=…&format=carrousel  a carousel instead of a Reel, from the case's photos (coiffure, trattoria),
 //                        composed by the carousel designer as for her (her photos read and cut out,
 //                        a test render of every slide, the critic, one correction), never charged;
@@ -606,6 +612,46 @@ async function result(key: string) {
   };
 }
 
+/** The lab studio of a case or a site, once set up. */
+async function labStudioId(key: string): Promise<string | null> {
+  const { data } = await supabaseAdmin().from("studios").select("id").eq("website_url", key).maybeSingle();
+  return (data?.id as string | undefined) ?? null;
+}
+
+/** No member: nothing of the lab studio's ever reaches a phone. */
+const LAB_MEMBER = "00000000-0000-4000-8000-000000000000";
+
+/** One message of hers to Simone in the app, in a web conversation of the lab studio, and her answer. */
+async function labChat(key: string, params: URLSearchParams) {
+  const text = params.get("text")?.trim().slice(0, 2000);
+  if (!text) return { error: "text=…" };
+  const studioId = await labStudioId(key);
+  if (!studioId) return { error: "case not set up" };
+  const db = supabaseAdmin();
+  let conversationId = params.get("c");
+  if (conversationId) {
+    const own = await db.from("conversations").select("id").eq("id", conversationId).eq("studio_id", studioId).maybeSingle();
+    if (!own.data) return { error: "conversation" };
+  } else {
+    const created = await db.from("conversations").insert({ studio_id: studioId, started_by: "web", title: "Banc d’essai" }).select("id").single();
+    if (created.error) return { error: created.error.message };
+    conversationId = created.data.id as string;
+  }
+  const inserted = await db.from("whatsapp_messages").insert({ studio_id: studioId, conversation_id: conversationId, channel: "web", direction: "inbound", type: "text", body: text }).select("id").single();
+  if (inserted.error) return { error: inserted.error.message };
+  const answer = await replyInConversation({ studioId, memberId: LAB_MEMBER, conversationId, reactToRowId: inserted.data.id as string, channel: "web" });
+  if (answer.reply) {
+    await db
+      .from("whatsapp_messages")
+      .insert({ studio_id: studioId, conversation_id: conversationId, channel: "web", direction: "outbound", type: "text", body: answer.reply, payload: { ...answer.extras, notes: answer.notes } });
+  }
+  // A montage she started runs after the answer, as in the app.
+  after(async () => {
+    for (const job of answer.afterReply) await job().catch((e: unknown) => console.error("lab: chat job failed", e));
+  });
+  return { conversation: conversationId, reply: answer.reply, extras: answer.extras, notes: answer.notes };
+}
+
 /** The version kept of the case's latest post, rendered again with a newly composed piece. */
 async function newMusic(key: string) {
   const db = supabaseAdmin();
@@ -631,6 +677,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "site" }, { status: 400 });
     }
     if (params.get("step") === "result") return Response.json(await result(siteKey(url.href)));
+    if (params.get("step") === "chat") return Response.json(await labChat(siteKey(url.href), params));
     if (params.get("step") === "music") {
       after(() => newMusic(siteKey(url.href)).catch((error: unknown) => console.error("lab: new music failed", url.href, error)));
       return Response.json({ ok: true, site: url.href, music: true });
@@ -652,6 +699,7 @@ export async function POST(request: Request) {
   if (!c) return Response.json({ error: `case=${Object.keys(CASES).join("|")}` }, { status: 400 });
   if (c.template && !motionTemplateSchema.safeParse(c.template).success) return Response.json({ error: "template" }, { status: 400 });
   if (params.get("step") === "result") return Response.json(await result(labUrl(name)));
+  if (params.get("step") === "chat") return Response.json(await labChat(labUrl(name), params));
   if (params.get("step") === "music") {
     after(() => newMusic(labUrl(name)).catch((error: unknown) => console.error("lab: new music failed", name, error)));
     return Response.json({ ok: true, case: name, music: true });

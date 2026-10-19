@@ -31,9 +31,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { photoRegions } from "@/lib/video/regions";
 
-// « C'est parti » on the Créer screen: her new files join her library, the publication
-// is created (where it goes, and for a Reel with or without a voice over, as she chose),
-// and a Reel starts at once (her tap is her yes; charged on delivery, like any montage).
+// « C'est parti » on the Créer screen, once she said what she imagines (or gave a ref): her
+// new files join her library, the publication is created (where it goes, and for a Reel
+// with or without a voice over, as she chose), and a Reel starts at once (her tap is her
+// yes; charged on delivery, like any montage).
 // The other formats go on with Simone in the chat, who writes their texts.
 
 const uploadSchema = z.object({ path: z.string().max(300), mime: z.string().max(100), size: z.number().int().positive() });
@@ -90,6 +91,10 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
       : { ok: false, locked: "credits", error: "Tu n’as plus de crédits ce mois-ci : ils reviennent le 1er du mois." };
   }
 
+  // What she imagines, or a ref: the Reel to copy, the model of this Reel only (one shot). Simone asks before she makes anything.
+  const copying = kind !== "reel" || copy === false ? null : typeof copy === "string" ? await ownInspiration(studioId, copy) : await pendingSteal(studioId).catch(() => null);
+  if (!idea && !copying) return { ok: false, error: kind === "reel" ? "Dis-moi ce que tu imagines pour ce Reel, ou montre-moi une ref." : "Dis-moi ce que tu imagines pour cette publication." };
+
   // Her new files become her library's, read once in the background (ready for the montage).
   const db = supabaseAdmin();
   const mediaIds: string[] = [];
@@ -114,8 +119,6 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     after(() => (video ? ensureClipAnalysis(studioId, mediaId) : photoRegions(studioId, mediaId)).then(() => undefined, (e: unknown) => console.warn("create: file read failed", e)));
   }
 
-  // The Reel to copy: the model of this Reel only (one shot).
-  const copying = kind !== "reel" || copy === false ? null : typeof copy === "string" ? await ownInspiration(studioId, copy) : await pendingSteal(studioId).catch(() => null);
   const created = await createPost({ kind, date, time, intention: idea, mediaIds, inspirationId: copying?.id });
   if (!created.ok) return created;
   // Her choices, before anything is made: where it goes, and the voice over of a Reel.

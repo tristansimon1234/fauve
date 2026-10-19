@@ -456,7 +456,10 @@ test("créer: the format Simone advises, what fits, and the steps she shows", as
 });
 
 test("créer: what she imagines titles the post, and reaches the montage and the voice whole", async () => {
-  const { imaginedBrief, intentionTitle } = await import("./creation.ts");
+  const { imaginedBrief, imagineQuestion, intentionTitle } = await import("./creation.ts");
+  // The Créer screen asks what she imagines, for the format she makes.
+  assert.equal(imagineQuestion("reel"), "Qu’est-ce que tu imagines pour ce Reel ?");
+  assert.equal(imagineQuestion("story"), "Qu’est-ce que tu imagines pour cette story ?");
   const idea = "Montre la queue devant le samedi midi, puis comment on fait le sandwich, et finis sur moi. Dis qu'on est ouvert du mercredi au dimanche.";
   assert.equal(intentionTitle(idea), "Montre la queue devant le samedi midi, puis comment on fait…");
   assert.equal(intentionTitle("  Un Reel   pour la rentrée "), "Un Reel pour la rentrée");

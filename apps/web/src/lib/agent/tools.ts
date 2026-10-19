@@ -346,7 +346,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           };
         }),
         note: rows.length
-          ? "Prends celles dont elle parle (souvent les plus récentes, envoyées ensemble) et enchaîne sans lui redemander : create_post avec ces media_ids, puis le texte (write_on_photos) ou le montage."
+          ? "Prends celles dont elle parle (souvent les plus récentes, envoyées ensemble), sans lui redemander ses fichiers ; si elle n'a pas dit ce qu'elle imagine, demande-le-lui (ou une ref), puis create_post avec ces media_ids et le texte (write_on_photos) ou le montage."
           : bank
             ? "Sa banque de plans est vide : rien de vivant de côté pour l'instant."
             : "Rien dans la médiathèque sur cette période : dis-le simplement et propose de les glisser ici.",

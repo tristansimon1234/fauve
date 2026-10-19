@@ -7,6 +7,7 @@ import {
   findVoice,
   formatBlocked,
   formatWhy,
+  imagineQuestion,
   publishWhen,
   SIMONE_VOICES,
   voiceSamplePath,
@@ -32,8 +33,9 @@ export type NewPostHandOff = (start: { postId: string; text: string; files: File
 export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 
 // « Nouvelle publication », in one screen: she gives her photos and videos (her library
-// or her phone), says what it is about if she wants, and Simone says what she will make
-// of them (« J'en fais un Reel, publié vendredi à 18 h »), both changeable in a tap.
+// or her phone), says what she imagines for it, or shows a ref (a Reel she likes), and
+// Simone says what she will make of them (« J'en fais un Reel, publié vendredi à 18 h »),
+// both changeable in a tap.
 // « C'est parti »: a Reel starts at once and the screen follows it (« Je m'en occupe »);
 // a carousel, a photo or a story goes on with Simone in the chat, who writes the texts.
 
@@ -172,6 +174,7 @@ function Create({
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const ideaRef = useRef<HTMLTextAreaElement>(null);
 
   // Escape closes a small sheet before the whole screen.
   useEffect(() => {
@@ -237,7 +240,9 @@ function Create({
   const where = places.length ? places : ["instagram"];
   const sending = picked.some((k) => k.startsWith("u:") && drafts.get(k.slice(2))?.status === "uploading");
   const broken = picked.some((k) => k.startsWith("u:") && drafts.get(k.slice(2))?.status === "error");
-  const ready = picked.length > 0 && Boolean(chosenWhen) && !sending && !broken;
+  // What she imagines, or a ref: Simone asks before she makes anything (Tristan: « simone part trop vite en production »).
+  const told = Boolean(idea.trim()) || Boolean(copying);
+  const ready = picked.length > 0 && Boolean(chosenWhen) && !sending && !broken && told;
 
   const toggle = (key: string) => setOrder((o) => (o.includes(key) ? o.filter((k) => k !== key) : picked.length >= MAX_FILES ? o : [...o, key]));
   const add = (list: FileList | File[]) => {
@@ -433,10 +438,11 @@ function Create({
 
         <section className="flex flex-col gap-2.5">
           <label htmlFor={`${titleId}-idea`} className="text-[17px] font-extrabold tracking-[-0.01em]">
-            Ce que tu imagines <span className="text-[13px] font-semibold tracking-normal text-muted">facultatif</span>
+            {imagineQuestion(kind)}
           </label>
           <p className="-mt-1 text-[13.5px] leading-snug text-muted">Par quoi commencer, comment finir, ce que les gens doivent faire. Avec une voix, ou juste un message à l’écran.</p>
           <textarea
+            ref={ideaRef}
             id={`${titleId}-idea`}
             value={idea}
             maxLength={500}
@@ -459,6 +465,21 @@ function Create({
                 </button>
               ))}
             </div>
+          )}
+          {/* Or a ref: a Reel she likes, its link or its video (the style sheet). */}
+          {kind === "reel" && options && (
+            <button
+              type="button"
+              onClick={() => setSheet("copy")}
+              className={`fauve-press flex items-center gap-2.5 self-start rounded-full border-[1.5px] py-1.5 pr-3.5 pl-2 text-left text-[14px] font-bold ${
+                copying ? "border-violet bg-violet-tint text-violet" : "border-dashed border-line bg-white text-violet hover:border-violet/40"
+              }`}
+            >
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet">
+                <PlayIcon size={12} />
+              </span>
+              {copying ? `Ta ref : ${readingLabel(reading)}` : "Ou montre-moi une ref : un Reel que tu aimes"}
+            </button>
           )}
         </section>
 
@@ -513,6 +534,18 @@ function Create({
           <p className="pt-1 text-center text-[13px] text-muted">J’envoie tes fichiers…</p>
         ) : broken ? (
           <p className="pt-1 text-center text-[13px] text-danger">Un fichier n’est pas passé : retire-le ou ajoute-le à nouveau.</p>
+        ) : !told ? (
+          // The question may be below the fold on a phone: a tap brings it up.
+          <button
+            type="button"
+            onClick={() => {
+              ideaRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+              ideaRef.current?.focus({ preventScroll: true });
+            }}
+            className="pt-1 text-center text-[13px] font-semibold text-ink underline decoration-line underline-offset-4"
+          >
+            Dis-moi ce que tu imagines{kind === "reel" ? ", ou montre-moi une ref" : ""}.
+          </button>
         ) : (
           <p className="pt-1 text-center text-[12.5px] leading-snug text-muted">
             {kind === "reel" ? "Le style, les textes et la musique, je les choisis." : "La mise en page et les textes, je les choisis."} Tu pourras tout changer après.

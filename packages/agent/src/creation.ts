@@ -51,6 +51,12 @@ export function intentionTitle(intention: string): string {
   return text.length > 60 ? `${text.slice(0, 60).replace(/\s+\S*$/, "")}…` : text;
 }
 
+/** The question the Créer screen asks her, for the format she makes (Tristan: « demande lui juste ce que tu imagines pour ce post / reel, ou une ref »). */
+export function imagineQuestion(kind: PostKind): string {
+  const what = { reel: "ce Reel", carousel: "ce carrousel", post: "ce post", story: "cette story" }[kind];
+  return `Qu’est-ce que tu imagines pour ${what} ?`;
+}
+
 /** What she imagines, as the montage reads it, and the voice over written before it. */
 export const imaginedBrief = (idea: string): string | undefined => (idea.trim() ? `Ce que la gérante imagine : ${idea.trim()}` : undefined);
 
