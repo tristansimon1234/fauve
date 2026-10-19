@@ -75,6 +75,8 @@ const bodySchema = z.object({
   replyTo: z.string().max(200).optional(),
   /** Started from the app (« Créer »): the delivery also reaches her on WhatsApp. */
   notify: z.boolean().optional(),
+  /** Asked in a conversation of the app: delivered in it, not in the latest automatic one. */
+  conversationId: z.uuid().optional(),
   rationale: z.string().max(600).optional(),
   /** What Fauve says about the delivered version, kept on the post (else the rationale). */
   note: z.string().max(600).optional(),
@@ -158,7 +160,7 @@ export async function POST(request: Request) {
 const FAILED = "Je n’ai pas réussi à préparer le montage. Aucun crédit n’a été débité. Tu veux que je réessaie ?";
 
 async function run(job: Job) {
-  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify };
+  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify, conversationId: job.conversationId };
   const level = job.effort ? EFFORTS[job.effort] : null;
 
   // A Reel whose effect holds to what moves in her video: the effects agent makes it, whatever the level of care.
@@ -414,7 +416,7 @@ async function effectsDone(job: Job, effect: NonNullable<Job["effect"]>, state: 
  */
 async function backToChain(job: Job, error: unknown) {
   console.error(`montage ${job.step} failed, ${job.correction ? "the effect stays as it was" : "the chain takes the Reel back"}`, job.postId, error);
-  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify };
+  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify, conversationId: job.conversationId };
   if (job.effect) await endEffectsSession(job.effect.session, job.effect.files).catch(() => {});
   if (job.quoteId) await restoreChainQuote(job.quoteId);
   if (job.correction) {
@@ -611,7 +613,7 @@ function careLine(compared: boolean, outcome: Care | null): string {
  * with what the review did; the quote is charged for what was really made.
  */
 async function deliver(job: Job, best: Version, outcome: Care | null): Promise<boolean> {
-  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify };
+  const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify, conversationId: job.conversationId };
   const db = supabaseAdmin();
   await db.from("posts").update({ edit_plan_id: best.planId, render_id: best.renderId }).eq("id", job.postId).eq("studio_id", job.studioId);
   const [post, render] = await Promise.all([
