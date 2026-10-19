@@ -38,22 +38,26 @@ export type DeliveryTarget = {
   conversationId?: string;
 };
 
-function store(
+async function store(
   target: DeliveryTarget,
   fields: { wa_message_id?: string; type: string; body: string; payload?: Record<string, unknown>; media_id?: string },
   waId = target.waId,
 ) {
-  return supabaseAdmin()
-    .from("whatsapp_messages")
-    .insert({
-      studio_id: target.studioId,
-      channel: waId ? "whatsapp" : "web",
-      direction: "outbound",
-      phone_e164: waId ? `+${waId}` : null,
-      ...(target.conversationId && !waId ? { conversation_id: target.conversationId } : {}),
-      ...fields,
-      payload: { reply_to: target.replyTo, ...fields.payload },
-    });
+  const db = supabaseAdmin();
+  // In the conversation she asked in, unless she closed it meanwhile: then the latest one, where she sees it.
+  const asked =
+    target.conversationId && !waId
+      ? (await db.from("conversations").select("id").eq("id", target.conversationId).eq("studio_id", target.studioId).is("archived_at", null).maybeSingle()).data
+      : null;
+  return db.from("whatsapp_messages").insert({
+    studio_id: target.studioId,
+    channel: waId ? "whatsapp" : "web",
+    direction: "outbound",
+    phone_e164: waId ? `+${waId}` : null,
+    ...(asked ? { conversation_id: target.conversationId } : {}),
+    ...fields,
+    payload: { reply_to: target.replyTo, ...fields.payload },
+  });
 }
 
 /** Tells the manager something went wrong, on the channel she uses. */

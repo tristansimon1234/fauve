@@ -82,7 +82,7 @@ export async function launchQuote(quoteId: string, conversationId: string, effor
 
   const db = supabaseAdmin();
   try {
-    await startMontage(ctx.studioId, quote);
+    await startMontage(ctx.studioId, quote, { conversationId });
   } catch (error) {
     console.error("launchQuote: montage not queued", error);
     // Not started: the quote can be launched again.

@@ -203,7 +203,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   async function effectCorrection(postId: string, brief: string, doing: string) {
     const accepted = await correctionQuote(studioId, postId, brief);
     if ("error" in accepted) return json({ error: accepted.error });
-    ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
+    ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
     ctx.extras.quote = accepted.id;
     ctx.notes.push(`correction de l'effet lancée job=${accepted.id} post_id=${postId}`);
     return json({
@@ -480,7 +480,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if ("error" in accepted) return json({ error: accepted.error });
       // Who makes it, decided now so she hears the right time (the job keeps it): an effect drawn image by image takes longer.
       const route = accepted.kind === "variant" ? "chain" : await effectRoute(studioId, { postId: post_id, correction: accepted.kind === "correction", brief: accepted.brief, mediaIds: accepted.mediaIds }).catch(() => undefined);
-      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, route }));
+      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, route, conversationId: ctx.conversationId }));
       // In the app, the card follows the montage step by step; on WhatsApp, cards become links, so the post's link stays.
       ctx.extras.quote = job.id;
       if (ctx.waId) ctx.extras.posts = [post_id];
@@ -563,7 +563,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       const accepted = await acceptQuote(studioId, quote.id, turnStartedAt, { immediate: true });
       if ("error" in accepted) return json({ error: accepted.error });
-      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId }));
+      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
       ctx.extras.quote = quote.id;
       if (ctx.waId) ctx.extras.posts = [post_id];
       ctx.notes.push(`version ${change.button.toLowerCase()} lancée quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id}`);
@@ -603,7 +603,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (!post.edit_plan_id) return json({ error: "Cette publication n'a pas encore de montage : lance montage." });
       // A re-render of an unchanged plan: free (no AI work).
       ctx.afterReply.push(async () => {
-        await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
+        await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
       });
       return json({
         status: "started",
@@ -619,7 +619,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // Not montaged yet: the choice is kept for the montage.
       if (!post.edit_plan_id) return json({ ok: true, note: "C'est noté pour son montage. Continue sans le redire longuement." });
       ctx.afterReply.push(async () => {
-        await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, freshMusic: mode === "another" });
+        await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, freshMusic: mode === "another", conversationId: ctx.conversationId });
       });
       return json({ status: "started", note: "La vidéo se refait (1 à 2 min) et le lien part tout seul. Dis-le en une phrase." });
     },
@@ -647,7 +647,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         // The voice is mixed into the video the effects agent drew: it makes the effect again without it.
         if (rerender === "agent") return effectCorrection(post_id, EFFECT_VOICE_OUT, "Simone refait l'effet sans la voix");
         ctx.afterReply.push(async () => {
-          await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
+          await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
         });
         return json({ status: "started", note: "La vidéo se refait sans voix (1 à 2 min) et le lien part tout seul. Dis-le en une phrase." });
       }
@@ -758,7 +758,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         return json({ error: error instanceof Error ? error.message : "Texte non enregistré" });
       }
       ctx.afterReply.push(async () => {
-        await renderSlidesAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
+        await renderSlidesAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
       });
       return json({
         status: "started",
@@ -779,7 +779,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.afterReply.push(async () => {
         try {
           await retouchPostPhotos(studioId, post_id, { photos, light, blur, onlyRecognizable: only_recognizable });
-          await renderSlidesAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
+          await renderSlidesAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
         } catch (error) {
           await notifyFailure({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId }, "Je n’ai pas réussi à retoucher tes photos cette fois. Tu veux que je réessaie ?", error);
         }
@@ -834,7 +834,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.afterReply.push(async () => {
         try {
           await blurMontage(studioId, post_id, what);
-          await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
+          await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
         } catch (error) {
           await notifyFailure({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId }, "Je n’ai pas réussi à flouter la vidéo cette fois. Tu veux que je réessaie ?", error);
         }
@@ -953,7 +953,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             return { look: block.look, ...(copy_places ? { y: block.y, x: block.x } : {}) };
           });
           ctx.afterReply.push(async () => {
-            const target = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId };
+            const target = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId };
             await (result.kind === "slides" ? renderSlidesAndDeliver(target) : renderAndDeliver(target));
           });
           applied = { post_id, texts: result.changed, on: result.kind === "slides" ? "photos" : "montage" };
@@ -1079,7 +1079,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (!rendering.has(post_id)) {
           rendering.add(post_id);
           ctx.afterReply.push(async () => {
-            const to = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId };
+            const to = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId };
             await (result.kind === "slides" ? renderSlidesAndDeliver(to) : renderAndDeliver(to));
           });
         }

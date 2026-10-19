@@ -23,8 +23,11 @@ export async function correctionQuote(studioId: string, postId: string, brief: s
 export function startMontage(
   studioId: string,
   quote: AcceptedQuote,
-  /** route: who makes it, when it was decided before (effectRoute), so the job does not decide again. */
-  target: { waId?: string; replyTo?: string; notify?: boolean; route?: "agent" | "chain" } = {},
+  /**
+   * route: who makes it, when it was decided before (effectRoute), so the job does not decide again.
+   * conversationId: the app's conversation she asked in, where the Reel is delivered.
+   */
+  target: { waId?: string; replyTo?: string; notify?: boolean; route?: "agent" | "chain"; conversationId?: string } = {},
 ) {
   return queueJob("montage", {
     // A variant skips the editor: same cut, another style and hook, then the render.
@@ -43,5 +46,6 @@ export function startMontage(
     replyTo: target.replyTo,
     notify: target.notify || undefined,
     route: target.route,
+    conversationId: target.waId ? undefined : target.conversationId,
   });
 }
