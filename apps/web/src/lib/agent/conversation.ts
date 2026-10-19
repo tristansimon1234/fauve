@@ -1,7 +1,7 @@
 import "server-only";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, questionsMemo, readMemory, readVoiceSetting, replyExtrasSchema, stableWindow, type BriefQuestion } from "@fauve/agent";
+import { DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, readMemory, readVoiceSetting, stableWindow } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
@@ -29,8 +29,6 @@ export type StoredMessage = {
   notes?: string[];
   /** Emoji reactions on the message: the manager's on Fauve's messages, Fauve's on hers. */
   reactions?: { fauve?: string; me?: string } | null;
-  /** Fauve's brief: the questions she asked in a card under the message. */
-  questions?: BriefQuestion[];
 };
 
 const mediaLabels: Record<string, string> = {
@@ -40,12 +38,6 @@ const mediaLabels: Record<string, string> = {
   audio: "Message vocal reçu",
   sticker: "Sticker reçu",
 };
-
-/** The questions of Fauve's brief stored with her message (reply_with questions). */
-function questionsOf(payload: unknown): BriefQuestion[] | undefined {
-  const parsed = replyExtrasSchema.pick({ questions: true }).safeParse(payload ?? {});
-  return parsed.success ? parsed.data.questions : undefined;
-}
 
 /** Rebuilds the conversation for the model from stored messages (text only). */
 export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessageParam[] {
@@ -62,7 +54,7 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
     const cut = text.length > MESSAGE_MAX_CHARS ? `${text.slice(0, MESSAGE_MAX_CHARS)}…` : text;
     // A reaction is part of the conversation: she liked a message, Fauve already answered one with an emoji.
     const reacted = row.direction === "outbound" ? row.reactions?.me && `[elle a réagi ${row.reactions.me}]` : row.reactions?.fauve && `[tu as réagi ${row.reactions.fauve}]`;
-    const short = [row.notes?.length ? `${cut}\n[mémo : ${row.notes.join(" ; ")}]` : cut, row.questions?.length && questionsMemo(row.questions), reacted].filter(Boolean).join("\n");
+    const short = [row.notes?.length ? `${cut}\n[mémo : ${row.notes.join(" ; ")}]` : cut, reacted].filter(Boolean).join("\n");
     const last = history.at(-1);
     if (last?.role === role && typeof last.content === "string") {
       last.content = `${last.content}\n${short}`;
@@ -145,7 +137,6 @@ export async function replyInConversation(params: {
     ...(r as StoredMessage & { wa_message_id: string | null }),
     reply_to: (r.payload as { reply_to?: string } | null)?.reply_to ?? null,
     notes: (r.payload as { notes?: string[] } | null)?.notes,
-    questions: r.direction === "outbound" ? questionsOf(r.payload) : undefined,
   }));
   const history = toModelHistory(orderReplies(stored));
   // Every message has already been answered (e.g. a retried delivery): nothing to say.

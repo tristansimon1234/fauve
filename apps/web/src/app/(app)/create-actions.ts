@@ -1,21 +1,17 @@
 "use server";
 
 import {
-  creationBrief,
   creationPhase,
   DEFAULT_EFFORT,
   EFFECT_MINUTES,
   EFFORTS,
   effortSchema,
-  fallbackQuestions,
   findVoice,
+  imaginedBrief,
   JOB_STALE_MINUTES,
-  MAX_BRIEF_ANSWER,
-  MAX_BRIEF_QUESTIONS,
   MAX_MONTAGE_FILES,
   postKindSchema,
   TRIAL_DAYS,
-  type BriefQuestion,
   type CreationPhase,
   type Effort,
   type PostKind,
@@ -25,7 +21,6 @@ import { z } from "zod";
 import { createPost } from "@/app/(app)/calendrier/actions";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { studioAccess } from "@/lib/billing/access";
-import { briefQuestions } from "@/lib/brief";
 import { acceptQuote, createMontageQuote, pricedAsEffect } from "@/lib/credits";
 import { env } from "@/lib/env";
 import { startMontage } from "@/lib/montage-start";
@@ -36,12 +31,11 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { photoRegions } from "@/lib/video/regions";
 
-// « Continuer » on the Créer screen: Simone asks the few questions that change the result
-// (her brief, packages/agent/src/brief.ts). Then « C'est parti »: her new files join her
-// library, the publication is created (where it goes, and for a Reel with or without a voice
-// over, as she chose), and a Reel starts at once with her idea and her answers (her tap is
-// her yes; charged on delivery, like any montage). The other formats go on with Simone in
-// the chat, who writes their texts.
+// « C'est parti » on the Créer screen, once she said what she imagines (or gave a ref): her
+// new files join her library, the publication is created (where it goes, and for a Reel
+// with or without a voice over, as she chose), and a Reel starts at once (her tap is her
+// yes; charged on delivery, like any montage).
+// The other formats go on with Simone in the chat, who writes their texts.
 
 const uploadSchema = z.object({ path: z.string().max(300), mime: z.string().max(100), size: z.number().int().positive() });
 const launchSchema = z.object({
@@ -58,8 +52,6 @@ const launchSchema = z.object({
   platforms: z.array(z.enum(["instagram", "tiktok"])).min(1).max(2).optional(),
   /** A Reel made like another (« Steal »): the one she chose on this screen (its inspiration), or true for the one she sent Simone, false for her own style. */
   copy: z.union([z.uuid(), z.boolean()]).default(true),
-  /** Her answers to Simone's questions (empty: Simone chooses). */
-  answers: z.array(z.object({ question: z.string().max(120), answer: z.string().max(MAX_BRIEF_ANSWER) })).max(MAX_BRIEF_QUESTIONS).default([]),
 });
 
 export type LaunchInput = z.input<typeof launchSchema>;
@@ -82,31 +74,10 @@ async function ownInspiration(studioId: string, id: string): Promise<{ id: strin
   return data ? { id: data.id as string } : null;
 }
 
-const questionsInputSchema = z.object({
-  kind: postKindSchema,
-  idea: z.string().max(500),
-  /** Picked from her library: what Simone already saw of them. */
-  media: z.array(z.uuid()).max(MAX_MONTAGE_FILES),
-  /** Just sent from her phone: not seen yet, only counted. */
-  sent: z.object({ videos: z.number().int().min(0).max(MAX_MONTAGE_FILES), photos: z.number().int().min(0).max(MAX_MONTAGE_FILES) }),
-  /** What the screen already chose, in her words: never asked again. */
-  chosen: z.object({ format: z.string().max(40), voice: z.string().max(60).optional(), style: z.string().max(80).optional(), when: z.string().max(120) }),
-});
-
-/** Simone's questions before she makes this publication (her brief, lib/brief.ts). */
-export async function creationQuestions(input: z.input<typeof questionsInputSchema>): Promise<{ questions: BriefQuestion[] }> {
-  const parsed = questionsInputSchema.safeParse(input);
-  // Never a screen that asks nothing: the usual questions when hers cannot be written.
-  if (!parsed.success) return { questions: fallbackQuestions(input.kind === "reel") };
-  const { member } = await getStudioContext();
-  if (!member) return { questions: [] };
-  return { questions: await briefQuestions(member.studio.id, parsed.data) };
-}
-
 export async function launchCreation(input: LaunchInput): Promise<LaunchResult> {
   const parsed = launchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Choisis au moins une photo ou une vidéo." };
-  const { kind, date, time, items, voice, platforms, copy, answers } = parsed.data;
+  const { kind, date, time, items, voice, platforms, copy } = parsed.data;
   const idea = parsed.data.idea.trim();
   const { member } = await getStudioContext();
   if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
@@ -119,6 +90,10 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
       ? { ok: false, locked: "subscribe", error: `Ta première publication est faite. Pour en créer d’autres, démarre ton essai : ${TRIAL_DAYS} jours offerts.` }
       : { ok: false, locked: "credits", error: "Tu n’as plus de crédits ce mois-ci : ils reviennent le 1er du mois." };
   }
+
+  // What she imagines, or a ref: the Reel to copy, the model of this Reel only (one shot). Simone asks before she makes anything.
+  const copying = kind !== "reel" || copy === false ? null : typeof copy === "string" ? await ownInspiration(studioId, copy) : await pendingSteal(studioId).catch(() => null);
+  if (!idea && !copying) return { ok: false, error: kind === "reel" ? "Dis-moi ce que tu imagines pour ce Reel, ou montre-moi une ref." : "Dis-moi ce que tu imagines pour cette publication." };
 
   // Her new files become her library's, read once in the background (ready for the montage).
   const db = supabaseAdmin();
@@ -144,8 +119,6 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     after(() => (video ? ensureClipAnalysis(studioId, mediaId) : photoRegions(studioId, mediaId)).then(() => undefined, (e: unknown) => console.warn("create: file read failed", e)));
   }
 
-  // The Reel to copy: the model of this Reel only (one shot).
-  const copying = kind !== "reel" || copy === false ? null : typeof copy === "string" ? await ownInspiration(studioId, copy) : await pendingSteal(studioId).catch(() => null);
   const created = await createPost({ kind, date, time, intention: idea, mediaIds, inspirationId: copying?.id });
   if (!created.ok) return created;
   // Her choices, before anything is made: where it goes, and the voice over of a Reel.
@@ -166,7 +139,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     studioId,
     postId: created.id,
     mediaIds,
-    brief: creationBrief(idea, answers),
+    brief: imaginedBrief(idea),
     correction: false,
     maxNewScenes: scenes,
     effort,

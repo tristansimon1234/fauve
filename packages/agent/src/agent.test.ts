@@ -456,7 +456,10 @@ test("créer: the format Simone advises, what fits, and the steps she shows", as
 });
 
 test("créer: what she imagines titles the post, and reaches the montage and the voice whole", async () => {
-  const { imaginedBrief, intentionTitle } = await import("./creation.ts");
+  const { imaginedBrief, imagineQuestion, intentionTitle } = await import("./creation.ts");
+  // The Créer screen asks what she imagines, for the format she makes.
+  assert.equal(imagineQuestion("reel"), "Qu’est-ce que tu imagines pour ce Reel ?");
+  assert.equal(imagineQuestion("story"), "Qu’est-ce que tu imagines pour cette story ?");
   const idea = "Montre la queue devant le samedi midi, puis comment on fait le sandwich, et finis sur moi. Dis qu'on est ouvert du mercredi au dimanche.";
   assert.equal(intentionTitle(idea), "Montre la queue devant le samedi midi, puis comment on fait…");
   assert.equal(intentionTitle("  Un Reel   pour la rentrée "), "Un Reel pour la rentrée");
@@ -3775,52 +3778,4 @@ test("carousel editor: a tap on the image finds the text the slide drew there", 
   assert.equal(slotTextLimit({ max_chars: 2 }), 80);
   assert.equal(slotTextLimit({ max_chars: 55 }), 110);
   assert.equal(slotTextLimit({ max_chars: 300 }), 400);
-});
-
-test("brief: Simone's questions before she makes something, her answers in the request", async () => {
-  const { answersText, briefQuestionsSchema, briefWriterSchema, fallbackQuestions, questionsAsText, questionsMemo, MAX_BRIEF_QUESTIONS } = await import("./brief.ts");
-  const { creationBrief } = await import("./creation.ts");
-  const { replyExtrasSchema } = await import("./schemas.ts");
-  const why = { question: "C’est pour quoi, ce Reel ?", answers: ["Faire réserver", "Faire découvrir le studio", "Annoncer une nouveauté"] };
-  const offer = { question: "Je mets une offre à la fin ?", answers: ["La séance découverte à 40 €", "Non, juste l’ambiance"] };
-
-  // A card of 1 to 3 questions, each with 2 to 4 answers to tap; a form of 4 questions is not a brief.
-  assert.equal(replyExtrasSchema.safeParse({ questions: [why, offer] }).success, true);
-  assert.equal(briefQuestionsSchema.safeParse([why, offer, why, offer]).success, false);
-  assert.equal(briefQuestionsSchema.safeParse([{ question: "Une voix ?", answers: ["Oui"] }]).success, false, "one answer is not a choice");
-  // The writer may find nothing to ask when her request says it all.
-  assert.equal(briefWriterSchema.safeParse({ questions: [] }).success, true);
-  assert.equal(MAX_BRIEF_QUESTIONS, 3);
-
-  // Her answers, one per line; a question left open is Simone's to choose.
-  const answers = [
-    { question: why.question, answer: "Faire réserver" },
-    { question: offer.question, answer: "" },
-  ];
-  assert.equal(answersText(answers), "C’est pour quoi, ce Reel ? Faire réserver\nJe mets une offre à la fin ? Choisis pour moi.");
-  assert.equal(answersText([{ question: "Les mots ?", answer: "x".repeat(300) }]).length, "Les mots ? ".length + 200);
-
-  // From the Créer screen: what she imagines and the questions she answered, as the montage reads them.
-  assert.equal(
-    creationBrief("Un Reel sur le Reformer", answers),
-    "Ce que la gérante imagine : Un Reel sur le Reformer\nSes réponses aux questions de Simone :\nC’est pour quoi, ce Reel ? Faire réserver",
-  );
-  assert.equal(creationBrief("", answers), "Ses réponses aux questions de Simone :\nC’est pour quoi, ce Reel ? Faire réserver");
-  assert.equal(creationBrief("  ", [{ question: why.question, answer: " " }]), undefined);
-  assert.equal(creationBrief("Juste l’idée"), "Ce que la gérante imagine : Juste l’idée");
-
-  // Without a card: one short question gets its buttons; several are numbered, answered in one message.
-  assert.deepEqual(questionsAsText([{ question: "Une voix off ?", answers: ["Oui", "Non"] }]), { text: "Une voix off ?", options: ["Oui", "Non"] });
-  const text = questionsAsText([why, offer]);
-  assert.equal(text.options, undefined);
-  assert.match(text.text, /^1\. C’est pour quoi, ce Reel \?\nFaire réserver · Faire découvrir le studio · Annoncer une nouveauté\n\n2\. Je mets une offre/);
-  assert.match(text.text, /Réponds-moi en un message/);
-  // A long answer would be cut on a WhatsApp button: the question goes as text.
-  assert.equal(questionsAsText([offer]).options, undefined);
-  assert.equal(questionsAsText([offer]).text, "Je mets une offre à la fin ?\nLa séance découverte à 40 € · Non, juste l’ambiance");
-
-  // The model reads back what it asked; the fallback asks what any publication needs.
-  assert.equal(questionsMemo([offer]), "[questions dans une carte : 1. Je mets une offre à la fin ? (La séance découverte à 40 € / Non, juste l’ambiance)]");
-  assert.equal(briefQuestionsSchema.safeParse(fallbackQuestions(true)).success, true);
-  assert.match(fallbackQuestions(false)[0]!.question, /cette publication/);
 });

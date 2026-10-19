@@ -1,4 +1,3 @@
-import { answersText, type BriefAnswer } from "./brief.ts";
 import { EFFORTS, type Effort } from "./effort.ts";
 import type { PostKind } from "./schemas.ts";
 import type { PublishWhen } from "./when.ts";
@@ -52,15 +51,14 @@ export function intentionTitle(intention: string): string {
   return text.length > 60 ? `${text.slice(0, 60).replace(/\s+\S*$/, "")}…` : text;
 }
 
+/** The question the Créer screen asks her, for the format she makes (Tristan: « demande lui juste ce que tu imagines pour ce post / reel, ou une ref »). */
+export function imagineQuestion(kind: PostKind): string {
+  const what = { reel: "ce Reel", carousel: "ce carrousel", post: "ce post", story: "cette story" }[kind];
+  return `Qu’est-ce que tu imagines pour ${what} ?`;
+}
+
 /** What she imagines, as the montage reads it, and the voice over written before it. */
 export const imaginedBrief = (idea: string): string | undefined => (idea.trim() ? `Ce que la gérante imagine : ${idea.trim()}` : undefined);
-
-/** What she imagines and her answers to Simone's questions (the brief), as the montage, the voice over and the designer read them. */
-export function creationBrief(idea: string, answers: BriefAnswer[] = []): string | undefined {
-  const said = answers.filter((a) => a.answer.trim());
-  const parts = [imaginedBrief(idea), said.length ? `Ses réponses aux questions de Simone :\n${answersText(said)}` : undefined].filter(Boolean);
-  return parts.length ? parts.join("\n") : undefined;
-}
 
 export type CreationPhase = "watch" | "edit" | "second" | "render" | "review";
 
