@@ -53,9 +53,11 @@ export type PostMusic = z.infer<typeof postMusicSchema>;
 export const readPostMusic = (value: unknown): PostMusic => postMusicSchema.catch({ mode: "on" }).parse(value ?? {});
 
 /** The cut of a montage: what the music follows (the clips, scenes and their lengths), not the texts. */
-export function cutSignature(plan: Pick<EditPlan, "segments" | "template" | "transitions"> & { voice?: EditPlan["voice"]; tempo?: number }): string {
+export function cutSignature(plan: Pick<EditPlan, "segments" | "template" | "transitions"> & { voice?: EditPlan["voice"]; tempo?: number; baked?: EditPlan["baked"] }): string {
+  // An effect's video is known by the session that drew it: drawn again with her words by its kit, it is a new
+  // video with the same cut, and keeps its music (by its video's id, changing a word composed a new piece).
   const cut = plan.segments.map((s) =>
-    isClipSegment(s) ? ["c", s.clip_id, s.in, s.out] : isMotionSegment(s) ? ["m", s.duration] : ["s", s.duration],
+    isClipSegment(s) ? ["c", plan.baked?.session ?? s.clip_id, s.in, s.out] : isMotionSegment(s) ? ["m", s.duration] : ["s", s.duration],
   );
   // A Reel's own tempo counts (the music is composed at it); a plan without one keeps the signature it had.
   return createHash("sha1")

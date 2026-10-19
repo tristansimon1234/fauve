@@ -6,6 +6,7 @@ import {
   EFFECT_MAX_CREDITS,
   EFFECTS_TIMEOUT_MINUTES,
   effectPlan,
+  effectWords,
   EFFORTS,
   effortSchema,
   effortVersions,
@@ -418,7 +419,7 @@ async function effectsDone(job: Job, effect: NonNullable<Job["effect"]>, state: 
   await endEffectsSession(effect.session, effect.files);
   job.effect = undefined;
   const costEur = state.costUsd === null ? null : usdToEur(state.costUsd, env("USD_TO_EUR"));
-  await deliver(job, { planId: row.id, renderId: rendered.renderId, rationale: out.message?.slice(0, 600) }, { reviewed: false, effect: { checked: state.satisfied, costEur } });
+  await deliver(job, { planId: row.id, renderId: rendered.renderId, rationale: out.message?.slice(0, 600) }, { reviewed: false, effect: { checked: state.satisfied, costEur, words: effectWords(plan).length > 0 } });
 }
 
 /**
@@ -596,14 +597,22 @@ type Care = {
   line?: string;
   /** What the critic would still correct (the last round allowed found something). */
   left?: string;
-  /** Made by the effects agent: its grader passed it (checked) or not, and what its session cost (€, null: not read). */
-  effect?: { checked: boolean; costEur: number | null };
+  /** Made by the effects agent: its grader passed it (checked) or not, what its session cost (€, null: not read), and whether she can change its words herself. */
+  effect?: { checked: boolean; costEur: number | null; words?: boolean };
 };
 
 /** The care sentence of the delivery message, from what really happened. */
 function careLine(compared: boolean, outcome: Care | null): string {
   // The agent says what it made in its own words (the rationale): only a check that really passed is added.
-  if (outcome?.effect) return outcome.effect.checked ? "J’ai vérifié l’effet image par image, à chaque geste, avant de te l’envoyer." : "";
+  if (outcome?.effect) {
+    return [
+      outcome.effect.checked ? "J’ai vérifié l’effet image par image, à chaque geste, avant de te l’envoyer." : "",
+      // Where she changes its words (the agent never names its files to her), read in the chat and on its page alike.
+      outcome.effect.words ? "Ses mots, tu peux les changer toi-même : « Changer quelque chose », puis « Le texte à l’écran »." : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
   const left = outcome?.left?.trim().replace(/[\s.]+$/, "");
   return [
     compared ? "J’ai préparé deux versions et gardé la meilleure." : "",

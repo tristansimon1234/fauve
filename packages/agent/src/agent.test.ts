@@ -3602,6 +3602,13 @@ test("effects agent: its video's length, its plan of one shot, its price once ma
   assert.equal(effectsMessage("**J'ai fait** ton effet.\n\nFilme-le de face."), "J'ai fait ton effet. Filme-le de face.");
   assert.equal(effectsMessage("   "), null);
   assert.ok((effectsMessage(`${"Une phrase assez longue pour remplir. ".repeat(20)}`) ?? "").length <= 500);
+  // Never one of its files: the clause that names one goes, else its sentence (the lab's boutique Reel said « dans words.json »).
+  assert.equal(
+    effectsMessage("Ton « -20 % » naît entre tes doigts, avec « sur toute la boutique » juste dessous : tu peux changer ces mots toi-même dans words.json. Filme-le de face."),
+    "Ton « -20 % » naît entre tes doigts, avec « sur toute la boutique » juste dessous. Filme-le de face.",
+  );
+  assert.equal(effectsMessage("J'ai fait ton effet. Lance render.py pour le refaire."), "J'ai fait ton effet.");
+  assert.equal(effectsMessage("Change tes mots dans words.json."), null);
 
   // Her blur, drawn by the agent on its own video.
   assert.match(effectBlurBrief(["face", "plate"]), /les visages, les plaques d'immatriculation/);
