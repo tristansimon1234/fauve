@@ -1,6 +1,7 @@
 import "server-only";
 import { FileState, GoogleGenAI } from "@google/genai";
 import { accessMessage, bankWorthy, CLIP_ANALYSIS_PROMPT, clipAnalysisRequestSchema, clipAnalysisSchema, type ClipAnalysis } from "@fauve/agent";
+import { readAnswer } from "@fauve/agent/answer";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
@@ -113,7 +114,7 @@ async function runAnalysis(asset: { id: string; studio_id: string; storage_path:
     const raw = JSON.parse(response.text ?? "") as { words?: unknown };
     // Words are a bonus for subtitles: keep only a clean, bounded list.
     const words = wordsSchema.safeParse(raw.words);
-    const analysis = clipAnalysisSchema.parse({ ...raw, words: words.success ? words.data.slice(0, 400) : undefined });
+    const analysis = readAnswer(clipAnalysisSchema, { ...raw, words: words.success ? words.data.slice(0, 400) : undefined });
     const insert = await db
       .from("clip_analyses")
       .insert({ studio_id: asset.studio_id, media_id: asset.id, analysis, model });

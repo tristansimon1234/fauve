@@ -1,5 +1,4 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   brandProfileSchema,
   buildSlideProps,
@@ -20,6 +19,7 @@ import {
   type KitDesignOutput,
   type SlideElement,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { transform } from "sucrase";
 import { z } from "zod";
 import { loadElement } from "@/lib/elements";
@@ -187,7 +187,7 @@ async function design(input: ElementsRequest, ctx: Context, fix?: { draft: KitDr
     .beta.messages.stream({
       model: CLAUDE_MODEL,
       max_tokens: 32000,
-      output_config: { effort: "high", format: betaZodOutputFormat(kitDesignOutputSchema) },
+      output_config: { effort: "high", format: outputFormat(kitDesignOutputSchema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: [{ type: "text", text: input.mode === "edit" ? ELEMENT_EDIT_PROMPT : ELEMENTS_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
@@ -216,7 +216,7 @@ async function review(input: ElementsRequest, ctx: Context, stills: { index: num
   const response = await anthropic().beta.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: 4000,
-    output_config: { effort: "medium", format: betaZodOutputFormat(layerReviewSchema) },
+    output_config: { effort: "medium", format: outputFormat(layerReviewSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: LAYER_CRITIC_PROMPT,

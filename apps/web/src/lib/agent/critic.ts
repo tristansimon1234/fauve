@@ -1,5 +1,4 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import {
   ambianceLine,
@@ -32,6 +31,7 @@ import {
   voiceLine,
   voiceTranscriptSchema,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { videoFramesInSandbox } from "@/lib/render/sandbox";
 import { loadTracks } from "@/lib/render/tracks";
 import { postStyle } from "@/lib/steal";
@@ -189,7 +189,7 @@ export async function reviewMontage(input: {
     const response = await anthropic().beta.messages.parse({
       model: CRITIC_MODEL,
       max_tokens: 6000,
-      output_config: { effort: "medium", format: betaZodOutputFormat(montageReviewSchema) },
+      output_config: { effort: "medium", format: outputFormat(montageReviewSchema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: [{ type: "text", text: MONTAGE_CRITIC_PROMPT, cache_control: { type: "ephemeral" } }],

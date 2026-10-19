@@ -1,5 +1,4 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   ANALYST_MODEL,
   weeklyGrowth,
@@ -12,6 +11,7 @@ import {
   segmentSeconds,
   type PerformanceReport,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { z } from "zod";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { mediaInsights, recentMedia } from "@/lib/social/instagram";
@@ -125,7 +125,7 @@ export async function analyzePerformance(studioId: string): Promise<StoredReport
   const response = await anthropic().beta.messages.parse({
     model: ANALYST_MODEL,
     max_tokens: 8000,
-    output_config: { effort: "medium", format: betaZodOutputFormat(performanceReportSchema) },
+    output_config: { effort: "medium", format: outputFormat(performanceReportSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: PERFORMANCE_PROMPT,

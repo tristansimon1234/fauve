@@ -1,5 +1,4 @@
 import "server-only";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
   brandProfileSchema,
   buildCarouselProps,
@@ -22,6 +21,7 @@ import {
   type MotionTemplate,
   type PhotoEdit,
 } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import sharp from "sharp";
 import { transform } from "sucrase";
 import { carouselPhotos, type CarouselSource } from "@/lib/render/carousel";
@@ -212,7 +212,7 @@ async function design(input: CarouselRequest, ctx: Context, previous?: CarouselP
     .beta.messages.stream({
       model: CLAUDE_MODEL,
       max_tokens: 48000,
-      output_config: { effort: "high", format: betaZodOutputFormat(carouselOutputSchema) },
+      output_config: { effort: "high", format: outputFormat(carouselOutputSchema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: [{ type: "text", text: CAROUSEL_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
@@ -245,7 +245,7 @@ async function review(input: CarouselRequest, ctx: Context, made: CarouselDesign
   const response = await anthropic().beta.messages.parse({
     model: CRITIC_MODEL,
     max_tokens: 4000,
-    output_config: { effort: "medium", format: betaZodOutputFormat(layerReviewSchema) },
+    output_config: { effort: "medium", format: outputFormat(layerReviewSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: CAROUSEL_CRITIC_PROMPT,
