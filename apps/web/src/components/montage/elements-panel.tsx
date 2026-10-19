@@ -72,12 +72,6 @@ export function ElementsPanel({
         )}
       </div>
 
-      {bank.length === 0 && (
-        <p className="rounded-[12px] bg-soft px-3 py-2.5 text-[13px] leading-snug text-muted">
-          Ta banque de composants est vide. Envoie à Simone une inspiration (la capture d’un post qui te plaît) : elle en sortira tes titres, étiquettes, listes… réutilisables sur toutes tes photos.
-        </p>
-      )}
-
       {placed.length > 0 && (
         <ul className="flex flex-col gap-1.5">
           {placed.map((e, i) => {
@@ -194,9 +188,6 @@ export function ElementsPanel({
               </div>
             </div>
           ))}
-          <Link href="/composants" className="self-start text-[12px] font-bold text-muted hover:text-violet">
-            Voir toute ma banque
-          </Link>
         </div>
       )}
     </div>

@@ -394,7 +394,7 @@ export function ComponentStudio({
             action={() => archiveComponent(element.id)}
             label="Retirer de ma banque"
             confirmText="Retirer ce composant ? Les publications déjà faites ne changent pas."
-            redirectTo="/composants"
+            redirectTo="/style"
           />
         </div>
       </aside>

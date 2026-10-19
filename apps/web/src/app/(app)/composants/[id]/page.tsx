@@ -17,9 +17,9 @@ export const metadata: Metadata = { title: "Élément pour photos" };
 export default function ComponentPage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <main className="flex min-w-0 flex-col gap-5 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
-      <Link href="/composants?onglet=photos" className="inline-flex items-center gap-1.5 self-start text-[14px] font-semibold text-muted hover:text-ink">
+      <Link href="/style" className="inline-flex items-center gap-1.5 self-start text-[14px] font-semibold text-muted hover:text-ink">
         <ArrowLeftIcon size={16} />
-        Éléments pour photos
+        Ton style
       </Link>
       <PageSuspense title="Composant">
         <Component params={params} />

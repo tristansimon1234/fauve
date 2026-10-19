@@ -33,6 +33,7 @@ export function StyleEditor({
   logo: initialLogo,
   moodboard,
   inspirations,
+  created,
   ownFonts,
 }: {
   studioId: string;
@@ -43,6 +44,8 @@ export function StyleEditor({
   moodboard: MoodboardView;
   /** Server-rendered list of the Reels shared on Instagram. */
   inspirations: React.ReactNode;
+  /** Server-rendered: what Simone made for the studio and reuses (animations, text styles). */
+  created?: React.ReactNode;
   /** The studio's own font files, with signed links. */
   ownFonts: OwnFont[];
 }) {
@@ -93,9 +96,9 @@ export function StyleEditor({
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col gap-5">
       <header className="flex flex-col gap-1.5">
-        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Style</h1>
+        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Ton style</h1>
         <p className="text-[15px] leading-normal text-muted">
-          Ce que Simone suit pour monter tes vidéos : tes inspirations, tes mots, ton logo, tes couleurs.
+          Ce que Simone suit pour tes Reels et tes carrousels : tes inspirations, ton logo, tes couleurs, tes polices, ta voix et tes mots. Et ce qu’elle a déjà créé pour toi.
         </p>
       </header>
 
@@ -126,6 +129,7 @@ export function StyleEditor({
       />
       <VoiceSection value={form} onChange={update} />
       <ToneSection value={form} onChange={update} />
+      {created}
 
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[18px] border border-line bg-white/95 px-4 py-3 shadow-[0_8px_30px_rgba(28,21,48,0.08)] backdrop-blur lg:bottom-4">
         <p

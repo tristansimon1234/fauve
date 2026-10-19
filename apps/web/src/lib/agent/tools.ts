@@ -63,8 +63,6 @@ import { defaultPlatforms, tiktokAccount } from "@/lib/social/tiktok-account";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { ensureTranscript } from "@/lib/voice";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
-import { elementInstance, listElements, loadElement, markElementsUsed, placeElements } from "@/lib/elements";
-import { startElements } from "@/lib/elements-start";
 import { startCarousel } from "@/lib/carousels";
 import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
@@ -173,9 +171,6 @@ const COSTLY_TOOLS = [
   "retouch_photos",
   "make_image",
   "blur_video",
-  "place_elements",
-  "design_elements",
-  "edit_element",
   "copy_text_style",
   "style_texts",
   "analyze_performance",
@@ -198,10 +193,6 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   }
 
   /** A carousel composed by the carousel designer: its words and its layout change their own way. */
-  async function designedCarousel(postId: string): Promise<boolean> {
-    const { data } = await db.from("posts").select("slides").eq("id", postId).eq("studio_id", studioId).maybeSingle();
-    return Boolean(slidesPlanSchema.safeParse(data?.slides).data?.design);
-  }
   const DESIGNED =
     "Ce carrousel est composé par Simone (design_carousel) : ses mots se changent avec carousel_texts (gratuit), sa mise en page ou son style avec design_carousel (une correction, avec le changement demandé et l'exemple s'il y en a un).";
 
@@ -928,97 +919,6 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (error) return json({ error: "Le logo n'a pas pu être enregistré." });
       await insertProfileVersion(studioId, (profile) => ({ ...profile, logo_path: path }));
       return json({ ok: true, note: "Son logo est enregistré : il finira ses Reels et peut se poser sur ses photos." });
-    },
-
-    async list_elements() {
-      const elements = await listElements(studioId, 60);
-      return json({
-        composants: elements.map((e) => ({
-          element_id: e.id,
-          nom: e.name,
-          type: e.role,
-          kit: e.kitName ?? undefined,
-          slots: e.slots.map((sl) => ({ slot: sl.name, role: sl.role, max: sl.max_chars, multiline: sl.multiline || undefined })),
-          exemple: e.sample,
-          place_sur_son_kit: e.box ?? undefined,
-        })),
-        note: elements.length
-          ? "Les poser est gratuit (place_elements). Pour un kit entier, pose tous les composants du même kit à leur place."
-          : "Banque vide : design_elements en crée à partir d'une inspiration (la capture d'un post qu'elle aime).",
-      });
-    },
-
-    async place_elements({ post_id, photos, mode }) {
-      if (await designedCarousel(post_id)) return json({ error: DESIGNED });
-      const bank = new Map((await listElements(studioId)).map((e) => [e.id, e]));
-      const missing = new Set<string>();
-      const unknownSlots = new Set<string>();
-      const perPhoto = new Map(
-        photos.map((p) => [
-          p.photo,
-          p.elements.flatMap((pl) => {
-            const element = bank.get(pl.element_id);
-            if (!element) {
-              missing.add(pl.element_id);
-              return [];
-            }
-            const known = new Set(element.slots.map((sl) => sl.name));
-            for (const t of pl.texts) if (!known.has(t.slot)) unknownSlots.add(`${element.name} : ${t.slot}`);
-            const texts = Object.fromEntries(pl.texts.filter((t) => known.has(t.slot)).map((t) => [t.slot, t.text]));
-            const box = { ...(pl.x !== undefined ? { x: pl.x } : {}), ...(pl.y !== undefined ? { y: pl.y } : {}), ...(pl.w !== undefined ? { w: pl.w } : {}), ...(pl.rotate !== undefined ? { rotate: pl.rotate } : {}) };
-            return [elementInstance(element, { box, texts })];
-          }),
-        ] as const),
-      );
-      if (missing.size) return json({ error: `Composants introuvables dans la banque : ${[...missing].join(", ")} (list_elements).` });
-      try {
-        await placeElements(studioId, post_id, perPhoto, mode);
-      } catch (error) {
-        return json({ error: error instanceof Error ? error.message : "Composants non posés" });
-      }
-      await markElementsUsed([...new Set(photos.flatMap((p) => p.elements.map((e) => e.element_id)))]);
-      ctx.afterReply.push(async () => {
-        await renderSlidesAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId });
-      });
-      return json({
-        status: "started",
-        photos: photos.map((p) => p.photo),
-        slots_inconnus: unknownSlots.size ? `Ignorés : ${[...unknownSlots].join(", ")}` : undefined,
-        note: "Le rendu part après ta réponse (environ une minute) et le lien est envoyé tout seul. Annonce-le en une phrase.",
-      });
-    },
-
-    async design_elements({ request, example_media_id, post_id, photos }) {
-      if (post_id) {
-        const post = unwrap(await db.from("posts").select("kind, status, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
-        if (post.kind !== "carousel" && post.kind !== "post") return json({ error: "Les composants se posent sur les photos d'un carrousel ou d'un post photo. Pour un Reel, les textes font partie du montage." });
-        if (await designedCarousel(post_id)) return json({ error: DESIGNED });
-        if (post.status === "published" || post.status === "measured") return json({ error: "Cette publication est déjà en ligne." });
-        if (!((post.media_ids as string[] | null) ?? []).length) return json({ error: "Cette publication n'a pas encore de photos : ajoute-les d'abord (update_post media_ids)." });
-      }
-      if (example_media_id) {
-        const example = await db.from("media_assets").select("kind").eq("id", example_media_id).eq("studio_id", studioId).maybeSingle();
-        if (example.data?.kind !== "image") return json({ error: "L'inspiration doit être une image (photo ou capture d'écran)." });
-      }
-      const started = await startElements({ studioId, mode: "create", postId: post_id, request, exampleMediaId: example_media_id, photos, origin: "chat", waId: ctx.waId, replyTo: ctx.replyToMessageId });
-      if (started.status === "already_running") {
-        return json({ status: "already_running", etape: started.stage, depuis_minutes: started.minutes, note: "C'est déjà en cours : ne relance rien. Dis où ça en est ; le message arrive tout seul (pastille « Simone travaille » dans l'app)." });
-      }
-      if (started.status === "error") return json({ error: `${started.error} Propose plutôt des composants de sa banque (gratuit).` });
-      ctx.notes.push(`composants en cours${post_id ? ` pour la publication ${post_id}` : ""}`);
-      return json({ status: "started", credits: started.credits, note: "Simone décompose l'inspiration en composants, les teste et les relit : 2 à 4 minutes. Les crédits sont débités une fois livré et un message part tout seul. Annonce-le en une phrase (délai et coût), sans lien." });
-    },
-
-    async edit_element({ element_id, change, example_media_id, post_id }) {
-      const element = await loadElement(studioId, element_id);
-      if (!element) return json({ error: "Composant introuvable dans la banque (list_elements)." });
-      const started = await startElements({ studioId, mode: "edit", elementId: element_id, postId: post_id, request: change, exampleMediaId: example_media_id, origin: "chat", waId: ctx.waId, replyTo: ctx.replyToMessageId });
-      if (started.status === "already_running") {
-        return json({ status: "already_running", etape: started.stage, depuis_minutes: started.minutes, note: "Ce composant est déjà en cours de modification : ne relance rien." });
-      }
-      if (started.status === "error") return json({ error: started.error });
-      ctx.notes.push(`modification du composant ${element_id} en cours`);
-      return json({ status: "started", credits: started.credits, note: `Nouvelle version de « ${element.name} » en préparation (une à deux minutes, ${started.credits} crédit). L'ancienne reste dans son historique. Un message part tout seul. Annonce-le en une phrase.` });
     },
 
     async copy_text_style({ media_id, post_id, note, copy_places }) {
