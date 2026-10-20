@@ -24,7 +24,7 @@ import { copyReel, copyState, newPostOptions, type CopyState, type NewPostOption
 import { useFauveDrawer } from "./fauve-drawer";
 import { publicEnv } from "@/lib/public-env";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, ImageIcon, LayersIcon, MicIcon, PaletteIcon, PauseIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
+import { CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, ImageIcon, LayersIcon, PaletteIcon, PauseIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
 import { Mascot } from "./mascot";
 import { nudgeWork } from "./work-pill";
 
@@ -60,6 +60,11 @@ const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
 function defaultVoice(o: NewPostOptions | null): string {
   if (!o || o.voice.use === "auto") return "auto";
   if (o.voice.use === "never") return "off";
+  return o.voice.voiceId && findVoice(o.voice.voiceId) ? o.voice.voiceId : SIMONE_VOICES[0]!.id;
+}
+
+/** « Une voix off » chosen: the studio's voice (Style), else Simone's first. */
+function studioVoice(o: NewPostOptions): string {
   return o.voice.voiceId && findVoice(o.voice.voiceId) ? o.voice.voiceId : SIMONE_VOICES[0]!.id;
 }
 
@@ -347,6 +352,87 @@ function Create({
           </p>
         </div>
 
+        {/* In her order (Tristan): what to make, its style, a voice or just music, her files, then what she imagines. */}
+        <section aria-labelledby={`${titleId}-format`} className="flex flex-col gap-2.5">
+          <h3 id={`${titleId}-format`} className="text-[17px] font-extrabold tracking-[-0.01em]">
+            Tu veux publier…
+          </h3>
+          <div role="radiogroup" aria-labelledby={`${titleId}-format`} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {FORMATS.map((f) => {
+              const blocked = formatBlocked(f.kind, counts);
+              const on = f.kind === kind;
+              return (
+                <button
+                  key={f.kind}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  disabled={Boolean(blocked)}
+                  title={blocked ?? f.hint}
+                  onClick={() => setFormat(f.kind)}
+                  className={`fauve-press flex h-12 items-center gap-2 rounded-[14px] border-[1.5px] px-3 text-left text-[14.5px] font-extrabold disabled:opacity-40 ${
+                    on ? "border-violet bg-violet-tint text-violet" : "border-line bg-white hover:border-violet/40"
+                  }`}
+                >
+                  <f.Icon size={17} />
+                  {f.title}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {kind === "reel" && options && (
+          <section aria-labelledby={`${titleId}-style`} className="flex flex-col gap-2.5">
+            <h3 id={`${titleId}-style`} className="text-[17px] font-extrabold tracking-[-0.01em]">
+              Quel style ?
+            </h3>
+            <Field
+              wide
+              icon={<PaletteIcon size={17} />}
+              label="Style"
+              value={copying ? (given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé") : "Ton style"}
+              sub={copying ? readingLabel(reading) : "Ou celui d’un Reel que tu aimes : son lien ou sa vidéo"}
+              onClick={() => setSheet("copy")}
+            />
+          </section>
+        )}
+
+        {kind === "reel" && options && (
+          <section aria-labelledby={`${titleId}-voice`} className="flex flex-col gap-2.5">
+            <h3 id={`${titleId}-voice`} className="text-[17px] font-extrabold tracking-[-0.01em]">
+              Une voix off, ou juste la musique ?
+            </h3>
+            <div role="radiogroup" aria-labelledby={`${titleId}-voice`} className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { key: "on", title: "Une voix off", on: voiceAsked && chosenVoice !== "auto" && chosenVoice !== "off", pick: () => setVoice(chosenVoice !== "auto" && chosenVoice !== "off" ? chosenVoice : studioVoice(options)) },
+                  { key: "off", title: "Juste la musique", on: voiceAsked && chosenVoice === "off", pick: () => setVoice("off") },
+                  { key: "auto", title: "Simone choisit", on: voiceAsked && chosenVoice === "auto", pick: () => setVoice("auto") },
+                ] as const
+              ).map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={c.on}
+                  onClick={c.pick}
+                  className={`fauve-press flex min-h-12 items-center justify-center rounded-[14px] border-[1.5px] px-2 py-2 text-center text-[14px] leading-tight font-extrabold ${
+                    c.on ? "border-violet bg-violet-tint text-violet" : "border-line bg-white hover:border-violet/40"
+                  }`}
+                >
+                  {c.title}
+                </button>
+              ))}
+            </div>
+            {voiceAsked && chosenVoice !== "auto" && chosenVoice !== "off" && (
+              <button type="button" onClick={() => setSheet("voice")} className="self-start text-[13.5px] font-bold text-violet">
+                Avec la voix de {voiceLabel(chosenVoice, true)} · écouter ou changer
+              </button>
+            )}
+          </section>
+        )}
+
         <section
           aria-labelledby={`${titleId}-files`}
           className={`flex flex-col gap-2.5 rounded-[18px] transition-colors ${dragging ? "bg-violet-soft outline-2 outline-offset-4 outline-violet outline-dashed" : ""}`}
@@ -490,21 +576,6 @@ function Create({
               ))}
             </div>
           )}
-          {/* Or a ref: a Reel she likes, its link or its video (the style sheet). */}
-          {kind === "reel" && options && (
-            <button
-              type="button"
-              onClick={() => setSheet("copy")}
-              className={`fauve-press flex items-center gap-2.5 self-start rounded-full border-[1.5px] py-1.5 pr-3.5 pl-2 text-left text-[14px] font-bold ${
-                copying ? "border-violet bg-violet-tint text-violet" : "border-dashed border-line bg-white text-violet hover:border-violet/40"
-              }`}
-            >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet">
-                <PlayIcon size={12} />
-              </span>
-              {copying ? `Ta ref : ${readingLabel(reading)}` : "Ou montre-moi une ref : un Reel que tu aimes"}
-            </button>
-          )}
           {/* Or a ref for a carousel, a post or a story: captures of one she likes (Instagram does not let a carousel's link open). */}
           {kind !== "reel" && options && (
             <div className="flex flex-col gap-2">
@@ -561,18 +632,6 @@ function Create({
         {/* What Simone will do, right above the button that does it: each line opens its choice. */}
         {picked.length > 0 && chosenWhen && (
           <div aria-live="polite" className="fauve-enter grid grid-cols-2 gap-2 pb-2">
-            <Field wide={kind !== "reel"} icon={<meta.Icon size={17} />} label="Format" value={meta.title} onClick={() => setSheet("format")} />
-            {kind === "reel" && <Field icon={<MicIcon size={17} />} label="Voix off" value={voiceLabel(chosenVoice, voiceAsked)} onClick={() => setSheet("voice")} />}
-            {kind === "reel" && (
-              <Field
-                wide
-                icon={<PaletteIcon size={17} />}
-                label="Style"
-                value={copying ? (given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé") : "Ton style"}
-                sub={copying ? readingLabel(reading) : "Ou celui d’un Reel que tu aimes"}
-                onClick={() => setSheet("copy")}
-              />
-            )}
             <Field wide icon={<CalendarIcon size={17} />} label="Quand et où" value={chosenWhen.full} sub={placeLabel(where)} onClick={() => setSheet("date")} />
           </div>
         )}
