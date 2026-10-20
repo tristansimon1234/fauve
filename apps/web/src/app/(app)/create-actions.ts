@@ -52,6 +52,8 @@ const launchSchema = z.object({
   platforms: z.array(z.enum(["instagram", "tiktok"])).min(1).max(2).optional(),
   /** A Reel made like another (« Steal »): the one she chose on this screen (its inspiration), or true for the one she sent Simone, false for her own style. */
   copy: z.union([z.uuid(), z.boolean()]).default(true),
+  /** A carousel or a post she likes, as captures or a screen recording of it (Instagram does not open a carousel's link to us): its form is followed, never its words. */
+  refs: z.array(uploadSchema).max(4).default([]),
 });
 
 export type LaunchInput = z.input<typeof launchSchema>;
@@ -63,6 +65,8 @@ export type LaunchResult =
       title: string;
       kind: PostKind;
       mediaIds: string[];
+      /** The captures of the carousel or post she likes, for Simone (design_carousel example_media_ids). */
+      refIds: string[];
       /** A Reel: the montage that started, to follow on the working screen (effect: the effects agent makes it). */
       montage: { quoteId: string; effort: Effort; minutes: string; music: boolean; effect: boolean } | null;
     }
@@ -78,6 +82,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
   const parsed = launchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Choisis au moins une photo ou une vidéo." };
   const { kind, date, time, items, voice, platforms, copy } = parsed.data;
+  const refs = kind === "reel" ? [] : parsed.data.refs;
   const idea = parsed.data.idea.trim();
   const { member } = await getStudioContext();
   if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
@@ -93,7 +98,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
 
   // What she imagines, or a ref: the Reel to copy, the model of this Reel only (one shot). Simone asks before she makes anything.
   const copying = kind !== "reel" || copy === false ? null : typeof copy === "string" ? await ownInspiration(studioId, copy) : await pendingSteal(studioId).catch(() => null);
-  if (!idea && !copying) return { ok: false, error: kind === "reel" ? "Dis-moi ce que tu imagines pour ce Reel, ou montre-moi une ref." : "Dis-moi ce que tu imagines pour cette publication." };
+  if (!idea && !copying && !refs.length) return { ok: false, error: kind === "reel" ? "Dis-moi ce que tu imagines pour ce Reel, ou montre-moi une ref." : "Dis-moi ce que tu imagines, ou montre-moi une ref." };
 
   // Her new files become her library's, read once in the background (ready for the montage).
   const db = supabaseAdmin();
@@ -119,6 +124,21 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     after(() => (video ? ensureClipAnalysis(studioId, mediaId) : photoRegions(studioId, mediaId)).then(() => undefined, (e: unknown) => console.warn("create: file read failed", e)));
   }
 
+  // The captures of the post she likes: images of hers for Simone to look at, never published.
+  const refIds: string[] = [];
+  for (const file of refs) {
+    if (!file.path.startsWith(`${studioId}/chat/`) || file.path.includes("..") || !/^(image|video)\//.test(file.mime)) {
+      return { ok: false, error: "Ta ref doit être une capture ou une vidéo." };
+    }
+    const asset = await db
+      .from("media_assets")
+      .insert({ studio_id: studioId, storage_path: file.path, kind: file.mime.startsWith("video/") ? "video" : "image", source: "web_upload", mime_type: file.mime, size_bytes: file.size })
+      .select("id")
+      .single();
+    if (asset.error) return { ok: false, error: "Ta ref n’a pas pu être ajoutée. Réessaie." };
+    refIds.push(asset.data.id as string);
+  }
+
   const created = await createPost({ kind, date, time, intention: idea, mediaIds, inspirationId: copying?.id });
   if (!created.ok) return created;
   // Her choices, before anything is made: where it goes, and the voice over of a Reel.
@@ -129,7 +149,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     const { error } = await db.from("posts").update(patch).eq("id", created.id).eq("studio_id", studioId);
     if (error) console.warn("create: choices not saved", error.message);
   }
-  if (kind !== "reel") return { ok: true, postId: created.id, title: created.title, kind, mediaIds, montage: null };
+  if (kind !== "reel") return { ok: true, postId: created.id, title: created.title, kind, mediaIds, refIds, montage: null };
 
   // The level of care of the studio (Réglages); her first Reel gets its made-to-measure animations, as in the chat.
   const { data: studio } = await db.from("studios").select("montage_effort").eq("id", studioId).single();
@@ -161,6 +181,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     title: created.title,
     kind,
     mediaIds,
+    refIds: [],
     montage: { quoteId: quote.id, effort: level, minutes: effect ? EFFECT_MINUTES : EFFORTS[level].minutes, music: Boolean(env("ELEVENLABS_API_KEY")), effect },
   };
 }

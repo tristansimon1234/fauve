@@ -217,9 +217,9 @@ export const toolSpecs = {
       media_ids: z.array(z.string().uuid()).max(10).optional().describe("Ses photos, dans l'ordre ; par défaut celles de la publication"),
       example_media_ids: z
         .array(z.string().uuid())
-        .max(3)
+        .max(4)
         .optional()
-        .describe("Les captures d'un carrousel qu'elle aime (« fais comme ça ») : Simone suit sa forme, sa typographie et son rythme, jamais ses mots ni ses images"),
+        .describe("Un carrousel qu'elle aime (« fais comme ça ») : ses captures, ou la vidéo où elle le fait défiler (enregistrement d'écran) ; Simone suit sa forme, sa typographie et son rythme, jamais ses mots ni ses images"),
       fresh: z.boolean().default(false).describe("true : un nouveau carrousel, pas une correction de celui qu'elle a"),
     }),
   },

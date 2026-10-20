@@ -27,7 +27,8 @@ import { transform } from "sucrase";
 import { carouselPhotos, type CarouselSource } from "@/lib/render/carousel";
 import { ensureCutouts } from "@/lib/render/cutout";
 import { loadMontageInputs } from "@/lib/render/render-post";
-import { renderStillsInSandbox, sandboxCostEur } from "@/lib/render/sandbox";
+import { RECORDING_FRAMES, refFramePath } from "@/lib/render/ref-frames";
+import { renderStillsInSandbox, sandboxCostEur, videoFramesInSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { photoRegions } from "@/lib/video/regions";
 import { anthropic, logClaudeCost } from "./run";
@@ -158,13 +159,37 @@ const photoLines = (photos: CarouselSource[]) =>
     ...(p.photo.cutout && p.photo.subject ? { sujet: p.photo.subject, ...(p.photo.cutEdges?.length ? { sujet_coupe_par: p.photo.cutEdges } : {}) } : {}),
   }));
 
-/** Her examples (images of her library), signed for the designer. */
+/** Her examples (captures, or a screen recording of a carousel she likes), signed for the designer. */
 async function exampleUrls(input: CarouselRequest): Promise<string[]> {
   if (!input.examples?.length) return [];
   const db = supabaseAdmin();
-  const { data } = await db.from("media_assets").select("storage_path, kind").eq("studio_id", input.studioId).in("id", input.examples);
-  const paths = (data ?? []).filter((a) => a.kind === "image").map((a) => a.storage_path as string);
+  const { data } = await db.from("media_assets").select("id, storage_path, kind, duration").eq("studio_id", input.studioId).in("id", input.examples);
+  const paths: string[] = [];
+  for (const a of data ?? []) {
+    if (a.kind === "image") paths.push(a.storage_path as string);
+    else if (a.kind === "video") paths.push(...(await recordingFrames(input.studioId, a.id as string, a.storage_path as string, (a.duration as number | null) ?? null)));
+  }
   return paths.length ? ((await db.storage.from("media").createSignedUrls(paths, 3600)).data ?? []).flatMap((d) => (d.signedUrl ? [d.signedUrl] : [])) : [];
+}
+
+/** Frames of a recording a little apart (one per slide she swipes, roughly): cut once in the sandbox, kept beside it. */
+async function recordingFrames(studioId: string, mediaId: string, path: string, duration: number | null): Promise<string[]> {
+  const db = supabaseAdmin();
+  const dir = `${studioId}/refs/${mediaId}`;
+  const { data: kept } = await db.storage.from("media").list(dir);
+  if (kept?.length) return kept.map((f) => `${dir}/${f.name}`).sort();
+  const { data: signed } = await db.storage.from("media").createSignedUrl(path, 3600);
+  if (!signed?.signedUrl) return [];
+  const length = duration && duration > 0 ? duration : 12;
+  const times = Array.from({ length: RECORDING_FRAMES }, (_, i) => Math.round(((i + 0.5) * length * 100) / RECORDING_FRAMES) / 100);
+  const frames = await videoFramesInSandbox(`ref-${mediaId}`, signed.signedUrl, times).catch(() => []);
+  const paths: string[] = [];
+  for (const [i, f] of frames.entries()) {
+    const at = refFramePath(studioId, mediaId, i);
+    const { error } = await db.storage.from("media").upload(at, f.jpeg, { contentType: "image/jpeg", upsert: true });
+    if (!error) paths.push(at);
+  }
+  return paths;
 }
 
 async function signedStills(paths: string[]): Promise<string[]> {
@@ -188,7 +213,7 @@ async function design(input: CarouselRequest, ctx: Context, previous?: CarouselP
   const photoBlocks = (await Promise.all(ctx.photos.map(async (p) => ({ p, image: await seen(p.photo.src) })))).flatMap(({ p, image }) =>
     image ? [{ type: "text" as const, text: `Photo ${p.id} :` }, image] : [],
   );
-  // A carousel she likes (a capture): its form, its typography, its rhythm; never its words, its pictures or its brand.
+  // A carousel she likes (captures, or frames of her screen recording): its form, its typography, its rhythm; never its words, its pictures or its brand.
   const exampleBlocks = (await Promise.all((await exampleUrls(input)).map((url) => seen(url)))).flatMap((image, i) =>
     image ? [{ type: "text" as const, text: `Exemple qu'elle aime ${i + 1} (suis sa forme, sa typographie et son rythme ; jamais ses mots, ses images ni sa marque) :` }, image] : [],
   );
