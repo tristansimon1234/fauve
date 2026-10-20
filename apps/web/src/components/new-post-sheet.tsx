@@ -231,6 +231,16 @@ function Create({
   // A Reel that could not be read copies nothing: her own style, and the sheet says what to send instead.
   const usable = model && reading?.state !== "missed" ? model : null;
   const copying = kind === "reel" && usable && (copyChoice ?? (sent ? "copy" : "mine")) === "copy" ? usable : null;
+  // One of her own Reels kept as a model (« Garder comme modèle »): already read, never one shot.
+  const models = options?.models ?? [];
+  const ownModel = models.find((m) => m.id === copying) ?? null;
+  const copyLabel = ownModel ? `Comme ton Reel « ${ownModel.title} »` : given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé";
+  const pickModel = (m: (typeof models)[number]) => {
+    setGiven(m.id);
+    setCopyRead({ state: "read", name: m.name, lines: m.lines });
+    setCopyChoice("copy");
+    setSheet(null);
+  };
   // Its reading followed until it is done (about a minute): what her Reel takes from it, or why not.
   const waiting = model && reading?.state !== "read" && reading?.state !== "missed" ? model : null;
   useEffect(() => {
@@ -438,8 +448,8 @@ function Create({
               wide
               icon={<PaletteIcon size={17} />}
               label="Style"
-              value={copying ? (given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé") : "Ton style"}
-              sub={copying ? readingLabel(reading) : "Ou celui d’un Reel que tu aimes : son lien ou sa vidéo"}
+              value={copying ? copyLabel : "Ton style"}
+              sub={copying ? readingLabel(reading) : models.length ? "Ou comme un de tes Reels, ou un Reel que tu aimes" : "Ou celui d’un Reel que tu aimes : son lien ou sa vidéo"}
               onClick={() => setSheet("copy")}
             />
           </section>
@@ -844,7 +854,11 @@ function Create({
         <Sheet label="Le style" onClose={() => setSheet(null)}>
           <SheetHead
             title="Quel style pour ce Reel ?"
-            hint="Le tien, ou celui d’un Reel que tu aimes : j’en reprends la façon de faire (le rythme, les textes, la lumière), pour ce Reel seulement, avec tes images."
+            hint={
+              models.length
+                ? "Le tien, comme un de tes Reels gardés, ou comme un Reel que tu aimes : j’en reprends la façon de faire (le rythme, les textes, la lumière), avec tes nouvelles images."
+                : "Le tien, ou celui d’un Reel que tu aimes : j’en reprends la façon de faire (le rythme, les textes, la lumière), pour ce Reel seulement, avec tes images."
+            }
             onClose={() => setSheet(null)}
           />
           <div role="radiogroup" aria-label="Le style" className="flex flex-col gap-2">
@@ -857,7 +871,21 @@ function Create({
                 setSheet(null);
               }}
             />
-            {usable && (
+            {/* The Reel she sent Simone, still there when she picked another one here. */}
+            {sent && given && given !== sent.id && (
+              <Choice
+                on={false}
+                title="Comme le Reel que tu m’as envoyé"
+                hint={sent.name ?? "Je le regarde"}
+                onClick={() => {
+                  setGiven(null);
+                  setCopyRead(null);
+                  setCopyChoice("copy");
+                  setSheet(null);
+                }}
+              />
+            )}
+            {usable && !models.some((m) => m.id === usable) && (
               <Choice
                 on={Boolean(copying)}
                 title={given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé"}
@@ -869,6 +897,16 @@ function Create({
               />
             )}
           </div>
+          {models.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-[13px] font-bold">Comme un de tes Reels</span>
+              <div role="radiogroup" aria-label="Comme un de tes Reels" className="flex flex-col gap-2">
+                {models.map((m) => (
+                  <Choice key={m.id} on={copying === m.id} title={`Comme ton Reel « ${m.title} »`} hint={`Même rythme, mêmes textes : ${m.name}`} onClick={() => pickModel(m)} />
+                ))}
+              </div>
+            </div>
+          )}
           {copying && reading?.state === "read" && reading.lines.length > 0 && (
             <div className="flex flex-col gap-1.5 rounded-[16px] bg-soft px-3.5 py-3">
               <span className="text-[13px] font-bold">Ce que ton Reel en reprendra</span>

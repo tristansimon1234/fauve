@@ -17,6 +17,7 @@ import type { TikTokPanel } from "@/components/montage/where-to-post";
 import { localInstant, parseIsoDate } from "@/lib/dates";
 import { env } from "@/lib/env";
 import { montageStatus } from "@/lib/montage-status";
+import { modelState, type ModelState } from "@/lib/reel-models";
 import { readPostMusic } from "@/lib/render/music";
 import { ensureSceneSprite } from "@/lib/render/scene-sprite";
 import { freeSlots } from "@/lib/slots";
@@ -79,6 +80,8 @@ export type ReviewData = {
   timezone: string;
   /** TikTok, when the app offers it: connected or not, and her choices for a direct post. */
   tiktok: TikTokPanel | null;
+  /** Kept as a model (« Garder comme modèle »): new Reels can be made like it. */
+  model: ModelState | null;
 };
 
 type ReviewPost = {
@@ -131,7 +134,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     after(() => ensureSceneSprite(studioId, renderId));
   }
   const fileName = `${post.title.replace(/[^\p{L}\p{N} _-]+/gu, "").trim() || "reel"}.mp4`;
-  const [jobs, replays, account, slots, voice, tiktok, download] = await Promise.all([
+  const [jobs, replays, account, slots, voice, tiktok, download, model] = await Promise.all([
     locked ? Promise.resolve([]) : montageStatus(studioId, post.id),
     // Her new words on its effect, drawn again by its own script.
     locked || !isBaked(plan.data) ? Promise.resolve([]) : runningJobs(studioId, { postId: post.id, kind: "effect_words" }),
@@ -140,6 +143,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     loadVoice(studioId, post.voice_media_id),
     tiktokPanel(studioId, { kind: "reel", platforms: post.platforms, caption: post.caption, hashtags: post.hashtags, tiktok: post.tiktok, external_ids: post.external_ids }, !locked),
     shown?.storage_path ? admin.storage.from("media").createSignedUrl(shown.storage_path as string, 3600, { download: fileName }) : Promise.resolve(null),
+    modelState(studioId, post.id).catch(() => null),
   ]);
   const running = jobs.find((j) => j.step !== "livré" && !j.late);
   const latest = (renders.data ?? []).find((r) => r.edit_plan_id === current.id);
@@ -192,6 +196,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     }),
     timezone,
     tiktok,
+    model,
   };
 }
 

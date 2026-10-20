@@ -22,6 +22,8 @@ const bodySchema = z.object({
   replyTo: z.string().max(200).optional(),
   /** Given on the Créer screen, which shows its reading: told in the chat only when her Reel is already on its way. */
   fromCreate: z.boolean().optional(),
+  /** One of her Reels kept as a model: its page shows its reading, nothing is said in the chat. */
+  quiet: z.boolean().optional(),
 });
 type Job = z.infer<typeof bodySchema>;
 
@@ -35,6 +37,7 @@ async function run(job: Job) {
   const target = { studioId: job.studioId, waId: job.waId, replyTo: job.replyTo };
   try {
     const outcome = await stealStyle(job.studioId, job.inspirationId);
+    if (job.quiet) return;
     if (!outcome.ok) return void (await notifyStudio(target, await missMessage(outcome.miss)));
     if (job.example) await dropExample(job.studioId, job.example).catch((error: unknown) => console.warn("steal: example not removed", error));
     // Her Reel may already be on its way (launched from the same message): it waits for this reading.
@@ -44,6 +47,7 @@ async function run(job: Job) {
     // Not yet: her files are asked for (in the app, her library under the message).
     await messageStudio(target, stolenStyleMessage(outcome.style, making), making || job.waId ? {} : { pick_media: "any" });
   } catch (error) {
+    if (job.quiet) return void console.warn("steal: model not read", error);
     await notifyFailure({ ...target, postId: "" }, "Je n’ai pas réussi à regarder ce Reel cette fois. Tu veux que je réessaie ?", error);
   }
 }

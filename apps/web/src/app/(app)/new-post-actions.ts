@@ -6,6 +6,7 @@ import { studioAccess } from "@/lib/billing/access";
 import { localInstant, localDateOf, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
 import { queueJob } from "@/lib/jobs";
 import { freeSlots, type Slot } from "@/lib/slots";
+import { studioModels, type ReelModel } from "@/lib/reel-models";
 import { missMessage, pendingSteal, READING_MS, startSteal, type StealMissReason, type StealSource } from "@/lib/steal";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -34,6 +35,8 @@ export type NewPostOptions = {
   tiktok: boolean;
   /** The Reel she sent Simone to copy (« Steal »): her next Reel follows it, unless she says otherwise. */
   copy: { id: string; name: string | null; lines: string[] } | null;
+  /** Her Reels kept as models (« Garder comme modèle »): a new Reel made like one of them. */
+  models: ReelModel[];
 };
 
 export async function newPostOptions(): Promise<NewPostOptions | null> {
@@ -47,11 +50,12 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     freeSlots(studioId, tz, 4, now),
     db.from("media_assets").select("id, storage_path, kind, created_at, duration").eq("studio_id", studioId).in("kind", ["image", "video"]).neq("source", "render").order("created_at", { ascending: false }).limit(40),
   ]);
-  const [{ data: studio }, { data: brand }, { data: tiktok }, copy] = await Promise.all([
+  const [{ data: studio }, { data: brand }, { data: tiktok }, copy, models] = await Promise.all([
     db.from("studios").select("business_type").eq("id", studioId).maybeSingle(),
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     db.from("social_accounts").select("status").eq("studio_id", studioId).eq("platform", "tiktok").maybeSingle(),
     pendingSteal(studioId).catch(() => null),
+    studioModels(studioId).catch(() => []),
   ]);
   const voice = readVoiceSetting((brand?.profile as { voice?: unknown } | null)?.voice);
 
@@ -86,6 +90,7 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     voice: { use: voice.use, voiceId: voice.voice_id ?? null },
     tiktok: tiktok?.status === "connected",
     copy: copy ? { id: copy.id, name: copy.name, lines: copy.lines } : null,
+    models,
   };
 }
 

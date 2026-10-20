@@ -8,6 +8,7 @@ import { studioAccess } from "@/lib/billing/access";
 import { startEffectWords } from "@/lib/effect-words";
 import { loadEditorData } from "@/lib/montage-editor-data";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
+import { forgetModel, keepAsModel, type ModelState } from "@/lib/reel-models";
 import { loadTextLooks } from "@/lib/text-looks";
 import { removeVoice } from "@/lib/voice-over";
 import { getStudioContext } from "@/lib/studio";
@@ -152,6 +153,31 @@ export async function liveMontage(postId: string): Promise<LiveMontage> {
   // Its effect and its texts are drawn in the image: only Simone remakes them.
   if (isBaked(editor.plan)) return { ok: false, error: "Ce Reel a un effet dessiné image par image : dis à Simone ce que tu veux changer." };
   return { ok: true, plan: editor.plan, inputs: editor.inputs, looks };
+}
+
+/**
+ * « Garder comme modèle »: a Reel of hers she likes, to make new ones like it (Créer › Style).
+ * Free; its video is read once in the background, a minute or two. Online Reels too: those are the ones that worked.
+ */
+export async function keepModel(postId: string): Promise<{ ok: true; model: ModelState } | { ok: false; error: string }> {
+  const found = await reel(postId);
+  if (!found || found.post.kind !== "reel") return UNKNOWN;
+  const access = await studioAccess(found.studioId);
+  if (!access.subscribed) return { ok: false, error: `Démarre ton essai pour garder tes Reels comme modèles : ${TRIAL_DAYS} jours offerts.` };
+  const kept = await keepAsModel(found.studioId, postId);
+  if ("error" in kept) return { ok: false, error: kept.error };
+  touched(postId);
+  return { ok: true, model: kept };
+}
+
+/** No longer a model (the Reels already made like it stay as they are). */
+export async function dropModel(postId: string): Promise<ReviewResult> {
+  const found = await reel(postId);
+  if (!found) return UNKNOWN;
+  await forgetModel(found.studioId, postId);
+  touched(postId);
+  revalidatePath("/style");
+  return { ok: true };
 }
 
 /** « Revenir à l'ancienne »: the version before, with its video, becomes the one that goes out. Free and instant. */

@@ -38,6 +38,8 @@ export const STEAL_WAIT_MS = 4 * 60_000;
 const PENDING_MS = 48 * 3600_000;
 /** Inspirations sent to be copied: a link or a video in the conversation, a share to Simone on Instagram. */
 export const SENT_TO_COPY = ["link", "chat", "instagram_dm"];
+/** One of her own Reels kept as a model (lib/reel-models.ts): read like a Reel to copy, never one shot. */
+export const MODEL_SOURCE = "model";
 /** A Reel still being read: it usually takes a minute or two. */
 export const READING_MS = 15 * 60_000;
 
@@ -153,8 +155,11 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     const link = reelLink(url);
     take = link ? { link: link.url } : { file: url };
   } else return { ok: false, miss: "not_found" };
+  // One of her Reels kept as a model comes with its plan's structure, kept with its reading.
+  const written = (row.style as { outline?: unknown } | null)?.outline;
+  const outline = typeof written === "string" ? { outline: written } : {};
   const missed = async (miss: StealMissReason): Promise<StealOutcome> => {
-    await db.from("inspirations").update({ style: { miss } }).eq("id", inspirationId).eq("studio_id", studioId);
+    await db.from("inspirations").update({ style: { miss, ...outline } }).eq("id", inspirationId).eq("studio_id", studioId);
     return { ok: false, miss };
   };
 
@@ -179,7 +184,7 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   // A font that makes its style, by the name Google Fonts serves it under (the render loads it from there); else hers stay.
   const { font: named, ...text } = look.text;
   const font = named ? await googleFont(named).catch(() => null) : null;
-  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures };
+  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, ...outline };
   // Its three lines also stand as its reading (the inspirations list, the editor's chosen inspiration).
   const analysis = stolenStyleLines(style).join(" ");
   await db
@@ -187,7 +192,7 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     .update({ style, analysis, title: (row.title as string | null) || look.name, storage_path: null })
     .eq("id", inspirationId)
     .eq("studio_id", studioId);
-  // The file was only for this reading (someone else's content).
+  // The file was only for this reading (someone else's content, or a copy of her own Reel's video).
   if (row.storage_path) await db.storage.from("media").remove([row.storage_path as string]).catch(() => {});
   return read(inspirationId, style, false);
 }
@@ -213,11 +218,13 @@ export async function postStyle(studioId: string, postId: string, { waitMs = 0 }
   if (!id) return undefined;
   const deadline = Date.now() + waitMs;
   for (;;) {
-    const { data: row } = await db.from("inspirations").select("style, analysis, created_at").eq("id", id).maybeSingle();
+    const { data: row } = await db.from("inspirations").select("source, style, analysis, created_at").eq("id", id).maybeSingle();
     if (!row) return undefined;
     const style = stolenStyleSchema.safeParse(row.style);
-    if (style.success) return followedFrom(id, style.data);
-    const reading = !row.style && !row.analysis && Date.now() - Date.parse(row.created_at as string) < READING_MS;
+    if (style.success) return followedFrom(id, style.data, row.source === MODEL_SOURCE);
+    // Not read yet: no style, or only a model's structure waiting for its reading (never one that missed).
+    const kept = row.style as { miss?: unknown } | null;
+    const reading = (!kept || !kept.miss) && !row.analysis && Date.now() - Date.parse(row.created_at as string) < READING_MS;
     if (!reading || Date.now() >= deadline) return undefined;
     await new Promise((resolve) => setTimeout(resolve, 5000));
   }
