@@ -22,7 +22,7 @@ const steps: [string, string][] = [
   ["Ton style", "Elle prend tes couleurs, ta police et tes plus belles photos pour ton moodboard."],
   ["Ton rythme", "Combien de posts et de stories par semaine : elle prépare ta semaine avec."],
   ["Un premier essai", "Une première publication ensemble, ajustée jusqu’à ce qu’elle te ressemble."],
-  ["Ton Instagram", "En dernier, quand ta publication est prête : elle part à l’heure prévue."],
+  ["Ton Instagram", "En dernier, quand ta publication est prête : elle part dès que tu dis oui."],
 ];
 
 /** The two offers (the same work; quality over quantity: Pro has room for more care on each Reel). */
@@ -46,7 +46,7 @@ const offers = [
 ] as const;
 
 const faq: [string, string][] = [
-  ["Simone, c’est une vraie personne ?", "Non, c’est une IA, et elle le dit. Elle écrit, monte et programme comme une community manager, et tu gardes toujours la main."],
+  ["Simone, c’est une vraie personne ?", "Non, c’est une IA, et elle le dit. Elle écrit, monte et publie comme une community manager, te fait signe au bon moment, et tu gardes toujours la main."],
   ["Est-ce qu’elle publie sans me demander ?", "Jamais. Chaque publication attend ta validation, sur WhatsApp ou dans l’app. Tu peux corriger un texte, déplacer une date ou demander une autre version."],
   ["Je n’ai pas de vidéo, ça marche quand même ?", "Oui. Elle part des photos de ton site, de celles que tu lui envoies, ou fait un Reel tout en animation à tes couleurs. Quand tu filmes, elle te dit quoi et comment."],
   ["Pour quel commerce ?", "Studios de sport ou de yoga, salons de coiffure et de beauté, restaurants, cafés, boutiques : elle parle ta langue et adapte ses idées à ton activité."],
@@ -86,7 +86,7 @@ export default function LandingPage() {
             Des réseaux qui te rapportent <span className="accent">des clients.</span>
           </h1>
           <p className="max-w-[540px] text-[18px] leading-[1.55] text-muted sm:text-[19px]">
-            Simone est ta community manager. Elle lit ton site, apprend ton style, monte tes Reels, écrit tes posts et les programme sur Instagram. Toi, tu valides d’un mot, sur WhatsApp ou ici.
+            Simone est ta community manager. Elle lit ton site, apprend ton style, monte tes Reels, écrit tes posts et les publie sur Instagram quand tu dis oui. Toi, tu valides d’un mot, sur WhatsApp ou ici.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Start waUrl={waUrl} size="lg" />

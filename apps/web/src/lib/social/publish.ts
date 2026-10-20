@@ -392,7 +392,7 @@ async function captureMetrics(): Promise<number> {
   return captured;
 }
 
-/** Cron entry point: publish what is due, measure, refresh tokens. */
+/** Cron entry point: publish what she said to publish, remind what is due, measure, refresh tokens. */
 export async function runPublishWorker() {
   const db = supabaseAdmin();
   const due = check(
@@ -411,6 +411,12 @@ export async function runPublishWorker() {
     const outcome = await publishIfDue(id as string);
     if (outcome) published.push(outcome);
   }
+  // The moment Simone suggested has come: she reminds her (nothing goes out on its own any more).
+  const { remindDue } = await import("@/lib/reminders");
+  const reminded = await remindDue().catch((error) => {
+    console.error("reminders failed", error);
+    return 0;
+  });
   const handPublished = await matchHandPublished().catch((error) => {
     console.error("hand-off match failed", error);
     return 0;
@@ -428,5 +434,5 @@ export async function runPublishWorker() {
     console.error("account stats failed", error);
     return 0;
   });
-  return { due: due.length, published, handPublished, tiktok, measured, refreshed, account };
+  return { due: due.length, published, reminded, handPublished, tiktok, measured, refreshed, account };
 }

@@ -34,7 +34,8 @@ export function shouldNudge(input: {
 
 /** The reminder, short: what she has at hand is enough. */
 export function nudgeMessage(daysSince: number | null, banked: number): string {
-  const since = daysSince === null ? "Ta première publication t'attend 🙂" : `Ça fait ${daysSince} jours sans publication 🙂`;
-  const bank = banked ? " Sinon, je peux repartir d'une des vidéos que j'ai gardées." : "";
-  return `${since} Envoie-moi les photos ou vidéos que tu as sous la main, je m'occupe du reste.${bank}`;
+  // Tristan : « en gros eh ho tu n'as pas posté depuis longtemps, on crée ton prochain post ? »
+  const since = daysSince === null ? "Eh ho, ta première publication t'attend 🙂" : `Eh ho, ça fait ${daysSince} jours que tu n'as rien posté 🙂`;
+  const bank = banked ? " Ou je repars d'une des vidéos que j'ai gardées." : "";
+  return `${since} On crée ton prochain post ? Envoie-moi les photos ou vidéos que tu as sous la main, je m'occupe du reste.${bank}`;
 }

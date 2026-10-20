@@ -138,7 +138,7 @@ export function WhereToPost({ postId, initial, tiktok }: { postId: string; initi
               </div>
               <p className="text-[12px] leading-snug text-muted">
                 {settings.privacy_level
-                  ? "Simone la publie sur TikTok à l’heure prévue. "
+                  ? "Simone la publie aussi sur TikTok. "
                   : "Sans choix ici, la vidéo ira dans tes brouillons TikTok. "}
                 En publiant, tu acceptes la{" "}
                 <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noreferrer" className="font-bold text-violet">

@@ -21,7 +21,8 @@ const ReelEditor = dynamic(() => import("./reel-editor").then((m) => m.ReelEdito
 
 // « Ta publication », the page of a Reel for someone who has never edited a video: the
 // video as it will go out, its scenes in a row, when and where, its caption, ONE button
-// that says what it does (« Publier vendredi à 18 h »), and « Changer quelque chose ».
+// that says what it does (« Publier maintenant »: nothing goes out on its own at a set time,
+// Simone reminds her at the moment she suggested), and « Changer quelque chose ».
 // A scene or « Le texte à l'écran » turns the page into « Modifier » (texts, their place
 // and style, the order of the scenes), live, where the video was. Same page in the app
 // and from WhatsApp.
@@ -133,7 +134,7 @@ export function PostReview({
   const where = data.platforms.length ? data.platforms.map((p) => (p === "tiktok" ? "TikTok" : "Instagram")).join(" et ") : "Instagram";
   const publishLabel = !data.instagram
     ? "Valider"
-    : `${data.publishByHand ? "Me l’envoyer" : "Publier"} ${data.when && data.upcoming ? data.when.short : "maintenant"}`;
+    : `${data.publishByHand ? "Me l’envoyer" : "Publier"} maintenant`;
 
   const publish = () =>
     start(async () => {
@@ -173,8 +174,8 @@ export function PostReview({
     <div className="flex items-start gap-3 rounded-[18px] bg-success-soft px-4 py-3.5 text-success">
       <CheckIcon size={20} className="mt-0.5 shrink-0" />
       <p className="text-[14.5px] leading-snug font-semibold">
-        {data.status === "scheduled" && data.when
-          ? `C’est programmé : il part ${data.when.short}, sur ${where}. Tu peux encore le changer d’ici là.`
+        {data.status === "scheduled"
+          ? `C’est parti : il part sur ${where}, Simone te dit quand il est en ligne.`
           : "C’est validé. Connecte Instagram dans Réglages pour que Simone le publie."}
       </p>
     </div>
@@ -189,7 +190,7 @@ export function PostReview({
       </button>
       {!data.instagram && <p className="text-center text-[12.5px] text-muted">Connecte Instagram dans Réglages pour que Simone le publie toute seule.</p>}
       {data.publishByHand && data.instagram && (
-        <p className="text-center text-[12.5px] text-muted">À l’heure prévue, Simone t’envoie la vidéo et la légende sur WhatsApp : tu publies avec le son de ton choix.</p>
+        <p className="text-center text-[12.5px] text-muted">Simone t’envoie la vidéo et la légende sur WhatsApp : tu publies avec le son de ton choix.</p>
       )}
     </div>
   );
@@ -296,8 +297,8 @@ export function PostReview({
               <CalendarIcon size={19} />
             </span>
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-[15px] font-extrabold">{data.when?.full ?? "Date à choisir"}</span>
-              <span className="text-[13px] text-muted">{where}</span>
+              <span className="text-[15px] font-extrabold">{data.when && data.upcoming ? `Je te fais signe ${data.when.short}` : "Quand te faire signe ?"}</span>
+              <span className="text-[13px] text-muted">Pour le poster au bon moment, sur {where}</span>
             </span>
             {!data.locked && <ChevronRightIcon size={18} className="text-muted" />}
           </button>
@@ -362,7 +363,7 @@ function StatusLine({ data, onBack, pending }: { data: ReviewData; onBack: () =>
   if (data.previous !== null) {
     return (
       <p className="flex flex-wrap items-center justify-center gap-x-2 text-[13.5px] font-semibold">
-        <span>{scheduled ? "Programmé, nouvelle version" : "Nouvelle version"}</span>
+        <span>{scheduled ? "En route, nouvelle version" : "Nouvelle version"}</span>
         <span aria-hidden="true" className="text-line">
           |
         </span>
@@ -376,7 +377,7 @@ function StatusLine({ data, onBack, pending }: { data: ReviewData; onBack: () =>
   return (
     <p className="flex items-center gap-1.5 text-[13.5px] font-semibold text-success">
       <span className="size-2 rounded-full bg-online" />
-      {data.status === "scheduled" ? "Programmé" : data.status === "validated" ? "Validé, en attente d’Instagram" : "Prêt, pas encore publié"}
+      {data.status === "scheduled" ? "En train de partir" : data.status === "validated" ? "Validé, en attente d’Instagram" : "Prêt, pas encore publié"}
     </p>
   );
 }

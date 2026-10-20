@@ -100,9 +100,7 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
       ? "C’est validé."
       : "blocked" in scheduled
         ? NOT_SCHEDULED[scheduled.blocked]
-        : scheduled.when === "now"
-          ? "C’est validé : Simone le publie maintenant."
-          : `C’est validé : Simone le publie le ${scheduled.when}.`,
+        : "C’est validé : Simone le publie maintenant.",
   };
 }
 

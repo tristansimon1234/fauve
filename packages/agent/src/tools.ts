@@ -350,8 +350,8 @@ export const toolSpecs = {
   },
   schedule_post: {
     description:
-      "Programme une publication validée sur ses plateformes (Instagram, TikTok), à son horaire (scheduled_at) ou à l'horaire donné ; si l'horaire est passé ou absent, elle part tout de suite. Il faut chaque compte connecté (sinon envoie le lien get_connect_link) et le contenu du format : un Reel a besoin de sa vidéo montée ; un post d'une photo (media_ids) ; un carrousel de 2 à 10 photos ou vidéos (media_ids, dans l'ordre) ; une story de sa vidéo montée ou d'une photo/vidéo (pas de légende sur une story). Ne programme jamais sans l'accord explicite de la gérante.",
-    input: z.object({ post_id: z.string().uuid(), scheduled_at: isoDateTime.optional() }),
+      "Publie maintenant une publication validée sur ses plateformes (Instagram, TikTok). Rien ne part tout seul à une heure prévue : l'horaire d'une publication (update_post scheduled_at) est le moment où tu lui fais signe pour la poster (un rappel sur WhatsApp avec « Oui, publie-le »). Il faut chaque compte connecté (sinon envoie le lien get_connect_link) et le contenu du format : un Reel a besoin de sa vidéo montée ; un post d'une photo (media_ids) ; un carrousel de 2 à 10 photos ou vidéos (media_ids, dans l'ordre) ; une story de sa vidéo montée ou d'une photo/vidéo (pas de légende sur une story). Ne publie jamais sans l'accord explicite de la gérante.",
+    input: z.object({ post_id: z.string().uuid() }),
   },
   get_instagram_activity: {
     description:

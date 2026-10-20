@@ -18,7 +18,7 @@ const instrument = Instrument_Serif({
 export const metadata: Metadata = {
   title: { default: "Simone · ton community manager dans WhatsApp", template: "%s · Simone" },
   description:
-    "Simone monte tes vidéos, écrit les légendes et programme tes posts Instagram et TikTok. Pour les studios, salons, restaurants et boutiques de quartier.",
+    "Simone monte tes vidéos, écrit les légendes et publie tes posts Instagram et TikTok. Pour les studios, salons, restaurants et boutiques de quartier.",
   applicationName: "Simone",
   appleWebApp: { capable: true, title: "Simone", statusBarStyle: "default" },
 };

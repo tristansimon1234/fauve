@@ -477,7 +477,8 @@ test("créer: « Oui, publie-le » and « Je regarde d’abord » are answered w
   assert.equal(publishOfferAnswer("Oui, vas-y"), "yes");
   assert.equal(publishOfferAnswer("Je veux le voir"), "look");
   assert.equal(publishOfferAnswer("oui mais change la musique"), null);
-  assert.equal(publishQuestion({ full: "Vendredi 16 octobre à 18 h", short: "vendredi à 18 h" }, true), "Je le publie vendredi à 18 h ?");
+  // Nothing goes out on its own at a set time: a good moment ahead is a reminder.
+  assert.equal(publishQuestion({ full: "Vendredi 16 octobre à 18 h", short: "vendredi à 18 h" }, true), "Je le publie maintenant ? Sinon je te fais signe vendredi à 18 h, le bon moment pour le poster.");
   assert.equal(publishQuestion({ full: "Vendredi 16 octobre à 18 h", short: "vendredi à 18 h" }, false), "Je le publie maintenant ?");
   assert.ok(PUBLISH_OFFER_OPTIONS.every((o) => o.length <= 20), "WhatsApp reply buttons hold 20 characters");
 });
@@ -1987,7 +1988,7 @@ test("nudge: one short reminder when nothing went out for a while, never twice a
   // Two reminders without an answer: no more until she writes.
   assert.equal(shouldNudge({ ...base, daysSinceNudge: 8, unanswered: 1 }), true);
   assert.equal(shouldNudge({ ...base, daysSinceNudge: 30, unanswered: 2 }), false);
-  assert.match(nudgeMessage(6, 0), /^Ça fait 6 jours sans publication 🙂 Envoie-moi les photos ou vidéos que tu as sous la main, je m'occupe du reste\.$/);
+  assert.match(nudgeMessage(6, 0), /^Eh ho, ça fait 6 jours que tu n'as rien posté 🙂 On crée ton prochain post \? Envoie-moi les photos ou vidéos que tu as sous la main, je m'occupe du reste\.$/);
   assert.match(nudgeMessage(6, 2), /vidéos que j'ai gardées/);
 });
 
@@ -4052,4 +4053,10 @@ test("her own Reel as a model: its structure for the editor, its origin for the 
   assert.equal(sent.own, undefined);
   assert.equal(followedForEditor(sent).structure, undefined);
   assert.match(followedLine(sent), /un Reel qu'elle a envoyé/);
+});
+
+test("reminders: at the suggested moment, the post and one question", async () => {
+  const { reminderMessage } = await import("./creation.ts");
+  assert.equal(reminderMessage("reel", "Cours du soir", ["instagram"]), "C’est le bon moment pour poster ton Reel « Cours du soir » ✨ Je le publie maintenant sur Instagram ?");
+  assert.equal(reminderMessage("carousel", "", ["instagram", "tiktok"]), "C’est le bon moment pour poster ton carrousel ✨ Je le publie maintenant sur Instagram et TikTok ?");
 });

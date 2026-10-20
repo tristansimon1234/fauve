@@ -95,7 +95,7 @@ export function IdeaToPost() {
           )}
           {phase >= 3 && (
             <Her>
-              <strong className="text-violet">Ta-da ✨</strong> Ton carrousel est prêt : 4 photos, tes couleurs, ta police. Je le programme jeudi à 18 h ?
+              <strong className="text-violet">Ta-da ✨</strong> Ton carrousel est prêt : 4 photos, tes couleurs, ta police. Je le publie maintenant ?
               <span className="mt-2.5 flex flex-wrap gap-1.5">
                 {["Oui, valide", "Change un texte"].map((label) => (
                   <span key={label} className="rounded-full border border-line bg-white px-3 py-1.5 text-[12px] font-bold text-violet">
