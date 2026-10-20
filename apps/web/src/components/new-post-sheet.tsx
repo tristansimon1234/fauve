@@ -24,7 +24,7 @@ import { copyReel, copyState, newPostOptions, type CopyState, type NewPostOption
 import { useFauveDrawer } from "./fauve-drawer";
 import { publicEnv } from "@/lib/public-env";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, ImageIcon, LayersIcon, PaletteIcon, PauseIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
+import { ArrowLeftIcon, CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, ImageIcon, LayersIcon, PaletteIcon, PauseIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
 import { Mascot } from "./mascot";
 import { nudgeWork } from "./work-pill";
 
@@ -38,6 +38,9 @@ export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 // both changeable in a tap.
 // « C'est parti »: a Reel starts at once and the screen follows it (« Je m'en occupe »);
 // a carousel, a photo or a story goes on with Simone in the chat, who writes the texts.
+
+type Step = "format" | "style" | "voice" | "files" | "idea";
+const STEP_LABELS: Record<Step, string> = { format: "Type", style: "Style", voice: "Voix", files: "Photos", idea: "Ton idée" };
 
 const FORMATS: { kind: PostKind; title: string; phrase: string; hint: string; Icon: typeof FilmIcon }[] = [
   { kind: "reel", title: "Un Reel", phrase: "un Reel", hint: "Une vidéo montée, avec musique", Icon: FilmIcon },
@@ -259,6 +262,20 @@ function Create({
   const told = Boolean(idea.trim()) || Boolean(copying) || refShots.length > 0;
   const ready = picked.length > 0 && Boolean(chosenWhen) && !sending && !refSending && !broken && told;
 
+  // One question per screen, in her order (Tristan: « un form avec stepper plutôt que tout dans une modale »).
+  const steps: Step[] = kind === "reel" ? ["format", "style", "voice", "files", "idea"] : ["format", "files", "idea"];
+  const [stepAt, setStepAt] = useState(0);
+  const at = Math.min(stepAt, steps.length - 1);
+  const step = steps[at]!;
+  const last = at === steps.length - 1;
+  const canNext =
+    step === "voice" ? voiceAsked : step === "files" ? picked.length > 0 && !sending && !broken : step === "idea" ? told && !refSending : true;
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 });
+  }, [at]);
+  const next = () => setStepAt(Math.min(at + 1, steps.length - 1));
+
   const toggle = (key: string) => setOrder((o) => (o.includes(key) ? o.filter((k) => k !== key) : picked.length >= MAX_FILES ? o : [...o, key]));
   const add = (list: FileList | File[]) => {
     setError(null);
@@ -335,24 +352,50 @@ function Create({
   return (
     <>
       <header className="flex shrink-0 items-center justify-between px-2 pt-2.5 pb-1">
-        <button type="button" onClick={onClose} aria-label="Fermer" className="flex size-11 items-center justify-center rounded-full text-ink hover:bg-soft">
-          <XIcon size={22} />
-        </button>
+        {at > 0 ? (
+          <button type="button" onClick={() => setStepAt(at - 1)} aria-label="Étape d’avant" className="flex size-11 items-center justify-center rounded-full text-ink hover:bg-soft">
+            <ArrowLeftIcon size={21} />
+          </button>
+        ) : (
+          <span className="size-11" aria-hidden />
+        )}
         <h2 id={titleId} className="text-[16px] font-bold">
           Nouvelle publication
         </h2>
-        <span className="size-11" aria-hidden />
+        <button type="button" onClick={onClose} aria-label="Fermer" className="flex size-11 items-center justify-center rounded-full text-ink hover:bg-soft">
+          <XIcon size={22} />
+        </button>
       </header>
+      {/* Where she is: a step already done can be tapped to go back to it. */}
+      <ol aria-label={`Étape ${at + 1} sur ${steps.length}`} className="flex shrink-0 gap-1.5 px-5 pt-1 pb-3">
+        {steps.map((s, i) => (
+          <li key={s} className="min-w-0 flex-1">
+            <button
+              type="button"
+              disabled={i > at}
+              onClick={() => setStepAt(i)}
+              aria-current={i === at ? "step" : undefined}
+              className="flex w-full flex-col gap-1.5 text-left disabled:cursor-default"
+            >
+              <span className={`h-1 rounded-full ${i <= at ? "bg-violet" : "bg-line"}`} />
+              <span className={`truncate text-[11.5px] font-bold ${i === at ? "text-violet" : i < at ? "text-ink" : "text-muted"}`}>{STEP_LABELS[s]}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-[22px] overflow-y-auto px-5 pt-1.5 pb-6">
-        <div className="flex items-end gap-2.5">
-          <Mascot size={46} still />
-          <p className="rounded-[20px_20px_20px_6px] bg-[#F3EEF8] px-[15px] py-3 text-[15.5px] leading-[1.4] font-medium">
-            Donne-moi tes photos ou vidéos, je m’occupe de tout le reste.
-          </p>
-        </div>
+      <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col gap-[22px] overflow-y-auto px-5 pt-1.5 pb-6">
+        {step === "format" && (
+          <div className="flex items-end gap-2.5">
+            <Mascot size={46} still />
+            <p className="rounded-[20px_20px_20px_6px] bg-[#F3EEF8] px-[15px] py-3 text-[15.5px] leading-[1.4] font-medium">
+              Donne-moi tes photos ou vidéos, je m’occupe de tout le reste.
+            </p>
+          </div>
+        )}
 
         {/* In her order (Tristan): what to make, its style, a voice or just music, her files, then what she imagines. */}
+        {step === "format" && (
         <section aria-labelledby={`${titleId}-format`} className="flex flex-col gap-2.5">
           <h3 id={`${titleId}-format`} className="text-[17px] font-extrabold tracking-[-0.01em]">
             Tu veux publier…
@@ -369,7 +412,10 @@ function Create({
                   aria-checked={on}
                   disabled={Boolean(blocked)}
                   title={blocked ?? f.hint}
-                  onClick={() => setFormat(f.kind)}
+                  onClick={() => {
+                    setFormat(f.kind);
+                    setStepAt(1);
+                  }}
                   className={`fauve-press flex h-12 items-center gap-2 rounded-[14px] border-[1.5px] px-3 text-left text-[14.5px] font-extrabold disabled:opacity-40 ${
                     on ? "border-violet bg-violet-tint text-violet" : "border-line bg-white hover:border-violet/40"
                   }`}
@@ -381,8 +427,9 @@ function Create({
             })}
           </div>
         </section>
+        )}
 
-        {kind === "reel" && options && (
+        {step === "style" && options && (
           <section aria-labelledby={`${titleId}-style`} className="flex flex-col gap-2.5">
             <h3 id={`${titleId}-style`} className="text-[17px] font-extrabold tracking-[-0.01em]">
               Quel style ?
@@ -398,7 +445,7 @@ function Create({
           </section>
         )}
 
-        {kind === "reel" && options && (
+        {step === "voice" && options && (
           <section aria-labelledby={`${titleId}-voice`} className="flex flex-col gap-2.5">
             <h3 id={`${titleId}-voice`} className="text-[17px] font-extrabold tracking-[-0.01em]">
               Une voix off, ou juste la musique ?
@@ -433,6 +480,7 @@ function Create({
           </section>
         )}
 
+        {step === "files" && (
         <section
           aria-labelledby={`${titleId}-files`}
           className={`flex flex-col gap-2.5 rounded-[18px] transition-colors ${dragging ? "bg-violet-soft outline-2 outline-offset-4 outline-violet outline-dashed" : ""}`}
@@ -541,7 +589,9 @@ function Create({
             </button>
           )}
         </section>
+        )}
 
+        {step === "idea" && (
         <section className="flex flex-col gap-2.5">
           <label htmlFor={`${titleId}-idea`} className="text-[17px] font-extrabold tracking-[-0.01em]">
             {imagineQuestion(kind)}
@@ -615,6 +665,7 @@ function Create({
             </div>
           )}
         </section>
+        )}
 
         {error && (
           <div role="alert" className="flex flex-col gap-2 rounded-[16px] bg-peach px-4 py-3 text-[14px] leading-snug text-peach-ink">
@@ -629,49 +680,46 @@ function Create({
       </div>
 
       <footer className="flex shrink-0 flex-col items-stretch gap-1 border-t border-line bg-white px-5 pt-3 pb-[max(1.1rem,env(safe-area-inset-bottom))]">
-        {/* What Simone will do, right above the button that does it: each line opens its choice. */}
-        {picked.length > 0 && chosenWhen && (
+        {last && picked.length > 0 && chosenWhen && (
           <div aria-live="polite" className="fauve-enter grid grid-cols-2 gap-2 pb-2">
             <Field wide icon={<CalendarIcon size={17} />} label="Quand et où" value={chosenWhen.full} sub={placeLabel(where)} onClick={() => setSheet("date")} />
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => launch()}
-          disabled={!ready || pending}
-          className="btn btn-primary h-[54px] text-[17px] font-extrabold shadow-[0_8px_22px_rgba(91,63,217,0.28)] disabled:bg-line disabled:text-muted disabled:shadow-none"
-        >
-          {pending ? <Spinner /> : null}
-          {pending ? "C’est parti…" : "C’est parti"}
-        </button>
-        {!picked.length ? (
+        {last ? (
+          <button
+            type="button"
+            onClick={() => launch()}
+            disabled={!ready || pending}
+            className="btn btn-primary h-[54px] text-[17px] font-extrabold shadow-[0_8px_22px_rgba(91,63,217,0.28)] disabled:bg-line disabled:text-muted disabled:shadow-none"
+          >
+            {pending ? <Spinner /> : null}
+            {pending ? "C’est parti…" : "C’est parti"}
+          </button>
+        ) : (
+          <button type="button" onClick={next} disabled={!canNext} className="btn btn-primary h-[54px] text-[17px] font-extrabold disabled:bg-line disabled:text-muted">
+            Suivant
+          </button>
+        )}
+        {step === "files" && !picked.length ? (
           <>
             <p className="text-center text-[13px] text-muted">Choisis au moins une photo ou une vidéo.</p>
             <button type="button" onClick={() => setSheet("nothing")} className="h-10 text-[14.5px] font-bold text-violet">
               Je n’ai rien sous la main
             </button>
           </>
-        ) : sending ? (
+        ) : step === "files" && sending ? (
           <p className="pt-1 text-center text-[13px] text-muted">J’envoie tes fichiers…</p>
-        ) : broken ? (
+        ) : step === "files" && broken ? (
           <p className="pt-1 text-center text-[13px] text-danger">Un fichier n’est pas passé : retire-le ou ajoute-le à nouveau.</p>
-        ) : !told ? (
-          // The question may be below the fold on a phone: a tap brings it up.
-          <button
-            type="button"
-            onClick={() => {
-              ideaRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-              ideaRef.current?.focus({ preventScroll: true });
-            }}
-            className="pt-1 text-center text-[13px] font-semibold text-ink underline decoration-line underline-offset-4"
-          >
-            Dis-moi ce que tu imagines, ou montre-moi une ref.
-          </button>
-        ) : (
+        ) : step === "voice" && !voiceAsked ? (
+          <p className="pt-1 text-center text-[13px] text-muted">Choisis une des trois, tu pourras changer après.</p>
+        ) : step === "idea" && !told ? (
+          <p className="pt-1 text-center text-[13px] font-semibold text-muted">Dis-moi ce que tu imagines, ou montre-moi une ref.</p>
+        ) : last ? (
           <p className="pt-1 text-center text-[12.5px] leading-snug text-muted">
-            {kind === "reel" ? "Le style, les textes et la musique, je les choisis." : "La mise en page et les textes, je les choisis."} Tu pourras tout changer après.
+            {kind === "reel" ? "Les textes, les animations et la musique, je les choisis." : "La mise en page et les textes, je les choisis."} Tu pourras tout changer après.
           </p>
-        )}
+        ) : null}
       </footer>
 
       {sheet === "format" && (
