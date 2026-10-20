@@ -63,8 +63,9 @@ function defaultVoice(o: NewPostOptions | null): string {
   return o.voice.voiceId && findVoice(o.voice.voiceId) ? o.voice.voiceId : SIMONE_VOICES[0]!.id;
 }
 
-/** Under « Voix off »: « Simone choisit », « Aucune », « Eva ». */
-function voiceLabel(voice: string): string {
+/** Under « Voix off »: « À choisir » until she answers, « Simone choisit », « Aucune », « Eva ». */
+function voiceLabel(voice: string, asked: boolean): string {
+  if (!asked) return "Avec ou sans ?";
   if (voice === "auto") return "Simone choisit";
   if (voice === "off") return "Aucune";
   return findVoice(voice)?.name ?? "Simone choisit";
@@ -211,6 +212,10 @@ function Create({
   const meta = FORMATS.find((f) => f.kind === kind)!;
   const chosenWhen = when ?? defaultWhen(options, date);
   const chosenVoice = voice ?? defaultVoice(options);
+  // With or without a voice over: always asked for a Reel (Tristan: « il faut demander si voix off ou pas »),
+  // unless her Style already says always or never.
+  const voiceAsked = voice !== null || (options?.voice.use ?? "auto") !== "auto";
+  const [launchOnVoice, setLaunchOnVoice] = useState(false);
   const sent = options?.copy ?? null;
   const model = given ?? sent?.id ?? null;
   // Its reading: the one she sent Simone comes read (or still being read); one given here is followed below.
@@ -261,7 +266,15 @@ function Create({
     setOrder((o) => o.filter((k) => k !== `u:${id}`));
   };
 
-  const launch = () =>
+  const launch = () => {
+    if (kind === "reel" && !voiceAsked) {
+      setLaunchOnVoice(true);
+      setSheet("voice");
+      return;
+    }
+    go(chosenVoice);
+  };
+  const go = (spoken: string) =>
     start(async () => {
       if (!chosenWhen || !picked.length) return;
       setError(null);
@@ -277,7 +290,7 @@ function Create({
         time: chosenWhen.time,
         idea,
         items,
-        voice: kind === "reel" ? chosenVoice : "auto",
+        voice: kind === "reel" ? spoken : "auto",
         platforms: where.filter((p): p is "instagram" | "tiktok" => p === "instagram" || p === "tiktok"),
         copy: copying ?? false,
         refs: refShots.map((f) => ({ path: f.path!, mime: f.file.type, size: f.file.size })),
@@ -549,7 +562,7 @@ function Create({
         {picked.length > 0 && chosenWhen && (
           <div aria-live="polite" className="fauve-enter grid grid-cols-2 gap-2 pb-2">
             <Field wide={kind !== "reel"} icon={<meta.Icon size={17} />} label="Format" value={meta.title} onClick={() => setSheet("format")} />
-            {kind === "reel" && <Field icon={<MicIcon size={17} />} label="Voix off" value={voiceLabel(chosenVoice)} onClick={() => setSheet("voice")} />}
+            {kind === "reel" && <Field icon={<MicIcon size={17} />} label="Voix off" value={voiceLabel(chosenVoice, voiceAsked)} onClick={() => setSheet("voice")} />}
             {kind === "reel" && (
               <Field
                 wide
@@ -565,7 +578,7 @@ function Create({
         )}
         <button
           type="button"
-          onClick={launch}
+          onClick={() => launch()}
           disabled={!ready || pending}
           className="btn btn-primary h-[54px] text-[17px] font-extrabold shadow-[0_8px_22px_rgba(91,63,217,0.28)] disabled:bg-line disabled:text-muted disabled:shadow-none"
         >
@@ -690,13 +703,31 @@ function Create({
       )}
 
       {sheet === "voice" && (
-        <Sheet label="La voix off" onClose={() => setSheet(null)}>
-          <SheetHead title="Une voix off ?" hint="Une voix raconte ton Reel, la musique passe dessous. Écoute et choisis." onClose={() => setSheet(null)} />
+        <Sheet
+          label="La voix off"
+          onClose={() => {
+            setLaunchOnVoice(false);
+            setSheet(null);
+          }}
+        >
+          <SheetHead
+            title="Une voix off sur ce Reel ?"
+            hint="Une voix raconte ton Reel, la musique passe dessous. Ou juste la musique. Écoute et choisis."
+            onClose={() => {
+              setLaunchOnVoice(false);
+              setSheet(null);
+            }}
+          />
           <VoicePicker
-            value={chosenVoice}
+            value={voiceAsked ? chosenVoice : null}
             onPick={(v) => {
               setVoice(v);
               setSheet(null);
+              // Asked by « C’est parti »: her answer launches it.
+              if (launchOnVoice) {
+                setLaunchOnVoice(false);
+                go(v);
+              }
             }}
           />
         </Sheet>
@@ -1026,7 +1057,7 @@ function CopyGiver({ studioId, another, onGiven }: { studioId: string; another: 
 }
 
 /** « Simone choisit », without, or one of her voices (each to listen to first). */
-function VoicePicker({ value, onPick }: { value: string; onPick: (voice: string) => void }) {
+function VoicePicker({ value, onPick }: { value: string | null; onPick: (voice: string) => void }) {
   const [playing, setPlaying] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => audio.current?.pause(), []);

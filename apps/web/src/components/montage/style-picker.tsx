@@ -5,57 +5,12 @@ import { useEffect } from "react";
 
 // A text's style in one tap, for people who are not designers: each choice is
 // drawn as it will look (font, colours, background, outline), on a dark photo-
-// like tile. The studio's saved styles first, then a few ready-made ones in its
-// colours, and the plain style of the montage. No settings: anything finer is
-// asked of Simone.
+// like tile. The studio's saved styles, then the plain style of the montage (its
+// charter). No ready-made styles: they were flyer looks (a tilted block, italic,
+// boxes) against the native texts. No settings: anything finer is asked of Simone.
 
 type Role = "hook" | "band" | "caption";
 export type StyleBrand = { accent: string; accentInk: string; displayFont: string; bodyFont: string; palette?: BrandPalette };
-
-const SIZE: Record<Role, number> = { hook: 110, band: 54, caption: 46 };
-const ENTER: Record<Role, TextLook["enter"]> = { hook: "pop", band: "slide", caption: "rise" };
-
-const luminance = (hex: string) => {
-  if (!/^#[0-9a-f]{6}$/i.test(hex)) return 0.5;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
-  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-};
-
-/**
- * Ready-made styles drawn from the studio's brand: its title and text fonts and its
- * colours by role (never a fixed font or colour), so they follow the brand when it changes.
- */
-export function stylePresets(role: Role, brand: StyleBrand): { name: string; look: TextLook }[] {
-  const base = { italic: false, uppercase: false, size: SIZE[role], letter_spacing: 0, line_height: 1.05, align: "center", rotate: 0, enter: ENTER[role] } as const;
-  const onSecondary = luminance(brand.palette?.secondary ?? brand.accent) > 0.45 ? "dark" : "light";
-  return [
-    {
-      name: "Percutant",
-      look: { ...base, font: "brand_display", weight: 900, uppercase: true, letter_spacing: 0.01, color: "light", shadow: "hard", stroke: { color: "dark", width: 4 }, emphasis: { color: "accent" } },
-    },
-    {
-      name: "Bloc couleur",
-      look: { ...base, font: "brand_body", weight: 800, color: "accent_ink", shadow: "none", fill: { kind: "box", color: "accent", opacity: 1, radius: 6 } },
-    },
-    {
-      name: "Bloc 2e couleur",
-      look: { ...base, font: "brand_body", weight: 800, uppercase: true, letter_spacing: 0.06, color: onSecondary, shadow: "none", fill: { kind: "box", color: "secondary", opacity: 1, radius: 0 }, rotate: -2, enter: "slide" },
-    },
-    {
-      name: "Étiquette",
-      look: { ...base, font: "brand_body", weight: 700, color: "light", shadow: "none", fill: { kind: "pill", color: "dark", opacity: 0.75 } },
-    },
-    {
-      name: "Surligné",
-      look: { ...base, font: "brand_body", weight: 800, line_height: 1.25, color: "dark", shadow: "none", fill: { kind: "line", color: "light", opacity: 1, radius: 4 } },
-    },
-    {
-      name: "Élégant",
-      look: { ...base, font: "brand_display", weight: 400, italic: true, letter_spacing: 0.01, color: "light", shadow: "soft", enter: "fade" },
-    },
-  ];
-}
 
 const same = (a?: TextLook, b?: TextLook) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 const loadedFonts = new Set<string>();
@@ -99,7 +54,6 @@ export function StylePicker({
   const plain = defaultLook(role, { display: brand.displayFont, body: brand.bodyFont });
   const choices = [
     ...saved.map((s) => ({ key: `saved:${s.name}`, name: s.name, look: s.look as TextLook | undefined, preview: s.look })),
-    ...stylePresets(role, brand).map((p) => ({ key: `preset:${p.name}`, name: p.name, look: p.look as TextLook | undefined, preview: p.look })),
     { key: "plain", name: "Simple", look: undefined as TextLook | undefined, preview: plain },
   ];
   // A style Simone made for this text only: shown first, so it is never lost by a tap.
