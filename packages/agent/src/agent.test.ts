@@ -3984,3 +3984,11 @@ test("never constrained without knowing: Simone and the editor say what a real l
   assert.ok(EDITOR_SYSTEM_PROMPT.indexOf("1. sa demande") < EDITOR_SYSTEM_PROMPT.indexOf("2. le Reel qu'elle recopie"));
   assert.ok(EDITOR_SYSTEM_PROMPT.length < 17_000);
 });
+
+test("the imagine question stands alone: no dates, formats or filming in its buttons", async () => {
+  const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
+  assert.match(FAUVE_SYSTEM_PROMPT, /posée une seule fois, seule dans son message : ni date, ni format, ni conseil/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /jamais dans le message où tu demandes ce qu'elle imagine/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /partir des photos de son site : ne lui propose pas de filmer/);
+  assert.doesNotMatch(FAUVE_SYSTEM_PROMPT, /un autre format ou un autre jour, elle le dit dans sa réponse/);
+});
