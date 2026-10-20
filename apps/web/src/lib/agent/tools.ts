@@ -1273,10 +1273,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.extras.options = answers;
       ctx.extras.posts = own.length ? own : undefined;
       ctx.extras.grid = grid || undefined;
-      // The drop zone is the app's: WhatsApp has its own paperclip.
-      ctx.extras.upload = ctx.waId ? undefined : upload;
+      // The drop zone is the app's; on WhatsApp, files asked for become her upload link under the message (full quality).
+      ctx.extras.upload = ctx.waId ? (upload ?? pick_media) : upload;
       ctx.extras.pick_media = ctx.waId ? undefined : pick_media;
-      return "ok : affiché sous ton message.";
+      return ctx.waId && (upload ?? pick_media) ? "ok : son lien de dépôt (pleine qualité) est ajouté sous ton message ; n'écris aucun lien." : "ok : affiché sous ton message.";
     },
   };
 

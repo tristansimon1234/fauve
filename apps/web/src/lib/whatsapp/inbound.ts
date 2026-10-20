@@ -1,5 +1,6 @@
 import "server-only";
 import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, replyExtrasSchema } from "@fauve/agent";
+import { createLoginLink } from "@/lib/auth/login-link";
 import { claimPairing } from "@/lib/auth/pairing";
 import { answerPublishOffer } from "@/lib/publish-offer";
 import { deliverPendingHandOffs } from "@/lib/social/hand-off";
@@ -228,19 +229,23 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     }
   }
 
+  await replyOnWhatsApp({ studioId: member.studio_id, memberId: member.id, waId: message.from, phone, replyTo: message.id });
+}
+
+/**
+ * Simone's turn on WhatsApp: her answer, with its buttons and links, sent and stored, then
+ * what runs after it (a render…). Also after files dropped through her upload link (lib/upload-link.ts).
+ */
+export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo }: { studioId: string; memberId: string; waId: string; phone: string; replyTo?: string }): Promise<void> {
+  const db = supabaseAdmin();
   let result: Awaited<ReturnType<typeof replyInConversation>>;
   try {
-    result = await replyInConversation({
-      studioId: member.studio_id,
-      memberId: member.id,
-      waId: message.from,
-      replyToMessageId: message.id,
-    });
+    result = await replyInConversation({ studioId, memberId, waId, replyToMessageId: replyTo });
   } catch (error) {
     // Never leave the manager on a "typing…" that leads nowhere. Not stored, so
     // the conversation history stays clean for the next attempt.
     console.error("agent failed, sending fallback reply", error);
-    await sendText(message.from, TECHNICAL_ISSUE_REPLY).catch((e) => console.error("fallback reply failed", e));
+    await sendText(waId, TECHNICAL_ISSUE_REPLY).catch((e) => console.error("fallback reply failed", e));
     return;
   }
 
@@ -249,22 +254,25 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     // A quote gets its yes / other level / no buttons, unless Fauve chose others.
     // The quote's own buttons win over the model's (they carry the other level).
     // (none for a montage already launched).
-    const buttons = quote ? await quoteButtons(member.studio_id, quote).catch(() => []) : [];
+    const buttons = quote ? await quoteButtons(studioId, quote).catch(() => []) : [];
     const options = buttons.length ? buttons : result.extras.options;
     // Cards are app-only: on WhatsApp they become links to the app.
+    // Files asked for (a drop zone in the app): on WhatsApp, her own upload link, in full quality (WhatsApp compresses videos).
+    const upload = result.extras.upload ? await createLoginLink(phone, "/depot", "upload").catch((e) => console.warn("upload link failed", e)) : null;
     const links = [
       ...(posts ?? []).map((id) => `${env("APP_URL")}/publications/${id}`),
       ...(grid ? [`Ta grille : ${env("APP_URL")}/grille`] : []),
+      ...(upload ? [`Pour me les envoyer en pleine qualité, depuis ta galerie : ${upload}`] : []),
     ];
-    const waMessageId = await sendReply(message.from, result.reply, options, links);
+    const waMessageId = await sendReply(waId, result.reply, options, links);
     await db.from("whatsapp_messages").insert({
-      studio_id: member.studio_id,
+      studio_id: studioId,
       wa_message_id: waMessageId,
       direction: "outbound",
       phone_e164: phone,
       type: "text",
       body: result.reply,
-      payload: { reply_to: message.id, ...result.extras, notes: result.notes },
+      payload: { ...(replyTo ? { reply_to: replyTo } : {}), ...result.extras, notes: result.notes },
     });
   }
   // E.g. a render: the video follows the "je monte ta vidéo" reply.
