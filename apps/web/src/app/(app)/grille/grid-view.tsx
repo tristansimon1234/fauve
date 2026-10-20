@@ -145,7 +145,7 @@ function Count({ value, label }: { value?: number; label: string }) {
   );
 }
 
-const statusLabels: Record<string, string> = { draft: "Brouillon", validated: "Validé", scheduled: "Prévu", tiktok_draft: "Dans tes brouillons" };
+const statusLabels: Record<string, string> = { draft: "Brouillon", validated: "Validé", scheduled: "En train de partir", tiktok_draft: "Dans tes brouillons" };
 
 function UpcomingTile({ tile, tz }: { tile: Extract<Tile, { kind: "upcoming" }>; tz: string }) {
   return (
@@ -160,10 +160,10 @@ function UpcomingTile({ tile, tz }: { tile: Extract<Tile, { kind: "upcoming" }>;
           {tile.title}
         </span>
       )}
-      {/* Not on Instagram yet: dashed frame and the status, like a placeholder in the grid. */}
+      {/* Not on Instagram yet: dashed frame and the status (at the bottom, the format badge holds the top right), like a placeholder in the grid. */}
       <span className="pointer-events-none absolute inset-0 border-2 border-dashed border-violet/70" />
       <span
-        className={`absolute top-1.5 left-1.5 max-w-[calc(100%-2.5rem)] truncate rounded-full px-2 py-0.5 text-[11px] font-bold ${
+        className={`absolute bottom-1.5 left-1.5 max-w-[calc(100%-0.75rem)] truncate rounded-full px-2 py-0.5 text-[11px] font-bold ${
           tile.status === "draft" ? "bg-peach text-peach-ink" : "bg-violet text-white"
         }`}
       >

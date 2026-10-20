@@ -692,7 +692,7 @@ function Create({
       <footer className="flex shrink-0 flex-col items-stretch gap-1 border-t border-line bg-white px-5 pt-3 pb-[max(1.1rem,env(safe-area-inset-bottom))]">
         {last && picked.length > 0 && chosenWhen && (
           <div aria-live="polite" className="fauve-enter grid grid-cols-2 gap-2 pb-2">
-            <Field wide icon={<CalendarIcon size={17} />} label="Quand et où" value={chosenWhen.full} sub={placeLabel(where)} onClick={() => setSheet("date")} />
+            <Field wide icon={<CalendarIcon size={17} />} label="Je te fais signe" value={chosenWhen.full} sub={placeLabel(where)} onClick={() => setSheet("date")} />
           </div>
         )}
         {last ? (
@@ -759,7 +759,7 @@ function Create({
 
       {sheet === "date" && options && (
         <Sheet label="La date" onClose={() => setSheet(null)}>
-          <SheetHead title="Quand et où le publier ?" hint="Tes prochains jours libres, à ton heure habituelle." onClose={() => setSheet(null)} />
+          <SheetHead title="Quand te faire signe ?" hint="Rien ne part tout seul : à ce moment-là, je t’envoie un rappel et tu le publies d’un mot. Tes prochains jours libres, à ton heure habituelle." onClose={() => setSheet(null)} />
           {kind === "reel" && options.tiktok && (
             <div className="flex items-center gap-2">
               <span className="flex-1 text-[14px] font-bold">Où ?</span>

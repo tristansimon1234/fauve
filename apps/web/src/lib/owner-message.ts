@@ -18,6 +18,8 @@ export type OwnerMessage = {
   kind?: string;
   /** Outside the 24 h window: an approved template and its parameters. */
   template?: { name: string; params: string[] };
+  /** More of the message's payload (a post's card, the publish offer its buttons answer). */
+  payload?: Record<string, unknown>;
 };
 
 /** The owner's WhatsApp, and whether a free message can reach her now (she wrote in the last 24 h). */
@@ -48,7 +50,7 @@ export async function messageOwner(studioId: string, message: OwnerMessage): Pro
   const db = supabaseAdmin();
   const owner = await ownerWhatsApp(studioId);
   const phone = owner?.phone ?? null;
-  const payload = { ...(message.kind ? { kind: message.kind } : {}), ...(message.options?.length ? { options: message.options } : {}), ...(message.notes?.length ? { notes: message.notes } : {}) };
+  const payload = { ...message.payload, ...(message.kind ? { kind: message.kind } : {}), ...(message.options?.length ? { options: message.options } : {}), ...(message.notes?.length ? { notes: message.notes } : {}) };
 
   if (owner) {
     const waId = owner.waId;

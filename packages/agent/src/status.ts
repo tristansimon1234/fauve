@@ -37,7 +37,7 @@ export const statusLabels: Record<PostStatus, { label: string; tone: "done" | "o
   media_received: { label: "Média reçu", tone: "plan" },
   draft: { label: "À valider", tone: "todo" },
   validated: { label: "Validé", tone: "ok" },
-  scheduled: { label: "Programmé", tone: "ok" },
+  scheduled: { label: "En train de partir", tone: "ok" },
   published: { label: "Publié", tone: "done" },
   measured: { label: "Publié", tone: "done" },
   skipped: { label: "Annulé", tone: "plan" },

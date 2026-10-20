@@ -99,9 +99,25 @@ export function creationPhase(stage: string | null, watched: boolean): CreationP
   return stage === "design" && watched ? "edit" : "watch";
 }
 
-/** « Je le publie vendredi à 18 h ? », or now when the planned time has passed. */
+/**
+ * « Je le publie maintenant ? » (Tristan : « la programmation sert à rien », « mais les rappels
+ * oui »): nothing goes out on its own at a set time; with a good moment ahead, Simone says she
+ * will remind her then (« Sinon je te fais signe vendredi à 18 h »).
+ */
 export function publishQuestion(when: PublishWhen | null, upcoming: boolean): string {
-  return when && upcoming ? `Je le publie ${when.short} ?` : "Je le publie maintenant ?";
+  return when && upcoming ? `Je le publie maintenant ? Sinon je te fais signe ${when.short}, le bon moment pour le poster.` : "Je le publie maintenant ?";
+}
+
+/** A reminder is sent at most this long after its moment (the cron missed it, or it was set in the past). */
+export const REMINDER_GRACE_HOURS = 36;
+
+const KIND_WORDS: Record<string, string> = { reel: "ton Reel", carousel: "ton carrousel", post: "ta photo", story: "ta story" };
+
+/** The reminder at the moment Simone suggested: the post, then the same question and buttons as a delivery. */
+export function reminderMessage(kind: string, title: string, platforms: string[]): string {
+  const where = platforms.includes("tiktok") ? "sur Instagram et TikTok" : "sur Instagram";
+  const name = title.trim() ? ` « ${title.trim().slice(0, 60)} »` : "";
+  return `C’est le bon moment pour poster ${KIND_WORDS[kind] ?? "ta publication"}${name} ✨ Je le publie maintenant ${where} ?`;
 }
 
 /** The buttons under that question, on WhatsApp and in the app. */

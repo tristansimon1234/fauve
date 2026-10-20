@@ -79,7 +79,7 @@ export function ChangePanel(props: Props) {
 const TITLES: Record<Exclude<ChangeView, "menu">, string> = {
   caption: "La légende",
   cover: "La couverture",
-  date: "Le jour et l’heure",
+  date: "Quand te faire signe",
   shorter: "Plus court",
   punchier: "Plus rythmé",
   music: "La musique",
@@ -126,7 +126,7 @@ function Menu({ data, onView, onEdit, ask }: Props) {
         )}
         <Tile tone="violet" icon={<CaptionIcon size={18} />} label="La légende" onClick={() => onView("caption")} />
         <Tile tone="violet" icon={<ImageIcon size={18} />} label="La couverture" onClick={() => onView("cover")} disabled={!data.videoUrl} />
-        <Tile tone="violet" icon={<CalendarIcon size={18} />} label="Le jour et l’heure" onClick={() => onView("date")} />
+        <Tile tone="violet" icon={<CalendarIcon size={18} />} label="Quand te faire signe" onClick={() => onView("date")} />
       </div>
       <h3 className="mt-1 text-[13.5px] font-bold text-muted">Simone refait la vidéo, {data.baked ? `${EFFECT_MINUTES} minutes` : "2 minutes environ"}</h3>
       <div className="grid grid-cols-2 gap-2">
@@ -393,7 +393,7 @@ function DateView({ data, onDone }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const options = [
-    ...(current ? [{ iso: current, label: data.when?.full ?? "", hint: "le jour prévu" }] : []),
+    ...(current ? [{ iso: current, label: data.when?.full ?? "", hint: "le moment prévu" }] : []),
     ...data.slots.filter((s) => s.iso !== current),
   ].slice(0, 5);
   const save = () =>
@@ -403,11 +403,11 @@ function DateView({ data, onDone }: Props) {
         const result = await reschedule(data.postId, chosen);
         if (!result.ok) return setError(result.error);
       }
-      onDone(chosen && chosen !== current ? "C’est noté." : "");
+      onDone(chosen && chosen !== current ? "C’est noté : je te fais signe à ce moment-là pour le poster." : "");
     });
   return (
     <div className="flex flex-col gap-2.5">
-      <div role="radiogroup" aria-label="Quand le publier" className="flex flex-col gap-1.5">
+      <div role="radiogroup" aria-label="Quand te faire signe" className="flex flex-col gap-1.5">
         {options.map((o) => {
           const on = chosen === o.iso;
           return (
@@ -502,9 +502,9 @@ function MusicView({ data, onDone }: Props) {
     {
       id: "trend",
       title: "Un son tendance d’Instagram",
-      hint: "Tu le choisis en publiant : à l’heure prévue, je t’envoie la vidéo et la légende sur WhatsApp.",
+      hint: "Tu le choisis en publiant : quand tu le publies, je t’envoie la vidéo et la légende sur WhatsApp.",
       button: "Je mettrai un son d’Instagram",
-      message: "C’est noté : à l’heure prévue, je t’envoie la vidéo pour que tu ajoutes ton son.",
+      message: "C’est noté : quand tu le publies, je t’envoie la vidéo pour que tu ajoutes ton son.",
       apply: () => setPublishByHand(data.postId, true),
     },
     ...(data.music

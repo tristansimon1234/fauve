@@ -8,8 +8,6 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Shared by the publication page and the calendar's grouped actions.
 
-const whenFormat = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
-
 type Blocked = "montage" | "photos" | "instagram" | "tiktok";
 
 /**
@@ -34,25 +32,25 @@ export const NOT_SCHEDULED: Record<Blocked, string> = {
   tiktok: "C’est validé. Reconnecte TikTok (Réglages), ou retire-le de « Où publier », pour que Simone le publie.",
 };
 
-/** validated → scheduled when possible; returns when it goes out, or why it cannot yet. */
-export async function scheduleValidated(studioId: string, postId: string): Promise<{ when: string } | { blocked: Blocked } | null> {
+/**
+ * validated → published now when possible (Tristan : « la programmation sert à rien ») : nothing
+ * waits for a set time; the moment Simone suggested (scheduled_at) is only when she reminds her
+ * (lib/reminders.ts). Returns « now », or why it cannot go out yet.
+ */
+export async function scheduleValidated(studioId: string, postId: string): Promise<{ when: "now" } | { blocked: Blocked } | null> {
   const db = supabaseAdmin();
-  const post = await db.from("posts").select("kind, render_id, media_ids, platforms, scheduled_at").eq("id", postId).eq("studio_id", studioId).single();
+  const post = await db.from("posts").select("kind, render_id, media_ids, platforms").eq("id", postId).eq("studio_id", studioId).single();
   if (!post.data) return null;
   const why = await blocked(studioId, post.data as { kind: string; render_id: string | null; media_ids: string[] | null; platforms: string[] | null });
   if (why) return { blocked: why };
-  const planned = post.data.scheduled_at ? new Date(post.data.scheduled_at as string) : null;
-  const at = planned && planned.getTime() > Date.now() + 60_000 ? planned : new Date();
   const { data } = await db
     .from("posts")
-    .update({ status: "scheduled", scheduled_at: at.toISOString(), publish_started_at: null, publish_error: null, handoff_at: null, handoff_via: null })
+    .update({ status: "scheduled", scheduled_at: new Date().toISOString(), publish_started_at: null, publish_error: null, handoff_at: null, handoff_via: null })
     .eq("id", postId)
     .eq("status", "validated")
     .select("id");
   if (!data?.length) return null;
   revalidatePath(`/publications/${postId}`);
-  if (at === planned) return { when: whenFormat.format(at) };
   after(() => publishIfDue(postId).then(() => revalidatePath(`/publications/${postId}`)));
   return { when: "now" };
 }
-

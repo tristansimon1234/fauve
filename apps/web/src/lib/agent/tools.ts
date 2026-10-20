@@ -1118,7 +1118,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
     },
 
-    async schedule_post({ post_id, scheduled_at }) {
+    async schedule_post({ post_id }) {
       const post = unwrap(
         await db.from("posts").select("id, kind, status, render_id, media_ids, scheduled_at, platforms").eq("id", post_id).eq("studio_id", studioId).single(),
       );
@@ -1135,23 +1135,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (current !== "validated" && current !== "failed" && current !== "scheduled") {
         return json({ error: `La publication est au statut « ${current} » : elle doit d'abord être validée par la gérante (update_post status validated).` });
       }
-      const when = new Date(scheduled_at ?? (post.scheduled_at as string | null) ?? Date.now());
-      const at = when.getTime() < Date.now() + 60_000 ? new Date() : when;
+      // Nothing waits for a set time any more: it goes out now (its moment was only for her reminder).
       check(
         await db
           .from("posts")
-          .update({ status: "scheduled", scheduled_at: at.toISOString(), publish_started_at: null, publish_error: null, handoff_at: null, handoff_via: null })
+          .update({ status: "scheduled", scheduled_at: new Date().toISOString(), publish_started_at: null, publish_error: null, handoff_at: null, handoff_via: null })
           .eq("id", post_id),
       );
-      const now = at.getTime() <= Date.now() + 1000;
-      if (now) ctx.afterReply.push(async () => void (await publishIfDue(post_id)));
-      return json({
-        status: "scheduled",
-        scheduled_at: at.toISOString(),
-        note: now
-          ? "Publication immédiate après ta réponse ; la gérante recevra le lien du Reel."
-          : "Simone publiera automatiquement à l'horaire prévu et préviendra la gérante.",
-      });
+      ctx.afterReply.push(async () => void (await publishIfDue(post_id)));
+      return json({ status: "publishing", note: "Publication immédiate après ta réponse ; elle verra le Reel en ligne dans quelques minutes." });
     },
 
     async get_instagram_activity({ media_limit, comments_per_post }) {
