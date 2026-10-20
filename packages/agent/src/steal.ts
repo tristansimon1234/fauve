@@ -239,7 +239,7 @@ export function stealMissMessage(miss: "unreachable" | "too_long" | "not_video" 
     case "too_long":
       return "Cette vidéo dure plus de 3 minutes : envoie-moi un Reel plus court, ou juste le passage qui te plaît.";
     case "not_video":
-      return "Je n’y trouve pas de vidéo. Si c’est un carrousel, envoie-moi une capture de la photo qui te plaît : je recopie le style de ses textes.";
+      return "Je n’y trouve pas de vidéo : Instagram ne me laisse pas ouvrir un carrousel par son lien. Envoie-moi une vidéo où tu le fais défiler (enregistrement d’écran), ou des captures : je recopie sa mise en page et son style.";
     case "unreadable":
       return "Je n’ai pas réussi à le regarder cette fois. Tu veux que je réessaie ?";
     case "not_found":

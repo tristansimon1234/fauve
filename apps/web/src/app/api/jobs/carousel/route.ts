@@ -26,7 +26,7 @@ const bodySchema = z.object({
   /** Composed anew, not a correction of the carousel the post already has. */
   fresh: z.boolean().optional(),
   /** Images of carousels she likes (her media), shown to the designer. */
-  examples: z.array(z.uuid()).max(3).optional(),
+  examples: z.array(z.uuid()).max(4).optional(),
   round: z.number().int().min(0).max(5).default(0),
   /** Her photos are read and cut out (the first step); then the designer's rounds. */
   prepared: z.boolean().default(false),

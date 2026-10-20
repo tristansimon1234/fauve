@@ -19,7 +19,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { creationProgress, launchCreation, type CreationProgress, type LaunchResult } from "@/app/(app)/create-actions";
-import { MAX_FILE_BYTES, MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/chat-uploads";
+import { FileStrip, MAX_FILE_BYTES, MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/chat-uploads";
 import { copyReel, copyState, newPostOptions, type CopyState, type NewPostOptions } from "@/app/(app)/new-post-actions";
 import { useFauveDrawer } from "./fauve-drawer";
 import { publicEnv } from "@/lib/public-env";
@@ -156,6 +156,9 @@ function Create({
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState<"subscribe" | "credits" | null>(null);
   const uploads = useChatUploads(options?.studioId ?? null, setError);
+  // A carousel or a post she likes, as captures: its form for Simone, never its words (a link of a carousel does not open).
+  const refs = useChatUploads(options?.studioId ?? null, setError);
+  const refRef = useRef<HTMLInputElement>(null);
   /** Picked, in order: « m:<media id> » from her library, « u:<draft id> » from her phone. */
   const [order, setOrder] = useState<string[]>([]);
   const [idea, setIdea] = useState("");
@@ -241,8 +244,10 @@ function Create({
   const sending = picked.some((k) => k.startsWith("u:") && drafts.get(k.slice(2))?.status === "uploading");
   const broken = picked.some((k) => k.startsWith("u:") && drafts.get(k.slice(2))?.status === "error");
   // What she imagines, or a ref: Simone asks before she makes anything (Tristan: « simone part trop vite en production »).
-  const told = Boolean(idea.trim()) || Boolean(copying);
-  const ready = picked.length > 0 && Boolean(chosenWhen) && !sending && !broken && told;
+  const refShots = kind === "reel" ? [] : refs.files.filter((f) => f.status === "ready" && f.path);
+  const refSending = kind !== "reel" && refs.files.some((f) => f.status === "uploading");
+  const told = Boolean(idea.trim()) || Boolean(copying) || refShots.length > 0;
+  const ready = picked.length > 0 && Boolean(chosenWhen) && !sending && !refSending && !broken && told;
 
   const toggle = (key: string) => setOrder((o) => (o.includes(key) ? o.filter((k) => k !== key) : picked.length >= MAX_FILES ? o : [...o, key]));
   const add = (list: FileList | File[]) => {
@@ -275,6 +280,7 @@ function Create({
         voice: kind === "reel" ? chosenVoice : "auto",
         platforms: where.filter((p): p is "instagram" | "tiktok" => p === "instagram" || p === "tiktok"),
         copy: copying ?? false,
+        refs: refShots.map((f) => ({ path: f.path!, mime: f.file.type, size: f.file.size })),
       }).catch(
         (): LaunchResult => ({ ok: false, error: "Ça n’est pas parti. Réessaie dans un instant." }),
       );
@@ -295,6 +301,7 @@ function Create({
         `Nouvelle publication : ${meta.phrase} pour ${chosenWhen.full.charAt(0).toLowerCase()}${chosenWhen.full.slice(1)}.`,
         idea.trim() ? `Ce que j’imagine : ${idea.trim()}` : "",
         `${counts.videos ? "Mes photos et vidéos" : "Mes photos"} (media_id, dans l’ordre) : ${res.mediaIds.join(", ")}.`,
+        res.refIds.length ? `Ma ref, un ${meta.phrase.includes("carrousel") ? "carrousel" : "post"} que j’aime (captures ou vidéo où je le fais défiler ; example_media_ids : suis sa forme, jamais ses mots) : ${res.refIds.join(", ")}.` : "",
         "Choisis toi-même la mise en page et les textes, et lance-toi : je regarde le résultat après.",
       ]
         .filter(Boolean)
@@ -440,7 +447,11 @@ function Create({
           <label htmlFor={`${titleId}-idea`} className="text-[17px] font-extrabold tracking-[-0.01em]">
             {imagineQuestion(kind)}
           </label>
-          <p className="-mt-1 text-[13.5px] leading-snug text-muted">Par quoi commencer, comment finir, ce que les gens doivent faire. Avec une voix, ou juste un message à l’écran.</p>
+          <p className="-mt-1 text-[13.5px] leading-snug text-muted">
+            {kind === "reel"
+              ? "Par quoi commencer, comment finir, ce que les gens doivent faire. Avec une voix, ou juste un message à l’écran."
+              : "Par quoi commencer, comment finir, ce que les gens doivent faire."}
+          </p>
           <textarea
             ref={ideaRef}
             id={`${titleId}-idea`}
@@ -480,6 +491,44 @@ function Create({
               </span>
               {copying ? `Ta ref : ${readingLabel(reading)}` : "Ou montre-moi une ref : un Reel que tu aimes"}
             </button>
+          )}
+          {/* Or a ref for a carousel, a post or a story: captures of one she likes (Instagram does not let a carousel's link open). */}
+          {kind !== "reel" && options && (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => refRef.current?.click()}
+                disabled={refs.files.length >= 4}
+                className={`fauve-press flex items-center gap-2.5 self-start rounded-full border-[1.5px] py-1.5 pr-3.5 pl-2 text-left text-[14px] font-bold disabled:opacity-60 ${
+                  refs.files.length ? "border-violet bg-violet-tint text-violet" : "border-dashed border-line bg-white text-violet hover:border-violet/40"
+                }`}
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet">
+                  <ImageIcon size={13} />
+                </span>
+                {refs.files.length ? "Ajouter une capture" : `Ou montre-moi une ref : un ${kind === "carousel" ? "carrousel" : "post"} que tu aimes`}
+              </button>
+              {!refs.files.length && (
+                <p className="-mt-1 pl-1 text-[12.5px] leading-snug text-muted">Une vidéo où tu le fais défiler (enregistrement d’écran), ou des captures.</p>
+              )}
+              {refs.files.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <FileStrip files={refs.files} onRemove={refs.removeFile} />
+                  <p className="text-[12.5px] leading-snug text-muted">Je suis sa mise en page et son style, avec tes photos et tes mots.</p>
+                </div>
+              )}
+              <input
+                ref={refRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  refs.addFiles([...(e.target.files ?? [])].slice(0, 4 - refs.files.length));
+                  e.target.value = "";
+                }}
+              />
+            </div>
           )}
         </section>
 
@@ -544,7 +593,7 @@ function Create({
             }}
             className="pt-1 text-center text-[13px] font-semibold text-ink underline decoration-line underline-offset-4"
           >
-            Dis-moi ce que tu imagines{kind === "reel" ? ", ou montre-moi une ref" : ""}.
+            Dis-moi ce que tu imagines, ou montre-moi une ref.
           </button>
         ) : (
           <p className="pt-1 text-center text-[12.5px] leading-snug text-muted">
