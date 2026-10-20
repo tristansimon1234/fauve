@@ -22,6 +22,8 @@ export type OnboardingView = {
   direction: string | null;
   /** Her style on one of her photos: the Reel composition's props, drawn live (null until her site is read). */
   preview: ReelProps | null;
+  /** Her site's look has been read (its signature written): until then, the style card makes her wait for her preview. */
+  siteRead: boolean;
   /** fromSite: Simone took these photos from her website (she has not made her own moodboard yet). */
   moodboard: { items: { path: string; url: string }[]; reading: string | null; fromSite: boolean };
   rhythm: { posts: number; stories: number };
@@ -78,6 +80,7 @@ export async function onboardingView(): Promise<OnboardingView | null> {
     fonts: (profile.fonts ?? []).slice(0, 2).map((name) => ({ name, twin: twins[name] ?? null, own: own.has(name.toLowerCase()) })),
     direction: profile.art_direction?.trim() || null,
     preview,
+    siteRead: Boolean(profile.signature),
     moodboard: { items: items.flatMap((i) => (urls.get(i.path) ? [{ path: i.path, url: urls.get(i.path)! }] : [])), reading: profile.moodboard?.reading ?? null, fromSite: items.some((i) => i.note === "Photo de ton site") },
     rhythm: { posts: (plan.data?.posts_per_week as number | null) ?? offer.postsPerWeek, stories: (plan.data?.stories_per_week as number | null) ?? 4 },
     offer: { label: offer.label, credits: offer.credits, postsPerWeek: offer.postsPerWeek, reels: reelsPerMonth(offerId) },

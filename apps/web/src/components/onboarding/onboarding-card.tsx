@@ -233,9 +233,11 @@ function StyleStep({
   const fileRef = useRef<HTMLInputElement>(null);
   const items = view.moodboard.items;
   const room = MOODBOARD_MAX_ITEMS - items.length;
-  // Simone reads her site's photos and look right after its step: they land here in a few seconds.
+  // Simone reads her site's photos and look right after its step: the photos land here in a few seconds, her
+  // style (its preview, « Tes Reels auront ce style ») a little later. She waits for both before moving on: the
+  // preview came after she had already continued (Tristan: « il apparaît un peu tard… faire attendre le user »).
   const [waited, setWaited] = useState(0);
-  const lookingAtSite = Boolean(view.website) && !items.length && waited < 24;
+  const lookingAtSite = Boolean(view.website) && (!items.length || !view.siteRead) && waited < 30;
   useEffect(() => {
     if (!lookingAtSite) return;
     const timer = setTimeout(() => {
@@ -290,6 +292,18 @@ function StyleStep({
           </Link>
         </div>
       )}
+      {!view.preview && lookingAtSite && items.length > 0 && (
+        <div className="fauve-fade flex items-center gap-4 rounded-[16px] bg-soft p-3.5">
+          <span aria-hidden="true" className="aspect-[9/16] w-[118px] shrink-0 animate-pulse rounded-[12px] bg-line sm:w-[132px]" />
+          <div className="flex min-w-0 flex-col gap-2">
+            <span className="text-[14px] font-bold">Tes Reels auront ce style</span>
+            <span className="flex items-center gap-2 text-[13px] font-semibold text-violet">
+              <Mascot size={24} mood="thinking" />
+              Je le prépare avec tes titres, tes couleurs et ta lumière…
+            </span>
+          </div>
+        </div>
+      )}
       {view.preview && (
         <div className="flex items-start gap-4 rounded-[16px] bg-soft p-3.5">
           <div className="w-[118px] shrink-0 overflow-hidden rounded-[12px] shadow-sm sm:w-[132px]">
@@ -315,7 +329,7 @@ function StyleStep({
             ? "J’ai pris les photos de ton site pour commencer. Ajoute ou retire ce que tu veux : je m’en sers pour tous tes visuels."
             : "Des images de ce que tu aimes : des posts, des ambiances, des couleurs. Je m’en sers pour tous tes visuels."}
         </p>
-        {lookingAtSite && (
+        {lookingAtSite && !items.length && (
           <p className="fauve-fade flex items-center gap-2 rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[13px] font-semibold text-violet">
             <Mascot size={24} mood="thinking" />
             Je regarde les photos et le style de ton site…
@@ -335,6 +349,7 @@ function StyleStep({
           ))}
           {/* The site's photos on their way: their places are already there. */}
           {lookingAtSite &&
+            !items.length &&
             [0, 1, 2, 3].map((n) => <span key={n} aria-hidden="true" className="aspect-square w-full animate-pulse rounded-[12px] bg-line" style={{ animationDelay: `${n * 150}ms` }} />)}
           {room > 0 && !lookingAtSite && (
             <button
