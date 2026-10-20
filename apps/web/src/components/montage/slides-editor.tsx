@@ -1,6 +1,6 @@
 "use client";
 
-import { AMBIANCES, buildSlideProps, SLIDE_Y, type ReelInputs, type SavedLook, type SlidesPlan, type SlideText } from "@fauve/agent";
+import { buildSlideProps, SLIDE_Y, type ReelInputs, type SavedLook, type SlidesPlan, type SlideText } from "@fauve/agent";
 import { useMemo, useRef, useState } from "react";
 import { PenIcon, PlusIcon } from "@/components/icons";
 import { SlidePreview } from "./slide-preview";
@@ -21,7 +21,6 @@ const logoPlaces = [
 ] as const;
 
 /** On photos only the texts change: each ambiance named by its texts. */
-const templates = (["doux", "dynamique", "chic"] as const).map((value) => ({ value, label: AMBIANCES[value].photo }));
 
 export function SlidesEditor({
   plan,
@@ -171,20 +170,6 @@ export function SlidesEditor({
           </div>
         ))}
 
-      <div className="flex items-center gap-2">
-        <span className={`text-[12px] font-bold ${muted}`}>Textes</span>
-        {templates.map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            aria-pressed={plan.template === t.value}
-            onClick={() => onChange({ ...plan, template: t.value })}
-            className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${chip(plan.template === t.value)}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
       {url && (
         <RetouchSwitches
           key={slide.media_id}
