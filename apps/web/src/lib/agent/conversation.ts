@@ -7,6 +7,7 @@ import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
 import { presenceLines } from "@/lib/nudge";
 import { accessLine } from "@/lib/billing/access";
+import { studioModels } from "@/lib/reel-models";
 import { pendingSteal } from "@/lib/steal";
 
 // Shared by every channel (WhatsApp webhook, web test chat): rebuild the
@@ -104,7 +105,7 @@ export async function replyInConversation(params: {
     .limit(ownThread ? HISTORY_READ : HISTORY_READ * 2);
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
-  const [studio, member, rows, instagram, brand, jobs, tiktok, copying] = await Promise.all([
+  const [studio, member, rows, instagram, brand, jobs, tiktok, copying, models] = await Promise.all([
     db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
@@ -114,6 +115,8 @@ export async function replyInConversation(params: {
     db.from("social_accounts").select("handle, status").eq("studio_id", params.studioId).eq("platform", "tiktok").maybeSingle(),
     // The Reel she sent to copy (« Steal »), for her next Reel only.
     pendingSteal(params.studioId).catch(() => null),
+    // Her Reels kept as models, to make new ones like them.
+    studioModels(params.studioId, 5).catch(() => []),
   ]);
   const jobTitles = jobs.length
     ? new Map(
@@ -188,6 +191,7 @@ export async function replyInConversation(params: {
         return { use: setting.use, name: findVoice(setting.voice_id ?? DEFAULT_VOICE_ID)?.name ?? "sa voix" };
       })(),
       copying: copying ? { inspirationId: copying.id, name: copying.name, lines: copying.lines } : undefined,
+      models: models.map((m) => ({ inspirationId: m.id, title: m.title, name: m.name })),
       routine: await Promise.all([
         accessLine(params.studioId).catch(() => null),
         presenceLines(params.studioId).catch((error) => {

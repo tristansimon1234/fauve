@@ -6,7 +6,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 const TTL_MS = 15 * 60_000;
 // A finished montage is often opened hours later: its link lasts a day (still
 // single use, and anyone who can read her WhatsApp could get a login code anyway).
-const TTL_BY_PURPOSE: Record<string, number> = { open_post: 24 * 3600_000 };
+// Her upload link (/depot) too: files are often sent later in the day.
+const TTL_BY_PURPOSE: Record<string, number> = { open_post: 24 * 3600_000, upload: 24 * 3600_000 };
 
 /**
  * A one-time link Fauve sends on WhatsApp (15 min, a day for a publication,
