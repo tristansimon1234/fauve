@@ -12,7 +12,7 @@ import { Orb } from "@/components/orb";
 import { DeleteButton } from "@/components/delete-button";
 import { AskFauveButton } from "@/components/fauve-drawer";
 import { StatusPill } from "@/components/status-pill";
-import { formatDateTime, formatSeconds, kindLabels, platformLabels } from "@/lib/format";
+import { formatDateTime, kindLabels, platformLabels } from "@/lib/format";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { postSlides } from "@/lib/render/slides";
 import { getStudioContext, rows, signMediaUrls, type Db } from "@/lib/studio";
@@ -79,8 +79,6 @@ const renderSchema = z.object({
 });
 type Render = z.infer<typeof renderSchema>;
 
-const textStyleLabels: Record<string, string> = { hook: "Accroche", band: "Bandeau", caption: "Sous-titre" };
-const segmentColors = ["bg-violet", "bg-coral", "bg-lilac", "bg-peach-ink", "bg-violet-hover"];
 const LOCKED: readonly PostStatus[] = ["published", "measured"];
 
 const handedFormat = (timeZone: string) => new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone });
@@ -160,12 +158,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const plan = await loadPlan(db, post);
   const render = await loadRender(db, plan?.id ?? null, post.render_id);
-  const [videoUrls, clipLabels] = await Promise.all([
-    render?.status === "done" && render.storage_path
-      ? signMediaUrls(db, studioId, [render.storage_path])
-      : Promise.resolve(new Map<string, string>()),
-    plan ? loadClipLabels(db, [...plan.view.segments.map((s) => s.clip_id), ...post.media_ids]) : Promise.resolve(new Map<string, string>()),
-  ]);
+  const videoUrls =
+    render?.status === "done" && render.storage_path ? await signMediaUrls(db, studioId, [render.storage_path]) : new Map<string, string>();
   const videoUrl = render?.storage_path ? videoUrls.get(render.storage_path) : undefined;
   // « Je publie moi-même » : the video to save, under the post's name.
   const downloadUrl =
@@ -310,12 +304,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
       {!canEdit && tiktokLine && <p className="-mt-2 text-[13px] font-semibold">{tiktokLine}</p>}
 
-      {plan && (
-        <>
-          {canEdit && <EditMontageButton postId={post.id} title={post.title} />}
-          <PlanSection plan={plan.view} clipLabels={clipLabels} />
-        </>
-      )}
+      {plan && canEdit && <EditMontageButton postId={post.id} title={post.title} />}
 
     </>
   );
@@ -445,23 +434,6 @@ async function loadRender(db: Db, editPlanId: string | null, preferredId: string
   );
 }
 
-/** Short labels for the clips (the plan's and the post's), from Fauve's video analysis. */
-async function loadClipLabels(db: Db, clipIds: string[]): Promise<Map<string, string>> {
-  const ids = [...new Set(clipIds)].filter((id) => z.uuid().safeParse(id).success);
-  const labels = new Map<string, string>();
-  if (!ids.length) return labels;
-  const { data } = await db
-    .from("clip_analyses")
-    .select("media_id, analysis, created_at")
-    .in("media_id", ids)
-    .order("created_at", { ascending: false });
-  for (const row of data ?? []) {
-    const summary = z.object({ summary: z.string() }).safeParse(row.analysis);
-    if (summary.success && !labels.has(row.media_id)) labels.set(row.media_id, summary.data.summary);
-  }
-  return labels;
-}
-
 function previewMessage(status: PostStatus, hasPlan: boolean, render: Render | null): string {
   if (render?.status === "queued" || render?.status === "rendering") return "Le montage est en cours de fabrication.";
   if (render?.status === "failed") return "Le montage n’a pas abouti. Demande à Simone de le relancer sur WhatsApp.";
@@ -472,64 +444,6 @@ function previewMessage(status: PostStatus, hasPlan: boolean, render: Render | n
   }
   if (status === "media_received") return "Vidéos bien reçues : Simone prépare le brouillon.";
   return "Pas d’aperçu pour cette publication.";
-}
-
-function PlanSection({ plan, clipLabels }: { plan: PlanView; clipLabels: Map<string, string> }) {
-  const total = plan.duration ?? plan.segments.reduce((sum, s) => sum + Math.max(0, s.out - s.in), 0);
-  return (
-    <section className="flex flex-col gap-3.5 rounded-[18px] border border-line p-4.5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[15px] font-bold">Montage · {formatSeconds(total)}</h2>
-        <span className="text-[13px] text-muted">
-          {plan.segments.length} {plan.segments.length > 1 ? "plans" : "plan"}
-          {plan.subtitles ? " · sous-titres" : ""}
-        </span>
-      </div>
-      {plan.segments.length > 0 && (
-        <>
-          <div className="flex h-12 gap-1">
-            {plan.segments.map((s, i) => (
-              <span
-                key={i}
-                className={`flex items-end rounded-[10px] px-2 py-1.5 text-[11px] font-bold text-white ${
-                  segmentColors[i % segmentColors.length]
-                }`}
-                style={{ flex: Math.max(0.5, s.out - s.in) }}
-              >
-                {i + 1}
-              </span>
-            ))}
-          </div>
-          <ol className="flex flex-col gap-2 text-sm">
-            {plan.segments.map((s, i) => (
-              <li key={i} className="flex gap-2.5">
-                <span className="w-16 shrink-0 font-semibold text-muted">Plan {i + 1}</span>
-                <span className="min-w-0">
-                  {formatSeconds(Math.max(0, s.out - s.in))}
-                  {s.zoom === "light" ? " · léger zoom" : ""}
-                  {clipLabels.get(s.clip_id) ? ` · ${clipLabels.get(s.clip_id)}` : ""}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
-      {plan.texts.length > 0 && (
-        <ul className="flex flex-col gap-2 border-t border-line pt-3 text-sm">
-          {plan.texts.map((t, i) => (
-            <li key={i} className="flex gap-2.5">
-              <span className="w-24 shrink-0 font-semibold text-muted">
-                {formatSeconds(t.from).replace(" s", "")}–{formatSeconds(t.to)}
-              </span>
-              <span className="min-w-0">
-                {textStyleLabels[t.style] ?? "Texte"} « {t.text} »
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
 }
 
 type PostMedia = { id: string; url: string; video: boolean };
