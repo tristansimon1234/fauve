@@ -27,7 +27,9 @@ import { SceneStrip, type SceneSprite } from "./scene-strip";
 
 // « Modifier », the editor of « Ta publication », for someone who has never edited a
 // video: the Reel plays live (the same composition as the render), its scenes in a
-// row below, as in Instagram's editor. Touch a text to change its words, size and
+// row below, as in Instagram's editor. On « Ta publication » it opens in place, the
+// page itself becomes the editor (Tristan: « bizarre d'avoir une page montage alors
+// qu'on est déjà sur montage »); a story's montage still opens it full screen. Touch a text to change its words, size and
 // style, drag it to place it; touch a scene to move it earlier or later, or take it
 // out. Nothing else to learn: cuts, animations and the rest are asked of Simone.
 // One « Enregistrer » makes a new version, rendered in the background, free.
@@ -48,6 +50,7 @@ export function ReelEditor({
   live: preloaded,
   onClose,
   onAsk,
+  inline = false,
 }: {
   postId: string;
   /** The strip made with the video shown, for the scenes' images. */
@@ -55,6 +58,8 @@ export function ReelEditor({
   start: EditStart;
   /** Already loaded (a preview); otherwise loaded when it opens. */
   live?: Live;
+  /** In the page, where the video was (« Ta publication »), not a full-screen layer. */
+  inline?: boolean;
   /** Closed: with a line to show her when something was saved. */
   onClose: (saved?: string) => void;
   /** « Demander à Simone » about one scene. */
@@ -81,12 +86,31 @@ export function ReelEditor({
 
   // A full-screen layer: the page under it does not scroll.
   useEffect(() => {
+    if (inline) return;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = overflow;
     };
-  }, []);
+  }, [inline]);
+
+  if (inline) {
+    return live ? (
+      <Editor postId={postId} live={live} scenes={scenes} start={start} onClose={onClose} onAsk={onAsk} inline />
+    ) : (
+      <div className="flex flex-col items-center justify-center gap-3 rounded-[24px] bg-soft px-8 py-16 text-center">
+        <Mascot size={64} mood={error ? "sad" : "thinking"} />
+        <p role={error ? "alert" : "status"} className="text-[15px] leading-snug font-semibold text-muted">
+          {error ?? "J’ouvre ton montage…"}
+        </p>
+        {error && (
+          <button type="button" onClick={() => onClose()} className="h-10 rounded-full px-4 text-[14px] font-bold text-violet">
+            Revenir
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Modifier le Reel" className="fauve-enter fixed inset-0 z-[60] flex flex-col bg-white text-ink">
@@ -119,6 +143,7 @@ function Editor({
   start,
   onClose,
   onAsk,
+  inline = false,
 }: {
   postId: string;
   live: Live;
@@ -126,6 +151,7 @@ function Editor({
   start: EditStart;
   onClose: (saved?: string) => void;
   onAsk: (scene: number, label: string) => void;
+  inline?: boolean;
 }) {
   // The plan being changed, and for each scene its place in the saved plan (its image in the strip).
   const [draft, setDraft] = useState(() => ({ plan: live.plan, origin: live.plan.segments.map((_, i): number | null => i) }));
@@ -213,96 +239,147 @@ function Editor({
   // The scene shown now, for the strip when a text is chosen.
   const textScene = text ? spans.findIndex((s) => text.from >= s.start && text.from < s.end) : -1;
 
+  const header = (
+    <header
+      className={
+        inline
+          ? "sticky top-0 z-20 -mx-1 flex h-14 items-center gap-2 bg-white/95 px-1 backdrop-blur"
+          : "flex h-14 shrink-0 items-center gap-2 border-b border-line px-2"
+      }
+    >
+      <button type="button" onClick={cancel} className="h-10 rounded-full px-3 text-[15px] font-bold text-muted hover:bg-soft">
+        {inline && !changed ? "Fermer" : "Annuler"}
+      </button>
+      <h2 className="flex-1 text-center text-[16px] font-extrabold">Modifier</h2>
+      <button type="button" onClick={save} disabled={!changed || saving} className="btn btn-primary h-10 px-4 text-[14.5px] disabled:opacity-45">
+        {saving ? "Un instant…" : "Enregistrer"}
+      </button>
+    </header>
+  );
+  const leave = leaving && (
+    <div
+      role="alertdialog"
+      aria-label="Quitter sans enregistrer"
+      className={`flex shrink-0 flex-wrap items-center gap-2 bg-peach px-4 py-2.5 text-peach-ink ${inline ? "rounded-[16px]" : ""}`}
+    >
+      <p className="min-w-0 flex-1 text-[14px] font-semibold">Tes changements ne seront pas gardés.</p>
+      <button type="button" onClick={() => setLeaving(false)} className="h-9 rounded-full bg-white px-3.5 text-[13.5px] font-bold text-ink">
+        Rester
+      </button>
+      <button type="button" onClick={() => onClose()} className="h-9 rounded-full px-3 text-[13.5px] font-bold underline underline-offset-2">
+        Quitter
+      </button>
+    </div>
+  );
+  const preview = (
+    <div
+      ref={previewRef}
+      className={
+        inline
+          ? "relative w-[max(176px,min(280px,calc((100dvh-470px)*0.5625)))] overflow-hidden rounded-[22px] bg-ink shadow-[0_18px_44px_rgba(28,21,48,.18)] lg:w-[320px]"
+          : "relative w-[min(calc(40dvh*9/16),236px)] overflow-hidden rounded-[14px] shadow-[0_18px_44px_rgba(0,0,0,.45)] lg:w-[min(calc((100dvh-250px)*9/16),340px)]"
+      }
+    >
+      <ReelPlayer props={props} playerRef={playerRef} initialFrame={initialFrame} />
+      <TextBoxes
+        container={previewRef}
+        player={playerRef}
+        texts={plan.texts}
+        active={text ? (selection?.index ?? null) : null}
+        // Her hand's place: the engine leaves it where she put it from now on.
+        onMove={(i, place) => setText(i, { ...place, auto_y: undefined })}
+        onPick={(i) => selectText(i, false)}
+        onEdit={(i, words) => setText(i, { text: words })}
+      />
+    </div>
+  );
+  const strip = (
+    <SceneStrip
+      segments={plan.segments}
+      sprite={scenes}
+      origin={origin}
+      photos={live.inputs.photoIds}
+      selected={sceneIndex}
+      playing={text && textScene >= 0 ? textScene : null}
+      dark={!inline}
+      onPick={selectScene}
+    />
+  );
+  const settings = (
+    <>
+      {message && (
+        <p role="alert" className="mb-3 rounded-[12px] bg-peach px-3 py-2 text-[13.5px] font-semibold text-danger">
+          {message}
+        </p>
+      )}
+      {text && selection ? (
+        <TextPanel
+          key={selection.index}
+          text={text}
+          looks={live.looks}
+          brand={props.brand}
+          onChange={(patch) => setText(selection.index, patch)}
+          onRemove={() => removeText(selection.index)}
+          onScene={textScene >= 0 ? () => selectScene(textScene) : undefined}
+        />
+      ) : scene && sceneIndex !== null ? (
+        <ScenePanel
+          key={sceneIndex}
+          index={sceneIndex}
+          count={plan.segments.length}
+          segment={scene}
+          seconds={spans[sceneIndex] ? spans[sceneIndex].end - spans[sceneIndex].start : 0}
+          photo={"clip_id" in scene && Boolean(live.inputs.photoIds?.includes(scene.clip_id))}
+          voiced={voiced}
+          texts={plan.texts.map((t, i) => ({ t, i })).filter(({ t }) => spans[sceneIndex] && t.from >= spans[sceneIndex].start && t.from < spans[sceneIndex].end)}
+          endCard={sceneIndex === plan.segments.length - 1 ? plan.end_card : undefined}
+          changed={changed}
+          onMove={(to) => moveScene(sceneIndex, to)}
+          onRemove={() => removeScene(sceneIndex)}
+          onChange={(segment) => setSegment(sceneIndex, segment)}
+          onEndCard={(endCard) => edit({ plan: { ...plan, end_card: endCard } })}
+          onText={(i) => selectText(i)}
+          onAsk={() => onAsk(sceneIndex, `Scène ${sceneIndex + 1}`)}
+        />
+      ) : (
+        <p className="text-[14.5px] leading-relaxed text-muted">Touche un texte sur la vidéo pour le changer, ou une scène en dessous.</p>
+      )}
+    </>
+  );
+
+  // In the page: the same place as « Ta publication », the video where it was, its scenes under it, the settings beside.
+  if (inline) {
+    return (
+      <div className="flex flex-col gap-3">
+        {header}
+        {leave}
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
+          <section aria-label="Aperçu" className="flex flex-col items-center gap-3 rounded-[24px] bg-soft px-4 py-5 lg:py-8">
+            {preview}
+            <div className="flex w-full max-w-[340px] flex-col items-center gap-1">{strip}</div>
+          </section>
+          <aside aria-label="Réglages" className="rounded-[24px] border border-line bg-white p-5">
+            {settings}
+          </aside>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
-        <button type="button" onClick={cancel} className="h-10 rounded-full px-3 text-[15px] font-bold text-muted hover:bg-soft">
-          Annuler
-        </button>
-        <h2 className="flex-1 text-center text-[16px] font-extrabold">Modifier</h2>
-        <button type="button" onClick={save} disabled={!changed || saving} className="btn btn-primary h-10 px-4 text-[14.5px] disabled:opacity-45">
-          {saving ? "Un instant…" : "Enregistrer"}
-        </button>
-      </header>
-      {leaving && (
-        <div role="alertdialog" aria-label="Quitter sans enregistrer" className="flex shrink-0 flex-wrap items-center gap-2 bg-peach px-4 py-2.5 text-peach-ink">
-          <p className="min-w-0 flex-1 text-[14px] font-semibold">Tes changements ne seront pas gardés.</p>
-          <button type="button" onClick={() => setLeaving(false)} className="h-9 rounded-full bg-white px-3.5 text-[13.5px] font-bold text-ink">
-            Rester
-          </button>
-          <button type="button" onClick={() => onClose()} className="h-9 rounded-full px-3 text-[13.5px] font-bold underline underline-offset-2">
-            Quitter
-          </button>
-        </div>
-      )}
-
+      {header}
+      {leave}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* The Reel, live, and its scenes. */}
         <section aria-label="Aperçu" className="flex shrink-0 flex-col items-center gap-2.5 bg-[radial-gradient(ellipse_at_top,#2a2145_0%,#16112a_70%)] px-4 pt-3.5 pb-2.5 lg:min-w-0 lg:flex-1 lg:justify-center lg:gap-4 lg:py-6">
-          <div ref={previewRef} className="relative w-[min(calc(40dvh*9/16),236px)] overflow-hidden rounded-[14px] shadow-[0_18px_44px_rgba(0,0,0,.45)] lg:w-[min(calc((100dvh-250px)*9/16),340px)]">
-            <ReelPlayer props={props} playerRef={playerRef} initialFrame={initialFrame} />
-            <TextBoxes
-              container={previewRef}
-              player={playerRef}
-              texts={plan.texts}
-              active={text ? (selection?.index ?? null) : null}
-              // Her hand's place: the engine leaves it where she put it from now on.
-              onMove={(i, place) => setText(i, { ...place, auto_y: undefined })}
-              onPick={(i) => selectText(i, false)}
-              onEdit={(i, words) => setText(i, { text: words })}
-            />
-          </div>
-          <SceneStrip
-            segments={plan.segments}
-            sprite={scenes}
-            origin={origin}
-            photos={live.inputs.photoIds}
-            selected={sceneIndex}
-            playing={text && textScene >= 0 ? textScene : null}
-            dark
-            onPick={selectScene}
-          />
+          {preview}
+          {strip}
         </section>
 
         {/* What is chosen: a text, or a scene. */}
         <aside aria-label="Réglages" className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] lg:w-[420px] lg:flex-none lg:border-l lg:border-line lg:px-5 lg:pt-5">
-          {message && (
-            <p role="alert" className="mb-3 rounded-[12px] bg-peach px-3 py-2 text-[13.5px] font-semibold text-danger">
-              {message}
-            </p>
-          )}
-          {text && selection ? (
-            <TextPanel
-              key={selection.index}
-              text={text}
-              looks={live.looks}
-              brand={props.brand}
-              onChange={(patch) => setText(selection.index, patch)}
-              onRemove={() => removeText(selection.index)}
-              onScene={textScene >= 0 ? () => selectScene(textScene) : undefined}
-            />
-          ) : scene && sceneIndex !== null ? (
-            <ScenePanel
-              key={sceneIndex}
-              index={sceneIndex}
-              count={plan.segments.length}
-              segment={scene}
-              seconds={spans[sceneIndex] ? spans[sceneIndex].end - spans[sceneIndex].start : 0}
-              photo={"clip_id" in scene && Boolean(live.inputs.photoIds?.includes(scene.clip_id))}
-              voiced={voiced}
-              texts={plan.texts.map((t, i) => ({ t, i })).filter(({ t }) => spans[sceneIndex] && t.from >= spans[sceneIndex].start && t.from < spans[sceneIndex].end)}
-              endCard={sceneIndex === plan.segments.length - 1 ? plan.end_card : undefined}
-              changed={changed}
-              onMove={(to) => moveScene(sceneIndex, to)}
-              onRemove={() => removeScene(sceneIndex)}
-              onChange={(segment) => setSegment(sceneIndex, segment)}
-              onEndCard={(endCard) => edit({ plan: { ...plan, end_card: endCard } })}
-              onText={(i) => selectText(i)}
-              onAsk={() => onAsk(sceneIndex, `Scène ${sceneIndex + 1}`)}
-            />
-          ) : (
-            <p className="text-[14.5px] leading-relaxed text-muted">Touche un texte sur la vidéo pour le changer, ou une scène en dessous.</p>
-          )}
+          {settings}
         </aside>
       </div>
     </>
