@@ -15,14 +15,16 @@ import { ChangePanel, type ChangeView } from "./change-panel";
 import type { EditStart } from "./reel-editor";
 import { SceneStrip } from "./scene-strip";
 
-// « Modifier » plays the montage live (Remotion): loaded only when she opens it.
+// « Modifier » plays the montage live (Remotion): loaded only when she opens it, in place
+// of the video, the page itself becoming the editor.
 const ReelEditor = dynamic(() => import("./reel-editor").then((m) => m.ReelEditor), { ssr: false });
 
 // « Ta publication », the page of a Reel for someone who has never edited a video: the
 // video as it will go out, its scenes in a row, when and where, its caption, ONE button
 // that says what it does (« Publier vendredi à 18 h »), and « Changer quelque chose ».
-// A scene or « Le texte à l'écran » opens « Modifier » (texts, their place and style,
-// the order of the scenes), live. Same page in the app and from WhatsApp.
+// A scene or « Le texte à l'écran » turns the page into « Modifier » (texts, their place
+// and style, the order of the scenes), live, where the video was. Same page in the app
+// and from WhatsApp.
 
 const STEPS: Record<string, string> = {
   montage: "Simone refait le montage",
@@ -87,6 +89,7 @@ export function PostReview({
     setSheet(false);
     video.current?.pause();
     setEditing(start);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const closeEditor = (saved?: string) => {
     setEditing(null);
@@ -190,6 +193,15 @@ export function PostReview({
       )}
     </div>
   );
+
+  // « Modifier » in place: the same page, the live video where the video was.
+  if (editing) {
+    return (
+      <div className="flex flex-col gap-5 pb-10">
+        <ReelEditor postId={data.postId} scenes={data.scenes} start={editing} onClose={closeEditor} onAsk={askScene} inline />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5 pb-36 lg:pb-0">
@@ -323,8 +335,6 @@ export function PostReview({
           {panel}
         </Sheet>
       )}
-
-      {editing && <ReelEditor postId={data.postId} scenes={data.scenes} start={editing} onClose={closeEditor} onAsk={askScene} />}
 
       {toast && (
         <p
