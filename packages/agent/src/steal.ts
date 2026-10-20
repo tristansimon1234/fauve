@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MAX_AVERAGE_SHOT, type QualityOptions } from "./critic.ts";
 import { BEAT_STEP } from "./mix.ts";
+import { OUTLINE_CHARS } from "./reel-model.ts";
 import { clip, SIGNATURE_GRADES, type BrandSignature } from "./signature.ts";
 
 // « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA », « c'est one
@@ -134,8 +135,11 @@ export function clampLook(reading: StolenLookReading): StolenLook {
   };
 }
 
-/** A stolen style as it is kept on its inspiration (inspirations.style): the reading and the measures. */
-export const stolenStyleSchema = z.object({ look: stolenLookSchema, measures: reelMeasuresSchema });
+/**
+ * A stolen style as it is kept on its inspiration (inspirations.style): the reading and the
+ * measures; for one of her own Reels kept as a model (reel-model.ts), its plan's structure too.
+ */
+export const stolenStyleSchema = z.object({ look: stolenLookSchema, measures: reelMeasuresSchema, outline: z.string().max(OUTLINE_CHARS).optional() });
 export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
 export const STEAL_PROMPT = `Tu es la directrice artistique de Simone, qui monte les Reels Instagram d'un commerce de quartier (studio, salon, restaurant, boutique…). La personne qui gère le commerce veut reprendre le style de ce Reel pour les siens : lis-le comme une monteuse pro qui veut en refaire le style, pas le contenu.
@@ -149,16 +153,21 @@ export const followedStyleSchema = z.object({
   /** Seconds per shot of the stolen Reel, and its tempo, when measured. */
   average_shot: z.number().min(0.2).max(30).nullable(),
   bpm: z.number().min(50).max(200).nullable(),
+  /** One of her own Reels, kept as a model: redone with her new images, its structure known. */
+  own: z.boolean().optional(),
+  outline: z.string().max(OUTLINE_CHARS).optional(),
 });
 export type FollowedStyle = z.infer<typeof followedStyleSchema>;
 
-/** The style a Reel copies, from a kept stolen style (a single shot of minutes counts as 30 s). */
-export function followedFrom(inspirationId: string, style: StolenStyle): FollowedStyle {
+/** The style a Reel copies, from a kept stolen style (a single shot of minutes counts as 30 s). `own`: one of her Reels, kept as a model. */
+export function followedFrom(inspirationId: string, style: StolenStyle, own = false): FollowedStyle {
   return {
     inspiration_id: inspirationId,
     look: style.look,
     average_shot: style.measures.duration > 0 ? Math.min(30, Math.max(0.2, secondsPerShot(style.measures))) : null,
     bpm: style.measures.bpm === null ? null : Math.round(style.measures.bpm),
+    ...(own ? { own: true } : {}),
+    ...(style.outline ? { outline: style.outline } : {}),
   };
 }
 
@@ -308,6 +317,9 @@ export function followedForEditor(followed: FollowedStyle) {
   const { look } = followed;
   return {
     nom: look.name,
+    ...(followed.own ? { origine: "un de ses Reels à elle, qu'elle a gardé comme modèle : refais-le avec ses nouvelles images et de nouveaux mots" } : {}),
+    // Its plan, when it is one of hers: the same build, shot for shot and text for text, cut to her new images.
+    ...(followed.outline ? { structure: followed.outline } : {}),
     forme: FORMAT_WORDS[look.format],
     voix: look.voice,
     rythme: paceWords(followed.average_shot, followed.bpm),
@@ -329,7 +341,7 @@ export function followedForEditor(followed: FollowedStyle) {
 export function followedLine(followed: FollowedStyle): string {
   const { look } = followed;
   return [
-    `Reel à recopier (un Reel qu'elle a envoyé, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
+    `Reel à recopier (${followed.own ? "un de ses Reels, gardé comme modèle" : "un Reel qu'elle a envoyé"}, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
     `accroche ${look.hook.kind}`,
     `texte : ${look.text.amount}`,
     // With a voice, whether its words are written on screen: a copy may speak without subtitles.

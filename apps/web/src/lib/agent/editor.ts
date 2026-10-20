@@ -66,7 +66,7 @@ import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
 import { ensureInspirationRead } from "@/lib/inspirations";
-import { postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
+import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
 import { isFirstReel } from "@/lib/onboarding";
 import { LAYER_ROLE, markTemplatesUsed, OVERLAY_ROLE, PHOTO_ROLE, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { anthropic, logClaudeCost } from "./run";
@@ -274,9 +274,9 @@ export async function designEdit(params: {
       // What worked on this studio's Instagram (weekly analysis): follow it when it applies.
       lessons: report?.lessons.map((l) => l.lesson),
       // Reels she likes (added in Style, shared with Simone on Instagram), as read by Gemini; not a Reel she sent
-      // to copy (« Steal »): that one is the model of one Reel only.
+      // to copy (« Steal »): that one is the model of one Reel only; nor one of hers kept as a model, for the Reels made like it.
       inspirations: (inspirations.data ?? [])
-        .filter((i) => !(i.copied && SENT_TO_COPY.includes(i.source as string)))
+        .filter((i) => !(i.copied && SENT_TO_COPY.includes(i.source as string)) && i.source !== MODEL_SOURCE)
         .map((i) => i.analysis as string)
         .filter((a) => a !== chosenInspiration)
         .slice(0, 6),

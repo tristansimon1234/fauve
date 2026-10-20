@@ -3992,3 +3992,64 @@ test("the imagine question stands alone: no dates, formats or filming in its but
   assert.match(FAUVE_SYSTEM_PROMPT, /partir des photos de son site : ne lui propose pas de filmer/);
   assert.doesNotMatch(FAUVE_SYSTEM_PROMPT, /un autre format ou un autre jour, elle le dit dans sa réponse/);
 });
+
+test("her own Reel as a model: its structure for the editor, its origin for the editor and the critic", async () => {
+  const { planOutline, OUTLINE_CHARS } = await import("./reel-model.ts");
+  const { clampLook, followedFrom, followedForEditor, followedLine, stolenStyleSchema } = await import("./steal.ts");
+  const plan = editPlanObjectSchema.parse({
+    ...validPlan,
+    template: "libre",
+    tempo: 100,
+    duration: 9,
+    segments: [
+      { clip_id: "a", in: 0, out: 1.2, zoom: "none" },
+      { clip_id: "b", in: 2, out: 5.2, zoom: "none" },
+      { motion: { brief: "le prix qui arrive" }, duration: 2 },
+      { clip_id: "c", in: 0, out: 2.6, zoom: "none" },
+    ],
+    texts: [
+      { text: "le secret de nos croissants", from: 0, to: 2.4, style: "hook" },
+      { text: "réserve ta place", from: 7, to: 9, style: "caption" },
+    ],
+    images: [],
+    effect: "dust",
+  });
+  const outline = planOutline(plan);
+  assert.equal(
+    outline,
+    "9 s, 4 plans, le premier de 1,2 s, 2,3 s en moyenne, à 100 BPM ; textes : accroche de 0 à 2,4 s (5 mots), légende de 7 à 9 s (3 mots) ; 1 animation ; une poussière de pellicule",
+  );
+  // Never her words, and never longer than it is kept.
+  assert.doesNotMatch(outline, /croissants/);
+  const many = editPlanObjectSchema.parse({ ...plan, duration: 30, texts: Array.from({ length: 30 }, (_, i) => ({ text: "un deux trois", from: i, to: i + 0.9, style: "band" })) });
+  assert.ok(planOutline(many).length <= OUTLINE_CHARS);
+  assert.match(planOutline(many), /…$/);
+
+  const look = clampLook({
+    name: "visite au croissant",
+    format: "autre",
+    voice: "aucune",
+    hook: { kind: "promesse", what: "un gros plan qui promet un secret" },
+    text: { amount: "une ligne", composition: "une phrase au tiers haut", case: "normal", weight: "bold", tracking: "normal", align: "center", stress: "color", band: "none", subtitles: false, font: "" },
+    colors: [],
+    effect: "dust",
+    grade: "warm",
+    motion: "chaleureux",
+    camera: "à la main",
+    transitions: "coupes nettes",
+    music: "warm chillhop",
+    ending: "un plan large du comptoir.",
+    why: "Le secret donne envie de rester.",
+  });
+  const style = stolenStyleSchema.parse({ look, measures: { duration: 9, cuts: [1.2, 4.4, 6.4], bpm: 100, lufs: -14 }, outline });
+  const own = followedFrom("11111111-2222-4333-8444-555555555555", style, true);
+  assert.equal(own.own, true);
+  assert.equal(followedForEditor(own).structure, outline);
+  assert.match(followedForEditor(own).origine ?? "", /ses Reels à elle/);
+  assert.match(followedLine(own), /^Reel à recopier \(un de ses Reels, gardé comme modèle, « visite au croissant »\)/);
+  // A Reel she sent stays someone else's, without a structure.
+  const sent = followedFrom("11111111-2222-4333-8444-555555555555", { look, measures: style.measures });
+  assert.equal(sent.own, undefined);
+  assert.equal(followedForEditor(sent).structure, undefined);
+  assert.match(followedLine(sent), /un Reel qu'elle a envoyé/);
+});

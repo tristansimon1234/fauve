@@ -94,7 +94,7 @@ export const toolSpecs = {
   },
   list_inspirations: {
     description:
-      "Les inspirations de la gérante : des Reels qu'elle aime, partagés sur Instagram ou ajoutés dans l'app, avec ce qu'on peut en reprendre (accroche, rythme, textes). À regarder avant de proposer un nouveau Reel, pour lui demander s'il doit suivre l'une d'elles.",
+      "Les inspirations de la gérante : des Reels qu'elle aime, partagés sur Instagram ou ajoutés dans l'app, avec ce qu'on peut en reprendre (accroche, rythme, textes). Source « model » : un de ses Reels qu'elle a gardé comme modèle (« Garder comme modèle ») : quand elle veut un Reel « comme celui de … », passe son inspiration_id à montage. À regarder avant de proposer un nouveau Reel, pour lui demander s'il doit suivre l'une d'elles.",
     input: z.object({}),
   },
   steal_style: {

@@ -5,9 +5,9 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
-import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
+import { dropModel, keepModel, restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
 import { useFauveDrawer } from "@/components/fauve-drawer";
-import { CalendarIcon, CheckIcon, ChevronRightIcon, UndoIcon, VolumeIcon, VolumeOffIcon, XIcon } from "@/components/icons";
+import { CalendarIcon, CheckIcon, ChevronRightIcon, RepeatIcon, UndoIcon, VolumeIcon, VolumeOffIcon, XIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
@@ -282,6 +282,7 @@ export function PostReview({
               Télécharger la vidéo
             </a>
           )}
+          {data.videoUrl && !data.making && <KeepAsModel key={data.model?.state ?? "none"} postId={data.postId} model={data.model} />}
         </section>
 
         <aside className="flex flex-col gap-3.5">
@@ -411,6 +412,59 @@ function Sheet({ onClose, label, children }: { onClose: () => void; label: strin
         </button>
         {children}
       </div>
+    </div>
+  );
+}
+
+/**
+ * « Garder comme modèle »: a Reel of hers she likes, to make new ones like it (Créer › Style,
+ * « Comme ton Reel … »): the same rhythm, the same texts, the same way of doing, with new images.
+ */
+function KeepAsModel({ postId, model: initial }: { postId: string; model: ReviewData["model"] }) {
+  const [model, setModel] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const keep = () =>
+    start(async () => {
+      setError(null);
+      const res = await keepModel(postId).catch(() => ({ ok: false as const, error: "Ça n’est pas passé. Réessaie dans un instant." }));
+      if (res.ok) setModel(res.model);
+      else setError(res.error);
+    });
+  const drop = () =>
+    start(async () => {
+      setError(null);
+      const res = await dropModel(postId).catch(() => ({ ok: false as const, error: "Ça n’est pas passé. Réessaie dans un instant." }));
+      if (res.ok) setModel(null);
+      else setError(res.error);
+    });
+  if (model && model.state !== "missed") {
+    return (
+      <p className="flex max-w-[320px] flex-wrap items-center justify-center gap-x-1.5 text-center text-[13px] leading-snug text-muted">
+        <RepeatIcon size={14} className="text-violet" />
+        <span>
+          <strong className="font-bold text-ink">Gardé comme modèle</strong> · {model.state === "kept" ? "dans Créer, à l’étape Style" : "je le regarde, une minute ou deux"}
+        </span>
+        <button type="button" onClick={drop} disabled={pending} className="font-semibold underline underline-offset-3 hover:text-ink disabled:opacity-50">
+          Retirer
+        </button>
+      </p>
+    );
+  }
+  return (
+    <div className="flex max-w-[320px] flex-col items-center gap-1 text-center">
+      <button
+        type="button"
+        onClick={keep}
+        disabled={pending}
+        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-[13px] font-bold hover:border-lilac disabled:opacity-50"
+      >
+        <RepeatIcon size={14} className="text-violet" />
+        {model?.state === "missed" ? "Réessayer de le garder comme modèle" : "Garder comme modèle"}
+      </button>
+      {!error && !model && <span className="text-[12px] leading-snug text-muted">Pour refaire des Reels comme celui-ci avec tes nouvelles vidéos</span>}
+      {!error && model?.state === "missed" && <span className="text-[12px] leading-snug text-muted">Je n’ai pas réussi à le regarder la première fois.</span>}
+      {error && <span className="text-[12px] leading-snug text-danger">{error}</span>}
     </div>
   );
 }
