@@ -12,7 +12,6 @@ import {
   ArrowUpIcon,
   CalendarIcon,
   CaptionIcon,
-  FilmIcon,
   ImageIcon,
   MicIcon,
   MusicIcon,
@@ -124,10 +123,6 @@ function Menu({ data, onView, onEdit, ask }: Props) {
         {!data.baked && <Tile tone="violet" icon={<TypeIcon size={18} />} label="Le texte à l’écran" onClick={() => onEdit({ text: 0 })} disabled={data.making !== null} />}
         {data.baked && data.words.length > 0 && (
           <Tile tone="violet" icon={<TypeIcon size={18} />} label="Le texte à l’écran" onClick={() => onView("words")} disabled={data.making !== null} />
-        )}
-        {/* Its scenes (order, remove one, the words of an animation, ask Simone about one): in « Modifier », no strip under the video. */}
-        {!data.baked && data.plan.segments.length > 1 && (
-          <Tile tone="violet" icon={<FilmIcon size={18} />} label="Les scènes" onClick={() => onEdit({ scene: 0 })} disabled={data.making !== null} />
         )}
         <Tile tone="violet" icon={<CaptionIcon size={18} />} label="La légende" onClick={() => onView("caption")} />
         <Tile tone="violet" icon={<ImageIcon size={18} />} label="La couverture" onClick={() => onView("cover")} disabled={!data.videoUrl} />

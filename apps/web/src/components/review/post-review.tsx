@@ -1,9 +1,9 @@
 "use client";
 
-import { EFFECT_MINUTES, type PostCover } from "@fauve/agent";
+import { EFFECT_MINUTES, timeline, type PostCover } from "@fauve/agent";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
 import { useFauveDrawer } from "@/components/fauve-drawer";
@@ -13,14 +13,15 @@ import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
 import { ChangePanel, type ChangeView } from "./change-panel";
 import type { EditStart } from "./reel-editor";
+import { SceneStrip } from "./scene-strip";
 
 // « Modifier » plays the montage live (Remotion): loaded only when she opens it.
 const ReelEditor = dynamic(() => import("./reel-editor").then((m) => m.ReelEditor), { ssr: false });
 
 // « Ta publication », the page of a Reel for someone who has never edited a video: the
-// video as it will go out (no montage view under it: Tristan, « je vois pas l'intérêt »), when and where, its caption, ONE button
+// video as it will go out, its scenes in a row, when and where, its caption, ONE button
 // that says what it does (« Publier vendredi à 18 h »), and « Changer quelque chose ».
-// « Le texte à l'écran » opens « Modifier » (texts, their place and style,
+// A scene or « Le texte à l'écran » opens « Modifier » (texts, their place and style,
 // the order of the scenes), live. Same page in the app and from WhatsApp.
 
 const STEPS: Record<string, string> = {
@@ -56,6 +57,9 @@ export function PostReview({
   const [toast, setToast] = useState<string | null>(null);
   /** « Modifier » open, on a text or a scene. */
   const [editing, setEditing] = useState<EditStart | null>(null);
+  /** Where the video is, for the scene it shows. */
+  const [time, setTime] = useState(0);
+  const spans = useMemo(() => timeline(data.plan), [data.plan]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -205,6 +209,7 @@ export function PostReview({
                 loop
                 playsInline
                 preload="auto"
+                onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
                 className="size-full object-cover"
                 aria-label="Ton Reel"
               />
@@ -240,6 +245,18 @@ export function PostReview({
               </div>
             )}
           </div>
+          {/* Its scenes: a tap opens « Modifier » on that one. */}
+          {!data.locked && !data.making && !data.failed && data.videoUrl && data.plan.segments.length > 1 && (
+            <div className="flex w-full max-w-[340px] flex-col items-center gap-1">
+              <SceneStrip
+                segments={data.plan.segments}
+                sprite={data.scenes}
+                playing={spans.findIndex((s) => time >= s.start && time < s.end)}
+                onPick={(scene) => edit({ scene })}
+              />
+              <p className="text-[12px] font-semibold text-muted">Touche une scène pour la modifier</p>
+            </div>
+          )}
           <p className="w-full max-w-[320px] text-[13.5px] leading-snug">
             <strong className="font-extrabold">{data.handle ?? "toi"}</strong> {clip(data.captionShown)}{" "}
             {!data.locked && (
