@@ -246,7 +246,7 @@ export async function voiceOverIfWanted(params: {
   correction?: boolean;
   /** Her request for the Reel, read by the voice too. */
   brief?: string;
-}): Promise<{ mediaId: string; voice: string } | { format: Extract<ReelFormat, "message">; why: string } | null> {
+}): Promise<{ mediaId: string; voice: string } | { format: Extract<ReelFormat, "message">; why: string } | { spokenKept: true } | null> {
   if (!env("ELEVENLABS_API_KEY")) return null;
   const db = supabaseAdmin();
   const [post, brand] = await Promise.all([
@@ -287,6 +287,8 @@ export async function voiceOverIfWanted(params: {
     photos: (media ?? []).filter((m) => m.kind === "image").length,
     copied: copied?.look.voice,
   });
+  // She chose a voice (for this Reel, or always) but someone speaks in her videos: their words stay, and the delivery says so.
+  if (!wanted && speechInClips && !choices.onReel && !choices.correction && choice?.mode !== "off" && (choice?.mode === "on" || setting.use === "always")) return { spokenKept: true };
   if (!wanted) return null;
   // A voice of the gallery, or one of her own (a clone made with her consent) kept as it is.
   const voiceId = choice?.voice_id ?? setting.voice_id ?? DEFAULT_VOICE_ID;
