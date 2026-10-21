@@ -22,7 +22,7 @@ import { ClipBlurLayer, cssFilter, ExposureFilters, Photo } from "./Retouch";
 import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
 import { TEXT_Y, themeFor, type Theme } from "./theme";
-import { cameraMotion, framingPercent, punchScale, straightening } from "./track";
+import { cameraMotion, faceFocus, framingPercent, punchScale, straightening, type FaceZone } from "./track";
 import type { CameraMove, ReelProps, ReelUnder, TextLook } from "./types";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -181,7 +181,7 @@ export function Reel(props: ReelProps) {
             overlay
             photos={compose.photos}
             cuts={compose.cuts}
-            footage={{ shots: compose.shots ?? [], draw: (shot, size) => drawShot(props.segments[shot.segment], theme, size) }}
+            footage={{ shots: compose.shots ?? [], draw: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face) }}
             reelTexts={compose.reelTexts}
             end={compose.end}
             fallbackNode={
@@ -253,9 +253,9 @@ export function Reel(props: ReelProps) {
   );
 }
 
-/** One of her shots in a box of that size, as the Reel draws it (its retouch, its camera move, its light): for a collage's composition. */
-function drawShot(segment: ReelProps["segments"][number] | undefined, theme: Theme, size: { width: number; height: number }): ReactNode {
-  if (segment?.type === "clip") return <Shot segment={segment} theme={theme} frame={size} />;
+/** One of her shots in a box of that size, as the Reel draws it (its retouch, its camera move, its light), its faces whole: for a composition. */
+function drawShot(segment: ReelProps["segments"][number] | undefined, theme: Theme, size: { width: number; height: number }, face?: FaceZone): ReactNode {
+  if (segment?.type === "clip") return <Shot segment={segment} theme={theme} frame={size} face={face} />;
   if (segment?.type === "image") return <Photo src={segment.src} edit={segment.edit} grade={theme.grade} frame={size} />;
   return null;
 }
@@ -415,12 +415,13 @@ function straighten(degrees: number | undefined, frameAspect: number): string | 
 }
 
 /** A clip as filmed and retouched, covering the frame, or the box it is drawn in (`frame`: a collage's composition). */
-function Shot({ segment, theme, frame: box }: { segment: ClipSegment; theme: Theme; frame?: { width: number; height: number } }) {
+function Shot({ segment, theme, frame: box, face }: { segment: ClipSegment; theme: Theme; frame?: { width: number; height: number }; face?: FaceZone }) {
   const frame = useCurrentFrame();
   const video = useVideoConfig();
   const { width, height } = box ?? video;
   const move = segment.move ?? (segment.zoom ? "in" : "none");
   const frameAspect = width / height;
+  const focus = faceFocus(segment.adjust?.focus, face, segment.aspect, frameAspect);
   return (
     <AbsoluteFill style={{ transform: cameraTransform(move, frame, segment.durationInFrames, theme) }}>
       <AbsoluteFill style={{ transform: straighten(segment.adjust?.straighten, frameAspect) }}>
@@ -434,12 +435,12 @@ function Shot({ segment, theme, frame: box }: { segment: ClipSegment; theme: The
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            objectPosition: framing(segment.adjust?.focus, segment.aspect, frameAspect),
+            objectPosition: framing(focus, segment.aspect, frameAspect),
             filter: [theme.grade, cssFilter(segment.adjust)].filter(Boolean).join(" ") || undefined,
           }}
         />
         {segment.blur?.tracks.length ? (
-          <ClipBlurLayer blur={segment.blur} startFrom={segment.startFrom} focus={segment.adjust?.focus} speed={segment.speed} size={box} />
+          <ClipBlurLayer blur={segment.blur} startFrom={segment.startFrom} focus={focus} speed={segment.speed} size={box} />
         ) : null}
       </AbsoluteFill>
     </AbsoluteFill>

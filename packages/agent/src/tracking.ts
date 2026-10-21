@@ -41,6 +41,8 @@ export type FootageLook = {
   aspect: number;
   framingAspect?: number;
   focus?: { x: number; y: number };
+  /** The faces seen in the passage (shares of the picture): a box narrower than the shot keeps them whole (faceFocus). */
+  face?: FaceZone;
   straighten?: number;
   move?: CameraMove;
   accent?: "punch" | "wipe";
@@ -53,6 +55,51 @@ export type FootageLook = {
 export type TrackPiece = { at: number; length: number; startFrom: number; speed?: number; look: FootageLook; tracks: FootageTracks; clip?: string };
 /** What was tracked in a shot a composition lays, and how it is drawn. */
 export type ShotTrack = Omit<TrackPiece, "at" | "length">;
+
+/** Where the faces of a passage are, in shares of the picture, with room for the hair and the chin. */
+export type FaceZone = { x: number; y: number; w: number; h: number };
+
+/** The tracker's face box is tight: the hair above it, the chin below it, a little on its sides (shares of the face's size). */
+const FACE_ROOM = { above: 0.45, below: 0.25, sides: 0.2 };
+
+/** Every face tracked in a clip over [from, from + seconds] (its seconds), as one zone; null when none was. */
+export function faceZone(file: TracksFile, from: number, seconds: number): FaceZone | null {
+  const first = Math.max(0, Math.floor(from * file.fps) - file.from);
+  const end = Math.min(file.frames.length, Math.ceil((from + seconds) * file.fps) - file.from);
+  let zone: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  for (let k = first; k < end; k++) {
+    for (const [id, x, y, w, h] of file.frames[k]?.f ?? []) {
+      if (id === undefined || x === undefined || y === undefined || !w || !h) continue;
+      const box = { x0: x - w * FACE_ROOM.sides, y0: y - h * FACE_ROOM.above, x1: x + w * (1 + FACE_ROOM.sides), y1: y + h * (1 + FACE_ROOM.below) };
+      zone = zone ? { x0: Math.min(zone.x0, box.x0), y0: Math.min(zone.y0, box.y0), x1: Math.max(zone.x1, box.x1), y1: Math.max(zone.y1, box.y1) } : box;
+    }
+  }
+  if (!zone) return null;
+  const share = (v: number) => Math.round(Math.min(1000, Math.max(0, v))) / 1000;
+  const x = share(zone.x0);
+  const y = share(zone.y0);
+  return { x, y, w: share(zone.x1) - x, h: share(zone.y1) - y };
+}
+
+/**
+ * Where to centre a shot in a box of `frameAspect` (shares of the picture, as `focus`) so that the
+ * faces of `face` stay whole: the subject's centre as it is when they already are, else moved just
+ * enough, the top of the heads first when they cannot all fit. A shot of someone laid in a wide box
+ * (half of a split screen) was framed on the middle of their body: their head was cut at the nose.
+ * Mirror of apps/render/src/track.ts.
+ */
+export function faceFocus(focus: { x: number; y: number } | undefined, face: FaceZone | undefined, aspect: number | undefined, frameAspect: number): { x: number; y: number } | undefined {
+  if (!face || !aspect) return focus;
+  const keep = (centre: number, start: number, size: number, shown: number) => {
+    if (shown >= 1) return centre;
+    let top = centre - shown / 2;
+    if (start < top) top = start - 0.02;
+    if (start + size > top + shown) top = Math.min(start - 0.02, start + size - shown);
+    return Math.round((top + shown / 2) * 1000) / 1000;
+  };
+  const centre = focus ?? { x: face.x + face.w / 2, y: face.y + face.h / 2 };
+  return { x: keep(centre.x, face.x, face.w, frameAspect / aspect), y: keep(centre.y, face.y, face.h, aspect / frameAspect) };
+}
 
 /** A clip's tracks by media id. */
 export type TracksByClip = Record<string, TracksFile>;
@@ -342,8 +389,9 @@ function shownAt(u: number, v: number, look: FootageLook, width: number, height:
   // object-position from the subject, as the render frames it (framingPercent).
   const at = (f: number, ratio: number) => (ratio <= 1.001 ? 0.5 : Math.min(1, Math.max(0, (f * ratio - 0.5) / (ratio - 1))));
   const framed = look.framingAspect;
-  const px = look.focus && framed ? at(look.focus.x, framed / frameAspect) : 0.5;
-  const py = look.focus && framed ? at(look.focus.y, frameAspect / framed) : 0.5;
+  const focus = faceFocus(look.focus, look.face, framed, frameAspect);
+  const px = focus && framed ? at(focus.x, framed / frameAspect) : 0.5;
+  const py = focus && framed ? at(focus.y, frameAspect / framed) : 0.5;
   let x = (width - w) * px + u * w;
   let y = (height - h) * py + v * h;
   if (look.straighten) {

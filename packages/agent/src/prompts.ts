@@ -232,6 +232,6 @@ Repère ensuite les meilleurs passages pour un Reel : une personne qui regarde l
 
 Note aussi ce que font les personnes (actions) : chaque geste ou mouvement net, avec son début et sa fin, en une phrase courte et factuelle qui dit la main ou la partie du corps et où (« elle pince l'air près de son visage », « il pose l'assiette sur le comptoir »). Un monteur coupe sur un geste, et une animation peut partir d'un geste ou le suivre. Vide s'il n'y a personne.
 
-Si quelqu'un parle, donne aussi chaque mot prononcé avec son début et sa fin en secondes (words), pour des sous-titres mot à mot ; sinon laisse words vide.
+Si quelqu'un parle, donne aussi chaque mot prononcé avec son début et sa fin en secondes (words), pour des sous-titres mot à mot ; sinon laisse words vide. Simone est l'assistante qui fait ses Reels : quand on l'entend nommer, écris « Simone », jamais « Simon ».
 
 Réponds en français, de façon factuelle : décris seulement ce que tu vois et entends.`;

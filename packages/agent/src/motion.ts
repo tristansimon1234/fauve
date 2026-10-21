@@ -5,7 +5,7 @@ import type { LogoOnDark } from "./logo.ts";
 import type { VoiceWord } from "./voice.ts";
 import type { BrandSignature } from "./signature.ts";
 import { previewMusic, speechWindows, type MixCase } from "./mix.ts";
-import { layerTrack, sceneTrack, shotTrack, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
+import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -114,6 +114,8 @@ export type ComposeShot = ScenePhoto & {
   durationInFrames: number;
   kind: "video" | "photo";
   focus?: { x: number; y: number };
+  /** The faces of a video shot (shares of the picture): kept whole in the box it is laid in. */
+  face?: FaceZone;
   /** What was tracked in a video shot and how it is drawn: track(frame, box) places it in the box it is laid in. */
   track?: ShotTrack;
 };
@@ -594,6 +596,9 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         const focus = s.photo?.adjust?.focus;
         return [{ ...(photo ?? { src: segment.src }), aspect, ...span, kind: "photo" as const, ...(focus ? { focus } : {}) }];
       }
+      // Its faces, kept whole in the box the composition lays it in (and its tracks placed the same way).
+      const file = tracks?.[s.clip_id];
+      const face = file ? (faceZone(file, s.in, s.out - s.in) ?? undefined) : undefined;
       const track = shotTrack(plan, segments, i, tracks);
       return [
         {
@@ -602,7 +607,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           ...span,
           kind: "video" as const,
           ...(s.adjust?.focus ? { focus: s.adjust.focus } : {}),
-          ...(track ? { track } : {}),
+          ...(face ? { face } : {}),
+          ...(track ? { track: face ? { ...track, look: { ...track.look, face } } : track } : {}),
         },
       ];
     });
