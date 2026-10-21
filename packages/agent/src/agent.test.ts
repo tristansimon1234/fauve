@@ -3259,6 +3259,8 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
 
   // Links from a message: Instagram, TikTok, YouTube Shorts; punctuation after the link is left out.
   assert.deepEqual(reelLink("regarde ça https://www.instagram.com/reel/DAbc_12-x/?igsh=xyz, trop bien"), { url: "https://www.instagram.com/reel/DAbc_12-x/", platform: "instagram" });
+  // Copied without its scheme, it is still a Reel to copy.
+  assert.deepEqual(reelLink("comme instagram.com/reel/DAbc_12-x/ stp"), { url: "https://instagram.com/reel/DAbc_12-x/", platform: "instagram" });
   assert.deepEqual(reelLink("https://www.tiktok.com/@chez.lou/video/7412?is_from_webapp=1&sender_device=pc."), { url: "https://www.tiktok.com/@chez.lou/video/7412", platform: "tiktok" });
   assert.deepEqual(reelLink("(https://vm.tiktok.com/ZMabc123/)"), { url: "https://vm.tiktok.com/ZMabc123/", platform: "tiktok" });
   assert.deepEqual(reelLink("https://youtube.com/shorts/aBc-123"), { url: "https://youtube.com/shorts/aBc-123", platform: "youtube" });

@@ -376,15 +376,19 @@ export function paceCeiling(base: number, followed: FollowedStyle | undefined): 
 /** A link to a Reel, a TikTok or a YouTube Short in a message, and where it is from (without its share parameters, which change at each share). */
 export function reelLink(text: string): { url: string; platform: "instagram" | "tiktok" | "youtube" } | null {
   const patterns: [RegExp, "instagram" | "tiktok" | "youtube"][] = [
-    [/https?:\/\/(?:www\.|m\.)?instagram\.com\/(?:[\w.]+\/)?(?:reels?|p|tv)\/[\w-]+\/?(?:\?[^\s]*)?/i, "instagram"],
-    [/https?:\/\/(?:www\.|m\.|vm\.|vt\.)?tiktok\.com\/[^\s]+/i, "tiktok"],
-    [/https?:\/\/(?:www\.|m\.)?youtube\.com\/shorts\/[\w-]+(?:\?[^\s]*)?/i, "youtube"],
-    [/https?:\/\/youtu\.be\/[\w-]+(?:\?[^\s]*)?/i, "youtube"],
+    // The scheme is optional: a link copied without it (« instagram.com/reel/… ») is still hers.
+    [/(?:https?:\/\/)?(?:www\.|m\.)?instagram\.com\/(?:[\w.]+\/)?(?:reels?|p|tv)\/[\w-]+\/?(?:\?[^\s]*)?/i, "instagram"],
+    [/(?:https?:\/\/)?(?:www\.|m\.|vm\.|vt\.)?tiktok\.com\/[^\s]+/i, "tiktok"],
+    [/(?:https?:\/\/)?(?:www\.|m\.)?youtube\.com\/shorts\/[\w-]+(?:\?[^\s]*)?/i, "youtube"],
+    [/(?:https?:\/\/)?youtu\.be\/[\w-]+(?:\?[^\s]*)?/i, "youtube"],
   ];
   for (const [pattern, platform] of patterns) {
     const found = pattern.exec(text)?.[0];
     // A link closed by punctuation or a bracket in the sentence keeps none of it.
-    if (found) return { url: found.replace(/[?#].*$/, "").replace(/[)\].,;!?»"']+$/, ""), platform };
+    if (found) {
+      const url = found.replace(/[?#].*$/, "").replace(/[)\].,;!?»"']+$/, "");
+      return { url: /^https?:\/\//i.test(url) ? url : `https://${url}`, platform };
+    }
   }
   return null;
 }

@@ -183,6 +183,8 @@ export async function libraryForPicker(kind: "photo" | "video" | "any"): Promise
 
 const proposalInput = z.object({
   kind: postKindSchema,
+  /** What she imagines, in her words (« Ton idée »): the proposals are ways of doing it. */
+  idea: z.string().max(500).optional(),
   /** Her picks, in order: from her library (« media »), or just sent from her phone (« upload »). */
   files: z
     .array(z.union([z.object({ media: z.uuid() }), z.object({ upload: z.object({ path: z.string().max(300), mime: z.string().max(100), video: z.boolean() }) })]))
@@ -209,7 +211,7 @@ export async function proposeIdeas(input: z.input<typeof proposalInput>): Promis
   const { db, member } = await getStudioContext();
   if (!member || !parsed.success) return { ideas: [], fromFiles: false };
   const studioId = member.studio.id;
-  const { kind, files, voice, copying, copy } = parsed.data;
+  const { kind, idea, files, voice, copying, copy } = parsed.data;
   const [{ data: studio }, { data: brand }, { data: recent }] = await Promise.all([
     db.from("studios").select("name, business_type, memory").eq("id", studioId).maybeSingle(),
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
@@ -299,7 +301,7 @@ export async function proposeIdeas(input: z.input<typeof proposalInput>): Promis
                   ...(profile.art_direction?.trim() ? { direction_artistique: profile.art_direction.trim().slice(0, 600) } : {}),
                   ...(profile.tone?.trim() ? { ton: profile.tone.trim().slice(0, 200) } : {}),
                 },
-                publication: { format, ...(spoken ? { voix: spoken } : {}) },
+                publication: { format, ...(spoken ? { voix: spoken } : {}), ...(idea?.trim() ? { ce_qu_elle_imagine: idea.trim() } : {}) },
                 ...(copying ? { reel_a_recopier: copy?.lines.length ? { nom: copy.name ?? undefined, ce_que_son_reel_en_reprend: copy.lines } : "un Reel qu'elle aime, encore en lecture : propose le fond, la forme viendra de lui" } : {}),
                 ...((recent ?? []).length ? { publications_recentes: (recent ?? []).map((p) => `${p.kind} : ${p.title}`) } : {}),
                 fichiers_dans_l_ordre: lines,
