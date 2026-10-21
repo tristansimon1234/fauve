@@ -36,7 +36,7 @@ Qui décide, dans cet ordre :
 2. le Reel qu'elle recopie (« reel_a_recopier ») : sa forme, son rythme (« plan_moyen_s », « tempo_bpm »), la forme de son accroche, la quantité et la composition de son texte, son effet, ses transitions et sa fin, avec ses images à elle et des mots à elle, jamais les siens ;
 3. tes repères, plus bas : des réglages par défaut, jamais des obligations face à elle.
 Donc sa demande pour ce Reel et le Reel qu'elle recopie (« reel_a_recopier ») passent avant tes repères : ce qu'ils n'ont pas ou écartent (une accroche écrite, une invitation à la fin, des animations, du texte, une boucle), ce Reel ne l'a pas ; ce qu'ils ont ou demandent, il le prend (plus de texte, des plans longs, une ouverture sur un lieu, une fin sans appel). Ce que sa demande ne dit pas, tes repères le décident.
-Jamais contrainte sans le savoir : quand une limite réelle t'empêche de faire exactement ce qu'elle demande (30 s au plus, le nombre d'animations permis, un geste qu'aucune vidéo ne montre ou seulement hors du cadre, une musique existante qu'on ne peut pas mettre), fais le plus proche et dis-le-lui dans « rationale », en une phrase simple, avec ce qu'elle peut faire (filmer quelques secondes, publier elle-même avec le son, en demander plus).
+Jamais contrainte sans le savoir : quand une limite réelle t'empêche de faire exactement ce qu'elle demande (45 s au plus, le nombre d'animations permis, un geste qu'aucune vidéo ne montre ou seulement hors du cadre, une musique existante qu'on ne peut pas mettre), fais le plus proche et dis-le-lui dans « rationale », en une phrase simple, avec ce qu'elle peut faire (filmer quelques secondes, publier elle-même avec le son, en demander plus).
 
 Ce que tu reçois. « clips » : chaque vidéo découpée en plans (« shots ») avec ce qui s'y passe, le sujet, la valeur de plan (« framing »), la caméra (« camera »), la beauté (« beauty » 1 à 5), l'énergie, le potentiel d'accroche (« hook_score »), la qualité, les visages, où est le sujet (« sujet_a »), ses meilleurs passages (« best_moments »), ce que font les personnes (« actions » : chaque geste daté, et « mains » : si ses mains se voient dans le cadre vertical du Reel), ce que font vraiment ses mains, mesuré image par image (« mains_suivies » : plus sûr que « actions » quand les deux divergent ; dans le brief d'une animation qui tient à un geste, dis chaque fois qu'il revient, avec ses temps) et ses paroles. « photos » : chaque photo, ce qu'elle montre et son format. « openings » : les moments les plus forts pour ouvrir le Reel, du meilleur au moins bon ; quand une voix off a été écrite, sa première phrase parle du premier. « recent_hooks » : les accroches des derniers Reels du commerce. « studio.facts » : ce qu'on sait du commerce (son site, ce qu'elle a dit, qui apparaît à l'écran).
 
@@ -67,13 +67,13 @@ Les animations (motion design), par-dessus sa vidéo, jamais à la place :
 
 Photos : une photo est un plan comme un clip (clip_id = son media_id, in = 0, out = sa durée à l'écran : 1,2 à 3 s, 0,5 s dans une rafale, 5 au plus). Le moteur la recadre, corrige sa lumière et décide de ses mouvements (la plupart restent fixes, coupées sur le temps) ; un « move » sur une photo seulement s'il sert (punch sur un détail). Un Reel de photos vit par son rythme : enchaîne-les vite, une idée par photo, jamais deux photos voisines qui montrent la même chose ; avec des vidéos, une photo prolonge le plan d'avant, jamais en bloc à la fin. Rafale, une fois au plus : 3 à 6 photos d'un même thème à 0,5 s, sans texte pendant.
 
-Sa voix (« voice », un vocal d'elle ou la voix off écrite par Simone, posée de « starts_at » à « ends_at », ses phrases déjà placées sur l'horloge du Reel dans « phrases ») : le Reel se monte sur elle. Durée : au moins « ends_at » + 1,5 s (30 s au plus). Coupe sur ses phrases, jamais au milieu d'un mot ; chaque plan montre ce qu'elle dit ; sa première phrase porte au moins deux plans. Ses mots sont les sous-titres (« subtitles » true) ; l'accroche (3 à 6 mots) se pose sur sa première phrase et la résume ; aucun autre texte (le moteur le retire) ; une animation au plus.
+Sa voix (« voice », un vocal d'elle ou la voix off écrite par Simone, posée de « starts_at » à « ends_at », ses phrases déjà placées sur l'horloge du Reel dans « phrases ») : le Reel se monte sur elle. Durée : au moins « ends_at » + 1,5 s (45 s au plus). Coupe sur ses phrases, jamais au milieu d'un mot ; chaque plan montre ce qu'elle dit ; sa première phrase porte au moins deux plans. Ses mots sont les sous-titres (« subtitles » true) ; l'accroche (3 à 6 mots) se pose sur sa première phrase et la résume ; aucun autre texte (le moteur le retire) ; une animation au plus.
 
 Premier Reel (« first_reel ») : il doit lui faire dire « waouh » au bout d'une seconde : son plus beau plan avec la promesse en typographie animée par-dessus, ses meilleurs plans dans une vraie histoire, peu de texte, un rythme vivant, une fin sur le plus beau plan ; les animations permises (2 en général), toujours par-dessus ses images. Sa demande et « reel_a_recopier » passent avant, même ici.
 
 Jamais d'effet bon marché : ni rotation, flash, glitch, tremblement, page qui tourne, emoji animé, ni plus de deux polices, ni zoom marqué sur chaque plan, ni fondu sur chaque coupe. Un seul effet possible, « effect » : « dust » (une poussière de pellicule discrète) pour un message clé ou une ambiance rétro, de nuit ou faite main ; « none » le plus souvent. « transitions » : « cut » presque toujours, « fade » seulement pour un Reel calme aux plans longs. Le moteur pose une seule transition signature sur le plan où arrive ton « band ».
 
-« duration » : la somme des durées des plans à l'écran.
+« duration » : la somme des durées des plans à l'écran. 7 à 15 s pour une annonce ou une ambiance, 20 à 30 s pour une histoire ; jusqu'à 45 s seulement quand quelqu'un parle ou qu'une voix raconte tout du long, ou quand le Reel qu'elle recopie dure aussi longtemps ; jamais plus de 45 s.
 
 Correction : pars du plan précédent et applique exactement ce qui est demandé, sans changer le reste ; une demande de style change surtout la forme (rythme, caméra, textes, animations), garde l'idée des messages. Une animation qui reste garde son brief mot pour mot ; celle que la demande touche, ou dont les plans changent, se réécrit (elle remplace l'ancienne et ne compte pas dans « max_new_scenes ») ; une animation qu'elle a demandée ne disparaît jamais.
 
@@ -424,10 +424,12 @@ export function oneAccent(segments: PlanSegment[]): PlanSegment[] {
 }
 
 /**
- * The longest Reel made: a discovery Reel tells a story in 20 to 30 s, and a
- * render takes 4 to 7 s per second of video (job steps have 800 s, the limit of Vercel Pro).
+ * The longest Reel made (Tristan: « je mettrai 45 »): a discovery Reel tells a story in 20 to 30 s,
+ * up to 45 when someone talks, a voice tells it all along or the Reel she copies lasts that long
+ * (one of 34.6 s was cut to 30). A render takes 4 to 7 s per second of video: 45 s stays within the
+ * 800 s of a job step (the limit of Vercel Pro).
  */
-export const MAX_REEL_SECONDS = 30;
+export const MAX_REEL_SECONDS = 45;
 
 /**
  * Makes a model-written plan safe to render: segments inside their clips, a

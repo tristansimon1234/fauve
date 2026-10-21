@@ -260,10 +260,11 @@ test("editor: model plans are clamped to the clips and the timeline", async () =
 
 test("editor: a plan longer than MAX_REEL_SECONDS loses plans before the end", async () => {
   const { normalizeEditPlan, MAX_REEL_SECONDS } = await import("./editor.ts");
-  const segments = Array.from({ length: 12 }, (_, i) => ({ clip_id: "a", in: 0, out: i === 11 ? 2 : 4, zoom: "none" }));
-  const plan = normalizeEditPlan(editPlanObjectSchema.parse({ ...validPlan, template: "dynamique", duration: 46, segments, transitions: "cut" }), { a: 10 });
+  const segments = Array.from({ length: 15 }, (_, i) => ({ clip_id: "a", in: 0, out: i === 14 ? 2 : 4, zoom: "none" }));
+  const plan = normalizeEditPlan(editPlanObjectSchema.parse({ ...validPlan, template: "dynamique", duration: 58, segments, transitions: "cut" }), { a: 10 });
+  assert.equal(MAX_REEL_SECONDS, 45);
   assert.ok(plan.duration <= MAX_REEL_SECONDS);
-  assert.equal(plan.duration, 30);
+  assert.equal(plan.duration, 42);
   const last = plan.segments.at(-1)!;
   assert.ok("clip_id" in last && last.out === 2, "the closing plan stays");
 });

@@ -222,7 +222,7 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
 }
 
 
-export const CLIP_ANALYSIS_PROMPT = `Tu analyses un clip vidéo filmé dans un commerce de quartier (studio de sport ou de bien-être, salon de coiffure ou de beauté, restaurant, café, boutique…), pour préparer un Reel Instagram / TikTok (7 à 30 secondes).
+export const CLIP_ANALYSIS_PROMPT = `Tu analyses un clip vidéo filmé dans un commerce de quartier (studio de sport ou de bien-être, salon de coiffure ou de beauté, restaurant, café, boutique…), pour préparer un Reel Instagram / TikTok (7 à 45 secondes).
 
 Découpe le clip en plans successifs (un plan change quand le cadrage, le sujet ou l'action change nettement). Pour chaque plan, ce dont un monteur professionnel a besoin pour choisir et enchaîner : horodatages en secondes, ce qui se passe, le sujet, l'énergie, le potentiel d'accroche, la qualité (flou, sombre, bougé), si un visage est reconnaissable, la valeur de plan (framing : large, moyen, gros plan, détail), la caméra (static, handheld, moving), la boîte du sujet principal (subject_box, pour recadrer en vertical sans le couper) et la beauté du plan (beauty, de 1 à 5 : lumière, cadrage, netteté, couleurs ; sois exigeant, 5 est rare).
 

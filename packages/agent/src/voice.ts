@@ -34,7 +34,7 @@ export function voiceAt(t: Pick<VoiceTranscript, "words">): number {
 }
 
 /** The longest voice note used on a Reel: past it, it would not fit (MAX_REEL_SECONDS with the end card). */
-export const VOICE_MAX_SECONDS = 27;
+export const VOICE_MAX_SECONDS = 42;
 
 const scribeSchema = z.object({
   text: z.string().catch(""),
