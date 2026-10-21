@@ -80,7 +80,7 @@ import { photoRegions } from "@/lib/video/regions";
 //                        a test render of every slide, the critic, one correction), never charged;
 //                        idea=<her words> what she asks for (else the case's carousel idea);
 //                        step=result then gives its slides (signed links, 24 h) and its outline.
-//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&idea=…][&voice=…|&own_voice=…][&format=carrousel]
+//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&idea=…][&voice=…|&own_voice=…][&format=carrousel][&steal=<url>[&steal_only=1]]
 //                        a real business from its website, as at onboarding: its site read
 //                        (facts and activity, colours and fonts of its code, logo), then its look
 //                        (its page read in the sandbox's browser: fonts and colours measured, captures;
@@ -450,11 +450,14 @@ const ANY_KIND: (typeof KINDS)[string] = {
   carousel: "Un carrousel avec les photos de mon site, qui présente le commerce et donne envie de venir.",
 };
 
-async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice, idea: string | null, template?: MotionTemplate, asCarousel = false, motion?: Motion) {
+async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice, idea: string | null, template?: MotionTemplate, asCarousel = false, motion?: Motion, steal: { url: string | null; only: boolean } = { url: null, only: false }) {
   const kind = KINDS[kindName] ?? ANY_KIND;
   const studioId = await siteStudio(url, kind);
   if (reset) await clearPosts(studioId);
   await setMotion(studioId, motion);
+  // A Reel to copy (« Steal »), read first, as for a case.
+  const copy = steal.url ? await labSteal(studioId, steal.url) : null;
+  if (steal.only) return;
   const db = supabaseAdmin();
   const { data: site } = await db.from("media_assets").select("id").eq("studio_id", studioId).eq("source", "website").eq("kind", "image").order("created_at").limit(asCarousel ? 10 : 8);
   if (asCarousel) return carousel(siteKey(url), studioId, idea ?? kind.carousel, (site ?? []).map((m) => m.id as string));
@@ -462,7 +465,7 @@ async function startSite(url: string, kindName: string, withClips: boolean, rese
   const { videos } = stock ? await labMedia(studioId, { ...stock, photosOf: undefined }) : { videos: [] as string[] };
   const photos = (site ?? []).map((m) => m.id as string);
   if (!photos.length && !videos.length) throw new Error("lab: no photo on the site, try clips=1");
-  await montage(siteKey(url), studioId, { title: kind.title, idea: idea ?? kind.idea, template }, videos, photos, voice);
+  await montage(siteKey(url), studioId, { title: kind.title, idea: idea ?? kind.idea, template }, videos, photos, voice, copy);
 }
 
 async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template">, videos: string[], photos: string[], voice: LabVoice, copy: string | null = null) {
@@ -743,12 +746,15 @@ export async function POST(request: Request) {
     const asCarousel = params.get("format") === "carrousel";
     const motion = motionOf(params);
     if (motion === "bad") return Response.json({ error: "motion=claude|<gemini model>" }, { status: 400 });
+    const steal = params.get("steal");
+    if (steal && !/^https:\/\/\S{8,500}$/.test(steal)) return Response.json({ error: "steal=<https url>" }, { status: 400 });
+    const stealing = { url: steal, only: params.get("steal_only") === "1" };
     after(() =>
-      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params), template?.data, asCarousel, motion).catch((error: unknown) =>
+      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params), template?.data, asCarousel, motion, stealing).catch((error: unknown) =>
         console.error("lab: site failed", url.href, error),
       ),
     );
-    return Response.json({ ok: true, site: url.href, kind, started: true, ...(asCarousel ? { format: "carrousel" } : {}) });
+    return Response.json({ ok: true, site: url.href, kind, started: true, ...(asCarousel ? { format: "carrousel" } : {}), ...(steal ? { steal } : {}) });
   }
   const name = params.get("case") ?? "";
   const c = CASES[name];
