@@ -14,7 +14,7 @@ import {
   type Segment,
 } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { saveEditPlan } from "@/app/(app)/publications/[id]/actions";
 import { liveMontage } from "@/app/(app)/publications/[id]/review-actions";
 import { ArrowLeftIcon, ChevronRightIcon, TrashIcon } from "@/components/icons";
@@ -23,13 +23,16 @@ import { ListItems } from "@/components/montage/list-items";
 import { StylePicker } from "@/components/montage/style-picker";
 import { TextBoxes } from "@/components/montage/text-boxes";
 import { ReelPlayer } from "@/components/reel-player";
+import { openingParts, type EditorParts } from "./editor-parts";
 import { SceneStrip, type SceneSprite } from "./scene-strip";
 
 // « Modifier », the editor of « Ta publication », for someone who has never edited a
 // video: the Reel plays live (the same composition as the render), its scenes in a
-// row below, as in Instagram's editor. On « Ta publication » it opens in place, the
-// page itself becomes the editor (Tristan: « bizarre d'avoir une page montage alors
-// qu'on est déjà sur montage »); a story's montage still opens it full screen. Touch a text to change its words, size and
+// row below, as in Instagram's editor. On « Ta publication » it is laid out by the page
+// (`layout`): the live Reel where the video was, its scenes where they were, the settings
+// in the panel beside, nothing else moves (Tristan: « bizarre d'avoir une page montage
+// alors qu'on est déjà sur montage », « j'aimerais qu'on reste au même endroit »); a
+// story's montage still opens it full screen. Touch a text to change its words, size and
 // style, drag it to place it; touch a scene to move it earlier or later, or take it
 // out. Nothing else to learn: cuts, animations and the rest are asked of Simone.
 // One « Enregistrer » makes a new version, rendered in the background, free.
@@ -50,7 +53,7 @@ export function ReelEditor({
   live: preloaded,
   onClose,
   onAsk,
-  inline = false,
+  layout,
 }: {
   postId: string;
   /** The strip made with the video shown, for the scenes' images. */
@@ -58,8 +61,8 @@ export function ReelEditor({
   start: EditStart;
   /** Already loaded (a preview); otherwise loaded when it opens. */
   live?: Live;
-  /** In the page, where the video was (« Ta publication »), not a full-screen layer. */
-  inline?: boolean;
+  /** In the page (« Ta publication »), which places the pieces where its own are; otherwise a full-screen layer. */
+  layout?: (parts: EditorParts) => ReactNode;
   /** Closed: with a line to show her when something was saved. */
   onClose: (saved?: string) => void;
   /** « Demander à Simone » about one scene. */
@@ -85,31 +88,19 @@ export function ReelEditor({
   }, [live, postId]);
 
   // A full-screen layer: the page under it does not scroll.
+  const inPage = Boolean(layout);
   useEffect(() => {
-    if (inline) return;
+    if (inPage) return;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = overflow;
     };
-  }, [inline]);
+  }, [inPage]);
 
-  if (inline) {
-    return live ? (
-      <Editor postId={postId} live={live} scenes={scenes} start={start} onClose={onClose} onAsk={onAsk} inline />
-    ) : (
-      <div className="flex flex-col items-center justify-center gap-3 rounded-[24px] bg-soft px-8 py-16 text-center">
-        <Mascot size={64} mood={error ? "sad" : "thinking"} />
-        <p role={error ? "alert" : "status"} className="text-[15px] leading-snug font-semibold text-muted">
-          {error ?? "J’ouvre ton montage…"}
-        </p>
-        {error && (
-          <button type="button" onClick={() => onClose()} className="h-10 rounded-full px-4 text-[14px] font-bold text-violet">
-            Revenir
-          </button>
-        )}
-      </div>
-    );
+  if (layout) {
+    if (live) return <Editor postId={postId} live={live} scenes={scenes} start={start} onClose={onClose} onAsk={onAsk} layout={layout} />;
+    return layout(openingParts(onClose, error));
   }
 
   return (
@@ -143,7 +134,7 @@ function Editor({
   start,
   onClose,
   onAsk,
-  inline = false,
+  layout,
 }: {
   postId: string;
   live: Live;
@@ -151,8 +142,9 @@ function Editor({
   start: EditStart;
   onClose: (saved?: string) => void;
   onAsk: (scene: number, label: string) => void;
-  inline?: boolean;
+  layout?: (parts: EditorParts) => ReactNode;
 }) {
+  const inPage = Boolean(layout);
   // The plan being changed, and for each scene its place in the saved plan (its image in the strip).
   const [draft, setDraft] = useState(() => ({ plan: live.plan, origin: live.plan.segments.map((_, i): number | null => i) }));
   const [changed, setChanged] = useState(false);
@@ -240,15 +232,9 @@ function Editor({
   const textScene = text ? spans.findIndex((s) => text.from >= s.start && text.from < s.end) : -1;
 
   const header = (
-    <header
-      className={
-        inline
-          ? "sticky top-0 z-20 -mx-1 flex h-14 items-center gap-2 bg-white/95 px-1 backdrop-blur"
-          : "flex h-14 shrink-0 items-center gap-2 border-b border-line px-2"
-      }
-    >
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
       <button type="button" onClick={cancel} className="h-10 rounded-full px-3 text-[15px] font-bold text-muted hover:bg-soft">
-        {inline && !changed ? "Fermer" : "Annuler"}
+        Annuler
       </button>
       <h2 className="flex-1 text-center text-[16px] font-extrabold">Modifier</h2>
       <button type="button" onClick={save} disabled={!changed || saving} className="btn btn-primary h-10 px-4 text-[14.5px] disabled:opacity-45">
@@ -260,7 +246,7 @@ function Editor({
     <div
       role="alertdialog"
       aria-label="Quitter sans enregistrer"
-      className={`flex shrink-0 flex-wrap items-center gap-2 bg-peach px-4 py-2.5 text-peach-ink ${inline ? "rounded-[16px]" : ""}`}
+      className={`flex shrink-0 flex-wrap items-center gap-2 bg-peach px-4 py-2.5 text-peach-ink ${inPage ? "rounded-[16px]" : ""}`}
     >
       <p className="min-w-0 flex-1 text-[14px] font-semibold">Tes changements ne seront pas gardés.</p>
       <button type="button" onClick={() => setLeaving(false)} className="h-9 rounded-full bg-white px-3.5 text-[13.5px] font-bold text-ink">
@@ -275,8 +261,8 @@ function Editor({
     <div
       ref={previewRef}
       className={
-        inline
-          ? "relative w-[max(176px,min(280px,calc((100dvh-470px)*0.5625)))] overflow-hidden rounded-[22px] bg-ink shadow-[0_18px_44px_rgba(28,21,48,.18)] lg:w-[320px]"
+        inPage
+          ? "relative size-full"
           : "relative w-[min(calc(40dvh*9/16),236px)] overflow-hidden rounded-[14px] shadow-[0_18px_44px_rgba(0,0,0,.45)] lg:w-[min(calc((100dvh-250px)*9/16),340px)]"
       }
     >
@@ -301,7 +287,7 @@ function Editor({
       photos={live.inputs.photoIds}
       selected={sceneIndex}
       playing={text && textScene >= 0 ? textScene : null}
-      dark={!inline}
+      dark={!inPage}
       onPick={selectScene}
     />
   );
@@ -347,23 +333,22 @@ function Editor({
     </>
   );
 
-  // In the page: the same place as « Ta publication », the video where it was, its scenes under it, the settings beside.
-  if (inline) {
-    return (
-      <div className="flex flex-col gap-3">
-        {header}
+  // In the page: « Ta publication » puts each piece where its own was (the video, its scenes, the panel beside).
+  if (layout) {
+    const actions = (
+      <div className="flex flex-col gap-2">
         {leave}
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
-          <section aria-label="Aperçu" className="flex flex-col items-center gap-3 rounded-[24px] bg-soft px-4 py-5 lg:py-8">
-            {preview}
-            <div className="flex w-full max-w-[340px] flex-col items-center gap-1">{strip}</div>
-          </section>
-          <aside aria-label="Réglages" className="rounded-[24px] border border-line bg-white p-5">
-            {settings}
-          </aside>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={cancel} className="btn btn-secondary h-11 flex-1 text-[15px]">
+            {changed ? "Annuler" : "Fermer"}
+          </button>
+          <button type="button" onClick={save} disabled={!changed || saving} className="btn btn-primary h-11 flex-[2] text-[15px] disabled:opacity-45">
+            {saving ? "Un instant…" : "Enregistrer"}
+          </button>
         </div>
       </div>
     );
+    return layout({ preview, strip, settings, actions });
   }
 
   return (
