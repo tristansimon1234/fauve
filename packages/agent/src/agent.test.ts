@@ -416,6 +416,8 @@ test("pricing: Gemini, the sandbox, the music and the transcriptions are priced"
   assert.equal(geminiCostUsd("gemini-unknown", tokens), null);
   // A Pro model (the lab's motion designer), at its list price up to 200K tokens.
   assert.equal(geminiCostUsd("gemini-3.1-pro-preview", tokens), 2 + 1.2);
+  assert.equal(geminiCostUsd("gemini-4-argon", tokens, new Date("2026-11-15T12:00:00Z")), 2 + 1);
+  assert.equal(geminiCostUsd("gemini-4-argon", tokens, new Date("2026-12-01T00:00:00Z")), 4 + 2);
   // An hour on 4 vCPUs in Paris: CPU on every vCPU and 2 GB of memory each.
   assert.ok(Math.abs(sandboxCostUsd(3600, 4, "cdg1") - 4 * (0.177 + 2 * 0.0292)) < 1e-9);
   assert.ok(sandboxCostUsd(60, 4, "iad1") < sandboxCostUsd(60, 4, "cdg1"));

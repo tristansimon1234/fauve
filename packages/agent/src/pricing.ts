@@ -73,11 +73,16 @@ const GEMINI_FLASH: GeminiPrice = { input: 1.5, output: 7.5 };
 const GEMINI_FLASH_INTRO_UNTIL = Date.UTC(2027, 0, 1);
 // The Pro models, prompts up to 200K tokens (Gemini 3.1 Pro's list price): tried as the motion designer in the lab.
 const GEMINI_PRO: GeminiPrice = { input: 2, output: 12 };
+// Gemini 4 Argon: introductory price through November 30, 2026, doubled from December 1.
+const GEMINI_ARGON_INTRO: GeminiPrice = { input: 2, output: 10 };
+const GEMINI_ARGON: GeminiPrice = { input: 4, output: 20 };
+const GEMINI_ARGON_INTRO_UNTIL = Date.UTC(2026, 11, 1);
 /** A Gemini model id, as studios.motion_model names one (a lab studio's motion designer). */
 export const GEMINI_MODEL_ID = /^gemini-[a-z0-9.-]{1,48}$/;
 
 /** Price of a Gemini model at a date, or null for a model not in the list (logged unpriced). */
 export function geminiPrice(model: string, at = new Date()): GeminiPrice | null {
+  if (model.startsWith("gemini-4-argon")) return at.getTime() < GEMINI_ARGON_INTRO_UNTIL ? GEMINI_ARGON_INTRO : GEMINI_ARGON;
   if (/^gemini-[\d.]+-pro\b/.test(model)) return GEMINI_PRO;
   if (!GEMINI_FLASH_MODELS.has(model)) return null;
   return at.getTime() < GEMINI_FLASH_INTRO_UNTIL ? GEMINI_FLASH_INTRO : GEMINI_FLASH;
