@@ -43,6 +43,10 @@ export type ComposeShot = ScenePhoto & {
   /** What was tracked in a video shot (hands, faces, bodies) and how it is drawn: track(frame, box) places it in the box it is laid in. */
   track?: Omit<TrackPiece, "at" | "length">;
 };
+/** A text of the Reel that a collage's composition draws itself (frames from its start): its words, its role, the words to stress, a message's lines. */
+export type ComposeText = { text: string; role: "hook" | "band" | "caption"; from: number; to: number; emphasis: string[]; items?: { title: string; detail?: string }[] };
+/** The Reel's end that a composition draws itself: its title and line, from its frame. */
+export type ComposeEnd = { title: string; subtitle: string | null; from: number };
 export type RegionKind = "face" | "plate" | "screen" | "document" | "other";
 export type PhotoEdit = { source: { width: number; height: number }; adjust?: Adjust; blur?: (Box & { kind: RegionKind; shape: "ellipse" | "rect" })[] };
 /** One of her photos in a designed carousel: as a scene gets it, with its retouch (light, framing on its subject, blurred zones). */
@@ -208,6 +212,10 @@ export type ReelProps = {
     track?: TrackPiece[];
     /** Google Fonts families its code uses besides the Reel's two, loaded with it. */
     fonts?: string[];
+    /** A collage's composition that draws the whole picture: the Reel's texts and its end are its own (no paper nor texts of the engine). */
+    drawsTexts?: boolean;
+    reelTexts?: ComposeText[];
+    end?: ComposeEnd | null;
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {

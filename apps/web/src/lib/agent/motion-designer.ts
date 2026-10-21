@@ -2,6 +2,7 @@ import "server-only";
 import {
   CLAUDE_MODEL,
   checkMotionCode,
+  type CompositionTexts,
   GEMINI_MODEL_ID,
   MOTION_DESIGNER_PROMPT,
   motionSceneOutputSchema,
@@ -11,7 +12,6 @@ import {
   type MotionSlot,
   type ReelProps,
   type ScenePhoto,
-  type TextBand,
   type TrackPiece,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
@@ -51,7 +51,7 @@ export type SceneRequest = {
   busy?: { y: number; h: number }[];
   photos?: OfferedPhoto[];
   cuts?: number[];
-  compose?: { plans: CompositionShot[]; texts: TextBand[]; shots: ComposeShot[] };
+  compose?: { plans: CompositionShot[]; shots: ComposeShot[] } & CompositionTexts;
   /** What moves in the footage under it: the pieces its `track` reads (its test render follows them), and what the designer is told of them. */
   track?: TrackPiece[];
   moves?: DesignerMoves | { par_plan: ({ plan: number } & DesignerMoves)[] };
@@ -190,7 +190,16 @@ async function writeScene(
         ...(request.moves ? { ce_qui_bouge: request.moves } : {}),
         // A collage's composition lays the shots itself (nothing plays under it); another animation over several shots, the cuts under it.
         ...(request.compose
-          ? { composition_du_reel: { plans: request.compose.plans, textes_par_dessus: request.compose.texts, coupes_images: request.cuts ?? [] } }
+          ? {
+              composition_du_reel: {
+                plans: request.compose.plans,
+                // The texts and the end are its own: its code gets them as reelTexts and end.
+                textes: request.compose.texts,
+                fin: request.compose.end,
+                ...(request.compose.subtitles ? { sous_titres_du_moteur: request.compose.subtitles } : {}),
+                coupes_images: request.cuts ?? [],
+              },
+            }
           : request.cuts
             ? { plans_dessous: { plans: request.cuts.length + 1, coupes_images: request.cuts } }
             : {}),
@@ -282,7 +291,7 @@ export async function designMotionScenes(
             ...(photos.length ? { photos } : {}),
             ...(r.fonts?.length ? { fonts: r.fonts } : {}),
             ...(request.cuts ? { cuts: request.cuts } : {}),
-            ...(request.compose ? { shots: request.compose.shots } : {}),
+            ...(request.compose ? { shots: request.compose.shots, reelTexts: request.compose.texts, end: request.compose.end } : {}),
             // A scene that follows what moves is checked where it goes, with the Reel's camera moves.
             ...(request.track?.length || request.compose?.shots.some((x) => x.track) ? { ...(request.track?.length ? { track: request.track } : {}), look: context.look } : {}),
           };

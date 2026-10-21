@@ -17,7 +17,7 @@ import { PaperCutout, type RimSpec } from "./PaperCutout";
 import { SceneView } from "./Scene";
 import type { Theme } from "./theme";
 import { footageTrack, type TrackFn, type TrackPiece } from "./track";
-import type { ComposeShot, ReelProps, Scene, ScenePhoto } from "./types";
+import type { ComposeEnd, ComposeShot, ComposeText, ReelProps, Scene, ScenePhoto } from "./types";
 
 // Free motion-design scene: plain JS written by the motion designer (checked and
 // smoke-rendered before reaching here). It only sees this scope; any error at
@@ -110,6 +110,9 @@ export type SceneComponent = (props: {
   shots: ComposeShot[];
   /** What is seen in the footage at one of its frames (hands, faces, bodies, in px of the frame); in a composition, in the box a shot was laid in. */
   track: TrackFn;
+  /** For a collage's composition that draws the whole picture: the Reel's texts, each at its moment (frames from its start), and its end. */
+  reelTexts: ComposeText[];
+  end: ComposeEnd | null;
 }) => ReactNode;
 
 /** The component a generated code defines (`Scene` for a motion scene, `Layer` for a text layer, `Carousel` for a whole carousel…), or null. */
@@ -162,6 +165,9 @@ export function MotionScene(p: {
   fallbackNode?: ReactNode;
   /** What moves in the footage under it, piece by piece (a composition's shots carry their own). */
   track?: TrackPiece[];
+  /** A composition that draws the whole picture: the Reel's texts and its end. */
+  reelTexts?: ComposeText[];
+  end?: ComposeEnd | null;
 }) {
   const { fps } = useVideoConfig();
   const Generated = useMemo(() => compileScene(p.js), [p.js]);
@@ -184,6 +190,8 @@ export function MotionScene(p: {
       cuts={p.cuts ?? []}
       shots={p.footage?.shots ?? []}
       track={track}
+      reelTexts={p.reelTexts ?? []}
+      end={p.end ?? null}
     />
   );
   return (

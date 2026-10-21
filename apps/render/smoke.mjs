@@ -1,11 +1,12 @@
 // Smoke test for generated motion scenes, run in the render sandbox (never in the
 // web app). Usage: node smoke.mjs scenes.json [bundle-dir] → prints
 // {"results": {"<id>": null | "error"}, "bands": {"<id>": [top, bottom]}, "faces": {"<id>": "what to move"}}.
-// scenes.json: [{ id, js, durationInFrames, texts?, brand?, photos?, cuts?, shots?, track?, look?, fonts? }] (photos: the ones
+// scenes.json: [{ id, js, durationInFrames, texts?, brand?, photos?, cuts?, shots?, track?, look?, fonts?, reelTexts?, end? }] (photos: the ones
 // the scene composes with, with their links; cuts: for an animation over several shots; shots: the
 // shots a collage's composition lays, each one a grey card here; track: what moves in the footage under it,
 // read by its `track`, with look, the Reel's rhythm and look for the camera moves; fonts: the Google Fonts
-// families its code brings besides the brand's two, laid out with them).
+// families its code brings besides the brand's two, laid out with them; reelTexts, end: for a composition that
+// draws the whole picture, the Reel's texts it must write at their moment, and its end).
 // 1. Each scene is rendered at its first, middle and last frame with React's server
 //    renderer and minimal Remotion shims, which catches crashes and bad output early. Its `track` sees
 //    nothing there: a scene must stand without anyone in the picture (reused over other footage).
@@ -82,6 +83,8 @@ for (const scene of scenes) {
           cuts: scene.cuts ?? [],
           shots: scene.shots ?? [],
           track: () => ({ hands: [], faces: [], bodies: [] }),
+          reelTexts: scene.reelTexts ?? [],
+          end: scene.end ?? null,
         }),
       );
       if (html.length < 20) throw new Error(`empty output at frame ${f}`);
@@ -119,6 +122,8 @@ if (browser) {
         ...(scene.track ? { track: scene.track } : {}),
         ...(scene.look ? { look: scene.look } : {}),
         ...(scene.fonts?.length ? { fonts: scene.fonts } : {}),
+        ...(scene.reelTexts?.length ? { reelTexts: scene.reelTexts } : {}),
+        ...(scene.end ? { end: scene.end } : {}),
       };
       try {
         const composition = await selectComposition({ serveUrl: bundle, id: "SceneCheck", inputProps, puppeteerInstance: browser, browserExecutable, logLevel: "error" });

@@ -41,6 +41,9 @@ export type SceneCheckProps = {
   look?: { template?: MotionTemplate; tempo?: number; signature?: ReelProps["brand"]["signature"] };
   /** The fonts its code brings besides the Reel's two: checked with them, as the render draws it. */
   fonts?: string[];
+  /** A collage's composition that draws the whole picture: the Reel's texts (each must be written, whole, at its moment) and its end. */
+  reelTexts?: Parameters<SceneComponent>[0]["reelTexts"];
+  end?: Parameters<SceneComponent>[0]["end"];
 };
 
 const FrameContext = createContext(0);
@@ -147,7 +150,25 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
 
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
-export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [] }: SceneCheckProps) {
+/** Words compared as written: spaces of any kind and case aside. */
+const plain = (s: string) => s.replace(/[\s\u00a0\u202f]+/g, "").toLowerCase();
+
+/**
+ * The Reel's texts a composition does not write: each one is looked for, whole, in the copies of
+ * the frames it holds (its words may come one by one, so the fullest copy counts).
+ */
+function missingTexts(reelTexts: NonNullable<SceneCheckProps["reelTexts"]>, frames: number[]): string[] {
+  const copies = new Map<number, string>();
+  document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => copies.set(Number(copy.dataset.checkFrame), plain(copy.textContent ?? "")));
+  return reelTexts.flatMap((t) => {
+    const held = frames.filter((f) => f >= t.from && f < t.to);
+    const words = [t.text, ...(t.items ?? []).map((item) => item.title)].map(plain);
+    const found = held.some((f) => words.every((w) => copies.get(f)?.includes(w)));
+    return held.length && !found ? [`« ${t.text.slice(0, 50)} » (images ${t.from} à ${t.to})`] : [];
+  });
+}
+
+export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null }: SceneCheckProps) {
   const width = 1080;
   const height = 1920;
   const [track] = useState(() => footageTrack(pieces, themeFor(look?.template ?? "libre", look?.signature, look?.tempo), { width, height }, { shots }));
@@ -178,6 +199,16 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
       });
       const failures = [...out.values()].filter((o) => o.frames.length * step > OUT_FRAMES);
       const r = (n: number) => Math.round(n);
+      // A composition that draws the whole picture writes every text of the Reel.
+      const missing = missingTexts(reelTexts, frames);
+      if (!failures.length && missing.length) {
+        cancelRender(
+          new Error(
+            `texte du Reel absent : ${missing.slice(0, 3).join(" ; ")}. Ta composition écrit chaque texte de reelTexts pendant son moment (from à to), en entier et tel quel, détails d'un message compris (items).`,
+          ),
+        );
+        return;
+      }
       if (!failures.length) {
         // Read by smoke.mjs: where the texts sit, so the render can move the scene off the faces under it.
         if (Number.isFinite(band.top)) console.log(`FAUVE_BAND ${JSON.stringify([Math.round(band.top) / height, Math.round(band.bottom) / height])}`);
@@ -214,7 +245,7 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         <div key={f} data-check-frame={f} style={{ position: "absolute", left: 0, top: 0, width, height }}>
           <Catch onError={(error) => cancelRender(new Error(`erreur à l'image ${f} : ${error instanceof Error ? error.message : String(error)}`))}>
             <FrameContext.Provider value={f}>
-              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} shots={shots} track={track} />
+              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} shots={shots} track={track} reelTexts={reelTexts} end={end} />
             </FrameContext.Provider>
           </Catch>
         </div>

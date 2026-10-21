@@ -1,6 +1,7 @@
 import { shotAt, subjectPlace, type MediaFacts } from "./finish.ts";
-import { planTimeline, REEL_FPS } from "./motion.ts";
-import { MESSAGE_ROW, SUBTITLE_ROW, TEXT_ROWS } from "./retouch.ts";
+import { END_CARD_SECONDS } from "./editor.ts";
+import { planTimeline, REEL_FPS, type ComposeEnd, type ComposeText } from "./motion.ts";
+import { SUBTITLE_ROW } from "./retouch.ts";
 import { isClipSegment, type EditPlan, type PlanLayer } from "./schemas.ts";
 
 // A free collage (Tristan: « je voulais un truc libre pas des options »): no fixed rule
@@ -90,20 +91,27 @@ export function compositionShots(plan: EditPlan, facts: MediaFacts, shows: Recor
   return shots;
 }
 
-/** A text of the Reel over the composition: when (frames), the rows it takes (px of the 1920-high frame), its words. */
-export type TextBand = { de: number; a: number; y_haut: number; y_bas: number; texte: string };
-
-/** Where the Reel's texts sit over the composition and when: no face goes there meanwhile. */
-export function textBands(plan: EditPlan): TextBand[] {
+/**
+ * What a collage's composition draws besides her shots (Tristan, on the paper, the cut words and the
+ * tape the engine laid around them: « tout ça n'est pas assez libre ») : the Reel's texts, each one at
+ * its moment (frames from the start), as its code gets them (reelTexts), and its end (an offer, an
+ * announcement). Subtitles stay the engine's: the band they take, when a voice speaks.
+ */
+export type CompositionTexts = { texts: ComposeText[]; end: ComposeEnd | null; subtitles: { y_haut: number; y_bas: number } | null };
+export function compositionTexts(plan: EditPlan): CompositionTexts {
+  const frames = (s: number) => Math.round(s * REEL_FPS);
   const px = (share: number) => Math.round(share * 1920);
-  const bands = plan.texts.map((t) => {
-    const row = t.items?.length ? MESSAGE_ROW : TEXT_ROWS[t.style];
-    const top = t.y ?? row.y;
-    return { de: Math.round(t.from * REEL_FPS), a: Math.round(t.to * REEL_FPS), y_haut: px(top), y_bas: px(Math.min(0.8, top + row.h * (t.scale ?? 1))), texte: t.text };
-  });
-  if (plan.subtitles) {
-    const y = plan.subtitle_y ?? SUBTITLE_ROW.y;
-    bands.push({ de: 0, a: Math.round(plan.duration * REEL_FPS), y_haut: px(y - 0.01), y_bas: px(y + SUBTITLE_ROW.h * 1.6), texte: "sous-titres (quand quelqu'un parle)" });
-  }
-  return bands;
+  const y = plan.subtitle_y ?? SUBTITLE_ROW.y;
+  return {
+    texts: plan.texts.map((t) => ({
+      text: t.text,
+      role: t.style,
+      from: frames(t.from),
+      to: frames(t.to),
+      emphasis: t.emphasis ?? [],
+      ...(t.items?.length ? { items: t.items } : {}),
+    })),
+    end: plan.end_card ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, frames(plan.duration - END_CARD_SECONDS)) } : null,
+    subtitles: plan.subtitles ? { y_haut: px(y - 0.01), y_bas: px(y + SUBTITLE_ROW.h * 1.6) } : null,
+  };
 }

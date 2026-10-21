@@ -15,7 +15,9 @@ import {
   sandboxCostUsd,
   speechGain,
   usdToEur,
+  type ComposeEnd,
   type ComposeShot,
+  type ComposeText,
   type ReelProps,
   type ReelUnder,
   type ScenePhoto,
@@ -293,6 +295,9 @@ export type SmokeScene = {
   look?: { template?: MotionTemplate; tempo?: number; signature?: ReelProps["brand"]["signature"] };
   /** The Google Fonts families its code brings besides the brand's two: laid out with them. */
   fonts?: string[];
+  /** A collage's composition that draws the whole picture: the Reel's texts (each one checked, written whole at its moment) and its end. */
+  reelTexts?: ComposeText[];
+  end?: ComposeEnd | null;
 };
 
 /**
