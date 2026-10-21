@@ -68,11 +68,12 @@ export function Reel(props: ReelProps) {
     ...(props.layers ?? []).flatMap((l) => l.fonts ?? []),
   ]);
   const k = props.width / 1080;
-  // A free collage: its composition lays the shots on the paper (the fixed prints only if its code cannot run).
-  const compose = collage ? props.layers?.find((l) => l.compose) : undefined;
+  // A free collage, or another composed Reel (a split screen…): its composition lays the shots (the fixed prints,
+  // or the plain montage, only if its code cannot run).
+  const compose = props.layers?.find((l) => l.compose);
   // One that draws the whole picture (Tristan: « tout ça n'est pas assez libre ») has its own ground, texts and end:
-  // the engine's paper, texts and end card only play in its fallback, the fixed collage.
-  const whole = Boolean(compose?.drawsTexts);
+  // the engine's paper, texts and end card only play in its fallback. Another composition always does.
+  const whole = Boolean(compose?.drawsTexts) || Boolean(compose && !collage);
   const isShot = (segment: ReelProps["segments"][number]) => segment.type === "clip" || segment.type === "image";
   // A collage's print of a shot: a card that stays a little under the next one sliding over it.
   const print = (segment: ReelProps["segments"][number], i: number, from = 0) =>
@@ -112,6 +113,52 @@ export function Reel(props: ReelProps) {
       )}
     </>
   );
+  // A shot or a scene of the plain montage, one after the other.
+  const montaged = (segment: ReelProps["segments"][number], i: number) => (
+    <Sequence key={i} from={segment.startAt} durationInFrames={segment.durationInFrames} layout="none">
+      <FadeIn frames={i > 0 && !collage ? props.fadeFrames : 0}>
+        {segment.type === "clip" || segment.type === "image" ? (
+          <Accent kind={segment.accent} color={props.brand.accent}>
+            {segment.type === "clip" ? (
+              <Shot segment={segment} theme={theme} />
+            ) : (
+              <KenBurns on={Boolean(segment.zoom)} move={segment.move} index={i} durationInFrames={segment.durationInFrames} theme={theme}>
+                <Photo src={segment.src} edit={segment.edit} grade={theme.grade} />
+              </KenBurns>
+            )}
+            <Legibility theme={theme} />
+          </Accent>
+        ) : (
+          // Animations play over her footage (the passage the plan names), else on the studio's colours.
+          <AbsoluteFill>
+            {segment.under ? (
+              <Under under={segment.under} durationInFrames={segment.durationInFrames} theme={theme} />
+            ) : segment.type === "motion" ? (
+              // No footage to play over: the studio's colours (new scenes are transparent).
+              <Backdrop background={segment.fallback.background} props={props} k={k} />
+            ) : null}
+            {segment.type === "motion" ? (
+              <MotionScene
+                js={segment.js}
+                texts={segment.texts ?? {}}
+                fallback={segment.fallback}
+                durationInFrames={segment.durationInFrames}
+                props={props}
+                theme={theme}
+                k={k}
+                overlay={Boolean(segment.under)}
+                shift={segment.shift}
+                photos={segment.photos}
+                track={segment.track}
+              />
+            ) : (
+              <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} overlay={Boolean(segment.under)} />
+            )}
+          </AbsoluteFill>
+        )}
+      </FadeIn>
+    </Sequence>
+  );
   const endCard = props.endCard ? (
     <Sequence from={props.endCard.from} layout="none">
       {collage ? <CollageEndCard props={props} k={k} /> : <EndCard props={props} k={k} />}
@@ -138,7 +185,14 @@ export function Reel(props: ReelProps) {
             reelTexts={compose.reelTexts}
             end={compose.end}
             fallbackNode={
-              whole ? (
+              !collage ? (
+                // The plain montage: her shots full frame, the Reel's texts and end card.
+                <>
+                  {props.segments.map((segment, i) => (isShot(segment) ? montaged(segment, i) : null))}
+                  {engineTexts}
+                  {endCard}
+                </>
+              ) : whole ? (
                 // The fixed collage in full: its paper, its prints, the Reel's texts and end card on paper.
                 <>
                   <CollageBackdrop props={props} />
@@ -155,54 +209,8 @@ export function Reel(props: ReelProps) {
         </Sequence>
       ) : null}
       {props.segments.map((segment, i) =>
-        collage && isShot(segment) ? (
-          // A collage's shots: laid by its composition, else each one a print.
-          compose ? null : print(segment, i)
-        ) : (
-          <Sequence key={i} from={segment.startAt} durationInFrames={segment.durationInFrames} layout="none">
-            <FadeIn frames={i > 0 && !collage ? props.fadeFrames : 0}>
-              {segment.type === "clip" || segment.type === "image" ? (
-                <Accent kind={segment.accent} color={props.brand.accent}>
-                  {segment.type === "clip" ? (
-                    <Shot segment={segment} theme={theme} />
-                  ) : (
-                    <KenBurns on={Boolean(segment.zoom)} move={segment.move} index={i} durationInFrames={segment.durationInFrames} theme={theme}>
-                      <Photo src={segment.src} edit={segment.edit} grade={theme.grade} />
-                    </KenBurns>
-                  )}
-                  <Legibility theme={theme} />
-                </Accent>
-              ) : (
-                // Animations play over her footage (the passage the plan names), else on the studio's colours.
-                <AbsoluteFill>
-                  {segment.under ? (
-                    <Under under={segment.under} durationInFrames={segment.durationInFrames} theme={theme} />
-                  ) : segment.type === "motion" ? (
-                    // No footage to play over: the studio's colours (new scenes are transparent).
-                    <Backdrop background={segment.fallback.background} props={props} k={k} />
-                  ) : null}
-                  {segment.type === "motion" ? (
-                    <MotionScene
-                      js={segment.js}
-                      texts={segment.texts ?? {}}
-                      fallback={segment.fallback}
-                      durationInFrames={segment.durationInFrames}
-                      props={props}
-                      theme={theme}
-                      k={k}
-                      overlay={Boolean(segment.under)}
-                      shift={segment.shift}
-                      photos={segment.photos}
-                      track={segment.track}
-                    />
-                  ) : (
-                    <SceneView scene={segment.scene} durationInFrames={segment.durationInFrames} props={props} theme={theme} k={k} overlay={Boolean(segment.under)} />
-                  )}
-                </AbsoluteFill>
-              )}
-            </FadeIn>
-          </Sequence>
-        ),
+        // A composed Reel's shots are laid by its composition; a collage's, else each one a print.
+        isShot(segment) && compose ? null : collage && isShot(segment) ? print(segment, i) : montaged(segment, i),
       )}
       {/* Animations over several shots (a character on every shot, a counter that runs…), above the montage, under its texts. */}
       {(props.layers ?? []).map((layer, i) =>

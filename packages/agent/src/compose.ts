@@ -11,27 +11,35 @@ import { isClipSegment, type EditPlan, type PlanLayer } from "./schemas.ts";
 // Reel's texts over it. The fixed collage (every shot a taped print) only plays when its
 // code cannot run.
 
-/** The brief of a collage's composition when the editor wrote none. */
-export function compositionBrief(plan: Pick<EditPlan, "texts">): string {
+// The same holds for any Reel whose shots are not full frame one after the other (a split
+// screen, a shot in a frame…): its composition lays them, and the plain montage plays when its
+// code cannot run.
+
+/** The brief of a composition when the editor wrote none: a collage's, or another form's. */
+export function compositionBrief(plan: Pick<EditPlan, "texts"> & Partial<Pick<EditPlan, "template">>): string {
   const hook = plan.texts.find((t) => t.style === "hook")?.text;
-  return `Le collage de tout le Reel, fait main${hook ? `, autour de son accroche « ${hook} »` : ""} : ses plans composés à ta façon, chaque moment autrement, jusqu'à la dernière image.`;
+  const around = hook ? `, autour de son accroche « ${hook} »` : "";
+  return plan.template === "collage"
+    ? `Le collage de tout le Reel, fait main${around} : ses plans composés à ta façon, chaque moment autrement, jusqu'à la dernière image.`
+    : `Tout le Reel composé${around} : ses plans posés à ta façon, dans la forme que demande ce Reel, chaque moment autrement, jusqu'à la dernière image.`;
 }
 
 /**
- * A plan's animations over several shots, with a collage's composition first: the editor's
- * animation over the whole Reel becomes it, else one is added, over [0, duration]. Another
- * ambiance has none (it would cover the shots it plays).
+ * A plan's animations over several shots, with its composition first: in a collage, the editor's
+ * animation over the whole Reel becomes it, else one is added; in another Reel, the one the editor
+ * marked (fromEditorPlan), over [0, duration]. Any other Reel has none.
  */
 export function composedLayers(plan: Pick<EditPlan, "template" | "texts" | "layers">, duration: number): PlanLayer[] {
   const layers = plan.layers ?? [];
-  if (plan.template !== "collage") return layers.filter((l) => !l.compose);
+  // An older ambiance has none (it would cover the shots it plays).
+  if (plan.template !== "collage" && (plan.template !== "libre" || !layers.some((l) => l.compose))) return layers.filter((l) => !l.compose);
   const spans = (l: PlanLayer) => l.from <= 0.5 && l.to >= duration - 0.5;
   const chosen = layers.find((l) => l.compose) ?? layers.find(spans);
   const others = layers.filter((l) => l !== chosen).map(({ compose: _compose, ...l }) => l);
   return [{ ...(chosen ?? { motion: { brief: compositionBrief(plan) } }), from: 0, to: duration, compose: true }, ...others].slice(0, 3);
 }
 
-/** A plan whose collage is composed by its own animation (its texts and subtitles keep their usual rows). */
+/** A plan composed by its own animation, a collage or another form (its texts and subtitles keep their usual rows). */
 export const isComposed = (plan: Pick<EditPlan, "layers">) => Boolean(plan.layers?.some((l) => l.compose));
 
 /** One of her shots as the composition's designer reads it: when it plays (frames from the start), what it is and shows. */
