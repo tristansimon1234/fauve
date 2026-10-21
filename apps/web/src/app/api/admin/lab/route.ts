@@ -80,14 +80,15 @@ import { photoRegions } from "@/lib/video/regions";
 //                        a test render of every slide, the critic, one correction), never charged;
 //                        idea=<her words> what she asks for (else the case's carousel idea);
 //                        step=result then gives its slides (signed links, 24 h) and its outline.
-//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&reset=1][&idea=…][&voice=…|&own_voice=…][&format=carrousel][&steal=<url>[&steal_only=1]]
+//   ?site=<url>[&kind=coiffeur|restaurant|pilates][&clips=1][&own=<file>,…][&reset=1][&idea=…][&voice=…|&own_voice=…][&format=carrousel][&steal=<url>[&steal_only=1]]
 //                        a real business from its website, as at onboarding: its site read
 //                        (facts and activity, colours and fonts of its code, logo), then its look
 //                        (its page read in the sandbox's browser: fonts and colours measured, captures;
 //                        Sonnet writes its art direction and signature, gives its fonts their free
 //                        twins and keeps the photos that show the business), then its first Reel
 //                        from those photos (clips=1 adds the stock clips of the kind's trade; the
-//                        kind only sets the idea). Never published. step=result adds its brand.
+//                        kind only sets the idea; own= her videos, uploaded with step=upload&file=…, as for
+//                        a case). Never published. step=result adds its brand.
 //   motion=<gemini model>|claude  (with a case or a site) the model that writes its animations from
 //                        this run on (studios.motion_model, read only for a lab studio): to compare
 //                        Gemini with Opus on the same case (reset=1 for the same first Reel); step=result
@@ -450,7 +451,7 @@ const ANY_KIND: (typeof KINDS)[string] = {
   carousel: "Un carrousel avec les photos de mon site, qui présente le commerce et donne envie de venir.",
 };
 
-async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice, idea: string | null, template?: MotionTemplate, asCarousel = false, motion?: Motion, steal: { url: string | null; only: boolean } = { url: null, only: false }) {
+async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice, idea: string | null, template?: MotionTemplate, asCarousel = false, motion?: Motion, steal: { url: string | null; only: boolean } = { url: null, only: false }, own: string[] = []) {
   const kind = KINDS[kindName] ?? ANY_KIND;
   const studioId = await siteStudio(url, kind);
   if (reset) await clearPosts(studioId);
@@ -462,7 +463,8 @@ async function startSite(url: string, kindName: string, withClips: boolean, rese
   const { data: site } = await db.from("media_assets").select("id").eq("studio_id", studioId).eq("source", "website").eq("kind", "image").order("created_at").limit(asCarousel ? 10 : 8);
   if (asCarousel) return carousel(siteKey(url), studioId, idea ?? kind.carousel, (site ?? []).map((m) => m.id as string));
   const stock = withClips && kind.clipsOf ? CASES[kind.clipsOf] : undefined;
-  const { videos } = stock ? await labMedia(studioId, { ...stock, photosOf: undefined }) : { videos: [] as string[] };
+  // Her own videos (step=upload) first, then the stock clips of her trade.
+  const { videos } = stock || own.length ? await labMedia(studioId, { ...(stock ?? { clips: [] }), photosOf: undefined, own } as LabCase) : { videos: [] as string[] };
   const photos = (site ?? []).map((m) => m.id as string);
   if (!photos.length && !videos.length) throw new Error("lab: no photo on the site, try clips=1");
   await montage(siteKey(url), studioId, { title: kind.title, idea: idea ?? kind.idea, template }, videos, photos, voice, copy);
@@ -740,6 +742,17 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, site: url.href, music: true });
     }
     if (kind && !KINDS[kind]) return Response.json({ error: `kind=${Object.keys(KINDS).join("|")}` }, { status: 400 });
+    // A video of hers, as for a case: uploaded to the lab studio (step=upload), then used with own=.
+    if (params.get("step") === "upload") {
+      const file = params.get("file") ?? "";
+      if (!LAB_FILE.test(file)) return Response.json({ error: "file=<name>.mp4|mov" }, { status: 400 });
+      const studioId = await siteStudio(url.href, KINDS[kind] ?? ANY_KIND);
+      const signed = await supabaseAdmin().storage.from("media").createSignedUploadUrl(`${studioId}/lab/${file}`, { upsert: true });
+      if (signed.error) return Response.json({ error: signed.error.message }, { status: 500 });
+      return Response.json({ path: signed.data.path, url: signed.data.signedUrl });
+    }
+    const own = params.get("own")?.split(",") ?? [];
+    if (own.length > MAX_MEDIA || !own.every((f) => LAB_FILE.test(f))) return Response.json({ error: "own=<file>,…" }, { status: 400 });
     // An ambiance chosen for the post (as she would pick « Façon collage »), else the editor's choice.
     const template = params.get("template") ? motionTemplateSchema.safeParse(params.get("template")) : null;
     if (template && !template.success) return Response.json({ error: "template" }, { status: 400 });
@@ -750,7 +763,7 @@ export async function POST(request: Request) {
     if (steal && !/^https:\/\/\S{8,500}$/.test(steal)) return Response.json({ error: "steal=<https url>" }, { status: 400 });
     const stealing = { url: steal, only: params.get("steal_only") === "1" };
     after(() =>
-      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params), template?.data, asCarousel, motion, stealing).catch((error: unknown) =>
+      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params), template?.data, asCarousel, motion, stealing, own).catch((error: unknown) =>
         console.error("lab: site failed", url.href, error),
       ),
     );
