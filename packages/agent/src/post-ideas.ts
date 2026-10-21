@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 // Ideas offered in one tap when the manager starts a post, by format and by the kind of
 // business (studios.business_type): a restaurant does not post what a hair salon does.
 
@@ -206,4 +208,41 @@ export function postIdeas(businessType: string | null | undefined): Record<IdeaK
 /** Three things easy to film this week, for this business. */
 export function filmIdeas(businessType: string | null | undefined): { idea: string; how: string }[] {
   return FILM[businessFamily(businessType)];
+}
+
+// The last step of « Créer » (Tristan : « la dernière étape doit être dynamique, une
+// proposition ») : once her files are picked, Simone looks at them and proposes what she
+// would make of them, in three requests written as the manager would write them; a tap
+// fills them in, she can change them. The ideas above are only the fallback.
+
+export const PROPOSAL_PROMPT = `Tu es Simone, la community manager d'un commerce de quartier. La gérante vient de choisir ses photos et vidéos pour une publication. Propose-lui 3 idées de ce que tu en ferais, toutes différentes (l'angle, la forme, la fin), pour qu'elle en touche une.
+
+Chaque idée :
+- label : 2 à 5 mots, ce que c'est (« Le geste puis le résultat », « Une matinée au studio »), jamais une phrase de pub ;
+- prompt : la demande entière, écrite comme la gérante l'écrirait elle-même, à la première personne, en 1 à 3 phrases simples : par quoi commencer, comment finir, ce que les gens doivent faire ; pour un Reel, dis si c'est avec une voix qui raconte ou juste un message à l'écran (suis son choix de voix s'il est donné).
+
+Pars de ce qu'il y a vraiment dans ses fichiers (ce qu'on y voit, dans leur ordre) : nomme ce qu'on voit (« la vidéo du reformer », « la photo de la vitrine »), jamais une image qui n'y est pas. Rien d'inventé sur le commerce : ni prix, ni horaire, ni offre, ni nom, ni avis ; seulement ce que disent ses fichiers et ce qu'on sait du commerce. Une idée native et vraie, jamais une pub ni un flyer. Le but : des clients, pas du buzz. Tutoiement, français simple, sans tiret long.`;
+
+export const proposalSchema = z.object({
+  ideas: z
+    .array(
+      z.object({
+        label: z.string().describe("2 à 5 mots"),
+        prompt: z.string().describe("La demande entière, comme elle l'écrirait, 1 à 3 phrases"),
+      }),
+    )
+    .describe("3 idées différentes"),
+});
+export type Proposal = z.infer<typeof proposalSchema>;
+
+/** The proposals as shown: 3 at most, short labels, requests that fit « Ce que tu imagines » (500 characters). */
+export function keptProposals(p: Proposal | null | undefined): PostIdea[] {
+  const cut = (text: string, max: number) => {
+    const flat = text.replace(/\s+/g, " ").replace(/\s*—\s*/g, ", ").trim();
+    return flat.length <= max ? flat : `${flat.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
+  };
+  return (p?.ideas ?? [])
+    .map((i) => ({ label: cut(i.label, 40), prompt: cut(i.prompt, 480) }))
+    .filter((i) => i.label && i.prompt.length >= 20)
+    .slice(0, 3);
 }

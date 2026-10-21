@@ -6,7 +6,7 @@ import { canTransition } from "./status.ts";
 import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES } from "./credits.ts";
-import { businessFamily, filmIdeas, postIdeas } from "./post-ideas.ts";
+import { businessFamily, filmIdeas, keptProposals, postIdeas } from "./post-ideas.ts";
 import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 
@@ -4059,4 +4059,21 @@ test("reminders: at the suggested moment, the post and one question", async () =
   const { reminderMessage } = await import("./creation.ts");
   assert.equal(reminderMessage("reel", "Cours du soir", ["instagram"]), "C’est le bon moment pour poster ton Reel « Cours du soir » ✨ Je le publie maintenant sur Instagram ?");
   assert.equal(reminderMessage("carousel", "", ["instagram", "tiktok"]), "C’est le bon moment pour poster ton carrousel ✨ Je le publie maintenant sur Instagram et TikTok ?");
+});
+
+test("Simone's proposals from her files: 3 at most, short labels, no long dash, requests that fit the field", () => {
+  const long = "Commence par la vidéo du reformer — puis la photo de la vitrine. ".repeat(12);
+  const kept = keptProposals({
+    ideas: [
+      { label: "Le geste puis le résultat", prompt: "Commence par la vidéo du reformer, puis finis sur la photo du groupe avec l’invitation à venir essayer." },
+      { label: "Une matinée au studio, racontée par une voix qui prend son temps et en dit beaucoup trop", prompt: long },
+      { label: "Trop court", prompt: "Viens." },
+      { label: "Un message", prompt: "Juste un message à l’écran, sans voix, sur les plus beaux plans coupés sur la musique." },
+      { label: "Une quatrième", prompt: "Une idée de plus, qui ne doit pas passer car on en garde trois au plus." },
+    ],
+  });
+  assert.equal(kept.length, 3);
+  assert.ok(kept.every((i) => i.label.length <= 40 && i.prompt.length <= 480 && !i.prompt.includes("—")));
+  assert.ok(!kept.some((i) => i.label === "Trop court"));
+  assert.deepEqual(keptProposals(null), []);
 });

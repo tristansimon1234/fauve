@@ -1,7 +1,9 @@
 "use server";
 
-import { filmIdeas, postIdeas, publishWhen, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, TRIAL_DAYS, type PostIdea } from "@fauve/agent";
+import { ANALYST_MODEL, filmIdeas, keptProposals, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, readMemory, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, TRIAL_DAYS, type PostIdea } from "@fauve/agent";
+import { outputFormat } from "@fauve/agent/answer";
 import { z } from "zod";
+import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { studioAccess } from "@/lib/billing/access";
 import { localInstant, localDateOf, localTimeOf, parseIsoDate, toIsoDate } from "@/lib/dates";
 import { queueJob } from "@/lib/jobs";
@@ -177,4 +179,111 @@ export async function libraryForPicker(kind: "photo" | "video" | "any"): Promise
     const url = urls.get(m.path);
     return url ? [{ id: m.id, url, video: m.video, at: m.at }] : [];
   });
+}
+
+const proposalInput = z.object({
+  kind: postKindSchema,
+  /** Her picks, in order: from her library (« media »), or just sent from her phone (« upload »). */
+  files: z
+    .array(z.union([z.object({ media: z.uuid() }), z.object({ upload: z.object({ path: z.string().max(300), mime: z.string().max(100), video: z.boolean() }) })]))
+    .min(1)
+    .max(20),
+  /** For a Reel: « off » just the music, a voice id, « auto » Simone chooses. */
+  voice: z.string().max(60).optional(),
+  /** She follows a Reel she likes: its form, not her own. */
+  copying: z.boolean().optional(),
+});
+
+/** Images Claude reads from a link. */
+const READABLE = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const MAX_LOOKS = 6;
+
+/**
+ * The last step of « Créer »: what Simone would make of the files she picked, three ideas in a
+ * tap, from what is in them (what Gemini read of her library, or the photos themselves when they
+ * were just sent). On any failure, the usual ideas for her kind of business.
+ */
+export async function proposeIdeas(input: z.input<typeof proposalInput>): Promise<{ ideas: PostIdea[]; fromFiles: boolean }> {
+  const parsed = proposalInput.safeParse(input);
+  const { db, member } = await getStudioContext();
+  if (!member || !parsed.success) return { ideas: [], fromFiles: false };
+  const studioId = member.studio.id;
+  const { kind, files, voice, copying } = parsed.data;
+  const { data: studio } = await db.from("studios").select("name, business_type, memory").eq("id", studioId).maybeSingle();
+  const fallback = { ideas: postIdeas(studio?.business_type as string | null)[kind].slice(0, 3), fromFiles: false };
+  try {
+    const admin = supabaseAdmin();
+    const ids = files.flatMap((f) => ("media" in f ? [f.media] : []));
+    const [{ data: assets }, { data: analyses }] = await Promise.all([
+      ids.length ? admin.from("media_assets").select("id, kind, mime_type, storage_path, duration, regions").eq("studio_id", studioId).in("id", ids) : Promise.resolve({ data: [] }),
+      ids.length ? admin.from("clip_analyses").select("media_id, analysis").in("media_id", ids).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
+    ]);
+    const byId = new Map((assets ?? []).map((a) => [a.id as string, a]));
+    const summaries = new Map<string, string>();
+    for (const a of analyses ?? []) {
+      const summary = (a.analysis as { summary?: string } | null)?.summary;
+      if (summary && !summaries.has(a.media_id as string)) summaries.set(a.media_id as string, summary);
+    }
+    // Each file, in her order: what is known of it, or the photo itself for Claude to look at.
+    const lines: string[] = [];
+    const looks: { n: number; path: string }[] = [];
+    files.forEach((f, i) => {
+      const n = i + 1;
+      if ("upload" in f) {
+        if (!f.upload.path.startsWith(`${studioId}/`)) return;
+        if (f.upload.video) lines.push(`${n}. une vidéo qu'elle vient d'envoyer (pas encore regardée)`);
+        else if (READABLE.has(f.upload.mime) && looks.length < MAX_LOOKS) {
+          looks.push({ n, path: f.upload.path });
+          lines.push(`${n}. une photo (image ${n} ci-dessous)`);
+        } else lines.push(`${n}. une photo qu'elle vient d'envoyer`);
+        return;
+      }
+      const a = byId.get(f.media);
+      if (!a) return;
+      const video = a.kind === "video";
+      const known = video ? summaries.get(f.media) : (a.regions as { notes?: string } | null)?.notes;
+      if (known) lines.push(`${n}. ${video ? `vidéo${a.duration ? ` de ${Math.round(Number(a.duration))} s` : ""}` : "photo"} : ${known.slice(0, 300)}`);
+      else if (!video && READABLE.has(String(a.mime_type)) && looks.length < MAX_LOOKS) {
+        looks.push({ n, path: a.storage_path as string });
+        lines.push(`${n}. une photo (image ${n} ci-dessous)`);
+      } else lines.push(`${n}. ${video ? "une vidéo (pas encore regardée)" : "une photo"}`);
+    });
+    // Nothing known of any of them: her kind of business is all there is, the usual ideas say it as well.
+    if (!looks.length && !lines.some((l) => l.includes(" : "))) return fallback;
+    const signed = looks.length ? ((await admin.storage.from("media").createSignedUrls(looks.map((l) => l.path), 300)).data ?? []) : [];
+    const images = looks.flatMap((l, i) => {
+      const url = signed[i]?.signedUrl;
+      return url ? [{ type: "text" as const, text: `Image ${l.n}` }, { type: "image" as const, source: { type: "url" as const, url } }] : [];
+    });
+    const format = { reel: "un Reel", carousel: "un carrousel", post: "un post photo", story: "une story" }[kind];
+    const spoken = kind !== "reel" || !voice ? undefined : voice === "off" ? "juste la musique, sans voix" : voice === "auto" ? "elle laisse Simone choisir" : "avec une voix off qui raconte";
+    const response = await anthropic().beta.messages.parse({
+      model: ANALYST_MODEL,
+      max_tokens: 900,
+      output_config: { effort: "low", format: outputFormat(proposalSchema) },
+      system: PROPOSAL_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                commerce: { nom: studio?.name ?? undefined, activite: studio?.business_type ?? undefined, ce_qu_on_sait: readMemory(studio?.memory).map((m) => m.fact).slice(0, 12) },
+                publication: { format, ...(spoken ? { voix: spoken } : {}), ...(copying ? { forme: "elle recopie un Reel qu'elle aime : propose le fond, la forme viendra de ce Reel" } : {}) },
+                fichiers_dans_l_ordre: lines,
+              }),
+            },
+            ...images,
+          ],
+        },
+      ],
+    });
+    await logClaudeCost(studioId, response.usage, "ideas", ANALYST_MODEL);
+    const ideas = keptProposals(response.parsed_output);
+    return ideas.length >= 2 ? { ideas, fromFiles: true } : fallback;
+  } catch (error) {
+    console.warn("proposeIdeas failed", error instanceof Error ? error.message : error);
+    return fallback;
+  }
 }

@@ -56,6 +56,26 @@ const TEMPLATE_DEFINITIONS = [
     ],
   },
   {
+    // Its buttons are the publish offer's (publishOfferAnswer): « oui » publishes it, « d'abord » sends its page.
+    name: "post_reminder",
+    language: "fr",
+    category: "UTILITY",
+    components: [
+      {
+        type: "BODY",
+        text: "Rappel : ton {{1}} « {{2}} » est prévu pour maintenant. Tu veux que je le publie ?",
+        example: { body_text: [["Reel", "Lancement de la rentrée"]] },
+      },
+      {
+        type: "BUTTONS",
+        buttons: [
+          { type: "QUICK_REPLY", text: "Oui, publie-le" },
+          { type: "QUICK_REPLY", text: "Je regarde d’abord" },
+        ],
+      },
+    ],
+  },
+  {
     name: "ready_to_post",
     language: "fr",
     category: "UTILITY",
