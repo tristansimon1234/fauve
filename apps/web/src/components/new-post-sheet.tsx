@@ -11,18 +11,19 @@ import {
   publishWhen,
   reelLink,
   SIMONE_VOICES,
+  validatedPlanBrief,
   voiceSamplePath,
   type Effort,
   type Picked,
-  type PostIdea,
   type PostKind,
+  type PostPlan,
 } from "@fauve/agent";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { creationProgress, launchCreation, type CreationProgress, type LaunchResult } from "@/app/(app)/create-actions";
 import { FileStrip, MAX_FILE_BYTES, MAX_FILES, useChatUploads, type DraftFile } from "@/app/(app)/fauve/chat-uploads";
-import { copyReel, copyState, newPostOptions, proposeIdeas, type CopyState, type NewPostOptions } from "@/app/(app)/new-post-actions";
+import { copyReel, copyState, newPostOptions, proposePlan, type CopyState, type NewPostOptions } from "@/app/(app)/new-post-actions";
 import { useFauveDrawer } from "./fauve-drawer";
 import { publicEnv } from "@/lib/public-env";
 import { supabaseBrowser } from "@/lib/supabase/client";
@@ -34,11 +35,10 @@ import { nudgeWork } from "./work-pill";
 export type NewPostHandOff = (start: { postId: string; text: string; files: File[] }) => void;
 export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 
-// « Nouvelle publication », in three steps (Tristan : « trop d'étapes », « écrans vides ») :
-// what to make (the type, and for a Reel its style and a voice or just the music, on one
-// screen), her photos and videos (her library or her phone), then Simone's proposal: what
-// she would make of those files, three ideas in a tap (« la dernière étape doit être
-// dynamique, une proposition »), or what she imagines in her words, or a ref.
+// « Nouvelle publication », in four steps (Tristan : « trop d'étapes », « écrans vides ») :
+// what to make (the type, and for a Reel a voice or just the music, on one screen), her photos and videos (her library or her phone), what she imagines or a Reel she
+// likes, then Simone's proposal: her request said back as one plan in points, with why
+// (« la demande bien reformulée, claire et précise, lisible »), which she takes or changes.
 // « C'est parti »: a Reel starts at once and the screen follows it (« Je m'en occupe »);
 // a carousel, a photo or a story goes on with Simone in the chat, who writes the texts.
 
@@ -274,11 +274,8 @@ function Create({
   // A Reel she likes, given on « Ton idée » (its link pasted in what she imagines, or the field below).
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
-  // What she asks for: one of Simone's proposals she took, else her own words.
-  const [choice, setChoice] = useState<string | null>(null);
-  const finalIdea = (choice ?? idea).trim();
-  const told = Boolean(finalIdea) || Boolean(copying) || refShots.length > 0;
-  const ready = picked.length > 0 && !unfit && Boolean(chosenWhen) && !sending && !refSending && !broken && told;
+  // What she asks for: her own words, and the plan Simone said back for them (« La proposition »).
+  const finalIdea = idea.trim();
   // On « Ton idée », what she gave (her words, a Reel to copy, captures): nothing means « propose-moi ».
   const gaveIdea = Boolean(idea.trim()) || Boolean(copying) || refShots.length > 0;
 
@@ -325,14 +322,18 @@ function Create({
     const timer = setTimeout(() => setSettledAsk(proposalAsk), step === "proposal" ? 0 : step === "idea" ? 1500 : 900);
     return () => clearTimeout(timer);
   }, [proposalAsk, step]);
-  const [proposal, setProposal] = useState<{ ask: string; ideas: PostIdea[]; fromFiles: boolean } | null>(null);
+  const [proposal, setProposal] = useState<{ ask: string; plan: PostPlan | null } | null>(null);
   const proposing = proposalAsk !== null && proposal?.ask !== proposalAsk;
+  // The plan for what she gave now (an older one, for other files or other words, is not hers anymore).
+  const plan = !proposing ? (proposal?.plan ?? null) : null;
+  const told = Boolean(finalIdea) || Boolean(plan) || Boolean(copying) || refShots.length > 0;
+  const ready = picked.length > 0 && !unfit && Boolean(chosenWhen) && !sending && !refSending && !broken && !proposing && told;
   useEffect(() => {
     if (!settledAsk) return;
     let live = true;
-    proposeIdeas(JSON.parse(settledAsk))
+    proposePlan(JSON.parse(settledAsk))
       .then((r) => live && setProposal({ ask: settledAsk, ...r }))
-      .catch(() => live && setProposal({ ask: settledAsk, ideas: [], fromFiles: false }));
+      .catch(() => live && setProposal({ ask: settledAsk, plan: null }));
     return () => {
       live = false;
     };
@@ -344,8 +345,6 @@ function Create({
     setCopyChoice("copy");
   };
   const typeIdea = (text: string) => {
-    // Her words changed: Simone's proposals will follow them, the one she took is let go.
-    setChoice(null);
     const found = kind === "reel" ? reelLink(text) : null;
     if (!found) return setIdea(text);
     // The link becomes the Reel to copy; her words stay what she imagines.
@@ -393,6 +392,7 @@ function Create({
         date: chosenWhen.date,
         time: chosenWhen.time,
         idea: finalIdea,
+        ...(plan ? { plan } : {}),
         items,
         voice: kind === "reel" ? spoken : "auto",
         platforms: where.filter((p): p is "instagram" | "tiktok" => p === "instagram" || p === "tiktok"),
@@ -417,6 +417,7 @@ function Create({
       const text = [
         `Nouvelle publication : ${meta.phrase} pour ${chosenWhen.full.charAt(0).toLowerCase()}${chosenWhen.full.slice(1)}.`,
         finalIdea ? `Ce que j’imagine : ${finalIdea}` : "",
+        plan ? validatedPlanBrief(plan) : "",
         `${counts.videos ? "Mes photos et vidéos" : "Mes photos"} (media_id, dans l’ordre) : ${res.mediaIds.join(", ")}.`,
         res.refIds.length ? `Ma ref, un ${meta.phrase.includes("carrousel") ? "carrousel" : "post"} que j’aime (captures ou vidéo où je le fais défiler ; example_media_ids : suis sa forme, jamais ses mots) : ${res.refIds.join(", ")}.` : "",
         "Choisis toi-même la mise en page et les textes, et lance-toi : je regarde le résultat après.",
@@ -429,7 +430,6 @@ function Create({
     });
 
   const shownLibrary = all ? library : library.slice(0, Math.max(0, FIRST_TILES - uploads.files.length));
-  const ideas = proposal?.ideas.length ? proposal.ideas : (options?.ideas[kind] ?? []).slice(0, 3);
 
   return (
     <>
@@ -797,37 +797,37 @@ function Create({
 
         {step === "proposal" && (
         <section className="flex flex-col gap-2.5">
-          {/* Simone proposes, from her files and her idea; a tap takes one, or she keeps her own words. */}
+          {/* Simone says back what she will make: one plan, in points, with why (Tristan: « la demande bien reformulée, claire et précise, lisible »). */}
           <div className="flex items-end gap-2.5">
             <Mascot size={46} mood={proposing ? "thinking" : "happy"} still />
             <p aria-live="polite" className="rounded-[20px_20px_20px_6px] bg-[#F3EEF8] px-[15px] py-3 text-[15.5px] leading-[1.4] font-medium">
               {proposing
                 ? idea.trim()
-                  ? "Je regarde tes fichiers et ton idée…"
+                  ? "Je relis ta demande et je regarde tes fichiers…"
                   : "Je regarde tes photos et vidéos…"
-                : idea.trim()
-                  ? "Voilà comment je ferais ton idée. Garde ta demande, ou prends une des miennes."
-                  : proposal?.fromFiles
-                    ? "Voilà ce que j’en ferais. Prends celle qui te plaît."
-                    : "Quelques idées pour commencer. Prends celle qui te plaît."}
+                : plan
+                  ? idea.trim()
+                    ? "Voilà ce que je vais faire, d’après ta demande."
+                    : "Voilà ce que je te propose."
+                  : "Je n’ai pas pu préparer mon plan : je partirai de ta demande."}
             </p>
           </div>
-          <div role="radiogroup" aria-label="Ce que je fais" className="flex flex-col gap-2">
-            {idea.trim() && <IdeaCard on={choice === null} label="Ta demande" text={idea.trim()} onClick={() => setChoice(null)} />}
-            {proposing
-              ? [0, 1, 2].map((i) => <div key={i} className="h-[84px] animate-pulse rounded-[18px] bg-soft" />)
-              : ideas.map((it) => (
-                  <IdeaCard
-                    key={it.label}
-                    on={choice === it.prompt}
-                    label={it.label}
-                    text={it.prompt}
-                    onClick={() => setChoice(choice === it.prompt ? null : it.prompt)}
-                  />
-                ))}
-          </div>
-          {copying && reading?.state === "read" && (
-            <p className="text-[13px] leading-snug text-muted">Sa forme vient du Reel que tu aimes : {reading.lines[0]?.replace(/^\W+/, "").toLowerCase() ?? "son rythme et ses textes"}.</p>
+          {proposing ? (
+            <div className="flex flex-col gap-2.5 rounded-[20px] border-[1.5px] border-line p-4" aria-hidden>
+              <div className="h-5 w-1/2 animate-pulse rounded-full bg-soft" />
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-4 animate-pulse rounded-full bg-soft" style={{ width: `${88 - i * 9}%` }} />
+              ))}
+            </div>
+          ) : plan ? (
+            <PlanCard plan={plan} />
+          ) : idea.trim() ? (
+            <p className="rounded-[18px] bg-soft px-4 py-3 text-[14.5px] leading-snug">{idea.trim()}</p>
+          ) : null}
+          {!proposing && (
+            <button type="button" onClick={() => setStepAt(steps.indexOf("idea"))} className="self-start py-1 text-[14px] font-bold text-violet">
+              Changer ma demande
+            </button>
           )}
         </section>
         )}
@@ -882,8 +882,10 @@ function Create({
           <p className="pt-1 text-center text-[13px] text-danger">Un fichier n’est pas passé : retire-le ou ajoute-le à nouveau.</p>
         ) : step === "what" && kind === "reel" && !voiceAsked ? (
           <p className="pt-1 text-center text-[13px] text-muted">Voix off ou juste la musique : choisis, tu pourras changer après.</p>
+        ) : step === "proposal" && proposing ? (
+          <p className="pt-1 text-center text-[13px] text-muted">Une seconde, je prépare ton plan.</p>
         ) : step === "proposal" && !told ? (
-          <p className="pt-1 text-center text-[13px] font-semibold text-muted">Prends une de mes idées, ou reviens écrire la tienne.</p>
+          <p className="pt-1 text-center text-[13px] font-semibold text-muted">Dis-moi ce que tu imagines : « Changer ma demande ».</p>
         ) : last ? (
           <p className="pt-1 text-center text-[12.5px] leading-snug text-muted">
             {kind === "reel" ? "Les textes, les animations et la musique, je les choisis." : "La mise en page et les textes, je les choisis."} Tu pourras tout changer après.
@@ -1194,24 +1196,32 @@ function Field({ icon, label, value, sub, wide, onClick }: { icon: ReactNode; la
 }
 
 /** Under the Reel to copy: its name once read, or where its reading is. */
-/** One request to take on « La proposition »: hers, or one of Simone's. */
-function IdeaCard({ on, label, text, onClick }: { on: boolean; label: string; text: string; onClick: () => void }) {
+/** The plan Simone will follow: its title, its points in order (the rubric in bold), and why. */
+function PlanCard({ plan }: { plan: PostPlan }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={on}
-      onClick={onClick}
-      className={`fauve-press flex items-start gap-3 rounded-[18px] border-[1.5px] px-4 py-3 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-violet/40"}`}
-    >
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className={`text-[15px] font-extrabold ${on ? "text-violet" : ""}`}>{label}</span>
-        <span className="text-[13.5px] leading-snug text-muted">{text}</span>
-      </span>
-      <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border-[1.5px] ${on ? "border-violet bg-violet text-white" : "border-line"}`} aria-hidden>
-        {on && <CheckIcon size={14} />}
-      </span>
-    </button>
+    <div className="fauve-enter flex flex-col gap-3 rounded-[20px] border-[1.5px] border-violet/30 bg-white p-4">
+      <h3 className="text-[17px] font-extrabold tracking-[-0.01em]">{plan.title}</h3>
+      <ul className="flex flex-col gap-2">
+        {plan.points.map((point) => {
+          const cut = point.indexOf(" : ");
+          return (
+            <li key={point} className="flex gap-2.5 text-[14.5px] leading-snug">
+              <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-violet" aria-hidden />
+              <span>
+                {cut > 0 && cut < 24 ? (
+                  <>
+                    <strong className="font-extrabold">{point.slice(0, cut)}</strong> : {point.slice(cut + 3)}
+                  </>
+                ) : (
+                  point
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {plan.why && <p className="border-t border-line pt-2.5 text-[13.5px] leading-snug text-muted">{plan.why}</p>}
+    </div>
   );
 }
 

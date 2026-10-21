@@ -6,7 +6,7 @@ import { canTransition } from "./status.ts";
 import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES } from "./credits.ts";
-import { businessFamily, filmIdeas, keptProposals, postIdeas } from "./post-ideas.ts";
+import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas } from "./post-ideas.ts";
 import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 
@@ -4063,19 +4063,25 @@ test("reminders: at the suggested moment, the post and one question", async () =
   assert.equal(reminderMessage("carousel", "", ["instagram", "tiktok"]), "C’est le bon moment pour poster ton carrousel ✨ Je le publie maintenant sur Instagram et TikTok ?");
 });
 
-test("Simone's proposals from her files: 3 at most, short labels, no long dash, requests that fit the field", () => {
-  const long = "Commence par la vidéo du reformer — puis la photo de la vitrine. ".repeat(12);
-  const kept = keptProposals({
-    ideas: [
-      { label: "Le geste puis le résultat", prompt: "Commence par la vidéo du reformer, puis finis sur la photo du groupe avec l’invitation à venir essayer." },
-      { label: "Une matinée au studio, racontée par une voix qui prend son temps et en dit beaucoup trop", prompt: long },
-      { label: "Trop court", prompt: "Viens." },
-      { label: "Un message", prompt: "Juste un message à l’écran, sans voix, sur les plus beaux plans coupés sur la musique." },
-      { label: "Une quatrième", prompt: "Une idée de plus, qui ne doit pas passer car on en garde trois au plus." },
+test("Simone's plan: 3 to 6 short points, a title and why, kept for the montage; too little is no plan", () => {
+  const plan = keptPlan({
+    title: "Lancement de la rentrée",
+    points: [
+      "Ouverture : la vidéo où elle ajuste le reformer — en gros plan",
+      "- Ensuite : trois plans du cours, coupés sur la musique",
+      "Fin : le groupe qui sourit, et « réserve ton cours d'essai »",
+      "Le son : juste la musique",
+      "Court",
+      "À l'écran : « la rentrée commence ici »",
+      "Un point de trop : il ne passe pas, six au plus",
+      "Encore un : il ne passe pas non plus",
     ],
+    why: "Le geste en gros plan arrête le pouce, et la fin dit quoi faire.",
   });
-  assert.equal(kept.length, 3);
-  assert.ok(kept.every((i) => i.label.length <= 40 && i.prompt.length <= 480 && !i.prompt.includes("—")));
-  assert.ok(!kept.some((i) => i.label === "Trop court"));
-  assert.deepEqual(keptProposals(null), []);
+  assert.ok(plan);
+  assert.equal(plan.points.length, 6);
+  assert.ok(plan.points.every((p) => p.length <= 220 && !p.includes("—") && !p.startsWith("-")));
+  assert.ok(!plan.points.includes("Court"));
+  assert.match(validatedPlanBrief(plan), /^Le plan que la gérante a validé \(« Lancement de la rentrée »\) :\n- Ouverture/);
+  assert.equal(keptPlan({ title: "x", points: ["Ouverture : un seul point"], why: "" }), null);
 });
