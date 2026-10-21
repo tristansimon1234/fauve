@@ -3259,6 +3259,7 @@ test("what moves: the tracks under each animation, placed as the Reel draws the 
 test("steal: a Reel's style read, measured, summed up and copied over her charter by one Reel", async () => {
   const {
     reelLink,
+    videoUrlIn,
     parseSceneCuts,
     tempoOf,
     clampLook,
@@ -3284,6 +3285,14 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   assert.deepEqual(reelLink("regarde ça https://www.instagram.com/reel/DAbc_12-x/?igsh=xyz, trop bien"), { url: "https://www.instagram.com/reel/DAbc_12-x/", platform: "instagram" });
   // Copied without its scheme, it is still a Reel to copy.
   assert.deepEqual(reelLink("comme instagram.com/reel/DAbc_12-x/ stp"), { url: "https://instagram.com/reel/DAbc_12-x/", platform: "instagram" });
+  // The video of a Reel in a post-detail answer: a field named for a video first, never its picture, else an .mp4 link.
+  assert.equal(
+    videoUrlIn({ data: { display_url: "https://cdn.x/p.jpg", video_versions: [{ url: "https://cdn.x/v.mp4?e=1" }], thumbnail: "https://cdn.x/t.jpg" } }),
+    "https://cdn.x/v.mp4?e=1",
+  );
+  assert.equal(videoUrlIn({ result: { videoUrl: "https://cdn.x/a" } }), "https://cdn.x/a");
+  assert.equal(videoUrlIn({ items: [{ media: "https://cdn.x/clip.mp4" }] }), "https://cdn.x/clip.mp4");
+  assert.equal(videoUrlIn({ image: "https://cdn.x/p.jpg" }), null);
   assert.deepEqual(reelLink("https://www.tiktok.com/@chez.lou/video/7412?is_from_webapp=1&sender_device=pc."), { url: "https://www.tiktok.com/@chez.lou/video/7412", platform: "tiktok" });
   assert.deepEqual(reelLink("(https://vm.tiktok.com/ZMabc123/)"), { url: "https://vm.tiktok.com/ZMabc123/", platform: "tiktok" });
   assert.deepEqual(reelLink("https://youtube.com/shorts/aBc-123"), { url: "https://youtube.com/shorts/aBc-123", platform: "youtube" });
