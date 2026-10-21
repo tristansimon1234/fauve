@@ -5,6 +5,7 @@ import { readAnswer } from "@fauve/agent/answer";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
+import { toGeminiSchema } from "@/lib/gemini-schema";
 import { studioAccess } from "@/lib/billing/access";
 import { sortClip } from "@/lib/clip-sort";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -21,16 +22,6 @@ const STALE_CLAIM_MS = 4 * 60_000;
 let client: GoogleGenAI | undefined;
 const gemini = () => (client ??= new GoogleGenAI({ apiKey: env("GEMINI_API_KEY") }));
 
-/** Gemini accepts a subset of JSON Schema: drop the keywords it does not need. */
-function toGeminiSchema(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(toGeminiSchema);
-  if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.entries(value)
-      .filter(([key]) => key !== "$schema" && key !== "additionalProperties")
-      .map(([key, v]) => [key, toGeminiSchema(v)]),
-  );
-}
 // Gemini rejects some schemas with a bare "invalid argument": ask for the full
 // analysis (the look of every shot, the clip's correction, word timings with no
 // size bound on the list) first, then without words, then the plain analysis.
