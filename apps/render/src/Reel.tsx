@@ -70,6 +70,9 @@ export function Reel(props: ReelProps) {
   const k = props.width / 1080;
   // A free collage: its composition lays the shots on the paper (the fixed prints only if its code cannot run).
   const compose = collage ? props.layers?.find((l) => l.compose) : undefined;
+  // One that draws the whole picture (Tristan: « tout ça n'est pas assez libre ») has its own ground, texts and end:
+  // the engine's paper, texts and end card only play in its fallback, the fixed collage.
+  const whole = Boolean(compose?.drawsTexts);
   const isShot = (segment: ReelProps["segments"][number]) => segment.type === "clip" || segment.type === "image";
   // A collage's print of a shot: a card that stays a little under the next one sliding over it.
   const print = (segment: ReelProps["segments"][number], i: number, from = 0) =>
@@ -82,10 +85,43 @@ export function Reel(props: ReelProps) {
       </Sequence>
     ) : null;
 
+  // The Reel's texts as the engine draws them (a collage subject in front of its hook between them).
+  const engineTexts = (
+    <>
+      {props.texts.map((t, i) =>
+        underStickers(props, t) ? (
+          <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
+            <TextBeat text={t} index={i} props={props} theme={theme} k={k} />
+          </Sequence>
+        ) : null,
+      )}
+      {/* A collage subject in front of its hook: the words go behind the person, as if cut out with them. */}
+      {props.segments.map((segment, i) =>
+        hookBehind(props, i) && segment.type === "image" ? (
+          <Sequence key={`k${i}`} from={segment.startAt} durationInFrames={segment.durationInFrames} layout="none">
+            <CollageCard index={i} props={props} sticker={stickerOf(segment, theme)} layer="sticker" />
+          </Sequence>
+        ) : null,
+      )}
+      {props.texts.map((t, i) =>
+        underStickers(props, t) ? null : (
+          <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
+            <TextBeat text={t} index={i} props={props} theme={theme} k={k} />
+          </Sequence>
+        ),
+      )}
+    </>
+  );
+  const endCard = props.endCard ? (
+    <Sequence from={props.endCard.from} layout="none">
+      {collage ? <CollageEndCard props={props} k={k} /> : <EndCard props={props} k={k} />}
+    </Sequence>
+  ) : null;
+
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       <ExposureFilters />
-      {collage ? <CollageBackdrop props={props} /> : null}
+      {collage && !whole ? <CollageBackdrop props={props} /> : null}
       {compose ? (
         <Sequence from={compose.from} durationInFrames={compose.durationInFrames} layout="none">
           <MotionScene
@@ -99,7 +135,22 @@ export function Reel(props: ReelProps) {
             photos={compose.photos}
             cuts={compose.cuts}
             footage={{ shots: compose.shots ?? [], draw: (shot, size) => drawShot(props.segments[shot.segment], theme, size) }}
-            fallbackNode={<>{props.segments.map((segment, i) => print(segment, i, compose.from))}</>}
+            reelTexts={compose.reelTexts}
+            end={compose.end}
+            fallbackNode={
+              whole ? (
+                // The fixed collage in full: its paper, its prints, the Reel's texts and end card on paper.
+                <>
+                  <CollageBackdrop props={props} />
+                  {props.segments.map((segment, i) => print(segment, i, compose.from))}
+                  {engineTexts}
+                  {endCard}
+                  <Grain props={props} />
+                </>
+              ) : (
+                <>{props.segments.map((segment, i) => print(segment, i, compose.from))}</>
+              )
+            }
           />
         </Sequence>
       ) : null}
@@ -174,40 +225,15 @@ export function Reel(props: ReelProps) {
       )}
       {props.effect === "dust" ? <FilmDust k={k} /> : null}
 
-      {props.texts.map((t, i) =>
-        underStickers(props, t) ? (
-          <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
-            <TextBeat text={t} index={i} props={props} theme={theme} k={k} />
-          </Sequence>
-        ) : null,
-      )}
-      {/* A collage subject in front of its hook: the words go behind the person, as if cut out with them. */}
-      {props.segments.map((segment, i) =>
-        hookBehind(props, i) && segment.type === "image" ? (
-          <Sequence key={`k${i}`} from={segment.startAt} durationInFrames={segment.durationInFrames} layout="none">
-            <CollageCard index={i} props={props} sticker={stickerOf(segment, theme)} layer="sticker" />
-          </Sequence>
-        ) : null,
-      )}
-      {props.texts.map((t, i) =>
-        underStickers(props, t) ? null : (
-          <Sequence key={`t${i}`} from={t.from} durationInFrames={t.durationInFrames} layout="none">
-            <TextBeat text={t} index={i} props={props} theme={theme} k={k} />
-          </Sequence>
-        ),
-      )}
+      {whole ? null : engineTexts}
 
       {props.words.length > 0 && <Subtitles props={props} theme={theme} k={k} />}
       {props.layer ? <TextLayer props={props} /> : null}
       {props.elements?.length ? <Elements props={props} /> : null}
       <Logo props={props} k={k} />
 
-      {props.endCard && (
-        <Sequence from={props.endCard.from} layout="none">
-          {collage ? <CollageEndCard props={props} k={k} /> : <EndCard props={props} k={k} />}
-        </Sequence>
-      )}
-      {collage ? <Grain props={props} /> : null}
+      {whole ? null : endCard}
+      {collage && !whole ? <Grain props={props} /> : null}
       {props.soundtrack?.src ? <Audio src={props.soundtrack.src} volume={(f) => musicVolume(props.soundtrack!, f)} /> : null}
       {props.voice?.src ? (
         // A voice that starts before the Reel (negative from): its silence before the first word is cut.

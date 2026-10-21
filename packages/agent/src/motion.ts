@@ -118,6 +118,27 @@ export type ComposeShot = ScenePhoto & {
   track?: ShotTrack;
 };
 
+/**
+ * A text of the Reel that a collage's composition draws itself: its words, its role (the hook, a
+ * band, a caption), when (frames from the composition's start), the words to stress and, for a
+ * message, its lines. Mirrors apps/render/src/types.ts.
+ */
+export type ComposeText = { text: string; role: "hook" | "band" | "caption"; from: number; to: number; emphasis: string[]; items?: ListItem[] };
+/** The Reel's end (an offer, an announcement) that a composition draws itself: its title and line, from its frame. */
+export type ComposeEnd = { title: string; subtitle: string | null; from: number };
+
+/** The Reel's texts as a composition reads them, from its start (`from`, frames). */
+export function composeTexts(texts: ReelText[], from = 0): ComposeText[] {
+  return texts.map((t) => ({
+    text: t.text,
+    role: t.style,
+    from: t.from - from,
+    to: t.from + t.durationInFrames - from,
+    emphasis: t.emphasis,
+    ...(t.items?.length ? { items: t.items } : {}),
+  }));
+}
+
 export type ScenePhoto = {
   src: string;
   aspect: number;
@@ -211,6 +232,10 @@ export type ReelProps = {
     track?: TrackPiece[];
     /** Google Fonts families its code uses besides the Reel's two, loaded with it. */
     fonts?: string[];
+    /** A collage's composition that draws the whole picture: the Reel's texts and its end are its own (no paper nor texts of the engine). */
+    drawsTexts?: boolean;
+    reelTexts?: ComposeText[];
+    end?: ComposeEnd | null;
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
@@ -584,6 +609,9 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
 
   // Animations over several shots: their span in frames and the cuts under them (from their start).
   const starts = segments.slice(1).map((s) => s.startAt);
+  const endCard = plan.end_card
+    ? { title: frenchSpaces(keepName(plan.end_card.title, inputs.brand.name)), subtitle: plan.end_card.subtitle ? frenchSpaces(plan.end_card.subtitle) : null, from: Math.max(0, durationInFrames - endCardFrames) }
+    : null;
   const layers = (plan.layers ?? []).flatMap((l) => {
     if (!l.motion.js) return [];
     const from = Math.min(durationInFrames - 1, toFrames(l.from));
@@ -600,6 +628,10 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         cuts: starts.filter((f) => f > from && f < from + length).map((f) => f - from),
         ...(l.motion.photos?.length ? { photos: scenePhotos(l.motion.photos, inputs) } : {}),
         ...(l.compose ? { compose: true, shots: composeShots(from) } : {}),
+        // A composition that draws the whole picture gets the Reel's texts and its end to draw.
+        ...(l.compose && l.motion.draws_texts
+          ? { drawsTexts: true, reelTexts: composeTexts(texts, from), end: endCard ? { ...endCard, from: endCard.from - from } : null }
+          : {}),
         ...(track.length ? { track } : {}),
         ...(l.motion.fonts?.length ? { fonts: l.motion.fonts } : {}),
       },
@@ -617,9 +649,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     texts,
     words,
     brand,
-    endCard: plan.end_card
-      ? { title: frenchSpaces(keepName(plan.end_card.title, inputs.brand.name)), subtitle: plan.end_card.subtitle ? frenchSpaces(plan.end_card.subtitle) : null, from: Math.max(0, durationInFrames - endCardFrames) }
-      : null,
+    endCard,
     ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack, ...music } } : {}),
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
     ...(plan.effect ? { effect: plan.effect } : {}),

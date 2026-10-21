@@ -3069,7 +3069,7 @@ test("readings that hold: a long line never loses a site's look", async () => {
 
 test("collage: one free composition lays the Reel's shots, never a paid animation", async () => {
   const { fromEditorPlan, keepWrittenAnimations, normalizeEditPlan } = await import("./editor.ts");
-  const { compositionShots, textBands } = await import("./compose.ts");
+  const { compositionShots, compositionTexts } = await import("./compose.ts");
   const { finishPlan } = await import("./finish.ts");
   const { buildReelProps } = await import("./motion.ts");
   const durations = { a: 10, p: 5 };
@@ -3138,7 +3138,12 @@ test("collage: one free composition lays the Reel's shots, never a paid animatio
       [1, 83, 150, "photo", "portrait", undefined, true, true],
     ],
   );
-  assert.deepEqual(textBands(finished)[0], { de: 0, a: 45, y_haut: 384, y_bas: 768, texte: "back to culte" });
+  // The texts it draws itself, each at its moment (frames), and no end nor subtitles here.
+  const drawn = compositionTexts(finished);
+  assert.deepEqual(drawn.texts[0], { text: "back to culte", role: "hook", from: 0, to: 45, emphasis: [] });
+  assert.equal(drawn.texts.length, finished.texts.length);
+  assert.equal(drawn.end, null);
+  assert.equal(drawn.subtitles, null);
 
   // The render gets the shots it lays: segment, span, shape, subject, and the photo's cut-out.
   const props = buildReelProps(
@@ -3162,6 +3167,17 @@ test("collage: one free composition lays the Reel's shots, never a paid animatio
       [1, 83, 67, "photo", "https://x/p.webp"],
     ],
   );
+  // Written before: it draws only its shots, the paper and the texts stay the engine's.
+  assert.equal(layer.drawsTexts, undefined);
+  assert.equal(layer.reelTexts, undefined);
+  // Written now: the whole picture is its own, the Reel's texts given to draw at their moment.
+  const whole = buildReelProps(
+    editPlanSchema.parse({ ...finished, layers: [{ ...finished.layers![0]!, motion: { ...finished.layers![0]!.motion, js: scene, draws_texts: true } }] }),
+    { template: "collage", clipUrls: { a: "https://x/a.mp4", p: "https://x/p.jpg" }, photoIds: ["p"], aspects: { a: 0.5625 }, photoAspects: { p: 0.75 }, brand: { name: "Culte" } },
+  ).layers![0]!;
+  assert.equal(whole.drawsTexts, true);
+  assert.deepEqual(whole.reelTexts?.[0], { text: "back to culte", role: "hook", from: 0, to: 45, emphasis: [] });
+  assert.equal(whole.end, null);
 });
 
 test("what moves: the tracks under each animation, placed as the Reel draws the footage", async () => {

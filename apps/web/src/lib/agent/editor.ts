@@ -16,7 +16,7 @@ import {
   carryTextStyle,
   clearOfVoice,
   compositionShots,
-  textBands,
+  compositionTexts,
   holdAfterVoice,
   keepWrittenAnimations,
   replacedAnimations,
@@ -486,7 +486,7 @@ export async function designEdit(params: {
   // and for its test render, each shot's span and shape (a photo with its cut-out).
   const composition = (): NonNullable<SceneRequest["compose"]> => ({
     plans: compositionShots(plan, facts, Object.fromEntries(offers.map((o) => [o.id, o.shows])), new Set(offers.filter((o) => o.photo.cutout).map((o) => o.id))),
-    texts: textBands(plan),
+    ...compositionTexts(plan),
     shots: plan.segments.flatMap((s, i) => {
       if (!isClipSegment(s)) return [];
       const at = timeline.segments[i]!;
@@ -645,6 +645,8 @@ export async function designEdit(params: {
         ...(kept.photos ? { photos: kept.photos } : {}),
         ...(kept.fonts ? { fonts: kept.fonts } : {}),
         ...(kept.template_id ? { template_id: kept.template_id } : {}),
+        // A composition kept as it was draws what it drew (its texts, or only its shots).
+        ...(kept.draws_texts ? { draws_texts: true } : {}),
       };
       return [{ ...l, motion }];
     }
@@ -659,6 +661,8 @@ export async function designEdit(params: {
       js: result.js,
       ...(result.photos?.length ? { photos: result.photos } : {}),
       ...(result.fonts?.length ? { fonts: result.fonts } : {}),
+      // A collage's composition written now draws the whole picture: its ground, the Reel's texts and its end.
+      ...(l.compose ? { draws_texts: true } : {}),
     };
     return [{ ...l, motion }];
   });

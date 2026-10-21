@@ -134,6 +134,12 @@ export const editPlanMotionSegmentSchema = z.object({
      * copies): from the motion designer's answer, loaded with the scene. They follow its code.
      */
     fonts: z.array(z.string().regex(LOOK_FONT)).max(3).optional(),
+    /**
+     * A collage's composition that draws the whole picture: its ground, the Reel's texts and its end
+     * (set by the engine when the motion designer writes it). One written before draws only its shots:
+     * the paper and the texts stay the engine's.
+     */
+    draws_texts: z.boolean().optional(),
   }),
   duration: z.number().min(1).max(8),
   /**
@@ -191,7 +197,7 @@ export const AMBIANCES: Record<MotionTemplate, { label: string; hint: string; ph
   doux: { label: "Calme et lumineux", hint: "des plans qui prennent leur temps, une lumière douce, un mot en italique", photo: "Textes légers" },
   dynamique: { label: "Coupes rapides", hint: "des plans courts calés sur la musique, de gros titres, des coups de zoom", photo: "Gros titres" },
   chic: { label: "Sobre et élégant", hint: "peu de texte, de l'italique, un rythme lent", photo: "Italique élégant" },
-  collage: { label: "Façon collage", hint: "ses photos et vidéos composées à la main, avec du papier, du scotch, des découpes et de petits dessins", photo: "Papier découpé" },
+  collage: { label: "Façon collage", hint: "ses photos et vidéos assemblées comme un collage, superposées et découpées, sous une forme propre à ce Reel", photo: "Papier découpé" },
   libre: { label: "Sur mesure", hint: "le rythme de sa demande et de ses images, le look de sa charte", photo: "Textes légers" },
 };
 
