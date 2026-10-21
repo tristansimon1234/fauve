@@ -190,8 +190,9 @@ const proposalInput = z.object({
     .max(20),
   /** For a Reel: « off » just the music, a voice id, « auto » Simone chooses. */
   voice: z.string().max(60).optional(),
-  /** She follows a Reel she likes: its form, not her own. */
+  /** She follows a Reel she likes: its form, not her own; what her Reel takes from it, once read. */
   copying: z.boolean().optional(),
+  copy: z.object({ name: z.string().max(120).nullable().optional(), lines: z.array(z.string().max(300)).max(4) }).optional(),
 });
 
 /** Images Claude reads from a link. */
@@ -208,8 +209,13 @@ export async function proposeIdeas(input: z.input<typeof proposalInput>): Promis
   const { db, member } = await getStudioContext();
   if (!member || !parsed.success) return { ideas: [], fromFiles: false };
   const studioId = member.studio.id;
-  const { kind, files, voice, copying } = parsed.data;
-  const { data: studio } = await db.from("studios").select("name, business_type, memory").eq("id", studioId).maybeSingle();
+  const { kind, files, voice, copying, copy } = parsed.data;
+  const [{ data: studio }, { data: brand }, { data: recent }] = await Promise.all([
+    db.from("studios").select("name, business_type, memory").eq("id", studioId).maybeSingle(),
+    db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+    db.from("posts").select("title, kind").eq("studio_id", studioId).not("status", "in", "(skipped,failed)").order("created_at", { ascending: false }).limit(6),
+  ]);
+  const profile = (brand?.profile ?? {}) as { art_direction?: string; tone?: string };
   const fallback = { ideas: postIdeas(studio?.business_type as string | null)[kind].slice(0, 3), fromFiles: false };
   try {
     const admin = supabaseAdmin();
@@ -219,10 +225,27 @@ export async function proposeIdeas(input: z.input<typeof proposalInput>): Promis
       ids.length ? admin.from("clip_analyses").select("media_id, analysis").in("media_id", ids).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
     ]);
     const byId = new Map((assets ?? []).map((a) => [a.id as string, a]));
+    // What Gemini saw in each video: its shots, its best moments, what is said in it.
     const summaries = new Map<string, string>();
     for (const a of analyses ?? []) {
-      const summary = (a.analysis as { summary?: string } | null)?.summary;
-      if (summary && !summaries.has(a.media_id as string)) summaries.set(a.media_id as string, summary);
+      if (summaries.has(a.media_id as string)) continue;
+      const v = a.analysis as {
+        summary?: string;
+        setting?: string;
+        shots?: { start: number; end: number; description?: string }[];
+        best_moments?: { why?: string }[];
+        transcript?: string;
+      } | null;
+      if (!v?.summary) continue;
+      const shots = (v.shots ?? []).slice(0, 6).map((s) => `${Math.round(s.start)}-${Math.round(s.end)} s ${s.description ?? ""}`.trim());
+      const best = (v.best_moments ?? []).map((m) => m.why).filter(Boolean).slice(0, 2);
+      const said = v.transcript?.trim();
+      summaries.set(
+        a.media_id as string,
+        [v.summary, v.setting ? `lieu : ${v.setting}` : "", shots.length ? `plans : ${shots.join(" ; ")}` : "", best.length ? `meilleurs passages : ${best.join(" ; ")}` : "", said ? `on y dit : « ${said.slice(0, 280)} »` : ""]
+          .filter(Boolean)
+          .join(" | "),
+      );
     }
     // Each file, in her order: what is known of it, or the photo itself for Claude to look at.
     const lines: string[] = [];
@@ -242,7 +265,7 @@ export async function proposeIdeas(input: z.input<typeof proposalInput>): Promis
       if (!a) return;
       const video = a.kind === "video";
       const known = video ? summaries.get(f.media) : (a.regions as { notes?: string } | null)?.notes;
-      if (known) lines.push(`${n}. ${video ? `vidéo${a.duration ? ` de ${Math.round(Number(a.duration))} s` : ""}` : "photo"} : ${known.slice(0, 300)}`);
+      if (known) lines.push(`${n}. ${video ? `vidéo${a.duration ? ` de ${Math.round(Number(a.duration))} s` : ""}` : "photo"} : ${known.slice(0, video ? 1200 : 300)}`);
       else if (!video && READABLE.has(String(a.mime_type)) && looks.length < MAX_LOOKS) {
         looks.push({ n, path: a.storage_path as string });
         lines.push(`${n}. une photo (image ${n} ci-dessous)`);
@@ -259,8 +282,8 @@ export async function proposeIdeas(input: z.input<typeof proposalInput>): Promis
     const spoken = kind !== "reel" || !voice ? undefined : voice === "off" ? "juste la musique, sans voix" : voice === "auto" ? "elle laisse Simone choisir" : "avec une voix off qui raconte";
     const response = await anthropic().beta.messages.parse({
       model: ANALYST_MODEL,
-      max_tokens: 900,
-      output_config: { effort: "low", format: outputFormat(proposalSchema) },
+      max_tokens: 1500,
+      output_config: { effort: "medium", format: outputFormat(proposalSchema) },
       system: PROPOSAL_PROMPT,
       messages: [
         {
@@ -269,8 +292,16 @@ export async function proposeIdeas(input: z.input<typeof proposalInput>): Promis
             {
               type: "text",
               text: JSON.stringify({
-                commerce: { nom: studio?.name ?? undefined, activite: studio?.business_type ?? undefined, ce_qu_on_sait: readMemory(studio?.memory).map((m) => m.fact).slice(0, 12) },
-                publication: { format, ...(spoken ? { voix: spoken } : {}), ...(copying ? { forme: "elle recopie un Reel qu'elle aime : propose le fond, la forme viendra de ce Reel" } : {}) },
+                commerce: {
+                  nom: studio?.name ?? undefined,
+                  activite: studio?.business_type ?? undefined,
+                  ce_qu_on_sait: readMemory(studio?.memory).map((m) => m.fact).slice(0, 12),
+                  ...(profile.art_direction?.trim() ? { direction_artistique: profile.art_direction.trim().slice(0, 600) } : {}),
+                  ...(profile.tone?.trim() ? { ton: profile.tone.trim().slice(0, 200) } : {}),
+                },
+                publication: { format, ...(spoken ? { voix: spoken } : {}) },
+                ...(copying ? { reel_a_recopier: copy?.lines.length ? { nom: copy.name ?? undefined, ce_que_son_reel_en_reprend: copy.lines } : "un Reel qu'elle aime, encore en lecture : propose le fond, la forme viendra de lui" } : {}),
+                ...((recent ?? []).length ? { publications_recentes: (recent ?? []).map((p) => `${p.kind} : ${p.title}`) } : {}),
                 fichiers_dans_l_ordre: lines,
               }),
             },

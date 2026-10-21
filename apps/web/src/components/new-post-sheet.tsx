@@ -9,6 +9,7 @@ import {
   formatWhy,
   imagineQuestion,
   publishWhen,
+  reelLink,
   SIMONE_VOICES,
   voiceSamplePath,
   type Effort,
@@ -287,9 +288,11 @@ function Create({
   }, [at]);
   const next = () => setStepAt(Math.min(at + 1, steps.length - 1));
 
-  // The last step: what Simone would make of the files she picked (asked again when they change).
+  // The last step: what Simone would make of the files she picked. Asked as soon as they are picked
+  // (Tristan : « pas du tout optimisé »: three empty cards on the last step), again when they, the
+  // type, the voice or the Reel she copies change.
   const proposalAsk =
-    step === "idea" && picked.length && !sending && !broken
+    picked.length && !sending && !broken
       ? JSON.stringify({
           kind,
           files: picked.flatMap((k): ({ media: string } | { upload: { path: string; mime: string; video: boolean } })[] => {
@@ -297,21 +300,54 @@ function Create({
             const f = drafts.get(k.slice(2));
             return f?.path ? [{ upload: { path: f.path, mime: f.file.type, video: f.video } }] : [];
           }),
-          ...(kind === "reel" ? { voice: chosenVoice, copying: Boolean(copying) } : {}),
+          ...(kind === "reel"
+            ? {
+                voice: chosenVoice,
+                copying: Boolean(copying),
+                ...(copying && reading?.state === "read" ? { copy: { name: reading.name, lines: reading.lines } } : {}),
+              }
+            : {}),
         })
       : null;
+  // While she is still picking, asked once her picks rest a moment; on the last step, at once.
+  const [settledAsk, setSettledAsk] = useState<string | null>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettledAsk(proposalAsk), step === "idea" ? 0 : 900);
+    return () => clearTimeout(timer);
+  }, [proposalAsk, step]);
   const [proposal, setProposal] = useState<{ ask: string; ideas: PostIdea[]; fromFiles: boolean } | null>(null);
   const proposing = proposalAsk !== null && proposal?.ask !== proposalAsk;
   useEffect(() => {
-    if (!proposalAsk) return;
+    if (!settledAsk) return;
     let live = true;
-    proposeIdeas(JSON.parse(proposalAsk))
-      .then((r) => live && setProposal({ ask: proposalAsk, ...r }))
-      .catch(() => live && setProposal({ ask: proposalAsk, ideas: [], fromFiles: false }));
+    proposeIdeas(JSON.parse(settledAsk))
+      .then((r) => live && setProposal({ ask: settledAsk, ...r }))
+      .catch(() => live && setProposal({ ask: settledAsk, ideas: [], fromFiles: false }));
     return () => {
       live = false;
     };
-  }, [proposalAsk]);
+  }, [settledAsk]);
+
+  // A Reel she likes, given on the last step (its link pasted in what she imagines, or the field below): read and followed, as on the first step.
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const followGiven = (id: string) => {
+    setGiven(id);
+    setCopyRead({ state: "reading" });
+    setCopyChoice("copy");
+  };
+  const typeIdea = (text: string) => {
+    const found = kind === "reel" ? reelLink(text) : null;
+    if (!found) return setIdea(text);
+    // The link becomes the Reel to copy; her words stay what she imagines.
+    setIdea(text.replace(/https?:\/\/\S+/i, "").replace(/\s{2,}/g, " ").trimStart());
+    setLinkBusy(true);
+    setLinkError(null);
+    copyReel({ link: found.url })
+      .then((res) => (res.ok ? followGiven(res.id) : setLinkError(res.error)))
+      .catch(() => setLinkError("Ce Reel n’est pas passé. Réessaie dans un instant."))
+      .finally(() => setLinkBusy(false));
+  };
 
   const toggle = (key: string) => setOrder((o) => (o.includes(key) ? o.filter((k) => k !== key) : picked.length >= MAX_FILES ? o : [...o, key]));
   const add = (list: FileList | File[]) => {
@@ -536,11 +572,7 @@ function Create({
             <CopyGiver
               studioId={options.studioId}
               another={Boolean(usable)}
-              onGiven={(id) => {
-                setGiven(id);
-                setCopyRead({ state: "reading" });
-                setCopyChoice("copy");
-              }}
+              onGiven={followGiven}
             />
           </section>
         )}
@@ -738,10 +770,45 @@ function Create({
             value={idea}
             maxLength={500}
             rows={3}
-            onChange={(e) => setIdea(e.target.value)}
+            onChange={(e) => typeIdea(e.target.value)}
             placeholder={SCENARIO_EXAMPLE[kind]}
             className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-3 text-[15.5px] leading-snug outline-none focus:border-violet"
           />
+          {/* Or a ref for a Reel: one she likes, its link or its video (the same as on the first step). */}
+          {kind === "reel" && options && (
+            <div className="flex flex-col gap-2">
+              {linkBusy && (
+                <p className="flex items-center gap-2 text-[13.5px] text-muted">
+                  <Spinner /> J’ouvre ce Reel…
+                </p>
+              )}
+              {linkError && <p className="text-[13px] leading-snug text-danger">{linkError}</p>}
+              {copying ? (
+                <div className="flex flex-col gap-1.5 rounded-[16px] bg-soft px-3.5 py-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-[14px] font-bold">{models.some((m) => m.id === copying) ? "Comme un de tes Reels" : given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé"}</span>
+                    <button type="button" onClick={() => setCopyChoice("mine")} className="text-[13px] font-bold text-violet">
+                      Retirer
+                    </button>
+                  </div>
+                  {reading?.state === "read" && reading.lines.length > 0 ? (
+                    <ul className="flex flex-col gap-1 text-[13.5px] leading-snug text-muted">
+                      {reading.lines.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="flex items-center gap-2 text-[13.5px] text-muted">
+                      <Spinner /> Je le regarde, environ une minute. Tu peux lancer : ton Reel l’attendra.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                !linkBusy && <CopyGiver studioId={options.studioId} another={false} onGiven={followGiven} />
+              )}
+              {model && reading?.state === "missed" && <p className="text-[13.5px] leading-snug text-danger">{reading.message}</p>}
+            </div>
+          )}
           {/* Or a ref for a carousel, a post or a story: captures of one she likes (Instagram does not let a carousel's link open). */}
           {kind !== "reel" && options && (
             <div className="flex flex-col gap-2">
