@@ -37,12 +37,15 @@ export async function remindDue(): Promise<number> {
     if (missingContent(post.kind as PostKind, Boolean(post.render_id), ((post.media_ids as string[] | null) ?? []).length)) continue;
     if (!(await studioAccess(studioId)).unlock) continue;
     const platforms = (post.platforms as string[] | null)?.length ? (post.platforms as string[]) : ["instagram"];
+    const kind = post.kind === "carousel" ? "carrousel" : post.kind === "story" ? "story" : post.kind === "post" ? "post" : "Reel";
+    const title = ((post.title as string | null) ?? "").replace(/\s+/g, " ").trim().slice(0, 60) || "ta publication";
     try {
       await messageOwner(studioId, {
         text: reminderMessage(post.kind as string, (post.title as string | null) ?? "", platforms),
         options: PUBLISH_OFFER_OPTIONS,
         kind: "reminder",
-        template: { name: "draft_ready", params: [post.kind === "carousel" ? "carrousel" : post.kind === "story" ? "story" : post.kind === "post" ? "post" : "Reel", "aujourd’hui"] },
+        // Utility, so Meta does not cap it; draft_ready until post_reminder is approved.
+        template: { name: "post_reminder", params: [kind, title], fallback: { name: "draft_ready", params: [kind, "aujourd’hui"] } },
         payload: { posts: [post.id], open_post: post.id, publish_offer: post.id },
       });
       sent++;

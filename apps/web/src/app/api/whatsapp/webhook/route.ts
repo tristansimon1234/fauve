@@ -35,6 +35,12 @@ export async function POST(request: NextRequest) {
   for (const entry of parsed.data.entry) {
     for (const change of entry.changes) {
       const names = new Map(change.value.contacts?.map((c) => [c.wa_id, c.profile?.name]));
+      // A message Meta could not deliver (a template outside the 24 h window, often): said in the logs, with its code.
+      for (const status of change.value.statuses ?? []) {
+        if (status.status !== "failed") continue;
+        const why = (status.errors ?? []).map((e) => `${e.code} ${e.title ?? ""}${e.error_data?.details ? ` (${e.error_data.details})` : ""}`.trim()).join("; ");
+        console.warn("WhatsApp message not delivered", status.id, status.recipient_id ?? "", why || "no reason given");
+      }
       for (const message of change.value.messages ?? []) {
         after(() =>
           handleInboundMessage(message, names.get(message.from)).catch((error) =>

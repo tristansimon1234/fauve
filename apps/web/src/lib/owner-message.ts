@@ -16,8 +16,8 @@ export type OwnerMessage = {
   notes?: string[];
   /** What kind of message it is, kept in its payload (e.g. « nudge », counted by lib/nudge.ts). */
   kind?: string;
-  /** Outside the 24 h window: an approved template and its parameters. */
-  template?: { name: string; params: string[] };
+  /** Outside the 24 h window: an approved template and its parameters, and another if Meta refuses it (not approved yet). */
+  template?: { name: string; params: string[]; fallback?: { name: string; params: string[] } };
   /** More of the message's payload (a post's card, the publish offer its buttons answer). */
   payload?: Record<string, unknown>;
 };
@@ -52,6 +52,7 @@ export async function messageOwner(studioId: string, message: OwnerMessage): Pro
   const phone = owner?.phone ?? null;
   const payload = { ...message.payload, ...(message.kind ? { kind: message.kind } : {}), ...(message.options?.length ? { options: message.options } : {}), ...(message.notes?.length ? { notes: message.notes } : {}) };
 
+  let templateId: string | undefined;
   if (owner) {
     const waId = owner.waId;
     if (owner.open) {
@@ -62,11 +63,17 @@ export async function messageOwner(studioId: string, message: OwnerMessage): Pro
     if (message.template) {
       // Outside the window only an approved template opens the conversation; her answer
       // reopens it and Simone sees the waiting message in her context.
-      await sendTemplate(waId, message.template.name, message.template.params).catch((error) =>
-        console.warn("template refused", message.template!.name, error instanceof Error ? error.message : error),
-      );
+      const refused = (name: string) => (error: unknown) => {
+        console.warn("template refused", name, error instanceof Error ? error.message : error);
+        return undefined;
+      };
+      const { name, params, fallback } = message.template;
+      templateId = await sendTemplate(waId, name, params).catch(refused(name));
+      if (!templateId && fallback) templateId = await sendTemplate(waId, fallback.name, fallback.params).catch(refused(fallback.name));
     }
   }
-  await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "web", direction: "outbound", type: "text", body: message.text, payload });
+  // The template's id kept with it: a « not delivered » from Meta (webhook) names it.
+  const kept = templateId ? { ...payload, template: { wa_message_id: templateId } } : payload;
+  await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "web", direction: "outbound", type: "text", body: message.text, payload: kept });
   return phone && message.template ? "template" : "app";
 }

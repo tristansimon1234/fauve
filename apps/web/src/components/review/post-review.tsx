@@ -1,7 +1,6 @@
 "use client";
 
 import { EFFECT_MINUTES, timeline, type PostCover } from "@fauve/agent";
-import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
@@ -12,20 +11,21 @@ import { Mascot } from "@/components/mascot";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
 import { ChangePanel, type ChangeView } from "./change-panel";
+import { OpeningEditor, type EditorParts } from "./editor-parts";
 import type { EditStart } from "./reel-editor";
 import { SceneStrip } from "./scene-strip";
 
-// « Modifier » plays the montage live (Remotion): loaded only when she opens it, in place
-// of the video, the page itself becoming the editor.
-const ReelEditor = dynamic(() => import("./reel-editor").then((m) => m.ReelEditor), { ssr: false });
+// « Modifier » plays the montage live (Remotion): its code is loaded only when she opens it.
+type EditorModule = typeof import("./reel-editor");
 
 // « Ta publication », the page of a Reel for someone who has never edited a video: the
 // video as it will go out, its scenes in a row, when and where, its caption, ONE button
 // that says what it does (« Publier maintenant »: nothing goes out on its own at a set time,
 // Simone reminds her at the moment she suggested), and « Changer quelque chose ».
-// A scene or « Le texte à l'écran » turns the page into « Modifier » (texts, their place
-// and style, the order of the scenes), live, where the video was. Same page in the app
-// and from WhatsApp.
+// A scene or « Le texte à l'écran » opens « Modifier » (texts, their place and style, the
+// order of the scenes) without leaving: the Reel plays live in the same frame, its scenes
+// stay under it, the panel beside becomes the text or the scene, « Annuler » / « Enregistrer »
+// in the panel (and in the bar at the bottom of a phone). Same page in the app and from WhatsApp.
 
 const STEPS: Record<string, string> = {
   montage: "Simone refait le montage",
@@ -60,6 +60,7 @@ export function PostReview({
   const [toast, setToast] = useState<string | null>(null);
   /** « Modifier » open, on a text or a scene. */
   const [editing, setEditing] = useState<EditStart | null>(null);
+  const [editor, setEditor] = useState<EditorModule | null>(null);
   /** Where the video is, for the scene it shows. */
   const [time, setTime] = useState(0);
   const spans = useMemo(() => timeline(data.plan), [data.plan]);
@@ -88,9 +89,15 @@ export function PostReview({
   };
   const edit = (start: EditStart) => {
     setSheet(false);
+    setView("menu");
     video.current?.pause();
     setEditing(start);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (!editor) {
+      import("./reel-editor").then(setEditor, () => {
+        setEditing(null);
+        setError("Le montage n’a pas pu s’ouvrir. Réessaie dans un instant.");
+      });
+    }
   };
   const closeEditor = (saved?: string) => {
     setEditing(null);
@@ -195,159 +202,195 @@ export function PostReview({
     </div>
   );
 
-  // « Modifier » in place: the same page, the live video where the video was.
+  // « Modifier » open: the same page, each piece of the editor where its own was.
   if (editing) {
+    const Editor = editor?.ReelEditor;
+    return Editor ? (
+      <Editor postId={data.postId} scenes={data.scenes} start={editing} onClose={closeEditor} onAsk={askScene} layout={page} />
+    ) : (
+      <OpeningEditor onClose={closeEditor} layout={page} />
+    );
+  }
+  return page(null);
+
+  function page(parts: EditorParts | null) {
     return (
-      <div className="flex flex-col gap-5 pb-10">
-        <ReelEditor postId={data.postId} scenes={data.scenes} start={editing} onClose={closeEditor} onAsk={askScene} inline />
+      <div className="flex flex-col gap-5 pb-36 lg:pb-0">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
+          {/* The Reel as it will go out. */}
+          <section aria-label="Aperçu" className="flex flex-col items-center gap-3 rounded-[24px] bg-soft px-4 py-5 lg:py-8">
+            {parts ? (
+              <p className="text-[13.5px] font-bold text-violet">Tu modifies ton Reel</p>
+            ) : (
+              <StatusLine data={data} onBack={back} pending={pending} />
+            )}
+            {/* On a phone it leaves room for its scenes and the buttons below; from a laptop, 320 px wide. */}
+            <div className="relative aspect-[9/16] w-[max(176px,min(280px,calc((100dvh-470px)*0.5625)))] overflow-hidden rounded-[22px] bg-ink shadow-[0_18px_44px_rgba(28,21,48,.18)] lg:w-[320px]">
+              {parts?.preview ? (
+                parts.preview
+              ) : data.videoUrl ? (
+                <video
+                  key={data.videoUrl}
+                  ref={video}
+                  src={data.videoUrl}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="auto"
+                  onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
+                  className="size-full object-cover"
+                  aria-label="Ton Reel"
+                />
+              ) : null}
+              {data.videoUrl && !parts && (
+                <button
+                  type="button"
+                  onClick={toggleSound}
+                  aria-label={sound ? "Couper le son" : "Mettre le son"}
+                  className="absolute right-3 bottom-3 flex size-11 items-center justify-center rounded-full bg-ink/60 text-white backdrop-blur-sm"
+                >
+                  {sound ? <VolumeIcon size={20} /> : <VolumeOffIcon size={20} />}
+                </button>
+              )}
+              {!parts?.preview && data.failed && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/70 p-6 text-center text-white">
+                  <span className="flex size-20 items-center justify-center rounded-full bg-white">
+                    <Mascot size={64} mood="sad" />
+                  </span>
+                  <span className="text-[16px] font-extrabold">La vidéo n’a pas pu être fabriquée</span>
+                  <span className="text-[13px] leading-snug text-white/85">Dis-le à Simone dans « Autre chose » : elle la relance.</span>
+                </div>
+              )}
+              {!parts?.preview && !data.failed && (data.making || !data.videoUrl) && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/65 p-6 text-center text-white">
+                  <span className="flex size-20 items-center justify-center rounded-full bg-white">
+                    <Mascot size={64} mood="thinking" />
+                  </span>
+                  <span className="text-[16px] font-extrabold">{data.making?.step ? (STEPS[data.making.step] ?? "Simone y travaille") : "La vidéo se met à jour"}</span>
+                  <span className="text-[13px] leading-snug text-white/85">
+                    {data.making?.step === "effet" ? `Ça prend ${EFFECT_MINUTES} minutes.` : "Ça prend une à deux minutes."} Tu peux fermer, Simone te prévient.
+                  </span>
+                </div>
+              )}
+            </div>
+            {/* Its scenes: a tap opens « Modifier » on that one; while it is open, they choose the scene to change. */}
+            {parts?.strip ? (
+              <div className="flex w-full max-w-[340px] flex-col items-center gap-1">{parts.strip}</div>
+            ) : (
+              !data.locked &&
+              !data.making &&
+              !data.failed &&
+              data.videoUrl &&
+              data.plan.segments.length > 1 && (
+                <div className="flex w-full max-w-[340px] flex-col items-center gap-1">
+                  <SceneStrip
+                    segments={data.plan.segments}
+                    sprite={data.scenes}
+                    playing={spans.findIndex((s) => time >= s.start && time < s.end)}
+                    onPick={(scene) => (parts ? undefined : edit({ scene }))}
+                  />
+                  {!parts && <p className="text-[12px] font-semibold text-muted">Touche une scène pour la modifier</p>}
+                </div>
+              )
+            )}
+            {!parts && (
+              <>
+                <p className="w-full max-w-[320px] text-[13.5px] leading-snug">
+                  <strong className="font-extrabold">{data.handle ?? "toi"}</strong> {clip(data.captionShown)}{" "}
+                  {!data.locked && (
+                    <button type="button" onClick={() => openView("caption")} className="font-semibold text-muted hover:text-ink">
+                      modifier
+                    </button>
+                  )}
+                </p>
+                {data.downloadUrl && (
+                  <a href={data.downloadUrl} download className="text-[13px] font-semibold text-muted underline underline-offset-3 hover:text-ink">
+                    Télécharger la vidéo
+                  </a>
+                )}
+                {data.videoUrl && !data.making && <KeepAsModel key={data.model?.state ?? "none"} postId={data.postId} model={data.model} />}
+              </>
+            )}
+          </section>
+
+          {parts ? (
+            // « Modifier »: the panel beside the video becomes the text or the scene chosen.
+            <aside aria-label="Modifier" className="flex flex-col gap-4 rounded-[24px] border border-line bg-white p-5">
+              <div className="hidden lg:block">{parts.actions}</div>
+              {parts.settings}
+            </aside>
+          ) : (
+            <aside className="flex flex-col gap-3.5">
+              <button
+                type="button"
+                onClick={() => !data.locked && openView("date")}
+                disabled={data.locked}
+                className="flex w-full items-center gap-3 rounded-[20px] border border-line bg-white py-2.5 pr-4 pl-2.5 text-left hover:border-lilac disabled:hover:border-line"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-tint text-violet">
+                  <CalendarIcon size={19} />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[15px] font-extrabold">{data.when && data.upcoming ? `Je te fais signe ${data.when.short}` : "Quand te faire signe ?"}</span>
+                  <span className="text-[13px] text-muted">Pour le poster au bon moment, sur {where}</span>
+                </span>
+                {!data.locked && <ChevronRightIcon size={18} className="text-muted" />}
+              </button>
+
+              <div className="hidden lg:block">{action}</div>
+              {error && (
+                <p role="alert" className="hidden text-[13.5px] font-semibold text-danger lg:block">
+                  {error}
+                </p>
+              )}
+
+              {/* One panel at a time: beside the video from a laptop, in the sheet on a phone. */}
+              {!data.locked && !sheet && <div className="hidden rounded-[24px] border border-line bg-white p-5 lg:block">{panel}</div>}
+            </aside>
+          )}
+        </div>
+
+        {/* Phone: the button that publishes and « Changer quelque chose », always at hand; « Annuler » / « Enregistrer » while « Modifier » is open. */}
+        {!data.locked && (
+          <div
+            className={`fixed inset-x-0 z-30 flex flex-col gap-2 border-t border-line bg-white/95 px-4 pt-3 pb-3 backdrop-blur lg:hidden ${surface === "app" ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"}`}
+          >
+            {parts ? (
+              parts.actions
+            ) : (
+              <>
+                {error && (
+                  <p role="alert" className="text-center text-[13.5px] font-semibold text-danger">
+                    {error}
+                  </p>
+                )}
+                {action}
+                <button type="button" onClick={() => openView("menu")} className="btn btn-secondary h-[50px] w-full text-[16px] font-extrabold">
+                  Changer quelque chose
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {sheet && (
+          <Sheet onClose={() => setSheet(false)} label="Changer quelque chose">
+            {panel}
+          </Sheet>
+        )}
+
+        {toast && (
+          <p
+            role="status"
+            className={`fixed inset-x-4 z-40 mx-auto max-w-[420px] rounded-[18px] bg-ink px-4 py-3 text-center text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(28,21,48,.25)] lg:bottom-8 ${surface === "app" ? "bottom-[calc(14rem+env(safe-area-inset-bottom))]" : "bottom-[calc(9.5rem+env(safe-area-inset-bottom))]"}`}
+          >
+            {toast}
+          </p>
+        )}
       </div>
     );
   }
-
-  return (
-    <div className="flex flex-col gap-5 pb-36 lg:pb-0">
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
-        {/* The Reel as it will go out. */}
-        <section aria-label="Aperçu" className="flex flex-col items-center gap-3 rounded-[24px] bg-soft px-4 py-5 lg:py-8">
-          <StatusLine data={data} onBack={back} pending={pending} />
-          {/* On a phone it leaves room for its scenes and the buttons below; from a laptop, 320 px wide. */}
-          <div className="relative aspect-[9/16] w-[max(176px,min(280px,calc((100dvh-470px)*0.5625)))] overflow-hidden rounded-[22px] bg-ink shadow-[0_18px_44px_rgba(28,21,48,.18)] lg:w-[320px]">
-            {data.videoUrl ? (
-              <video
-                key={data.videoUrl}
-                ref={video}
-                src={data.videoUrl}
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="auto"
-                onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
-                className="size-full object-cover"
-                aria-label="Ton Reel"
-              />
-            ) : null}
-            {data.videoUrl && (
-              <button
-                type="button"
-                onClick={toggleSound}
-                aria-label={sound ? "Couper le son" : "Mettre le son"}
-                className="absolute right-3 bottom-3 flex size-11 items-center justify-center rounded-full bg-ink/60 text-white backdrop-blur-sm"
-              >
-                {sound ? <VolumeIcon size={20} /> : <VolumeOffIcon size={20} />}
-              </button>
-            )}
-            {data.failed && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/70 p-6 text-center text-white">
-                <span className="flex size-20 items-center justify-center rounded-full bg-white">
-                  <Mascot size={64} mood="sad" />
-                </span>
-                <span className="text-[16px] font-extrabold">La vidéo n’a pas pu être fabriquée</span>
-                <span className="text-[13px] leading-snug text-white/85">Dis-le à Simone dans « Autre chose » : elle la relance.</span>
-              </div>
-            )}
-            {!data.failed && (data.making || !data.videoUrl) && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/65 p-6 text-center text-white">
-                <span className="flex size-20 items-center justify-center rounded-full bg-white">
-                  <Mascot size={64} mood="thinking" />
-                </span>
-                <span className="text-[16px] font-extrabold">{data.making?.step ? (STEPS[data.making.step] ?? "Simone y travaille") : "La vidéo se met à jour"}</span>
-                <span className="text-[13px] leading-snug text-white/85">
-                  {data.making?.step === "effet" ? `Ça prend ${EFFECT_MINUTES} minutes.` : "Ça prend une à deux minutes."} Tu peux fermer, Simone te prévient.
-                </span>
-              </div>
-            )}
-          </div>
-          {/* Its scenes: a tap opens « Modifier » on that one. */}
-          {!data.locked && !data.making && !data.failed && data.videoUrl && data.plan.segments.length > 1 && (
-            <div className="flex w-full max-w-[340px] flex-col items-center gap-1">
-              <SceneStrip
-                segments={data.plan.segments}
-                sprite={data.scenes}
-                playing={spans.findIndex((s) => time >= s.start && time < s.end)}
-                onPick={(scene) => edit({ scene })}
-              />
-              <p className="text-[12px] font-semibold text-muted">Touche une scène pour la modifier</p>
-            </div>
-          )}
-          <p className="w-full max-w-[320px] text-[13.5px] leading-snug">
-            <strong className="font-extrabold">{data.handle ?? "toi"}</strong> {clip(data.captionShown)}{" "}
-            {!data.locked && (
-              <button type="button" onClick={() => openView("caption")} className="font-semibold text-muted hover:text-ink">
-                modifier
-              </button>
-            )}
-          </p>
-          {data.downloadUrl && (
-            <a href={data.downloadUrl} download className="text-[13px] font-semibold text-muted underline underline-offset-3 hover:text-ink">
-              Télécharger la vidéo
-            </a>
-          )}
-          {data.videoUrl && !data.making && <KeepAsModel key={data.model?.state ?? "none"} postId={data.postId} model={data.model} />}
-        </section>
-
-        <aside className="flex flex-col gap-3.5">
-          <button
-            type="button"
-            onClick={() => !data.locked && openView("date")}
-            disabled={data.locked}
-            className="flex w-full items-center gap-3 rounded-[20px] border border-line bg-white py-2.5 pr-4 pl-2.5 text-left hover:border-lilac disabled:hover:border-line"
-          >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-tint text-violet">
-              <CalendarIcon size={19} />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-[15px] font-extrabold">{data.when && data.upcoming ? `Je te fais signe ${data.when.short}` : "Quand te faire signe ?"}</span>
-              <span className="text-[13px] text-muted">Pour le poster au bon moment, sur {where}</span>
-            </span>
-            {!data.locked && <ChevronRightIcon size={18} className="text-muted" />}
-          </button>
-
-          <div className="hidden lg:block">{action}</div>
-          {error && (
-            <p role="alert" className="hidden text-[13.5px] font-semibold text-danger lg:block">
-              {error}
-            </p>
-          )}
-
-          {/* One panel at a time: beside the video from a laptop, in the sheet on a phone. */}
-          {!data.locked && !sheet && <div className="hidden rounded-[24px] border border-line bg-white p-5 lg:block">{panel}</div>}
-        </aside>
-      </div>
-
-      {/* Phone: the button that publishes and « Changer quelque chose », always at hand. */}
-      {!data.locked && (
-        <div
-          className={`fixed inset-x-0 z-30 flex flex-col gap-2 border-t border-line bg-white/95 px-4 pt-3 pb-3 backdrop-blur lg:hidden ${surface === "app" ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"}`}
-        >
-          {error && (
-            <p role="alert" className="text-center text-[13.5px] font-semibold text-danger">
-              {error}
-            </p>
-          )}
-          {action}
-          <button type="button" onClick={() => openView("menu")} className="btn btn-secondary h-[50px] w-full text-[16px] font-extrabold">
-            Changer quelque chose
-          </button>
-        </div>
-      )}
-
-      {sheet && (
-        <Sheet onClose={() => setSheet(false)} label="Changer quelque chose">
-          {panel}
-        </Sheet>
-      )}
-
-      {toast && (
-        <p
-          role="status"
-          className={`fixed inset-x-4 z-40 mx-auto max-w-[420px] rounded-[18px] bg-ink px-4 py-3 text-center text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(28,21,48,.25)] lg:bottom-8 ${surface === "app" ? "bottom-[calc(14rem+env(safe-area-inset-bottom))]" : "bottom-[calc(9.5rem+env(safe-area-inset-bottom))]"}`}
-        >
-          {toast}
-        </p>
-      )}
-    </div>
-  );
 }
 
 /** About two lines of the caption, as the feed shows it before « plus ». */

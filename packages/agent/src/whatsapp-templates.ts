@@ -3,6 +3,10 @@
 export const whatsappTemplates = {
   content_request: { category: "utility", params: ["what", "day"] },
   draft_ready: { category: "utility", params: ["kind", "day"] },
+  // The reminder at the moment she chose (lib/reminders.ts), worded as a reminder of her own post so Meta
+  // keeps it Utility (draft_ready, « Je le programme ? », was moved to Marketing and capped):
+  // « Rappel : ton {{1}} « {{2}} » est prévu pour maintenant. Tu veux que je le publie ? »
+  post_reminder: { category: "utility", params: ["kind", "title"] },
   weekly_report: { category: "utility", params: [] },
   // « C’est l’heure de publier « {{1}} » ! Réponds-moi et je t’envoie la vidéo et la légende. »
   ready_to_post: { category: "utility", params: ["title"] },
