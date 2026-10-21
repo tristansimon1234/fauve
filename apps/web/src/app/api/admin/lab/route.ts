@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   CHAT_MODEL,
   editPlanSchema,
+  GEMINI_MODEL_ID,
   imaginedBrief,
   intentionTitle,
   isMotionSegment,
@@ -87,6 +88,10 @@ import { photoRegions } from "@/lib/video/regions";
 //                        twins and keeps the photos that show the business), then its first Reel
 //                        from those photos (clips=1 adds the stock clips of the kind's trade; the
 //                        kind only sets the idea). Never published. step=result adds its brand.
+//   motion=<gemini model>|claude  (with a case or a site) the model that writes its animations from
+//                        this run on (studios.motion_model, read only for a lab studio): to compare
+//                        Gemini with Opus on the same case (reset=1 for the same first Reel); step=result
+//                        gives the model and what its animations cost (motion).
 // Lab studios go with /api/admin/delete-studio.
 // A render with its music (step=music) runs after the answer, as long as a montage job's step.
 export const maxDuration = 800;
@@ -346,9 +351,10 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
 /** The voice over a lab Reel: Simone's (voice=), or a voice note of hers (own_voice=). */
 type LabVoice = { simone: string | null; hers: string | null };
 
-async function start(name: string, c: LabCase, reset: boolean, voice: LabVoice, idea: string | null, steal: { url: string | null; only: boolean }, asCarousel = false) {
+async function start(name: string, c: LabCase, reset: boolean, voice: LabVoice, idea: string | null, steal: { url: string | null; only: boolean }, asCarousel = false, motion?: Motion) {
   const studioId = await labStudio(name, c);
   if (reset) await clearPosts(studioId);
+  await setMotion(studioId, motion);
   const copy = steal.url ? await labSteal(studioId, steal.url) : null;
   if (steal.only) return;
   const { videos, photos } = await labMedia(studioId, c);
@@ -372,6 +378,23 @@ async function carousel(name: string, studioId: string, idea: string, photos: st
   if (post.error) throw new Error(post.error.message);
   const started = await startCarousel({ studioId, postId: post.data.id as string, request: idea, mediaIds: media, charge: false });
   console.log("lab: carousel started", name, post.data.id, JSON.stringify(started));
+}
+
+/** Who writes the animations: a Gemini model, or null for Opus; undefined leaves the studio as it is. */
+type Motion = string | null | undefined;
+
+/** motion=claude|<gemini model>, or "bad" for anything else. */
+function motionOf(params: URLSearchParams): Motion | "bad" {
+  const motion = params.get("motion");
+  if (motion === null) return undefined;
+  if (motion === "claude") return null;
+  return GEMINI_MODEL_ID.test(motion) ? motion : "bad";
+}
+
+async function setMotion(studioId: string, motion: Motion) {
+  if (motion === undefined) return;
+  const { error } = await supabaseAdmin().from("studios").update({ motion_model: motion }).eq("id", studioId);
+  if (error) throw new Error(`lab: motion model not set: ${error.message}`);
 }
 
 /** A new first Reel: the studio's posts and scenes go (its media and brand stay). */
@@ -427,10 +450,11 @@ const ANY_KIND: (typeof KINDS)[string] = {
   carousel: "Un carrousel avec les photos de mon site, qui présente le commerce et donne envie de venir.",
 };
 
-async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice, idea: string | null, template?: MotionTemplate, asCarousel = false) {
+async function startSite(url: string, kindName: string, withClips: boolean, reset: boolean, voice: LabVoice, idea: string | null, template?: MotionTemplate, asCarousel = false, motion?: Motion) {
   const kind = KINDS[kindName] ?? ANY_KIND;
   const studioId = await siteStudio(url, kind);
   if (reset) await clearPosts(studioId);
+  await setMotion(studioId, motion);
   const db = supabaseAdmin();
   const { data: site } = await db.from("media_assets").select("id").eq("studio_id", studioId).eq("source", "website").eq("kind", "image").order("created_at").limit(asCarousel ? 10 : 8);
   if (asCarousel) return carousel(siteKey(url), studioId, idea ?? kind.carousel, (site ?? []).map((m) => m.id as string));
@@ -521,7 +545,7 @@ const ideaOf = (params: URLSearchParams) => params.get("idea")?.trim().slice(0, 
 
 async function result(key: string) {
   const db = supabaseAdmin();
-  const studio = await db.from("studios").select("id, name, business_type, memory").eq("website_url", key).maybeSingle();
+  const studio = await db.from("studios").select("id, name, business_type, memory, motion_model").eq("website_url", key).maybeSingle();
   if (!studio.data) return { error: "case not set up" };
   const studioId = studio.data.id as string;
   const post = await db
@@ -537,7 +561,7 @@ async function result(key: string) {
   const [plans, message, costs, voice, brand] = await Promise.all([
     db.from("edit_plans").select("id, version, plan, created_at").eq("post_id", post.data.id).order("version"),
     db.from("whatsapp_messages").select("body, created_at").eq("studio_id", studioId).eq("direction", "outbound").order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    db.from("cost_events").select("kind, cost_eur, created_at").eq("studio_id", studioId),
+    db.from("cost_events").select("kind, cost_eur, created_at, meta").eq("studio_id", studioId),
     post.data.voice_media_id ? db.from("media_assets").select("transcript").eq("id", post.data.voice_media_id).maybeSingle() : Promise.resolve({ data: null }),
     db.from("brand_profiles").select("version, profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
   ]);
@@ -576,9 +600,14 @@ async function result(key: string) {
     }
     return sums;
   };
+  // Its animations: who wrote them, and what they cost for this Reel (with their fixes).
+  const motionCost = (costs.data ?? [])
+    .filter((c) => new Date(c.created_at as string) >= new Date(post.data!.created_at as string) && (c.meta as { purpose?: string } | null)?.purpose === "motion_designer")
+    .reduce((sum, c) => sum + Number(c.cost_eur), 0);
   return {
     studioId,
     studio: { name: studio.data.name, business: studio.data.business_type, facts: studio.data.memory },
+    motion: { model: (studio.data.motion_model as string | null) ?? "claude", cost_eur: Math.round(motionCost * 1000) / 1000 },
     brand: {
       version: brand.data?.version ?? null,
       colors: profile.colors ?? [],
@@ -712,8 +741,10 @@ export async function POST(request: Request) {
     const template = params.get("template") ? motionTemplateSchema.safeParse(params.get("template")) : null;
     if (template && !template.success) return Response.json({ error: "template" }, { status: 400 });
     const asCarousel = params.get("format") === "carrousel";
+    const motion = motionOf(params);
+    if (motion === "bad") return Response.json({ error: "motion=claude|<gemini model>" }, { status: 400 });
     after(() =>
-      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params), template?.data, asCarousel).catch((error: unknown) =>
+      startSite(url.href, kind, params.get("clips") === "1", params.get("reset") === "1", voiceOf(params), ideaOf(params), template?.data, asCarousel, motion).catch((error: unknown) =>
         console.error("lab: site failed", url.href, error),
       ),
     );
@@ -752,7 +783,9 @@ export async function POST(request: Request) {
   }
   const stealing = { url: steal, only: params.get("steal_only") === "1" };
   const asCarousel = params.get("format") === "carrousel";
+  const motion = motionOf(params);
+  if (motion === "bad") return Response.json({ error: "motion=claude|<gemini model>" }, { status: 400 });
   // call_app gives up after a few seconds: the work goes on after the answer.
-  after(() => start(name, run, params.get("reset") === "1", voiceOf(params), ideaOf(params), stealing, asCarousel).catch((error: unknown) => console.error("lab: case failed", name, error)));
-  return Response.json({ ok: true, case: name, started: true, ...(steal ? { steal } : {}), ...(asCarousel ? { format: "carrousel" } : {}) });
+  after(() => start(name, run, params.get("reset") === "1", voiceOf(params), ideaOf(params), stealing, asCarousel, motion).catch((error: unknown) => console.error("lab: case failed", name, error)));
+  return Response.json({ ok: true, case: name, started: true, ...(steal ? { steal } : {}), ...(asCarousel ? { format: "carrousel" } : {}), ...(motion !== undefined ? { motion: motion ?? "claude" } : {}) });
 }

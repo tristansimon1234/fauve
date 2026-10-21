@@ -2,6 +2,7 @@ import "server-only";
 import {
   CLAUDE_MODEL,
   checkMotionCode,
+  GEMINI_MODEL_ID,
   MOTION_DESIGNER_PROMPT,
   motionSceneOutputSchema,
   type ComposeShot,
@@ -13,9 +14,15 @@ import {
   type TextBand,
   type TrackPiece,
 } from "@fauve/agent";
-import { outputFormat } from "@fauve/agent/answer";
+import { outputFormat, readAnswer } from "@fauve/agent/answer";
+import { GoogleGenAI } from "@google/genai";
 import { transform } from "sucrase";
+import { z } from "zod";
+import { env } from "@/lib/env";
 import { googleFont } from "@/lib/fonts";
+import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
+import { toGeminiSchema } from "@/lib/gemini-schema";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { smokeTestScenes, type SceneChecks, type SmokeScene } from "@/lib/render/sandbox";
 import { anthropic, logClaudeCost } from "./run";
 
@@ -87,12 +94,59 @@ const MAX_SCENE_FONTS = 2;
 
 const EDGE_WORDS = { top: "le haut", bottom: "le bas", left: "la gauche", right: "la droite" } as const;
 
+type Block = { type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: "image/jpeg"; data: string } };
+type SceneOutput = z.output<typeof motionSceneOutputSchema>;
+
+async function askClaude(studioId: string, content: string | Block[]): Promise<SceneOutput | null> {
+  const response = await anthropic().beta.messages.parse({
+    model: CLAUDE_MODEL,
+    max_tokens: 16000,
+    // Medium: the code needs care, not long deliberation; most of the cost was thinking tokens.
+    output_config: { effort: "medium", format: outputFormat(motionSceneOutputSchema) },
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    system: [{ type: "text", text: MOTION_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
+    messages: [{ role: "user", content }],
+  });
+  await logClaudeCost(studioId, response.usage, "motion_designer");
+  return response.parsed_output ?? null;
+}
+
+// Gemini as the motion designer, for a lab studio only (studios.motion_model): the same prompt,
+// the same request and the same checks, to compare the two on the same cases.
+let geminiClient: GoogleGenAI | undefined;
+const gemini = () => (geminiClient ??= new GoogleGenAI({ apiKey: env("GEMINI_API_KEY") }));
+// Patterns and bounds are left to readAnswer, which repairs them (Gemini may refuse a pattern).
+const GEMINI_SCENE_SCHEMA = toGeminiSchema(z.toJSONSchema(motionSceneOutputSchema), ["pattern"]);
+
+async function askGemini(studioId: string, model: string, content: string | Block[]): Promise<SceneOutput | null> {
+  const parts = (typeof content === "string" ? [{ type: "text" as const, text: content }] : content).map((b) =>
+    b.type === "text" ? { text: b.text } : { inlineData: { mimeType: b.source.media_type, data: b.source.data } },
+  );
+  const response = await gemini().models.generateContent({
+    model,
+    contents: [{ role: "user", parts }],
+    config: { systemInstruction: MOTION_DESIGNER_PROMPT, responseMimeType: "application/json", responseJsonSchema: GEMINI_SCENE_SCHEMA, maxOutputTokens: 32000 },
+  });
+  await logGeminiCost({ studioId, kind: "llm", model, usage: response.usageMetadata as GeminiUsage, meta: { purpose: "motion_designer" } });
+  return response.text ? readAnswer(motionSceneOutputSchema, JSON.parse(response.text)) : null;
+}
+
+/** The model that writes this studio's scenes: Opus, or the Gemini model a lab studio is set to (studios.motion_model). */
+async function designerModel(studioId: string): Promise<string> {
+  const { data } = await supabaseAdmin().from("studios").select("website_url, motion_model").eq("id", studioId).maybeSingle();
+  const lab = typeof data?.website_url === "string" && data.website_url.startsWith("lab://");
+  const asked = data?.motion_model as string | null | undefined;
+  return lab && asked && GEMINI_MODEL_ID.test(asked) ? asked : CLAUDE_MODEL;
+}
+
 function transpile(code: string): string {
   return transform(code, { transforms: ["typescript", "jsx"], jsxRuntime: "classic", production: true }).code;
 }
 
 async function writeScene(
   studioId: string,
+  model: string,
   request: SceneRequest,
   brand: Brand,
   artDirection: string | undefined,
@@ -143,8 +197,7 @@ async function writeScene(
         ...(seen ? { version_precedente: { relecture: seen.review.slice(0, 1500), images: `${seen.frames.length} images jointes, au-dessus` } } : {}),
         code_precedent: seen?.code ?? request.previousCode,
       });
-  type Block = { type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: "image/jpeg"; data: string } };
-  const content: string | Block[] = seen
+    const content: string | Block[] = seen
     ? [
         { type: "text", text: "Ton animation d'avant, rendue sur ses images :" },
         ...seen.frames.flatMap((f): Block[] => [
@@ -154,27 +207,17 @@ async function writeScene(
         { type: "text", text },
       ]
     : text;
-  const response = await anthropic().beta.messages.parse({
-    model: CLAUDE_MODEL,
-    max_tokens: 16000,
-    // Medium: the code needs care, not long deliberation; most of the cost was thinking tokens.
-    output_config: { effort: "medium", format: outputFormat(motionSceneOutputSchema) },
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system: [{ type: "text", text: MOTION_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content }],
-  });
-  await logClaudeCost(studioId, response.usage, "motion_designer");
-  const code = response.parsed_output?.code ?? "";
+  const output = model === CLAUDE_MODEL ? await askClaude(studioId, content) : await askGemini(studioId, model, content);
+  const code = output?.code ?? "";
   // Only photos it was offered, each once, in its order.
   const offered = new Set((request.photos ?? []).map((p) => p.id));
-  const photos = [...new Set(response.parsed_output?.photos ?? [])].filter((id) => offered.has(id)).slice(0, MAX_SCENE_PHOTOS);
+  const photos = [...new Set(output?.photos ?? [])].filter((id) => offered.has(id)).slice(0, MAX_SCENE_PHOTOS);
   // The fonts it brings: only families Google Fonts serves, by the name it serves them under (the render loads them from there).
-  const named = [...new Set((response.parsed_output?.fonts ?? []).map((f) => f.trim()))]
+  const named = [...new Set((output?.fonts ?? []).map((f) => f.trim()))]
     .filter((f) => f && f !== brand.displayFont && f !== brand.bodyFont)
     .slice(0, MAX_SCENE_FONTS);
   const fonts = (await Promise.all(named.map((f) => googleFont(f).catch(() => null)))).filter((f): f is string => Boolean(f));
-  const meta = { name: response.parsed_output?.name ?? "", slots: response.parsed_output?.slots ?? [], notes: response.parsed_output?.notes ?? "", photos, fonts };
+  const meta = { name: output?.name ?? "", slots: output?.slots ?? [], notes: output?.notes ?? "", photos, fonts };
   const problems = checkMotionCode(code);
   if (problems.length) return { code, js: null, error: `code refusé : ${problems.join(", ")}`, ...meta };
   try {
@@ -206,6 +249,7 @@ export async function designMotionScenes(
   context: { kept?: string[]; done?: string[]; look?: SmokeScene["look"] } = {},
 ): Promise<SceneResult[]> {
   if (!requests.length) return [];
+  const model = await designerModel(studioId);
   const requestOf = (id: string) => requests.find((q) => q.id === id)!;
   // One after the other: each scene knows what the earlier ones of the Reel do (a minute more for a second one).
   let results: SceneResult[] = [];
@@ -218,7 +262,7 @@ export async function designMotionScenes(
       ],
       done: context.done ?? [],
     };
-    results.push({ id: r.id, ...(await writeScene(studioId, r, brand, artDirection, kit, existing).catch((e: unknown) => ({ code: null, js: null, error: String(e) }))) });
+    results.push({ id: r.id, ...(await writeScene(studioId, model, r, brand, artDirection, kit, existing).catch((e: unknown) => ({ code: null, js: null, error: String(e) }))) });
   }
 
   // Scenes that passed the check but leave a text on a face of the footage they follow: kept as they
@@ -257,7 +301,7 @@ export async function designMotionScenes(
     const fixed = await Promise.all(
       toFix.map(async (r) => ({
         id: r.id,
-        ...(await writeScene(studioId, requestOf(r.id), brand, artDirection, kit, { reel: [], done: [] }, {
+        ...(await writeScene(studioId, model, requestOf(r.id), brand, artDirection, kit, { reel: [], done: [] }, {
           code: r.code!,
           error: r.error ?? checks.faces[r.id] ?? "erreur",
           photos: r.photos,
