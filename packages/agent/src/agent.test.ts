@@ -345,7 +345,7 @@ test("variants: same cut and rhythm with a new hook, priced as a render", async 
 });
 
 test("the editor chooses each Reel's tempo and the collage form, no ambiance", async () => {
-  const { fromEditorPlan, signatureTransition, EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
+  const { fromEditorPlan, keepWrittenAnimations, signatureTransition, EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
   const base = {
     duration: 6,
     segments: [
@@ -360,17 +360,32 @@ test("the editor chooses each Reel's tempo and the collage form, no ambiance", a
     transitions: "cut" as const,
     subtitles: false,
   };
-  const calm = fromEditorPlan({ ...base, tempo: 82, collage: false });
+  const calm = fromEditorPlan({ ...base, tempo: 82, form: "montage" as const });
   assert.equal(calm.template, "libre");
   assert.equal(calm.tempo, 82);
   assert.equal(calm.segments.find((s) => "accent" in s && s.accent)?.["accent" as never], "wipe"); // a calm Reel's signature: the wipe
-  const lively = fromEditorPlan({ ...base, tempo: 124, collage: false });
+  const lively = fromEditorPlan({ ...base, tempo: 124, form: "montage" as const });
   assert.equal(lively.segments.find((s) => "accent" in s && s.accent)?.["accent" as never], "punch");
-  assert.equal(fromEditorPlan({ ...base, tempo: 400, collage: false }).tempo, 130); // kept in its range
-  assert.equal(fromEditorPlan({ ...base, tempo: 20, collage: false }).tempo, 70);
-  const collage = fromEditorPlan({ ...base, tempo: 104, collage: true });
+  assert.equal(fromEditorPlan({ ...base, tempo: 400, form: "montage" as const }).tempo, 130); // kept in its range
+  assert.equal(fromEditorPlan({ ...base, tempo: 20, form: "montage" as const }).tempo, 70);
+  const collage = fromEditorPlan({ ...base, tempo: 104, form: "collage" as const });
   assert.equal(collage.template, "collage");
   assert.equal(collage.tempo, 104);
+  // A composition (a split screen…): a free Reel whose animation over the whole Reel lays its shots.
+  const split = fromEditorPlan({ ...base, duration: 4, tempo: 100, form: "composition" as const, layers: [{ brief: "écran partagé : elle parle en bas", from: 0, to: 4 }] });
+  assert.equal(split.template, "libre");
+  assert.deepEqual(split.layers?.map((l) => [l.motion.brief, l.compose]), [["écran partagé : elle parle en bas", true]]);
+  const { composedLayers, compositionBrief } = await import("./compose.ts");
+  assert.equal(composedLayers(split, 4)[0]?.compose, true); // kept, over the whole Reel
+  assert.equal(composedLayers({ ...split, layers: [{ motion: { brief: "un cadre" }, from: 1, to: 3 }] }, 4)[0]?.compose, undefined);
+  // Without an animation over the whole Reel, one is added with a brief of its own (never a collage's).
+  const bare = fromEditorPlan({ ...base, duration: 4, tempo: 100, form: "composition" as const });
+  assert.equal(bare.layers?.[0]?.compose, true);
+  assert.equal(bare.layers?.[0]?.motion.brief, compositionBrief(bare));
+  assert.doesNotMatch(compositionBrief(bare), /collage/);
+  // A correction that only got that added composition keeps the one already written.
+  const written = { ...split, layers: [{ ...split.layers![0]!, motion: { brief: "écran partagé : elle parle en bas", js: "x", code: "x" } }] };
+  assert.equal(keepWrittenAnimations(bare, written).layers?.[0]?.motion.js, "x");
   // A plan written with a template (older callers) keeps it.
   assert.equal(fromEditorPlan({ ...base, template: "chic" }).template, "chic");
   assert.equal(signatureTransition("libre"), "punch"); // 100 BPM by default
@@ -1667,7 +1682,7 @@ test("formats: a key message held all along, film dust when the editor asks, Fre
   const output = {
     duration: 12,
     tempo: 118,
-    collage: false,
+    form: "montage" as const,
     segments: [
       { clip_id: "a", in: 0, out: 1.5, move: "none", speed: 1 },
       { clip_id: "b", in: 0, out: 1.5, move: "none", speed: 1 },
@@ -1831,6 +1846,7 @@ test("copy first: what the Reel she copies (or her request) does not have is nev
     effect: "none",
     grade: "natural",
     motion: "epure",
+    layout: "plein cadre",
     camera: "fixe",
     transitions: "coupes nettes",
     music: "slow lo-fi piano",
@@ -3336,6 +3352,7 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
     effect: "dust",
     grade: "film",
     motion: "energique",
+    layout: "plein cadre",
     camera: "à la main",
     transitions: "coupes nettes",
     music: "upbeat french house, warm bass, claps",
@@ -3467,6 +3484,7 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
     effect: "none" as const,
     grade: "natural" as const,
     motion: "energique" as const,
+    layout: "plein cadre",
     camera: "à la main" as const,
     transitions: "coupes nettes" as const,
     music: "punchy hip hop beat",
@@ -3493,6 +3511,14 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
   assert.deepEqual(followedLook({}, followedFrom(followed.inspiration_id, { ...style, look: clampLook({ ...reading, text: { ...reading.text, font: "" }, colors: [] }) })), {});
   // The editor and the critic know they are wanted.
   assert.match(followedForEditor(followed).police_et_couleurs ?? "", /Anton.*#ffdd00.*font son style/);
+  // A Reel laid out otherwise than full frame (a split screen) is copied as a composition, never a montage of full frames.
+  const { composedLayout } = await import("./steal.ts");
+  assert.equal(followedForEditor(followed).mise_en_page, undefined);
+  assert.equal(composedLayout({ layout: "Plein cadre, plans serrés" }), null);
+  assert.equal(composedLayout({}), null); // read before its layout was
+  const split = { ...followed, look: { ...followed.look, layout: "écran partagé : la personne en bas, la démo en haut" } };
+  assert.match(followedForEditor(split).mise_en_page ?? "", /écran partagé.*composition/);
+  assert.match(followedLine(split), /mise en page : écran partagé/);
   assert.match(followedLine(followed), /sa police \(Anton\) et ses couleurs/);
   // She is told what her Reel takes from it.
   assert.match(stolenStyleMessage(style, true), /une police et des couleurs comme les siennes \(elles font son style\)/);
@@ -3906,7 +3932,7 @@ test("model answers: read as written, then brought within their schema's limits"
   const plan = {
     duration: 12,
     tempo: 118,
-    collage: false,
+    form: "montage" as const,
     segments: [
       { clip_id: "a", in: 0, out: 1.5, move: "none", speed: 1 },
       { clip_id: "b", in: 0, out: 1.5, move: "none", speed: 1 },
@@ -4070,6 +4096,7 @@ test("her own Reel as a model: its structure for the editor, its origin for the 
     effect: "dust",
     grade: "warm",
     motion: "chaleureux",
+    layout: "plein cadre",
     camera: "à la main",
     transitions: "coupes nettes",
     music: "warm chillhop",

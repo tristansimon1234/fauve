@@ -17,6 +17,7 @@ import {
   clearOfVoice,
   compositionShots,
   compositionTexts,
+  isComposed,
   holdAfterVoice,
   keepWrittenAnimations,
   replacedAnimations,
@@ -333,7 +334,7 @@ export async function designEdit(params: {
                 : s,
             ),
             // Its animations over several shots, by their brief and span (a collage's composition named as such).
-            layers: previousPlan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, ...(l.compose ? { composition_du_collage: true } : {}) })),
+            layers: previousPlan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, ...(l.compose ? { composition_du_reel: true } : {}) })),
           }
         : undefined,
     request: params.brief ?? "Premier montage de cette publication.",
@@ -452,9 +453,9 @@ export async function designEdit(params: {
     ...plan.segments.flatMap((s, i) => (isMotionSegment(s) && !s.motion.js && !reusable.has(s.motion.brief) ? [{ id: `s${i}`, brief: s.motion.brief }] : [])),
     ...layers.flatMap((l, i) => (!l.motion.js && !reusable.has(l.motion.brief) ? [{ id: `l${i}`, brief: l.motion.brief }] : [])),
   ];
-  // Her photos an animation may compose with: in a collage, every photo of the Reel; elsewhere, those its brief
-  // names (by media_id). Each is cut out first (their own sandbox); one without a clean cut-out comes whole.
-  const collage = plan.template === "collage";
+  // Her photos an animation may compose with: in a collage or another composition, every photo of the Reel; elsewhere,
+  // those its brief names (by media_id). Each is cut out first (their own sandbox); one without a clean cut-out comes whole.
+  const collage = plan.template === "collage" || isComposed(plan);
   const named = (brief: string) => photoIds.filter((id) => brief.includes(id));
   const wanted = [...new Set(toWrite.flatMap((w) => (collage ? photoIds : named(w.brief))))].slice(0, MAX_OFFERED_PHOTOS);
   await earlyCutouts;

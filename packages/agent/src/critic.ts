@@ -123,7 +123,7 @@ Plusieurs versions : compare-les et retiens la meilleure (best = son numéro, wh
 Pour la version retenue :
 - score de 1 à 10 ;
 - ok = true si elle peut partir telle quelle (8 ou plus, aucun défaut gênant) ;
-- issues : chaque défaut, avec la scène, le problème et la correction précise à demander au monteur, qui connaît les clips et les gabarits (ex. « accroche trop longue : la réduire à 3 mots », « scène 3 sombre et floue : la remplacer par un meilleur passage du même clip », « texte de la scène 2 collé au bord droit : le recentrer ») ; 4 au plus, les plus importants d'abord. Un texte ou une animation sur un visage : demande de les déplacer, jamais de changer le plan (son plus beau plan, ses sourires, restent), sauf si l'effet qu'elle a demandé a besoin d'être devant un visage (un mot tenu entre ses doigts, un message posé sur elle comme dans le Reel qu'elle recopie) : sa demande l'autorise. Dans une animation ou un collage, un texte masqué ou un plan caché : dis ce qui doit rester lisible ou visible, jamais une forme à prendre (pas « un seul tirage à la fois », « ne plus superposer », « aligner ») : la forme et sa richesse restent au motion designer ;
+- issues : chaque défaut, avec la scène, le problème et la correction précise à demander au monteur, qui connaît les clips et les gabarits (ex. « accroche trop longue : la réduire à 3 mots », « scène 3 sombre et floue : la remplacer par un meilleur passage du même clip », « texte de la scène 2 collé au bord droit : le recentrer ») ; 4 au plus, les plus importants d'abord. Un texte ou une animation sur un visage : demande de les déplacer, jamais de changer le plan (son plus beau plan, ses sourires, restent), sauf si l'effet qu'elle a demandé a besoin d'être devant un visage (un mot tenu entre ses doigts, un message posé sur elle comme dans le Reel qu'elle recopie) : sa demande l'autorise. Dans une animation, un collage ou une composition, un texte masqué ou un plan caché : dis ce qui doit rester lisible ou visible, jamais une forme à prendre (pas « un seul tirage à la fois », « ne plus superposer », « aligner ») : la forme et sa richesse restent au motion designer ;
 - summary : une phrase pour la gérante, au tutoiement, sans jargon, au passé, car elle la lit avec la vidéo finie : ce que tu as vérifié si la version peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. ») ; jamais ce qui resterait à faire (« il reste à… ») : la vidéo qu'elle reçoit est finie.`;
 
 export type ReviewMoment = { t: number; scene: number | null; label: string; texts: string[] };
@@ -244,7 +244,8 @@ export function reviewMoments(plan: EditPlan, max = 8, gestures: GestureMoment[]
 /** A Reel's form and rhythm in words: a collage or not, its tempo (an older Reel: its ambiance). */
 function formWords(plan: EditPlan): string {
   const bpm = planBpm(plan);
-  const form = plan.template === "collage" ? "Collage" : plan.template === "libre" ? "Reel" : `Ambiance ${plan.template}`;
+  const composed = plan.layers?.some((l) => l.compose);
+  const form = plan.template === "collage" ? "Collage" : plan.template === "libre" ? (composed ? "Reel composé (ses plans posés par une composition)" : "Reel") : `Ambiance ${plan.template}`;
   return bpm ? `${form} à ${bpm} BPM` : form;
 }
 
@@ -259,7 +260,9 @@ export function planDigest(plan: EditPlan, options: QualityOptions = {}): string
     `${formWords(plan)}, ${Math.round(timeline.duration)} s, ${plan.segments.length} scènes : ${plan.segments.map((s, i) => `${i + 1}. ${kindOf(s)}${isMotionSegment(s) ? ` (${s.motion.brief.slice(0, 80)})` : ""}`).join(" ; ")}.`,
     hook.length ? `Accroche : « ${hook.join(" / ")} ».` : "",
     // An animation over several shots comes back on purpose (asked for): not a repeat.
-    ...(plan.layers ?? []).map((l) => `Animation par-dessus les plans de ${seconds(l.from)} à ${seconds(l.to)} s, voulue : ${l.motion.brief.slice(0, 120)}.`),
+    ...(plan.layers ?? []).map((l) =>
+      l.compose ? `Composition de tout le Reel, voulue : ${l.motion.brief.slice(0, 160)}.` : `Animation par-dessus les plans de ${seconds(l.from)} à ${seconds(l.to)} s, voulue : ${l.motion.brief.slice(0, 120)}.`,
+    ),
     rhythmLine(plan),
     qualityLine(plan, options),
   ]

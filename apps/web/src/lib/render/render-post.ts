@@ -9,6 +9,7 @@ import {
   clipsUnderAnimations,
   isClipSegment,
   motionTemplateSchema,
+  isComposed,
   planMediaIds,
   PHOTO_MAX_SECONDS,
   scenePhotoIds,
@@ -130,7 +131,7 @@ export async function loadMontageInputs(
   // A collage lays the subject of a photo as a sticker when its cut-out is clean; in any Reel, an
   // animation composes with the photos it names, and their clean cut-outs.
   const withPhotos = scenePhotoIds(plan);
-  const cutouts = template === "collage" && plan.template === "collage" ? await stickerInputs(studioId, photoIds).catch(() => ({})) : undefined;
+  const cutouts = (template === "collage" && plan.template === "collage") || isComposed(plan) ? await stickerInputs(studioId, photoIds).catch(() => ({})) : undefined;
   // The animations' cut-outs: a clean edge is enough, even cut by the photo's frame (the animation brings the subject in from there).
   const sceneCutouts = withPhotos.length ? await sceneCutoutInputs(studioId, withPhotos).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
@@ -224,9 +225,9 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  // Photos have their subject cut out once (an open model in its own sandbox): a collage's, laid as stickers,
-  // and those an animation composes with (the design step has usually made them already).
-  const toCut = plan.template === "collage" ? planMediaIds(plan) : scenePhotoIds(plan);
+  // Photos have their subject cut out once (an open model in its own sandbox): a collage's, laid as stickers, a
+  // composed Reel's, and those an animation composes with (the design step has usually made them already).
+  const toCut = plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : scenePhotoIds(plan);
   if (toCut.length) await ensureCutouts(studioId, toCut);
   const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, photoAspects, tracks } =
     await loadMontageInputs(studioId, plan, { postId });

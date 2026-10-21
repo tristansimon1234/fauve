@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { composedLayers } from "./compose.ts";
+import { compositionBrief, composedLayers } from "./compose.ts";
 import { planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
 import { hookAtStart } from "./hook.ts";
@@ -60,8 +60,8 @@ Les animations (motion design), par-dessus sa vidéo, jamais à la place :
 - 0 à 2 par Reel, sur le moment où les mots comptent (la promesse, l'offre, un chiffre, une liste courte), 1,5 à 3 s chacune ; un Reel peut n'en avoir aucune. Sa demande décide d'abord (plus d'animations, une idée précise), dans la limite de « max_new_scenes » (sinon dis-le dans « rationale »).
 - « over_clip » : le media_id de la vidéo ou de la photo qui joue dessous.
 - « motion » sur mesure : son « brief » (600 caractères au plus) dit le message, les mots exacts, le moment fort et l'énergie, jamais la forme ni les mouvements : le motion designer les choisit, et deux animations d'un Reel ne se ressemblent jamais. Seule exception : ce qu'elle a demandé elle-même de la forme, transmis avec ses mots et le geste de la vidéo auquel ça se rattache ; un univers qu'elle nomme (un dessin animé, un manga, un film) ou le look du Reel recopié passe tel quel, avec ses couleurs et son lettrage. Ce qui tient à un geste le suit tant qu'il dure et chaque fois qu'elle le refait : dis combien de fois, avec ses temps. Une de ses photos peut entrer dans une animation (détourée, en papier, un texte qui passe derrière la personne) : écris son media_id dans le brief. Les textes restent entiers dans le cadre. Donne aussi « fallback », la version fixe (title, list, quote, number).
-- « layers » (from, to en secondes du Reel) : une animation par-dessus le montage quand l'idée court sur plusieurs plans (un personnage qui revient, un compteur, un cadre) ou vit avec ce qui se passe dans un plan : le moteur sait où sont les mains, les visages et les corps, et l'animation peut partir d'un geste, s'y accrocher ou suivre quelqu'un ; pose-la sur le plan où ça se passe, monté assez long, sur un geste dont les mains sont « dans le cadre ». Chacune compte comme une nouvelle animation (sauf la composition d'un collage).
-- La forme collage (« collage » : true), à sa demande ou quand elle sert ce Reel et sa direction artistique : le motion designer compose tout le Reel comme un collage, avec ses plans. Tu montes comme d'habitude et tu écris la composition dans « layers », de 0 à la fin : son brief dit ce que le collage raconte, ses moments forts et son énergie, et ce qu'elle a demandé de la forme ; la forme est au motion designer ; elle ne compte pas dans « max_new_scenes ». En correction, garde la composition (« composition_du_collage ») avec le même brief, sauf si la demande touche au collage : ajoute alors ce qui doit changer (ce qui doit rester lisible ou visible), jamais une forme imposée. Sinon « collage » : false.
+- « layers » (from, to en secondes du Reel) : une animation par-dessus le montage quand l'idée court sur plusieurs plans (un personnage qui revient, un compteur, un cadre) ou vit avec ce qui se passe dans un plan : le moteur sait où sont les mains, les visages et les corps, et l'animation peut partir d'un geste, s'y accrocher ou suivre quelqu'un ; pose-la sur le plan où ça se passe, monté assez long, sur un geste dont les mains sont « dans le cadre ». Chacune compte comme une nouvelle animation (sauf la composition d'un collage ou d'une composition).
+- « form » : « montage » (ses plans l'un après l'autre en plein cadre), sauf dans deux cas où le motion designer compose tout le Reel avec ses plans. « collage », à sa demande ou quand il sert ce Reel et sa direction artistique. « composition », quand la forme qu'elle demande ou celle du Reel qu'elle recopie ne tient pas en plans plein cadre : un écran partagé (une personne qui parle dans une moitié, ce qu'elle raconte dans l'autre), un plan posé dans un cadre ou une fenêtre, plusieurs plans à la fois. Tu montes comme d'habitude (l'ordre et la durée de ses plans, ses textes) et tu écris la composition dans « layers », de 0 à la fin : son brief dit ce que le Reel raconte, ses moments forts et son énergie, et la forme demandée ou celle du Reel recopié avec ses mots (pour un écran partagé : quelle moitié montre quoi, ce qui y apparaît, où passent les sous-titres) ; le reste de la forme est au motion designer ; elle ne compte pas dans « max_new_scenes ». En correction, garde la même « form » et la composition (« composition_du_reel ») avec le même brief, sauf si la demande y touche : ajoute alors ce qui doit changer (ce qui doit rester lisible ou visible), jamais une forme imposée.
 - Bibliothèque (« templates ») : des animations déjà faites, gratuites, chacune au plus une fois par Reel ; si l'une convient, réutilise-la (template_id, template_texts dans ses max_chars, une phrase de brief, fallback) ; n'en commande une nouvelle que si aucune ne convient. Au plus « max_new_scenes » nouvelles animations.
 - Sans aucune vidéo ni photo : un Reel entièrement en animations (3 à 5) sur les couleurs de la marque.
 
@@ -102,12 +102,18 @@ const editorTextSchema = editPlanTextSchema.omit({ look: true, detail_look: true
 
 /**
  * The Reel's rhythm as the editor chooses it for each Reel (no ambiance any more): its tempo,
- * and the collage form when it serves. No bounds here (structured output does not enforce them):
+ * and its form: shots full frame one after the other, a collage, or a composition (a split
+ * screen, a shot in a frame…: Tristan, on a split-screen Reel copied as a slideshow, « ça n'a
+ * rien à voir »), the last two drawn whole by the motion designer. No bounds here (structured output does not enforce them):
  * fromEditorPlan keeps the tempo between 70 and 130.
  */
 const editorRhythm = {
   tempo: z.number().describe("Tempo de ce Reel en battements par minute : 70 (posé) à 130 (qui claque)"),
-  collage: z.boolean().describe("true : la forme collage (le motion designer compose tout le Reel, écrite dans layers)"),
+  form: z
+    .enum(["montage", "collage", "composition"])
+    .describe(
+      "montage : ses plans l'un après l'autre en plein cadre ; collage : la forme collage ; composition : ses plans posés autrement qu'en plein cadre (écran partagé, plan dans un cadre, plusieurs à la fois) ; collage et composition : le motion designer compose tout le Reel, écrit dans layers de 0 à la fin",
+    ),
 };
 
 /**
@@ -210,10 +216,18 @@ export function keepWrittenAnimations(plan: EditPlan, previous: EditPlan | null)
         }
       : m;
   };
-  // A collage's composition the editor left out of a correction stays as it was (none of its animations spans the Reel).
+  // A composition the editor left out of a correction stays as it was: a collage none of whose animations spans
+  // the Reel, or another composed Reel that only got the composition added for want of one (compositionBrief).
   const composition = previous.layers?.find((l) => l.compose && l.motion.js);
   const spans = (plan.layers ?? []).some((l) => l.from <= 0.5 && l.to >= plan.duration - 0.5);
-  const layers = plan.template === "collage" && composition && !spans ? [composition, ...(plan.layers ?? [])] : plan.layers;
+  const added = (l: NonNullable<EditPlan["layers"]>[number]) => l.compose && !l.motion.js && l.motion.brief === compositionBrief(plan);
+  const layers = !composition
+    ? plan.layers
+    : plan.layers?.some(added)
+      ? plan.layers.map((l) => (added(l) ? composition : l))
+      : plan.template === "collage" && !spans
+        ? [composition, ...(plan.layers ?? [])]
+        : plan.layers;
   return {
     ...plan,
     segments: plan.segments.map((s) => (isMotionSegment(s) ? { ...s, motion: keep(s.motion) } : s)),
@@ -305,13 +319,13 @@ export function signatureShot(plan: { segments: object[]; texts: { style: string
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
 
 /** The editor's plan: its rhythm (tempo, collage), or a template (a plan written before a Reel had its own tempo). */
-type Written<P> = Omit<P, "tempo" | "collage"> & { template: MotionTemplate; tempo?: number };
+type Written<P> = Omit<P, "tempo" | "form"> & { template: MotionTemplate; tempo?: number };
 type EditorPlanIn = EditorOutput["plan"] | EditorOutputLegacy["plan"] | Written<EditorOutput["plan"]> | Written<EditorOutputLegacy["plan"]>;
 
 export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): EditPlan {
-  // Its form: the collage, else « libre » (its own tempo, the look of its charter).
-  const { tempo: chosen, collage, template: written, ...plan } = input as EditorOutput["plan"] & { template?: MotionTemplate };
-  const template: MotionTemplate = motionTemplateSchema.safeParse(written).success ? written! : collage ? "collage" : "libre";
+  // Its form: the collage, else « libre » (its own tempo, the look of its charter), composed or not.
+  const { tempo: chosen, form, collage, template: written, ...plan } = input as EditorOutput["plan"] & { template?: MotionTemplate; collage?: boolean };
+  const template: MotionTemplate = motionTemplateSchema.safeParse(written).success ? written! : form === "collage" || collage ? "collage" : "libre";
   const tempo = typeof chosen === "number" && Number.isFinite(chosen) ? Math.round(Math.min(MAX_TEMPO, Math.max(MIN_TEMPO, chosen))) : undefined;
   const byName = new Map(looks.map((l) => [l.name.toLowerCase(), l]));
   const signature = signatureTransition(template, tempo);
@@ -328,11 +342,17 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
   const { effect: _effect, layers: asked, ...kept } = rest as typeof rest & { effect?: string; layers?: { brief: string; from: number; to: number }[] };
   // Animations over several shots: a brief and a span, the code comes later (like a scene's).
   const layers = (asked ?? []).filter((l) => l.brief?.trim() && Number.isFinite(l.from) && Number.isFinite(l.to)).slice(0, 3);
+  // A composition: the animation over the whole Reel lays its shots (one is added when the editor wrote none).
+  const composed = template === "libre" && form === "composition";
+  const duration = Number(plan.duration) || 0;
+  const whole = composed ? layers.findIndex((l) => l.from <= 0.5 && l.to >= duration - 0.5) : -1;
+  const asLayers = layers.map((l, i) => ({ motion: { brief: l.brief.trim().slice(0, 4000) }, from: l.from, to: l.to, ...(i === whole ? { compose: true } : {}) }));
+  const allLayers = composed && whole < 0 ? [{ motion: { brief: compositionBrief(plan) }, from: 0, to: duration, compose: true }, ...asLayers].slice(0, 3) : asLayers;
   return {
     ...kept,
     template,
     ...(tempo ? { tempo } : {}),
-    ...(layers.length ? { layers: layers.map((l) => ({ motion: { brief: l.brief.trim().slice(0, 4000) }, from: l.from, to: l.to })) } : {}),
+    ...(allLayers.length ? { layers: allLayers } : {}),
     format: "9:16",
     images: [],
     music: null,
