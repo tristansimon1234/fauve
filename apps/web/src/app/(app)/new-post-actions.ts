@@ -1,6 +1,6 @@
 "use server";
 
-import { ANALYST_MODEL, filmIdeas, keptProposals, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, readMemory, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, TRIAL_DAYS, type PostIdea } from "@fauve/agent";
+import { ANALYST_MODEL, filmIdeas, keptPlan, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, readMemory, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, TRIAL_DAYS, type PostIdea, type PostPlan } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { z } from "zod";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
@@ -202,14 +202,14 @@ const READABLE = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"])
 const MAX_LOOKS = 6;
 
 /**
- * The last step of « Créer »: what Simone would make of the files she picked, three ideas in a
- * tap, from what is in them (what Gemini read of her library, or the photos themselves when they
- * were just sent). On any failure, the usual ideas for her kind of business.
+ * The last step of « Créer »: what Simone will make, said back as one plan in points with why, from
+ * her words and what is in her files (what Gemini read of her library, or the photos themselves when
+ * they were just sent). Null when it could not be written: she launches from her own words.
  */
-export async function proposeIdeas(input: z.input<typeof proposalInput>): Promise<{ ideas: PostIdea[]; fromFiles: boolean }> {
+export async function proposePlan(input: z.input<typeof proposalInput>): Promise<{ plan: PostPlan | null }> {
   const parsed = proposalInput.safeParse(input);
   const { db, member } = await getStudioContext();
-  if (!member || !parsed.success) return { ideas: [], fromFiles: false };
+  if (!member || !parsed.success) return { plan: null };
   const studioId = member.studio.id;
   const { kind, idea, files, voice, copying, copy } = parsed.data;
   const [{ data: studio }, { data: brand }, { data: recent }] = await Promise.all([
@@ -218,7 +218,7 @@ export async function proposeIdeas(input: z.input<typeof proposalInput>): Promis
     db.from("posts").select("title, kind").eq("studio_id", studioId).not("status", "in", "(skipped,failed)").order("created_at", { ascending: false }).limit(6),
   ]);
   const profile = (brand?.profile ?? {}) as { art_direction?: string; tone?: string };
-  const fallback = { ideas: postIdeas(studio?.business_type as string | null)[kind].slice(0, 3), fromFiles: false };
+  const fallback = { plan: null };
   try {
     const admin = supabaseAdmin();
     const ids = files.flatMap((f) => ("media" in f ? [f.media] : []));
@@ -273,8 +273,6 @@ export async function proposeIdeas(input: z.input<typeof proposalInput>): Promis
         lines.push(`${n}. une photo (image ${n} ci-dessous)`);
       } else lines.push(`${n}. ${video ? "une vidéo (pas encore regardée)" : "une photo"}`);
     });
-    // Nothing known of any of them: her kind of business is all there is, the usual ideas say it as well.
-    if (!looks.length && !lines.some((l) => l.includes(" : "))) return fallback;
     const signed = looks.length ? ((await admin.storage.from("media").createSignedUrls(looks.map((l) => l.path), 300)).data ?? []) : [];
     const images = looks.flatMap((l, i) => {
       const url = signed[i]?.signedUrl;
@@ -313,10 +311,9 @@ export async function proposeIdeas(input: z.input<typeof proposalInput>): Promis
       ],
     });
     await logClaudeCost(studioId, response.usage, "ideas", ANALYST_MODEL);
-    const ideas = keptProposals(response.parsed_output);
-    return ideas.length >= 2 ? { ideas, fromFiles: true } : fallback;
+    return { plan: keptPlan(response.parsed_output) };
   } catch (error) {
-    console.warn("proposeIdeas failed", error instanceof Error ? error.message : error);
+    console.warn("proposePlan failed", error instanceof Error ? error.message : error);
     return fallback;
   }
 }

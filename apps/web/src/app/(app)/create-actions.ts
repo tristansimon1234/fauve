@@ -9,6 +9,7 @@ import {
   findVoice,
   imaginedBrief,
   JOB_STALE_MINUTES,
+  validatedPlanBrief,
   MAX_MONTAGE_FILES,
   postKindSchema,
   TRIAL_DAYS,
@@ -44,6 +45,8 @@ const launchSchema = z.object({
   time: z.string().max(5),
   /** What she imagines (the scenario, an offer, a message), in her words. */
   idea: z.string().max(500),
+  /** The plan Simone said back and she validated (« La proposition »): the montage follows it. */
+  plan: z.object({ title: z.string().max(80), points: z.array(z.string().max(300)).min(1).max(8), why: z.string().max(400) }).optional(),
   /** In the order she picked them: from her library, or just sent (already in Storage). */
   items: z.array(z.union([z.object({ media: z.uuid() }), z.object({ upload: uploadSchema })])).min(1).max(MAX_MONTAGE_FILES),
   /** A Reel's voice over: as the studio's setting (auto), none, or one of Simone's voices. */
@@ -84,6 +87,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
   const { kind, date, time, items, voice, platforms, copy } = parsed.data;
   const refs = kind === "reel" ? [] : parsed.data.refs;
   const idea = parsed.data.idea.trim();
+  const plan = parsed.data.plan;
   const { member } = await getStudioContext();
   if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
   const studioId = member.studio.id;
@@ -98,7 +102,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
 
   // What she imagines, or a ref: the Reel to copy, the model of this Reel only (one shot). Simone asks before she makes anything.
   const copying = kind !== "reel" || copy === false ? null : typeof copy === "string" ? await ownInspiration(studioId, copy) : await pendingSteal(studioId).catch(() => null);
-  if (!idea && !copying && !refs.length) return { ok: false, error: kind === "reel" ? "Dis-moi ce que tu imagines pour ce Reel, ou montre-moi une ref." : "Dis-moi ce que tu imagines, ou montre-moi une ref." };
+  if (!idea && !plan && !copying && !refs.length) return { ok: false, error: kind === "reel" ? "Dis-moi ce que tu imagines pour ce Reel, ou montre-moi une ref." : "Dis-moi ce que tu imagines, ou montre-moi une ref." };
 
   // Her new files become her library's, read once in the background (ready for the montage).
   const db = supabaseAdmin();
@@ -139,7 +143,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     refIds.push(asset.data.id as string);
   }
 
-  const created = await createPost({ kind, date, time, intention: idea, mediaIds, inspirationId: copying?.id });
+  const created = await createPost({ kind, date, time, intention: idea || plan?.title || "", mediaIds, inspirationId: copying?.id });
   if (!created.ok) return created;
   // Her choices, before anything is made: where it goes, and the voice over of a Reel.
   const where = platforms ? [...new Set(platforms.filter((p) => p === "instagram" || kind === "reel"))] : [];
@@ -159,7 +163,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     studioId,
     postId: created.id,
     mediaIds,
-    brief: imaginedBrief(idea),
+    brief: [imaginedBrief(idea), plan ? validatedPlanBrief(plan) : undefined].filter(Boolean).join("\n\n") || undefined,
     correction: false,
     maxNewScenes: scenes,
     effort,

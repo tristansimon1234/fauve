@@ -210,41 +210,46 @@ export function filmIdeas(businessType: string | null | undefined): { idea: stri
   return FILM[businessFamily(businessType)];
 }
 
-// The last step of « Créer » (Tristan : « la dernière étape doit être dynamique, une
-// proposition ») : once her files are picked, Simone looks at them and proposes what she
-// would make of them, in three requests written as the manager would write them; a tap
-// fills them in, she can change them. The ideas above are only the fallback.
+// The last step of « Créer » (Tristan : « la dernière étape doit être dynamique, une proposition »,
+// then « pas trois idées, la demande bien reformulée, claire et précise, lisible, en points, avec une
+// explication ») : Simone reads her files and what she asked, and says back what she will make, as one
+// plan in points, with why. She takes it, or goes back to change her words.
 
-export const PROPOSAL_PROMPT = `Tu es Simone, la community manager d'un commerce de quartier, avec l'œil d'un bon créateur de contenu. La gérante vient de choisir ses photos et vidéos pour une publication. Propose-lui 3 idées de ce que tu en ferais, pour qu'elle en touche une : celles d'un pro qui a regardé ses fichiers, pas des idées qui iraient à n'importe quel commerce.
+export const PROPOSAL_PROMPT = `Tu es Simone, la community manager d'un commerce de quartier, avec l'œil d'un bon créateur de contenu. La gérante a choisi ses photos et vidéos pour une publication et t'a peut-être dit ce qu'elle imagine. Avant de te lancer, tu lui redis clairement ce que tu vas faire : UN plan, précis et facile à lire, qu'elle valide d'un coup d'œil.
 
-Chaque idée :
-- label : 2 à 5 mots, ce que c'est (« Le geste puis le résultat », « Elle raconte sa matinée »), jamais une phrase de pub ;
-- prompt : la demande entière, écrite comme la gérante l'écrirait elle-même, à la première personne, en 2 ou 3 phrases simples : par quel plan précis commencer (ce qui arrête le pouce dans la 1re seconde), l'ordre de ce qu'on voit, comment finir, ce que les gens doivent faire (venir, réserver, enregistrer, envoyer à quelqu'un) ; pour un Reel, avec une voix qui raconte, ses propres paroles, ou juste un message à l'écran.
+Quand elle a dit ce qu'elle imagine (« publication.ce_qu_elle_imagine »), tu reformules SA demande : tout ce qu'elle a demandé y est, avec ses intentions, rien n'est remplacé par une autre idée ; tu la rends concrète avec ses vrais fichiers et tu complètes seulement ce qu'elle n'a pas dit (l'ouverture, l'ordre, la fin, ce que les gens doivent faire). Quand elle n'a rien dit, tu proposes le meilleur plan pour ses fichiers. Quand elle recopie un Reel qu'elle aime (« reel_a_recopier »), le plan suit sa forme.
 
-Regarde vraiment ses fichiers (« fichiers_dans_l_ordre » : leurs plans, leurs meilleurs passages, ce qu'on y dit, et les photos ci-dessous) : chaque idée nomme des plans précis qui y sont (« la vidéo où elle ajuste le reformer », « la photo de la vitrine le soir »), jamais une image qui n'y est pas. Quand quelqu'un parle dans une vidéo, une idée au moins se construit sur ce qu'il dit, avec ses mots (et sans voix off par-dessus). Trois idées vraiment différentes : un angle et une forme chacune (raconté par une voix, ses propres paroles face caméra, un seul message clé posé sur de beaux plans, une visite en point de vue, le geste puis le résultat, avant / après, les coulisses, un mini-tuto…), jamais trois variantes du même Reel. Quand elle a dit ce qu'elle imagine (« publication.ce_qu_elle_imagine »), les trois idées sont trois façons concrètes de faire SON idée : son message, son intention et ce qu'elle a demandé restent, tu les précises avec ses vrais plans (l'ouverture, l'ordre, la fin, la forme) ; jamais une autre idée à la place de la sienne. Quand elle recopie un Reel qu'elle aime (« reel_a_recopier »), les trois idées suivent sa forme et changent le fond. Ne refais pas ses publications récentes (« publications_recentes »). Respecte son choix de voix s'il est donné, et sa direction artistique.
+Le plan :
+- title : le titre de la publication, 2 à 6 mots, comme elle l'appellerait ;
+- points : 4 à 6 points dans l'ordre, chacun « Rubrique : ce qu'on fait », en une phrase courte et concrète, par exemple « Ouverture : … », « Ensuite : … », « Fin : … », « Le son : … » (voix off qui raconte, ses propres paroles ou juste la musique, selon son choix s'il est donné), « À l'écran : … » (le texte posé, en quelques mots, entre guillemets) ; nomme les plans précis qui sont dans ses fichiers (« la vidéo où elle ajuste le reformer »), et pour un fichier dont tu ne sais rien, dis juste « ta 2e vidéo » ;
+- why : une ou deux phrases simples, pourquoi ce plan marche pour elle (ce qui arrête le pouce, ce qui donne envie de venir).
 
-Rien d'inventé sur le commerce : ni prix, ni horaire, ni offre, ni nom, ni avis ; seulement ce que montrent ses fichiers et ce qu'on sait du commerce. Native et vraie, jamais une pub ni un flyer. Le but : des clients, pas du buzz. Tutoiement, français simple, sans tiret long.`;
+Regarde vraiment ses fichiers (« fichiers_dans_l_ordre » : leurs plans, leurs meilleurs passages, ce qu'on y dit, et les photos ci-dessous) ; quand quelqu'un parle dans une vidéo, ses paroles comptent (et pas de voix off par-dessus). Ne refais pas ses publications récentes (« publications_recentes »). Rien d'inventé sur le commerce : ni prix, ni horaire, ni offre, ni nom, ni avis que ni elle ni ses fichiers ne donnent. Natif et vrai, jamais une pub ni un flyer. Le but : des clients, pas du buzz. Tutoiement, français simple, sans tiret long.`;
 
 export const proposalSchema = z.object({
-  ideas: z
-    .array(
-      z.object({
-        label: z.string().describe("2 à 5 mots"),
-        prompt: z.string().describe("La demande entière, comme elle l'écrirait, 1 à 3 phrases"),
-      }),
-    )
-    .describe("3 idées différentes"),
+  title: z.string().describe("Le titre de la publication, 2 à 6 mots"),
+  points: z.array(z.string()).describe("4 à 6 points dans l'ordre, chacun « Rubrique : ce qu'on fait »"),
+  why: z.string().describe("Pourquoi ce plan marche, en une ou deux phrases"),
 });
 export type Proposal = z.infer<typeof proposalSchema>;
 
-/** The proposals as shown: 3 at most, short labels, requests that fit « Ce que tu imagines » (500 characters). */
-export function keptProposals(p: Proposal | null | undefined): PostIdea[] {
-  const cut = (text: string, max: number) => {
-    const flat = text.replace(/\s+/g, " ").replace(/\s*—\s*/g, ", ").trim();
-    return flat.length <= max ? flat : `${flat.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
-  };
-  return (p?.ideas ?? [])
-    .map((i) => ({ label: cut(i.label, 40), prompt: cut(i.prompt, 480) }))
-    .filter((i) => i.label && i.prompt.length >= 20)
-    .slice(0, 3);
+/** The plan she validates: a title, its points in order, and why. */
+export type PostPlan = { title: string; points: string[]; why: string };
+
+const tidy = (text: string, max: number) => {
+  const flat = text.replace(/\s+/g, " ").replace(/\s*—\s*/g, ", ").replace(/^[-•*\s]+/, "").trim();
+  return flat.length <= max ? flat : `${flat.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
+};
+
+/** The plan as shown and kept: 3 to 6 short points, a title, a short why; null when there is too little of it. */
+export function keptPlan(p: Proposal | null | undefined): PostPlan | null {
+  if (!p) return null;
+  const points = p.points.map((point) => tidy(point, 220)).filter((point) => point.length >= 8).slice(0, 6);
+  if (points.length < 3) return null;
+  return { title: tidy(p.title, 60) || "Ta publication", points, why: tidy(p.why, 280) };
+}
+
+/** The validated plan, as the montage (or Simone in the chat) reads it. */
+export function validatedPlanBrief(plan: PostPlan): string {
+  return [`Le plan que la gérante a validé (« ${plan.title} ») :`, ...plan.points.map((point) => `- ${point}`), plan.why ? `Pourquoi : ${plan.why}` : ""].filter(Boolean).join("\n");
 }
