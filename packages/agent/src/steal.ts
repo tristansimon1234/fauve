@@ -393,6 +393,32 @@ export function reelLink(text: string): { url: string; platform: "instagram" | "
   return null;
 }
 
+/**
+ * The video file of a Reel in what a post-detail API answered (Treg's anyapi.instagram.post.detail):
+ * its field named for a video (video_url, videoUrl, video_versions…) first, else the first link to an
+ * .mp4; never an image. Read loosely: its shape is the provider's and may change.
+ */
+export function videoUrlIn(answer: unknown): string | null {
+  const isLink = (v: unknown): v is string => typeof v === "string" && /^https:\/\/\S+$/.test(v);
+  const named: string[] = [];
+  const mp4: string[] = [];
+  const walk = (node: unknown, key: string, depth: number) => {
+    if (depth > 8 || node === null || node === undefined) return;
+    if (isLink(node)) {
+      if (/video/i.test(key)) named.push(node);
+      else if (/\.mp4(\?|$)/i.test(node)) mp4.push(node);
+      return;
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, key, depth + 1);
+      return;
+    }
+    if (typeof node === "object") for (const [k, v] of Object.entries(node)) walk(v, /video/i.test(key) && k === "url" ? key : k, depth + 1);
+  };
+  walk(answer, "", 0);
+  return named.find((u) => !/\.(jpe?g|png|webp|heic)(\?|$)/i.test(u)) ?? mp4[0] ?? null;
+}
+
 /** The hard cuts ffmpeg's scene detection printed (« lavfi.scd.time: 1.234 »), at least `gap` s apart, inside the Reel. */
 export function parseSceneCuts(log: string, duration: number, gap = 0.2): number[] {
   const times = [...log.matchAll(/lavfi\.scd\.time:\s*([0-9.]+)/g)].map((m) => Number(m[1])).filter((t) => Number.isFinite(t) && t > 0.1 && t < duration - 0.1);

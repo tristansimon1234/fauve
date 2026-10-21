@@ -20,6 +20,8 @@ const schema = {
   // Secret for the browser test chat (/essai?cle=…). Unset = test chat disabled.
   FAUVE_TEST_KEY: z.string().min(16),
   USD_TO_EUR: z.coerce.number().positive().optional(),
+  // Treg (treg.to, pay per call): the video of an Instagram Reel from its link when yt-dlp cannot open it. Unset = she sends the video.
+  TREG_API_KEY: z.string().min(1).optional(),
   // ElevenLabs Music: each Reel's soundtrack, composed from the rendered video. Unset = silent Reels.
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
   ELEVENLABS_MUSIC_MODEL: z.string().default("music_v2_5"),

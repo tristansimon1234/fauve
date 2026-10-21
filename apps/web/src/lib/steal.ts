@@ -8,14 +8,17 @@ import {
   stolenStyleLines,
   stolenStyleSchema,
   tempoOf,
+  usdToEur,
   type FollowedStyle,
   type StolenStyle,
 } from "@fauve/agent";
+import { env } from "@/lib/env";
 import { googleFont } from "@/lib/fonts";
 import { cutoutPath } from "@/lib/render/cutout";
 import { sandboxCostEur, stealReelInSandbox, type StealMiss } from "@/lib/render/sandbox";
 import { tracksPath } from "@/lib/render/tracks";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { instagramVideo, TREG_POST_USD } from "@/lib/treg";
 import { readStolenLook } from "@/lib/video/inspiration";
 
 // « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA », « c'est one shot ») :
@@ -164,7 +167,15 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   };
 
   const started = Date.now();
-  const reel = await stealReelInSandbox(`steal-${randomUUID()}`, take);
+  let reel = await stealReelInSandbox(`steal-${randomUUID()}`, take);
+  // An Instagram link the sandbox could not open (Instagram often refuses a server): its video through Treg, read as a file.
+  if ("miss" in reel && reel.miss === "unreachable" && "link" in take && reelLink(take.link)?.platform === "instagram") {
+    const video = await instagramVideo(take.link).catch(() => null);
+    if (env("TREG_API_KEY")) {
+      await db.from("cost_events").insert({ studio_id: studioId, kind: "steal", provider: "treg", units: 1, cost_eur: usdToEur(TREG_POST_USD, env("USD_TO_EUR")), meta: { found: Boolean(video) } });
+    }
+    if (video) reel = await stealReelInSandbox(`steal-${randomUUID()}`, { file: video });
+  }
   const seconds = "miss" in reel ? (Date.now() - started) / 1000 : reel.seconds;
   // A miss is kept with what yt-dlp or curl said (links without their query: no signed token in it).
   const why = "miss" in reel ? { miss: reel.miss, detail: reel.detail.replace(/\?[^\s"']*/g, "").slice(-400) } : {};
