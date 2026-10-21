@@ -34,6 +34,8 @@ export type FootageLook = {
   aspect: number;
   framingAspect?: number;
   focus?: { x: number; y: number };
+  /** The faces seen in the passage (shares of the picture): a box narrower than the shot keeps them whole (faceFocus). */
+  face?: FaceZone;
   straighten?: number;
   move?: CameraMove;
   accent?: "punch" | "wipe";
@@ -137,6 +139,27 @@ export function framingPercent(focus: { x: number; y: number } | undefined, aspe
   return [at(focus.x, aspect / frameAspect), at(focus.y, frameAspect / aspect)];
 }
 
+/** Where the faces of a passage are, in shares of the picture, with room for the hair and the chin. */
+export type FaceZone = { x: number; y: number; w: number; h: number };
+
+/**
+ * Where to centre a shot in a box of `frameAspect` (shares of the picture) so that the faces of
+ * `face` stay whole: the subject's centre as it is when they already are, else moved just enough,
+ * the top of the heads first when they cannot all fit (mirror of packages/agent/src/tracking.ts).
+ */
+export function faceFocus(focus: { x: number; y: number } | undefined, face: FaceZone | undefined, aspect: number | undefined, frameAspect: number): { x: number; y: number } | undefined {
+  if (!face || !aspect) return focus;
+  const keep = (centre: number, start: number, size: number, shown: number) => {
+    if (shown >= 1) return centre;
+    let top = centre - shown / 2;
+    if (start < top) top = start - 0.02;
+    if (start + size > top + shown) top = Math.min(start - 0.02, start + size - shown);
+    return Math.round((top + shown / 2) * 1000) / 1000;
+  };
+  const centre = focus ?? { x: face.x + face.w / 2, y: face.y + face.h / 2 };
+  return { x: keep(centre.x, face.x, face.w, frameAspect / aspect), y: keep(centre.y, face.y, face.h, aspect / frameAspect) };
+}
+
 /** A tilted picture rotated straight, enlarged just enough that no corner shows. */
 export function straightening(degrees: number | undefined, frameAspect: number): { degrees: number; scale: number } | undefined {
   if (!degrees) return undefined;
@@ -189,7 +212,7 @@ export function picturePoint(u: number, v: number, look: FootageLook, t: number,
   const wide = look.aspect > frameAspect;
   const shownWidth = wide ? height * look.aspect : width;
   const shownHeight = wide ? height : width / look.aspect;
-  const [px, py] = framingPercent(look.focus, look.framingAspect, frameAspect) ?? [50, 50];
+  const [px, py] = framingPercent(faceFocus(look.focus, look.face, look.framingAspect, frameAspect), look.framingAspect, frameAspect) ?? [50, 50];
   let p: Point = { x: ((width - shownWidth) * px) / 100 + u * shownWidth, y: ((height - shownHeight) * py) / 100 + v * shownHeight };
   const straight = straightening(look.straighten, frameAspect);
   if (straight) p = about(p, width, height, straight.scale, straight.degrees);

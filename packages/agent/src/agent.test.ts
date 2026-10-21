@@ -4144,3 +4144,21 @@ test("Simone's plan: 3 to 6 short points, a title and why, kept for the montage;
   assert.match(validatedPlanBrief(plan), /^Le plan que la gérante a validé \(« Lancement de la rentrée »\) :\n- Ouverture/);
   assert.equal(keptPlan({ title: "x", points: ["Ouverture : un seul point"], why: "" }), null);
 });
+
+test("a composition keeps the faces of a shot whole in a wide box (half of a split screen)", async () => {
+  const { faceFocus, faceZone } = await import("./tracking.ts");
+  // A face near the top of an upright video, the subject's centre lower (the body).
+  const file = { v: 1, fps: 30, w: 1080, h: 1920, from: 0, frames: Array.from({ length: 30 }, () => ({ f: [[1, 380, 150, 240, 140]] })) } as never;
+  const face = faceZone(file, 0, 1)!;
+  assert.ok(face.y < 0.15 && face.y + face.h < 0.35);
+  const body = { x: 0.5, y: 0.55 };
+  // A box as wide as the frame and 860 px high: about 45 % of the picture's height shows.
+  const focus = faceFocus(body, face, 9 / 16, 1080 / 860)!;
+  const shown = 9 / 16 / (1080 / 860);
+  const top = focus.y - shown / 2;
+  assert.ok(top <= face.y && face.y + face.h <= top + shown, "the face fits in the box");
+  // Full frame: nothing to change; no face: the subject's centre as before.
+  assert.deepEqual(faceFocus(body, face, 9 / 16, 9 / 16), { x: 0.5, y: 0.55 });
+  assert.deepEqual(faceFocus(body, undefined, 9 / 16, 2), body);
+  assert.equal(faceZone(file, 5, 1), null);
+});

@@ -1,6 +1,6 @@
 // Mirror of ReelProps in packages/agent/src/motion.ts (the web app builds them).
 // This package is shipped alone to the render sandbox, so it cannot import it.
-import type { TrackPiece } from "./track";
+import type { FaceZone, TrackPiece } from "./track";
 
 export type MotionTemplate = "doux" | "dynamique" | "chic" | "collage" | "libre";
 
@@ -40,6 +40,8 @@ export type ComposeShot = ScenePhoto & {
   durationInFrames: number;
   kind: "video" | "photo";
   focus?: { x: number; y: number };
+  /** The faces of a video shot (shares of the picture): kept whole in the box it is laid in. */
+  face?: FaceZone;
   /** What was tracked in a video shot (hands, faces, bodies) and how it is drawn: track(frame, box) places it in the box it is laid in. */
   track?: Omit<TrackPiece, "at" | "length">;
 };
