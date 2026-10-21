@@ -52,6 +52,7 @@ export async function messageOwner(studioId: string, message: OwnerMessage): Pro
   const phone = owner?.phone ?? null;
   const payload = { ...message.payload, ...(message.kind ? { kind: message.kind } : {}), ...(message.options?.length ? { options: message.options } : {}), ...(message.notes?.length ? { notes: message.notes } : {}) };
 
+  let templateId: string | undefined;
   if (owner) {
     const waId = owner.waId;
     if (owner.open) {
@@ -62,11 +63,14 @@ export async function messageOwner(studioId: string, message: OwnerMessage): Pro
     if (message.template) {
       // Outside the window only an approved template opens the conversation; her answer
       // reopens it and Simone sees the waiting message in her context.
-      await sendTemplate(waId, message.template.name, message.template.params).catch((error) =>
-        console.warn("template refused", message.template!.name, error instanceof Error ? error.message : error),
-      );
+      templateId = await sendTemplate(waId, message.template.name, message.template.params).catch((error) => {
+        console.warn("template refused", message.template!.name, error instanceof Error ? error.message : error);
+        return undefined;
+      });
     }
   }
-  await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "web", direction: "outbound", type: "text", body: message.text, payload });
+  // The template's id kept with it: a « not delivered » from Meta (webhook) names it.
+  const kept = templateId ? { ...payload, template: { name: message.template!.name, wa_message_id: templateId } } : payload;
+  await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "web", direction: "outbound", type: "text", body: message.text, payload: kept });
   return phone && message.template ? "template" : "app";
 }

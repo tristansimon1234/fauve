@@ -24,7 +24,7 @@ import { copyReel, copyState, newPostOptions, type CopyState, type NewPostOption
 import { useFauveDrawer } from "./fauve-drawer";
 import { publicEnv } from "@/lib/public-env";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { ArrowLeftIcon, CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, ImageIcon, LayersIcon, PaletteIcon, PauseIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
+import { ArrowLeftIcon, CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, ImageIcon, LayersIcon, PauseIcon, PlayIcon, PlusIcon, XIcon } from "./icons";
 import { Mascot } from "./mascot";
 import { nudgeWork } from "./work-pill";
 
@@ -181,7 +181,7 @@ function Create({
   const [given, setGiven] = useState<string | null>(null);
   const [copyChoice, setCopyChoice] = useState<"mine" | "copy" | null>(null);
   const [copyRead, setCopyRead] = useState<CopyState | null>(null);
-  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "copy" | "nothing" | null>(null);
+  const [sheet, setSheet] = useState<"format" | "date" | "voice" | "nothing" | null>(null);
   const [all, setAll] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
@@ -216,7 +216,9 @@ function Create({
     { videos: 0, photos: 0 },
   );
   const advised = advisedFormat(counts);
-  const kind = format && !formatBlocked(format, counts) ? format : advised;
+  // The type comes before her files (Tristan's order): what she picks stays, checked against her files at the Photos step.
+  const kind = format ?? advised;
+  const unfit = picked.length ? formatBlocked(kind, counts) : null;
   const meta = FORMATS.find((f) => f.kind === kind)!;
   const chosenWhen = when ?? defaultWhen(options, date);
   const chosenVoice = voice ?? defaultVoice(options);
@@ -233,13 +235,10 @@ function Create({
   const copying = kind === "reel" && usable && (copyChoice ?? (sent ? "copy" : "mine")) === "copy" ? usable : null;
   // One of her own Reels kept as a model (« Garder comme modèle »): already read, never one shot.
   const models = options?.models ?? [];
-  const ownModel = models.find((m) => m.id === copying) ?? null;
-  const copyLabel = ownModel ? `Comme ton Reel « ${ownModel.title} »` : given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé";
   const pickModel = (m: (typeof models)[number]) => {
     setGiven(m.id);
     setCopyRead({ state: "read", name: m.name, lines: m.lines });
     setCopyChoice("copy");
-    setSheet(null);
   };
   // Its reading followed until it is done (about a minute): what her Reel takes from it, or why not.
   const waiting = model && reading?.state !== "read" && reading?.state !== "missed" ? model : null;
@@ -270,7 +269,7 @@ function Create({
   const refShots = kind === "reel" ? [] : refs.files.filter((f) => f.status === "ready" && f.path);
   const refSending = kind !== "reel" && refs.files.some((f) => f.status === "uploading");
   const told = Boolean(idea.trim()) || Boolean(copying) || refShots.length > 0;
-  const ready = picked.length > 0 && Boolean(chosenWhen) && !sending && !refSending && !broken && told;
+  const ready = picked.length > 0 && !unfit && Boolean(chosenWhen) && !sending && !refSending && !broken && told;
 
   // One question per screen, in her order (Tristan: « un form avec stepper plutôt que tout dans une modale »).
   const steps: Step[] = kind === "reel" ? ["format", "style", "voice", "files", "idea"] : ["format", "files", "idea"];
@@ -279,7 +278,7 @@ function Create({
   const step = steps[at]!;
   const last = at === steps.length - 1;
   const canNext =
-    step === "voice" ? voiceAsked : step === "files" ? picked.length > 0 && !sending && !broken : step === "idea" ? told && !refSending : true;
+    step === "voice" ? voiceAsked : step === "files" ? picked.length > 0 && !unfit && !sending && !broken : step === "idea" ? told && !refSending : true;
   const bodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: 0 });
@@ -412,7 +411,8 @@ function Create({
           </h3>
           <div role="radiogroup" aria-labelledby={`${titleId}-format`} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {FORMATS.map((f) => {
-              const blocked = formatBlocked(f.kind, counts);
+              // Nothing picked yet: every type is open (her files come after).
+              const blocked = picked.length ? formatBlocked(f.kind, counts) : null;
               const on = f.kind === kind;
               return (
                 <button
@@ -444,13 +444,74 @@ function Create({
             <h3 id={`${titleId}-style`} className="text-[17px] font-extrabold tracking-[-0.01em]">
               Quel style ?
             </h3>
-            <Field
-              wide
-              icon={<PaletteIcon size={17} />}
-              label="Style"
-              value={copying ? copyLabel : "Ton style"}
-              sub={copying ? readingLabel(reading) : models.length ? "Ou comme un de tes Reels, ou un Reel que tu aimes" : "Ou celui d’un Reel que tu aimes : son lien ou sa vidéo"}
-              onClick={() => setSheet("copy")}
+            <p className="-mt-1 text-[13.5px] leading-snug text-muted">
+              {models.length
+                ? "Le tien, comme un de tes Reels gardés, ou comme un Reel que tu aimes : j’en reprends la façon de faire (le rythme, les textes, la lumière), avec tes nouvelles images."
+                : "Le tien, ou celui d’un Reel que tu aimes : j’en reprends la façon de faire (le rythme, les textes, la lumière), pour ce Reel seulement, avec tes images."}
+            </p>
+            <div role="radiogroup" aria-label="Le style" className="flex flex-col gap-2">
+              <Choice
+                on={!copying}
+                title="Ton style"
+                hint="Tes couleurs, tes polices, ta façon de faire"
+                onClick={() => setCopyChoice("mine")}
+              />
+              {/* The Reel she sent Simone, still there when she picked another one here. */}
+              {sent && given && given !== sent.id && (
+                <Choice
+                  on={false}
+                  title="Comme le Reel que tu m’as envoyé"
+                  hint={sent.name ?? "Je le regarde"}
+                  onClick={() => {
+                    setGiven(null);
+                    setCopyRead(null);
+                    setCopyChoice("copy");
+                  }}
+                />
+              )}
+              {usable && !models.some((m) => m.id === usable) && (
+                <Choice
+                  on={Boolean(copying)}
+                  title={given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé"}
+                  hint={readingLabel(reading)}
+                  onClick={() => setCopyChoice("copy")}
+                />
+              )}
+            </div>
+            {models.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <span className="text-[13px] font-bold">Comme un de tes Reels</span>
+                <div role="radiogroup" aria-label="Comme un de tes Reels" className="flex flex-col gap-2">
+                  {models.map((m) => (
+                    <Choice key={m.id} on={copying === m.id} title={`Comme ton Reel « ${m.title} »`} hint={`Même rythme, mêmes textes : ${m.name}`} onClick={() => pickModel(m)} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {copying && reading?.state === "read" && reading.lines.length > 0 && (
+              <div className="flex flex-col gap-1.5 rounded-[16px] bg-soft px-3.5 py-3">
+                <span className="text-[13px] font-bold">Ce que ton Reel en reprendra</span>
+                <ul className="flex flex-col gap-1 text-[13.5px] leading-snug text-muted">
+                  {reading.lines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {copying && reading?.state === "reading" && (
+              <p className="flex items-center gap-2 text-[13.5px] text-muted">
+                <Spinner /> Je le regarde, environ une minute. Tu peux lancer ton Reel : il attendra.
+              </p>
+            )}
+            {model && reading?.state === "missed" && <p className="text-[13.5px] leading-snug text-danger">{reading.message}</p>}
+            <CopyGiver
+              studioId={options.studioId}
+              another={Boolean(usable)}
+              onGiven={(id) => {
+                setGiven(id);
+                setCopyRead({ state: "reading" });
+                setCopyChoice("copy");
+              }}
             />
           </section>
         )}
@@ -719,6 +780,10 @@ function Create({
           </>
         ) : step === "files" && sending ? (
           <p className="pt-1 text-center text-[13px] text-muted">J’envoie tes fichiers…</p>
+        ) : step === "files" && unfit ? (
+          <p className="pt-1 text-center text-[13px] font-semibold text-danger">
+            {FORMATS.find((f) => f.kind === kind)!.title} : {unfit.charAt(0).toLowerCase()}{unfit.slice(1)}.
+          </p>
         ) : step === "files" && broken ? (
           <p className="pt-1 text-center text-[13px] text-danger">Un fichier n’est pas passé : retire-le ou ajoute-le à nouveau.</p>
         ) : step === "voice" && !voiceAsked ? (
@@ -845,91 +910,6 @@ function Create({
                 setLaunchOnVoice(false);
                 go(v);
               }
-            }}
-          />
-        </Sheet>
-      )}
-
-      {sheet === "copy" && options && (
-        <Sheet label="Le style" onClose={() => setSheet(null)}>
-          <SheetHead
-            title="Quel style pour ce Reel ?"
-            hint={
-              models.length
-                ? "Le tien, comme un de tes Reels gardés, ou comme un Reel que tu aimes : j’en reprends la façon de faire (le rythme, les textes, la lumière), avec tes nouvelles images."
-                : "Le tien, ou celui d’un Reel que tu aimes : j’en reprends la façon de faire (le rythme, les textes, la lumière), pour ce Reel seulement, avec tes images."
-            }
-            onClose={() => setSheet(null)}
-          />
-          <div role="radiogroup" aria-label="Le style" className="flex flex-col gap-2">
-            <Choice
-              on={!copying}
-              title="Ton style"
-              hint="Tes couleurs, tes polices, ta façon de faire"
-              onClick={() => {
-                setCopyChoice("mine");
-                setSheet(null);
-              }}
-            />
-            {/* The Reel she sent Simone, still there when she picked another one here. */}
-            {sent && given && given !== sent.id && (
-              <Choice
-                on={false}
-                title="Comme le Reel que tu m’as envoyé"
-                hint={sent.name ?? "Je le regarde"}
-                onClick={() => {
-                  setGiven(null);
-                  setCopyRead(null);
-                  setCopyChoice("copy");
-                  setSheet(null);
-                }}
-              />
-            )}
-            {usable && !models.some((m) => m.id === usable) && (
-              <Choice
-                on={Boolean(copying)}
-                title={given ? "Comme le Reel que tu aimes" : "Comme le Reel que tu m’as envoyé"}
-                hint={readingLabel(reading)}
-                onClick={() => {
-                  setCopyChoice("copy");
-                  setSheet(null);
-                }}
-              />
-            )}
-          </div>
-          {models.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <span className="text-[13px] font-bold">Comme un de tes Reels</span>
-              <div role="radiogroup" aria-label="Comme un de tes Reels" className="flex flex-col gap-2">
-                {models.map((m) => (
-                  <Choice key={m.id} on={copying === m.id} title={`Comme ton Reel « ${m.title} »`} hint={`Même rythme, mêmes textes : ${m.name}`} onClick={() => pickModel(m)} />
-                ))}
-              </div>
-            </div>
-          )}
-          {copying && reading?.state === "read" && reading.lines.length > 0 && (
-            <div className="flex flex-col gap-1.5 rounded-[16px] bg-soft px-3.5 py-3">
-              <span className="text-[13px] font-bold">Ce que ton Reel en reprendra</span>
-              <ul className="flex flex-col gap-1 text-[13.5px] leading-snug text-muted">
-                {reading.lines.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {copying && reading?.state === "reading" && (
-            <p className="flex items-center gap-2 text-[13.5px] text-muted">
-              <Spinner /> Je le regarde, environ une minute. Tu peux lancer ton Reel : il attendra.
-            </p>
-          )}
-          {model && reading?.state === "missed" && <p className="text-[13.5px] leading-snug text-danger">{reading.message}</p>}
-          <CopyGiver
-            studioId={options.studioId}
-            another={Boolean(usable)}
-            onGiven={(id) => {
-              setGiven(id);
-              setCopyRead({ state: "reading" });
-              setCopyChoice("copy");
             }}
           />
         </Sheet>

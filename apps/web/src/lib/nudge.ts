@@ -47,23 +47,26 @@ export async function nudgeIfQuiet(studioId: string, now = Date.now()): Promise<
   if (!(await studioAccess(studioId)).unlock) return false;
   const db = supabaseAdmin();
   const [{ data: studio }, { data: rhythm }, { count: upcoming }, daysSince, { count: banked }] = await Promise.all([
-    db.from("studios").select("nudged_at").eq("id", studioId).single(),
+    db.from("studios").select("nudged_at, created_at").eq("id", studioId).single(),
     db.from("content_plans").select("posts_per_week").eq("studio_id", studioId).maybeSingle(),
     db
       .from("posts")
       .select("id", { count: "exact", head: true })
       .eq("studio_id", studioId)
       .not("status", "in", "(skipped,failed)")
-      .gt("scheduled_at", new Date(now).toISOString())
+      // A post whose moment just came counts too: its reminder is waiting for her (both left at 10 h the same minute).
+      .gt("scheduled_at", new Date(now - NUDGE_UPCOMING_DAYS * DAY).toISOString())
       .lte("scheduled_at", new Date(now + NUDGE_UPCOMING_DAYS * DAY).toISOString()),
     lastPublication(studioId, now),
     db.from("media_assets").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("bank", true),
   ]);
   const nudgedAt = studio?.nudged_at as string | null | undefined;
   const unanswered = await unansweredNudges(studioId);
+  // Never published: counted from the day she arrived, never the morning after her onboarding.
+  const since = daysSince ?? (studio?.created_at ? Math.floor((now - new Date(studio.created_at as string).getTime()) / DAY) : null);
   const ok = shouldNudge({
     unanswered,
-    daysSince,
+    daysSince: since,
     upcoming: Boolean(upcoming),
     daysSinceNudge: nudgedAt ? Math.floor((now - new Date(nudgedAt).getTime()) / DAY) : null,
     postsPerWeek: rhythm?.posts_per_week as number | null | undefined,

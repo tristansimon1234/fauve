@@ -48,7 +48,17 @@ export const webhookPayloadSchema = z.object({
               .array(z.object({ wa_id: z.string(), profile: z.object({ name: z.string() }).optional() }))
               .optional(),
             messages: z.array(inboundMessageSchema).optional(),
-            statuses: z.array(z.object({ id: z.string(), status: z.string() })).optional(),
+            statuses: z
+              .array(
+                z.object({
+                  id: z.string(),
+                  status: z.string(),
+                  recipient_id: z.string().optional(),
+                  // Why Meta did not deliver it (a « failed » status): its code and words.
+                  errors: z.array(z.object({ code: z.number(), title: z.string().optional(), error_data: z.object({ details: z.string().optional() }).optional() })).optional(),
+                }),
+              )
+              .optional(),
           }),
         }),
       ),
