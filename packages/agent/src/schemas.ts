@@ -203,7 +203,7 @@ export const AMBIANCES: Record<MotionTemplate, { label: string; hint: string; ph
 
 /** What Fauve proposes before a montage, shown on the quote and followed by the editor. */
 export const montagePlanSchema = z.object({
-  duration: z.number().min(5).max(30).describe("Durée visée en secondes : 7 à 15 pour une annonce ou une ambiance, 20 à 30 pour une histoire (quelqu'un qui parle, un conseil, un avant/après)"),
+  duration: z.number().min(5).max(45).describe("Durée visée en secondes : 7 à 15 pour une annonce ou une ambiance, 20 à 30 pour une histoire (quelqu'un qui parle, un conseil, un avant/après), jusqu'à 45 quand quelqu'un parle ou qu'une voix raconte tout du long"),
   style: motionTemplateSchema.optional().describe("collage si elle veut la forme collage (ses images composées à la main) ; sinon rien : le rythme se décide pour chaque Reel"),
   scenes: z
     .array(
