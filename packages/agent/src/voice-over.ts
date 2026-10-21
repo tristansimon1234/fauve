@@ -106,6 +106,9 @@ export function wantsVoiceOver(
 ): boolean {
   if (p.onReel === "hers" || p.post?.mode === "off") return false;
   if (p.onReel === "simone") return Boolean(p.post?.remake);
+  // Someone speaking in her videos keeps their words, even when she chose « Une voix off » or « toujours »
+  // (Tristan: « ok » to « ses paroles passent avant la voix off ») ; only a voice she asked for again, with what it says, goes over them.
+  if (p.speechInClips && !p.post?.wish) return false;
   if (p.post?.mode === "on") return true;
   if (p.correction || p.studio === "never") return false;
   if (p.studio === "always") return true;

@@ -1452,7 +1452,10 @@ test("voice over: when Simone puts her voice on a Reel, and which voice", async 
   // The studio's setting, then the Reel's own choice over it.
   assert.equal(wantsVoiceOver({ ...base, studio: "never" }), false);
   assert.equal(wantsVoiceOver({ ...base, studio: "never", post: { mode: "on" } }), true);
-  assert.equal(wantsVoiceOver({ ...base, studio: "always", speechInClips: true }), true);
+  // Someone speaking keeps their words over her choice or her setting; a voice she asked for again, with what it says, goes on.
+  assert.equal(wantsVoiceOver({ ...base, studio: "always", speechInClips: true }), false);
+  assert.equal(wantsVoiceOver({ ...base, post: { mode: "on" }, speechInClips: true }), false);
+  assert.equal(wantsVoiceOver({ ...base, post: { mode: "on", wish: "raconte le cours du matin" }, speechInClips: true }), true);
   assert.equal(wantsVoiceOver({ ...base, studio: "always", post: { mode: "off" } }), false);
   // Her own voice note is never covered; Simone's voice is made again only when asked (another text or voice).
   assert.equal(wantsVoiceOver({ ...base, onReel: "hers", post: { mode: "on", remake: true } }), false);

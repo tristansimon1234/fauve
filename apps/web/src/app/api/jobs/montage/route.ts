@@ -110,6 +110,8 @@ const bodySchema = z.object({
   reviewed: z.boolean().optional(),
   /** The voice Simone recorded over this Reel (its name), told at delivery. */
   voice: z.string().max(40).optional(),
+  /** She wanted a voice over, but someone speaks in her videos: their words were kept, told at delivery. */
+  spokenKept: z.boolean().optional(),
   /** The voice step is done: the design goes on (in its own invocation when a voice was recorded). */
   voiced: z.boolean().optional(),
   /** Simone chose a key message with the music over a voice for this Reel (her setting is « auto »). */
@@ -205,7 +207,7 @@ async function run(job: Job) {
     if (job.step === "render") {
       await setQuoteStage(job.quoteId, "render");
       const cost = job.quoteId ? await montageCost(job.quoteId, job.newScenes ?? 0) : null;
-      const delivered = await renderAndDeliver({ ...target, rationale: job.rationale, note: job.note ?? job.rationale, offerVariant: true, voice: job.voice, cost });
+      const delivered = await renderAndDeliver({ ...target, rationale: job.rationale, note: job.note ?? job.rationale, offerVariant: true, voice: job.voice, spokenKept: job.spokenKept, cost });
       // Charged only once the video is out, for the scenes really made (never above the quote).
       if (delivered && job.quoteId) {
         await setQuoteStage(job.quoteId, "delivered");
@@ -217,7 +219,7 @@ async function run(job: Job) {
       await setQuoteStage(job.quoteId, "design");
       if (await voiceFirst(job)) return;
       const edit = await designEdit({ ...designInput(job), effort: level?.editorEffort });
-      await queueJob("montage", { ...target, step: "render", rationale: edit.rationale, quoteId: job.quoteId, newScenes: edit.newScenes, effort: job.effort, voice: job.voice });
+      await queueJob("montage", { ...target, step: "render", rationale: edit.rationale, quoteId: job.quoteId, newScenes: edit.newScenes, effort: job.effort, voice: job.voice, spokenKept: job.spokenKept });
     } catch (error) {
       console.error("montage design failed", job.postId, error);
       await reopenQuote(job.quoteId);
@@ -265,6 +267,10 @@ async function voiceFirst(job: Job): Promise<boolean> {
   // A Reel with an effect too, as any Reel (Tristan: « oui »): her choice, else her business's, else Simone's.
   const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief });
   if (!made) return false;
+  if ("spokenKept" in made) {
+    Object.assign(job, { voiced: true, spokenKept: true });
+    return false;
+  }
   // A key message with the music suits it better: no voice, the editor knows it, the design goes on now.
   if ("format" in made) {
     Object.assign(job, { voiced: true, format: made.format });
@@ -667,6 +673,7 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         // Two versions were already compared: no variant offered on top; an effect has no hook of the engine's to change.
         offerVariant: !job.compared && !outcome?.effect,
         voice: job.voice,
+        spokenKept: job.spokenKept,
         cost: job.quoteId ? await montageCost(job.quoteId, job.newScenes ?? 0, job.fixes ?? 0, skipped) : null,
       },
       { title, durationMs: (render.data?.duration_ms as number | null) ?? 0 },

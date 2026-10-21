@@ -30,6 +30,8 @@ export type DeliveryTarget = {
   freshMusic?: boolean;
   /** Simone recorded a voice over this Reel (its name): said, with how to change it. */
   voice?: string;
+  /** She wanted a voice over, but someone speaks in her videos: their words were kept instead, said. */
+  spokenKept?: boolean;
   /** What the montage used, and what is left (charged right after the delivery): said in the message. */
   cost?: { credits: number; left: number } | null;
   /** Started from the app (« Créer »): she is told on WhatsApp too, so she can close the app. */
@@ -158,7 +160,9 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const intro = `Ton montage « ${r.title} » est prêt 🎬${seconds ? ` (${seconds} s)` : ""}.`;
   const voiceLine = target.voice
     ? `J’ai posé une voix off dessus (${target.voice}) : si tu le préfères sans, ou avec une autre voix, dis-le-moi.`
-    : "";
+    : target.spokenKept
+      ? "Quelqu’un parle dans ta vidéo : j’ai gardé ses paroles plutôt que de poser une voix off par-dessus. Tu veux quand même une voix off ? Dis-moi ce qu’elle doit raconter."
+      : "";
   // No quote before: what it used is said once it is there.
   const costLine = unlocked && target.cost?.credits ? `Ça a utilisé ${target.cost.credits} crédit${target.cost.credits > 1 ? "s" : ""}, il t’en reste ${target.cost.left}.` : "";
   // The editor's and the critic's words are the model's: no stray markup (« </br> ») reaches her.
