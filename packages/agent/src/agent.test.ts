@@ -9,6 +9,7 @@ import { CREDIT_PRICES } from "./credits.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas } from "./post-ideas.ts";
 import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
+import { contractIsEmpty, contractLines, EMPTY_CONTRACT, VOICE_SPEED, verbatimScript } from "./contract.ts";
 
 const validPlan = {
   format: "9:16",
@@ -4176,4 +4177,29 @@ test("a composition keeps the faces of a shot whole in a wide box (half of a spl
   assert.deepEqual(faceFocus(body, face, 9 / 16, 9 / 16), { x: 0.5, y: 0.55 });
   assert.deepEqual(faceFocus(body, undefined, 9 / 16, 2), body);
   assert.equal(faceZone(file, 5, 1), null);
+});
+
+test("contract: only what she fixed, in plain lines", () => {
+  assert.ok(contractIsEmpty(EMPTY_CONTRACT));
+  assert.deepEqual(contractLines(EMPTY_CONTRACT), []);
+  const fixed = {
+    ...EMPTY_CONTRACT,
+    voice_text: "Je viens de découvrir Simone.",
+    voice_text_mode: "polish" as const,
+    person: "je" as const,
+    voice_pace: "rapide" as const,
+    layout: "écran partagé 50/50",
+    duration: 30,
+    call_to_action: "aucune" as const,
+    musts: ["fond papier"],
+  };
+  assert.ok(!contractIsEmpty(fixed));
+  const lines = contractLines(fixed);
+  assert.ok(lines.some((l) => l.includes("Je viens de découvrir Simone.") && l.includes("améliorer")));
+  assert.ok(lines.some((l) => l.includes("première personne")));
+  assert.ok(lines.includes("Voix plus rapide"));
+  assert.ok(lines.includes("Aucune invitation à la fin"));
+  assert.ok(lines.includes("Demandé : fond papier"));
+  assert.ok(VOICE_SPEED.rapide > 1 && VOICE_SPEED.lente < 1 && VOICE_SPEED.normale === 1);
+  assert.equal(verbatimScript(" « Je lis\n tranquille  pendant qu'elle bosse » "), "Je lis tranquille pendant qu'elle bosse");
 });

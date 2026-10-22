@@ -154,6 +154,8 @@ export const VOICE_OVER_PROMPT = `Tu écris la voix off d'un Reel Instagram pour
 
 Ce que tu reçois : le commerce (nom, activité, ce qu'on sait de lui), l'idée de la publication et, quand il y en a, la demande faite pour ce Reel (« publication.demande », souvent dans les mots de la personne qui gère) et ce qu'elle veut entendre (« consigne_voix »), le ton du commerce, ce que montrent ses images, dans l'ordre où elles ont été filmées, l'image sur laquelle le Reel s'ouvre (« ouverture », le plan le plus fort pour accrocher), la longueur à viser (« longueur » : de mots_min à mots_max mots) et, quand elle en recopie un, le Reel qu'elle a envoyé (« reel_a_recopier » : la forme de son accroche et sa fin).
 
+« contrat », quand il y en a un, c'est ce qu'elle a fixé elle-même pour ce Reel : il passe avant tout le reste, ces règles comprises. Une personne (« je » : la voix parle en son nom, à la première personne, et la règle du créateur qui parle du commerce ne s'applique pas), une invitation (« aucune » : pas d'invitation ni d'appel à commenter ; « la sienne » : ses mots), une fin, une durée, ses demandes : tu les suis à la lettre.
+
 Sa demande passe avant tes idées et ces règles : le message, l'ordre et l'invitation qu'elle donne, avec des phrases à toi, dites à l'oral ; les faits qu'elle y donne sont vrais. Le Reel qu'elle recopie aussi : ta première phrase prend la forme de son accroche, et ta fin la sienne (une chute, une boucle sur la première image ; sans invitation s'il n'en a pas), jamais ses mots. Elle écrit souvent en son nom (« chez nous », « moi ») : la voix, elle, reste celle d'un créateur qui parle du commerce.
 
 Les exemples entre guillemets ci-dessous montrent une forme, jamais des mots à reprendre : écris toujours les tiens, à partir de ce commerce et de ces images.
@@ -168,6 +170,7 @@ Règles :
 - parle comme le commerce parle (« ton ») : ses mots, son humour, tutoiement ou vouvoiement comme lui ;
 - la voix est celle d'un créateur qui fait découvrir le commerce à ses abonnés : elle en parle (« ici », « chez Lina », « l'équipe »), jamais en son nom (pas de « chez nous » ni de « je » pour le commerce), et tutoie la personne qui regarde, sauf si le ton du commerce vouvoie ;
 - finis (sauf si sa demande ou le Reel qu'elle recopie finissent autrement) par une invitation simple et concrète, qui dit quoi faire (venir, réserver, essayer : le geste précis pour ce commerce, et où le faire, par exemple « le lien est dans la bio »), ou par une raison de l'envoyer à quelqu'un (« si tu as une gourmande autour de toi, tu sais à qui l'envoyer ») ;
+- jamais une invitation que le commerce ne tient pas : pas d'« écris X en commentaire, on t'envoie le lien » ni de promesse d'envoi, de code ou de cadeau qui n'est pas dans ce qu'on te donne ;
 - interdit : les formules de pub (« découvrez », « n'hésitez pas », « une expérience unique », « de qualité », « savoureux », « au cœur de »), les superlatifs creux, les emojis, les hashtags, le tiret long, les parenthèses ;
 - écris les nombres en lettres quand ils se disent mal en chiffres (« dix-huit mois ») et la ponctuation d'une voix qui parle : des points, des virgules, des points de suspension pour une petite pause, une question au plus ;
 - ça s'écoute comme quelqu'un qui parle, jamais comme une pub lue au micro : écris comme on parle à un ami dans une note vocale ou face caméra, avec les tournures de l'oral (« t'as », « y a », « c'est », « franchement », « en vrai », « du coup », « bref ») quand elles collent au ton du commerce, une phrase qui se reprend ou une petite hésitation de temps en temps (« enfin… »), des phrases qui ne sont pas toutes parfaites ; relis-la dans ta tête : si on dirait une annonce, une plaquette ou un spot radio, réécris-la ;
@@ -176,6 +179,17 @@ Règles :
 - si on te dit que la voix est chuchotée (ASMR), écris pour un murmure tout près de l'oreille : des phrases encore plus courtes et lentes, des points de suspension, ce qu'on entend et ce qu'on sent (le bruit des ciseaux, la mousse, la croûte qui craque, la chaleur d'une serviette), aucune question qui claque ni point d'exclamation, [whispers] ou [softly] comme balises.
 
 Réponds avec hooks (les 4 premières phrases possibles) et rest (tout ce qui suit la première phrase, balises comprises).`;
+
+/**
+ * Her own text for the voice (« contrat.voice_text »): read as she wrote it, or improved for the ear,
+ * never turned into someone else's words (Tristan's « Je viens de découvrir Simone… » came back as
+ * « Tristan a trouvé Simone… » with an invitation he never asked for).
+ */
+export const OWN_TEXT_PROMPT = `Tu prépares, pour une voix de synthèse française, le texte qu'une personne a écrit elle-même pour la voix off de son Reel.
+- mode « verbatim » : corrige seulement l'orthographe, les accords et la ponctuation d'une voix qui parle (points, virgules, points de suspension pour une petite pause) ; écris en lettres un nombre qui se dit mal en chiffres. Ne change, n'ajoute ni ne retire aucun mot, aucune idée.
+- mode « polish » : rends-le meilleur à l'oral, plus vivant et plus fluide, en phrases courtes, sans rien perdre : son sens, ses idées dans son ordre, sa personne (un « je » reste un « je »), ses mots forts, à peu près sa longueur (« longueur » donne la cible si elle est là). N'ajoute rien qui n'y est pas : ni invitation, ni appel à commenter, ni fait, ni chiffre, ni promesse.
+Dans les deux cas, suis « contrat » (personne, invitation, fin) et ne mets aucune balise entre crochets. Réponds avec script : le texte tel qu'il sera lu.`;
+export const ownTextSchema = z.object({ script: z.string().describe("Le texte tel qu'il sera lu") });
 
 /** Acting tags (« [warmly] »): played by the voice, never read, never shown in the subtitles. */
 const TAG = /\[[^\]]*\]/g;

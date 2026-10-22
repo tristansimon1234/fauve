@@ -1,7 +1,10 @@
 import "server-only";
 import {
   brandProfileSchema,
+  CHAT_MODEL,
   CLAUDE_MODEL,
+  contractIsEmpty,
+  contractLines,
   clipAnalysisSchema,
   DEFAULT_VOICE_ID,
   editPlanSchema,
@@ -9,6 +12,11 @@ import {
   fromTtsAlignment,
   isBaked,
   openingCandidates,
+  OWN_TEXT_PROMPT,
+  ownTextSchema,
+  SIMONE_VOICES,
+  VOICE_SPEED,
+  verbatimScript,
   scriptFrom,
   readPostVoice,
   readVoiceSetting,
@@ -26,6 +34,7 @@ import {
   voiceWordsFor,
   voiceOverDecisionSchema,
   voiceOverScriptSchema,
+  type ReelContract,
   type ReelFormat,
   type VoiceOverDecision,
   type VoiceOverDraft,
@@ -120,6 +129,8 @@ type ScriptOptions = {
   whispered?: boolean;
   /** Choose the form first (her setting is « auto »). */
   decide?: boolean;
+  /** What she fixed for this Reel: her text, her person, her ending… over every rule. */
+  contract?: ReelContract;
 };
 
 /**
@@ -130,13 +141,17 @@ type ScriptOptions = {
 export async function writeVoiceScript(
   studioId: string,
   postId: string,
-  { wish, mediaIds, brief, whispered = false, decide = false }: ScriptOptions = {},
+  { wish, mediaIds, brief, whispered = false, decide = false, contract }: ScriptOptions = {},
 ): Promise<VoiceOverScript & Partial<Pick<VoiceOverDecision, "format" | "why">>> {
+  const fixed = contractLines(contract);
   const input = {
     ...(await scriptInput(studioId, postId, mediaIds, brief)),
     ...(wish ? { consigne_voix: wish } : {}),
     ...(whispered ? { voix: "chuchotée (ASMR)" } : {}),
+    ...(fixed.length ? { contrat: fixed } : {}),
   };
+  // She wrote the words herself: read as written (or improved for the ear when she asked), never rewritten into another voice.
+  if (contract?.voice_text) return ownTextScript(studioId, contract, fixed, input.longueur);
   let draft: VoiceOverDraft & Partial<Pick<VoiceOverDecision, "format" | "why">>;
   for (let attempt = 0; ; attempt++) {
     const response = await anthropic().beta.messages.parse({
@@ -159,8 +174,9 @@ export async function writeVoiceScript(
   }
   // Its first sentence decides whether anyone stays: the strongest of its hooks (and the judge's own), for the image it opens on.
   const next = stripAudioTags(draft.rest).split(/(?<=[.!?…])\s+/)[0];
+  // What she fixed (her person, her words, her ending) is kept from the judge, who would weigh other forms against it.
   const chosen =
-    draft.hooks.length > 0
+    draft.hooks.length > 0 && contractIsEmpty(contract)
       ? await judgeHooks(studioId, {
           type: "voix",
           commerce: { nom: input.commerce.nom, activite: input.commerce.activite, ce_qu_on_sait: input.commerce.ce_qu_on_sait, ton: input.commerce.ton },
@@ -174,6 +190,45 @@ export async function writeVoiceScript(
   return { ...scriptFrom(chosen?.text ?? draft.hooks[0] ?? "", draft.rest), format: draft.format, why: draft.why };
 }
 
+/** Her own text, prepared for the voice: corrected only (verbatim), or improved for the ear keeping her meaning and her person (polish). */
+async function ownTextScript(studioId: string, contract: ReelContract, fixed: string[], longueur: { mots_min: number; mots_max: number }): Promise<VoiceOverScript> {
+  let script = verbatimScript(contract.voice_text ?? "");
+  try {
+    const response = await anthropic().beta.messages.parse({
+      model: CHAT_MODEL,
+      max_tokens: 2000,
+      output_config: { effort: "low", format: outputFormat(ownTextSchema) },
+      system: OWN_TEXT_PROMPT,
+      messages: [{ role: "user", content: JSON.stringify({ mode: contract.voice_text_mode, texte: contract.voice_text, contrat: fixed, ...(contract.voice_text_mode === "polish" ? { longueur } : {}) }) }],
+    });
+    await logClaudeCost(studioId, response.usage, "voice_script", CHAT_MODEL);
+    const written = response.parsed_output?.script?.trim();
+    if (written) script = stripAudioTags(written);
+  } catch (error) {
+    console.warn("her text read as she wrote it", error);
+  }
+  return { hook: script.split(/(?<=[.!?…])\s+/)[0] ?? script, script };
+}
+
+/** A voice of the gallery that matches what she asked (a man's, a woman's), keeping the chosen one when it does. */
+function voiceFor(voiceId: string, gender: ReelContract["voice_gender"] | undefined): string {
+  if (!gender || gender === "libre") return voiceId;
+  const want = gender === "homme" ? "m" : "f";
+  const current = findVoice(voiceId);
+  if (current && current.gender === want) return voiceId;
+  return SIMONE_VOICES.find((v) => v.gender === want && !v.asmr)?.id ?? voiceId;
+}
+
+/** A voice's own settings in the library, kept when only its speed changes (Tristan: « garde le ton d'origine des voix »). */
+const voiceSettings = new Map<string, Record<string, unknown> | null>();
+async function settingsOf(voiceId: string, key: string): Promise<Record<string, unknown> | null> {
+  if (voiceSettings.has(voiceId)) return voiceSettings.get(voiceId)!;
+  const res = await fetch(`https://api.elevenlabs.io/v1/voices/${encodeURIComponent(voiceId)}/settings`, { headers: { "xi-api-key": key } }).catch(() => null);
+  const settings = res?.ok ? ((await res.json().catch(() => null)) as Record<string, unknown> | null) : null;
+  voiceSettings.set(voiceId, settings);
+  return settings;
+}
+
 /** The models tried in turn: the one configured, then older ones whose word timings are documented. */
 const fallbackModels = () => [...new Set([env("ELEVENLABS_TTS_MODEL"), "eleven_v3", "eleven_multilingual_v2"])];
 
@@ -184,20 +239,35 @@ const BUSY_RETRIES = 5;
  * ElevenLabs reads the script: the audio (as it comes, its loudness varies by voice,
  * see levelSpeech) and the time of every word.
  */
-export async function speak(text: string, voiceId = env("ELEVENLABS_VOICE_ID")): Promise<{ mp3: Buffer; transcript: VoiceTranscript; model: string; voiceId: string }> {
+export async function speak(
+  text: string,
+  voiceId = env("ELEVENLABS_VOICE_ID"),
+  speed = 1,
+): Promise<{ mp3: Buffer; transcript: VoiceTranscript; model: string; voiceId: string }> {
   const key = env("ELEVENLABS_API_KEY");
   if (!key) throw new Error("ELEVENLABS_API_KEY missing");
+  // A pace she asked for: the voice's own settings, its speed changed (refused by a model, the voice is read at its pace).
+  const paced = speed !== 1 ? { ...((await settingsOf(voiceId, key)) ?? {}), speed } : null;
   let failure = "";
   for (const model of fallbackModels()) {
     let res: Response;
+    let withPace = Boolean(paced);
     for (let attempt = 0; ; attempt++) {
       res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps?output_format=mp3_44100_128`, {
         method: "POST",
         headers: { "xi-api-key": key, "content-type": "application/json" },
         // Multilingual v2 finds the language itself (it refuses language_code) and would read the acting tags aloud.
         // Each voice keeps its own tone (its library settings): Tristan picked them by ear as they are.
-        body: JSON.stringify(model === "eleven_multilingual_v2" ? { text: stripAudioTags(text), model_id: model } : { text, model_id: model, language_code: "fr" }),
+        body: JSON.stringify({
+          ...(model === "eleven_multilingual_v2" ? { text: stripAudioTags(text), model_id: model } : { text, model_id: model, language_code: "fr" }),
+          ...(withPace && paced ? { voice_settings: paced } : {}),
+        }),
       });
+      if ((res.status === 400 || res.status === 422) && withPace) {
+        console.warn("voice pace refused by", model, (await res.text().catch(() => "")).slice(0, 200));
+        withPace = false;
+        continue;
+      }
       if (res.status !== 429 || attempt >= BUSY_RETRIES) break;
       await res.text().catch(() => "");
       await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1) + Math.random() * 1000));
@@ -246,6 +316,8 @@ export async function voiceOverIfWanted(params: {
   correction?: boolean;
   /** Her request for the Reel, read by the voice too. */
   brief?: string;
+  /** What she fixed: her own text asks for a voice reading it, at her pace, with the voice she asked. */
+  contract?: ReelContract;
 }): Promise<{ mediaId: string; voice: string } | { format: Extract<ReelFormat, "message">; why: string } | { spokenKept: true } | null> {
   if (!env("ELEVENLABS_API_KEY")) return null;
   const db = supabaseAdmin();
@@ -270,7 +342,7 @@ export async function voiceOverIfWanted(params: {
   const footageSeconds = videos.reduce((sum, v) => sum + (Number(v.duration) || 0), 0) || read.reduce((sum, a) => sum + a.duration, 0);
   // The voice on the Reel now: hers (a voice note she sent) or one Simone made.
   const current = post.data.voice_media_id
-    ? (await db.from("media_assets").select("source").eq("id", post.data.voice_media_id as string).maybeSingle()).data
+    ? (await db.from("media_assets").select("source, ai").eq("id", post.data.voice_media_id as string).maybeSingle()).data
     : null;
   const choices = {
     post: choice,
@@ -280,27 +352,34 @@ export async function voiceOverIfWanted(params: {
   };
   // Left to Simone, the Reel she copies decides (told by a voice, or not): its reading is waited for, as the editor does.
   const copied = voiceLeftToSimone(choices) ? await postStyle(params.studioId, params.postId, { waitMs: STEAL_WAIT_MS }).catch(() => undefined) : undefined;
-  const wanted = wantsVoiceOver({
-    ...choices,
-    speechInClips,
-    footageSeconds,
-    photos: (media ?? []).filter((m) => m.kind === "image").length,
-    copied: copied?.look.voice,
-  });
+  // Her own text for the voice asks for it (a correction too), unless it is already the one on the Reel, at her pace.
+  const ownText = params.contract?.voice_text ? verbatimScript(params.contract.voice_text) : null;
+  const pace = VOICE_SPEED[params.contract?.voice_pace ?? "normale"];
+  const ownTextOnReel = ownText && current && (current as { ai?: { own_text?: string; speed?: number } }).ai?.own_text === ownText && ((current as { ai?: { speed?: number } }).ai?.speed ?? 1) === pace;
+  if (ownTextOnReel) return null;
+  const wanted =
+    Boolean(ownText && choice?.mode !== "off") ||
+    wantsVoiceOver({
+      ...choices,
+      speechInClips,
+      footageSeconds,
+      photos: (media ?? []).filter((m) => m.kind === "image").length,
+      copied: copied?.look.voice,
+    });
   // She chose a voice (for this Reel, or always) but someone speaks in her videos: their words stay, and the delivery says so.
   if (!wanted && speechInClips && !choices.onReel && !choices.correction && choice?.mode !== "off" && (choice?.mode === "on" || setting.use === "always")) return { spokenKept: true };
   if (!wanted) return null;
   // A voice of the gallery, or one of her own (a clone made with her consent) kept as it is.
-  const voiceId = choice?.voice_id ?? setting.voice_id ?? DEFAULT_VOICE_ID;
+  const voiceId = voiceFor(choice?.voice_id ?? setting.voice_id ?? DEFAULT_VOICE_ID, params.contract?.voice_gender);
   try {
     // Her setting leaves it to Simone: told by a voice, or one key message with the music (then nothing is read nor paid);
     // a Reel she copies told by a voice has its form already.
-    const auto = choice?.mode !== "on" && !choice?.wish && setting.use === "auto" && !copied;
+    const auto = choice?.mode !== "on" && !choice?.wish && setting.use === "auto" && !copied && !ownText;
     const written = auto
-      ? await writeVoiceScript(params.studioId, params.postId, { mediaIds: ids, brief: params.brief, whispered: Boolean(findVoice(voiceId)?.asmr), decide: true })
+      ? await writeVoiceScript(params.studioId, params.postId, { mediaIds: ids, brief: params.brief, whispered: Boolean(findVoice(voiceId)?.asmr), decide: true, contract: params.contract })
       : undefined;
     if (written?.format === "message") return { format: "message", why: (written.why ?? "").slice(0, 300) };
-    const made = await makeVoiceOver({ studioId: params.studioId, postId: params.postId, wish: choice?.wish, voiceId, mediaIds: ids, brief: params.brief, script: written });
+    const made = await makeVoiceOver({ studioId: params.studioId, postId: params.postId, wish: choice?.wish, voiceId, mediaIds: ids, brief: params.brief, script: written, contract: params.contract });
     // Her wish and the remake were for this voice: used once.
     if (choice?.wish || choice?.remake) await db.from("posts").update({ voice_over: { mode: choice.mode, ...(choice.voice_id ? { voice_id: choice.voice_id } : {}) } }).eq("id", params.postId);
     return { mediaId: made.mediaId, voice: findVoice(voiceId)?.name ?? "ta voix" };
@@ -355,13 +434,22 @@ export async function makeVoiceOver(params: {
   brief?: string;
   /** Already written (when Simone chose the form first). */
   script?: VoiceOverScript;
+  /** What she fixed for this Reel (her text, her person, her pace). */
+  contract?: ReelContract;
 }): Promise<{ mediaId: string; script: string; seconds: number }> {
   const db = supabaseAdmin();
   const script =
     params.script ??
-    (await writeVoiceScript(params.studioId, params.postId, { wish: params.wish, mediaIds: params.mediaIds, brief: params.brief, whispered: Boolean(findVoice(params.voiceId)?.asmr) }));
+    (await writeVoiceScript(params.studioId, params.postId, {
+      wish: params.wish,
+      mediaIds: params.mediaIds,
+      brief: params.brief,
+      whispered: Boolean(findVoice(params.voiceId)?.asmr),
+      contract: params.contract,
+    }));
   const started = Date.now();
-  const voice = await speak(script.script, params.voiceId);
+  const speed = VOICE_SPEED[params.contract?.voice_pace ?? "normale"];
+  const voice = await speak(script.script, params.voiceId, speed);
   if (voice.transcript.duration > VOICE_MAX_SECONDS) throw new Error(`Voix trop longue (${voice.transcript.duration} s)`);
   // A breath between two sentences read in one go, while it still fits a Reel.
   const breaths = sentencePauses(voice.transcript.words);
@@ -382,7 +470,15 @@ export async function makeVoiceOver(params: {
       size_bytes: leveled.mp3.length,
       duration: transcript.duration,
       transcript,
-      ai: { mode: "voice", voice_id: voice.voiceId, model: voice.model, lufs: leveled.lufs },
+      ai: {
+        mode: "voice",
+        voice_id: voice.voiceId,
+        model: voice.model,
+        lufs: leveled.lufs,
+        // Her own text and pace, so that the next correction keeps this voice when they have not changed.
+        ...(params.contract?.voice_text ? { own_text: verbatimScript(params.contract.voice_text) } : {}),
+        ...(speed !== 1 ? { speed } : {}),
+      },
       consent_ok: true,
     })
     .select("id")

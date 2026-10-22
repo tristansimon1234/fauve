@@ -1,6 +1,8 @@
 import "server-only";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import {
+  contractLines,
+  type ReelContract,
   editorClip,
   signatureLines,
   followedForEditor,
@@ -148,6 +150,9 @@ export type DesignedEdit = {
   reusedScenes: number;
 };
 
+/** A failed composition is tried once more only when the design step has spent less than this (its limit is 800 s). */
+const COMPOSE_RETRY_BEFORE_MS = 330_000;
+
 /** How long the montage waits for what moves in her videos (its faces, its hands) before the editor cuts. */
 const TRACKS_WAIT_MS = 180_000;
 
@@ -171,7 +176,10 @@ export async function designEdit(params: {
   fresh?: boolean;
   /** Simone chose the form: « message », one key message with the music, no voice. */
   format?: ReelFormat;
+  /** What she fixed for this Reel: over every default of the editor. */
+  contract?: ReelContract;
 }): Promise<DesignedEdit> {
+  const started = Date.now();
   const db = supabaseAdmin();
   const [post, studio, brand, previous, recent, report, inspirations, hooks] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id, voice_media_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
@@ -291,6 +299,8 @@ export async function designEdit(params: {
       dos: profile.dos,
       donts: profile.donts,
     },
+    // What she fixed herself for this Reel (her text, the layout, the length, the ending…): followed to the letter.
+    ...(contractLines(params.contract).length ? { contrat: contractLines(params.contract) } : {}),
     post: {
       ...post.data,
       edit_plan_id: undefined,
@@ -386,7 +396,7 @@ export async function designEdit(params: {
   // other forms by the hook judge, who keeps the strongest (an opening animation is its own hook).
   const hook = planHook(plan);
   const opener = plan.segments[0];
-  if (hook && !hook.text.items?.length && opener && isClipSegment(opener) && !correction) {
+  if (hook && !hook.text.items?.length && opener && isClipSegment(opener) && !correction && !params.contract?.screen_text) {
     const clip = clips.find((c) => c.media_id === opener.clip_id);
     const firstImage = clip
       ? (clip.analysis.shots.find((shot) => opener.in >= shot.start && opener.in < shot.end)?.description ?? clip.analysis.summary)
@@ -585,9 +595,7 @@ export async function designEdit(params: {
     ?.split("\n")
     .filter((line) => !(bare && line.startsWith("Phrases sur la vidéo")))
     .join("\n");
-  const designed = await designMotionScenes(
-    params.studioId,
-    requests,
+  const direction =
     [
       profile.art_direction,
       charter && `Sa charte en réglages (ses titres, son mouvement, sa lumière) :\n${charter}`,
@@ -596,16 +604,15 @@ export async function designEdit(params: {
       profile.moodboard?.reading && `Lecture du moodboard de la gérante : ${profile.moodboard.reading}`,
     ]
       .filter(Boolean)
-      .join("\n\n") || undefined,
-    resolveReelBrand(plan, template, {
+      .join("\n\n") || undefined;
+  const sceneBrand = resolveReelBrand(plan, template, {
       name: (studio.data?.name as string | null) ?? "",
       accent: profile.colors?.[0],
       // The real (signed) URL is set at render time; the designer only needs to know a logo exists.
       logoUrl: profile.logo_path ? "https://logo.fauve/studio" : profile.logo_url,
       fonts: usable,
-    }),
-    kit,
-    {
+    });
+  const sceneContext = {
       kept: keptScenes.map((name) => `déjà dans ce Reel : ${name}`),
       done,
       // The Reel's rhythm and look: its test render moves the footage like the video does (what a scene follows stays under it).
@@ -614,8 +621,21 @@ export async function designEdit(params: {
         ...(plan.tempo ? { tempo: plan.tempo } : {}),
         ...(signature ? { signature: resolveReelBrand(plan, template, { name: "", signature }).signature } : {}),
       },
-    },
-  );
+    };
+  const designed = await designMotionScenes(params.studioId, requests, direction, sceneBrand, kit, sceneContext);
+  // The composition is the Reel itself (a split screen, a frame…): when its code failed, a whole new try before
+  // the plain montage takes its place (Tristan's split screen fell back to full-frame shots, twice, silently).
+  const composeId = requests.find((r) => r.compose)?.id;
+  let compositionMissed = Boolean(composeId && !designed.find((d) => d.id === composeId)?.js);
+  // Only while the step has time for it (800 s for the whole design): a step cut short would deliver nothing at all.
+  if (composeId && !designed.find((d) => d.id === composeId)?.js && Date.now() - started < COMPOSE_RETRY_BEFORE_MS) {
+    console.warn("composition failed, one more try", params.postId, designed.find((d) => d.id === composeId)?.error);
+    const again = (await designMotionScenes(params.studioId, requests.filter((r) => r.id === composeId), direction, sceneBrand, kit, sceneContext).catch(() => []))[0];
+    if (again?.js) {
+      designed.splice(designed.findIndex((d) => d.id === composeId), 1, again);
+      compositionMissed = false;
+    }
+  }
   const resultOf = (id: string) => designed.find((d) => d.id === id);
   plan.segments = plan.segments.map((s, i) => {
     if (!isMotionSegment(s) || s.motion.js) return s;
@@ -646,8 +666,9 @@ export async function designEdit(params: {
         ...(kept.photos ? { photos: kept.photos } : {}),
         ...(kept.fonts ? { fonts: kept.fonts } : {}),
         ...(kept.template_id ? { template_id: kept.template_id } : {}),
-        // A composition kept as it was draws what it drew (its texts, or only its shots).
+        // A composition kept as it was draws what it drew (its texts, or only its shots), and keeps its subtitles' row.
         ...(kept.draws_texts ? { draws_texts: true } : {}),
+        ...(kept.subtitle_y !== undefined ? { subtitle_y: kept.subtitle_y } : {}),
       };
       return [{ ...l, motion }];
     }
@@ -662,8 +683,10 @@ export async function designEdit(params: {
       js: result.js,
       ...(result.photos?.length ? { photos: result.photos } : {}),
       ...(result.fonts?.length ? { fonts: result.fonts } : {}),
-      // A collage's composition written now draws the whole picture: its ground, the Reel's texts and its end.
+      // A collage's composition written now draws the whole picture: its ground, the Reel's texts and its end;
+      // it knows where its faces are, so it sets the row of a voice's subtitles (they had landed on Tristan's eyes).
       ...(l.compose ? { draws_texts: true } : {}),
+      ...(l.compose && result.subtitleY !== undefined ? { subtitle_y: result.subtitleY } : {}),
     };
     return [{ ...l, motion }];
   });
@@ -706,7 +729,10 @@ export async function designEdit(params: {
     editPlanId: row.id,
     version,
     plan,
-    rationale: response.parsed_output.rationale,
+    // Said as it is when the composition she asked for could not be made: never a split screen announced over full-frame shots.
+    rationale: compositionMissed
+      ? `Je n'ai pas réussi à composer la mise en page demandée : cette version passe tes plans en plein cadre. Dis-moi « réessaie la mise en page » et je la refais. ${response.parsed_output.rationale}`
+      : response.parsed_output.rationale,
     // A collage's composition is the ambiance itself, never a paid animation.
     newScenes: requests.filter((r) => !r.compose).length,
     reusedScenes: reused.size,

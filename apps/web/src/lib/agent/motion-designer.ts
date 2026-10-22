@@ -72,6 +72,8 @@ export type SceneResult = {
   photos?: string[];
   /** The Google Fonts families its code brings besides the Reel's two (a universe she names, the Reel she copies). */
   fonts?: string[];
+  /** A composition: where it wants a voice's subtitles (share of the height). */
+  subtitleY?: number;
 };
 
 /** What already exists, so that a new scene takes another idea. */
@@ -231,7 +233,9 @@ async function writeScene(
     .filter((f) => f && f !== brand.displayFont && f !== brand.bodyFont)
     .slice(0, MAX_SCENE_FONTS);
   const fonts = (await Promise.all(named.map((f) => googleFont(f).catch(() => null)))).filter((f): f is string => Boolean(f));
-  const meta = { name: output?.name ?? "", slots: output?.slots ?? [], notes: output?.notes ?? "", photos, fonts };
+  // A composition's choice of row for a voice's subtitles, kept within the frame's safe rows.
+  const subtitleY = request.compose && typeof output?.subtitle_y === "number" ? Math.min(0.8, Math.max(0.1, output.subtitle_y)) : undefined;
+  const meta = { name: output?.name ?? "", slots: output?.slots ?? [], notes: output?.notes ?? "", photos, fonts, ...(subtitleY !== undefined ? { subtitleY } : {}) };
   const problems = checkMotionCode(code);
   if (problems.length) return { code, js: null, error: `code refusé : ${problems.join(", ")}`, ...meta };
   try {

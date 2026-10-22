@@ -18,12 +18,14 @@ import {
   montageIssueSchema,
   MAX_MONTAGE_FILES,
   motionTemplateSchema,
+  reelContractSchema,
   reelFormatSchema,
   usdToEur,
   variantPlan,
   VOICE_AT,
 } from "@fauve/agent";
 import { reviewMontage } from "@/lib/agent/critic";
+import { readContract } from "@/lib/agent/contract";
 import { designEdit } from "@/lib/agent/editor";
 import {
   collectEffects,
@@ -117,6 +119,8 @@ const bodySchema = z.object({
   voiced: z.boolean().optional(),
   /** Simone chose a key message with the music over a voice for this Reel (her setting is « auto »). */
   format: reelFormatSchema.optional(),
+  /** What she fixed for this Reel, read once from her request at its design (the editor and the voice obey it). */
+  contract: reelContractSchema.optional(),
   /** Who makes this Reel, decided once at its design: the effects agent or the chain. */
   route: z.enum(["agent", "chain"]).optional(),
   /** The agent's session at work: its id, the files it was given, its voice, when it started, her files by the names it knows them. */
@@ -257,7 +261,13 @@ const next = (job: Job, patch: Partial<Job>) => queueJob("montage", { ...job, ..
 
 /** What the editor is asked for: the clips, the request with the validated plan, the scenes allowed. */
 function designInput(job: Job) {
-  return { studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, maxNewScenes: job.maxNewScenes, format: job.format };
+  return { studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, maxNewScenes: job.maxNewScenes, format: job.format, contract: job.contract };
+}
+
+/** What she fixed for this Reel, read once (it travels with the job to every step). */
+async function withContract(job: Job): Promise<void> {
+  if (job.contract || !job.brief?.trim()) return;
+  job.contract = await readContract(job.studioId, job.brief);
 }
 
 /** New animated scenes still allowed by the quote for the next version. */
@@ -270,9 +280,10 @@ const scenesLeft = (job: Job) => Math.max(0, (job.maxNewScenes ?? 2) - (job.newS
  * budget (true); otherwise right away (false).
  */
 async function voiceFirst(job: Job): Promise<boolean> {
+  await withContract(job);
   if (job.voiced) return false;
   // A Reel with an effect too, as any Reel (Tristan: « oui »): her choice, else her business's, else Simone's.
-  const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief });
+  const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief, contract: job.contract });
   if (!made) return false;
   if ("spokenKept" in made) {
     Object.assign(job, { voiced: true, spokenKept: true });
@@ -536,6 +547,7 @@ async function review(job: Job) {
     postId: job.postId,
     versions: rendered,
     request: job.brief,
+    contract: job.contract,
     asked: round > 0 ? job.issues : undefined,
     format: job.format,
   });
