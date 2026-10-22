@@ -98,18 +98,23 @@ type Block = { type: "text"; text: string } | { type: "image"; source: { type: "
 type SceneOutput = z.output<typeof motionSceneOutputSchema>;
 
 async function askClaude(studioId: string, content: string | Block[]): Promise<SceneOutput | null> {
-  const response = await anthropic().beta.messages.parse({
-    model: CLAUDE_MODEL,
-    max_tokens: 16000,
-    // Medium: the code needs care, not long deliberation; most of the cost was thinking tokens.
-    output_config: { effort: "medium", format: outputFormat(motionSceneOutputSchema) },
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system: [{ type: "text", text: MOTION_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content }],
-  });
+  // Streamed, with room: a composition of a whole Reel is long code, and at 16 000 tokens its answer
+  // was cut off mid-string (the split screen of Simone's Reel, twice), the Reel falling back to plain shots.
+  const response = await anthropic()
+    .beta.messages.stream({
+      model: CLAUDE_MODEL,
+      max_tokens: 32000,
+      // Medium: the code needs care, not long deliberation; most of the cost was thinking tokens.
+      output_config: { effort: "medium", format: outputFormat(motionSceneOutputSchema) },
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      system: [{ type: "text", text: MOTION_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content }],
+    })
+    .finalMessage();
   await logClaudeCost(studioId, response.usage, "motion_designer");
-  return response.parsed_output ?? null;
+  if (!response.parsed_output) throw new Error(`pas de réponse lisible (${response.stop_reason})`);
+  return response.parsed_output;
 }
 
 // Gemini as the motion designer, for a lab studio only (studios.motion_model): the same prompt,
@@ -271,7 +276,14 @@ export async function designMotionScenes(
       ],
       done: context.done ?? [],
     };
-    results.push({ id: r.id, ...(await writeScene(studioId, model, r, brand, artDirection, kit, existing).catch((e: unknown) => ({ code: null, js: null, error: String(e) }))) });
+    const write = () => writeScene(studioId, model, r, brand, artDirection, kit, existing).catch((e: unknown) => ({ code: null, js: null, error: String(e) }));
+    // An answer with no code at all (cut off, unreadable) has nothing to correct: it is asked once more.
+    let written = await write();
+    if (!written.code?.trim()) {
+      console.warn("motion scene without code, asked again", r.brief.slice(0, 80), written.error);
+      written = await write();
+    }
+    results.push({ id: r.id, ...written });
   }
 
   // Scenes that passed the check but leave a text on a face of the footage they follow: kept as they
