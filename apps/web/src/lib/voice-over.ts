@@ -293,12 +293,16 @@ export async function speak(
  * -19 and -31 LUFS): set once, so the live preview and the mix hear it the same.
  * As it came when the sandbox cannot do it.
  */
-export async function levelSpeech(id: string, mp3: Buffer, pauses: { at: number; add: number }[] = []): Promise<{ mp3: Buffer; lufs: number | null; paused: boolean }> {
+export async function levelSpeech(
+  id: string,
+  mp3: Buffer,
+  pauses: { at: number; add: number }[] = [],
+): Promise<{ mp3: Buffer; lufs: number | null; paused: boolean; pauses: { at: number; add: number }[] }> {
   try {
     return await levelSpeechInSandbox(id, mp3, pauses);
   } catch (error) {
     console.warn("voice level unchanged", id, error);
-    return { mp3, lufs: null, paused: false };
+    return { mp3, lufs: null, paused: false, pauses: [] };
   }
 }
 
@@ -455,7 +459,8 @@ export async function makeVoiceOver(params: {
   const breaths = sentencePauses(voice.transcript.words);
   const pauses = voice.transcript.duration + breaths.reduce((sum, p) => sum + p.add, 0) <= VOICE_MAX_SECONDS ? breaths : [];
   const leveled = await levelSpeech(`voice-${params.postId}`, voice.mp3, pauses);
-  const transcript = leveled.paused ? withPauses(voice.transcript, pauses) : voice.transcript;
+  // The breaths where they were really opened (moved to the voice's silence, or left out).
+  const transcript = leveled.paused ? withPauses(voice.transcript, leveled.pauses) : voice.transcript;
   const path = `${params.studioId}/voice/${params.postId}-${Date.now()}.mp3`;
   const upload = await db.storage.from("media").upload(path, leveled.mp3, { contentType: "audio/mpeg", upsert: true });
   if (upload.error) throw new Error(upload.error.message);
