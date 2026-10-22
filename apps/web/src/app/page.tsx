@@ -2,15 +2,21 @@ import { PLANS } from "@fauve/agent";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import {
-  CalendarIcon,
   ChartIcon,
   CheckIcon,
+  ClockIcon,
   EyeIcon,
+  GridIcon,
+  LayersIcon,
+  MicIcon,
+  MusicIcon,
   PenIcon,
+  RepeatIcon,
   WhatsAppIcon,
+  ZapIcon,
 } from "@/components/icons";
 import { LandingDemo } from "@/components/landing/landing-demo";
-import { PHOTOS, ReelMock, ReportMock, RetouchMock, unsplash, WeekMock } from "@/components/landing/mocks";
+import { PHOTOS, ReelMock, ReminderMock, ReportMock, RetouchMock, unsplash } from "@/components/landing/mocks";
 import { IdeaToPost } from "@/components/landing/idea-to-post";
 import { ReelsFeed } from "@/components/landing/showcase";
 import { Mascot } from "@/components/mascot";
@@ -20,9 +26,9 @@ import { whatsappLink } from "@/lib/public-env";
 const steps: [string, string][] = [
   ["Ton site", "Donne-lui l’adresse : elle comprend ton commerce, ton offre et ton ton."],
   ["Ton style", "Elle prend tes couleurs, ta police et tes plus belles photos pour ton moodboard."],
-  ["Ton rythme", "Combien de posts et de stories par semaine : elle prépare ta semaine avec."],
+  ["Ton rythme", "Combien de posts et de stories par semaine : elle te fait signe quand ça fait longtemps."],
   ["Un premier essai", "Une première publication ensemble, ajustée jusqu’à ce qu’elle te ressemble."],
-  ["Ton Instagram", "En dernier, quand ta publication est prête : elle part dès que tu dis oui."],
+  ["Ton Instagram", "En dernier, quand ta publication est prête : elle part dès que tu dis oui. TikTok aussi, si tu veux."],
 ];
 
 /** The two offers (the same work; quality over quantity: Pro has room for more care on each Reel). */
@@ -50,7 +56,9 @@ const faq: [string, string][] = [
   ["Est-ce qu’elle publie sans me demander ?", "Jamais. Chaque publication attend ta validation, sur WhatsApp ou dans l’app. Tu peux corriger un texte, déplacer une date ou demander une autre version."],
   ["Je n’ai pas de vidéo, ça marche quand même ?", "Oui. Elle part des photos de ton site, de celles que tu lui envoies, ou fait un Reel tout en animation à tes couleurs. Quand tu filmes, elle te dit quoi et comment."],
   ["Pour quel commerce ?", "Studios de sport ou de yoga, salons de coiffure et de beauté, restaurants, cafés, boutiques : elle parle ta langue et adapte ses idées à ton activité."],
-  ["Et la musique ?", "Instagram ne laisse pas une autre appli ajouter un son tendance : Simone t’envoie la vidéo prête et tu l’ajoutes en un geste au moment de publier."],
+  ["Je peux lui montrer un Reel que j’aime ?", "Oui : colle son lien. Simone en reprend la forme, le rythme, la mise en page et le style des textes, avec tes images et tes mots. Ça vaut pour ce Reel-là ; les suivants restent à ton style."],
+  ["Et la musique ?", "Simone compose une musique pour chaque Reel, calée sur les coupes et libre de droits. Pour un son tendance, Instagram ne laisse pas une autre appli l’ajouter : tu le poses en un geste au moment de publier."],
+  ["Il y a un essai ?", "Oui. Simone fait ta première publication pendant l’inscription, puis tu as 3 jours d’essai pour tout tester (ta carte est demandée, rien n’est prélevé avant la fin de l’essai). Sans engagement, tu arrêtes quand tu veux."],
   ["Où vont mes photos et mes données ?", "Elles sont hébergées en Europe. Tes fichiers sont supprimés peu après la publication, et tout disparaît si tu pars."],
 ];
 
@@ -86,7 +94,7 @@ export default function LandingPage() {
             Des réseaux qui te rapportent <span className="accent">des clients.</span>
           </h1>
           <p className="max-w-[540px] text-[18px] leading-[1.55] text-muted sm:text-[19px]">
-            Simone est ta community manager. Elle lit ton site, apprend ton style, monte tes Reels, écrit tes posts et les publie sur Instagram quand tu dis oui. Toi, tu valides d’un mot, sur WhatsApp ou ici.
+            Simone est ta community manager. Elle lit ton site, apprend ton style, monte tes Reels, recopie ceux que tu aimes, écrit tes posts et les publie sur Instagram et TikTok quand tu dis oui. Toi, tu valides d’un mot, sur WhatsApp ou ici.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Start waUrl={waUrl} size="lg" />
@@ -95,7 +103,7 @@ export default function LandingPage() {
             </a>
           </div>
           <ul className="flex flex-wrap gap-x-5 gap-y-2 text-[14px] font-semibold text-muted">
-            {["Rien ne part sans ta validation", "En place en 5 minutes", "Sans engagement"].map((t) => (
+            {["Rien ne part sans ta validation", "En place en 5 minutes", "3 jours d’essai, sans engagement"].map((t) => (
               <li key={t} className="flex items-center gap-1.5">
                 <CheckIcon size={16} className="text-violet" />
                 {t}
@@ -169,6 +177,36 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* What she can be asked */}
+      <section className="mx-auto flex max-w-[1200px] flex-col gap-8 px-4 pb-24 sm:px-8">
+        <SectionTitle kicker="Ce que tu peux lui demander">
+          Une idée, un lien, un vocal : <span className="accent">elle s’en occupe.</span>
+        </SectionTitle>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card icon={RepeatIcon} title="« Refais-moi ce Reel »" className="lg:row-span-2">
+            Colle le lien d’un Reel que tu aimes : Simone reprend sa forme, son rythme, sa mise en page et le style de ses textes, avec tes images et ta marque.
+            <span className="mt-4 flex flex-col gap-2">
+              <span className="self-end rounded-[14px_14px_4px_14px] bg-violet px-3 py-2 text-[12.5px] text-white">instagram.com/reel/… fais-moi le même</span>
+              <span className="max-w-[94%] rounded-[14px_14px_14px_4px] border border-line bg-soft px-3 py-2.5 text-[12.5px] leading-snug text-ink">
+                Je reprends son écran partagé, ses coupes sur le temps et ses textes en capitales. Avec ta vidéo en bas et ton offre en haut.
+              </span>
+            </span>
+          </Card>
+          <Card icon={MicIcon} title="Une voix off">
+            Huit voix au choix, un texte qui parle de ton commerce comme un créateur. Ou ta propre voix, envoyée en vocal.
+          </Card>
+          <Card icon={MusicIcon} title="Une musique à lui">
+            Un morceau composé pour chaque Reel, calé sur les coupes, libre de droits.
+          </Card>
+          <Card icon={ZapIcon} title="Des effets qui suivent tes gestes">
+            Un mot qui grandit entre tes doigts, un titre qui passe derrière toi : elle suit tes mains et ton visage image par image.
+          </Card>
+          <Card icon={LayersIcon} title="Bien plus qu’un diaporama">
+            Écran partagé, collage fait main, carrousels composés comme par un graphiste : la forme suit ton idée.
+          </Card>
+        </div>
+      </section>
+
       {/* What else she does */}
       <section className="mx-auto flex max-w-[1200px] flex-col gap-8 px-4 pb-24 sm:px-8">
         <SectionTitle kicker="Ce qu’elle fait aussi">
@@ -182,10 +220,10 @@ export default function LandingPage() {
               <span className="mt-1.5 block font-semibold text-violet">#pilateslyon #studiolune #coursdumatin</span>
             </span>
           </Card>
-          <Card icon={CalendarIcon} title="Publié à la bonne heure">
-            Elle tient ton calendrier et publie sur Instagram quand tu as validé.
+          <Card icon={ClockIcon} title="Un signe au bon moment">
+            Pas de planning à tenir : elle te prévient quand c’est le moment de poster, et publie d’un « oui ».
             <span className="mt-4 block">
-              <WeekMock />
+              <ReminderMock />
             </span>
           </Card>
           <Card icon={ChartIcon} title="Ce qui marche, chaque dimanche">
@@ -257,8 +295,8 @@ export default function LandingPage() {
           <Channel icon={WhatsAppIcon} title="Sur WhatsApp">
             Envoie tes photos et tes vidéos, réponds d’un mot, valide d’un bouton. Simone t’écrit quand ta publication est prête.
           </Channel>
-          <Channel icon={CalendarIcon} title="Dans l’app">
-            Ton calendrier, ta grille Instagram, et l’éditeur pour retoucher un texte ou une scène, sur ordinateur comme sur téléphone.
+          <Channel icon={GridIcon} title="Dans l’app">
+            Ta grille Instagram, tes résultats, et l’éditeur pour changer un texte ou une scène, sur ordinateur comme sur téléphone.
           </Channel>
         </div>
       </section>
@@ -299,7 +337,7 @@ export default function LandingPage() {
           ))}
         </div>
         <p className="mt-5 text-center text-[14px] text-muted">
-          Les deux font tout : Reels montés et corrigés, carrousels, stories, légendes, publication sur Instagram, bilan chaque semaine. Tu arrêtes quand tu veux.
+          Les deux font tout : Reels montés et relus, voix off et musique, carrousels, stories, légendes, publication sur Instagram et TikTok, bilan chaque semaine. Tu arrêtes quand tu veux.
         </p>
       </section>
 
