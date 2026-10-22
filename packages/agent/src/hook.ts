@@ -126,7 +126,7 @@ Une accroche très forte :
 - sonne comme un créateur qui parle à ses abonnés, jamais comme une pub ni un piège à clics : pas de formule creuse, pas de « vous ne devinerez jamais », pas de majuscules criées, pas d'emojis, pas de tiret long ;
 - n'a ni la forme ni les mots des accroches récentes du commerce (« recentes »).
 
-Pour la voix, une accroche est dite à l'oral et mène à la phrase suivante (« suite ») : la tienne aussi ; une voix chuchotée (« chuchotee ») accroche par la sensation, tout bas, jamais par une question qui claque. Pour le texte, quand la voix a déjà une première phrase (« voix_premiere_phrase »), le texte la résume ou la prolonge, jamais en contradiction. Si la demande impose les mots de l'accroche, ils gagnent ; si elle dit par quoi le Reel commence, la première image est celle-là.
+Pour la voix, une accroche est dite à l'oral, ouvre le message de la vidéo (« message ») sans le dire tout de suite et mène à la phrase suivante (« suite ») : la tienne aussi ; une accroche qui ne sert pas ce message, même forte, passe après ; une voix chuchotée (« chuchotee ») accroche par la sensation, tout bas, jamais par une question qui claque. Pour le texte, quand la voix a déjà une première phrase (« voix_premiere_phrase »), le texte la résume ou la prolonge, jamais en contradiction. Si la demande impose les mots de l'accroche, ils gagnent ; si elle dit par quoi le Reel commence, la première image est celle-là.
 
 D'abord, écris 2 ou 3 autres accroches de formes différentes (ideas), avec pour le texte 1 ou 2 mots qui ressortent (emphasis, écrits exactement comme dans l'accroche). Puis note chaque accroche, celles reçues (index 0, 1…) puis les tiennes à la suite, de 1 à 10 (10 : on s'arrête net ; 5 : on hésite ; 1 : on passe), avec la raison en quelques mots. best : l'index de la meilleure ; à force égale, la première reçue.`;
 
@@ -136,7 +136,8 @@ export type HookJudgeInput = {
   commerce: { nom?: string; activite?: string; ce_qu_on_sait?: string[]; ton?: string };
   demande?: string;
   premiere_image?: string;
-  /** The voice: the sentence that comes next, and whether it is whispered (ASMR). */
+  /** The voice: the video's message (the script is built on it), the sentence that comes next, and whether it is whispered (ASMR). */
+  message?: string;
   suite?: string;
   chuchotee?: boolean;
   /** The written hook: the voice's first sentence, when a voice speaks. */
