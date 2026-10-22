@@ -37,7 +37,8 @@ export const EFFORTS: Record<Effort, EffortLevel> = {
     review: false,
     fixRounds: 0,
     minutes: "2 à 4",
-    editorEffort: "medium",
+    // High like the others: Rapide is the default now, only the review is left out.
+    editorEffort: "high",
   },
   soigne: {
     label: "Soigné",
