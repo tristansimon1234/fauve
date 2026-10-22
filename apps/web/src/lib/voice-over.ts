@@ -58,12 +58,18 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 /** What the script is written from: the business, the idea and her request, the tone and what the images show, in order. */
 async function scriptInput(studioId: string, postId: string, mediaIds?: string[], brief?: string) {
   const db = supabaseAdmin();
-  const [post, studio, brand] = await Promise.all([
+  const [post, studio, brand, recent] = await Promise.all([
     db.from("posts").select("title, kind, agent_note, media_ids").eq("id", postId).eq("studio_id", studioId).single(),
     db.from("studios").select("name, business_type, booking_url, memory").eq("id", studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+    // Its last voices, so a new one never takes the same hook, build or turns of phrase.
+    db.from("media_assets").select("transcript").eq("studio_id", studioId).eq("kind", "audio").eq("source", "ai").order("created_at", { ascending: false }).limit(3),
   ]);
   if (post.error) throw new Error("Publication introuvable");
+  const recentVoices = (recent.data ?? []).flatMap((r) => {
+    const text = (r.transcript as { text?: string } | null)?.text?.trim();
+    return text ? [text.slice(0, 400)] : [];
+  });
   const ids = mediaIds?.length ? mediaIds : ((post.data.media_ids as string[] | null) ?? []);
   const [media, analyses, copied] = await Promise.all([
     ids.length ? db.from("media_assets").select("id, kind, regions").eq("studio_id", studioId).in("id", ids) : Promise.resolve({ data: [] }),
@@ -117,6 +123,7 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
     images,
     ...(opening?.what ? { ouverture: opening.what } : {}),
     ...(copied ? { reel_a_recopier: { accroche: `${copied.look.hook.kind} : ${copied.look.hook.what}`, fin: copied.look.ending } } : {}),
+    ...(recentVoices.length ? { voix_recentes: recentVoices } : {}),
   };
 }
 
@@ -182,6 +189,7 @@ export async function writeVoiceScript(
           commerce: { nom: input.commerce.nom, activite: input.commerce.activite, ce_qu_on_sait: input.commerce.ce_qu_on_sait, ton: input.commerce.ton },
           demande: input.publication.demande,
           premiere_image: input.ouverture,
+          message: draft.message || undefined,
           suite: next || undefined,
           chuchotee: whispered || undefined,
           accroches: draft.hooks,

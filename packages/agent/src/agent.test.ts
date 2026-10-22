@@ -1713,7 +1713,7 @@ test("formats: a key message held all along, film dust when the editor asks, Fre
   assert.equal(checks.find((c) => c.key === "texts")!.ok, true);
   // The writer chooses the form first: a key message comes back with nothing to read.
   assert.deepEqual(reelFormatSchema.options, ["raconte", "message"]);
-  assert.equal(voiceOverDecisionSchema.safeParse({ format: "message", why: "une offre", hooks: [], rest: "" }).success, true);
+  assert.equal(voiceOverDecisionSchema.safeParse({ format: "message", why: "une offre", message: "", hooks: [], rest: "" }).success, true);
 });
 
 test("lab fixes: lines that hold together, a breath between sentences, subtitles off faces, the format told to the critic", async () => {
@@ -2713,7 +2713,9 @@ test("hooks: the strongest shot opens, the hook is read from the first image, th
 
   // The voice: its first sentence chosen, then all that follows; written as hooks and the rest.
   assert.equal(scriptFrom(" Pourquoi cette file ? ", "Ici, tout passe au toaster.").script, "Pourquoi cette file ? Ici, tout passe au toaster.");
-  assert.equal(voiceOverScriptSchema.safeParse({ hooks: ["a", "b"], rest: "c" }).success, true);
+  assert.equal(voiceOverScriptSchema.safeParse({ message: "ici, la pâte a deux jours", hooks: ["a", "b"], rest: "c" }).success, true);
+  // The message comes first: a script without it is not read.
+  assert.equal(voiceOverScriptSchema.safeParse({ hooks: ["a"], rest: "c" }).success, false);
 
   // A voice note that opens on silence: its first word is heard at once (the silence is cut).
   const note = { text: "Pourquoi cette file ?", duration: 3, words: [{ w: "Pourquoi", start: 0.9, end: 1.3 }, { w: "cette", start: 1.3, end: 1.5 }, { w: "file ?", start: 1.5, end: 1.9 }] };
