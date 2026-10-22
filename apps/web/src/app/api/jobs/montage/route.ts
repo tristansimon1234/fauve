@@ -35,7 +35,7 @@ import {
   type EffectsState,
 } from "@/lib/agent/effects-agent";
 import { voiceOverIfWanted } from "@/lib/voice-over";
-import { chargeQuote, montageCost, restoreChainQuote, setQuoteStage, switchQuoteToEffect } from "@/lib/credits";
+import { chargeQuote, montageCost, quoteSuperseded, restoreChainQuote, setQuoteStage, switchQuoteToEffect } from "@/lib/credits";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { keepKit } from "@/lib/effect-words";
 import { env } from "@/lib/env";
@@ -174,6 +174,12 @@ export async function POST(request: Request) {
 const FAILED = "Je n’ai pas réussi à préparer le montage. Aucun crédit n’a été débité. Tu veux que je réessaie ?";
 
 async function run(job: Job) {
+  // Replaced by a newer request on this Reel: stop here (its effects session too), nothing goes out.
+  if (await quoteSuperseded(job.quoteId)) {
+    console.log("montage superseded, stopped", job.postId, job.quoteId, job.step);
+    if (job.effect) await endEffectsSession(job.effect.session, job.effect.files).catch(() => {});
+    return;
+  }
   const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify, conversationId: job.conversationId };
   const level = job.effort ? EFFORTS[job.effort] : null;
 
@@ -645,6 +651,10 @@ function careLine(compared: boolean, outcome: Care | null): string {
  * with what the review did; the quote is charged for what was really made.
  */
 async function deliver(job: Job, best: Version, outcome: Care | null): Promise<boolean> {
+  if (await quoteSuperseded(job.quoteId)) {
+    console.log("montage superseded, not delivered", job.postId, job.quoteId);
+    return true;
+  }
   const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify, conversationId: job.conversationId };
   const db = supabaseAdmin();
   await db.from("posts").update({ edit_plan_id: best.planId, render_id: best.renderId }).eq("id", job.postId).eq("studio_id", job.studioId);
@@ -700,6 +710,6 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
  */
 async function reopenQuote(quoteId: string | undefined) {
   if (!quoteId) return;
-  await supabaseAdmin().from("credit_quotes").update({ used_at: null, stage: null }).eq("id", quoteId).is("charged_at", null);
+  await supabaseAdmin().from("credit_quotes").update({ used_at: null, stage: null }).eq("id", quoteId).is("charged_at", null).or("stage.is.null,stage.neq.superseded");
   await finishJob(quoteId, true);
 }

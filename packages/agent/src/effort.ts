@@ -9,7 +9,9 @@ import { z } from "zod";
 export const effortSchema = z.enum(["rapide", "soigne", "max"]);
 export type Effort = z.infer<typeof effortSchema>;
 
-export const DEFAULT_EFFORT: Effort = "soigne";
+// Rapide by default (Tristan: « la relecture par un autre agent me soûle… elle ajoute beaucoup de temps,
+// vaut mieux faire relire par l'humain directement »): the Reel goes out as soon as it is rendered.
+export const DEFAULT_EFFORT: Effort = "rapide";
 
 export type EffortLevel = {
   label: string;
@@ -35,7 +37,8 @@ export const EFFORTS: Record<Effort, EffortLevel> = {
     review: false,
     fixRounds: 0,
     minutes: "2 à 4",
-    editorEffort: "medium",
+    // High like the others: Rapide is the default now, only the review is left out.
+    editorEffort: "high",
   },
   soigne: {
     label: "Soigné",

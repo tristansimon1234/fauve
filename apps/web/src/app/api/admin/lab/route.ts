@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import {
   CHAT_MODEL,
+  DEFAULT_EFFORT,
   editPlanSchema,
   GEMINI_MODEL_ID,
   imaginedBrief,
@@ -509,7 +510,7 @@ async function montage(name: string, studioId: string, c: Pick<LabCase, "title" 
     console.log("lab: her voice note", name, note.seconds, note.text);
   }
   // The same chain as her first Reel at the default care, without a quote: two scenes of her own.
-  await queueJob("montage", { step: "design", studioId, postId: post.data.id, mediaIds, brief, maxNewScenes: 2, effort: "soigne" });
+  await queueJob("montage", { step: "design", studioId, postId: post.data.id, mediaIds, brief, maxNewScenes: 2, effort: DEFAULT_EFFORT });
   console.log("lab: montage started", name, post.data.id);
 }
 

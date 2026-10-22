@@ -63,7 +63,7 @@ export type Quote = {
 };
 
 /** Where a launched montage is in the chain (montage_status, the quote card). */
-export type QuoteStage = "design" | "effects" | "alternative" | "render" | "review" | "fix" | "delivered";
+export type QuoteStage = "design" | "effects" | "alternative" | "render" | "review" | "fix" | "delivered" | "superseded";
 
 /**
  * Her Reel goes to the effects agent: the launched work is priced as one (quoteEffect: the chain's price
@@ -307,6 +307,9 @@ export async function acceptQuote(
     .is("used_at", null)
     .select("id");
   if (!claimed.data?.length) return { error: "Ce montage est déjà lancé." };
+  // A new request on this Reel replaces the work still running on it: that one stops, never delivered nor charged
+  // (Tristan's Simone Reel: three corrections ran side by side, each about to deliver and charge).
+  if (q.post_id && q.kind !== "variant") await supersedeRunning(q.post_id as string, q.id as string);
   // The plan the manager said yes to goes to the editor with the brief.
   const plan = montagePlanSchema.safeParse(params.plan);
   const brief = [params.brief, plan.success ? planBrief(plan.data) : null].filter(Boolean).join("\n\n") || null;
@@ -331,13 +334,36 @@ export async function quoteButtons(studioId: string, quoteId: string): Promise<s
   return ["Oui, lance", ...(other ? [`Version ${EFFORTS[other].label}`] : []), "Pas maintenant"];
 }
 
-/** Records where a launched montage is (montage_status and the quote card read it). */
+/** The montages still running on a post, other than the one starting: replaced, they stop where they are. */
+async function supersedeRunning(postId: string, keepId: string): Promise<void> {
+  const { data, error } = await supabaseAdmin()
+    .from("credit_quotes")
+    .update({ stage: "superseded", stage_at: new Date().toISOString() })
+    .eq("post_id", postId)
+    .neq("id", keepId)
+    .not("used_at", "is", null)
+    .is("charged_at", null)
+    .or("stage.is.null,stage.not.in.(delivered,superseded)")
+    .select("id");
+  if (error) console.warn("credit_quotes: running montages not superseded", error.message);
+  for (const row of data ?? []) await finishJob(row.id as string);
+}
+
+/** Replaced by a newer request on the same Reel: its job stops, nothing delivered nor charged. */
+export async function quoteSuperseded(quoteId: string | undefined): Promise<boolean> {
+  if (!quoteId) return false;
+  const { data } = await supabaseAdmin().from("credit_quotes").select("stage").eq("id", quoteId).maybeSingle();
+  return data?.stage === "superseded";
+}
+
+/** Records where a launched montage is (montage_status and the quote card read it); a replaced one stays replaced. */
 export async function setQuoteStage(quoteId: string | undefined, stage: QuoteStage): Promise<void> {
   if (!quoteId) return;
   const { data, error } = await supabaseAdmin()
     .from("credit_quotes")
     .update({ stage, stage_at: new Date().toISOString() })
     .eq("id", quoteId)
+    .or("stage.is.null,stage.neq.superseded")
     .select("studio_id, post_id")
     .maybeSingle();
   if (error) console.warn("credit_quotes: stage not recorded", error.message);

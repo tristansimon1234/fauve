@@ -53,6 +53,13 @@ export const TEXT_Y = { hook: 0.2, band: 0.47, caption: 0.62 } as const;
 /** The tempo of a « libre » Reel that has none (mirror of TEMPLATE_BPM.libre in packages/agent/src/tempo.ts). */
 export const LIBRE_TEMPO = 100;
 
+/**
+ * A lively entrance that lands without bouncing: at damping 14 (12 for the collage) each word of a
+ * lively hook overshot and wobbled, one frame after the other, and the line looked like it shook
+ * (Tristan: « des textes qui vibrent »). Close to critical, it stays quick and settles at once.
+ */
+const LANDS = { damping: 20, stiffness: 260, mass: 0.6 };
+
 export const THEMES: Record<MotionTemplate, Theme> = {
   doux: {
     hook: { family: "body", weight: 700, italic: false, size: 100, uppercase: false, letterSpacing: -1.5, lineHeight: 1.06, stagger: 1, enter: "rise", stress: "color" },
@@ -73,7 +80,7 @@ export const THEMES: Record<MotionTemplate, Theme> = {
     subtitle: { weight: 800, size: 56, uppercase: false, highlight: "pill" },
     zoomTo: 1.09,
     punch: 1.15,
-    spring: { damping: 14, stiffness: 210, mass: 0.6 },
+    spring: LANDS,
     exitFrames: 4,
     grade: "contrast(1.1) saturate(1.1) brightness(1.01) sepia(0.04)",
     vignette: 0.14,
@@ -97,7 +104,7 @@ export const THEMES: Record<MotionTemplate, Theme> = {
     subtitle: { weight: 800, size: 50, uppercase: false, highlight: "pill" },
     zoomTo: 1.05,
     punch: 1.12,
-    spring: { damping: 12, stiffness: 210, mass: 0.6 },
+    spring: LANDS,
     exitFrames: 6,
     grade: "saturate(1.05) sepia(0.05) contrast(1.02)",
     vignette: 0,
@@ -123,7 +130,7 @@ export function liveTheme(tempo: number): Theme {
     subtitle: { weight: 800, size: Math.round(mix(52, 56)), uppercase: false, highlight: "pill" },
     zoomTo: Math.round(mix(1.05, 1.09) * 1000) / 1000,
     punch: Math.round(mix(1.1, 1.15) * 1000) / 1000,
-    spring: lively ? { damping: 14, stiffness: 210, mass: 0.6 } : e < 0.3 ? { damping: 200, stiffness: 160, mass: 0.9 } : { damping: 200, stiffness: 220, mass: 0.7 },
+    spring: lively ? LANDS : e < 0.3 ? { damping: 200, stiffness: 160, mass: 0.9 } : { damping: 200, stiffness: 220, mass: 0.7 },
     exitFrames: Math.round(mix(6, 4)),
     grade: "brightness(1.02) contrast(1.06) saturate(1.06) sepia(0.05)",
     vignette: Math.round(mix(0.1, 0.14) * 100) / 100,
