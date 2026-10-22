@@ -95,28 +95,17 @@ export function CarouselMock() {
   );
 }
 
-/** A week with its posts in place. */
-export function WeekMock() {
-  const days = ["L", "M", "M", "J", "V", "S", "D"];
-  const kinds = { reel: { label: "Reel", tone: "bg-violet" }, carousel: { label: "Carrousel", tone: "bg-coral" }, story: { label: "Story", tone: "bg-lilac" } } as const;
-  const posts: Record<number, keyof typeof kinds> = { 1: "reel", 3: "carousel", 5: "story" };
+/** Her reminder at the right moment, answered with one button. */
+export function ReminderMock() {
   return (
-    <span className="flex flex-col gap-2.5" aria-hidden="true">
-      <span className="grid grid-cols-7 gap-1.5">
-        {days.map((d, i) => (
-          <span key={i} className="flex flex-col items-center gap-1.5">
-            <span className="text-[11px] font-bold text-muted">{d}</span>
-            <span className="flex h-[64px] w-full items-end rounded-[10px] border border-line bg-white p-1">
-              {posts[i] && <span className={`h-[26px] w-full rounded-[6px] ${kinds[posts[i]!].tone}`} />}
-            </span>
-          </span>
-        ))}
+    <span className="flex flex-col gap-2" aria-hidden="true">
+      <span className="max-w-[94%] rounded-[14px_14px_14px_4px] border border-line bg-white px-3 py-2.5 text-[12.5px] leading-snug text-ink">
+        C’est le bon moment pour poster ton Reel : vendredi 18 h, tes clientes sont là. Je le publie ?
       </span>
-      <span className="flex flex-wrap gap-x-3 gap-y-1">
-        {Object.values(kinds).map((k) => (
-          <span key={k.label} className="flex items-center gap-1.5 text-[11.5px] font-semibold text-muted">
-            <span className={`size-2.5 rounded-full ${k.tone}`} />
-            {k.label}
+      <span className="flex flex-wrap gap-1.5">
+        {["Oui, publie-le", "Je regarde d’abord"].map((label) => (
+          <span key={label} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11.5px] font-bold text-violet">
+            {label}
           </span>
         ))}
       </span>
@@ -135,7 +124,7 @@ export function ReportMock() {
         ))}
       </span>
       <span className="rounded-[12px] bg-violet-tint px-3 py-2 text-[12.5px] leading-snug text-violet">
-        Tes Reels du matin font plus de vues : on garde 8 h le jeudi.
+        Tes Reels du jeudi matin amènent le plus de visites sur ton profil : on garde ce moment.
       </span>
     </span>
   );
