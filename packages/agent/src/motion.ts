@@ -431,6 +431,9 @@ export function brandLooks(
   };
 }
 
+/** Where a voice's subtitles sit: the row its composition chose (it knows where its faces are), else the plan's. */
+const subtitleRow = (plan: EditPlan): number | undefined => plan.layers?.find((l) => l.compose)?.motion.subtitle_y ?? plan.subtitle_y;
+
 export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const fps = REEL_FPS;
   const brand = resolveReelBrand(plan, inputs.template, inputs.brand);
@@ -659,7 +662,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack, ...music } } : {}),
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
     ...(plan.effect ? { effect: plan.effect } : {}),
-    ...(plan.subtitle_y !== undefined ? { subtitleY: plan.subtitle_y } : {}),
+    ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),
     ...(layers.length ? { layers } : {}),
   };
 }

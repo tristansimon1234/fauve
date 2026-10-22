@@ -140,6 +140,8 @@ export const editPlanMotionSegmentSchema = z.object({
      * the paper and the texts stay the engine's.
      */
     draws_texts: z.boolean().optional(),
+    /** A composition's choice of where the engine sets a voice's subtitles (share of the height): where none of its faces nor texts go. */
+    subtitle_y: z.number().min(0.1).max(0.8).optional(),
   }),
   duration: z.number().min(1).max(8),
   /**

@@ -18,6 +18,12 @@ const HISTORY_LIMIT = 20;
 const HISTORY_STEP = 10;
 /** Rows read to find the window's start. */
 const HISTORY_READ = HISTORY_LIMIT + 4 * HISTORY_STEP;
+/** A conversation about one publication also reads this much of what was said before it elsewhere (its Reel was asked there). */
+const POST_CONTEXT = 16;
+/** A message that does not look finished (cut on a comma, on « et »…) waits this long for the rest before Simone answers. */
+const UNFINISHED_WAIT_MS = 12_000;
+/** The end of a message that announces more to come. */
+const UNFINISHED = /(?:[,:;]|\b(?:et|mais|ou|donc|du coup|genre|avec|puis))\s*$/i;
 /** Long messages (video captions, links) are cut in the history: the model rarely needs them whole. */
 const MESSAGE_MAX_CHARS = 700;
 
@@ -87,7 +93,7 @@ export async function replyInConversation(params: {
   // costs fewer tokens); otherwise Fauve keeps the studio's recent history.
   let conversations = db
     .from("conversations")
-    .select("id, started_by")
+    .select("id, started_by, post_id")
     .eq("studio_id", params.studioId)
     .is("archived_at", null)
     .order("last_message_at", { ascending: false })
@@ -98,7 +104,7 @@ export async function replyInConversation(params: {
   const ownThread = conversation?.started_by === "web";
   let messages = db
     .from("whatsapp_messages")
-    .select("id, direction, type, body, media_id, wa_message_id, payload, conversation_id, reactions")
+    .select("id, direction, type, body, media_id, wa_message_id, payload, conversation_id, reactions, created_at")
     .eq("studio_id", params.studioId)
     .order("created_at", { ascending: false })
     // WhatsApp keeps the studio's recent thread across conversations, minus the ones opened in the app: read a little more, then filter.
@@ -128,6 +134,18 @@ export async function replyInConversation(params: {
 
   // Outside an app conversation, leave out the conversations opened in the app (their own thread, or one publication).
   let kept = rows.data;
+  // A conversation opened on one publication (from its page) starts empty: it also reads what was said just
+  // before elsewhere, where that Reel was asked for (« 50/50, c'est quoi ? » came from a thread that knew nothing).
+  if (ownThread && conversation?.post_id) {
+    const { data: before } = await db
+      .from("whatsapp_messages")
+      .select("id, direction, type, body, media_id, wa_message_id, payload, conversation_id, reactions, created_at")
+      .eq("studio_id", params.studioId)
+      .neq("conversation_id", conversation.id)
+      .order("created_at", { ascending: false })
+      .limit(POST_CONTEXT);
+    kept = [...kept, ...(before ?? [])].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, HISTORY_READ);
+  }
   if (!ownThread) {
     const ids = [...new Set(kept.map((r) => r.conversation_id as string | null).filter((id): id is string => Boolean(id)))];
     const { data: separate } = ids.length
@@ -142,9 +160,17 @@ export async function replyInConversation(params: {
     notes: (r.payload as { notes?: string[] } | null)?.notes,
   }));
   const history = toModelHistory(orderReplies(stored));
+  const silent: RunFauveResult = { reply: null, reactions: [], extras: {}, notes: [], usage: { input_tokens: 0, output_tokens: 0 }, afterReply: [] };
   // Every message has already been answered (e.g. a retried delivery): nothing to say.
-  if (history.at(-1)?.role !== "user") {
-    return { reply: null, reactions: [], extras: {}, notes: [], usage: { input_tokens: 0, output_tokens: 0 }, afterReply: [] };
+  if (history.at(-1)?.role !== "user") return silent;
+  // A message cut on a comma (« il faut que ça reprenne le parcours global, ») is waited on: when the rest comes,
+  // its own turn answers both together (a Reel had been launched on half a sentence, then again on the whole).
+  const latest = kept[0];
+  if (latest?.direction === "inbound" && typeof latest.body === "string" && UNFINISHED.test(latest.body.trim())) {
+    await new Promise((resolve) => setTimeout(resolve, UNFINISHED_WAIT_MS));
+    let newer = db.from("whatsapp_messages").select("id").eq("studio_id", params.studioId).eq("direction", "inbound").gt("created_at", latest.created_at as string).limit(1);
+    if (ownThread && conversation) newer = newer.eq("conversation_id", conversation.id);
+    if ((await newer).data?.length) return silent;
   }
 
   return runFauve({
