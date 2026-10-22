@@ -11,6 +11,7 @@ import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, VOICE_SPEED, verbatimScript } from "./contract.ts";
 import { montageJobSteps } from "./jobs.ts";
+import { quietPauses } from "./mix.ts";
 
 const validPlan = {
   format: "9:16",
@@ -4211,4 +4212,12 @@ test("a montage's progress steps follow its level", () => {
   assert.deepEqual(labels({ effort: "soigne", kind: "correction", effect: false }), ["Correction", "Rendu", "Relecture", "Correction"]);
   assert.deepEqual(labels({ effort: "max", kind: "montage", effect: false }), ["Montage", "2e version", "Rendu", "Relecture", "Correction"]);
   assert.deepEqual(labels({ effort: null, kind: "montage", effect: true }), ["Montage", "Effet", "Rendu"]);
+});
+
+test("a breath between two sentences opens where the voice is quiet, or not at all", () => {
+  // 10 ms levels: speech at -20 dB, a quiet dip (-60) from 0.50 to 0.53 s, none near 1.5 s.
+  const levels = Array.from({ length: 200 }, (_, i) => (i >= 50 && i < 53 ? -60 : -20));
+  assert.deepEqual(quietPauses([{ at: 0.6, add: 0.3 }], levels), [{ at: 0.515, add: 0.3 }]);
+  assert.deepEqual(quietPauses([{ at: 1.5, add: 0.3 }], levels), []);
+  assert.deepEqual(quietPauses([{ at: 1.5, add: 0.3 }], []), [{ at: 1.5, add: 0.3 }]);
 });

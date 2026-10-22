@@ -81,6 +81,44 @@ export function mixFilter(gains: ReturnType<typeof mixGains>, fadeAt: number | n
   );
 }
 
+/** The ffmpeg filter that prints a voice's level (RMS, dB) every `step` seconds (its rumble left out). */
+export const speechLevelsFilter = (step: number) =>
+  `highpass=f=80,aresample=16000,asetnsamples=n=${Math.round(16000 * step)}:p=0,` +
+  "astats=metadata=1:reset=1,ametadata=mode=print:key=lavfi.astats.Overall.RMS_level";
+
+/** How far from the timing of a sentence's end a breath may move to find the voice's silence (s). */
+export const PAUSE_REACH = 0.15;
+
+/** A voice this far under its loud level (dB) is between two words: a cut there chops nothing. */
+const QUIET_UNDER_DB = 28;
+
+/**
+ * Where to open each breath between two sentences: at the quietest moment of the voice
+ * within PAUSE_REACH of where its timing puts it (levels every `step` s). ElevenLabs' timing
+ * of a sentence read in one go is approximate: cut there, « légendes… » lost its end in
+ * 10 ms, right on a cut of Tristan's Reel. A breath with no quiet moment near it is left
+ * out: better two sentences run together than a word chopped.
+ */
+export function quietPauses(pauses: { at: number; add: number }[], levels: number[], step = BEAT_STEP): { at: number; add: number }[] {
+  if (!levels.length) return pauses;
+  const sorted = [...levels].filter(Number.isFinite).sort((a, b) => a - b);
+  const loud = sorted[Math.floor(sorted.length * 0.9)] ?? -20;
+  const quiet = loud - QUIET_UNDER_DB;
+  return pauses.flatMap((p) => {
+    const from = Math.max(0, Math.floor((p.at - PAUSE_REACH) / step));
+    const to = Math.min(levels.length - 1, Math.ceil((p.at + PAUSE_REACH) / step));
+    let best = -1;
+    for (let i = from; i <= to; i++) if (best < 0 || levels[i]! < levels[best]! || (levels[i] === levels[best] && Math.abs((i + 0.5) * step - p.at) < Math.abs((best + 0.5) * step - p.at))) best = i;
+    if (best < 0 || levels[best]! > quiet) return [];
+    // The middle of that silence, so both words keep their whole sound.
+    let start = best;
+    let end = best;
+    while (start > 0 && levels[start - 1]! <= quiet) start--;
+    while (end < levels.length - 1 && levels[end + 1]! <= quiet) end++;
+    return [{ at: Math.round(((start + end + 1) / 2) * step * 1000) / 1000, add: p.add }];
+  });
+}
+
 /** How long each edge of a cut in a voice fades (s): long enough to never click, too short to hear. */
 const EDGE_FADE = 0.012;
 
