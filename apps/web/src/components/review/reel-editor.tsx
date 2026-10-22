@@ -210,7 +210,7 @@ function Editor({
       if (!valid) return setMessage("Un texte est vide : écris quelque chose, ou retire-le.");
       const result = await saveEditPlan(postId, plan).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
       if (!result.ok) return setMessage(result.error);
-      onClose("C’est enregistré : la vidéo se met à jour, une à deux minutes.");
+      onClose("C’est enregistré : la vidéo se met à jour, 3 à 8 minutes.");
     });
   const cancel = () => (changed ? setLeaving(true) : onClose());
 

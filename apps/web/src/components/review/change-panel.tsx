@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_COVER_SECONDS, EFFECT_MINUTES, EFFECT_WORDS_MINUTES, SIMONE_VOICES, voiceSamplePath, type PostCover } from "@fauve/agent";
+import { DEFAULT_COVER_SECONDS, EFFECT_MINUTES, EFFECT_WORDS_MINUTES, REDO_MINUTES, RERENDER_MINUTES, SIMONE_VOICES, voiceSamplePath, type PostCover } from "@fauve/agent";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { setMusic, setPublishByHand, setVoiceOff } from "@/app/(app)/publications/[id]/cover-actions";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
@@ -128,7 +128,7 @@ function Menu({ data, onView, onEdit, ask }: Props) {
         <Tile tone="violet" icon={<ImageIcon size={18} />} label="La couverture" onClick={() => onView("cover")} disabled={!data.videoUrl} />
         <Tile tone="violet" icon={<CalendarIcon size={18} />} label="Quand te faire signe" onClick={() => onView("date")} />
       </div>
-      <h3 className="mt-1 text-[13.5px] font-bold text-muted">Simone refait la vidéo, {data.baked ? `${EFFECT_MINUTES} minutes` : "2 minutes environ"}</h3>
+      <h3 className="mt-1 text-[13.5px] font-bold text-muted">Simone refait la vidéo, {data.baked ? `${EFFECT_MINUTES} minutes` : `${REDO_MINUTES} minutes`}</h3>
       <div className="grid grid-cols-2 gap-2">
         <Tile tone="peach" icon={<ScissorsIcon size={18} />} label="Plus court" onClick={() => onView("shorter")} disabled={busy} />
         <Tile tone="peach" icon={<ZapIcon size={18} />} label="Plus rythmé" onClick={() => onView("punchier")} disabled={busy} />
@@ -209,7 +209,7 @@ const REDO_TEXT = {
 } as const;
 
 /** How long Simone takes to remake the video: an effect is drawn image by image again. */
-const redoTime = (data: Props["data"]) => (data.baked ? `${EFFECT_MINUTES} minutes` : "environ 2 minutes");
+const redoTime = (data: Props["data"]) => `${data.baked ? EFFECT_MINUTES : REDO_MINUTES} minutes`;
 
 /** « Plus court », « Plus rythmé »: what Simone will do, a précision if she wants, then her go. */
 function RedoView({ data, onDone, kind }: Props & { kind: "shorter" | "punchier" }) {
@@ -228,7 +228,7 @@ function RedoView({ data, onDone, kind }: Props & { kind: "shorter" | "punchier"
     <div className="flex flex-col gap-2.5">
       <p className="text-[14px] leading-snug text-muted">{text.what}</p>
       <NoteField label="Une précision ?" placeholder={text.placeholder} value={note} onChange={setNote} />
-      <p className="text-[12.5px] leading-snug text-muted">{data.baked ? `${EFFECT_MINUTES} minutes : Simone refait l’effet image par image.` : "Environ 2 minutes."} Ta version actuelle reste, tu pourras y revenir.</p>
+      <p className="text-[12.5px] leading-snug text-muted">{data.baked ? `${EFFECT_MINUTES} minutes : Simone refait l’effet image par image.` : `${REDO_MINUTES} minutes.`} Ta version actuelle reste, tu pourras y revenir.</p>
       {error && (
         <p role="alert" className="text-[13.5px] font-semibold text-danger">
           {error}
@@ -480,7 +480,7 @@ function MusicView({ data, onDone }: Props) {
             title: "Une autre musique",
             hint: "Simone en compose une nouvelle pour ce Reel.",
             button: "Composer une autre musique",
-            message: "Simone compose une autre musique. La vidéo arrive dans deux minutes environ.",
+            message: "Simone compose une autre musique. La vidéo arrive dans 3 à 8 minutes.",
             apply: async () => {
               await hers();
               return setMusic(data.postId, "another");
@@ -602,7 +602,7 @@ function VoiceView({ data, onDone }: Props) {
       if (picked === null) {
         const result = await setVoiceOff(data.postId);
         return result.ok
-          ? onDone(data.baked ? `Sans voix : Simone refait l’effet sans la voix, ${EFFECT_MINUTES} minutes.` : "Sans voix : la vidéo se refait, une minute environ.")
+          ? onDone(data.baked ? `Sans voix : Simone refait l’effet sans la voix, ${EFFECT_MINUTES} minutes.` : `Sans voix : la vidéo se refait, ${RERENDER_MINUTES} minutes.`)
           : setError("Ça n’a pas marché. Réessaie.");
       }
       const result = await putVoice(data.postId, picked, words);

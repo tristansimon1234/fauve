@@ -36,7 +36,7 @@ export const EFFORTS: Record<Effort, EffortLevel> = {
     versions: 1,
     review: false,
     fixRounds: 0,
-    minutes: "2 à 4",
+    minutes: "5 à 20",
     // High like the others: Rapide is the default now, only the review is left out.
     editorEffort: "high",
   },
@@ -46,7 +46,7 @@ export const EFFORTS: Record<Effort, EffortLevel> = {
     versions: 1,
     review: true,
     fixRounds: 1,
-    minutes: "4 à 8",
+    minutes: "10 à 30",
     editorEffort: "high",
   },
   max: {
@@ -55,7 +55,7 @@ export const EFFORTS: Record<Effort, EffortLevel> = {
     versions: 2,
     review: true,
     fixRounds: 2,
-    minutes: "8 à 15",
+    minutes: "15 à 40",
     editorEffort: "high",
   },
 };

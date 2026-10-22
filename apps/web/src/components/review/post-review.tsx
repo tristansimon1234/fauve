@@ -1,6 +1,6 @@
 "use client";
 
-import { EFFECT_MINUTES, timeline, type PostCover } from "@fauve/agent";
+import { EFFECT_MINUTES, REDO_MINUTES, RERENDER_MINUTES, timeline, type PostCover } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
@@ -269,7 +269,7 @@ export function PostReview({
                   </span>
                   <span className="text-[16px] font-extrabold">{data.making?.step ? (STEPS[data.making.step] ?? "Simone y travaille") : "La vidéo se met à jour"}</span>
                   <span className="text-[13px] leading-snug text-white/85">
-                    {data.making?.step === "effet" ? `Ça prend ${EFFECT_MINUTES} minutes.` : "Ça prend une à deux minutes."} Tu peux fermer, Simone te prévient.
+                    {`Ça prend ${data.making?.step === "effet" ? EFFECT_MINUTES : data.making?.kind === "montage" ? REDO_MINUTES : RERENDER_MINUTES} minutes.`} Tu peux fermer, Simone te prévient.
                   </span>
                 </div>
               )}
