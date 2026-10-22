@@ -100,12 +100,12 @@ type Block = { type: "text"; text: string } | { type: "image"; source: { type: "
 type SceneOutput = z.output<typeof motionSceneOutputSchema>;
 
 async function askClaude(studioId: string, content: string | Block[]): Promise<SceneOutput | null> {
-  // Streamed, with room: a composition of a whole Reel is long code, and at 16 000 tokens its answer
-  // was cut off mid-string (the split screen of Simone's Reel, twice), the Reel falling back to plain shots.
+  // Streamed, with room: a composition of a whole Reel is long code, and its answer was cut off mid-string at
+  // 16 000 tokens, then again at 32 000 (18 000 of them thinking): Simone's split screen fell back to plain shots.
   const response = await anthropic()
     .beta.messages.stream({
       model: CLAUDE_MODEL,
-      max_tokens: 32000,
+      max_tokens: 64000,
       // Medium: the code needs care, not long deliberation; most of the cost was thinking tokens.
       output_config: { effort: "medium", format: outputFormat(motionSceneOutputSchema) },
       betas: ["server-side-fallback-2026-07-01"],

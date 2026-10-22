@@ -655,6 +655,8 @@ export async function designEdit(params: {
     };
   });
   // An animation over several shots has no fixed version: one that could not be written is left out.
+  const earlierComposition = correction && previousPlan.success ? previousPlan.data.layers?.find((l) => l.compose && l.motion.js) : undefined;
+  let compositionKept = false;
   const written = layers.flatMap((l, i) => {
     if (l.motion.js) return [l];
     const kept = reusable.get(l.motion.brief);
@@ -673,6 +675,14 @@ export async function designEdit(params: {
       return [{ ...l, motion }];
     }
     const result = resultOf(`l${i}`);
+    // A correction whose composition could not be written again keeps the one her Reel had (it lays out the new
+    // shots and draws the new texts it is given): Tristan asked for bigger subtitles and lost his whole split screen.
+    const earlier = l.compose && !result?.js ? earlierComposition : undefined;
+    if (earlier) {
+      console.warn("composition not rewritten, the earlier one kept", params.postId, result?.error);
+      compositionKept = true;
+      return [{ ...l, motion: { ...earlier.motion, brief: l.motion.brief } }];
+    }
     if (!result?.js) {
       console.warn("animation over several shots left out", l.motion.brief.slice(0, 80), result?.error);
       return [];
@@ -730,9 +740,12 @@ export async function designEdit(params: {
     version,
     plan,
     // Said as it is when the composition she asked for could not be made: never a split screen announced over full-frame shots.
-    rationale: compositionMissed
-      ? `Je n'ai pas réussi à composer la mise en page demandée : cette version passe tes plans en plein cadre. Dis-moi « réessaie la mise en page » et je la refais. ${response.parsed_output.rationale}`
-      : response.parsed_output.rationale,
+    // The editor's own words describe the composition it asked for: never sent over a Reel that does not have it.
+    rationale: compositionKept
+      ? "Je n'ai pas réussi à refaire l'animation du haut avec tes changements : je garde celle de la version d'avant, avec tes nouveaux textes et ta nouvelle voix. Dis-moi « refais l'animation » et je la reprends."
+      : compositionMissed
+        ? "Je n'ai pas réussi à composer la mise en page demandée : cette version passe tes plans en plein cadre. Dis-moi « réessaie la mise en page » et je la refais."
+        : response.parsed_output.rationale,
     // A collage's composition is the ambiance itself, never a paid animation.
     newScenes: requests.filter((r) => !r.compose).length,
     reusedScenes: reused.size,
