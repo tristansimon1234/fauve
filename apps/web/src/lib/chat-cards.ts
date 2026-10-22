@@ -18,7 +18,7 @@ export type CardPost = {
   media: { url: string; video: boolean } | null;
 };
 
-export type QuoteState = "open" | "launched" | "delivered" | "expired";
+export type QuoteState = "open" | "launched" | "delivered" | "expired" | "replaced";
 
 export type CardQuote = {
   id: string;
@@ -52,8 +52,10 @@ export type CardQuote = {
 };
 
 /** What a quote card can show of a quote, from its row. */
-export function quoteState(row: { used_at?: unknown; charged_at?: unknown; expires_at?: unknown }): QuoteState {
+export function quoteState(row: { used_at?: unknown; charged_at?: unknown; expires_at?: unknown; stage?: unknown }): QuoteState {
   if (row.charged_at) return "delivered";
+  // Stopped by a newer request on the same Reel (credits.ts, supersedeRunning): never charged.
+  if (row.stage === "superseded") return "replaced";
   if (row.used_at) return "launched";
   return new Date(row.expires_at as string).getTime() < Date.now() ? "expired" : "open";
 }

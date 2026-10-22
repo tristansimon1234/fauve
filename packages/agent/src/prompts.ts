@@ -197,7 +197,7 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
       ? `Mémoire (ce que tu sais déjà du commerce, valable dans toutes les conversations ; ne le redemande jamais) :\n${ctx.known.memory.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
       : "Mémoire : vide pour l'instant.",
     ctx.work?.length
-      ? `Travaux en cours (en ce moment même, ne relance jamais l'un d'eux ; si elle demande où ça en est, donne l'étape et le temps écoulé, et dis qu'elle peut suivre l'avancement dans l'app) :\n${ctx.work.map((w) => `- ${w}`).join("\n")}`
+      ? `Travaux en cours (en ce moment même, ne relance jamais l'un d'eux pour rien ; si elle demande où ça en est, donne l'étape et le temps écoulé, et dis qu'elle peut suivre l'avancement dans l'app ; si elle demande un changement pour un Reel en cours, lance le nouveau montage avec toute sa demande, l'ancienne et la nouvelle réunies : il remplace celui en cours, qui s'arrête sans être débité, et dis-le en une phrase ; un message qui n'a pas l'air fini, coupé sur une virgule, attend la suite avant de lancer) :\n${ctx.work.map((w) => `- ${w}`).join("\n")}`
       : "Travaux en cours : aucun. Si tu as annoncé un montage ou un texte et qu'il n'est pas ici, c'est qu'il est fini ou qu'il a échoué : vérifie (montage_status, read_post) avant d'affirmer quoi que ce soit.",
     ...(ctx.routine?.length ? [`Sa présence sur les réseaux :\n${ctx.routine.map((r) => `- ${r}`).join("\n")}`] : []),
     `Prénom de la personne qui gère : ${ctx.firstName ?? "pas encore connu"}.`,

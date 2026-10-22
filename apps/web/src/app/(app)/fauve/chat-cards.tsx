@@ -119,6 +119,7 @@ const eyebrows: Record<CardQuote["state"], Record<CardQuote["kind"], string>> = 
   launched: { montage: "Montage en cours", correction: "Correction en cours", variant: "Variante en cours" },
   delivered: { montage: "Montage livré", correction: "Correction livrée", variant: "Variante livrée" },
   expired: { montage: "Pas lancé", correction: "Pas lancé", variant: "Pas lancé" },
+  replaced: { montage: "Remplacé", correction: "Remplacée", variant: "Remplacée" },
 };
 
 /**
@@ -373,6 +374,8 @@ function QuoteCard({
                   {credits(quote.charged ?? quote.base)} débité{(quote.charged ?? quote.base) > 1 ? "s" : ""} · solde {credits(quote.balance)}
                 </p>
               </>
+            ) : quote.state === "replaced" ? (
+              <p className="text-[13px] leading-snug text-muted">Arrêté pour ta nouvelle demande, sans rien débiter : la version qui la suit arrive à sa place.</p>
             ) : (
               <>
                 <div className="opacity-60">{priceList}</div>

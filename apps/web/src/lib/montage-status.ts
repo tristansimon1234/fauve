@@ -26,6 +26,8 @@ export async function montageStatus(studioId: string, postId?: string): Promise<
     .select("post_id, used_at, charged_at, effort, stage, stage_at, posts(title)")
     .eq("studio_id", studioId)
     .not("used_at", "is", null)
+    // A montage replaced by a newer request on its Reel has stopped: only the one that replaced it is told.
+    .or("stage.is.null,stage.neq.superseded")
     .gt("used_at", new Date(Date.now() - RECENT_MS).toISOString())
     .order("used_at", { ascending: false })
     .limit(10);
