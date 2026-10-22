@@ -1,6 +1,8 @@
 // The work Fauve does in the background (studio_jobs): its steps, as the
 // manager reads them in the app's progress pill and as Fauve reports them.
 
+import { DEFAULT_EFFORT, EFFORTS, type Effort } from "./effort.ts";
+
 export type JobKind = "montage" | "text_layer" | "elements" | "carousel" | "effect_words";
 
 export const JOB_STEPS: Record<JobKind, { stage: string; label: string }[]> = {
@@ -33,6 +35,21 @@ export const JOB_STEPS: Record<JobKind, { stage: string; label: string }[]> = {
   // Her words on an effect: its own script draws it again, then the music goes on it.
   effect_words: [{ stage: "render", label: "Tes mots sur l’effet" }],
 };
+
+/**
+ * A montage's steps as its level runs them (Tristan, the pill still read « Relecture » on a
+ * Rapide Reel): a 2nd version only in Max, the review and its correction only when the level
+ * reviews, the effect only for an effect, a variant is only a render.
+ */
+export function montageJobSteps(o: { effort: Effort | null; kind: "montage" | "correction" | "variant"; effect: boolean }): { stage: string; label: string }[] {
+  if (o.kind === "variant") return [{ stage: "render", label: "Rendu" }];
+  const level = EFFORTS[o.effort ?? DEFAULT_EFFORT];
+  return JOB_STEPS.montage
+    .filter((s) => s.stage !== "effects" || o.effect)
+    .filter((s) => s.stage !== "alternative" || (level.versions > 1 && o.kind === "montage"))
+    .filter((s) => (s.stage !== "review" && s.stage !== "fix") || level.review)
+    .map((s) => (s.stage === "design" && o.kind === "correction" ? { ...s, label: "Correction" } : s));
+}
 
 export const JOB_KIND_LABELS: Record<JobKind, string> = {
   montage: "Montage vidéo",

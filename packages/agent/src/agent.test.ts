@@ -10,6 +10,7 @@ import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas } fr
 import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, VOICE_SPEED, verbatimScript } from "./contract.ts";
+import { montageJobSteps } from "./jobs.ts";
 
 const validPlan = {
   format: "9:16",
@@ -4202,4 +4203,12 @@ test("contract: only what she fixed, in plain lines", () => {
   assert.ok(lines.includes("Demandé : fond papier"));
   assert.ok(VOICE_SPEED.rapide > 1 && VOICE_SPEED.lente < 1 && VOICE_SPEED.normale === 1);
   assert.equal(verbatimScript(" « Je lis\n tranquille  pendant qu'elle bosse » "), "Je lis tranquille pendant qu'elle bosse");
+});
+
+test("a montage's progress steps follow its level", () => {
+  const labels = (o: Parameters<typeof montageJobSteps>[0]) => montageJobSteps(o).map((s) => s.label);
+  assert.deepEqual(labels({ effort: "rapide", kind: "montage", effect: false }), ["Montage", "Rendu"]);
+  assert.deepEqual(labels({ effort: "soigne", kind: "correction", effect: false }), ["Correction", "Rendu", "Relecture", "Correction"]);
+  assert.deepEqual(labels({ effort: "max", kind: "montage", effect: false }), ["Montage", "2e version", "Rendu", "Relecture", "Correction"]);
+  assert.deepEqual(labels({ effort: null, kind: "montage", effect: true }), ["Montage", "Effet", "Rendu"]);
 });
