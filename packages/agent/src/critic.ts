@@ -21,6 +21,8 @@ export const montageIssueSchema = z.object({
   scene: z.number().int().min(1).max(30).nullable(),
   problem: z.string().max(200),
   fix: z.string().max(240),
+  /** An objective defect the editor must fix; any other remark is an opinion told to her, never a correction. */
+  blocking: z.boolean().optional(),
 });
 export type MontageIssue = z.infer<typeof montageIssueSchema>;
 
@@ -37,6 +39,11 @@ export const montageReviewSchema = z.object({
         scene: z.number().int().nullable().describe("Numéro de la scène concernée (dès 1), ou null pour l'ensemble"),
         problem: z.string().describe("Ce qui ne va pas, tel qu'on le voit, en une phrase courte"),
         fix: z.string().describe("La correction précise à demander au monteur, en une phrase"),
+        blocking: z
+          .boolean()
+          .describe(
+            "true seulement pour un défaut objectif : un texte coupé, illisible ou sous l'interface d'Instagram, un texte ou une animation sur un visage (sauf l'effet qu'elle a demandé), un chiffre, un prix ou un fait que ni sa demande ni le commerce ne donnent, une image cassée (noire, figée, vide, floue au point de ne rien montrer) ; false pour un avis (durée, choix ou ordre des plans, forme, rythme, couleurs, un visage caché par un geste voulu)",
+          ),
       }),
     )
     .describe("Les défauts de la version retenue, 4 au plus, les plus importants d'abord (vide si ok)"),
@@ -68,26 +75,36 @@ export function shortSentence(text: string, max: number): string {
 
 /**
  * The critic's answer within bounds: at most 4 issues, short lines, scores 1–10, best within
- * the versions shown. A weak hook never lets the Reel go while there is a correction to make.
+ * the versions shown. Only an objective defect is corrected (Tristan, on corrections that cut
+ * the coffee gag of his Reel and shortened it from 10 to 6.5 s: « la phase de correction elle
+ * est pas overkill ? »): the rest are opinions, told to her, never imposed. A weak hook stays a
+ * defect to correct first. The defects come first.
  */
 export function normalizeReview(answer: MontageReviewAnswer, versions: number): MontageReview {
   const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(n)));
   const hook = clamp(answer.hook ?? 10, 1, 10);
+  const issues = answer.issues.slice(0, 4).map((i, k) => ({
+    scene: i.scene === null ? null : clamp(i.scene, 1, 30),
+    // The first one left is told to her as it is (« je peux encore corriger ceci : … »).
+    problem: shortSentence(i.problem, 200),
+    fix: i.fix.slice(0, 240),
+    // A weak hook: its correction, written first, is a defect.
+    blocking: i.blocking === true || (hook < HOOK_PASS && k === 0),
+  }));
+  const ordered = [...issues.filter((i) => i.blocking), ...issues.filter((i) => !i.blocking)];
   return {
     best: clamp(answer.best, 1, Math.max(1, versions)),
     why: answer.why.slice(0, 300),
     score: clamp(answer.score, 1, 10),
     hook,
-    ok: answer.ok && !(hook < HOOK_PASS && answer.issues.length > 0),
-    issues: answer.issues.slice(0, 4).map((i) => ({
-      scene: i.scene === null ? null : clamp(i.scene, 1, 30),
-      // The first one left is told to her as it is (« je peux encore corriger ceci : … »).
-      problem: shortSentence(i.problem, 200),
-      fix: i.fix.slice(0, 240),
-    })),
+    ok: !ordered.some((i) => i.blocking),
+    issues: ordered,
     summary: managerLine(answer.summary),
   };
 }
+
+/** The defects of a review, the only ones the editor is asked to fix. */
+export const blockingIssues = (review: Pick<MontageReview, "issues">) => review.issues.filter((i) => i.blocking);
 
 /** A sentence that tells her what is still to do (« il reste à… »): she receives a finished video. */
 const LEFT_TO_DO = /\b(il reste|reste à|il faudrait|il faut encore|à revoir|à corriger|à reprendre|pas encore)\b/i;
@@ -114,7 +131,7 @@ export const MONTAGE_CRITIC_PROMPT = `Tu es la directrice artistique de Simone, 
 - sa demande (« Demande de la gérante ») est la règle, jamais un défaut : ce qu'elle impose ou écarte (par quoi le Reel commence ou finit, l'ordre des moments, les mots ou l'offre à dire, pas de texte, pas de voix) reste, même pour une accroche plus forte ; juge seulement comment c'est fait et propose de le faire mieux sans y déroger (un autre passage du même moment, un cadrage plus serré, d'autres mots par-dessus) ;
 - le Reel qu'elle recopie (ligne « Reel à recopier ») passe aussi avant tes repères : ce qu'il n'a pas (une accroche écrite, du texte, une invitation à la fin, une voix, des animations), ce Reel n'a pas à l'avoir, et ce qu'il a (plus de texte, des plans plus longs, une fin sans appel), il le garde ; ne demande jamais de l'en écarter pour cocher un repère, juge s'il le refait bien, avec ses images et ses mots à elle ;
 - peu de texte : les Reels qui marchent laissent parler les images (une accroche, parfois une ligne de plus) ; avec une voix, ses sous-titres disent tout : aucun autre texte que l'accroche n'est normal, ne demande jamais d'en ajouter un ; un Reel qu'elle recopie garde la quantité de texte du sien ;
-- la ligne « Contrôle qualité » vérifie sur le plan ce que les Reels qui marchent ont presque toujours (ça bouge dès la 1re image, une accroche écrite, des plans de 2 s au plus en moyenne hors phrases de quelqu'un qui parle, des coupes sur le temps, peu de texte) : chaque point « à revoir » devient une correction précise ; « à tenter » (une fin qui reboucle sur la 1re image) est un conseil à donner seulement si un de ses clips le permet, jamais une raison de refuser le Reel. Ces repères servent le Reel, pas l'inverse (ils tiennent déjà compte du Reel qu'elle recopie) : un Reel juste pour ce commerce et pour sa demande passe avant une case cochée.
+- la ligne « Contrôle qualité » vérifie sur le plan ce que les Reels qui marchent ont presque toujours (ça bouge dès la 1re image, une accroche écrite, des plans de 2 s au plus en moyenne hors phrases de quelqu'un qui parle, des coupes sur le temps, peu de texte) : chaque point « à revoir » devient une remarque (un avis, blocking false) ; « à tenter » (une fin qui reboucle sur la 1re image) est un conseil à donner seulement si un de ses clips le permet, jamais une raison de refuser le Reel. Ces repères servent le Reel, pas l'inverse (ils tiennent déjà compte du Reel qu'elle recopie) : un Reel juste pour ce commerce et pour sa demande passe avant une case cochée.
 
 Ne relève que ce qui se voit vraiment sur les images et qui change le résultat, pas tes goûts. Une image est un instant : un texte en train d'apparaître ou une animation en mouvement n'est pas un défaut.
 
@@ -122,8 +139,8 @@ Plusieurs versions : compare-les et retiens la meilleure (best = son numéro, wh
 
 Pour la version retenue :
 - score de 1 à 10 ;
-- ok = true si elle peut partir telle quelle (8 ou plus, aucun défaut gênant) ;
-- issues : chaque défaut, avec la scène, le problème et la correction précise à demander au monteur, qui connaît les clips et les gabarits (ex. « accroche trop longue : la réduire à 3 mots », « scène 3 sombre et floue : la remplacer par un meilleur passage du même clip », « texte de la scène 2 collé au bord droit : le recentrer ») ; 4 au plus, les plus importants d'abord. Un texte ou une animation sur un visage : demande de les déplacer, jamais de changer le plan (son plus beau plan, ses sourires, restent), sauf si l'effet qu'elle a demandé a besoin d'être devant un visage (un mot tenu entre ses doigts, un message posé sur elle comme dans le Reel qu'elle recopie) : sa demande l'autorise. Dans une animation, un collage ou une composition, un texte masqué ou un plan caché : dis ce qui doit rester lisible ou visible, jamais une forme à prendre (pas « un seul tirage à la fois », « ne plus superposer », « aligner ») : la forme et sa richesse restent au motion designer ;
+- ok = true si elle n'a aucun défaut bloquant ;
+- issues : chaque remarque, avec la scène, le problème et la correction précise à demander au monteur, qui connaît les clips et les gabarits (ex. « accroche trop longue : la réduire à 3 mots », « scène 3 sombre et floue : la remplacer par un meilleur passage du même clip », « texte de la scène 2 collé au bord droit : le recentrer ») ; 4 au plus, les plus importants d'abord. blocking = true seulement pour un défaut objectif (texte coupé ou illisible, texte sur un visage, un fait inventé, une image cassée, une accroche sous 7) : lui seul déclenche une correction, qui refait le Reel. Tout le reste est un avis (blocking false), dit à la gérante, qui décide : jamais la durée, le choix des plans ou la forme changés pour ton goût, et un visage caché par un geste voulu (une gorgée de café, un livre levé) n'est pas un défaut. Un texte ou une animation sur un visage : demande de les déplacer, jamais de changer le plan (son plus beau plan, ses sourires, restent), sauf si l'effet qu'elle a demandé a besoin d'être devant un visage (un mot tenu entre ses doigts, un message posé sur elle comme dans le Reel qu'elle recopie) : sa demande l'autorise. Dans une animation, un collage ou une composition, un texte masqué ou un plan caché : dis ce qui doit rester lisible ou visible, jamais une forme à prendre (pas « un seul tirage à la fois », « ne plus superposer », « aligner ») : la forme et sa richesse restent au motion designer ;
 - summary : une phrase pour la gérante, au tutoiement, sans jargon, au passé, car elle la lit avec la vidéo finie : ce que tu as vérifié si la version peut partir, sinon ce que la correction aura amélioré (ex. « J'ai raccourci l'accroche et retiré un plan flou. ») ; jamais ce qui resterait à faire (« il reste à… ») : la vidéo qu'elle reçoit est finie.`;
 
 export type ReviewMoment = { t: number; scene: number | null; label: string; texts: string[] };

@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import {
   alternativeBrief,
+  blockingIssues,
   EFFECT_MAX_CREDITS,
   EFFECTS_TIMEOUT_MINUTES,
   effectPlan,
@@ -547,7 +548,8 @@ async function review(job: Job) {
       fixed: Boolean(best.fix),
       keptFirst: Boolean(corrected && !best.fix),
       line: best.fix ? best.summary : verdict?.review.ok ? verdict.review.summary : undefined,
-      left: verdict && !verdict.review.ok ? verdict.review.issues[0]?.problem : undefined,
+      // A defect left after the last round, else the critic's first opinion: hers to decide.
+      left: verdict?.review.issues[0]?.problem,
     });
     return;
   }
@@ -555,7 +557,8 @@ async function review(job: Job) {
     await next(job, {
       step: "fix",
       versions: [best],
-      issues: verdict.review.issues,
+      // Only its defects: an opinion is told to her, never corrected.
+      issues: blockingIssues(verdict.review),
       score: verdict.review.score,
       summary: verdict.review.summary.slice(0, 300),
       compared,
