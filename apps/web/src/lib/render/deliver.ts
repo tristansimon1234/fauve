@@ -114,9 +114,11 @@ export async function messageStudio(
  * in the app: the post's card (and the app opens the publication page).
  * Returns what was delivered, or null if it failed (the manager is told).
  */
-export async function renderAndDeliver(target: DeliveryTarget): Promise<{ title: string } | null> {
+export async function renderAndDeliver(target: DeliveryTarget, stillWanted?: () => Promise<boolean>): Promise<{ title: string } | "stopped" | null> {
   try {
     const r = await renderPost(target.studioId, target.postId, { freshMusic: target.freshMusic });
+    // A newer request replaced this work while it rendered: nothing goes out.
+    if (stillWanted && !(await stillWanted())) return "stopped";
     await deliverMontage(target, r);
     return { title: r.title };
   } catch (error) {

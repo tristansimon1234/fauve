@@ -218,7 +218,12 @@ async function run(job: Job) {
     if (job.step === "render") {
       await setQuoteStage(job.quoteId, "render");
       const cost = job.quoteId ? await montageCost(job.quoteId, job.newScenes ?? 0) : null;
-      const delivered = await renderAndDeliver({ ...target, rationale: job.rationale, note: job.note ?? job.rationale, offerVariant: true, voice: job.voice, spokenKept: job.spokenKept, cost });
+      // Replaced while it rendered: not delivered, not charged (the « plu » version went out at 15:05, charged, after the new request).
+      const delivered = await renderAndDeliver(
+        { ...target, rationale: job.rationale, note: job.note ?? job.rationale, offerVariant: true, voice: job.voice, spokenKept: job.spokenKept, cost },
+        async () => !(await quoteSuperseded(job.quoteId)),
+      );
+      if (delivered === "stopped") return;
       // Charged only once the video is out, for the scenes really made (never above the quote).
       if (delivered && job.quoteId) {
         await setQuoteStage(job.quoteId, "delivered");
@@ -267,7 +272,17 @@ function designInput(job: Job) {
 /** What she fixed for this Reel, read once (it travels with the job to every step). */
 async function withContract(job: Job): Promise<void> {
   if (job.contract || !job.brief?.trim()) return;
-  job.contract = await readContract(job.studioId, job.brief);
+  job.contract = await readContract(job.studioId, job.brief, job.correction ? await currentVoiceText(job) : null);
+}
+
+/** The words of the voice on the Reel now (hers or Simone's), for a correction's contract. */
+async function currentVoiceText(job: Job): Promise<string | null> {
+  const db = supabaseAdmin();
+  const post = await db.from("posts").select("voice_media_id").eq("id", job.postId).eq("studio_id", job.studioId).maybeSingle();
+  const id = post.data?.voice_media_id as string | null | undefined;
+  if (!id) return null;
+  const voice = await db.from("media_assets").select("transcript").eq("id", id).maybeSingle();
+  return ((voice.data?.transcript as { text?: string } | null)?.text ?? null) || null;
 }
 
 /** New animated scenes still allowed by the quote for the next version. */

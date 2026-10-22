@@ -41,7 +41,8 @@ export const CONTRACT_PROMPT = `Tu lis la demande d'une personne pour un Reel et
 - duration : la durée en secondes si elle la donne. layout : la mise en page qu'elle décrit (écran partagé, moitié-moitié, plan dans un cadre…), dans ses mots.
 - screen_text : un texte à l'écran qu'elle donne mot pour mot. ending : la fin qu'elle décrit.
 - call_to_action : « la_sienne » avec son texte si elle donne l'invitation ; « aucune » si elle n'en veut pas ; sinon « libre ».
-- musts : tout le reste qu'elle demande explicitement pour ce Reel (une ambiance, un fond, un univers, un rythme, des éléments à montrer), dans ses mots, une chose par ligne.`;
+- musts : tout le reste qu'elle demande explicitement pour ce Reel (une ambiance, un fond, un univers, un rythme, des éléments à montrer), dans ses mots, une chose par ligne.
+- Une correction d'un Reel qui a déjà sa voix off reçoit aussi « Texte actuel de la voix ». Quand la demande change seulement une partie de ce texte (un mot, une prononciation, une phrase, la fin) ou n'en cite qu'un morceau, voice_text est le texte actuel EN ENTIER avec seulement ce changement fait, rien d'autre de coupé ni de réécrit (verbatim) : un morceau cité n'est jamais tout le texte. Seule une demande qui donne un texte complet nouveau, ou qui demande de le réécrire, le remplace. Sans changement de la voix demandé, voice_text reste null.`;
 
 export const EMPTY_CONTRACT: ReelContract = {
   voice_text: null,
