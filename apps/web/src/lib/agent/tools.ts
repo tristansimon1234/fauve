@@ -490,7 +490,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.extras.quote = job.id;
       if (ctx.waId) ctx.extras.posts = [post_id];
       const level = job.effort ? EFFORTS[job.effort] : null;
-      const minutes = route === "agent" ? EFFECT_MINUTES : (level?.minutes ?? "2 à 4");
+      const minutes = route === "agent" ? EFFECT_MINUTES : (level?.minutes ?? EFFORTS.rapide.minutes);
       ctx.notes.push(`montage lancé job=${job.id} pour « ${post.title as string} » post_id=${post_id}${route === "agent" ? " (effet image par image)" : level ? ` (${level.label})` : ""}`);
       return json({
         status: "started",
@@ -575,7 +575,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         status: "started",
         style: style === "custom" ? wish : change.button,
-        note: `Le style est retenu pour tous ses prochains montages, et la nouvelle version de ce Reel est en route (${quote.effort ? EFFORTS[quote.effort].minutes : "2 à 4"} min). Dis-le en une ou deux phrases chaleureuses, sans parler de prix : la livraison dira combien de crédits ont servi.`,
+        note: `Le style est retenu pour tous ses prochains montages, et la nouvelle version de ce Reel est en route (${quote.effort ? EFFORTS[quote.effort].minutes : EFFORTS.rapide.minutes} min). Dis-le en une ou deux phrases chaleureuses, sans parler de prix : la livraison dira combien de crédits ont servi.`,
       });
     },
 

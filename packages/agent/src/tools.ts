@@ -163,7 +163,7 @@ export const toolSpecs = {
   },
   montage: {
     description:
-      "Lance un montage ou une correction, tout de suite, dès qu'elle le demande en disant ce qu'elle imagine (ou avec une ref), ou qu'elle a répondu à ta question (pas de devis : les crédits sont débités à la livraison pour ce qui a vraiment été fait, et le message de livraison dit combien). En tâche de fond : ton monteur regarde les clips, choisit le rythme et la forme, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Simone la regarde et la fait corriger avant de l'envoyer (Rapide 2 à 4 min, Soigné 4 à 8, Max 8 à 15). Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus calme », « plus rythmé », « en collage », « enlève le texte », « change la police ») part du montage précédent. Si le solde ne suffit pas, rien ne part : la réponse le dit.",
+      "Lance un montage ou une correction, tout de suite, dès qu'elle le demande en disant ce qu'elle imagine (ou avec une ref), ou qu'elle a répondu à ta question (pas de devis : les crédits sont débités à la livraison pour ce qui a vraiment été fait, et le message de livraison dit combien). En tâche de fond : ton monteur regarde les clips, choisit le rythme et la forme, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Simone la regarde et la fait corriger avant de l'envoyer (Rapide 5 à 20 min, Soigné 10 à 30, Max 15 à 40 ; le haut de la fourchette pour un Reel en motion design ou en écran partagé). Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus calme », « plus rythmé », « en collage », « enlève le texte », « change la police ») part du montage précédent. Si le solde ne suffit pas, rien ne part : la réponse le dit.",
     input: z.object({
       post_id: z.string().uuid(),
       media_ids: z.array(z.string().uuid()).max(MAX_MONTAGE_FILES).optional().describe("Clips et photos à monter (media_id), 20 au plus. Facultatif pour une correction ou une vidéo 100 % motion design."),
@@ -294,7 +294,7 @@ export const toolSpecs = {
   },
   blur_video: {
     description:
-      "Floute des zones sur toutes les vidéos du montage d'une publication (par défaut les visages), en les suivant dans le temps, gratuit. Pour les personnes filmées sans leur accord. what vide retire le flou. Refait le rendu après ta réponse (une à deux minutes) ; le lien est envoyé tout seul.",
+      "Floute des zones sur toutes les vidéos du montage d'une publication (par défaut les visages), en les suivant dans le temps, gratuit. Pour les personnes filmées sans leur accord. what vide retire le flou. Refait le rendu après ta réponse (3 à 8 minutes) ; le lien est envoyé tout seul.",
     input: z.object({
       post_id: z.string().uuid(),
       what: z.array(z.enum(["face", "plate", "screen", "document", "other"])).default(["face"]),

@@ -126,7 +126,7 @@ export function WorkPill({ studioId }: { studioId: string }) {
                     ))}
                   </ol>
                   <span className="text-[12px] text-muted">
-                    Depuis {minutesSince(item.startedAt, now) || "moins d’une"} min · {item.kind === "montage" ? "4 à 15 min en tout" : "2 à 4 min en tout"} · {item.postId ? "le lien arrive tout seul" : "ils arrivent dans ta banque"}
+                    Depuis {minutesSince(item.startedAt, now) || "moins d’une"} min · {item.kind === "montage" ? "5 à 20 min en tout" : "2 à 4 min en tout"} · {item.postId ? "le lien arrive tout seul" : "ils arrivent dans ta banque"}
                   </span>
                 </>
               )}

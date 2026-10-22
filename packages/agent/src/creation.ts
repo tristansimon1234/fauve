@@ -65,6 +65,14 @@ export type CreationPhase = "watch" | "edit" | "second" | "render" | "review";
 /** How long a Reel made by the effects agent takes, as she reads it. */
 export const EFFECT_MINUTES = "10 à 30";
 
+// Measured, not hoped (Tristan: « la production d'un reel est bcp plus longue que ce qui est
+// indiqué »): his Rapide composition took 19 min (the motion designer writes ~30 000 tokens
+// in 9 min, the render takes 7 min), his corrections 11 to 35 min.
+/** A correction of a Reel (« Plus court », « Plus rythmé », a voice): a new montage at the studio's level. */
+export const REDO_MINUTES = "10 à 20";
+/** Only the video made again (her words, her text sizes, without the voice): checks, render, music. */
+export const RERENDER_MINUTES = "3 à 8";
+
 /**
  * The steps of a Reel in the making, as she reads them, for this level of care. A Reel
  * with an effect (the effects agent makes it, with its own checks): the effect, then the music.
