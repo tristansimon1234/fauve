@@ -991,7 +991,7 @@ test("critic: an overlong answer is clamped, not thrown away; lateness is measur
   const { effortPitch, montageLate } = await import("./effort.ts");
   const long = "x".repeat(500);
   const review = normalizeReview(
-    { best: 5, why: long, score: 14, hook: 0, ok: false, summary: long, issues: Array.from({ length: 6 }, () => ({ scene: 99, problem: long, fix: long })) },
+    { best: 5, why: long, score: 14, hook: 0, ok: false, summary: long, issues: Array.from({ length: 6 }, () => ({ scene: 99, problem: long, fix: long, blocking: false })) },
     2,
   );
   assert.equal(review.best, 2); // within the versions shown
@@ -2741,10 +2741,24 @@ test("hooks: the strongest shot opens, the hook is read from the first image, th
   assert.equal(qualityChecks({ ...late, segments: [{ clip_id: "a", in: 0, out: 1.2, zoom: "none" }, late.segments[1]!] }).find((c) => c.key === "opening")!.ok, true);
 
   // A weak hook never lets the Reel go while there is something to correct.
-  const review = (hook: number, issues: { scene: number | null; problem: string; fix: string }[]) => normalizeReview({ best: 1, why: "", score: 8, hook, ok: true, issues, summary: "" }, 1);
+  const review = (hook: number, issues: { scene: number | null; problem: string; fix: string; blocking?: boolean }[]) =>
+    normalizeReview({ best: 1, why: "", score: 8, hook, ok: true, issues: issues.map((i) => ({ blocking: false, ...i })), summary: "" }, 1);
   assert.equal(review(5, [{ scene: 1, problem: "1re image : une salle vide", fix: "ouvrir sur le fromage qui file" }]).ok, false);
   assert.equal(review(5, []).ok, true);
   assert.equal(review(8, [{ scene: 2, problem: "x", fix: "y" }]).ok, true);
+  // Only a defect is corrected; an opinion (a gesture hiding the face on purpose, a length) is told to her, defects first.
+  const { blockingIssues } = await import("./critic.ts");
+  const mixed = review(8, [
+    { scene: 3, problem: "la tasse cache son visage pendant la gorgée", fix: "couper la gorgée" },
+    { scene: 1, problem: "l'accroche est coupée par le bord droit", fix: "la recentrer", blocking: true },
+  ]);
+  assert.equal(mixed.ok, false);
+  assert.deepEqual(blockingIssues(mixed).map((i) => i.scene), [1]);
+  assert.equal(mixed.issues[0]!.scene, 1);
+  const opinions = review(8, [{ scene: 3, problem: "la tasse cache son visage", fix: "couper la gorgée" }]);
+  assert.equal(opinions.ok, true);
+  assert.equal(blockingIssues(opinions).length, 0);
+  assert.equal(opinions.issues[0]!.problem, "la tasse cache son visage"); // still offered to her
 });
 
 test("lab fixes 2: a Reel's message shows its title, subtitles off faces read where the photo shows them", async () => {
