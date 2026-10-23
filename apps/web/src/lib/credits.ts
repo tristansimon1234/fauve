@@ -306,7 +306,7 @@ export async function acceptQuote(
   // A new request on this Reel replaces the work still running on it: that one stops, never delivered nor charged
   // (Tristan's Simone Reel: three corrections ran side by side, each about to deliver and charge).
   if (q.post_id && q.kind !== "variant") await supersedeRunning(q.post_id as string, q.id as string);
-  // The plan the manager said yes to goes to the editor with the brief.
+  // Simone's outline goes to the editor with the brief, as her proposal (planBrief): her request comes first.
   const plan = montagePlanSchema.safeParse(params.plan);
   const brief = [params.brief, plan.success ? planBrief(plan.data) : null].filter(Boolean).join("\n\n") || null;
   return {
