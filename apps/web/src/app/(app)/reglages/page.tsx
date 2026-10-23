@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTAGE_CEILING, MONTAGE_FLOOR, PLANS, planOf, readMemory, reelsPerMonth } from "@fauve/agent";
+import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTAGE_CEILING, MONTAGE_FLOOR, PLANS, planOf, memoryLines, reelsPerMonth } from "@fauve/agent";
 import { NoStudio } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
@@ -96,7 +96,7 @@ async function Settings() {
         </Section>
 
         <Section title="Ce que Simone sait de ton commerce">
-          <MemoryList initial={readMemory(care.data?.memory).map((f) => f.fact)} />
+          <MemoryList initial={memoryLines(care.data?.memory)} />
         </Section>
 
         <Section title="Mon compte">

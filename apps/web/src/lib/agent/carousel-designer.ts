@@ -11,7 +11,7 @@ import {
   CRITIC_MODEL,
   boundReview,
   layerReviewSchema,
-  readMemory,
+  memoryLines,
   resolveReelBrand,
   signatureLines,
   SLIDE_FRAME,
@@ -119,7 +119,7 @@ async function loadContext(input: CarouselRequest) {
     studio: {
       nom: studio.data?.name ?? brand.name,
       activite: studio.data?.business_type ?? undefined,
-      ce_qu_on_sait: readMemory(studio.data?.memory).map((f) => f.fact),
+      ce_qu_on_sait: memoryLines(studio.data?.memory),
       site: studio.data?.website_url ?? undefined,
       reservation: studio.data?.booking_url ?? undefined,
       ton: profile.tone,

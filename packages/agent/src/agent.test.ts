@@ -1042,6 +1042,12 @@ test("memory keeps each fact once, drops removed ones and ignores junk", async (
   assert.equal(readMemory([{ fact: "ok", at }, { nope: 1 }, "x"]).length, 1);
   assert.equal(readMemory(null).length, 0);
   assert.equal(awaitsAnswer({ body: "Dépose-les ici", upload: "video" }), true);
+  // What she does not want is kept apart and says so to every writer; facts stay plain.
+  const { memoryLines } = await import("./memory.ts");
+  memory = addFacts(memory, ["la phrase « rien ne part sans ton accord »"], at, "avoid");
+  assert.equal(memory[1]?.kind, "avoid");
+  assert.deepEqual(memoryLines(memory), ["Cours de 12 personnes max", "À éviter, elle n'en veut pas : la phrase « rien ne part sans ton accord »"]);
+  assert.equal(memoryLines([{ fact: "ok", at, kind: "nope" }]).length, 0);
 });
 
 test("Simone's instant reaction reads Jev's answers safely", async () => {

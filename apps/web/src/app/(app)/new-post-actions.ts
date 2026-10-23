@@ -1,6 +1,6 @@
 "use server";
 
-import { ANALYST_MODEL, filmIdeas, keptPlan, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, readMemory, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, TRIAL_DAYS, type PostIdea, type PostPlan } from "@fauve/agent";
+import { ANALYST_MODEL, filmIdeas, keptPlan, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, memoryLines, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, TRIAL_DAYS, type PostIdea, type PostPlan } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { z } from "zod";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
@@ -295,7 +295,7 @@ export async function proposePlan(input: z.input<typeof proposalInput>): Promise
                 commerce: {
                   nom: studio?.name ?? undefined,
                   activite: studio?.business_type ?? undefined,
-                  ce_qu_on_sait: readMemory(studio?.memory).map((m) => m.fact).slice(0, 12),
+                  ce_qu_on_sait: memoryLines(studio?.memory).slice(0, 12),
                   ...(profile.art_direction?.trim() ? { direction_artistique: profile.art_direction.trim().slice(0, 600) } : {}),
                   ...(profile.tone?.trim() ? { ton: profile.tone.trim().slice(0, 200) } : {}),
                 },

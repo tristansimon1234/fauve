@@ -25,7 +25,7 @@ import {
   KIT_FILE,
   mp4Duration,
   readEffectWords,
-  readMemory,
+  memoryLines,
   signatureLines,
   usdToEur,
   voiceTranscriptSchema,
@@ -286,7 +286,7 @@ export async function startEffectsSession(input: {
     studio: {
       name: (studio.data?.name as string | null) ?? "",
       business: (studio.data?.business_type as string | null) ?? null,
-      facts: readMemory(studio.data?.memory).map((f) => f.fact).slice(0, 12),
+      facts: memoryLines(studio.data?.memory).slice(0, 12),
       tone: profile.tone ?? null,
     },
     brand: { colors: profile.colors ?? [], fonts: profile.fonts ?? [], signature: signatureLines(profile.signature) },

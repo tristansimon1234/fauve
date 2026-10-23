@@ -81,9 +81,10 @@ export const toolSpecs = {
   },
   remember: {
     description:
-      "Garde dans ta mémoire du commerce (valable dans toutes les conversations) des infos durables : activité précise, offre, prestations, prix, horaires, adresse, équipe, public, temps forts, goûts de la gérante pour ses posts. Une phrase précise par info. remove : les numéros d'infos de la Mémoire du contexte devenues fausses.",
+      "Garde dans ta mémoire du commerce (valable dans toutes les conversations et lue par tous ceux qui écrivent ses posts) des infos durables : activité précise, offre, prestations, prix, horaires, adresse, équipe, public, temps forts, goûts de la gérante pour ses posts. Une phrase précise par info. Jamais une demande pour une seule publication (son idée, sa fin, sa démo, son texte) : elle va dans le brief de cette publication, sinon elle reviendrait dans toutes les autres. avoid : ce qu'elle ne veut pas voir ou entendre dans ses posts (une phrase, un mot, un ton, un genre d'image). remove : les numéros d'infos de la Mémoire du contexte devenues fausses ou qu'elle veut oublier.",
     input: z.object({
       add: z.array(z.string().min(3).max(240)).max(8).optional(),
+      avoid: z.array(z.string().min(3).max(240)).max(4).optional(),
       remove: z.array(z.number().int().min(1)).max(10).optional(),
     }),
   },
