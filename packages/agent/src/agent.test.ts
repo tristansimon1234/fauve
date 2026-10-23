@@ -3541,6 +3541,46 @@ test("rework: an animation a correction rewrites looks at its earlier render, du
   assert.match(MOTION_DESIGNER_PROMPT, /version_precedente/);
 });
 
+test("look: a new animation is looked at in its Reel over her footage before it goes out; the engine binds none of its form", async () => {
+  const { lookMoments, MAX_LOOK_FRAMES } = await import("./rework.ts");
+  const { buildReelProps, propsAt } = await import("./motion.ts");
+  const { MOTION_DESIGNER_PROMPT, motionLookOutputSchema } = await import("./motion-scene.ts");
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    template: "libre",
+    duration: 8,
+    texts: [],
+    images: [],
+    segments: [
+      { clip_id: "a", in: 0, out: 2, zoom: "none" },
+      { motion: { brief: "la conversation WhatsApp avec Simone", js: "function Scene(){return null}" }, duration: 3, over: { clip_id: "b" } },
+      { clip_id: "c", in: 0, out: 3, zoom: "none" },
+    ],
+    layers: [{ motion: { brief: "tout le Reel en écran partagé", js: "function Scene(){return null}" }, from: 0, to: 8, compose: true }],
+  });
+  // A scene: once its words are in, during a gesture under it, its middle, just before its end, on its own frames.
+  const looks = lookMoments(plan, ["s1", "l0"], [{ t: 3.1, what: "elle tape un message" }, { t: 6, what: "ailleurs" }]);
+  assert.deepEqual(looks.get("s1")?.map((m) => m.t), [2.8, 3.1, 3.5, 4.75]);
+  assert.match(looks.get("s1")![1]!.label, /^image 33 de ton animation \(pendant un geste : elle tape un message\)$/);
+  assert.ok(looks.get("s1")!.length <= MAX_LOOK_FRAMES);
+  // A composition of the whole Reel: its first image and across the Reel.
+  assert.deepEqual(looks.get("l0")?.map((m) => m.t), [0.3, 2, 4, 6, 7.6]);
+  // Its frames are drawn with the media they show only: a shot far from them is not fetched (a composition keeps all).
+  const props = buildReelProps(plan, { template: "libre", clipUrls: { a: "https://x/a.mp4", b: "https://x/b.mp4", c: "https://x/c.mp4" }, brand: { name: "Fleurs" } });
+  const at = propsAt({ ...props, layers: undefined }, [Math.round(2.8 * 30), Math.round(3.5 * 30)]);
+  assert.equal((at.segments[0] as { src: string }).src, "https://x/a.mp4");
+  assert.equal((at.segments[1] as { under?: { src: string } }).under?.src, "https://x/b.mp4");
+  assert.equal((at.segments[2] as { src: string }).src, "");
+  assert.equal(propsAt(props, [84]), props);
+  // It says what it sees, and keeps or rewrites.
+  assert.equal(motionLookOutputSchema.safeParse({ code: "", notes: "", name: "x", slots: [], photos: [], fonts: [], seen: "trop petit", keep: false }).success, true);
+  assert.match(MOTION_DESIGNER_PROMPT, /ton_rendu/);
+  // The footage plays bare, its form is its own: no veil, no forced exit, no forced fit, no engine move, a family in one Reel.
+  assert.match(MOTION_DESIGNER_PROMPT, /sans voile/);
+  assert.match(MOTION_DESIGNER_PROMPT, /vont ensemble/);
+  assert.doesNotMatch(MOTION_DESIGNER_PROMPT, /joue dessous et doit se voir|Les 10 dernières images|Jamais deux fois la même idée|mets chaque slot dans un FitText|déplace toute l'animation|reste sur les bords et les coins/);
+});
+
 test("DA liberties: the copied Reel's font and colours when they make its style, an animation's own fonts", async () => {
   const { clampLook, followedFrom, followedLook, followedForEditor, followedLine, stolenLookSchema, stolenStyleMessage } = await import("./steal.ts");
   const { buildReelProps, resolveReelBrand } = await import("./motion.ts");
