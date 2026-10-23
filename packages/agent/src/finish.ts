@@ -207,20 +207,7 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
   });
   const finished = { ...plan, segments };
 
-  // What texts must not cover, shot by shot: lettering and faces in photos, faces in videos;
-  // and under each animation, the same in the footage that plays beneath it.
-  const timeline = planTimeline(finished);
-  const shots = segments.map((s, i) => {
-    const at = timeline.segments[i]!;
-    const boxes = isClipSegment(s)
-      ? busyZones(facts, s.clip_id, s.in, segmentSeconds(s) * (s.speed ?? 1), s.photo)
-      : isMotionSegment(s) && s.over
-        ? busyZones(facts, s.over.clip_id, s.over.in ?? 0, s.duration, segments.find((x): x is Extract<PlanSegment, { clip_id: string }> => isClipSegment(x) && x.clip_id === s.over!.clip_id)?.photo)
-        : [];
-    // A tracked passage is weighed window by window: a text meets the faces of its own moments.
-    const windows = isClipSegment(s) ? busyWindows(facts, s.clip_id, s.in, segmentSeconds(s) * (s.speed ?? 1), at) : null;
-    return { start: at.start, length: at.length, boxes, windows: windows ?? [{ start: at.start, length: at.length, boxes }], motion: isMotionSegment(s) };
-  });
+  const shots = busyTimeline(finished, facts);
   const placed = segments.map((s, i) => {
     if (isClipSegment(s)) {
       const { subtitle_y: _old, ...rest } = s;
@@ -238,14 +225,34 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
     const { subtitle_y: _row, ...rest } = finished;
     return { ...rest, segments: placed, texts: finished.texts.map(({ auto_y, y, ...t }) => (auto_y ? t : { ...t, ...(y !== undefined ? { y } : {}) })) };
   }
-  // A voice's subtitles keep one place for the whole Reel, the one faces cover least (they never move from shot to shot).
-  const windows = shots.filter((s) => !s.motion).flatMap((s) => s.windows);
+  // A voice's subtitles keep one place for the whole Reel, the one faces cover least (they never move from shot to shot),
+  // the footage under the animations included: they show over them too. The render then weighs what the animations draw.
+  const windows = shots.flatMap((s) => s.windows);
   const row = reelSubtitleRow(windows);
   // They show all along what is said, other texts or not: the Reel's texts keep off their row (two texts one over the other do not read).
   const subtitles: Box[] = plan.subtitles ? [{ x: 0, y: row ?? SUBTITLE_ROW.y, w: 1, h: SUBTITLE_ROW.h }] : [];
   const clear = subtitles.length ? windows.map((w) => ({ ...w, boxes: [...w.boxes, ...subtitles] })) : windows;
   const { subtitle_y: _row, ...rest } = finished;
   return { ...rest, ...(row !== null ? { subtitle_y: row } : {}), segments: placed, texts: avoidPhotoText(finished.texts, clear) };
+}
+
+/**
+ * What texts must not cover, shot by shot, in the Reel's seconds: lettering and faces in photos,
+ * faces in videos; and under each animation, the same in the footage that plays beneath it. A
+ * tracked passage is weighed window by window: a text meets the faces of its own moments.
+ */
+export function busyTimeline(plan: EditPlan, facts: MediaFacts) {
+  const timeline = planTimeline(plan);
+  return plan.segments.map((s, i) => {
+    const at = timeline.segments[i]!;
+    const boxes = isClipSegment(s)
+      ? busyZones(facts, s.clip_id, s.in, segmentSeconds(s) * (s.speed ?? 1), s.photo)
+      : isMotionSegment(s) && s.over
+        ? busyZones(facts, s.over.clip_id, s.over.in ?? 0, s.duration, plan.segments.find((x): x is Extract<PlanSegment, { clip_id: string }> => isClipSegment(x) && x.clip_id === s.over!.clip_id)?.photo)
+        : [];
+    const windows = isClipSegment(s) ? busyWindows(facts, s.clip_id, s.in, segmentSeconds(s) * (s.speed ?? 1), at) : null;
+    return { start: at.start, length: at.length, boxes, windows: windows ?? [{ start: at.start, length: at.length, boxes }], motion: isMotionSegment(s) };
+  });
 }
 
 /**

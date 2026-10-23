@@ -397,7 +397,7 @@ async function checkScenes(
   const working = new Map<string, SceneResult>();
   for (let round = 0; round < 2; round++) {
     const checks = await smokeTestScenes(smokeScenes(results, requestOf, context), brand).catch(
-      (e: unknown): SceneChecks => ({ errors: Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])), faces: {} }),
+      (e: unknown): SceneChecks => ({ errors: Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])), faces: {}, cover: {} }),
     );
     results = results.map((r) => {
       if (!r.js || !checks.errors[r.id]) return r;

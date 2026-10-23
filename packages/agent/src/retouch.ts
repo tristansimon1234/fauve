@@ -312,6 +312,58 @@ export function reelSubtitleRow(shots: { length: number; boxes: Box[] }[]): numb
   return best;
 }
 
+/** How much of the subtitles' band at `y` an animation draws on, from what it draws row by row (each row 0 to 1). */
+export function profileCover(profile: number[], y: number): number {
+  const n = profile.length;
+  const from = Math.max(0, Math.floor((y - 0.01) * n));
+  const to = Math.min(n, Math.ceil((y + SUBTITLE_ROW.h + 0.01) * n));
+  let sum = 0;
+  for (let i = from; i < to; i++) sum += profile[i] ?? 0;
+  return to > from ? sum / (to - from) : 0;
+}
+
+/** Less than this on their row (seconds of cover) and the subtitles stay where they are. */
+const SUBTITLE_ROOM = 0.25;
+
+/**
+ * The one row of a voice's subtitles for the whole Reel, once its animations are drawn: they show all along
+ * it, so they go where nothing else is (Tristan: « il faut pas masquer mais bien les placer là où ça ne gêne
+ * pas les anim et les visages »). What sits on a row, in seconds: the faces and lettering of the footage
+ * (`faces`, counted double: a subtitle on a face reads as a mistake), what each animation draws there for as
+ * long as it plays (`animations`, measured by the scene check), and the Reel's own texts. The row in place
+ * stays unless something sits on it; else the nearest row about as clear as the clearest: they move as
+ * little as they can.
+ */
+export function subtitleRowAmong(
+  current: number,
+  parts: { faces: { length: number; boxes: Box[] }[]; animations: { seconds: number; profile: number[] }[]; texts: { seconds: number; y: number; h: number }[] },
+): number {
+  const band = SUBTITLE_ROW.h + 0.02;
+  const cost = (y: number) =>
+    parts.faces.reduce((sum, s) => sum + 2 * s.length * Math.min(1, rowCovered(s.boxes, y) / band), 0) +
+    parts.animations.reduce((sum, a) => sum + a.seconds * profileCover(a.profile, y), 0) +
+    parts.texts.reduce((sum, t) => sum + t.seconds * Math.min(1, Math.max(0, Math.min(y + SUBTITLE_ROW.h + 0.01, t.y + t.h) - Math.max(y - 0.01, t.y)) / band), 0);
+  const here = cost(current);
+  if (here < SUBTITLE_ROOM) return current;
+  const rows = [SUBTITLE_ROW.y, ...SUBTITLE_ROWS].map((y) => ({ y, c: cost(y) }));
+  const least = Math.min(...rows.map((r) => r.c));
+  const best = rows.filter((r) => r.c <= least + SUBTITLE_ROOM).sort((a, b) => Math.abs(a.y - current) - Math.abs(b.y - current))[0]!;
+  // A real gain only: a row barely better is not worth leaving the one in place.
+  return best.c < here - SUBTITLE_ROOM ? best.y : current;
+}
+
+/**
+ * The Reel's texts where the render draws them (top and height, shares of the frame) and how long each
+ * shows: a caption goes up to the band's row while a voice speaks, a message takes a third of the frame.
+ */
+export function textBands(texts: { from: number; to: number; style: "hook" | "band" | "caption"; y?: number; items?: unknown[] }[], voiced: boolean) {
+  return texts.map((t) => {
+    const row = t.items?.length ? MESSAGE_ROW : TEXT_ROWS[t.style];
+    const y = t.y ?? (t.style === "caption" && voiced ? TEXT_ROWS.band.y : row.y);
+    return { seconds: Math.max(0, t.to - t.from), y, h: row.h };
+  });
+}
+
 /** The Reel's frame, which the shares of a photo's zones are mapped into. */
 const REEL_FRAME = { width: 1080, height: 1920 } as const;
 

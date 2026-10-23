@@ -4,6 +4,7 @@ import {
   brandProfileSchema,
   buildAss,
   buildReelProps,
+  busyTimeline,
   clipAnalysisSchema,
   clipAspect,
   clipsUnderAnimations,
@@ -21,12 +22,18 @@ import {
   postStatusSchema,
   renderDuration,
   signatureOf,
+  photoDetectionSchema,
+  subtitleRowAmong,
+  SUBTITLE_ROW,
+  textBands,
   type EditPlan,
+  type MediaFacts,
   type PostKind,
   type PostStatus,
   type ReelInputs,
   voiceTranscriptSchema,
 } from "@fauve/agent";
+import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { logoTone } from "./logo-tone";
 import { withMusic } from "./music";
@@ -145,11 +152,18 @@ export async function loadMontageInputs(
   const words: Record<string, ClipAnalysis["words"]> = {};
   // Each clip's shape, to frame its subject in the vertical crop (phones film 16:9 or 9:16).
   const aspects: Record<string, number> = {};
+  // What was read in her clips and photos (where faces and lettering are), for the place of a voice's subtitles.
+  const facts: MediaFacts = { clips: {}, photos: {} };
   for (const row of analyses.data ?? []) {
     const parsed = clipAnalysisSchema.safeParse(row.analysis);
     if (!parsed.success || row.media_id in words) continue;
     words[row.media_id as string] = parsed.data.words;
     aspects[row.media_id as string] = clipAspect(parsed.data);
+    facts.clips[row.media_id as string] = parsed.data;
+  }
+  for (const a of assets) {
+    const read = photoReadSchema.safeParse(a.kind === "image" ? a.regions : null);
+    if (read.success) facts.photos[a.id as string] = read.data;
   }
   return {
     clipIds,
@@ -177,8 +191,12 @@ export async function loadMontageInputs(
     sceneCutouts,
     photoAspects,
     tracks,
+    facts,
   };
 }
+
+/** A photo's reading as kept on it (its size and what Gemini saw: faces, lettering). */
+const photoReadSchema = z.object({ width: z.number(), height: z.number(), detection: photoDetectionSchema });
 
 /** The finished video of a Reel the effects agent made: its one shot. */
 async function bakedVideo(studioId: string, plan: EditPlan): Promise<Buffer> {
@@ -228,7 +246,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   // composed Reel's, and those an animation composes with (the design step has usually made them already).
   const toCut = plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : scenePhotoIds(plan);
   if (toCut.length) await ensureCutouts(studioId, toCut);
-  const { clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, photoAspects, tracks } =
+  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, photoAspects, tracks, facts } =
     await loadMontageInputs(studioId, plan, { postId });
   const motion = motionTemplateSchema.safeParse(plan.template);
 
@@ -309,8 +327,14 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         props.brand,
       ).catch((e: unknown): SceneChecks => {
         console.warn("motion scenes: check unavailable", e);
-        return { errors: {}, faces: {} };
+        return { errors: {}, faces: {}, cover: {} };
       });
+      // What each animation that plays draws, row by row, for as long as it plays: where a voice's subtitles go (below).
+      const drawnFor = (id: string, frames: number) => (!checks.errors[id] && checks.cover[id] ? [{ seconds: frames / props.fps, profile: checks.cover[id]! }] : []);
+      const drawnBy = [
+        ...props.segments.flatMap((s, i) => (s.type === "motion" ? drawnFor(`m${i}`, s.durationInFrames) : [])),
+        ...(props.layers ?? []).flatMap((l, i) => drawnFor(`l${i}`, l.durationInFrames)),
+      ];
       props.segments = props.segments.map((s, i) => {
         if (s.type !== "motion" || !checks.errors[`m${i}`]) return s;
         console.warn("motion scene falls back to its fixed scene", renderId, checks.errors[`m${i}`]);
@@ -327,6 +351,30 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       }
       // Where an animation sits over her footage is its designer's (it looked at it on her images): the engine no longer
       // moves it (a move kept on an older plan stays, motion.shift).
+      // A voice's subtitles show all along it, on one row for the whole Reel: now that its animations are drawn, the row
+      // where they, the faces and the Reel's texts leave them room (Tristan: « il faut pas masquer mais bien les placer
+      // là où ça ne gêne pas les anim et les visages »); kept on the plan, so the preview shows them there too. A
+      // composition sets its own row.
+      if (props.words.length && !props.layers?.some((l) => l.compose)) {
+        const current = props.subtitleY ?? SUBTITLE_ROW.y;
+        try {
+          const missing = clipIds.filter((id) => !(id in tracks) && !facts.photos[id]);
+          const everyTrack = { ...tracks, ...(await loadTracks(studioId, missing).catch(() => ({}))) };
+          const row = subtitleRowAmong(current, {
+            faces: busyTimeline(plan, { ...facts, tracks: everyTrack }).flatMap((s) => s.windows),
+            animations: drawnBy,
+            texts: textBands(plan.texts, Boolean(plan.voice)),
+          });
+          if (row !== current) {
+            console.log("subtitles placed where the animations leave room", renderId, current, "→", row);
+            props.subtitleY = row;
+            const saved = await db.from("edit_plans").update({ plan: { ...(planRow.plan as Record<string, unknown>), subtitle_y: row } }).eq("id", planRow.id);
+            if (saved.error) console.warn("subtitles' row not kept on the plan", planRow.id, saved.error.message);
+          }
+        } catch (error) {
+          console.warn("subtitles' row not weighed, kept", renderId, error);
+        }
+      }
       try {
         mp4 = await renderReelInSandbox({ id: renderId, props });
         engine = "remotion";
