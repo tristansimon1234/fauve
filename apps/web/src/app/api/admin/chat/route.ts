@@ -1,4 +1,6 @@
+import { timingSafeEqual } from "node:crypto";
 import { type NextRequest } from "next/server";
+import { env } from "@/lib/env";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getOrCreateTestMember, isValidTestKey } from "@/lib/test-studio";
@@ -8,11 +10,27 @@ import { getOrCreateTestMember, isValidTestKey } from "@/lib/test-studio";
 // (same path as the in-app chat; jobs such as a montage start after the reply).
 //   &studio=…       on a real studio instead, as its owner, in a separate web
 //                   conversation (returned; pass &c=… to continue it).
+// Also in POST with CRON_SECRET (Authorization: Bearer …), from the database by net.http_post:
+// a correction asked for a real studio without anyone handling a key.
 export const maxDuration = 300;
 
+function cronAuthorized(request: Request): boolean {
+  const given = Buffer.from(request.headers.get("authorization") ?? "");
+  const expected = Buffer.from(`Bearer ${env("CRON_SECRET")}`);
+  return given.length === expected.length && timingSafeEqual(given, expected);
+}
+
 export async function GET(request: NextRequest) {
-  const params = request.nextUrl.searchParams;
-  if (!isValidTestKey(params.get("cle"))) return new Response("Forbidden", { status: 403 });
+  if (!isValidTestKey(request.nextUrl.searchParams.get("cle"))) return new Response("Forbidden", { status: 403 });
+  return chat(request.nextUrl.searchParams);
+}
+
+export async function POST(request: NextRequest) {
+  if (!cronAuthorized(request)) return new Response("unauthorized", { status: 401 });
+  return chat(request.nextUrl.searchParams);
+}
+
+async function chat(params: URLSearchParams) {
   const text = params.get("text")?.trim().slice(0, 2000);
   if (!text) return Response.json({ error: "text=… attendu" }, { status: 400 });
 
