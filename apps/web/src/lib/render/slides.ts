@@ -32,7 +32,27 @@ export type SlidesRender = {
   error?: string | null;
 };
 
-export const slidesKey = (plan: SlidesPlan) => createHash("sha256").update(JSON.stringify(plan)).digest("hex").slice(0, 16);
+const digest = (value: string) => createHash("sha256").update(value).digest("hex").slice(0, 16);
+
+/** The plan as it reads back from the database: its JSON, through its schema (defaults, known fields). */
+const asStored = (plan: SlidesPlan): SlidesPlan => slidesPlanSchema.safeParse(JSON.parse(JSON.stringify(plan))).data ?? plan;
+
+/**
+ * Its JSON with each object's keys in order. Postgres keeps a jsonb object's keys in its own
+ * order: the texts of a designed carousel came back in another order than the designer's, its
+ * key no longer matched its slides, and the Grille lost its cover.
+ */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v,
+  );
+}
+
+/** The key of a slides plan: the same for the plan saved and the plan read back. */
+export const slidesKey = (plan: SlidesPlan) => digest(canonical(asStored(plan)));
+
+/** Whether a render was made from this plan (read back from its post): its key, or the one renders were stored with before. */
+export const rendersPlan = (key: string | null | undefined, plan: SlidesPlan) => Boolean(key) && (key === slidesKey(plan) || key === digest(JSON.stringify(plan)));
 export const hasTexts = (plan: SlidesPlan) => Boolean(plan.design) || plan.slides.some((s) => s.texts.length > 0 || s.layer || s.elements?.length || s.logo || s.edit);
 
 /** A post's slides plan, one slide per photo in order; null without one. */
@@ -55,9 +75,8 @@ export function slidesToPublish(post: { slides: unknown; slides_render: unknown;
   const plan = postSlides(post);
   if (!plan || !hasTexts(plan)) return { state: "ready", rendered: {} };
   const render = (post.slides_render ?? null) as SlidesRender | null;
-  const key = slidesKey(plan);
-  if (render?.key === key && plan.design) return { state: "ready", rendered: {}, designed: render.paths.filter((p): p is string => Boolean(p)) };
-  if (render?.key === key) {
+  if (render && rendersPlan(render.key, plan) && plan.design) return { state: "ready", rendered: {}, designed: render.paths.filter((p): p is string => Boolean(p)) };
+  if (render && rendersPlan(render.key, plan)) {
     const rendered: Record<string, string> = {};
     plan.slides.forEach((s, i) => {
       const path = render.paths[i];
@@ -65,7 +84,7 @@ export function slidesToPublish(post: { slides: unknown; slides_render: unknown;
     });
     return { state: "ready", rendered };
   }
-  const recent = render?.pending === key && render.pending_at && Date.now() - new Date(render.pending_at).getTime() < 15 * 60_000;
+  const recent = rendersPlan(render?.pending, plan) && render?.pending_at && Date.now() - new Date(render.pending_at).getTime() < 15 * 60_000;
   return { state: recent ? "rendering" : "failed", rendered: {} };
 }
 
@@ -148,7 +167,7 @@ export async function renderSlides(studioId: string, postId: string): Promise<Sl
   if (!plan) return { key: null, paths: [] };
   const key = slidesKey(plan);
   const previous = (post.slides_render ?? null) as SlidesRender | null;
-  if (previous?.key === key) return previous;
+  if (previous && rendersPlan(previous.key, plan)) return previous;
 
   const started = Date.now();
   try {
