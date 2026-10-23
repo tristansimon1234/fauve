@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { useFauveDrawer } from "@/components/fauve-drawer";
-import { CheckIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
+import { CheckIcon, PauseIcon, PlayIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { CoverPicker } from "@/components/montage/cover-picker";
+import { PausedSign, Scrubber, useReelPlayback } from "@/components/review/reel-player";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
 
@@ -45,7 +46,7 @@ export function PostReview({
   const router = useRouter();
   const openDrawer = useFauveDrawer();
   const video = useRef<HTMLVideoElement>(null);
-  const [sound, setSound] = useState(false);
+  const player = useReelPlayback(video, data.videoUrl);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -71,13 +72,6 @@ export function PostReview({
       return;
     }
     openDrawer({ postId: data.postId, title: data.title });
-  };
-  const toggleSound = () => {
-    const el = video.current;
-    if (!el) return;
-    el.muted = !el.muted;
-    if (!el.muted) el.play().catch(() => {});
-    setSound(!el.muted);
   };
 
   const scheduled = data.status === "scheduled" || data.status === "validated";
@@ -128,17 +122,42 @@ export function PostReview({
           {data.locked && <p className="text-[13.5px] font-bold text-success">Publié</p>}
           <div className="relative aspect-[9/16] w-[max(176px,min(280px,calc((100dvh-470px)*0.5625)))] overflow-hidden rounded-[22px] bg-ink shadow-[0_18px_44px_rgba(28,21,48,.18)] lg:w-[320px]">
             {data.videoUrl && (
-              <video key={data.videoUrl} ref={video} src={data.videoUrl} autoPlay muted loop playsInline preload="auto" className="size-full object-cover" aria-label="Ton Reel" />
+              <video
+                key={data.videoUrl}
+                ref={video}
+                src={data.videoUrl}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                onClick={player.toggle}
+                className="size-full cursor-pointer object-cover"
+                aria-label="Ton Reel : touche pour mettre en pause ou relancer"
+              />
             )}
+            {data.videoUrl && <PausedSign playing={player.playing} />}
             {data.videoUrl && (
-              <button
-                type="button"
-                onClick={toggleSound}
-                aria-label={sound ? "Couper le son" : "Mettre le son"}
-                className="absolute right-3 bottom-3 flex size-11 items-center justify-center rounded-full bg-ink/60 text-white backdrop-blur-sm"
-              >
-                {sound ? <VolumeIcon size={20} /> : <VolumeOffIcon size={20} />}
-              </button>
+              // Play or pause, where it is (drag to go forward or back), its sound.
+              <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/60 to-transparent px-2.5 pt-8 pb-2.5">
+                <button
+                  type="button"
+                  onClick={player.toggle}
+                  aria-label={player.playing ? "Mettre en pause" : "Lire la vidéo"}
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full text-white"
+                >
+                  {player.playing ? <PauseIcon size={18} /> : <PlayIcon size={18} />}
+                </button>
+                <Scrubber time={player.time} duration={player.duration} onSeek={player.seek} />
+                <button
+                  type="button"
+                  onClick={player.toggleSound}
+                  aria-label={player.sound ? "Couper le son" : "Mettre le son"}
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full text-white"
+                >
+                  {player.sound ? <VolumeIcon size={18} /> : <VolumeOffIcon size={18} />}
+                </button>
+              </div>
             )}
             {data.failed && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/70 p-6 text-center text-white">
