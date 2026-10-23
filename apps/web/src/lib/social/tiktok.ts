@@ -113,11 +113,12 @@ export type TikTokUser = {
   following_count?: number;
   likes_count?: number;
   video_count?: number;
+  bio_description?: string;
 };
 
 /** Her profile and, with user.info.stats, her counters. */
 export async function tiktokUser(accessToken: string): Promise<TikTokUser> {
-  const fields = "open_id,display_name,username,avatar_url,follower_count,following_count,likes_count,video_count";
+  const fields = "open_id,display_name,username,avatar_url,bio_description,follower_count,following_count,likes_count,video_count";
   const data = await call<{ user: TikTokUser }>(`/user/info/?fields=${fields}`, accessToken, { method: "GET" });
   return data.user;
 }
