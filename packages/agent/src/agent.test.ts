@@ -4306,6 +4306,18 @@ test("a breath between two sentences opens where the voice is quiet, or not at a
   assert.deepEqual(quietPauses([{ at: 1.5, add: 0.3 }], []), [{ at: 1.5, add: 0.3 }]);
 });
 
+test("the length she asked for is measured on the plan, and the message never announces another", async () => {
+  const { missesLength, lengthNote, honestLength } = await import("./editor.ts");
+  // Her Pauline Reel: « environ 26 s », delivered at 19.6 s with « un Reel de 26 s » in the message.
+  assert.equal(missesLength(19.6, 26), true);
+  assert.equal(missesLength(24.5, 26), false);
+  assert.equal(missesLength(12, null), false);
+  assert.equal(missesLength(45, 60), false, "her 60 s is held to the 45 s a Reel can last");
+  assert.match(lengthNote(19.6, 26), /dure 19,6 s.*environ 26 s/);
+  assert.match(honestLength("Un Reel de 26 s qui respire.", 19.6, 26), /Il fait 19,6 s et pas 26 s/);
+  assert.equal(honestLength("Un Reel de 25 s.", 25, 26), "Un Reel de 25 s.");
+});
+
 test("a text stays on screen long enough to be read, never over the next one", async () => {
   const { readingSeconds, longEnoughToRead } = await import("./editor.ts");
   assert.equal(readingSeconds("Hey"), 1.2);

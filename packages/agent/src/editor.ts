@@ -37,7 +37,7 @@ Qui décide, dans cet ordre :
 2. le Reel qu'elle recopie (« reel_a_recopier ») : sa forme, son rythme (« plan_moyen_s », « tempo_bpm »), la forme de son accroche, la quantité et la composition de son texte, son effet, ses transitions et sa fin, avec ses images à elle et des mots à elle, jamais les siens ;
 3. tes repères, plus bas : des réglages par défaut, jamais des obligations face à elle.
 Donc sa demande pour ce Reel et le Reel qu'elle recopie (« reel_a_recopier ») passent avant tes repères : ce qu'ils n'ont pas ou écartent (une accroche écrite, une invitation à la fin, des animations, du texte, une boucle), ce Reel ne l'a pas ; ce qu'ils ont ou demandent, il le prend (plus de texte, des plans longs, une ouverture sur un lieu, une fin sans appel). Ce que sa demande ne dit pas, tes repères le décident.
-Jamais contrainte sans le savoir : quand une limite réelle t'empêche de faire exactement ce qu'elle demande (45 s au plus, le nombre d'animations permis, un geste qu'aucune vidéo ne montre ou seulement hors du cadre, une musique existante qu'on ne peut pas mettre), fais le plus proche et dis-le-lui dans « rationale », en une phrase simple, avec ce qu'elle peut faire (filmer quelques secondes, publier elle-même avec le son, en demander plus). Jamais lui demander d'écrire, de compléter ou de rallonger un texte elle-même : les mots, c'est votre travail. Une voix plus courte que la durée demandée : le Reel finit avec elle, jamais des secondes muettes à la fin.
+Jamais contrainte sans le savoir : quand une limite réelle t'empêche de faire exactement ce qu'elle demande (45 s au plus, le nombre d'animations permis, un geste qu'aucune vidéo ne montre ou seulement hors du cadre, une musique existante qu'on ne peut pas mettre), fais le plus proche et dis-le-lui dans « rationale », en une phrase simple, avec ce qu'elle peut faire (filmer quelques secondes, publier elle-même avec le son, en demander plus). Jamais lui demander d'écrire, de compléter ou de rallonger un texte elle-même : les mots, c'est votre travail. Une voix plus courte que la durée demandée : les images tiennent la durée (une fin tenue après la voix, portée par la musique) ; sans durée demandée, le Reel finit peu après la voix. « rationale » décrit le plan rendu, sa vraie durée comprise.
 
 Ce que tu reçois. « clips » : chaque vidéo découpée en plans (« shots ») avec ce qui s'y passe, le sujet, la valeur de plan (« framing »), la caméra (« camera »), la beauté (« beauty » 1 à 5), l'énergie, le potentiel d'accroche (« hook_score »), la qualité, les visages, où est le sujet (« sujet_a »), ses meilleurs passages (« best_moments »), ce que font les personnes (« actions » : chaque geste daté, et « mains » : si ses mains se voient dans le cadre vertical du Reel), ce que font vraiment ses mains, mesuré image par image (« mains_suivies » : plus sûr que « actions » quand les deux divergent ; dans le brief d'une animation qui tient à un geste, dis chaque fois qu'il revient, avec ses temps) et ses paroles. « photos » : chaque photo, ce qu'elle montre et son format. « openings » : les moments les plus forts pour ouvrir le Reel, du meilleur au moins bon ; quand une voix off a été écrite, sa première phrase parle du premier. « recent_hooks » : les accroches des derniers Reels du commerce. « studio.facts » : ce qu'on sait du commerce (son site, ce qu'elle a dit, qui apparaît à l'écran).
 
@@ -685,6 +685,29 @@ export function clearOfAnimations<T extends { from: number; to: number; text?: s
     if (to - from >= 1.2 && clear && free(from, to)) kept.push({ ...text, from, to });
   }
   return kept.sort((a, b) => a.from - b.from);
+}
+
+/**
+ * True when a plan lands too far from the length she asked for (2 s, or 12 % of a long
+ * Reel): her Pauline Reel came back at 19.6 s for « environ 26 s », the editor's own
+ * words saying 26.
+ */
+export function missesLength(actual: number, asked: number | null | undefined): boolean {
+  if (!asked) return false;
+  return Math.abs(actual - Math.min(asked, MAX_REEL_SECONDS)) > Math.max(2, asked * 0.12);
+}
+
+const seconds = (value: number) => `${String(Math.round(value * 10) / 10).replace(".", ",")} s`;
+
+/** What the editor reads when its plan missed her length: the measure, and what can stretch. */
+export function lengthNote(actual: number, asked: number): string {
+  return `[Contrôle du moteur, pas de la gérante] Ton plan dure ${seconds(actual)} une fois monté (somme des plans, moins les fondus) ; elle a demandé environ ${seconds(Math.min(asked, MAX_REEL_SECONDS))}. Rends le plan entier avec cette durée : une animation dure 8 s au plus, un plan filmé ne dépasse pas sa vidéo, une photo 5 s ; une voix plus courte ne s'étire pas, ce sont les images qui tiennent (une fin ou un écran de fin tenus après elle). « rationale » dit la vraie durée.`;
+}
+
+/** Her message never announces a length the video does not have: the true one is said when it is still off. */
+export function honestLength(rationale: string, actual: number, asked: number | null | undefined): string {
+  if (!asked || !missesLength(actual, asked)) return rationale;
+  return `${rationale.trim()} Il fait ${seconds(actual)} et pas ${seconds(Math.min(asked, MAX_REEL_SECONDS))} : je n'ai pas réussi à tenir la durée demandée, dis-moi « réessaie la durée » et je le reprends.`.trim();
 }
 
 /** With a voice, what the Reel keeps after its last word: the invitation, read in silence. */

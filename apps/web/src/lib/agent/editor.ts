@@ -56,6 +56,9 @@ import {
   handMoves,
   type ReelProps,
   type TracksByClip,
+  honestLength,
+  lengthNote,
+  missesLength,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
@@ -355,7 +358,8 @@ export async function designEdit(params: {
     max_new_scenes: params.maxNewScenes ?? MAX_FREE_SCENES,
   };
 
-  const ask = async (legacy: boolean) => {
+  // `again`: its earlier answer and what the engine measured on it (a length it missed).
+  const ask = async (legacy: boolean, again?: { answer: EditorOutput | EditorOutputLegacy; note: string }) => {
     const response = await anthropic().beta.messages.parse({
       model: CLAUDE_MODEL,
       max_tokens: 16000,
@@ -363,23 +367,29 @@ export async function designEdit(params: {
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: [{ type: "text", text: EDITOR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: JSON.stringify(input) }],
+      messages: [
+        { role: "user", content: JSON.stringify(input) },
+        ...(again ? [{ role: "assistant" as const, content: JSON.stringify(again.answer) }, { role: "user" as const, content: again.note }] : []),
+      ],
     });
     await logClaudeCost(params.studioId, response.usage, "editor");
     return response as { stop_reason: string | null; parsed_output: EditorOutput | EditorOutputLegacy | null };
   };
   // The answer's schema is compiled into a grammar with limits of its own: if the API ever
   // refuses it, the editor answers in the previous, smaller schema rather than not at all.
+  let legacy = false;
   const response = await ask(false).catch((error: unknown) => {
     const status = (error as { status?: number }).status;
     const message = error instanceof Error ? error.message : String(error);
     if (status !== 400 || !/grammar|schema|complex|compil/i.test(message)) throw error;
     console.warn("editor: schema refused, answering in the legacy schema", message);
+    legacy = true;
     return ask(true);
   });
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error(`Le montage n'a pas pu être préparé (${response.stop_reason})`);
   }
+  let output = response.parsed_output;
 
   const durations = { ...Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.duration])), ...Object.fromEntries(photoIds.map((id) => [id, PHOTO_MAX_SECONDS])) };
   // Retouch and blur stay on their clips from one version to the next.
@@ -387,11 +397,30 @@ export async function designEdit(params: {
   const base = previousPlan.success ? previousPlan.data : null;
   // Its animations whose brief did not change keep their code before the new ones are counted;
   // one rewritten (its shots changed, or the request touched it) takes the place of the one it replaces.
-  const withWritten = keepWrittenAnimations(fromEditorPlan(response.parsed_output.plan, profile.text_looks ?? []), params.fresh ? null : base);
-  // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
-  const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;
-  const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
-  const plan = carryRetouch(carryTextStyle(normalizeEditPlan(drafted, durations, allowed), params.fresh ? null : base), base);
+  const toPlan = (answer: EditorOutput | EditorOutputLegacy) => {
+    const withWritten = keepWrittenAnimations(fromEditorPlan(answer.plan, profile.text_looks ?? []), params.fresh ? null : base);
+    // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
+    const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;
+    const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
+    return carryRetouch(carryTextStyle(normalizeEditPlan(drafted, durations, allowed), params.fresh ? null : base), base);
+  };
+  let plan = toPlan(output);
+  // The length she asked for is measured on the plan, never taken from the editor's words: missed, it
+  // reads the measure and answers once more, and the closer of its two plans is kept.
+  const asked = params.contract?.duration;
+  if (asked && missesLength(plan.duration, asked)) {
+    const again = await ask(legacy, { answer: output, note: lengthNote(plan.duration, asked) }).catch((error: unknown) => {
+      console.warn("editor: length retry failed", error);
+      return null;
+    });
+    if (again?.parsed_output) {
+      const retried = toPlan(again.parsed_output);
+      if (Math.abs(retried.duration - asked) < Math.abs(plan.duration - asked)) {
+        output = again.parsed_output;
+        plan = retried;
+      }
+    }
+  }
   // The Reel she copies takes its own font and colours over her charter's when they make its style (the animations get them too).
   Object.assign(plan, followedLook(plan, followed));
 
@@ -748,7 +777,7 @@ export async function designEdit(params: {
       ? "Je n'ai pas réussi à refaire l'animation du haut avec tes changements : je garde celle de la version d'avant, avec tes nouveaux textes et ta nouvelle voix. Dis-moi « refais l'animation » et je la reprends."
       : compositionMissed
         ? "Je n'ai pas réussi à composer la mise en page demandée : cette version passe tes plans en plein cadre. Dis-moi « réessaie la mise en page » et je la refais."
-        : response.parsed_output.rationale,
+        : honestLength(output.rationale, plan.duration, params.contract?.duration),
     // A collage's composition is the ambiance itself, never a paid animation.
     newScenes: requests.filter((r) => !r.compose).length,
     reusedScenes: reused.size,
