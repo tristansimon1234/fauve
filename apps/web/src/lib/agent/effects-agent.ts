@@ -332,6 +332,9 @@ export type EffectsState = {
   stop: string | null;
   /** The grader was satisfied with the last version. */
   satisfied: boolean;
+  /** The session's status as the API says it (running, idle, terminated…), and its grader's rounds so far. */
+  status: string;
+  rounds: number;
   costUsd: number | null;
   activeSeconds: number | null;
   usage: Record<string, unknown>;
@@ -354,6 +357,8 @@ export async function effectsState(sessionId: string): Promise<EffectsState> {
     stopped: session.status === "terminated" || (session.status === "idle" && stop !== "requires_action"),
     stop,
     satisfied: last?.result === "satisfied",
+    status: String(session.status),
+    rounds: session.outcome_evaluations.length,
     costUsd: session.usage.list_cost ? Number(session.usage.list_cost.amount) / 100 : null,
     activeSeconds: session.usage.active_seconds ?? null,
     usage: session.usage as unknown as Record<string, unknown>,
