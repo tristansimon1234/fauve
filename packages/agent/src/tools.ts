@@ -191,7 +191,7 @@ export const toolSpecs = {
   },
   montage_status: {
     description:
-      "Où en sont les montages lancés ces 3 dernières heures (ou celui d'une publication) : en montage (le monteur écrit le plan), 2e version (Max), en rendu, en relecture (tu regardes la vidéo), en correction, ou livré, et depuis combien de minutes. Un montage prend 2 à 15 minutes selon son niveau ; « late » signifie qu'il a sans doute échoué.",
+      "Où en sont les montages lancés ces 3 dernières heures (ou celui d'une publication) : en montage (le monteur écrit le plan), 2e version (Max), en rendu, en relecture (tu regardes la vidéo), en correction, ou livré, et depuis combien de minutes. Un montage prend 5 à 25 minutes selon son niveau et ce qu'il demande ; tant qu'il n'est pas « late », il tourne. « late » : il s'est arrêté.",
     input: z.object({ post_id: z.string().uuid().optional() }),
   },
   choose_version: {

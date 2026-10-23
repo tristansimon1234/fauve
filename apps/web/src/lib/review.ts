@@ -44,7 +44,7 @@ export type ReviewData = {
   /** The current version's render, for the page to start over when it changes. */
   renderId: string | null;
   /** A new version on its way: a render of texts saved by hand, or Simone redoing the montage. */
-  making: { kind: "render" | "montage"; step: string | null } | null;
+  making: { kind: "render" | "montage"; step: string | null; minutes?: number } | null;
   /** The video could not be made (no older one to show). */
   failed: boolean;
   /** The video to save on her phone, under the post's name. */
@@ -150,7 +150,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
   const rendering = !done(current.id as string) && (latest?.status === "rendering" || latest?.status === "queued");
   const failed = !shown && !running && latest?.status === "failed";
   const making = running
-    ? { kind: "montage" as const, step: running.step }
+    ? { kind: "montage" as const, step: running.step, minutes: running.minutes }
     : replays.length || rendering || (!shown && !locked && !failed)
       ? { kind: "render" as const, step: null }
       : null;
