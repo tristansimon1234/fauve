@@ -14,7 +14,7 @@ import type { ReviewData } from "@/lib/review";
 // « Ta publication », the page of a Reel, and nothing more (Tristan: « enlève tout sauf
 // la légende, qui doit être tout le temps visible, et la photo de couverture, et juste un
 // bouton demande une modif à Simone qui ouvre le drawer, that's it »): the video as it
-// will go out, its whole caption, its cover, « Publier maintenant », and « Demander une
+// will go out, its whole caption (written over in place), its cover, « Publier maintenant », and « Demander une
 // modif à Simone » (her panel in the app, WhatsApp from the page of the links). Every
 // other change is asked to Simone.
 
@@ -49,6 +49,8 @@ export function PostReview({
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // Her caption as she writes it: « Publier » sends it, saved or not.
+  const [caption, setCaption] = useState(data.captionShown);
 
   // A new version on its way: the page follows it until the video is there.
   useEffect(() => {
@@ -87,7 +89,7 @@ export function PostReview({
       setError(null);
       const form = new FormData();
       form.set("intent", "validate");
-      form.set("caption", data.caption);
+      form.set("caption", caption);
       const result = await updatePost(data.postId, { status: "idle" }, form);
       if (result.status === "error") return setError(result.message);
       if (result.status === "ok") setToast(result.message);
@@ -162,13 +164,7 @@ export function PostReview({
         </section>
 
         <aside className="flex flex-col gap-3.5">
-          {/* Its whole caption, always in sight. */}
-          <section aria-label="Légende" className="flex flex-col gap-1.5 rounded-[20px] border border-line bg-white p-4">
-            <h2 className="text-[13px] font-bold text-muted">Légende</h2>
-            <p className="text-[14.5px] leading-relaxed whitespace-pre-line">
-              <strong className="font-extrabold">{data.handle ?? "toi"}</strong> {data.captionShown || <span className="text-muted">Simone l’écrit avec la vidéo.</span>}
-            </p>
-          </section>
+          <Caption data={data} caption={caption} onChange={setCaption} onSaved={() => setToast("Légende enregistrée.")} />
 
           {data.videoUrl && !data.locked && !data.making && (
             <CoverPicker postId={data.postId} videoUrl={data.videoUrl} initial={cover} defaultAt={DEFAULT_COVER_SECONDS} initialShareToFeed={shareToFeed} photos={[]} />
@@ -210,5 +206,59 @@ export function PostReview({
         </p>
       )}
     </div>
+  );
+}
+
+/** Its whole caption, always in sight, written over in place (as Instagram will show it, hashtags included). */
+function Caption({ data, caption, onChange: setCaption, onSaved }: { data: ReviewData; caption: string; onChange: (caption: string) => void; onSaved: () => void }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const changed = caption.trim() !== data.captionShown.trim();
+  const save = () =>
+    start(async () => {
+      setError(null);
+      const form = new FormData();
+      form.set("intent", "save");
+      form.set("caption", caption);
+      const result = await updatePost(data.postId, { status: "idle" }, form);
+      if (result.status === "error") return setError(result.message);
+      onSaved();
+      router.refresh();
+    });
+  return (
+    <section aria-label="Légende" className="flex flex-col gap-2 rounded-[20px] border border-line bg-white p-4">
+      <label htmlFor={`caption-${data.postId}`} className="text-[13px] font-bold text-muted">
+        Légende
+      </label>
+      {data.locked ? (
+        <p className="text-[14.5px] leading-relaxed whitespace-pre-line">{data.captionShown}</p>
+      ) : (
+        <textarea
+          id={`caption-${data.postId}`}
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          maxLength={2200}
+          rows={7}
+          placeholder="Simone l’écrit avec la vidéo."
+          className="w-full resize-y rounded-[14px] border-[1.5px] border-line bg-white px-3 py-2.5 text-[14.5px] leading-relaxed outline-none focus:border-violet"
+        />
+      )}
+      {error && (
+        <p role="alert" className="text-[13px] font-semibold text-danger">
+          {error}
+        </p>
+      )}
+      {changed && !data.locked && (
+        <div className="flex gap-2">
+          <button type="button" onClick={save} disabled={pending} className="btn btn-primary h-10 px-4 text-[14px] disabled:opacity-60">
+            {pending ? "Un instant…" : "Enregistrer"}
+          </button>
+          <button type="button" onClick={() => setCaption(data.captionShown)} disabled={pending} className="btn btn-secondary h-10 px-4 text-[14px]">
+            Annuler
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
