@@ -226,11 +226,15 @@ export const montagePlanSchema = z.object({
 });
 export type MontagePlan = z.infer<typeof montagePlanSchema>;
 
-/** The plan as the editor reads it, inside its brief. */
+/**
+ * Simone's outline as the editor reads it, inside its brief: her proposal, never a plan the manager
+ * validated (she never sees it as such). Presented as validated, it bound the editor to 20 s and two
+ * animations a florist's 6 s of footage could not carry: what she asked herself is in the brief.
+ */
 export function planBrief(plan: MontagePlan): string {
   const kinds = { clip: "vidéo", animation: "animation", end: "fin" } as const;
   return [
-    `Plan validé par la gérante (respecte l'ordre, le nombre de scènes et les textes) : ~${Math.round(plan.duration)} s${plan.style === "collage" ? ", en collage" : plan.style && plan.style !== "libre" ? `, ${AMBIANCES[plan.style].label.toLowerCase()}` : ""}.`,
+    `Piste de Simone (une proposition, pas un plan validé par la gérante : sa demande et ses images passent avant) : ~${Math.round(plan.duration)} s${plan.style === "collage" ? ", en collage" : plan.style && plan.style !== "libre" ? `, ${AMBIANCES[plan.style].label.toLowerCase()}` : ""}.`,
     ...plan.scenes.map((s, i) => `${i + 1}. ${kinds[s.kind]} : ${s.what}`),
   ].join("\n");
 }

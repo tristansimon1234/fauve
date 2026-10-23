@@ -101,6 +101,13 @@ export function Backdrop({ background = "accent", props, k }: { background?: Sce
   );
 }
 
+/**
+ * The engine's fixed scene over her footage brings its own scrim (the footage plays bare under the
+ * motion designer's animations): darker at the top and the bottom, so its white type reads on any picture.
+ */
+const OVERLAY_SCRIM =
+  "linear-gradient(180deg, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0.2) 26%, rgba(0,0,0,0.06) 46%, rgba(0,0,0,0) 56%, rgba(0,0,0,0.1) 72%, rgba(0,0,0,0.3) 100%), rgba(10,8,18,0.32)";
+
 export function SceneView({
   scene,
   durationInFrames,
@@ -155,7 +162,7 @@ export function SceneView({
     );
 
   return (
-    <AbsoluteFill style={{ backgroundColor: c.bg, overflow: "hidden", textShadow: overlay ? "0 2px 6px rgba(0,0,0,0.25), 0 10px 40px rgba(0,0,0,0.45)" : undefined }}>
+    <AbsoluteFill style={{ background: overlay ? OVERLAY_SCRIM : c.bg, overflow: "hidden", textShadow: overlay ? "0 2px 6px rgba(0,0,0,0.25), 0 10px 40px rgba(0,0,0,0.45)" : undefined }}>
       {/* Living background: two soft orbs drifting slowly (none over footage). */}
       {overlay ? null : (
       <div

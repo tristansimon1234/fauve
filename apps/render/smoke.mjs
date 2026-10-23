@@ -1,6 +1,6 @@
 // Smoke test for generated motion scenes, run in the render sandbox (never in the
 // web app). Usage: node smoke.mjs scenes.json [bundle-dir] → prints
-// {"results": {"<id>": null | "error"}, "bands": {"<id>": [top, bottom]}, "faces": {"<id>": "what to move"}}.
+// {"results": {"<id>": null | "error"}, "faces": {"<id>": "what to move"}}.
 // scenes.json: [{ id, js, durationInFrames, texts?, brand?, photos?, cuts?, shots?, track?, look?, fonts?, reelTexts?, end? }] (photos: the ones
 // the scene composes with, with their links; cuts: for an animation over several shots; shots: the
 // shots a collage's composition lays, each one a grey card here; track: what moves in the footage under it,
@@ -12,11 +12,10 @@
 //    nothing there: a scene must stand without anyone in the picture (reused over other footage).
 // 2. The scenes that pass are laid out in Chrome (the SceneCheck composition of the
 //    bundle, default ./build) at many frames, with the studio's fonts: a text that
-//    leaves the frame or the safe zone fails the scene. A scene that passes says where
-//    its texts sit while it holds (shares of the height), so the render can move it off
-//    the faces of the footage under it, and which of its texts stay on a face it follows
-//    (faces: not a failure, a reason for one more round of the motion designer), and its
-//    sentences that do not stay long enough to be read (in faces too).
+//    leaves the frame or the safe zone fails the scene. A scene that passes says which
+//    of its texts stay on a face it follows (faces: not a failure, a reason for one more
+//    round of the motion designer), and its sentences that do not stay long enough to be
+//    read (in faces too).
 // BROWSER_EXECUTABLE overrides Remotion's own Chrome (local runs).
 import { existsSync, readFileSync } from "node:fs";
 import React from "react";
@@ -57,7 +56,6 @@ const defaultBrand = {
 
 const scenes = JSON.parse(readFileSync(process.argv[2], "utf8"));
 const results = {};
-const bands = {};
 const faces = {};
 for (const scene of scenes) {
   try {
@@ -140,8 +138,6 @@ if (browser) {
           logLevel: "error",
           timeoutInMilliseconds: 60000,
           onBrowserLog: (log) => {
-            const band = /^FAUVE_BAND (\[.*\])$/.exec(log.text)?.[1];
-            if (band) bands[scene.id] = JSON.parse(band);
             // Not failures, reasons for one more round: a text on a face, a sentence too quick to read.
             const note = /^FAUVE_(?:FACE|READ) (".*")$/.exec(log.text)?.[1];
             if (note) faces[scene.id] = [faces[scene.id], JSON.parse(note)].filter(Boolean).join("\n");
@@ -159,4 +155,4 @@ if (browser) {
     await browser.close({ silent: true });
   }
 }
-console.log(JSON.stringify({ results, bands, faces }));
+console.log(JSON.stringify({ results, faces }));

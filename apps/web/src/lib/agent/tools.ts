@@ -46,6 +46,7 @@ import {
   keptPlan,
   planMessage,
   PLAN_BUTTONS,
+  withHerWords,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -108,6 +109,8 @@ export type ToolContext = {
   timezone?: string;
   /** The app's conversation being answered: work started from it is delivered in it. */
   conversationId?: string;
+  /** Her messages this turn answers, as she wrote them (a voice note's words): a correction carries them to the editor. */
+  asked?: string;
 };
 
 /**
@@ -471,6 +474,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         correction = true;
         variant = undefined;
       }
+      // A correction carries her own words to the editor, as she wrote them: Simone's reading of « améliore-la
+      // nettement » had become « réduire la taille du texte », and the animation came back the same, smaller.
+      if (correction && ctx.asked) brief = withHerWords(brief, ctx.asked);
       // The level asked for, else the studio's default (Réglages).
       const studio = await db.from("studios").select("montage_effort").eq("id", studioId).single();
       const wanted = effort ?? effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);

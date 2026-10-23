@@ -447,7 +447,10 @@ function Shot({ segment, theme, frame: box, face }: { segment: ClipSegment; them
   );
 }
 
-/** Her footage under an animation: the passage keeps playing with a slow push-in, a little darker so the animation reads. */
+/**
+ * Her footage under an animation: the passage keeps playing with a slow push-in, as filmed. No veil: what the
+ * animation lays over it, and how much of it shows, is the motion designer's (a fixed scene brings its own scrim).
+ */
 function Under({ under, durationInFrames, theme }: { under: ReelUnder; durationInFrames: number; theme: Theme }) {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
@@ -471,8 +474,6 @@ function Under({ under, durationInFrames, theme }: { under: ReelUnder; durationI
           <Photo src={under.src} edit={under.edit} grade={theme.grade} />
         )}
       </AbsoluteFill>
-      <AbsoluteFill style={{ background: "rgba(10,8,18,0.32)" }} />
-      <Legibility theme={theme} />
     </AbsoluteFill>
   );
 }
@@ -1167,11 +1168,8 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
     if (current && last && current.length < 3 && word.from - last.to < 12 && !PHRASE_END.test(last.w)) current.push(word);
     else chunks.push([word]);
   }
-  // Another text or an animation on screen says it already: the subtitles step aside (never two texts at once).
-  const busy =
-    props.texts.some((t) => frame >= t.from && frame < t.from + t.durationInFrames) ||
-    props.segments.some((seg) => seg.type === "motion" && frame >= seg.startAt && frame < seg.startAt + seg.durationInFrames);
-  const chunk = busy ? undefined : chunks.find((c) => frame >= c[0]!.from && frame <= c.at(-1)!.to + 6);
+  // Shown all along the voice, like the apps' own captions: the other texts and the animations keep off their row.
+  const chunk = chunks.find((c) => frame >= c[0]!.from && frame <= c.at(-1)!.to + 6);
   if (!chunk) return null;
   const s = theme.subtitle;
   // One place for the whole Reel, off the faces (the engine's choice); older plans set a row per shot.

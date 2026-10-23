@@ -303,23 +303,23 @@ export type SmokeScene = {
 };
 
 /**
- * What the scene check found: the error per scene id (null when it passes), where a passing scene's
- * texts sit while it holds (top, bottom: shares of the height), and, for a passing scene, its texts
- * that stay on a face of the footage under it (what to move, for the motion designer).
+ * What the scene check found: the error per scene id (null when it passes), and, for a passing
+ * scene, its texts that stay on a face of the footage under it or go too quickly to be read
+ * (what to change, for the motion designer).
  */
-export type SceneChecks = { errors: Record<string, string | null>; bands: Record<string, [number, number]>; faces: Record<string, string> };
+export type SceneChecks = { errors: Record<string, string | null>; faces: Record<string, string> };
 
 /**
  * Runs generated motion scenes outside the video: a server render (first, middle,
  * last frame), then a layout check in Chrome with the studio's fonts, which
- * rejects a scene whose text leaves the frame or the safe zone, measures the
- * rows its texts cover and finds the texts that stay on a face it follows.
+ * rejects a scene whose text leaves the frame or the safe zone, and finds the
+ * texts that stay on a face it follows.
  */
 export async function smokeTestScenes(
   scenes: SmokeScene[],
   brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">,
 ): Promise<SceneChecks> {
-  if (!scenes.length) return { errors: {}, bands: {}, faces: {} };
+  if (!scenes.length) return { errors: {}, faces: {} };
   const sandbox = await withTimeLeft(await remotionSandbox());
   const file = `${ROOT}/jobs/smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
   try {
@@ -329,15 +329,14 @@ export async function smokeTestScenes(
     try {
       const parsed = JSON.parse(lastLine) as {
         results?: Record<string, string | null>;
-        bands?: Record<string, [number, number]>;
         faces?: Record<string, string>;
       } & Record<string, unknown>;
       // A workshop still on the previous checker prints the errors alone.
-      if (parsed.results && typeof parsed.results === "object") return { errors: parsed.results, bands: parsed.bands ?? {}, faces: parsed.faces ?? {} };
-      return { errors: parsed as Record<string, string | null>, bands: {}, faces: {} };
+      if (parsed.results && typeof parsed.results === "object") return { errors: parsed.results, faces: parsed.faces ?? {} };
+      return { errors: parsed as Record<string, string | null>, faces: {} };
     } catch {
       const output = (await result.output("both").catch(() => "")).slice(-400);
-      return { errors: Object.fromEntries(scenes.map((s) => [s.id, `smoke test failed: ${output}`])), bands: {}, faces: {} };
+      return { errors: Object.fromEntries(scenes.map((s) => [s.id, `smoke test failed: ${output}`])), faces: {} };
     }
   } finally {
     await bash(sandbox, 'rm -f "$1"', [file]).catch(() => {});
@@ -381,6 +380,47 @@ export async function renderStillsInSandbox(
     return images;
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/**
+ * Frames of a Reel before its render, as it will come out (her footage, its texts and subtitles):
+ * the motion designer looks at its animations there before they go out. Its media are copied
+ * into the sandbox as for a render (the caller leaves out the shots no frame shows), then each
+ * frame is a still of the Reel composition, at `scale` of its size. The image of each frame, or its error.
+ */
+export async function reelFramesInSandbox(id: string, props: ReelProps, frames: number[], scale = 0.5): Promise<Record<number, Buffer | Error>> {
+  if (!frames.length) return {};
+  const sandbox = await withTimeLeft(await remotionSandbox());
+  const dir = `${ROOT}/jobs/${id}`;
+  const media = `${REMOTION}/build/public/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
+    const local = await localMedia(sandbox, id, props);
+    const jobs = frames.map((frame, i) => ({ id: `f${i}`, frame, out: `${dir}/f${i}.jpg`, scale }));
+    await sandbox.writeFiles([{ path: `${dir}/frames.json`, content: JSON.stringify({ props: local, jobs }) }]);
+    const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 240 node stills.mjs "$1/frames.json"`, "bash", dir] });
+    const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
+    let errors: Record<string, string | null>;
+    try {
+      errors = JSON.parse(lastLine) as Record<string, string | null>;
+    } catch {
+      const output = (await result.output("both").catch(() => "")).slice(-600);
+      throw new Error(`frames failed: ${output}`);
+    }
+    const images: Record<number, Buffer | Error> = {};
+    for (const job of jobs) {
+      const error = errors[job.id];
+      if (error) {
+        images[job.frame] = new Error(error);
+        continue;
+      }
+      const jpeg = await sandbox.readFileToBuffer({ path: job.out }).catch(() => null);
+      images[job.frame] = jpeg?.length ? jpeg : new Error("frame produced no file");
+    }
+    return images;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1" "$2"', [dir, media]).catch(() => {});
   }
 }
 

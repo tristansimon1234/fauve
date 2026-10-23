@@ -5,6 +5,7 @@ import {
   type CompositionTexts,
   GEMINI_MODEL_ID,
   MOTION_DESIGNER_PROMPT,
+  motionLookOutputSchema,
   motionSceneOutputSchema,
   type ComposeShot,
   type CompositionShot,
@@ -32,13 +33,16 @@ import { anthropic, logClaudeCost } from "./run";
 // rendered in the sandbox; a failing scene gets one round of fixes, and if it
 // still fails the renderer uses the scene's fixed fallback. The scenes of one Reel
 // are written one after the other, each knowing what the earlier ones do, so that
-// no two share an idea; the business's latest ones are named too.
+// they go together; the business's latest ones are named too, not to be redone.
+// Then, as a motion designer looks at a render before delivering it, it looks at its
+// animations rendered over her footage, in the Reel as it will come out, and reworks
+// the ones below the bar, once.
 
 /** A photo of hers a scene may compose with: its id and what it shows (for the designer), its links (for the test render). */
 export type OfferedPhoto = { id: string; shows: string; photo: ScenePhoto };
 
 /**
- * busy: the rows of the footage under the scene that must stay seen (faces, lettering; shares of the height);
+ * busy: the rows of the footage under the scene where faces and lettering show (shares of the height): no words on them while they show;
  * photos: her photos it may compose with; cuts: for an animation over several shots, where the shot changes under it (frames from its start);
  * compose: a collage's composition, which lays the Reel's shots itself: what each one shows and when (plans), where the
  * Reel's texts go over it (texts), and each shot's span and shape for its test render (shots).
@@ -56,9 +60,17 @@ export type SceneRequest = {
   /** What moves in the footage under it: the pieces its `track` reads (its test render follows them), and what the designer is told of them. */
   track?: TrackPiece[];
   moves?: DesignerMoves | { par_plan: ({ plan: number } & DesignerMoves)[] };
-  /** A correction: the animation it reworks as it was rendered on her images (frames with their instant), its code, what the review found. */
-  seen?: { code: string; review: string; frames: { label: string; jpeg: Buffer }[] };
+  /** A correction: the animation it reworks as it was rendered on her images (frames with their instant), its code, what is asked (her words, Simone's reading, the review). */
+  seen?: { code: string; review: string; frames: SceneFrame[] };
+  /** The row where a voice's subtitles show during the scene (shares of the height): its words keep off it. */
+  subtitles?: { y: number; h: number };
 };
+
+/** One image of an animation as it renders in the Reel, with the instant it shows (in the animation's frames). */
+export type SceneFrame = { label: string; jpeg: Buffer };
+
+/** The images of each written animation over her footage, by its id: what the motion designer looks at before it goes out. */
+export type SceneLooks = Map<string, SceneFrame[]>;
 export type SceneResult = {
   id: string;
   code: string | null;
@@ -75,6 +87,9 @@ export type SceneResult = {
   fonts?: string[];
   /** A composition: where it wants a voice's subtitles (share of the height). */
   subtitleY?: number;
+  /** Looking at its render: it keeps the animation as it is (nothing new written), and what it saw. */
+  keep?: boolean;
+  seen?: string;
 };
 
 /** What already exists, so that a new scene takes another idea. */
@@ -85,7 +100,8 @@ type Existing = {
   done: string[];
 };
 
-type Brand = Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">;
+/** The brand as an animation sees it. */
+export type SceneBrand = Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">;
 
 /** The business's motion kit: its latest scenes, whose language a new one keeps (never their code as such). */
 export type MotionKit = { name: string; code: string }[];
@@ -98,9 +114,11 @@ const MAX_SCENE_FONTS = 2;
 const EDGE_WORDS = { top: "le haut", bottom: "le bas", left: "la gauche", right: "la droite" } as const;
 
 type Block = { type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: "image/jpeg"; data: string } };
-type SceneOutput = z.output<typeof motionSceneOutputSchema>;
+/** Its answer: a scene written, or its look at a scene rendered (with whether it keeps it). */
+type SceneOutput = z.output<typeof motionSceneOutputSchema> & Partial<Pick<z.output<typeof motionLookOutputSchema>, "keep" | "seen">>;
+type AnswerSchema = typeof motionSceneOutputSchema | typeof motionLookOutputSchema;
 
-async function askClaude(studioId: string, content: string | Block[]): Promise<SceneOutput | null> {
+async function askClaude(studioId: string, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
   // Streamed, with room: a composition of a whole Reel is long code, and its answer was cut off mid-string at
   // 16 000 tokens, then again at 32 000 (18 000 of them thinking): Simone's split screen fell back to plain shots.
   const response = await anthropic()
@@ -108,7 +126,7 @@ async function askClaude(studioId: string, content: string | Block[]): Promise<S
       model: CLAUDE_MODEL,
       max_tokens: 64000,
       // Medium: the code needs care, not long deliberation; most of the cost was thinking tokens.
-      output_config: { effort: "medium", format: outputFormat(motionSceneOutputSchema) },
+      output_config: { effort: "medium", format: outputFormat<AnswerSchema>(schema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: [{ type: "text", text: MOTION_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
@@ -117,7 +135,7 @@ async function askClaude(studioId: string, content: string | Block[]): Promise<S
     .finalMessage();
   await logClaudeCost(studioId, response.usage, "motion_designer");
   if (!response.parsed_output) throw new Error(`pas de réponse lisible (${response.stop_reason})`);
-  return response.parsed_output;
+  return response.parsed_output as SceneOutput;
 }
 
 // Gemini as the motion designer, for a lab studio only (studios.motion_model): the same prompt,
@@ -126,18 +144,21 @@ let geminiClient: GoogleGenAI | undefined;
 const gemini = () => (geminiClient ??= new GoogleGenAI({ apiKey: env("GEMINI_API_KEY") }));
 // Patterns and bounds are left to readAnswer, which repairs them (Gemini may refuse a pattern).
 const GEMINI_SCENE_SCHEMA = toGeminiSchema(z.toJSONSchema(motionSceneOutputSchema), ["pattern"]);
+const GEMINI_LOOK_SCHEMA = toGeminiSchema(z.toJSONSchema(motionLookOutputSchema), ["pattern"]);
 
-async function askGemini(studioId: string, model: string, content: string | Block[]): Promise<SceneOutput | null> {
+async function askGemini(studioId: string, model: string, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
   const parts = (typeof content === "string" ? [{ type: "text" as const, text: content }] : content).map((b) =>
     b.type === "text" ? { text: b.text } : { inlineData: { mimeType: b.source.media_type, data: b.source.data } },
   );
+  const look = schema === motionLookOutputSchema;
   const response = await gemini().models.generateContent({
     model,
     contents: [{ role: "user", parts }],
-    config: { systemInstruction: MOTION_DESIGNER_PROMPT, responseMimeType: "application/json", responseJsonSchema: GEMINI_SCENE_SCHEMA, maxOutputTokens: 32000 },
+    config: { systemInstruction: MOTION_DESIGNER_PROMPT, responseMimeType: "application/json", responseJsonSchema: look ? GEMINI_LOOK_SCHEMA : GEMINI_SCENE_SCHEMA, maxOutputTokens: 32000 },
   });
   await logGeminiCost({ studioId, kind: "llm", model, usage: response.usageMetadata as GeminiUsage, meta: { purpose: "motion_designer" } });
-  return response.text ? readAnswer(motionSceneOutputSchema, JSON.parse(response.text)) : null;
+  if (!response.text) return null;
+  return look ? readAnswer(motionLookOutputSchema, JSON.parse(response.text)) : readAnswer(motionSceneOutputSchema, JSON.parse(response.text));
 }
 
 /** The model that writes this studio's scenes: Opus, or the Gemini model a lab studio is set to (studios.motion_model). */
@@ -152,19 +173,38 @@ function transpile(code: string): string {
   return transform(code, { transforms: ["typescript", "jsx"], jsxRuntime: "classic", production: true }).code;
 }
 
+/** The images a look shows it, each with its instant, then what it is asked. */
+function withFrames(intro: string, frames: SceneFrame[], text: string): Block[] {
+  return [
+    { type: "text", text: intro },
+    ...frames.flatMap((f): Block[] => [
+      { type: "text", text: f.label },
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: f.jpeg.toString("base64") } },
+    ]),
+    { type: "text", text },
+  ];
+}
+
+const px = (share: number) => Math.round(share * 1920);
+
+/**
+ * One call of the motion designer: a scene written from its request; with `fix`, its code corrected from
+ * a check's error; with `look`, its scene rendered over her footage looked at, kept (`keep`) or rewritten whole.
+ */
 async function writeScene(
   studioId: string,
   model: string,
   request: SceneRequest,
-  brand: Brand,
+  brand: SceneBrand,
   artDirection: string | undefined,
   kit: MotionKit,
   existing: Existing,
   fix?: { code: string; error: string; photos?: string[]; fonts?: string[] },
-) {
+  look?: { code: string; frames: SceneFrame[] },
+): Promise<Omit<SceneResult, "id">> {
   const kept = [fix?.photos?.length && `les mêmes photos (${fix.photos.join(", ")})`, fix?.fonts?.length && `les mêmes polices (${fix.fonts.join(", ")})`].filter(Boolean);
   // A correction looks at its earlier render first: each image with its instant, then the request.
-  const seen = !fix && request.seen?.frames.length ? request.seen : undefined;
+  const seen = !fix && !look && request.seen?.frames.length ? request.seen : undefined;
   const text = fix
     ? `Ce code a échoué : ${fix.error}\nCorrige-le en gardant la même intention${kept.length ? ` et ${kept.join(" et ")}` : ""}.\n\nBrief : ${request.brief}\n\nCode :\n${fix.code}`
     : JSON.stringify({
@@ -177,10 +217,10 @@ async function writeScene(
         ...(kit.length ? { kit_du_commerce: kit } : {}),
         ...(existing.reel.length ? { autres_animations_du_reel: existing.reel } : {}),
         ...(existing.done.length ? { deja_faites: existing.done } : {}),
-        // Faces and lettering of the picture under the scene, in px of the 1920 high frame: the words go around them.
-        ...(request.busy?.length
-          ? { sous_la_scene: request.busy.map((b) => ({ a_laisser_visible: `de y = ${Math.round(b.y * 1920)} à y = ${Math.round((b.y + b.h) * 1920)}` })) }
-          : {}),
+        // Faces and lettering of the picture under the scene, in px of the 1920 high frame: no words on them while they show.
+        ...(request.busy?.length ? { sous_la_scene: request.busy.map((b) => ({ visage_ou_enseigne: `de y = ${px(b.y)} à y = ${px(b.y + b.h)}` })) } : {}),
+        // Her voice's subtitles show all along: its words keep off their row.
+        ...(request.subtitles ? { sous_titres: `de y = ${px(request.subtitles.y)} à y = ${px(request.subtitles.y + request.subtitles.h)}` } : {}),
         // Her photos it may compose with: their id, what they show, and whether their subject is cut out.
         ...(request.photos?.length
           ? {
@@ -211,20 +251,19 @@ async function writeScene(
           : request.cuts
             ? { plans_dessous: { plans: request.cuts.length + 1, coupes_images: request.cuts } }
             : {}),
-        ...(seen ? { version_precedente: { relecture: seen.review.slice(0, 1500), images: `${seen.frames.length} images jointes, au-dessus` } } : {}),
-        code_precedent: seen?.code ?? request.previousCode,
+        ...(seen ? { version_precedente: { demande: seen.review.slice(0, 2500), images: `${seen.frames.length} images jointes, au-dessus` } } : {}),
+        // Its look at its render: the images above, and its code as it is.
+        ...(look ? { ton_rendu: { images: `${look.frames.length} images jointes, au-dessus` }, code_actuel: look.code } : { code_precedent: seen?.code ?? request.previousCode }),
       });
-    const content: string | Block[] = seen
-    ? [
-        { type: "text", text: "Ton animation d'avant, rendue sur ses images :" },
-        ...seen.frames.flatMap((f): Block[] => [
-          { type: "text", text: f.label },
-          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: f.jpeg.toString("base64") } },
-        ]),
-        { type: "text", text },
-      ]
-    : text;
-  const output = model === CLAUDE_MODEL ? await askClaude(studioId, content) : await askGemini(studioId, model, content);
+  const content: string | Block[] = look
+    ? withFrames("Ton animation, rendue sur sa vidéo dans le Reel tel qu'il sortira :", look.frames, text)
+    : seen
+      ? withFrames("Ton animation d'avant, rendue sur ses images :", seen.frames, text)
+      : text;
+  const schema = look ? motionLookOutputSchema : motionSceneOutputSchema;
+  const output = model === CLAUDE_MODEL ? await askClaude(studioId, content, schema) : await askGemini(studioId, model, content, schema);
+  // Its render is at the level: nothing new (an answer without code keeps it too).
+  if (look && (output?.keep || !output?.code?.trim())) return { code: look.code, js: null, error: null, keep: true, seen: output?.seen ?? "" };
   const code = output?.code ?? "";
   // Only photos it was offered, each once, in its order.
   const offered = new Set((request.photos ?? []).map((p) => p.id));
@@ -236,7 +275,15 @@ async function writeScene(
   const fonts = (await Promise.all(named.map((f) => googleFont(f).catch(() => null)))).filter((f): f is string => Boolean(f));
   // A composition's choice of row for a voice's subtitles, kept within the frame's safe rows.
   const subtitleY = request.compose && typeof output?.subtitle_y === "number" ? Math.min(0.8, Math.max(0.1, output.subtitle_y)) : undefined;
-  const meta = { name: output?.name ?? "", slots: output?.slots ?? [], notes: output?.notes ?? "", photos, fonts, ...(subtitleY !== undefined ? { subtitleY } : {}) };
+  const meta = {
+    name: output?.name ?? "",
+    slots: output?.slots ?? [],
+    notes: output?.notes ?? "",
+    photos,
+    fonts,
+    ...(subtitleY !== undefined ? { subtitleY } : {}),
+    ...(look ? { keep: false, seen: output?.seen ?? "" } : {}),
+  };
   const problems = checkMotionCode(code);
   if (problems.length) return { code, js: null, error: `code refusé : ${problems.join(", ")}`, ...meta };
   try {
@@ -254,28 +301,56 @@ function photosOf(result: SceneResult, request: SceneRequest): ScenePhoto[] {
   });
 }
 
-/**
- * `kept`: the Reel's animations that keep their code (name or brief); `done`: the names of
- * the business's latest animations. Both, with the scenes written before, tell each new
- * scene what not to repeat.
- */
 /** What a motion designer call can take (up to 64 000 tokens streamed: 1.5 to 4.5 min), and a check of its scenes. */
 const SCENE_CALL_MS = 290_000;
 const SMOKE_MS = 60_000;
+/** Its look at its render: the frames over her footage (a minute or so), its calls side by side, a check of the reworked ones. */
+const LOOK_NEEDS_MS = 90_000 + SCENE_CALL_MS + SMOKE_MS;
+
+export type SceneContext = {
+  /** The Reel's animations that keep their code (name or brief), and the names of the business's latest ones. */
+  kept?: string[];
+  done?: string[];
+  /** The Reel's rhythm and look, for the test render of a scene that follows what moves. */
+  look?: SmokeScene["look"];
+  /** Its written animations rendered over her footage, in the Reel as it will come out: what it looks at before delivering. */
+  rendered?: (written: SceneResult[]) => Promise<SceneLooks>;
+};
+
+/** The test render of written scenes: each with its photos, fonts, cuts, composition and what moves under it. */
+function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneRequest, context: SceneContext): SmokeScene[] {
+  return results
+    .filter((r) => r.js)
+    .map((r) => {
+      const request = requestOf(r.id);
+      const photos = photosOf(r, request);
+      return {
+        id: r.id,
+        js: r.js!,
+        durationInFrames: request.durationInFrames,
+        ...(photos.length ? { photos } : {}),
+        ...(r.fonts?.length ? { fonts: r.fonts } : {}),
+        ...(request.cuts ? { cuts: request.cuts } : {}),
+        ...(request.compose ? { shots: request.compose.shots, reelTexts: request.compose.texts, end: request.compose.end } : {}),
+        // A scene that follows what moves is checked where it goes, with the Reel's camera moves.
+        ...(request.track?.length || request.compose?.shots.some((x) => x.track) ? { ...(request.track?.length ? { track: request.track } : {}), look: context.look } : {}),
+      };
+    });
+}
 
 export async function designMotionScenes(
   studioId: string,
   requests: SceneRequest[],
   artDirection: string | undefined,
-  brand: Brand,
+  brand: SceneBrand,
   kit: MotionKit = [],
-  context: { kept?: string[]; done?: string[]; look?: SmokeScene["look"] } = {},
+  context: SceneContext = {},
 ): Promise<SceneResult[]> {
   if (!requests.length) return [];
   const model = await designerModel(studioId);
   const requestOf = (id: string) => requests.find((q) => q.id === id)!;
   // One after the other: each scene knows what the earlier ones of the Reel do (a minute more for a second one).
-  let results: SceneResult[] = [];
+  const results: SceneResult[] = [];
   for (const [i, r] of requests.entries()) {
     const existing: Existing = {
       reel: [
@@ -300,31 +375,30 @@ export async function designMotionScenes(
     }
     results.push({ id: r.id, ...written });
   }
+  return checkScenes(studioId, model, results, requestOf, brand, artDirection, kit, context);
+}
 
-  // Scenes that passed the check but leave a text on a face of the footage they follow: kept as they
-  // are if their fix fails (a scene that works beats none).
+/**
+ * The check of written scenes, then one round of fixes, with the reason, for those that fail it or leave a text
+ * on a face of the footage they follow or too quick to read. Those that passed are kept as they are if their fix
+ * fails (a scene that works beats none); the others have no js (their fixed scene, or none, plays).
+ */
+async function checkScenes(
+  studioId: string,
+  model: string,
+  written: SceneResult[],
+  requestOf: (id: string) => SceneRequest,
+  brand: SceneBrand,
+  artDirection: string | undefined,
+  kit: MotionKit,
+  context: SceneContext,
+): Promise<SceneResult[]> {
+  let results = written;
   const working = new Map<string, SceneResult>();
   for (let round = 0; round < 2; round++) {
-    const checks = await smokeTestScenes(
-      results
-        .filter((r) => r.js)
-        .map((r) => {
-          const request = requestOf(r.id);
-          const photos = photosOf(r, request);
-          return {
-            id: r.id,
-            js: r.js!,
-            durationInFrames: request.durationInFrames,
-            ...(photos.length ? { photos } : {}),
-            ...(r.fonts?.length ? { fonts: r.fonts } : {}),
-            ...(request.cuts ? { cuts: request.cuts } : {}),
-            ...(request.compose ? { shots: request.compose.shots, reelTexts: request.compose.texts, end: request.compose.end } : {}),
-            // A scene that follows what moves is checked where it goes, with the Reel's camera moves.
-            ...(request.track?.length || request.compose?.shots.some((x) => x.track) ? { ...(request.track?.length ? { track: request.track } : {}), look: context.look } : {}),
-          };
-        }),
-      brand,
-    ).catch((e: unknown): SceneChecks => ({ errors: Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])), bands: {}, faces: {} }));
+    const checks = await smokeTestScenes(smokeScenes(results, requestOf, context), brand).catch(
+      (e: unknown): SceneChecks => ({ errors: Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])), faces: {} }),
+    );
     results = results.map((r) => {
       if (!r.js || !checks.errors[r.id]) return r;
       return working.get(r.id) ?? { ...r, js: null, error: checks.errors[r.id]! };
@@ -359,4 +433,61 @@ export async function designMotionScenes(
     });
   }
   return results;
+}
+
+/**
+ * Before they go out, as a motion designer looks at a render (its own step of the montage, after the design): each
+ * animation just written, rendered over her footage in the Reel as it will come out (`context.rendered`), goes back to
+ * the motion designer, who keeps it as it is or rewrites it whole, once (side by side). Written blind, a florist's
+ * WhatsApp chat was squeezed into a strip of the screen, its words overflowing their bubbles. A rewrite goes out only
+ * if it passes the check; else, and when anything fails on the way, the animation stays as it was. Only the reworked
+ * ones are returned.
+ */
+export async function lookAtScenes(
+  studioId: string,
+  requests: SceneRequest[],
+  results: SceneResult[],
+  artDirection: string | undefined,
+  brand: SceneBrand,
+  kit: MotionKit,
+  context: SceneContext & Required<Pick<SceneContext, "rendered">>,
+): Promise<SceneResult[]> {
+  if (!results.some((r) => r.js) || timeLeft() < LOOK_NEEDS_MS) {
+    if (results.length) console.warn("motion look skipped", results.some((r) => r.js) ? `the step has ${Math.round(timeLeft() / 1000)} s left` : "nothing to look at");
+    return [];
+  }
+  const model = await designerModel(studioId);
+  const requestOf = (id: string) => requests.find((q) => q.id === id)!;
+  const looks = await context.rendered(results.filter((r) => r.js)).catch((error: unknown): SceneLooks => {
+    console.warn("motion look: frames not rendered", error);
+    return new Map();
+  });
+  const looked = results.filter((r) => r.js && r.code && looks.get(r.id)?.length);
+  if (!looked.length || timeLeft() < SCENE_CALL_MS + SMOKE_MS) return [];
+  const answers = await Promise.all(
+    looked.map(async (r) => {
+      // The Reel's other animations, as they are now: the reworked one stays in their family.
+      const others = results.filter((o) => o.id !== r.id && o.js).map((o) => (o.name ? `${o.name} : ${o.notes ?? ""}`.trim() : requestOf(o.id).brief));
+      const answer = await writeScene(studioId, model, requestOf(r.id), brand, artDirection, kit, { reel: [...(context.kept ?? []), ...others], done: context.done ?? [] }, undefined, {
+        code: r.code!,
+        frames: looks.get(r.id)!,
+      }).catch((e: unknown) => ({ code: null, js: null, error: String(e) }) as Omit<SceneResult, "id">);
+      return { r, answer };
+    }),
+  );
+  for (const { r, answer } of answers) console.log("motion look", r.id, r.name ?? "", answer.keep ? "kept" : answer.js ? "reworked" : `left as it was (${answer.error ?? "no code"})`, answer.seen?.slice(0, 300) ?? "");
+  // The reworked ones keep the photos and fonts they had when they name none.
+  const reworked = answers.flatMap(({ r, answer }): SceneResult[] =>
+    !answer.keep && answer.js
+      ? [{ ...r, ...answer, id: r.id, photos: answer.photos?.length ? answer.photos : r.photos, fonts: answer.fonts?.length ? answer.fonts : r.fonts, subtitleY: answer.subtitleY ?? r.subtitleY }]
+      : [],
+  );
+  if (!reworked.length) return [];
+  // Checked as a new animation is (a text on a face or too quick to read gets its round of fixes too).
+  const checked = await checkScenes(studioId, model, reworked, requestOf, brand, artDirection, kit, context);
+  return checked.filter((r) => {
+    if (r.js) return true;
+    console.warn("motion look: the rework failed its check, the animation stays as it was", r.id, r.error);
+    return false;
+  });
 }

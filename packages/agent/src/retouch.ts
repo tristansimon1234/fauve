@@ -312,31 +312,6 @@ export function reelSubtitleRow(shots: { length: number; boxes: Box[] }[]): numb
   return best;
 }
 
-/** Where texts may go in a Reel: under the top margin, above the bottom quarter (the apps' buttons and caption). */
-const SCENE_TOP = 80 / 1920;
-const SCENE_BOTTOM = 0.75;
-
-/**
- * How far to move an animation drawn over her footage (share of the height, down when
- * positive) so its texts clear the faces and lettering under it: none when they are clear
- * already, else the smallest move that sets its text band in a free stretch of the safe
- * zone, none when no stretch can hold it. `band`: the rows its texts cover while they
- * hold still; `busy`: the rows of the footage that must stay seen.
- */
-export function sceneShift(band: { top: number; bottom: number }, busy: Pick<Box, "y" | "h">[]): number {
-  const margin = 0.02;
-  const rows = busy.filter((b) => b.h > 0.02).map((b) => ({ top: b.y - margin, bottom: b.y + b.h + margin }));
-  const hits = (top: number, bottom: number) => rows.some((r) => r.top < bottom && r.bottom > top);
-  if (!rows.length || band.bottom <= band.top || !hits(band.top, band.bottom)) return 0;
-  const height = band.bottom - band.top;
-  const tops = [SCENE_TOP, ...rows.map((r) => r.bottom), ...rows.map((r) => r.top - height), SCENE_BOTTOM - height].filter(
-    (top) => top >= SCENE_TOP - 1e-6 && top + height <= SCENE_BOTTOM + 1e-6 && !hits(top, top + height),
-  );
-  if (!tops.length) return 0;
-  const best = tops.sort((a, b) => Math.abs(a - band.top) - Math.abs(b - band.top))[0]!;
-  return Math.round((best - band.top) * 1000) / 1000;
-}
-
 /** The Reel's frame, which the shares of a photo's zones are mapped into. */
 const REEL_FRAME = { width: 1080, height: 1920 } as const;
 

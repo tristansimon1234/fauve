@@ -16,7 +16,6 @@ import {
   type ReelFormat,
   carryRetouch,
   carryTextStyle,
-  clearOfVoice,
   compositionShots,
   compositionTexts,
   isComposed,
@@ -54,6 +53,8 @@ import {
   earlierLooks,
   gestureMoments,
   handMoves,
+  lookMoments,
+  SUBTITLE_ROW,
   type ReelProps,
   type TracksByClip,
   honestLength,
@@ -72,6 +73,7 @@ import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
+import { forLook, saveLook, type PendingLook } from "./motion-look";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
 import { isFirstReel } from "@/lib/onboarding";
@@ -153,6 +155,8 @@ export type DesignedEdit = {
   /** Scenes written by the motion designer for this plan (the costly part), and scenes reused from the library. */
   newScenes: number;
   reusedScenes: number;
+  /** New animations to look at before the render (the montage's look step): what was saved for it. */
+  look?: { path: string };
 };
 
 /** A failed composition is tried once more only with this much left in the design step (its limit is 800 s): a call, its check, the rest of the step. */
@@ -445,27 +449,26 @@ export async function designEdit(params: {
     if (judged && judged.index > 0) plan.texts[hook.index] = { ...hook.text, text: judged.text, emphasis: judged.emphasis };
   }
 
+  // Her voice plays with its first word at once, her words as subtitles; without it, the plan has no voice.
+  // The Reel she copies wins over these defaults: a voice it speaks without subtitles. Her voice leads: the Reel
+  // holds a moment after its last word. The texts the editor kept stay (its prompt keeps them few): the engine no
+  // longer takes them away, and places them off the subtitles' row.
+  if (voice && voiceId && spoken) {
+    plan.voice = { media_id: voiceId, at: voiceStart };
+    plan.subtitles = !followed || followed.look.voice === "aucune" || followed.look.text.subtitles;
+    Object.assign(plan, holdAfterVoice(plan, spoken.ends_at, durations));
+  } else delete plan.voice;
+
   // The finishing touches of a professional editor, from what Gemini read: each clip's
   // light, colour and tilt corrected when it needs it, the vertical crop framed on its
   // subject, a slow move on shots filmed still, her footage under every animation, texts
-  // kept off faces and off the lettering in a picture.
+  // kept off faces, off the lettering in a picture and off the subtitles.
   const facts: MediaFacts = {
     clips: Object.fromEntries(clips.map((c) => [c.media_id, c.analysis])),
     photos: Object.fromEntries(photoIds.flatMap((id, i) => (photoReads[i] ? [[id, photoReads[i]!]] : []))),
     tracks,
   };
   Object.assign(plan, finishPlan(plan, facts, durations));
-
-  // Her voice plays with its first word at once, her words as subtitles; without it, the plan has no voice.
-  // The Reel she copies wins over these defaults: a voice it speaks without subtitles, several texts it sets over its voice.
-  if (voice && voiceId && spoken) {
-    plan.voice = { media_id: voiceId, at: voiceStart };
-    plan.subtitles = !followed || followed.look.voice === "aucune" || followed.look.text.subtitles;
-    // Her voice leads: the Reel holds a moment after its last word, and the other texts keep to
-    // its silences (its words are the subtitles; the hook stays over its first phrase).
-    Object.assign(plan, holdAfterVoice(plan, spoken.ends_at, durations));
-    if (followed?.look.text.amount !== "plusieurs") plan.texts = clearOfVoice(plan.texts, spoken.phrases);
-  } else delete plan.voice;
 
   // The animations of the version corrected: a scene kept by its id keeps the photos it composes with.
   const previousMotions = previousPlan.success
@@ -547,6 +550,9 @@ export async function designEdit(params: {
       ];
     }),
   });
+  // Her voice's subtitles show all along it (an animation over several shots meets the subtitles of who speaks in them):
+  // an animation's words keep off their row.
+  const subtitles = plan.subtitles ? { y: plan.subtitle_y ?? SUBTITLE_ROW.y, h: SUBTITLE_ROW.h } : null;
   const requests: SceneRequest[] = toWrite.map((w) => {
     const photos = offersFor(w.brief);
     const layer = w.id.startsWith("l") ? layers[Number(w.id.slice(1))]! : null;
@@ -580,6 +586,7 @@ export async function designEdit(params: {
       ...(photos.length ? { photos } : {}),
       ...(track.length ? { track } : {}),
       ...(Array.isArray(moves) ? (moves.length ? { moves: { par_plan: moves } } : {}) : moves ? { moves } : {}),
+      ...(subtitles && !compose && (plan.voice || layer) ? { subtitles } : {}),
     };
   });
   // A correction: each animation rewritten first looks at how its earlier version came out on her images.
@@ -767,10 +774,37 @@ export async function designEdit(params: {
   const row = await insertPlanVersion(params.studioId, params.postId, plan);
   const version = row.version;
   await db.from("posts").update({ edit_plan_id: row.id }).eq("id", params.postId);
+
+  // Before they go out, the motion designer looks at its new animations rendered over her footage (the montage's
+  // next step, with its own time): what it was given for each, and when each one is looked at. A layer is found by
+  // its brief in the plan (one that failed before it was left out).
+  let look: DesignedEdit["look"];
+  if (fresh.length) {
+    const ids = fresh.map((d) => d.id);
+    const briefOf = (id: string) => requests.find((r) => r.id === id)?.brief;
+    const placed = (id: string) => (id.startsWith("l") ? `l${(plan.layers ?? []).findIndex((l) => l.motion.brief === briefOf(id))}` : id);
+    const moments = lookMoments(plan, ids.map(placed), gestureMoments(plan, actions));
+    const pending: PendingLook = {
+      ids,
+      moments: Object.fromEntries(ids.flatMap((id) => (moments.get(placed(id))?.length ? [[id, moments.get(placed(id))!]] : []))),
+      requests: requests.filter((r) => ids.includes(r.id)).map(forLook),
+      written: Object.fromEntries(fresh.map((d) => [d.id, { name: d.name, slots: d.slots, notes: d.notes }])),
+      direction,
+      brand: sceneBrand,
+      kit,
+      context: sceneContext,
+    };
+    const path = await saveLook(params.studioId, row.id, pending).catch((error: unknown) => {
+      console.warn("motion look: not saved, the animations go as they are", params.postId, error);
+      return null;
+    });
+    if (path) look = { path };
+  }
   return {
     editPlanId: row.id,
     version,
     plan,
+    ...(look ? { look } : {}),
     // Said as it is when the composition she asked for could not be made: never a split screen announced over full-frame shots.
     // The editor's own words describe the composition it asked for: never sent over a Reel that does not have it.
     rationale: compositionKept

@@ -668,6 +668,25 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
 }
 
 /**
+ * The Reel's props for drawing a few of its frames (the motion designer's look at its animations): the shots no frame
+ * shows, a second around it aside, keep their place but not their media, so nothing is fetched for them; a composition
+ * shown at one of the frames keeps every shot (it may lay them all at once).
+ */
+export function propsAt(props: ReelProps, frames: number[]): ReelProps {
+  const near = (from: number, length: number) => frames.some((f) => f >= from - REEL_FPS && f < from + length + REEL_FPS);
+  if (props.layers?.some((l) => l.compose && near(l.from, l.durationInFrames))) return props;
+  return {
+    ...props,
+    segments: props.segments.map((s): ReelSegment => {
+      if (near(s.startAt, s.durationInFrames)) return s;
+      if (s.type === "clip" || s.type === "image") return { ...s, src: "" };
+      const { under: _under, ...rest } = s;
+      return rest;
+    }),
+  };
+}
+
+/**
  * Colours and fonts a Reel uses: the plan's (its own, over her charter: the Reel she copies, a
  * request that needs them), then the studio's, then the template's.
  */

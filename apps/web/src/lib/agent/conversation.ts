@@ -154,7 +154,8 @@ export async function replyInConversation(params: {
     const skip = new Set((separate ?? []).map((c) => c.id as string));
     kept = kept.filter((r) => !skip.has(r.conversation_id as string)).slice(0, HISTORY_READ);
   }
-  const stored = stableWindow(kept.reverse(), HISTORY_LIMIT, HISTORY_STEP).map((r) => ({
+  // A copy: `kept` stays newest first (her latest message, the words this turn answers).
+  const stored = stableWindow([...kept].reverse(), HISTORY_LIMIT, HISTORY_STEP).map((r) => ({
     ...(r as StoredMessage & { wa_message_id: string | null }),
     reply_to: (r.payload as { reply_to?: string } | null)?.reply_to ?? null,
     notes: (r.payload as { notes?: string[] } | null)?.notes,
@@ -181,6 +182,8 @@ export async function replyInConversation(params: {
     reactToRowId: params.reactToRowId,
     // In the app, what she starts here is delivered here (WhatsApp delivers on WhatsApp).
     conversationId: params.waId ? undefined : conversation?.id,
+    // Her words this turn answers, as she wrote them: a correction carries them to the editor.
+    asked: herLatestWords(kept),
     timezone: studio.data.timezone,
     reactions: [],
     extras: {},
@@ -227,6 +230,16 @@ export async function replyInConversation(params: {
       ]).then(([access, presence]) => [...(access ? [access] : []), ...presence]),
     },
   });
+}
+
+/** Her messages since Simone last answered (newest first in `rows`), oldest first, as she wrote them (a voice note's words). */
+function herLatestWords(rows: { direction: string; body: string | null }[]): string | undefined {
+  const words: string[] = [];
+  for (const row of rows) {
+    if (row.direction !== "inbound") break;
+    if (row.body?.trim()) words.unshift(row.body.trim());
+  }
+  return words.join("\n") || undefined;
 }
 
 /**
