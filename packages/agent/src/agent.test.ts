@@ -3004,6 +3004,36 @@ test("free animations: her photos, and an animation over several shots", async (
   assert.equal(buildReelProps(unwritten, { template: "doux", ...inputs }).layers, undefined);
 });
 
+test("a correction that redraws nothing keeps the composition's code, whatever brief the editor wrote", async () => {
+  const { keepComposition } = await import("./editor.ts");
+  const { reelContractSchema, contractLines, EMPTY_CONTRACT } = await import("./contract.ts");
+  const code = "function Scene(){return null}";
+  const previous = editPlanSchema.parse({
+    ...validPlan,
+    duration: 12,
+    template: "libre",
+    texts: [],
+    images: [],
+    segments: [{ clip_id: "a", in: 0, out: 12, zoom: "none" }],
+    layers: [{ compose: true, motion: { brief: "écran partagé, l'interface en haut", js: code, draws_texts: true, subtitle_y: 0.8 }, from: 0, to: 12 }],
+  });
+  // The editor wrote the composition's brief again in its own words: its code stays, on the new span.
+  const rewritten = editPlanSchema.parse({ ...previous, duration: 10, layers: [{ compose: true, motion: { brief: "écran partagé avec l'interface au-dessus" }, from: 0, to: 10 }] });
+  const kept = keepComposition(rewritten, previous);
+  assert.equal(kept.layers?.[0]?.motion.js, code);
+  assert.equal(kept.layers?.[0]?.motion.draws_texts, true);
+  assert.equal(kept.layers?.[0]?.to, 10);
+  // Left out of the new plan, it comes back over the whole Reel.
+  const dropped = keepComposition(editPlanSchema.parse({ ...rewritten, layers: undefined }), previous);
+  assert.deepEqual(dropped.layers?.map((l) => [l.from, l.to, l.motion.js]), [[0, 10, code]]);
+  // Nothing to keep without an earlier composition.
+  assert.equal(keepComposition(rewritten, editPlanSchema.parse({ ...previous, layers: undefined })), rewritten);
+  // A job read before the field existed redraws, as before; the editor is told when it does not.
+  const { redraw: _ignored, ...older } = EMPTY_CONTRACT;
+  assert.equal(reelContractSchema.parse(older).redraw, true);
+  assert.match(contractLines({ ...EMPTY_CONTRACT, voice_pace: "rapide", redraw: false }).join("\n"), /restent telles quelles/);
+});
+
 test("free animations: a correction keeps the ones written, and a cut-out cut by its frame still serves", async () => {
   const { keepWrittenAnimations, normalizeEditPlan } = await import("./editor.ts");
   const { sceneWorthy, cutEdges } = await import("./cutout.ts");

@@ -237,6 +237,20 @@ export function keepWrittenAnimations(plan: EditPlan, previous: EditPlan | null)
 }
 
 /**
+ * A correction that leaves the composition as it is (her request redraws nothing: `redraw` false in its
+ * contract) keeps the composition's code, whatever brief the editor wrote back for it: it lays the new shots
+ * and draws the new texts it is given when the Reel renders, so it is never written again (each rewrite
+ * cost about $0.45; Tristan: « pourquoi la correction refait tout, c'est une hérésie »). Left out of the new
+ * plan, it comes back over the whole Reel.
+ */
+export function keepComposition(plan: EditPlan, previous: EditPlan | null): EditPlan {
+  const earlier = previous?.layers?.find((l) => l.compose && l.motion.js);
+  if (!earlier) return plan;
+  if (!plan.layers?.some((l) => l.compose)) return { ...plan, layers: [{ ...earlier, from: 0, to: plan.duration }, ...(plan.layers ?? [])] };
+  return { ...plan, layers: plan.layers.map((l) => (l.compose ? { ...l, motion: { ...earlier.motion } } : l)) };
+}
+
+/**
  * In a correction, how many animations of the version corrected the new plan no longer keeps
  * as they were (their brief rewritten, or left out; a collage's composition aside): each one
  * rewritten takes the place of one of them, on top of the budget of new animations. Without
