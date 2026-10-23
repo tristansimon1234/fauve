@@ -13,6 +13,7 @@ import {
   isBaked,
   openingCandidates,
   OWN_TEXT_PROMPT,
+  ownTextKey,
   ownTextSchema,
   SIMONE_VOICES,
   VOICE_SPEED,
@@ -152,14 +153,20 @@ export async function writeVoiceScript(
   { wish, mediaIds, brief, whispered = false, decide = false, contract }: ScriptOptions = {},
 ): Promise<VoiceOverScript & Partial<Pick<VoiceOverDecision, "format" | "why">>> {
   const fixed = contractLines(contract);
+  const read = await scriptInput(studioId, postId, mediaIds, brief);
+  // The length she asked for decides how much the voice says, so that it reaches the end of her Reel.
+  if (contract?.duration) {
+    const asked = voiceWordsFor(0, contract.duration);
+    read.longueur = { mots_min: asked.min, mots_max: asked.max };
+  }
   const input = {
-    ...(await scriptInput(studioId, postId, mediaIds, brief)),
+    ...read,
     ...(wish ? { consigne_voix: wish } : {}),
     ...(whispered ? { voix: "chuchotée (ASMR)" } : {}),
     ...(fixed.length ? { contrat: fixed } : {}),
   };
   // She wrote the words herself: read as written (or improved for the ear when she asked), never rewritten into another voice.
-  if (contract?.voice_text) return ownTextScript(studioId, contract, fixed, input.longueur);
+  if (contract?.voice_text) return ownTextScript(studioId, contract, fixed, input);
   let draft: VoiceOverDraft & Partial<Pick<VoiceOverDecision, "format" | "why">>;
   for (let attempt = 0; ; attempt++) {
     const response = await anthropic().beta.messages.parse({
@@ -200,15 +207,36 @@ export async function writeVoiceScript(
 }
 
 /** Her own text, prepared for the voice: corrected only (verbatim), or improved for the ear keeping her meaning and her person (polish). */
-async function ownTextScript(studioId: string, contract: ReelContract, fixed: string[], longueur: { mots_min: number; mots_max: number }): Promise<VoiceOverScript> {
+async function ownTextScript(
+  studioId: string,
+  contract: ReelContract,
+  fixed: string[],
+  input: Pick<Awaited<ReturnType<typeof scriptInput>>, "longueur" | "commerce" | "publication">,
+): Promise<VoiceOverScript> {
   let script = verbatimScript(contract.voice_text ?? "");
+  // She wrote only its start and described the rest: Simone writes the rest, the whole voice as long as her Reel.
+  const rest = contract.voice_text_rest?.trim();
   try {
     const response = await anthropic().beta.messages.parse({
       model: CHAT_MODEL,
       max_tokens: 2000,
-      output_config: { effort: "low", format: outputFormat(ownTextSchema) },
+      output_config: { effort: rest ? "medium" : "low", format: outputFormat(ownTextSchema) },
       system: OWN_TEXT_PROMPT,
-      messages: [{ role: "user", content: JSON.stringify({ mode: contract.voice_text_mode, texte: contract.voice_text, contrat: fixed, ...(contract.voice_text_mode === "polish" ? { longueur } : {}) }) }],
+      messages: [
+        {
+          role: "user",
+          content: JSON.stringify({
+            mode: contract.voice_text_mode,
+            texte: contract.voice_text,
+            ...(rest ? { suite: rest } : {}),
+            // Her whole request, always: the writer reads what she asked, not only the words she quoted.
+            demande: input.publication.demande ?? input.publication.idee,
+            commerce: input.commerce,
+            contrat: fixed,
+            ...(rest || contract.voice_text_mode === "polish" ? { longueur: input.longueur } : {}),
+          }),
+        },
+      ],
     });
     await logClaudeCost(studioId, response.usage, "voice_script", CHAT_MODEL);
     const written = response.parsed_output?.script?.trim();
@@ -366,7 +394,7 @@ export async function voiceOverIfWanted(params: {
   // Left to Simone, the Reel she copies decides (told by a voice, or not): its reading is waited for, as the editor does.
   const copied = voiceLeftToSimone(choices) ? await postStyle(params.studioId, params.postId, { waitMs: STEAL_WAIT_MS }).catch(() => undefined) : undefined;
   // Her own text for the voice asks for it (a correction too), unless it is already the one on the Reel, at her pace.
-  const ownText = params.contract?.voice_text ? verbatimScript(params.contract.voice_text) : null;
+  const ownText = params.contract?.voice_text ? ownTextKey(params.contract) : null;
   const pace = VOICE_SPEED[params.contract?.voice_pace ?? "normale"];
   const ownTextOnReel = ownText && current && (current as { ai?: { own_text?: string; speed?: number } }).ai?.own_text === ownText && ((current as { ai?: { speed?: number } }).ai?.speed ?? 1) === pace;
   if (ownTextOnReel) return null;
@@ -490,7 +518,7 @@ export async function makeVoiceOver(params: {
         model: voice.model,
         lufs: leveled.lufs,
         // Her own text and pace, so that the next correction keeps this voice when they have not changed.
-        ...(params.contract?.voice_text ? { own_text: verbatimScript(params.contract.voice_text) } : {}),
+        ...(params.contract?.voice_text ? { own_text: ownTextKey(params.contract) } : {}),
         ...(speed !== 1 ? { speed } : {}),
       },
       consent_ok: true,
