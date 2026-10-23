@@ -60,6 +60,10 @@ export type ReviewData = {
   version: number;
   /** The version before, when its video exists: « Revenir à l'ancienne ». */
   previous: number | null;
+  /** A newer version with its video, after going back: « Reprendre la nouvelle ». */
+  next: number | null;
+  /** The versions that have their video, oldest first (« Version 2 sur 3 »). */
+  versions: number[];
   scheduledAt: string | null;
   when: PublishWhen | null;
   /** The date is still ahead (else it goes out as soon as she says yes). */
@@ -155,8 +159,10 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
       ? { kind: "render" as const, step: null }
       : null;
 
-  // The version before this one that has its video.
-  const previous = list.find((p) => (p.version as number) < (current.version as number) && done(p.id as string));
+  // The versions that have their video: the one before this one, and the one after when she went back.
+  const versions = list.filter((p) => p.id === current.id || done(p.id as string)).map((p) => p.version as number).sort((a, b) => a - b);
+  const previous = versions.filter((v) => v < (current.version as number)).at(-1);
+  const next = versions.find((v) => v > (current.version as number));
   const music = readPostMusic(post.music);
   const handle = ((await admin.from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").maybeSingle()).data?.handle as string | null) ?? null;
 
@@ -175,7 +181,9 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     baked: isBaked(plan.data),
     words: effectWords(plan.data),
     version: current.version as number,
-    previous: previous ? (previous.version as number) : null,
+    previous: previous ?? null,
+    next: next ?? null,
+    versions,
     scheduledAt: post.scheduled_at,
     when: post.scheduled_at ? publishWhen(post.scheduled_at, timezone) : null,
     upcoming: post.scheduled_at !== null && new Date(post.scheduled_at).getTime() > Date.now() + 60_000,
