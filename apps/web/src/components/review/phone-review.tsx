@@ -7,7 +7,7 @@ import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
 import { ArrowDownIcon, ArrowLeftIcon, CaptionIcon, CheckIcon, PenIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
-import { useReelPlayback } from "@/components/review/reel-player";
+import { PausedSign, useReelPlayback } from "@/components/review/reel-player";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
 
@@ -19,8 +19,11 @@ import type { ReviewData } from "@/lib/review";
 export function PhoneReview({ data }: { data: ReviewData }) {
   const router = useRouter();
   const video = useRef<HTMLVideoElement>(null);
-  // Its sound (a touch, as on Instagram), and silent once its page is hidden.
-  const { sound, toggleSound } = useReelPlayback(video, data.videoUrl);
+  // It plays silently behind her buttons; a touch plays it from the start with its sound and
+  // clears the screen, the next one pauses it and brings them back (Tristan: « quand je clique
+  // sur play les actions disparaissent, pause elles réapparaissent »). Silent once its page is hidden.
+  const { playing, sound, toggle, toggleSound, seek } = useReelPlayback(video, data.videoUrl);
+  const [watching, setWatching] = useState(false);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -74,6 +77,17 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   const publishLabel = !data.instagram ? "C’est bon pour moi" : data.publishByHand ? "Me l’envoyer sur WhatsApp" : `Publier sur ${where}`;
   const change = whatsappLink(`Pour « ${data.title} » : `);
   const ready = Boolean(data.videoUrl) && !data.making && !data.failed;
+  const tap = () => {
+    if (!ready) return;
+    if (watching) return toggle();
+    setWatching(true);
+    seek(0);
+    if (!sound) toggleSound();
+    else if (!playing) toggle();
+  };
+  // Only while she watches it: the Reel alone, as it will go out.
+  const quiet = ready && watching && playing;
+  const fade = `transition-opacity duration-300 ${quiet ? "pointer-events-none opacity-0" : "opacity-100"}`;
 
   return (
     <main className="relative mx-auto flex h-dvh sm:max-w-[calc(100dvh*9/16)] flex-col overflow-hidden bg-black text-white">
@@ -88,11 +102,12 @@ export function PhoneReview({ data }: { data: ReviewData }) {
           loop
           playsInline
           preload="auto"
-          onClick={toggleSound}
+          onClick={tap}
           className="absolute inset-0 size-full object-cover"
           aria-label={`Ton Reel « ${data.title} »`}
         />
       )}
+      {ready && <PausedSign playing={watching && playing} />}
       {data.failed ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/80 px-8 text-center">
           <span className="flex size-20 items-center justify-center rounded-full bg-white">
@@ -110,7 +125,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       )}
 
       {/* Top: back to WhatsApp, the sound. */}
-      <div className="relative z-10 flex items-center justify-between gap-3 bg-gradient-to-b from-black/55 to-transparent px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-8">
+      <div className={`relative z-10 flex items-center justify-between gap-3 ${fade} bg-gradient-to-b from-black/55 to-transparent px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-8`}>
         <a href={whatsappLink("")} aria-label="Retourner sur WhatsApp" className="flex size-11 items-center justify-center rounded-full bg-black/35 backdrop-blur-sm">
           <ArrowLeftIcon size={20} />
         </a>
@@ -132,7 +147,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       </div>
 
       {/* Bottom: the caption as the feed shows it, then what she does. */}
-      <div className="relative z-10 mt-auto flex flex-col gap-3 bg-gradient-to-t from-black/85 via-black/60 to-transparent px-4 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <div className={`relative z-10 mt-auto flex flex-col gap-3 ${fade} bg-gradient-to-t from-black/85 via-black/60 to-transparent px-4 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))]`}>
         {data.captionShown && (
           <button type="button" onClick={() => setOpen(!open)} className="text-left text-[14px] leading-snug drop-shadow">
             {data.handle && <strong className="font-extrabold">{data.handle} </strong>}
