@@ -1,12 +1,13 @@
 import "server-only";
+import { brandProfileSchema } from "@fauve/agent";
 import { coverSrc } from "@/lib/cover-src";
 import { postCovers, type CoverPost } from "@/lib/covers";
 import { mediaViews, profile, recentMedia, type InstagramProfile } from "@/lib/social/instagram";
 import { instagramAccount } from "@/lib/social/publish";
 import { recentTikToks, tiktokEnabled, tiktokUser, type TikTokUser } from "@/lib/social/tiktok";
 import { tiktokAccount } from "@/lib/social/tiktok-account";
-import type { Db } from "@/lib/studio";
-import type { Tile } from "@/app/(app)/grille/grid-view";
+import { signMediaUrls, type Db } from "@/lib/studio";
+import type { ProfileIdentity, Tile } from "@/app/(app)/grille/grid-view";
 
 // The studio's Instagram grid as followers see it, with Fauve's coming posts
 // placed where they will land (top of the grid), to plan the feed at a glance.
@@ -111,4 +112,23 @@ export async function loadTikTokGrid(db: Db, studioId: string) {
     ...videos.map((video): Tile => ({ kind: "tiktok", video })),
   ];
   return { connected: Boolean(account), handle: user?.username ?? account?.handle ?? null, user, tiles };
+}
+
+/**
+ * Who the profile is before Instagram or TikTok answers (or when neither is linked):
+ * her business's name, its activity, its site and its logo, as her profile shows them.
+ */
+export async function profileIdentity(db: Db, studioId: string): Promise<ProfileIdentity> {
+  const [studio, brand] = await Promise.all([
+    db.from("studios").select("name, business_type, website_url").eq("id", studioId).maybeSingle(),
+    db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
+  ]);
+  const style = brandProfileSchema.pick({ logo_url: true, logo_path: true }).catch({}).parse(brand.data?.[0]?.profile ?? {});
+  const signed = style.logo_path ? await signMediaUrls(db, studioId, [style.logo_path]) : new Map<string, string>();
+  return {
+    name: (studio.data?.name as string | null) ?? null,
+    category: (studio.data?.business_type as string | null) ?? null,
+    website: /^https?:\/\//.test(studio.data?.website_url ?? "") ? (studio.data?.website_url as string) : null,
+    logo: (style.logo_path && signed.get(style.logo_path)) || style.logo_url || null,
+  };
 }

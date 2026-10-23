@@ -1,6 +1,6 @@
 import { PageSuspense } from "@/components/page-suspense";
 import { NoStudio } from "@/components/empty-state";
-import { loadGrid, loadTikTokGrid } from "@/lib/grid";
+import { loadGrid, loadTikTokGrid, profileIdentity } from "@/lib/grid";
 import { getStudioContext } from "@/lib/studio";
 import { CreatePostButton } from "./create-post-button";
 import { GridView } from "./grid-view";
@@ -20,14 +20,14 @@ export default function GridPage() {
 async function Grid() {
   const { db, member } = await getStudioContext();
   if (!member) return <NoStudio />;
-  const [grid, tiktok] = await Promise.all([loadGrid(db, member.studio.id), loadTikTokGrid(db, member.studio.id)]);
+  const [grid, tiktok, identity] = await Promise.all([loadGrid(db, member.studio.id), loadTikTokGrid(db, member.studio.id), profileIdentity(db, member.studio.id)]);
   return (
     <>
-      <div className="mx-auto flex w-full max-w-[520px] flex-wrap items-center justify-between gap-3">
+      <div className="mx-auto flex w-full max-w-[430px] flex-wrap items-center justify-between gap-3">
         <h1 className="text-[30px] font-extrabold tracking-[-0.02em]">Grille</h1>
         <CreatePostButton timezone={member.studio.timezone} />
       </div>
-      <GridView heading={false} connected={grid.connected} handle={grid.handle} info={grid.info} tiles={grid.tiles} timezone={member.studio.timezone} tiktok={tiktok} />
+      <GridView identity={identity} connected={grid.connected} handle={grid.handle} info={grid.info} tiles={grid.tiles} timezone={member.studio.timezone} tiktok={tiktok} />
     </>
   );
 }
