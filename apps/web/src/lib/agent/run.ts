@@ -22,6 +22,8 @@ import {
   type ToolName,
   type ReactionMood,
   endsTurn,
+  keptPlan,
+  proposalSchema,
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -170,7 +172,18 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   // A step that closes her message with its own words (buttons, a reaction) ends the turn: its
   // tools run, and the model is not asked again, which made it write the same answer twice.
   // Buttons or a reaction alone go back to the model: the answer they belong to is still to come.
-  const closes = (message: Anthropic.Beta.BetaMessage) => endsTurn(toolsOf(message), textOf(message).length > 0);
+  // A plan given to reply_with is her message too (it is written under Simone's words); one too
+  // short to keep is refused by the tool, and the model is asked again even after a sentence.
+  const planIn = (message: Anthropic.Beta.BetaMessage): "none" | "kept" | "refused" => {
+    const call = message.content.find((b) => b.type === "tool_use" && b.name === "reply_with");
+    const plan = call?.type === "tool_use" ? (call.input as { plan?: unknown } | null)?.plan : undefined;
+    if (!plan) return "none";
+    return keptPlan(proposalSchema.safeParse(plan).data) ? "kept" : "refused";
+  };
+  const closes = (message: Anthropic.Beta.BetaMessage) => {
+    const plan = planIn(message);
+    return plan !== "refused" && endsTurn(toolsOf(message), textOf(message).length > 0 || plan === "kept");
+  };
   // A step that stops without a word after tools (« Je regarde tes vidéos… », then nothing) is
   // asked once more: she answers from what the tools returned instead of leaving a promise.
   let usedTools = false;
@@ -220,7 +233,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   if (!last || last.stop_reason === "refusal") {
     return { reply: FALLBACK_REPLY, reactions: input.reactions, extras: {}, notes: input.notes, usage, afterReply: input.afterReply };
   }
-  const reply = spoken.join("\n\n");
+  const reply = [...spoken, input.plan ?? ""].filter(Boolean).join("\n\n");
   // Never silent: a turn that only reacted keeps its reaction; one that did nothing at all says so.
   const silent = !reply && !input.reactions.length;
   return {

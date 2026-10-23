@@ -249,6 +249,18 @@ export function keptPlan(p: Proposal | null | undefined): PostPlan | null {
   return { title: tidy(p.title, 60) || "Ta publication", points, why: tidy(p.why, 280) };
 }
 
+/** The buttons under a plan in the chat (20 characters at most: a WhatsApp button). */
+export const PLAN_BUTTONS = ["C'est parti", "Changer le plan"] as const;
+
+/**
+ * Her plan in the chat, written by the code from what Simone gave reply_with: a title, its
+ * points, why. Written in her prose, it was sometimes announced and never written
+ * (« Voilà le plan : dis-moi si je lance », and nothing above).
+ */
+export function planMessage(plan: PostPlan): string {
+  return [plan.title, plan.points.map((point) => `• ${point}`).join("\n"), plan.why].filter(Boolean).join("\n\n");
+}
+
 /** The validated plan, as the montage (or Simone in the chat) reads it. */
 export function validatedPlanBrief(plan: PostPlan): string {
   return [`Le plan que la gérante a validé (« ${plan.title} ») :`, ...plan.points.map((point) => `- ${point}`), plan.why ? `Pourquoi : ${plan.why}` : ""].filter(Boolean).join("\n");

@@ -43,6 +43,9 @@ import {
   effectBlurBrief,
   effectWords,
   type ToolName,
+  keptPlan,
+  planMessage,
+  PLAN_BUTTONS,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -94,6 +97,8 @@ export type ToolContext = {
   afterReply: (() => Promise<void>)[];
   /** Filled by reply_with: buttons and cards the caller shows under the reply. */
   extras: ReplyExtras;
+  /** Filled by reply_with: her plan before a new publication, written under Simone's words. */
+  plan?: string;
   /**
    * Ids made during this turn (quote, post), stored with the reply and shown to the
    * model on the next turns: the history keeps only text, not tool results.
@@ -1260,7 +1265,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return "ok";
     },
 
-    async reply_with({ options, posts, grid, upload, pick_media, step_card }) {
+    async reply_with({ options, posts, grid, upload, pick_media, step_card, plan }) {
+      const kept = plan ? keptPlan(plan) : null;
+      if (plan && !kept) return "Plan trop court : un titre, 4 à 6 points « Rubrique : ce qu'on fait », et pourquoi. Rappelle reply_with avec le plan entier.";
       let own: string[] = [];
       if (posts?.length) {
         const { data } = await db.from("posts").select("id").eq("studio_id", studioId).in("id", posts);
@@ -1271,7 +1278,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // In the app, a step with its own card (site, style, rhythm) is answered on the card:
       // never answer buttons beside it, which would show the same choice twice.
       let card = ctx.waId ? undefined : step_card;
-      let answers = options;
+      let answers = options ?? (kept ? [...PLAN_BUTTONS] : undefined);
       if (!ctx.waId && (answers?.length || card)) {
         const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
         const step = onboardingStepOf(studio?.onboarding_step);
@@ -1282,11 +1289,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       ctx.extras.step_card = card;
       ctx.extras.options = answers;
+      ctx.plan = kept ? planMessage(kept) : undefined;
       ctx.extras.posts = own.length ? own : undefined;
       ctx.extras.grid = grid || undefined;
       // The drop zone is the app's; on WhatsApp, files asked for become her upload link under the message (full quality).
       ctx.extras.upload = ctx.waId ? (upload ?? pick_media) : upload;
       ctx.extras.pick_media = ctx.waId ? undefined : pick_media;
+      if (kept) return "ok : ton plan est écrit sous ta phrase, avec ses boutons ; ne le réécris pas.";
       const shown = ctx.waId && (upload ?? pick_media) ? "ok : son lien de dépôt (pleine qualité) est ajouté sous ton message ; n'écris aucun lien." : "ok : affiché sous ton message.";
       // Called before a word was written, the model was asked again and wrote « Voilà, j'attends ton choix. »
       // as if its question had been sent: only what it writes reaches her, never its thoughts.
