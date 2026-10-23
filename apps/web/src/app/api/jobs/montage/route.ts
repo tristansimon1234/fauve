@@ -27,6 +27,7 @@ import {
 import { reviewMontage } from "@/lib/agent/critic";
 import { readContract } from "@/lib/agent/contract";
 import { designEdit } from "@/lib/agent/editor";
+import { lookAtAnimations } from "@/lib/agent/motion-look";
 import {
   collectEffects,
   effectRoute,
@@ -52,7 +53,9 @@ import { withStepDeadline } from "@/lib/step-clock";
 import { withCostScope } from "@/lib/cost-scope";
 
 // Montage pipeline, one step per invocation (each with its own time budget).
-// Rapide (and older quotes): design → render, delivered at once.
+// Rapide (and older quotes): design → look → render, delivered at once.
+// After any design that wrote new animations, the motion designer looks at them
+// rendered over her footage and reworks the ones below the bar (look).
 // Soigné and Max, a fixed chain of specialists: the editor (Opus) writes the
 // plan and the motion designer the free scenes (design; Max adds a second take,
 // alternative) → each version is rendered (render) → the critic watches key
@@ -82,7 +85,7 @@ const versionSchema = z.object({
 type Version = z.infer<typeof versionSchema>;
 
 const bodySchema = z.object({
-  step: z.enum(["design", "effects", "effects_wait", "alternative", "variant", "render", "review", "fix"]),
+  step: z.enum(["design", "look", "effects", "effects_wait", "alternative", "variant", "render", "review", "fix"]),
   studioId: z.uuid(),
   postId: z.uuid(),
   mediaIds: z.array(z.uuid()).max(MAX_MONTAGE_FILES).optional(),
@@ -132,6 +135,8 @@ const bodySchema = z.object({
   contract: reelContractSchema.optional(),
   /** Who makes this Reel, decided once at its design: the effects agent or the chain. */
   route: z.enum(["agent", "chain"]).optional(),
+  /** The motion designer's look at the animations a design just wrote (its version, what was saved for it), then the step that follows. */
+  look: z.object({ planId: z.uuid(), path: z.string().max(300), then: z.enum(["render", "alternative"]) }).optional(),
   /** The agent's session at work: its id, the files it was given, its voice, when it started, her files by the names it knows them. */
   effect: z
     .object({
@@ -219,6 +224,12 @@ async function runStep(job: Job) {
   const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify, conversationId: job.conversationId };
   const level = job.effort ? EFFORTS[job.effort] : null;
 
+  // Between a design and its render, whatever the level of care: the motion designer looks at its new animations.
+  if (job.step === "look") {
+    await look(job);
+    return;
+  }
+
   // A Reel whose effect holds to what moves in her video: the effects agent makes it, whatever the level of care.
   if (job.step === "effects" || job.step === "effects_wait") {
     try {
@@ -275,7 +286,17 @@ async function runStep(job: Job) {
       await setQuoteStage(job.quoteId, "design");
       if (await voiceFirst(job)) return;
       const edit = await designEdit({ ...designInput(job), effort: level?.editorEffort });
-      await queueJob("montage", { ...target, step: "render", rationale: edit.rationale, quoteId: job.quoteId, newScenes: edit.newScenes, effort: job.effort, voice: job.voice, spokenKept: job.spokenKept });
+      await queueJob("montage", {
+        ...target,
+        step: edit.look ? "look" : "render",
+        rationale: edit.rationale,
+        quoteId: job.quoteId,
+        newScenes: edit.newScenes,
+        effort: job.effort,
+        voice: job.voice,
+        spokenKept: job.spokenKept,
+        ...(edit.look ? { look: { planId: edit.editPlanId, path: edit.look.path, then: "render" } } : {}),
+      });
     } catch (error) {
       console.error("montage design failed", job.postId, error);
       await reopenQuote(job.quoteId);
@@ -537,7 +558,26 @@ async function design(job: Job) {
   const edit = await designEdit({ ...designInput(job), effort: EFFORTS[job.effort!].editorEffort });
   const versions: Version[] = [{ planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) }];
   const two = effortVersions(job.effort!, Boolean(job.correction)) > 1;
-  await next(job, { step: two ? "alternative" : "render", versions, newScenes: edit.newScenes, round: 0, fixes: 0 });
+  const then = two ? "alternative" : "render";
+  await next(job, { step: edit.look ? "look" : then, versions, newScenes: edit.newScenes, round: 0, fixes: 0, look: edit.look ? { planId: edit.editPlanId, path: edit.look.path, then } : undefined });
+}
+
+/**
+ * The motion designer looks at the animations a design just wrote, rendered over her footage in the Reel as it will
+ * come out, and reworks the ones below the bar (lib/agent/motion-look.ts); the montage goes on whatever happens.
+ */
+async function look(job: Job) {
+  await setQuoteStage(job.quoteId, "design");
+  const pending = job.look;
+  if (pending) {
+    try {
+      const reworked = await lookAtAnimations(job.studioId, job.postId, pending.planId, pending.path);
+      console.log("montage: look", job.postId, `${reworked} animation(s) reworked`);
+    } catch (error) {
+      console.warn("montage: look failed, the animations go as they are", job.postId, error);
+    }
+  }
+  await next(job, { step: pending?.then ?? "render", look: undefined });
 }
 
 /** Max: a second take, to compare. If it fails, the first one goes on alone. */
@@ -545,6 +585,7 @@ async function alternative(job: Job) {
   await setQuoteStage(job.quoteId, "alternative");
   const versions = [...(job.versions ?? [])];
   let newScenes = job.newScenes ?? 0;
+  let seen: Job["look"];
   try {
     const first = await supabaseAdmin().from("edit_plans").select("plan").eq("id", versions[0]!.planId).single();
     const plan = editPlanSchema.parse(first.data?.plan);
@@ -558,10 +599,11 @@ async function alternative(job: Job) {
     });
     versions.push({ planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) });
     newScenes += edit.newScenes;
+    if (edit.look) seen = { planId: edit.editPlanId, path: edit.look.path, then: "render" };
   } catch (error) {
     console.warn("second version failed, going on with one", job.postId, error);
   }
-  await next(job, { step: "render", versions, newScenes });
+  await next(job, { step: seen ? "look" : "render", versions, newScenes, look: seen });
 }
 
 /** Renders one version per invocation; a version that fails to render is dropped. */
@@ -662,10 +704,11 @@ async function fix(job: Job) {
       effort: EFFORTS[job.effort!].editorEffort,
     });
     await next(job, {
-      step: "render",
+      step: edit.look ? "look" : "render",
       versions: [best, { planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600), fix: true, summary: job.summary }],
       newScenes: (job.newScenes ?? 0) + edit.newScenes,
       round: (job.round ?? 0) + 1,
+      look: edit.look ? { planId: edit.editPlanId, path: edit.look.path, then: "render" } : undefined,
     });
   } catch (error) {
     console.warn("correction failed, the reviewed version goes out", job.postId, error);

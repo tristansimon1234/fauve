@@ -54,7 +54,6 @@ import {
   gestureMoments,
   handMoves,
   lookMoments,
-  propsAt,
   SUBTITLE_ROW,
   type ReelProps,
   type TracksByClip,
@@ -64,8 +63,7 @@ import {
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
-import { loadMontageInputs } from "@/lib/render/render-post";
-import { reelFramesInSandbox, videoFramesInSandbox } from "@/lib/render/sandbox";
+import { videoFramesInSandbox } from "@/lib/render/sandbox";
 import { ensureTracks, loadTracks } from "@/lib/render/tracks";
 import { usableFonts } from "@/lib/fonts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -74,7 +72,8 @@ import { ensureTranscript } from "@/lib/voice";
 import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
-import { designMotionScenes, type SceneLooks, type SceneRequest, type SceneResult } from "./motion-designer";
+import { designMotionScenes, type SceneRequest } from "./motion-designer";
+import { forLook, saveLook, type PendingLook } from "./motion-look";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
 import { isFirstReel } from "@/lib/onboarding";
@@ -156,6 +155,8 @@ export type DesignedEdit = {
   /** Scenes written by the motion designer for this plan (the costly part), and scenes reused from the library. */
   newScenes: number;
   reusedScenes: number;
+  /** New animations to look at before the render (the montage's look step): what was saved for it. */
+  look?: { path: string };
 };
 
 /** A failed composition is tried once more only with this much left in the design step (its limit is 800 s): a call, its check, the rest of the step. */
@@ -650,65 +651,6 @@ export async function designEdit(params: {
       logoUrl: profile.logo_path ? "https://logo.fauve/studio" : profile.logo_url,
       fonts: usable,
     });
-  // The Reel with the animations just written in place (and those it keeps): as it will come out.
-  const withWritten = (written: SceneResult[]): EditPlan => {
-    const coded = (result: SceneResult | undefined, kept: (typeof previousMotions)[number] | undefined) =>
-      result?.js
-        ? { code: result.code ?? undefined, js: result.js, ...(result.photos?.length ? { photos: result.photos } : {}), ...(result.fonts?.length ? { fonts: result.fonts } : {}) }
-        : kept?.js
-          ? { code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}), ...(kept.fonts ? { fonts: kept.fonts } : {}) }
-          : null;
-    return {
-      ...plan,
-      segments: plan.segments.map((s, i) => {
-        if (!isMotionSegment(s) || s.motion.js) return s;
-        const found = coded(written.find((d) => d.id === `s${i}`), reusable.get(s.motion.brief));
-        return found ? { ...s, motion: { ...s.motion, ...found } } : s;
-      }),
-      layers: (plan.layers ?? []).flatMap((l, i) => {
-        if (l.motion.js) return [l];
-        const result = written.find((d) => d.id === `l${i}`);
-        const kept = reusable.get(l.motion.brief);
-        const found = coded(result, kept);
-        if (!found) return [];
-        // A composition written now draws the whole picture (its ground, the Reel's texts, its end), and sets the subtitles' row.
-        const drawn = result?.js ? (l.compose ? { draws_texts: true, ...(result.subtitleY !== undefined ? { subtitle_y: result.subtitleY } : {}) } : {}) : { ...(kept?.draws_texts ? { draws_texts: true } : {}), ...(kept?.subtitle_y !== undefined ? { subtitle_y: kept.subtitle_y } : {}) };
-        return [{ ...l, motion: { ...l.motion, ...found, ...drawn } }];
-      }),
-    };
-  };
-  // What the motion designer looks at before its animations go out: each one rendered over her footage, in the Reel
-  // as it will come out (its texts, its subtitles, the shots under it), at a few instants.
-  const rendered = async (written: SceneResult[]): Promise<SceneLooks> => {
-    const draft = withWritten(written);
-    const moments = lookMoments(draft, written.map((w) => w.id), gestureMoments(draft, actions));
-    const frames = [...new Set([...moments.values()].flatMap((list) => list.map((m) => Math.round(m.t * 30))))].sort((a, b) => a - b);
-    if (!frames.length) return new Map();
-    const inputs = await loadMontageInputs(params.studioId, draft, { postId: params.postId });
-    const props = buildReelProps(draft, {
-      template,
-      clipUrls: inputs.clipUrls,
-      photoIds: inputs.photoIds,
-      words: inputs.words,
-      aspects: inputs.aspects,
-      brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts, signature: inputs.reelSignature },
-      ...(inputs.voice ? { voice: inputs.voice } : {}),
-      ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
-      ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
-      photoAspects: inputs.photoAspects,
-      ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),
-    });
-    const images = await reelFramesInSandbox(`look-${params.postId.slice(0, 8)}-${Date.now()}`, propsAt(props, frames), frames);
-    return new Map(
-      [...moments].map(([id, list]) => [
-        id,
-        list.flatMap((m) => {
-          const image = images[Math.round(m.t * 30)];
-          return image instanceof Buffer ? [{ label: m.label, jpeg: image }] : [];
-        }),
-      ]),
-    );
-  };
   const sceneContext = {
       kept: keptScenes.map((name) => `déjà dans ce Reel : ${name}`),
       done,
@@ -718,7 +660,6 @@ export async function designEdit(params: {
         ...(plan.tempo ? { tempo: plan.tempo } : {}),
         ...(signature ? { signature: resolveReelBrand(plan, template, { name: "", signature }).signature } : {}),
       },
-      rendered,
     };
   const designed = await designMotionScenes(params.studioId, requests, direction, sceneBrand, kit, sceneContext);
   // The composition is the Reel itself (a split screen, a frame…): when its code failed, a whole new try before
@@ -833,10 +774,37 @@ export async function designEdit(params: {
   const row = await insertPlanVersion(params.studioId, params.postId, plan);
   const version = row.version;
   await db.from("posts").update({ edit_plan_id: row.id }).eq("id", params.postId);
+
+  // Before they go out, the motion designer looks at its new animations rendered over her footage (the montage's
+  // next step, with its own time): what it was given for each, and when each one is looked at. A layer is found by
+  // its brief in the plan (one that failed before it was left out).
+  let look: DesignedEdit["look"];
+  if (fresh.length) {
+    const ids = fresh.map((d) => d.id);
+    const briefOf = (id: string) => requests.find((r) => r.id === id)?.brief;
+    const placed = (id: string) => (id.startsWith("l") ? `l${(plan.layers ?? []).findIndex((l) => l.motion.brief === briefOf(id))}` : id);
+    const moments = lookMoments(plan, ids.map(placed), gestureMoments(plan, actions));
+    const pending: PendingLook = {
+      ids,
+      moments: Object.fromEntries(ids.flatMap((id) => (moments.get(placed(id))?.length ? [[id, moments.get(placed(id))!]] : []))),
+      requests: requests.filter((r) => ids.includes(r.id)).map(forLook),
+      written: Object.fromEntries(fresh.map((d) => [d.id, { name: d.name, slots: d.slots, notes: d.notes }])),
+      direction,
+      brand: sceneBrand,
+      kit,
+      context: sceneContext,
+    };
+    const path = await saveLook(params.studioId, row.id, pending).catch((error: unknown) => {
+      console.warn("motion look: not saved, the animations go as they are", params.postId, error);
+      return null;
+    });
+    if (path) look = { path };
+  }
   return {
     editPlanId: row.id,
     version,
     plan,
+    ...(look ? { look } : {}),
     // Said as it is when the composition she asked for could not be made: never a split screen announced over full-frame shots.
     // The editor's own words describe the composition it asked for: never sent over a Reel that does not have it.
     rationale: compositionKept

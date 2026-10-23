@@ -100,7 +100,8 @@ type Existing = {
   done: string[];
 };
 
-type Brand = Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">;
+/** The brand as an animation sees it. */
+export type SceneBrand = Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">;
 
 /** The business's motion kit: its latest scenes, whose language a new one keeps (never their code as such). */
 export type MotionKit = { name: string; code: string }[];
@@ -194,7 +195,7 @@ async function writeScene(
   studioId: string,
   model: string,
   request: SceneRequest,
-  brand: Brand,
+  brand: SceneBrand,
   artDirection: string | undefined,
   kit: MotionKit,
   existing: Existing,
@@ -306,7 +307,7 @@ const SMOKE_MS = 60_000;
 /** Its look at its render: the frames over her footage (a minute or so), its calls side by side, a check of the reworked ones. */
 const LOOK_NEEDS_MS = 90_000 + SCENE_CALL_MS + SMOKE_MS;
 
-type Context = {
+export type SceneContext = {
   /** The Reel's animations that keep their code (name or brief), and the names of the business's latest ones. */
   kept?: string[];
   done?: string[];
@@ -317,7 +318,7 @@ type Context = {
 };
 
 /** The test render of written scenes: each with its photos, fonts, cuts, composition and what moves under it. */
-function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneRequest, context: Context): SmokeScene[] {
+function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneRequest, context: SceneContext): SmokeScene[] {
   return results
     .filter((r) => r.js)
     .map((r) => {
@@ -341,9 +342,9 @@ export async function designMotionScenes(
   studioId: string,
   requests: SceneRequest[],
   artDirection: string | undefined,
-  brand: Brand,
+  brand: SceneBrand,
   kit: MotionKit = [],
-  context: Context = {},
+  context: SceneContext = {},
 ): Promise<SceneResult[]> {
   if (!requests.length) return [];
   const model = await designerModel(studioId);
@@ -415,38 +416,38 @@ export async function designMotionScenes(
       };
     });
   }
-  // Before they go out, it looks at them rendered over her footage, in the Reel as it will come out, as a motion
-  // designer looks at a render: written blind, a florist's WhatsApp chat was squeezed into a strip of the screen,
-  // its words overflowing their bubbles. Only with the time for it: a step cut short would deliver nothing.
-  if (context.rendered && results.some((r) => r.js)) {
-    if (timeLeft() >= LOOK_NEEDS_MS) results = await lookAtRender(studioId, model, requests, results, brand, artDirection, kit, context);
-    else console.warn("motion look skipped, the step has no time left", Math.round(timeLeft() / 1000));
-  }
   return results;
 }
 
 /**
- * Each written animation, rendered over her footage at a few instants, goes back to the motion designer, who keeps
- * it as it is or rewrites it whole, once (side by side). A rewrite goes out only if it passes the check; else, and
- * when anything fails on the way, the animation stays as it was.
+ * Before they go out, as a motion designer looks at a render (its own step of the montage, after the design): each
+ * animation just written, rendered over her footage in the Reel as it will come out (`context.rendered`), goes back to
+ * the motion designer, who keeps it as it is or rewrites it whole, once (side by side). Written blind, a florist's
+ * WhatsApp chat was squeezed into a strip of the screen, its words overflowing their bubbles. A rewrite goes out only
+ * if it passes the check; else, and when anything fails on the way, the animation stays as it was. Only the reworked
+ * ones are returned.
  */
-async function lookAtRender(
+export async function lookAtScenes(
   studioId: string,
-  model: string,
   requests: SceneRequest[],
   results: SceneResult[],
-  brand: Brand,
   artDirection: string | undefined,
+  brand: SceneBrand,
   kit: MotionKit,
-  context: Context,
+  context: SceneContext & Required<Pick<SceneContext, "rendered">>,
 ): Promise<SceneResult[]> {
+  if (!results.some((r) => r.js) || timeLeft() < LOOK_NEEDS_MS) {
+    if (results.length) console.warn("motion look skipped", results.some((r) => r.js) ? `the step has ${Math.round(timeLeft() / 1000)} s left` : "nothing to look at");
+    return [];
+  }
+  const model = await designerModel(studioId);
   const requestOf = (id: string) => requests.find((q) => q.id === id)!;
-  const looks = await context.rendered!(results.filter((r) => r.js)).catch((error: unknown): SceneLooks => {
+  const looks = await context.rendered(results.filter((r) => r.js)).catch((error: unknown): SceneLooks => {
     console.warn("motion look: frames not rendered", error);
     return new Map();
   });
   const looked = results.filter((r) => r.js && r.code && looks.get(r.id)?.length);
-  if (!looked.length || timeLeft() < SCENE_CALL_MS + SMOKE_MS) return results;
+  if (!looked.length || timeLeft() < SCENE_CALL_MS + SMOKE_MS) return [];
   const answers = await Promise.all(
     looked.map(async (r) => {
       // The Reel's other animations, as they are now: the reworked one stays in their family.
@@ -465,18 +466,14 @@ async function lookAtRender(
       ? [{ ...r, ...answer, id: r.id, photos: answer.photos?.length ? answer.photos : r.photos, fonts: answer.fonts?.length ? answer.fonts : r.fonts, subtitleY: answer.subtitleY ?? r.subtitleY }]
       : [],
   );
-  if (!reworked.length) return results;
+  if (!reworked.length) return [];
   const checks = await smokeTestScenes(smokeScenes(reworked, requestOf, context), brand).catch((e: unknown): SceneChecks => {
     console.warn("motion look: reworked scenes not checked, kept as they were", e);
     return { errors: Object.fromEntries(reworked.map((r) => [r.id, String(e)])), faces: {} };
   });
-  return results.map((r) => {
-    const better = reworked.find((x) => x.id === r.id);
-    if (!better) return r;
-    if (checks.errors[r.id]) {
-      console.warn("motion look: the rework failed its check, the animation stays as it was", r.id, checks.errors[r.id]);
-      return r;
-    }
-    return better;
+  return reworked.filter((r) => {
+    if (!checks.errors[r.id]) return true;
+    console.warn("motion look: the rework failed its check, the animation stays as it was", r.id, checks.errors[r.id]);
+    return false;
   });
 }
