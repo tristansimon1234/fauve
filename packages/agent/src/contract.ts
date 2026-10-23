@@ -30,6 +30,13 @@ export const reelContractSchema = z.object({
   call_to_action_text: z.string().max(200).nullable(),
   /** Everything else she asked for explicitly (« fond papier », « bulles WhatsApp », « coupes rapides »), in her words. */
   musts: z.array(z.string().max(200)).max(10),
+  /**
+   * A correction: whether it asks to redraw what the Reel's composition draws (its layout, its animations, its
+   * interface, its effects, its background, how they move). False when it only touches the voice, the subtitles,
+   * a text's words, the music, the length or the shots: the composition's code is kept, never written again
+   * (Tristan: « pourquoi la correction refait tout, c'est une hérésie »). A job read before it had none: true.
+   */
+  redraw: z.boolean().default(true),
 });
 export type ReelContract = z.infer<typeof reelContractSchema>;
 
@@ -42,7 +49,8 @@ export const CONTRACT_PROMPT = `Tu lis la demande d'une personne pour un Reel et
 - screen_text : un texte à l'écran qu'elle donne mot pour mot. ending : la fin qu'elle décrit.
 - call_to_action : « la_sienne » avec son texte si elle donne l'invitation ; « aucune » si elle n'en veut pas ; sinon « libre ».
 - musts : tout le reste qu'elle demande explicitement pour ce Reel (une ambiance, un fond, un univers, un rythme, des éléments à montrer), dans ses mots, une chose par ligne.
-- Une correction d'un Reel qui a déjà sa voix off reçoit aussi « Texte actuel de la voix ». Quand la demande change seulement une partie de ce texte (un mot, une prononciation, une phrase, la fin) ou n'en cite qu'un morceau, voice_text est le texte actuel EN ENTIER avec seulement ce changement fait, rien d'autre de coupé ni de réécrit (verbatim) : un morceau cité n'est jamais tout le texte. Seule une demande qui donne un texte complet nouveau, ou qui demande de le réécrire, le remplace. Sans changement de la voix demandé, voice_text reste null.`;
+- Une correction d'un Reel qui a déjà sa voix off reçoit aussi « Texte actuel de la voix ». Quand la demande change seulement une partie de ce texte (un mot, une prononciation, une phrase, la fin) ou n'en cite qu'un morceau, voice_text est le texte actuel EN ENTIER avec seulement ce changement fait, rien d'autre de coupé ni de réécrit (verbatim) : un morceau cité n'est jamais tout le texte. Seule une demande qui donne un texte complet nouveau, ou qui demande de le réécrire, le remplace. Sans changement de la voix demandé, voice_text reste null.
+- redraw : pour une correction, true seulement quand elle demande de changer ce que dessine la mise en page ou ses animations (la disposition, l'écran partagé, l'interface, un effet, un élément graphique, le fond, leur mouvement ou leur style) ; false quand elle ne touche que la voix, les sous-titres, les mots d'un texte, la musique, la durée, la légende, l'ordre ou le choix des plans. Pour un nouveau Reel : true.`;
 
 export const EMPTY_CONTRACT: ReelContract = {
   voice_text: null,
@@ -57,6 +65,7 @@ export const EMPTY_CONTRACT: ReelContract = {
   call_to_action: "libre",
   call_to_action_text: null,
   musts: [],
+  redraw: true,
 };
 
 /** Nothing fixed: the defaults decide everything. */
@@ -87,6 +96,7 @@ export function contractLines(c: ReelContract | null | undefined): string[] {
     c.ending ? `Fin : ${c.ending}` : null,
     c.call_to_action === "aucune" ? "Aucune invitation à la fin" : c.call_to_action === "la_sienne" && c.call_to_action_text ? `Invitation à la fin, la sienne : « ${c.call_to_action_text} »` : null,
     ...c.musts.map((m) => `Demandé : ${m}`),
+    c.redraw === false ? "La mise en page et ses animations restent telles quelles (leur code est gardé) : ne change ni la forme du Reel ni le brief de sa composition" : null,
   ].filter((l): l is string => Boolean(l));
 }
 

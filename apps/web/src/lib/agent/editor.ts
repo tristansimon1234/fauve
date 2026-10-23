@@ -21,6 +21,7 @@ import {
   compositionTexts,
   isComposed,
   holdAfterVoice,
+  keepComposition,
   keepWrittenAnimations,
   replacedAnimations,
   brandProfileSchema,
@@ -386,7 +387,9 @@ export async function designEdit(params: {
   const base = previousPlan.success ? previousPlan.data : null;
   // Its animations whose brief did not change keep their code before the new ones are counted;
   // one rewritten (its shots changed, or the request touched it) takes the place of the one it replaces.
-  const drafted = keepWrittenAnimations(fromEditorPlan(response.parsed_output.plan, profile.text_looks ?? []), params.fresh ? null : base);
+  const withWritten = keepWrittenAnimations(fromEditorPlan(response.parsed_output.plan, profile.text_looks ?? []), params.fresh ? null : base);
+  // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
+  const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;
   const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
   const plan = carryRetouch(carryTextStyle(normalizeEditPlan(drafted, durations, allowed), params.fresh ? null : base), base);
   // The Reel she copies takes its own font and colours over her charter's when they make its style (the animations get them too).
