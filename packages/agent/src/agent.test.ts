@@ -4299,3 +4299,19 @@ test("a breath between two sentences opens where the voice is quiet, or not at a
   assert.deepEqual(quietPauses([{ at: 1.5, add: 0.3 }], levels), []);
   assert.deepEqual(quietPauses([{ at: 1.5, add: 0.3 }], []), [{ at: 1.5, add: 0.3 }]);
 });
+
+test("a text stays on screen long enough to be read, never over the next one", async () => {
+  const { readingSeconds, longEnoughToRead } = await import("./editor.ts");
+  assert.equal(readingSeconds("Hey"), 1.2);
+  assert.ok(Math.abs(readingSeconds("Pauline croule sous la comm toute seule") - 2.9) < 0.01);
+  assert.equal(readingSeconds("un ".repeat(30)), 4.5);
+  const texts = [
+    { from: 0, to: 1, text: "Pauline croule sous la comm toute seule" },
+    { from: 2, to: 3, text: "Simone répond sur WhatsApp" },
+  ];
+  // The first grows up to the next text, the second up to its reading time but not past the animation.
+  const read = longEnoughToRead(texts, [{ from: 4, to: 6 }], 10);
+  assert.deepEqual(read.map((t) => [t.from, t.to]), [[0, 2], [2, 4]]);
+  // Long enough already: untouched.
+  assert.deepEqual(longEnoughToRead([{ from: 0, to: 3, text: "Bonjour" }], [], 10)[0], { from: 0, to: 3, text: "Bonjour" });
+});
