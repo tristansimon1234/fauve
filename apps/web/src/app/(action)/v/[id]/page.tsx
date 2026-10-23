@@ -17,7 +17,8 @@ import { recentMedia } from "@/lib/social/instagram";
 import { ActionView, type ActionMedia } from "./action-view";
 import { Paywall } from "@/components/paywall";
 import { studioAccess } from "@/lib/billing/access";
-import { PhoneReview } from "@/components/review/phone-review";
+import { PhoneMaking, PhoneReview } from "@/components/review/phone-review";
+import { montageStatus } from "@/lib/montage-status";
 import { loadReview } from "@/lib/review";
 
 export const metadata: Metadata = { title: "Ta publication" };
@@ -75,6 +76,9 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
     );
     // Made for her phone: the Reel full screen and what she does from WhatsApp, not the app's page.
     if (review) return <PhoneReview key={`${review.version}-${review.renderId ?? ""}-${review.status}`} data={review} />;
+    // No version yet: its montage at work, where it is (the old page said nothing of it).
+    const running = (await montageStatus(studioId, id)).find((m) => m.step !== "livré" && !m.late);
+    if (running) return <PhoneMaking title={post.title as string} step={running.step} minutes={running.minutes} />;
   }
 
   const planId =

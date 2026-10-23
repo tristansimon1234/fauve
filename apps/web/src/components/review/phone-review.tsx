@@ -98,25 +98,20 @@ export function PhoneReview({ data }: { data: ReviewData }) {
           aria-label={`Ton Reel « ${data.title} »`}
         />
       )}
-      {(data.making || !data.videoUrl || data.failed) && (
+      {data.failed ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink/80 px-8 text-center">
           <span className="flex size-20 items-center justify-center rounded-full bg-white">
-            <Mascot size={64} mood={data.failed ? "sad" : "thinking"} />
+            <Mascot size={64} mood="sad" />
           </span>
-          {data.failed ? (
-            <>
-              <span className="text-[18px] font-extrabold">La vidéo n’a pas pu être fabriquée</span>
-              <span className="text-[14px] leading-snug text-white/80">Dis-le-moi sur WhatsApp, je la relance.</span>
-            </>
-          ) : (
-            <>
-              <span className="text-[18px] font-extrabold">Je fabrique ta vidéo</span>
-              <span className="text-[14px] leading-snug text-white/80">
-                {`Ça prend ${data.making?.step === "effet" ? EFFECT_MINUTES : data.making?.kind === "montage" ? REDO_MINUTES : RERENDER_MINUTES} minutes.`} Tu peux fermer : je te préviens sur WhatsApp.
-              </span>
-            </>
-          )}
+          <span className="text-[18px] font-extrabold">La vidéo n’a pas pu être fabriquée</span>
+          <span className="text-[14px] leading-snug text-white/80">Dis-le-moi sur WhatsApp, je la relance.</span>
         </div>
+      ) : (
+        (data.making || !data.videoUrl) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-ink/80 px-8">
+            <Making step={data.making?.step ?? null} kind={data.making?.kind ?? "render"} minutes={data.making?.minutes} again={Boolean(data.videoUrl)} />
+          </div>
+        )
       )}
 
       {/* Top: back to WhatsApp, the sound. */}
@@ -202,6 +197,68 @@ export function PhoneReview({ data }: { data: ReviewData }) {
           {toast}
         </p>
       )}
+    </main>
+  );
+}
+
+/** Where the montage is, said plainly: its step, how long it has been going, what it usually takes. */
+const STEPS: Record<string, string> = {
+  montage: "Je monte ton Reel",
+  effet: "Je fais l’effet image par image",
+  "2e version": "J’essaie une autre version",
+  rendu: "Je fabrique la vidéo",
+  relecture: "Je relis tout",
+  correction: "Je corrige un détail",
+};
+const ORDER = ["montage", "rendu"];
+
+function Making({ step, kind, minutes, again }: { step: string | null; kind: "render" | "montage"; minutes?: number; again: boolean }) {
+  const usual = step === "effet" ? EFFECT_MINUTES : kind === "montage" ? REDO_MINUTES : RERENDER_MINUTES;
+  const at = step ? ORDER.indexOf(step === "effet" || step === "2e version" ? "montage" : step === "relecture" || step === "correction" ? "rendu" : step) : 1;
+  return (
+    <div className="flex flex-col items-center gap-3 text-center text-white">
+      <span className="flex size-20 items-center justify-center rounded-full bg-white">
+        <Mascot size={64} mood="thinking" />
+      </span>
+      <span className="text-[19px] font-extrabold">{step ? (STEPS[step] ?? "J’y travaille") : again ? "Je mets la vidéo à jour" : "Je fabrique ta vidéo"}</span>
+      {/* The two steps she can picture: the montage, then the video. */}
+      <span className="flex items-center gap-2 text-[12.5px] font-bold" aria-hidden="true">
+        {["Montage", "Vidéo"].map((label, i) => (
+          <span key={label} className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${i < at ? "bg-white/25 text-white" : i === at ? "bg-violet text-white" : "bg-white/10 text-white/55"}`}>
+            {i < at && <CheckIcon size={13} />}
+            {label}
+          </span>
+        ))}
+      </span>
+      <span className="text-[14px] leading-snug text-white/80">
+        {minutes !== undefined && minutes > 0 ? `En cours depuis ${minutes} min, ça prend en général ${usual} minutes.` : `Ça prend en général ${usual} minutes.`} Tu peux fermer : je te préviens sur WhatsApp dès qu’il est prêt.
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Her Reel before its first version (the link of « je te l'envoie dès qu'il est prêt », opened early):
+ * where it is, and the page follows it until the video is there.
+ */
+export function PhoneMaking({ title, step, minutes }: { title: string; step: string | null; minutes: number }) {
+  const router = useRouter();
+  useEffect(() => {
+    const timer = setInterval(() => router.refresh(), 12_000);
+    return () => clearInterval(timer);
+  }, [router]);
+  return (
+    <main className="mx-auto flex h-dvh max-w-[calc(100dvh*9/16)] flex-col bg-ink text-white">
+      <div className="flex items-center gap-3 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+        <a href={whatsappLink("")} aria-label="Retourner sur WhatsApp" className="flex size-11 items-center justify-center rounded-full bg-white/10">
+          <ArrowLeftIcon size={20} />
+        </a>
+        <span className="min-w-0 flex-1 truncate text-center text-[14px] font-bold">{title}</span>
+        <span className="size-11" />
+      </div>
+      <div className="flex flex-1 items-center justify-center px-8">
+        <Making step={step} kind="montage" minutes={minutes} again={false} />
+      </div>
     </main>
   );
 }

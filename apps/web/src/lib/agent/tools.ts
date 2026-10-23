@@ -526,7 +526,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (!montages.length) return json({ montages: [], note: "Aucun montage lancé récemment." });
       return json({
         montages: montages.map((m) => ({ post_id: m.postId, publication: m.title, etape: m.step, depuis_minutes: m.minutes, late: m.late })),
-        note: "En montage, en rendu, en relecture ou en correction : tout va bien, la vidéo arrive toute seule. late : propose de relancer (montage).",
+        note: "En montage, en rendu, en relecture ou en correction : tout va bien, il tourne et la vidéo arrive toute seule, même après 15 ou 20 minutes ; ne propose jamais de le relancer. late (seulement) : il s'est arrêté ; dis-le-lui simplement et propose de le refaire (montage).",
       });
     },
 
