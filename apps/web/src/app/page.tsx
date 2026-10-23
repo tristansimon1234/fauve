@@ -95,7 +95,7 @@ export default function LandingPage() {
             Ton assistant IA sur WhatsApp <span className="accent">qui gère tes réseaux.</span>
           </h1>
           <p className="max-w-[540px] text-[18px] leading-[1.55] text-muted sm:text-[19px]">
-            Envoie tes photos et tes vidéos à Simone sur WhatsApp, comme à un collègue. Il monte tes Reels, crée tes carrousels, écrit tes légendes et publie sur Instagram et TikTok.
+            Envoie tes photos et tes vidéos à Simone sur WhatsApp, comme à un collègue. Il monte tes Reels, crée tes carrousels, écrit tes légendes et publie sur Instagram et TikTok. Le but : <strong className="font-bold text-ink">plus de clients</strong>, pas juste des vues.
           </p>
           <ul className="grid max-w-[560px] gap-3 sm:grid-cols-2">
             {(
