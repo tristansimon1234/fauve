@@ -4,7 +4,7 @@ import { GridTabs } from "./grid-tabs";
 import { formatCompact, formatShortDateTime } from "@/lib/format";
 import type { InstagramMedia, InstagramProfile } from "@/lib/social/instagram";
 import type { TikTokUser, TikTokVideo } from "@/lib/social/tiktok";
-import { PlatformSwitch } from "./platform-switch";
+import { GridLayout, type ProfileView } from "./platform-switch";
 
 // Her profiles as her followers see them in the apps (Tristan: « tu peux reproduire réellement
 // les comptes Insta / TikTok ? »): Instagram's header, counters, bio, buttons, icon tabs and 3:4
@@ -25,6 +25,7 @@ export type ProfileIdentity = { name: string | null; category: string | null; we
 const APP_FONT = "[font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Helvetica,Arial,sans-serif]";
 
 export function GridView({
+  aside,
   connected,
   handle,
   info,
@@ -33,6 +34,8 @@ export function GridView({
   timezone: tz,
   tiktok = null,
 }: {
+  /** The page's title and button, set beside the profile. */
+  aside: React.ReactNode;
   /** Her TikTok profile too, when TikTok is offered: a switch shows one or the other. */
   tiktok?: TikTokGrid | null;
   connected: boolean;
@@ -42,21 +45,37 @@ export function GridView({
   tiles: Tile[];
   timezone: string;
 }) {
-  const instagramView = <InstagramView connected={connected} handle={handle} info={info} identity={identity} tiles={tiles} tz={tz} />;
+  const views: ProfileView[] = [
+    {
+      key: "instagram",
+      hint: connected ? null : <LinkHint href="/connect" network="Instagram" />,
+      profile: <InstagramView handle={handle} info={info} identity={identity} tiles={tiles} tz={tz} />,
+    },
+  ];
+  if (tiktok) {
+    views.push({
+      key: "tiktok",
+      hint: tiktok.connected ? null : <LinkHint href="/api/tiktok/connect" network="TikTok" />,
+      profile: <TikTokView grid={tiktok} identity={identity} tz={tz} />,
+    });
+  }
   return (
-    <>
-      <p className="mx-auto max-w-[430px] text-center text-[14px] text-muted">
-        Ton profil comme le voient tes abonnés, avec les publications prévues à l’endroit où elles vont arriver.
-      </p>
-      {tiktok ? <PlatformSwitch instagram={instagramView} tiktok={<TikTokView grid={tiktok} identity={identity} tz={tz} />} /> : instagramView}
-    </>
+    <GridLayout
+      aside={
+        <>
+          {aside}
+          <p className="text-[14px] leading-snug text-muted">Ton profil comme le voient tes abonnés, avec les publications prévues à l’endroit où elles vont arriver.</p>
+        </>
+      }
+      views={views}
+    />
   );
 }
 
-/** Not linked yet: one quiet line above the profile, never a card in its place. */
+/** Not linked yet: one quiet line beside the profile, never a card in its place. */
 function LinkHint({ href, network }: { href: string; network: string }) {
   return (
-    <p className="mx-auto max-w-[430px] text-center text-[13.5px] text-muted">
+    <p className="text-[13.5px] leading-snug text-muted">
       Aperçu avec ce que Simone sait de ton commerce.{" "}
       <a href={href} className="font-bold text-violet">
         Relier {network}
@@ -66,13 +85,12 @@ function LinkHint({ href, network }: { href: string; network: string }) {
   );
 }
 
-function InstagramView({ connected, handle, info, identity, tiles, tz }: { connected: boolean; handle: string | null; info: InstagramProfile | null; identity: ProfileIdentity; tiles: Tile[]; tz: string }) {
+function InstagramView({ handle, info, identity, tiles, tz }: { handle: string | null; info: InstagramProfile | null; identity: ProfileIdentity; tiles: Tile[]; tz: string }) {
   const name = info?.name || identity.name || "Ton commerce";
   const username = handle ?? usernameOf(identity.name);
   const reelTiles = tiles.filter((t) => (t.kind === "upcoming" ? t.format === "reel" : t.kind === "instagram" && t.media.media_product_type === "REELS"));
   return (
     <>
-      {!connected && <LinkHint href="/connect" network="Instagram" />}
       <section aria-label="Aperçu du profil Instagram" className={`mx-auto w-full max-w-[430px] overflow-hidden rounded-[28px] border border-line bg-white text-[#000] ${APP_FONT}`}>
         {/* The top bar: her username, then « create » and the menu. */}
         <div className="flex h-12 items-center justify-between px-4">
@@ -129,7 +147,6 @@ function TikTokView({ grid, identity, tz }: { grid: TikTokGrid; identity: Profil
   const username = grid.handle ?? usernameOf(identity.name);
   return (
     <>
-      {!grid.connected && <LinkHint href="/api/tiktok/connect" network="TikTok" />}
       <section aria-label="Aperçu du profil TikTok" className={`mx-auto w-full max-w-[430px] overflow-hidden rounded-[28px] border border-line bg-white text-[#161823] ${APP_FONT}`}>
         <div className="relative flex h-12 items-center justify-center px-4">
           <span className="flex min-w-0 items-center gap-1 text-[17px] font-bold">

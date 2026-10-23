@@ -22,12 +22,20 @@ async function Grid() {
   if (!member) return <NoStudio />;
   const [grid, tiktok, identity] = await Promise.all([loadGrid(db, member.studio.id), loadTikTokGrid(db, member.studio.id), profileIdentity(db, member.studio.id)]);
   return (
-    <>
-      <div className="mx-auto flex w-full max-w-[430px] flex-wrap items-center justify-between gap-3">
-        <h1 className="text-[30px] font-extrabold tracking-[-0.02em]">Grille</h1>
-        <CreatePostButton timezone={member.studio.timezone} />
-      </div>
-      <GridView identity={identity} connected={grid.connected} handle={grid.handle} info={grid.info} tiles={grid.tiles} timezone={member.studio.timezone} tiktok={tiktok} />
-    </>
+    <GridView
+      aside={
+        <div className="flex flex-wrap items-center justify-between gap-3 lg:flex-col lg:items-start">
+          <h1 className="text-[30px] font-extrabold tracking-[-0.02em]">Grille</h1>
+          <CreatePostButton timezone={member.studio.timezone} />
+        </div>
+      }
+      identity={identity}
+      connected={grid.connected}
+      handle={grid.handle}
+      info={grid.info}
+      tiles={grid.tiles}
+      timezone={member.studio.timezone}
+      tiktok={tiktok}
+    />
   );
 }

@@ -90,12 +90,31 @@ export default function LandingPage() {
       <section className="mx-auto grid max-w-[1200px] items-center gap-10 px-4 pt-6 pb-20 sm:px-8 sm:pt-10 lg:grid-cols-[1.05fr_1fr] lg:gap-14">
         <div className="flex min-w-0 flex-col gap-6">
           <span className="self-start rounded-full bg-peach px-3 py-1.5 text-[13px] font-bold text-peach-ink">Pour les studios, salons, restaurants et boutiques</span>
-          <h1 className="text-[clamp(40px,5.4vw,72px)] leading-[1.02] font-extrabold tracking-[-0.035em]">
-            Des réseaux qui te rapportent <span className="accent">des clients.</span>
+          {/* What it is, said first (Tristan: « on doit mettre en avant assistant IA sur WhatsApp et via une app web pour gérer tes réseaux, monter des Reels ») */}
+          <h1 className="text-[clamp(38px,5vw,66px)] leading-[1.04] font-extrabold tracking-[-0.035em]">
+            Ton assistant IA sur WhatsApp <span className="accent">qui gère tes réseaux.</span>
           </h1>
           <p className="max-w-[540px] text-[18px] leading-[1.55] text-muted sm:text-[19px]">
-            Simone est ton community manager IA. Il lit ton site, apprend ton style, monte tes Reels, recopie ceux que tu aimes, écrit tes posts et les publie sur Instagram et TikTok quand tu dis oui. Toi, tu valides d’un mot, sur WhatsApp ou ici.
+            Envoie tes photos et tes vidéos à Simone sur WhatsApp, comme à un collègue. Il monte tes Reels, crée tes carrousels, écrit tes légendes et publie sur Instagram et TikTok.
           </p>
+          <ul className="grid max-w-[560px] gap-3 sm:grid-cols-2">
+            {(
+              [
+                [WhatsAppIcon, "Sur WhatsApp", "Tu lui écris, tu envoies tes vidéos, tu valides d’un mot."],
+                [GridIcon, "Dans l’app web", "Ta grille, tes Reels à retoucher, tes résultats."],
+              ] as const
+            ).map(([Icon, title, text]) => (
+              <li key={title} className="flex gap-3 rounded-[18px] border border-line bg-white p-3.5">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-soft text-violet">
+                  <Icon size={20} />
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[15px] font-extrabold">{title}</span>
+                  <span className="text-[14px] leading-snug text-muted">{text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
           <div className="flex flex-wrap items-center gap-3">
             <Start waUrl={waUrl} size="lg" />
             <a href="#ce-qu-elle-fait" className="btn btn-secondary h-14 px-6 text-base">
