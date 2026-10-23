@@ -285,6 +285,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async get_connect_link() {
+      // On WhatsApp, a button under her message (the one-time link is made when it is sent).
+      if (ctx.waId) {
+        ctx.extras.link = { path: "/connect", label: "Relier mes comptes", purpose: "connect_social" };
+        return json({ bouton: "« Relier mes comptes » sous ton message", note: "N'écris aucun lien : le bouton l'ouvre." });
+      }
       const { data: member } = await db.from("members").select("phone_e164").eq("id", ctx.memberId).single();
       const url = await createLoginLink(member?.phone_e164 as string, "/connect", "connect_social");
       return json({ url, expires_in_minutes: 15 });
@@ -301,9 +306,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           note: "Elle est dans l'application : la carte de la publication s'affiche sous ton message et ouvre sa page en un clic. N'écris aucun lien.",
         });
       }
-      const { data: member } = await db.from("members").select("phone_e164").eq("id", ctx.memberId).single();
-      const url = await createLoginLink(member?.phone_e164 as string, `/v/${post_id}`, "open_post");
-      return json({ url, expires_in_minutes: 15 });
+      // On WhatsApp, a button under her message (the one-time link is made when it is sent).
+      ctx.extras.link = { path: `/v/${post_id}`, label: "Voir la publication", purpose: "open_post" };
+      return json({ bouton: "« Voir la publication » sous ton message", note: "N'écris aucun lien : le bouton ouvre sa page." });
     },
 
     async list_media({ kind, days, limit, bank }) {

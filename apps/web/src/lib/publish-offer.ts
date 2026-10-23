@@ -12,8 +12,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // to Simone as usual.
 
 export type OfferReply = {
-  /** Sent (on WhatsApp it may carry a one-time link)… */
+  /** Sent… */
   reply: string;
+  /** …with, on WhatsApp, its page behind a button (a one-time link)… */
+  link?: { url: string; label: string };
   /** …and stored without the link (Simone's history must not reuse it). */
   body: string;
   payload: Record<string, unknown>;
@@ -48,7 +50,7 @@ export async function answerPublishOffer(
   if (answer === "look") {
     const line = "Prends ton temps ! Sur sa page, tu peux changer le texte ou la musique, puis le publier d’un bouton.";
     const link = channel.waId ? await createLoginLink(`+${channel.waId}`, page, "open_post") : null;
-    return { reply: link ? `${line}\n\nIl est ici : ${link}` : line, body: line, payload: card };
+    return { reply: line, body: line, payload: card, ...(link ? { link: { url: link, label: "Voir la vidéo" } } : {}) };
   }
 
   const status = post.status as string;

@@ -84,6 +84,56 @@ export async function sendReply(toWaId: string, body: string, options?: string[]
   }
 }
 
+/** Labels on WhatsApp's URL buttons are 20 characters at most, bodies 1024. */
+const CTA_LABEL = 20;
+const CTA_BODY = 1024;
+
+/**
+ * A message with a page of the app behind a button (« Voir mon Reel »), as brands send them on
+ * WhatsApp: no long link in her chat. Plain text with the link if WhatsApp refuses it.
+ */
+export async function sendLinkButton(toWaId: string, body: string, link: { url: string; label: string }): Promise<string | undefined> {
+  const text = body.trim() || link.label;
+  // Too long for one: the first paragraphs carry the button, the rest follows.
+  const paragraphs = text.split(/\n{2,}/);
+  let head = paragraphs[0]!;
+  let i = 1;
+  while (i < paragraphs.length && head.length + 2 + paragraphs[i]!.length <= CTA_BODY) head += `\n\n${paragraphs[i++]}`;
+  const rest = paragraphs.slice(i).join("\n\n");
+  if (head.length <= CTA_BODY) {
+    try {
+      const res = await sendMessage({
+        recipient_type: "individual",
+        to: toWaId,
+        type: "interactive",
+        interactive: { type: "cta_url", body: { text: head }, action: { name: "cta_url", parameters: { display_text: link.label.slice(0, CTA_LABEL), url: link.url } } },
+      });
+      if (rest) await sendText(toWaId, rest);
+      return res.messages[0]?.id;
+    } catch (error) {
+      // Never lose the message over the button.
+      console.warn("link button refused, sending text", error instanceof WhatsAppError ? error.body : error);
+    }
+  }
+  return sendText(toWaId, `${text}\n\n👉 ${link.url}`);
+}
+
+/**
+ * A message with its page behind a button, then its question with answer buttons: WhatsApp puts
+ * one kind of button on a message. Without answers, one message. Returns the last one's id.
+ */
+export async function sendLinkThenReply(
+  toWaId: string,
+  body: string,
+  link: { url: string; label: string },
+  question?: string,
+  options?: string[],
+): Promise<string | undefined> {
+  if (!options?.length || !question) return sendLinkButton(toWaId, [body, question].filter(Boolean).join("\n\n"), link);
+  await sendLinkButton(toWaId, body, link);
+  return sendReply(toWaId, question, options);
+}
+
 /** Sends a video by link (WhatsApp downloads it; max 16 MB) with a caption (max 1024 chars). */
 export async function sendVideo(toWaId: string, link: string, caption?: string): Promise<string | undefined> {
   const res = await sendMessage({

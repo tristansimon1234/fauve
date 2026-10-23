@@ -40,6 +40,8 @@ export async function ownerWhatsApp(studioId: string): Promise<{ phone: string; 
     .eq("studio_id", studioId)
     .eq("channel", "whatsapp")
     .eq("direction", "inbound")
+    // Files dropped through her upload link are not messages she wrote: they open no window.
+    .is("payload->>via", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

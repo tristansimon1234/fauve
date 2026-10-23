@@ -50,6 +50,13 @@ export const replyExtrasSchema = z.object({
   step_card: z.enum(["website", "style", "rhythm", "connect", "first_post"]).optional(),
   /** A montage under way, shown as a card that follows its steps (set by the montage tools, not by the model). */
   quote: z.uuid().optional(),
+  /**
+   * WhatsApp: a page of the app behind a button under the message (« Voir la publication »), set by
+   * the link tools, not by the model; its one-time sign-in link is made when the message is sent.
+   */
+  link: z
+    .object({ path: z.string().startsWith("/").max(200), label: z.string().min(1).max(20), purpose: z.enum(["open_post", "connect_social", "upload"]) })
+    .optional(),
 });
 export type ReplyExtras = z.infer<typeof replyExtrasSchema>;
 export type Reaction = z.infer<typeof reactionSchema>;
