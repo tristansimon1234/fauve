@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { CheckIcon } from "@/components/icons";
 import { saveStyle } from "./actions";
 import { ArtDirectionSection } from "./art-direction-section";
@@ -16,6 +16,22 @@ import { VoiceSection } from "./voice-section";
 import { useStylesheets } from "./use-stylesheet";
 
 type SaveState = { status: "idle" } | { status: "ok"; version: number } | { status: "error"; message: string };
+
+// On a computer, her style in tabs rather than one long page (Tristan: « fais un système d'onglets sur desktop
+// plutôt que tout à la suite ») ; on a phone, the sections follow one another. One save bar for all of them.
+const TABS = [
+  { key: "inspirations", label: "Inspirations" },
+  { key: "identite", label: "Logo et couleurs" },
+  { key: "polices", label: "Polices" },
+  { key: "voix", label: "Voix et ton" },
+  { key: "creations", label: "Tes créations" },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
+const isTab = (v: string): v is Tab => TABS.some((t) => t.key === v);
+const onHashChange = (notify: () => void) => {
+  window.addEventListener("hashchange", notify);
+  return () => window.removeEventListener("hashchange", notify);
+};
 
 /** What the server stores: trimmed texts, no empty rules. */
 function clean(form: StyleForm): StyleForm {
@@ -55,6 +71,15 @@ export function StyleEditor({
   const [logo, setLogo] = useState(initialLogo);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const [pending, startTransition] = useTransition();
+  // The tab lives in the address (#polices): a link or a reload opens it again.
+  const hash = useSyncExternalStore(onHashChange, () => window.location.hash.slice(1), () => "");
+  const tab: Tab = isTab(hash) ? hash : "inspirations";
+  const choose = (next: Tab) => {
+    window.history.replaceState(null, "", `#${next}`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  };
+  /** A tab's sections: always on a phone, only the chosen tab's on a computer. */
+  const panel = (key: Tab) => `flex flex-col gap-5 ${tab === key ? "" : "lg:hidden"}`;
 
   const dirty = !same(form, saved);
   const update = (patch: Partial<StyleForm>) => {
@@ -102,34 +127,63 @@ export function StyleEditor({
         </p>
       </header>
 
-      <MoodboardSection
-        studioId={studioId}
-        initial={moodboard}
-        onSaved={setVersion}
-        onUsePalette={(colors) => update({ colors: colors.slice(0, MAX_COLORS) })}
-      />
-      {inspirations}
-      <ArtDirectionSection value={form.art_direction} onChange={(art_direction) => update({ art_direction })} />
-      <LogoSection
-        studioId={studioId}
-        studioName={studioName}
-        logo={logo}
-        onSaved={(v, l) => {
-          setVersion(v);
-          setLogo(l);
-        }}
-      />
-      <ColorsSection value={form.colors} onChange={(colors) => update({ colors })} />
-      <FontsSection
-        display={form.display_font}
-        body={form.body_font}
-        templateFonts={DEFAULT_FONTS}
-        onChange={update}
-        own={<OwnFonts studioId={studioId} initial={ownFonts} display={form.display_font} body={form.body_font} onUse={update} />}
-      />
-      <VoiceSection value={form} onChange={update} />
-      <ToneSection value={form} onChange={update} />
-      {created}
+      <nav aria-label="Ton style" role="tablist" className="sticky top-0 z-20 -mx-1 hidden gap-1 border-b border-line bg-white/95 px-1 pt-1 backdrop-blur lg:flex">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => choose(t.key)}
+            className={`-mb-px border-b-2 px-3.5 py-3 text-[14.5px] font-bold ${tab === t.key ? "border-violet text-ink" : "border-transparent text-muted hover:text-ink"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      <div role="tabpanel" className={panel("inspirations")}>
+        <MoodboardSection
+          studioId={studioId}
+          initial={moodboard}
+          onSaved={setVersion}
+          onUsePalette={(colors) => update({ colors: colors.slice(0, MAX_COLORS) })}
+        />
+        {inspirations}
+        <ArtDirectionSection value={form.art_direction} onChange={(art_direction) => update({ art_direction })} />
+      </div>
+      <div role="tabpanel" className={panel("identite")}>
+        <LogoSection
+          studioId={studioId}
+          studioName={studioName}
+          logo={logo}
+          onSaved={(v, l) => {
+            setVersion(v);
+            setLogo(l);
+          }}
+        />
+        <ColorsSection value={form.colors} onChange={(colors) => update({ colors })} />
+      </div>
+      <div role="tabpanel" className={panel("polices")}>
+        <FontsSection
+          display={form.display_font}
+          body={form.body_font}
+          templateFonts={DEFAULT_FONTS}
+          onChange={update}
+          own={<OwnFonts studioId={studioId} initial={ownFonts} display={form.display_font} body={form.body_font} onUse={update} />}
+        />
+      </div>
+      <div role="tabpanel" className={panel("voix")}>
+        <VoiceSection value={form} onChange={update} />
+        <ToneSection value={form} onChange={update} />
+      </div>
+      <div role="tabpanel" className={panel("creations")}>
+        {/* Nothing made yet: on a computer, a line says so (on a phone, the section is just absent). */}
+        <div className="peer flex flex-col gap-5">{created}</div>
+        <p className="hidden rounded-[18px] border border-dashed border-line px-5 py-8 text-center text-[14.5px] text-muted lg:peer-empty:block">
+          Simone n’a encore rien créé pour toi : ses animations et tes styles de texte apparaîtront ici après tes premiers Reels.
+        </p>
+      </div>
 
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[18px] border border-line bg-white/95 px-4 py-3 shadow-[0_8px_30px_rgba(28,21,48,0.08)] backdrop-blur lg:bottom-4">
         <p

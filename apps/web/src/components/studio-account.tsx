@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { InstagramIcon, TikTokIcon } from "@/components/icons";
+import { creditBalance } from "@/lib/credits";
 import { initials } from "@/lib/format";
 import { tiktokEnabled } from "@/lib/social/tiktok";
 import { getSocialAccounts, getStudioContext } from "@/lib/studio";
@@ -21,6 +22,7 @@ export async function SidebarAccount() {
 
   return (
     <>
+      <Credits studioId={member.studio.id} wide />
       <div className="flex flex-col gap-2 rounded-[14px] bg-soft p-3.5">
         <span className="text-xs font-bold tracking-[.06em] text-muted">COMPTES CONNECTÉS</span>
         {accounts.map((a) => (
@@ -61,8 +63,34 @@ export async function SidebarAccount() {
 export async function HeaderAvatar() {
   const { member } = await getStudioContext();
   return (
-    <Link href="/reglages" aria-label="Réglages">
-      <Avatar name={member?.studio.name} small />
+    <span className="flex items-center gap-2">
+      {member && <Credits studioId={member.studio.id} />}
+      <Link href="/reglages" aria-label="Réglages">
+        <Avatar name={member?.studio.name} small />
+      </Link>
+    </span>
+  );
+}
+
+/**
+ * Her credits, always in sight (Tristan: « le nombre de crédits dispo doit être visible tout le temps »):
+ * in the side menu and the phone's header, to Réglages › Crédits. Refreshed with the page (StudioLive).
+ */
+async function Credits({ studioId, wide = false }: { studioId: string; wide?: boolean }) {
+  const balance = await creditBalance(studioId).catch(() => null);
+  if (balance === null) return null;
+  const low = balance < 20;
+  return (
+    <Link
+      href="/reglages#credits"
+      aria-label={`${balance} crédits disponibles`}
+      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold tabular-nums ${low ? "bg-peach text-peach-ink" : "bg-violet-tint text-violet"} ${wide ? "justify-between" : ""}`}
+    >
+      {wide ? <span className="font-semibold">Crédits</span> : null}
+      <span>
+        {balance}
+        {wide ? "" : " crédits"}
+      </span>
     </Link>
   );
 }

@@ -68,6 +68,9 @@ async function Library() {
       .eq("studio_id", studioId)
       // Simone's own montages (an effect's video) are not her photos and videos.
       .neq("source", "render")
+      // Nor are voices: her voice notes to Simone and Simone's voice-overs live on their Reel, not here
+      // (Tristan: « plein de vocaux qui servent à rien »).
+      .in("kind", ["video", "image"])
       .order("created_at", { ascending: false })
       .limit(LIMIT),
     "media_assets",

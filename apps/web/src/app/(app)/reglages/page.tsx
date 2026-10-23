@@ -201,7 +201,7 @@ async function Settings() {
           {billing ? <SubscriptionButton subscribed={subscription === "trialing" || subscription === "active" || subscription === "past_due"} /> : null}
         </Section>
 
-        <Section title="Crédits">
+        <Section title="Crédits" id="credits">
           <p className="flex items-baseline gap-2">
             <span className="text-[34px] font-extrabold tracking-[-0.02em] tabular-nums">{balance}</span>
             <span className="text-sm font-semibold text-muted">crédits disponibles</span>
@@ -248,9 +248,9 @@ async function Settings() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   return (
-    <section className="card flex flex-col gap-3 p-5">
+    <section id={id} className="card flex scroll-mt-6 flex-col gap-3 p-5">
       <h2 className="text-base font-bold">{title}</h2>
       {children}
     </section>
