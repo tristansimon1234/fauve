@@ -9,10 +9,11 @@ import { useEffect, useRef, useState } from "react";
 
 const BASE = "https://tfxkhktofgtljlqlksba.supabase.co/storage/v1/object/public/landing";
 
+// Each with its first picture (public/landing), so the phone is never black while it loads.
 export const SHOWCASE_REELS = [
-  { file: "reel-pilates-music.mp4", name: "studio.lune", who: "Studio de Pilates · Lyon" },
-  { file: "reel-coiffure-music.mp4", name: "maison.maya", who: "Salon de coiffure · Paris" },
-  { file: "reel-trattoria-music.mp4", name: "chezlino.bordeaux", who: "Trattoria · Bordeaux" },
+  { file: "reel-pilates-music.mp4", name: "studio.lune", who: "Studio de Pilates · Lyon", poster: "/landing/reel-pilates.webp" },
+  { file: "reel-coiffure-music.mp4", name: "maison.maya", who: "Salon de coiffure · Paris", poster: "/landing/reel-coiffure.webp" },
+  { file: "reel-trattoria-music.mp4", name: "chezlino.bordeaux", who: "Trattoria · Bordeaux", poster: "/landing/reel-trattoria.webp" },
 ] as const;
 
 /** The carousel's rendered photos (empty until it is made: the Reels then take the whole width). */
@@ -84,7 +85,14 @@ export function ReelsFeed() {
 
   return (
     <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-center lg:justify-center lg:gap-10">
-      <div className="relative">
+      <div className="relative isolate">
+        {/* The colours of the Reel playing glow behind the phone. */}
+        <div className="pointer-events-none absolute -inset-x-24 -inset-y-12 -z-10" aria-hidden="true">
+          {SHOWCASE_REELS.map((reel, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={reel.poster} src={reel.poster} alt="" className={`land-glow absolute inset-0 size-full object-cover blur-[70px] saturate-150 ${i === active ? "opacity-50" : "opacity-0"}`} />
+          ))}
+        </div>
         <div className="relative h-[min(78vh,600px)] w-[min(84vw,338px)] overflow-hidden rounded-[34px] bg-ink shadow-[0_30px_70px_rgba(28,21,48,.32)] ring-[7px] ring-ink">
           <div ref={feed} className="h-full snap-y snap-mandatory overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Reels faits par Simone">
             {SHOWCASE_REELS.map((reel, i) => (
@@ -93,7 +101,8 @@ export function ReelsFeed() {
                   ref={(el) => {
                     videos.current[i] = el;
                   }}
-                  src={`${BASE}/${srcs[i]}#t=0.1`}
+                  src={`${BASE}/${srcs[i]}`}
+                  poster={reel.poster}
                   // The version with music is made once after a deploy: until then, the silent one.
                   onError={() => setSrcs((all) => all.map((f, j) => (j === i ? reel.file.replace("-music", "") : f)))}
                   onTimeUpdate={(e) => i === active && setProgress(e.currentTarget.currentTime / (e.currentTarget.duration || 1))}
@@ -119,7 +128,7 @@ export function ReelsFeed() {
                       <path d="M9 18V5l12-2v13M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3zm12-2a3 3 0 1 1-3-3 3 3 0 0 1 3 3z" />
                     </svg>
                     <span className="min-w-0 overflow-hidden">
-                      <span className="landing-ticker block w-max whitespace-nowrap">Musique composée par Simone · son original · Musique composée par Simone · son original ·&nbsp;</span>
+                      <span className="land-ticker block w-max whitespace-nowrap">Musique composée par Simone · son original · Musique composée par Simone · son original ·&nbsp;</span>
                     </span>
                   </span>
                 </span>
@@ -168,6 +177,10 @@ export function ReelsFeed() {
             >
               <span className={`text-[13px] font-bold ${i === active ? "text-violet" : "text-ink"}`}>{reel.name}</span>
               <span className="hidden text-[12px] text-muted lg:block">{reel.who}</span>
+              {/* Where the Reel playing is. */}
+              <span className="mt-2 hidden h-[3px] overflow-hidden rounded-full bg-violet/15 lg:block">
+                <span className="block h-full origin-left rounded-full bg-violet" style={{ transform: `scaleX(${i === active ? progress : 0})` }} />
+              </span>
             </button>
           </li>
         ))}
@@ -176,52 +189,5 @@ export function ReelsFeed() {
         </li>
       </ol>
     </div>
-  );
-}
-
-/** The carousel as an Instagram post: the photos slide by themselves, the dots follow. */
-export function CarouselShowcase({ className = "max-w-[340px]" }: { className?: string }) {
-  const [at, setAt] = useState(0);
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = setInterval(() => setAt((i) => (i + 1) % SHOWCASE_SLIDES.length), 2600);
-    return () => clearInterval(timer);
-  }, []);
-  return (
-    <figure className={`mx-auto flex w-full ${className} flex-col overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_18px_44px_rgba(28,21,48,.14)]`}>
-      <span className="flex items-center gap-2 px-3 py-2.5">
-        <span className="size-7 shrink-0 rounded-full bg-[conic-gradient(from_180deg,#F2694E,#5B3FD9,#F2694E)] p-[2px]">
-          <span className="block size-full rounded-full bg-[#6D2E46]" />
-        </span>
-        <span className="flex flex-col leading-tight">
-          <span className="text-[13px] font-bold">maison.maya</span>
-          <span className="text-[11px] text-muted">Paris 11e</span>
-        </span>
-      </span>
-      <span className="relative block aspect-[4/5] w-full overflow-hidden bg-soft">
-        <span className="flex h-full transition-transform duration-700 ease-[cubic-bezier(.22,1,.36,1)]" style={{ transform: `translateX(-${at * 100}%)` }}>
-          {SHOWCASE_SLIDES.map((file, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={file} src={`${BASE}/${file}`} alt={`Carrousel de Maison Maya, photo ${i + 1}`} loading="lazy" className="size-full shrink-0 object-cover" />
-          ))}
-        </span>
-        <span className="absolute top-2.5 right-2.5 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">
-          {at + 1}/{SHOWCASE_SLIDES.length}
-        </span>
-      </span>
-      <span className="flex items-center gap-3 px-3 pt-2.5 pb-3" aria-hidden="true">
-        {[HEART, BUBBLE, PLANE].map((d, i) => (
-          <svg key={i} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
-            <path d={d} />
-          </svg>
-        ))}
-        <span className="mx-auto flex gap-1">
-          {SHOWCASE_SLIDES.map((f, i) => (
-            <span key={f} className={`size-1.5 rounded-full transition-colors ${i === at ? "bg-violet" : "bg-line"}`} />
-          ))}
-        </span>
-        <span className="w-[66px]" />
-      </span>
-    </figure>
   );
 }
