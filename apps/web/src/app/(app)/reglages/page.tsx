@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, PLANS, planOf, readMemory, reelsPerMonth } from "@fauve/agent";
+import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTAGE_CEILING, MONTAGE_FLOOR, PLANS, planOf, readMemory, reelsPerMonth } from "@fauve/agent";
 import { NoStudio } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
@@ -22,15 +22,11 @@ export const metadata: Metadata = { title: "Réglages" };
 
 /** The price list, as the manager reads it. */
 const CREDIT_LINES: [string, string][] = [
-  ["Montage", `${CREDIT_PRICES.montage} + ${CREDIT_PRICES.clip} par clip`],
-  ["Nouvelle scène animée", `${CREDIT_PRICES.newScene}`],
-  ["Scène de ta bibliothèque", "gratuit"],
-  ["Correction d’un montage", `${CREDIT_PRICES.correction}`],
+  // A montage is charged on what it really took (its animations, its voice, its corrections), between these bounds.
+  ["Montage (Rapide)", `${MONTAGE_FLOOR.montage} à ${MONTAGE_CEILING.rapide}, selon ce qu’il demande`],
+  ["Montage Soigné / Max", `jusqu’à ${MONTAGE_CEILING.soigne} / ${MONTAGE_CEILING.max}`],
+  ["Correction d’un montage", `${MONTAGE_FLOOR.correction} à ${MONTAGE_CEILING.correction}`],
   ["Variante d’un montage", `${CREDIT_PRICES.variant}`],
-  ["Simone regarde la vidéo (Soigné, Max)", `${CREDIT_PRICES.review}`],
-  ["Correction après l’avoir regardée", `${CREDIT_PRICES.fixRound}`],
-  ["2e version à comparer (Max)", `${CREDIT_PRICES.alternative}`],
-  ["Rendu vidéo", `${CREDIT_PRICES.render}`],
   ["Lecture du moodboard", `${CREDIT_PRICES.moodboard}`],
   ["Messages à Simone", "gratuit"],
 ];

@@ -34,6 +34,8 @@ export type DeliveryTarget = {
   spokenKept?: boolean;
   /** What the montage used, and what is left (charged right after the delivery): said in the message. */
   cost?: { credits: number; left: number } | null;
+  /** The same, read once the video is rendered (a montage is charged on what it really cost, the render and music included). */
+  costOf?: () => Promise<{ credits: number; left: number } | null>;
   /** Started from the app (« Créer »): she is told on WhatsApp too, so she can close the app. */
   notify?: boolean;
   /** The conversation she asked in (the app): the message lands there, not in the latest automatic one. */
@@ -114,13 +116,18 @@ export async function messageStudio(
  * in the app: the post's card (and the app opens the publication page).
  * Returns what was delivered, or null if it failed (the manager is told).
  */
-export async function renderAndDeliver(target: DeliveryTarget, stillWanted?: () => Promise<boolean>): Promise<{ title: string } | "stopped" | null> {
+export async function renderAndDeliver(
+  target: DeliveryTarget,
+  stillWanted?: () => Promise<boolean>,
+): Promise<{ title: string; cost: { credits: number; left: number } | null } | "stopped" | null> {
   try {
     const r = await renderPost(target.studioId, target.postId, { freshMusic: target.freshMusic });
     // A newer request replaced this work while it rendered: nothing goes out.
     if (stillWanted && !(await stillWanted())) return "stopped";
-    await deliverMontage(target, r);
-    return { title: r.title };
+    // What it cost, once rendered: the message says what will be charged.
+    const cost = target.costOf ? await target.costOf().catch(() => null) : (target.cost ?? null);
+    await deliverMontage({ ...target, cost }, r);
+    return { title: r.title, cost };
   } catch (error) {
     console.error("render failed", target.postId, error);
     await notifyFailure(target, "Le montage n’a pas abouti cette fois, je regarde ce qui coince. Tu veux que je réessaie ? Aucun crédit n’a été débité.", error);

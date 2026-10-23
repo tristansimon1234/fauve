@@ -14,6 +14,18 @@ export const TARGET_MARGIN = 0.5;
 export const creditValue = (plan: PlanId) => PLANS[plan].priceEur / PLANS[plan].credits;
 /** What one credit is worth at least, whatever the plan: the margin of every job is checked against it. */
 export const CREDIT_VALUE_EUR = Math.min(...(Object.keys(PLANS) as PlanId[]).map(creditValue));
+/** What one credit pays of a job's real cost, the margin kept (on the plan where a credit is worth least). */
+export const EUR_PER_CREDIT_SPENT = CREDIT_VALUE_EUR * (1 - TARGET_MARGIN);
+
+/**
+ * A metered job's charge (a montage, a correction): what it really cost, in credits that keep the
+ * margin, between its floor and its ceiling. Its cost unknown (not logged): the floor.
+ */
+export function meteredCredits(input: { costEur: number | null; floor: number; ceiling: number }): number {
+  const credits = input.costEur === null ? 0 : Math.ceil(Math.max(0, input.costEur) / EUR_PER_CREDIT_SPENT - 1e-9);
+  return Math.max(input.floor, Math.min(input.ceiling, credits));
+}
+
 /** The most a studio's month may cost (AI, render…) while keeping the margin. */
 export const monthlyCostBudget = (plan: PlanId) => PLANS[plan].priceEur * (1 - TARGET_MARGIN);
 /** Pro's month budget. */

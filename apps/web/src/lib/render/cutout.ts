@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { CUTOUT_MODEL, cutEdges, cutoutSchema, sceneWorthy, stickerWorthy, type Cutout, type ReelInputs, type ScenePhoto } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cutoutCostEur, cutoutsInSandbox } from "./sandbox";
+import { costMeta } from "@/lib/cost-scope";
 
 // Cut-outs: the subject of a photo cut out once in its own sandbox (an open model,
 // never redrawn), kept on the photo (media_assets.cutout) with its image in Storage.
@@ -53,7 +54,7 @@ export async function ensureCutouts(studioId: string, mediaIds: string[]): Promi
       provider: "vercel_sandbox",
       units: Math.round(seconds),
       cost_eur: cutoutCostEur(seconds),
-      meta: { photos: photos.length, model: CUTOUT_MODEL },
+      meta: costMeta({ photos: photos.length, model: CUTOUT_MODEL }),
     });
   } catch (error) {
     console.warn("cut-outs unavailable, the photos stay prints", error instanceof Error ? error.message.slice(0, 300) : error);

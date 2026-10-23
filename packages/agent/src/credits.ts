@@ -2,9 +2,10 @@ import { EFFORTS, type Effort } from "./effort.ts";
 import { MAX_FREE_SCENES } from "./editor.ts";
 import { PLANS } from "./plans.ts";
 
-// Credits: what a studio is charged for the costly work, shown to the manager
-// before it runs. A fixed price list (not metered tokens) keeps the quote
-// predictable; the charge after the work is the real one, never above the quote.
+// Credits: what a studio is charged for the costly work. A montage is charged on what it
+// really cost (Tristan: « le calcul des crédits devrait se faire en fonction de la complexité
+// passée, pas un truc fixe ») in credits that keep the margin (meteredCredits, margin.ts),
+// between a floor and a ceiling said at launch; the other jobs keep a fixed price list.
 // A credit is worth the plan spread over the month's credits (margin.ts): each
 // job's price keeps at least half of that as margin, checked by the tests.
 
@@ -61,29 +62,22 @@ export function effortVersions(effort: Effort, correction: boolean): 1 | 2 {
   return correction ? 1 : EFFORTS[effort].versions;
 }
 
-/** Price of a montage or a correction at a level of care (Rapide by default), before it runs. */
-export function quoteMontage(input: { clips: number; correction: boolean; maxNewScenes?: number; effort?: Effort }): MontageQuote {
-  const clips = Math.max(0, Math.min(10, Math.round(input.clips)));
+/** The least a montage or a correction is charged, whatever it cost (Tristan: « top » to 5 to 25 for a Reel). */
+export const MONTAGE_FLOOR = { montage: 5, correction: 2 } as const;
+/** The most, said at launch: by level of care for a new Reel (two versions and corrections cost more), and for a correction. */
+export const MONTAGE_CEILING: Record<Effort | "correction", number> = { rapide: 25, soigne: 30, max: 40, correction: 15 };
+
+/**
+ * Price of a montage or a correction at a level of care (Rapide by default), before it runs: what it
+ * will really cost, between its floor (`base`) and its ceiling (`max`); the charge is meteredCredits.
+ */
+export function quoteMontage(input: { correction: boolean; maxNewScenes?: number; effort?: Effort }): MontageQuote {
   // Callers pass the animations of the plan; without them, two (8 at most).
   const maxNewScenes = Math.max(0, Math.min(MAX_FREE_SCENES, input.maxNewScenes ?? 2));
   const level = EFFORTS[input.effort ?? "rapide"];
-  const lines: QuoteLine[] = input.correction
-    ? [{ label: "Correction du montage", credits: CREDIT_PRICES.correction }]
-    : [{ label: "Montage", credits: CREDIT_PRICES.montage }];
-  if (!input.correction && clips) lines.push({ label: `${clips} clip${clips > 1 ? "s" : ""} analysé${clips > 1 ? "s" : ""}`, credits: clips * CREDIT_PRICES.clip });
-  if (maxNewScenes) lines.push({ label: scenesLabel(maxNewScenes), credits: maxNewScenes * CREDIT_PRICES.newScene });
-  lines.push({ label: "Rendu vidéo", credits: CREDIT_PRICES.render });
-  const versions = effortVersions(input.effort ?? "rapide", input.correction);
-  if (versions > 1) lines.push({ label: "2e version à comparer", credits: CREDIT_PRICES.alternative });
-  if (level.review) lines.push({ label: versions > 1 ? "Simone regarde et choisit" : "Simone regarde la vidéo", credits: CREDIT_PRICES.review });
-  const base = lines.reduce((sum, l) => sum + l.credits, 0);
-  return {
-    lines,
-    base,
-    max: base + level.fixRounds * CREDIT_PRICES.fixRound,
-    maxNewScenes,
-    fixRounds: level.fixRounds,
-  };
+  const base = input.correction ? MONTAGE_FLOOR.correction : MONTAGE_FLOOR.montage;
+  const lines: QuoteLine[] = [{ label: input.correction ? "Correction, selon ce qu’elle demande vraiment" : "Montage, selon ce qu’il demande vraiment", credits: base }];
+  return { lines, base, max: MONTAGE_CEILING[input.correction ? "correction" : (input.effort ?? "rapide")], maxNewScenes, fixRounds: level.fixRounds };
 }
 
 /** Price of a variant: no AI work, only the render. */
@@ -102,8 +96,9 @@ export function scenesInQuote(lines: QuoteLine[] | null | undefined): number {
 }
 
 /**
- * What is actually charged once the montage is delivered: the work, the new scenes
- * really made (the quoted ones not made come off) and the corrections, never above the quote.
+ * What a montage priced from the old list (launched before montages were metered) is charged once
+ * delivered: the work, the new scenes really made (the quoted ones not made come off) and the
+ * corrections, never above the quote.
  */
 export function montageCharge(quote: Pick<MontageQuote, "base" | "max" | "lines">, newScenes: number, fixRounds = 0): number {
   const work = quote.base - scenesInQuote(quote.lines) * CREDIT_PRICES.newScene;

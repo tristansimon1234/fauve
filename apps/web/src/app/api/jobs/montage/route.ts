@@ -48,6 +48,7 @@ import { renderPost } from "@/lib/render/render-post";
 import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { finishJob } from "@/lib/studio-jobs";
+import { withCostScope } from "@/lib/cost-scope";
 
 // Montage pipeline, one step per invocation (each with its own time budget).
 // Rapide (and older quotes): design → render, delivered at once.
@@ -171,7 +172,8 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid job" }, { status: 400 });
   const job = parsed.data;
-  after(() => run(job));
+  // Every cost this step logs is counted for its montage: it is charged on what it really cost.
+  after(() => withCostScope(job.quoteId, () => run(job)));
   return Response.json({ queued: job.step }, { status: 202 });
 }
 
@@ -217,17 +219,25 @@ async function run(job: Job) {
   if (!reviewed) {
     if (job.step === "render") {
       await setQuoteStage(job.quoteId, "render");
-      const cost = job.quoteId ? await montageCost(job.quoteId, job.newScenes ?? 0) : null;
       // Replaced while it rendered: not delivered, not charged (the « plu » version went out at 15:05, charged, after the new request).
       const delivered = await renderAndDeliver(
-        { ...target, rationale: job.rationale, note: job.note ?? job.rationale, offerVariant: true, voice: job.voice, spokenKept: job.spokenKept, cost },
+        {
+          ...target,
+          rationale: job.rationale,
+          note: job.note ?? job.rationale,
+          offerVariant: true,
+          voice: job.voice,
+          spokenKept: job.spokenKept,
+          costOf: async () => (job.quoteId ? montageCost(job.quoteId, job.newScenes ?? 0) : null),
+        },
         async () => !(await quoteSuperseded(job.quoteId)),
       );
       if (delivered === "stopped") return;
       // Charged only once the video is out, for the scenes really made (never above the quote).
       if (delivered && job.quoteId) {
         await setQuoteStage(job.quoteId, "delivered");
-        await chargeQuote(job.quoteId, job.newScenes ?? 0, delivered.title);
+        // Exactly what the message said.
+        await chargeQuote(job.quoteId, job.newScenes ?? 0, delivered.title, 0, { said: delivered.cost?.credits });
       } else await reopenQuote(job.quoteId);
       return;
     }
@@ -701,6 +711,7 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         skipReview: !outcome?.reviewed && Boolean(job.effort && EFFORTS[job.effort].review),
         skipAlternative: Boolean(job.effort && effortVersions(job.effort, Boolean(job.correction)) > 1 && !job.compared),
       };
+  const cost = job.quoteId ? await montageCost(job.quoteId, job.newScenes ?? 0, job.fixes ?? 0, skipped) : null;
   try {
     await deliverMontage(
       {
@@ -714,7 +725,7 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         offerVariant: !job.compared && !outcome?.effect,
         voice: job.voice,
         spokenKept: job.spokenKept,
-        cost: job.quoteId ? await montageCost(job.quoteId, job.newScenes ?? 0, job.fixes ?? 0, skipped) : null,
+        cost,
       },
       { title, durationMs: (render.data?.duration_ms as number | null) ?? 0 },
     );
@@ -726,7 +737,7 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
   }
   if (job.quoteId) {
     await setQuoteStage(job.quoteId, "delivered");
-    await chargeQuote(job.quoteId, job.newScenes ?? 0, title, job.fixes ?? 0, skipped);
+    await chargeQuote(job.quoteId, job.newScenes ?? 0, title, job.fixes ?? 0, { ...skipped, said: cost?.credits });
   }
   return true;
 }

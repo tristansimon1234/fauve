@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { clipAnalysisSchema, mediaTracksSchema, TRACK_MODEL, tracksFileSchema, trackWorthy, type MediaTracks, type TracksByClip, type TracksFile } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cutoutCostEur, tracksInSandbox } from "./sandbox";
+import { costMeta } from "@/lib/cost-scope";
 
 // What moves in her videos (hands, faces, bodies, image by image), read once per clip in the
 // cut-out sandbox and kept beside it in Storage ({studio}/tracks/{media}.json, removed with
@@ -75,7 +76,7 @@ export async function ensureTracks(studioId: string, mediaIds: string[]): Promis
       provider: "vercel_sandbox",
       units: Math.round(seconds),
       cost_eur: cutoutCostEur(seconds),
-      meta: { videos: videos.length, model: TRACK_MODEL },
+      meta: costMeta({ videos: videos.length, model: TRACK_MODEL }),
     });
   } catch (error) {
     console.warn("tracking unavailable, the animations see nothing to follow", error instanceof Error ? error.message.slice(0, 300) : error);
