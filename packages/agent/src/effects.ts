@@ -81,6 +81,8 @@ La chaîne de montage de Simone (par défaut) coupe et ordonne ses plans, pose d
 
 L'atelier d'effets travaille image par image sur sa vidéo : il mesure ce qui bouge (le bout des doigts, les mains, le corps, le visage) et dessine un effet qui y est accroché à chaque image, comme un monteur d'effets spéciaux : un texte qui naît et grossit entre ses doigts, une boule d'énergie dans ses mains et un rayon qui part vers la caméra, un objet tenu qui suit son geste, une aura autour d'elle, un texte posé derrière elle dans sa vidéo (sa silhouette découpée à chaque image, elle passe devant les mots), un univers de dessin animé ou de film sur elle. Il coûte plus cher et prend 10 à 30 minutes.
 
+Quand elle recopie un Reel, ses moments (reel_recopie, ses effets l'un après l'autre) font partie de sa demande : un de ces moments qui demande de dessiner sur elle image par image ou de passer derrière elle dans sa vidéo compte comme un effet de ce genre ; des cartes, des photos, des graphiques ou des textes posés par-dessus sa vidéo restent à la chaîne.
+
 Réponds agent = true seulement quand sa demande contient un effet de ce genre, accroché à ce qui bouge dans ses images ou qui demande de dessiner sur elle image par image. Sinon false : une ambiance, une offre, une visite, un texte animé, un collage, une voix qui raconte, une animation posée sur la vidéo restent à la chaîne, même avec des mots comme « effet » ou « animation ». Sans vidéo, toujours false. Dans le doute, false.
 
 effect : l'effet en quelques mots quand c'est l'atelier, sinon vide. why : une phrase.`;

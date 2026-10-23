@@ -78,6 +78,20 @@ export const stolenLookReadingSchema = z.object({
       "Seulement si les couleurs de ses textes et de ses formes font son style (un jaune cerné de noir, un néon, une palette rétro…) : 1 à 3 couleurs hex (#RRGGBB), la plus visible d'abord. Sinon une liste vide : les couleurs de ses images ne comptent pas, ni un texte blanc ou noir ordinaire",
     ),
   effect: z.enum(["dust", "grain", "none"]).describe("Un effet sur toute la vidéo : dust (poussière et rayures de pellicule), grain, none"),
+  moments: z
+    .array(
+      z.object({
+        at: z.number().describe("Quand il commence, en secondes"),
+        what: z
+          .string()
+          .describe(
+            "Ce qui se passe à l'écran, en une phrase précise : l'élément (une carte d'appli, des photos, un graphique, un mot en très grand, une page de texte, un écran coupé en deux…), où il est posé (autour de sa main, à côté de sa tête, derrière la personne, sur tout le fond), devant ou derrière elle, comment il arrive et bouge ; sans recopier ses mots ni les marques",
+          ),
+      }),
+    )
+    .describe(
+      "Quand le Reel enchaîne des effets, des animations ou des temps bien distincts (une liste d'effets montrés l'un après l'autre, des étapes, un avant/après), chacun dans l'ordre, jusqu'à 12 : c'est ce qui fait ce Reel, la personne qui le recopie doit pouvoir les refaire sans le revoir. Une liste vide pour un Reel sans moments distincts",
+    ),
   grade: z
     .enum(SIGNATURE_GRADES)
     .describe("La lumière et les couleurs de ses images : natural, warm (chaude), bright (claire et aérée), flash (flash direct), film (argentique), moody (sombre et contrastée), cool (froide)"),
@@ -98,7 +112,9 @@ export const stolenLookReadingSchema = z.object({
 export type StolenLookReading = z.infer<typeof stolenLookReadingSchema>;
 
 /** The longest words of a stolen look, as it is kept. */
-const LOOK_CHARS = { name: 40, what: 200, composition: 240, layout: 200, music: 80, ending: 160, why: 300 } as const;
+const LOOK_CHARS = { name: 40, what: 200, composition: 240, layout: 200, music: 80, ending: 160, why: 300, moment: 220 } as const;
+/** The most moments a look keeps (a Reel of 9 effects, its ending). */
+export const MAX_MOMENTS = 12;
 
 /**
  * A stolen look as it is kept: the reading within its lengths. Its font and colours only when
@@ -111,6 +127,11 @@ export const stolenLookSchema = stolenLookReadingSchema.extend({
   colors: z.array(z.string().regex(HEX)).min(1).max(3).optional(),
   // A look read before its layout was read has none (its shots taken as full frame).
   layout: z.string().max(LOOK_CHARS.layout).optional(),
+  // A look read before its moments were read, or a Reel without distinct moments, has none.
+  moments: z
+    .array(z.object({ at: z.number().min(0).max(600), what: z.string().min(1).max(LOOK_CHARS.moment) }))
+    .max(MAX_MOMENTS)
+    .optional(),
   music: z.string().max(LOOK_CHARS.music),
   ending: z.string().max(LOOK_CHARS.ending),
   why: z.string().max(LOOK_CHARS.why),
@@ -127,9 +148,14 @@ function hexColor(written: string): string | null {
 
 /** Structured outputs do not enforce lengths: the reading is taken as written, then clamped. */
 export function clampLook(reading: StolenLookReading): StolenLook {
-  const { colors: written, text: { font: named, ...text }, ...rest } = reading;
+  const { colors: written, text: { font: named, ...text }, moments: read, ...rest } = reading;
   const font = named.trim();
   const colors = [...new Set(written.flatMap((c) => hexColor(c) ?? []))].slice(0, 3);
+  const moments = read
+    .filter((m) => Number.isFinite(m.at) && m.what.trim())
+    .map((m) => ({ at: Math.round(Math.min(600, Math.max(0, m.at)) * 10) / 10, what: clip(m.what, LOOK_CHARS.moment) }))
+    .sort((a, b) => a.at - b.at)
+    .slice(0, MAX_MOMENTS);
   return {
     ...rest,
     name: clip(reading.name, LOOK_CHARS.name) || "son style",
@@ -137,6 +163,8 @@ export function clampLook(reading: StolenLookReading): StolenLook {
     text: { ...text, composition: clip(reading.text.composition, LOOK_CHARS.composition), ...(FONT_FAMILY.test(font) ? { font } : {}) },
     ...(colors.length ? { colors } : {}),
     layout: clip(reading.layout, LOOK_CHARS.layout) || "plein cadre",
+    // One moment is not a sequence: a Reel built on one effect says it in its hook and its layout.
+    ...(moments.length > 1 ? { moments } : {}),
     music: clip(reading.music, LOOK_CHARS.music),
     ending: clip(reading.ending, LOOK_CHARS.ending),
     why: clip(reading.why, LOOK_CHARS.why),
@@ -151,7 +179,7 @@ export const stolenStyleSchema = z.object({ look: stolenLookSchema, measures: re
 export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
 export const STEAL_PROMPT = `Tu es la directrice artistique de Simone, qui monte les Reels Instagram d'un commerce de quartier (studio, salon, restaurant, boutique…). La personne qui gère le commerce veut reprendre le style de ce Reel pour les siens : lis-le comme une monteuse pro qui veut en refaire le style, pas le contenu.
-Regarde tout le Reel, image par image, avec le son : la forme (raconté par une voix, un message clé tenu, une visite, du collage), la mise en page (ses plans en plein cadre, ou un écran partagé, un plan dans une fenêtre, plusieurs à la fois), l'accroche des 2 premières secondes, le texte posé sur la vidéo (combien, comment il est composé : niveaux, tailles, casse, graisse, espacement des lettres, mot clé, fond sous la phrase, place, alignement ; sa police et ses couleurs seulement quand elles font son style), les sous-titres, l'effet sur la vidéo (poussière de pellicule, grain), la lumière, le mouvement des textes, la caméra, les transitions, la musique (genre et énergie, pour un compositeur), la fin.
+Regarde tout le Reel, image par image, avec le son : la forme (raconté par une voix, un message clé tenu, une visite, du collage), la mise en page (ses plans en plein cadre, ou un écran partagé, un plan dans une fenêtre, plusieurs à la fois), l'accroche des 2 premières secondes, le texte posé sur la vidéo (combien, comment il est composé : niveaux, tailles, casse, graisse, espacement des lettres, mot clé, fond sous la phrase, place, alignement ; sa police et ses couleurs seulement quand elles font son style), les sous-titres, l'effet sur la vidéo (poussière de pellicule, grain), ses moments quand il enchaîne des effets ou des animations bien distincts (chacun : quand, quel élément, où, devant ou derrière la personne, comment il bouge), la lumière, le mouvement des textes, la caméra, les transitions, la musique (genre et énergie, pour un compositeur), la fin.
 Ne recopie ni ses mots, ni ses images, ni le nom de sa musique : décris une forme réutilisable par un autre commerce. N'accorde rien au féminin ou au masculin pour la personne qui gère. En français, sauf « music » en anglais.`;
 
 /** The style one Reel copies (from its inspiration's stolen style): its look and its pace. */
@@ -206,7 +234,7 @@ export function stolenStyleLines(style: StolenStyle): string[] {
   const { look, measures } = style;
   const effect = EFFECT_WORDS[look.effect];
   return [
-    `La forme : ${FORMAT_WORDS[look.format]}, ${paceWords(secondsPerShot(measures), measures.bpm, measures.cuts.length)}.`,
+    `La forme : ${FORMAT_WORDS[look.format]}, ${paceWords(secondsPerShot(measures), measures.bpm, measures.cuts.length)}${look.moments?.length ? `, ${look.moments.length} effets ou temps enchaînés, que je refais avec tes images` : ""}.`,
     `Le texte : ${look.text.composition.replace(/[.\s]+$/, "")}${look.text.subtitles ? ", avec des sous-titres" : ""}.`,
     [`L'ambiance : ${look.music}`, effect, look.why.replace(/[.\s]+$/, "")].filter(Boolean).join(" ; ") + ".",
   ];
@@ -346,6 +374,10 @@ export function followedForEditor(followed: FollowedStyle) {
     ...(followed.average_shot !== null ? { plan_moyen_s: followed.average_shot } : {}),
     ...(followed.bpm !== null ? { tempo_bpm: followedTempo(followed.bpm) } : {}),
     accroche: `${look.hook.kind} : ${look.hook.what}`,
+    // What makes it: each effect or animation in turn, redone with her images (as many, each at its moment).
+    ...(look.moments?.length
+      ? { moments: look.moments.map((m) => ({ a_s: m.at, quoi: m.what })), moments_consigne: "refais chacun de ces moments, dans cet ordre et à peu près à ces temps, avec ses images et ses mots : c'est ce qui fait ce Reel" }
+      : {}),
     texte: `${look.text.amount} ; ${look.text.composition}${look.text.subtitles ? " ; des sous-titres" : ""}`,
     // Already set on the plan by the engine (followedLook): the editor and the animations follow it.
     ...(takenLook(look) ? { police_et_couleurs: takenLook(look)! } : {}),
@@ -357,6 +389,11 @@ export function followedForEditor(followed: FollowedStyle) {
   };
 }
 
+/** Its moments in one line (« 1,2 s : … ; 3,4 s : … »), or null. */
+export function momentsLine(look: Pick<StolenLook, "moments">): string | null {
+  return look.moments?.length ? look.moments.map((m) => `${seconds(m.at)} s : ${m.what.replace(/[.\s]+$/, "")}`).join(" ; ") : null;
+}
+
 /** The followed style in one line, for the critic: the Reel must follow it, its ending and its voice too. */
 export function followedLine(followed: FollowedStyle): string {
   const { look } = followed;
@@ -364,6 +401,7 @@ export function followedLine(followed: FollowedStyle): string {
     `Reel à recopier (${followed.own ? "un de ses Reels, gardé comme modèle" : "un Reel qu'elle a envoyé"}, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
     ...(composedLayout(look) ? [`mise en page : ${composedLayout(look)}`] : []),
     `accroche ${look.hook.kind}`,
+    ...(momentsLine(look) ? [`ses moments, chacun à refaire avec ses images : ${momentsLine(look)}`] : []),
     `texte : ${look.text.amount}`,
     // With a voice, whether its words are written on screen: a copy may speak without subtitles.
     look.voice === "aucune" ? "voix : aucune" : `voix : ${look.voice}, ${look.text.subtitles ? "avec" : "sans"} sous-titres`,

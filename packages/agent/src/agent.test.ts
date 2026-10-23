@@ -1848,6 +1848,7 @@ test("copy first: what the Reel she copies (or her request) does not have is nev
     text: { amount: "aucun", composition: "aucun texte", case: "normal", weight: "regular", tracking: "normal", align: "center", stress: "none", band: "none", subtitles: false, font: "" },
     colors: [],
     effect: "none",
+    moments: [],
     grade: "natural",
     motion: "epure",
     layout: "plein cadre",
@@ -3370,6 +3371,7 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
     text: { amount: "un message tenu", composition: "un titre très grand en capitales, un sous-titre en petit dessous, centré au tiers haut. ".repeat(5), case: "upper", weight: "black", tracking: "tight", align: "center", stress: "block", band: "none", subtitles: false, font: "" },
     colors: [],
     effect: "dust",
+    moments: [],
     grade: "film",
     motion: "energique",
     layout: "plein cadre",
@@ -3381,6 +3383,29 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   });
   assert.ok(look.text.composition.length <= 240);
   assert.ok(stolenLookSchema.safeParse(look).success);
+  // A Reel without distinct moments keeps none.
+  assert.equal("moments" in look, false);
+  // A Reel of effects one after the other: each kept in order, within its length; one moment alone is no sequence.
+  const effects = clampLook({
+    ...look,
+    layout: "plein cadre",
+    text: { ...look.text, font: "" },
+    colors: [],
+    moments: [
+      { at: 4.2, what: "une fenêtre d'appli surgit à côté de sa tête" },
+      { at: 2.04, what: "des icônes tournent autour de sa main. ".repeat(10) },
+      { at: 6, what: "  " },
+      { at: 7.5, what: "une page de texte remplit le fond, la personne détourée devant" },
+    ],
+  });
+  assert.deepEqual(effects.moments?.map((m) => m.at), [2, 4.2, 7.5]);
+  assert.ok(effects.moments!.every((m) => m.what.length <= 220));
+  assert.ok(stolenLookSchema.safeParse(effects).success);
+  assert.equal("moments" in clampLook({ ...look, layout: "plein cadre", text: { ...look.text, font: "" }, colors: [], moments: [{ at: 1, what: "un seul effet" }] }), false);
+  const sequence = followedFrom("11111111-2222-4333-8444-555555555555", { look: effects, measures: { duration: 19, cuts: [], bpm: null, lufs: -14 } });
+  assert.equal(followedForEditor(sequence).moments?.length, 3);
+  assert.match(followedLine(sequence), /ses moments, chacun à refaire avec ses images : 2 s : des icônes .* ; 4,2 s : une fenêtre d'appli surgit à côté de sa tête ; 7,5 s : une page de texte/);
+  assert.match(stolenStyleLines({ look: effects, measures: { duration: 19, cuts: [], bpm: null, lufs: -14 } })[0]!, /3 effets ou temps enchaînés/);
   // An ordinary font and plain colours do not make its style: none is kept, hers stay.
   assert.equal("font" in look.text, false);
   assert.equal("colors" in look, false);
@@ -3502,6 +3527,7 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
     text: { amount: "plusieurs" as const, composition: "des mots en capitales très grasses, un mot jaune", case: "upper" as const, weight: "black" as const, tracking: "tight" as const, align: "center" as const, stress: "color" as const, band: "none" as const, subtitles: true, font: " Anton " },
     colors: ["#FD0", "jaune", "#FFFFFF", "#ffdd00", "#000000", "#ff3b30"],
     effect: "none" as const,
+    moments: [],
     grade: "natural" as const,
     motion: "energique" as const,
     layout: "plein cadre",
@@ -4114,6 +4140,7 @@ test("her own Reel as a model: its structure for the editor, its origin for the 
     text: { amount: "une ligne", composition: "une phrase au tiers haut", case: "normal", weight: "bold", tracking: "normal", align: "center", stress: "color", band: "none", subtitles: false, font: "" },
     colors: [],
     effect: "dust",
+    moments: [],
     grade: "warm",
     motion: "chaleureux",
     layout: "plein cadre",

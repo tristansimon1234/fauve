@@ -45,6 +45,8 @@ import { photoRegions } from "@/lib/video/regions";
 //                        reset=1 first removes the case's posts and scenes, for a new first Reel;
 //                        stock=<id>,… other free stock clips (Mixkit ids) for this run, to try a
 //                        clip without a new deploy;
+//                        route=agent|chain makes this Reel with the effects workshop or the chain,
+//                        to compare them on the same case (else decided as for her);
 //                        idea=<her words> is what she writes in « Ce que tu imagines » (else the
 //                        case's idea), sent as the Créer screen sends it: the post's title, and
 //                        « Ce que la gérante imagine : … » for the editor and the voice;
@@ -119,6 +121,8 @@ type LabCase = {
   own?: string[];
   /** The vertical photos of a demo studio. */
   photosOf?: { studio: string; max: number };
+  /** Who makes the Reel for this run (route=agent|chain), to compare the effects workshop with the chain; else decided as for her. */
+  route?: "agent" | "chain";
 };
 
 const CASES: Record<string, LabCase> = {
@@ -471,7 +475,7 @@ async function startSite(url: string, kindName: string, withClips: boolean, rese
   await montage(siteKey(url), studioId, { title: kind.title, idea: idea ?? kind.idea, template }, videos, photos, voice, copy);
 }
 
-async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template">, videos: string[], photos: string[], voice: LabVoice, copy: string | null = null) {
+async function montage(name: string, studioId: string, c: Pick<LabCase, "title" | "idea" | "template" | "route">, videos: string[], photos: string[], voice: LabVoice, copy: string | null = null) {
   const db = supabaseAdmin();
   // Everything read first, as when she sends them: Gemini watches each video, each photo is framed.
   const [analyses] = await Promise.all([
@@ -510,7 +514,7 @@ async function montage(name: string, studioId: string, c: Pick<LabCase, "title" 
     console.log("lab: her voice note", name, note.seconds, note.text);
   }
   // The same chain as her first Reel at the default care, without a quote: two scenes of her own.
-  await queueJob("montage", { step: "design", studioId, postId: post.data.id, mediaIds, brief, maxNewScenes: 2, effort: DEFAULT_EFFORT });
+  await queueJob("montage", { step: "design", studioId, postId: post.data.id, mediaIds, brief, maxNewScenes: 2, effort: DEFAULT_EFFORT, ...(c.route ? { route: c.route } : {}) });
   console.log("lab: montage started", name, post.data.id);
 }
 
@@ -795,7 +799,10 @@ export async function POST(request: Request) {
   if (stock && !new RegExp(`^\\d{1,7}(,\\d{1,7}){0,${MAX_MEDIA - 1}}$`).test(stock)) return Response.json({ error: "stock=<mixkit id>,…" }, { status: 400 });
   const own = params.get("own")?.split(",");
   if (own && (own.length > MAX_MEDIA || !own.every((f) => LAB_FILE.test(f)))) return Response.json({ error: "own=<file>,…" }, { status: 400 });
-  const run = own ? { ...c, clips: [], own } : stock ? { ...c, clips: stock.split(",").map(Number) } : c;
+  const route = params.get("route");
+  if (route && route !== "agent" && route !== "chain") return Response.json({ error: "route=agent|chain" }, { status: 400 });
+  const media = own ? { ...c, clips: [], own } : stock ? { ...c, clips: stock.split(",").map(Number) } : c;
+  const run = route ? { ...media, route: route as "agent" | "chain" } : media;
   // « Steal »: a Reel's link, a video file's URL (https), or a video uploaded to the lab studio (lab:<file>).
   const steal = params.get("steal");
   if (steal && !/^https:\/\/\S{8,500}$/.test(steal) && !(steal.startsWith("lab:") && LAB_FILE.test(steal.slice(4)))) {
