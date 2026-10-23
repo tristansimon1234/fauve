@@ -20,6 +20,7 @@ import {
   effectsTask,
   editPlanSchema,
   followedLine,
+  momentsLine,
   isBaked,
   KIT_FILE,
   mp4Duration,
@@ -78,16 +79,16 @@ const extension = (mime: string | null, kind: string) =>
  * else the chain. Sonnet reads her request; nothing is asked without a video, and a failed
  * reading leaves the Reel to the chain.
  */
-export async function routeEffect(studioId: string, request: string | undefined, files: { videos: number; photos: number }): Promise<EffectRoute> {
+export async function routeEffect(studioId: string, request: string | undefined, files: { videos: number; photos: number }, copied?: string | null): Promise<EffectRoute> {
   const chain = { agent: false, effect: "", why: "" };
-  if (!request?.trim() || !files.videos) return chain;
+  if ((!request?.trim() && !copied) || !files.videos) return chain;
   try {
     const response = await anthropic().beta.messages.parse({
       model: ANALYST_MODEL,
       max_tokens: 400,
       output_config: { effort: "low", format: outputFormat(effectRouteSchema) },
       system: EFFECT_ROUTER_PROMPT,
-      messages: [{ role: "user", content: JSON.stringify({ demande: request.slice(0, 3000), videos: files.videos, photos: files.photos }) }],
+      messages: [{ role: "user", content: JSON.stringify({ demande: (request ?? "").slice(0, 3000), ...(copied ? { reel_recopie: copied } : {}), videos: files.videos, photos: files.photos }) }],
     });
     await logClaudeCost(studioId, response.usage, "effect_route", ANALYST_MODEL);
     return response.parsed_output ?? chain;
@@ -115,7 +116,10 @@ export async function effectRoute(studioId: string, input: { postId: string; cor
   const ids = input.mediaIds?.length ? input.mediaIds : ((post.media_ids as string[] | null) ?? []);
   const { data: media } = ids.length ? await db.from("media_assets").select("kind").eq("studio_id", studioId).in("id", ids) : { data: [] };
   const videos = (media ?? []).filter((m) => m.kind === "video").length;
-  const route = await routeEffect(studioId, input.brief ?? undefined, { videos, photos: (media ?? []).length - videos });
+  // The Reel she copies is part of her request: its moments (an effect after another) say what it takes.
+  const followed = await postStyle(studioId, input.postId).catch(() => undefined);
+  const copied = followed ? momentsLine(followed.look) : null;
+  const route = await routeEffect(studioId, input.brief ?? undefined, { videos, photos: (media ?? []).length - videos }, copied);
   if (route.agent) console.log("montage: effects agent", input.postId, route.effect, "—", route.why);
   return route.agent ? "agent" : "chain";
 }
