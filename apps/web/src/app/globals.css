@@ -772,3 +772,36 @@
     animation-delay: 0s !important;
   }
 }
+
+/* The Reel's scrubber on its page (components/review/reel-player.tsx): a thin white track, filled as it plays. */
+.fauve-scrubber {
+  appearance: none;
+  background: transparent;
+}
+.fauve-scrubber::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #fff var(--fauve-progress, 0%), rgb(255 255 255 / 0.35) var(--fauve-progress, 0%));
+}
+.fauve-scrubber::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #fff var(--fauve-progress, 0%), rgb(255 255 255 / 0.35) var(--fauve-progress, 0%));
+}
+.fauve-scrubber::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+.fauve-scrubber::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}

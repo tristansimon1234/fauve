@@ -7,6 +7,7 @@ import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
 import { ArrowDownIcon, ArrowLeftIcon, CaptionIcon, CheckIcon, PenIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
+import { useReelPlayback } from "@/components/review/reel-player";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
 
@@ -18,7 +19,8 @@ import type { ReviewData } from "@/lib/review";
 export function PhoneReview({ data }: { data: ReviewData }) {
   const router = useRouter();
   const video = useRef<HTMLVideoElement>(null);
-  const [sound, setSound] = useState(false);
+  // Its sound (a touch, as on Instagram), and silent once its page is hidden.
+  const { sound, toggleSound } = useReelPlayback(video, data.videoUrl);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -37,13 +39,6 @@ export function PhoneReview({ data }: { data: ReviewData }) {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const toggleSound = () => {
-    const el = video.current;
-    if (!el) return;
-    el.muted = !el.muted;
-    if (!el.muted) el.play().catch(() => {});
-    setSound(!el.muted);
-  };
   const publish = () =>
     start(async () => {
       setError(null);
