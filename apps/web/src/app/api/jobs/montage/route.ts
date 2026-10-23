@@ -695,8 +695,8 @@ function careLine(compared: boolean, outcome: Care | null): string {
   if (outcome?.effect) {
     return [
       outcome.effect.checked ? "J’ai vérifié l’effet image par image, à chaque geste, avant de te l’envoyer." : "",
-      // Where she changes its words (the agent never names its files to her), read in the chat and on its page alike.
-      outcome.effect.words ? "Ses mots, tu peux les changer toi-même : « Changer quelque chose », puis « Le texte à l’écran »." : "",
+      // Its words change without redoing the effect (the agent never names its files to her): she asks, Simone calls effect_words.
+      outcome.effect.words ? "Ses mots, dis-moi lesquels changer : l’effet se redessine avec eux, sans rien te coûter." : "",
     ]
       .filter(Boolean)
       .join(" ");

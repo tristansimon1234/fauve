@@ -6,7 +6,7 @@ import { canTransition } from "./status.ts";
 import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES } from "./credits.ts";
-import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas } from "./post-ideas.ts";
+import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
 import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
@@ -4223,6 +4223,12 @@ test("Simone's plan: 3 to 6 short points, a title and why, kept for the montage;
   assert.ok(!plan.points.includes("Court"));
   assert.match(validatedPlanBrief(plan), /^Le plan que la gérante a validé \(« Lancement de la rentrée »\) :\n- Ouverture/);
   assert.equal(keptPlan({ title: "x", points: ["Ouverture : un seul point"], why: "" }), null);
+  // In the chat, the code writes it under Simone's words: title, points, why; buttons a WhatsApp button holds.
+  assert.equal(
+    planMessage({ title: "Pauline ouvre son studio", points: ["Ouverture : Pauline dans son studio", "Fin : « Essaie Simone »", "Le son : la voix d'Antonin"], why: "On suit quelqu'un, pas une pub." }),
+    "Pauline ouvre son studio\n\n• Ouverture : Pauline dans son studio\n• Fin : « Essaie Simone »\n• Le son : la voix d'Antonin\n\nOn suit quelqu'un, pas une pub.",
+  );
+  assert.ok(PLAN_BUTTONS.every((label) => label.length <= 20));
 });
 
 test("a composition keeps the faces of a shot whole in a wide box (half of a split screen)", async () => {

@@ -126,7 +126,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   if (!data) notFound();
   const post = postSchema.parse(data);
 
-  // A Reel with its montage: the simple page (the video, when, one button, « Changer quelque chose »).
+  // A Reel with its montage: the simple page (the video, its caption, its cover, « Publier », « Demander une modif à Simone »).
   if (post.kind === "reel") {
     const review = await loadReview(db, studioId, post, tz);
     if (review) {

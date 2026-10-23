@@ -49,15 +49,25 @@ export async function sendText(toWaId: string, body: string): Promise<string | u
   return res.messages[0]?.id;
 }
 
+/** Bodies of WhatsApp's buttons and lists are 1024 characters at most. */
+const INTERACTIVE_BODY = 1024;
+
 /**
  * Fauve's reply with answer buttons: up to 3 short options as WhatsApp reply
- * buttons, up to 10 as a list; otherwise (or for a long reply) plain text.
- * The manager's tap comes back as a message whose text is the option.
+ * buttons, up to 10 as a list; otherwise plain text. A reply too long for one (a
+ * plan in points) sends its first paragraphs as text and keeps the buttons under
+ * the last ones. The manager's tap comes back as a message whose text is the option.
  */
 export async function sendReply(toWaId: string, body: string, options?: string[], links: string[] = []): Promise<string | undefined> {
   const text = [body, ...links].join("\n\n");
-  if (!options?.length || text.length > 1024) {
-    return sendText(toWaId, options?.length ? `${text}\n\n${options.join(" · ")}` : text);
+  if (!options?.length) return sendText(toWaId, text);
+  if (text.length > INTERACTIVE_BODY) {
+    const paragraphs = text.split(/\n{2,}/);
+    let tail = paragraphs.pop()!;
+    while (paragraphs.length && tail.length + 2 + paragraphs.at(-1)!.length <= INTERACTIVE_BODY) tail = `${paragraphs.pop()!}\n\n${tail}`;
+    if (!paragraphs.length || tail.length > INTERACTIVE_BODY) return sendText(toWaId, `${text}\n\n${options.join(" · ")}`);
+    await sendText(toWaId, paragraphs.join("\n\n"));
+    return sendReply(toWaId, tail, options);
   }
   const interactive =
     options.length <= 3 && options.every((o) => o.length <= 20)
