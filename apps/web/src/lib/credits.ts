@@ -109,7 +109,9 @@ export async function restoreChainQuote(quoteId: string): Promise<void> {
 /**
  * What can still be spent: the balance minus the most each montage in flight
  * (launched, not yet charged, recent) may cost, so two launches cannot both
- * count on the same credits.
+ * count on the same credits. A montage replaced by a newer request is never charged:
+ * it holds nothing (three replaced corrections held 45 of Tristan's 45 credits, and
+ * Simone said he had 0 while the app showed 45).
  */
 export async function availableCredits(studioId: string, exceptQuoteId?: string): Promise<number> {
   const [balance, inFlight] = await Promise.all([
@@ -120,6 +122,7 @@ export async function availableCredits(studioId: string, exceptQuoteId?: string)
       .eq("studio_id", studioId)
       .not("used_at", "is", null)
       .is("charged_at", null)
+      .or("stage.is.null,stage.neq.superseded")
       .gt("used_at", new Date(Date.now() - 2 * 3600_000).toISOString()),
   ]);
   const held = (inFlight.data ?? []).filter((q) => q.id !== exceptQuoteId).reduce((sum, q) => sum + ((q.max as number) ?? 0), 0);
