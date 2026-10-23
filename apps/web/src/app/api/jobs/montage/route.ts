@@ -63,14 +63,21 @@ import { withCostScope } from "@/lib/cost-scope";
 // Vercel Pro with Fluid compute: up to 800 s; each step stays well under it, the rest is headroom.
 export const maxDuration = 800;
 
+/**
+ * Words a model wrote (the editor's rationale, the critic's summary…), carried from one step to the next:
+ * cut to their room, never refused. A rationale of more than 600 characters failed the next step (400) and
+ * threw away a whole design (Tristan's correction, « job montage refused: 400 »).
+ */
+const words = (max: number) => z.string().transform((s) => (s.length > max ? `${s.slice(0, max - 1).replace(/\s+\S*$/, "")}…` : s));
+
 const versionSchema = z.object({
   planId: z.uuid(),
   renderId: z.uuid().optional(),
-  rationale: z.string().max(600).optional(),
+  rationale: words(600).optional(),
   /** Made from the critic's corrections (charged as a correction once rendered)… */
   fix: z.boolean().optional(),
   /** …and what those corrections change, told to the manager if this version is kept. */
-  summary: z.string().max(300).optional(),
+  summary: words(300).optional(),
 });
 type Version = z.infer<typeof versionSchema>;
 
@@ -80,21 +87,21 @@ const bodySchema = z.object({
   postId: z.uuid(),
   mediaIds: z.array(z.uuid()).max(MAX_MONTAGE_FILES).optional(),
   /** The manager's request, with the plan she said yes to. */
-  brief: z.string().max(4000).optional(),
+  brief: words(4000).optional(),
   waId: z.string().regex(/^\d{6,16}$/).optional(),
   replyTo: z.string().max(200).optional(),
   /** Started from the app (« Créer »): the delivery also reaches her on WhatsApp. */
   notify: z.boolean().optional(),
   /** Asked in a conversation of the app: delivered in it, not in the latest automatic one. */
   conversationId: z.uuid().optional(),
-  rationale: z.string().max(600).optional(),
+  rationale: words(600).optional(),
   /** What Fauve says about the delivered version, kept on the post (else the rationale). */
-  note: z.string().max(600).optional(),
+  note: words(600).optional(),
   /** Credits: the accepted quote, the new scenes it allows, and the new scenes made so far. */
   quoteId: z.uuid().optional(),
   maxNewScenes: z.number().int().min(0).max(MAX_FREE_SCENES).optional(),
   newScenes: z.number().int().min(0).max(10).optional(),
-  title: z.string().max(200).optional(),
+  title: words(200).optional(),
   /** Variant step: the hook to change (an older quote may still name a template: no longer switched). */
   variant: z.object({ template: motionTemplateSchema.optional(), hook: z.string().max(120).optional() }).optional(),
   /** Level of care; absent: one version, no review (older quotes). */
@@ -108,7 +115,7 @@ const bodySchema = z.object({
   /** The critic's last word: what to correct, its score, its line for the manager. */
   issues: z.array(montageIssueSchema).max(4).optional(),
   score: z.number().int().min(1).max(10).optional(),
-  summary: z.string().max(300).optional(),
+  summary: words(300).optional(),
   /** Two takes were compared by the critic (Max). */
   compared: z.boolean().optional(),
   /** The critic gave a verdict at least once. */
@@ -171,7 +178,10 @@ function authorized(request: Request): boolean {
 export async function POST(request: Request) {
   if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: "invalid job" }, { status: 400 });
+  if (!parsed.success) {
+    console.error("montage job refused", parsed.error.issues.slice(0, 5));
+    return Response.json({ error: "invalid job", issues: parsed.error.issues.slice(0, 5) }, { status: 400 });
+  }
   const job = parsed.data;
   // Every cost this step logs is counted for its montage: it is charged on what it really cost.
   // Its long calls start only with the time to finish (step-clock), and its pulse says it is alive.

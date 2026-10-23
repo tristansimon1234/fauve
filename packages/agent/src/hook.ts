@@ -121,6 +121,7 @@ Une accroche très forte :
 - ne marche que pour ce commerce : une phrase qui irait à n'importe quel commerce est faible (« tu vas adorer », « le meilleur endroit du quartier ») ;
 - va avec la première image : elle en parle, ou crée l'écart qui donne envie de comprendre ce qu'on voit ;
 - se comprend d'un coup, sans contexte, et le texte sans le son ;
+- est du français juste, comme un Français le dirait : une phrase entière et idiomatique, jamais un calque ni une tournure bancale qu'on comprend de travers (une accroche fautive ou bizarre vaut au plus 3, même si elle intrigue) ;
 - est courte : 9 mots au plus pour la voix (moins de trois secondes), 6 au plus pour le texte ;
 - est vraie : rien que les faits donnés et ce que montre l'image, ni prix, ni chiffre, ni promesse inventés ;
 - sonne comme un créateur qui parle à ses abonnés, jamais comme une pub ni un piège à clics : pas de formule creuse, pas de « vous ne devinerez jamais », pas de majuscules criées, pas d'emojis, pas de tiret long ;
