@@ -18,7 +18,9 @@ import type { MotionTemplate, ReelProps } from "./types";
 // hung on a hand next to the face) is not a failure: it is reported (FAUVE_FACE), and
 // the motion designer gets one more round to move it. So is a sentence that does not stay
 // whole on screen long enough to be read (FAUVE_READ: Tristan, « parfois c'est trop rapide
-// donc on peut même pas lire »).
+// donc on peut même pas lire »). And what it draws, row by row (FAUVE_COVER), for the engine
+// to set a voice's subtitles where the animations leave room (Tristan: « il faut pas masquer
+// mais bien les placer là où ça ne gêne pas les anim et les visages »).
 
 export const SAFE_ZONE = { side: 140, top: 80, bottom: 0.75 };
 const TOLERANCE = 12; // px: glyph boxes are a little wider than the ink
@@ -217,6 +219,64 @@ function tooQuick(frames: number[], step: number, last: number): { text: string;
   });
 }
 
+/** Rows of the frame the drawing is measured in (20 px each). */
+const COVER_ROWS = 96;
+/** Elements drawn as shapes (an image, a canvas, a vector shape), whatever their style. */
+const SHAPES = new Set(["img", "canvas", "video", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "image", "use"]);
+/** A colour's alpha (computed colours are rgb() or rgba()). */
+const alpha = (color: string) => (color.startsWith("rgba") ? Number(color.slice(color.lastIndexOf(",") + 1, -1)) : color.startsWith("rgb") ? 1 : 0);
+
+/**
+ * What a copy of the scene draws, row by row: the share of the subtitles' width (the safe zone's)
+ * covered by its texts, its pictures and its painted shapes. A backdrop over most of the frame does
+ * not count: subtitles read on it, as on her footage.
+ */
+function drawn(copy: HTMLElement, width: number, height: number): number[] {
+  const origin = copy.getBoundingClientRect();
+  const [left, right] = [SAFE_ZONE.side, width - SAFE_ZONE.side];
+  const rows: [number, number][][] = Array.from({ length: COVER_ROWS }, () => []);
+  const add = (r: DOMRect) => {
+    if (r.width * r.height > width * height * 0.6) return;
+    const x0 = Math.max(left, r.left - origin.left);
+    const x1 = Math.min(right, r.right - origin.left);
+    if (x1 <= x0) return;
+    const from = Math.max(0, Math.floor(((r.top - origin.top) / height) * COVER_ROWS));
+    const to = Math.min(COVER_ROWS, Math.ceil(((r.bottom - origin.top) / height) * COVER_ROWS));
+    for (let i = from; i < to; i++) rows[i]!.push([x0, x1]);
+  };
+  // Effective opacity, top down: a faded element and all it holds do not count.
+  const opacity = new Map<Element, number>();
+  const visit = (el: Element, parent: number) => {
+    const style = getComputedStyle(el);
+    if (style.display === "none") return;
+    const seen = style.visibility === "hidden" ? 0 : parent * Number(style.opacity);
+    if (seen < 0.15) return;
+    opacity.set(el, seen);
+    const border = ["Top", "Right", "Bottom", "Left"].some((side) => parseFloat(style.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0) && alpha(style.borderTopColor) > 0.15;
+    if (SHAPES.has(el.tagName.toLowerCase()) || alpha(style.backgroundColor) > 0.15 || style.backgroundImage !== "none" || border) add(el.getBoundingClientRect());
+    for (const child of Array.from(el.children)) visit(child, seen);
+  };
+  for (const child of Array.from(copy.children)) visit(child, 1);
+  const range = document.createRange();
+  const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.textContent?.trim() || !node.parentElement || !opacity.has(node.parentElement)) continue;
+    range.selectNodeContents(node);
+    for (const r of Array.from(range.getClientRects())) if (r.width >= 1 && r.height >= 1) add(r);
+  }
+  return rows.map((spans) => {
+    // The width the spans cover together, overlaps counted once.
+    let covered = 0;
+    let end = -Infinity;
+    for (const [a, b] of spans.sort((p, q) => p[0] - q[0])) {
+      if (b <= end) continue;
+      covered += b - Math.max(a, end);
+      end = b;
+    }
+    return covered / (right - left);
+  });
+}
+
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
 /** Words compared as written: spaces of any kind and case aside. */
@@ -297,6 +357,10 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
           const message = `texte trop rapide pour être lu : ${detail}. Une phrase reste entière à l'écran au moins 0,8 s plus 0,3 s par mot avant de partir (le temps de la lire sur un téléphone) : fais-la arriver plus tôt ou partir plus tard, ou garde moins de phrases, sans changer l'idée.`;
           console.log(`FAUVE_READ ${JSON.stringify(message)}`);
         }
+        // What it draws, row by row, over its length (each row: the share of the subtitles' width it covers, on average).
+        const copies = Array.from(document.querySelectorAll<HTMLElement>("[data-check-frame]")).map((copy) => drawn(copy, width, height));
+        const cover = Array.from({ length: COVER_ROWS }, (_, i) => Math.round((copies.reduce((sum, c) => sum + c[i]!, 0) / Math.max(1, copies.length)) * 100) / 100);
+        console.log(`FAUVE_COVER ${JSON.stringify(cover)}`);
         return continueRender(handle);
       }
       const detail = failures

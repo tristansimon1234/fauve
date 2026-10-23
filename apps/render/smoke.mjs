@@ -57,6 +57,8 @@ const defaultBrand = {
 const scenes = JSON.parse(readFileSync(process.argv[2], "utf8"));
 const results = {};
 const faces = {};
+// What each scene draws, row by row: where a voice's subtitles leave it room.
+const cover = {};
 for (const scene of scenes) {
   try {
     const factory = new Function(
@@ -141,6 +143,8 @@ if (browser) {
             // Not failures, reasons for one more round: a text on a face, a sentence too quick to read.
             const note = /^FAUVE_(?:FACE|READ) (".*")$/.exec(log.text)?.[1];
             if (note) faces[scene.id] = [faces[scene.id], JSON.parse(note)].filter(Boolean).join("\n");
+            const drawn = /^FAUVE_COVER (\[.*\])$/.exec(log.text)?.[1];
+            if (drawn) cover[scene.id] = JSON.parse(drawn);
           },
         });
       } catch (error) {
@@ -155,4 +159,4 @@ if (browser) {
     await browser.close({ silent: true });
   }
 }
-console.log(JSON.stringify({ results, faces }));
+console.log(JSON.stringify({ results, faces, cover }));

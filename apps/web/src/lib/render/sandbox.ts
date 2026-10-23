@@ -305,9 +305,10 @@ export type SmokeScene = {
 /**
  * What the scene check found: the error per scene id (null when it passes), and, for a passing
  * scene, its texts that stay on a face of the footage under it or go too quickly to be read
- * (what to change, for the motion designer).
+ * (what to change, for the motion designer), and what it draws, row by row (`cover`: the rows of
+ * the frame, each the share of the subtitles' width it covers on average), for a voice's subtitles.
  */
-export type SceneChecks = { errors: Record<string, string | null>; faces: Record<string, string> };
+export type SceneChecks = { errors: Record<string, string | null>; faces: Record<string, string>; cover: Record<string, number[]> };
 
 /**
  * Runs generated motion scenes outside the video: a server render (first, middle,
@@ -319,7 +320,7 @@ export async function smokeTestScenes(
   scenes: SmokeScene[],
   brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">,
 ): Promise<SceneChecks> {
-  if (!scenes.length) return { errors: {}, faces: {} };
+  if (!scenes.length) return { errors: {}, faces: {}, cover: {} };
   const sandbox = await withTimeLeft(await remotionSandbox());
   const file = `${ROOT}/jobs/smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
   try {
@@ -330,13 +331,14 @@ export async function smokeTestScenes(
       const parsed = JSON.parse(lastLine) as {
         results?: Record<string, string | null>;
         faces?: Record<string, string>;
+        cover?: Record<string, number[]>;
       } & Record<string, unknown>;
       // A workshop still on the previous checker prints the errors alone.
-      if (parsed.results && typeof parsed.results === "object") return { errors: parsed.results, faces: parsed.faces ?? {} };
-      return { errors: parsed as Record<string, string | null>, faces: {} };
+      if (parsed.results && typeof parsed.results === "object") return { errors: parsed.results, faces: parsed.faces ?? {}, cover: parsed.cover ?? {} };
+      return { errors: parsed as Record<string, string | null>, faces: {}, cover: {} };
     } catch {
       const output = (await result.output("both").catch(() => "")).slice(-400);
-      return { errors: Object.fromEntries(scenes.map((s) => [s.id, `smoke test failed: ${output}`])), faces: {} };
+      return { errors: Object.fromEntries(scenes.map((s) => [s.id, `smoke test failed: ${output}`])), faces: {}, cover: {} };
     }
   } finally {
     await bash(sandbox, 'rm -f "$1"', [file]).catch(() => {});

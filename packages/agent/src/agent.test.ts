@@ -2792,6 +2792,44 @@ test("lab fixes 2: a Reel's message shows its title, subtitles off faces read wh
   assert.equal(subtitleRow([{ x: 0, y: 0.05, w: 1, h: 0.8 }]), null);
 });
 
+test("subtitles never hidden: placed where the animations, the faces and the texts leave room", async () => {
+  const { profileCover, subtitleRowAmong, textBands, SUBTITLE_ROW } = await import("./retouch.ts");
+  const { finishPlan } = await import("./finish.ts");
+  // What an animation draws, row by row (96 rows of the frame): a whole band of it.
+  const drawn = (from: number, to: number) => Array.from({ length: 96 }, (_, i) => ((i + 0.5) / 96 >= from && (i + 0.5) / 96 < to ? 1 : 0));
+  // A chat window over the middle of the frame: on the usual row, not on the top one.
+  assert.ok(profileCover(drawn(0.3, 0.7), SUBTITLE_ROW.y) > 0.5);
+  assert.equal(profileCover(drawn(0.3, 0.7), 0.22), 0);
+  // Nothing on their row: they stay.
+  assert.equal(subtitleRowAmong(SUBTITLE_ROW.y, { faces: [], animations: [{ seconds: 4, profile: drawn(0.1, 0.4) }], texts: [] }), SUBTITLE_ROW.y);
+  // The window on it for 4 s: just under it, the nearest free row (not the top of the frame).
+  assert.equal(subtitleRowAmong(SUBTITLE_ROW.y, { faces: [], animations: [{ seconds: 4, profile: drawn(0.3, 0.7) }], texts: [] }), 0.71);
+  // The window on it for 4 s, a face just under it for 6 s: where neither is.
+  const face = { length: 6, boxes: [{ x: 0.3, y: 0.71, w: 0.4, h: 0.09 }] };
+  assert.equal(subtitleRowAmong(SUBTITLE_ROW.y, { faces: [face], animations: [{ seconds: 4, profile: drawn(0.3, 0.7) }], texts: [] }), 0.22);
+  // A moment of drawing on their row is not worth moving them for the whole Reel.
+  assert.equal(subtitleRowAmong(SUBTITLE_ROW.y, { faces: [], animations: [{ seconds: 0.2, profile: drawn(0.6, 0.7) }], texts: [] }), SUBTITLE_ROW.y);
+  // A caption goes up to the band's row while a voice speaks; a message takes a third of the frame.
+  assert.deepEqual(textBands([{ from: 1, to: 3, style: "caption" }], true), [{ seconds: 2, y: 0.47, h: 0.08 }]);
+  assert.deepEqual(textBands([{ from: 0, to: 2, style: "caption", items: [{ title: "x" }] }], false), [{ seconds: 2, y: 0.42, h: 0.3 }]);
+  // The design weighs the footage under the animations too: the subtitles show over it.
+  const analysis = {
+    duration: 10, orientation: "portrait", summary: "", setting: "", lighting: "ok", best_moments: [], transcript: "", issues: [],
+    shots: [{ start: 0, end: 10, description: "", subject: "", energy: 3, hook_score: 3, quality: { blurry: false, dark: false, shaky: false }, faces_visible: true, camera: "handheld", subject_box: [500, 300, 1000, 700] }],
+  };
+  const plan = {
+    format: "9:16", duration: 8, template: "libre", images: [], transitions: "cut", subtitles: true, music: null, texts: [],
+    segments: [
+      { clip_id: "c", in: 0, out: 1, zoom: "none" },
+      { motion: { brief: "la conversation", fallback: { kind: "title", title: "x", background: "accent" } }, duration: 7, over: { clip_id: "b", in: 0 } },
+    ],
+  } as never;
+  const facts = { clips: { b: analysis, c: { ...analysis, shots: [{ ...analysis.shots[0], faces_visible: false }] } }, photos: {} } as never;
+  const out = finishPlan(plan, facts, { b: 10, c: 10 });
+  assert.equal(typeof out.subtitle_y, "number");
+  assert.notEqual(out.subtitle_y, SUBTITLE_ROW.y);
+});
+
 test("off faces: one subtitle row for the Reel, the engine's places worked out again, an older animation's move kept", async () => {
   const { finishPlan } = await import("./finish.ts");
   const { avoidPhotoText, reelSubtitleRow, SUBTITLE_ROW } = await import("./retouch.ts");
