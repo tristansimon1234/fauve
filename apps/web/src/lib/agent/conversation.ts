@@ -1,7 +1,7 @@
 import "server-only";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, readMemory, readVoiceSetting, stableWindow } from "@fauve/agent";
+import { DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readVoiceSetting, stableWindow } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
@@ -209,7 +209,7 @@ export async function replyInConversation(params: {
         booking: (studio.data.booking_url as string | null) ?? null,
         tone: ((brand.data as { tone?: string | null } | null)?.tone ?? null)?.slice(0, 300) ?? null,
         fonts: fontsLine(brand.data as { fonts?: unknown; font_twins?: unknown; custom_fonts?: unknown } | null),
-        memory: readMemory(studio.data.memory).map((f) => f.fact),
+        memory: memoryLines(studio.data.memory),
       },
       work: describeJobs(jobs.map((j) => ({ ...j, title: j.postId ? jobTitles.get(j.postId) : undefined }))),
       voice: (() => {

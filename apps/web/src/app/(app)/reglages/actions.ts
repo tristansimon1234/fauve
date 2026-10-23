@@ -1,6 +1,6 @@
 "use server";
 
-import { addFacts, effortSchema, MAX_FACT_CHARS, readMemory, type Effort } from "@fauve/agent";
+import { addFacts, effortSchema, factLine, MAX_FACT_CHARS, readMemory, type Effort } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { createLinkCode } from "@/lib/instagram-dm";
 import { getStudioContext } from "@/lib/studio";
@@ -39,9 +39,9 @@ export async function editMemory(change: { add?: string; remove?: string }): Pro
   const db = supabaseAdmin();
   const { data } = await db.from("studios").select("memory").eq("id", member.studio.id).single();
   let memory = readMemory(data?.memory);
-  if (typeof change.remove === "string") memory = memory.filter((f) => f.fact !== change.remove);
+  if (typeof change.remove === "string") memory = memory.filter((f) => factLine(f) !== change.remove);
   if (typeof change.add === "string" && change.add.trim().length >= 3) memory = addFacts(memory, [change.add.slice(0, MAX_FACT_CHARS)], new Date().toISOString());
   const { error } = await db.from("studios").update({ memory }).eq("id", member.studio.id);
   if (error) return { ok: false, error: "Ce n’est pas enregistré. Réessaie dans un instant." };
-  return { ok: true, facts: memory.map((f) => f.fact) };
+  return { ok: true, facts: memory.map(factLine) };
 }

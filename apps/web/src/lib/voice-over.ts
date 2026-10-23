@@ -25,7 +25,7 @@ import {
   voiceLeftToSimone,
   wantsVoiceOver,
   withPauses,
-  readMemory,
+  memoryLines,
   spokenWords,
   stripAudioTags,
   usdToEur,
@@ -114,7 +114,7 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
     commerce: {
       nom: studio.data?.name ?? undefined,
       activite: studio.data?.business_type ?? undefined,
-      ce_qu_on_sait: readMemory(studio.data?.memory).map((f) => f.fact),
+      ce_qu_on_sait: memoryLines(studio.data?.memory),
       reservation_en_ligne: Boolean(studio.data?.booking_url),
       ton: profile.tone,
     },

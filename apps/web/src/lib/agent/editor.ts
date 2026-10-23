@@ -36,7 +36,7 @@ import {
   motionTemplateSchema,
   normalizeEditPlan,
   PHOTO_MAX_SECONDS,
-  readMemory,
+  memoryLines,
   resolveReelBrand,
   type EditPlan,
   openingCandidates,
@@ -272,7 +272,7 @@ export async function designEdit(params: {
       business: studio.data?.business_type ?? undefined,
       booking: Boolean(studio.data?.booking_url),
       // What Simone knows of the business (its site, what was said): where the words on screen come from.
-      facts: readMemory(studio.data?.memory).map((f) => f.fact),
+      facts: memoryLines(studio.data?.memory),
     },
     brand: {
       tone: profile.tone,

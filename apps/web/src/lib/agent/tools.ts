@@ -868,13 +868,27 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async remember({ add, remove }) {
+    async remember({ add, avoid, remove }) {
       const { data } = await db.from("studios").select("memory").eq("id", studioId).single();
       let memory = readMemory(data?.memory);
+      // What was really there: Simone tells her what she forgot, or that it was never kept (never « retiré » for nothing).
+      const forgotten = (remove ?? []).flatMap((n) => (memory[n - 1] ? [memory[n - 1]!.fact] : []));
+      const missing = (remove ?? []).filter((n) => !memory[n - 1]);
       if (remove?.length) memory = removeFacts(memory, remove);
-      if (add?.length) memory = addFacts(memory, add, new Date().toISOString());
+      const at = new Date().toISOString();
+      if (add?.length) memory = addFacts(memory, add, at);
+      if (avoid?.length) memory = addFacts(memory, avoid, at, "avoid");
       check(await db.from("studios").update({ memory }).eq("id", studioId));
-      return `ok : ${memory.length} info${memory.length > 1 ? "s" : ""} en mémoire. Ne l'annonce pas, continue la conversation.`;
+      return json({
+        ok: `${memory.length} info${memory.length > 1 ? "s" : ""} en mémoire`,
+        ...(forgotten.length ? { oublie: forgotten } : {}),
+        ...(missing.length ? { pas_en_memoire: missing } : {}),
+        note: missing.length
+          ? "Ces numéros n'étaient pas dans ta Mémoire : ne dis jamais que tu les as retirés."
+          : forgotten.length || avoid?.length
+            ? "Dis-lui en une phrase ce qui est oublié ou noté à éviter, avec ses mots."
+            : "Ne l'annonce pas, continue la conversation.",
+      });
     },
 
     async suggest_dates({ count }) {

@@ -1,5 +1,5 @@
 import "server-only";
-import { ANALYST_MODEL, CAPTION_WRITER_PROMPT, captionDraftSchema, keptCaption, readMemory } from "@fauve/agent";
+import { ANALYST_MODEL, CAPTION_WRITER_PROMPT, captionDraftSchema, keptCaption, memoryLines } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -33,7 +33,7 @@ export async function ensureCaption(studioId: string, postId: string, planId: st
           commerce: {
             nom: studio.data?.name ?? undefined,
             activite: studio.data?.business_type ?? undefined,
-            ce_qu_on_sait: readMemory(studio.data?.memory).map((f) => f.fact),
+            ce_qu_on_sait: memoryLines(studio.data?.memory),
             reservation_en_ligne: Boolean(studio.data?.booking_url),
             ton: (profile.data?.profile as { tone?: string } | null)?.tone ?? undefined,
           },
