@@ -172,7 +172,7 @@ function tiktokLine(t: TikTokContext): string {
 }
 
 const channelLines: Record<NonNullable<StudioContextForPrompt["channel"]>, string> = {
-  whatsapp: "Canal : WhatsApp. Pour des photos ou des vidéos, reply_with upload ajoute sous ton message son lien de dépôt (sa galerie, en pleine qualité) ; sinon ici « en tant que document » (trombone, puis Document), car WhatsApp compresse les vidéos.",
+  whatsapp: "Canal : WhatsApp. Pour des photos ou des vidéos, reply_with upload ajoute sous ton message son lien de dépôt (sa galerie, en pleine qualité) ; sinon ici « en tant que document » (trombone, puis Document), car WhatsApp compresse les vidéos. Elle est sur son téléphone : ne l'envoie jamais dans l'application (« suis l'avancement dans l'app », « va dans Réglages ») ; tout se fait ici, et quand une page est utile (voir une publication, déposer des fichiers, relier ses comptes), son bouton s'affiche sous ton message (get_post_link, reply_with upload, get_connect_link).",
   web: "Canal : l'application Simone (web), pas WhatsApp. Pour envoyer des photos ou des vidéos, la gérante les glisse dans la conversation ou clique sur le trombone à gauche du champ de message : elles arrivent en pleine qualité. Ne parle pas de « document » ni de WhatsApp pour les fichiers.",
   instagram: "Canal : messages Instagram. Pour des vidéos de montage, invite à les envoyer sur WhatsApp en tant que document ou à les déposer dans l'application ; un Reel partagé ici sert d'inspiration.",
 };
@@ -197,8 +197,8 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
       ? `Mémoire (ce que tu sais déjà du commerce, valable dans toutes les conversations ; ne le redemande jamais) :\n${ctx.known.memory.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
       : "Mémoire : vide pour l'instant.",
     ctx.work?.length
-      ? `Travaux en cours (en ce moment même, ne relance jamais l'un d'eux pour rien ; si elle demande où ça en est, donne l'étape et le temps écoulé, et dis qu'elle peut suivre l'avancement dans l'app ; si elle demande un changement pour un Reel en cours, lance le nouveau montage avec toute sa demande, l'ancienne et la nouvelle réunies : il remplace celui en cours, qui s'arrête sans être débité, et dis-le en une phrase ; un message qui n'a pas l'air fini, coupé sur une virgule, attend la suite avant de lancer) :\n${ctx.work.map((w) => `- ${w}`).join("\n")}`
-      : "Travaux en cours : aucun. Si tu as annoncé un montage ou un texte et qu'il n'est pas ici, c'est qu'il est fini ou qu'il a échoué : vérifie (montage_status, read_post) avant d'affirmer quoi que ce soit.",
+      ? `Travaux en cours (en ce moment même, ne propose jamais de relancer l'un d'eux, ni ne le relance toi-même : ils tournent, et un travail qui s'arrête repart tout seul ou elle est prévenue ; un montage soigné prend souvent 15 à 25 minutes, ce n'est jamais un signe qu'il bloque ; si elle demande où ça en est, donne l'étape et le temps écoulé, et dis que tu la préviens dès qu'il est prêt ; si elle demande un changement pour un Reel en cours, lance le nouveau montage avec toute sa demande, l'ancienne et la nouvelle réunies : il remplace celui en cours, qui s'arrête sans être débité, et dis-le en une phrase ; un message qui n'a pas l'air fini, coupé sur une virgule, attend la suite avant de lancer) :\n${ctx.work.map((w) => `- ${w}`).join("\n")}`
+      : "Travaux en cours : aucun. Si tu as annoncé un montage ou un texte et qu'il n'est pas ici, c'est qu'il est fini ou qu'il a échoué : vérifie (montage_status, read_post) avant d'affirmer quoi que ce soit, et ne propose de le relancer que s'il a vraiment échoué.",
     ...(ctx.routine?.length ? [`Sa présence sur les réseaux :\n${ctx.routine.map((r) => `- ${r}`).join("\n")}`] : []),
     `Prénom de la personne qui gère : ${ctx.firstName ?? "pas encore connu"}.`,
     `Étape d'onboarding : ${ctx.onboardingStep}.`,

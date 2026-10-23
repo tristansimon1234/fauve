@@ -34,6 +34,30 @@ export async function setJobStage(id: string | undefined, stage: string): Promis
   if (error) console.warn("studio_jobs: stage not recorded", error.message);
 }
 
+/** How often a running step says it is alive (studio_jobs.updated_at). */
+export const PULSE_MS = 60_000;
+
+/**
+ * The pulse of a running step: its job's updated_at every minute, with what it needs to be sent
+ * again (`resume`, its step's body). Returns what stops it.
+ */
+export function keepAlive(id: string, resume: Record<string, unknown>): () => void {
+  const beat = () =>
+    void supabaseAdmin()
+      .from("studio_jobs")
+      .update({ updated_at: new Date().toISOString(), resume })
+      .eq("id", id)
+      .is("finished_at", null)
+      .then(({ error }) => error && console.warn("studio_jobs: pulse not recorded", error.message));
+  // The job's row may be made by the step itself (its design): a first beat a little later.
+  const first = setTimeout(beat, 5_000);
+  const timer = setInterval(beat, PULSE_MS);
+  return () => {
+    clearTimeout(first);
+    clearInterval(timer);
+  };
+}
+
 /** The component the job made or changed (the progress pill links to it). */
 export async function setJobTemplate(id: string | undefined, templateId: string): Promise<void> {
   if (!id) return;

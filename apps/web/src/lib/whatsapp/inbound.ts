@@ -232,6 +232,24 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   await replyOnWhatsApp({ studioId: member.studio_id, memberId: member.id, waId: message.from, phone, replyTo: message.id });
 }
 
+/** Whether she sent another message after this one (on WhatsApp, its own turn answers it). */
+async function newerMessage(studioId: string, waMessageId: string): Promise<boolean> {
+  const db = supabaseAdmin();
+  const { data: mine } = await db.from("whatsapp_messages").select("created_at").eq("wa_message_id", waMessageId).maybeSingle();
+  if (!mine) return false;
+  const { data: later } = await db
+    .from("whatsapp_messages")
+    .select("id")
+    .eq("studio_id", studioId)
+    .eq("channel", "whatsapp")
+    .eq("direction", "inbound")
+    .neq("type", "reaction")
+    .is("payload->>via", null)
+    .gt("created_at", mine.created_at as string)
+    .limit(1);
+  return Boolean(later?.length);
+}
+
 /**
  * Simone's turn on WhatsApp: her answer, with its buttons and links, sent and stored, then
  * what runs after it (a render…). Also after files dropped through her upload link (lib/upload-link.ts).
@@ -249,14 +267,20 @@ export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo
     return;
   }
 
-  if (result.reply) {
-    const { posts, grid, quote } = result.extras;
+  // She wrote again while this turn ran (a video, then « c'est envoyé ! » a few seconds later):
+  // the newer turn reads both and answers them; two answers crossed and contradicted each other.
+  // Only when this one started nothing (a montage, a post), which must be said.
+  const superseded = replyTo && !result.afterReply.length && !result.notes.length ? await newerMessage(studioId, replyTo).catch(() => false) : false;
+  if (result.reply && superseded) console.info("whatsapp: reply left to the newer turn", replyTo);
+  if (result.reply && !superseded) {
+    // The grid is the app's: never a link from WhatsApp, only the pages made for her phone.
+    const { posts, quote } = result.extras;
     // A quote gets its yes / other level / no buttons, unless Fauve chose others.
     // The quote's own buttons win over the model's (they carry the other level).
     // (none for a montage already launched).
     const buttons = quote ? await quoteButtons(studioId, quote).catch(() => []) : [];
     const options = buttons.length ? buttons : result.extras.options;
-    // Cards are app-only: on WhatsApp, a page of the app behind a button (no long link in her chat).
+    // Cards are app-only: on WhatsApp, a page made for her phone behind a button (no long link in her chat).
     // Files asked for (a drop zone or the library in the app): her own upload link, in full quality (WhatsApp compresses videos).
     const button =
       result.extras.link ??
@@ -264,9 +288,7 @@ export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo
         ? { path: "/depot", label: "Envoyer mes fichiers", purpose: "upload" as const }
         : posts?.length === 1
           ? { path: `/v/${posts[0]}`, label: "Voir la publication", purpose: "open_post" as const }
-          : grid
-            ? { path: "/grille", label: "Voir ma grille", purpose: "open_post" as const }
-            : null);
+          : null);
     const url = button ? await createLoginLink(phone, button.path, button.purpose).catch((e: unknown) => void console.warn("button link failed", e)) : undefined;
     // Several posts: their pages, in text under the message.
     const links = [

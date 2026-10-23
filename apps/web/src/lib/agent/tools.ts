@@ -1273,7 +1273,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // The drop zone is the app's; on WhatsApp, files asked for become her upload link under the message (full quality).
       ctx.extras.upload = ctx.waId ? (upload ?? pick_media) : upload;
       ctx.extras.pick_media = ctx.waId ? undefined : pick_media;
-      return ctx.waId && (upload ?? pick_media) ? "ok : son lien de dépôt (pleine qualité) est ajouté sous ton message ; n'écris aucun lien." : "ok : affiché sous ton message.";
+      const shown = ctx.waId && (upload ?? pick_media) ? "ok : son lien de dépôt (pleine qualité) est ajouté sous ton message ; n'écris aucun lien." : "ok : affiché sous ton message.";
+      // Called before a word was written, the model was asked again and wrote « Voilà, j'attends ton choix. »
+      // as if its question had been sent: only what it writes reaches her, never its thoughts.
+      return `${shown} Si tu n'as encore rien écrit dans cette réponse, écris maintenant ton message entier (ce que tu proposes et la question à laquelle ces boutons répondent) : elle ne voit que ce que tu écris, jamais tes réflexions. Jamais une phrase qui renvoie à un message absent (« Voilà le plan », « j'attends ton choix »).`;
     },
   };
 
