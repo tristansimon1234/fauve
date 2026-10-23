@@ -17,8 +17,7 @@ import { recentMedia } from "@/lib/social/instagram";
 import { ActionView, type ActionMedia } from "./action-view";
 import { Paywall } from "@/components/paywall";
 import { studioAccess } from "@/lib/billing/access";
-import { Mascot } from "@/components/mascot";
-import { PostReview } from "@/components/review/post-review";
+import { PhoneReview } from "@/components/review/phone-review";
 import { loadReview } from "@/lib/review";
 
 export const metadata: Metadata = { title: "Ta publication" };
@@ -51,7 +50,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
     .maybeSingle();
   if (!post) notFound();
 
-  // A Reel with its montage: the same simple page as in the app, light, for the phone.
+  // A Reel with its montage.
   if (post.kind === "reel") {
     const review = await loadReview(
       db,
@@ -74,26 +73,8 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
       },
       member.studio.timezone,
     );
-    if (review) {
-      return (
-        <div className="min-h-dvh bg-white px-4 pt-4 text-ink sm:px-8">
-          <header className="mx-auto flex max-w-[1040px] items-center gap-2.5 pb-4">
-            <Mascot size={34} still />
-            <h1 className="min-w-0 flex-1 truncate text-[18px] font-extrabold tracking-[-0.01em]">{post.title as string}</h1>
-          </header>
-          <div className="mx-auto max-w-[1040px]">
-            <PostReview
-              key={`${review.version}-${review.renderId ?? ""}-${review.status}`}
-              data={review}
-              surface="whatsapp"
-              whatsAppPrefix={`Pour « ${post.title as string} » : `}
-              cover={postCoverSchema.nullable().catch(null).parse(post.cover ?? null)}
-              shareToFeed={post.share_to_feed !== false}
-            />
-          </div>
-        </div>
-      );
-    }
+    // Made for her phone: the Reel full screen and what she does from WhatsApp, not the app's page.
+    if (review) return <PhoneReview key={`${review.version}-${review.renderId ?? ""}-${review.status}`} data={review} />;
   }
 
   const planId =

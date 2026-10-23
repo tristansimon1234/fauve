@@ -24,6 +24,7 @@ import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
 import { toGeminiSchema } from "@/lib/gemini-schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { smokeTestScenes, type SceneChecks, type SmokeScene } from "@/lib/render/sandbox";
+import { timeLeft } from "@/lib/step-clock";
 import { anthropic, logClaudeCost } from "./run";
 
 // The motion designer: one Opus call per free scene, which writes the component.
@@ -258,6 +259,10 @@ function photosOf(result: SceneResult, request: SceneRequest): ScenePhoto[] {
  * the business's latest animations. Both, with the scenes written before, tell each new
  * scene what not to repeat.
  */
+/** What a motion designer call can take (up to 64 000 tokens streamed: 1.5 to 4.5 min), and a check of its scenes. */
+const SCENE_CALL_MS = 290_000;
+const SMOKE_MS = 60_000;
+
 export async function designMotionScenes(
   studioId: string,
   requests: SceneRequest[],
@@ -281,9 +286,15 @@ export async function designMotionScenes(
       done: context.done ?? [],
     };
     const write = () => writeScene(studioId, model, r, brand, artDirection, kit, existing).catch((e: unknown) => ({ code: null, js: null, error: String(e) }));
+    // Not started without the time to finish it: the step would die with nothing (its fixed scene, or none, plays).
+    if (timeLeft() < SCENE_CALL_MS) {
+      console.warn("motion scene skipped, the step has no time left", r.brief.slice(0, 80));
+      results.push({ id: r.id, code: null, js: null, error: "plus le temps dans cette étape" });
+      continue;
+    }
     // An answer with no code at all (cut off, unreadable) has nothing to correct: it is asked once more.
     let written = await write();
-    if (!written.code?.trim()) {
+    if (!written.code?.trim() && timeLeft() >= SCENE_CALL_MS) {
       console.warn("motion scene without code, asked again", r.brief.slice(0, 80), written.error);
       written = await write();
     }
@@ -321,7 +332,8 @@ export async function designMotionScenes(
     if (round === 1) break;
     for (const r of results) if (r.js && checks.faces[r.id]) working.set(r.id, r);
     const toFix = results.filter((r) => (!r.js && r.code) || working.has(r.id));
-    if (!toFix.length) break;
+    // A fix is a call and a check more: not without the time for both.
+    if (!toFix.length || timeLeft() < SCENE_CALL_MS + SMOKE_MS) break;
     // One round of fixes, with the error (or the text to move off a face), for those scenes (they keep their photos).
     const fixed = await Promise.all(
       toFix.map(async (r) => ({

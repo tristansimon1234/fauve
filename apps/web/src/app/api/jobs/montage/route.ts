@@ -47,7 +47,8 @@ import { deliverMontage, notifyFailure, renderAndDeliver } from "@/lib/render/de
 import { renderPost } from "@/lib/render/render-post";
 import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { finishJob } from "@/lib/studio-jobs";
+import { finishJob, keepAlive } from "@/lib/studio-jobs";
+import { withStepDeadline } from "@/lib/step-clock";
 import { withCostScope } from "@/lib/cost-scope";
 
 // Montage pipeline, one step per invocation (each with its own time budget).
@@ -173,13 +174,32 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: "invalid job" }, { status: 400 });
   const job = parsed.data;
   // Every cost this step logs is counted for its montage: it is charged on what it really cost.
-  after(() => withCostScope(job.quoteId, () => run(job)));
+  // Its long calls start only with the time to finish (step-clock), and its pulse says it is alive.
+  after(() => withCostScope(job.quoteId, () => withStepDeadline(STEP_BUDGET_MS, () => run(job))));
   return Response.json({ queued: job.step }, { status: 202 });
 }
 
 const FAILED = "Je n’ai pas réussi à préparer le montage. Aucun crédit n’a été débité. Tu veux que je réessaie ?";
 
+/** What a step may spend of its 800 s: the rest saves its plan and sends the next step. */
+const STEP_BUDGET_MS = (maxDuration - 70) * 1000;
+
+/**
+ * A step with its pulse: every minute its job says it is alive, with what it needs to start again.
+ * A step Vercel stops (its time is up, the machine is gone) falls silent: the watchdog sends it again
+ * once, else she is told (lib/montage-watchdog.ts). Without it, a design that died at 800 s stayed
+ * « en cours » and Simone offered to start it again while it still ran.
+ */
 async function run(job: Job) {
+  const stop = job.quoteId ? keepAlive(job.quoteId, job) : null;
+  try {
+    await runStep(job);
+  } finally {
+    stop?.();
+  }
+}
+
+async function runStep(job: Job) {
   // Replaced by a newer request on this Reel: stop here (its effects session too), nothing goes out.
   if (await quoteSuperseded(job.quoteId)) {
     console.log("montage superseded, stopped", job.postId, job.quoteId, job.step);

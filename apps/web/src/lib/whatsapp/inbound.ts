@@ -12,7 +12,7 @@ import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { photoRegions } from "@/lib/video/regions";
 import { setReaction } from "@/lib/reactions";
 import { env } from "@/lib/env";
-import { downloadMedia, markReadAndTyping, sendReaction, sendReply, sendText } from "./client";
+import { downloadMedia, markReadAndTyping, sendLinkButton, sendReaction, sendReply, sendText } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 
 // Several messages often arrive together (a caption + 5 clips). We wait briefly and
@@ -215,7 +215,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
       return null;
     });
     if (offer) {
-      const waMessageId = await sendText(message.from, offer.reply);
+      const waMessageId = offer.link ? await sendLinkButton(message.from, offer.reply, offer.link) : await sendText(message.from, offer.reply);
       await db.from("whatsapp_messages").insert({
         studio_id: member.studio_id,
         wa_message_id: waMessageId,
@@ -230,6 +230,24 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   }
 
   await replyOnWhatsApp({ studioId: member.studio_id, memberId: member.id, waId: message.from, phone, replyTo: message.id });
+}
+
+/** Whether she sent another message after this one (on WhatsApp, its own turn answers it). */
+async function newerMessage(studioId: string, waMessageId: string): Promise<boolean> {
+  const db = supabaseAdmin();
+  const { data: mine } = await db.from("whatsapp_messages").select("created_at").eq("wa_message_id", waMessageId).maybeSingle();
+  if (!mine) return false;
+  const { data: later } = await db
+    .from("whatsapp_messages")
+    .select("id")
+    .eq("studio_id", studioId)
+    .eq("channel", "whatsapp")
+    .eq("direction", "inbound")
+    .neq("type", "reaction")
+    .is("payload->>via", null)
+    .gt("created_at", mine.created_at as string)
+    .limit(1);
+  return Boolean(later?.length);
 }
 
 /**
@@ -249,22 +267,43 @@ export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo
     return;
   }
 
-  if (result.reply) {
-    const { posts, grid, quote } = result.extras;
+  // She wrote again while this turn ran (a video, then « c'est envoyé ! » a few seconds later):
+  // the newer turn reads both and answers them; two answers crossed and contradicted each other.
+  // Only when this one started nothing (a montage, a post), which must be said.
+  const superseded = replyTo && !result.afterReply.length && !result.notes.length ? await newerMessage(studioId, replyTo).catch(() => false) : false;
+  if (result.reply && superseded) console.info("whatsapp: reply left to the newer turn", replyTo);
+  if (result.reply && !superseded) {
+    // The grid is the app's: never a link from WhatsApp, only the pages made for her phone.
+    const { posts, quote } = result.extras;
     // A quote gets its yes / other level / no buttons, unless Fauve chose others.
     // The quote's own buttons win over the model's (they carry the other level).
     // (none for a montage already launched).
     const buttons = quote ? await quoteButtons(studioId, quote).catch(() => []) : [];
     const options = buttons.length ? buttons : result.extras.options;
-    // Cards are app-only: on WhatsApp they become links to the app.
-    // Files asked for (a drop zone in the app): on WhatsApp, her own upload link, in full quality (WhatsApp compresses videos).
-    const upload = result.extras.upload ? await createLoginLink(phone, "/depot", "upload").catch((e) => console.warn("upload link failed", e)) : null;
+    // Cards are app-only: on WhatsApp, a page made for her phone behind a button (no long link in her chat).
+    // Files asked for (a drop zone or the library in the app): her own upload link, in full quality (WhatsApp compresses videos).
+    const button =
+      result.extras.link ??
+      (result.extras.upload || result.extras.pick_media
+        ? { path: "/depot", label: "Envoyer mes fichiers", purpose: "upload" as const }
+        : posts?.length === 1
+          ? { path: `/v/${posts[0]}`, label: "Voir la publication", purpose: "open_post" as const }
+          : null);
+    const url = button ? await createLoginLink(phone, button.path, button.purpose).catch((e: unknown) => void console.warn("button link failed", e)) : undefined;
+    // Several posts: their pages, in text under the message.
     const links = [
-      ...(posts ?? []).map((id) => `${env("APP_URL")}/publications/${id}`),
-      ...(grid ? [`Ta grille : ${env("APP_URL")}/grille`] : []),
-      ...(upload ? [`Pour me les envoyer en pleine qualité, depuis ta galerie : ${upload}`] : []),
+      ...(posts && posts.length > 1 ? posts.map((id) => `${env("APP_URL")}/v/${id}`) : []),
+      ...(!url && button ? [`${env("APP_URL")}${button.path}`] : []),
     ];
-    const waMessageId = await sendReply(waId, result.reply, options, links);
+    const waMessageId = url
+      ? options?.length
+        ? // WhatsApp puts one kind of button on a message: the answers on hers, then the page.
+          await sendReply(waId, result.reply, options, links).then(async (id) => {
+            await sendLinkButton(waId, button!.purpose === "upload" ? "En pleine qualité, depuis ta galerie :" : "C’est ici :", { url, label: button!.label });
+            return id;
+          })
+        : await sendLinkButton(waId, [result.reply, ...links].join("\n\n"), { url, label: button!.label })
+      : await sendReply(waId, result.reply, options, links);
     await db.from("whatsapp_messages").insert({
       studio_id: studioId,
       wa_message_id: waMessageId,

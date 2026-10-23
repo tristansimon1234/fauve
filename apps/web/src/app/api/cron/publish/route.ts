@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
+import { reviveStalledMontages } from "@/lib/montage-watchdog";
 import { runPublishWorker } from "@/lib/social/publish";
 
 // Called every 5 minutes by pg_cron (Supabase) with the shared CRON_SECRET.
@@ -13,7 +14,9 @@ function authorized(request: Request): boolean {
 
 async function handle(request: Request) {
   if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
-  return Response.json(await runPublishWorker());
+  // Montages whose step stopped without a word: sent again, or she is told.
+  const montages = await reviveStalledMontages().catch((e: unknown) => ({ error: String(e) }));
+  return Response.json({ ...(await runPublishWorker()), montages });
 }
 
 export const GET = handle;

@@ -10,7 +10,7 @@ import { sendDropped } from "./actions";
 /** Pick in her gallery, watch them go up, send them to Simone; then back to WhatsApp. */
 export function DropView({ studioId }: { studioId: string }) {
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState<number | null>(null);
+  const [sent, setSent] = useState<{ count: number; answered: boolean } | null>(null);
   const [pending, start] = useTransition();
   const uploads = useChatUploads(studioId, setError);
   const input = useRef<HTMLInputElement>(null);
@@ -22,7 +22,7 @@ export function DropView({ studioId }: { studioId: string }) {
       const res = await sendDropped(uploads.attachments()).catch(() => ({ ok: false as const, error: "Ça n’est pas passé. Réessaie dans un instant." }));
       if (!res.ok) return setError(res.error);
       uploads.clear();
-      setSent(res.count);
+      setSent({ count: res.count, answered: res.answered });
     });
 
   if (sent !== null) {
@@ -31,10 +31,15 @@ export function DropView({ studioId }: { studioId: string }) {
         <Mascot size={96} mood="happy" />
         <h1 className="text-[24px] font-extrabold tracking-[-0.01em]">C’est reçu, merci !</h1>
         <p className="text-[15px] leading-snug text-white/80">
-          {sent > 1 ? `Tes ${sent} fichiers sont arrivés` : "Ton fichier est arrivé"} en pleine qualité. Je les regarde et je te réponds sur WhatsApp.
+          {sent.count > 1 ? `Tes ${sent.count} fichiers sont arrivés` : "Ton fichier est arrivé"} en pleine qualité.{" "}
+          {sent.answered ? "Je t’ai écrit sur WhatsApp : je les regarde et je reviens vers toi." : "Envoie-moi le petit message tout prêt sur WhatsApp, et je m’y mets."}
         </p>
-        <a href={whatsappLink("")} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-[15px] font-extrabold text-ink">
-          <WhatsAppIcon size={18} /> Retourner sur WhatsApp
+        {/* WhatsApp never lets a link send a message by itself: when Simone cannot write first, hers is ready to send. */}
+        <a
+          href={whatsappLink(sent.answered ? "" : `C’est envoyé ! ${sent.count > 1 ? `${sent.count} fichiers` : "1 fichier"} 📎`)}
+          className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-[15px] font-extrabold text-ink"
+        >
+          <WhatsAppIcon size={18} /> {sent.answered ? "Retourner sur WhatsApp" : "Prévenir Simone sur WhatsApp"}
         </a>
         <button type="button" onClick={() => setSent(null)} className="text-[13.5px] font-semibold text-white/70 underline underline-offset-3">
           En envoyer d’autres

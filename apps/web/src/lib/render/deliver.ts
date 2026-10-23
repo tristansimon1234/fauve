@@ -7,7 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isFirstReel } from "@/lib/onboarding";
 import { ownerWhatsApp } from "@/lib/owner-message";
 import { instagramAccount } from "@/lib/social/publish";
-import { sendImage, sendReply, sendTemplate, sendText } from "@/lib/whatsapp/client";
+import { sendImage, sendLinkButton, sendLinkThenReply, sendReply, sendTemplate, sendText } from "@/lib/whatsapp/client";
 import { renderPost } from "./render-post";
 import { renderSlides } from "./slides";
 
@@ -87,7 +87,7 @@ export async function notifyStudio(target: Pick<DeliveryTarget, "studioId" | "wa
   const full = { ...target, postId: "" };
   if (target.waId) {
     const url = link ? await createLoginLink(`+${target.waId}`, link.path, "open_post") : null;
-    const id = await sendText(target.waId, url ? `${text}\n\n${link!.label} : ${url}` : text);
+    const id = url ? await sendLinkButton(target.waId, text, { url, label: link!.label }) : await sendText(target.waId, text);
     await store(full, { wa_message_id: id, type: "text", body: text, payload: link ? { open_path: link.path } : {} });
   } else {
     await store(full, { type: "text", body: link ? `${text}\n\n${link.label} : ${env("APP_URL")}${link.path}` : text, payload: link ? { open_path: link.path } : {} });
@@ -198,9 +198,9 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   // Stored without the one-time link (Fauve's history must not reuse it).
   const stored = [intro, notes, after].filter(Boolean).join("\n\n");
   const send = async (waId: string) => {
-    const link = await createLoginLink(`+${waId}`, page, "open_post");
-    const message = [`${intro}\nRegarde-le ici : ${link}`, notes, after].filter(Boolean).join("\n\n");
-    return options ? sendReply(waId, message, options) : sendText(waId, message);
+    // The page behind a button under the first lines (no long link in her chat), then the question with its answers.
+    const url = await createLoginLink(`+${waId}`, page, "open_post");
+    return sendLinkThenReply(waId, [intro, notes].filter(Boolean).join("\n\n"), { url, label: "Voir la vidéo" }, after, options);
   };
   if (target.waId) {
     const id = await send(target.waId);
@@ -257,8 +257,8 @@ export async function deliverImages(
       : "Elle est sur ta publication : regarde, et dis-moi si tu veux autre chose.";
   const payload = { posts: [target.postId], open_post: target.postId };
   if (target.waId) {
-    const link = await createLoginLink(`+${target.waId}`, `/v/${target.postId}`, "open_post");
-    const id = await sendText(target.waId, `${after}\n\nRegarde ici : ${link}`);
+    const url = await createLoginLink(`+${target.waId}`, `/v/${target.postId}`, "open_post");
+    const id = await sendLinkButton(target.waId, after, { url, label: "Voir ma publication" });
     await store(full, { wa_message_id: id, type: "text", body: after, payload });
   } else {
     await store(full, { type: "text", body: after, payload });
@@ -277,8 +277,8 @@ export async function deliverCarousel(target: DeliveryTarget, made: { count: num
   const after = [plainText(made.note), "Fais défiler pour tout voir : tu peux changer chaque texte, puis valider."].filter(Boolean).join("\n\n");
   const payload = { posts: [target.postId], open_post: target.postId };
   if (target.waId) {
-    const link = await createLoginLink(`+${target.waId}`, `/v/${target.postId}`, "open_post");
-    const id = await sendText(target.waId, `${intro}\n\nRegarde ici : ${link}\n\n${after}`);
+    const url = await createLoginLink(`+${target.waId}`, `/v/${target.postId}`, "open_post");
+    const id = await sendLinkButton(target.waId, `${intro}\n\n${after}`, { url, label: "Voir mon carrousel" });
     await store(target, { wa_message_id: id, type: "text", body: `${intro}\n\n${after}`, payload });
   } else {
     await store(target, { type: "text", body: `${intro}\n\n${after}`, payload });
@@ -294,8 +294,8 @@ export async function renderSlidesAndDeliver(target: DeliveryTarget): Promise<bo
     const after = "Fais défiler pour tout voir. Tu peux déplacer ou corriger chaque texte du doigt, puis valider.";
     const payload = { posts: [target.postId], open_post: target.postId };
     if (target.waId) {
-      const link = await createLoginLink(`+${target.waId}`, `/v/${target.postId}`, "open_post");
-      const id = await sendText(target.waId, `${intro}\n\nRegarde ici : ${link}\n\n${after}`);
+      const url = await createLoginLink(`+${target.waId}`, `/v/${target.postId}`, "open_post");
+      const id = await sendLinkButton(target.waId, `${intro}\n\n${after}`, { url, label: "Voir ma publication" });
       await store(target, { wa_message_id: id, type: "text", body: `${intro}\n\n${after}`, payload });
     } else {
       await store(target, { type: "text", body: `${intro}\n\n${after}`, payload });

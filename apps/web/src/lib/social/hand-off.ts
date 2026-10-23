@@ -2,7 +2,7 @@ import "server-only";
 import { captionForInstagram, captionMatch, isInSessionWindow } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { sendImage, sendTemplate, sendText, sendVideo } from "@/lib/whatsapp/client";
+import { sendImage, sendLinkButton, sendTemplate, sendText, sendVideo } from "@/lib/whatsapp/client";
 import { recentMedia, recentStories, InstagramError } from "./instagram";
 
 // « Je publie moi-même » : at the post's time, Simone hands the post over on
@@ -66,11 +66,8 @@ async function sendStoryOnWhatsApp(post: HandOffPost, phone: string) {
   });
   if (id) await store(post.studio_id, phone, id, intro, { open_post: post.id });
   else {
-    const page = await createLoginLink(phone, `/v/${post.id}`, "open_post");
-    const text = `${intro}
-
-Elle est ici : ${page}`;
-    await store(post.studio_id, phone, await sendText(waId, text), text, { open_post: post.id });
+    const url = await createLoginLink(phone, `/v/${post.id}`, "open_post");
+    await store(post.studio_id, phone, await sendLinkButton(waId, intro, { url, label: "Voir ma story" }), intro, { open_post: post.id });
   }
   if (link) await store(post.studio_id, phone, await sendText(waId, link), link);
 }
@@ -98,9 +95,8 @@ async function sendOnWhatsApp(post: HandOffPost, phone: string) {
   }
   if (!sent) {
     // Too big for WhatsApp (16 MB) or not sent: the page of the post, where it downloads.
-    const link = await createLoginLink(phone, `/v/${post.id}`, "open_post");
-    const text = `${intro}\n\nLa vidéo est ici : ${link}`;
-    await store(post.studio_id, phone, await sendText(waId, text), text, { open_post: post.id });
+    const url = await createLoginLink(phone, `/v/${post.id}`, "open_post");
+    await store(post.studio_id, phone, await sendLinkButton(waId, intro, { url, label: "Voir la vidéo" }), intro, { open_post: post.id });
   }
   const caption = fullCaption(post);
   if (caption) await store(post.studio_id, phone, await sendText(waId, caption.slice(0, 4000)), caption);

@@ -71,12 +71,12 @@ export const toolSpecs = {
   },
   get_connect_link: {
     description:
-      "Renvoie le lien sécurisé (valable 15 min) vers la page où la gérante connecte son compte Instagram professionnel et, si elle veut, son TikTok. À envoyer quand un compte n'est pas connecté.",
+      "Donne à la gérante la page où elle connecte son compte Instagram professionnel et, si elle veut, son TikTok. À proposer quand un compte n'est pas connecté. Sur WhatsApp, un bouton « Relier mes comptes » s'affiche sous ton message : n'écris aucun lien ; dans l'application, il renvoie le lien à écrire.",
     input: z.object({}),
   },
   get_post_link: {
     description:
-      "Renvoie le lien sécurisé (valable 15 min, à usage unique) vers la page mobile d'une publication : la gérante y regarde la vidéo, lit la légende, valide, ou déplace et corrige un texte du doigt. À envoyer quand elle veut revoir ou modifier une publication (« renvoie-moi le lien », « je veux voir le rendu »). Dans l'application, pas de lien : la carte de la publication s'affiche sous ton message.",
+      "Donne à la gérante la page mobile d'une publication : elle y regarde la vidéo, lit la légende, valide, ou déplace et corrige un texte du doigt. Quand elle veut revoir ou modifier une publication (« renvoie-moi le lien », « je veux voir le rendu »). Sur WhatsApp, un bouton « Voir la publication » s'affiche sous ton message ; dans l'application, sa carte. N'écris jamais de lien.",
     input: z.object({ post_id: z.string().uuid() }),
   },
   remember: {
@@ -409,7 +409,7 @@ export const toolSpecs = {
   reply_with: {
     description:
       "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. upload : une zone de dépôt (video, photo ou any) quand tu lui demandes des fichiers ; sur WhatsApp, elle devient son lien de dépôt en pleine qualité, ajouté sous ton message. pick_media (video, photo ou any) : sa médiathèque en vignettes à cocher, avec aussi l'ajout de nouveaux fichiers ; sa réponse revient avec les media_id choisis. step_card (onboarding, dans l'app) : la carte de l'étape en cours (website : champ pour son site ; style : sa charte trouvée et son moodboard ; rhythm : son rythme ; connect : le bouton Instagram ; first_post : créer sa première publication). Ni pick_media ni step_card n'apparaissent sur WhatsApp. Appelle-le au plus une fois par réponse, avec ton message.",
-    input: replyExtrasSchema.omit({ quote: true }),
+    input: replyExtrasSchema.omit({ quote: true, link: true }),
   },
   react_to_message: {
     description:

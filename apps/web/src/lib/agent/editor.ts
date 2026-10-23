@@ -73,6 +73,7 @@ import { ensureInspirationRead } from "@/lib/inspirations";
 import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
 import { isFirstReel } from "@/lib/onboarding";
 import { LAYER_ROLE, markTemplatesUsed, OVERLAY_ROLE, PHOTO_ROLE, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
+import { timeLeft } from "@/lib/step-clock";
 import { anthropic, logClaudeCost } from "./run";
 
 /** The hooks of the studio's latest other Reels: the next one takes another form and other words. */
@@ -151,8 +152,8 @@ export type DesignedEdit = {
   reusedScenes: number;
 };
 
-/** A failed composition is tried once more only when the design step has spent less than this (its limit is 800 s). */
-const COMPOSE_RETRY_BEFORE_MS = 330_000;
+/** A failed composition is tried once more only with this much left in the design step (its limit is 800 s): a call, its check, the rest of the step. */
+const COMPOSE_RETRY_NEEDS_MS = 420_000;
 
 /** How long the montage waits for what moves in her videos (its faces, its hands) before the editor cuts. */
 const TRACKS_WAIT_MS = 180_000;
@@ -180,7 +181,6 @@ export async function designEdit(params: {
   /** What she fixed for this Reel: over every default of the editor. */
   contract?: ReelContract;
 }): Promise<DesignedEdit> {
-  const started = Date.now();
   const db = supabaseAdmin();
   const [post, studio, brand, previous, recent, report, inspirations, hooks] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id, voice_media_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
@@ -631,7 +631,7 @@ export async function designEdit(params: {
   const composeId = requests.find((r) => r.compose)?.id;
   let compositionMissed = Boolean(composeId && !designed.find((d) => d.id === composeId)?.js);
   // Only while the step has time for it (800 s for the whole design): a step cut short would deliver nothing at all.
-  if (composeId && !designed.find((d) => d.id === composeId)?.js && Date.now() - started < COMPOSE_RETRY_BEFORE_MS) {
+  if (composeId && !designed.find((d) => d.id === composeId)?.js && timeLeft() > COMPOSE_RETRY_NEEDS_MS) {
     console.warn("composition failed, one more try", params.postId, designed.find((d) => d.id === composeId)?.error);
     const again = (await designMotionScenes(params.studioId, requests.filter((r) => r.id === composeId), direction, sceneBrand, kit, sceneContext).catch(() => []))[0];
     if (again?.js) {
