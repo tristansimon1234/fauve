@@ -13,6 +13,7 @@ import type { MotionTemplate, ReelProps } from "./types";
 // (the side margins, out of the bottom quarter). A text may fly in from outside,
 // but not stay out longer than OUT_FRAMES. A failure cancels the render with the
 // reason, which goes back to the motion designer; the fixed scene is used if it persists.
+// A mark (an arrow, a number, a key: isMark) only has to stay inside the picture.
 // A text that stays on the eyes, nose or mouth of a face tracked under the scene (one
 // hung on a hand next to the face) is not a failure: it is reported (FAUVE_FACE), and
 // the motion designer gets one more round to move it.
@@ -90,6 +91,14 @@ class Catch extends Component<{ onError: (error: unknown) => void; children: Rea
 
 type Out = { text: string; frames: number[]; box: [number, number, number, number] };
 
+/**
+ * A mark, not words to read: an arrow, a number, a key of a drawn keyboard, a dot of an interface
+ * (no letter and 3 characters at most, or a single character). It may sit near the edge, as in the
+ * interfaces of the Reels she copies, but stays inside the picture: a fake app's « ↑ » and « 01 »
+ * by its side had the whole composition of Tristan's Reel left out.
+ */
+const isMark = (text: string) => [...text].length <= 1 || ([...text].length <= 3 && !/\p{L}/u.test(text));
+
 /** A text over a face of the footage: the frames it is on it, and the face's box (px). */
 type OnFace = { text: string; frames: number[]; face: [number, number, number, number] };
 
@@ -139,7 +148,8 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
         if (entry.frames.at(-1) !== frame) entry.frames.push(frame);
         onFace.set(text, entry);
       }
-      if (box[0] >= zone.left && box[2] <= zone.right && box[1] >= zone.top && box[3] <= zone.bottom) continue;
+      const limit = isMark(text) ? { left: -TOLERANCE, right: width + TOLERANCE, top: -TOLERANCE, bottom: height + TOLERANCE } : zone;
+      if (box[0] >= limit.left && box[2] <= limit.right && box[1] >= limit.top && box[3] <= limit.bottom) continue;
       const entry = out.get(text) ?? { text, frames: [], box };
       if (entry.frames.at(-1) !== frame) entry.frames.push(frame);
       entry.box = [Math.min(entry.box[0], box[0]), Math.min(entry.box[1], box[1]), Math.max(entry.box[2], box[2]), Math.max(entry.box[3], box[3])];
