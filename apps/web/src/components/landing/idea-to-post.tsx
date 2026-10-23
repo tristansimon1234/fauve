@@ -74,7 +74,7 @@ export function IdeaToPost() {
           <Mascot size={48} mood={MOODS[phase]} still={still} />
           <span className="flex flex-col">
             <span className="text-[16px] font-bold">Simone</span>
-            <span className="text-[12.5px] text-muted">{phase === 2 ? "au travail…" : "ta community manager"}</span>
+            <span className="text-[12.5px] text-muted">{phase === 2 ? "au travail…" : "ton community manager"}</span>
           </span>
         </div>
         <div className="flex min-h-[300px] flex-col justify-end gap-2.5 px-4 pt-4 pb-5 sm:min-h-[340px] sm:px-5">

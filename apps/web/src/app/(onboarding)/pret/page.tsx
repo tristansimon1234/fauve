@@ -96,7 +96,7 @@ function Ready({ firstName, items }: { firstName: string | null; items: Item[] |
           {firstName && <span className="accent">{firstName}.</span>}
         </h1>
         <p className="text-[15px] leading-[1.55] text-muted">
-          <span className="md:hidden">La suite se passe sur WhatsApp : envoie tes vidéos à Simone, elle prépare tes publications avec toi.</span>
+          <span className="md:hidden">La suite se passe sur WhatsApp : envoie tes vidéos à Simone, il prépare tes publications avec toi.</span>
           <span className="hidden md:inline">Ta première publication peut partir sur Instagram. La suite se passe dans l’app, avec Simone.</span>
         </p>
       </div>

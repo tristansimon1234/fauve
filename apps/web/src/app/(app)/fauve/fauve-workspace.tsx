@@ -500,7 +500,7 @@ export function FauveWorkspace({
               <span className="flex min-w-0 flex-col leading-tight">
                 <span className="text-[15px] font-bold">Simone</span>
                 <span key={typing ? (live?.status ?? "writing") : "online"} className={`fauve-fade truncate text-[12px] ${typing ? "text-violet" : "text-muted"}`}>
-                  {typing ? (live?.status ?? "écrit…") : "ta community manager"}
+                  {typing ? (live?.status ?? "écrit…") : "ton community manager"}
                 </span>
               </span>
             </div>

@@ -644,7 +644,7 @@ function VoiceView({ data, onDone }: Props) {
       {picked !== null && (
         <NoteField label="Ce que la voix doit dire ?" placeholder="Ex. parle du cours offert pour une première venue" value={note} onChange={setNote} />
       )}
-      <p className="text-[13px] leading-snug text-muted">Ou ta propre voix : envoie un vocal à Simone sur WhatsApp, elle le pose dessus.</p>
+      <p className="text-[13px] leading-snug text-muted">Ou ta propre voix : envoie un vocal à Simone sur WhatsApp, il le pose dessus.</p>
       {error && (
         <p role="alert" className="text-[13.5px] font-semibold text-danger">
           {error}
