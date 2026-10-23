@@ -42,7 +42,7 @@ import { anthropic, logClaudeCost } from "./run";
 export type OfferedPhoto = { id: string; shows: string; photo: ScenePhoto };
 
 /**
- * busy: the rows of the footage under the scene that must stay seen (faces, lettering; shares of the height);
+ * busy: the rows of the footage under the scene where faces and lettering show (shares of the height): no words on them while they show;
  * photos: her photos it may compose with; cuts: for an animation over several shots, where the shot changes under it (frames from its start);
  * compose: a collage's composition, which lays the Reel's shots itself: what each one shows and when (plans), where the
  * Reel's texts go over it (texts), and each shot's span and shape for its test render (shots).
@@ -350,7 +350,7 @@ export async function designMotionScenes(
   const model = await designerModel(studioId);
   const requestOf = (id: string) => requests.find((q) => q.id === id)!;
   // One after the other: each scene knows what the earlier ones of the Reel do (a minute more for a second one).
-  let results: SceneResult[] = [];
+  const results: SceneResult[] = [];
   for (const [i, r] of requests.entries()) {
     const existing: Existing = {
       reel: [
@@ -375,9 +375,25 @@ export async function designMotionScenes(
     }
     results.push({ id: r.id, ...written });
   }
+  return checkScenes(studioId, model, results, requestOf, brand, artDirection, kit, context);
+}
 
-  // Scenes that passed the check but leave a text on a face of the footage they follow: kept as they
-  // are if their fix fails (a scene that works beats none).
+/**
+ * The check of written scenes, then one round of fixes, with the reason, for those that fail it or leave a text
+ * on a face of the footage they follow or too quick to read. Those that passed are kept as they are if their fix
+ * fails (a scene that works beats none); the others have no js (their fixed scene, or none, plays).
+ */
+async function checkScenes(
+  studioId: string,
+  model: string,
+  written: SceneResult[],
+  requestOf: (id: string) => SceneRequest,
+  brand: SceneBrand,
+  artDirection: string | undefined,
+  kit: MotionKit,
+  context: SceneContext,
+): Promise<SceneResult[]> {
+  let results = written;
   const working = new Map<string, SceneResult>();
   for (let round = 0; round < 2; round++) {
     const checks = await smokeTestScenes(smokeScenes(results, requestOf, context), brand).catch(
@@ -467,13 +483,11 @@ export async function lookAtScenes(
       : [],
   );
   if (!reworked.length) return [];
-  const checks = await smokeTestScenes(smokeScenes(reworked, requestOf, context), brand).catch((e: unknown): SceneChecks => {
-    console.warn("motion look: reworked scenes not checked, kept as they were", e);
-    return { errors: Object.fromEntries(reworked.map((r) => [r.id, String(e)])), faces: {} };
-  });
-  return reworked.filter((r) => {
-    if (!checks.errors[r.id]) return true;
-    console.warn("motion look: the rework failed its check, the animation stays as it was", r.id, checks.errors[r.id]);
+  // Checked as a new animation is (a text on a face or too quick to read gets its round of fixes too).
+  const checked = await checkScenes(studioId, model, reworked, requestOf, brand, artDirection, kit, context);
+  return checked.filter((r) => {
+    if (r.js) return true;
+    console.warn("motion look: the rework failed its check, the animation stays as it was", r.id, r.error);
     return false;
   });
 }

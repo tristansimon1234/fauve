@@ -97,12 +97,28 @@ async function framesOf(studioId: string, postId: string, plan: EditPlan, moment
   );
 }
 
+/** What the design left for a look nobody will take (its montage replaced, or done). */
+export async function dropLook(path: string): Promise<void> {
+  await supabaseAdmin()
+    .storage.from("media")
+    .remove([path])
+    .catch(() => undefined);
+}
+
 /**
  * The look of a montage's new animations: rendered over her footage, looked at by the motion designer, the ones it
  * reworks (and that pass their check) put in the plan, which keeps its version (nothing was rendered of it yet),
  * and in the library. The number reworked; the plan stays as it was when anything fails.
  */
 export async function lookAtAnimations(studioId: string, postId: string, planId: string, path: string): Promise<number> {
+  try {
+    return await reworkFromLook(studioId, postId, planId, path);
+  } finally {
+    await dropLook(path);
+  }
+}
+
+async function reworkFromLook(studioId: string, postId: string, planId: string, path: string): Promise<number> {
   const db = supabaseAdmin();
   const file = await db.storage.from("media").download(path);
   if (!file.data) throw new Error(`look: ${file.error?.message ?? "file missing"}`);
@@ -159,6 +175,5 @@ export async function lookAtAnimations(studioId: string, postId: string, planId:
       if (error) console.warn("motion look: library scene not updated", templateId, error.message);
     }
   }
-  await db.storage.from("media").remove([path]).catch(() => undefined);
   return reworked.length;
 }

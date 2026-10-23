@@ -27,7 +27,7 @@ import {
 import { reviewMontage } from "@/lib/agent/critic";
 import { readContract } from "@/lib/agent/contract";
 import { designEdit } from "@/lib/agent/editor";
-import { lookAtAnimations } from "@/lib/agent/motion-look";
+import { dropLook, lookAtAnimations } from "@/lib/agent/motion-look";
 import {
   collectEffects,
   effectRoute,
@@ -219,6 +219,7 @@ async function runStep(job: Job) {
   if (await quoteSuperseded(job.quoteId)) {
     console.log("montage superseded, stopped", job.postId, job.quoteId, job.step);
     if (job.effect) await endEffectsSession(job.effect.session, job.effect.files).catch(() => {});
+    if (job.look) await dropLook(job.look.path);
     return;
   }
   const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify, conversationId: job.conversationId };

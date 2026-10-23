@@ -154,7 +154,8 @@ export async function replyInConversation(params: {
     const skip = new Set((separate ?? []).map((c) => c.id as string));
     kept = kept.filter((r) => !skip.has(r.conversation_id as string)).slice(0, HISTORY_READ);
   }
-  const stored = stableWindow(kept.reverse(), HISTORY_LIMIT, HISTORY_STEP).map((r) => ({
+  // A copy: `kept` stays newest first (her latest message, the words this turn answers).
+  const stored = stableWindow([...kept].reverse(), HISTORY_LIMIT, HISTORY_STEP).map((r) => ({
     ...(r as StoredMessage & { wa_message_id: string | null }),
     reply_to: (r.payload as { reply_to?: string } | null)?.reply_to ?? null,
     notes: (r.payload as { notes?: string[] } | null)?.notes,
