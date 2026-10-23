@@ -104,14 +104,11 @@ const isMark = (text: string) => [...text].length <= 1 || ([...text].length <= 3
 /** A text over a face of the footage: the frames it is on it, and the face's box (px). */
 type OnFace = { text: string; frames: number[]; face: [number, number, number, number] };
 
-/** The rows its texts cover while they hold still (the middle of the scene, entrances and exits aside), in px. */
-type Band = { top: number; bottom: number };
-
 /**
- * Visible texts outside the safe zone, per text, in one copy of the scene; those over the eyes, nose
- * or mouth of a face seen under it at that frame (`onFace`); and the rows its texts cover when it holds (`band`).
+ * Visible texts outside the safe zone, per text, in one copy of the scene; and those over the eyes,
+ * nose or mouth of a face seen under it at that frame (`onFace`).
  */
-function measure(copy: HTMLElement, frame: number, width: number, height: number, out: Map<string, Out>, seen: Seen, onFace: Map<string, OnFace>, band?: Band) {
+function measure(copy: HTMLElement, frame: number, width: number, height: number, out: Map<string, Out>, seen: Seen, onFace: Map<string, OnFace>) {
   const origin = copy.getBoundingClientRect();
   const zone = {
     left: SAFE_ZONE.side - TOLERANCE,
@@ -136,10 +133,6 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
     for (const r of Array.from(range.getClientRects())) {
       if (r.width < 1 || r.height < 1) continue;
       const box: Out["box"] = [r.left - origin.left, r.top - origin.top, r.right - origin.left, r.bottom - origin.top];
-      if (band) {
-        band.top = Math.min(band.top, box[1]);
-        band.bottom = Math.max(band.bottom, box[3]);
-      }
       for (const face of seen.faces) {
         const features = [face.points?.right_eye, face.points?.left_eye, face.points?.nose, face.points?.mouth];
         const covered = features.some(
@@ -267,11 +260,9 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
       await waitFrame();
       const out = new Map<string, Out>();
       const onFace = new Map<string, OnFace>();
-      const band: Band = { top: Infinity, bottom: -Infinity };
       document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
         const frame = Number(copy.dataset.checkFrame);
-        const settled = frame >= durationInFrames * 0.2 && frame <= durationInFrames * 0.8;
-        measure(copy, frame, width, height, out, track(frame), onFace, settled ? band : undefined);
+        measure(copy, frame, width, height, out, track(frame), onFace);
       });
       const failures = [...out.values()].filter((o) => o.frames.length * step > OUT_FRAMES);
       const r = (n: number) => Math.round(n);
@@ -286,16 +277,14 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         return;
       }
       if (!failures.length) {
-        // Read by smoke.mjs: where the texts sit, so the render can move the scene off the faces under it.
-        if (Number.isFinite(band.top)) console.log(`FAUVE_BAND ${JSON.stringify([Math.round(band.top) / height, Math.round(band.bottom) / height])}`);
-        // And the texts that stay on a face of the footage, for one more round of the motion designer.
+        // Read by smoke.mjs: the texts that stay on a face of the footage, for one more round of the motion designer.
         const onFaces = [...onFace.values()].filter((o) => o.frames.length * step > FACE_FRAMES);
         if (onFaces.length) {
           const detail = onFaces
             .slice(0, 3)
             .map((o) => `« ${o.text.slice(0, 40)} » (images ${o.frames[0]} à ${o.frames.at(-1)}, visage de x ${r(o.face[0])} à ${r(o.face[2])}, y ${r(o.face[1])} à ${r(o.face[3])})`)
             .join(" ; ");
-          const message = `texte sur un visage de la vidéo : ${detail}. Un texte ne se pose jamais sur les yeux, le nez ou la bouche de quelqu'un : lis track(frame).faces et pose-le du côté libre (de l'autre côté de la main, au-dessus de la tête ou plus bas), sans changer l'idée. Sauf si l'effet qu'elle a demandé a besoin d'être devant un visage (un mot tenu entre ses doigts, un message posé sur elle comme dans le Reel qu'elle recopie) : alors garde-le, sa demande l'autorise.`;
+          const message = `texte sur un visage de la vidéo : ${detail}. Un texte ne se pose pas sur les yeux, le nez ou la bouche de quelqu'un qu'on voit : lis track(frame).faces et pose-le du côté libre (de l'autre côté de la main, au-dessus de la tête ou plus bas), sans changer l'idée. Sauf si ce que tu poses cache la vidéo à cet endroit (un aplat, une carte : le visage ne se voit plus), ou si l'effet qu'elle a demandé a besoin d'être devant un visage (un mot tenu entre ses doigts, un message posé sur elle comme dans le Reel qu'elle recopie) : alors garde-le.`;
           console.log(`FAUVE_FACE ${JSON.stringify(message)}`);
         }
         const quick = tooQuick(frames, step, frames.at(-1) ?? 0);

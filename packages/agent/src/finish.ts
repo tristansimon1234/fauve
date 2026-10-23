@@ -1,4 +1,4 @@
-import { avoidPhotoText, boxFrom2d, headZone, photoBoxInFrame, photoEditFrom, reelSubtitleRow, sceneShift, type Adjust, type Box, type PhotoDetection, type PhotoEdit } from "./retouch.ts";
+import { avoidPhotoText, boxFrom2d, headZone, photoBoxInFrame, photoEditFrom, reelSubtitleRow, SUBTITLE_ROW, type Adjust, type Box, type PhotoDetection, type PhotoEdit } from "./retouch.ts";
 import { planTimeline } from "./motion.ts";
 import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type EditPlan, type PlanSegment } from "./schemas.ts";
 import { handMoves, type TracksByClip, type TracksFile } from "./tracking.ts";
@@ -241,8 +241,11 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
   // A voice's subtitles keep one place for the whole Reel, the one faces cover least (they never move from shot to shot).
   const windows = shots.filter((s) => !s.motion).flatMap((s) => s.windows);
   const row = reelSubtitleRow(windows);
+  // They show all along what is said, other texts or not: the Reel's texts keep off their row (two texts one over the other do not read).
+  const subtitles: Box[] = plan.subtitles ? [{ x: 0, y: row ?? SUBTITLE_ROW.y, w: 1, h: SUBTITLE_ROW.h }] : [];
+  const clear = subtitles.length ? windows.map((w) => ({ ...w, boxes: [...w.boxes, ...subtitles] })) : windows;
   const { subtitle_y: _row, ...rest } = finished;
-  return { ...rest, ...(row !== null ? { subtitle_y: row } : {}), segments: placed, texts: avoidPhotoText(finished.texts, windows) };
+  return { ...rest, ...(row !== null ? { subtitle_y: row } : {}), segments: placed, texts: avoidPhotoText(finished.texts, clear) };
 }
 
 /**
@@ -289,37 +292,6 @@ function busyZones(facts: MediaFacts, mediaId: string, from: number, seconds: nu
     if (head) boxes.push(head);
   }
   return boxes;
-}
-
-/**
- * How far each animation over her footage moves (share of the height), by segment index:
- * the rows its texts cover (measured by the scene check, `bands` by `m<index>`) set clear
- * of the faces and lettering under it (`over.busy`), 0 when they are clear already. An
- * animation that was not measured keeps the move it has; one that follows what is tracked
- * under it (its code reads `track`) is never moved: it would leave the hand it follows.
- */
-export function sceneShifts(plan: Pick<EditPlan, "segments">, bands: Record<string, [number, number]>): Map<number, number> {
-  const shifts = new Map<number, number>();
-  plan.segments.forEach((s, i) => {
-    const band = bands[`m${i}`];
-    if (!isMotionSegment(s) || !s.over || !band || /\btrack\s*\(/.test(s.motion.js ?? "")) return;
-    shifts.set(i, sceneShift({ top: band[0], bottom: band[1] }, s.over.busy ?? []));
-  });
-  return shifts;
-}
-
-/** The plan with the animations' moves kept on them (null when none changes). */
-export function withShifts<P extends Pick<EditPlan, "segments">>(plan: P, shifts: Map<number, number>): P | null {
-  let changed = false;
-  const segments = plan.segments.map((s, i) => {
-    if (!isMotionSegment(s) || !shifts.has(i)) return s;
-    const shift = shifts.get(i)!;
-    if ((s.motion.shift ?? 0) === shift) return s;
-    changed = true;
-    const { shift: _old, ...motion } = s.motion;
-    return { ...s, motion: shift ? { ...motion, shift } : motion };
-  });
-  return changed ? { ...plan, segments } : null;
 }
 
 /** The rows of zones worth keeping clear (a tiny word does not count), merged when they touch. */

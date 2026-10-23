@@ -498,6 +498,22 @@ test("créer: what she imagines titles the post, and reaches the montage and the
   assert.equal(imaginedBrief("   "), undefined);
 });
 
+test("a correction carries her own words, as she wrote them, after Simone's reading", async () => {
+  const { withHerWords } = await import("./creation.ts");
+  const asked = "cest bien mais le texte depasse de lanimation whatapps\nameliore la nettement";
+  const brief = "Dans l'animation WhatsApp, le texte dépasse : réduire la taille du texte, bulles plus larges.";
+  assert.equal(
+    withHerWords(brief, asked),
+    `${brief}\n\nSes mots, tels quels : « cest bien mais le texte depasse de lanimation whatapps ameliore la nettement »`,
+  );
+  // Without a brief of Simone's, her words alone; quoted whole already, nothing added; nothing said, the brief as it is.
+  assert.equal(withHerWords(undefined, "plus court"), "Ses mots, tels quels : « plus court »");
+  assert.equal(withHerWords("Elle dit « plus court » : raccourcir.", "plus court"), "Elle dit « plus court » : raccourcir.");
+  assert.equal(withHerWords("Raccourcir.", "   "), "Raccourcir.");
+  // A long voice note is cut at a word.
+  assert.ok(withHerWords(undefined, "mot ".repeat(500))!.length < 1300);
+});
+
 test("créer: « Oui, publie-le » and « Je regarde d’abord » are answered without Simone", async () => {
   const { publishOfferAnswer, publishQuestion, PUBLISH_OFFER_OPTIONS } = await import("./creation.ts");
   assert.equal(publishOfferAnswer(PUBLISH_OFFER_OPTIONS[0]), "yes");
@@ -528,7 +544,7 @@ test("reply_with: answer buttons and cards", async () => {
   assert.equal(replyExtrasSchema.safeParse({ posts: ["pas-un-id"] }).success, false);
 });
 
-test("montage plan: shown on the quote and read by the editor", async () => {
+test("montage plan: shown on the quote and read by the editor as Simone's proposal, never as validated", async () => {
   const { montagePlanSchema, planBrief } = await import("./schemas.ts");
   const plan = montagePlanSchema.parse({
     duration: 15,
@@ -540,6 +556,8 @@ test("montage plan: shown on the quote and read by the editor", async () => {
     ],
   });
   const brief = planBrief(plan);
+  assert.match(brief, /^Piste de Simone \(une proposition, pas un plan validé par la gérante/);
+  assert.doesNotMatch(brief, /respecte l'ordre/);
   assert.match(brief, /~15 s, coupes rapides\./); // an older style: its energy in words
   assert.match(planBrief({ ...plan, style: "collage" }), /~15 s, en collage\./);
   assert.match(planBrief({ ...plan, style: undefined }), /~15 s\./);
@@ -2311,30 +2329,6 @@ test("acting tags are played, never read in the subtitles", async () => {
   assert.equal(stripAudioTags("Tu sais pourquoi ? [warmly] Viens."), "Tu sais pourquoi ? Viens.");
 });
 
-test("voice: the hook keeps the first phrase, its words say the rest", async () => {
-  const { clearOfVoice } = await import("./editor.ts");
-  const phrases = [
-    { start: 0.3, end: 2.1 },
-    { start: 2.4, end: 6 },
-    { start: 7.6, end: 11 },
-  ];
-  const texts = [
-    { text: "ta pizza, sans raccourci", from: 0, to: 3.5, style: "hook" },
-    { text: "48 h de pousse", from: 3, to: 5, style: "band" },
-    { text: "réserve ta table", from: 10, to: 13, style: "caption" },
-  ];
-  // The hook ends soon after the first phrase; the band and the invitation go (the subtitles say them).
-  assert.deepEqual(
-    clearOfVoice(texts, phrases).map((t) => [t.text, t.from, t.to]),
-    [["ta pizza, sans raccourci", 0, 2.5]],
-  );
-  // No hook on its first phrase: nothing but the subtitles.
-  assert.deepEqual(clearOfVoice([{ text: "x", from: 3, to: 5, style: "band" }], [{ start: 0.3, end: 12 }]), []);
-  assert.deepEqual(clearOfVoice([{ text: "y", from: 2.5, to: 4, style: "hook" }], phrases), []);
-  // No voice: the texts as they are.
-  assert.equal(clearOfVoice(texts, []).length, 3);
-});
-
 test("voice: the last shot holds after the last word when its clip has room", async () => {
   const { holdAfterVoice } = await import("./editor.ts");
   const plan = editPlanSchema.parse({
@@ -2798,9 +2792,9 @@ test("lab fixes 2: a Reel's message shows its title, subtitles off faces read wh
   assert.equal(subtitleRow([{ x: 0, y: 0.05, w: 1, h: 0.8 }]), null);
 });
 
-test("off faces: one subtitle row for the Reel, animations moved off the faces under them, the engine's places worked out again", async () => {
-  const { finishPlan, sceneShifts, withShifts } = await import("./finish.ts");
-  const { avoidPhotoText, reelSubtitleRow, sceneShift, SUBTITLE_ROW } = await import("./retouch.ts");
+test("off faces: one subtitle row for the Reel, the engine's places worked out again, an older animation's move kept", async () => {
+  const { finishPlan } = await import("./finish.ts");
+  const { avoidPhotoText, reelSubtitleRow, SUBTITLE_ROW } = await import("./retouch.ts");
   const { carryTextStyle } = await import("./editor.ts");
   const { buildReelProps } = await import("./motion.ts");
   const shot = (start: number, end: number, extra: object) => ({
@@ -2884,26 +2878,29 @@ test("off faces: one subtitle row for the Reel, animations moved off the faces u
   assert.equal(carried.texts[0]!.y, undefined);
   assert.equal(carried.texts[1]!.y, 0.3);
 
-  // The opening animation's words sit on the sunglasses: they go under the face.
-  assert.equal(sceneShift({ top: 0.09, bottom: 0.36 }, busy), 0.29);
-  // A face low in the frame: they go above it (the bottom quarter stays free).
-  assert.equal(sceneShift({ top: 0.42, bottom: 0.68 }, [{ y: 0.5, h: 0.28 }]), -0.2);
-  assert.equal(sceneShift({ top: 0.42, bottom: 0.6 }, [{ y: 0.05, h: 0.2 }]), 0);
-  assert.equal(sceneShift({ top: 0.2, bottom: 0.6 }, [{ y: 0.05, h: 0.7 }]), 0);
-  const shifts = sceneShifts(out, { m0: [0.09, 0.36] });
-  assert.equal(shifts.get(0), 0.29);
-  const kept = withShifts(out, shifts)!;
-  assert.equal((kept.segments[0] as { motion: { shift: number } }).motion.shift, 0.29);
-  assert.equal(withShifts(kept, shifts), null);
-  // An animation that follows a hand (its code reads track) is never slid: it would leave the hand.
-  const following = { ...out, segments: out.segments.map((s, i) => (i === 0 && "motion" in s ? { ...s, motion: { ...s.motion, js: "const h = track(frame).hands[0];" } } : s)) };
-  assert.equal(sceneShifts(following, { m0: [0.09, 0.36] }).has(0), false);
-
-  // The render gets both: the scene's move, the subtitles' one row.
-  const withCode = { ...kept, segments: kept.segments.map((s) => ("motion" in s ? { ...s, motion: { ...s.motion, js: "function Scene(){return null}" } } : s)) };
-  const props = buildReelProps(editPlanSchema.parse(withCode), { template: "doux", clipUrls: { b: "https://x/b.mp4", c: "https://x/c.mp4", p: "https://x/p.jpg" }, photoIds: ["p"], brand: { name: "Mousse" } });
+  // The render gets the subtitles' one row; an animation the engine moved on an older plan keeps its move
+  // (the engine no longer moves any: where an animation sits is its designer's).
+  const older = { ...out, segments: out.segments.map((s) => ("motion" in s ? { ...s, motion: { ...s.motion, js: "function Scene(){return null}", shift: 0.29 } } : s)) };
+  const props = buildReelProps(editPlanSchema.parse(older), { template: "doux", clipUrls: { b: "https://x/b.mp4", c: "https://x/c.mp4", p: "https://x/p.jpg" }, photoIds: ["p"], brand: { name: "Mousse" } });
   assert.equal((props.segments[0] as { shift?: number }).shift, 0.29);
   assert.equal(props.subtitleY, out.subtitle_y);
+});
+
+test("subtitles shown all along a voice: the Reel's texts keep off their row", async () => {
+  const { finishPlan } = await import("./finish.ts");
+  const facts = { clips: {}, photos: {} } as never;
+  const plan = (subtitles: boolean) =>
+    ({
+      format: "9:16", duration: 6, template: "libre", images: [], transitions: "cut", subtitles, music: null,
+      segments: [{ clip_id: "a", in: 0, out: 6, zoom: "none" }],
+      // A caption sits on the subtitles' usual row.
+      texts: [{ text: "réserve ta place", from: 1, to: 4, style: "caption" }],
+    }) as never;
+  const voiced = finishPlan(plan(true), facts, { a: 10 });
+  assert.equal(voiced.texts[0]!.auto_y, true);
+  assert.ok(voiced.texts[0]!.y! + 0.08 < 0.64, "the caption goes above the subtitles");
+  // Without subtitles, it keeps its place.
+  assert.equal(finishPlan(plan(false), facts, { a: 10 }).texts[0]!.y, undefined);
 });
 
 test("collages: a clean cut-out makes a sticker over its print, in a collage only", async () => {

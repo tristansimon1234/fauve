@@ -21,8 +21,6 @@ import {
   postStatusSchema,
   renderDuration,
   signatureOf,
-  sceneShifts,
-  withShifts,
   type EditPlan,
   type PostKind,
   type PostStatus,
@@ -311,7 +309,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         props.brand,
       ).catch((e: unknown): SceneChecks => {
         console.warn("motion scenes: check unavailable", e);
-        return { errors: {}, bands: {}, faces: {} };
+        return { errors: {}, faces: {} };
       });
       props.segments = props.segments.map((s, i) => {
         if (s.type !== "motion" || !checks.errors[`m${i}`]) return s;
@@ -327,23 +325,8 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         });
         props.layers = layers.length ? layers : undefined;
       }
-      // An animation over her footage never covers a face or a sign under it: where its texts sit
-      // was just measured, the whole scene moves to the free rows when they fall on them. The move
-      // is kept on the plan, so the live preview shows it where the video has it.
-      const shifts = sceneShifts(plan, checks.bands);
-      if (shifts.size) {
-        props.segments = props.segments.map((s, i) => {
-          if (s.type !== "motion" || !shifts.has(i)) return s;
-          // Measured now: this move replaces the one kept on the plan (none when the texts are clear).
-          return { ...s, shift: (s.under && shifts.get(i)) || undefined };
-        });
-        // Kept on the plan as it is stored (not its parsed copy), so nothing else of it changes.
-        const kept = withShifts(planRow.plan as EditPlan, shifts);
-        if (kept) {
-          const saved = await db.from("edit_plans").update({ plan: kept }).eq("id", planRow.id);
-          if (saved.error) console.warn("motion scenes: shift not kept on the plan", planRow.id, saved.error.message);
-        }
-      }
+      // Where an animation sits over her footage is its designer's (it looked at it on her images): the engine no longer
+      // moves it (a move kept on an older plan stays, motion.shift).
       try {
         mp4 = await renderReelInSandbox({ id: renderId, props });
         engine = "remotion";

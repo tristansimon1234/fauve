@@ -10,6 +10,9 @@ import { isMotionSegment, type EditPlan } from "./schemas.ts";
 /** The most images of its earlier render an animation reworked looks at. */
 export const MAX_EARLIER_FRAMES = 6;
 
+/** The most images of its render a new animation is looked at on before it goes out (a whole Reel's composition: one more). */
+export const MAX_LOOK_FRAMES = 4;
+
 type Span = { from: number; to: number; code?: string };
 
 /** Each animation's span on its Reel's clock, by the motion designer's id (s<i>: a scene, l<i>: a layer). */
@@ -63,6 +66,50 @@ export function earlierLooks(
       .filter((x, k, list) => k === 0 || x.t - list[k - 1]!.t >= 0.15)
       .map((x) => ({ t: x.t, label: `image ${Math.max(0, Math.round((x.t - from) * 30))} de ton animation (${x.label})` }));
     looks.set(id, { code, times });
+  }
+  return looks;
+}
+
+/**
+ * The instants at which each animation just written (`ids`: the motion designer's ids) is looked at in its Reel before
+ * it goes out, on the Reel's clock: once its words are in, the gestures that play under it (`gestures`), its middle and
+ * just before its end; a composition of the whole Reel at its first image and across the Reel. Each instant is told on
+ * the animation's own frames.
+ */
+export function lookMoments(plan: EditPlan, ids: string[], gestures: GestureMoment[] = []): Map<string, { t: number; label: string }[]> {
+  const spans = animationSpans(plan);
+  const duration = planTimeline(plan).duration;
+  const round = (t: number) => Math.round(t * 100) / 100;
+  const looks = new Map<string, { t: number; label: string }[]>();
+  for (const id of ids) {
+    const span = spans.get(id);
+    if (!span || span.to - span.from < 0.3) continue;
+    const { from, to } = span;
+    const length = to - from;
+    const composed = id.startsWith("l") && plan.layers?.[Number(id.slice(1))]?.compose;
+    const moments = composed
+      ? [
+          { t: round(Math.min(to - 0.1, from + 0.3)), label: "sa première image" },
+          ...[0.25, 0.5, 0.75].map((k) => ({ t: round(from + k * Math.min(length, duration)), label: "pendant le Reel" })),
+          { t: round(Math.max(from, to - 0.4)), label: "sa fin" },
+        ]
+      : [
+          { t: round(from + Math.min(0.8, length * 0.3)), label: "ses mots arrivés" },
+          ...gestures.filter((g) => g.t > from + 0.2 && g.t < to - 0.2).map((g) => ({ t: round(g.t), label: `pendant un geste : ${g.what}` })),
+          { t: round(from + length / 2), label: "son milieu" },
+          { t: round(Math.max(from, to - Math.min(0.25, length * 0.1))), label: "juste avant sa fin" },
+        ];
+    const sorted = moments.sort((a, b) => a.t - b.t).filter((m, k, list) => k === 0 || m.t - list[k - 1]!.t >= 0.25);
+    const room = composed ? MAX_LOOK_FRAMES + 1 : MAX_LOOK_FRAMES;
+    // Its first and last instants, and in between the others spread when there are too many.
+    const kept =
+      sorted.length <= room
+        ? sorted
+        : [sorted[0]!, ...Array.from({ length: room - 2 }, (_, k) => sorted[1 + Math.round((k * (sorted.length - 3)) / Math.max(1, room - 3))]!), sorted.at(-1)!];
+    looks.set(
+      id,
+      kept.filter((m, k, list) => list.indexOf(m) === k).map((m) => ({ t: m.t, label: `image ${Math.max(0, Math.round((m.t - from) * 30))} de ton animation (${m.label})` })),
+    );
   }
   return looks;
 }

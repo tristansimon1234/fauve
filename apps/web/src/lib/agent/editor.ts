@@ -16,7 +16,6 @@ import {
   type ReelFormat,
   carryRetouch,
   carryTextStyle,
-  clearOfVoice,
   compositionShots,
   compositionTexts,
   isComposed,
@@ -54,6 +53,9 @@ import {
   earlierLooks,
   gestureMoments,
   handMoves,
+  lookMoments,
+  propsAt,
+  SUBTITLE_ROW,
   type ReelProps,
   type TracksByClip,
   honestLength,
@@ -62,7 +64,8 @@ import {
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
-import { videoFramesInSandbox } from "@/lib/render/sandbox";
+import { loadMontageInputs } from "@/lib/render/render-post";
+import { reelFramesInSandbox, videoFramesInSandbox } from "@/lib/render/sandbox";
 import { ensureTracks, loadTracks } from "@/lib/render/tracks";
 import { usableFonts } from "@/lib/fonts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -71,7 +74,7 @@ import { ensureTranscript } from "@/lib/voice";
 import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
-import { designMotionScenes, type SceneRequest } from "./motion-designer";
+import { designMotionScenes, type SceneLooks, type SceneRequest, type SceneResult } from "./motion-designer";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
 import { isFirstReel } from "@/lib/onboarding";
@@ -445,27 +448,26 @@ export async function designEdit(params: {
     if (judged && judged.index > 0) plan.texts[hook.index] = { ...hook.text, text: judged.text, emphasis: judged.emphasis };
   }
 
+  // Her voice plays with its first word at once, her words as subtitles; without it, the plan has no voice.
+  // The Reel she copies wins over these defaults: a voice it speaks without subtitles. Her voice leads: the Reel
+  // holds a moment after its last word. The texts the editor kept stay (its prompt keeps them few): the engine no
+  // longer takes them away, and places them off the subtitles' row.
+  if (voice && voiceId && spoken) {
+    plan.voice = { media_id: voiceId, at: voiceStart };
+    plan.subtitles = !followed || followed.look.voice === "aucune" || followed.look.text.subtitles;
+    Object.assign(plan, holdAfterVoice(plan, spoken.ends_at, durations));
+  } else delete plan.voice;
+
   // The finishing touches of a professional editor, from what Gemini read: each clip's
   // light, colour and tilt corrected when it needs it, the vertical crop framed on its
   // subject, a slow move on shots filmed still, her footage under every animation, texts
-  // kept off faces and off the lettering in a picture.
+  // kept off faces, off the lettering in a picture and off the subtitles.
   const facts: MediaFacts = {
     clips: Object.fromEntries(clips.map((c) => [c.media_id, c.analysis])),
     photos: Object.fromEntries(photoIds.flatMap((id, i) => (photoReads[i] ? [[id, photoReads[i]!]] : []))),
     tracks,
   };
   Object.assign(plan, finishPlan(plan, facts, durations));
-
-  // Her voice plays with its first word at once, her words as subtitles; without it, the plan has no voice.
-  // The Reel she copies wins over these defaults: a voice it speaks without subtitles, several texts it sets over its voice.
-  if (voice && voiceId && spoken) {
-    plan.voice = { media_id: voiceId, at: voiceStart };
-    plan.subtitles = !followed || followed.look.voice === "aucune" || followed.look.text.subtitles;
-    // Her voice leads: the Reel holds a moment after its last word, and the other texts keep to
-    // its silences (its words are the subtitles; the hook stays over its first phrase).
-    Object.assign(plan, holdAfterVoice(plan, spoken.ends_at, durations));
-    if (followed?.look.text.amount !== "plusieurs") plan.texts = clearOfVoice(plan.texts, spoken.phrases);
-  } else delete plan.voice;
 
   // The animations of the version corrected: a scene kept by its id keeps the photos it composes with.
   const previousMotions = previousPlan.success
@@ -547,6 +549,9 @@ export async function designEdit(params: {
       ];
     }),
   });
+  // Her voice's subtitles show all along it (an animation over several shots meets the subtitles of who speaks in them):
+  // an animation's words keep off their row.
+  const subtitles = plan.subtitles ? { y: plan.subtitle_y ?? SUBTITLE_ROW.y, h: SUBTITLE_ROW.h } : null;
   const requests: SceneRequest[] = toWrite.map((w) => {
     const photos = offersFor(w.brief);
     const layer = w.id.startsWith("l") ? layers[Number(w.id.slice(1))]! : null;
@@ -580,6 +585,7 @@ export async function designEdit(params: {
       ...(photos.length ? { photos } : {}),
       ...(track.length ? { track } : {}),
       ...(Array.isArray(moves) ? (moves.length ? { moves: { par_plan: moves } } : {}) : moves ? { moves } : {}),
+      ...(subtitles && !compose && (plan.voice || layer) ? { subtitles } : {}),
     };
   });
   // A correction: each animation rewritten first looks at how its earlier version came out on her images.
@@ -644,6 +650,65 @@ export async function designEdit(params: {
       logoUrl: profile.logo_path ? "https://logo.fauve/studio" : profile.logo_url,
       fonts: usable,
     });
+  // The Reel with the animations just written in place (and those it keeps): as it will come out.
+  const withWritten = (written: SceneResult[]): EditPlan => {
+    const coded = (result: SceneResult | undefined, kept: (typeof previousMotions)[number] | undefined) =>
+      result?.js
+        ? { code: result.code ?? undefined, js: result.js, ...(result.photos?.length ? { photos: result.photos } : {}), ...(result.fonts?.length ? { fonts: result.fonts } : {}) }
+        : kept?.js
+          ? { code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}), ...(kept.fonts ? { fonts: kept.fonts } : {}) }
+          : null;
+    return {
+      ...plan,
+      segments: plan.segments.map((s, i) => {
+        if (!isMotionSegment(s) || s.motion.js) return s;
+        const found = coded(written.find((d) => d.id === `s${i}`), reusable.get(s.motion.brief));
+        return found ? { ...s, motion: { ...s.motion, ...found } } : s;
+      }),
+      layers: (plan.layers ?? []).flatMap((l, i) => {
+        if (l.motion.js) return [l];
+        const result = written.find((d) => d.id === `l${i}`);
+        const kept = reusable.get(l.motion.brief);
+        const found = coded(result, kept);
+        if (!found) return [];
+        // A composition written now draws the whole picture (its ground, the Reel's texts, its end), and sets the subtitles' row.
+        const drawn = result?.js ? (l.compose ? { draws_texts: true, ...(result.subtitleY !== undefined ? { subtitle_y: result.subtitleY } : {}) } : {}) : { ...(kept?.draws_texts ? { draws_texts: true } : {}), ...(kept?.subtitle_y !== undefined ? { subtitle_y: kept.subtitle_y } : {}) };
+        return [{ ...l, motion: { ...l.motion, ...found, ...drawn } }];
+      }),
+    };
+  };
+  // What the motion designer looks at before its animations go out: each one rendered over her footage, in the Reel
+  // as it will come out (its texts, its subtitles, the shots under it), at a few instants.
+  const rendered = async (written: SceneResult[]): Promise<SceneLooks> => {
+    const draft = withWritten(written);
+    const moments = lookMoments(draft, written.map((w) => w.id), gestureMoments(draft, actions));
+    const frames = [...new Set([...moments.values()].flatMap((list) => list.map((m) => Math.round(m.t * 30))))].sort((a, b) => a - b);
+    if (!frames.length) return new Map();
+    const inputs = await loadMontageInputs(params.studioId, draft, { postId: params.postId });
+    const props = buildReelProps(draft, {
+      template,
+      clipUrls: inputs.clipUrls,
+      photoIds: inputs.photoIds,
+      words: inputs.words,
+      aspects: inputs.aspects,
+      brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts, signature: inputs.reelSignature },
+      ...(inputs.voice ? { voice: inputs.voice } : {}),
+      ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
+      ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
+      photoAspects: inputs.photoAspects,
+      ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),
+    });
+    const images = await reelFramesInSandbox(`look-${params.postId.slice(0, 8)}-${Date.now()}`, propsAt(props, frames), frames);
+    return new Map(
+      [...moments].map(([id, list]) => [
+        id,
+        list.flatMap((m) => {
+          const image = images[Math.round(m.t * 30)];
+          return image instanceof Buffer ? [{ label: m.label, jpeg: image }] : [];
+        }),
+      ]),
+    );
+  };
   const sceneContext = {
       kept: keptScenes.map((name) => `déjà dans ce Reel : ${name}`),
       done,
@@ -653,6 +718,7 @@ export async function designEdit(params: {
         ...(plan.tempo ? { tempo: plan.tempo } : {}),
         ...(signature ? { signature: resolveReelBrand(plan, template, { name: "", signature }).signature } : {}),
       },
+      rendered,
     };
   const designed = await designMotionScenes(params.studioId, requests, direction, sceneBrand, kit, sceneContext);
   // The composition is the Reel itself (a split screen, a frame…): when its code failed, a whole new try before
