@@ -411,6 +411,11 @@ async function effectsWait(job: Job) {
     if (Date.now() - freshAt > 2 * 60_000) {
       await setQuoteStage(job.quoteId, "effects");
       freshAt = Date.now();
+      // Where it is, every two minutes: a session works for half an hour and says nothing until it ends.
+      if (state) {
+        const minutes = Math.round((Date.now() - new Date(effect.started).getTime()) / 60_000);
+        console.log("effects: running", job.postId, JSON.stringify({ minutes, status: state.status, rounds: state.rounds, cost_usd: state.costUsd, active_s: state.activeSeconds }));
+      }
     }
     if (Date.now() > until) {
       await next(job, { step: "effects_wait" });
