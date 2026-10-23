@@ -20,6 +20,7 @@ import { tracksPath } from "@/lib/render/tracks";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { instagramVideo } from "@/lib/treg";
 import { readStolenLook } from "@/lib/video/inspiration";
+import { costMeta } from "@/lib/cost-scope";
 
 // « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA », « c'est one shot ») :
 // a Reel she likes, from its link, a video she sent or a share to Simone on Instagram, is the
@@ -174,7 +175,7 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     if (fetched) {
       await db
         .from("cost_events")
-        .insert({ studio_id: studioId, kind: "steal", provider: "treg", units: 1, cost_eur: usdToEur(fetched.costUsd, env("USD_TO_EUR")), meta: { found: Boolean(fetched.video), cost_usd: fetched.costUsd } });
+        .insert({ studio_id: studioId, kind: "steal", provider: "treg", units: 1, cost_eur: usdToEur(fetched.costUsd, env("USD_TO_EUR")), meta: costMeta({ found: Boolean(fetched.video), cost_usd: fetched.costUsd }) });
     }
     if (fetched?.video) reel = await stealReelInSandbox(`steal-${randomUUID()}`, { file: fetched.video });
   }
@@ -183,7 +184,7 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   const why = "miss" in reel ? { miss: reel.miss, detail: reel.detail.replace(/\?[^\s"']*/g, "").slice(-400) } : {};
   await db
     .from("cost_events")
-    .insert({ studio_id: studioId, kind: "steal", provider: "vercel_sandbox", units: Math.round(seconds), cost_eur: sandboxCostEur(seconds), meta: { link: "link" in take, ...why } });
+    .insert({ studio_id: studioId, kind: "steal", provider: "vercel_sandbox", units: Math.round(seconds), cost_eur: sandboxCostEur(seconds), meta: costMeta({ link: "link" in take, ...why }) });
   if ("miss" in reel) {
     console.warn("steal: not taken", reel.miss, reel.detail.slice(-500));
     return missed(reel.miss);

@@ -2,6 +2,7 @@ import "server-only";
 import { geminiCostUsd, usdToEur } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { costMeta } from "@/lib/cost-scope";
 
 /** The usage block of a Gemini response (usageMetadata). */
 export type GeminiUsage = Record<string, number | undefined> | undefined;
@@ -26,7 +27,7 @@ export async function logGeminiCost(params: { studioId: string; kind: string; mo
       provider: "google",
       units: input + output,
       cost_eur: usd === null ? 0 : usdToEur(usd, env("USD_TO_EUR")),
-      meta: { model: params.model, usage, cost_usd: usd, priced: usd !== null, ...params.meta },
+      meta: costMeta({ model: params.model, usage, cost_usd: usd, priced: usd !== null, ...params.meta }),
     });
   if (error) console.error("cost_events insert failed", error.message);
 }

@@ -48,6 +48,7 @@ import { env } from "@/lib/env";
 import { levelSpeechInSandbox } from "@/lib/render/sandbox";
 import { postStyle, STEAL_WAIT_MS } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { costMeta } from "@/lib/cost-scope";
 
 // Simone's voice over a Reel: the script she writes from what the images show,
 // read by an ElevenLabs voice with the timing of every word, kept as an audio
@@ -506,7 +507,7 @@ export async function makeVoiceOver(params: {
       provider: "elevenlabs",
       units: script.script.length,
       cost_eur: usdToEur((script.script.length / 1000) * env("ELEVENLABS_TTS_USD_PER_KCHAR"), env("USD_TO_EUR")),
-      meta: { post_id: params.postId, model: voice.model, voice_id: voice.voiceId, seconds: transcript.duration, ms: Date.now() - started },
+      meta: costMeta({ post_id: params.postId, model: voice.model, voice_id: voice.voiceId, seconds: transcript.duration, ms: Date.now() - started }),
     }),
   ]);
   return { mediaId: asset.data.id as string, script: script.script, seconds: transcript.duration };

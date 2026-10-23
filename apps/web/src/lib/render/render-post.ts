@@ -38,6 +38,7 @@ import { ensureCutouts, sceneCutoutInputs, stickerInputs } from "./cutout";
 import { loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
+import { costMeta } from "@/lib/cost-scope";
 
 const extensionByMime: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
@@ -393,7 +394,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       provider: "vercel_sandbox",
       units: seconds,
       cost_eur: sandboxCostEur(seconds),
-      meta: { render_id: renderId, engine, template: plan.template, seconds_of_video: durationMs / 1000, bytes: mp4.length },
+      meta: costMeta({ render_id: renderId, engine, template: plan.template, seconds_of_video: durationMs / 1000, bytes: mp4.length }),
     });
 
     return {

@@ -292,7 +292,7 @@ function QuoteCard({
                     </p>
                   )}
                   <p className="text-[12px] leading-snug text-muted">
-                    {extra ? `Jusqu’à ${credits(price.max)} si Simone corrige la vidéo après l’avoir regardée. ` : ""}Tu ne paies que ce qui est vraiment fait.
+                    {extra ? `Selon ce qu’il demande vraiment, jusqu’à ${credits(price.max)}. ` : ""}Tu ne paies que ce qui est vraiment fait.
                   </p>
                   <p className="text-[12px] text-muted tabular-nums">
                     Solde {credits(quote.balance)} · il t’en restera au moins {Math.max(0, quote.balance - price.max)}

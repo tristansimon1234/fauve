@@ -21,6 +21,7 @@ import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { alignMusicInSandbox, bassLevelsInSandbox, loopedReelInSandbox, muxAudioInSandbox } from "./sandbox";
 import { postStyle } from "@/lib/steal";
+import { costMeta } from "@/lib/cost-scope";
 
 // Simone's music on a Reel (ElevenLabs Music): composed from its brief alone, in
 // the mood of the Reel and the business, as the looping track of a creator's Reel
@@ -239,7 +240,7 @@ export async function withMusic(params: {
         provider: "elevenlabs",
         units: 1,
         cost_eur: usdToEur(usd, env("USD_TO_EUR")),
-        meta: { post_id: params.postId, render_id: params.renderId, song_id: composed.songId, model: env("ELEVENLABS_MUSIC_MODEL"), engine: composed.engine, signature, ms: composed.ms, seconds, take, cost_usd: usd },
+        meta: costMeta({ post_id: params.postId, render_id: params.renderId, song_id: composed.songId, model: env("ELEVENLABS_MUSIC_MODEL"), engine: composed.engine, signature, ms: composed.ms, seconds, take, cost_usd: usd }),
       });
       // Its bass every 10 ms: where its beats land, and where its beat falls away inside the Reel
       // (a break, a stop, an ending too early): heard as the sound cutting out.

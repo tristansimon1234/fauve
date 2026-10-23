@@ -2,6 +2,7 @@ import "server-only";
 import { fromScribe, transcriptionCostUsd, usdToEur, voiceTranscriptSchema, type VoiceTranscript } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { costMeta } from "@/lib/cost-scope";
 
 // Her voice notes (WhatsApp or the app), transcribed once by ElevenLabs Scribe:
 // the text for Simone (she understands vocal messages) and every word with its
@@ -44,7 +45,7 @@ export async function ensureTranscript(studioId: string, mediaId: string): Promi
         provider: "elevenlabs",
         units: transcript.duration,
         cost_eur: usdToEur(transcriptionCostUsd(transcript.duration), env("USD_TO_EUR")),
-        meta: { media_id: mediaId, model: env("ELEVENLABS_STT_MODEL"), purpose: "transcription", ms: Date.now() - started },
+        meta: costMeta({ media_id: mediaId, model: env("ELEVENLABS_STT_MODEL"), purpose: "transcription", ms: Date.now() - started }),
       }),
     ]);
     return transcript;

@@ -1,18 +1,15 @@
 "use client";
 
-import { CREDIT_PRICES, DEFAULT_EFFORT, EFFORTS, type Effort } from "@fauve/agent";
+import { DEFAULT_EFFORT, EFFORTS, MONTAGE_CEILING, MONTAGE_FLOOR, type Effort } from "@fauve/agent";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { CheckIcon } from "@/components/icons";
 import { setMontageEffort } from "./actions";
 
 const LEVELS: Effort[] = ["rapide", "soigne", "max"];
 
-/** What a level adds to a montage's price, as the manager reads it: from the price list, so it cannot drift. */
+/** What a montage at a level may cost, as the manager reads it: from its bounds, so it cannot drift (charged on what it really takes). */
 function extraCost(e: Effort): string {
-  const level = EFFORTS[e];
-  const least = (level.versions > 1 ? CREDIT_PRICES.alternative : 0) + (level.review ? CREDIT_PRICES.review : 0);
-  const most = least + level.fixRounds * CREDIT_PRICES.fixRound;
-  return least ? `+${least} à ${most} crédits` : "sans supplément";
+  return `${MONTAGE_FLOOR.montage} à ${MONTAGE_CEILING[e]} crédits`;
 }
 
 /**

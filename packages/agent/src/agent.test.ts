@@ -315,21 +315,28 @@ test("editor: library scenes keep their id and get their texts as a record", asy
   assert.deepEqual(normalizeEditPlan(plan, {}, 3).segments.map((s) => ("motion" in s ? "motion" : "scene")), ["motion", "motion", "motion", "motion"]);
 });
 
-test("credits: a montage is quoted before it runs and never charged above the quote", async () => {
-  const { quoteMontage, montageCharge, CREDIT_PRICES } = await import("./credits.ts");
-  const quote = quoteMontage({ clips: 4, correction: false });
-  // The new animated scenes allowed are in the price shown, not hidden behind a maximum.
-  assert.deepEqual(quote.lines.map((l) => l.credits), [CREDIT_PRICES.montage, 4, 2 * CREDIT_PRICES.newScene, CREDIT_PRICES.render]);
-  assert.equal(quote.base, 13);
-  assert.equal(quote.max, 13); // Rapide: no correction to add
-  assert.equal(montageCharge(quote, 0), 7); // library scenes only: the quoted ones not made come off
-  assert.equal(montageCharge(quote, 1), 10);
-  assert.equal(montageCharge(quote, 5), 13); // capped at the quote
-  // An older quote counted no scene in its price.
+test("credits: a montage is charged on what it really cost, between its floor and its ceiling", async () => {
+  const { quoteMontage, montageCharge, MONTAGE_FLOOR, MONTAGE_CEILING } = await import("./credits.ts");
+  const { meteredCredits, EUR_PER_CREDIT_SPENT, CREDIT_VALUE_EUR, TARGET_MARGIN } = await import("./margin.ts");
+  const quote = quoteMontage({ correction: false });
+  assert.equal(quote.base, MONTAGE_FLOOR.montage);
+  assert.equal(quote.max, MONTAGE_CEILING.rapide);
+  assert.deepEqual([quote.base, quote.max], [5, 25]); // Tristan: « top » to 5 to 25 for a Reel
+  assert.equal(quote.maxNewScenes, 2);
+  const correction = quoteMontage({ correction: true, maxNewScenes: 0 });
+  assert.deepEqual([correction.base, correction.max], [2, 15]);
+  // Each credit pays its share of the real cost and keeps the margin.
+  assert.ok(Math.abs(EUR_PER_CREDIT_SPENT - CREDIT_VALUE_EUR * (1 - TARGET_MARGIN)) < 1e-9);
+  // Tristan's Simone Reel cost 0.94 €: 4 credits under the old list lost money; now the margin is kept.
+  const simone = meteredCredits({ costEur: 0.94, floor: quote.base, ceiling: quote.max });
+  assert.ok(simone * EUR_PER_CREDIT_SPENT >= 0.94);
+  assert.ok((simone - 1) * EUR_PER_CREDIT_SPENT < 0.94);
+  // A small one pays the floor, a heavy one the ceiling; its cost unknown, the floor.
+  assert.equal(meteredCredits({ costEur: 0.1, floor: 5, ceiling: 25 }), 5);
+  assert.equal(meteredCredits({ costEur: 9, floor: 5, ceiling: 25 }), 25);
+  assert.equal(meteredCredits({ costEur: null, floor: 5, ceiling: 25 }), 5);
+  // A quote from the old list, still in flight, keeps its own charge.
   assert.equal(montageCharge({ base: 7, max: 13, lines: [{ label: "Montage", credits: 7 }] }, 1), 10);
-  const simple = quoteMontage({ clips: 2, correction: true, maxNewScenes: 0 });
-  assert.equal(simple.base, 3); // a correction does not re-watch the clips
-  assert.equal(simple.max, 3);
 });
 
 test("variants: same cut and rhythm with a new hook, priced as a render", async () => {
@@ -836,33 +843,23 @@ test("retouch: boxes, tracking, cover layout without empty corners, edits from G
   assert.equal(next.segments[0] && "blur" in next.segments[0] ? next.segments[0].blur?.tracks.length : 0, 1);
 });
 
-test("effort: each level adds its review, second version and corrections to what a montage may cost", async () => {
-  const { quoteMontage, montageCharge, effortVersions, CREDIT_PRICES } = await import("./credits.ts");
+test("effort: each level may cost more, never above its ceiling", async () => {
+  const { quoteMontage, effortVersions, MONTAGE_CEILING } = await import("./credits.ts");
   const { otherEffort } = await import("./effort.ts");
-  const rapide = quoteMontage({ clips: 3, correction: false });
-  assert.deepEqual(quoteMontage({ clips: 3, correction: false, effort: "rapide" }), rapide); // no level = Rapide, as before
+  const rapide = quoteMontage({ correction: false });
+  assert.deepEqual(quoteMontage({ correction: false, effort: "rapide" }), rapide); // no level = Rapide, as before
   assert.equal(rapide.fixRounds, 0);
-
-  const soigne = quoteMontage({ clips: 3, correction: false, effort: "soigne" });
-  assert.equal(soigne.base, rapide.base + CREDIT_PRICES.review);
-  assert.equal(soigne.max, soigne.base + CREDIT_PRICES.fixRound); // the new scenes are already in the price
-  assert.ok(soigne.max <= 20); // a cared Reel stays near CARED_REEL_CREDITS
-
-  const max = quoteMontage({ clips: 3, correction: false, effort: "max" });
-  assert.equal(max.base, rapide.base + CREDIT_PRICES.alternative + CREDIT_PRICES.review);
+  const soigne = quoteMontage({ correction: false, effort: "soigne" });
+  const max = quoteMontage({ correction: false, effort: "max" });
+  assert.equal(soigne.base, rapide.base); // the same floor: what a level adds shows in its real cost
+  assert.deepEqual([rapide.max, soigne.max, max.max], [MONTAGE_CEILING.rapide, MONTAGE_CEILING.soigne, MONTAGE_CEILING.max]);
+  assert.ok(rapide.max < soigne.max && soigne.max < max.max);
   assert.equal(max.fixRounds, 2);
-  assert.ok(max.max > soigne.max);
 
-  // Charged: the work, the scenes and corrections really made, never above the quote.
-  assert.equal(montageCharge(soigne, 2, 0), soigne.base);
-  assert.equal(montageCharge(soigne, 0, 0), soigne.base - 2 * CREDIT_PRICES.newScene);
-  assert.equal(montageCharge(soigne, 1, 1), soigne.base - CREDIT_PRICES.newScene + CREDIT_PRICES.fixRound);
-  assert.equal(montageCharge(soigne, 5, 5), soigne.max);
-
-  // A correction is one version, even at Max.
+  // A correction is one version, even at Max, with its own ceiling.
   assert.equal(effortVersions("max", true), 1);
   assert.equal(effortVersions("max", false), 2);
-  assert.equal(quoteMontage({ clips: 0, correction: true, effort: "max" }).lines.some((l) => l.credits === CREDIT_PRICES.alternative), false);
+  assert.equal(quoteMontage({ correction: true, effort: "max" }).max, MONTAGE_CEILING.correction);
 
   // The level offered next to the quoted one: up when allowed, else down.
   assert.equal(otherEffort("soigne", ["rapide", "soigne", "max"]), "max");

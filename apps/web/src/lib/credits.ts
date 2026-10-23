@@ -6,6 +6,7 @@ import {
   effectCredits,
   EFFORTS,
   effortSchema,
+  meteredCredits,
   montageCharge,
   montagePlanSchema,
   PLANS,
@@ -26,8 +27,9 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { finishJob, setJobStage, startJob } from "@/lib/studio-jobs";
 
 // Credits (see packages/agent/src/credits.ts for the price list). The balance is
-// the sum of the ledger, topped up once a month. A montage is quoted first, the
-// manager says yes, and the real cost is charged once the video is delivered.
+// the sum of the ledger, topped up once a month. A montage starts at once, priced
+// between a floor and a ceiling, and is charged once delivered on what it really
+// cost: every cost logged while its job ran carries its id (cost-scope.ts).
 
 const QUOTE_TTL_MS = 24 * 3600_000;
 
@@ -128,23 +130,12 @@ export async function availableCredits(studioId: string, exceptQuoteId?: string)
 const LEVELS: Effort[] = ["max", "soigne", "rapide"];
 
 /**
- * The price of a montage at a level, fitted to the balance: fewer new scenes
- * when they do not all fit; null when even its corrections do not fit.
+ * The price of a montage at a level, fitted to what can be spent: its ceiling no higher than that
+ * (it is held while the montage runs); null when even its floor does not fit.
  */
-/** Clips to analyse: the videos only (a photo is read for free). */
-async function videoCount(studioId: string, mediaIds: string[]): Promise<number> {
-  if (!mediaIds.length) return 0;
-  const { data } = await supabaseAdmin().from("media_assets").select("id").eq("studio_id", studioId).eq("kind", "image").in("id", mediaIds);
-  return mediaIds.length - (data?.length ?? 0);
-}
-
-function priceAt(input: { clips: number; correction: boolean; maxNewScenes?: number }, effort: Effort, balance: number): MontageQuote | null {
-  // Fewer new scenes when they do not all fit (the library and fixed scenes do the rest).
-  for (let scenes = quoteMontage({ ...input, effort }).maxNewScenes; scenes >= 0; scenes--) {
-    const quote = quoteMontage({ ...input, effort, maxNewScenes: scenes });
-    if (quote.max <= balance) return quote;
-  }
-  return null;
+function priceAt(input: { correction: boolean; maxNewScenes?: number }, effort: Effort, balance: number): MontageQuote | null {
+  const quote = quoteMontage({ ...input, effort });
+  return balance < quote.base ? null : { ...quote, max: Math.max(quote.base, Math.min(quote.max, Math.floor(balance))) };
 }
 
 /**
@@ -169,7 +160,7 @@ export async function createMontageQuote(input: {
   if (input.plan && input.maxNewScenes === undefined) {
     input = { ...input, maxNewScenes: input.plan.scenes.filter((s) => s.kind === "animation").length };
   }
-  const work = { clips: await videoCount(input.studioId, input.mediaIds), correction: input.correction, maxNewScenes: input.maxNewScenes };
+  const work = { correction: input.correction, maxNewScenes: input.maxNewScenes };
   const efforts: Partial<Record<Effort, MontageQuote>> = {};
   if (!input.variant) {
     for (const level of LEVELS) {
@@ -204,6 +195,8 @@ export async function createMontageQuote(input: {
         variant: input.variant ?? null,
         plan: input.plan ?? null,
         efforts,
+        // Charged on what it really costs (a variant keeps its fixed price).
+        ...(input.variant ? {} : { metered: true }),
       },
       expires_at: new Date(Date.now() + QUOTE_TTL_MS).toISOString(),
     })
@@ -289,7 +282,7 @@ export async function acceptQuote(
     q.kind === "variant" || !chosen
       ? { base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[], maxNewScenes: params.max_new_scenes ?? 0 }
       : priceAt(
-          { clips: await videoCount(studioId, params.media_ids ?? []), correction: q.kind === "correction", maxNewScenes: level ? level.maxNewScenes : (params.max_new_scenes ?? 0) },
+          { correction: q.kind === "correction", maxNewScenes: level ? level.maxNewScenes : (params.max_new_scenes ?? 0) },
           chosen,
           available,
         );
@@ -301,7 +294,7 @@ export async function acceptQuote(
     .from("credit_quotes")
     .update({
       used_at: new Date().toISOString(),
-      ...(repriced ? { effort: chosen, base: price.base, max: price.max, lines: price.lines, params: { ...params, max_new_scenes: price.maxNewScenes } } : {}),
+      ...(repriced ? { effort: chosen, base: price.base, max: price.max, lines: price.lines, params: { ...params, max_new_scenes: price.maxNewScenes, metered: true } } : {}),
     })
     .eq("id", quoteId)
     .is("used_at", null)
@@ -377,11 +370,28 @@ export async function setQuoteStage(quoteId: string | undefined, stage: QuoteSta
  * What really happened, for the charge: work priced for a montage that did not happen (the review, when
  * the critic could not watch; the second take), and an effect's real cost in euros (null: not read).
  */
-type ChargeFacts = { skipReview?: boolean; skipAlternative?: boolean; effectEur?: number | null };
+type ChargeFacts = {
+  skipReview?: boolean;
+  skipAlternative?: boolean;
+  effectEur?: number | null;
+  /** What the delivery message said it used (a metered montage): charged as said, within its bounds. */
+  said?: number;
+};
 
-/** The credits a delivered montage costs: its real new scenes and corrections, an effect its real cost, never above what was priced. */
-function chargeOf(q: { base: unknown; max: unknown; lines: unknown; params: unknown }, newScenes: number, fixRounds: number, facts: ChargeFacts): number {
+/** A launched quote charged on its real cost (montages and corrections since they are metered). */
+const metered = (params: unknown): boolean => Boolean((params as { metered?: unknown } | null)?.metered);
+
+/** What a montage really cost so far, in euros: every cost logged while its job ran (cost-scope.ts); null when none was. */
+export async function quoteCostEur(quoteId: string): Promise<number | null> {
+  const { data, error } = await supabaseAdmin().from("cost_events").select("cost_eur").eq("meta->>quote_id", quoteId);
+  if (error || !data?.length) return null;
+  return data.reduce((sum, row) => sum + (Number(row.cost_eur) || 0), 0);
+}
+
+/** The credits a delivered montage costs: what it really cost (an older quote: its real new scenes and corrections), an effect its real cost, never above what was priced. */
+function chargeOf(q: { base: unknown; max: unknown; lines: unknown; params: unknown }, newScenes: number, fixRounds: number, facts: ChargeFacts, costEur: number | null): number {
   if (pricedAsEffect(q.params)) return effectCredits({ agentEur: facts.effectEur ?? null, floor: q.base as number, ceiling: q.max as number });
+  if (metered(q.params)) return meteredCredits({ costEur, floor: q.base as number, ceiling: q.max as number });
   const skipped = (facts.skipReview ? CREDIT_PRICES.review : 0) + (facts.skipAlternative ? CREDIT_PRICES.alternative : 0);
   return Math.max(0, montageCharge({ base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[] }, newScenes, fixRounds) - skipped);
 }
@@ -390,7 +400,7 @@ function chargeOf(q: { base: unknown; max: unknown; lines: unknown; params: unkn
 export async function montageCost(quoteId: string, newScenes: number, fixRounds = 0, facts: ChargeFacts = {}): Promise<{ credits: number; left: number } | null> {
   const { data: q } = await supabaseAdmin().from("credit_quotes").select("studio_id, base, max, lines, params, charged_at").eq("id", quoteId).maybeSingle();
   if (!q || q.charged_at) return null;
-  const credits = chargeOf(q, newScenes, fixRounds, facts);
+  const credits = chargeOf(q, newScenes, fixRounds, facts, await quoteCostEur(quoteId));
   return { credits, left: Math.max(0, (await creditBalance(q.studio_id as string)) - credits) };
 }
 
@@ -406,7 +416,12 @@ export async function chargeQuote(quoteId: string, newScenes: number, title: str
     .maybeSingle();
   const q = claimed.data;
   if (!q) return;
-  const credits = chargeOf(q, newScenes, fixRounds, facts);
+  const measured = metered(q.params) && !pricedAsEffect(q.params);
+  const costEur = measured ? await quoteCostEur(quoteId) : null;
+  const credits =
+    measured && facts.said !== undefined
+      ? Math.max(q.base as number, Math.min(q.max as number, facts.said))
+      : chargeOf(q, newScenes, fixRounds, facts, costEur);
   const kind = q.kind as AcceptedQuote["kind"];
   const level = effortSchema.nullable().catch(null).parse(q.effort);
   const label = pricedAsEffect(q.params)
@@ -420,5 +435,6 @@ export async function chargeQuote(quoteId: string, newScenes: number, title: str
     new_scenes: newScenes,
     fix_rounds: fixRounds,
     ...(facts.effectEur !== undefined ? { effect_eur: facts.effectEur } : {}),
+    ...(costEur !== null ? { cost_eur: Math.round(costEur * 1000) / 1000 } : {}),
   });
 }
