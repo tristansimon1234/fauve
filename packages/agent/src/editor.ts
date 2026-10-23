@@ -542,7 +542,8 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
       return words ? [{ from: l.from, to: l.to, words }] : [];
     }),
   ];
-  const texts = readableEnding(
+  const texts = longEnoughToRead(
+    readableEnding(
     clearOfAnimations(
       // The hook is read from the first image, never after a blank half second.
       hookAtStart(tempo.texts.map((t) => ({ ...t, from: round(Math.max(0, t.from)), to: round(Math.min(t.to, textsEnd)) }))),
@@ -551,11 +552,45 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
     ),
     animations,
     textsEnd,
+  ),
+    animations,
+    textsEnd,
   )
     .filter((t) => t.to - t.from >= MIN_TEXT_SECONDS)
     .map((t) => ({ ...t, emphasis: t.emphasis?.filter((e) => t.text.toLowerCase().includes(e.toLowerCase())) }));
 
   return editPlanSchema.parse({ ...draft, duration, texts, layers: layers.length ? layers : undefined });
+}
+
+/**
+ * How long a text must stay on screen to be read on a phone: about 0.3 s a word after a
+ * first glance, between 1.2 and 4.5 s (Tristan: « parfois c'est trop rapide donc on peut
+ * même pas lire »). The scene check holds the animations' sentences to the same.
+ */
+export function readingSeconds(text: string): number {
+  const words = text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+  return Math.min(4.5, Math.max(1.2, 0.8 + 0.3 * words));
+}
+
+/**
+ * Texts too short to be read stay longer, up to their reading time: until the next text,
+ * the next animation or the end, never over them.
+ */
+export function longEnoughToRead<T extends { from: number; to: number; text: string; items?: { title: string; detail?: string }[] }>(
+  texts: T[],
+  animations: { from: number; to: number }[],
+  end: number,
+): T[] {
+  const sorted = [...texts].sort((a, b) => a.from - b.from);
+  return sorted.map((t, i) => {
+    const words = [t.text, ...(t.items ?? []).flatMap((item) => [item.title, item.detail ?? ""])].join(" ");
+    const wanted = t.from + readingSeconds(words);
+    if (t.to >= wanted - 0.05) return t;
+    const next = sorted[i + 1]?.from ?? end;
+    const animation = Math.min(end, ...animations.filter((a) => a.from >= t.to - 0.05).map((a) => a.from));
+    const to = round(Math.min(wanted, next, animation, end));
+    return to > t.to ? { ...t, to } : t;
+  });
 }
 
 /** A text on screen for less than this is not read: it goes. */

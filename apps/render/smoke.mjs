@@ -15,7 +15,8 @@
 //    leaves the frame or the safe zone fails the scene. A scene that passes says where
 //    its texts sit while it holds (shares of the height), so the render can move it off
 //    the faces of the footage under it, and which of its texts stay on a face it follows
-//    (faces: not a failure, a reason for one more round of the motion designer).
+//    (faces: not a failure, a reason for one more round of the motion designer), and its
+//    sentences that do not stay long enough to be read (in faces too).
 // BROWSER_EXECUTABLE overrides Remotion's own Chrome (local runs).
 import { existsSync, readFileSync } from "node:fs";
 import React from "react";
@@ -141,8 +142,9 @@ if (browser) {
           onBrowserLog: (log) => {
             const band = /^FAUVE_BAND (\[.*\])$/.exec(log.text)?.[1];
             if (band) bands[scene.id] = JSON.parse(band);
-            const face = /^FAUVE_FACE (".*")$/.exec(log.text)?.[1];
-            if (face) faces[scene.id] = JSON.parse(face);
+            // Not failures, reasons for one more round: a text on a face, a sentence too quick to read.
+            const note = /^FAUVE_(?:FACE|READ) (".*")$/.exec(log.text)?.[1];
+            if (note) faces[scene.id] = [faces[scene.id], JSON.parse(note)].filter(Boolean).join("\n");
           },
         });
       } catch (error) {

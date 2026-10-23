@@ -16,7 +16,9 @@ import type { MotionTemplate, ReelProps } from "./types";
 // A mark (an arrow, a number, a key: isMark) only has to stay inside the picture.
 // A text that stays on the eyes, nose or mouth of a face tracked under the scene (one
 // hung on a hand next to the face) is not a failure: it is reported (FAUVE_FACE), and
-// the motion designer gets one more round to move it.
+// the motion designer gets one more round to move it. So is a sentence that does not stay
+// whole on screen long enough to be read (FAUVE_READ: Tristan, « parfois c'est trop rapide
+// donc on peut même pas lire »).
 
 export const SAFE_ZONE = { side: 140, top: 80, bottom: 0.75 };
 const TOLERANCE = 12; // px: glyph boxes are a little wider than the ink
@@ -158,6 +160,70 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
   }
 }
 
+/**
+ * How long a sentence must stay whole on screen to be read on a phone: about 0.3 s a word
+ * after a first glance, between 1.2 and 4.5 s (the same as readingSeconds in @fauve/agent).
+ */
+export const readingSeconds = (text: string) => {
+  const words = text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+  return Math.min(4.5, Math.max(1.2, 0.8 + 0.3 * words));
+};
+
+/** The block a text sits in (its sentence), past the inline spans of its words. */
+function blockOf(node: Node, copy: HTMLElement): HTMLElement | null {
+  for (let el = node.parentElement; el && el !== copy; el = el.parentElement) {
+    if (!getComputedStyle(el).display.startsWith("inline")) return el;
+  }
+  return node.parentElement;
+}
+
+/**
+ * Sentences that do not stay whole on screen long enough to be read (3 words or more), with how
+ * long they stay and how long they need. A sentence still on screen when the scene ends is left
+ * to the montage; one that only grows into a longer one is read as the longer one.
+ */
+function tooQuick(frames: number[], step: number, last: number): { text: string; seconds: number; needs: number; from: number }[] {
+  const seen = new Map<string, number[]>();
+  document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
+    const frame = Number(copy.dataset.checkFrame);
+    const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+    const blocks = new Set<HTMLElement>();
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.textContent?.trim()) continue;
+      let opacity = 1;
+      for (let el: HTMLElement | null = node.parentElement; el && el !== copy; el = el.parentElement) {
+        const style = getComputedStyle(el);
+        if (style.visibility === "hidden") opacity = 0;
+        opacity *= Number(style.opacity);
+      }
+      const block = opacity >= 0.5 ? blockOf(node, copy) : null;
+      if (block) blocks.add(block);
+    }
+    for (const block of blocks) {
+      const text = (block.textContent ?? "").replace(/\s+/g, " ").trim();
+      if (text.split(" ").length < 3) continue;
+      const at = seen.get(text) ?? [];
+      if (at.at(-1) !== frame) at.push(frame);
+      seen.set(text, at);
+    }
+  });
+  const texts = [...seen.keys()];
+  return [...seen.entries()].flatMap(([text, at]) => {
+    if (texts.some((other) => other !== text && other.includes(text))) return [];
+    // Its longest stay, in one piece.
+    let best = { from: at[0]!, to: at[0]! };
+    let run = { from: at[0]!, to: at[0]! };
+    for (const f of at.slice(1)) {
+      run = f - run.to <= step ? { ...run, to: f } : { from: f, to: f };
+      if (run.to - run.from > best.to - best.from) best = run;
+    }
+    if (best.to >= last) return [];
+    const seconds = (best.to - best.from + step) / 30;
+    const needs = readingSeconds(text);
+    return seconds < needs * 0.8 && frames.length > 1 ? [{ text, seconds, needs, from: best.from }] : [];
+  });
+}
+
 const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
 /** Words compared as written: spaces of any kind and case aside. */
@@ -231,6 +297,16 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
             .join(" ; ");
           const message = `texte sur un visage de la vidéo : ${detail}. Un texte ne se pose jamais sur les yeux, le nez ou la bouche de quelqu'un : lis track(frame).faces et pose-le du côté libre (de l'autre côté de la main, au-dessus de la tête ou plus bas), sans changer l'idée. Sauf si l'effet qu'elle a demandé a besoin d'être devant un visage (un mot tenu entre ses doigts, un message posé sur elle comme dans le Reel qu'elle recopie) : alors garde-le, sa demande l'autorise.`;
           console.log(`FAUVE_FACE ${JSON.stringify(message)}`);
+        }
+        const quick = tooQuick(frames, step, frames.at(-1) ?? 0);
+        if (quick.length) {
+          const s = (n: number) => n.toFixed(1).replace(".", ",");
+          const detail = quick
+            .slice(0, 3)
+            .map((q) => `« ${q.text.slice(0, 50)} » (dès l'image ${q.from}) reste ${s(q.seconds)} s entière à l'écran, il lui en faut ${s(q.needs)}`)
+            .join(" ; ");
+          const message = `texte trop rapide pour être lu : ${detail}. Une phrase reste entière à l'écran au moins 0,8 s plus 0,3 s par mot avant de partir (le temps de la lire sur un téléphone) : fais-la arriver plus tôt ou partir plus tard, ou garde moins de phrases, sans changer l'idée.`;
+          console.log(`FAUVE_READ ${JSON.stringify(message)}`);
         }
         return continueRender(handle);
       }
