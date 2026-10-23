@@ -142,7 +142,7 @@ export const textExampleSchema = z.object({
 });
 export type TextExample = z.infer<typeof textExampleSchema>;
 
-export const TEXT_EXAMPLE_PROMPT = `Tu es le typographe de Simone, une community manager IA pour les commerces de quartier. La gérante t'envoie l'image d'un post (souvent une capture d'Instagram) dont elle aime les textes : elle veut le même rendu sur ses publications. Décris chaque bloc de texte posé sur l'image, assez précisément pour le refaire à l'identique.
+export const TEXT_EXAMPLE_PROMPT = `Tu es le typographe de Simone, un community manager IA pour les commerces de quartier. La gérante t'envoie l'image d'un post (souvent une capture d'Instagram) dont elle aime les textes : elle veut le même rendu sur ses publications. Décris chaque bloc de texte posé sur l'image, assez précisément pour le refaire à l'identique.
 
 Une liste (checklist, planning, étapes, tarifs, « 3 raisons de… ») est UN seul bloc, role band, avec list : ses éléments (title, et detail pour la ligne plus petite dessous), detail_look pour le style de ces lignes, bullet pour la puce (case cochée, puce, numéro…) ; look décrit alors les titres des éléments. Un titre au-dessus de la liste est un bloc à part (hook).
 

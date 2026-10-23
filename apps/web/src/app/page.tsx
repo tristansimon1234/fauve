@@ -24,9 +24,9 @@ import { Logo } from "@/components/orb";
 import { whatsappLink } from "@/lib/public-env";
 
 const steps: [string, string][] = [
-  ["Ton site", "Donne-lui l’adresse : elle comprend ton commerce, ton offre et ton ton."],
-  ["Ton style", "Elle prend tes couleurs, ta police et tes plus belles photos pour ton moodboard."],
-  ["Ton rythme", "Combien de posts et de stories par semaine : elle te fait signe quand ça fait longtemps."],
+  ["Ton site", "Donne-lui l’adresse : il comprend ton commerce, ton offre et ton ton."],
+  ["Ton style", "Il prend tes couleurs, ta police et tes plus belles photos pour ton moodboard."],
+  ["Ton rythme", "Combien de posts et de stories par semaine : il te fait signe quand ça fait longtemps."],
   ["Un premier essai", "Une première publication ensemble, ajustée jusqu’à ce qu’elle te ressemble."],
   ["Ton Instagram", "En dernier, quand ta publication est prête : elle part dès que tu dis oui. TikTok aussi, si tu veux."],
 ];
@@ -52,10 +52,10 @@ const offers = [
 ] as const;
 
 const faq: [string, string][] = [
-  ["Simone, c’est une vraie personne ?", "Non, c’est une IA, et elle le dit. Elle écrit, monte et publie comme une community manager, te fait signe au bon moment, et tu gardes toujours la main."],
-  ["Est-ce qu’elle publie sans me demander ?", "Jamais. Chaque publication attend ta validation, sur WhatsApp ou dans l’app. Tu peux corriger un texte, déplacer une date ou demander une autre version."],
-  ["Je n’ai pas de vidéo, ça marche quand même ?", "Oui. Elle part des photos de ton site, de celles que tu lui envoies, ou fait un Reel tout en animation à tes couleurs. Quand tu filmes, elle te dit quoi et comment."],
-  ["Pour quel commerce ?", "Studios de sport ou de yoga, salons de coiffure et de beauté, restaurants, cafés, boutiques : elle parle ta langue et adapte ses idées à ton activité."],
+  ["Simone, c’est une vraie personne ?", "Non, c’est un assistant IA, et il le dit. Il écrit, monte et publie comme un community manager, te fait signe au bon moment, et tu gardes toujours la main."],
+  ["Est-ce qu’il publie sans me demander ?", "Jamais. Chaque publication attend ta validation, sur WhatsApp ou dans l’app. Tu peux corriger un texte, déplacer une date ou demander une autre version."],
+  ["Je n’ai pas de vidéo, ça marche quand même ?", "Oui. Il part des photos de ton site, de celles que tu lui envoies, ou fait un Reel tout en animation à tes couleurs. Quand tu filmes, il te dit quoi et comment."],
+  ["Pour quel commerce ?", "Studios de sport ou de yoga, salons de coiffure et de beauté, restaurants, cafés, boutiques : il parle ta langue et adapte ses idées à ton activité."],
   ["Je peux lui montrer un Reel que j’aime ?", "Oui : colle son lien. Simone en reprend la forme, le rythme, la mise en page et le style des textes, avec tes images et tes mots. Ça vaut pour ce Reel-là ; les suivants restent à ton style."],
   ["Et la musique ?", "Simone compose une musique pour chaque Reel, calée sur les coupes et libre de droits. Pour un son tendance, Instagram ne laisse pas une autre appli l’ajouter : tu le poses en un geste au moment de publier."],
   ["Il y a un essai ?", "Oui. Simone fait ta première publication pendant l’inscription, puis tu as 3 jours d’essai pour tout tester (ta carte est demandée, rien n’est prélevé avant la fin de l’essai). Sans engagement, tu arrêtes quand tu veux."],
@@ -71,7 +71,7 @@ export default function LandingPage() {
         <Logo />
         <nav className="flex items-center gap-6">
           <a href="#ce-qu-elle-fait" className="hidden text-[15px] font-semibold lg:inline">
-            Ce qu’elle fait
+            Ce qu’il fait
           </a>
           <a href="#comment" className="hidden text-[15px] font-semibold lg:inline">
             Comment ça marche
@@ -94,12 +94,12 @@ export default function LandingPage() {
             Des réseaux qui te rapportent <span className="accent">des clients.</span>
           </h1>
           <p className="max-w-[540px] text-[18px] leading-[1.55] text-muted sm:text-[19px]">
-            Simone est ta community manager. Elle lit ton site, apprend ton style, monte tes Reels, recopie ceux que tu aimes, écrit tes posts et les publie sur Instagram et TikTok quand tu dis oui. Toi, tu valides d’un mot, sur WhatsApp ou ici.
+            Simone est ton community manager IA. Il lit ton site, apprend ton style, monte tes Reels, recopie ceux que tu aimes, écrit tes posts et les publie sur Instagram et TikTok quand tu dis oui. Toi, tu valides d’un mot, sur WhatsApp ou ici.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Start waUrl={waUrl} size="lg" />
             <a href="#ce-qu-elle-fait" className="btn btn-secondary h-14 px-6 text-base">
-              Voir ce qu’elle fait
+              Voir ce qu’il fait
             </a>
           </div>
           <ul className="flex flex-wrap gap-x-5 gap-y-2 text-[14px] font-semibold text-muted">
@@ -170,7 +170,7 @@ export default function LandingPage() {
           De vraies publications, <span className="accent">faites par l’app.</span>
         </SectionTitle>
         <p className="-mt-4 max-w-[640px] text-[16px] leading-relaxed text-muted">
-          Ces Reels sortent tels quels de Simone, pour trois commerces d’exemple : elle a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
+          Ces Reels sortent tels quels de Simone, pour trois commerces d’exemple : il a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
         </p>
         <div className="rounded-[28px] border border-line bg-[radial-gradient(ellipse_at_top,#fff_0%,#FBF7F4_70%)] px-4 py-8 sm:px-8">
           <ReelsFeed />
@@ -180,7 +180,7 @@ export default function LandingPage() {
       {/* What she can be asked */}
       <section className="mx-auto flex max-w-[1200px] flex-col gap-8 px-4 pb-24 sm:px-8">
         <SectionTitle kicker="Ce que tu peux lui demander">
-          Une idée, un lien, un vocal : <span className="accent">elle s’en occupe.</span>
+          Une idée, un lien, un vocal : <span className="accent">il s’en occupe.</span>
         </SectionTitle>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card icon={RepeatIcon} title="« Refais-moi ce Reel »" className="lg:row-span-2">
@@ -199,7 +199,7 @@ export default function LandingPage() {
             Un morceau composé pour chaque Reel, calé sur les coupes, libre de droits.
           </Card>
           <Card icon={ZapIcon} title="Des effets qui suivent tes gestes">
-            Un mot qui grandit entre tes doigts, un titre qui passe derrière toi : elle suit tes mains et ton visage image par image.
+            Un mot qui grandit entre tes doigts, un titre qui passe derrière toi : il suit tes mains et ton visage image par image.
           </Card>
           <Card icon={LayersIcon} title="Bien plus qu’un diaporama">
             Écran partagé, collage fait main, carrousels composés comme par un graphiste : la forme suit ton idée.
@@ -209,8 +209,8 @@ export default function LandingPage() {
 
       {/* What else she does */}
       <section className="mx-auto flex max-w-[1200px] flex-col gap-8 px-4 pb-24 sm:px-8">
-        <SectionTitle kicker="Ce qu’elle fait aussi">
-          Tout ce qu’une community manager fait, <span className="accent">à tes couleurs.</span>
+        <SectionTitle kicker="Ce qu’il fait aussi">
+          Tout ce qu’un community manager fait, <span className="accent">à tes couleurs.</span>
         </SectionTitle>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card icon={PenIcon} title="Les légendes et les hashtags">
@@ -221,13 +221,13 @@ export default function LandingPage() {
             </span>
           </Card>
           <Card icon={ClockIcon} title="Un signe au bon moment">
-            Pas de planning à tenir : elle te prévient quand c’est le moment de poster, et publie d’un « oui ».
+            Pas de planning à tenir : il te prévient quand c’est le moment de poster, et publie d’un « oui ».
             <span className="mt-4 block">
               <ReminderMock />
             </span>
           </Card>
           <Card icon={ChartIcon} title="Ce qui marche, chaque dimanche">
-            Elle compare tes posts et en tire des leçons pour les suivants.
+            Il compare tes posts et en tire des leçons pour les suivants.
             <span className="mt-4 block">
               <ReportMock />
             </span>
@@ -246,7 +246,7 @@ export default function LandingPage() {
         <div className="grid items-center gap-10 overflow-hidden rounded-[28px] border border-line bg-white p-6 sm:p-10 lg:grid-cols-[1fr_1.1fr]">
           <div className="flex flex-col gap-4">
             <SectionTitle kicker="Ton style">
-              Elle apprend ton style, <span className="accent">pas un modèle.</span>
+              Il apprend ton style, <span className="accent">pas un modèle.</span>
             </SectionTitle>
             <p className="max-w-[480px] text-[16px] leading-relaxed text-muted">
               Pas de gabarit tout fait. Simone part de ton site et de ce que tu aimes, te montre un premier essai, et chaque retour affine ta direction artistique pour toutes les publications suivantes.
@@ -366,7 +366,7 @@ export default function LandingPage() {
           <h2 className="text-[clamp(30px,4vw,44px)] leading-[1.08] font-extrabold tracking-[-0.03em]">
             Simone <span className="accent">t’attend.</span>
           </h2>
-          <p className="max-w-[460px] text-[16px] text-muted">Donne-lui ton site : dans cinq minutes, elle te montre ce qu’elle ferait pour toi.</p>
+          <p className="max-w-[460px] text-[16px] text-muted">Donne-lui ton site : dans cinq minutes, il te montre ce qu’il ferait pour toi.</p>
           <Start waUrl={waUrl} size="lg" />
         </div>
       </section>

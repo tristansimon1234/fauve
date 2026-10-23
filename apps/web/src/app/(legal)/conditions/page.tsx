@@ -14,9 +14,9 @@ export default function TermsPage() {
 
       <h2>Le service</h2>
       <p>
-        Simone est une assistante fondée sur l’intelligence artificielle. Elle prépare le calendrier de publication, monte
+        Simone est un assistant fondé sur l’intelligence artificielle. Il prépare le calendrier de publication, monte
         les vidéos envoyées par le studio, rédige les légendes, programme les publications sur les comptes connectés et
-        envoie un bilan chaque semaine. Simone ne se fait jamais passer pour une personne : elle se présente comme une IA et le redit dès qu’on le lui demande.
+        envoie un bilan chaque semaine. Simone ne se fait jamais passer pour une personne : il se présente comme une IA et le redit dès qu’on le lui demande.
       </p>
 
       <h2>Validation avant publication</h2>

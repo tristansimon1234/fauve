@@ -146,7 +146,7 @@ export function PostReview({
                   <Mascot size={64} mood="sad" />
                 </span>
                 <span className="text-[16px] font-extrabold">La vidéo n’a pas pu être fabriquée</span>
-                <span className="text-[13px] leading-snug text-white/85">Demande-le à Simone : elle la relance.</span>
+                <span className="text-[13px] leading-snug text-white/85">Demande-le à Simone : il la relance.</span>
               </div>
             )}
             {!data.failed && (data.making || !data.videoUrl) && (

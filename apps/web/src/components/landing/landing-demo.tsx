@@ -50,7 +50,7 @@ export function LandingDemo() {
         <Mascot size={52} mood={mood} still={still} />
         <span className="flex flex-col">
           <span className="text-[16px] font-bold">Simone</span>
-          <span className="text-[12.5px] text-muted">{typing ? "écrit…" : "ta community manager"}</span>
+          <span className="text-[12.5px] text-muted">{typing ? "écrit…" : "ton community manager"}</span>
         </span>
       </div>
       <div className="flex h-[400px] flex-col justify-end gap-2.5 overflow-hidden px-4 pt-4 pb-5 sm:h-[470px] sm:px-5">

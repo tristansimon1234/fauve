@@ -8,7 +8,7 @@ export default function PrivacyPage() {
     <>
       <h1>Politique de confidentialité</h1>
       <p>
-        Simone est une assistante IA qui gère les réseaux sociaux des commerces de quartier (studios, salons, restaurants, boutiques), principalement
+        Simone est un assistant IA qui gère les réseaux sociaux des commerces de quartier (studios, salons, restaurants, boutiques), principalement
         depuis WhatsApp. Cette page explique quelles données nous traitons, pourquoi, et quels sont tes droits.
       </p>
 

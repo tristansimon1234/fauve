@@ -491,7 +491,7 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
               ? "Simone compare les deux versions"
               : "Simone regarde la vidéo"
           : quote.stage === "fix"
-            ? "Simone corrige ce qu’elle a repéré"
+            ? "Simone corrige ce qu’il a repéré"
             : quote.stage === "delivered"
               ? "Ta vidéo est prête"
               : quote.kind === "correction"

@@ -183,7 +183,7 @@ export function MoodboardSection({
               : state.status === "reading"
                 ? "Ça prend jusqu’à une minute."
                 : dirty
-                  ? "Moodboard modifié : fais-le lire à Simone pour qu’elle l’applique."
+                  ? "Moodboard modifié : fais-le lire à Simone pour qu’il l’applique."
                   : ""}
           </p>
         </div>
