@@ -81,7 +81,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   const ready = Boolean(data.videoUrl) && !data.making && !data.failed;
 
   return (
-    <main className="relative mx-auto flex h-dvh max-w-[calc(100dvh*9/16)] flex-col overflow-hidden bg-black text-white">
+    <main className="relative mx-auto flex h-dvh sm:max-w-[calc(100dvh*9/16)] flex-col overflow-hidden bg-black text-white">
       {/* The Reel, as it will go out. */}
       {data.videoUrl && (
         <video
@@ -140,7 +140,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       <div className="relative z-10 mt-auto flex flex-col gap-3 bg-gradient-to-t from-black/85 via-black/60 to-transparent px-4 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {data.captionShown && (
           <button type="button" onClick={() => setOpen(!open)} className="text-left text-[14px] leading-snug drop-shadow">
-            <strong className="font-extrabold">{data.handle ?? "toi"}</strong>{" "}
+            {data.handle && <strong className="font-extrabold">{data.handle} </strong>}
             <span className={open ? "whitespace-pre-line" : "line-clamp-2"}>{data.captionShown}</span>
           </button>
         )}
@@ -248,7 +248,7 @@ export function PhoneMaking({ title, step, minutes }: { title: string; step: str
     return () => clearInterval(timer);
   }, [router]);
   return (
-    <main className="mx-auto flex h-dvh max-w-[calc(100dvh*9/16)] flex-col bg-ink text-white">
+    <main className="mx-auto flex h-dvh sm:max-w-[calc(100dvh*9/16)] flex-col bg-ink text-white">
       <div className="flex items-center gap-3 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <a href={whatsappLink("")} aria-label="Retourner sur WhatsApp" className="flex size-11 items-center justify-center rounded-full bg-white/10">
           <ArrowLeftIcon size={20} />

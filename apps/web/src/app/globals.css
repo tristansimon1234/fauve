@@ -487,8 +487,12 @@
   .fauve-press:active:not(:disabled) {
     scale: 0.97;
   }
-  /* Chat scroll: smooth when a message arrives (scrollIntoView with behavior "auto" follows it). */
+  /* Chat scroll: smooth when a message arrives (scrollIntoView with behavior "auto" follows it).
+     Positioned, so what is placed in it (a screen reader's live line, sr-only) stays in its scroll:
+     held by the section around it, that line sat at the end of a long conversation and stretched
+     the whole page to 3 000 px, which scrolled instead of the conversation. */
   .fauve-scroll {
+    position: relative;
     scroll-behavior: smooth;
   }
 }
