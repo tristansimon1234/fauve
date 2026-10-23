@@ -9,7 +9,7 @@ import { CREDIT_PRICES } from "./credits.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas } from "./post-ideas.ts";
 import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
-import { contractIsEmpty, contractLines, EMPTY_CONTRACT, VOICE_SPEED, verbatimScript } from "./contract.ts";
+import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
 import { montageJobSteps } from "./jobs.ts";
 import { quietPauses } from "./mix.ts";
 
@@ -4260,6 +4260,22 @@ test("contract: only what she fixed, in plain lines", () => {
   assert.ok(lines.includes("Demandé : fond papier"));
   assert.ok(VOICE_SPEED.rapide > 1 && VOICE_SPEED.lente < 1 && VOICE_SPEED.normale === 1);
   assert.equal(verbatimScript(" « Je lis\n tranquille  pendant qu'elle bosse » "), "Je lis tranquille pendant qu'elle bosse");
+  // Her start, then the rest she described: both reach the writers, and the voice is redone when the rest changes.
+  const started = { ...EMPTY_CONTRACT, voice_text: "Je vous présente Pauline.", voice_text_rest: "la voix présente Simone" };
+  assert.ok(contractLines(started).some((l) => l.includes("Je vous présente Pauline.") && l.includes("puis la voix continue : la voix présente Simone")));
+  assert.notEqual(ownTextKey(started), ownTextKey({ ...started, voice_text_rest: null }));
+  assert.equal(ownTextKey({ ...started, voice_text_rest: null }), "Je vous présente Pauline.");
+});
+
+test("the voice says as much as the length she asked for", async () => {
+  const { voiceWordsFor } = await import("./voice-over.ts");
+  const { VOICE_MAX_SECONDS } = await import("./voice.ts");
+  // 20 to 30 s asked, one short clip: the voice still carries the Reel to its end.
+  const asked = voiceWordsFor(6, 25);
+  assert.ok(asked.min >= 40 && asked.max <= 55, JSON.stringify(asked));
+  assert.ok(voiceWordsFor(6).max < asked.min);
+  // Never longer than a voice can be.
+  assert.ok(voiceWordsFor(0, 60).max <= Math.round((VOICE_MAX_SECONDS - 4) * 2.2) + 3);
 });
 
 test("a montage's progress steps follow its level", () => {

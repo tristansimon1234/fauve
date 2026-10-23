@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { VoiceTranscript } from "./voice.ts";
+import { VOICE_MAX_SECONDS, type VoiceTranscript } from "./voice.ts";
 
 // Simone's voice over a Reel (ElevenLabs text to speech): she writes what a
 // creator would say over these images, a voice reads it with the time of every
@@ -15,7 +15,14 @@ export const VOICE_OVER_WORDS = { min: 35, max: 58 } as const;
  * show (a photo counts 2 s), never longer, between 12 and 22 seconds of voice. A voice
  * longer than the footage makes the editor stretch it (shots shown twice, photos held).
  */
-export function voiceWordsFor(footageSeconds: number): { min: number; max: number } {
+export function voiceWordsFor(footageSeconds: number, askedSeconds?: number | null): { min: number; max: number } {
+  // The length she asked for decides: the voice carries the Reel to its end, a breath before it
+  // (his Pauline Reel asked 20 to 30 s, its voice stopped at 14 s and the last animations played in silence).
+  if (askedSeconds) {
+    const spoken = Math.min(VOICE_MAX_SECONDS - 4, Math.max(8, askedSeconds - 2));
+    const words = Math.round(spoken * 2.2);
+    return { min: words - 6, max: words + 3 };
+  }
   const seconds = Math.min(22, Math.max(12, footageSeconds));
   // About 2.2 words a second: a creator leaves room to breathe; at 2.6 with a floor, the writer
   // filled the gaps by describing the images (Tristan: « le script de la voix est souvent pas ouf »).
@@ -200,7 +207,10 @@ Réponds avec message (le message de la vidéo en une phrase), hooks (les 4 prem
 export const OWN_TEXT_PROMPT = `Tu prépares, pour une voix de synthèse française, le texte qu'une personne a écrit elle-même pour la voix off de son Reel.
 - mode « verbatim » : corrige seulement l'orthographe, les accords et la ponctuation d'une voix qui parle (points, virgules, points de suspension pour une petite pause) ; écris en lettres un nombre qui se dit mal en chiffres. Ne change, n'ajoute ni ne retire aucun mot, aucune idée.
 - mode « polish » : rends-le meilleur à l'oral, plus vivant et plus fluide, en phrases courtes, sans rien perdre : son sens, ses idées dans son ordre, sa personne (un « je » reste un « je »), ses mots forts, à peu près sa longueur (« longueur » donne la cible si elle est là). N'ajoute rien qui n'y est pas : ni invitation, ni appel à commenter, ni fait, ni chiffre, ni promesse.
-Dans les deux cas, suis « contrat » (personne, invitation, fin) et ne mets aucune balise entre crochets. Réponds avec script : le texte tel qu'il sera lu.`;
+Lis d'abord « demande », sa demande entière : elle dit ce que la voix doit raconter, et son texte n'en est parfois que le début.
+- « suite », quand elle est là : elle n'a écrit que le début de la voix et décrit la suite. Son début d'abord (selon le mode), puis écris toi-même la suite qu'elle décrit, dans la même voix, la même personne et le même ton, sans couture : ce qui manque y est dit, dans son ordre, en phrases courtes et naturelles, en français juste et idiomatique, jamais en liste lue ni en formule de pub. Sers-toi de « commerce » et de « demande » pour dire vrai (ce qu'est le commerce, ce qu'il fait pour la personne qui regarde) ; n'invente ni fait, ni chiffre, ni promesse.
+- « longueur », quand elle est là : le texte entier (son début et la suite) fait entre mots_min et mots_max mots, pour que la voix porte le Reel jusqu'au bout ; la suite prend la place qu'il faut, son début ne s'allonge jamais.
+Dans tous les cas, suis « contrat » (personne, invitation, fin) et ne mets aucune balise entre crochets. Réponds avec script : le texte tel qu'il sera lu, en entier.`;
 export const ownTextSchema = z.object({ script: z.string().describe("Le texte tel qu'il sera lu") });
 
 /** Acting tags (« [warmly] »): played by the voice, never read, never shown in the subtitles. */
