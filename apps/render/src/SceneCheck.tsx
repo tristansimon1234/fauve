@@ -18,7 +18,9 @@ import type { MotionTemplate, ReelProps } from "./types";
 // hung on a hand next to the face) is not a failure: it is reported (FAUVE_FACE), and
 // the motion designer gets one more round to move it. So is a sentence that does not stay
 // whole on screen long enough to be read (FAUVE_READ: Tristan, « parfois c'est trop rapide
-// donc on peut même pas lire »). And what it draws, row by row (FAUVE_COVER), for the engine
+// donc on peut même pas lire »), and a text drawn under MIN_TYPE, its instructions' minimum
+// (FAUVE_SIZE: the WhatsApp of a florist's Reel was written at 40 px, Tristan: « il y a une raison
+// pour laquelle il fait un truc si p'tit ? »). And what it draws, row by row (FAUVE_COVER), for the engine
 // to set a voice's subtitles where the animations leave room (Tristan: « il faut pas masquer
 // mais bien les placer là où ça ne gêne pas les anim et les visages »).
 
@@ -28,6 +30,8 @@ const OUT_FRAMES = 12; // 0.4 s at 30 fps
 const FACE_FRAMES = 12; // a text may cross a face, not stay on it
 const FACE_MARGIN = 10; // px around the eyes, nose and mouth
 const STEP = 2; // frames between two samples
+/** The size a text to read is drawn at, at the least, in px of the 1080 × 1920 frame (its instructions say so too). */
+const MIN_TYPE = 48;
 /** At most this many copies laid out at once: a collage's composition runs the whole Reel. */
 const MAX_COPIES = 120;
 
@@ -219,6 +223,39 @@ function tooQuick(frames: number[], step: number, last: number): { text: string;
   });
 }
 
+/**
+ * The size each text to read (3 letters at least: a time or a tick is not read) is drawn at in a copy, kept at
+ * its largest over the scene (an entrance that grows it does not count): its font size times the scale of the
+ * transforms above it, in px of the frame. An SVG text, sized in its drawing's units, is read on its boxes.
+ */
+function sizes(copy: HTMLElement, largest: Map<string, number>) {
+  const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.textContent?.replace(/\s+/g, " ").trim();
+    const el = node.parentElement;
+    if (!text || !el || (text.match(/\p{L}/gu)?.length ?? 0) < 3) continue;
+    let opacity = 1;
+    let scale = 1;
+    for (let up: HTMLElement | null = el; up && up !== copy; up = up.parentElement) {
+      const style = getComputedStyle(up);
+      if (style.visibility === "hidden") opacity = 0;
+      opacity *= Number(style.opacity);
+      if (style.transform && style.transform !== "none") {
+        const m = new DOMMatrixReadOnly(style.transform);
+        scale *= Math.hypot(m.c, m.d);
+      }
+    }
+    if (opacity < 0.5) continue;
+    let size = parseFloat(getComputedStyle(el).fontSize) * scale;
+    if (!(el instanceof HTMLElement)) {
+      range.selectNodeContents(node);
+      size = Math.max(0, ...Array.from(range.getClientRects()).map((r) => r.height)) / 1.2;
+    }
+    if (size > 0) largest.set(text, Math.max(largest.get(text) ?? 0, size));
+  }
+}
+
 /** Rows of the frame the drawing is measured in (20 px each). */
 const COVER_ROWS = 96;
 /** Elements drawn as shapes (an image, a canvas, a vector shape), whatever their style. */
@@ -320,9 +357,11 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
       await waitFrame();
       const out = new Map<string, Out>();
       const onFace = new Map<string, OnFace>();
+      const largest = new Map<string, number>();
       document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
         const frame = Number(copy.dataset.checkFrame);
         measure(copy, frame, width, height, out, track(frame), onFace);
+        sizes(copy, largest);
       });
       const failures = [...out.values()].filter((o) => o.frames.length * step > OUT_FRAMES);
       const r = (n: number) => Math.round(n);
@@ -356,6 +395,15 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
             .join(" ; ");
           const message = `texte trop rapide pour être lu : ${detail}. Une phrase reste entière à l'écran au moins 0,8 s plus 0,3 s par mot avant de partir (le temps de la lire sur un téléphone) : fais-la arriver plus tôt ou partir plus tard, ou garde moins de phrases, sans changer l'idée.`;
           console.log(`FAUVE_READ ${JSON.stringify(message)}`);
+        }
+        const small = [...largest.entries()].filter(([, size]) => size < MIN_TYPE - 0.5).sort((a, b) => a[1] - b[1]);
+        if (small.length) {
+          const detail = small
+            .slice(0, 3)
+            .map(([text, size]) => `« ${text.slice(0, 40)} » (${r(size)} px)`)
+            .join(" ; ");
+          const message = `texte trop petit pour un téléphone : ${detail}. Un texte se lit d'un coup d'œil à ${MIN_TYPE} px au moins, sa taille dans l'image de 1080 × 1920 : grossis-le, et s'il n'a pas la place, garde moins de mots ou de lignes, ou prends plus de place dans l'image, sans changer l'idée.`;
+          console.log(`FAUVE_SIZE ${JSON.stringify(message)}`);
         }
         // What it draws, row by row, over its length (each row: the share of the subtitles' width it covers, on average).
         const copies = Array.from(document.querySelectorAll<HTMLElement>("[data-check-frame]")).map((copy) => drawn(copy, width, height));
