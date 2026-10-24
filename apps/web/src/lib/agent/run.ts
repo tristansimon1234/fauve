@@ -36,6 +36,13 @@ export function anthropic() {
   return client;
 }
 
+/**
+ * Cached prompts are kept an hour: she often answers Simone 5 to 60 minutes later, and the montages come minutes
+ * apart; kept 5 minutes, the cache had expired and the whole prefix was written again (60 % of the chat's cost,
+ * three editor calls in four). An hour's write costs 2x input instead of 1.25x; a read, almost nothing.
+ */
+export const CACHE_AN_HOUR = { type: "ephemeral", ttl: "1h" } as const;
+
 function buildTools(handlers: ToolHandlers) {
   return (Object.keys(toolSpecs) as ToolName[]).map((name) => {
     const spec = toolSpecs[name];
@@ -101,7 +108,7 @@ function withCacheBreakpoint(history: Anthropic.Beta.BetaMessageParam[]): Anthro
   if (!last || typeof last.content !== "string") return history;
   return [
     ...history.slice(0, -1),
-    { ...last, content: [{ type: "text", text: last.content, cache_control: { type: "ephemeral" } }] },
+    { ...last, content: [{ type: "text", text: last.content, cache_control: CACHE_AN_HOUR }] },
   ];
 }
 
@@ -126,9 +133,9 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     // Stable prefix first (tools, system prompt, history), cached; the volatile
     // studio context (date, step) goes last as a system message so it never
     // invalidates the cached history.
-    system: [{ type: "text", text: FAUVE_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+    system: [{ type: "text", text: FAUVE_SYSTEM_PROMPT, cache_control: CACHE_AN_HOUR }],
     // Each step of the tool loop re-reads everything before it from the cache.
-    cache_control: { type: "ephemeral" },
+    cache_control: CACHE_AN_HOUR,
     tools: buildTools(createToolHandlers(input)),
     messages: [
       ...withCacheBreakpoint(input.history),

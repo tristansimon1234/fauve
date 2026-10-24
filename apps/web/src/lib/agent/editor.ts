@@ -79,7 +79,7 @@ import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/stea
 import { isFirstReel } from "@/lib/onboarding";
 import { LAYER_ROLE, markTemplatesUsed, OVERLAY_ROLE, PHOTO_ROLE, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { timeLeft } from "@/lib/step-clock";
-import { anthropic, logClaudeCost } from "./run";
+import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
 
 /** The hooks of the studio's latest other Reels: the next one takes another form and other words. */
 async function recentHooks(studioId: string, postId: string): Promise<string[]> {
@@ -370,7 +370,7 @@ export async function designEdit(params: {
       output_config: { effort: params.effort ?? "high", format: outputFormat(legacy ? editorOutputSchemaLegacy : editorOutputSchema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      system: [{ type: "text", text: EDITOR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+      system: [{ type: "text", text: EDITOR_SYSTEM_PROMPT, cache_control: CACHE_AN_HOUR }],
       messages: [
         { role: "user", content: JSON.stringify(input) },
         ...(again ? [{ role: "assistant" as const, content: JSON.stringify(again.answer) }, { role: "user" as const, content: again.note }] : []),

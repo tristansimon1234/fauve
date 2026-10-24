@@ -18,14 +18,14 @@ export const CRITIC_MODEL = "claude-sonnet-5-5";
 /** Haiku 5.5 rejects server-side fallbacks (400): only send them to models that take them. */
 export const supportsServerFallback = (model: string) => !model.startsWith("claude-haiku");
 
-type ModelPrice = { input: number; output: number; cacheRead: number; cacheWrite: number };
+type ModelPrice = { input: number; output: number; cacheRead: number; cacheWrite: number; cacheWriteHour: number };
 
 const CLAUDE_PRICES_USD: Record<string, ModelPrice> = {
-  // Cache writes (5 min TTL) are billed at 1.25x input.
-  "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
-  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
-  // Prompts up to 100K tokens (ours are far below); cache read 0.1x and write 1.25x input.
-  "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
+  // Cache writes are billed at 1.25x input when kept 5 minutes, 2x when kept an hour.
+  "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5, cacheWriteHour: 8 },
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5, cacheWriteHour: 4 },
+  // Prompts up to 100K tokens (ours are far below); cache read 0.1x input.
+  "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125, cacheWriteHour: 0.2 },
 };
 
 /** Rough conversion used for reporting only; override with USD_TO_EUR. */
@@ -36,17 +36,22 @@ export type TokenUsage = {
   output_tokens: number;
   cache_read_input_tokens?: number | null;
   cache_creation_input_tokens?: number | null;
+  /** The same writes by how long they are kept. */
+  cache_creation?: { ephemeral_5m_input_tokens?: number | null; ephemeral_1h_input_tokens?: number | null } | null;
 };
 
 export function claudeCostUsd(model: string, usage: TokenUsage): number {
   const price = CLAUDE_PRICES_USD[model];
   if (!price) return 0;
   const perToken = (perMillion: number) => perMillion / 1_000_000;
+  const written = usage.cache_creation_input_tokens ?? 0;
+  const forAnHour = Math.min(written, usage.cache_creation?.ephemeral_1h_input_tokens ?? 0);
   return (
     usage.input_tokens * perToken(price.input) +
     usage.output_tokens * perToken(price.output) +
     (usage.cache_read_input_tokens ?? 0) * perToken(price.cacheRead) +
-    (usage.cache_creation_input_tokens ?? 0) * perToken(price.cacheWrite)
+    (written - forAnHour) * perToken(price.cacheWrite) +
+    forAnHour * perToken(price.cacheWriteHour)
   );
 }
 
@@ -60,6 +65,10 @@ export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
     output_tokens: a.output_tokens + b.output_tokens,
     cache_read_input_tokens: (a.cache_read_input_tokens ?? 0) + (b.cache_read_input_tokens ?? 0),
     cache_creation_input_tokens: (a.cache_creation_input_tokens ?? 0) + (b.cache_creation_input_tokens ?? 0),
+    cache_creation: {
+      ephemeral_5m_input_tokens: (a.cache_creation?.ephemeral_5m_input_tokens ?? 0) + (b.cache_creation?.ephemeral_5m_input_tokens ?? 0),
+      ephemeral_1h_input_tokens: (a.cache_creation?.ephemeral_1h_input_tokens ?? 0) + (b.cache_creation?.ephemeral_1h_input_tokens ?? 0),
+    },
   };
 }
 

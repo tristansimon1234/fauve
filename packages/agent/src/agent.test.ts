@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { addFacts, readMemory, removeFacts } from "./memory.ts";
 import { editPlanObjectSchema, editPlanSchema, segmentSeconds } from "./schemas.ts";
 import { canTransition } from "./status.ts";
-import { claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
+import { addUsage, claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES } from "./credits.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
@@ -62,6 +62,16 @@ test("pricing: opus input + output", () => {
     cache_creation_input_tokens: 4_600,
   });
   assert.ok(Math.abs(turn - 0.001205) < 1e-9);
+  // A write kept an hour costs 2x input, one kept 5 minutes 1.25x.
+  const written = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 1_000_000 };
+  assert.equal(claudeCostUsd("claude-opus-5-5", written), 5);
+  assert.equal(claudeCostUsd("claude-opus-5-5", { ...written, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 1_000_000 } }), 8);
+  assert.equal(claudeCostUsd("claude-sonnet-5-5", { ...written, cache_creation: { ephemeral_5m_input_tokens: 500_000, ephemeral_1h_input_tokens: 500_000 } }), 3.25);
+  const summed = addUsage(
+    { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 100, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 100 } },
+    { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 50 },
+  );
+  assert.deepEqual(summed.cache_creation, { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 100 });
   assert.equal(supportsServerFallback("claude-haiku-5-5"), false);
   assert.equal(supportsServerFallback("claude-opus-5-5"), true);
 });
