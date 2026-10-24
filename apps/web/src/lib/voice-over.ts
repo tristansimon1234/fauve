@@ -171,7 +171,8 @@ export async function writeVoiceScript(
   for (let attempt = 0; ; attempt++) {
     const response = await anthropic().beta.messages.parse({
       model: CLAUDE_MODEL,
-      max_tokens: 2000,
+      // Its thinking counts in this budget: at 2000 it took nearly all of it, and the script came back cut (no voice on the Reel).
+      max_tokens: 8000,
       output_config: { effort: "medium", format: outputFormat(decide ? voiceOverDecisionSchema : voiceOverScriptSchema) },
       system: decide ? `${VOICE_OVER_PROMPT}\n\n${VOICE_FORMAT_PROMPT}` : VOICE_OVER_PROMPT,
       messages: [{ role: "user", content: JSON.stringify(input) }],
