@@ -104,8 +104,8 @@ export function faceFocus(focus: { x: number; y: number } | undefined, face: Fac
 /** A clip's tracks by media id. */
 export type TracksByClip = Record<string, TracksFile>;
 
-/** The models that read the tracks: a clip read by others is read again. */
-export const TRACK_MODEL = "mediapipe-1.1.1";
+/** The models that read the tracks, and how we read them: a clip read otherwise is read again (r2: a body's head is a face only when it faces the camera). */
+export const TRACK_MODEL = "mediapipe-1.1.1-r2";
 
 /** What is kept on a video (media_assets.tracks): its tracks file in Storage and what was found, or why it failed. */
 export const mediaTracksSchema = z.union([

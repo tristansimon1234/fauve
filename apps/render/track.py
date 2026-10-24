@@ -29,6 +29,9 @@ MIN_FRAMES = 6
 HAND_CONFIDENCE = 0.4
 BODY_CONFIDENCE = 0.7
 FACE_CONFIDENCE = 0.7
+# Which way a body faces is decided by the majority of its readings this many images around (half a second either side):
+# the model turns a back round for a few images now and then.
+FACING_WINDOW = 15
 
 MODELS = os.environ.get("TRACK_MODELS", ".")
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
@@ -123,6 +126,17 @@ def head_of(pts, aspect):
     box = (cx - bw / 2, cy - bh * 0.55, bw, bh)
     points = [(r_eye[0], r_eye[1]), (l_eye[0], l_eye[1]), (nose[0], nose[1]), mouth, (r_ear[0], r_ear[1]), (l_ear[0], l_ear[1])]
     return box, points
+
+
+def facing(pts, aspect):
+    """True when a body faces the camera (its left shoulder on the right of the picture), False when it shows its back,
+    None when its shoulders do not say (hidden, or side on). Its face points cannot tell: seen from behind, the model still
+    places them, sure of itself (a florist from behind had her nose and eyes seen at 1.00, and the back of her head kept
+    the animations of her Reel in the top third of the picture)."""
+    left, right = pts[11], pts[12]
+    if min(left[2], right[2]) <= 0.5 or abs(left[0] - right[0]) * aspect < 0.02:
+        return None
+    return left[0] > right[0]
 
 
 def distinct(bodies, aspect):
@@ -234,19 +248,33 @@ def track(job):
     # Ids that stay from one image to the next, then one smoothing filter per coordinate of each thing.
     ids = {"h": Ids(), "f": Ids(), "b": Ids()}
     series = {"h": {}, "f": {}, "b": {}}  # kind -> id -> {frame: values}
+    # Bodies first: which way each one faces, read around each image, decides whether its head is a face.
+    body_ids = []
+    turns = {}  # body id -> {frame: faces the camera}
+    for n, seen in enumerate(raw):
+        body_keys = [spread([(x, y) for x, y, v in pts if v > 0.5] or [(x, y) for x, y, v in pts]) for pts in seen["b"]]
+        body_ids.append(ids["b"].assign(n, body_keys))
+        for tid, pts in zip(body_ids[n], seen["b"]):
+            series["b"].setdefault(tid, {})[n] = [c for p in pts for c in p]
+            way = facing(pts, w / h)
+            if way is not None:
+                turns.setdefault(tid, {})[n] = way
+
+    def faces_camera(tid, n):
+        around = [way for k, way in turns.get(tid, {}).items() if abs(k - n) <= FACING_WINDOW]
+        return sum(around) * 2 >= len(around)  # no reading: as before, its head is a face
+
     for n, seen in enumerate(raw):
         hand_keys = [spread(pts) for pts in seen["h"]]
         for tid, pts in zip(ids["h"].assign(n, hand_keys), seen["h"]):
             series["h"].setdefault(tid, {})[n] = [c for p in pts for c in p]
-        # A face too far for the face model (a whole body in the frame) is read from its body's head.
-        seen["f"] = seen["f"] + [face for face in (head_of(pts, w / h) for pts in seen["b"]) if face and not any(inside(face[0], b) for b, _ in seen["f"])]
+        # A face too far for the face model (a whole body in the frame) is read from its body's head, when it faces the camera.
+        heads = [head_of(pts, w / h) for tid, pts in zip(body_ids[n], seen["b"]) if faces_camera(tid, n)]
+        seen["f"] = seen["f"] + [face for face in heads if face and not any(inside(face[0], b) for b, _ in seen["f"])]
         face_keys = [(b[0] + b[2] / 2, b[1] + b[3] / 2, max(b[2], b[3])) for b, _ in seen["f"]]
         for tid, (box, pts) in zip(ids["f"].assign(n, face_keys), seen["f"]):
             pts = (pts + [(box[0] + box[2] / 2, box[1] + box[3] / 2)] * 6)[:6]
             series["f"].setdefault(tid, {})[n] = list(box) + [c for p in pts for c in p]
-        body_keys = [spread([(x, y) for x, y, v in pts if v > 0.5] or [(x, y) for x, y, v in pts]) for pts in seen["b"]]
-        for tid, pts in zip(ids["b"].assign(n, body_keys), seen["b"]):
-            series["b"].setdefault(tid, {})[n] = [c for p in pts for c in p]
 
     dt = 1.0 / FPS
     frames = [{} for _ in raw]

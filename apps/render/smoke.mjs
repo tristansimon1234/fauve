@@ -14,8 +14,8 @@
 //    bundle, default ./build) at many frames, with the studio's fonts: a text that
 //    leaves the frame or the safe zone fails the scene. A scene that passes says which
 //    of its texts stay on a face it follows (faces: not a failure, a reason for one more
-//    round of the motion designer), and its sentences that do not stay long enough to be
-//    read (in faces too).
+//    round of the motion designer), its sentences that do not stay long enough to be
+//    read and its texts drawn too small for a phone (in faces too).
 // BROWSER_EXECUTABLE overrides Remotion's own Chrome (local runs).
 import { existsSync, readFileSync } from "node:fs";
 import React from "react";
@@ -140,8 +140,8 @@ if (browser) {
           logLevel: "error",
           timeoutInMilliseconds: 60000,
           onBrowserLog: (log) => {
-            // Not failures, reasons for one more round: a text on a face, a sentence too quick to read.
-            const note = /^FAUVE_(?:FACE|READ) (".*")$/.exec(log.text)?.[1];
+            // Not failures, reasons for one more round: a text on a face, a sentence too quick to read, a text too small.
+            const note = /^FAUVE_(?:FACE|READ|SIZE) (".*")$/.exec(log.text)?.[1];
             if (note) faces[scene.id] = [faces[scene.id], JSON.parse(note)].filter(Boolean).join("\n");
             const drawn = /^FAUVE_COVER (\[.*\])$/.exec(log.text)?.[1];
             if (drawn) cover[scene.id] = JSON.parse(drawn);
