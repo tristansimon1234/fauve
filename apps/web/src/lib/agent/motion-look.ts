@@ -5,16 +5,21 @@ import { loadMontageInputs } from "@/lib/render/render-post";
 import { reelFramesInSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { lookAtScenes, type MotionKit, type SceneBrand, type SceneContext, type SceneLooks, type SceneRequest, type SceneResult } from "./motion-designer";
+import { OVERLAY_ROLE, saveTemplates } from "./motion-templates";
 
 // The motion designer looks at its render before it goes out, in its own step of the montage (after the design,
 // before the render, with its own time): the design leaves what it gave the motion designer for each animation it
-// wrote, the look renders those animations over her footage in the Reel as it will come out (her texts, her
-// subtitles, the shots under them) at a few instants, and what the motion designer reworks takes their place in
-// the plan and in the studio's library. Tristan: « je trouve les animations sous quali ».
+// wrote, and for each library scene new to this Reel; the look renders those animations over her footage in the Reel
+// as it will come out (her texts, her subtitles, the shots under them) at a few instants, and what the motion designer
+// reworks takes their place in the plan and in the studio's library (a library scene rewritten becomes a new one).
+// Tristan: « je trouve les animations sous quali », and of library scenes, « que si l'animation est très pertinente
+// pour le brief + est bien faite ».
 
 /** What the design leaves for the look: the animations just written, when to look at each, and what their designer was given. */
 export type PendingLook = {
   ids: string[];
+  /** Those taken from the library (written for another Reel): rewritten, they become a new scene of it. */
+  library?: string[];
   /** The instants each one is looked at, on the Reel's clock. */
   moments: Record<string, { t: number; label: string }[]>;
   /** What the motion designer was given for each (a correction's earlier frames aside). */
@@ -37,6 +42,7 @@ export function forLook(request: SceneRequest): Omit<SceneRequest, "seen"> {
 /** Read back as it was written (our own file): only its shape is checked. */
 const pendingLookSchema = z.object({
   ids: z.array(z.string()),
+  library: z.array(z.string()).optional(),
   moments: z.record(z.string(), z.array(z.object({ t: z.number(), label: z.string() }))),
   requests: z.array(z.object({ id: z.string(), brief: z.string(), durationInFrames: z.number() }).loose()),
   written: z.record(z.string(), z.object({ name: z.string().optional(), slots: z.array(motionSlotSchema).optional(), notes: z.string().optional() })),
@@ -139,11 +145,37 @@ async function reworkFromLook(studioId: string, postId: string, planId: string, 
     rendered: (written) => framesOf(studioId, postId, plan, Object.fromEntries(written.flatMap((w) => (look.moments[w.id] ? [[w.id, look.moments[w.id]!]] : [])))),
   });
   if (reworked.length) {
+    const briefOf = (id: string) => requests.find((r) => r.id === id)?.brief;
+    // A library scene rewritten for this Reel becomes a new scene of the library: the one it replaces stays as it was
+    // (it may serve another Reel, where it fits).
+    const library = new Set(look.library ?? []);
+    const fromLibrary = reworked.filter((r) => library.has(r.id));
+    const savedIds = await saveTemplates(
+      studioId,
+      fromLibrary.map((r) => ({
+        name: r.name ?? "",
+        description: briefOf(r.id) ?? "",
+        slots: r.slots ?? [],
+        code: r.code!,
+        js: r.js!,
+        fonts: r.fonts ?? [],
+        durationSeconds: (requests.find((q) => q.id === r.id)?.durationInFrames ?? 60) / 30,
+        role: OVERLAY_ROLE,
+      })),
+    );
+    const newScene = new Map(fromLibrary.map((r, i) => [r.id, savedIds[i] ?? undefined] as const));
+    // Its own code, photos and fonts; the words it carries (a library scene's texts were for the code it replaces).
     const own = (id: string) => {
       const r = reworked.find((x) => x.id === id)!;
-      return { code: r.code ?? undefined, js: r.js!, ...(r.photos?.length ? { photos: r.photos } : {}), ...(r.fonts?.length ? { fonts: r.fonts } : {}) };
+      return {
+        code: r.code ?? undefined,
+        js: r.js!,
+        texts: undefined,
+        ...(r.photos?.length ? { photos: r.photos } : {}),
+        ...(r.fonts?.length ? { fonts: r.fonts } : {}),
+        ...(library.has(id) ? { template_id: newScene.get(id) } : {}),
+      };
     };
-    const briefOf = (id: string) => requests.find((r) => r.id === id)?.brief;
     const next: EditPlan = {
       ...plan,
       segments: plan.segments.map((s, i) => {
@@ -163,8 +195,9 @@ async function reworkFromLook(studioId: string, postId: string, planId: string, 
     };
     const saved = await db.from("edit_plans").update({ plan: editPlanSchema.parse(next) }).eq("id", planId);
     if (saved.error) throw new Error(saved.error.message);
-    // The library keeps the reworked code under the same scene (a next Reel may reuse it).
+    // The library keeps a new animation's reworked code under the same scene (a next Reel may reuse it).
     for (const r of reworked) {
+      if (library.has(r.id)) continue;
       const templateId = motionOf(next, r.id, briefOf(r.id) ?? "")?.template_id;
       if (!templateId) continue;
       const { error } = await db

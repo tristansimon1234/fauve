@@ -64,6 +64,8 @@ export type SceneRequest = {
   seen?: { code: string; review: string; frames: SceneFrame[] };
   /** The row where a voice's subtitles show during the scene (shares of the height): its words keep off it. */
   subtitles?: { y: number; h: number };
+  /** A library scene placed in this Reel (written for another one): looked at, it stays only if it really serves this brief. */
+  fromLibrary?: boolean;
 };
 
 /** One image of an animation as it renders in the Reel, with the instant it shows (in the animation's frames). */
@@ -254,6 +256,13 @@ async function writeScene(
         ...(seen ? { version_precedente: { demande: seen.review.slice(0, 2500), images: `${seen.frames.length} images jointes, au-dessus` } } : {}),
         // Its look at its render: the images above, and its code as it is.
         ...(look ? { ton_rendu: { images: `${look.frames.length} images jointes, au-dessus` }, code_actuel: look.code } : { code_precedent: seen?.code ?? request.previousCode }),
+        // A library scene, written for another Reel: kept only if it really serves this brief and is well made here.
+        ...(look && request.fromLibrary
+          ? {
+              origine:
+                "Une animation de la bibliothèque du commerce, écrite pour un autre Reel et posée ici avec ces mots : garde-la seulement si son idée sert vraiment ce brief et si elle est bien faite sur ces images ; sinon écris la tienne pour ce moment.",
+            }
+          : {}),
       });
   const content: string | Block[] = look
     ? withFrames("Ton animation, rendue sur sa vidéo dans le Reel tel qu'il sortira :", look.frames, text)
