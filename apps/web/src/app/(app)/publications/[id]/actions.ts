@@ -61,7 +61,9 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
 
   const patch: { caption?: string | null; status?: PostStatus } = {};
   if (caption !== (post.caption ?? "")) patch.caption = caption || null;
-  if (intent === "validate") {
+  const validating = intent === "validate";
+  // Validated earlier (before Instagram was connected), it goes out on « Publier » too.
+  if (validating && status !== "validated") {
     try {
       if (status !== "draft") throw new Error(`not a draft: ${status}`);
       assertTransition(status, "validated");
@@ -70,29 +72,31 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
     }
     patch.status = "validated";
   }
-  if (!Object.keys(patch).length) return { status: "ok", message: "Rien à enregistrer." };
+  if (!Object.keys(patch).length && !validating) return { status: "ok", message: "Rien à enregistrer." };
 
-  // Only apply if nobody (Fauve included) changed the status in the meantime.
-  const { data: updated, error } = await db
-    .from("posts")
-    .update(patch)
-    .eq("id", post.id)
-    .eq("studio_id", member.studio.id)
-    .eq("status", status)
-    .select("id");
-  if (error) {
-    console.warn("updatePost failed", error.message);
-    return { status: "error", message: "L’enregistrement a échoué. Réessaie dans un instant." };
-  }
-  if (!updated?.length) {
-    return { status: "error", message: "La publication a changé entre-temps. Recharge la page pour voir la dernière version." };
+  if (Object.keys(patch).length) {
+    // Only apply if nobody (Fauve included) changed the status in the meantime.
+    const { data: updated, error } = await db
+      .from("posts")
+      .update(patch)
+      .eq("id", post.id)
+      .eq("studio_id", member.studio.id)
+      .eq("status", status)
+      .select("id");
+    if (error) {
+      console.warn("updatePost failed", error.message);
+      return { status: "error", message: "L’enregistrement a échoué. Réessaie dans un instant." };
+    }
+    if (!updated?.length) {
+      return { status: "error", message: "La publication a changé entre-temps. Recharge la page pour voir la dernière version." };
+    }
   }
 
   revalidatePath(`/publications/${post.id}`);
   revalidatePath("/publications");
   revalidatePath("/calendrier");
   revalidatePath("/fauve");
-  if (patch.status !== "validated") return { status: "ok", message: "Légende enregistrée." };
+  if (!validating) return { status: "ok", message: "Légende enregistrée." };
   const scheduled = await scheduleValidated(member.studio.id, post.id);
   return {
     status: "ok",
@@ -100,7 +104,7 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
       ? "C’est validé."
       : "blocked" in scheduled
         ? NOT_SCHEDULED[scheduled.blocked]
-        : "C’est validé : Simone le publie maintenant.",
+        : "C’est parti : Simone le publie maintenant.",
   };
 }
 
