@@ -386,7 +386,8 @@ function fromLocalValue(value: string, timeZone: string): string | null {
   return new Date(guess - (shown - guess)).toISOString();
 }
 
-function DateView({ data, onDone }: Props) {
+/** When Simone reminds her to post it (« Prévoir » on its page too). */
+export function DateView({ data, onDone }: Pick<Props, "data" | "onDone">) {
   const current = data.scheduledAt;
   const [chosen, setChosen] = useState<string | null>(current);
   const [other, setOther] = useState(() => (current ? localValue(current, data.timezone) : ""));

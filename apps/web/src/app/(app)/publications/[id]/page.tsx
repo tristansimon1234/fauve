@@ -126,7 +126,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   if (!data) notFound();
   const post = postSchema.parse(data);
 
-  // A Reel with its montage: the simple page (the video, its caption, its cover, « Publier », « Demander une modif à Simone »).
+  // A Reel with its montage: the simple page (the video, its caption, its cover, « Publier », « Télécharger », « Prévoir », « Modifier avec Simone »).
   if (post.kind === "reel") {
     const review = await loadReview(db, studioId, post, tz);
     if (review) {
@@ -329,7 +329,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <AskFauveButton topic={{ postId: post.id, title: post.title }} label="Demander une modif" />
+          <AskFauveButton topic={{ postId: post.id, title: post.title }} label="Modifier avec Simone" />
           {canEdit && post.status === "draft" && (
             // Submits the caption form, so a caption being edited is saved with the validation.
             <button type="submit" form={POST_FORM} name="intent" value="validate" className="btn btn-primary">

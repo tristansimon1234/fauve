@@ -6,12 +6,13 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
 import { useFauveDrawer } from "@/components/fauve-drawer";
-import { CheckIcon, PauseIcon, PlayIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
+import { ArrowUpIcon, CalendarIcon, CheckIcon, DownloadIcon, InstagramIcon, PauseIcon, PenIcon, PlayIcon, UndoIcon, VolumeIcon, VolumeOffIcon, XIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { CoverPicker } from "@/components/montage/cover-picker";
 import { PausedSign, Scrubber, useReelPlayback } from "@/components/review/reel-player";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
+import { DateView } from "./change-panel";
 import { OpeningEditor, type EditorParts } from "./editor-parts";
 import type { EditStart } from "./reel-editor";
 import { SceneStrip } from "./scene-strip";
@@ -22,8 +23,9 @@ type EditorModule = typeof import("./reel-editor");
 // « Ta publication », the page of a Reel, and nothing more (Tristan: « enlève tout sauf
 // la légende, qui doit être tout le temps visible, et la photo de couverture, et juste un
 // bouton demande une modif à Simone qui ouvre le drawer, that's it »): the video as it
-// will go out, its whole caption (written over in place), its cover, « Publier maintenant », and « Demander une
-// modif à Simone » (her panel in the app, WhatsApp from the page of the links). Above the
+// will go out, its whole caption (written over in place), its cover, « Publier », « Télécharger », « Prévoir »
+// (when Simone reminds her to post it) and « Modifier avec Simone » (Tristan: « 3 boutons publier, télécharger,
+// prévoir + modifier avec simone »; her panel in the app, WhatsApp from the page of the links). Above the
 // video, « Revenir à l'ancienne » (and back to the newer one); under it, its scenes: a tap
 // changes that scene alone, in place (Tristan: « remettre revenir à l'ancienne version et
 // pouvoir modifier qu'une scène »): the Reel plays live in the same frame, the panel beside
@@ -67,6 +69,8 @@ export function PostReview({
   const [pending, start] = useTransition();
   // Her caption as she writes it: « Publier » sends it, saved or not.
   const [caption, setCaption] = useState(data.captionShown);
+  /** « Prévoir » open, or « Publier » before Instagram is connected. */
+  const [sheet, setSheet] = useState<"date" | "instagram" | null>(null);
 
   // A new version on its way: the page follows it until the video is there.
   useEffect(() => {
@@ -115,11 +119,12 @@ export function PostReview({
     openDrawer({ postId: data.postId, title: data.title, scene, sceneLabel: label });
   };
 
-  const scheduled = data.status === "scheduled" || data.status === "validated";
   const where = data.platforms.length ? data.platforms.map((p) => (p === "tiktok" ? "TikTok" : "Instagram")).join(" et ") : "Instagram";
-  const publishLabel = !data.instagram ? "Valider" : `${data.publishByHand ? "Me l’envoyer" : "Publier"} maintenant`;
+  const needsInstagram = !data.instagram && (!data.platforms.length || data.platforms.includes("instagram"));
 
-  const publish = () =>
+  const publish = () => {
+    // Nothing goes out before her Instagram is connected: « Publier » first offers to connect it.
+    if (needsInstagram) return setSheet("instagram");
     start(async () => {
       setError(null);
       const form = new FormData();
@@ -130,6 +135,13 @@ export function PostReview({
       if (result.status === "ok") setToast(result.message);
       router.refresh();
     });
+  };
+  const planned = (message: string) => {
+    setSheet(null);
+    if (!message) return;
+    setToast(message);
+    router.refresh();
+  };
   // Another version, with its video, becomes the one that goes out (free and instant).
   const switchTo = (version: number, message: string) =>
     start(async () => {
@@ -140,27 +152,51 @@ export function PostReview({
       router.refresh();
     });
 
-  const action = data.locked ? null : scheduled ? (
+  const tile = "fauve-press flex h-[60px] min-w-0 flex-col items-center justify-center gap-1 rounded-[18px] px-1 text-[13.5px] font-extrabold disabled:opacity-60";
+  const action = data.locked ? null : data.status === "scheduled" ? (
     <div className="flex items-start gap-3 rounded-[18px] bg-success-soft px-4 py-3.5 text-success">
       <CheckIcon size={20} className="mt-0.5 shrink-0" />
-      <p className="text-[14.5px] leading-snug font-semibold">
-        {data.status === "scheduled"
-          ? `C’est parti : il part sur ${where}, Simone te dit quand il est en ligne.`
-          : "C’est validé. Connecte Instagram dans Réglages pour que Simone le publie."}
-      </p>
+      <p className="text-[14.5px] leading-snug font-semibold">{`C’est parti : il part sur ${where}, Simone te dit quand il est en ligne.`}</p>
     </div>
   ) : data.making ? (
     <button type="button" disabled className="btn h-[54px] w-full bg-line text-[16px] text-muted">
       Simone finit la nouvelle version…
     </button>
   ) : (
-    <button type="button" onClick={publish} disabled={pending || !data.videoUrl} className="btn btn-primary h-[54px] w-full text-[17px] shadow-[0_8px_22px_rgba(91,63,217,0.26)] disabled:opacity-60">
-      {pending ? "Un instant…" : publishLabel}
-    </button>
+    <div className="flex flex-col gap-1.5">
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          onClick={publish}
+          disabled={pending || !data.videoUrl}
+          className={`${tile} bg-violet text-white shadow-[0_8px_22px_rgba(91,63,217,0.26)] hover:bg-violet-hover`}
+        >
+          <ArrowUpIcon size={19} />
+          {pending ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
+        </button>
+        {data.downloadUrl ? (
+          <a href={data.downloadUrl} download className={`${tile} border-[1.5px] border-line bg-white text-ink hover:border-lilac`}>
+            <DownloadIcon size={19} />
+            Télécharger
+          </a>
+        ) : (
+          <button type="button" disabled className={`${tile} border-[1.5px] border-line bg-white text-ink`}>
+            <DownloadIcon size={19} />
+            Télécharger
+          </button>
+        )}
+        <button type="button" onClick={() => setSheet("date")} className={`${tile} border-[1.5px] border-line bg-white text-ink hover:border-lilac`}>
+          <CalendarIcon size={19} />
+          Prévoir
+        </button>
+      </div>
+      {data.upcoming && data.when && <p className="text-center text-[12.5px] font-semibold text-muted">Simone te fait signe {data.when.short} pour le poster.</p>}
+    </div>
   );
   const askButton = !data.locked && (
     <button type="button" onClick={ask} className="btn btn-secondary h-[50px] w-full text-[16px] font-extrabold">
-      Demander une modif à Simone
+      <PenIcon size={18} />
+      Modifier avec Simone
     </button>
   );
   // Its scenes, when it has several and its video is this version's: a tap changes that one.
@@ -318,6 +354,30 @@ export function PostReview({
           </div>
         )}
 
+        {sheet === "date" && (
+          <Sheet title="Quand te faire signe ?" hint="Simone te rappelle de le poster à ce moment-là, sur WhatsApp et dans l’app." onClose={() => setSheet(null)}>
+            <DateView data={data} onDone={planned} />
+          </Sheet>
+        )}
+        {sheet === "instagram" && (
+          <Sheet
+            title="Relie ton Instagram"
+            hint="Pour que Simone publie ton Reel, relie ton compte Instagram une fois. Ou télécharge la vidéo et publie-la toi-même."
+            onClose={() => setSheet(null)}
+          >
+            <a href="/api/instagram/connect" className="btn btn-primary w-full">
+              <InstagramIcon size={18} />
+              Relier Instagram
+            </a>
+            {data.downloadUrl && (
+              <a href={data.downloadUrl} download className="btn btn-secondary w-full">
+                <DownloadIcon size={18} />
+                Télécharger la vidéo
+              </a>
+            )}
+          </Sheet>
+        )}
+
         {toast && (
           <p
             role="status"
@@ -329,6 +389,37 @@ export function PostReview({
       </div>
     );
   }
+}
+
+/** A small sheet over the page: from the bottom of a phone, in the middle of a computer's screen. */
+function Sheet({ title, hint, onClose, children }: { title: string; hint: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
+      <button type="button" aria-label="Fermer" onClick={onClose} className="fauve-fade absolute inset-0 bg-ink/35" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="fauve-enter relative flex max-h-[88dvh] w-full flex-col gap-3 overflow-y-auto rounded-t-[26px] bg-white px-5 pt-4 pb-[max(1.4rem,env(safe-area-inset-bottom))] shadow-[0_-10px_40px_rgba(28,21,48,0.14)] sm:max-w-[440px] sm:rounded-[22px] sm:pb-5"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <h2 className="text-[18px] font-extrabold">{title}</h2>
+            <p className="text-[13.5px] leading-snug text-muted">{hint}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-soft text-muted">
+            <XIcon size={18} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 /** Which version goes out, and the way back to the one before (or forward again to the newer one). */
