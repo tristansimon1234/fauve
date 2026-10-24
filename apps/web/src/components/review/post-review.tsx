@@ -6,15 +6,15 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
 import { useFauveDrawer } from "@/components/fauve-drawer";
-import { ArrowUpIcon, CalendarIcon, CheckIcon, DownloadIcon, InstagramIcon, PauseIcon, PenIcon, PlayIcon, UndoIcon, VolumeIcon, VolumeOffIcon, XIcon } from "@/components/icons";
+import { ArrowUpIcon, CalendarIcon, CheckIcon, DownloadIcon, PauseIcon, PenIcon, PlayIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { CoverPicker } from "@/components/montage/cover-picker";
 import { PausedSign, Scrubber, useReelPlayback } from "@/components/review/reel-player";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
-import { DateView } from "./change-panel";
 import { OpeningEditor, type EditorParts } from "./editor-parts";
 import type { EditStart } from "./reel-editor";
+import { needsInstagram, ReviewSheets, type ReviewSheet } from "./review-sheets";
 import { SceneStrip } from "./scene-strip";
 
 // « Modifier » plays the montage live (Remotion): its code is loaded only when she opens it.
@@ -70,7 +70,7 @@ export function PostReview({
   // Her caption as she writes it: « Publier » sends it, saved or not.
   const [caption, setCaption] = useState(data.captionShown);
   /** « Prévoir » open, or « Publier » before Instagram is connected. */
-  const [sheet, setSheet] = useState<"date" | "instagram" | null>(null);
+  const [sheet, setSheet] = useState<ReviewSheet | null>(null);
 
   // A new version on its way: the page follows it until the video is there.
   useEffect(() => {
@@ -120,11 +120,9 @@ export function PostReview({
   };
 
   const where = data.platforms.length ? data.platforms.map((p) => (p === "tiktok" ? "TikTok" : "Instagram")).join(" et ") : "Instagram";
-  const needsInstagram = !data.instagram && (!data.platforms.length || data.platforms.includes("instagram"));
 
   const publish = () => {
-    // Nothing goes out before her Instagram is connected: « Publier » first offers to connect it.
-    if (needsInstagram) return setSheet("instagram");
+    if (needsInstagram(data)) return setSheet("instagram");
     start(async () => {
       setError(null);
       const form = new FormData();
@@ -354,29 +352,7 @@ export function PostReview({
           </div>
         )}
 
-        {sheet === "date" && (
-          <Sheet title="Quand te faire signe ?" hint="Simone te rappelle de le poster à ce moment-là, sur WhatsApp et dans l’app." onClose={() => setSheet(null)}>
-            <DateView data={data} onDone={planned} />
-          </Sheet>
-        )}
-        {sheet === "instagram" && (
-          <Sheet
-            title="Relie ton Instagram"
-            hint="Pour que Simone publie ton Reel, relie ton compte Instagram une fois. Ou télécharge la vidéo et publie-la toi-même."
-            onClose={() => setSheet(null)}
-          >
-            <a href="/api/instagram/connect" className="btn btn-primary w-full">
-              <InstagramIcon size={18} />
-              Relier Instagram
-            </a>
-            {data.downloadUrl && (
-              <a href={data.downloadUrl} download className="btn btn-secondary w-full">
-                <DownloadIcon size={18} />
-                Télécharger la vidéo
-              </a>
-            )}
-          </Sheet>
-        )}
+        <ReviewSheets sheet={sheet} data={data} onClose={() => setSheet(null)} onPlanned={planned} />
 
         {toast && (
           <p
@@ -389,37 +365,6 @@ export function PostReview({
       </div>
     );
   }
-}
-
-/** A small sheet over the page: from the bottom of a phone, in the middle of a computer's screen. */
-function Sheet({ title, hint, onClose, children }: { title: string; hint: string; onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
-      <button type="button" aria-label="Fermer" onClick={onClose} className="fauve-fade absolute inset-0 bg-ink/35" />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className="fauve-enter relative flex max-h-[88dvh] w-full flex-col gap-3 overflow-y-auto rounded-t-[26px] bg-white px-5 pt-4 pb-[max(1.4rem,env(safe-area-inset-bottom))] shadow-[0_-10px_40px_rgba(28,21,48,0.14)] sm:max-w-[440px] sm:rounded-[22px] sm:pb-5"
-      >
-        <div className="flex items-start gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <h2 className="text-[18px] font-extrabold">{title}</h2>
-            <p className="text-[13.5px] leading-snug text-muted">{hint}</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-soft text-muted">
-            <XIcon size={18} />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
 }
 
 /** Which version goes out, and the way back to the one before (or forward again to the newer one). */

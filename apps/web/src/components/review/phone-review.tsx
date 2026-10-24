@@ -5,16 +5,19 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
-import { ArrowDownIcon, ArrowLeftIcon, CaptionIcon, CheckIcon, PenIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
+import { ArrowLeftIcon, ArrowUpIcon, CalendarIcon, CaptionIcon, CheckIcon, DownloadIcon, PenIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { PausedSign, useReelPlayback } from "@/components/review/reel-player";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
+import { needsInstagram, ReviewSheets, type ReviewSheet } from "./review-sheets";
 
 // A Reel opened from WhatsApp (/v/{id}): a page made for her phone, not the app. The video
-// full screen as on Instagram, and only what she does from there: publish it, save it, copy
-// its caption, or tell Simone what to change, back in WhatsApp where everything else happens
-// (Tristan: « il ne doit pas envoyer de lien vers une app, juste des pages optimisées »).
+// full screen as on Instagram, and only what she does from there, the same buttons as its page
+// in the app (Tristan: « la page de publication envoyée sur WhatsApp mobile doit avoir les mêmes
+// boutons »): publish it, save it, choose when Simone reminds her to post it, or tell Simone what to
+// change, back in WhatsApp where everything else happens (« il ne doit pas envoyer de lien vers
+// une app, juste des pages optimisées »); its caption is copied from the caption itself.
 
 export function PhoneReview({ data }: { data: ReviewData }) {
   const router = useRouter();
@@ -29,6 +32,8 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  /** « Prévoir » open, or « Publier » before Instagram is connected. */
+  const [sheet, setSheet] = useState<ReviewSheet | null>(null);
 
   // A new version on its way: the page follows it until the video is there.
   useEffect(() => {
@@ -42,7 +47,8 @@ export function PhoneReview({ data }: { data: ReviewData }) {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const publish = () =>
+  const publish = () => {
+    if (needsInstagram(data)) return setSheet("instagram");
     start(async () => {
       setError(null);
       const form = new FormData();
@@ -53,6 +59,13 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       if (result.status === "ok") setToast(result.message);
       router.refresh();
     });
+  };
+  const planned = (message: string) => {
+    setSheet(null);
+    if (!message) return;
+    setToast(message);
+    router.refresh();
+  };
   const back = () =>
     start(async () => {
       setError(null);
@@ -73,9 +86,9 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   };
 
   const where = data.platforms.length ? data.platforms.map((p) => (p === "tiktok" ? "TikTok" : "Instagram")).join(" et ") : "Instagram";
-  const sent = data.status === "scheduled" || data.status === "validated";
-  const publishLabel = !data.instagram ? "C’est bon pour moi" : data.publishByHand ? "Me l’envoyer sur WhatsApp" : `Publier sur ${where}`;
+  const sent = data.status === "scheduled";
   const change = whatsappLink(`Pour « ${data.title} » : `);
+  const tile = "flex h-[60px] min-w-0 flex-col items-center justify-center gap-1 rounded-[18px] px-1 text-[13px] font-extrabold disabled:opacity-50";
   const ready = Boolean(data.videoUrl) && !data.making && !data.failed;
   const tap = () => {
     if (!ready) return;
@@ -149,10 +162,18 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       {/* Bottom: the caption as the feed shows it, then what she does. */}
       <div className={`relative z-10 mt-auto flex flex-col gap-3 ${fade} bg-gradient-to-t from-black/85 via-black/60 to-transparent px-4 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))]`}>
         {data.captionShown && (
-          <button type="button" onClick={() => setOpen(!open)} className="text-left text-[14px] leading-snug drop-shadow">
-            {data.handle && <strong className="font-extrabold">{data.handle} </strong>}
-            <span className={open ? "whitespace-pre-line" : "line-clamp-2"}>{data.captionShown}</span>
-          </button>
+          <div className="flex flex-col gap-1.5">
+            <button type="button" onClick={() => setOpen(!open)} className="text-left text-[14px] leading-snug drop-shadow">
+              {data.handle && <strong className="font-extrabold">{data.handle} </strong>}
+              <span className={open ? "whitespace-pre-line" : "line-clamp-2"}>{data.captionShown}</span>
+            </button>
+            {open && (
+              <button type="button" onClick={copy} className="inline-flex items-center gap-1.5 self-start text-[13px] font-semibold text-white/85 underline underline-offset-3">
+                {copied ? <CheckIcon size={14} /> : <CaptionIcon size={14} />}
+                {copied ? "Légende copiée" : "Copier la légende"}
+              </button>
+            )}
+          </div>
         )}
 
         {data.previous !== null && !data.locked && !data.making && (
@@ -167,40 +188,52 @@ export function PhoneReview({ data }: { data: ReviewData }) {
           </p>
         )}
 
-        {data.locked ? null : sent ? (
+        {data.locked ? (
+          data.downloadUrl && (
+            <a href={data.downloadUrl} download className="flex h-[50px] items-center justify-center gap-2 rounded-full bg-white/15 text-[15px] font-extrabold backdrop-blur-sm">
+              <DownloadIcon size={19} /> Télécharger
+            </a>
+          )
+        ) : sent ? (
           <p className="flex items-start gap-2 rounded-[18px] bg-white/15 px-4 py-3 text-[14.5px] leading-snug font-semibold backdrop-blur-sm">
             <CheckIcon size={19} className="mt-0.5 shrink-0" />
-            {data.status === "scheduled" ? `C’est parti sur ${where}, je te dis quand il est en ligne.` : "C’est validé. Relie ton Instagram et je le publie."}
+            {`C’est parti sur ${where}, je te dis quand il est en ligne.`}
           </p>
         ) : (
-          <button
-            type="button"
-            onClick={publish}
-            disabled={pending || !ready}
-            className="h-[54px] w-full rounded-full bg-violet text-[17px] font-extrabold shadow-[0_8px_22px_rgba(91,63,217,0.4)] disabled:opacity-50"
-          >
-            {pending ? "Un instant…" : publishLabel}
-          </button>
+          <div className="flex flex-col gap-1.5">
+            <div className="grid grid-cols-3 gap-2">
+              <button type="button" onClick={publish} disabled={pending || !ready} className={`${tile} bg-violet shadow-[0_8px_22px_rgba(91,63,217,0.4)]`}>
+                <ArrowUpIcon size={19} />
+                {pending ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
+              </button>
+              {data.downloadUrl ? (
+                <a href={data.downloadUrl} download className={`${tile} bg-white/15 backdrop-blur-sm`}>
+                  <DownloadIcon size={19} />
+                  Télécharger
+                </a>
+              ) : (
+                <button type="button" disabled className={`${tile} bg-white/15 backdrop-blur-sm`}>
+                  <DownloadIcon size={19} />
+                  Télécharger
+                </button>
+              )}
+              <button type="button" onClick={() => setSheet("date")} className={`${tile} bg-white/15 backdrop-blur-sm`}>
+                <CalendarIcon size={19} />
+                Prévoir
+              </button>
+            </div>
+            {data.upcoming && data.when && <p className="text-center text-[12.5px] font-semibold text-white/80">Je te fais signe {data.when.short} pour le poster.</p>}
+          </div>
         )}
 
-        <div className="flex gap-2 *:flex-1">
-          {!data.locked && (
-            <a href={change} className="flex flex-col items-center gap-1 rounded-[16px] bg-white/15 py-2.5 text-[12.5px] font-bold backdrop-blur-sm">
-              <PenIcon size={19} /> Changer
-            </a>
-          )}
-          {data.downloadUrl && (
-            <a href={data.downloadUrl} download className="flex flex-col items-center gap-1 rounded-[16px] bg-white/15 py-2.5 text-[12.5px] font-bold backdrop-blur-sm">
-              <ArrowDownIcon size={19} /> Enregistrer
-            </a>
-          )}
-          {data.captionShown && (
-            <button type="button" onClick={copy} className="flex flex-col items-center gap-1 rounded-[16px] bg-white/15 py-2.5 text-[12.5px] font-bold backdrop-blur-sm">
-              {copied ? <CheckIcon size={19} /> : <CaptionIcon size={19} />} {copied ? "Copiée" : "La légende"}
-            </button>
-          )}
-        </div>
+        {!data.locked && (
+          <a href={change} className="flex h-[50px] items-center justify-center gap-2 rounded-full bg-white/15 text-[15.5px] font-extrabold backdrop-blur-sm">
+            <PenIcon size={18} /> Modifier avec Simone
+          </a>
+        )}
       </div>
+
+      <ReviewSheets sheet={sheet} data={data} onClose={() => setSheet(null)} onPlanned={planned} />
 
       {toast && (
         <p role="status" className="absolute inset-x-4 top-[calc(4.5rem+env(safe-area-inset-top))] z-20 rounded-[18px] bg-white px-4 py-3 text-center text-[14px] font-bold text-ink shadow-lg">
