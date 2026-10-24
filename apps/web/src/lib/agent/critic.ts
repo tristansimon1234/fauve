@@ -37,7 +37,7 @@ import { videoFramesInSandbox } from "@/lib/render/sandbox";
 import { loadTracks } from "@/lib/render/tracks";
 import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { anthropic, logClaudeCost } from "./run";
+import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
 
 // The critic of a montage (Soigné, Max): key frames of each rendered version
 // are cut in the sandbox, Opus looks at them with what the plan puts on screen,
@@ -204,7 +204,7 @@ export async function reviewMontage(input: {
       output_config: { effort: "medium", format: outputFormat(montageReviewSchema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      system: [{ type: "text", text: MONTAGE_CRITIC_PROMPT, cache_control: { type: "ephemeral" } }],
+      system: [{ type: "text", text: MONTAGE_CRITIC_PROMPT, cache_control: CACHE_AN_HOUR }],
       messages: [{ role: "user", content }],
     });
     await logClaudeCost(input.studioId, response.usage, "montage_critic", CRITIC_MODEL);

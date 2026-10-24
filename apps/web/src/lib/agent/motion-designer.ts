@@ -26,7 +26,7 @@ import { toGeminiSchema } from "@/lib/gemini-schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { smokeTestScenes, type SceneChecks, type SmokeScene } from "@/lib/render/sandbox";
 import { timeLeft } from "@/lib/step-clock";
-import { anthropic, logClaudeCost } from "./run";
+import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
 
 // The motion designer: one Opus call per free scene, which writes the component.
 // Code is checked statically, transpiled (never executed here), then smoke-
@@ -131,7 +131,7 @@ async function askClaude(studioId: string, content: string | Block[], schema: An
       output_config: { effort: "medium", format: outputFormat<AnswerSchema>(schema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      system: [{ type: "text", text: MOTION_DESIGNER_PROMPT, cache_control: { type: "ephemeral" } }],
+      system: [{ type: "text", text: MOTION_DESIGNER_PROMPT, cache_control: CACHE_AN_HOUR }],
       messages: [{ role: "user", content }],
     })
     .finalMessage();
