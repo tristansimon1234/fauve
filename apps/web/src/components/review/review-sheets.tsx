@@ -53,7 +53,7 @@ export function ReviewSheets({
 }
 
 /** A small sheet over the page: from the bottom of a phone, in the middle of a computer's screen. */
-function Sheet({ title, hint, onClose, children }: { title: string; hint: string; onClose: () => void; children: React.ReactNode }) {
+export function Sheet({ title, hint, onClose, children }: { title: string; hint: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
