@@ -1,7 +1,7 @@
 "use client";
 
 import { EFFECT_MINUTES, REDO_MINUTES, RERENDER_MINUTES } from "@fauve/agent";
-import { useRouter } from "next/navigation";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
@@ -10,14 +10,14 @@ import { Mascot } from "@/components/mascot";
 import { PausedSign, useReelPlayback } from "@/components/review/reel-player";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
-import { needsInstagram, ReviewSheets, type ReviewSheet } from "./review-sheets";
+import { needsInstagram, ReviewSheets, Sheet, type ReviewSheet } from "./review-sheets";
 
 // A Reel opened from WhatsApp (/v/{id}): a page made for her phone, not the app. The video
 // full screen as on Instagram, and only what she does from there, the same buttons as its page
 // in the app (Tristan: « la page de publication envoyée sur WhatsApp mobile doit avoir les mêmes
 // boutons »): publish it, save it, choose when Simone reminds her to post it, or tell Simone what to
 // change, back in WhatsApp where everything else happens (« il ne doit pas envoyer de lien vers
-// une app, juste des pages optimisées »); its caption is copied from the caption itself.
+// une app, juste des pages optimisées »); its caption, touched, opens to be written over, as on its page in the app.
 
 export function PhoneReview({ data }: { data: ReviewData }) {
   const router = useRouter();
@@ -32,8 +32,18 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  /** « Prévoir » open, or « Publier » before Instagram is connected. */
-  const [sheet, setSheet] = useState<ReviewSheet | null>(null);
+  /** « Prévoir » open, « Publier » before Instagram is connected, or her caption. */
+  const [sheet, setSheet] = useState<ReviewSheet | "caption" | null>(null);
+  // Her caption as she writes it (Tristan: « le lien de la publication sur mobile permet de modif la
+  // legende ? »), as Instagram will show it, hashtags included, like its page in the app.
+  const [caption, setCaption] = useState(data.captionShown);
+  const [saved, setSaved] = useState(data.captionShown);
+  if (saved !== data.captionShown) {
+    setSaved(data.captionShown);
+    // Its sheet closed, nothing of hers is unsaved: it follows what was saved since (by her or Simone).
+    if (sheet !== "caption") setCaption(data.captionShown);
+  }
+  const edited = caption.trim() !== data.captionShown.trim();
 
   // A new version on its way: the page follows it until the video is there.
   useEffect(() => {
@@ -53,7 +63,8 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       setError(null);
       const form = new FormData();
       form.set("intent", "validate");
-      form.set("caption", data.caption);
+      // Just saved, the page may still hold the caption before it: what she wrote goes out.
+      form.set("caption", edited ? caption : data.caption);
       const result = await updatePost(data.postId, { status: "idle" }, form);
       if (result.status === "error") return setError(result.message);
       if (result.status === "ok") setToast(result.message);
@@ -75,9 +86,38 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       setToast("Tu as retrouvé la version d’avant.");
       router.refresh();
     });
-  const copy = async () => {
+  const writeCaption = () => {
+    setError(null);
+    setSheet("caption");
+  };
+  // Closed (outside, its cross), its sheet keeps what she wrote, saved as « Enregistrer » does; only « Annuler » puts it back.
+  const keepCaption = () => {
+    if (pending) return;
+    if (!edited) return setSheet(null);
+    start(async () => {
+      setError(null);
+      const form = new FormData();
+      form.set("intent", "save");
+      form.set("caption", caption);
+      // A phone loses its network: what she wrote stays in its sheet (signed out, Next's redirect still goes through).
+      const result = await updatePost(data.postId, { status: "idle" }, form).catch((reason: unknown) => {
+        unstable_rethrow(reason);
+        return { status: "error" as const, message: "L’enregistrement a échoué. Vérifie ta connexion et réessaie." };
+      });
+      if (result.status === "error") return setError(result.message);
+      setSheet(null);
+      if (result.status === "ok") setToast(result.message);
+      router.refresh();
+    });
+  };
+  const dropCaption = () => {
+    setCaption(data.captionShown);
+    setError(null);
+    setSheet(null);
+  };
+  const copy = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(data.captionShown);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -161,18 +201,34 @@ export function PhoneReview({ data }: { data: ReviewData }) {
 
       {/* Bottom: the caption as the feed shows it, then what she does. */}
       <div className={`relative z-10 mt-auto flex flex-col gap-3 ${fade} bg-gradient-to-t from-black/85 via-black/60 to-transparent px-4 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))]`}>
-        {data.captionShown && (
+        {data.locked ? (
+          data.captionShown && (
+            <div className="flex flex-col gap-1.5">
+              <button type="button" onClick={() => setOpen(!open)} className="text-left text-[14px] leading-snug drop-shadow">
+                {data.handle && <strong className="font-extrabold">{data.handle} </strong>}
+                <span className={open ? "whitespace-pre-line" : "line-clamp-2"}>{data.captionShown}</span>
+              </button>
+              {open && (
+                <button type="button" onClick={() => copy(data.captionShown)} className="inline-flex items-center gap-1.5 self-start text-[13px] font-semibold text-white/85 underline underline-offset-3">
+                  {copied ? <CheckIcon size={14} /> : <CaptionIcon size={14} />}
+                  {copied ? "Légende copiée" : "Copier la légende"}
+                </button>
+              )}
+            </div>
+          )
+        ) : (
+          // Touched, it opens to be written over.
           <div className="flex flex-col gap-1.5">
-            <button type="button" onClick={() => setOpen(!open)} className="text-left text-[14px] leading-snug drop-shadow">
-              {data.handle && <strong className="font-extrabold">{data.handle} </strong>}
-              <span className={open ? "whitespace-pre-line" : "line-clamp-2"}>{data.captionShown}</span>
-            </button>
-            {open && (
-              <button type="button" onClick={copy} className="inline-flex items-center gap-1.5 self-start text-[13px] font-semibold text-white/85 underline underline-offset-3">
-                {copied ? <CheckIcon size={14} /> : <CaptionIcon size={14} />}
-                {copied ? "Légende copiée" : "Copier la légende"}
+            {caption.trim() && (
+              <button type="button" onClick={writeCaption} className="text-left text-[14px] leading-snug drop-shadow">
+                {data.handle && <strong className="font-extrabold">{data.handle} </strong>}
+                <span className="line-clamp-2">{caption}</span>
               </button>
             )}
+            <button type="button" onClick={writeCaption} className="inline-flex items-center gap-1.5 self-start text-[13px] font-semibold text-white/85 underline underline-offset-3">
+              <PenIcon size={14} />
+              {caption.trim() ? "Modifier la légende" : "Écrire la légende"}
+            </button>
           </div>
         )}
 
@@ -233,7 +289,40 @@ export function PhoneReview({ data }: { data: ReviewData }) {
         )}
       </div>
 
-      <ReviewSheets sheet={sheet} data={data} onClose={() => setSheet(null)} onPlanned={planned} />
+      <ReviewSheets sheet={sheet === "caption" ? null : sheet} data={data} onClose={() => setSheet(null)} onPlanned={planned} />
+      {sheet === "caption" && (
+        <Sheet title="Ta légende" hint="Telle qu’elle partira avec ton Reel." onClose={keepCaption}>
+          <textarea
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            maxLength={2200}
+            rows={8}
+            aria-label="Ta légende"
+            placeholder="Simone l’écrit avec la vidéo."
+            // 16 px: under it, the phone zooms into the page as soon as she touches it.
+            className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3 py-2.5 text-[16px] leading-relaxed outline-none focus:border-violet"
+          />
+          {error && (
+            <p role="alert" className="text-[13px] font-semibold text-danger">
+              {error}
+            </p>
+          )}
+          {edited && (
+            <div className="flex gap-2">
+              <button type="button" onClick={keepCaption} disabled={pending} className="btn btn-primary flex-1 disabled:opacity-60">
+                {pending ? "Un instant…" : "Enregistrer"}
+              </button>
+              <button type="button" onClick={dropCaption} disabled={pending} className="btn btn-secondary">
+                Annuler
+              </button>
+            </div>
+          )}
+          <button type="button" onClick={() => copy(caption)} className="inline-flex items-center gap-1.5 self-start text-[14px] font-semibold text-violet">
+            {copied ? <CheckIcon size={15} /> : <CaptionIcon size={15} />}
+            {copied ? "Légende copiée" : "Copier la légende"}
+          </button>
+        </Sheet>
+      )}
 
       {toast && (
         <p role="status" className="absolute inset-x-4 top-[calc(4.5rem+env(safe-area-inset-top))] z-20 rounded-[18px] bg-white px-4 py-3 text-center text-[14px] font-bold text-ink shadow-lg">
