@@ -74,7 +74,7 @@ export async function HeaderAvatar() {
 
 /**
  * Her credits, always in sight (Tristan: « le nombre de crédits dispo doit être visible tout le temps »):
- * in the side menu and the phone's header, to Réglages › Crédits. Refreshed with the page (StudioLive).
+ * in the side menu and the phone's header, to Réglages › Abonnement et crédits. Refreshed with the page (StudioLive).
  */
 async function Credits({ studioId, wide = false }: { studioId: string; wide?: boolean }) {
   const balance = await creditBalance(studioId).catch(() => null);
