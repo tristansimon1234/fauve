@@ -103,6 +103,25 @@ export function geminiCostUsd(model: string, tokens: { input: number; output: nu
   return price ? (tokens.input * price.input + tokens.output * price.output) / 1_000_000 : null;
 }
 
+// Kimi (Moonshot) through Vercel AI Gateway, USD per million tokens: the gateway's list prices
+// (ai-gateway.vercel.sh/v1/models, October 2026). Only a lab studio's motion designer uses it.
+const KIMI_PRICES: Record<string, { input: number; cachedInput: number; output: number }> = {
+  "kimi-k3.1-pro": { input: 2, cachedInput: 0.2, output: 10 },
+  "kimi-k3.1-pro-highspeed": { input: 4, cachedInput: 0.2, output: 20 },
+  "kimi-k3": { input: 3, cachedInput: 0.3, output: 15 },
+  "kimi-k3-fast": { input: 4.5, cachedInput: 0.45, output: 22.5 },
+};
+/** A Kimi model a lab studio's motion designer may be set to (studios.motion_model). */
+export const isKimiModel = (model: string) => Object.hasOwn(KIMI_PRICES, model);
+
+/** A Kimi call: its input tokens (those read from the cache, cheaper, among them) and its output tokens (thinking included). */
+export function kimiCostUsd(model: string, tokens: { input: number; cachedInput: number; output: number }): number | null {
+  const price = KIMI_PRICES[model];
+  if (!price) return null;
+  const cached = Math.min(tokens.cachedInput, tokens.input);
+  return ((tokens.input - cached) * price.input + cached * price.cachedInput + tokens.output * price.output) / 1_000_000;
+}
+
 /**
  * Where the render sandbox runs: Paris, next to the functions (cdg1) and to Supabase
  * (eu-west-3), so the clips are worked on in Europe and never cross the Atlantic.

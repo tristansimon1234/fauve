@@ -4,6 +4,7 @@ import {
   checkMotionCode,
   type CompositionTexts,
   GEMINI_MODEL_ID,
+  isKimiModel,
   MOTION_DESIGNER_PROMPT,
   motionLookOutputSchema,
   motionSceneOutputSchema,
@@ -23,6 +24,7 @@ import { env } from "@/lib/env";
 import { googleFont } from "@/lib/fonts";
 import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
 import { toGeminiSchema } from "@/lib/gemini-schema";
+import { askKimiJson, strictShape } from "@/lib/kimi";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { smokeTestScenes, type SceneChecks, type SmokeScene } from "@/lib/render/sandbox";
 import { timeLeft } from "@/lib/step-clock";
@@ -163,12 +165,37 @@ async function askGemini(studioId: string, model: string, content: string | Bloc
   return look ? readAnswer(motionLookOutputSchema, JSON.parse(response.text)) : readAnswer(motionSceneOutputSchema, JSON.parse(response.text));
 }
 
-/** The model that writes this studio's scenes: Opus, or the Gemini model a lab studio is set to (studios.motion_model). */
+// Kimi as the motion designer, for a lab studio only, through Vercel AI Gateway: the same prompt,
+// the same request (its images as data URLs) and the same checks.
+const KIMI_SCENE_SCHEMA = strictShape(z.toJSONSchema(motionSceneOutputSchema));
+const KIMI_LOOK_SCHEMA = strictShape(z.toJSONSchema(motionLookOutputSchema));
+
+async function askKimi(studioId: string, model: string, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
+  const parts = (typeof content === "string" ? [{ type: "text" as const, text: content }] : content).map((b) =>
+    b.type === "text" ? { type: "text" as const, text: b.text } : { type: "image_url" as const, image_url: { url: `data:${b.source.media_type};base64,${b.source.data}` } },
+  );
+  const look = schema === motionLookOutputSchema;
+  const answer = await askKimiJson({
+    studioId,
+    model,
+    system: MOTION_DESIGNER_PROMPT,
+    content: parts,
+    name: look ? "motion_look" : "motion_scene",
+    schema: look ? KIMI_LOOK_SCHEMA : KIMI_SCENE_SCHEMA,
+    maxTokens: 64000,
+    purpose: "motion_designer",
+  });
+  // What it leaves empty (null) is left out, as an optional field never written.
+  const written = Object.fromEntries(Object.entries((answer ?? {}) as Record<string, unknown>).filter(([, v]) => v !== null));
+  return look ? readAnswer(motionLookOutputSchema, written) : readAnswer(motionSceneOutputSchema, written);
+}
+
+/** The model that writes this studio's scenes: Opus, or the Gemini or Kimi model a lab studio is set to (studios.motion_model). */
 async function designerModel(studioId: string): Promise<string> {
   const { data } = await supabaseAdmin().from("studios").select("website_url, motion_model").eq("id", studioId).maybeSingle();
   const lab = typeof data?.website_url === "string" && data.website_url.startsWith("lab://");
   const asked = data?.motion_model as string | null | undefined;
-  return lab && asked && GEMINI_MODEL_ID.test(asked) ? asked : CLAUDE_MODEL;
+  return lab && asked && (GEMINI_MODEL_ID.test(asked) || isKimiModel(asked)) ? asked : CLAUDE_MODEL;
 }
 
 function transpile(code: string): string {
@@ -270,7 +297,12 @@ async function writeScene(
       ? withFrames("Ton animation d'avant, rendue sur ses images :", seen.frames, text)
       : text;
   const schema = look ? motionLookOutputSchema : motionSceneOutputSchema;
-  const output = model === CLAUDE_MODEL ? await askClaude(studioId, content, schema) : await askGemini(studioId, model, content, schema);
+  const output =
+    model === CLAUDE_MODEL
+      ? await askClaude(studioId, content, schema)
+      : isKimiModel(model)
+        ? await askKimi(studioId, model, content, schema)
+        : await askGemini(studioId, model, content, schema);
   // Its render is at the level: nothing new (an answer without code keeps it too).
   if (look && (output?.keep || !output?.code?.trim())) return { code: look.code, js: null, error: null, keep: true, seen: output?.seen ?? "" };
   const code = output?.code ?? "";

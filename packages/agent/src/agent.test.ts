@@ -444,8 +444,8 @@ test("motion scenes: the renderer, the smoke test and the prompt share one scope
   }
 });
 
-test("pricing: Gemini, the sandbox, the music and the transcriptions are priced", async () => {
-  const { geminiCostUsd, musicCostUsd, sandboxCostUsd, transcriptionCostUsd } = await import("./pricing.ts");
+test("pricing: Gemini, Kimi, the sandbox, the music and the transcriptions are priced", async () => {
+  const { geminiCostUsd, isKimiModel, kimiCostUsd, musicCostUsd, sandboxCostUsd, transcriptionCostUsd } = await import("./pricing.ts");
   const tokens = { input: 1_000_000, output: 100_000 };
   // Introductory Flash price through 2026, doubled from January 1, 2027.
   assert.equal(geminiCostUsd("gemini-3.7-flash", tokens, new Date("2026-10-15T12:00:00Z")), 0.75 + 0.375);
@@ -455,6 +455,10 @@ test("pricing: Gemini, the sandbox, the music and the transcriptions are priced"
   assert.equal(geminiCostUsd("gemini-3.1-pro-preview", tokens), 2 + 1.2);
   assert.equal(geminiCostUsd("gemini-4-argon", tokens, new Date("2026-11-15T12:00:00Z")), 2 + 1);
   assert.equal(geminiCostUsd("gemini-4-argon", tokens, new Date("2026-12-01T00:00:00Z")), 4 + 2);
+  // Kimi through AI Gateway: the tokens read from the cache at their own price, thinking counted as output.
+  assert.ok(Math.abs((kimiCostUsd("kimi-k3.1-pro", { input: 20_000, cachedInput: 10_000, output: 8_000 }) ?? 0) - 0.102) < 1e-9);
+  assert.equal(kimiCostUsd("kimi-unknown", { input: 1, cachedInput: 0, output: 1 }), null);
+  assert.deepEqual([isKimiModel("kimi-k3.1-pro"), isKimiModel("kimi-k2"), isKimiModel("constructor")], [true, false, false]);
   // An hour on 4 vCPUs in Paris: CPU on every vCPU and 2 GB of memory each.
   assert.ok(Math.abs(sandboxCostUsd(3600, 4, "cdg1") - 4 * (0.177 + 2 * 0.0292)) < 1e-9);
   assert.ok(sandboxCostUsd(60, 4, "iad1") < sandboxCostUsd(60, 4, "cdg1"));
