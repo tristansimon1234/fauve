@@ -128,6 +128,7 @@ export function PostReview({
       const form = new FormData();
       form.set("intent", "validate");
       form.set("caption", caption);
+      form.set("with_hashtags", "1");
       const result = await updatePost(data.postId, { status: "idle" }, form);
       if (result.status === "error") return setError(result.message);
       if (result.status === "ok") setToast(result.message);
@@ -416,6 +417,7 @@ function Caption({ data, caption, onChange: setCaption, onSaved }: { data: Revie
       const form = new FormData();
       form.set("intent", "save");
       form.set("caption", caption);
+      form.set("with_hashtags", "1");
       const result = await updatePost(data.postId, { status: "idle" }, form);
       if (result.status === "error") return setError(result.message);
       onSaved();

@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
-import { CREDIT_VALUE_EUR, PLANS, planOf, studioMonth, TARGET_MARGIN } from "@fauve/agent";
+import { CREDIT_VALUE_EUR, monthlyCostBudget, netRevenue, PLANS, planOf, studioMonth, TARGET_MARGIN, type PlanId } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isValidTestKey } from "@/lib/test-studio";
 
@@ -49,7 +49,10 @@ export async function GET(request: NextRequest) {
   rows.sort((a, b) => b.total - a.total);
   return Response.json({
     month,
-    plans: PLANS,
+    // Each offer: its price (VAT included), what it brings in once VAT and Stripe's fees are out, and the most its month may cost.
+    plans: Object.fromEntries(
+      (Object.keys(PLANS) as PlanId[]).map((p) => [p, { ...PLANS[p], net_revenue_eur: Math.round(netRevenue(p) * 100) / 100, cost_budget_eur: Math.round(monthlyCostBudget(p) * 100) / 100 }]),
+    ),
     target_margin: TARGET_MARGIN,
     credit_value_eur: Math.round(CREDIT_VALUE_EUR * 1000) / 1000,
     studios: rows,

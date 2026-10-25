@@ -56,7 +56,7 @@ export async function Paywall({ db, studioId, postId, next }: { db: Db; studioId
         </div>
         <PlanChoice next={next} />
         <p className="text-[12px] leading-snug text-muted">
-          Ta carte est demandée pour l’essai et débitée seulement après {TRIAL_DAYS} jours ({PLANS.essentiel.priceEur} € ou {PLANS.pro.priceEur} € par mois). Paiement sécurisé par
+          Ta carte est demandée pour l’essai et débitée seulement après {TRIAL_DAYS} jours ({PLANS.essentiel.priceEur} € ou {PLANS.pro.priceEur} € TTC par mois). Paiement sécurisé par
           Stripe.
         </p>
       </div>

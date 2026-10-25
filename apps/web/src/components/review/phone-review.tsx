@@ -65,6 +65,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       form.set("intent", "validate");
       // Just saved, the page may still hold the caption before it: what she wrote goes out.
       form.set("caption", edited ? caption : data.caption);
+      if (edited) form.set("with_hashtags", "1");
       const result = await updatePost(data.postId, { status: "idle" }, form);
       if (result.status === "error") return setError(result.message);
       if (result.status === "ok") setToast(result.message);
@@ -99,6 +100,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       const form = new FormData();
       form.set("intent", "save");
       form.set("caption", caption);
+      form.set("with_hashtags", "1");
       // A phone loses its network: what she wrote stays in its sheet (signed out, Next's redirect still goes through).
       const result = await updatePost(data.postId, { status: "idle" }, form).catch((reason: unknown) => {
         unstable_rethrow(reason);

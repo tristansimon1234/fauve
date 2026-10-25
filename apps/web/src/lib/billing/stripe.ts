@@ -51,34 +51,45 @@ export async function stripe<T>(method: "GET" | "POST", path: string, params: Pa
 
 const lookupKey = (plan: PlanId) => `simone_${plan}_monthly`;
 
-const prices = new Map<PlanId, string>();
+type StripePrice = { id: string; unit_amount: number | null; product: string };
 
-/** The monthly price of an offer, created in Stripe the first time it is needed. */
-export async function priceFor(plan: PlanId): Promise<string> {
+const prices = new Map<PlanId, StripePrice>();
+
+/**
+ * The monthly price of an offer, created in Stripe the first time it is needed. When the offer's
+ * price changed, a new price on its product takes the lookup key: new subscriptions pay the new
+ * amount, the ones already running keep theirs.
+ */
+async function offerPrice(plan: PlanId): Promise<StripePrice> {
   const known = prices.get(plan);
   if (known) return known;
-  const found = await stripe<{ data: { id: string }[] }>("GET", "/prices", { "lookup_keys[]": lookupKey(plan), active: true });
-  let id = found.data[0]?.id;
-  if (!id) {
-    const product = await stripe<{ id: string }>("POST", "/products", { name: `Simone ${PLANS[plan].label}` });
-    const price = await stripe<{ id: string }>("POST", "/prices", {
-      product: product.id,
-      currency: "eur",
-      unit_amount: PLANS[plan].priceEur * 100,
-      recurring: { interval: "month" },
-      lookup_key: lookupKey(plan),
-      tax_behavior: "inclusive",
-    });
-    id = price.id;
-  }
-  prices.set(plan, id);
-  return id;
+  const found = await stripe<{ data: StripePrice[] }>("GET", "/prices", { "lookup_keys[]": lookupKey(plan), active: true });
+  const old = found.data[0];
+  const price =
+    old?.unit_amount === PLANS[plan].priceEur * 100
+      ? old
+      : await stripe<StripePrice>("POST", "/prices", {
+          product: old?.product ?? (await stripe<{ id: string }>("POST", "/products", { name: `Simone ${PLANS[plan].label}` })).id,
+          currency: "eur",
+          unit_amount: PLANS[plan].priceEur * 100,
+          recurring: { interval: "month" },
+          lookup_key: lookupKey(plan),
+          transfer_lookup_key: old ? true : undefined,
+          tax_behavior: "inclusive",
+        });
+  prices.set(plan, price);
+  return price;
 }
 
-/** The offer a Stripe price stands for. */
+export const priceFor = async (plan: PlanId) => (await offerPrice(plan)).id;
+
+/** The offer a Stripe price stands for: its current price, or an older one of the same product (before its price changed). */
 export async function planOfPrice(priceId: string | undefined): Promise<PlanId | null> {
   if (!priceId) return null;
-  for (const plan of Object.keys(PLANS) as PlanId[]) if ((await priceFor(plan)) === priceId) return plan;
+  const plans = Object.keys(PLANS) as PlanId[];
+  for (const plan of plans) if ((await offerPrice(plan)).id === priceId) return plan;
+  const { product } = await stripe<StripePrice>("GET", `/prices/${encodeURIComponent(priceId)}`);
+  for (const plan of plans) if ((await offerPrice(plan)).product === product) return plan;
   return null;
 }
 

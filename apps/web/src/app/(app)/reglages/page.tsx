@@ -195,12 +195,12 @@ async function Settings() {
               <Section title="Abonnement">
                 <p className="text-sm leading-normal">
                   {subscription === "trialing"
-                    ? `Essai en cours${trialEnd ? ` jusqu’au ${trialEnd}` : ""}, avec ${PLANS[offer].label}. Ensuite ${PLANS[offer].priceEur} € / mois, sans engagement : arrête avant la fin de l’essai et tu ne paies rien.`
+                    ? `Essai en cours${trialEnd ? ` jusqu’au ${trialEnd}` : ""}, avec ${PLANS[offer].label}. Ensuite ${PLANS[offer].priceEur} € TTC / mois, sans engagement : arrête avant la fin de l’essai et tu ne paies rien.`
                     : subscription === "active"
-                      ? `${PLANS[offer].label} : ${PLANS[offer].priceEur} € / mois, ${PLANS[offer].credits} crédits par mois (environ ${reelsPerMonth(offer)} Reels soignés, carrousels et photos en plus), sans engagement.`
+                      ? `${PLANS[offer].label} : ${PLANS[offer].priceEur} € TTC / mois, ${PLANS[offer].credits} crédits par mois (environ ${reelsPerMonth(offer)} Reels soignés ; les photos avec leurs textes ne coûtent rien), sans engagement.`
                       : billing
-                        ? `Pas encore d’abonnement. ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € / mois, avec 3 jours d’essai offerts, sans engagement.`
-                        : `Période d’essai en cours, avec tout ${PLANS.pro.label}. Ensuite : ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € / mois, sans engagement.`}
+                        ? `Pas encore d’abonnement. ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € TTC / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € TTC / mois, avec 3 jours d’essai offerts, sans engagement.`
+                        : `Période d’essai en cours, avec tout ${PLANS.pro.label}. Ensuite : ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € TTC / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € TTC / mois, sans engagement.`}
                 </p>
                 {billing ? <SubscriptionButton subscribed={subscription === "trialing" || subscription === "active" || subscription === "past_due"} /> : null}
               </Section>

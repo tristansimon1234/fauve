@@ -29,6 +29,8 @@ const input = z.object({
  * Saves the edited caption and, with intent "validate", moves the draft to
  * "validated", then schedules it on Instagram when the studio is connected and
  * the video is rendered (published by the worker at scheduled_at, or now).
+ * With "with_hashtags", the caption was written over as the page shows it, the
+ * post's hashtags in it: it holds the ones she kept, so the list is emptied.
  */
 export async function updatePost(postId: string, _prev: PostFormState, formData: FormData): Promise<PostFormState> {
   const parsed = input.safeParse({
@@ -47,7 +49,7 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
 
   const { data: post, error: readError } = await db
     .from("posts")
-    .select("id, status, caption")
+    .select("id, status, caption, hashtags")
     .eq("id", parsed.data.postId)
     .eq("studio_id", member.studio.id)
     .maybeSingle();
@@ -59,8 +61,10 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
     return { status: "error", message: "Cette publication est déjà en ligne : elle ne peut plus être modifiée ici." };
   }
 
-  const patch: { caption?: string | null; status?: PostStatus } = {};
+  const patch: { caption?: string | null; hashtags?: string[]; status?: PostStatus } = {};
   if (caption !== (post.caption ?? "")) patch.caption = caption || null;
+  // A hashtag she took out of the caption would come back from the list.
+  if (formData.get("with_hashtags") === "1" && patch.caption !== undefined && (post.hashtags as string[] | null)?.length) patch.hashtags = [];
   const validating = intent === "validate";
   // Validated earlier (before Instagram was connected), it goes out on « Publier » too.
   if (validating && status !== "validated") {

@@ -1,20 +1,22 @@
 import { CREDIT_PRICES } from "./credits.ts";
 import { PLANS, type PlanId } from "./plans.ts";
 
-// What a studio costs against what it pays: its plan's price, the share kept as
-// margin, and what a credit is worth. Every priced job must cost at most half of
-// what its credits are worth (on the plan where a credit is worth least), and a
-// studio's whole month (work, chat, everything logged in cost_events) at most half of its plan.
+// What a studio costs against what it brings in: its offer's price once VAT and Stripe's fees
+// are out, the share kept as margin, and what a credit pays. Every priced job costs at most what
+// its credits pay, and each offer's credits are sized so that a whole month (every credit spent,
+// the chat and the readings no credit pays) costs at most half of what the offer brings in.
 
-/** Pro's monthly price, in euros. */
+/** Pro's monthly price, in euros, VAT included. */
 export const PLAN_PRICE_EUR = PLANS.pro.priceEur;
-/** Share of the price kept, at least: costs stay under the other half. */
+/** Share of what an offer brings in kept, at least: costs stay under the other half. */
 export const TARGET_MARGIN = 0.5;
-/** What one credit is worth to a studio on a plan: the plan spread over its month's credits. */
-export const creditValue = (plan: PlanId) => PLANS[plan].priceEur / PLANS[plan].credits;
-/** What one credit is worth at least, whatever the plan: the margin of every job is checked against it. */
-export const CREDIT_VALUE_EUR = Math.min(...(Object.keys(PLANS) as PlanId[]).map(creditValue));
-/** What one credit pays of a job's real cost, the margin kept (on the plan where a credit is worth least). */
+/**
+ * What a credit is worth, the margin included: every job is priced against it. Fixed at what it was
+ * worth when credits came in (Pro's 220 credits at €49) so that a job keeps its price in credits when
+ * an offer changes: the offers are sized on it, never the other way round.
+ */
+export const CREDIT_VALUE_EUR = 49 / 220;
+/** What one credit pays of a job's real cost, the margin kept. */
 export const EUR_PER_CREDIT_SPENT = CREDIT_VALUE_EUR * (1 - TARGET_MARGIN);
 
 /**
@@ -26,10 +28,28 @@ export function meteredCredits(input: { costEur: number | null; floor: number; c
   return Math.max(input.floor, Math.min(input.ceiling, credits));
 }
 
-/** The most a studio's month may cost (AI, render…) while keeping the margin. */
-export const monthlyCostBudget = (plan: PlanId) => PLANS[plan].priceEur * (1 - TARGET_MARGIN);
+/** VAT in the prices shown (France, 20 %): the offers are priced VAT included. */
+export const VAT_RATE = 0.2;
+/** Stripe's fees on a monthly payment, in euros: a card from the EEA (1.5 % + €0.25) and Billing for the subscription (0.7 %). */
+export const stripeFeeEur = (priceEur: number) => priceEur * (0.015 + 0.007) + 0.25;
+/** What an offer brings in a month, VAT and Stripe's fees out. */
+export const netRevenue = (plan: PlanId) => PLANS[plan].priceEur / (1 + VAT_RATE) - stripeFeeEur(PLANS[plan].priceEur);
+/** The most a studio's month may cost (AI, render, chat…) while keeping the margin. */
+export const monthlyCostBudget = (plan: PlanId) => netRevenue(plan) * (1 - TARGET_MARGIN);
 /** Pro's month budget. */
 export const MONTHLY_COST_BUDGET_EUR = monthlyCostBudget("pro");
+
+/**
+ * What no credit pays, per publication, in euros: about 6 turns of chat (€0.076 a turn on average,
+ * 111 turns measured from 22 to 24 October before the prompt cache was kept an hour, which removed
+ * most of its rewrites) and the readings around it (her files read as they arrive, the caption, the
+ * plan proposed in Créer, a Reel to copy). To measure again on real studios (/api/admin/margin).
+ */
+export const UNPRICED_EUR_PER_POST = 0.4;
+/** Publications a month at an offer's weekly rhythm. */
+export const postsPerMonth = (plan: PlanId) => (PLANS[plan].postsPerWeek * 52) / 12;
+/** The most an offer's month costs: every credit spent, and what no credit pays at its rhythm. It stays under its budget. */
+export const monthCostCeiling = (plan: PlanId) => PLANS[plan].credits * EUR_PER_CREDIT_SPENT + postsPerMonth(plan) * UNPRICED_EUR_PER_POST;
 
 /**
  * Typical cost of each priced job in euros, measured in cost_events (23–25 October 2026, the
@@ -76,7 +96,7 @@ export type StudioMonth = {
   /** Everything else: montages, components, readings, renders. */
   work: number;
   byPurpose: Record<string, number>;
-  /** 1 − total / plan price. */
+  /** 1 − total / what the plan brings in (VAT and Stripe's fees out). */
   margin: number;
   /** What is left of the month's cost budget before the margin falls under the target. */
   budgetLeft: number;
@@ -94,7 +114,7 @@ export function studioMonth(costs: { purpose: string; eur: number }[], plan: Pla
     chat: round(chat),
     work: round(total - chat),
     byPurpose: Object.fromEntries(Object.entries(byPurpose).map(([k, v]) => [k, round(v)])),
-    margin: Math.round((1 - total / PLANS[plan].priceEur) * 1000) / 1000,
+    margin: Math.round((1 - total / netRevenue(plan)) * 1000) / 1000,
     budgetLeft: round(monthlyCostBudget(plan) - total),
   };
 }
