@@ -5,6 +5,7 @@ import {
   DEFAULT_EFFORT,
   editPlanSchema,
   GEMINI_MODEL_ID,
+  isKimiModel,
   imaginedBrief,
   intentionTitle,
   isMotionSegment,
@@ -92,10 +93,11 @@ import { photoRegions } from "@/lib/video/regions";
 //                        from those photos (clips=1 adds the stock clips of the kind's trade; the
 //                        kind only sets the idea; own= her videos, uploaded with step=upload&file=…, as for
 //                        a case). Never published. step=result adds its brand.
-//   motion=<gemini model>|claude  (with a case or a site) the model that writes its animations from
-//                        this run on (studios.motion_model, read only for a lab studio): to compare
-//                        Gemini with Opus on the same case (reset=1 for the same first Reel); step=result
-//                        gives the model and what its animations cost (motion).
+//   motion=<gemini model>|<kimi model>|claude  (with a case or a site) the model that writes its
+//                        animations from this run on (studios.motion_model, read only for a lab studio):
+//                        to compare Gemini or Kimi (kimi-k3.1-pro…, through Vercel AI Gateway) with Opus on
+//                        the same case (reset=1 for the same first Reel); step=result gives the model and
+//                        what its animations cost (motion).
 // Lab studios go with /api/admin/delete-studio.
 // A render with its music (step=music) runs after the answer, as long as a montage job's step.
 export const maxDuration = 800;
@@ -389,12 +391,12 @@ async function carousel(name: string, studioId: string, idea: string, photos: st
 /** Who writes the animations: a Gemini model, or null for Opus; undefined leaves the studio as it is. */
 type Motion = string | null | undefined;
 
-/** motion=claude|<gemini model>, or "bad" for anything else. */
+/** motion=claude|<gemini model>|<kimi model>, or "bad" for anything else. */
 function motionOf(params: URLSearchParams): Motion | "bad" {
   const motion = params.get("motion");
   if (motion === null) return undefined;
   if (motion === "claude") return null;
-  return GEMINI_MODEL_ID.test(motion) ? motion : "bad";
+  return GEMINI_MODEL_ID.test(motion) || isKimiModel(motion) ? motion : "bad";
 }
 
 async function setMotion(studioId: string, motion: Motion) {
@@ -763,7 +765,7 @@ export async function POST(request: Request) {
     if (template && !template.success) return Response.json({ error: "template" }, { status: 400 });
     const asCarousel = params.get("format") === "carrousel";
     const motion = motionOf(params);
-    if (motion === "bad") return Response.json({ error: "motion=claude|<gemini model>" }, { status: 400 });
+    if (motion === "bad") return Response.json({ error: "motion=claude|<gemini model>|<kimi model>" }, { status: 400 });
     const steal = params.get("steal");
     if (steal && !/^https:\/\/\S{8,500}$/.test(steal)) return Response.json({ error: "steal=<https url>" }, { status: 400 });
     const stealing = { url: steal, only: params.get("steal_only") === "1" };
@@ -811,7 +813,7 @@ export async function POST(request: Request) {
   const stealing = { url: steal, only: params.get("steal_only") === "1" };
   const asCarousel = params.get("format") === "carrousel";
   const motion = motionOf(params);
-  if (motion === "bad") return Response.json({ error: "motion=claude|<gemini model>" }, { status: 400 });
+  if (motion === "bad") return Response.json({ error: "motion=claude|<gemini model>|<kimi model>" }, { status: 400 });
   // call_app gives up after a few seconds: the work goes on after the answer.
   after(() => start(name, run, params.get("reset") === "1", voiceOf(params), ideaOf(params), stealing, asCarousel, motion).catch((error: unknown) => console.error("lab: case failed", name, error)));
   return Response.json({ ok: true, case: name, started: true, ...(steal ? { steal } : {}), ...(asCarousel ? { format: "carrousel" } : {}), ...(motion !== undefined ? { motion: motion ?? "claude" } : {}) });
