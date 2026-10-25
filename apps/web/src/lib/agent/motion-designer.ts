@@ -5,7 +5,10 @@ import {
   type CompositionTexts,
   GEMINI_MODEL_ID,
   isKimiModel,
+  LOOK_MODEL,
   MOTION_DESIGNER_PROMPT,
+  MOTION_LOOK_PROMPT,
+  motionJudgeOutputSchema,
   motionLookOutputSchema,
   motionSceneOutputSchema,
   type ComposeShot,
@@ -36,9 +39,9 @@ import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
 // still fails the renderer uses the scene's fixed fallback. The scenes of one Reel
 // are written one after the other, each knowing what the earlier ones do, so that
 // they go together; the business's latest ones are named too, not to be redone.
-// Then, as a motion designer looks at a render before delivering it, it looks at its
-// animations rendered over her footage, in the Reel as it will come out, and reworks
-// the ones below the bar, once.
+// Then, as a director looks at a render before it goes out, Sonnet looks at the
+// animations rendered over her footage, in the Reel as it will come out, and sends
+// the ones below the bar back to the motion designer, who reworks them once.
 
 /** A photo of hers a scene may compose with: its id and what it shows (for the designer), its links (for the test render). */
 export type OfferedPhoto = { id: string; shows: string; photo: ScenePhoto };
@@ -232,7 +235,7 @@ async function writeScene(
   kit: MotionKit,
   existing: Existing,
   fix?: { code: string; error: string; photos?: string[]; fonts?: string[] },
-  look?: { code: string; frames: SceneFrame[] },
+  look?: { code: string; frames: SceneFrame[]; review?: { ce_qu_il_voit: string; ce_qu_il_faut_obtenir: string } },
 ): Promise<Omit<SceneResult, "id">> {
   const kept = [fix?.photos?.length && `les mêmes photos (${fix.photos.join(", ")})`, fix?.fonts?.length && `les mêmes polices (${fix.fonts.join(", ")})`].filter(Boolean);
   // A correction looks at its earlier render first: each image with its instant, then the request.
@@ -284,8 +287,10 @@ async function writeScene(
             ? { plans_dessous: { plans: request.cuts.length + 1, coupes_images: request.cuts } }
             : {}),
         ...(seen ? { version_precedente: { demande: seen.review.slice(0, 2500), images: `${seen.frames.length} images jointes, au-dessus` } } : {}),
-        // Its look at its render: the images above, and its code as it is.
-        ...(look ? { ton_rendu: { images: `${look.frames.length} images jointes, au-dessus` }, code_actuel: look.code } : { code_precedent: seen?.code ?? request.previousCode }),
+        // Its look at its render: the images above, its code as it is, and what the director who sent it back saw.
+        ...(look
+          ? { ton_rendu: { images: `${look.frames.length} images jointes, au-dessus` }, code_actuel: look.code, ...(look.review ? { relecture: look.review } : {}) }
+          : { code_precedent: seen?.code ?? request.previousCode }),
         // A library scene, written for another Reel: kept only if it really serves this brief and is well made here.
         ...(look && request.fromLibrary
           ? {
@@ -348,8 +353,10 @@ function photosOf(result: SceneResult, request: SceneRequest): ScenePhoto[] {
 /** What a motion designer call can take (up to 64 000 tokens streamed: 1.5 to 4.5 min), and a check of its scenes. */
 const SCENE_CALL_MS = 290_000;
 const SMOKE_MS = 60_000;
-/** Its look at its render: the frames over her footage (a minute or so), its calls side by side, a check of the reworked ones. */
-const LOOK_NEEDS_MS = 90_000 + SCENE_CALL_MS + SMOKE_MS;
+/** The director's look at one animation (Sonnet, a few images, a short answer). */
+const JUDGE_MS = 60_000;
+/** Its look at its render: the frames over her footage (a minute or so), the director's looks then the rewrites side by side, a check of the reworked ones. */
+const LOOK_NEEDS_MS = 90_000 + JUDGE_MS + SCENE_CALL_MS + SMOKE_MS;
 
 export type SceneContext = {
   /** The Reel's animations that keep their code (name or brief), and the names of the business's latest ones. */
@@ -480,12 +487,38 @@ async function checkScenes(
 }
 
 /**
- * Before they go out, as a motion designer looks at a render (its own step of the montage, after the design): each
- * animation just written, rendered over her footage in the Reel as it will come out (`context.rendered`), goes back to
- * the motion designer, who keeps it as it is or rewrites it whole, once (side by side). Written blind, a florist's
- * WhatsApp chat was squeezed into a strip of the screen, its words overflowing their bubbles. A rewrite goes out only
- * if it passes the check; else, and when anything fails on the way, the animation stays as it was. Only the reworked
- * ones are returned.
+ * The director's look (Sonnet, LOOK_MODEL): an animation rendered over her footage, with its brief, kept as it is or
+ * sent back with what to change.
+ */
+async function judgeLook(studioId: string, request: SceneRequest, frames: SceneFrame[], artDirection: string | undefined) {
+  const text = JSON.stringify({
+    brief: request.brief,
+    direction_artistique: artDirection,
+    ...(request.fromLibrary ? { origine: "écrite pour un autre Reel du commerce, posée ici avec ces mots" } : {}),
+  });
+  const response = await anthropic().beta.messages.parse({
+    model: LOOK_MODEL,
+    max_tokens: 8000,
+    output_config: { effort: "medium", format: outputFormat(motionJudgeOutputSchema) },
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    system: [{ type: "text", text: MOTION_LOOK_PROMPT, cache_control: CACHE_AN_HOUR }],
+    messages: [{ role: "user", content: withFrames("L'animation, rendue sur sa vidéo dans le Reel tel qu'il sortira :", frames, text) }],
+  });
+  await logClaudeCost(studioId, response.usage, "motion_look", LOOK_MODEL);
+  if (!response.parsed_output) throw new Error(`pas de réponse lisible (${response.stop_reason})`);
+  return response.parsed_output;
+}
+
+/**
+ * Before they go out, as a director looks at a render (its own step of the montage, after the design): each animation
+ * just written, rendered over her footage in the Reel as it will come out (`context.rendered`), is looked at by Sonnet,
+ * who keeps it as it is or sends it back with what to change; the motion designer rewrites those sent back, whole and
+ * once (side by side), and may still keep one when the images show the director is wrong. Written blind, a florist's
+ * WhatsApp chat was squeezed into a strip of the screen, its words overflowing their bubbles; and the motion designer
+ * looking itself cost an Opus call per animation, most of them to keep it. When the director cannot look, the motion
+ * designer looks itself, as before. A rewrite goes out only if it passes the check; else, and when anything fails on
+ * the way, the animation stays as it was. Only the reworked ones are returned.
  */
 export async function lookAtScenes(
   studioId: string,
@@ -510,16 +543,30 @@ export async function lookAtScenes(
   if (!looked.length || timeLeft() < SCENE_CALL_MS + SMOKE_MS) return [];
   const answers = await Promise.all(
     looked.map(async (r) => {
+      const frames = looks.get(r.id)!;
+      // The director looks first: an animation at the level goes out as it is, without a call to the motion designer.
+      const verdict = await judgeLook(studioId, requestOf(r.id), frames, artDirection).catch((error: unknown) => {
+        console.warn("motion look: the director could not look, the motion designer looks itself", r.id, error);
+        return null;
+      });
+      if (verdict?.keep) return { r, verdict, answer: { code: r.code, js: null, error: null, keep: true, seen: verdict.seen } as Omit<SceneResult, "id"> };
+      // A rewrite is a call and a check more: not without the time for both (the animation stays as it was).
+      if (timeLeft() < SCENE_CALL_MS + SMOKE_MS) return { r, verdict, answer: { code: r.code, js: null, error: "plus le temps de la reprendre" } as Omit<SceneResult, "id"> };
       // The Reel's other animations, as they are now: the reworked one stays in their family.
       const others = results.filter((o) => o.id !== r.id && o.js).map((o) => (o.name ? `${o.name} : ${o.notes ?? ""}`.trim() : requestOf(o.id).brief));
       const answer = await writeScene(studioId, model, requestOf(r.id), brand, artDirection, kit, { reel: [...(context.kept ?? []), ...others], done: context.done ?? [] }, undefined, {
         code: r.code!,
-        frames: looks.get(r.id)!,
+        frames,
+        ...(verdict ? { review: { ce_qu_il_voit: verdict.seen, ce_qu_il_faut_obtenir: verdict.fix } } : {}),
       }).catch((e: unknown) => ({ code: null, js: null, error: String(e) }) as Omit<SceneResult, "id">);
-      return { r, answer };
+      return { r, verdict, answer };
     }),
   );
-  for (const { r, answer } of answers) console.log("motion look", r.id, r.name ?? "", answer.keep ? "kept" : answer.js ? "reworked" : `left as it was (${answer.error ?? "no code"})`, answer.seen?.slice(0, 300) ?? "");
+  for (const { r, verdict, answer } of answers) {
+    const who = verdict ? (verdict.keep ? "kept by the director" : "sent back by the director") : "looked at by the designer";
+    const outcome = answer.keep ? "kept" : answer.js ? "reworked" : `left as it was (${answer.error ?? "no code"})`;
+    console.log("motion look", r.id, r.name ?? "", who, outcome, (verdict && !verdict.keep ? `${verdict.fix} | ${answer.seen ?? ""}` : (answer.seen ?? "")).slice(0, 400));
+  }
   // The reworked ones keep the photos and fonts they had when they name none.
   const reworked = answers.flatMap(({ r, answer }): SceneResult[] =>
     !answer.keep && answer.js

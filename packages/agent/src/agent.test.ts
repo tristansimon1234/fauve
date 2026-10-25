@@ -3650,6 +3650,14 @@ test("look: a new animation is looked at in its Reel over her footage before it 
   // It says what it sees, and keeps or rewrites.
   assert.equal(motionLookOutputSchema.safeParse({ code: "", notes: "", name: "x", slots: [], photos: [], fonts: [], seen: "trop petit", keep: false }).success, true);
   assert.match(MOTION_DESIGNER_PROMPT, /ton_rendu/);
+  // A director looks first (Sonnet, the same bar), and sends back what to obtain, never a form: Opus only rewrites.
+  const { MOTION_LOOK_PROMPT, motionJudgeOutputSchema } = await import("./motion-scene.ts");
+  const { LOOK_MODEL, CLAUDE_MODEL } = await import("./pricing.ts");
+  assert.notEqual(LOOK_MODEL, CLAUDE_MODEL);
+  assert.equal(motionJudgeOutputSchema.safeParse({ seen: "la carte couvre les sous-titres", keep: false, fix: "dégager la bande des sous-titres" }).success, true);
+  assert.match(MOTION_LOOK_PROMPT, /directeur artistique exigeant/);
+  assert.match(MOTION_LOOK_PROMPT, /jamais la forme à prendre/);
+  assert.match(MOTION_DESIGNER_PROMPT, /« relecture »/);
   // The footage plays bare, its form is its own: no veil, no forced exit, no forced fit, no engine move, a family in one Reel.
   assert.match(MOTION_DESIGNER_PROMPT, /sans voile/);
   assert.match(MOTION_DESIGNER_PROMPT, /vont ensemble/);
