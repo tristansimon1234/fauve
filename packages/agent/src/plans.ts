@@ -1,25 +1,30 @@
-// The two offers. Each has its price and its monthly credits; a credit is worth
-// about the same in both (price / credits), so every job keeps its margin on either.
-// Quality over quantity: the credits pay for each Reel to be made with care
-// (Soigné: watched and corrected, about 15 to 20 credits) at the rhythm of the
-// offer, not for more posts. A studio on trial gets Pro.
+// The two offers, VAT included. Each has its price and its monthly credits, sized so that a
+// month keeps the margin once VAT, Stripe's fees and the chat are paid (margin.ts): a credit is
+// worth about the same in both. Quality over quantity: the credits pay for each Reel to be made
+// with care at the rhythm of the offer, not for more posts. A studio on trial gets Pro.
 
 export const PLANS = {
-  essentiel: { label: "Essentiel", priceEur: 29, credits: 110, postsPerWeek: 2 },
-  pro: { label: "Pro", priceEur: 49, credits: 220, postsPerWeek: 3 },
+  essentiel: { label: "Essentiel", priceEur: 19, credits: 50, postsPerWeek: 1 },
+  pro: { label: "Pro", priceEur: 49, credits: 130, postsPerWeek: 3 },
 } as const;
 
 export type PlanId = keyof typeof PLANS;
 
 /**
- * About what a Reel made with care costs (Soigné: the montage, its clips, an
- * animation made to measure, the review and one correction), to say what a
- * month of credits holds. Carousels and photos with their texts cost nothing.
+ * About what a Reel made with care costs: its montage (7.6 credits on average since montages are
+ * charged on what they cost, 6 to 9, from 22 to 25 October) and one correction (4.7 on average),
+ * to say what a month of credits holds. Photos with their texts cost nothing.
  */
-export const CARED_REEL_CREDITS = 18;
+export const CARED_REEL_CREDITS = 12;
 
 /** Reels made with care that a month of the offer pays for. */
 export const reelsPerMonth = (plan: PlanId) => Math.floor(PLANS[plan].credits / CARED_REEL_CREDITS);
+
+/** « 1 publication soignée par semaine », « 3 publications soignées par semaine ». */
+export function weeklyPosts(plan: PlanId): string {
+  const n = PLANS[plan].postsPerWeek;
+  return n > 1 ? `${n} publications soignées par semaine` : `${n} publication soignée par semaine`;
+}
 
 /** The offer of a studio from `studios.plan` (trial and anything unknown: Pro). */
 export function planOf(value: unknown): PlanId {

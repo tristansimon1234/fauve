@@ -1,6 +1,6 @@
 "use client";
 
-import { PLANS, reelsPerMonth, TRIAL_DAYS, type PlanId } from "@fauve/agent";
+import { PLANS, reelsPerMonth, TRIAL_DAYS, weeklyPosts, type PlanId } from "@fauve/agent";
 import { useState, useTransition } from "react";
 import { startCheckout } from "@/app/abonnement/actions";
 import { CheckIcon } from "./icons";
@@ -36,10 +36,13 @@ export function PlanChoice({ next }: { next: string }) {
                   {id === "pro" ? <span className="ml-2 rounded-full bg-violet px-2 py-0.5 text-[10px] font-extrabold text-white">conseillé</span> : null}
                 </span>
                 <span className="text-[13px] text-muted">
-                  {PLANS[id].postsPerWeek} publications soignées par semaine, environ {reelsPerMonth(id)} Reels par mois
+                  {weeklyPosts(id)}, environ {reelsPerMonth(id)} Reels par mois
                 </span>
               </span>
-              <span className="text-[15px] font-extrabold tabular-nums">{PLANS[id].priceEur} €</span>
+              <span className="flex shrink-0 flex-col items-end">
+                <span className="text-[15px] font-extrabold tabular-nums">{PLANS[id].priceEur} €</span>
+                <span className="text-[11px] text-muted">TTC / mois</span>
+              </span>
             </button>
           );
         })}

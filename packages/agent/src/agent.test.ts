@@ -8,7 +8,7 @@ import { isInSessionWindow } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
-import { EUR_PER_CREDIT_SPENT, jobMargin, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
+import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
 import { montageJobSteps } from "./jobs.ts";
@@ -1189,8 +1189,8 @@ test("a studio's month splits the chat from the work and says what is left", () 
   assert.equal(month.chat, 10);
   assert.equal(month.work, 3.5);
   assert.equal(month.byPurpose.editor, 3.5);
-  assert.equal(month.budgetLeft, 24.5 - 13.5);
-  assert.equal(month.margin, Math.round((1 - 13.5 / 49) * 1000) / 1000);
+  assert.equal(month.budgetLeft, Math.round((monthlyCostBudget("pro") - 13.5) * 1000) / 1000);
+  assert.equal(month.margin, Math.round((1 - 13.5 / netRevenue("pro")) * 1000) / 1000);
 });
 
 test("post ideas follow the kind of business", () => {
@@ -1264,17 +1264,22 @@ test("history: the window's start stays put for several turns, then jumps ahead"
   assert.equal(stableWindow(all.slice(0, 5), 10, 4).length, 5); // fewer than the limit: all of them
 });
 
-test("plans: Essentiel and Pro, a credit worth about the same, each month under half its price", async () => {
-  const { PLANS, planOf } = await import("./plans.ts");
-  const { creditValue, monthlyCostBudget } = await import("./margin.ts");
+test("plans: Essentiel at 19 € and Pro at 49 € VAT included, each month keeps half of what it brings in", async () => {
+  const { PLANS, planOf, weeklyPosts } = await import("./plans.ts");
+  const { monthCostCeiling } = await import("./margin.ts");
   assert.equal(planOf("trial"), "pro");
   assert.equal(planOf("essentiel"), "essentiel");
-  assert.equal(PLANS.essentiel.priceEur, 29);
-  // Essentiel's credit is not cheaper than Pro's: no job loses its margin there.
-  assert.ok(creditValue("essentiel") >= creditValue("pro"));
-  assert.equal(monthlyCostBudget("essentiel"), 14.5);
-  const month = studioMonth([{ purpose: "editor", eur: 7.25 }], "essentiel");
-  assert.equal(month.margin, 0.75);
+  assert.deepEqual([PLANS.essentiel.priceEur, PLANS.pro.priceEur], [19, 49]);
+  // What they bring in, VAT (20 %) and Stripe's fees out.
+  assert.ok(Math.abs(netRevenue("essentiel") - 15.17) < 0.01);
+  assert.ok(Math.abs(netRevenue("pro") - 39.51) < 0.01);
+  // Every credit spent, and the chat and readings no credit pays at its rhythm: still half of it kept.
+  for (const plan of ["essentiel", "pro"] as const) assert.ok(monthCostCeiling(plan) <= monthlyCostBudget(plan), plan);
+  // A credit costs her about the same on either offer.
+  const perCredit = (plan: "essentiel" | "pro") => PLANS[plan].priceEur / PLANS[plan].credits;
+  assert.ok(Math.abs(perCredit("essentiel") - perCredit("pro")) / perCredit("pro") < 0.05);
+  assert.equal(studioMonth([{ purpose: "editor", eur: monthlyCostBudget("essentiel") }], "essentiel").margin, 0.5);
+  assert.deepEqual([weeklyPosts("essentiel"), weeklyPosts("pro")], ["1 publication soignée par semaine", "3 publications soignées par semaine"]);
 });
 
 test("caption match: the Reel she published by hand, words changed or not", async () => {

@@ -1,4 +1,4 @@
-import { PLANS } from "@fauve/agent";
+import { PLANS, weeklyPosts } from "@fauve/agent";
 import Link from "next/link";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import {
@@ -40,8 +40,8 @@ const offers = [
     id: "essentiel",
     label: PLANS.essentiel.label,
     price: PLANS.essentiel.priceEur,
-    pitch: "Pour être présent chaque semaine avec des publications soignées, sans y penser.",
-    points: [`${PLANS.essentiel.postsPerWeek} publications soignées par semaine, plus les stories`, `${PLANS.essentiel.credits} crédits par mois`, "Simone sur WhatsApp et dans l’app"],
+    pitch: "Pour être là chaque semaine avec une publication soignée, sans y penser.",
+    points: [`${weeklyPosts("essentiel")}, plus les stories`, `${PLANS.essentiel.credits} crédits par mois`, "Simone sur WhatsApp et dans l’app"],
     dark: false,
   },
   {
@@ -49,7 +49,7 @@ const offers = [
     label: PLANS.pro.label,
     price: PLANS.pro.priceEur,
     pitch: "Pour aller plus loin : plus de Reels et le plus grand soin sur chacun.",
-    points: [`${PLANS.pro.postsPerWeek} publications soignées par semaine, plus les stories`, `${PLANS.pro.credits} crédits par mois`, "Assez de crédits pour des montages Max : deux versions, la meilleure gardée"],
+    points: [`${weeklyPosts("pro")}, plus les stories`, `${PLANS.pro.credits} crédits par mois`, "Assez de crédits pour des montages Max : deux versions, la meilleure gardée"],
     dark: true,
   },
 ] as const;
@@ -377,7 +377,7 @@ export default function LandingPage() {
                 {o.dark && <span className="rounded-full bg-white/10 px-3 py-1 text-[12px] font-bold">Le plus complet</span>}
               </div>
               <span className="text-[52px] leading-none font-extrabold tracking-[-0.03em]">
-                {o.price} € <span className={`text-xl font-semibold ${o.dark ? "text-lilac-ink" : "text-muted"}`}>/ mois</span>
+                {o.price} € <span className={`text-xl font-semibold ${o.dark ? "text-lilac-ink" : "text-muted"}`}>TTC / mois</span>
               </span>
               <p className={`text-[15px] ${o.dark ? "text-[#E4DFF2]" : "text-muted"}`}>{o.pitch}</p>
               <ul className={`grid gap-2 text-[15px] ${o.dark ? "text-[#E4DFF2]" : "text-ink/85"}`}>

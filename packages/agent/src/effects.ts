@@ -26,7 +26,7 @@ export const EFFECTS_TIMEOUT_MINUTES = 60;
 // have charged for the same Reel, never over a ceiling held while it works, and the session's own spending
 // limit follows that ceiling, so it can never cost more than she can be charged.
 
-/** What one credit pays of an effect's real cost, the margin kept (on the plan where a credit is worth least). */
+/** What one credit pays of an effect's real cost, the margin kept. */
 export const EFFECT_EUR_PER_CREDIT = CREDIT_VALUE_EUR * (1 - TARGET_MARGIN);
 /** The most an effect is charged, a new Reel or a correction (from the version she saw: usually one take). */
 export const EFFECT_MAX_CREDITS = { reel: 40, fix: 25 } as const;
