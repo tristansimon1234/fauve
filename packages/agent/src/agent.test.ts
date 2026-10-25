@@ -5,9 +5,10 @@ import { editPlanObjectSchema, editPlanSchema, segmentSeconds } from "./schemas.
 import { canTransition } from "./status.ts";
 import { addUsage, claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
 import { isInSessionWindow } from "./whatsapp-templates.ts";
-import { CREDIT_PRICES } from "./credits.ts";
+import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
+import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
-import { jobMargin, studioMonth, TARGET_MARGIN } from "./margin.ts";
+import { EUR_PER_CREDIT_SPENT, jobMargin, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
 import { montageJobSteps } from "./jobs.ts";
@@ -1154,12 +1155,29 @@ test("brand colours from the site's look: signature first, neutrals after", asyn
   assert.deepEqual(brandColorsFromLook(["#fff", "nope", "#111111"]), ["#111111"]);
 });
 
-test("every priced job keeps at least the target margin on what its credits are worth", () => {
+test("every job at a fixed price keeps at least the target margin on what its credits are worth", () => {
   for (const item of Object.keys(CREDIT_PRICES) as (keyof typeof CREDIT_PRICES)[]) {
     const margin = jobMargin(item);
     if (margin === null) continue;
     assert.ok(margin >= TARGET_MARGIN, `${item}: ${Math.round(margin * 100)} % de marge`);
   }
+  // Montages are charged on what they really cost: no fixed price to check.
+  assert.equal(jobMargin("montage"), null);
+  assert.equal(jobMargin("correction"), null);
+});
+
+test("a montage or a correction twice as costly as usual still stays under its ceiling, its margin kept", () => {
+  assert.ok(2 * TYPICAL_COST_EUR.montage <= MONTAGE_CEILING.rapide * EUR_PER_CREDIT_SPENT);
+  assert.ok(2 * TYPICAL_COST_EUR.correction <= MONTAGE_CEILING.correction * EUR_PER_CREDIT_SPENT);
+});
+
+test("Simone's turns a day: none for the team, 200 for a subscriber, 30 for anyone else", () => {
+  assert.equal(dailyTurnCap({ team: true, subscription: null }), null);
+  assert.equal(dailyTurnCap({ team: false, subscription: "active" }), DAILY_TURNS.subscribed);
+  assert.equal(dailyTurnCap({ team: false, subscription: "trialing" }), DAILY_TURNS.subscribed);
+  assert.equal(dailyTurnCap({ team: false, subscription: "past_due" }), DAILY_TURNS.open);
+  assert.equal(dailyTurnCap({ team: false, subscription: null }), DAILY_TURNS.open);
+  assert.match(newNumbersAlert(21), /^21 nouveaux numéros .* 30 réponses par jour/);
 });
 
 test("a studio's month splits the chat from the work and says what is left", () => {
@@ -3800,7 +3818,7 @@ test("effects agent: its video's length, its plan of one shot, its price once ma
     assert.ok(cents > 0 && cents <= 600);
     assert.ok(effectCredits({ agentEur: (cents / 100) * 0.86, floor: 0, ceiling: 1000 }) <= ceiling, `${ceiling} crédits : ${cents} cents`);
   }
-  assert.equal(effectsBudgetCents(EFFECT_MAX_CREDITS.reel, 0.86), 509);
+  assert.equal(effectsBudgetCents(EFFECT_MAX_CREDITS.reel, 0.86), 506);
   assert.equal(effectsBudgetCents(500, 0.86), 600);
   assert.equal(effectsBudgetCents(0, 0.86), 0);
 

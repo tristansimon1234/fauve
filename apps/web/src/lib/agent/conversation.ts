@@ -1,7 +1,8 @@
 import "server-only";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readVoiceSetting, stableWindow } from "@fauve/agent";
+import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readVoiceSetting, stableWindow } from "@fauve/agent";
+import { dayOfTurns } from "@/lib/reply-cap";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
@@ -112,7 +113,7 @@ export async function replyInConversation(params: {
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
   const [studio, member, rows, instagram, brand, jobs, tiktok, copying, models] = await Promise.all([
-    db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory").eq("id", params.studioId).single(),
+    db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory, team, subscription_status").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
@@ -173,6 +174,11 @@ export async function replyInConversation(params: {
     if (ownThread && conversation) newer = newer.eq("conversation_id", conversation.id);
     if ((await newer).data?.length) return silent;
   }
+
+  // Her day's turns used up (a number writing in a loop, or spam): said once, then nothing until tomorrow.
+  const day = await dayOfTurns(params.studioId, studio.data);
+  if (day === "silent") return silent;
+  if (day === "notice") return { ...silent, reply: DAILY_CAP_REPLY, extras: { kind: "daily_cap" } };
 
   return runFauve({
     studioId: params.studioId,

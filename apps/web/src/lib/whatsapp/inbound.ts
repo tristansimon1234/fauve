@@ -6,6 +6,7 @@ import { answerPublishOffer } from "@/lib/publish-offer";
 import { deliverPendingHandOffs } from "@/lib/social/hand-off";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { quoteButtons } from "@/lib/credits";
+import { alertOnNewNumbers } from "@/lib/reply-cap";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureTranscript } from "@/lib/voice";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
@@ -38,7 +39,11 @@ async function findOrCreateMember(phone: string, profileName?: string): Promise<
     .insert({ studio_id: studio.data.id, phone_e164: phone, first_name: firstName, role: "owner" })
     .select("id, studio_id, first_name")
     .single();
-  if (created.data) return created.data;
+  if (created.data) {
+    // More numbers than usual starting today (a launch, or spam): the team is told once.
+    await alertOnNewNumbers().catch((e) => console.warn("new numbers alert failed", e));
+    return created.data;
+  }
 
   // Lost a race with a concurrent first message: use the winner and drop our studio.
   await db.from("studios").delete().eq("id", studio.data.id);
