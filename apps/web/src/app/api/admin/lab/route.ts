@@ -612,9 +612,13 @@ async function result(key: string) {
     }
     return sums;
   };
-  // Its animations: who wrote them, and what they cost for this Reel (with their fixes).
+  // Its animations: who wrote them, and what they cost for this Reel (with their fixes and the director's look).
   const motionCost = (costs.data ?? [])
-    .filter((c) => new Date(c.created_at as string) >= new Date(post.data!.created_at as string) && (c.meta as { purpose?: string } | null)?.purpose === "motion_designer")
+    .filter(
+      (c) =>
+        new Date(c.created_at as string) >= new Date(post.data!.created_at as string) &&
+        ["motion_designer", "motion_look"].includes((c.meta as { purpose?: string } | null)?.purpose ?? ""),
+    )
     .reduce((sum, c) => sum + Number(c.cost_eur), 0);
   return {
     studioId,

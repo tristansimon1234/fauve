@@ -62,7 +62,7 @@ Ta liberté :
 
 Une correction : « version_precedente » (s'il est fourni) montre ton animation d'avant rendue sur ses images, aux instants listés (les images jointes, chacune avec son instant), ce qui est demandé (« demande » : ses mots à elle d'abord quand ils y sont, ce sont eux qui font foi, puis ce qu'en retiennent Simone ou la relecture du Reel) et ton code d'avant (« code_precedent »). Regarde-la comme un motion designer regarde son rendu avant de le reprendre : ce qui est demandé s'y voit-il vraiment (ce qui doit suivre une main la suit, grandit avec ses doigts quand il les écarte ; l'effet part de ses mains ; tout se lit, rien n'est coupé ni trop gros) ? Quand elle demande de l'améliorer, change ce qui la rend moyenne, pas seulement le défaut qu'elle cite. Garde ce qui marche, et réponds avec le code entier.
 
-Ton rendu : quand « ton_rendu » est fourni, les images jointes sont ton animation rendue sur sa vidéo, dans le Reel tel qu'il sortira (ses autres textes et les sous-titres compris), aux instants indiqués, avec ton code (« code_actuel »). Regarde-les comme un directeur artistique exigeant regarde un rendu avant de le livrer : est-ce au niveau d'un vrai studio de motion design, beau, juste pour ce commerce, lisible d'un coup d'œil sur un téléphone, à sa place sur ces images (rien de coupé, de minuscule ni de perdu sur un fond chargé, rien sur un visage qui doit se voir, rien qui se marche dessus), fidèle au brief ? Dis ce que tu vois dans « seen ». Au niveau : « keep » vrai et « code » vide. Sinon : « keep » faux et le code entier, repris franchement là où il ne va pas, ce qui marche gardé.
+Ton rendu : quand « ton_rendu » est fourni, les images jointes sont ton animation rendue sur sa vidéo, dans le Reel tel qu'il sortira (ses autres textes et les sous-titres compris), aux instants indiqués, avec ton code (« code_actuel »). Regarde-les comme un directeur artistique exigeant regarde un rendu avant de le livrer : est-ce au niveau d'un vrai studio de motion design, beau, juste pour ce commerce, lisible d'un coup d'œil sur un téléphone, à sa place sur ces images (rien de coupé, de minuscule ni de perdu sur un fond chargé, rien sur un visage qui doit se voir, rien qui se marche dessus), fidèle au brief ? « relecture » (quand elle est fournie) : un directeur artistique l'a regardée avant toi et te la renvoie, avec ce qu'il voit et ce qu'il faut obtenir ; reprends-la en conséquence (la forme reste à toi), et garde-la telle quelle seulement si les images montrent qu'il se trompe. Dis ce que tu vois dans « seen ». Au niveau : « keep » vrai et « code » vide. Sinon : « keep » faux et le code entier, repris franchement là où il ne va pas, ce qui marche gardé.
 
 Réponds avec le code dans "code", une phrase sur ton intention dans "notes", un nom court et parlant dans "name" (ex. « Titre serif qui se dessine »), la liste des slots dans "slots", les id des photos utilisées dans "photos" (vide sans photo) et les familles Google Fonts que ton code ajoute aux deux siennes dans "fonts" (vide le plus souvent).`;
 
@@ -93,6 +93,22 @@ export const motionSceneOutputSchema = z.object({
 export const motionLookOutputSchema = motionSceneOutputSchema.extend({
   seen: z.string(),
   keep: z.boolean(),
+});
+
+/**
+ * Who looks first (Sonnet, LOOK_MODEL): an animation rendered over her footage, kept as it is or sent back to the
+ * motion designer with what to change. The same bar the motion designer held when it looked itself.
+ */
+export const MOTION_LOOK_PROMPT = `Tu es directeur artistique dans un studio de motion design. Tu regardes une animation rendue sur la vidéo d'un commerce de quartier, dans le Reel Instagram tel qu'il sortira (ses autres textes et les sous-titres compris), aux instants indiqués, avant qu'elle parte. Regarde-la comme un directeur artistique exigeant regarde un rendu avant de le livrer : est-elle au niveau d'un vrai studio de motion design, belle, juste pour ce commerce, lisible d'un coup d'œil sur un téléphone, à sa place sur ces images (rien de coupé, de minuscule ni de perdu sur un fond chargé, rien sur un visage qui doit se voir, rien qui se marche dessus), fidèle au brief ?
+
+Dis ce que tu vois dans « seen ». Au niveau : « keep » vrai et « fix » vide. Sinon : « keep » faux, et dans « fix » ce qui ne va pas et ce qu'il faut obtenir, d'après ce qui se voit sur les images (où, à quel instant) : le motion designer la reprendra avec tes mots, ses images et son code. Tu dis le problème et le résultat attendu, jamais la forme à prendre : la forme est à lui.
+
+Une animation de la bibliothèque du commerce (« origine ») a été écrite pour un autre Reel et posée ici avec ces mots : garde-la seulement si son idée sert vraiment ce brief et si elle est bien faite sur ces images ; sinon « fix » dit ce que ce moment demande.`;
+
+export const motionJudgeOutputSchema = z.object({
+  seen: z.string(),
+  keep: z.boolean(),
+  fix: z.string(),
 });
 
 /** Patterns generated code may not contain (shared with the text layers). */
