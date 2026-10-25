@@ -190,12 +190,15 @@ async function askKimi(studioId: string, model: string, content: string | Block[
   return look ? readAnswer(motionLookOutputSchema, written) : readAnswer(motionSceneOutputSchema, written);
 }
 
-/** The model that writes this studio's scenes: Opus, or the Gemini or Kimi model a lab studio is set to (studios.motion_model). */
+/**
+ * The model that writes this studio's scenes: Opus, or the Gemini or Kimi model it is set to (studios.motion_model),
+ * read only where models are tried: a lab studio, or the team's own (never a real business).
+ */
 async function designerModel(studioId: string): Promise<string> {
-  const { data } = await supabaseAdmin().from("studios").select("website_url, motion_model").eq("id", studioId).maybeSingle();
-  const lab = typeof data?.website_url === "string" && data.website_url.startsWith("lab://");
+  const { data } = await supabaseAdmin().from("studios").select("website_url, motion_model, team").eq("id", studioId).maybeSingle();
+  const trial = data?.team === true || (typeof data?.website_url === "string" && data.website_url.startsWith("lab://"));
   const asked = data?.motion_model as string | null | undefined;
-  return lab && asked && (GEMINI_MODEL_ID.test(asked) || isKimiModel(asked)) ? asked : CLAUDE_MODEL;
+  return trial && asked && (GEMINI_MODEL_ID.test(asked) || isKimiModel(asked)) ? asked : CLAUDE_MODEL;
 }
 
 function transpile(code: string): string {
