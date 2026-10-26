@@ -25,8 +25,12 @@ const POST_CONTEXT = 16;
 const UNFINISHED_WAIT_MS = 12_000;
 /** The end of a message that announces more to come. */
 const UNFINISHED = /(?:[,:;]|\b(?:et|mais|ou|donc|du coup|genre|avec|puis))\s*$/i;
-/** Long messages (video captions, links) are cut in the history: the model rarely needs them whole. */
-const MESSAGE_MAX_CHARS = 700;
+/**
+ * Longer earlier messages (a pasted text) are cut in the history. Simone's plans and deliveries run to
+ * 1,300 characters and are kept whole: at 700, a third of them lost their end, and so did a request of
+ * 715 characters she was answering, which she took for a message cut by its sender and asked her to resend.
+ */
+const MESSAGE_MAX_CHARS = 2000;
 
 export type StoredMessage = {
   direction: "inbound" | "outbound";
@@ -50,7 +54,9 @@ const mediaLabels: Record<string, string> = {
 /** Rebuilds the conversation for the model from stored messages (text only). */
 export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessageParam[] {
   const history: Anthropic.Beta.BetaMessageParam[] = [];
-  for (const row of rows) {
+  // The messages she is answering now (after Simone's last one) are read whole, however long.
+  const answering = rows.findLastIndex((r) => r.direction === "outbound") + 1;
+  for (const [i, row] of rows.entries()) {
     const role = row.direction === "inbound" ? "user" : "assistant";
     const label = row.direction === "inbound" ? mediaLabels[row.type] : undefined;
     // A voice note whose words could not be read: Simone says so instead of guessing.
@@ -59,7 +65,8 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
       .filter(Boolean)
       .join(" ");
     if (!text) continue;
-    const cut = text.length > MESSAGE_MAX_CHARS ? `${text.slice(0, MESSAGE_MAX_CHARS)}…` : text;
+    // Said where it is cut: a bare « … » reads as a message its sender cut.
+    const cut = i < answering && text.length > MESSAGE_MAX_CHARS ? `${text.slice(0, MESSAGE_MAX_CHARS)}… [la suite est coupée dans ton historique]` : text;
     // A reaction is part of the conversation: she liked a message, Fauve already answered one with an emoji.
     const reacted = row.direction === "outbound" ? row.reactions?.me && `[elle a réagi ${row.reactions.me}]` : row.reactions?.fauve && `[tu as réagi ${row.reactions.fauve}]`;
     const short = [row.notes?.length ? `${cut}\n[mémo : ${row.notes.join(" ; ")}]` : cut, reacted].filter(Boolean).join("\n");

@@ -4,7 +4,6 @@ import {
   brandProfileSchema,
   CHAT_MODEL,
   CLAUDE_MODEL,
-  contractIsEmpty,
   contractLines,
   clipAnalysisSchema,
   DEFAULT_VOICE_ID,
@@ -191,13 +190,16 @@ export async function writeVoiceScript(
   }
   // Its first sentence decides whether anyone stays: the strongest of its hooks (and the judge's own), for the image it opens on.
   const next = stripAudioTags(draft.rest).split(/(?<=[.!?…])\s+/)[0];
-  // What she fixed (her person, her words, her ending) is kept from the judge, who would weigh other forms against it.
+  // What she fixed (her person, her ending, her requests) goes to the judge, who keeps to it in every hook he weighs.
+  // Her own text never comes here (ownTextScript). Skipped whenever she had asked anything, the judge had left
+  // a first sentence copied from her rough idea alone (« Ça, c'est Inès, Camille et Léa. »).
   const chosen =
-    draft.hooks.length > 0 && contractIsEmpty(contract)
+    draft.hooks.length > 0
       ? await judgeHooks(studioId, {
           type: "voix",
           commerce: { nom: input.commerce.nom, activite: input.commerce.activite, ce_qu_on_sait: input.commerce.ce_qu_on_sait, ton: input.commerce.ton },
           demande: input.publication.demande,
+          ...(fixed.length ? { contrat: fixed } : {}),
           premiere_image: input.ouverture,
           message: draft.message || undefined,
           suite: next || undefined,

@@ -290,7 +290,7 @@ export async function acceptQuote(
           available,
         );
   if (!price || available < price.base) {
-    return { error: "Pas assez de crédits pour ce montage : dis-le simplement, sans rien lancer." };
+    return { error: "Pas assez de crédits pour ce montage, même dans sa version la plus simple : dis-le simplement, sans rien lancer ni proposer une version plus simple." };
   }
   const repriced = q.kind !== "variant" && chosen && (level || price.max !== q.max);
   const claimed = await db
