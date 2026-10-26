@@ -4355,7 +4355,9 @@ test("never constrained without knowing: Simone and the editor say what a real l
 test("Simone makes sure she knows what she wants, and her plan fixes only what she said", async () => {
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
   // The team works from what Simone passes on: a request left open where it changes the result gets one short question.
-  assert.match(FAUVE_SYSTEM_PROMPT, /When her request leaves open something that changes the result .* ask: one short question/);
+  // Tristan: « question essentielles toujours »: every one that changes the result, one per message, and only those.
+  assert.match(FAUVE_SYSTEM_PROMPT, /Always ask the essential questions: whatever her request leaves open that changes the result .* one question per message, the most important first, two at most for one request/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /Only those: when the answer would change little, decide yourself/);
   // « textes animés en bas » was Simone's own idea in the florist's plan, validated with « C'est parti ».
   assert.match(FAUVE_SYSTEM_PROMPT, /not where things go on screen nor what an animation looks like, unless she said it/);
   // A preference said of her Reels in general is kept; a wish for one Reel goes in its brief.
