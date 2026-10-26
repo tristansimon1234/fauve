@@ -137,6 +137,8 @@ const bodySchema = z.object({
   route: z.enum(["agent", "chain"]).optional(),
   /** The motion designer's look at the animations a design just wrote (its version, what was saved for it), then the step that follows. */
   look: z.object({ planId: z.uuid(), path: z.string().max(300), then: z.enum(["render", "alternative"]) }).optional(),
+  /** A test run queued by hand: its new animations go as written, without that look (to compare with and without). */
+  noLook: z.boolean().optional(),
   /** The agent's session at work: its id, the files it was given, its voice, when it started, her files by the names it knows them. */
   effect: z
     .object({
@@ -296,6 +298,7 @@ async function runStep(job: Job) {
         effort: job.effort,
         voice: job.voice,
         spokenKept: job.spokenKept,
+        ...(job.noLook ? { noLook: true } : {}),
         ...(edit.look ? { look: { planId: edit.editPlanId, path: edit.look.path, then: "render" } } : {}),
       });
     } catch (error) {
@@ -570,7 +573,8 @@ async function design(job: Job) {
 async function look(job: Job) {
   await setQuoteStage(job.quoteId, "design");
   const pending = job.look;
-  if (pending) {
+  if (pending && job.noLook) await dropLook(pending.path);
+  else if (pending) {
     try {
       const reworked = await lookAtAnimations(job.studioId, job.postId, pending.planId, pending.path);
       console.log("montage: look", job.postId, `${reworked} animation(s) reworked`);
