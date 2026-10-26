@@ -1,5 +1,5 @@
 import "server-only";
-import { buildReelProps, editPlanSchema, isMotionSegment, motionSlotSchema, motionTemplateSchema, propsAt, type EditPlan, type ReelProps } from "@fauve/agent";
+import { buildReelProps, canvasMoments, editPlanSchema, isMotionSegment, motionSlotSchema, motionTemplateSchema, propsAt, type EditPlan, type ReelProps } from "@fauve/agent";
 import { z } from "zod";
 import { checkReelAnimations, loadMontageInputs, subtitleRowAmongAnimations } from "@/lib/render/render-post";
 import { reelFramesInSandbox } from "@/lib/render/sandbox";
@@ -29,13 +29,14 @@ export type PendingLook = {
   direction?: string;
   brand: SceneBrand;
   kit: MotionKit;
-  context: Omit<SceneContext, "rendered">;
+  context: Omit<SceneContext, "rendered" | "show">;
 };
 
-/** A request as the look keeps it: without a correction's earlier frames (images, in its own call only). */
+/** A request as the look keeps it: without the images its first draft saw (a correction's earlier frames, the Reel), in its own call only. */
 export function forLook(request: SceneRequest): Omit<SceneRequest, "seen"> {
   const kept = { ...request };
   delete kept.seen;
+  delete kept.canvas;
   return kept;
 }
 
@@ -73,15 +74,11 @@ function motionOf(plan: EditPlan, id: string, brief: string) {
   return plan.layers?.find((l) => l.motion.brief === brief)?.motion;
 }
 
-/**
- * The Reel as the render will show it, a voice's subtitles on the row the render gives them once its animations are
- * drawn: seen on the row the design had set, they fell on its cards, and two good animations in three were sent back
- * and rewritten for what the render corrects by itself (it moves the subtitles where the animations leave room).
- */
-async function reelAsRendered(studioId: string, postId: string, plan: EditPlan): Promise<ReelProps> {
+/** The Reel's props as the render builds them (its template, or another one), with what they were built from. */
+async function reelProps(studioId: string, postId: string, plan: EditPlan, template = motionTemplateSchema.catch("libre").parse(plan.template)) {
   const inputs = await loadMontageInputs(studioId, plan, { postId });
   const props = buildReelProps(plan, {
-    template: motionTemplateSchema.catch("libre").parse(plan.template),
+    template,
     clipUrls: inputs.clipUrls,
     photoIds: inputs.photoIds,
     words: inputs.words,
@@ -93,6 +90,16 @@ async function reelAsRendered(studioId: string, postId: string, plan: EditPlan):
     photoAspects: inputs.photoAspects,
     ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),
   });
+  return { inputs, props };
+}
+
+/**
+ * The Reel as the render will show it, a voice's subtitles on the row the render gives them once its animations are
+ * drawn: seen on the row the design had set, they fell on its cards, and two good animations in three were sent back
+ * and rewritten for what the render corrects by itself (it moves the subtitles where the animations leave room).
+ */
+async function reelAsRendered(studioId: string, postId: string, plan: EditPlan): Promise<ReelProps> {
+  const { inputs, props } = await reelProps(studioId, postId, plan);
   const row = await subtitleRowAmongAnimations(studioId, plan, props, await checkReelAnimations(props), inputs).catch((error: unknown) => {
     console.warn("motion look: subtitles' row not weighed, seen where the design set them", error);
     return undefined;
@@ -114,6 +121,46 @@ async function framesOf(props: ReelProps, postId: string, moments: PendingLook["
       }),
     ]),
   );
+}
+
+/** An animation that draws nothing: the footage under it shows as it will. */
+const BLANK_SCENE = "function Scene() { return null; }";
+/** The share of its size the Reel is shown at before writing (432 × 768: an image costs about 450 tokens). */
+const CANVAS_SCALE = 0.4;
+
+/**
+ * Before the motion designer writes, the Reel as it will come out without the animations it is about to write
+ * (Tristan: « il devrait voir la vidéo complètement »): her shots and the footage under each animation, the Reel's
+ * texts and a voice's subtitles on their row. Written blind, a florist's chat card hid her smile and another set its
+ * last bubble where the subtitles went. `plan` has the code of the animations it keeps; those without code are the ones
+ * being written (`requests`), drawn as nothing. A composition being written sees her shots full frame, one after the
+ * other (it lays them itself). Each first draft (a correction's rewrite sees its earlier render instead) gets its images
+ * in `canvas`; when anything fails, it is written blind, as before.
+ */
+export async function showReel(studioId: string, postId: string, plan: EditPlan, requests: SceneRequest[]): Promise<void> {
+  const writing = requests.filter((r) => !r.seen && !r.canvas);
+  if (!writing.length) return;
+  const started = Date.now();
+  // A scene being written draws nothing over its footage (an animation over several shots without code is not drawn at all).
+  const blank: EditPlan = {
+    ...plan,
+    segments: plan.segments.map((s) => (isMotionSegment(s) && !s.motion.js ? { ...s, motion: { ...s.motion, js: BLANK_SCENE } } : s)),
+  };
+  const composing = (plan.layers ?? []).some((l) => l.compose && !l.motion.js);
+  const { props } = await reelProps(studioId, postId, blank, composing ? "libre" : undefined);
+  // Each first draft's images; the moment of another animation being written says so.
+  const moments = canvasMoments(plan, requests.map((r) => r.id));
+  const frames = [...new Set(writing.flatMap((r) => (moments.get(r.id) ?? []).map((m) => Math.round(m.t * 30))))].sort((a, b) => a - b);
+  if (!frames.length) return;
+  const images = await reelFramesInSandbox(`canvas-${postId.slice(0, 8)}-${Date.now()}`, propsAt(props, frames), frames, CANVAS_SCALE);
+  for (const request of writing) {
+    const shown = (moments.get(request.id) ?? []).flatMap((m) => {
+      const image = images[Math.round(m.t * 30)];
+      return image instanceof Buffer ? [{ label: m.label, jpeg: image }] : [];
+    });
+    if (shown.length) request.canvas = shown;
+  }
+  console.log("motion: the Reel shown before writing", postId, `${frames.length} images in ${Math.round((Date.now() - started) / 1000)} s`);
 }
 
 /** What the design left for a look nobody will take (its montage replaced, or done). */

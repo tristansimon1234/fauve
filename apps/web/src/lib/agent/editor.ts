@@ -73,7 +73,7 @@ import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
-import { forLook, saveLook, type PendingLook } from "./motion-look";
+import { forLook, saveLook, showReel, type PendingLook } from "./motion-look";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
 import { isFirstReel } from "@/lib/onboarding";
@@ -670,7 +670,21 @@ export async function designEdit(params: {
         ...(signature ? { signature: resolveReelBrand(plan, template, { name: "", signature }).signature } : {}),
       },
     };
-  const designed = await designMotionScenes(params.studioId, requests, direction, sceneBrand, kit, sceneContext);
+  // Its first drafts see the Reel as it will come out without them (her shots, her texts, her subtitles), never blind:
+  // with the animations a correction keeps (their brief unchanged), the ones being written drawn as nothing.
+  const withKept = <M extends { brief: string; js?: string }>(motion: M): M => {
+    const kept = motion.js ? undefined : reusable.get(motion.brief);
+    return kept?.js ? { ...motion, code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}), ...(kept.fonts ? { fonts: kept.fonts } : {}) } : motion;
+  };
+  const shown: EditPlan = {
+    ...plan,
+    segments: plan.segments.map((s) => (isMotionSegment(s) ? { ...s, motion: withKept(s.motion) } : s)),
+    ...(plan.layers ? { layers: plan.layers.map((l) => ({ ...l, motion: withKept(l.motion) })) } : {}),
+  };
+  const designed = await designMotionScenes(params.studioId, requests, direction, sceneBrand, kit, {
+    ...sceneContext,
+    show: (written) => showReel(params.studioId, params.postId, shown, written),
+  });
   // The composition is the Reel itself (a split screen, a frame…): when its code failed, a whole new try before
   // the plain montage takes its place (Tristan's split screen fell back to full-frame shots, twice, silently).
   const composeId = requests.find((r) => r.compose)?.id;
