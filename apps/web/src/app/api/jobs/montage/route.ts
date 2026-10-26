@@ -133,6 +133,8 @@ const bodySchema = z.object({
   contract: reelContractSchema.optional(),
   /** Who makes this Reel, decided once at its design: the effects agent or the chain. */
   route: z.enum(["agent", "chain"]).optional(),
+  /** The editor's reasoning effort, set on a montage queued by hand to compare two levels; else its level of care's. */
+  editorEffort: z.enum(["medium", "high"]).optional(),
   /** A job queued before the look at the animations was cut: the file its design saved for it, and the step after it. */
   look: z.object({ planId: z.uuid(), path: z.string().max(300), then: z.enum(["render", "alternative"]) }).optional(),
   /** The agent's session at work: its id, the files it was given, its voice, when it started, her files by the names it knows them. */
@@ -290,7 +292,7 @@ async function runStep(job: Job) {
     try {
       await setQuoteStage(job.quoteId, "design");
       if (await voiceFirst(job)) return;
-      const edit = await designEdit({ ...designInput(job), effort: level?.editorEffort });
+      const edit = await designEdit({ ...designInput(job), effort: job.editorEffort ?? level?.editorEffort });
       await queueJob("montage", {
         ...target,
         step: "render",
@@ -559,7 +561,7 @@ async function backToChain(job: Job, error: unknown) {
 async function design(job: Job) {
   await setQuoteStage(job.quoteId, "design");
   if (await voiceFirst(job)) return;
-  const edit = await designEdit({ ...designInput(job), effort: EFFORTS[job.effort!].editorEffort });
+  const edit = await designEdit({ ...designInput(job), effort: job.editorEffort ?? EFFORTS[job.effort!].editorEffort });
   const versions: Version[] = [{ planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) }];
   const two = effortVersions(job.effort!, Boolean(job.correction)) > 1;
   const then = two ? "alternative" : "render";
@@ -587,7 +589,7 @@ async function alternative(job: Job) {
       // The Reel she copies stays the model of the second take too: what it does not have is not asked.
       brief: alternativeBrief(plan, job.brief, followedChecks(await postStyle(job.studioId, job.postId).catch(() => undefined))),
       maxNewScenes: scenesLeft(job),
-      effort: EFFORTS[job.effort!].editorEffort,
+      effort: job.editorEffort ?? EFFORTS[job.effort!].editorEffort,
       fresh: true,
     });
     versions.push({ planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) });
@@ -693,7 +695,7 @@ async function fix(job: Job) {
       brief: fixBrief({ score: job.score ?? 5, issues: job.issues ?? [] }, job.brief),
       fromPlanId: best.planId,
       maxNewScenes: scenesLeft(job),
-      effort: EFFORTS[job.effort!].editorEffort,
+      effort: job.editorEffort ?? EFFORTS[job.effort!].editorEffort,
     });
     await next(job, {
       step: "render",
