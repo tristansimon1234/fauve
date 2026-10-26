@@ -67,6 +67,8 @@ export type SceneRequest = {
   moves?: DesignerMoves | { par_plan: ({ plan: number } & DesignerMoves)[] };
   /** A correction: the animation it reworks as it was rendered on her images (frames with their instant), its code, what is asked (her words, Simone's reading, the review). */
   seen?: { code: string; review: string; frames: SceneFrame[] };
+  /** A first draft: the Reel as it will come out without the animations being written (frames with their instant), seen before writing. */
+  canvas?: SceneFrame[];
   /** The row where a voice's subtitles show during the scene (shares of the height): its words keep off it. */
   subtitles?: { y: number; h: number };
   /** A library scene placed in this Reel (written for another one): looked at, it stays only if it really serves this brief. */
@@ -240,6 +242,8 @@ async function writeScene(
   const kept = [fix?.photos?.length && `les mêmes photos (${fix.photos.join(", ")})`, fix?.fonts?.length && `les mêmes polices (${fix.fonts.join(", ")})`].filter(Boolean);
   // A correction looks at its earlier render first: each image with its instant, then the request.
   const seen = !fix && !look && request.seen?.frames.length ? request.seen : undefined;
+  // A first draft sees the Reel it is written for, as it will come out without its animations.
+  const canvas = !fix && !look && !seen && request.canvas?.length ? request.canvas : undefined;
   const text = fix
     ? `Ce code a échoué : ${fix.error}\nCorrige-le en gardant la même intention${kept.length ? ` et ${kept.join(" et ")}` : ""}.\n\nBrief : ${request.brief}\n\nCode :\n${fix.code}`
     : JSON.stringify({
@@ -287,6 +291,7 @@ async function writeScene(
             ? { plans_dessous: { plans: request.cuts.length + 1, coupes_images: request.cuts } }
             : {}),
         ...(seen ? { version_precedente: { demande: seen.review.slice(0, 2500), images: `${seen.frames.length} images jointes, au-dessus` } } : {}),
+        ...(canvas ? { images_du_reel: `${canvas.length} images jointes, au-dessus` } : {}),
         // Its look at its render: the images above, its code as it is, and what the director who sent it back saw.
         ...(look
           ? { ton_rendu: { images: `${look.frames.length} images jointes, au-dessus` }, code_actuel: look.code, ...(look.review ? { relecture: look.review } : {}) }
@@ -303,7 +308,15 @@ async function writeScene(
     ? withFrames("Ton animation, rendue sur sa vidéo dans le Reel tel qu'il sortira :", look.frames, text)
     : seen
       ? withFrames("Ton animation d'avant, rendue sur ses images :", seen.frames, text)
-      : text;
+      : canvas
+        ? withFrames(
+            request.compose
+              ? "Ses plans tels qu'ils sont filmés et retouchés, en plein cadre l'un après l'autre (ta composition les posera où tu veux), avec les textes du Reel et les sous-titres de sa voix, une image par seconde :"
+              : "Le Reel tel qu'il sortira, sans les animations qui s'écrivent (ses plans, ses textes, les sous-titres de sa voix à leur place), une image par seconde, puis plus serrées pendant ton moment :",
+            canvas,
+            text,
+          )
+        : text;
   const schema = look ? motionLookOutputSchema : motionSceneOutputSchema;
   const output =
     model === CLAUDE_MODEL
@@ -355,6 +368,8 @@ const SCENE_CALL_MS = 290_000;
 const SMOKE_MS = 60_000;
 /** The director's look at one animation (Sonnet, a few images, a short answer). */
 const JUDGE_MS = 60_000;
+/** The Reel shown to the motion designer before it writes: its media copied, then two dozen images (a minute or so). */
+const SHOW_MS = 90_000;
 /** Its look at its render: the frames over her footage (a minute or so), the director's looks then the rewrites side by side, a check of the reworked ones. */
 const LOOK_NEEDS_MS = 90_000 + JUDGE_MS + SCENE_CALL_MS + SMOKE_MS;
 
@@ -366,6 +381,8 @@ export type SceneContext = {
   look?: SmokeScene["look"];
   /** Its written animations rendered over her footage, in the Reel as it will come out: what it looks at before delivering. */
   rendered?: (written: SceneResult[]) => Promise<SceneLooks>;
+  /** The Reel as it will come out without the animations being written, given to their first drafts (`canvas`) before they are written. */
+  show?: (requests: SceneRequest[]) => Promise<void>;
 };
 
 /** The test render of written scenes: each with its photos, fonts, cuts, composition and what moves under it. */
@@ -400,6 +417,24 @@ export async function designMotionScenes(
   if (!requests.length) return [];
   const model = await designerModel(studioId);
   const requestOf = (id: string) => requests.find((q) => q.id === id)!;
+  // A first draft sees the Reel it is written for, when the step has the time for its images and a call after them;
+  // images that take longer than that are not waited for (they reach the drafts still to be written).
+  if (context.show && requests.some((r) => !r.seen && !r.canvas) && timeLeft() >= SHOW_MS + SCENE_CALL_MS + SMOKE_MS) {
+    let state: "showing" | "shown" | "failed" = "showing";
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const showing = context.show(requests).then(
+      () => {
+        state = "shown";
+      },
+      (error: unknown) => {
+        state = "failed";
+        console.warn("motion: the Reel could not be shown, its animations are written blind", error);
+      },
+    );
+    await Promise.race([showing, new Promise<void>((resolve) => (timer = setTimeout(resolve, SHOW_MS)))]);
+    clearTimeout(timer);
+    if (state === "showing") console.warn("motion: the Reel not shown in time, its first animation is written without it");
+  }
   // One after the other: each scene knows what the earlier ones of the Reel do (a minute more for a second one).
   const results: SceneResult[] = [];
   for (const [i, r] of requests.entries()) {

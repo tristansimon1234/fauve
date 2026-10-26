@@ -3664,6 +3664,65 @@ test("look: a new animation is looked at in its Reel over her footage before it 
   assert.doesNotMatch(MOTION_DESIGNER_PROMPT, /joue dessous et doit se voir|Les 10 dernières images|Jamais deux fois la même idée|mets chaque slot dans un FitText|déplace toute l'animation|reste sur les bords et les coins/);
 });
 
+test("canvas: the motion designer sees the whole Reel before writing, its own moment closer; the subtitles' band stays free", async () => {
+  const { canvasMoments, CANVAS_REEL_FRAMES, CANVAS_MOMENT_FRAMES } = await import("./rework.ts");
+  const { MOTION_DESIGNER_PROMPT } = await import("./motion-scene.ts");
+  const plan = editPlanSchema.parse({
+    ...validPlan,
+    template: "libre",
+    duration: 8,
+    texts: [],
+    images: [],
+    segments: [
+      { clip_id: "a", in: 0, out: 2, zoom: "none" },
+      { motion: { brief: "la conversation WhatsApp avec Simone" }, duration: 3, over: { clip_id: "b" } },
+      { clip_id: "c", in: 0, out: 3, zoom: "none" },
+    ],
+    layers: [{ motion: { brief: "un cadre qui se dessine" }, from: 5.5, to: 7.5 }],
+  });
+  const seen = canvasMoments(plan, ["s1", "l0"]);
+  // An image a second across the Reel outside its moment, another animation being written said as such; its own moment closer, on its own frames.
+  const scene = seen.get("s1")!;
+  assert.deepEqual(scene.filter((m) => m.t < 2 || m.t >= 5).map((m) => m.label), ["0,5 s", "1,5 s", "5,5 s · une autre animation du Reel jouera ici", "6,5 s · une autre animation du Reel jouera ici", "7,5 s"]);
+  const own = scene.filter((m) => m.t >= 2 && m.t < 5);
+  assert.equal(own.length, CANVAS_MOMENT_FRAMES);
+  assert.deepEqual([own[0]!.label, own.at(-1)!.label], ["2,1 s · image 3 de ton animation", "4,9 s · image 87 de ton animation"]);
+  assert.deepEqual(scene.map((m) => m.t), [...scene.map((m) => m.t)].sort((a, b) => a - b));
+  // An animation over several shots: its moment, every 0.3 s or so.
+  assert.deepEqual(seen.get("l0")!.filter((m) => m.t >= 5.5 && m.t < 7.5).map((m) => m.t), [5.6, 5.9, 6.2, 6.5, 6.8, 7.1, 7.4]);
+  assert.match(seen.get("l0")!.find((m) => m.t === 2.5)!.label, /une autre animation du Reel jouera ici/);
+  // A composition of the whole Reel sees her shots one after the other, each image saying which shot it is (shots[i]).
+  const composed = editPlanSchema.parse({
+    ...validPlan,
+    template: "libre",
+    duration: 6,
+    texts: [],
+    images: [],
+    segments: ["a", "b", "c"].map((clip_id) => ({ clip_id, in: 0, out: 2, zoom: "none" })),
+    layers: [{ motion: { brief: "un écran partagé" }, from: 0, to: 6, compose: true }],
+  });
+  assert.deepEqual(canvasMoments(composed, ["l0"]).get("l0")!.map((m) => m.label), ["0,5 s · plan 0", "1,5 s · plan 0", "2,5 s · plan 1", "3,5 s · plan 1", "4,5 s · plan 2", "5,5 s · plan 2"]);
+  // A long Reel: its images spread, never more than the cap.
+  const long = editPlanSchema.parse({
+    ...validPlan,
+    template: "libre",
+    duration: 40,
+    texts: [],
+    images: [],
+    segments: [
+      ...["a", "b", "c"].map((clip_id) => ({ clip_id, in: 0, out: 12, zoom: "none" })),
+      { motion: { brief: "la fin" }, duration: 4, over: { clip_id: "c" } },
+    ],
+  });
+  const wide = canvasMoments(long, ["s3"]).get("s3")!;
+  assert.equal(wide.filter((m) => !/de ton animation/.test(m.label)).length, CANVAS_REEL_FRAMES - 2);
+  assert.ok(wide.length <= CANVAS_REEL_FRAMES + CANVAS_MOMENT_FRAMES);
+  // It is told what it sees, and the subtitles' band stays free of all it draws (a backdrop over most of the frame aside).
+  assert.match(MOTION_DESIGNER_PROMPT, /Tu vois le Reel avant d'écrire : « images_du_reel »/);
+  assert.match(MOTION_DESIGNER_PROMPT, /ni mots, ni cartes, ni images, ni formes/);
+  assert.match(MOTION_DESIGNER_PROMPT, /Seul un fond qui couvre presque tout l'écran peut passer dessous/);
+});
+
 test("DA liberties: the copied Reel's font and colours when they make its style, an animation's own fonts", async () => {
   const { clampLook, followedFrom, followedLook, followedForEditor, followedLine, stolenLookSchema, stolenStyleMessage } = await import("./steal.ts");
   const { buildReelProps, resolveReelBrand } = await import("./motion.ts");
