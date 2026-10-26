@@ -296,7 +296,7 @@ export const editPlanObjectSchema = z.object({
   fonts: z
     .object({ display: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).optional(), body: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).optional() })
     .optional(),
-  /** This Reel's own colours over her charter's, the main one first (the copied Reel's, when they make its style). Set by the engine. */
+  /** This Reel's own colours over her charter's, the main one first: chosen by the editor (the copied Reel's are offered to it). */
   colors: z.array(z.string().regex(/^#[0-9a-f]{6}$/i)).min(1).max(3).optional(),
   /** Closing card over the last ~1.6 s: studio name or logo, plus a call to action. */
   end_card: z.object({ title: z.string().min(1).max(40), subtitle: z.string().max(60).optional() }).optional(),

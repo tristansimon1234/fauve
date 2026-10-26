@@ -3809,14 +3809,20 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
 
   const style = { look, measures: { duration: 10, cuts: [2, 4, 6, 8], bpm: null, lufs: -14 } };
   const followed = followedFrom("11111111-2222-4333-8444-555555555555", style);
-  // Set on the plan for this Reel: its titles in that font, its key words in that colour; a font this request chose stays.
-  assert.deepEqual(followedLook({}, followed), { fonts: { display: "Anton" }, colors: ["#ffdd00", "#ffffff", "#000000"] });
-  assert.deepEqual(followedLook({ fonts: { display: "Bangers" }, colors: ["#123456"] }, followed), {});
+  // Its font is set on the plan for this Reel (its titles in that font); a font this request chose stays.
+  assert.deepEqual(followedLook({}, followed), { fonts: { display: "Anton" } });
+  assert.deepEqual(followedLook({ fonts: { display: "Bangers" } }, followed), {});
   assert.deepEqual(followedLook({ fonts: { body: "Inter" } }, followed).fonts, { body: "Inter", display: "Anton" });
   assert.deepEqual(followedLook({}, undefined), {});
   assert.deepEqual(followedLook({}, followedFrom(followed.inspiration_id, { ...style, look: clampLook({ ...reading, text: { ...reading.text, font: "" }, colors: [] }) })), {});
-  // The editor and the critic know they are wanted.
-  assert.match(followedForEditor(followed).police_et_couleurs ?? "", /Anton.*#ffdd00.*font son style/);
+  // Its colours are offered to the editor, never set by the engine: the blue of a tutorial's interface had gone onto a hook whose charter says « never a cold blue ».
+  assert.match(followedForEditor(followed).police ?? "", /Anton.*fait son style/);
+  assert.match(followedForEditor(followed).couleurs ?? "", /#ffdd00.*Prends-les dans « colors » si elles servent ce Reel/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /its colours are yours to take or leave/);
+  const { fromEditorPlan } = await import("./editor.ts");
+  const written = { duration: 6, tempo: 100, form: "montage" as const, segments: [{ clip_id: "c1", in: 0, out: 6, move: "none", speed: 1 }], texts: [], transitions: "cut" as const, subtitles: false };
+  assert.deepEqual(fromEditorPlan({ ...written, colors: ["#FFDD00", "jaune", "#ffdd00", "#000000"] }).colors, ["#ffdd00", "#000000"]);
+  assert.equal("colors" in fromEditorPlan(written), false);
   // A Reel laid out otherwise than full frame (a split screen) is copied as a composition, never a montage of full frames.
   const { composedLayout } = await import("./steal.ts");
   assert.equal(followedForEditor(followed).mise_en_page, undefined);
@@ -3825,9 +3831,9 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
   const split = { ...followed, look: { ...followed.look, layout: "écran partagé : la personne en bas, la démo en haut" } };
   assert.match(followedForEditor(split).mise_en_page ?? "", /écran partagé.*composition/);
   assert.match(followedLine(split), /mise en page : écran partagé/);
-  assert.match(followedLine(followed), /sa police \(Anton\) et ses couleurs/);
-  // She is told what her Reel takes from it.
-  assert.match(stolenStyleMessage(style, true), /une police et des couleurs comme les siennes \(elles font son style\)/);
+  assert.match(followedLine(followed), /sa police \(Anton\).*ses couleurs \(#ffdd00.*seulement si elles servent ce Reel.*jamais un défaut/);
+  // She is told what her Reel takes from it: its colours only if they suit hers.
+  assert.match(stolenStyleMessage(style, true), /une police comme la sienne \(elle fait son style\), et ses couleurs si elles vont à ton Reel/);
   assert.match(stolenStyleMessage({ ...style, look: { ...look, colors: undefined } }, true), /Avec tes couleurs et tes images, et une police comme la sienne/);
   const plain = { ...look, text: { ...oldText }, colors: undefined };
   assert.match(stolenStyleMessage({ ...style, look: plain }, false), /Avec tes couleurs, tes polices et tes images : sa façon de faire/);

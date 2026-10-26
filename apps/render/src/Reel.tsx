@@ -1,4 +1,4 @@
-import { useId, type CSSProperties, type ReactNode } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 import {
   AbsoluteFill,
   Audio,
@@ -16,6 +16,7 @@ import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCa
 import { FilmDust } from "./FilmDust";
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
+import { Marker } from "./Marker";
 import { MotionScene } from "./MotionScene";
 import { Backdrop, SceneView } from "./Scene";
 import { ClipBlurLayer, cssFilter, ExposureFilters, Photo } from "./Retouch";
@@ -565,47 +566,6 @@ function legible(hex: string, on: "footage" | "white"): string {
   return rgbHex(c);
 }
 
-/**
- * A key word circled by hand, like the strokes on a business's site: an open loop drawn
- * around the word in a few frames, its end running past its start; a long group gets a
- * scribbled underline instead.
- */
-function Marker({ color, from, long, children }: { color: string; from: number; long: boolean; children: ReactNode }) {
-  const frame = useCurrentFrame();
-  const clip = useId();
-  // Drawn by uncovering the stroke from left to right (a dash animation does not survive the non-scaling stroke).
-  const drawn = interpolate(frame, [from, from + (long ? 10 : 13)], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
-  const stroke = { fill: "none", stroke: color, strokeWidth: long ? 7 : 6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, vectorEffect: "non-scaling-stroke" as const };
-  return (
-    <span style={{ position: "relative", display: "inline-block" }}>
-      {children}
-      <svg
-        viewBox="0 0 200 100"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-        style={
-          long
-            ? { position: "absolute", left: "-2%", width: "104%", top: "88%", height: "26%", overflow: "visible" }
-            : { position: "absolute", left: "-9%", width: "118%", top: "-4%", height: "112%", overflow: "visible" }
-        }
-      >
-        <defs>
-          <clipPath id={clip}>
-            <rect x={-20} y={-20} width={240 * drawn} height={140} />
-          </clipPath>
-        </defs>
-        <g clipPath={`url(#${clip})`}>
-          {long ? (
-            <path d="M 4 40 C 50 22, 120 30, 196 18 M 30 70 C 80 52, 140 58, 180 50" {...stroke} />
-          ) : (
-            <path d="M 28 20 C 78 0, 168 4, 193 38 C 207 68, 152 98, 94 96 C 36 94, 4 78, 7 50 C 10 26, 52 10, 118 9" {...stroke} />
-          )}
-        </g>
-      </svg>
-    </span>
-  );
-}
-
 /** A key message's title this short stays on one line (« Don't miss it ! »). */
 const KEY_TITLE_ONE_LINE = 12;
 
@@ -777,7 +737,7 @@ function Hook({ text, index, props, theme, k }: { text: ReelProps["texts"][numbe
           return (
             <span key={i} style={{ display: "inline-block", whiteSpace: "pre", ...enter }}>
               {group.stress && h.stress === "marker" ? (
-                <Marker color={legible(props.brand.accent, "footage")} from={Math.max(0, i * h.stagger + 5 - lead)} long={group.words.join(" ").length > 12}>
+                <Marker color={legible(props.brand.accent, "footage")} from={Math.max(0, i * h.stagger + 5 - lead)} shape={group.words.join(" ").length > 12 ? "underline" : "circle"}>
                   {group.words.join(" ")}
                 </Marker>
               ) : (
@@ -1207,7 +1167,7 @@ function Subtitles({ props, theme, k }: { props: ReelProps; theme: Theme; k: num
         return (
           <span key={i} style={{ display: "inline-block", margin: `0 ${8 * k}px`, ...style }}>
             {active && s.highlight === "marker" ? (
-              <Marker color={legible(props.brand.accent, "footage")} from={word.from} long>
+              <Marker color={legible(props.brand.accent, "footage")} from={word.from} shape="underline">
                 {word.w}
               </Marker>
             ) : (

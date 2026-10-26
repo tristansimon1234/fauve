@@ -56,6 +56,19 @@ const SETUP = [
 ].join("\n");
 
 /**
+ * Chrome draws an emoji with the first font that has it, before the colour emoji font. Its own
+ * defaults are Times New Roman and Arial (for sans-serif): neither is in the image, so both fell
+ * back to DejaVu Sans, which draws 😩 or 😀 in black and white, and an animation's bubble showed an
+ * outlined 😩 next to a colour 🌸. Liberation, their metric twins, has no emoji: each one goes to
+ * Noto Color Emoji. Once per sandbox (the marker), and never in the way of a render.
+ */
+const EMOJI_FONTS = [
+  `[ -f ${ROOT}/.emoji-fonts ] && exit 0`,
+  "sudo apt-get install -y -qq --no-install-recommends fonts-liberation >/dev/null 2>&1 || { sudo apt-get update -qq >/dev/null 2>&1; sudo apt-get install -y -qq --no-install-recommends fonts-liberation >/dev/null 2>&1; }",
+  `fc-list : family | grep -q "Liberation Sans" && touch ${ROOT}/.emoji-fonts`,
+].join("\n");
+
+/**
  * Downloads $2 to $1. HTTP/1.1: Supabase Storage's HTTP/2 streams sometimes break
  * mid-file on large videos ("stream was not closed cleanly"); retried on any error.
  */
@@ -104,6 +117,7 @@ export function renderSandbox(): Promise<Sandbox> {
       timeout: 15 * 60_000,
     });
     await bash(sandbox, SETUP);
+    await bash(sandbox, EMOJI_FONTS).catch((error: unknown) => console.warn("render sandbox: emoji fonts not set", error));
     return sandbox;
   })().catch((error: unknown) => {
     ready = undefined;

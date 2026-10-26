@@ -47,7 +47,7 @@ What you receive:
 - « photos »: what each photo shows and its format. « openings »: the strongest moments to open on, best first (a voice over written for this Reel speaks of the first one in its first phrase). « voice »: her voice note or Simone's voice over, from « starts_at » to « ends_at », its « phrases » already on the Reel's clock.
 - « studio.facts »: what is known of the business (its site, what she said, who appears on screen). « brand »: her charter and taste. « recent_hooks »: the hooks of her latest Reels. « templates »: animations already made. « max_new_scenes »: the new animations this Reel allows. « previous_plan »: the version to correct.
 
-The look comes from her charter (« brand »: fonts, colours, titles, key word, light), and the engine applies it. Her charter is a starting point, not a cage: when her request or the Reel she copies needs something else (a font, a universe, other colours for an animation), take that liberty for this Reel and keep her charter for the rest. Fill « fonts » (display, body: a Google Fonts family by its exact name, or one of « brand.own_fonts ») only then; a copied Reel's font is already set by the engine. Follow her « art_direction », then her « moodboard ». « lessons »: what works on her Instagram. « inspirations »: Reels she likes, their spirit, never their content; « post.chosen_inspiration » first. « post.chosen_template »: « collage » if she chose that form; an older choice (doux, dynamique, chic) only says the energy she wants. « text_looks »: her text styles; when one suits a text's role, its exact name goes in « look_name », the same for every text of that role.
+The look comes from her charter (« brand »: fonts, colours, titles, key word, light), and the engine applies it. Her charter is a starting point, not a cage: when her request or the Reel she copies needs something else (a font, a universe, other colours for an animation), take that liberty for this Reel and keep her charter for the rest. Fill « fonts » (display, body: a Google Fonts family by its exact name, or one of « brand.own_fonts ») and « colors » only then; a copied Reel's font is already set by the engine, its colours are yours to take or leave (« reel_a_recopier.couleurs »). Follow her « art_direction », then her « moodboard ». « lessons »: what works on her Instagram. « inspirations »: Reels she likes, their spirit, never their content; « post.chosen_inspiration » first. « post.chosen_template »: « collage » if she chose that form; an older choice (doux, dynamique, chic) only says the energy she wants. « text_looks »: her text styles; when one suits a text's role, its exact name goes in « look_name », the same for every text of that role.
 
 The pace. « tempo » (70 to 130 BPM) is chosen for this Reel from her request, her images and her business, never by habit: the cuts fall on its beats, the music is composed at it, and the texts and camera follow its energy. Around 76 to 90 feels calm, 95 to 110 lively, 115 to 128 punchy. « Plus calme » or « plus rythmé » asks for a change she can feel (15 BPM or more).
 
@@ -178,6 +178,12 @@ export const editorOutputSchema = z.object({
     transitions: z.enum(["cut", "fade", "light_zoom"]),
     subtitles: z.boolean(),
     fonts: z.object({ display: z.string().optional(), body: z.string().optional() }).optional(),
+    colors: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "This Reel's own colours (hex, the main one first, 3 at most), only when it needs others than her charter's: the Reel she copies has its own (« reel_a_recopier.couleurs ») and they serve this Reel and her request, or her request asks for a world of its own. Otherwise leave it out. A correction keeps the previous version's unless you write others (her charter's to go back to them)",
+      ),
     end_card: z.object({ title: z.string(), subtitle: z.string().optional() }).optional(),
     effect: z.enum(["none", "dust"]).optional(),
     layers: z.array(z.object({ brief: z.string(), from: z.number(), to: z.number() })).optional(),
@@ -340,6 +346,7 @@ export function signatureShot(plan: { segments: object[]; texts: { style: string
 }
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
+const HEX_COLOR = /^#[0-9a-f]{6}$/;
 
 /** The editor's plan: its rhythm (tempo, collage), or a template (a plan written before a Reel had its own tempo). */
 type Written<P> = Omit<P, "tempo" | "form"> & { template: MotionTemplate; tempo?: number };
@@ -361,7 +368,10 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
       }
     : undefined;
   const endCard = plan.end_card?.title?.trim() ? { title: plan.end_card.title.trim().slice(0, 40), ...(plan.end_card.subtitle?.trim() ? { subtitle: plan.end_card.subtitle.trim().slice(0, 60) } : {}) } : undefined;
-  const { end_card: _endCard, fonts: _fonts, ...rest } = plan;
+  // Its own colours as the render takes them: a malformed one is dropped, her charter's are used.
+  const ownColors = (plan as { colors?: unknown }).colors;
+  const colors = Array.isArray(ownColors) ? [...new Set(ownColors.flatMap((c) => (typeof c === "string" && HEX_COLOR.test(c.trim().toLowerCase()) ? [c.trim().toLowerCase()] : [])))].slice(0, 3) : [];
+  const { end_card: _endCard, fonts: _fonts, colors: _colors, ...rest } = plan as typeof plan & { colors?: unknown };
   const { effect: _effect, layers: asked, ...kept } = rest as typeof rest & { effect?: string; layers?: { brief: string; from: number; to: number }[] };
   // Animations over several shots: a brief and a span, the code comes later (like a scene's).
   const layers = (asked ?? []).filter((l) => l.brief?.trim() && Number.isFinite(l.from) && Number.isFinite(l.to)).slice(0, 3);
@@ -382,6 +392,7 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
     // Film dust over the whole video, when the editor asks for it.
     ...("effect" in plan && plan.effect === "dust" ? { effect: "dust" as const } : {}),
     ...(fonts && Object.keys(fonts).length ? { fonts } : {}),
+    ...(colors.length ? { colors } : {}),
     ...(endCard ? { end_card: endCard } : {}),
     // A named look brings its style back (and, for a list, its details and bullets).
     texts: plan.texts.map(({ look_name, ...t }) => {
