@@ -299,7 +299,11 @@ export const editPlanObjectSchema = z.object({
   /** This Reel's own colours over her charter's, the main one first: chosen by the editor (the copied Reel's are offered to it). */
   colors: z.array(z.string().regex(/^#[0-9a-f]{6}$/i)).min(1).max(3).optional(),
   /** Closing card over the last ~1.6 s: studio name or logo, plus a call to action. */
-  end_card: z.object({ title: z.string().min(1).max(40), subtitle: z.string().max(60).optional() }).optional(),
+  /**
+   * logo_named: set by the engine, whether her logo already writes her name (the end card then does not
+   * write it again under it). Absent on plans made before it: the logo is taken to write it.
+   */
+  end_card: z.object({ title: z.string().min(1).max(40), subtitle: z.string().max(60).optional(), logo_named: z.boolean().optional() }).optional(),
   /** Her own voice over the Reel: a voice note (media_assets, with its transcript), from `at` seconds. Set from the post, never written by the editor. */
   // `at`: where the recording starts on the Reel's clock; negative, the silence before its first word is cut.
   voice: z.object({ media_id: z.string().min(1), at: z.number().min(-30).max(10) }).optional(),

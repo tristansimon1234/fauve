@@ -27,3 +27,25 @@ export function logoOnDark(rgba: Uint8Array | Buffer): LogoOnDark {
   if (light / opaque >= 0.4) return "as_is";
   return chroma / opaque < 0.15 ? "white" : "plate";
 }
+
+/** What Gemini is asked of a logo, read once: the letters it writes. */
+export const LOGO_WORDS_PROMPT = `Copy the letters written in this logo, in reading order, exactly as they are. Only what is written, no description. A logo with no letters at all (a drawing, a character, a symbol) gives an empty string.`;
+
+/**
+ * Whether the words a logo writes already say the business's name: the end card then does not write
+ * it again under the logo. A drawing or a mascot says nothing: taken for a name, Simone's mascot left
+ * her end card without one.
+ */
+export function logoSaysName(words: string, name: string): boolean {
+  const plain = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]/gi, "")
+      .toLowerCase();
+  const said = plain(words);
+  const named = plain(name);
+  if (!said || !named) return false;
+  // « LUNE » says Studio Lune too; a monogram (« SL ») does not.
+  return said.includes(named) || (said.length >= 3 && named.includes(said));
+}

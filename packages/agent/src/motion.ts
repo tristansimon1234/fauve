@@ -201,7 +201,8 @@ export type ReelProps = {
     /** Its art direction as settings: its titles, key words, boxes and light (the render's theme follows them). */
     signature?: ReelSignature;
   };
-  endCard: { title: string; subtitle: string | null; from: number } | null;
+  /** logoNamed false: her logo does not write her name (a mascot, a symbol), the card writes it under it. */
+  endCard: { title: string; subtitle: string | null; from: number; logoNamed?: false } | null;
   /**
    * Simone's music, played in the live preview (the render gets it mixed in afterwards):
    * its volume (0–1), and the lower one while someone speaks, in `duck.windows` (frames).
@@ -619,7 +620,12 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   // Animations over several shots: their span in frames and the cuts under them (from their start).
   const starts = segments.slice(1).map((s) => s.startAt);
   const endCard = plan.end_card
-    ? { title: frenchSpaces(keepName(plan.end_card.title, inputs.brand.name)), subtitle: plan.end_card.subtitle ? frenchSpaces(plan.end_card.subtitle) : null, from: Math.max(0, durationInFrames - endCardFrames) }
+    ? {
+        title: frenchSpaces(keepName(plan.end_card.title, inputs.brand.name)),
+        subtitle: plan.end_card.subtitle ? frenchSpaces(plan.end_card.subtitle) : null,
+        from: Math.max(0, durationInFrames - endCardFrames),
+        ...(plan.end_card.logo_named === false ? { logoNamed: false as const } : {}),
+      }
     : null;
   const layers = (plan.layers ?? []).flatMap((l) => {
     if (!l.motion.js) return [];
