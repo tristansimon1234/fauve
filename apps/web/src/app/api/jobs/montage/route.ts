@@ -261,6 +261,9 @@ async function runStep(job: Job) {
   if (!reviewed) {
     if (job.step === "render") {
       await setQuoteStage(job.quoteId, "render");
+      // A Reel from « Créer » has no caption yet: written while it renders, before she opens its page (never blocks
+      // the delivery). Only the reviewed path wrote it, and Rapide Reels went out without one.
+      const caption = ensureCaption(job.studioId, job.postId, null, job.brief).catch((error) => console.error("caption failed", job.postId, error));
       // Replaced while it rendered: not delivered, not charged (the « plu » version went out at 15:05, charged, after the new request).
       const delivered = await renderAndDeliver(
         {
@@ -274,6 +277,7 @@ async function runStep(job: Job) {
         },
         async () => !(await quoteSuperseded(job.quoteId)),
       );
+      await caption;
       if (delivered === "stopped") return;
       // Charged only once the video is out, for the scenes really made (never above the quote).
       if (delivered && job.quoteId) {
