@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // and its photos as they would be published (a carousel's slides, the cover first):
 // POST ?post=<uuid> with CRON_SECRET (Authorization: Bearer …), from the database by net.http_post.
 // &render=slides makes its photos again when they are not its plan's (a render lost or failed).
+// &media=1 adds the photos and videos it was made from (its media_ids), as she sent them, to try them elsewhere.
 
 export const maxDuration = 300;
 
@@ -34,13 +35,17 @@ export async function POST(request: Request) {
     row = await readPost();
   }
   const plans = plansRead.data ?? [];
+  const sources =
+    params.get("media") === "1" && row?.media_ids?.length
+      ? ((await db.from("media_assets").select("id, kind, storage_path").in("id", row.media_ids)).data ?? [])
+      : [];
   const version = new Map(plans.map((p) => [p.id as string, p.version as number]));
   const renders = plans.length
     ? ((await db.from("renders").select("id, edit_plan_id, status, storage_path, created_at").in("edit_plan_id", [...version.keys()]).order("created_at", { ascending: false })).data ?? [])
     : [];
   const published = row ? slidesToPublish(row) : null;
   const slides = published ? (published.designed ?? Object.values(published.rendered)) : [];
-  const paths = [...renders.flatMap((r) => (r.storage_path ? [r.storage_path as string] : [])), ...slides];
+  const paths = [...renders.flatMap((r) => (r.storage_path ? [r.storage_path as string] : [])), ...slides, ...sources.flatMap((m) => (m.storage_path ? [m.storage_path as string] : []))];
   const signed = paths.length ? ((await db.storage.from("media").createSignedUrls(paths, 3600)).data ?? []) : [];
   const url = new Map(signed.flatMap((s) => (s.path && s.signedUrl ? [[s.path, s.signedUrl] as const] : [])));
   return Response.json({
@@ -52,5 +57,6 @@ export async function POST(request: Request) {
       url: r.storage_path ? (url.get(r.storage_path as string) ?? null) : null,
     })),
     slides: { state: published?.state ?? null, urls: slides.map((p) => url.get(p) ?? null) },
+    ...(sources.length ? { media: sources.map((m) => ({ id: m.id, kind: m.kind, url: m.storage_path ? (url.get(m.storage_path as string) ?? null) : null })) } : {}),
   });
 }

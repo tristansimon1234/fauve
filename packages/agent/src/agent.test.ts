@@ -3656,7 +3656,10 @@ test("look: a new animation is looked at in its Reel over her footage before it 
   assert.notEqual(LOOK_MODEL, CLAUDE_MODEL);
   assert.equal(motionJudgeOutputSchema.safeParse({ seen: "la carte couvre les sous-titres", keep: false, fix: "dégager la bande des sous-titres" }).success, true);
   assert.match(MOTION_LOOK_PROMPT, /demanding art director/);
-  assert.match(MOTION_LOOK_PROMPT, /never the form to take/);
+  assert.match(MOTION_LOOK_PROMPT, /never the means: never a card, band, panel or box to add behind the words/);
+  // Its fix says the problem: a panel it asks for is read as « hard to read », never drawn (test 9's cream band).
+  assert.match(MOTION_DESIGNER_PROMPT, /read it as « hard to read here »/);
+  assert.match(MOTION_LOOK_PROMPT, /a band or panel laid behind the words to make them readable/);
   assert.match(MOTION_DESIGNER_PROMPT, /review \(when given\)/);
   // The footage plays bare, its form is its own: no veil, no forced exit, no forced fit, no engine move, a family in one Reel.
   assert.match(MOTION_DESIGNER_PROMPT, /with no veil/);
