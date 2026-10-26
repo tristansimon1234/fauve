@@ -1227,8 +1227,8 @@ function EndCard({ props, k }: { props: ReelProps; k: number }) {
                 />
               </div>
             ) : null}
-            {/* The logo already says the name: written again under it, it reads twice. */}
-            {props.brand.logoUrl && sameName(card.title, props.brand.name) ? null : (
+            {/* The logo already says the name: written again under it, it reads twice. A mascot or a symbol does not say it. */}
+            {props.brand.logoUrl && card.logoNamed !== false && sameName(card.title, props.brand.name) ? null : (
               <div style={{ fontFamily: `"${props.brand.displayFont}", serif`, fontStyle: "italic", fontSize: 96 * k, lineHeight: 1.05 }}>
                 {card.title}
               </div>

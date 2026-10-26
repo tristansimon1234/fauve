@@ -1280,6 +1280,18 @@ test("a dark one-colour logo turns white on the end card, a dark coloured one ge
   assert.equal(logoOnDark(logo([10, 10, 10], 100)), "as_is");
 });
 
+test("the end card writes the name unless the logo already writes it", async () => {
+  const { logoSaysName } = await import("./logo.ts");
+  // Simone's mascot writes nothing: the name goes under it.
+  assert.equal(logoSaysName("", "Simone"), false);
+  assert.equal(logoSaysName("SIMONE", "Simone"), true);
+  assert.equal(logoSaysName("Chez Lino · Pizzeria", "Chez Lino"), true);
+  assert.equal(logoSaysName("LUNE", "Studio Lune"), true);
+  // A monogram does not say the name.
+  assert.equal(logoSaysName("SL", "Studio Lune"), false);
+  assert.equal(logoSaysName("Café", "Maison Maya"), false);
+});
+
 test("editor: a library scene plays once per Reel, a repeat becomes a new scene or a fixed one", async () => {
   const { fromEditorPlan, normalizeEditPlan } = await import("./editor.ts");
   const id = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b";

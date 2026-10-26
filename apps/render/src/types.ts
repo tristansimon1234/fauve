@@ -185,7 +185,8 @@ export type ReelProps = {
     /** Its art direction as settings (mirror of BrandSignature): its titles, key words, boxes and light. */
     signature?: ReelSignature;
   };
-  endCard: { title: string; subtitle: string | null; from: number } | null;
+  /** logoNamed false: the logo does not write the name (a mascot, a symbol), the card writes it under it. */
+  endCard: { title: string; subtitle: string | null; from: number; logoNamed?: false } | null;
   /** Simone's music in the live preview (the render gets it mixed in afterwards). */
   soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
   /** Her voice note over the Reel, from `from` (frames). */

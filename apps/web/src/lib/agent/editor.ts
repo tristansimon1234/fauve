@@ -62,6 +62,7 @@ import {
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
+import { logoNamed } from "@/lib/render/logo-tone";
 import { videoFramesInSandbox } from "@/lib/render/sandbox";
 import { ensureTracks, loadTracks } from "@/lib/render/tracks";
 import { usableFonts } from "@/lib/fonts";
@@ -446,6 +447,14 @@ export async function designEdit(params: {
       accroches: [hook.text.text],
     });
     if (judged && judged.index > 0) plan.texts[hook.index] = { ...hook.text, text: judged.text, emphasis: judged.emphasis };
+  }
+
+  // The end card writes her name under her logo unless the logo already writes it (read once from its
+  // letters): a mascot or a symbol says nothing, and Simone's end card had shown its mascot without a name.
+  const ownLogo = profile.logo_path?.startsWith(`${params.studioId}/`) ? profile.logo_path : undefined;
+  if (plan.end_card && (ownLogo || profile.logo_url)) {
+    const named = await logoNamed(params.studioId, (studio.data?.name as string | null) ?? "", ownLogo ? { path: ownLogo } : { url: profile.logo_url! });
+    if (named !== undefined) plan.end_card = { ...plan.end_card, logo_named: named };
   }
 
   // Her voice plays with its first word at once, her words as subtitles; without it, the plan has no voice.
