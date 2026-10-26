@@ -5,11 +5,7 @@ import {
   type CompositionTexts,
   GEMINI_MODEL_ID,
   isKimiModel,
-  LOOK_MODEL,
-  MOTION_LOOK_PROMPT,
   motionDesignerPrompt,
-  motionJudgeOutputSchema,
-  motionLookOutputSchema,
   motionSceneOutputSchema,
   type ComposeShot,
   type CompositionShot,
@@ -40,9 +36,6 @@ import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
 // still fails the renderer uses the scene's fixed fallback. The scenes of one Reel
 // are written one after the other, each knowing what the earlier ones do, so that
 // they go together; the business's latest ones are named too, not to be redone.
-// Then, as a director looks at a render before it goes out, Sonnet looks at the
-// animations rendered over her footage, in the Reel as it will come out, and sends
-// the ones below the bar back to the motion designer, who reworks them once.
 
 /** A photo of hers a scene may compose with: its id and what it shows (for the designer), its links (for the test render). */
 export type OfferedPhoto = { id: string; shows: string; photo: ScenePhoto };
@@ -73,15 +66,11 @@ export type SceneRequest = {
   canvas?: SceneFrame[];
   /** The row where a voice's subtitles show during the scene (shares of the height): its words keep off it. */
   subtitles?: { y: number; h: number };
-  /** A library scene placed in this Reel (written for another one): looked at, it stays only if it really serves this brief. */
-  fromLibrary?: boolean;
 };
 
-/** One image of an animation as it renders in the Reel, with the instant it shows (in the animation's frames). */
+/** One image of the Reel as it renders, with the instant it shows. */
 export type SceneFrame = { label: string; jpeg: Buffer };
 
-/** The images of each written animation over her footage, by its id: what the motion designer looks at before it goes out. */
-export type SceneLooks = Map<string, SceneFrame[]>;
 export type SceneResult = {
   id: string;
   code: string | null;
@@ -98,9 +87,6 @@ export type SceneResult = {
   fonts?: string[];
   /** A composition: where it wants a voice's subtitles (share of the height). */
   subtitleY?: number;
-  /** Looking at its render: it keeps the animation as it is (nothing new written), and what it saw. */
-  keep?: boolean;
-  seen?: string;
 };
 
 /** What already exists, so that a new scene takes another idea. */
@@ -123,14 +109,13 @@ const MAX_SCENE_PHOTOS = 4;
 const MAX_SCENE_FONTS = 2;
 
 type Block = { type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: "image/jpeg"; data: string } };
-/** Its answer: a scene written, or its look at a scene rendered (with whether it keeps it). */
-type SceneOutput = z.output<typeof motionSceneOutputSchema> & Partial<Pick<z.output<typeof motionLookOutputSchema>, "keep" | "seen">>;
-type AnswerSchema = typeof motionSceneOutputSchema | typeof motionLookOutputSchema;
+/** Its answer: a scene written. */
+type SceneOutput = z.output<typeof motionSceneOutputSchema>;
 /** The prompt of one call: its base, the same for every animation, and the parts this call needs. */
 type Prompt = ReturnType<typeof motionDesignerPrompt>;
 const whole = (prompt: Prompt) => [prompt.base, prompt.parts].filter(Boolean).join("\n\n");
 
-async function askClaude(studioId: string, prompt: Prompt, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
+async function askClaude(studioId: string, prompt: Prompt, content: string | Block[]): Promise<SceneOutput | null> {
   // Streamed, with room: a composition of a whole Reel is long code, and its answer was cut off mid-string at
   // 16 000 tokens, then again at 32 000 (18 000 of them thinking): Simone's split screen fell back to plain shots.
   const response = await anthropic()
@@ -138,7 +123,7 @@ async function askClaude(studioId: string, prompt: Prompt, content: string | Blo
       model: CLAUDE_MODEL,
       max_tokens: 64000,
       // Medium: the code needs care, not long deliberation; most of the cost was thinking tokens.
-      output_config: { effort: "medium", format: outputFormat<AnswerSchema>(schema) },
+      output_config: { effort: "medium", format: outputFormat(motionSceneOutputSchema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       // The base is cached for every animation; the parts follow it.
@@ -148,7 +133,7 @@ async function askClaude(studioId: string, prompt: Prompt, content: string | Blo
     .finalMessage();
   await logClaudeCost(studioId, response.usage, "motion_designer");
   if (!response.parsed_output) throw new Error(`pas de réponse lisible (${response.stop_reason})`);
-  return response.parsed_output as SceneOutput;
+  return response.parsed_output;
 }
 
 // Gemini as the motion designer, for a lab studio only (studios.motion_model): the same prompt,
@@ -157,46 +142,42 @@ let geminiClient: GoogleGenAI | undefined;
 const gemini = () => (geminiClient ??= new GoogleGenAI({ apiKey: env("GEMINI_API_KEY") }));
 // Patterns and bounds are left to readAnswer, which repairs them (Gemini may refuse a pattern).
 const GEMINI_SCENE_SCHEMA = toGeminiSchema(z.toJSONSchema(motionSceneOutputSchema), ["pattern"]);
-const GEMINI_LOOK_SCHEMA = toGeminiSchema(z.toJSONSchema(motionLookOutputSchema), ["pattern"]);
 
-async function askGemini(studioId: string, model: string, prompt: Prompt, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
+async function askGemini(studioId: string, model: string, prompt: Prompt, content: string | Block[]): Promise<SceneOutput | null> {
   const parts = (typeof content === "string" ? [{ type: "text" as const, text: content }] : content).map((b) =>
     b.type === "text" ? { text: b.text } : { inlineData: { mimeType: b.source.media_type, data: b.source.data } },
   );
-  const look = schema === motionLookOutputSchema;
   const response = await gemini().models.generateContent({
     model,
     contents: [{ role: "user", parts }],
-    config: { systemInstruction: whole(prompt), responseMimeType: "application/json", responseJsonSchema: look ? GEMINI_LOOK_SCHEMA : GEMINI_SCENE_SCHEMA, maxOutputTokens: 32000 },
+    config: { systemInstruction: whole(prompt), responseMimeType: "application/json", responseJsonSchema: GEMINI_SCENE_SCHEMA, maxOutputTokens: 32000 },
   });
   await logGeminiCost({ studioId, kind: "llm", model, usage: response.usageMetadata as GeminiUsage, meta: { purpose: "motion_designer" } });
   if (!response.text) return null;
-  return look ? readAnswer(motionLookOutputSchema, JSON.parse(response.text)) : readAnswer(motionSceneOutputSchema, JSON.parse(response.text));
+  return readAnswer(motionSceneOutputSchema, JSON.parse(response.text));
 }
 
 // Kimi as the motion designer, for a lab studio only, through Vercel AI Gateway: the same prompt,
 // the same request (its images as data URLs) and the same checks.
 const KIMI_SCENE_SCHEMA = strictShape(z.toJSONSchema(motionSceneOutputSchema));
-const KIMI_LOOK_SCHEMA = strictShape(z.toJSONSchema(motionLookOutputSchema));
 
-async function askKimi(studioId: string, model: string, prompt: Prompt, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
+async function askKimi(studioId: string, model: string, prompt: Prompt, content: string | Block[]): Promise<SceneOutput | null> {
   const parts = (typeof content === "string" ? [{ type: "text" as const, text: content }] : content).map((b) =>
     b.type === "text" ? { type: "text" as const, text: b.text } : { type: "image_url" as const, image_url: { url: `data:${b.source.media_type};base64,${b.source.data}` } },
   );
-  const look = schema === motionLookOutputSchema;
   const answer = await askKimiJson({
     studioId,
     model,
     system: whole(prompt),
     content: parts,
-    name: look ? "motion_look" : "motion_scene",
-    schema: look ? KIMI_LOOK_SCHEMA : KIMI_SCENE_SCHEMA,
+    name: "motion_scene",
+    schema: KIMI_SCENE_SCHEMA,
     maxTokens: 64000,
     purpose: "motion_designer",
   });
   // What it leaves empty (null) is left out, as an optional field never written.
   const written = Object.fromEntries(Object.entries((answer ?? {}) as Record<string, unknown>).filter(([, v]) => v !== null));
-  return look ? readAnswer(motionLookOutputSchema, written) : readAnswer(motionSceneOutputSchema, written);
+  return readAnswer(motionSceneOutputSchema, written);
 }
 
 /**
@@ -214,7 +195,7 @@ function transpile(code: string): string {
   return transform(code, { transforms: ["typescript", "jsx"], jsxRuntime: "classic", production: true }).code;
 }
 
-/** The images a look shows it, each with its instant, then what it is asked. */
+/** The images it is shown, each with its instant, then what it is asked. */
 function withFrames(intro: string, frames: SceneFrame[], text: string): Block[] {
   return [
     { type: "text", text: intro },
@@ -228,10 +209,7 @@ function withFrames(intro: string, frames: SceneFrame[], text: string): Block[] 
 
 const px = (share: number) => Math.round(share * 1920);
 
-/**
- * One call of the motion designer: a scene written from its request; with `fix`, its code corrected from
- * a check's error; with `look`, its scene rendered over her footage looked at, kept (`keep`) or rewritten whole.
- */
+/** One call of the motion designer: a scene written from its request; with `fix`, its code corrected from a check's error. */
 async function writeScene(
   studioId: string,
   model: string,
@@ -241,13 +219,12 @@ async function writeScene(
   kit: MotionKit,
   existing: Existing,
   fix?: { code: string; error: string; photos?: string[]; fonts?: string[] },
-  look?: { code: string; frames: SceneFrame[]; review?: { what_he_sees: string; what_to_achieve: string } },
 ): Promise<Omit<SceneResult, "id">> {
   const kept = [fix?.photos?.length && `the same photos (${fix.photos.join(", ")})`, fix?.fonts?.length && `the same fonts (${fix.fonts.join(", ")})`].filter(Boolean);
   // A correction looks at its earlier render first: each image with its instant, then the request.
-  const seen = !fix && !look && request.seen?.frames.length ? request.seen : undefined;
+  const seen = !fix && request.seen?.frames.length ? request.seen : undefined;
   // A first draft sees the Reel it is written for, as it will come out without its animations.
-  const canvas = !fix && !look && !seen && request.canvas?.length ? request.canvas : undefined;
+  const canvas = !fix && !seen && request.canvas?.length ? request.canvas : undefined;
   // Its prompt: the base, and only the parts this animation needs (a fix keeps those of its request).
   const parts: MotionPromptParts = {
     photos: Boolean(request.photos?.length || request.compose?.plans.some((p) => p.cut_out)),
@@ -255,7 +232,6 @@ async function writeScene(
     moves: Boolean(request.moves || request.track?.length || request.compose?.shots.some((x) => x.track)),
     composition: Boolean(request.compose),
     correction: Boolean(seen),
-    look: Boolean(look),
   };
   const text = fix
     ? `This code failed: ${fix.error}\nFix it, keeping the same intention${kept.length ? ` and ${kept.join(" and ")}` : ""}.\n\nBrief: ${request.brief}\n\nCode:\n${fix.code}`
@@ -306,39 +282,25 @@ async function writeScene(
             : {}),
         ...(seen ? { previous_version: { frames: `${seen.frames.length} images attached, above`, code: seen.code } } : {}),
         ...(canvas ? { reel_frames: `${canvas.length} images attached, above` } : {}),
-        // Its look at its render: the images above, its code as it is, and what the director who sent it back saw.
-        ...(look ? { your_render: { frames: `${look.frames.length} images attached, above` }, current_code: look.code, ...(look.review ? { review: look.review } : {}) } : {}),
-        // A library scene, written for another Reel: kept only if it really serves this brief and is well made here.
-        ...(look && request.fromLibrary
-          ? {
-              origin:
-                "A scene from the business's library, written for another Reel and placed here with these words: keep it only if its idea really serves this brief and it is well made on these images; otherwise write your own for this moment.",
-            }
-          : {}),
       });
-  const content: string | Block[] = look
-    ? withFrames("Your animation, rendered over her footage in the Reel as it will come out:", look.frames, text)
-    : seen
-      ? withFrames("Your earlier animation, rendered on her images:", seen.frames, text)
-      : canvas
-        ? withFrames(
-            request.compose
-              ? "Her shots as filmed and retouched, full frame one after the other (your composition will lay them where you want), with the Reel's texts and her voice's subtitles, a frame a second:"
-              : "The Reel as it will come out without the animations being written (its shots, its texts, her voice's subtitles in place), a frame a second, then closer together during your moment:",
-            canvas,
-            text,
-          )
-        : text;
-  const schema = look ? motionLookOutputSchema : motionSceneOutputSchema;
+  const content: string | Block[] = seen
+    ? withFrames("Your earlier animation, rendered on her images:", seen.frames, text)
+    : canvas
+      ? withFrames(
+          request.compose
+            ? "Her shots as filmed and retouched, full frame one after the other (your composition will lay them where you want), with the Reel's texts and her voice's subtitles, a frame a second:"
+            : "The Reel as it will come out without the animations being written (its shots, its texts, her voice's subtitles in place), a frame a second, then closer together during your moment:",
+          canvas,
+          text,
+        )
+      : text;
   const prompt = motionDesignerPrompt(parts);
   const output =
     model === CLAUDE_MODEL
-      ? await askClaude(studioId, prompt, content, schema)
+      ? await askClaude(studioId, prompt, content)
       : isKimiModel(model)
-        ? await askKimi(studioId, model, prompt, content, schema)
-        : await askGemini(studioId, model, prompt, content, schema);
-  // Its render is at the level: nothing new (an answer without code keeps it too).
-  if (look && (output?.keep || !output?.code?.trim())) return { code: look.code, js: null, error: null, keep: true, seen: output?.seen ?? "" };
+        ? await askKimi(studioId, model, prompt, content)
+        : await askGemini(studioId, model, prompt, content);
   const code = output?.code ?? "";
   // Only photos it was offered, each once, in its order.
   const offered = new Set((request.photos ?? []).map((p) => p.id));
@@ -357,7 +319,6 @@ async function writeScene(
     photos,
     fonts,
     ...(subtitleY !== undefined ? { subtitleY } : {}),
-    ...(look ? { keep: false, seen: output?.seen ?? "" } : {}),
   };
   const problems = checkMotionCode(code);
   if (problems.length) return { code, js: null, error: `code refusé : ${problems.join(", ")}`, ...meta };
@@ -379,12 +340,8 @@ function photosOf(result: SceneResult, request: SceneRequest): ScenePhoto[] {
 /** What a motion designer call can take (up to 64 000 tokens streamed: 1.5 to 4.5 min), and a check of its scenes. */
 const SCENE_CALL_MS = 290_000;
 const SMOKE_MS = 60_000;
-/** The director's look at one animation (Sonnet, a few images, a short answer). */
-const JUDGE_MS = 60_000;
 /** The Reel shown to the motion designer before it writes: its media copied, then two dozen images (a minute or so). */
 const SHOW_MS = 90_000;
-/** Its look at its render: the frames over her footage (a minute or so), the director's looks then the rewrites side by side, a check of the reworked ones. */
-const LOOK_NEEDS_MS = 90_000 + JUDGE_MS + SCENE_CALL_MS + SMOKE_MS;
 
 export type SceneContext = {
   /** The Reel's animations that keep their code (name or brief), and the names of the business's latest ones. */
@@ -392,8 +349,6 @@ export type SceneContext = {
   done?: string[];
   /** The Reel's rhythm and look, for the test render of a scene that follows what moves. */
   look?: SmokeScene["look"];
-  /** Its written animations rendered over her footage, in the Reel as it will come out: what it looks at before delivering. */
-  rendered?: (written: SceneResult[]) => Promise<SceneLooks>;
   /** The Reel as it will come out without the animations being written, given to their first drafts (`canvas`) before they are written. */
   show?: (requests: SceneRequest[]) => Promise<void>;
 };
@@ -532,102 +487,4 @@ async function checkScenes(
     });
   }
   return results;
-}
-
-/**
- * The director's look (Sonnet, LOOK_MODEL): an animation rendered over her footage, with its brief, kept as it is or
- * sent back with what to change.
- */
-async function judgeLook(studioId: string, request: SceneRequest, frames: SceneFrame[], artDirection: string | undefined) {
-  const text = JSON.stringify({
-    ...(request.request ? { request: request.request.slice(0, 3000) } : {}),
-    brief: request.brief,
-    art_direction: artDirection,
-    ...(request.fromLibrary ? { origin: "written for another Reel of the business, placed here with these words" } : {}),
-  });
-  const response = await anthropic().beta.messages.parse({
-    model: LOOK_MODEL,
-    max_tokens: 8000,
-    output_config: { effort: "medium", format: outputFormat(motionJudgeOutputSchema) },
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system: [{ type: "text", text: MOTION_LOOK_PROMPT, cache_control: CACHE_AN_HOUR }],
-    messages: [{ role: "user", content: withFrames("The animation, rendered over her footage in the Reel as it will come out:", frames, text) }],
-  });
-  await logClaudeCost(studioId, response.usage, "motion_look", LOOK_MODEL);
-  if (!response.parsed_output) throw new Error(`pas de réponse lisible (${response.stop_reason})`);
-  return response.parsed_output;
-}
-
-/**
- * Before they go out, as a director looks at a render (its own step of the montage, after the design): each animation
- * just written, rendered over her footage in the Reel as it will come out (`context.rendered`), is looked at by Sonnet,
- * who keeps it as it is or sends it back with what to change; the motion designer rewrites those sent back, whole and
- * once (side by side), and may still keep one when the images show the director is wrong. Written blind, a florist's
- * WhatsApp chat was squeezed into a strip of the screen, its words overflowing their bubbles; and the motion designer
- * looking itself cost an Opus call per animation, most of them to keep it. When the director cannot look, the motion
- * designer looks itself, as before. A rewrite goes out only if it passes the check; else, and when anything fails on
- * the way, the animation stays as it was. Only the reworked ones are returned.
- */
-export async function lookAtScenes(
-  studioId: string,
-  requests: SceneRequest[],
-  results: SceneResult[],
-  artDirection: string | undefined,
-  brand: SceneBrand,
-  kit: MotionKit,
-  context: SceneContext & Required<Pick<SceneContext, "rendered">>,
-): Promise<SceneResult[]> {
-  if (!results.some((r) => r.js) || timeLeft() < LOOK_NEEDS_MS) {
-    if (results.length) console.warn("motion look skipped", results.some((r) => r.js) ? `the step has ${Math.round(timeLeft() / 1000)} s left` : "nothing to look at");
-    return [];
-  }
-  const model = await designerModel(studioId);
-  const requestOf = (id: string) => requests.find((q) => q.id === id)!;
-  const looks = await context.rendered(results.filter((r) => r.js)).catch((error: unknown): SceneLooks => {
-    console.warn("motion look: frames not rendered", error);
-    return new Map();
-  });
-  const looked = results.filter((r) => r.js && r.code && looks.get(r.id)?.length);
-  if (!looked.length || timeLeft() < SCENE_CALL_MS + SMOKE_MS) return [];
-  const answers = await Promise.all(
-    looked.map(async (r) => {
-      const frames = looks.get(r.id)!;
-      // The director looks first: an animation at the level goes out as it is, without a call to the motion designer.
-      const verdict = await judgeLook(studioId, requestOf(r.id), frames, artDirection).catch((error: unknown) => {
-        console.warn("motion look: the director could not look, the motion designer looks itself", r.id, error);
-        return null;
-      });
-      if (verdict?.keep) return { r, verdict, answer: { code: r.code, js: null, error: null, keep: true, seen: verdict.seen } as Omit<SceneResult, "id"> };
-      // A rewrite is a call and a check more: not without the time for both (the animation stays as it was).
-      if (timeLeft() < SCENE_CALL_MS + SMOKE_MS) return { r, verdict, answer: { code: r.code, js: null, error: "plus le temps de la reprendre" } as Omit<SceneResult, "id"> };
-      // The Reel's other animations, as they are now: the reworked one stays in their family.
-      const others = results.filter((o) => o.id !== r.id && o.js).map((o) => (o.name ? `${o.name} : ${o.notes ?? ""}`.trim() : requestOf(o.id).brief));
-      const answer = await writeScene(studioId, model, requestOf(r.id), brand, artDirection, kit, { reel: [...(context.kept ?? []), ...others], done: context.done ?? [] }, undefined, {
-        code: r.code!,
-        frames,
-        ...(verdict ? { review: { what_he_sees: verdict.seen, what_to_achieve: verdict.fix } } : {}),
-      }).catch((e: unknown) => ({ code: null, js: null, error: String(e) }) as Omit<SceneResult, "id">);
-      return { r, verdict, answer };
-    }),
-  );
-  for (const { r, verdict, answer } of answers) {
-    const who = verdict ? (verdict.keep ? "kept by the director" : "sent back by the director") : "looked at by the designer";
-    const outcome = answer.keep ? "kept" : answer.js ? "reworked" : `left as it was (${answer.error ?? "no code"})`;
-    console.log("motion look", r.id, r.name ?? "", who, outcome, (verdict && !verdict.keep ? `${verdict.fix} | ${answer.seen ?? ""}` : (answer.seen ?? "")).slice(0, 400));
-  }
-  // The reworked ones keep the photos and fonts they had when they name none.
-  const reworked = answers.flatMap(({ r, answer }): SceneResult[] =>
-    !answer.keep && answer.js
-      ? [{ ...r, ...answer, id: r.id, photos: answer.photos?.length ? answer.photos : r.photos, fonts: answer.fonts?.length ? answer.fonts : r.fonts, subtitleY: answer.subtitleY ?? r.subtitleY }]
-      : [],
-  );
-  if (!reworked.length) return [];
-  // Checked as a new animation is (a text on a face or too quick to read gets its round of fixes too).
-  const checked = await checkScenes(studioId, model, reworked, requestOf, brand, artDirection, kit, context);
-  return checked.filter((r) => {
-    if (r.js) return true;
-    console.warn("motion look: the rework failed its check, the animation stays as it was", r.id, r.error);
-    return false;
-  });
 }

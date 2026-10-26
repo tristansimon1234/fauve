@@ -53,7 +53,6 @@ import {
   earlierLooks,
   gestureMoments,
   handMoves,
-  lookMoments,
   SUBTITLE_ROW,
   type ReelProps,
   type TracksByClip,
@@ -73,7 +72,7 @@ import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
-import { forLook, saveLook, showReel, type PendingLook } from "./motion-look";
+import { showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
 import { isFirstReel } from "@/lib/onboarding";
@@ -154,8 +153,6 @@ export type DesignedEdit = {
   /** Scenes written by the motion designer for this plan (the costly part), and scenes reused from the library. */
   newScenes: number;
   reusedScenes: number;
-  /** New animations to look at before the render (the montage's look step): what was saved for it. */
-  look?: { path: string };
 };
 
 /** A failed composition is tried once more only with this much left in the design step (its limit is 800 s): a call, its check, the rest of the step. */
@@ -489,14 +486,6 @@ export async function designEdit(params: {
     }
     return { ...s, motion: { ...s.motion, template_id: undefined, texts: undefined } };
   });
-  // The library scenes new to this Reel (a correction keeps the ones of the version it corrects as they are): written for
-  // another Reel, each is looked at here over her footage with its new words, as a new one is, and kept only if it really
-  // serves this brief and is well made there (Tristan: « que si l'animation est très pertinente pour le brief + est bien faite »).
-  const carried = new Set(correction ? previousMotions.flatMap((m) => (m.template_id ? [m.template_id] : [])) : []);
-  const fromLibrary = plan.segments.flatMap((s, i) =>
-    isMotionSegment(s) && s.motion.js && s.motion.template_id && reused.has(s.motion.template_id) && !carried.has(s.motion.template_id) ? [{ id: `s${i}`, brief: s.motion.brief }] : [],
-  );
-
   // Free scenes and animations over several shots: reuse the code of unchanged briefs, have the motion designer write the others.
   const reusable = new Map(previousMotions.filter((m) => m.js).map((m) => [m.brief, m] as const));
   const layers = plan.layers ?? [];
@@ -516,7 +505,7 @@ export async function designEdit(params: {
   // What moves under each animation: the tracks of the clips it plays over, placed as the Reel draws them (the
   // Reel's own segments, built without links), and the gestures Gemini saw in them.
   let reel: ReelProps | null = null;
-  if ((toWrite.length || fromLibrary.length) && Object.keys(tracks).length) {
+  if (toWrite.length && Object.keys(tracks).length) {
     try {
       reel = buildReelProps(plan, {
         template: motionTemplateSchema.catch("libre").parse(plan.template),
@@ -597,7 +586,6 @@ export async function designEdit(params: {
     };
   };
   const requests = toWrite.map(requestFor);
-  const libraryRequests = fromLibrary.map((w) => ({ ...requestFor(w), fromLibrary: true }));
   // A correction: each animation rewritten first looks at how its earlier version came out on her images.
   if (correction && previousPlan.success && baseId && requests.length) {
     await lookAtEarlierRender(params.studioId, params.postId, baseId, previousPlan.data, plan, requests, {
@@ -612,7 +600,7 @@ export async function designEdit(params: {
   }
   // Its motion kit: the business's latest scenes, whose language the new ones keep (a family from one Reel to the next);
   // their names, and those of the Reel's kept animations, say which ideas are already taken.
-  const latest = requests.length || libraryRequests.length
+  const latest = requests.length
     ? ((
         await supabaseAdmin()
           .from("motion_templates")
@@ -800,42 +788,10 @@ export async function designEdit(params: {
   const version = row.version;
   await db.from("posts").update({ edit_plan_id: row.id }).eq("id", params.postId);
 
-  // Before they go out, the motion designer looks at its new animations rendered over her footage (the montage's
-  // next step, with its own time), and at the library scenes new to this Reel: what it was given for each, and when
-  // each one is looked at. A layer is found by its brief in the plan (one that failed before it was left out).
-  let look: DesignedEdit["look"];
-  const ids = [...fresh.map((d) => d.id), ...fromLibrary.map((w) => w.id)];
-  if (ids.length) {
-    const asked = [...requests, ...libraryRequests];
-    const briefOf = (id: string) => asked.find((r) => r.id === id)?.brief;
-    const placed = (id: string) => (id.startsWith("l") ? `l${(plan.layers ?? []).findIndex((l) => l.motion.brief === briefOf(id))}` : id);
-    const moments = lookMoments(plan, ids.map(placed), gestureMoments(plan, actions));
-    // The Reel's other animations, kept as they are: the ones looked at are each other's « others » in the look.
-    const kept = plan.segments.flatMap((s, i) =>
-      isMotionSegment(s) && s.motion.js && !ids.includes(`s${i}`) ? [`déjà dans ce Reel : ${latest.find((t) => t.id === s.motion.template_id)?.name ?? s.motion.brief}`] : [],
-    );
-    const pending: PendingLook = {
-      ids,
-      library: fromLibrary.map((w) => w.id),
-      moments: Object.fromEntries(ids.flatMap((id) => (moments.get(placed(id))?.length ? [[id, moments.get(placed(id))!]] : []))),
-      requests: asked.filter((r) => ids.includes(r.id)).map(forLook),
-      written: Object.fromEntries(fresh.map((d) => [d.id, { name: d.name, slots: d.slots, notes: d.notes }])),
-      direction,
-      brand: sceneBrand,
-      kit,
-      context: { ...sceneContext, kept },
-    };
-    const path = await saveLook(params.studioId, row.id, pending).catch((error: unknown) => {
-      console.warn("motion look: not saved, the animations go as they are", params.postId, error);
-      return null;
-    });
-    if (path) look = { path };
-  }
   return {
     editPlanId: row.id,
     version,
     plan,
-    ...(look ? { look } : {}),
     // Said as it is when the composition she asked for could not be made: never a split screen announced over full-frame shots.
     // The editor's own words describe the composition it asked for: never sent over a Reel that does not have it.
     rationale: compositionKept
