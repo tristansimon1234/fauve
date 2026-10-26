@@ -1,7 +1,8 @@
 import "server-only";
-import { DEFAULT_EFFORT, effortSchema } from "@fauve/agent";
+import { DEFAULT_EFFORT, effortSchema, type RequestEntry, type RequestLine } from "@fauve/agent";
 import { acceptQuote, createMontageQuote, type AcceptedQuote } from "@/lib/credits";
 import { queueJob } from "@/lib/jobs";
+import { launchBrief, logLaunch } from "@/lib/request-log";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 /**
@@ -19,16 +20,31 @@ export async function correctionQuote(studioId: string, postId: string, brief: s
 /**
  * Starts the quoted work as a background job (it sends the video itself when
  * done). Shared by Fauve's montage tool and the « Lancer » button of the quote card.
+ * Its request is kept on the post first (`request`: where she asked and what was said), and every agent of the
+ * montage gets the exchange word for word with Simone's brief (launchBrief).
  */
-export function startMontage(
+export async function startMontage(
   studioId: string,
   quote: AcceptedQuote,
   /**
    * route: who makes it, when it was decided before (effectRoute), so the job does not decide again.
    * conversationId: the app's conversation she asked in, where the Reel is delivered.
    */
-  target: { waId?: string; replyTo?: string; notify?: boolean; route?: "agent" | "chain"; conversationId?: string } = {},
+  target: {
+    waId?: string;
+    replyTo?: string;
+    notify?: boolean;
+    route?: "agent" | "chain";
+    conversationId?: string;
+    request?: { via: RequestEntry["via"]; lines: RequestLine[] };
+  } = {},
 ) {
+  const simone = quote.brief ?? (quote.kind === "correction" ? "Correction demandée par la gérante." : undefined);
+  if (target.request) await logLaunch(studioId, quote.postId, target.request.via, target.request.lines).catch((error: unknown) => console.warn("request not kept", quote.postId, error));
+  const brief = await launchBrief(studioId, quote.postId, simone).catch((error: unknown) => {
+    console.warn("request not read, Simone's brief alone", quote.postId, error);
+    return simone;
+  });
   return queueJob("montage", {
     // A variant skips the editor: same cut, another style and hook, then the render.
     step: quote.kind === "variant" ? "variant" : "design",
@@ -36,7 +52,7 @@ export function startMontage(
     studioId,
     postId: quote.postId,
     mediaIds: quote.mediaIds.length ? quote.mediaIds : undefined,
-    brief: quote.brief ?? (quote.kind === "correction" ? "Correction demandée par la gérante." : undefined),
+    brief,
     maxNewScenes: quote.maxNewScenes,
     quoteId: quote.id,
     // Soigné and Max: reviewed by the critic before delivery (montage job).

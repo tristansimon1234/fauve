@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  BRIEF_MAX,
   CLAUDE_MODEL,
   checkMotionCode,
   type CompositionTexts,
@@ -236,7 +237,7 @@ async function writeScene(
   const text = fix
     ? `This code failed: ${fix.error}\nFix it, keeping the same intention${kept.length ? ` and ${kept.join(" and ")}` : ""}.\n\nBrief: ${request.brief}\n\nCode:\n${fix.code}`
     : JSON.stringify({
-        ...(request.request ? { request: request.request.slice(0, 3000) } : {}),
+        ...(request.request ? { request: request.request.slice(0, BRIEF_MAX) } : {}),
         brief: request.brief,
         duration_frames: request.durationInFrames,
         fps: 30,

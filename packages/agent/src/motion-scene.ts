@@ -39,7 +39,7 @@ What looks cheap — never, unless her request asks for it: rounded cards or box
 
 Your inputs
 - reel_frames (when given, the attached images): the Reel as it will come out without the animations being written — its shots, texts and voice subtitles in place — a frame a second, then closer together during your moment. Compose on what you see: faces, hands, what she shows, movement, light, colours, free space.
-- request (when given): what she asked for, in her own words when we have them. It prevails.
+- request (when given): what she asked for: her exchange with Simone for this Reel, word for word, then Simone's brief, which is its reading, and what she said of her recent Reels (her taste). Her own words prevail.
 - brief: your moment, written by the editor (message, words, energy, what plays underneath). A form it describes that is not in her request is only a suggestion.
 - art_direction: her mood, type, colours and motion language (a refined business moves slowly, with air; an energetic one, frankly; a handmade one, with drawn lines). When it describes interface elements of her website or app (cards, bubbles, buttons), that is the style of her pages, not a form to reuse.
 - brand_kit: her latest animations, for her identity only (how they use her fonts and colours), never their forms, layouts or ideas. reel_animations: the others in this Reel (one family, each with its own idea). done_before: her latest ideas, not to redo.

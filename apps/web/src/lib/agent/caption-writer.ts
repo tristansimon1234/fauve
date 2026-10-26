@@ -1,5 +1,5 @@
 import "server-only";
-import { ANALYST_MODEL, CAPTION_WRITER_PROMPT, captionDraftSchema, keptCaption, memoryLines } from "@fauve/agent";
+import { BRIEF_MAX, ANALYST_MODEL, CAPTION_WRITER_PROMPT, captionDraftSchema, keptCaption, memoryLines } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -8,14 +8,16 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // three Reels of Brume's test went out with none. Written here at delivery, only when the post
 // has none (hers, or Simone's from the chat, always stays), with the chat's caption rules.
 
+/** `planId`: the version that goes out; null, the post's current one. */
 export async function ensureCaption(studioId: string, postId: string, planId: string | null, brief?: string): Promise<void> {
   const db = supabaseAdmin();
-  const { data: post } = await db.from("posts").select("caption, title, agent_note, voice_media_id").eq("id", postId).eq("studio_id", studioId).single();
+  const { data: post } = await db.from("posts").select("caption, title, agent_note, voice_media_id, edit_plan_id").eq("id", postId).eq("studio_id", studioId).single();
   if (!post || (post.caption as string | null)?.trim()) return;
+  const shown = planId ?? (post.edit_plan_id as string | null);
   const [studio, profile, plan, voice] = await Promise.all([
     db.from("studios").select("name, business_type, memory, booking_url").eq("id", studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
-    planId ? db.from("edit_plans").select("plan").eq("id", planId).single() : Promise.resolve({ data: null }),
+    shown ? db.from("edit_plans").select("plan").eq("id", shown).single() : Promise.resolve({ data: null }),
     post.voice_media_id ? db.from("media_assets").select("transcript").eq("id", post.voice_media_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const texts = ((plan.data?.plan as { texts?: { text?: string }[] } | null)?.texts ?? []).map((t) => t.text?.trim()).filter(Boolean);
@@ -37,7 +39,7 @@ export async function ensureCaption(studioId: string, postId: string, planId: st
             reservation_en_ligne: Boolean(studio.data?.booking_url),
             ton: (profile.data?.profile as { tone?: string } | null)?.tone ?? undefined,
           },
-          publication: { idee: post.title ?? undefined, angle: post.agent_note ?? undefined, ...(brief?.trim() ? { demande: brief.trim().slice(0, 1500) } : {}) },
+          publication: { idee: post.title ?? undefined, angle: post.agent_note ?? undefined, ...(brief?.trim() ? { demande: brief.trim().slice(0, BRIEF_MAX) } : {}) },
           video: { textes_a_l_ecran: texts, ...(spoken ? { voix_off: spoken.slice(0, 1500) } : {}) },
         }),
       },

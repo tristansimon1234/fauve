@@ -1,7 +1,7 @@
 import "server-only";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readVoiceSetting, stableWindow } from "@fauve/agent";
+import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readVoiceSetting, stableWindow, type ExchangeRow } from "@fauve/agent";
 import { dayOfTurns } from "@/lib/reply-cap";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
@@ -188,8 +188,12 @@ export async function replyInConversation(params: {
     reactToRowId: params.reactToRowId,
     // In the app, what she starts here is delivered here (WhatsApp delivers on WhatsApp).
     conversationId: params.waId ? undefined : conversation?.id,
-    // Her words this turn answers, as she wrote them: a correction carries them to the editor.
-    asked: herLatestWords(kept),
+    // The conversation this turn answers (her latest message's): a montage launched now keeps its exchange for every
+    // agent. On WhatsApp the history spans her earlier conversations, whose talk was about other things.
+    exchange: [...kept]
+      .reverse()
+      .filter((r) => !latest?.conversation_id || r.conversation_id === latest.conversation_id)
+      .map(toExchange),
     timezone: studio.data.timezone,
     reactions: [],
     extras: {},
@@ -238,14 +242,14 @@ export async function replyInConversation(params: {
   });
 }
 
-/** Her messages since Simone last answered (newest first in `rows`), oldest first, as she wrote them (a voice note's words). */
-function herLatestWords(rows: { direction: string; body: string | null }[]): string | undefined {
-  const words: string[] = [];
-  for (const row of rows) {
-    if (row.direction !== "inbound") break;
-    if (row.body?.trim()) words.unshift(row.body.trim());
-  }
-  return words.join("\n") || undefined;
+/** Simone's notes of a turn that started work (a montage, a carousel, an effect's words): what was asked before was for it. */
+const LAUNCHED = /lancée? (job|quote_id)=|(carrousel|mots de l'effet) en cours/;
+
+/** A stored message as a launch's exchange reads it: Simone's reply of a turn that started work marks where it begins. */
+function toExchange(row: { direction: string; type: string; body: string | null; created_at: string; payload: unknown }): ExchangeRow {
+  const payload = row.payload as { quote?: unknown; notes?: string[] } | null;
+  const launched = row.direction === "outbound" && Boolean(payload?.quote || payload?.notes?.some((n) => LAUNCHED.test(n)));
+  return { direction: row.direction === "inbound" ? "inbound" : "outbound", type: row.type, body: row.body, created_at: row.created_at, ...(launched ? { launched } : {}) };
 }
 
 /**

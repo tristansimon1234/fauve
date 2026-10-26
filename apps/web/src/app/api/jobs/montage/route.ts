@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { z } from "zod";
 import {
+  BRIEF_MAX,
   alternativeBrief,
   blockingIssues,
   EFFECT_MAX_CREDITS,
@@ -87,7 +88,7 @@ const bodySchema = z.object({
   postId: z.uuid(),
   mediaIds: z.array(z.uuid()).max(MAX_MONTAGE_FILES).optional(),
   /** The manager's request, with the plan she said yes to. */
-  brief: words(4000).optional(),
+  brief: words(BRIEF_MAX).optional(),
   waId: z.string().regex(/^\d{6,16}$/).optional(),
   replyTo: z.string().max(200).optional(),
   /** Started from the app (« Créer »): the delivery also reaches her on WhatsApp. */
@@ -260,6 +261,9 @@ async function runStep(job: Job) {
   if (!reviewed) {
     if (job.step === "render") {
       await setQuoteStage(job.quoteId, "render");
+      // A Reel from « Créer » has no caption yet: written while it renders, before she opens its page (never blocks
+      // the delivery). Only the reviewed path wrote it, and Rapide Reels went out without one.
+      const caption = ensureCaption(job.studioId, job.postId, null, job.brief).catch((error) => console.error("caption failed", job.postId, error));
       // Replaced while it rendered: not delivered, not charged (the « plu » version went out at 15:05, charged, after the new request).
       const delivered = await renderAndDeliver(
         {
@@ -273,6 +277,7 @@ async function runStep(job: Job) {
         },
         async () => !(await quoteSuperseded(job.quoteId)),
       );
+      await caption;
       if (delivered === "stopped") return;
       // Charged only once the video is out, for the scenes really made (never above the quote).
       if (delivered && job.quoteId) {

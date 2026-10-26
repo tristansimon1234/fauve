@@ -31,6 +31,8 @@ const REDO_BRIEFS = {
     "La gérante veut ce Reel plus court. Garde le même sujet, l'accroche et la fin (l'invitation, l'offre) ; retire les plans les moins forts et raccourcis les autres : environ un tiers de moins au total, jamais sous 7 secondes.",
   punchier: RESTYLE.punchier.brief,
 } as const;
+/** The buttons she taps for them, as her request keeps them. */
+const REDO_LABELS: Record<keyof typeof REDO_BRIEFS, string> = { shorter: "Plus court", punchier: "Plus rythmé" };
 
 /** What she adds in her words (« garde le plan du shampoing »), passed with the request. */
 const noteOf = (note: string | undefined) => (note ?? "").trim().replace(/\s+/g, " ").slice(0, 300);
@@ -55,11 +57,11 @@ const touched = (postId: string) => {
   revalidatePath("/calendrier");
 };
 
-/** A corrected version of the montage, started at once (her tap is her yes). */
-async function correct(studioId: string, postId: string, brief: string): Promise<ReviewResult> {
+/** A corrected version of the montage, started at once (her tap is her yes); `said`: what she tapped and wrote, kept with its request. */
+async function correct(studioId: string, postId: string, brief: string, said: string): Promise<ReviewResult> {
   const accepted = await correctionQuote(studioId, postId, brief);
   if ("error" in accepted) return { ok: false, error: accepted.error };
-  after(() => startMontage(studioId, accepted));
+  after(() => startMontage(studioId, accepted, { request: { via: "page", lines: [{ who: "elle", text: said }] } }));
   touched(postId);
   return { ok: true };
 }
@@ -91,7 +93,7 @@ export async function redoReel(postId: string, kind: keyof typeof REDO_BRIEFS, n
   if (LOCKED.includes(found.post.status as string)) return ONLINE;
   if (!found.post.edit_plan_id) return { ok: false, error: "Ce Reel n’est pas encore monté." };
   const extra = noteOf(note);
-  return correct(found.studioId, postId, extra ? `${REDO_BRIEFS[kind]} Précision de la gérante : ${extra}` : REDO_BRIEFS[kind]);
+  return correct(found.studioId, postId, extra ? `${REDO_BRIEFS[kind]} Précision de la gérante : ${extra}` : REDO_BRIEFS[kind], `« ${REDO_LABELS[kind]} »${extra ? ` : ${extra}` : ""}`);
 }
 
 /** One of Simone's voices on the Reel (what it should say, if she said): kept on the post, then a new version cut on it. */
@@ -128,6 +130,7 @@ export async function putVoice(postId: string, voiceId: string, note?: string): 
     studioId,
     postId,
     `La gérante veut la voix off de ${voice.name} sur ce Reel.${extra ? ` Ce qu'elle veut que la voix dise : ${extra}.` : ""} Garde le même sujet, l'accroche et les plans, et cale le montage sur la voix.`,
+    `« Voix off : ${voice.name} »${extra ? ` : ${extra}` : ""}`,
   );
 }
 

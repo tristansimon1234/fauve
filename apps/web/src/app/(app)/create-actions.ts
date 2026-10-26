@@ -176,7 +176,12 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
   // Who makes it, decided now so the working screen shows its steps and its time (the job keeps it).
   const route = await effectRoute(studioId, { postId: created.id, correction: false, brief: accepted.brief, mediaIds }).catch(() => undefined);
   // Delivered in the app and on WhatsApp (she may close the app meanwhile).
-  after(() => startMontage(studioId, accepted, { notify: true, route }));
+  // What she wrote on this screen and the plan she validated, kept as the Reel's first request (a later correction reads it too).
+  const request = [
+    ...(idea.trim() ? [{ who: "elle" as const, text: idea.trim() }] : []),
+    ...(plan ? [{ who: "simone" as const, text: validatedPlanBrief(plan) }] : []),
+  ];
+  after(() => startMontage(studioId, accepted, { notify: true, route, request: { via: "create", lines: request } }));
   const level = quote.effort ?? effort;
   const effect = route === "agent";
   return {
