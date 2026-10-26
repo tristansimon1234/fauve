@@ -16,10 +16,10 @@ const PROCESSING_TIMEOUT_MS = 90_000;
 const STEAL_FPS = 2;
 const LOOK_SCHEMA = geminiSchema(stolenLookReadingSchema);
 
-const PROMPT = `Tu es la directrice artistique de Simone, qui monte les Reels Instagram d'un commerce de quartier (studio de sport, salon de coiffure ou de beauté, restaurant, boutique…).
-La personne qui gère le commerce (femme ou homme : n'accorde rien, ne dis ni « elle » ni « il ») t'a partagé ce contenu parce qu'il l'inspire. Dis en 3 phrases courtes ce qui plaît probablement et qu'on peut reprendre dans ses propres Reels :
-l'accroche des premières secondes, le rythme des coupes, les textes à l'écran (police, taille, animation, placement), les couleurs et la lumière, les transitions.
-Concret et réutilisable, sans décrire la personne ni recopier le contenu. En français.`;
+const PROMPT = `You are Simone's art director; Simone edits the Instagram Reels of a neighbourhood business (gym, hair or beauty salon, restaurant, shop…).
+The person who runs the business (a woman or a man: make no gender agreement, say neither « elle » nor « il ») shared this content with you because it inspires them. Say in 3 short sentences what probably appeals and can be taken into their own Reels:
+the hook of the first seconds, the rhythm of the cuts, the on-screen texts (font, size, animation, placement), the colours and the light, the transitions.
+Concrete and reusable, without describing the person nor copying the content. In French.`;
 
 let client: GoogleGenAI | undefined;
 const gemini = () => (client ??= new GoogleGenAI({ apiKey: env("GEMINI_API_KEY") }));

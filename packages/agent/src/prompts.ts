@@ -223,16 +223,16 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
 }
 
 
-export const CLIP_ANALYSIS_PROMPT = `Tu analyses un clip vidéo filmé dans un commerce de quartier (studio de sport ou de bien-être, salon de coiffure ou de beauté, restaurant, café, boutique…), pour préparer un Reel Instagram / TikTok (7 à 45 secondes).
+export const CLIP_ANALYSIS_PROMPT = `You analyse a video clip filmed in a neighbourhood business (gym or wellness studio, hair or beauty salon, restaurant, café, shop…), to prepare an Instagram / TikTok Reel (7 to 45 seconds).
 
-Découpe le clip en plans successifs (un plan change quand le cadrage, le sujet ou l'action change nettement). Pour chaque plan, ce dont un monteur professionnel a besoin pour choisir et enchaîner : horodatages en secondes, ce qui se passe, le sujet, l'énergie, le potentiel d'accroche, la qualité (flou, sombre, bougé), si un visage est reconnaissable, la valeur de plan (framing : large, moyen, gros plan, détail), la caméra (static, handheld, moving), la boîte du sujet principal (subject_box, pour recadrer en vertical sans le couper) et la beauté du plan (beauty, de 1 à 5 : lumière, cadrage, netteté, couleurs ; sois exigeant, 5 est rare).
+Split the clip into successive shots (a shot changes when the framing, the subject or the action clearly changes). For each shot, what a professional editor needs to choose and chain them: timestamps in seconds, what happens, the subject, the energy, the hook potential, the quality (blurry, dark, shaky), whether a face is recognisable, the shot size (framing: wide, medium, close-up, detail), the camera (static, handheld, moving), the main subject's box (subject_box, to crop vertically without cutting it) and the beauty of the shot (beauty, 1 to 5: light, framing, sharpness, colours; be demanding, 5 is rare).
 
-Donne aussi la correction légère qui rendrait le clip plus beau et cohérent avec d'autres vidéos du même commerce (correction : exposition, contraste, saturation, chaleur, redressement en degrés si l'horizon ou les verticales penchent ; 0 pour ce qui est déjà bien).
+Also give the light correction that would make the clip more beautiful and consistent with the other videos of the same business (correction: exposure, contrast, saturation, warmth, straightening in degrees if the horizon or the verticals lean; 0 for what is already fine).
 
-Repère ensuite les meilleurs passages pour un Reel : une personne qui regarde l'objectif ou parle, un résultat fini (coupe, plat, pièce terminée), mouvement net et lisible, geste précis (un exercice, une coupe, un dressage), produit ou plat appétissant, transformation avant/après, belle lumière, moment surprenant. Signale ce qui gêne techniquement (flou, sombre, bougé, son inaudible) ; un visage ou une personne n'est pas un problème, c'est souvent le meilleur plan.
+Then find the best passages for a Reel: a person looking at the lens or speaking, a finished result (a haircut, a dish, a finished piece), a clear and readable movement, a precise gesture (an exercise, a cut, plating), an appetising product or dish, a before/after transformation, beautiful light, a surprising moment. Point out what gets in the way technically (blurry, dark, shaky, inaudible sound); a face or a person is not a problem, it is often the best shot.
 
-Note aussi ce que font les personnes (actions) : chaque geste ou mouvement net, avec son début et sa fin, en une phrase courte et factuelle qui dit la main ou la partie du corps et où (« elle pince l'air près de son visage », « il pose l'assiette sur le comptoir »). Un monteur coupe sur un geste, et une animation peut partir d'un geste ou le suivre. Vide s'il n'y a personne.
+Also note what the people do (actions): each clear gesture or movement, with its start and end, in a short factual sentence that says the hand or the part of the body and where (« elle pince l'air près de son visage », « il pose l'assiette sur le comptoir »). An editor cuts on a gesture, and an animation can start from a gesture or follow it. Empty if there is nobody.
 
-Si quelqu'un parle, donne aussi chaque mot prononcé avec son début et sa fin en secondes (words), pour des sous-titres mot à mot ; sinon laisse words vide. Simone est l'assistant qui fait ses Reels : quand on l'entend nommer, écris « Simone », jamais « Simon ».
+If someone speaks, also give every word spoken with its start and end in seconds (words), for word-by-word subtitles; otherwise leave words empty. Simone is the assistant who makes her Reels: when you hear it named, write « Simone », never « Simon ».
 
-Réponds en français, de façon factuelle : décris seulement ce que tu vois et entends.`;
+Answer in French, factually: describe only what you see and hear.`;

@@ -16,11 +16,11 @@ export const clipSortSchema = z.object({
 });
 export type ClipSort = z.infer<typeof clipSortSchema>;
 
-export const CLIP_SORT_PROMPT = `Tu ranges une vidéo que la gérante d'un commerce vient d'envoyer, sans dire à quoi elle sert.
+export const CLIP_SORT_PROMPT = `You sort a video that the manager of a business has just sent without saying what it is for.
 
-Tu reçois ce qu'on voit dans la vidéo (lue par un modèle vidéo) et les publications des prochains jours qui attendent de la matière, avec leur idée et, quand il y en a une, la mission de tournage (ce qu'on lui a demandé de filmer).
+You get what is seen in the video (read by a video model) and the posts of the coming days that are waiting for material, with their idea and, when there is one, the filming mission (what she was asked to film).
 
-Choisis la publication à laquelle cette vidéo sert le mieux : d'abord une mission qui demande exactement ça, puis une publication dont l'idée colle. Si aucune ne colle vraiment, réponds post_id null : la vidéo reste dans sa banque de plans pour plus tard. Ne force jamais : une vidéo de la salle n'est pas une vidéo d'un plat. sure n'est vrai que si c'est clairement la bonne.`;
+Choose the post this video serves best: first a mission that asks for exactly this, then a post whose idea fits. If none really fits, answer post_id null: the video stays in her bank of shots for later. Never force it: a video of the room is not a video of a dish. sure is true only when it is clearly the right one. Write why in French: it is for her.`;
 
 /** Keeps a sort only when it names a candidate and is sure of it. */
 export function acceptedSort(sort: ClipSort, candidates: ReadonlySet<string>): string | null {

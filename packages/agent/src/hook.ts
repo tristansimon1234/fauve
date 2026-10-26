@@ -114,22 +114,22 @@ export const hookChoiceSchema = z.object({
 });
 export type HookChoice = z.infer<typeof hookChoiceSchema>;
 
-export const HOOK_JUDGE_PROMPT = `Tu choisis l'accroche d'un Reel Instagram pour un commerce de quartier : ce qui décide, dans la première seconde, si on reste ou si on fait défiler. Tu reçois le commerce, la demande faite pour ce Reel, ce que montre sa première image et une ou plusieurs accroches : la première phrase que dit la voix (« type » voix) ou le texte posé sur la première image (« type » texte).
+export const HOOK_JUDGE_PROMPT = `You choose the hook of an Instagram Reel for a neighbourhood business: what decides, in the first second, whether people stay or scroll on. You get the business, the request made for this Reel, what its first image shows and one or more hooks: the first sentence the voice says (« type » voix) or the text laid on the first image (« type » texte).
 
-Une accroche très forte :
-- arrête le pouce dès ses trois premiers mots : elle ouvre une question qu'on veut voir résolue, met côte à côte deux choses qui ne vont pas ensemble, donne un chiffre précis, révèle ce qu'on ne voit pas d'habitude, lance un défi, ou met la personne qui regarde dans la scène ;
-- ne marche que pour ce commerce : une phrase qui irait à n'importe quel commerce est faible (« tu vas adorer », « le meilleur endroit du quartier ») ;
-- va avec la première image : elle en parle, ou crée l'écart qui donne envie de comprendre ce qu'on voit ;
-- se comprend d'un coup, sans contexte, et le texte sans le son ;
-- est du français juste, comme un Français le dirait : une phrase entière et idiomatique, jamais un calque ni une tournure bancale qu'on comprend de travers (une accroche fautive ou bizarre vaut au plus 3, même si elle intrigue) ;
-- est courte : 9 mots au plus pour la voix (moins de trois secondes), 6 au plus pour le texte ;
-- est vraie : rien que les faits donnés et ce que montre l'image, ni prix, ni chiffre, ni promesse inventés ;
-- sonne comme un créateur qui parle à ses abonnés, jamais comme une pub ni un piège à clics : pas de formule creuse, pas de « vous ne devinerez jamais », pas de majuscules criées, pas d'emojis, pas de tiret long ;
-- n'a ni la forme ni les mots des accroches récentes du commerce (« recentes »).
+A very strong hook:
+- stops the thumb from its first three words: it opens a question you want answered, puts side by side two things that don't go together, gives a precise number, reveals what you don't usually see, throws down a challenge, or puts the person watching in the scene;
+- only works for this business: a sentence that would fit any business is weak (« tu vas adorer », « le meilleur endroit du quartier »);
+- goes with the first image: it talks about it, or creates the gap that makes you want to understand what you see;
+- is understood at once, without context, and the text without the sound;
+- is correct French, as a French person would say it: a whole, idiomatic sentence, never a calque nor an awkward turn of phrase that gets misread (a faulty or odd hook scores 3 at most, even if it intrigues);
+- is short: 9 words at most for the voice (under three seconds), 6 at most for the text;
+- is true: only the facts given and what the image shows, no invented price, number or promise;
+- sounds like a creator talking to their followers, never like an ad nor a clickbait: no hollow formula, no « vous ne devinerez jamais », no shouted capitals, no emojis, no em dash;
+- has neither the form nor the words of the business's recent hooks (« recentes »).
 
-Pour la voix, une accroche est dite à l'oral, ouvre le message de la vidéo (« message ») sans le dire tout de suite et mène à la phrase suivante (« suite ») : la tienne aussi ; une accroche qui ne sert pas ce message, même forte, passe après ; une voix chuchotée (« chuchotee ») accroche par la sensation, tout bas, jamais par une question qui claque. Pour le texte, quand la voix a déjà une première phrase (« voix_premiere_phrase »), le texte la résume ou la prolonge, jamais en contradiction. Si la demande impose les mots de l'accroche, ils gagnent ; si elle dit par quoi le Reel commence, la première image est celle-là.
+For the voice, a hook is spoken, opens the video's message (« message ») without saying it straight away and leads to the next sentence (« suite »): yours too; a hook that does not serve this message, however strong, comes after; a whispered voice (« chuchotee ») hooks through sensation, very softly, never with a question that snaps. For the text, when the voice already has a first sentence (« voix_premiere_phrase »), the text sums it up or extends it, never contradicts it. If the request imposes the hook's words, they win; if it says what the Reel opens on, the first image is that one.
 
-D'abord, écris 2 ou 3 autres accroches de formes différentes (ideas), avec pour le texte 1 ou 2 mots qui ressortent (emphasis, écrits exactement comme dans l'accroche). Puis note chaque accroche, celles reçues (index 0, 1…) puis les tiennes à la suite, de 1 à 10 (10 : on s'arrête net ; 5 : on hésite ; 1 : on passe), avec la raison en quelques mots. best : l'index de la meilleure ; à force égale, la première reçue.`;
+First, write 2 or 3 other hooks of different forms (ideas), in French, with, for the text, 1 or 2 words that stand out (emphasis, written exactly as in the hook). Then score each hook, those received (index 0, 1…) then yours after them, from 1 to 10 (10: you stop dead; 5: you hesitate; 1: you scroll on), with the reason in a few words. best: the index of the best one; at equal strength, the first received.`;
 
 /** What the judge reads. */
 export type HookJudgeInput = {

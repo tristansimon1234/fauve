@@ -103,14 +103,14 @@ export function clampSignature<T extends SignatureReading>(signature: T): T {
 }
 
 /** What the reading writes about the signature (moodboard or site), appended to its prompt. */
-export const SIGNATURE_GUIDE = `Signature : les mêmes choix en réglages, que le moteur applique à chaque Reel et à chaque photo sans qu'on le lui demande. Pars de ce que tu vois (et des mesures quand tu les as), jamais d'une habitude :
-- titles : la police (display ou body), la casse, la graisse, l'alignement et l'interlettrage de ses vrais titres ;
-- stress : comment ses mots importants ressortent sur son site (marker seulement s'il y a des traits dessinés à la main, serif seulement s'il mêle une serif italique) ;
-- band : le fond qui ira sous une phrase posée sur une vidéo, dans ses couleurs (white si rien ne s'impose) ;
-- grade : la lumière de ses photos ;
-- base : clair ou sombre, comme les fonds de son site ;
-- motion, music, voice : son mouvement, sa musique et sa façon de parler ;
-- narrator : la voix off qui lui ressemble (un commerce rock n'a pas une voix douce de spa) et comment elle joue.`;
+export const SIGNATURE_GUIDE = `Signature: the same choices as settings, which the engine applies to every Reel and every photo without being asked. Start from what you see (and from the measurements when you have them), never from a habit:
+- titles: the font (display or body), the case, the weight, the alignment and the letter spacing of her real titles;
+- stress: how her important words stand out on her site (marker only if there are hand-drawn strokes, serif only if it mixes in an italic serif);
+- band: the background that will go under a sentence laid on a video, in her colours (white if nothing imposes itself);
+- grade: the light of her photos;
+- base: light or dark, like her site's backgrounds;
+- motion, music, voice: her motion, her music and her way of speaking;
+- narrator: the voice-over that sounds like her (a rock business does not get a soft spa voice) and how it plays.`;
 
 /** The signature as a few plain lines, for the editor, the motion designer and the critic. */
 export function signatureLines(signature: BrandSignature | undefined): string | undefined {
