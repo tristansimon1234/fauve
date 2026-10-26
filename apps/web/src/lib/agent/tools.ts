@@ -200,7 +200,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   /** Posts whose render already waits for the end of this turn. */
   const rendering = new Set<string>();
   /** A montage launched in this turn keeps the exchange that led to it, word for word, for every agent. */
-  const chatRequest = () => ({ via: "chat" as const, lines: exchangeLines(ctx.exchange ?? []) });
+  const chatRequest = (postId: string) => ({ via: "chat" as const, lines: exchangeLines(ctx.exchange ?? [], postId) });
 
   /** Media ids given by the model must be this studio's. */
   async function assertOwnMedia(ids: string[]) {
@@ -219,7 +219,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   async function effectCorrection(postId: string, brief: string, doing: string) {
     const accepted = await correctionQuote(studioId, postId, brief);
     if ("error" in accepted) return json({ error: accepted.error });
-    ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId, request: chatRequest() }));
+    ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId, request: chatRequest(postId) }));
     ctx.extras.quote = accepted.id;
     ctx.notes.push(`correction de l'effet lancée job=${accepted.id} post_id=${postId}`);
     return json({
@@ -501,7 +501,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if ("error" in accepted) return json({ error: accepted.error });
       // Who makes it, decided now so she hears the right time (the job keeps it): an effect drawn image by image takes longer.
       const route = accepted.kind === "variant" ? "chain" : await effectRoute(studioId, { postId: post_id, correction: accepted.kind === "correction", brief: accepted.brief, mediaIds: accepted.mediaIds }).catch(() => undefined);
-      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, route, conversationId: ctx.conversationId, request: chatRequest() }));
+      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, route, conversationId: ctx.conversationId, request: chatRequest(post_id) }));
       // In the app, the card follows the montage step by step; on WhatsApp, cards become links, so the post's link stays.
       ctx.extras.quote = job.id;
       if (ctx.waId) ctx.extras.posts = [post_id];
@@ -584,7 +584,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       const accepted = await acceptQuote(studioId, quote.id, turnStartedAt, { immediate: true });
       if ("error" in accepted) return json({ error: accepted.error });
-      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId, request: chatRequest() }));
+      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId, request: chatRequest(post_id) }));
       ctx.extras.quote = quote.id;
       if (ctx.waId) ctx.extras.posts = [post_id];
       ctx.notes.push(`version ${change.button.toLowerCase()} lancée quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id}`);

@@ -245,11 +245,26 @@ export async function replyInConversation(params: {
 /** Simone's notes of a turn that started work (a montage, a carousel, an effect's words): what was asked before was for it. */
 const LAUNCHED = /lancée? (job|quote_id)=|(carrousel|mots de l'effet) en cours/;
 
-/** A stored message as a launch's exchange reads it: Simone's reply of a turn that started work marks where it begins. */
+/** What Simone sends on her own, outside a turn: a reminder to post, a nudge, the team's alerts. */
+const UNPROMPTED = new Set(["reminder", "nudge", "daily_cap", "new_numbers_alert"]);
+
+/**
+ * A stored message as a launch's exchange reads it: Simone's reply of a turn that started work marks where it begins;
+ * a message she sent on her own (a delivery, a reminder) says which post it is about.
+ */
 function toExchange(row: { direction: string; type: string; body: string | null; created_at: string; payload: unknown }): ExchangeRow {
-  const payload = row.payload as { quote?: unknown; notes?: string[] } | null;
-  const launched = row.direction === "outbound" && Boolean(payload?.quote || payload?.notes?.some((n) => LAUNCHED.test(n)));
-  return { direction: row.direction === "inbound" ? "inbound" : "outbound", type: row.type, body: row.body, created_at: row.created_at, ...(launched ? { launched } : {}) };
+  const payload = row.payload as { quote?: unknown; notes?: string[]; open_post?: unknown; kind?: unknown } | null;
+  const outbound = row.direction === "outbound";
+  const launched = outbound && Boolean(payload?.quote || payload?.notes?.some((n) => LAUNCHED.test(n)));
+  const unprompted = outbound && Boolean(payload?.open_post || (typeof payload?.kind === "string" && UNPROMPTED.has(payload.kind)));
+  return {
+    direction: outbound ? "outbound" : "inbound",
+    type: row.type,
+    body: row.body,
+    created_at: row.created_at,
+    ...(launched ? { launched } : {}),
+    ...(unprompted ? { unprompted: typeof payload?.open_post === "string" ? { post: payload.open_post } : {} } : {}),
+  };
 }
 
 /**
