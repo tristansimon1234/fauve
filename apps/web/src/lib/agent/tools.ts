@@ -112,6 +112,8 @@ export type ToolContext = {
   conversationId?: string;
   /** The conversation this turn answers (oldest first): a montage launched now keeps its exchange, word for word, for every agent. */
   exchange?: ExchangeRow[];
+  /** Set by the tool loop: whether her answer has any words yet this turn (buttons laid before them answer nothing). */
+  wrote?: boolean;
 };
 
 /**
@@ -1303,9 +1305,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.extras.pick_media = ctx.waId ? undefined : pick_media;
       if (kept) return "ok : ton plan est écrit sous ta phrase, avec ses boutons ; ne le réécris pas.";
       const shown = ctx.waId && (upload ?? pick_media) ? "ok : son lien de dépôt (pleine qualité) est ajouté sous ton message ; n'écris aucun lien." : "ok : affiché sous ton message.";
-      // Called before a word was written, the model was asked again and wrote « Voilà, j'attends ton choix. »
-      // as if its question had been sent: only what it writes reaches her, never its thoughts.
-      return `${shown} Si tu n'as encore rien écrit dans cette réponse, écris maintenant ton message entier (ce que tu proposes et la question à laquelle ces boutons répondent) : elle ne voit que ce que tu écris, jamais tes réflexions. Jamais une phrase qui renvoie à un message absent (« Voilà le plan », « j'attends ton choix »).`;
+      // Called before a word was written, the model was asked again and wrote « Voilà, j'attends ton choix. » or
+      // « Voilà, j'ai mis les boutons juste en dessous. » as if its question had been sent: only what it writes
+      // reaches her, never its thoughts. The loop knows whether anything was written: when nothing was, it says so plainly.
+      if (!ctx.wrote) {
+        return `${shown} Mais ta réponse n'a encore aucun mot : elle n'a rien reçu de toi, ni ta question ni ta proposition (tes réflexions ne lui parviennent jamais). Écris maintenant ton message entier, comme si c'était le premier mot que tu lui envoies : ce que tu proposes et la question à laquelle ces boutons répondent. Jamais une phrase sur les boutons ou sur un message absent (« Voilà le plan », « j'ai mis les boutons », « j'attends ton choix »).`;
+      }
+      return `${shown} Si ce que tu as écrit ne contient pas encore la question à laquelle ces boutons répondent, écris-la maintenant : elle ne voit que ce que tu écris, jamais tes réflexions. Jamais une phrase qui renvoie à un message absent (« Voilà le plan », « j'attends ton choix »).`;
     },
   };
 
