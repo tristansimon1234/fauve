@@ -3616,10 +3616,9 @@ test("rework: an animation a correction rewrites looks at its earlier render, du
   assert.match(MOTION_DESIGNER_PROMPT, /previous_version/);
 });
 
-test("look: a new animation is looked at in its Reel over her footage before it goes out; the engine binds none of its form", async () => {
-  const { lookMoments, MAX_LOOK_FRAMES } = await import("./rework.ts");
+test("frames of a Reel are drawn with the media they show only; the engine binds none of an animation's form", async () => {
   const { buildReelProps, propsAt } = await import("./motion.ts");
-  const { MOTION_DESIGNER_PROMPT, motionLookOutputSchema } = await import("./motion-scene.ts");
+  const { MOTION_DESIGNER_PROMPT } = await import("./motion-scene.ts");
   const plan = editPlanSchema.parse({
     ...validPlan,
     template: "libre",
@@ -3633,38 +3632,19 @@ test("look: a new animation is looked at in its Reel over her footage before it 
     ],
     layers: [{ motion: { brief: "tout le Reel en écran partagé", js: "function Scene(){return null}" }, from: 0, to: 8, compose: true }],
   });
-  // A scene: once its words are in, during a gesture under it, its middle, just before its end, on its own frames.
-  const looks = lookMoments(plan, ["s1", "l0"], [{ t: 3.1, what: "elle tape un message" }, { t: 6, what: "ailleurs" }]);
-  assert.deepEqual(looks.get("s1")?.map((m) => m.t), [2.8, 3.1, 3.5, 4.75]);
-  assert.match(looks.get("s1")![1]!.label, /^frame 33 of your animation \(during a gesture: elle tape un message\)$/);
-  assert.ok(looks.get("s1")!.length <= MAX_LOOK_FRAMES);
-  // A composition of the whole Reel: its first image and across the Reel.
-  assert.deepEqual(looks.get("l0")?.map((m) => m.t), [0.3, 2, 4, 6, 7.6]);
-  // Its frames are drawn with the media they show only: a shot far from them is not fetched (a composition keeps all).
+  // A shot far from the frames drawn is not fetched (a composition keeps all).
   const props = buildReelProps(plan, { template: "libre", clipUrls: { a: "https://x/a.mp4", b: "https://x/b.mp4", c: "https://x/c.mp4" }, brand: { name: "Fleurs" } });
-  const at = propsAt({ ...props, layers: undefined }, [Math.round(2.8 * 30), Math.round(3.5 * 30)]);
+  const at = propsAt({ ...props, layers: undefined }, [84, 105]);
   assert.equal((at.segments[0] as { src: string }).src, "https://x/a.mp4");
   assert.equal((at.segments[1] as { under?: { src: string } }).under?.src, "https://x/b.mp4");
   assert.equal((at.segments[2] as { src: string }).src, "");
   assert.equal(propsAt(props, [84]), props);
-  // It says what it sees, and keeps or rewrites.
-  assert.equal(motionLookOutputSchema.safeParse({ code: "", notes: "", name: "x", slots: [], photos: [], fonts: [], seen: "trop petit", keep: false }).success, true);
-  assert.match(MOTION_DESIGNER_PROMPT, /your_render/);
-  // A director looks first (Sonnet, the same bar), and sends back what to obtain, never a form: Opus only rewrites.
-  const { MOTION_LOOK_PROMPT, motionJudgeOutputSchema } = await import("./motion-scene.ts");
-  const { LOOK_MODEL, CLAUDE_MODEL } = await import("./pricing.ts");
-  assert.notEqual(LOOK_MODEL, CLAUDE_MODEL);
-  assert.equal(motionJudgeOutputSchema.safeParse({ seen: "la carte couvre les sous-titres", keep: false, fix: "dégager la bande des sous-titres" }).success, true);
-  assert.match(MOTION_LOOK_PROMPT, /demanding art director/);
-  assert.match(MOTION_LOOK_PROMPT, /never the means: never a card, band, panel or box to add behind the words/);
-  // Its fix says the problem: a panel it asks for is read as « hard to read », never drawn (test 9's cream band).
-  assert.match(MOTION_DESIGNER_PROMPT, /read it as « hard to read here »/);
-  assert.match(MOTION_LOOK_PROMPT, /a band or panel laid behind the words to make them readable/);
-  assert.match(MOTION_DESIGNER_PROMPT, /review \(when given\)/);
   // The footage plays bare, its form is its own: no veil, no forced exit, no forced fit, no engine move, a family in one Reel.
   assert.match(MOTION_DESIGNER_PROMPT, /with no veil/);
   assert.match(MOTION_DESIGNER_PROMPT, /one family, each with its own idea/);
   assert.doesNotMatch(MOTION_DESIGNER_PROMPT, /must stay visible|last 10 frames|each slot in a FitText|moves the whole animation|edges and corners/i);
+  // No look after it any more: nothing in its prompt waits for a director's review of its render.
+  assert.doesNotMatch(MOTION_DESIGNER_PROMPT, /your_render|review \(when given\)/);
 });
 
 test("canvas: the motion designer sees the whole Reel before writing, its own moment closer; the subtitles' band stays free", async () => {
@@ -3727,24 +3707,21 @@ test("canvas: the motion designer sees the whole Reel before writing, its own mo
 });
 
 test("motion designer: a base every animation gets, the parts its call needs; what looks cheap; her charter's palette", async () => {
-  const { motionDesignerPrompt, MOTION_DESIGNER_PROMPT, MOTION_LOOK_PROMPT } = await import("./motion-scene.ts");
+  const { motionDesignerPrompt, MOTION_DESIGNER_PROMPT } = await import("./motion-scene.ts");
   const { resolveReelBrand } = await import("./motion.ts");
   // A simple animation: the base alone, without the parts it has no use for.
   const simple = motionDesignerPrompt({});
   assert.equal(simple.parts, "");
-  assert.doesNotMatch(simple.base, /track\(frame\)|<Footage|previous_version|your_render|<Cutout/);
+  assert.doesNotMatch(simple.base, /track\(frame\)|<Footage|previous_version|<Cutout/);
   // Each part comes with its call, always in the same order; the whole prompt holds them all.
-  const busy = motionDesignerPrompt({ look: true, moves: true, photos: true });
-  assert.match(busy.parts, /^Her photos[\s\S]*track\(frame\)[\s\S]*your_render/);
-  assert.doesNotMatch(busy.parts, /<Footage|previous_version/);
+  const busy = motionDesignerPrompt({ correction: true, moves: true, photos: true });
+  assert.match(busy.parts, /^Her photos[\s\S]*track\(frame\)[\s\S]*previous_version/);
+  assert.doesNotMatch(busy.parts, /<Footage/);
   assert.ok(MOTION_DESIGNER_PROMPT.startsWith(simple.base) && busy.parts.split("\n\n").every((part) => MOTION_DESIGNER_PROMPT.includes(part)));
-  assert.equal(motionDesignerPrompt({ moves: true, look: true }).parts, motionDesignerPrompt({ look: true, moves: true }).parts);
-  // What looks cheap is named, for the motion designer and for the director who looks first; her request prevails.
+  assert.equal(motionDesignerPrompt({ moves: true, correction: true }).parts, motionDesignerPrompt({ correction: true, moves: true }).parts);
+  // What looks cheap is named; her request prevails.
   assert.match(simple.base, /What looks cheap/);
   assert.match(simple.base, /request \(when given\): what she asked for[^\n]*It prevails/);
-  assert.match(MOTION_LOOK_PROMPT, /What looks cheap is below the level/);
-  // Her voice's subtitles are the engine's, in her style: only their band is the animation's business.
-  assert.match(MOTION_LOOK_PROMPT, /never judge their style or size/);
   // Her charter's colours make the animations' palette, never Simone's own.
   const brand = resolveReelBrand({}, "libre", { name: "Fleurs", accent: "#C2185B", colors: ["#C2185B", "#2E7D32", "#F8E1E7", "#1B1B1B"] });
   assert.deepEqual(brand.palette, { secondary: "#2E7D32", light: "#F8E1E7", dark: "#1B1B1B" });

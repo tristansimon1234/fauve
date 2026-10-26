@@ -15,12 +15,6 @@ export const CHAT_EFFORT = "medium" as const;
 export const ANALYST_MODEL = "claude-sonnet-5-5";
 /** Watching the rendered montage (key frames against the plan): a checklist, Sonnet sees it as well at half the price. */
 export const CRITIC_MODEL = "claude-sonnet-5-5";
-/**
- * Looking at each new animation rendered over her footage before it goes out: Sonnet judges (keep it, or what to
- * change), and Opus is called only to rewrite those it sends back. Opus looking itself cost an Opus call per
- * animation (€0.35 of a €0.88 Reel), most of them to keep it as it was.
- */
-export const LOOK_MODEL = "claude-sonnet-5-5";
 /** Haiku 5.5 rejects server-side fallbacks (400): only send them to models that take them. */
 export const supportsServerFallback = (model: string) => !model.startsWith("claude-haiku");
 

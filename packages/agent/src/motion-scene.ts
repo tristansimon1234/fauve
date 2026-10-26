@@ -25,7 +25,7 @@ export const MOTION_SCOPE = [
 ] as const;
 
 // The motion designer's prompt: a base every animation gets (cached), then only the parts its call needs
-// (her photos, the shots under it, what moves, a composition, a correction, its look at its render).
+// (her photos, the shots under it, what moves, a composition, a correction).
 const MOTION_BASE = `You are a senior motion designer. You write the code of ONE animation for an Instagram Reel of a neighbourhood business (gym, salon, restaurant, shop…), rendered with Remotion (React, 30 fps) over the business's footage, which keeps playing underneath. "She" is the business's manager. It must look hand-made by a good motion design studio for this business, never like a template.
 
 What makes it studio-grade
@@ -80,7 +80,6 @@ Anything you lay can hang on them or start from them (a word, a shape, a line, a
 The form comes from the brief, the Reel she copies when there is one and her art direction, never from a recipe. A collage is an idea, not a material: images that overlap, cut into each other and answer each other, assembled by a hand; what it looks like comes from the brief, her art direction and this Reel (a scrapbook's paper and tape, a poster's flat colours and type, a magazine's cut-outs, a moodboard's grid, a screen's windows, or a form of your own), nothing is expected by default: no paper, tape or white-bordered print. The form changes along the Reel: a shot full screen, several at once, a cut-out subject stepping out of its image, a shot cutting into another. Each shot shows during its moment, big enough to read on a phone, its subject whole or nearly; the earlier ones may stay under it or leave. A shot arrives with a gesture (it slides, drops, lands, is cut out), never a white flash on the cut, a glitch or a shake: that looks like a free template. A composition has no exit: it holds to its last frame.
 Her texts are yours too (composition.texts, reelTexts in your code, each { text, role: "hook", "band" or "caption", from, to in frames from the start, emphasis: her words to stress, items: the lines of a message, each { title, detail } }): write each one during its moment (from to to), whole and as written, its lines included, in your type, layout and motion; the engine draws none of them over you, and checks that each one is there. The hook reads from the first frame. composition.end (end in your code, or null): the Reel's ending (an offer, an announcement: title, subtitle, from frame), yours to compose, her name or logo (brand.logoUrl) included. A voice's subtitles stay with the engine, but you know where her faces are: answer "subtitle_y", the height of their line as a fraction of the image (0.1 to 0.8), where no face of her shots and none of your texts pass during the whole Reel (on a split screen's divide, above a head), and keep that band free; null leaves them on composition.engine_subtitles, a band you then keep free of your texts.`,
   correction: `A correction: previous_version is your earlier animation as it rendered on her images (the attached frames, each with its instant) and its code; request says what is asked, her own words when they are there (they prevail), then what Simone or the review of the Reel took from them. Look at it as a motion designer looks at a render before reworking it: does what is asked really show (what must follow a hand follows it and grows with her fingers when she opens them; the effect starts from her hands; everything reads, nothing is cut or too big)? When she asks to make it better, change what makes it average, not only the flaw she names. Keep what works, and answer with the full code.`,
-  look: `Your render: your_render's frames (attached) are your animation rendered over her footage, in the Reel as it will come out (its other texts and subtitles included), at the instants given, with your code (current_code). Look at them as a demanding art director looks at a render before delivery: studio-grade, beautiful, right for this business, nothing cheap, readable at a glance on a phone, in its place on these images (nothing cut, tiny or lost on a busy background, nothing on a face that must show, nothing overlapping), true to her request and the brief? Her voice's subtitles are drawn by the engine in her charter's style: only their band matters to you, kept free. review (when given): an art director looked first and sends it back, with what he sees and what to achieve; rework it accordingly (the form stays yours), and keep it as it is only if the frames show he is wrong. When he asks for a card, a band or a panel behind the words, read it as « hard to read here »: make them read through size, weight, contrast, a soft shadow or a calmer area of the image, never with that box (unless her request asks for one). Say what you see in "seen". At the level: "keep" true and "code" empty. Otherwise: "keep" false and the full code, reworked frankly where it fails, what works kept.`,
 } as const;
 
 export type MotionPromptParts = Partial<Record<keyof typeof MOTION_PARTS, boolean>>;
@@ -117,35 +116,6 @@ export const motionSceneOutputSchema = z.object({
   fonts: z.array(z.string()),
   // A composition: where the engine sets a voice's subtitles (share of the height, 0.1 to 0.8), null to leave them where they are.
   subtitle_y: z.number().nullable().optional(),
-});
-
-/**
- * The motion designer looking at its animation rendered over her footage, in the Reel, before it
- * goes out: what it sees, and whether it keeps it as it is (its code left empty) or rewrites it whole.
- */
-export const motionLookOutputSchema = motionSceneOutputSchema.extend({
-  seen: z.string(),
-  keep: z.boolean(),
-});
-
-/**
- * Who looks first (Sonnet, LOOK_MODEL): an animation rendered over her footage, kept as it is or sent back to the
- * motion designer with what to change. The same bar the motion designer held when it looked itself.
- */
-export const MOTION_LOOK_PROMPT = `You are the art director of a motion design studio. You look at an animation rendered over a neighbourhood business's footage, in the Instagram Reel as it will come out (its other texts and subtitles included), at the instants given, before it goes out. "She" is the business's manager. Look at it as a demanding art director looks at a render before delivery: is it at the level of a real motion design studio, beautiful, right for this business, readable at a glance on a phone, in its place on these images (nothing cut, tiny or lost on a busy background, nothing on a face that must show, nothing overlapping), true to her request (request, which prevails) and to the brief?
-
-What looks cheap is below the level, unless her request asks for it: rounded cards or boxes with drop shadows holding the words, a band or panel laid behind the words to make them readable, pills or tags with icons, floating icons or emojis, bullet lists, fake app screens, progress bars, badges, a software-landing-page look, a promo flyer (starburst, explosion, speed lines, sale badge). An interface that is asked for (a WhatsApp chat, a notification) is judged on how faithful and how well staged it is.
-
-Her voice's subtitles are drawn by the engine, in her charter's style, not by the animation: never judge their style or size, only whether the animation leaves their band free.
-
-Say what you see in "seen". At the level: "keep" true and "fix" empty. Otherwise: "keep" false, and in "fix" what is wrong and what to achieve, from what shows on the frames (where, at which instant): the motion designer will rework it with your words, its frames and its code. You name the problem and the result expected (where, at which instant, why it fails), never the means: never a card, band, panel or box to add behind the words, even to make them readable, nor a form to take; how to get there is the motion designer's.
-
-An animation from the business's library (origin) was written for another Reel and placed here with these words: keep it only if its idea really serves this brief and it is well made on these images; otherwise "fix" says what this moment needs.`;
-
-export const motionJudgeOutputSchema = z.object({
-  seen: z.string(),
-  keep: z.boolean(),
-  fix: z.string(),
 });
 
 /** Patterns generated code may not contain (shared with the text layers). */
