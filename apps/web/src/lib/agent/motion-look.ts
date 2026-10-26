@@ -1,7 +1,7 @@
 import "server-only";
-import { buildReelProps, editPlanSchema, isMotionSegment, motionSlotSchema, motionTemplateSchema, propsAt, type EditPlan } from "@fauve/agent";
+import { buildReelProps, editPlanSchema, isMotionSegment, motionSlotSchema, motionTemplateSchema, propsAt, type EditPlan, type ReelProps } from "@fauve/agent";
 import { z } from "zod";
-import { loadMontageInputs } from "@/lib/render/render-post";
+import { checkReelAnimations, loadMontageInputs, subtitleRowAmongAnimations } from "@/lib/render/render-post";
 import { reelFramesInSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { lookAtScenes, type MotionKit, type SceneBrand, type SceneContext, type SceneLooks, type SceneRequest, type SceneResult } from "./motion-designer";
@@ -73,10 +73,12 @@ function motionOf(plan: EditPlan, id: string, brief: string) {
   return plan.layers?.find((l) => l.motion.brief === brief)?.motion;
 }
 
-/** Frames of the plan's animations as the Reel will show them: each at its instants, half size. */
-async function framesOf(studioId: string, postId: string, plan: EditPlan, moments: PendingLook["moments"]): Promise<SceneLooks> {
-  const frames = [...new Set(Object.values(moments).flatMap((list) => list.map((m) => Math.round(m.t * 30))))].sort((a, b) => a - b);
-  if (!frames.length) return new Map();
+/**
+ * The Reel as the render will show it, a voice's subtitles on the row the render gives them once its animations are
+ * drawn: seen on the row the design had set, they fell on its cards, and two good animations in three were sent back
+ * and rewritten for what the render corrects by itself (it moves the subtitles where the animations leave room).
+ */
+async function reelAsRendered(studioId: string, postId: string, plan: EditPlan): Promise<ReelProps> {
   const inputs = await loadMontageInputs(studioId, plan, { postId });
   const props = buildReelProps(plan, {
     template: motionTemplateSchema.catch("libre").parse(plan.template),
@@ -91,6 +93,17 @@ async function framesOf(studioId: string, postId: string, plan: EditPlan, moment
     photoAspects: inputs.photoAspects,
     ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),
   });
+  const row = await subtitleRowAmongAnimations(studioId, plan, props, await checkReelAnimations(props), inputs).catch((error: unknown) => {
+    console.warn("motion look: subtitles' row not weighed, seen where the design set them", error);
+    return undefined;
+  });
+  return row === undefined ? props : { ...props, subtitleY: row };
+}
+
+/** Frames of the plan's animations as the Reel will show them: each at its instants, half size. */
+async function framesOf(props: ReelProps, postId: string, moments: PendingLook["moments"]): Promise<SceneLooks> {
+  const frames = [...new Set(Object.values(moments).flatMap((list) => list.map((m) => Math.round(m.t * 30))))].sort((a, b) => a - b);
+  if (!frames.length) return new Map();
   const images = await reelFramesInSandbox(`look-${postId.slice(0, 8)}-${Date.now()}`, propsAt(props, frames), frames);
   return new Map(
     Object.entries(moments).map(([id, list]) => [
@@ -140,9 +153,13 @@ async function reworkFromLook(studioId: string, postId: string, planId: string, 
     const said = look.written[id] ?? {};
     return [{ id, code: motion.code, js: motion.js, error: null, ...said, photos: motion.photos, fonts: motion.fonts, ...(motion.subtitle_y !== undefined ? { subtitleY: motion.subtitle_y } : {}) }];
   });
-  const reworked = await lookAtScenes(studioId, requests, results, look.direction, look.brand, look.kit, {
+  if (!results.length) return 0;
+  const reel = await reelAsRendered(studioId, postId, plan);
+  // A rewrite keeps its words off the subtitles where they will really be.
+  const asked = requests.map((r) => (r.subtitles && reel.subtitleY !== undefined ? { ...r, subtitles: { ...r.subtitles, y: reel.subtitleY } } : r));
+  const reworked = await lookAtScenes(studioId, asked, results, look.direction, look.brand, look.kit, {
     ...look.context,
-    rendered: (written) => framesOf(studioId, postId, plan, Object.fromEntries(written.flatMap((w) => (look.moments[w.id] ? [[w.id, look.moments[w.id]!]] : [])))),
+    rendered: (written) => framesOf(reel, postId, Object.fromEntries(written.flatMap((w) => (look.moments[w.id] ? [[w.id, look.moments[w.id]!]] : [])))),
   });
   if (reworked.length) {
     const briefOf = (id: string) => requests.find((r) => r.id === id)?.brief;

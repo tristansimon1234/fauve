@@ -31,6 +31,8 @@ import {
   type PostKind,
   type PostStatus,
   type ReelInputs,
+  type ReelProps,
+  type TracksByClip,
   voiceTranscriptSchema,
 } from "@fauve/agent";
 import { z } from "zod";
@@ -198,6 +200,82 @@ export async function loadMontageInputs(
 /** A photo's reading as kept on it (its size and what Gemini saw: faces, lettering). */
 const photoReadSchema = z.object({ width: z.number(), height: z.number(), detection: photoDetectionSchema });
 
+/**
+ * The check of a Reel's animations before it renders (scenes `m<i>`, animations over several shots `l<i>`): one whose text
+ * leaves the frame is refused, and what each draws, row by row, is measured. Library scenes play with new texts, older
+ * plans predate the layout check: every animation is checked. A scene that follows what moves is checked where it goes,
+ * with the footage's tracks and the Reel's camera moves. Unavailable, nothing is refused.
+ */
+export async function checkReelAnimations(props: ReelProps): Promise<SceneChecks> {
+  const look = { template: props.template, ...(props.tempo ? { tempo: props.tempo } : {}), ...(props.brand.signature ? { signature: props.brand.signature } : {}) };
+  return smokeTestScenes(
+    [
+      ...props.segments.flatMap((s, i) =>
+        s.type === "motion"
+          ? [
+              {
+                id: `m${i}`,
+                js: s.js,
+                durationInFrames: s.durationInFrames,
+                texts: s.texts,
+                ...(s.photos ? { photos: s.photos } : {}),
+                ...(s.track ? { track: s.track, look } : {}),
+                ...(s.fonts ? { fonts: s.fonts } : {}),
+              },
+            ]
+          : [],
+      ),
+      ...(props.layers ?? []).map((l, i) => ({
+        id: `l${i}`,
+        js: l.js,
+        durationInFrames: l.durationInFrames,
+        texts: l.texts,
+        cuts: l.cuts,
+        ...(l.photos ? { photos: l.photos } : {}),
+        ...(l.shots ? { shots: l.shots } : {}),
+        ...(l.track || l.shots?.some((x) => x.track) ? { look, ...(l.track ? { track: l.track } : {}) } : {}),
+        ...(l.fonts ? { fonts: l.fonts } : {}),
+      })),
+    ],
+    props.brand,
+  ).catch((e: unknown): SceneChecks => {
+    console.warn("motion scenes: check unavailable", e);
+    return { errors: {}, faces: {}, cover: {} };
+  });
+}
+
+/**
+ * A voice's subtitles show all along it, on one row for the whole Reel: once its animations are drawn (those that pass
+ * their check), the row where they, the faces and the Reel's texts leave them room (Tristan: « il faut pas masquer mais
+ * bien les placer là où ça ne gêne pas les anim et les visages »). The new row, or undefined when it stays where it is
+ * (no voice, or a composition that plays sets its own). The render uses it, and the look before it, so that the
+ * animations are looked at with the subtitles where they will be.
+ */
+export async function subtitleRowAmongAnimations(
+  studioId: string,
+  plan: EditPlan,
+  props: ReelProps,
+  checks: SceneChecks,
+  inputs: { clipIds: string[]; tracks: TracksByClip; facts: MediaFacts },
+): Promise<number | undefined> {
+  if (!props.words.length || props.layers?.some((l, i) => l.compose && !checks.errors[`l${i}`])) return undefined;
+  // What each animation that plays draws, row by row, for as long as it plays.
+  const drawnFor = (id: string, frames: number) => (!checks.errors[id] && checks.cover[id] ? [{ seconds: frames / props.fps, profile: checks.cover[id]! }] : []);
+  const drawnBy = [
+    ...props.segments.flatMap((s, i) => (s.type === "motion" ? drawnFor(`m${i}`, s.durationInFrames) : [])),
+    ...(props.layers ?? []).flatMap((l, i) => drawnFor(`l${i}`, l.durationInFrames)),
+  ];
+  const current = props.subtitleY ?? SUBTITLE_ROW.y;
+  const missing = inputs.clipIds.filter((id) => !(id in inputs.tracks) && !inputs.facts.photos[id]);
+  const everyTrack = { ...inputs.tracks, ...(await loadTracks(studioId, missing).catch(() => ({}))) };
+  const row = subtitleRowAmong(current, {
+    faces: busyTimeline(plan, { ...inputs.facts, tracks: everyTrack }).flatMap((s) => s.windows),
+    animations: drawnBy,
+    texts: textBands(plan.texts, Boolean(plan.voice)),
+  });
+  return row === current ? undefined : row;
+}
+
 /** The finished video of a Reel the effects agent made: its one shot. */
 async function bakedVideo(studioId: string, plan: EditPlan): Promise<Buffer> {
   const shot = plan.segments.find(isClipSegment);
@@ -289,52 +367,14 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         photoAspects,
         ...(Object.keys(tracks).length ? { tracks } : {}),
       });
-      // Library scenes play with new texts, older plans predate the layout check: every
-      // scene is checked before the render, and one whose text leaves the frame plays its
-      // fixed scene (an animation over several shots, which has none, is left out). If the
-      // check is unavailable, the scenes stay.
-      // A scene that follows what moves is checked where it goes: with the footage's tracks and the Reel's camera moves.
-      const look = { template: props.template, ...(props.tempo ? { tempo: props.tempo } : {}), ...(props.brand.signature ? { signature: props.brand.signature } : {}) };
-      const checks = await smokeTestScenes(
-        [
-          ...props.segments.flatMap((s, i) =>
-            s.type === "motion"
-              ? [
-                  {
-                    id: `m${i}`,
-                    js: s.js,
-                    durationInFrames: s.durationInFrames,
-                    texts: s.texts,
-                    ...(s.photos ? { photos: s.photos } : {}),
-                    ...(s.track ? { track: s.track, look } : {}),
-                    ...(s.fonts ? { fonts: s.fonts } : {}),
-                  },
-                ]
-              : [],
-          ),
-          ...(props.layers ?? []).map((l, i) => ({
-            id: `l${i}`,
-            js: l.js,
-            durationInFrames: l.durationInFrames,
-            texts: l.texts,
-            cuts: l.cuts,
-            ...(l.photos ? { photos: l.photos } : {}),
-            ...(l.shots ? { shots: l.shots } : {}),
-            ...(l.track || l.shots?.some((x) => x.track) ? { look, ...(l.track ? { track: l.track } : {}) } : {}),
-            ...(l.fonts ? { fonts: l.fonts } : {}),
-          })),
-        ],
-        props.brand,
-      ).catch((e: unknown): SceneChecks => {
-        console.warn("motion scenes: check unavailable", e);
-        return { errors: {}, faces: {}, cover: {} };
+      // Every animation is checked before the render: one whose text leaves the frame plays its fixed scene (an
+      // animation over several shots, which has none, is left out). If the check is unavailable, the scenes stay.
+      const checks = await checkReelAnimations(props);
+      // Where a voice's subtitles go once its animations are drawn, weighed on the animations as checked (below).
+      const row = await subtitleRowAmongAnimations(studioId, plan, props, checks, { clipIds, tracks, facts }).catch((error: unknown) => {
+        console.warn("subtitles' row not weighed, kept", renderId, error);
+        return undefined;
       });
-      // What each animation that plays draws, row by row, for as long as it plays: where a voice's subtitles go (below).
-      const drawnFor = (id: string, frames: number) => (!checks.errors[id] && checks.cover[id] ? [{ seconds: frames / props.fps, profile: checks.cover[id]! }] : []);
-      const drawnBy = [
-        ...props.segments.flatMap((s, i) => (s.type === "motion" ? drawnFor(`m${i}`, s.durationInFrames) : [])),
-        ...(props.layers ?? []).flatMap((l, i) => drawnFor(`l${i}`, l.durationInFrames)),
-      ];
       props.segments = props.segments.map((s, i) => {
         if (s.type !== "motion" || !checks.errors[`m${i}`]) return s;
         console.warn("motion scene falls back to its fixed scene", renderId, checks.errors[`m${i}`]);
@@ -351,29 +391,12 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       }
       // Where an animation sits over her footage is its designer's (it looked at it on her images): the engine no longer
       // moves it (a move kept on an older plan stays, motion.shift).
-      // A voice's subtitles show all along it, on one row for the whole Reel: now that its animations are drawn, the row
-      // where they, the faces and the Reel's texts leave them room (Tristan: « il faut pas masquer mais bien les placer
-      // là où ça ne gêne pas les anim et les visages »); kept on the plan, so the preview shows them there too. A
-      // composition sets its own row.
-      if (props.words.length && !props.layers?.some((l) => l.compose)) {
-        const current = props.subtitleY ?? SUBTITLE_ROW.y;
-        try {
-          const missing = clipIds.filter((id) => !(id in tracks) && !facts.photos[id]);
-          const everyTrack = { ...tracks, ...(await loadTracks(studioId, missing).catch(() => ({}))) };
-          const row = subtitleRowAmong(current, {
-            faces: busyTimeline(plan, { ...facts, tracks: everyTrack }).flatMap((s) => s.windows),
-            animations: drawnBy,
-            texts: textBands(plan.texts, Boolean(plan.voice)),
-          });
-          if (row !== current) {
-            console.log("subtitles placed where the animations leave room", renderId, current, "→", row);
-            props.subtitleY = row;
-            const saved = await db.from("edit_plans").update({ plan: { ...(planRow.plan as Record<string, unknown>), subtitle_y: row } }).eq("id", planRow.id);
-            if (saved.error) console.warn("subtitles' row not kept on the plan", planRow.id, saved.error.message);
-          }
-        } catch (error) {
-          console.warn("subtitles' row not weighed, kept", renderId, error);
-        }
+      // A voice's subtitles on the row its animations, faces and texts leave free; kept on the plan, so the preview shows them there too.
+      if (row !== undefined) {
+        console.log("subtitles placed where the animations leave room", renderId, props.subtitleY ?? SUBTITLE_ROW.y, "→", row);
+        props.subtitleY = row;
+        const saved = await db.from("edit_plans").update({ plan: { ...(planRow.plan as Record<string, unknown>), subtitle_y: row } }).eq("id", planRow.id);
+        if (saved.error) console.warn("subtitles' row not kept on the plan", planRow.id, saved.error.message);
       }
       try {
         mp4 = await renderReelInSandbox({ id: renderId, props });
