@@ -118,7 +118,7 @@ export async function setVoiceOff(postId: string): Promise<{ ok: boolean }> {
     // The voice is drawn in the effect's video: the agent makes it again without it (a correction, charged on delivery).
     const accepted = await correctionQuote(studioId, postId, EFFECT_VOICE_OUT);
     if ("error" in accepted) return { ok: false };
-    after(() => startMontage(studioId, accepted));
+    after(() => startMontage(studioId, accepted, { request: { via: "page", lines: [{ who: "elle", text: "« Sans voix »" }] } }));
   } else if (again) {
     after(() =>
       renderPost(studioId, postId).then(

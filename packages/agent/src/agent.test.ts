@@ -513,20 +513,53 @@ test("créer: what she imagines titles the post, and reaches the montage and the
   assert.equal(imaginedBrief("   "), undefined);
 });
 
-test("a correction carries her own words, as she wrote them, after Simone's reading", async () => {
-  const { withHerWords } = await import("./creation.ts");
-  const asked = "cest bien mais le texte depasse de lanimation whatapps\nameliore la nettement";
-  const brief = "Dans l'animation WhatsApp, le texte dépasse : réduire la taille du texte, bulles plus larges.";
-  assert.equal(
-    withHerWords(brief, asked),
-    `${brief}\n\nSes mots, tels quels : « cest bien mais le texte depasse de lanimation whatapps ameliore la nettement »`,
+test("her request reaches every agent word for word: each launch's exchange, Simone's brief as its reading, her taste", async () => {
+  const { exchangeLines, requestBrief, withEntry, requestLogSchema, BRIEF_MAX } = await import("./request-log.ts");
+  // The exchange starts after the last montage launched in the thread (an earlier Reel's exchange is its own).
+  const rows = [
+    { direction: "inbound" as const, type: "text", body: "fais un truc quali avec L en bas, les animations en haut", created_at: "2026-10-23T15:12:00Z" },
+    { direction: "outbound" as const, type: "text", body: "C'est parti pour Inès.", created_at: "2026-10-23T15:13:00Z", launched: true },
+    { direction: "inbound" as const, type: "video", body: null, created_at: "2026-10-23T18:40:00Z" },
+    { direction: "inbound" as const, type: "audio", body: "Elle s'est fait une petite animation, quelque part sur l'écran où elles écrivent sur WhatsApp", created_at: "2026-10-23T18:43:48Z" },
+    { direction: "outbound" as const, type: "text", body: "Bien vu, on reconnaît WhatsApp.", created_at: "2026-10-23T18:44:01Z" },
+    { direction: "inbound" as const, type: "text", body: "C'est parti", created_at: "2026-10-23T18:44:13Z" },
+  ];
+  const lines = exchangeLines(rows);
+  assert.deepEqual(
+    lines.map((l) => [l.who, l.text]),
+    [
+      ["elle", "[elle envoie une vidéo]"],
+      ["elle", "Elle s'est fait une petite animation, quelque part sur l'écran où elles écrivent sur WhatsApp"],
+      ["simone", "Bien vu, on reconnaît WhatsApp."],
+      ["elle", "C'est parti"],
+    ],
   );
-  // Without a brief of Simone's, her words alone; quoted whole already, nothing added; nothing said, the brief as it is.
-  assert.equal(withHerWords(undefined, "plus court"), "Ses mots, tels quels : « plus court »");
-  assert.equal(withHerWords("Elle dit « plus court » : raccourcir.", "plus court"), "Elle dit « plus court » : raccourcir.");
-  assert.equal(withHerWords("Raccourcir.", "   "), "Raccourcir.");
-  // A long voice note is cut at a word.
-  assert.ok(withHerWords(undefined, "mot ".repeat(500))!.length < 1300);
+  // A long exchange keeps its latest messages.
+  const long = exchangeLines(Array.from({ length: 30 }, (_, i) => ({ direction: "inbound" as const, type: "text", body: `${i} ${"mot ".repeat(200)}`, created_at: `t${i}` })));
+  assert.ok(long.length < 30 && long.at(-1)!.text.startsWith("29 "));
+  // Every agent gets her words first, Simone's brief as their reading, then her words on her recent Reels.
+  const log = withEntry([], { at: "2026-10-23T18:44:52Z", via: "chat", lines });
+  const ines = withEntry([], { at: "x", via: "chat", lines: [{ who: "elle", text: "les animations en haut" }, { who: "simone", text: "ok" }] });
+  const brief = requestBrief(log, "Reel d'une fleuriste…", [{ title: "Inès ouvre son studio", log: ines }])!;
+  assert.match(brief, /^Sa conversation avec Simone pour ce Reel, mot pour mot/);
+  assert.match(brief, /\[Demande, dans la conversation\]\nElle : \[elle envoie une vidéo\]/);
+  assert.match(brief, /Le brief de Simone pour ce lancement :\nReel d'une fleuriste…/);
+  assert.match(brief, /Ce qu'elle a dit de ses Reels récents[^\n]*\n« Inès ouvre son studio » : les animations en haut$/);
+  assert.ok(brief.indexOf("Elle :") < brief.indexOf("Le brief de Simone"));
+  // A correction is its own launch, after the request.
+  const corrected = withEntry(log, { at: "y", via: "page", lines: [{ who: "elle", text: "« Plus court »" }] });
+  assert.match(requestBrief(corrected, "Plus court.")!, /\[Correction 1, depuis la page de la publication\]\nElle : « Plus court »/);
+  // Nothing kept: Simone's brief as it was.
+  assert.equal(requestBrief([], "Le brief."), "Le brief.");
+  // What the post holds is read leniently, an entry it cannot read left out.
+  assert.equal(requestLogSchema.parse([{ at: "x", via: "chat", lines: [] }, { nope: 1 }]).length, 1);
+  assert.deepEqual(requestLogSchema.parse("abc"), []);
+  // A post keeps its latest launches; the brief stays within what a montage job carries.
+  let many = log;
+  for (let i = 0; i < 20; i++) many = withEntry(many, { at: "z", via: "chat", lines: [] });
+  assert.equal(many.length, 12);
+  const full = Array.from({ length: 12 }, () => ({ at: "z", via: "chat" as const, lines: [{ who: "elle" as const, text: "mot ".repeat(370) }] }));
+  assert.ok(requestBrief(full, "B".repeat(1500))!.length <= BRIEF_MAX);
 });
 
 test("créer: « Oui, publie-le » and « Je regarde d’abord » are answered without Simone", async () => {
@@ -3721,7 +3754,7 @@ test("motion designer: a base every animation gets, the parts its call needs; wh
   assert.equal(motionDesignerPrompt({ moves: true, correction: true }).parts, motionDesignerPrompt({ correction: true, moves: true }).parts);
   // What looks cheap is named; her request prevails.
   assert.match(simple.base, /What looks cheap/);
-  assert.match(simple.base, /request \(when given\): what she asked for[^\n]*It prevails/);
+  assert.match(simple.base, /request \(when given\): what she asked for[^\n]*Her own words prevail/);
   // Her charter's colours make the animations' palette, never Simone's own.
   const brand = resolveReelBrand({}, "libre", { name: "Fleurs", accent: "#C2185B", colors: ["#C2185B", "#2E7D32", "#F8E1E7", "#1B1B1B"] });
   assert.deepEqual(brand.palette, { secondary: "#2E7D32", light: "#F8E1E7", dark: "#1B1B1B" });

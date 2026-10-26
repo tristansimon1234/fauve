@@ -1,5 +1,5 @@
 import "server-only";
-import { ANALYST_MODEL, CAPTION_WRITER_PROMPT, captionDraftSchema, keptCaption, memoryLines } from "@fauve/agent";
+import { BRIEF_MAX, ANALYST_MODEL, CAPTION_WRITER_PROMPT, captionDraftSchema, keptCaption, memoryLines } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -37,7 +37,7 @@ export async function ensureCaption(studioId: string, postId: string, planId: st
             reservation_en_ligne: Boolean(studio.data?.booking_url),
             ton: (profile.data?.profile as { tone?: string } | null)?.tone ?? undefined,
           },
-          publication: { idee: post.title ?? undefined, angle: post.agent_note ?? undefined, ...(brief?.trim() ? { demande: brief.trim().slice(0, 1500) } : {}) },
+          publication: { idee: post.title ?? undefined, angle: post.agent_note ?? undefined, ...(brief?.trim() ? { demande: brief.trim().slice(0, BRIEF_MAX) } : {}) },
           video: { textes_a_l_ecran: texts, ...(spoken ? { voix_off: spoken.slice(0, 1500) } : {}) },
         }),
       },

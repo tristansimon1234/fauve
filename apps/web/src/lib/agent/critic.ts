@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import {
+  BRIEF_MAX,
   ambianceLine,
   contractLines,
   type ReelContract,
@@ -156,7 +157,7 @@ export async function reviewMontage(input: {
     followed
       ? `${followedLine(followed)}. Ce Reel le recopie : il doit en reprendre la forme, le rythme, le texte et la fin, avec ses images et ses mots à elle ; ce que le Reel recopié n'a pas (une accroche écrite, du texte, une invitation à la fin, une voix), celui-ci n'a pas à l'avoir.`
       : "",
-    input.request ? `Demande de la gérante : ${input.request.slice(0, 1500)}` : "",
+    input.request ? `Demande de la gérante : ${input.request.slice(0, BRIEF_MAX)}` : "",
     contractLines(input.contract).length
       ? `Ce qu'elle a fixé (un point non tenu, ou une voix qui ne dit pas son texte, est un défaut bloquant) :\n${contractLines(input.contract).map((l) => `- ${l}`).join("\n")}`
       : "",

@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { toFile } from "@anthropic-ai/sdk";
 import {
+  BRIEF_MAX,
   ANALYST_MODEL,
   brandProfileSchema,
   CHAT_MODEL,
@@ -88,7 +89,7 @@ export async function routeEffect(studioId: string, request: string | undefined,
       max_tokens: 400,
       output_config: { effort: "low", format: outputFormat(effectRouteSchema) },
       system: EFFECT_ROUTER_PROMPT,
-      messages: [{ role: "user", content: JSON.stringify({ demande: (request ?? "").slice(0, 3000), ...(copied ? { reel_recopie: copied } : {}), videos: files.videos, photos: files.photos }) }],
+      messages: [{ role: "user", content: JSON.stringify({ demande: (request ?? "").slice(0, BRIEF_MAX), ...(copied ? { reel_recopie: copied } : {}), videos: files.videos, photos: files.photos }) }],
     });
     await logClaudeCost(studioId, response.usage, "effect_route", ANALYST_MODEL);
     return response.parsed_output ?? chain;

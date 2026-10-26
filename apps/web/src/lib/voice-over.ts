@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  BRIEF_MAX,
   brandProfileSchema,
   CHAT_MODEL,
   CLAUDE_MODEL,
@@ -121,7 +122,7 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
     // How its voice plays (its signature): « cool et nonchalant, un brin rock ».
     ...(profile.signature?.narrator ? { intonation: profile.signature.narrator.delivery } : {}),
     // Her whole request (the title keeps only its first words): what she imagines, or Simone's brief from the chat.
-    publication: { idee: post.data.title, angle: post.data.agent_note ?? undefined, ...(brief ? { demande: brief.slice(0, 1500) } : {}) },
+    publication: { idee: post.data.title, angle: post.data.agent_note ?? undefined, ...(brief ? { demande: brief.slice(0, BRIEF_MAX) } : {}) },
     images,
     ...(opening?.what ? { ouverture: opening.what } : {}),
     ...(copied ? { reel_a_recopier: { accroche: `${copied.look.hook.kind} : ${copied.look.hook.what}`, fin: copied.look.ending } } : {}),

@@ -46,7 +46,7 @@ export const reelContractSchema = z.object({
 });
 export type ReelContract = z.infer<typeof reelContractSchema>;
 
-export const CONTRACT_PROMPT = `You read a person's request for a Reel and note, adding nothing, what they fixed themselves. Nothing they did not say: a field they did not fix stays empty (null, « libre », an empty list). What you note stays in their own words, in French.
+export const CONTRACT_PROMPT = `You read a person's request for a Reel and note, adding nothing, what they fixed themselves. Nothing they did not say: a field they did not fix stays empty (null, « libre », an empty list). What you note stays in their own words, in French. When the request holds their exchange with Simone, only their own messages fix something: Simone's replies, plan and brief are context, never a fixed point, even when they answered « oui » or « c'est parti » to them.
 - voice_text: the words they want to hear in the voice-over, as they wrote them (often between quotes, after « texte : », « la voix dit : »); null if they gave no text. Loose ideas (« parle du prix ») are not a text.
 - voice_text_rest: when they write only the beginning of the voice and describe the rest instead of writing it (« … et là tu parles de Simone », « puis la voix présente l'offre », « et tu expliques que… »), what the rest must say, in their words; null when their text is the whole voice. Their beginning stays in voice_text; the rest described never goes into it.
 - voice_text_mode: « polish » when they ask to improve it, to rephrase it, or say « dans l'idée », « genre »; otherwise « verbatim ».

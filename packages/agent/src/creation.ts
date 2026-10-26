@@ -60,21 +60,6 @@ export function imagineQuestion(kind: PostKind): string {
 /** What she imagines, as the montage reads it, and the voice over written before it. */
 export const imaginedBrief = (idea: string): string | undefined => (idea.trim() ? `Ce que la gérante imagine : ${idea.trim()}` : undefined);
 
-/** The most of her own words a correction's brief carries (a montage job keeps 4000 characters of brief). */
-const HER_WORDS_MAX = 1200;
-
-/**
- * A correction's brief with her own words, as she wrote them, after Simone's reading of them: the
- * editor and the motion designer go by hers (« ameliore la nettement » had become « réduire la taille
- * du texte »). Unchanged when Simone's brief already quotes them whole.
- */
-export function withHerWords(brief: string | undefined, asked: string): string | undefined {
-  const words = asked.replace(/\s+/g, " ").trim();
-  if (!words || brief?.replace(/\s+/g, " ").includes(words)) return brief;
-  const shown = words.length > HER_WORDS_MAX ? `${words.slice(0, HER_WORDS_MAX).replace(/\s+\S*$/, "")}…` : words;
-  return [brief?.trim(), `Ses mots, tels quels : « ${shown} »`].filter(Boolean).join("\n\n");
-}
-
 export type CreationPhase = "watch" | "edit" | "second" | "render" | "review";
 
 /** How long a Reel made by the effects agent takes, as she reads it. */

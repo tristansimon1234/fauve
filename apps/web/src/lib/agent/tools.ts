@@ -46,7 +46,8 @@ import {
   keptPlan,
   planMessage,
   PLAN_BUTTONS,
-  withHerWords,
+  exchangeLines,
+  type ExchangeRow,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -109,8 +110,8 @@ export type ToolContext = {
   timezone?: string;
   /** The app's conversation being answered: work started from it is delivered in it. */
   conversationId?: string;
-  /** Her messages this turn answers, as she wrote them (a voice note's words): a correction carries them to the editor. */
-  asked?: string;
+  /** The conversation this turn answers (oldest first): a montage launched now keeps its exchange, word for word, for every agent. */
+  exchange?: ExchangeRow[];
 };
 
 /**
@@ -198,6 +199,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const turnStartedAt = new Date();
   /** Posts whose render already waits for the end of this turn. */
   const rendering = new Set<string>();
+  /** A montage launched in this turn keeps the exchange that led to it, word for word, for every agent. */
+  const chatRequest = () => ({ via: "chat" as const, lines: exchangeLines(ctx.exchange ?? []) });
 
   /** Media ids given by the model must be this studio's. */
   async function assertOwnMedia(ids: string[]) {
@@ -216,7 +219,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   async function effectCorrection(postId: string, brief: string, doing: string) {
     const accepted = await correctionQuote(studioId, postId, brief);
     if ("error" in accepted) return json({ error: accepted.error });
-    ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
+    ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId, request: chatRequest() }));
     ctx.extras.quote = accepted.id;
     ctx.notes.push(`correction de l'effet lancée job=${accepted.id} post_id=${postId}`);
     return json({
@@ -474,9 +477,6 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         correction = true;
         variant = undefined;
       }
-      // A correction carries her own words to the editor, as she wrote them: Simone's reading of « améliore-la
-      // nettement » had become « réduire la taille du texte », and the animation came back the same, smaller.
-      if (correction && ctx.asked) brief = withHerWords(brief, ctx.asked);
       // The level asked for, else the studio's default (Réglages).
       const studio = await db.from("studios").select("montage_effort").eq("id", studioId).single();
       const wanted = effort ?? effortSchema.catch(DEFAULT_EFFORT).parse(studio.data?.montage_effort);
@@ -501,7 +501,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if ("error" in accepted) return json({ error: accepted.error });
       // Who makes it, decided now so she hears the right time (the job keeps it): an effect drawn image by image takes longer.
       const route = accepted.kind === "variant" ? "chain" : await effectRoute(studioId, { postId: post_id, correction: accepted.kind === "correction", brief: accepted.brief, mediaIds: accepted.mediaIds }).catch(() => undefined);
-      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, route, conversationId: ctx.conversationId }));
+      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, route, conversationId: ctx.conversationId, request: chatRequest() }));
       // In the app, the card follows the montage step by step; on WhatsApp, cards become links, so the post's link stays.
       ctx.extras.quote = job.id;
       if (ctx.waId) ctx.extras.posts = [post_id];
@@ -584,7 +584,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       const accepted = await acceptQuote(studioId, quote.id, turnStartedAt, { immediate: true });
       if ("error" in accepted) return json({ error: accepted.error });
-      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
+      ctx.afterReply.push(() => startMontage(studioId, accepted, { waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId, request: chatRequest() }));
       ctx.extras.quote = quote.id;
       if (ctx.waId) ctx.extras.posts = [post_id];
       ctx.notes.push(`version ${change.button.toLowerCase()} lancée quote_id=${quote.id} pour « ${post.title as string} » post_id=${post_id}`);

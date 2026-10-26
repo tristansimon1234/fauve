@@ -1,5 +1,5 @@
 import "server-only";
-import { CHAT_MODEL, CONTRACT_PROMPT, EMPTY_CONTRACT, reelContractSchema, type ReelContract } from "@fauve/agent";
+import { BRIEF_MAX, CHAT_MODEL, CONTRACT_PROMPT, EMPTY_CONTRACT, reelContractSchema, type ReelContract } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "./run";
 
@@ -12,7 +12,7 @@ export async function readContract(studioId: string, brief: string | undefined, 
   if (!brief?.trim()) return EMPTY_CONTRACT;
   // A correction's voice: the whole text on the Reel now, so that a quoted fragment edits it instead of
   // replacing it (Simone quoted the first sentence to fix « plus », and his 24 s voice became 8 s, the Reel 13 s).
-  const content = currentVoice?.trim() ? `${brief.slice(0, 4000)}\n\nTexte actuel de la voix : « ${currentVoice.trim().slice(0, 1500)} »` : brief.slice(0, 4000);
+  const content = currentVoice?.trim() ? `${brief.slice(0, BRIEF_MAX)}\n\nTexte actuel de la voix : « ${currentVoice.trim().slice(0, 1500)} »` : brief.slice(0, BRIEF_MAX);
   try {
     const response = await anthropic().beta.messages.parse({
       model: CHAT_MODEL,
