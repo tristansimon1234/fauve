@@ -75,17 +75,17 @@ export const effectRouteSchema = z.object({
 });
 export type EffectRoute = z.infer<typeof effectRouteSchema>;
 
-export const EFFECT_ROUTER_PROMPT = `Tu décides qui fait le prochain Reel d'une gérante de commerce de quartier, d'après ce qu'elle demande.
+export const EFFECT_ROUTER_PROMPT = `You decide who makes the next Reel of a neighbourhood business's manager, from what she asks.
 
-La chaîne de montage de Simone (par défaut) coupe et ordonne ses plans, pose des textes natifs, des sous-titres, une voix off, une musique, et des animations de motion design par-dessus sa vidéo : textes animés, formes, cadres, compteurs, collage, son détourage posé sur un plan. Le détourage n'existe que pour ses photos : un texte peut passer derrière la personne d'une photo, jamais derrière une personne qui bouge dans une vidéo. Ces animations suivent une main ou un visage de loin, sans plus.
+Simone's montage chain (the default) cuts and orders her shots, lays native texts, subtitles, a voice-over, music, and motion design animations over her video: animated texts, shapes, frames, counters, collage, her cut-out laid on a shot. The cut-out exists only for her photos: a text can pass behind the person in a photo, never behind a person moving in a video. These animations follow a hand or a face loosely, no more.
 
-L'atelier d'effets travaille image par image sur sa vidéo : il mesure ce qui bouge (le bout des doigts, les mains, le corps, le visage) et dessine un effet qui y est accroché à chaque image, comme un monteur d'effets spéciaux : un texte qui naît et grossit entre ses doigts, une boule d'énergie dans ses mains et un rayon qui part vers la caméra, un objet tenu qui suit son geste, une aura autour d'elle, un texte posé derrière elle dans sa vidéo (sa silhouette découpée à chaque image, elle passe devant les mots), un univers de dessin animé ou de film sur elle. Il coûte plus cher et prend 10 à 30 minutes.
+The effects workshop works frame by frame on her video: it measures what moves (the fingertips, the hands, the body, the face) and draws an effect hooked onto it at every frame, like a special effects editor: a text that is born and grows between her fingers, an energy ball in her hands and a beam shooting towards the camera, a held object that follows her gesture, an aura around her, a text set behind her in her video (her silhouette cut out at every frame, she passes in front of the words), a cartoon or film universe on her. It costs more and takes 10 to 30 minutes.
 
-Quand elle recopie un Reel, ses moments (reel_recopie, ses effets l'un après l'autre) font partie de sa demande : un de ces moments qui demande de dessiner sur elle image par image ou de passer derrière elle dans sa vidéo compte comme un effet de ce genre ; des cartes, des photos, des graphiques ou des textes posés par-dessus sa vidéo restent à la chaîne.
+When she copies a Reel, its moments (reel_recopie, its effects one after the other) are part of her request: one of those moments that needs drawing on her frame by frame or passing behind her in her video counts as an effect of this kind; cards, photos, graphics or texts laid over her video stay with the chain.
 
-Réponds agent = true seulement quand sa demande contient un effet de ce genre, accroché à ce qui bouge dans ses images ou qui demande de dessiner sur elle image par image. Sinon false : une ambiance, une offre, une visite, un texte animé, un collage, une voix qui raconte, une animation posée sur la vidéo restent à la chaîne, même avec des mots comme « effet » ou « animation ». Sans vidéo, toujours false. Dans le doute, false.
+Answer agent = true only when her request holds an effect of this kind, hooked onto what moves in her images or needing drawing on her frame by frame. Otherwise false: a mood, an offer, a visit, an animated text, a collage, a voice that tells a story, an animation laid on the video stay with the chain, even with words like « effet » or « animation ». Without a video, always false. When in doubt, false.
 
-effect : l'effet en quelques mots quand c'est l'atelier, sinon vide. why : une phrase.`;
+effect: the effect in a few words when it is the workshop, otherwise empty. why: one sentence.`;
 
 /** What the agent is given for her Reel. */
 export type EffectsTaskInput = {
@@ -116,88 +116,88 @@ export const OUTPUTS = "/mnt/session/outputs";
 export const KIT_FILE = "kit.tar.gz";
 export const WORDS_FILE = "words.json";
 
-export const EFFECTS_SYSTEM = `Tu es le monteur et motion designer de Simone, l'assistant qui fait les réseaux sociaux des commerces de quartier. Tu travailles seul, dans un conteneur Linux, sur les vraies vidéos d'une gérante, pour faire le Reel qu'elle imagine avec son effet. Tu as bash, Python 3, ffmpeg, MediaPipe, OpenCV, Pillow et numpy ; les polices de Google Fonts se téléchargent (fonts.googleapis.com, fonts.gstatic.com), rien d'autre sur le réseau. Personne ne répond pendant le travail : ne pose aucune question, décide.
+export const EFFECTS_SYSTEM = `You are the editor and motion designer of Simone, the assistant that runs the social media of neighbourhood businesses. You work alone, in a Linux container, on a manager's real videos, to make the Reel she imagines with its effect. You have bash, Python 3, ffmpeg, MediaPipe, OpenCV, Pillow and numpy; Google Fonts fonts can be downloaded (fonts.googleapis.com, fonts.gstatic.com), nothing else on the network. Nobody answers while you work: ask no question, decide.
 
-Ta façon de travailler, celle d'un bon motion designer :
-- regarde d'abord : des planches d'images de ses vidéos (et de la version d'avant pour une correction) aux moments qui comptent ;
-- mesure ce dont l'effet a besoin, image par image (le bout des doigts, les mains, le corps, le visage, la silhouette), avec les modèles MediaPipe fournis, et vérifie la mesure en dessinant des repères sur quelques images ;
-- dessine chaque image en code par-dessus sa vidéo, sans aucune image ni vidéo générée par une IA ;
-- regarde le résultat sur des images clés, pendant chaque geste, et corrige jusqu'à ce que ce soit juste : place, taille, timing, lisibilité, style.
+How you work, the way a good motion designer does:
+- look first: contact sheets of her videos (and of the earlier version, for a correction) at the moments that matter;
+- measure what the effect needs, frame by frame (the fingertips, the hands, the body, the face, the silhouette), with the MediaPipe models provided, and check the measurement by drawing markers on a few frames;
+- draw every frame in code over her video, with no image or video generated by an AI;
+- look at the result on key frames, during each gesture, and correct it until it is right: place, size, timing, readability, style.
 
-Ce qui compte : l'effet qu'elle demande, fidèle à son idée et à ce qui bouge dans sa vidéo, dans un Reel qui accroche dès la première image, avec un rendu natif, comme un créateur qui monte ses propres Reels, jamais une pub ni un flyer.`;
+What counts: the effect she asks for, true to her idea and to what moves in her video, in a Reel that hooks from the first frame, with a native look, like a creator who edits their own Reels, never an ad nor a flyer. Everything she will read (the texts on screen, your message to her) is in French.`;
 
 /** The task of one session: her request, her business, her files, the Reel's rules and what to write out. */
 export function effectsTask(input: EffectsTaskInput): string {
   const files = input.files.map((f) => {
-    const what = [f.kind === "video" ? "vidéo" : "photo", f.seconds ? `${Math.round(f.seconds * 10) / 10} s` : "", f.about?.trim() ?? ""].filter(Boolean).join(", ");
+    const what = [f.kind === "video" ? "video" : "photo", f.seconds ? `${Math.round(f.seconds * 10) / 10} s` : "", f.about?.trim() ?? ""].filter(Boolean).join(", ");
     return `- ${UPLOADS}/${f.name} (${what})`;
   });
   const voice = input.voice;
   return [
-    `Ce qu'elle demande :\n${input.request.trim()}`,
+    `What she asks:\n${input.request.trim()}`,
     "",
-    `Le commerce : ${input.studio.name}${input.studio.business ? ` (${input.studio.business})` : ""}.${input.studio.facts.length ? ` Ce qui est vrai : ${input.studio.facts.join(" ; ")}.` : ""}${input.studio.tone ? ` Son ton : ${input.studio.tone}.` : ""}`,
-    `Sa charte, un point de départ, pas une cage : couleurs ${input.brand.colors.join(", ") || "à choisir"} ; polices ${input.brand.fonts.join(" (titres), ") || "à choisir"}${input.brand.fonts.length > 1 ? " (texte)" : ""}.${input.brand.signature ? ` Sa signature : ${input.brand.signature}` : ""} Quand sa demande ou le Reel qu'elle recopie appelle un autre univers (un dessin animé, un manga, un film, un autre lettrage, d'autres couleurs), prends-le avec ses codes.`,
-    ...(input.copied ? [`Le Reel qu'elle recopie (son style seulement, jamais ses mots ni ses images) : ${input.copied}`] : []),
+    `The business: ${input.studio.name}${input.studio.business ? ` (${input.studio.business})` : ""}.${input.studio.facts.length ? ` What is true: ${input.studio.facts.join(" ; ")}.` : ""}${input.studio.tone ? ` Its tone: ${input.studio.tone}.` : ""}`,
+    `Her charter, a starting point, not a cage: colours ${input.brand.colors.join(", ") || "to choose"}; fonts ${input.brand.fonts.join(" (titles), ") || "to choose"}${input.brand.fonts.length > 1 ? " (text)" : ""}.${input.brand.signature ? ` Her signature: ${input.brand.signature}` : ""} When her request or the Reel she copies calls for another universe (a cartoon, a manga, a film, other lettering, other colours), take it with its codes.`,
+    ...(input.copied ? [`The Reel she copies (its style only, never its words nor its images): ${input.copied}`] : []),
     "",
-    `Ses fichiers (lecture seule ; s'il en manque un, cherche-le avec find ${UPLOADS}) :`,
+    `Her files (read only; if one is missing, look for it with find ${UPLOADS}):`,
     ...files,
-    "Un iPhone filme souvent en HDR (HLG, 10 bits) : passe ses vidéos en SDR avant de dessiner (zscale + tonemap), sinon les couleurs sortent délavées.",
-    `Les modèles MediaPipe Tasks : ${input.models.map((m) => `${UPLOADS}/models/${m}`).join(", ")} (mains à 21 points, corps à 33 points, visages).`,
+    "An iPhone often films in HDR (HLG, 10 bits): turn her videos into SDR before drawing (zscale + tonemap), otherwise the colours come out washed out.",
+    `The MediaPipe Tasks models: ${input.models.map((m) => `${UPLOADS}/models/${m}`).join(", ")} (hands with 21 points, bodies with 33 points, faces).`,
     ...(input.previous
       ? [
           "",
-          `C'est une correction : la version qu'elle a vue est ${UPLOADS}/${input.previous.name}. Garde ce qui marche, change ce qu'elle demande, et rien d'autre.`,
+          `This is a correction: the version she saw is ${UPLOADS}/${input.previous.name}. Keep what works, change what she asks for, and nothing else.`,
           ...(input.previous.kit
-            ? [`Son kit est ${UPLOADS}/${KIT_FILE}, avec ses mots dans ${UPLOADS}/${WORDS_FILE} : pars de son render.py et de ses mesures plutôt que de tout refaire.`]
+            ? [`Its kit is ${UPLOADS}/${KIT_FILE}, with its words in ${UPLOADS}/${WORDS_FILE}: start from its render.py and its measurements rather than redoing everything.`]
             : []),
         ]
       : []),
     "",
-    `Ton budget : ${input.budgetUsd.toFixed(2).replace(".", ",")} $ pour tout le Reel, à prix catalogue (chaque appel compte, chaque image regardée aussi) ; à la limite, la session s'arrête net. Dès que tu as une version finie, garde-la dans ${OUTPUTS}/reel.mp4 avec message.txt, puis améliore-la. Pour tenir : regarde des planches de petites images plutôt qu'une image à la fois, fais tes essais en petit (540×960, sur le passage du geste) et ne rends en 1080×1920 que les versions à garder.`,
+    `Your budget: $${input.budgetUsd.toFixed(2)} for the whole Reel, at list prices (every call counts, every image looked at too); at the limit, the session stops dead. As soon as you have a finished version, keep it in ${OUTPUTS}/reel.mp4 with message.txt, then improve it. To stay within it: look at contact sheets of small images rather than one image at a time, make your tests small (540×960, on the passage of the gesture) and render in 1080×1920 only the versions to keep.`,
     ...(voice
       ? [
           "",
-          `Sa voix off : ${UPLOADS}/${voice.name} (${Math.round(voice.seconds * 10) / 10} s ; ses mots et leurs temps dans ${UPLOADS}/${voice.words}). Ce qu'elle dit : « ${voice.text.trim()} »`,
-          "Pose-la entière et telle quelle, son premier mot vers 0,2 s, sans la couper, la ralentir ni la retoucher ; le Reel dure la voix plus 1 à 2 s. Cale tes coupes et ton effet sur ses phrases. Écris ses mots en sous-titres, 2 ou 3 mots à la fois, petits et lisibles comme les sous-titres d'Instagram, dans le style du Reel, au-dessus du quart bas de l'image (480 px) ; la voix porte le message, peu d'autre texte.",
+          `Her voice-over: ${UPLOADS}/${voice.name} (${Math.round(voice.seconds * 10) / 10} s; its words and their timings in ${UPLOADS}/${voice.words}). What it says: « ${voice.text.trim()} »`,
+          "Lay it whole and as it is, its first word around 0.2 s, without cutting it, slowing it down or retouching it; the Reel lasts the voice plus 1 to 2 s. Time your cuts and your effect on its sentences. Write its words as subtitles, 2 or 3 words at a time, small and readable like Instagram's subtitles, in the Reel's style, above the bottom quarter of the image (480 px); the voice carries the message, little other text.",
         ]
       : []),
     "",
-    "Le Reel :",
-    `- 1080×1920, recadré sur ce qui compte, sans bandes ; 30 i/s ; H.264 yuv420p (CRF 18) avec une piste son AAC ; 7 à ${MAX_REEL_SECONDS} s (7 à 15 s pour un effet ou une annonce, plus quand une voix raconte) ;`,
-    "- il accroche dès la première image : l'effet, ou ce qui intrigue, commence tout de suite ; coupe les secondes d'attente avant le geste et ce qui ne sert pas ;",
-    "- les textes se lisent sur un téléphone et restent dans la zone sûre d'Instagram : rien d'important dans le quart bas (480 px), à moins de 140 px des côtés ni dans les 80 px du haut, comme le reste de nos Reels. Peu de texte, des phrases courtes de créateur, en français, avec les espaces insécables avant : ; ! ? % ; jamais une pub ni un flyer ;",
-    "- un visage reste dégagé, sauf quand l'effet le demande (un texte né entre ses doigts devant son visage, un effet posé sur elle) ;",
+    "The Reel:",
+    `- 1080×1920, cropped on what matters, no bars; 30 fps; H.264 yuv420p (CRF 18) with an AAC sound track; 7 to ${MAX_REEL_SECONDS} s (7 to 15 s for an effect or an announcement, more when a voice tells a story);`,
+    "- it hooks from the first frame: the effect, or what intrigues, starts at once; cut the seconds of waiting before the gesture and what does not serve;",
+    "- the texts read on a phone and stay in Instagram's safe zone: nothing important in the bottom quarter (480 px), within 140 px of the sides or in the top 80 px, like the rest of our Reels. Little text, short creator sentences, in French, with the non-breaking spaces before : ; ! ? %; never an ad nor a flyer;",
+    "- a face stays clear, except when the effect asks for it (a text born between her fingers in front of her face, an effect laid on her);",
     // The mix that lays the music brings the video's own sound to a voice's level: a quiet room tone left in would come up with it.
-    `- le son : ${voice ? "sa voix off" : "la voix de quelqu'un qui parle dans ses vidéos"} reste claire ; le reste du son d'origine se coupe : une musique est posée sous le Reel après toi, n'en mets pas. Des bruitages seulement quand l'effet les appelle (un dessin animé, une explosion), discrets.`,
+    `- the sound: ${voice ? "her voice-over" : "the voice of someone who speaks in her videos"} stays clear; the rest of the original sound is cut: music is laid under the Reel after you, don't add any. Sound effects only when the effect calls for them (a cartoon, an explosion), discreet.`,
     "",
-    "Elle doit pouvoir changer tes mots elle-même, sans toi : chaque texte écrit à l'écran (hors sous-titres de la voix) vient de words.json, et ton rendu final se refait d'une seule commande, dans un dossier qui contient le kit décompressé et ses fichiers sous leurs noms : python3 render.py words.json reel.mp4. render.py relit ce que tu as déjà mesuré (rien à remesurer), charge ses polices depuis le kit, ne télécharge rien, dessine ses textes en Python (jamais drawtext d'ffmpeg) et adapte leur taille à leur longueur, pour qu'un mot plus long tienne à sa place. Vérifie-le avant de finir : dans un dossier vide, le kit, ses fichiers et un mot changé dans words.json, la commande, puis une image regardée.",
+    "She must be able to change your words herself, without you: each text written on screen (apart from the voice's subtitles) comes from words.json, and your final render is made again with a single command, in a folder that holds the unpacked kit and her files under their names: python3 render.py words.json reel.mp4. render.py reads back what you already measured (nothing to measure again), loads its fonts from the kit, downloads nothing, draws its texts in Python (never ffmpeg's drawtext) and fits their size to their length, so that a longer word holds its place. Check it before you finish: in an empty folder, the kit, her files and a word changed in words.json, the command, then one image looked at.",
     "",
-    `À écrire dans ${OUTPUTS}/, à plat, sans sous-dossier :`,
-    "- reel.mp4 ;",
-    `- ${WORDS_FILE} : chaque texte écrit à l'écran, dans l'ordre où il apparaît : [{"id": "mot1", "label": "le mot qui grandit entre tes doigts", "text": "…", "max": 24}] (label : ce texte en quelques mots pour elle ; max : le plus long qui tient à sa place) ; [] s'il n'y en a aucun ;`,
-    `- ${KIT_FILE} : render.py et tout ce qu'il lit (mesures, masques, polices…), sans ses fichiers à elle ;`,
-    "- 6 à 10 images JPEG du Reel final aux moments qui comptent, nommées par leur temps : frame-03.40s.jpg… ;",
-    "- notes.md : ce que tu as mesuré, comment l'effet suit la vidéo, ce que tu as corrigé après avoir regardé, en quelques lignes ;",
-    "- message.txt : deux phrases pour elle, en la tutoyant, sans jargon : ce que tu as fait de son idée, et, si un moment manquait dans ses vidéos pour que l'effet soit parfait, ce qu'elle peut filmer en quelques secondes. Jamais le nom d'un de tes fichiers ni comment changer ses mots : l'app le lui dit.",
+    `To write in ${OUTPUTS}/, flat, with no subfolder:`,
+    "- reel.mp4;",
+    `- ${WORDS_FILE}: each text written on screen, in the order it appears: [{"id": "mot1", "label": "le mot qui grandit entre tes doigts", "text": "…", "max": 24}] (label: this text in a few words for her, in French; max: the longest that holds its place); [] if there is none;`,
+    `- ${KIT_FILE}: render.py and everything it reads (measurements, masks, fonts…), without her own files;`,
+    "- 6 to 10 JPEG images of the final Reel at the moments that matter, named by their time: frame-03.40s.jpg…;",
+    "- notes.md: what you measured, how the effect follows the video, what you corrected after looking, in a few lines;",
+    "- message.txt: two sentences for her, in French, using « tu », with no jargon: what you made of her idea, and, if a moment was missing in her videos for the effect to be perfect, what she can film in a few seconds. Never the name of one of your files nor how to change her words: the app tells her.",
   ].join("\n");
 }
 
 /** The grader's rubric: each point checked on its own, the voice's only when there is one. */
 export function effectsRubric({ voice }: { voice: boolean }): string {
   const points = [
-    `${OUTPUTS}/reel.mp4 existe et se lit : 1080×1920, 30 i/s, H.264, une piste son AAC, 7 à ${MAX_REEL_SECONDS} s.`,
-    "L'effet qu'elle demande est dans la vidéo, dessiné par-dessus ses vraies images (aucune image générée).",
-    "L'effet suit ce à quoi il est accroché dans sa vidéo, à chaque image où il en dépend (place, taille, angle ou timing) : vérifié sur les images des moments où ça bouge.",
-    "Il se passe quelque chose dès la première seconde : l'effet ou ce qui intrigue, pas des secondes d'attente.",
-    "6 à 10 images frame-<temps>.jpg du Reel final, qui couvrent chaque moment de l'effet.",
-    "Sur ces images, chaque texte est entier dans le cadre, lisible à la taille d'un téléphone, et hors du quart bas (480 px), à 140 px au moins des côtés.",
-    "Le style va avec sa demande, ou avec le Reel qu'elle recopie : rien qui fasse pub ou flyer (étoile promo, badge de soldes), sauf si elle l'a demandé ou si l'univers qu'elle nomme le fait lui-même (des traits de vitesse dans un manga, une explosion dans un dessin animé).",
-    ...(voice ? ["Sa voix off est entière et intacte, son premier mot vers 0,2 s, et ses mots sont sous-titrés, lisibles, hors du quart bas (480 px)."] : []),
-    `${WORDS_FILE} liste chaque texte écrit à l'écran (hors sous-titres) avec un libellé pour elle, son texte et sa longueur maximale ; ${KIT_FILE} contient render.py, qui refait reel.mp4 à partir de ${WORDS_FILE} et de ses fichiers, sans rien télécharger.`,
-    "notes.md dit ce qui a été mesuré, comment l'effet suit la vidéo et ce qui a été corrigé après avoir regardé ; message.txt lui parle en deux phrases.",
+    `${OUTPUTS}/reel.mp4 exists and plays: 1080×1920, 30 fps, H.264, an AAC sound track, 7 to ${MAX_REEL_SECONDS} s.`,
+    "The effect she asks for is in the video, drawn over her real images (no generated image).",
+    "The effect follows what it is hooked onto in her video, at every frame where it depends on it (place, size, angle or timing): checked on the images of the moments where it moves.",
+    "Something happens from the first second: the effect or what intrigues, not seconds of waiting.",
+    "6 to 10 images frame-<time>.jpg of the final Reel, covering every moment of the effect.",
+    "On these images, every text is whole in the frame, readable at a phone's size, out of the bottom quarter (480 px) and at least 140 px from the sides.",
+    "The style goes with her request, or with the Reel she copies: nothing that looks like an ad or a flyer (promo starburst, sale badge), unless she asked for it or the universe she names does it itself (speed lines in a manga, an explosion in a cartoon).",
+    ...(voice ? ["Her voice-over is whole and untouched, its first word around 0.2 s, and its words are subtitled, readable, out of the bottom quarter (480 px)."] : []),
+    `${WORDS_FILE} lists each text written on screen (apart from subtitles) with a label for her, its text and its maximum length; ${KIT_FILE} holds render.py, which remakes reel.mp4 from ${WORDS_FILE} and her files, downloading nothing.`,
+    "notes.md says what was measured, how the effect follows the video and what was corrected after looking; message.txt talks to her in two sentences, in French.",
   ];
-  return ["# Critères, chacun noté à part", ...points.map((p, i) => `${i + 1}. ${p}`)].join("\n");
+  return ["# Criteria, each graded on its own", ...points.map((p, i) => `${i + 1}. ${p}`)].join("\n");
 }
 
 /** A text as she sees it: spaces cleaned (the non-breaking ones of French typography kept), its lines kept. */
@@ -265,17 +265,17 @@ export const EFFECTS_REPLAY_CENTS = 150;
  * (her files only ever in a container of their own, never on a shared machine), by a lighter model
  * that only runs it. Nothing is designed again.
  */
-export const EFFECTS_REPLAY_SYSTEM = `Tu refais la vidéo d'un Reel déjà monté, avec d'autres mots, en relançant son propre script de rendu. Tu travailles seule dans un conteneur Linux (bash, Python 3, ffmpeg, OpenCV, Pillow) ; personne ne répond pendant le travail : ne pose aucune question. Tu ne changes rien au Reel, seulement ce qui empêche le script de tourner ou un mot de tenir à sa place.`;
+export const EFFECTS_REPLAY_SYSTEM = `You redo the video of a Reel already edited, with other words, by running its own render script again. You work alone in a Linux container (bash, Python 3, ffmpeg, OpenCV, Pillow); nobody answers while you work: ask no question. You change nothing in the Reel, only what stops the script from running or a word from fitting in its place.`;
 
 /** The replay's task: unpack, run the script with her words, check, write the video out. */
 export function effectsReplayTask(files: string[]): string {
   return [
-    `Le kit du Reel : ${UPLOADS}/${KIT_FILE} (render.py et ce qu'il lit). Ses fichiers : ${files.map((f) => `${UPLOADS}/${f}`).join(", ") || "aucun"}. Les nouveaux mots : ${UPLOADS}/${WORDS_FILE}.`,
-    "1. Dans un dossier de travail vide, décompresse le kit, puis copies-y ses fichiers sous les mêmes noms et le nouveau words.json (à la place de celui du kit).",
-    "2. Lance : python3 render.py words.json reel.mp4. S'il lui manque un paquet Python, installe-le avec pip ; s'il plante sur autre chose, corrige le moins possible, sans rien changer au rendu.",
-    "3. Vérifie que reel.mp4 se lit (ffprobe : 1080×1920, une piste son) et regarde 2 ou 3 images où les mots sont à l'écran : chaque mot entier et lisible. Un mot qui dépasse ou se coupe : réduis seulement sa taille dans render.py et relance.",
-    `4. Copie reel.mp4 dans ${OUTPUTS}/ ; si tu as corrigé render.py, écris aussi le kit corrigé dans ${OUTPUTS}/${KIT_FILE}.`,
-    `Si tu n'y arrives pas, écris pourquoi en une phrase dans ${OUTPUTS}/erreur.txt et arrête-toi.`,
+    `The Reel's kit: ${UPLOADS}/${KIT_FILE} (render.py and what it reads). Its files: ${files.map((f) => `${UPLOADS}/${f}`).join(", ") || "none"}. The new words: ${UPLOADS}/${WORDS_FILE}.`,
+    "1. In an empty working folder, unpack the kit, then copy its files into it under the same names, and the new words.json (in place of the kit's).",
+    "2. Run: python3 render.py words.json reel.mp4. If a Python package is missing, install it with pip; if it crashes on anything else, fix as little as possible, changing nothing in the render.",
+    "3. Check that reel.mp4 plays (ffprobe: 1080×1920, a sound track) and look at 2 or 3 images where the words are on screen: each word whole and readable. A word that overflows or gets cut: only reduce its size in render.py and run it again.",
+    `4. Copy reel.mp4 into ${OUTPUTS}/; if you fixed render.py, also write the fixed kit to ${OUTPUTS}/${KIT_FILE}.`,
+    `If you can't do it, write why in one sentence in ${OUTPUTS}/erreur.txt and stop.`,
   ].join("\n");
 }
 

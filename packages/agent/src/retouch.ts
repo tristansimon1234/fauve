@@ -83,23 +83,24 @@ export const clipDetectionSchema = z.object({
 });
 export type ClipDetection = z.infer<typeof clipDetectionSchema>;
 
-export const PHOTO_DETECT_PROMPT = `Tu prépares une photo pour Instagram, prise dans un commerce de quartier.
-1. regions : chaque zone à pouvoir flouter, avec sa boîte englobante box_2d [ymin, xmin, ymax, xmax] sur une grille de 0 à 1000 :
-   - face : chaque visage humain (même de profil ou partiel), recognizable = true si on peut reconnaître la personne ;
-   - plate : chaque plaque d'immatriculation ;
-   - screen : écran affichant des informations personnelles (téléphone, ordinateur, caisse) ;
-   - document : papier ou étiquette avec nom, adresse, numéro ;
-   - other : autre donnée personnelle visible.
-   Boîtes serrées sur la zone. Rien n'est inventé : liste vide s'il n'y a rien.
-2. adjust : la retouche légère qui rendrait la photo plus belle et naturelle sur Instagram, comme un bon photographe (0 = ne rien changer, rester sobre : ±0,1 à ±0,4 en général) : exposure (luminosité), contrast, saturation, warmth (-1 froid, 1 chaud ; corrige une dominante), straighten (degrés pour remettre l'horizon ou les verticales droites, 0 si c'est déjà droit).
-3. subject : le centre du sujet principal (0–1000), pour recadrer sans le couper.
-4. notes : une phrase sur ce que la photo montre (le sujet, le lieu, le détail), puis sa lumière et son cadrage.
-5. text_boxes : la boîte box_2d de chaque texte déjà visible sur la photo (enseigne, logo, lettrage sur une vitre, affiche, menu), lisible ou pas ; liste vide s'il n'y en a pas.`;
+export const PHOTO_DETECT_PROMPT = `You prepare a photo for Instagram, taken in a neighbourhood business.
+1. regions: every area that may need blurring, with its bounding box box_2d [ymin, xmin, ymax, xmax] on a 0 to 1000 grid:
+   - face: every human face (even in profile or partial), recognizable = true if the person can be recognised;
+   - plate: every licence plate;
+   - screen: a screen showing personal information (phone, computer, till);
+   - document: paper or label with a name, an address, a number;
+   - other: any other visible personal data.
+   Boxes tight on the area. Nothing is invented: an empty list if there is nothing.
+2. adjust: the light retouch that would make the photo more beautiful and natural on Instagram, as a good photographer would (0 = change nothing; stay subtle: ±0.1 to ±0.4 in general): exposure (brightness), contrast, saturation, warmth (-1 cool, 1 warm; corrects a colour cast), straighten (degrees to put the horizon or the verticals straight, 0 if already straight).
+3. subject: the centre of the main subject (0–1000), to crop without cutting it.
+4. notes: one sentence on what the photo shows (the subject, the place, the detail), then its light and its framing.
+5. text_boxes: the box_2d of each text already visible on the photo (shop sign, logo, lettering on a window, poster, menu), readable or not; an empty list if there is none.
+Write label and notes in French.`;
 
-export const CLIP_DETECT_PROMPT = `Tu prépares une vidéo pour un Reel Instagram, filmée dans un commerce de quartier. Repère les zones à flouter et suis-les dans le temps :
-- face : chaque visage humain (recognizable = true si on peut reconnaître la personne) ;
-- plate : plaque d'immatriculation ; screen : écran avec des informations personnelles ; document : papier avec nom ou adresse.
-Pour chaque zone suivie, donne keys : sa boîte box_2d [ymin, xmin, ymax, xmax] (grille 0–1000) toutes les 0,5 seconde environ (t en secondes depuis le début), plus souvent si elle bouge vite, tant qu'elle est visible. Une même personne garde la même piste. Liste vide s'il n'y a rien.`;
+export const CLIP_DETECT_PROMPT = `You prepare a video for an Instagram Reel, filmed in a neighbourhood business. Find the areas to blur and follow them over time:
+- face: every human face (recognizable = true if the person can be recognised);
+- plate: a licence plate; screen: a screen with personal information; document: paper with a name or an address.
+For each area followed, give keys: its box box_2d [ymin, xmin, ymax, xmax] (0–1000 grid) about every 0.5 second (t in seconds from the start), more often if it moves fast, as long as it is visible. One person keeps the same track. An empty list if there is nothing. Write label in French.`;
 
 /** A Gemini box as a zone of the image, with a margin around it (a blur must cover the whole face). */
 export function boxFrom2d(b: number[], pad = 0.15): Box {

@@ -142,24 +142,24 @@ export const textExampleSchema = z.object({
 });
 export type TextExample = z.infer<typeof textExampleSchema>;
 
-export const TEXT_EXAMPLE_PROMPT = `Tu es le typographe de Simone, un community manager IA pour les commerces de quartier. La gérante t'envoie l'image d'un post (souvent une capture d'Instagram) dont elle aime les textes : elle veut le même rendu sur ses publications. Décris chaque bloc de texte posé sur l'image, assez précisément pour le refaire à l'identique.
+export const TEXT_EXAMPLE_PROMPT = `You are the typographer of Simone, an AI community manager for neighbourhood businesses. The manager sends you the image of a post (often a screenshot from Instagram) whose texts she likes: she wants the same look on her posts. Describe each block of text laid on the image, precisely enough to redo it identically.
 
-Une liste (checklist, planning, étapes, tarifs, « 3 raisons de… ») est UN seul bloc, role band, avec list : ses éléments (title, et detail pour la ligne plus petite dessous), detail_look pour le style de ces lignes, bullet pour la puce (case cochée, puce, numéro…) ; look décrit alors les titres des éléments. Un titre au-dessus de la liste est un bloc à part (hook).
+A list (checklist, schedule, steps, prices, « 3 raisons de… ») is ONE block, role band, with list: its items (title, and detail for the smaller line below), detail_look for the style of those lines, bullet for the bullet (ticked box, dot, number…); look then describes the items' titles. A title above the list is a separate block (hook).
 
-Pour chaque bloc distinct (5 au plus, les plus visibles ; ignore l'interface d'Instagram, les pseudos, les compteurs, les sous-titres automatiques) :
-- name : un nom court et parlant, que la gérante reconnaîtra ;
-- role : hook pour le grand titre, band pour un texte posé sur un fond (bandeau, étiquette), caption pour une petite ligne ;
-- text, y, x : le texte et sa place sur l'image ;
-- look :
-  - font : la famille Google Fonts la plus proche. Repères : condensées grasses (Anton, Bebas Neue, Oswald, League Gothic, Archivo Black), géométriques (Montserrat, Poppins, Plus Jakarta Sans, Outfit), élégantes à empattements (Playfair Display, DM Serif Display, Fraunces, Cormorant Garamond, Instrument Serif), manuscrites (Caveat, Pacifico, Dancing Script, Kalam), machine à écrire (Courier Prime, Space Mono), rondes (Nunito, Quicksand, Fredoka). Choisis un nom exact de Google Fonts ;
-  - weight, italic, uppercase, letter_spacing (en em), line_height : comme sur l'image ;
-  - size : la hauteur du corps en px si l'image faisait 1080 px de large (un grand titre fait souvent 90 à 150, une ligne de texte 36 à 60) ;
-  - color, et fill / stroke / shadow : les vraies couleurs en hexadécimal (pas « accent ») ; fill.kind = box pour un bloc rectangulaire, pill pour un bloc très arrondi, line pour un surlignage qui épouse chaque ligne ; opacity < 1 si le fond est transparent ;
-  - emphasis : si certains mots ressortent (autre couleur, autre police, surlignés), comment ;
-  - rotate : l'inclinaison s'il y en a une ;
-  - enter : l'apparition qui irait avec ce style dans une vidéo (pop pour un style punchy, rise ou fade pour un style doux, typewriter pour un style machine à écrire, slide pour un bandeau).
-logo : où le logo du commerce est posé, s'il y en a un.
-summary : le style et la mise en page en une ou deux phrases simples, sans jargon, comme tu l'expliquerais à la gérante.`;
+For each distinct block (5 at most, the most visible; ignore Instagram's interface, usernames, counters, automatic subtitles):
+- name: a short, telling name the manager will recognise, in French;
+- role: hook for the big title, band for a text laid on a background (banner, label), caption for a small line;
+- text, y, x: the text, as written on the image, and its place on it;
+- look:
+  - font: the closest Google Fonts family. Landmarks: bold condensed (Anton, Bebas Neue, Oswald, League Gothic, Archivo Black), geometric (Montserrat, Poppins, Plus Jakarta Sans, Outfit), elegant serifs (Playfair Display, DM Serif Display, Fraunces, Cormorant Garamond, Instrument Serif), handwritten (Caveat, Pacifico, Dancing Script, Kalam), typewriter (Courier Prime, Space Mono), rounded (Nunito, Quicksand, Fredoka). Choose an exact Google Fonts name;
+  - weight, italic, uppercase, letter_spacing (in em), line_height: as on the image;
+  - size: the height of the type in px if the image were 1080 px wide (a big title is often 90 to 150, a line of text 36 to 60);
+  - color, and fill / stroke / shadow: the real colours in hexadecimal (not « accent »); fill.kind = box for a rectangular block, pill for a very rounded block, line for a highlight that hugs each line; opacity < 1 if the background is transparent;
+  - emphasis: if some words stand out (another colour, another font, highlighted), how;
+  - rotate: the tilt, if there is one;
+  - enter: the entrance that would go with this style in a video (pop for a punchy style, rise or fade for a soft style, typewriter for a typewriter style, slide for a banner).
+logo: where the business's logo is placed, if there is one.
+summary: the style and the layout in one or two simple sentences, in French, with no jargon, as you would explain it to the manager.`;
 
 /** The studio's colours by role, for looks that name them (« secondary », « light », « dark »). */
 export type BrandPalette = { secondary: string; light: string; dark: string };

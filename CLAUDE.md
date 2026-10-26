@@ -196,6 +196,7 @@ Intégration bsport (planning et données élèves), relances aux élèves (bspo
 - Migrations SQL versionnées dans `supabase/migrations`.
 - Secrets en variables d'environnement uniquement : `TYPESAFE_API_KEY` (Jev), `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_APP_SECRET`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `AYRSHARE_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`.
 - Avant chaque intégration (WhatsApp, Instagram, TikTok, Ayrshare, Gemini, Supabase Auth), lire la doc à jour : les API changent souvent.
+- Consignes des modèles en anglais (Tristan : « il faut les mettre en anglais pour moi tous les prompt système ») : chacune dit ce qui s'écrit en français, ce que la gérante lit (textes à l'écran, messages, légendes, noms) ; ses mots, les exemples de phrases et les valeurs qu'on lui montre restent en français. Restent en français : la consigne de Simone dans le chat (`FAUVE_SYSTEM_PROMPT`) et celle du monteur (`EDITOR_SYSTEM_PROMPT`), à réécrire plutôt qu'à traduire, et celles des Composants retirés (`elements.ts`, `text-layer.ts`).
 
 ## Dans le repo
 - Commandes : `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` (à la racine).

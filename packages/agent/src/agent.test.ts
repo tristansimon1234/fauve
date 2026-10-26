@@ -1015,8 +1015,8 @@ test("critic: the manager's line never says what is left to do", async () => {
   const review = normalizeReview({ best: 1, why: "", score: 8, hook: 8, ok: true, issues: [], summary: "J'ai vérifié les coupes. Il reste à éclaircir la scène 2." }, 1);
   assert.equal(review.summary, "J'ai vérifié les coupes.");
   const { MONTAGE_CRITIC_PROMPT } = await import("./critic.ts");
-  assert.match(MONTAGE_CRITIC_PROMPT, /jamais de changer le plan/);
-  assert.match(MONTAGE_CRITIC_PROMPT, /jamais une forme à prendre/);
+  assert.match(MONTAGE_CRITIC_PROMPT, /never to change the shot/);
+  assert.match(MONTAGE_CRITIC_PROMPT, /never a form to take/);
 });
 
 test("critic: an overlong answer is clamped, not thrown away; lateness is measured from the last step", async () => {
@@ -1315,7 +1315,7 @@ test("captions written at delivery: the chat's rules, cleaned and capped like he
   // One set of rules for Simone in the chat and for a Reel launched from « Créer ».
   assert.ok(FAUVE_SYSTEM_PROMPT.includes(CAPTION_RULES));
   assert.ok(CAPTION_WRITER_PROMPT.includes(CAPTION_RULES));
-  assert.match(CAPTION_WRITER_PROMPT, /tu ne l'inventes jamais/);
+  assert.match(CAPTION_WRITER_PROMPT, /you never make up/);
   // Long dashes out, hashtags without #, no duplicate of one already in the text, 5 in all.
   assert.deepEqual(keptCaption({ caption: "Coupe du jour — à la Croix-Rousse #lyon", hashtags: ["#Lyon", "coiffure", "coiffure", "salon de coiffure", "a", "b", "c"] }), {
     caption: "Coupe du jour, à la Croix-Rousse #lyon",
@@ -1988,12 +1988,12 @@ test("copy first: what the Reel she copies (or her request) does not have is nev
   assert.match(EDITOR_SYSTEM_PROMPT, /aucun texte d'accroche quand « reel_a_recopier » n'en a pas .* ou que sa demande n'en veut pas/);
   // What her request does not mention is still decided by the defaults: only what she sets aside falls.
   assert.match(EDITOR_SYSTEM_PROMPT, /Ce que sa demande ne dit pas, tes repères le décident/);
-  assert.match(CAROUSEL_DESIGNER_PROMPT, /Ce que sa demande ne dit pas, ces repères le décident/);
+  assert.match(CAROUSEL_DESIGNER_PROMPT, /What her request does not say, these guidelines decide/);
   assert.doesNotMatch(EDITOR_SYSTEM_PROMPT, /\(au moins 2\)/);
-  assert.match(MONTAGE_CRITIC_PROMPT, /le Reel qu'elle recopie \(ligne « Reel à recopier »\) passe aussi avant tes repères/);
-  assert.match(VOICE_OVER_PROMPT, /sans invitation s'il n'en a pas/);
-  assert.match(CAROUSEL_DESIGNER_PROMPT, /l'exemple qu'elle aime \(« Exemple qu'elle aime »\) passent avant/);
-  assert.match(CAROUSEL_CRITIC_PROMPT, /l'exemple qu'elle aime, quand il y en a un, passent avant ces repères/);
+  assert.match(MONTAGE_CRITIC_PROMPT, /the Reel she copies \(line « Reel à recopier »\) also comes before your guidelines/);
+  assert.match(VOICE_OVER_PROMPT, /no invitation if it has none/);
+  assert.match(CAROUSEL_DESIGNER_PROMPT, /the example she likes \(« Exemple qu'elle aime »\) come first/);
+  assert.match(CAROUSEL_CRITIC_PROMPT, /the example she likes, when there is one, come before these guidelines/);
 });
 
 test("editor: the signature transition goes on the shot where the band appears, the schema stays small", async () => {
@@ -3842,7 +3842,7 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
   assert.match(MOTION_DESIGNER_PROMPT, /starting point, not a cage/);
   assert.match(MOTION_DESIGNER_PROMPT, /listed in "fonts"/);
   assert.match(EDITOR_SYSTEM_PROMPT, /point de départ, pas une cage/);
-  assert.match(MONTAGE_CRITIC_PROMPT, /est voulue, jamais un défaut/);
+  assert.match(MONTAGE_CRITIC_PROMPT, /is intended, never a defect/);
 });
 
 test("effects agent: its video's length, its plan of one shot, its price once made, its budget", async () => {
@@ -3954,13 +3954,13 @@ test("effects agent: its video's length, its plan of one shot, its price once ma
     models: ["hand_landmarker.task"],
     budgetUsd: 5.09,
   });
-  assert.match(task, /5,09 \$/);
-  assert.match(task, /n'en mets pas/);
-  assert.doesNotMatch(task, /Sa voix off/);
+  assert.match(task, /\$5\.09/);
+  assert.match(task, /don't add any/);
+  assert.doesNotMatch(task, /Her voice-over:/);
   const bare = { request: "x", studio: { name: "A", business: null, facts: [], tone: null }, brand: { colors: [], fonts: [] }, files: [], models: [], budgetUsd: 3 };
-  assert.match(effectsTask({ ...bare, voice: { name: "voix.ogg", words: "voix.json", seconds: 12, text: "salut" } }), /Sa voix off/);
-  assert.match(effectsRubric({ voice: true }), /voix off/);
-  assert.doesNotMatch(effectsRubric({ voice: false }), /voix off/);
+  assert.match(effectsTask({ ...bare, voice: { name: "voix.ogg", words: "voix.json", seconds: 12, text: "salut" } }), /Her voice-over:/);
+  assert.match(effectsRubric({ voice: true }), /voice-over/);
+  assert.doesNotMatch(effectsRubric({ voice: false }), /voice-over/);
 
   // Her two sentences, cleaned and bounded.
   assert.equal(effectsMessage("**J'ai fait** ton effet.\n\nFilme-le de face."), "J'ai fait ton effet. Filme-le de face.");
@@ -4025,11 +4025,11 @@ test("effect words: she changes the texts of an effect herself, its own script d
   // The agent is asked for its kit and its words, the grader checks them; a correction starts from its kit.
   const bare = { request: "x", studio: { name: "A", business: null, facts: [], tone: null }, brand: { colors: [], fonts: [] }, files: [], models: [], budgetUsd: 3 };
   assert.match(effectsTask(bare), /python3 render\.py words\.json reel\.mp4/);
-  assert.match(effectsTask(bare), new RegExp(`- ${WORDS_FILE.replace(".", "\\.")} :`));
+  assert.match(effectsTask(bare), new RegExp(`- ${WORDS_FILE.replace(".", "\\.")}:`));
   assert.match(effectsTask(bare), new RegExp(KIT_FILE.replace(".", "\\.")));
-  assert.match(effectsRubric({ voice: false }), /render\.py, qui refait reel\.mp4/);
-  assert.match(effectsTask({ ...bare, previous: { name: "avant.mp4", kit: true } }), /pars de son render\.py/);
-  assert.doesNotMatch(effectsTask({ ...bare, previous: { name: "avant.mp4" } }), /pars de son render\.py/);
+  assert.match(effectsRubric({ voice: false }), /render\.py, which remakes reel\.mp4/);
+  assert.match(effectsTask({ ...bare, previous: { name: "avant.mp4", kit: true } }), /start from its render\.py/);
+  assert.doesNotMatch(effectsTask({ ...bare, previous: { name: "avant.mp4" } }), /start from its render\.py/);
   // The replay runs its script with her words, and says why when it cannot.
   const replay = effectsReplayTask(["video1.mov", "voix.ogg"]);
   assert.match(replay, /\/mnt\/session\/uploads\/video1\.mov, \/mnt\/session\/uploads\/voix\.ogg/);

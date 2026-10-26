@@ -228,7 +228,7 @@ async function siteFacts(studioId: string, site: Awaited<ReturnType<typeof readW
     model: CHAT_MODEL,
     max_tokens: 1000,
     output_config: { effort: "low", format: outputFormat(factsSchema) },
-    system: "Tu lis le site d'un commerce de quartier. Réponds en français. Uniquement ce que le site dit, rien d'inventé.",
+    system: "You read a neighbourhood business's website. Answer in French. Only what the site says, nothing invented.",
     messages: [{ role: "user", content: JSON.stringify({ titre: site.title, nom: site.siteName, description: site.description, texte: site.text.slice(0, 5000) }) }],
   });
   await logClaudeCost(studioId, response.usage, "lab_site", CHAT_MODEL);
