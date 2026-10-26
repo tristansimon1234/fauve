@@ -45,18 +45,19 @@ export const isComposed = (plan: Pick<EditPlan, "layers">) => Boolean(plan.layer
 /** One of her shots as the composition's designer reads it: when it plays (frames from the start), what it is and shows. */
 export type CompositionShot = {
   shot: number;
-  de: number;
-  a: number;
-  type: "vidéo" | "photo";
-  montre: string;
-  format: "portrait" | "paysage" | "carré";
-  sujet_a?: "gauche" | "centre" | "droite";
-  visages?: boolean;
+  from: number;
+  to: number;
+  kind: "video" | "photo";
+  shows: string;
+  format: "portrait" | "landscape" | "square";
+  subject_at?: "left" | "centre" | "right";
+  faces?: boolean;
   /** A photo whose subject cuts out cleanly (Cutout can lift it). */
-  detouree?: boolean;
+  cut_out?: boolean;
 };
 
-const formatOf = (aspect: number | undefined): CompositionShot["format"] => (!aspect ? "portrait" : aspect > 1.1 ? "paysage" : aspect < 0.9 ? "portrait" : "carré");
+const formatOf = (aspect: number | undefined): CompositionShot["format"] => (!aspect ? "portrait" : aspect > 1.1 ? "landscape" : aspect < 0.9 ? "portrait" : "square");
+const SIDES = { gauche: "left", centre: "centre", droite: "right" } as const;
 
 /**
  * The shots a collage's composition lays, in the order of the montage (its shots[i]):
@@ -69,17 +70,17 @@ export function compositionShots(plan: EditPlan, facts: MediaFacts, shows: Recor
   plan.segments.forEach((s, i) => {
     if (!isClipSegment(s)) return;
     const at = timeline.segments[i]!;
-    const span = { de: Math.round(at.start * REEL_FPS), a: Math.round((at.start + at.length) * REEL_FPS) };
+    const span = { from: Math.round(at.start * REEL_FPS), to: Math.round((at.start + at.length) * REEL_FPS) };
     const photo = facts.photos[s.clip_id];
     if (photo) {
       shots.push({
         shot: shots.length,
         ...span,
-        type: "photo",
-        montre: (shows[s.clip_id] ?? photo.detection.notes ?? "une photo du commerce").slice(0, 200),
+        kind: "photo",
+        shows: (shows[s.clip_id] ?? photo.detection.notes ?? "a photo of the business").slice(0, 200),
         format: formatOf(photo.width / photo.height),
-        ...(photo.detection.regions.some((r) => r.kind === "face") ? { visages: true } : {}),
-        ...(cutouts.has(s.clip_id) ? { detouree: true } : {}),
+        ...(photo.detection.regions.some((r) => r.kind === "face") ? { faces: true } : {}),
+        ...(cutouts.has(s.clip_id) ? { cut_out: true } : {}),
       });
       return;
     }
@@ -89,11 +90,11 @@ export function compositionShots(plan: EditPlan, facts: MediaFacts, shows: Recor
     shots.push({
       shot: shots.length,
       ...span,
-      type: "vidéo",
-      montre: (shot ? `${shot.description} (${shot.subject})` : (analysis?.summary ?? "une vidéo du commerce")).slice(0, 200),
-      format: analysis?.orientation === "landscape" ? "paysage" : analysis?.orientation === "square" ? "carré" : "portrait",
-      ...(place ? { sujet_a: place } : {}),
-      ...(shot?.faces_visible ? { visages: true } : {}),
+      kind: "video",
+      shows: (shot ? `${shot.description} (${shot.subject})` : (analysis?.summary ?? "a video of the business")).slice(0, 200),
+      format: analysis?.orientation === "landscape" ? "landscape" : analysis?.orientation === "square" ? "square" : "portrait",
+      ...(place ? { subject_at: SIDES[place] } : {}),
+      ...(shot?.faces_visible ? { faces: true } : {}),
     });
   });
   return shots;
@@ -105,7 +106,7 @@ export function compositionShots(plan: EditPlan, facts: MediaFacts, shows: Recor
  * its moment (frames from the start), as its code gets them (reelTexts), and its end (an offer, an
  * announcement). Subtitles stay the engine's: the band they take, when a voice speaks.
  */
-export type CompositionTexts = { texts: ComposeText[]; end: ComposeEnd | null; subtitles: { y_haut: number; y_bas: number } | null };
+export type CompositionTexts = { texts: ComposeText[]; end: ComposeEnd | null; subtitles: { y_top: number; y_bottom: number } | null };
 export function compositionTexts(plan: EditPlan): CompositionTexts {
   const frames = (s: number) => Math.round(s * REEL_FPS);
   const px = (share: number) => Math.round(share * 1920);
@@ -120,6 +121,6 @@ export function compositionTexts(plan: EditPlan): CompositionTexts {
       ...(t.items?.length ? { items: t.items } : {}),
     })),
     end: plan.end_card ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, frames(plan.duration - END_CARD_SECONDS)) } : null,
-    subtitles: plan.subtitles ? { y_haut: px(y - 0.01), y_bas: px(y + SUBTITLE_ROW.h * 1.6) } : null,
+    subtitles: plan.subtitles ? { y_top: px(y - 0.01), y_bottom: px(y + SUBTITLE_ROW.h * 1.6) } : null,
   };
 }

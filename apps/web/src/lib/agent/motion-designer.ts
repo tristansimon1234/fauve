@@ -6,14 +6,15 @@ import {
   GEMINI_MODEL_ID,
   isKimiModel,
   LOOK_MODEL,
-  MOTION_DESIGNER_PROMPT,
   MOTION_LOOK_PROMPT,
+  motionDesignerPrompt,
   motionJudgeOutputSchema,
   motionLookOutputSchema,
   motionSceneOutputSchema,
   type ComposeShot,
   type CompositionShot,
   type DesignerMoves,
+  type MotionPromptParts,
   type MotionSlot,
   type ReelProps,
   type ScenePhoto,
@@ -56,17 +57,18 @@ export type OfferedPhoto = { id: string; shows: string; photo: ScenePhoto };
 export type SceneRequest = {
   id: string;
   brief: string;
+  /** What she asked for (the montage's request, her own words when there are some): it prevails over the editor's brief. */
+  request?: string;
   durationInFrames: number;
-  previousCode?: string;
   busy?: { y: number; h: number }[];
   photos?: OfferedPhoto[];
   cuts?: number[];
   compose?: { plans: CompositionShot[]; shots: ComposeShot[] } & CompositionTexts;
   /** What moves in the footage under it: the pieces its `track` reads (its test render follows them), and what the designer is told of them. */
   track?: TrackPiece[];
-  moves?: DesignerMoves | { par_plan: ({ plan: number } & DesignerMoves)[] };
-  /** A correction: the animation it reworks as it was rendered on her images (frames with their instant), its code, what is asked (her words, Simone's reading, the review). */
-  seen?: { code: string; review: string; frames: SceneFrame[] };
+  moves?: DesignerMoves | { by_shot: ({ shot: number } & DesignerMoves)[] };
+  /** A correction: the animation it reworks as it was rendered on her images (frames with their instant) and its code (what is asked is its request). */
+  seen?: { code: string; frames: SceneFrame[] };
   /** A first draft: the Reel as it will come out without the animations being written (frames with their instant), seen before writing. */
   canvas?: SceneFrame[];
   /** The row where a voice's subtitles show during the scene (shares of the height): its words keep off it. */
@@ -110,7 +112,7 @@ type Existing = {
 };
 
 /** The brand as an animation sees it. */
-export type SceneBrand = Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">;
+export type SceneBrand = Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "palette" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">;
 
 /** The business's motion kit: its latest scenes, whose language a new one keeps (never their code as such). */
 export type MotionKit = { name: string; code: string }[];
@@ -120,14 +122,15 @@ const MAX_SCENE_PHOTOS = 4;
 /** The most fonts one scene brings besides the Reel's two. */
 const MAX_SCENE_FONTS = 2;
 
-const EDGE_WORDS = { top: "le haut", bottom: "le bas", left: "la gauche", right: "la droite" } as const;
-
 type Block = { type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: "image/jpeg"; data: string } };
 /** Its answer: a scene written, or its look at a scene rendered (with whether it keeps it). */
 type SceneOutput = z.output<typeof motionSceneOutputSchema> & Partial<Pick<z.output<typeof motionLookOutputSchema>, "keep" | "seen">>;
 type AnswerSchema = typeof motionSceneOutputSchema | typeof motionLookOutputSchema;
+/** The prompt of one call: its base, the same for every animation, and the parts this call needs. */
+type Prompt = ReturnType<typeof motionDesignerPrompt>;
+const whole = (prompt: Prompt) => [prompt.base, prompt.parts].filter(Boolean).join("\n\n");
 
-async function askClaude(studioId: string, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
+async function askClaude(studioId: string, prompt: Prompt, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
   // Streamed, with room: a composition of a whole Reel is long code, and its answer was cut off mid-string at
   // 16 000 tokens, then again at 32 000 (18 000 of them thinking): Simone's split screen fell back to plain shots.
   const response = await anthropic()
@@ -138,7 +141,8 @@ async function askClaude(studioId: string, content: string | Block[], schema: An
       output_config: { effort: "medium", format: outputFormat<AnswerSchema>(schema) },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      system: [{ type: "text", text: MOTION_DESIGNER_PROMPT, cache_control: CACHE_AN_HOUR }],
+      // The base is cached for every animation; the parts follow it.
+      system: [{ type: "text", text: prompt.base, cache_control: CACHE_AN_HOUR }, ...(prompt.parts ? [{ type: "text" as const, text: prompt.parts }] : [])],
       messages: [{ role: "user", content }],
     })
     .finalMessage();
@@ -155,7 +159,7 @@ const gemini = () => (geminiClient ??= new GoogleGenAI({ apiKey: env("GEMINI_API
 const GEMINI_SCENE_SCHEMA = toGeminiSchema(z.toJSONSchema(motionSceneOutputSchema), ["pattern"]);
 const GEMINI_LOOK_SCHEMA = toGeminiSchema(z.toJSONSchema(motionLookOutputSchema), ["pattern"]);
 
-async function askGemini(studioId: string, model: string, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
+async function askGemini(studioId: string, model: string, prompt: Prompt, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
   const parts = (typeof content === "string" ? [{ type: "text" as const, text: content }] : content).map((b) =>
     b.type === "text" ? { text: b.text } : { inlineData: { mimeType: b.source.media_type, data: b.source.data } },
   );
@@ -163,7 +167,7 @@ async function askGemini(studioId: string, model: string, content: string | Bloc
   const response = await gemini().models.generateContent({
     model,
     contents: [{ role: "user", parts }],
-    config: { systemInstruction: MOTION_DESIGNER_PROMPT, responseMimeType: "application/json", responseJsonSchema: look ? GEMINI_LOOK_SCHEMA : GEMINI_SCENE_SCHEMA, maxOutputTokens: 32000 },
+    config: { systemInstruction: whole(prompt), responseMimeType: "application/json", responseJsonSchema: look ? GEMINI_LOOK_SCHEMA : GEMINI_SCENE_SCHEMA, maxOutputTokens: 32000 },
   });
   await logGeminiCost({ studioId, kind: "llm", model, usage: response.usageMetadata as GeminiUsage, meta: { purpose: "motion_designer" } });
   if (!response.text) return null;
@@ -175,7 +179,7 @@ async function askGemini(studioId: string, model: string, content: string | Bloc
 const KIMI_SCENE_SCHEMA = strictShape(z.toJSONSchema(motionSceneOutputSchema));
 const KIMI_LOOK_SCHEMA = strictShape(z.toJSONSchema(motionLookOutputSchema));
 
-async function askKimi(studioId: string, model: string, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
+async function askKimi(studioId: string, model: string, prompt: Prompt, content: string | Block[], schema: AnswerSchema): Promise<SceneOutput | null> {
   const parts = (typeof content === "string" ? [{ type: "text" as const, text: content }] : content).map((b) =>
     b.type === "text" ? { type: "text" as const, text: b.text } : { type: "image_url" as const, image_url: { url: `data:${b.source.media_type};base64,${b.source.data}` } },
   );
@@ -183,7 +187,7 @@ async function askKimi(studioId: string, model: string, content: string | Block[
   const answer = await askKimiJson({
     studioId,
     model,
-    system: MOTION_DESIGNER_PROMPT,
+    system: whole(prompt),
     content: parts,
     name: look ? "motion_look" : "motion_scene",
     schema: look ? KIMI_LOOK_SCHEMA : KIMI_SCENE_SCHEMA,
@@ -237,93 +241,102 @@ async function writeScene(
   kit: MotionKit,
   existing: Existing,
   fix?: { code: string; error: string; photos?: string[]; fonts?: string[] },
-  look?: { code: string; frames: SceneFrame[]; review?: { ce_qu_il_voit: string; ce_qu_il_faut_obtenir: string } },
+  look?: { code: string; frames: SceneFrame[]; review?: { what_he_sees: string; what_to_achieve: string } },
 ): Promise<Omit<SceneResult, "id">> {
-  const kept = [fix?.photos?.length && `les mêmes photos (${fix.photos.join(", ")})`, fix?.fonts?.length && `les mêmes polices (${fix.fonts.join(", ")})`].filter(Boolean);
+  const kept = [fix?.photos?.length && `the same photos (${fix.photos.join(", ")})`, fix?.fonts?.length && `the same fonts (${fix.fonts.join(", ")})`].filter(Boolean);
   // A correction looks at its earlier render first: each image with its instant, then the request.
   const seen = !fix && !look && request.seen?.frames.length ? request.seen : undefined;
   // A first draft sees the Reel it is written for, as it will come out without its animations.
   const canvas = !fix && !look && !seen && request.canvas?.length ? request.canvas : undefined;
+  // Its prompt: the base, and only the parts this animation needs (a fix keeps those of its request).
+  const parts: MotionPromptParts = {
+    photos: Boolean(request.photos?.length || request.compose?.plans.some((p) => p.cut_out)),
+    cuts: Boolean(request.cuts && !request.compose),
+    moves: Boolean(request.moves || request.track?.length || request.compose?.shots.some((x) => x.track)),
+    composition: Boolean(request.compose),
+    correction: Boolean(seen),
+    look: Boolean(look),
+  };
   const text = fix
-    ? `Ce code a échoué : ${fix.error}\nCorrige-le en gardant la même intention${kept.length ? ` et ${kept.join(" et ")}` : ""}.\n\nBrief : ${request.brief}\n\nCode :\n${fix.code}`
+    ? `This code failed: ${fix.error}\nFix it, keeping the same intention${kept.length ? ` and ${kept.join(" and ")}` : ""}.\n\nBrief: ${request.brief}\n\nCode:\n${fix.code}`
     : JSON.stringify({
+        ...(request.request ? { request: request.request.slice(0, 3000) } : {}),
         brief: request.brief,
-        duree_images: request.durationInFrames,
+        duration_frames: request.durationInFrames,
         fps: 30,
         format: "1080 × 1920",
-        marque: brand,
-        direction_artistique: artDirection,
-        ...(kit.length ? { kit_du_commerce: kit } : {}),
-        ...(existing.reel.length ? { autres_animations_du_reel: existing.reel } : {}),
-        ...(existing.done.length ? { deja_faites: existing.done } : {}),
+        brand,
+        art_direction: artDirection,
+        ...(kit.length ? { brand_kit: kit } : {}),
+        ...(existing.reel.length ? { reel_animations: existing.reel } : {}),
+        ...(existing.done.length ? { done_before: existing.done } : {}),
         // Faces and lettering of the picture under the scene, in px of the 1920 high frame: no words on them while they show.
-        ...(request.busy?.length ? { sous_la_scene: request.busy.map((b) => ({ visage_ou_enseigne: `de y = ${px(b.y)} à y = ${px(b.y + b.h)}` })) } : {}),
+        ...(request.busy?.length ? { faces_under: request.busy.map((b) => `y ${px(b.y)} to ${px(b.y + b.h)}`) } : {}),
         // Her voice's subtitles show all along: its words keep off their row.
-        ...(request.subtitles ? { sous_titres: `de y = ${px(request.subtitles.y)} à y = ${px(request.subtitles.y + request.subtitles.h)}` } : {}),
+        ...(request.subtitles ? { subtitles: `y ${px(request.subtitles.y)} to ${px(request.subtitles.y + request.subtitles.h)}` } : {}),
         // Her photos it may compose with: their id, what they show, and whether their subject is cut out.
         ...(request.photos?.length
           ? {
-              photos_du_reel: request.photos.map((p) => ({
+              reel_photos: request.photos.map((p) => ({
                 id: p.id,
-                montre: p.shows,
-                detouree: Boolean(p.photo.cutout),
-                format: p.photo.aspect >= 1 ? "paysage" : "portrait",
+                shows: p.shows,
+                cut_out: Boolean(p.photo.cutout),
+                format: p.photo.aspect >= 1 ? "landscape" : "portrait",
                 // The edges of the photo that cut its subject: it comes in from there.
-                ...(p.photo.cutEdges?.length ? { sujet_coupe_par: p.photo.cutEdges.map((e) => EDGE_WORDS[e]) } : {}),
+                ...(p.photo.cutEdges?.length ? { subject_cut_by: p.photo.cutEdges } : {}),
               })),
             }
           : {}),
         // What moves in the footage under it (hands, faces, bodies, the gestures seen): its code follows it with `track`.
-        ...(request.moves ? { ce_qui_bouge: request.moves } : {}),
+        ...(request.moves ? { moves: request.moves } : {}),
         // A collage's composition lays the shots itself (nothing plays under it); another animation over several shots, the cuts under it.
         ...(request.compose
           ? {
-              composition_du_reel: {
-                plans: request.compose.plans,
+              composition: {
+                shots: request.compose.plans,
                 // The texts and the end are its own: its code gets them as reelTexts and end.
-                textes: request.compose.texts,
-                fin: request.compose.end,
-                ...(request.compose.subtitles ? { sous_titres_du_moteur: request.compose.subtitles } : {}),
-                coupes_images: request.cuts ?? [],
+                texts: request.compose.texts,
+                end: request.compose.end,
+                ...(request.compose.subtitles ? { engine_subtitles: request.compose.subtitles } : {}),
+                cut_frames: request.cuts ?? [],
               },
             }
           : request.cuts
-            ? { plans_dessous: { plans: request.cuts.length + 1, coupes_images: request.cuts } }
+            ? { shots_under: { shots: request.cuts.length + 1, cut_frames: request.cuts } }
             : {}),
-        ...(seen ? { version_precedente: { demande: seen.review.slice(0, 2500), images: `${seen.frames.length} images jointes, au-dessus` } } : {}),
-        ...(canvas ? { images_du_reel: `${canvas.length} images jointes, au-dessus` } : {}),
+        ...(seen ? { previous_version: { frames: `${seen.frames.length} images attached, above`, code: seen.code } } : {}),
+        ...(canvas ? { reel_frames: `${canvas.length} images attached, above` } : {}),
         // Its look at its render: the images above, its code as it is, and what the director who sent it back saw.
-        ...(look
-          ? { ton_rendu: { images: `${look.frames.length} images jointes, au-dessus` }, code_actuel: look.code, ...(look.review ? { relecture: look.review } : {}) }
-          : { code_precedent: seen?.code ?? request.previousCode }),
+        ...(look ? { your_render: { frames: `${look.frames.length} images attached, above` }, current_code: look.code, ...(look.review ? { review: look.review } : {}) } : {}),
         // A library scene, written for another Reel: kept only if it really serves this brief and is well made here.
         ...(look && request.fromLibrary
           ? {
-              origine:
-                "Une animation de la bibliothèque du commerce, écrite pour un autre Reel et posée ici avec ces mots : garde-la seulement si son idée sert vraiment ce brief et si elle est bien faite sur ces images ; sinon écris la tienne pour ce moment.",
+              origin:
+                "A scene from the business's library, written for another Reel and placed here with these words: keep it only if its idea really serves this brief and it is well made on these images; otherwise write your own for this moment.",
             }
           : {}),
       });
   const content: string | Block[] = look
-    ? withFrames("Ton animation, rendue sur sa vidéo dans le Reel tel qu'il sortira :", look.frames, text)
+    ? withFrames("Your animation, rendered over her footage in the Reel as it will come out:", look.frames, text)
     : seen
-      ? withFrames("Ton animation d'avant, rendue sur ses images :", seen.frames, text)
+      ? withFrames("Your earlier animation, rendered on her images:", seen.frames, text)
       : canvas
         ? withFrames(
             request.compose
-              ? "Ses plans tels qu'ils sont filmés et retouchés, en plein cadre l'un après l'autre (ta composition les posera où tu veux), avec les textes du Reel et les sous-titres de sa voix, une image par seconde :"
-              : "Le Reel tel qu'il sortira, sans les animations qui s'écrivent (ses plans, ses textes, les sous-titres de sa voix à leur place), une image par seconde, puis plus serrées pendant ton moment :",
+              ? "Her shots as filmed and retouched, full frame one after the other (your composition will lay them where you want), with the Reel's texts and her voice's subtitles, a frame a second:"
+              : "The Reel as it will come out without the animations being written (its shots, its texts, her voice's subtitles in place), a frame a second, then closer together during your moment:",
             canvas,
             text,
           )
         : text;
   const schema = look ? motionLookOutputSchema : motionSceneOutputSchema;
+  const prompt = motionDesignerPrompt(parts);
   const output =
     model === CLAUDE_MODEL
-      ? await askClaude(studioId, content, schema)
+      ? await askClaude(studioId, prompt, content, schema)
       : isKimiModel(model)
-        ? await askKimi(studioId, model, content, schema)
-        : await askGemini(studioId, model, content, schema);
+        ? await askKimi(studioId, model, prompt, content, schema)
+        : await askGemini(studioId, model, prompt, content, schema);
   // Its render is at the level: nothing new (an answer without code keeps it too).
   if (look && (output?.keep || !output?.code?.trim())) return { code: look.code, js: null, error: null, keep: true, seen: output?.seen ?? "" };
   const code = output?.code ?? "";
@@ -442,7 +455,7 @@ export async function designMotionScenes(
       reel: [
         ...(context.kept ?? []),
         ...results.map((w) => (w.name ? `${w.name} : ${w.notes ?? ""}`.trim() : requestOf(w.id).brief)),
-        ...requests.slice(i + 1).map((q) => `à venir : ${q.brief}`),
+        ...requests.slice(i + 1).map((q) => `to come: ${q.brief}`),
       ],
       done: context.done ?? [],
     };
@@ -527,9 +540,10 @@ async function checkScenes(
  */
 async function judgeLook(studioId: string, request: SceneRequest, frames: SceneFrame[], artDirection: string | undefined) {
   const text = JSON.stringify({
+    ...(request.request ? { request: request.request.slice(0, 3000) } : {}),
     brief: request.brief,
-    direction_artistique: artDirection,
-    ...(request.fromLibrary ? { origine: "écrite pour un autre Reel du commerce, posée ici avec ces mots" } : {}),
+    art_direction: artDirection,
+    ...(request.fromLibrary ? { origin: "written for another Reel of the business, placed here with these words" } : {}),
   });
   const response = await anthropic().beta.messages.parse({
     model: LOOK_MODEL,
@@ -538,7 +552,7 @@ async function judgeLook(studioId: string, request: SceneRequest, frames: SceneF
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: [{ type: "text", text: MOTION_LOOK_PROMPT, cache_control: CACHE_AN_HOUR }],
-    messages: [{ role: "user", content: withFrames("L'animation, rendue sur sa vidéo dans le Reel tel qu'il sortira :", frames, text) }],
+    messages: [{ role: "user", content: withFrames("The animation, rendered over her footage in the Reel as it will come out:", frames, text) }],
   });
   await logClaudeCost(studioId, response.usage, "motion_look", LOOK_MODEL);
   if (!response.parsed_output) throw new Error(`pas de réponse lisible (${response.stop_reason})`);
@@ -592,7 +606,7 @@ export async function lookAtScenes(
       const answer = await writeScene(studioId, model, requestOf(r.id), brand, artDirection, kit, { reel: [...(context.kept ?? []), ...others], done: context.done ?? [] }, undefined, {
         code: r.code!,
         frames,
-        ...(verdict ? { review: { ce_qu_il_voit: verdict.seen, ce_qu_il_faut_obtenir: verdict.fix } } : {}),
+        ...(verdict ? { review: { what_he_sees: verdict.seen, what_to_achieve: verdict.fix } } : {}),
       }).catch((e: unknown) => ({ code: null, js: null, error: String(e) }) as Omit<SceneResult, "id">);
       return { r, verdict, answer };
     }),

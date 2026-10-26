@@ -108,7 +108,7 @@ const MAX_OFFERED_PHOTOS = 8;
 /**
  * A correction's animations to rewrite look at their earlier version first: the frames of the
  * version corrected, rendered on her images where that animation played (its start, the gestures
- * under it, its middle, its end), with its code and what the review found (`seen`).
+ * under it, its middle, its end), with its code (`seen`); what is asked is their request.
  */
 async function lookAtEarlierRender(
   studioId: string,
@@ -117,7 +117,6 @@ async function lookAtEarlierRender(
   previous: EditPlan,
   plan: EditPlan,
   requests: SceneRequest[],
-  review: string,
   actions: Record<string, { start: number; end: number; what: string }[]>,
 ): Promise<void> {
   const looks = earlierLooks(previous, plan, requests.map((r) => r.id), gestureMoments(previous, actions));
@@ -143,7 +142,7 @@ async function lookAtEarlierRender(
       const frame = frames.find((f) => f.t === x.t);
       return frame ? [{ label: x.label, jpeg: frame.jpeg }] : [];
     });
-    if (look && shown?.length) request.seen = { code: look.code, review, frames: shown };
+    if (look && shown?.length) request.seen = { code: look.code, frames: shown };
   }
 }
 
@@ -577,7 +576,7 @@ export async function designEdit(params: {
     const moves = compose
       ? compose.shots.flatMap((shot, k) => {
           const seen = shot.track ? movesForDesigner([{ at: shot.from, length: shot.durationInFrames, ...shot.track }], durationInFrames, actions, { positions: false }) : null;
-          return seen ? [{ plan: k, ...seen }] : [];
+          return seen ? [{ shot: k, ...seen }] : [];
         })
       : track.length
         ? movesForDesigner(track, durationInFrames, actions)
@@ -585,6 +584,7 @@ export async function designEdit(params: {
     return {
       id: w.id,
       brief: w.brief,
+      ...(params.brief ? { request: params.brief } : {}),
       durationInFrames,
       // The faces and lettering of the footage under a scene: the designer composes around them.
       ...(segment?.over?.busy?.length ? { busy: segment.over.busy } : {}),
@@ -592,7 +592,7 @@ export async function designEdit(params: {
       ...(compose ? { compose } : {}),
       ...(photos.length ? { photos } : {}),
       ...(track.length ? { track } : {}),
-      ...(Array.isArray(moves) ? (moves.length ? { moves: { par_plan: moves } } : {}) : moves ? { moves } : {}),
+      ...(Array.isArray(moves) ? (moves.length ? { moves: { by_shot: moves } } : {}) : moves ? { moves } : {}),
       ...(subtitles && !compose && (plan.voice || layer) ? { subtitles } : {}),
     };
   };
@@ -600,7 +600,7 @@ export async function designEdit(params: {
   const libraryRequests = fromLibrary.map((w) => ({ ...requestFor(w), fromLibrary: true }));
   // A correction: each animation rewritten first looks at how its earlier version came out on her images.
   if (correction && previousPlan.success && baseId && requests.length) {
-    await lookAtEarlierRender(params.studioId, params.postId, baseId, previousPlan.data, plan, requests, params.brief ?? "", {
+    await lookAtEarlierRender(params.studioId, params.postId, baseId, previousPlan.data, plan, requests, {
       ...Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.actions ?? []])),
       ...Object.fromEntries(
         Object.entries(tracks).map(([id, file]) => [
@@ -656,12 +656,14 @@ export async function designEdit(params: {
   const sceneBrand = resolveReelBrand(plan, template, {
       name: (studio.data?.name as string | null) ?? "",
       accent: profile.colors?.[0],
+      // Her charter's other colours: the animations' palette (secondary, light, dark).
+      colors: profile.colors,
       // The real (signed) URL is set at render time; the designer only needs to know a logo exists.
       logoUrl: profile.logo_path ? "https://logo.fauve/studio" : profile.logo_url,
       fonts: usable,
     });
   const sceneContext = {
-      kept: keptScenes.map((name) => `déjà dans ce Reel : ${name}`),
+      kept: keptScenes.map((name) => `already in this Reel: ${name}`),
       done,
       // The Reel's rhythm and look: its test render moves the footage like the video does (what a scene follows stays under it).
       look: {
