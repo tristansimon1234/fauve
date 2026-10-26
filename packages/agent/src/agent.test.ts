@@ -2017,10 +2017,10 @@ test("copy first: what the Reel she copies (or her request) does not have is nev
   assert.equal(voiceLeftToSimone({ ...base, onReel: "simone" }), false);
 
   // Every model is told: her request and the Reel or carousel she copies come before our defaults.
-  assert.match(EDITOR_SYSTEM_PROMPT, /sa demande pour ce Reel et le Reel qu'elle recopie \(« reel_a_recopier »\) passent avant/);
-  assert.match(EDITOR_SYSTEM_PROMPT, /aucun texte d'accroche quand « reel_a_recopier » n'en a pas .* ou que sa demande n'en veut pas/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /her request and the Reel she copies come before your defaults/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /No hook text when « reel_a_recopier » has none .* or her request wants none/);
   // What her request does not mention is still decided by the defaults: only what she sets aside falls.
-  assert.match(EDITOR_SYSTEM_PROMPT, /Ce que sa demande ne dit pas, tes repères le décident/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /What her request does not say, your defaults decide/);
   assert.match(CAROUSEL_DESIGNER_PROMPT, /What her request does not say, these guidelines decide/);
   assert.doesNotMatch(EDITOR_SYSTEM_PROMPT, /\(au moins 2\)/);
   assert.match(MONTAGE_CRITIC_PROMPT, /the Reel she copies \(line « Reel à recopier »\) also comes before your guidelines/);
@@ -3851,7 +3851,7 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
   // The prompts give the liberty, and keep the charter as the starting point.
   assert.match(MOTION_DESIGNER_PROMPT, /starting point, not a cage/);
   assert.match(MOTION_DESIGNER_PROMPT, /listed in "fonts"/);
-  assert.match(EDITOR_SYSTEM_PROMPT, /point de départ, pas une cage/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /a starting point, not a cage/);
   assert.match(MONTAGE_CRITIC_PROMPT, /is intended, never a defect/);
 });
 
@@ -4337,10 +4337,19 @@ test("never constrained without knowing: Simone and the editor say what a real l
   const { EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
   assert.match(FAUVE_SYSTEM_PROMPT, /jamais une contrainte qu'elle ne comprend pas/);
   assert.match(FAUVE_SYSTEM_PROMPT, /jamais un refus ni un changement en silence/);
-  assert.match(EDITOR_SYSTEM_PROMPT, /Jamais contrainte sans le savoir/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /Never constrained without knowing it/);
   // Her request, then the Reel she copies, then the editor's defaults.
-  assert.ok(EDITOR_SYSTEM_PROMPT.indexOf("1. sa demande") < EDITOR_SYSTEM_PROMPT.indexOf("2. le Reel qu'elle recopie"));
+  assert.ok(EDITOR_SYSTEM_PROMPT.indexOf("1. Her request") < EDITOR_SYSTEM_PROMPT.indexOf("2. The Reel she copies"));
   assert.ok(EDITOR_SYSTEM_PROMPT.length < 17_000);
+});
+
+test("each agent in its role: the editor writes what an animation says, the motion designer its form", async () => {
+  const { EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
+  // Written blind, a place on screen landed on the subtitles: the form is left to the one who sees the images.
+  assert.match(EDITOR_SYSTEM_PROMPT, /The form of an animation .* is the motion designer's/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /You write what each one says, never how it looks/);
+  // What she reads stays in French; the briefs quote her words and the words on screen as they are.
+  assert.match(EDITOR_SYSTEM_PROMPT, /Briefs are in English, with her words and the words on screen quoted in French/);
 });
 
 test("the imagine question stands alone: no dates, formats or filming in its buttons", async () => {
