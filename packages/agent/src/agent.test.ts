@@ -2787,6 +2787,11 @@ test("hooks: the strongest shot opens, the hook is read from the first image, th
   assert.deepEqual([written.text, written.emphasis], ["40 minutes pour un sandwich ?", ["40 minutes"]]);
   assert.equal(pickHook(given, { ideas: [], scores: [], best: 7 }, "voix").text, given[0]);
   assert.equal(hookWords("[casually] Pourquoi cette file ?"), 3);
+  // The judge always weighs the voice's first sentence (her own text aside), keeping to what she fixed: skipped
+  // whenever she had asked anything, it left « Ça, c'est Inès, Camille et Léa. » alone.
+  const { HOOK_JUDGE_PROMPT } = await import("./hook.ts");
+  assert.match(HOOK_JUDGE_PROMPT, /What she fixed for this Reel \(« contrat »/);
+  assert.match(HOOK_JUDGE_PROMPT, /are an idea to say better, not a sentence to keep/);
 
   // The voice: its first sentence chosen, then all that follows; written as hooks and the rest.
   assert.equal(scriptFrom(" Pourquoi cette file ? ", "Ici, tout passe au toaster.").script, "Pourquoi cette file ? Ici, tout passe au toaster.");
@@ -4368,6 +4373,9 @@ test("Simone makes sure she knows what she wants, and her plan fixes only what s
   assert.match(FAUVE_SYSTEM_PROMPT, /not where things go on screen nor what an animation looks like, unless she said it/);
   // A preference said of her Reels in general is kept; a wish for one Reel goes in its brief.
   assert.match(FAUVE_SYSTEM_PROMPT, /A preference she states about her Reels in general .* is lasting too/);
+  // « ça c'est Ines, truc et truc… un truc comme ça » became the voice's first words, word for word, then « trouve les bons messages » changed nothing.
+  assert.match(FAUVE_SYSTEM_PROMPT, /The words it quotes .* are the ones the Reel will say, and writing them well is your craft/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /Her own words stay as they are only when she gives them as final/);
   assert.ok(FAUVE_SYSTEM_PROMPT.length < 46_000);
 });
 

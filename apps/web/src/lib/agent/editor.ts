@@ -439,6 +439,7 @@ export async function designEdit(params: {
       type: "texte",
       commerce: { nom: studio.data?.name ?? undefined, activite: studio.data?.business_type ?? undefined, ce_qu_on_sait: input.studio.facts, ton: profile.tone },
       demande: params.brief,
+      ...(contractLines(params.contract).length ? { contrat: contractLines(params.contract) } : {}),
       premiere_image: firstImage,
       voix_premiere_phrase: spoken?.phrases[0]?.text,
       recentes: hooks.length ? hooks : undefined,

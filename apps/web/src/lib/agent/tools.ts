@@ -496,7 +496,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           possible: false,
           solde: job.balance,
           credits_necessaires: job.needed,
-          note: "Pas assez de crédits pour ce montage : dis-le simplement, sans rien lancer (ils reviennent le 1er du mois).",
+          // credits_necessaires is already the simplest version's price: a lighter one offered instead would not start either.
+          note: "Pas assez de crédits pour ce montage, même dans sa version la plus simple (credits_necessaires). Dis-le simplement, sans rien lancer et sans proposer une version plus simple ou plus courte, qui ne passerait pas non plus : ses crédits reviennent le 1er du mois.",
         });
       }
       const accepted = await acceptQuote(studioId, job.id, turnStartedAt, { immediate: true });
