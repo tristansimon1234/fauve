@@ -55,11 +55,11 @@ export function earlierLooks(
     const match = before.map((a) => ({ a, shared: overlap(a) })).sort((x, y) => y.shared - x.shared)[0];
     if (!match || match.shared < 0.4 * Math.min(span.to - span.from, match.a.to - match.a.from)) continue;
     const { from, to, code } = match.a;
-    const first = { t: round(from + Math.min(0.2, (to - from) / 4)), label: "son début" };
-    const last = { t: round(Math.max(from, to - 0.35)), label: "sa fin" };
+    const first = { t: round(from + Math.min(0.2, (to - from) / 4)), label: "its start" };
+    const last = { t: round(Math.max(from, to - 0.35)), label: "its end" };
     const inside = [
-      ...gestures.filter((g) => g.t > first.t + 0.2 && g.t < last.t - 0.2).map((g) => ({ t: round(g.t), label: `pendant un geste : ${g.what}` })),
-      { t: round((from + to) / 2), label: "son milieu" },
+      ...gestures.filter((g) => g.t > first.t + 0.2 && g.t < last.t - 0.2).map((g) => ({ t: round(g.t), label: `during a gesture: ${g.what}` })),
+      { t: round((from + to) / 2), label: "its middle" },
     ]
       .sort((x, y) => x.t - y.t)
       .filter((x, k, list) => k === 0 || x.t - list[k - 1]!.t >= 0.25);
@@ -68,7 +68,7 @@ export function earlierLooks(
     const kept = inside.length <= room ? inside : Array.from({ length: room }, (_, k) => inside[Math.round((k * (inside.length - 1)) / (room - 1))]!);
     const times = [first, ...kept, last]
       .filter((x, k, list) => k === 0 || x.t - list[k - 1]!.t >= 0.15)
-      .map((x) => ({ t: x.t, label: `image ${Math.max(0, Math.round((x.t - from) * 30))} de ton animation (${x.label})` }));
+      .map((x) => ({ t: x.t, label: `frame ${Math.max(0, Math.round((x.t - from) * 30))} of your animation (${x.label})` }));
     looks.set(id, { code, times });
   }
   return looks;
@@ -93,15 +93,15 @@ export function lookMoments(plan: EditPlan, ids: string[], gestures: GestureMome
     const composed = id.startsWith("l") && plan.layers?.[Number(id.slice(1))]?.compose;
     const moments = composed
       ? [
-          { t: round(Math.min(to - 0.1, from + 0.3)), label: "sa première image" },
-          ...[0.25, 0.5, 0.75].map((k) => ({ t: round(from + k * Math.min(length, duration)), label: "pendant le Reel" })),
-          { t: round(Math.max(from, to - 0.4)), label: "sa fin" },
+          { t: round(Math.min(to - 0.1, from + 0.3)), label: "its first frame" },
+          ...[0.25, 0.5, 0.75].map((k) => ({ t: round(from + k * Math.min(length, duration)), label: "during the Reel" })),
+          { t: round(Math.max(from, to - 0.4)), label: "its end" },
         ]
       : [
-          { t: round(from + Math.min(0.8, length * 0.3)), label: "ses mots arrivés" },
-          ...gestures.filter((g) => g.t > from + 0.2 && g.t < to - 0.2).map((g) => ({ t: round(g.t), label: `pendant un geste : ${g.what}` })),
-          { t: round(from + length / 2), label: "son milieu" },
-          { t: round(Math.max(from, to - Math.min(0.25, length * 0.1))), label: "juste avant sa fin" },
+          { t: round(from + Math.min(0.8, length * 0.3)), label: "its words in" },
+          ...gestures.filter((g) => g.t > from + 0.2 && g.t < to - 0.2).map((g) => ({ t: round(g.t), label: `during a gesture: ${g.what}` })),
+          { t: round(from + length / 2), label: "its middle" },
+          { t: round(Math.max(from, to - Math.min(0.25, length * 0.1))), label: "just before its end" },
         ];
     const sorted = moments.sort((a, b) => a.t - b.t).filter((m, k, list) => k === 0 || m.t - list[k - 1]!.t >= 0.25);
     const room = composed ? MAX_LOOK_FRAMES + 1 : MAX_LOOK_FRAMES;
@@ -112,7 +112,7 @@ export function lookMoments(plan: EditPlan, ids: string[], gestures: GestureMome
         : [sorted[0]!, ...Array.from({ length: room - 2 }, (_, k) => sorted[1 + Math.round((k * (sorted.length - 3)) / Math.max(1, room - 3))]!), sorted.at(-1)!];
     looks.set(
       id,
-      kept.filter((m, k, list) => list.indexOf(m) === k).map((m) => ({ t: m.t, label: `image ${Math.max(0, Math.round((m.t - from) * 30))} de ton animation (${m.label})` })),
+      kept.filter((m, k, list) => list.indexOf(m) === k).map((m) => ({ t: m.t, label: `frame ${Math.max(0, Math.round((m.t - from) * 30))} of your animation (${m.label})` })),
     );
   }
   return looks;
@@ -129,7 +129,7 @@ export function canvasMoments(plan: EditPlan, ids: string[]): Map<string, { t: n
   const spans = animationSpans(plan);
   const timeline = planTimeline(plan);
   const round = (t: number) => Math.round(t * 100) / 100;
-  const at = (t: number) => `${t.toFixed(1).replace(".", ",")} s`;
+  const at = (t: number) => `${t.toFixed(1)} s`;
   const count = Math.min(CANVAS_REEL_FRAMES, Math.max(1, Math.floor(timeline.duration)));
   const across = Array.from({ length: count }, (_, k) => round(((k + 0.5) * timeline.duration) / count));
   // The shot that shows at an instant, by its rank among her shots (a composition's shots[i]).
@@ -151,7 +151,7 @@ export function canvasMoments(plan: EditPlan, ids: string[]): Map<string, { t: n
         id,
         across.map((t) => {
           const shot = shotAt(t);
-          return { t, label: shot === null ? at(t) : `${at(t)} · plan ${shot}` };
+          return { t, label: shot === null ? at(t) : `${at(t)} · shot ${shot}` };
         }),
       );
       continue;
@@ -165,8 +165,8 @@ export function canvasMoments(plan: EditPlan, ids: string[]): Map<string, { t: n
     looks.set(
       id,
       [
-        ...across.filter((t) => t < from || t >= to).map((t) => ({ t, label: another(t) ? `${at(t)} · une autre animation du Reel jouera ici` : at(t) })),
-        ...mine.map((t) => ({ t, label: `${at(t)} · image ${Math.max(0, Math.round((t - from) * 30))} de ton animation` })),
+        ...across.filter((t) => t < from || t >= to).map((t) => ({ t, label: another(t) ? `${at(t)} · another animation of the Reel will play here` : at(t) })),
+        ...mine.map((t) => ({ t, label: `${at(t)} · frame ${Math.max(0, Math.round((t - from) * 30))} of your animation` })),
       ].sort((a, b) => a.t - b.t),
     );
   }

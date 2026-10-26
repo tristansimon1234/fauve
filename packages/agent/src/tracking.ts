@@ -435,15 +435,15 @@ function spans(seen: { id: number; frame: number }[], step: number): Map<number,
   return byId;
 }
 
-const words = (list: [number, number][]) => list.map(([a, b]) => (a === b ? `image ${a}` : `images ${a} à ${b}`)).join(", ");
+const words = (list: [number, number][]) => list.map(([a, b]) => (a === b ? `frame ${a}` : `frames ${a} to ${b}`)).join(", ");
 
 export type DesignerMoves = {
-  gestes?: { de: number; a: number; quoi: string }[];
+  gestures?: { from: number; to: number; what: string }[];
   /** What the hands do, measured on their points (handMoves): surer than the gestures read. */
-  gestes_mesures?: { de: number; a: number; quoi: string }[];
-  mains?: { id: number; vue: string; trajet?: { image: number; paume: [number, number]; pouce: [number, number]; index: [number, number]; taille: number }[] }[];
-  visages?: { id: number; vu: string; boites?: { image: number; centre: [number, number]; largeur: number; hauteur: number }[] }[];
-  corps?: { id: number; vu: string; reperes?: { image: number; tete: [number, number]; epaules?: [[number, number], [number, number]]; poignets?: [number, number][] }[] }[];
+  measured_gestures?: { from: number; to: number; what: string }[];
+  hands?: { id: number; seen: string; path?: { frame: number; palm: [number, number]; thumb: [number, number]; index: [number, number]; size: number }[] }[];
+  faces?: { id: number; seen: string; boxes?: { frame: number; centre: [number, number]; width: number; height: number }[] }[];
+  bodies?: { id: number; seen: string; points?: { frame: number; head: [number, number]; shoulders?: [[number, number], [number, number]]; wrists?: [number, number][] }[] }[];
 };
 
 /**
@@ -464,10 +464,10 @@ export function movesForDesigner(
   const fine = samples(pieces, length, 5);
   const coarse = samples(pieces, length, 15);
   const handSpans = spans(fine.flatMap((s) => s.rows.h.map((r) => ({ id: r[0]!, frame: s.frame }))), 5);
-  const mains = [...handSpans.entries()].slice(0, 6).map(([id, list]) => ({
+  const hands = [...handSpans.entries()].slice(0, 6).map(([id, list]) => ({
     id,
-    vue: words(list),
-    trajet: !positions ? undefined : fine.flatMap((s) => {
+    seen: words(list),
+    path: !positions ? undefined : fine.flatMap((s) => {
       const row = s.rows.h.find((r) => r[0] === id);
       if (!row) return [];
       const wrist = place(s.piece, row, 1);
@@ -475,63 +475,63 @@ export function movesForDesigner(
       const palm = [0, 5, 9, 13, 17].map((p) => place(s.piece, row, 1 + 2 * p));
       return [
         {
-          image: s.frame,
-          paume: [Math.round(palm.reduce((a, p) => a + p[0], 0) / 5), Math.round(palm.reduce((a, p) => a + p[1], 0) / 5)] as [number, number],
-          pouce: place(s.piece, row, 1 + 2 * 4),
+          frame: s.frame,
+          palm: [Math.round(palm.reduce((a, p) => a + p[0], 0) / 5), Math.round(palm.reduce((a, p) => a + p[1], 0) / 5)] as [number, number],
+          thumb: place(s.piece, row, 1 + 2 * 4),
           index: place(s.piece, row, 1 + 2 * 8),
-          taille: Math.round(2 * Math.hypot(middle[0] - wrist[0], middle[1] - wrist[1])),
+          size: Math.round(2 * Math.hypot(middle[0] - wrist[0], middle[1] - wrist[1])),
         },
       ];
     }),
   }));
   const faceSpans = spans(coarse.flatMap((s) => s.rows.f.map((r) => ({ id: r[0]!, frame: s.frame }))), 15);
-  const visages = [...faceSpans.entries()].slice(0, 4).map(([id, list]) => ({
+  const faces = [...faceSpans.entries()].slice(0, 4).map(([id, list]) => ({
     id,
-    vu: words(list),
-    boites: !positions ? undefined : coarse.flatMap((s) => {
+    seen: words(list),
+    boxes: !positions ? undefined : coarse.flatMap((s) => {
       const row = s.rows.f.find((r) => r[0] === id);
       if (!row) return [];
       const a = place(s.piece, row, 1);
       const b = shownAt(((row[1] ?? 0) + (row[3] ?? 0)) / 1000, ((row[2] ?? 0) + (row[4] ?? 0)) / 1000, s.piece.look, size.width, size.height);
-      return [{ image: s.frame, centre: [Math.round((a[0] + b[0]) / 2), Math.round((a[1] + b[1]) / 2)] as [number, number], largeur: Math.abs(b[0] - a[0]), hauteur: Math.abs(b[1] - a[1]) }];
+      return [{ frame: s.frame, centre: [Math.round((a[0] + b[0]) / 2), Math.round((a[1] + b[1]) / 2)] as [number, number], width: Math.abs(b[0] - a[0]), height: Math.abs(b[1] - a[1]) }];
     }),
   }));
   const bodySpans = spans(coarse.flatMap((s) => s.rows.b.map((r) => ({ id: r[0]!, frame: s.frame }))), 15);
-  const corps = [...bodySpans.entries()].slice(0, 3).map(([id, list]) => ({
+  const bodies = [...bodySpans.entries()].slice(0, 3).map(([id, list]) => ({
     id,
-    vu: words(list),
-    reperes: !positions ? undefined : coarse.flatMap((s) => {
+    seen: words(list),
+    points: !positions ? undefined : coarse.flatMap((s) => {
       const row = s.rows.b.find((r) => r[0] === id);
       if (!row) return [];
       const seen = (k: number) => (row[3 + 3 * k] ?? 0) >= 50;
       const point = (k: number) => place(s.piece, row, 1 + 3 * k);
       return [
         {
-          image: s.frame,
-          tete: point(0),
-          ...(seen(11) && seen(12) ? { epaules: [point(11), point(12)] as [[number, number], [number, number]] } : {}),
-          ...(seen(15) || seen(16) ? { poignets: [15, 16].filter(seen).map(point) } : {}),
+          frame: s.frame,
+          head: point(0),
+          ...(seen(11) && seen(12) ? { shoulders: [point(11), point(12)] as [[number, number], [number, number]] } : {}),
+          ...(seen(15) || seen(16) ? { wrists: [15, 16].filter(seen).map(point) } : {}),
         },
       ];
     }),
   }));
   // A move of the clip (seconds), on the scene's frames, cut to the piece that plays it.
   const onScene = (p: TrackPiece, m: { start: number; end: number; what: string }) => {
-    const de = Math.round(p.at + (m.start * TRACK_FPS - p.startFrom) / (p.speed ?? 1));
-    const fin = Math.round(p.at + (m.end * TRACK_FPS - p.startFrom) / (p.speed ?? 1));
-    const from = Math.max(de, p.at, 0);
-    const to = Math.min(fin, p.at + p.length - 1, length - 1);
-    return to >= from ? [{ de: from, a: to, quoi: m.what }] : [];
+    const start = Math.round(p.at + (m.start * TRACK_FPS - p.startFrom) / (p.speed ?? 1));
+    const end = Math.round(p.at + (m.end * TRACK_FPS - p.startFrom) / (p.speed ?? 1));
+    const from = Math.max(start, p.at, 0);
+    const to = Math.min(end, p.at + p.length - 1, length - 1);
+    return to >= from ? [{ from, to, what: m.what }] : [];
   };
   // The gestures Gemini saw in these passages, and what the hands do there, measured on their points.
-  const gestes = pieces.flatMap((p) => (p.clip ? (actions[p.clip] ?? []) : []).flatMap((a) => onScene(p, a)));
-  const gestes_mesures = pieces.flatMap((p) => handMoves(p.tracks).flatMap((m) => onScene(p, m)));
-  if (!mains.length && !visages.length && !corps.length && !gestes.length && !gestes_mesures.length) return null;
+  const gestures = pieces.flatMap((p) => (p.clip ? (actions[p.clip] ?? []) : []).flatMap((a) => onScene(p, a)));
+  const measured_gestures = pieces.flatMap((p) => handMoves(p.tracks).flatMap((m) => onScene(p, m)));
+  if (!hands.length && !faces.length && !bodies.length && !gestures.length && !measured_gestures.length) return null;
   return {
-    ...(gestes.length ? { gestes } : {}),
-    ...(gestes_mesures.length ? { gestes_mesures } : {}),
-    ...(mains.length ? { mains } : {}),
-    ...(visages.length ? { visages } : {}),
-    ...(corps.length ? { corps } : {}),
+    ...(gestures.length ? { gestures } : {}),
+    ...(measured_gestures.length ? { measured_gestures } : {}),
+    ...(hands.length ? { hands } : {}),
+    ...(faces.length ? { faces } : {}),
+    ...(bodies.length ? { bodies } : {}),
   };
 }
