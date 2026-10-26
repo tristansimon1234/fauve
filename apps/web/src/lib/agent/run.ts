@@ -174,6 +174,8 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     last = message;
     const text = textOf(message).trim();
     if (text && spoken.at(-1) !== text) spoken.push(text);
+    // The tools of this step run after it: reply_with knows whether its buttons come with any words.
+    input.wrote = spoken.length > 0;
   };
   const toolsOf = (message: Anthropic.Beta.BetaMessage) => message.content.filter((b) => b.type === "tool_use").map((b) => b.name);
   // A step that closes her message with its own words (buttons, a reaction) ends the turn: its
