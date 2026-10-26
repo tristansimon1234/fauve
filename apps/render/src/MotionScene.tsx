@@ -13,6 +13,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { Fit } from "./Fit";
+import { Marker } from "./Marker";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
 import { SceneView } from "./Scene";
 import type { Theme } from "./theme";
@@ -92,7 +93,8 @@ function Footage({ shot, style }: { shot: number; style?: CSSProperties }) {
 // FitText: a box whose text shrinks until it fits (see Fit.tsx), so a long text never leaves the frame.
 // Cutout: a photo's subject cut out, with its scissor rim (collages, her photos in an animation).
 // Footage: one of her shots, where a collage's composition lays it.
-export const SCOPE = { AbsoluteFill, Sequence, Img, useCurrentFrame, useVideoConfig, interpolate, interpolateColors, spring, Easing, random, FitText: Fit, Cutout, Footage };
+// Marker: a word circled or underlined by hand, the stroke following the word as it is laid out.
+export const SCOPE = { AbsoluteFill, Sequence, Img, useCurrentFrame, useVideoConfig, interpolate, interpolateColors, spring, Easing, random, FitText: Fit, Cutout, Footage, Marker };
 
 export type SceneComponent = (props: {
   width: number;

@@ -251,13 +251,16 @@ export function measuresLine(measures: ReelMeasures): string {
   ].join(" ; ");
 }
 
-/** What her Reel keeps of hers: her images always, her fonts and colours unless the copied Reel's make its style. */
+/**
+ * What her Reel keeps of hers: her images always, her font unless the copied Reel's makes its style; its
+ * colours only if they suit her Reel (the editor decides, with her charter and her request in front of it).
+ */
 function keptWords(look: StolenLook): string {
   const font = Boolean(look.text.font);
   const colors = Boolean(look.colors?.length);
-  if (font && colors) return "Avec tes images, et une police et des couleurs comme les siennes (elles font son style)";
+  if (font && colors) return "Avec tes images, une police comme la sienne (elle fait son style), et ses couleurs si elles vont à ton Reel";
   if (font) return "Avec tes couleurs et tes images, et une police comme la sienne (elle fait son style)";
-  if (colors) return "Avec tes polices et tes images, et ses couleurs (elles font son style)";
+  if (colors) return "Avec tes polices et tes images, et ses couleurs si elles vont à ton Reel";
   return "Avec tes couleurs, tes polices et tes images";
 }
 
@@ -323,26 +326,29 @@ export function signatureOf(profile: { signature?: BrandSignature; followed?: Fo
 }
 
 /**
- * The copied Reel's font and colours, when they make its style: this Reel takes them over her
- * charter's (its titles in that font, its key words in that colour), set on the plan so the
- * render, the live preview and the animations agree. A font this request chose stays.
+ * The copied Reel's font, when it makes its style: this Reel takes it over her charter's (its titles
+ * in that font), set on the plan so the render, the live preview and the animations agree. A font
+ * this request chose stays. Its colours are only offered to the editor (followedForEditor): set on
+ * every copy, the blue of a tutorial's interface had gone onto the hook of a studio whose charter
+ * says « never a cold blue », next to its orange animations.
  */
-export function followedLook(
-  plan: { fonts?: { display?: string; body?: string }; colors?: string[] },
-  followed: FollowedStyle | undefined,
-): { fonts?: { display?: string; body?: string }; colors?: string[] } {
+export function followedLook(plan: { fonts?: { display?: string; body?: string } }, followed: FollowedStyle | undefined): { fonts?: { display?: string; body?: string } } {
   const font = followed?.look.text.font;
-  const colors = followed?.look.colors;
-  return {
-    ...(font && !plan.fonts?.display ? { fonts: { ...plan.fonts, display: font } } : {}),
-    ...(colors?.length && !plan.colors?.length ? { colors } : {}),
-  };
+  return font && !plan.fonts?.display ? { fonts: { ...plan.fonts, display: font } } : {};
 }
 
-/** The copied Reel's font and colours in words (what this Reel takes from them), or null. */
-function takenLook(look: StolenLook): string | null {
-  const taken = [look.text.font && `sa police (${look.text.font})`, look.colors?.length && `ses couleurs (${look.colors.join(", ")})`].filter(Boolean);
-  return taken.length ? `${taken.join(" et ")} : ${taken.length > 1 ? "elles font" : "elle fait"} son style, ce Reel les prend à la place de celles de sa charte` : null;
+/** The copied Reel's font in words (this Reel takes it), or null. */
+function takenFont(look: StolenLook): string | null {
+  return look.text.font ? `sa police (${look.text.font}) : elle fait son style, ce Reel la prend à la place de celle de sa charte` : null;
+}
+
+/** The copied Reel's colours in words (offered: this Reel takes them only if they serve it), or null. */
+function offeredColors(look: StolenLook, reader: "editor" | "critic"): string | null {
+  if (!look.colors?.length) return null;
+  const colors = look.colors.join(", ");
+  return reader === "editor"
+    ? `${colors} : celles de ses textes et de ses formes. Prends-les dans « colors » si elles servent ce Reel et sa demande, à côté de sa charte ; sinon sa charte garde les siennes`
+    : `ses couleurs (${colors}) : prises par le monteur seulement si elles servent ce Reel, sa charte sinon, jamais un défaut`;
 }
 
 /** A followed tempo as a plan holds it (60 to 140 BPM): a faster beat is cut at half time, on the same kicks. */
@@ -379,8 +385,10 @@ export function followedForEditor(followed: FollowedStyle) {
       ? { moments: look.moments.map((m) => ({ a_s: m.at, quoi: m.what })), moments_consigne: "refais chacun de ces moments, dans cet ordre et à peu près à ces temps, avec ses images et ses mots : c'est ce qui fait ce Reel" }
       : {}),
     texte: `${look.text.amount} ; ${look.text.composition}${look.text.subtitles ? " ; des sous-titres" : ""}`,
-    // Already set on the plan by the engine (followedLook): the editor and the animations follow it.
-    ...(takenLook(look) ? { police_et_couleurs: takenLook(look)! } : {}),
+    // Its font is already set on the plan by the engine (followedLook): the editor and the animations follow it.
+    ...(takenFont(look) ? { police: takenFont(look)! } : {}),
+    // Its colours are the editor's call: it has her charter and her request in front of it.
+    ...(offeredColors(look, "editor") ? { couleurs: offeredColors(look, "editor")! } : {}),
     ...(look.effect !== "none" ? { effet: EFFECT_WORDS[look.effect] } : {}),
     camera: look.camera,
     transitions: look.transitions,
@@ -405,7 +413,8 @@ export function followedLine(followed: FollowedStyle): string {
     `texte : ${look.text.amount}`,
     // With a voice, whether its words are written on screen: a copy may speak without subtitles.
     look.voice === "aucune" ? "voix : aucune" : `voix : ${look.voice}, ${look.text.subtitles ? "avec" : "sans"} sous-titres`,
-    ...(takenLook(look) ? [takenLook(look)!] : []),
+    ...(takenFont(look) ? [takenFont(look)!] : []),
+    ...(offeredColors(look, "critic") ? [offeredColors(look, "critic")!] : []),
     ...(look.effect !== "none" ? [EFFECT_WORDS[look.effect]] : []),
     `transitions : ${look.transitions}`,
     `fin : ${look.ending.replace(/[.\s]+$/, "")}`,

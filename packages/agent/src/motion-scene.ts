@@ -22,6 +22,7 @@ export const MOTION_SCOPE = [
   "FitText",
   "Cutout",
   "Footage",
+  "Marker",
 ] as const;
 
 // The motion designer's prompt: a base every animation gets (cached), then only the parts its call needs
@@ -64,6 +65,7 @@ Code contract (strict)
 - Words come from slots she can edit: texts.slot_name (lowercase, digits, _) with the brief's text as default (texts.title ?? "…"); texts is always an object, maybe empty. Declare each slot in "slots" with the length your layout holds.
 - No import or export. Only these identifiers exist: ${MOTION_SCOPE.join(", ")} (standard Remotion API: useCurrentFrame() is the scene's frame, from 0; interpolate(frame, [a, b], [x, y], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing }); spring({ frame, fps, config }); random("seed") for deterministic randomness).
 - FitText, when you need it: a box whose text shrinks until it fits, never breaking a word — <FitText style={{ position: "absolute", left, top, width, height }} innerStyle={{ fontFamily, fontSize, lineHeight, color }}>{title}</FitText> (style places the box; innerStyle sets its content's type and layout, centred in a flex column by default). Text you set by hand (a bubble, an interface line, a label) does not need it.
+- Marker, when you circle or underline a word by hand: <Marker color={…} from={frame it starts drawing} shape="circle" | "underline" strokeWidth={px, optional}>{word}</Marker> wraps the word where it sits (in a line, in FitText) and draws its stroke around the word as laid out, whatever its final size.
 - Forbidden: network access, Math.random, Date, setTimeout, eval, window, document, localStorage, <script>, external images (only brand.logoUrl, when there is one, and the given photos).
 - Inline styles and inline SVG; TypeScript or JavaScript.
 - brand = { name, accent (her main colour), accentInk (text readable on accent), palette: { secondary, light, dark } (her charter's other colours), displayFont, bodyFont (both loaded: fontFamily: \`"\${brand.displayFont}"\`), logoUrl, logoOnDark }. logoOnDark "white": a dark one-colour logo, filter: "brightness(0) invert(1)" on a dark background; "plate": a dark multicolour logo, on a light rounded plate; absent: as it is.

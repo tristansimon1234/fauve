@@ -421,7 +421,9 @@ export async function designEdit(params: {
       }
     }
   }
-  // The Reel she copies takes its own font and colours over her charter's when they make its style (the animations get them too).
+  // A correction keeps this Reel's own colours when the editor wrote none: only what she asked changes.
+  if (!plan.colors && base?.colors && !params.fresh) plan.colors = base.colors;
+  // The Reel she copies takes its own font over her charter's when it makes its style (the animations get it too); its colours were offered to the editor.
   Object.assign(plan, followedLook(plan, followed));
 
   // The hook's words decide whether anyone stays: a new Reel's written hook is weighed against
