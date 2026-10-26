@@ -534,6 +534,15 @@ test("her request reaches every agent word for word: each launch's exchange, Sim
       ["elle", "C'est parti"],
     ],
   );
+  // What Simone sent on her own about another post (its delivery, a reminder) is no part of this request; about this one, it is.
+  const sent = [
+    ...rows,
+    { direction: "outbound" as const, type: "text", body: "Ton montage « Inès » est prêt 🎬", created_at: "2026-10-23T18:44:20Z", unprompted: { post: "ines" } },
+    { direction: "outbound" as const, type: "text", body: "C'est le bon moment pour poster ton Reel", created_at: "2026-10-23T18:44:30Z", unprompted: {} },
+    { direction: "outbound" as const, type: "text", body: "Ton montage « La fleuriste » est prêt 🎬", created_at: "2026-10-23T18:44:40Z", unprompted: { post: "fleuriste" } },
+  ];
+  assert.deepEqual(exchangeLines(sent, "fleuriste").slice(-2).map((l) => l.text), ["C'est parti", "Ton montage « La fleuriste » est prêt 🎬"]);
+  assert.equal(exchangeLines(sent).length, lines.length);
   // A long exchange keeps its latest messages.
   const long = exchangeLines(Array.from({ length: 30 }, (_, i) => ({ direction: "inbound" as const, type: "text", body: `${i} ${"mot ".repeat(200)}`, created_at: `t${i}` })));
   assert.ok(long.length < 30 && long.at(-1)!.text.startsWith("29 "));
@@ -1166,7 +1175,7 @@ test("the first Reel's buttons and the ambiances speak plain words", async () =>
   }
   // No ambiance to choose any more: each Reel its own rhythm, in the look of her charter.
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
-  assert.ok(FAUVE_SYSTEM_PROMPT.includes("chaque Reel à son rythme") && !FAUVE_SYSTEM_PROMPT.includes("« Coupes rapides »"));
+  assert.ok(FAUVE_SYSTEM_PROMPT.includes("each Reel at its own pace") && !FAUVE_SYSTEM_PROMPT.includes("« Coupes rapides »"));
 });
 
 test("the site's photos: share image first, big images, no logos or icons", async () => {
@@ -4335,12 +4344,23 @@ test("ready to go out: a carousel or a photo needs its photos, never a montage",
 test("never constrained without knowing: Simone and the editor say what a real limit changed", async () => {
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
   const { EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
-  assert.match(FAUVE_SYSTEM_PROMPT, /jamais une contrainte qu'elle ne comprend pas/);
-  assert.match(FAUVE_SYSTEM_PROMPT, /jamais un refus ni un changement en silence/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /never a constraint she doesn't understand/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /never a refusal or a change in silence/);
   assert.match(EDITOR_SYSTEM_PROMPT, /Never constrained without knowing it/);
   // Her request, then the Reel she copies, then the editor's defaults.
   assert.ok(EDITOR_SYSTEM_PROMPT.indexOf("1. Her request") < EDITOR_SYSTEM_PROMPT.indexOf("2. The Reel she copies"));
   assert.ok(EDITOR_SYSTEM_PROMPT.length < 17_000);
+});
+
+test("Simone makes sure she knows what she wants, and her plan fixes only what she said", async () => {
+  const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
+  // The team works from what Simone passes on: a request left open where it changes the result gets one short question.
+  assert.match(FAUVE_SYSTEM_PROMPT, /When her request leaves open something that changes the result .* ask: one short question/);
+  // « textes animés en bas » was Simone's own idea in the florist's plan, validated with « C'est parti ».
+  assert.match(FAUVE_SYSTEM_PROMPT, /not where things go on screen nor what an animation looks like, unless she said it/);
+  // A preference said of her Reels in general is kept; a wish for one Reel goes in its brief.
+  assert.match(FAUVE_SYSTEM_PROMPT, /A preference she states about her Reels in general .* is lasting too/);
+  assert.ok(FAUVE_SYSTEM_PROMPT.length < 46_000);
 });
 
 test("each agent in its role: the editor writes what an animation says, the motion designer its form", async () => {
@@ -4354,9 +4374,9 @@ test("each agent in its role: the editor writes what an animation says, the moti
 
 test("the imagine question stands alone: no dates, formats or filming in its buttons", async () => {
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
-  assert.match(FAUVE_SYSTEM_PROMPT, /posée une seule fois, seule dans son message : ni date, ni format, ni conseil/);
-  assert.match(FAUVE_SYSTEM_PROMPT, /jamais dans le message où tu demandes ce qu'elle imagine/);
-  assert.match(FAUVE_SYSTEM_PROMPT, /partir des photos de son site : ne lui propose pas de filmer/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /asked once and alone in its message: no date, format, advice or other choice beside it/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /never in the message where you ask what she imagines/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /asked you to start from her site's photos: don't propose filming/);
   assert.doesNotMatch(FAUVE_SYSTEM_PROMPT, /un autre format ou un autre jour, elle le dit dans sa réponse/);
 });
 

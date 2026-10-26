@@ -25,8 +25,18 @@ export type RequestEntry = z.infer<typeof requestEntrySchema>;
 /** `posts.request_log`, read leniently: an entry it cannot read is left out. */
 export const requestLogSchema = z.array(requestEntrySchema.nullable().catch(null)).catch([]).transform((log) => log.filter((e): e is RequestEntry => e !== null));
 
-/** A stored message as the log reads it; `launched`: Simone's reply of a turn that started a montage. */
-export type ExchangeRow = { direction: "inbound" | "outbound"; type: string; body: string | null; created_at: string; launched?: boolean };
+/**
+ * A stored message as the log reads it; `launched`: Simone's reply of a turn that started a montage; `unprompted`: a
+ * message she sent on her own (a delivery, a reminder, a nudge), with the post it is about.
+ */
+export type ExchangeRow = {
+  direction: "inbound" | "outbound";
+  type: string;
+  body: string | null;
+  created_at: string;
+  launched?: boolean;
+  unprompted?: { post?: string };
+};
 
 /** One message kept whole up to this length (Simone's plans are under 1 000 characters). */
 const LINE_MAX = 1500;
@@ -52,12 +62,15 @@ const MEDIA: Record<string, string> = {
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max).replace(/\s+\S*$/, "")}…` : text);
 
 /**
- * The exchange of a launch, from her messages and Simone's replies (oldest first): what was said since the last montage
- * launched in this thread (an earlier Reel's exchange is its own), its latest messages kept when it is long.
+ * The exchange of a launch for `post`, from her messages and Simone's replies (oldest first): what was said since the
+ * last montage launched in this thread (an earlier Reel's exchange is its own), its latest messages kept when it is long.
+ * What Simone sent on her own about another post is left out: the florist's request carried the delivery of Inès's Reel
+ * and the reminder of a third one.
  */
-export function exchangeLines(rows: ExchangeRow[]): RequestLine[] {
-  const start = rows.reduce((at, row, i) => (row.launched ? i + 1 : at), 0);
-  const lines = rows.slice(start).flatMap((row): RequestLine[] => {
+export function exchangeLines(rows: ExchangeRow[], post?: string): RequestLine[] {
+  const relevant = rows.filter((row) => !row.unprompted || (post !== undefined && row.unprompted.post === post));
+  const start = relevant.reduce((at, row, i) => (row.launched ? i + 1 : at), 0);
+  const lines = relevant.slice(start).flatMap((row): RequestLine[] => {
     const inbound = row.direction === "inbound";
     const body = row.body?.trim() ?? "";
     const media = inbound ? MEDIA[row.type] : undefined;
