@@ -104,9 +104,11 @@ export default function LandingPage() {
           <a href="#tarif" className="hidden text-[15px] font-semibold lg:inline">
             Tarif
           </a>
-          <Link href="/commencer?connexion" className="hidden text-[15px] font-semibold md:inline">
-            Se connecter
-          </Link>
+          {OPEN && (
+            <Link href="/commencer?connexion" className="hidden text-[15px] font-semibold md:inline">
+              Se connecter
+            </Link>
+          )}
           <Start waUrl={waUrl} size="sm" />
         </nav>
       </header>
@@ -436,15 +438,30 @@ export default function LandingPage() {
         <Link href="/confidentialite">Confidentialité</Link>
         <Link href="/conditions">Conditions d’utilisation</Link>
         <Link href="/suppression-des-donnees">Suppression des données</Link>
-        <Link href="/connexion">Se connecter</Link>
+        {OPEN && <Link href="/connexion">Se connecter</Link>}
         <span className="font-normal">Photos : Unsplash</span>
       </footer>
     </div>
   );
 }
 
+/**
+ * Whether the landing lets anyone in. Closed while WhatsApp and Instagram are set up again on the new
+ * Meta account (Tristan: « enlève le bouton d'accès pour l'instant… rien n'est branché »): no
+ * « Commencer » nor « Se connecter », a « Bientôt disponible » in place of the big buttons.
+ */
+const OPEN = false;
+
 /** Getting started: in the app on a computer (a code sent from the phone), on WhatsApp on a phone. */
 function Start({ waUrl, size, light = false }: { waUrl: string; size: "sm" | "lg"; light?: boolean }) {
+  if (!OPEN) {
+    if (size === "sm") return null;
+    return (
+      <span className={`inline-flex h-14 items-center rounded-full px-7 text-base font-bold ${light ? "bg-white/10 text-white" : "bg-violet-soft text-violet"}`}>
+        Bientôt disponible
+      </span>
+    );
+  }
   const look = `${size === "lg" ? "h-14 px-7 text-base" : "h-11 px-5"} ${light ? "bg-white text-ink hover:bg-soft" : "btn-primary"}`;
   return (
     <>
