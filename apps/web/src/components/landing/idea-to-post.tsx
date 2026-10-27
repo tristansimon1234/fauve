@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowUpIcon, CheckIcon } from "@/components/icons";
 import { Mascot, type MascotMood } from "@/components/mascot";
 import { shownShare } from "./play";
-import { SHOWCASE_SLIDES } from "./showcase";
 
 // « Toi, les idées ; moi, j'exécute », in the app: she types her idea in one line, Edith works,
 // and her carousel develops on the table step by step (the texts, her colours, the retouch)
@@ -13,6 +12,8 @@ import { SHOWCASE_SLIDES } from "./showcase";
 // the server, and a device asking for less motion, show it finished.
 
 const BASE = "https://tfxkhktofgtljlqlksba.supabase.co/storage/v1/object/public/landing";
+/** The carousel's rendered photos, in the public `landing` bucket of Supabase Storage. */
+const SHOWCASE_SLIDES = ["carrousel-1.jpg", "carrousel-2.jpg", "carrousel-3.jpg", "carrousel-4.jpg"];
 const IDEA = "Un carrousel avec 3 conseils pour les cheveux en hiver";
 const WORK = ["J’écris les textes", "Je les pose à tes couleurs", "Je retouche les photos"];
 

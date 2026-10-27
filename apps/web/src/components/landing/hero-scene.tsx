@@ -3,20 +3,19 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChartIcon, ChatIcon, CheckIcon, GridIcon, PaletteIcon, PlusIcon } from "@/components/icons";
 import { Mascot, type MascotMood } from "@/components/mascot";
-import { PHOTOS, unsplash } from "./photos";
 
 // The landing's hero, what Edith is in one look (Tristan: « on doit mettre en avant assistant IA
 // sur WhatsApp et via une app web »): WhatsApp on her phone, and the app beside it, in sync. She
 // sends her videos and asks for a Reel; Edith answers, the app shows it being made, then ready;
 // she says yes, it goes online and her profile visits come in. Then Edith suggests a post on
-// his own, and it goes on, the conversation scrolling like a real one: the screen is never empty
-// and never resets. The Reel is the real one the app made for a demo studio (public/landing).
-// Still on its last picture when the device asks for less motion.
+// his own (a carousel of advice, never a promotion), and it goes on, the conversation scrolling
+// like a real one: the screen is never empty and never resets. The Reel and the grid come from the
+// landing's demo studio (public/landing). Still on its last picture when the device asks for less motion.
 
-const REEL = "/landing/hero-reel.mp4";
-const REEL_POSTER = "/landing/post-new.webp";
-const OFFER = "/landing/offer-post.webp";
-const CLIPS = [PHOTOS.studioClass, PHOTOS.groupClass, PHOTOS.yogaSunset];
+const REEL = "/landing/work-pilates.mp4";
+const REEL_POSTER = "/landing/work-pilates.webp";
+const POST = "/landing/post-planche.webp";
+const CLIPS = ["/landing/raw-pilates-0.webp", "/landing/raw-pilates-1.webp", "/landing/raw-pilates-2.webp"];
 
 type Msg =
   | { id: string; kind: "day"; text: string }
@@ -49,12 +48,12 @@ const START: Scene = {
   writing: false,
   draft: "",
   tiles: [
-    { id: "p1", src: "/landing/post-1.webp" },
-    { id: "p2", src: "/landing/post-2.webp" },
-    { id: "p3", src: "/landing/post-3.webp" },
-    { id: "p5", src: "/landing/post-5.webp" },
-    { id: "u1", src: unsplash(PHOTOS.yogaSunset, 140, 186) },
-    { id: "u2", src: unsplash(PHOTOS.groupClass, 140, 186) },
+    { id: "p1", src: "/landing/tile-1.webp" },
+    { id: "p2", src: "/landing/tile-2.webp" },
+    { id: "p3", src: "/landing/tile-3.webp" },
+    { id: "p4", src: "/landing/tile-4.webp" },
+    { id: "p5", src: "/landing/tile-5.webp" },
+    { id: "p6", src: "/landing/tile-6.webp" },
   ],
   visits: 0,
   card: false,
@@ -123,7 +122,7 @@ function reelStory(n: number): { steps: Step[]; length: number } {
   };
 }
 
-/** Edith suggests a post on his own; she says yes twice, it is online. */
+/** Edith suggests a carousel on his own (advice people save, not an offer); she says yes twice, it is online. */
 function postStory(n: number): { steps: Step[]; length: number } {
   const k = `b${n}`;
   return {
@@ -135,12 +134,12 @@ function postStory(n: number): { steps: Step[]; length: number } {
         1400,
         all(
           set({ writing: false, mood: "happy" }),
-          add({ id: `${k}a`, kind: "ask", at: "18:02", text: "Le mercredi soir, tes posts amènent le plus de visites. Je te prépare un post pour le cours d’essai offert ?", options: ["Oui, vas-y", "Pas cette semaine"] }),
+          add({ id: `${k}a`, kind: "ask", at: "18:02", text: "Le mercredi soir, tes posts amènent le plus de visites. Je te fais un carrousel « 3 erreurs en planche » avec tes vidéos de mardi ?", options: ["Oui, vas-y", "Pas cette semaine"] }),
         ),
       ],
       [3700, set({ tap: `${k}a` })],
       [4050, all(set({ tap: null }), patchMsg(`${k}a`, { picked: true }), add({ id: `${k}y`, kind: "text", me: true, text: "Oui, vas-y", at: "18:03" }))],
-      [4500, all(set({ writing: true, mood: "thinking" }), newTile({ id: `${k}t`, src: OFFER, state: "making", step: 0 }))],
+      [4500, all(set({ writing: true, mood: "thinking" }), newTile({ id: `${k}t`, src: POST, state: "making", step: 0 }))],
       [5400, patchTile(`${k}t`, { step: 1 })],
       [6300, patchTile(`${k}t`, { step: 2 })],
       [
@@ -148,7 +147,7 @@ function postStory(n: number): { steps: Step[]; length: number } {
         all(
           set({ writing: false, mood: "happy" }),
           patchTile(`${k}t`, { state: "ready", step: 3 }),
-          add({ id: `${k}p`, kind: "ask", at: "18:05", image: OFFER, text: "Le voilà, à tes couleurs. Je le publie ?", options: ["Oui, publie-le", "Je regarde d’abord"] }),
+          add({ id: `${k}p`, kind: "ask", at: "18:05", image: POST, text: "Le voilà, à tes couleurs. Je le publie ?", options: ["Oui, publie-le", "Je regarde d’abord"] }),
         ),
       ],
       [9300, set({ tap: `${k}p` })],
@@ -348,16 +347,16 @@ function Message({ m, tapped }: { m: Msg; tapped: boolean }) {
     return (
       <Bubble me className="p-[3px]">
         <span className="grid w-[168px] grid-cols-3 gap-[3px]">
-          {CLIPS.map((id) => (
-            <span key={id} className="relative aspect-[3/4] overflow-hidden rounded-[6px] bg-[#cfd8d3]">
+          {CLIPS.map((src) => (
+            <span key={src} className="relative aspect-[3/4] overflow-hidden rounded-[6px] bg-[#cfd8d3]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={unsplash(id, 60, 80)} alt="" className="size-full object-cover" />
+              <img src={src} alt="" className="size-full object-cover" />
               <span className="absolute bottom-1 left-1 flex items-center gap-0.5 text-[8.5px] font-semibold text-white drop-shadow">
                 <svg width="9" height="7" viewBox="0 0 24 16" fill="currentColor">
                   <rect x="1" y="2" width="15" height="12" rx="3" />
                   <path d="m16 7 6-3.5v9L16 9" />
                 </svg>
-                0:1{CLIPS.indexOf(id) + 2}
+                0:1{CLIPS.indexOf(src) + 2}
               </span>
               <span className={`absolute inset-0 flex items-center justify-center bg-black/35 transition-opacity duration-500 ${m.sent ? "opacity-0" : "opacity-100"}`}>
                 <svg width="24" height="24" viewBox="0 0 24 24" className="-rotate-90">
