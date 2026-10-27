@@ -293,7 +293,7 @@ export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose
 }
 
 /**
- * Keeps the start shared by every chat request warm (Simone's prompt and tools, the same for every business, about
+ * Keeps the start shared by every chat request warm (Edith's prompt and tools, the same for every business, about
  * 40 000 tokens): an hour without a message and it expired, and the next message wrote it all again (0.16 € instead of
  * about 0.03 €). The request is the chat's own up to its prompt, with max_tokens 0: it only reads that start, which
  * gives it another hour, and bills no output.
