@@ -138,7 +138,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     return;
   }
 
-  // Her answer to the « ready_to_post » template: the Reels to publish herself, now.
+  // Her answer to the « post_to_share » template: the Reels to publish herself, now.
   await deliverPendingHandOffs(member.studio_id, phone).catch((e) => console.error("pending hand-offs failed", e));
 
   const media = await storeMedia(member.studio_id, message).catch((e) => {

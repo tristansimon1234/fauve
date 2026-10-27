@@ -180,6 +180,8 @@ export async function sendTemplate(
   name: string,
   params: string[],
   languageCode = "fr",
+  /** The end of the template's URL button (its {{1}}), for a template that has one. */
+  urlSuffix?: string,
 ): Promise<string | undefined> {
   const res = await sendMessage({
     to: toWaId,
@@ -187,9 +189,10 @@ export async function sendTemplate(
     template: {
       name,
       language: { code: languageCode },
-      components: params.length
-        ? [{ type: "body", parameters: params.map((text) => ({ type: "text", text })) }]
-        : [],
+      components: [
+        ...(params.length ? [{ type: "body", parameters: params.map((text) => ({ type: "text", text })) }] : []),
+        ...(urlSuffix ? [{ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: urlSuffix }] }] : []),
+      ],
     },
   });
   return res.messages[0]?.id;
