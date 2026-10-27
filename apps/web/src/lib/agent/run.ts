@@ -291,25 +291,3 @@ export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose
     });
   if (error) console.error("cost_events insert failed", error.message);
 }
-
-/**
- * Keeps the start shared by every chat request warm (Simone's prompt and tools, the same for every business, about
- * 40 000 tokens): an hour without a message and it expired, and the next message wrote it all again (0.16 € instead of
- * about 0.03 €). The request is the chat's own up to its prompt, with max_tokens 0: it only reads that start, which
- * gives it another hour, and bills no output.
- */
-export async function warmChatCache(studioId: string): Promise<void> {
-  const unused = Object.fromEntries((Object.keys(toolSpecs) as ToolName[]).map((name) => [name, async () => ""])) as unknown as ToolHandlers;
-  // The definitions as the tool runner sends them: its tools as JSON, which leaves their functions out.
-  const tools = JSON.parse(JSON.stringify(buildTools(unused))) as Anthropic.Beta.BetaToolUnion[];
-  const response = await anthropic().beta.messages.create({
-    model: CHAT_MODEL,
-    max_tokens: 0,
-    output_config: { effort: CHAT_EFFORT },
-    ...(supportsServerFallback(CHAT_MODEL) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
-    system: [{ type: "text", text: FAUVE_SYSTEM_PROMPT, cache_control: CACHE_AN_HOUR }],
-    tools,
-    messages: [{ role: "user", content: "." }],
-  });
-  await logClaudeCost(studioId, response.usage, "cache_warm", CHAT_MODEL);
-}

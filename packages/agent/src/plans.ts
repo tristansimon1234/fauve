@@ -1,11 +1,11 @@
 // The two offers, VAT included. Each has its price and its monthly credits, sized so that a
-// month keeps the margin once VAT, Stripe's fees and the chat are paid (margin.ts): a credit is
+// month keeps the margin once VAT, Stripe's fees, the chat and WhatsApp are paid (margin.ts): a credit is
 // worth about the same in both. Quality over quantity: the credits pay for each Reel to be made
 // with care at the rhythm of the offer, not for more posts. A studio on trial gets Pro.
 
 export const PLANS = {
-  essentiel: { label: "Essentiel", priceEur: 19, credits: 50, postsPerWeek: 1 },
-  pro: { label: "Pro", priceEur: 49, credits: 130, postsPerWeek: 3 },
+  essentiel: { label: "Essentiel", priceEur: 19, credits: 44, postsPerWeek: 1 },
+  pro: { label: "Pro", priceEur: 49, credits: 110, postsPerWeek: 3 },
 } as const;
 
 export type PlanId = keyof typeof PLANS;
