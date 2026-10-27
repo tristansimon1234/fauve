@@ -1,11 +1,12 @@
-import { starterOffer } from "./plans.ts";
+import { offersLine } from "./plans.ts";
 
-// What a studio may do without paying. The onboarding goes all the way to her
-// first publication (the Reel is made in full); to see it, publish it or make
-// anything else, she subscribes (her first month at €9, STARTER in plans.ts,
-// Stripe). And with no credits left nothing costly starts, not even watching a video.
+// What a studio may do without paying (Tristan: « tu vas jusqu'au plan et pour le premier il
+// faut payer, tu as le choix entre 3 abonnements »). The onboarding goes all the way to the plan
+// of her first Reel (her site read, her style, her videos watched, the plan proposed); to make it,
+// she picks one of the 3 offers (Découverte at €9, plans.ts). Nothing is made for free. With no
+// credits left nothing costly starts, not even watching a video, and the next offer up is proposed.
 
-/** Videos watched (Gemini) before a subscription: enough for the first Reel. */
+/** Videos watched (Gemini) before a subscription: enough to propose the plan of her first Reel. */
 export const FREE_ANALYSES = 8;
 
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "unpaid" | "canceled" | "incomplete" | "incomplete_expired" | "paused";
@@ -16,8 +17,6 @@ export function isSubscribed(status: string | null | undefined): boolean {
 
 export type AccessInput = {
   subscription: string | null | undefined;
-  /** Her first publication has been made (a montage or photos with their texts). */
-  firstPostMade: boolean;
   credits: number;
   /** Videos already watched for her. */
   analyses: number;
@@ -41,12 +40,11 @@ export function accessOf(input: AccessInput): Access {
     const credits = input.credits > 0;
     return { subscribed, create: credits, analyze: credits, unlock: true, reason: credits ? null : "credits" };
   }
-  // Before paying: the onboarding's first publication only.
-  const free = !input.firstPostMade;
+  // Before paying: up to the plan of her first Reel, nothing made.
   return {
     subscribed,
-    create: free,
-    analyze: free && input.analyses < FREE_ANALYSES,
+    create: false,
+    analyze: input.analyses < FREE_ANALYSES,
     unlock: false,
     reason: "subscribe",
   };
@@ -55,6 +53,6 @@ export function accessOf(input: AccessInput): Access {
 /** What Edith says when something is refused. */
 export function accessMessage(reason: Access["reason"]): string {
   return reason === "credits"
-    ? "Plus de crédits ce mois-ci : rien de nouveau ne peut partir. Ils reviennent le 1er du mois ; en attendant, dis-le-lui simplement, sans rien lancer."
-    : `Pas encore abonnée : sa première publication est faite, la suite (la voir en entier, la publier, en faire d'autres) se débloque avec l'abonnement, ${starterOffer()}. Dis-le-lui simplement et donne le lien de l'abonnement (page /abonnement), sans rien lancer.`;
+    ? "Plus de crédits ce mois-ci : rien de nouveau ne peut partir. Propose-lui de passer à l'offre au-dessus, ses crédits arrivent aussitôt (page /abonnement) ; sinon ils reviennent le 1er du mois. Dis-le-lui simplement, sans rien lancer."
+    : `Pas encore abonnée : tout est prêt jusqu'au plan de son Reel, mais rien n'est fabriqué avant l'abonnement (${offersLine()} : Découverte 3 Reels, Essentiel, Pro ; sans engagement). Dis-le-lui simplement et donne le lien de l'abonnement (page /abonnement), sans rien lancer : dès qu'elle est abonnée, lance le plan qu'elle a validé sans le lui redemander.`;
 }

@@ -1,8 +1,8 @@
 import "server-only";
-import { accessMessage, accessOf, isSubscribed, starterOffer, type Access } from "@fauve/agent";
-import { creditBalance, startStarter } from "@/lib/credits";
+import { accessMessage, accessOf, isSubscribed, planOf, type Access } from "@fauve/agent";
+import { creditBalance, grantPlanCredits } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { billingEnabled, getSubscription, latestSubscription, periodEnd, planOfPrice, sessionSubscription, type StripeSubscription } from "./stripe";
+import { billingEnabled, getSubscription, latestSubscription, planOfPrice, sessionSubscription, type StripeSubscription } from "./stripe";
 
 // What a studio may do now (packages/agent/src/access.ts), from its subscription
 // (read back from Stripe when it may have changed), its first publication and
@@ -16,11 +16,13 @@ export class AccessError extends Error {
   }
 }
 
-/** Writes what Stripe says of her subscription on the studio. */
+/** Writes what Stripe says of her subscription on the studio; her credits follow a new subscription or a move up. */
 async function store(studioId: string, customer: string | null, subscription: StripeSubscription | null) {
   const price = subscription?.items.data[0]?.price.id;
   const plan = await planOfPrice(price).catch(() => null);
-  await supabaseAdmin()
+  const db = supabaseAdmin();
+  const { data: before } = await db.from("studios").select("plan, stripe_subscription_id, subscription_status").eq("id", studioId).single();
+  await db
     .from("studios")
     .update({
       ...(customer ? { stripe_customer_id: customer } : {}),
@@ -31,9 +33,10 @@ async function store(studioId: string, customer: string | null, subscription: St
       ...(plan ? { plan } : {}),
     })
     .eq("id", studioId);
-  // Her first month at €9 (STARTER): its credits until her first renewal.
-  const until = subscription && periodEnd(subscription);
-  if (subscription?.metadata?.starter === "1" && isSubscribed(subscription.status) && until) await startStarter(studioId, until);
+  if (!plan || !subscription || !isSubscribed(subscription.status)) return;
+  const wasLive = before?.stripe_subscription_id === subscription.id && isSubscribed(before?.subscription_status as string | null);
+  if (!wasLive) await grantPlanCredits(studioId, { from: null, to: plan });
+  else if (planOf(before?.plan) !== plan) await grantPlanCredits(studioId, { from: planOf(before?.plan), to: plan });
 }
 
 /** Her return from Checkout: the subscription it made, kept on her studio. */
@@ -72,12 +75,11 @@ export async function studioAccess(studioId: string): Promise<Access> {
     await syncSubscription(studioId).catch((error) => console.warn("subscription sync failed", studioId, error));
     ({ data: studio } = await db.from("studios").select("stripe_customer_id, subscription_status, trial_ends_at, subscription_synced_at").eq("id", studioId).single());
   }
-  const [credits, { count: made }, { count: analyses }] = await Promise.all([
+  const [credits, { count: analyses }] = await Promise.all([
     creditBalance(studioId),
-    db.from("posts").select("id", { count: "exact", head: true }).eq("studio_id", studioId).or("edit_plan_id.not.is.null,slides_render.not.is.null"),
     db.from("clip_analyses").select("id", { count: "exact", head: true }).eq("studio_id", studioId),
   ]);
-  return accessOf({ subscription: studio?.subscription_status as string | null, firstPostMade: Boolean(made), credits, analyses: analyses ?? 0 });
+  return accessOf({ subscription: studio?.subscription_status as string | null, credits, analyses: analyses ?? 0 });
 }
 
 /** Throws AccessError (its message tells Edith what to say) when nothing costly may start. */
@@ -91,7 +93,5 @@ export async function accessLine(studioId: string): Promise<string | null> {
   if (!billingEnabled()) return null;
   const access = await studioAccess(studioId);
   if (access.subscribed) return access.create ? null : `Abonnement : ${accessMessage("credits")}`;
-  return access.create
-    ? `Abonnement : pas encore abonnée. Sa première publication est offerte (c'est l'essai de l'onboarding) ; ensuite, la voir en entier et la publier demande l'abonnement (${starterOffer()}, page /abonnement).`
-    : `Abonnement : ${accessMessage("subscribe")}`;
+  return `Abonnement : ${accessMessage("subscribe")}`;
 }

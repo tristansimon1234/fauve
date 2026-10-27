@@ -14,13 +14,13 @@ import {
   otherEffort,
   planBrief,
   quoteEffect,
-  STARTER_CREDITS,
   quoteMontage,
   quoteVariant,
   type Effort,
   type MontagePlan,
   type MontageQuote,
   type MotionTemplate,
+  type PlanId,
   type QuoteLine,
 } from "@fauve/agent";
 import { z } from "zod";
@@ -37,33 +37,30 @@ const QUOTE_TTL_MS = 24 * 3600_000;
 export type Reason = "montage" | "correction" | "variant" | "moodboard" | "text_layer" | "image" | "carousel" | "adjustment";
 export type VariantChange = { template?: MotionTemplate; hook?: string };
 
-/**
- * The studio's balance, after this month's top-up. During her first month at €9 (until
- * `starter_until`) there is none: her 36 credits are what she has; from her renewal on, the
- * offer's credits come back the 1st of each month as for everyone.
- */
+/** The studio's balance, after this month's top-up. */
 export async function creditBalance(studioId: string): Promise<number> {
   const db = supabaseAdmin();
-  const { data: studio } = await db.from("studios").select("plan, starter_until").eq("id", studioId).maybeSingle();
-  const starter = studio?.starter_until && Date.parse(studio.starter_until as string) > Date.now();
-  const { data, error } = starter
-    ? await db.rpc("credit_balance", { p_studio: studioId })
-    : await db.rpc("ensure_monthly_credits", { p_studio: studioId, p_allowance: PLANS[planOf(studio?.plan)].credits });
+  const { data: studio } = await db.from("studios").select("plan").eq("id", studioId).maybeSingle();
+  const { data, error } = await db.rpc("ensure_monthly_credits", { p_studio: studioId, p_allowance: PLANS[planOf(studio?.plan)].credits });
   if (error) throw new Error(`credits: ${error.message}`);
   return data as number;
 }
 
 /**
- * Her first month at €9 starts (her subscription is live): its end kept on the studio, and her
- * balance set to its credits, whatever the onboarding left. Once: a studio that had it keeps it.
+ * Her credits follow her offer: a new subscription sets her balance to its credits (whatever the
+ * onboarding left, counted as Pro), a move up adds the difference at once; a move down changes
+ * nothing until the next month.
  */
-export async function startStarter(studioId: string, until: Date): Promise<void> {
+export async function grantPlanCredits(studioId: string, change: { from: PlanId | null; to: PlanId }): Promise<void> {
   const db = supabaseAdmin();
-  const { data: claimed } = await db.from("studios").update({ starter_until: until.toISOString() }).eq("id", studioId).is("starter_until", null).select("id");
-  if (!claimed?.length) return;
-  const { data: balance } = await db.rpc("credit_balance", { p_studio: studioId });
-  const delta = STARTER_CREDITS - Number(balance ?? 0);
-  if (delta) await db.from("credit_ledger").insert({ studio_id: studioId, delta, reason: "adjustment", label: "Ton premier mois" });
+  if (change.from === null) {
+    const { data: balance } = await db.rpc("credit_balance", { p_studio: studioId });
+    const delta = PLANS[change.to].credits - Number(balance ?? 0);
+    if (delta) await db.from("credit_ledger").insert({ studio_id: studioId, delta, reason: "adjustment", label: `Abonnement ${PLANS[change.to].label}` });
+    return;
+  }
+  const delta = PLANS[change.to].credits - PLANS[change.from].credits;
+  if (delta > 0) await db.from("credit_ledger").insert({ studio_id: studioId, delta, reason: "adjustment", label: `Passage à ${PLANS[change.to].label}` });
 }
 
 export async function chargeCredits(studioId: string, credits: number, reason: Reason, label: string, ref: Record<string, unknown> = {}) {

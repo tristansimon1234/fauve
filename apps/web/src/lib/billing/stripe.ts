@@ -1,11 +1,11 @@
 import "server-only";
-import { PLANS, STARTER, type PlanId } from "@fauve/agent";
+import { PLANS, type PlanId } from "@fauve/agent";
 import { env } from "@/lib/env";
 
 // Stripe over its REST API (form-encoded), no SDK: products and prices found by
-// lookup key (created on first use), Checkout in subscription mode (her first
-// subscription with its first month at €9: a coupon on the first invoice only, STARTER),
-// the customer portal to change or cancel.
+// lookup key (created on first use), Checkout in subscription mode (no trial: one
+// of the 3 offers, Découverte at €9 the smallest), a switch to the offer above when
+// her credits run out, the customer portal to change or cancel.
 // No webhook: the subscription is read back from Stripe (lib/billing/access.ts).
 
 const API = "https://api.stripe.com/v1";
@@ -103,30 +103,14 @@ export async function createCustomer(studio: { id: string; name: string | null; 
   return customer.id;
 }
 
-/**
- * The coupon that brings an offer's first invoice to €9 (STARTER), created the first time it is
- * needed; its id says the amount, so a changed price gets its own coupon.
- */
-async function starterCoupon(plan: PlanId): Promise<string> {
-  const amountOff = (PLANS[plan].priceEur - STARTER.priceEur) * 100;
-  const id = `simone_starter_${plan}_${amountOff}`;
-  try {
-    await stripe("GET", `/coupons/${id}`);
-  } catch {
-    await stripe("POST", "/coupons", { id, amount_off: amountOff, currency: "eur", duration: "once", name: `Premier mois à ${STARTER.priceEur} €` });
-  }
-  return id;
-}
-
-/** Checkout for an offer, the card always asked; `starter`: her first subscription, its first month at €9. */
-export async function checkoutSession(input: { customer: string; plan: PlanId; studioId: string; starter: boolean; successUrl: string; cancelUrl: string }): Promise<string> {
+/** Checkout for an offer, the card always asked. */
+export async function checkoutSession(input: { customer: string; plan: PlanId; studioId: string; successUrl: string; cancelUrl: string }): Promise<string> {
   const session = await stripe<{ url: string }>("POST", "/checkout/sessions", {
     mode: "subscription",
     customer: input.customer,
     client_reference_id: input.studioId,
     line_items: [{ price: await priceFor(input.plan), quantity: 1 }],
-    ...(input.starter ? { discounts: [{ coupon: await starterCoupon(input.plan) }] } : {}),
-    subscription_data: { metadata: { studio_id: input.studioId, ...(input.starter ? { starter: "1" } : {}) } },
+    subscription_data: { metadata: { studio_id: input.studioId } },
     payment_method_collection: "always",
     locale: "fr",
     success_url: input.successUrl,
@@ -139,17 +123,23 @@ export type StripeSubscription = {
   id: string;
   status: string;
   trial_end: number | null;
-  metadata?: Record<string, string>;
-  /** Older API versions; newer ones put it on the item. */
-  current_period_end?: number;
-  items: { data: { price: { id: string }; current_period_end?: number }[] };
+  items: { data: { id: string; price: { id: string } }[] };
 };
 
-/** When the subscription's current period ends (its first one: the end of her month at €9). */
-export const periodEnd = (s: StripeSubscription): Date | null => {
-  const at = s.items.data[0]?.current_period_end ?? s.current_period_end;
-  return at ? new Date(at * 1000) : null;
-};
+/**
+ * Her subscription moved to another offer at once: the difference for the rest of the period is
+ * invoiced now (prorated) and must be paid for the change to hold; her credits follow (store in access.ts).
+ */
+export async function switchPlan(subscriptionId: string, plan: PlanId): Promise<StripeSubscription> {
+  const current = await getSubscription(subscriptionId);
+  const item = current.items.data[0];
+  if (!item) throw new StripeError("subscription without item");
+  return stripe<StripeSubscription>("POST", `/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    items: [{ id: item.id, price: await priceFor(plan) }],
+    proration_behavior: "always_invoice",
+    payment_behavior: "error_if_incomplete",
+  });
+}
 
 export async function sessionSubscription(sessionId: string): Promise<{ customer: string; subscription: StripeSubscription | null; studioId: string | null }> {
   const session = await stripe<{ customer: string; client_reference_id: string | null; subscription: StripeSubscription | string | null }>(

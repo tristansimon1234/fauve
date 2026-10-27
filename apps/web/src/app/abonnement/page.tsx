@@ -1,3 +1,4 @@
+import { nextPlan, planOf } from "@fauve/agent";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -7,7 +8,7 @@ import { getStudioContext } from "@/lib/studio";
 
 export const metadata: Metadata = { title: "Ton abonnement" };
 
-// The offers and the trial (Stripe Checkout). Already subscribed: back to the app.
+// The 3 offers (Stripe Checkout). Subscribed with no credits left: the offers above hers. Otherwise back to the app.
 export default function SubscribePage({ searchParams }: PageProps<"/abonnement">) {
   return (
     <Suspense fallback={<div className="min-h-dvh bg-soft" />}>
@@ -21,6 +22,8 @@ async function Subscribe({ searchParams }: { searchParams: PageProps<"/abonnemen
   const next = typeof params.next === "string" ? params.next : "/fauve";
   const { db, member } = await getStudioContext();
   if (!member) redirect(`/connexion?next=/abonnement`);
-  if ((await studioAccess(member.studio.id)).unlock) redirect(next);
-  return <Paywall db={db} studioId={member.studio.id} postId={null} next={next} />;
+  const access = await studioAccess(member.studio.id);
+  const above = nextPlan(planOf(member.studio.plan));
+  if (access.subscribed && (access.create || !above)) redirect(next);
+  return <Paywall db={db} studioId={member.studio.id} postId={null} next={next} upgradeFrom={access.subscribed ? planOf(member.studio.plan) : undefined} />;
 }

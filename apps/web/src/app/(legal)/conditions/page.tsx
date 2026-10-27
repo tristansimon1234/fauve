@@ -36,7 +36,7 @@ export default function TermsPage() {
 
       <h2>Abonnement</h2>
       <p>
-        L’abonnement est de {PLANS.essentiel.priceEur} € TTC par mois ({PLANS.essentiel.label}) ou {PLANS.pro.priceEur} € TTC par mois ({PLANS.pro.label}), sans engagement, résiliable à tout moment depuis les réglages ou en écrivant à{" "}
+        L’abonnement est de {PLANS.decouverte.priceEur} € TTC par mois ({PLANS.decouverte.label}), {PLANS.essentiel.priceEur} € TTC par mois ({PLANS.essentiel.label}) ou {PLANS.pro.priceEur} € TTC par mois ({PLANS.pro.label}), sans engagement, résiliable à tout moment depuis les réglages ou en écrivant à{" "}
         {company.email}. La résiliation prend effet à la fin de la période en cours.
       </p>
 

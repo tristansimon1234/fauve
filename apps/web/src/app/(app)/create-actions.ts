@@ -12,7 +12,7 @@ import {
   validatedPlanBrief,
   MAX_MONTAGE_FILES,
   postKindSchema,
-  starterOffer,
+  offersLine,
   type CreationPhase,
   type Effort,
   type PostKind,
@@ -92,12 +92,14 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
   if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
   const studioId = member.studio.id;
 
-  // Before the subscription, only her first publication; without credits, no Reel (texts on photos are free).
+  // Nothing is made before a subscription; without credits, no Reel (texts on photos are free). What
+  // she asked is kept and starts on its own once she has subscribed or moved up (launchPendingCreation).
   const access = await studioAccess(studioId);
   if (!access.create && (access.reason === "subscribe" || kind === "reel")) {
+    await supabaseAdmin().from("studios").update({ pending_creation: { input: parsed.data, at: new Date().toISOString() } }).eq("id", studioId);
     return access.reason === "subscribe"
-      ? { ok: false, locked: "subscribe", error: `Ta première publication est faite. Pour en créer d’autres, abonne-toi : ${starterOffer()}.` }
-      : { ok: false, locked: "credits", error: "Tu n’as plus de crédits ce mois-ci : ils reviennent le 1er du mois." };
+      ? { ok: false, locked: "subscribe", error: `Ton plan est prêt. Choisis ton abonnement (${offersLine()}) : je lance ton Reel dès que c’est fait.` }
+      : { ok: false, locked: "credits", error: "Tu as utilisé tes crédits ce mois-ci. Passe à l’offre au-dessus et je lance ton Reel aussitôt ; sinon ils reviennent le 1er du mois." };
   }
 
   // What she imagines, or a ref: the Reel to copy, the model of this Reel only (one shot). Edith asks before she makes anything.
@@ -239,4 +241,24 @@ export async function creationProgress(quoteId: string, postId: string): Promise
     failed,
     seconds: render?.duration_ms ? Math.round((render.duration_ms as number) / 1000) : null,
   };
+}
+
+/** What she launched from « Créer » before subscribing (or with no credits left) waits this long. */
+const PENDING_MS = 2 * 24 * 3600_000;
+
+/**
+ * Launches what she asked from « Créer » before she could (no subscription yet, or no credits):
+ * called on her return from Checkout and after a move up. Taken once; a stale one is dropped.
+ */
+export async function launchPendingCreation(): Promise<LaunchResult | null> {
+  const { member } = await getStudioContext();
+  if (!member) return null;
+  const db = supabaseAdmin();
+  const { data } = await db.from("studios").select("pending_creation").eq("id", member.studio.id).single();
+  const pending = z.object({ input: z.unknown(), at: z.string() }).safeParse(data?.pending_creation);
+  if (!pending.success) return null;
+  // Taken once (a second return from Checkout finds it gone): the update returns the row it changed.
+  const { data: taken } = await db.from("studios").update({ pending_creation: null }).eq("id", member.studio.id).eq("pending_creation->>at", pending.data.at).select("id");
+  if (!taken?.length || Date.now() - Date.parse(pending.data.at) > PENDING_MS) return null;
+  return launchCreation(pending.data.input as LaunchInput);
 }

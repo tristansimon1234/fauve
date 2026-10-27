@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTAGE_CEILING, MONTAGE_FLOOR, PLANS, planOf, memoryLines, reelsPerMonth, STARTER, STARTER_CREDITS } from "@fauve/agent";
+import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTAGE_CEILING, MONTAGE_FLOOR, PLANS, planOf, memoryLines, reelsPerMonth, nextPlan, PLAN_ORDER } from "@fauve/agent";
 import { NoStudio } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
@@ -37,9 +37,6 @@ const accountStatusLabels: Record<SocialAccount["status"], string> = {
   disconnected: "déconnecté",
 };
 
-/** Her first month at €9 is still on (it ends at her first renewal). */
-const starterRunning = (until: string) => Date.parse(until) > Date.now();
-
 export default function SettingsPage() {
   return (
     <main className="flex min-w-0 flex-col gap-6 px-4 pt-6 pb-14 sm:px-10 sm:pt-9">
@@ -69,15 +66,11 @@ async function Settings() {
     getContentPlan(db, studio.id),
     creditBalance(studio.id),
     db.from("credit_ledger").select("id, delta, label, created_at").eq("studio_id", studio.id).order("created_at", { ascending: false }).limit(10),
-    db.from("studios").select("montage_effort, business_type, memory, subscription_status, trial_ends_at, starter_until").eq("id", studio.id).maybeSingle(),
+    db.from("studios").select("montage_effort, business_type, memory, subscription_status, trial_ends_at").eq("id", studio.id).maybeSingle(),
   ]);
   const tiktokOn = tiktokEnabled();
   const billing = billingEnabled();
   const subscription = (care.data?.subscription_status as string | null | undefined) ?? null;
-  const starterEnd =
-    care.data?.starter_until && starterRunning(care.data.starter_until as string)
-      ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: studio.timezone }).format(new Date(care.data.starter_until as string))
-      : null;
   const trialEnd = care.data?.trial_ends_at
     ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: studio.timezone }).format(new Date(care.data.trial_ends_at as string))
     : null;
@@ -182,15 +175,18 @@ async function Settings() {
                 <p className="text-sm leading-normal">
                   {subscription === "trialing"
                     ? `Essai en cours${trialEnd ? ` jusqu’au ${trialEnd}` : ""}, avec ${PLANS[offer].label}. Ensuite ${PLANS[offer].priceEur} € TTC / mois, sans engagement : arrête avant la fin de l’essai et tu ne paies rien.`
-                    : subscription === "active" && starterEnd
-                      ? `Ton premier mois à ${STARTER.priceEur} €, ${STARTER.reels} Reels compris (${STARTER_CREDITS} crédits), jusqu’au ${starterEnd}. Ensuite ${PLANS[offer].label} à ${PLANS[offer].priceEur} € TTC / mois avec ${PLANS[offer].credits} crédits par mois, sans engagement.`
                     : subscription === "active"
                       ? `${PLANS[offer].label} : ${PLANS[offer].priceEur} € TTC / mois, ${PLANS[offer].credits} crédits par mois (environ ${reelsPerMonth(offer)} Reels soignés ; les photos avec leurs textes ne coûtent rien), sans engagement.`
                       : billing
-                        ? `Pas encore d’abonnement. ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € TTC / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € TTC / mois, le premier mois à ${STARTER.priceEur} € avec ${STARTER.reels} Reels compris, sans engagement.`
+                        ? `Pas encore d’abonnement. ${PLAN_ORDER.map((id) => `${PLANS[id].label} à ${PLANS[id].priceEur} €`).join(", ")} TTC / mois, sans engagement.`
                         : `Période d’essai en cours, avec tout ${PLANS.pro.label}. Ensuite : ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € TTC / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € TTC / mois, sans engagement.`}
                 </p>
                 {billing ? <SubscriptionButton subscribed={subscription === "trialing" || subscription === "active" || subscription === "past_due"} /> : null}
+                {billing && subscription === "active" && balance <= 0 && nextPlan(offer) ? (
+                  <Link href="/abonnement?next=/reglages" className="btn btn-primary h-10 self-start px-5 text-sm">
+                    Passer à {PLANS[nextPlan(offer)!].label}
+                  </Link>
+                ) : null}
               </Section>
 
               <Section title="Crédits" id="credits">

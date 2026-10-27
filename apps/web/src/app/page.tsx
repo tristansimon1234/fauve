@@ -1,4 +1,4 @@
-import { PLANS, STARTER, weeklyPosts } from "@fauve/agent";
+import { PLANS, reelsPerMonth, weeklyPosts } from "@fauve/agent";
 import Link from "next/link";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import {
@@ -34,8 +34,16 @@ const steps: [string, string][] = [
   ["Ton Instagram", "En dernier, quand ta publication est prête : elle part dès que tu dis oui. TikTok aussi, si tu veux."],
 ];
 
-/** The two offers (the same work; quality over quantity: Pro has room for more care on each Reel). */
+/** The three offers (the same work; quality over quantity: Pro has room for more care on each Reel). */
 const offers = [
+  {
+    id: "decouverte",
+    label: PLANS.decouverte.label,
+    price: PLANS.decouverte.priceEur,
+    pitch: "Pour commencer : de beaux Reels chaque mois, sans y passer tes soirées.",
+    points: [weeklyPosts("decouverte"), `${PLANS.decouverte.credits} crédits par mois`, "Edith sur WhatsApp et dans l’app"],
+    dark: false,
+  },
   {
     id: "essentiel",
     label: PLANS.essentiel.label,
@@ -61,7 +69,7 @@ const faq: [string, string][] = [
   ["Pour quel commerce ?", "Studios de sport ou de yoga, salons de coiffure et de beauté, restaurants, cafés, boutiques : il parle ta langue et adapte ses idées à ton activité."],
   ["Je peux lui montrer un Reel que j’aime ?", "Oui : colle son lien. Edith en reprend la forme, le rythme, la mise en page et le style des textes, avec tes images et tes mots. Ça vaut pour ce Reel-là ; les suivants restent à ton style."],
   ["Et la musique ?", "Edith compose une musique pour chaque Reel, calée sur les coupes et libre de droits. Pour un son tendance, Instagram ne laisse pas une autre appli l’ajouter : tu le poses en un geste au moment de publier."],
-  ["Il y a un essai ?", `Edith fait ta première publication pendant l’inscription, offerte. Ensuite ton premier mois coûte ${STARTER.priceEur} €, avec ${STARTER.reels} Reels compris, puis l’offre choisie au prix normal. Sans engagement, tu arrêtes quand tu veux.`],
+  ["Il y a un essai ?", `Edith lit ton site, trouve ton style, regarde tes vidéos et te propose le plan de ton premier Reel, sans rien payer. Pour le fabriquer, tu choisis ton abonnement, dès ${PLANS.decouverte.priceEur} € par mois pour ${reelsPerMonth("decouverte")} Reels. Sans engagement, tu arrêtes quand tu veux.`],
   ["Où vont mes photos et mes données ?", "Elles sont hébergées en Europe. Tes fichiers sont supprimés peu après la publication, et tout disparaît si tu pars."],
 ];
 
@@ -150,7 +158,7 @@ export default function LandingPage() {
             </a>
           </div>
           <ul className="land-intro flex flex-wrap gap-x-5 gap-y-2 text-[14px] font-semibold text-muted" style={vars({ "--i": 5 })}>
-            {["Rien ne part sans ta validation", "En place en 5 minutes", `Premier mois à ${STARTER.priceEur} €, sans engagement`].map((t) => (
+            {["Rien ne part sans ta validation", "En place en 5 minutes", `Dès ${PLANS.decouverte.priceEur} € par mois, sans engagement`].map((t) => (
               <li key={t} className="flex items-center gap-1.5">
                 <CheckIcon size={16} className="text-violet" />
                 {t}
@@ -363,10 +371,10 @@ export default function LandingPage() {
       <section id="tarif" className="mx-auto max-w-[1200px] scroll-mt-6 px-4 pb-24 sm:px-8">
         <div className="land-reveal mb-8">
           <SectionTitle kicker="Tarif">
-            Deux offres, <span className="accent">sans engagement.</span>
+            Trois offres, <span className="accent">sans engagement.</span>
           </SectionTitle>
         </div>
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-5 lg:grid-cols-3">
           {offers.map((o, i) => (
             <div
               key={o.id}
@@ -381,9 +389,6 @@ export default function LandingPage() {
               <span className="text-[52px] leading-none font-extrabold tracking-[-0.03em]">
                 {o.price} € <span className={`text-xl font-semibold ${o.dark ? "text-lilac-ink" : "text-muted"}`}>TTC / mois</span>
               </span>
-              <p className={`-mt-2 text-[14px] font-semibold ${o.dark ? "text-lilac-ink" : "text-violet"}`}>
-                Le premier mois à {STARTER.priceEur} €, {STARTER.reels} Reels compris
-              </p>
               <p className={`text-[15px] ${o.dark ? "text-[#E4DFF2]" : "text-muted"}`}>{o.pitch}</p>
               <ul className={`grid gap-2 text-[15px] ${o.dark ? "text-[#E4DFF2]" : "text-ink/85"}`}>
                 {o.points.map((t) => (

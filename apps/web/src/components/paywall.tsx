@@ -1,10 +1,12 @@
-import { PLANS, STARTER } from "@fauve/agent";
+import { PLANS, type PlanId } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { signMediaUrls, type Db } from "@/lib/studio";
 import { PlanChoice } from "./plan-choice";
 
-// Her first publication is made in full; she sees it blurred, behind « Débloquer »:
-// Stripe Checkout with 3 days of trial (the card is asked, charged after the trial).
+// Before her first Reel: Edith has prepared everything up to its plan; to make it she picks one of
+// the 3 offers (Stripe Checkout, no trial), and what she launched from « Créer » starts on her
+// return. Her credits run out (`upgradeFrom`): the offers above hers, her extra credits at once.
+// A publication made before shows blurred behind it.
 
 async function previewOf(db: Db, studioId: string, postId: string | null): Promise<{ url: string; video: boolean } | null> {
   const admin = supabaseAdmin();
@@ -26,7 +28,7 @@ async function previewOf(db: Db, studioId: string, postId: string | null): Promi
   return url ? { url, video } : null;
 }
 
-export async function Paywall({ db, studioId, postId, next }: { db: Db; studioId: string; postId: string | null; next: string }) {
+export async function Paywall({ db, studioId, postId, next, upgradeFrom }: { db: Db; studioId: string; postId: string | null; next: string; upgradeFrom?: PlanId }) {
   const preview = await previewOf(db, studioId, postId);
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-soft px-4 py-10 md:flex-row md:gap-14">
@@ -41,23 +43,30 @@ export async function Paywall({ db, studioId, postId, next }: { db: Db; studioId
         ) : null}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-ink/30 text-center text-white">
           <span className="font-serif text-[30px] italic leading-none">Edith</span>
-          <span className="px-6 text-[13px] font-semibold opacity-90">Ta création est prête</span>
+          <span className="px-6 text-[13px] font-semibold opacity-90">{upgradeFrom ? "Plus de crédits ce mois-ci" : "Ton plan est prêt"}</span>
         </div>
       </div>
       <div className="flex w-full max-w-[400px] flex-col gap-5">
         <div className="flex flex-col gap-2">
           <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.02em]">
-            Ta première publication est <span className="font-serif font-normal italic text-violet">prête</span>
+            {upgradeFrom ? (
+              <>
+                Encore <span className="font-serif font-normal italic text-violet">plus</span> de Reels
+              </>
+            ) : (
+              <>
+                Ton premier Reel est <span className="font-serif font-normal italic text-violet">prêt à partir</span>
+              </>
+            )}
           </h1>
           <p className="text-[15px] leading-relaxed text-muted">
-            Pour la voir en entier, la publier et en faire d’autres, abonne-toi : ton premier mois coûte {STARTER.priceEur} €, avec {STARTER.reels} Reels compris, puis l’offre
-            choisie chaque mois. Sans engagement, tu arrêtes en un clic.
+            {upgradeFrom
+              ? `Tu as utilisé les crédits de ${PLANS[upgradeFrom].label} ce mois-ci. Passe à l’offre au-dessus : tes nouveaux crédits sont là tout de suite, et tu paies seulement la différence pour le reste du mois. Sinon, ils reviennent le 1er du mois.`
+              : "Choisis ton abonnement et je le fabrique aussitôt. Sans engagement, tu arrêtes en un clic."}
           </p>
         </div>
-        <PlanChoice next={next} />
-        <p className="text-[12px] leading-snug text-muted">
-          {STARTER.priceEur} € TTC aujourd’hui, puis {PLANS.essentiel.priceEur} € ou {PLANS.pro.priceEur} € TTC par mois selon l’offre choisie. Paiement sécurisé par Stripe.
-        </p>
+        <PlanChoice next={next} upgradeFrom={upgradeFrom} />
+        <p className="text-[12px] leading-snug text-muted">Prix TTC, chaque mois. Paiement sécurisé par Stripe.</p>
       </div>
     </main>
   );
