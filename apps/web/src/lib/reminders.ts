@@ -5,7 +5,7 @@ import { messageOwner } from "@/lib/owner-message";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // No more publishing on a schedule (Tristan : « la programmation sert à rien », « mais les
-// rappels oui ») : a post ready to go keeps the moment Simone suggested (scheduled_at), and at
+// rappels oui ») : a post ready to go keeps the moment Edith suggested (scheduled_at), and at
 // that moment she reminds her, once, with « Oui, publie-le » / « Je regarde d'abord » (the same
 // offer a delivery makes, answered by lib/publish-offer.ts : « oui » publishes it now). On
 // WhatsApp in the 24 h window, else the draft_ready template, and always in the app.

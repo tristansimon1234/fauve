@@ -101,7 +101,7 @@ export const toolSpecs = {
   },
   steal_style: {
     description:
-      "Recopie la DA d'un Reel qu'elle aime pour UN Reel à elle, le prochain (« fais comme ça », « je veux ce style », un lien de Reel, de TikTok ou de Short, ou une vidéo qu'elle t'envoie comme exemple) : rend son inspiration_id tout de suite, puis après ta réponse Simone le regarde (une minute), en mesure le rythme, lit sa forme, ses textes, sa lumière, son mouvement et sa musique, et lui envoie en trois lignes ce que son Reel en reprend. Le Reel qui le recopie : montage avec cet inspiration_id (le monteur attend la lecture) ; ses Reels suivants restent sur sa charte. Jamais ses images, ses mots ni sa musique : ses images restent les siennes, et ses couleurs et ses polices aussi, sauf quand celles du Reel recopié font son style. Un carrousel : demande une capture de la photo qui lui plaît, puis copy_text_style sur la publication.",
+      "Recopie la DA d'un Reel qu'elle aime pour UN Reel à elle, le prochain (« fais comme ça », « je veux ce style », un lien de Reel, de TikTok ou de Short, ou une vidéo qu'elle t'envoie comme exemple) : rend son inspiration_id tout de suite, puis après ta réponse Edith le regarde (une minute), en mesure le rythme, lit sa forme, ses textes, sa lumière, son mouvement et sa musique, et lui envoie en trois lignes ce que son Reel en reprend. Le Reel qui le recopie : montage avec cet inspiration_id (le monteur attend la lecture) ; ses Reels suivants restent sur sa charte. Jamais ses images, ses mots ni sa musique : ses images restent les siennes, et ses couleurs et ses polices aussi, sauf quand celles du Reel recopié font son style. Un carrousel : demande une capture de la photo qui lui plaît, puis copy_text_style sur la publication.",
     input: z.object({
       link: z.string().url().max(500).optional().describe("Le lien du Reel, du TikTok ou du Short, tel qu'elle l'a envoyé"),
       media_id: z.string().uuid().optional().describe("Une vidéo qu'elle a envoyée comme exemple, le Reel d'un autre compte : elle sort de sa médiathèque une fois regardée, jamais un de ses plans"),
@@ -165,7 +165,7 @@ export const toolSpecs = {
   },
   montage: {
     description:
-      "Lance un montage ou une correction, tout de suite, dès qu'elle le demande en disant ce qu'elle imagine (ou avec une ref), ou qu'elle a répondu à ta question (pas de devis : les crédits sont débités à la livraison pour ce qui a vraiment été fait, et le message de livraison dit combien). En tâche de fond : ton monteur regarde les clips, choisit le rythme et la forme, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Simone la regarde et la fait corriger avant de l'envoyer (Rapide 5 à 20 min, Soigné 10 à 30, Max 15 à 40 ; le haut de la fourchette pour un Reel en motion design ou en écran partagé). Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus calme », « plus rythmé », « en collage », « enlève le texte », « change la police ») part du montage précédent. Si le solde ne suffit pas, rien ne part : la réponse le dit.",
+      "Lance un montage ou une correction, tout de suite, dès qu'elle le demande en disant ce qu'elle imagine (ou avec une ref), ou qu'elle a répondu à ta question (pas de devis : les crédits sont débités à la livraison pour ce qui a vraiment été fait, et le message de livraison dit combien). En tâche de fond : ton monteur regarde les clips, choisit le rythme et la forme, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Edith la regarde et la fait corriger avant de l'envoyer (Rapide 5 à 20 min, Soigné 10 à 30, Max 15 à 40 ; le haut de la fourchette pour un Reel en motion design ou en écran partagé). Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus calme », « plus rythmé », « en collage », « enlève le texte », « change la police ») part du montage précédent. Si le solde ne suffit pas, rien ne part : la réponse le dit.",
     input: z.object({
       post_id: z.string().uuid(),
       media_ids: z.array(z.string().uuid()).max(MAX_MONTAGE_FILES).optional().describe("Clips et photos à monter (media_id), 20 au plus. Facultatif pour une correction ou une vidéo 100 % motion design."),
@@ -183,7 +183,7 @@ export const toolSpecs = {
       effort: effortSchema
         .optional()
         .describe(
-          "Niveau de soin : rapide (une version, sans relecture), soigne (Simone regarde la vidéo rendue et la fait corriger si besoin), max (deux versions, Simone garde la meilleure et la peaufine). Par défaut celui du studio (contexte). rapide si elle est pressée ou pour un essai ; max pour un post important (lancement, offre, temps fort) ou si elle le demande.",
+          "Niveau de soin : rapide (une version, sans relecture), soigne (Edith regarde la vidéo rendue et la fait corriger si besoin), max (deux versions, Edith garde la meilleure et la peaufine). Par défaut celui du studio (contexte). rapide si elle est pressée ou pour un essai ; max pour un post important (lancement, offre, temps fort) ou si elle le demande.",
         ),
       variant: z
         .object({
@@ -210,7 +210,7 @@ export const toolSpecs = {
   },
   design_carousel: {
     description:
-      "Compose tout un carrousel, ou un post d'une seule image, comme un graphiste : avec ses photos (media_ids dans l'ordre ; ses sujets détourés quand la découpe est nette), sa charte et ses mots : une couverture qui arrête le pouce, une idée par diapositive, des diapositives de texte, des photos qui passent d'une diapositive à l'autre, un appel concret à la fin. Simone le compose, en fait un rendu d'essai, le relit et le corrige une fois (3 à 6 minutes), puis le lien part tout seul. 9 crédits, débités une fois livré. C'est la façon de faire un carrousel : dès qu'elle en demande un, ou pour ses photos sans demande précise (propose-le en une phrase). Sur un carrousel déjà composé, une demande de changement (« la 3e plus aérée », « une diapo de plus », « change l'ordre », « plus de place aux photos ») est une correction : request dit le changement. fresh : un tout nouveau carrousel à la place. Changer seulement des mots : carousel_texts (gratuit).",
+      "Compose tout un carrousel, ou un post d'une seule image, comme un graphiste : avec ses photos (media_ids dans l'ordre ; ses sujets détourés quand la découpe est nette), sa charte et ses mots : une couverture qui arrête le pouce, une idée par diapositive, des diapositives de texte, des photos qui passent d'une diapositive à l'autre, un appel concret à la fin. Edith le compose, en fait un rendu d'essai, le relit et le corrige une fois (3 à 6 minutes), puis le lien part tout seul. 9 crédits, débités une fois livré. C'est la façon de faire un carrousel : dès qu'elle en demande un, ou pour ses photos sans demande précise (propose-le en une phrase). Sur un carrousel déjà composé, une demande de changement (« la 3e plus aérée », « une diapo de plus », « change l'ordre », « plus de place aux photos ») est une correction : request dit le changement. fresh : un tout nouveau carrousel à la place. Changer seulement des mots : carousel_texts (gratuit).",
     input: z.object({
       post_id: z.string().uuid(),
       request: z
@@ -223,7 +223,7 @@ export const toolSpecs = {
         .array(z.string().uuid())
         .max(4)
         .optional()
-        .describe("Un carrousel qu'elle aime (« fais comme ça ») : ses captures, ou la vidéo où elle le fait défiler (enregistrement d'écran) ; Simone suit sa forme, sa typographie et son rythme, jamais ses mots ni ses images"),
+        .describe("Un carrousel qu'elle aime (« fais comme ça ») : ses captures, ou la vidéo où elle le fait défiler (enregistrement d'écran) ; Edith suit sa forme, sa typographie et son rythme, jamais ses mots ni ses images"),
       fresh: z.boolean().default(false).describe("true : un nouveau carrousel, pas une correction de celui qu'elle a"),
     }),
   },
@@ -275,7 +275,7 @@ export const toolSpecs = {
   },
   retouch_photos: {
     description:
-      "Retouche et/ou floute les photos d'un carrousel ou d'un post photo, gratuit. Simone regarde chaque photo (visages, plaques, écrans, lumière, horizon, sujet) : light = retouche légère et naturelle (lumière, contraste, couleurs, horizon redressé, recadrage qui garde le sujet) ; blur = les zones à flouter (face : visages, plate : plaques, screen : écrans, document : papiers). L'original n'est jamais modifié ; light false et blur vide retirent la retouche. Le rendu part après ta réponse et le lien est envoyé tout seul.",
+      "Retouche et/ou floute les photos d'un carrousel ou d'un post photo, gratuit. Edith regarde chaque photo (visages, plaques, écrans, lumière, horizon, sujet) : light = retouche légère et naturelle (lumière, contraste, couleurs, horizon redressé, recadrage qui garde le sujet) ; blur = les zones à flouter (face : visages, plate : plaques, screen : écrans, document : papiers). L'original n'est jamais modifié ; light false et blur vide retirent la retouche. Le rendu part après ta réponse et le lien est envoyé tout seul.",
     input: z.object({
       post_id: z.string().uuid(),
       photos: z.array(z.number().int().min(1).max(10)).max(10).optional().describe("Numéros des photos (à partir de 1) ; par défaut toutes"),
@@ -306,7 +306,7 @@ export const toolSpecs = {
   },
   copy_text_style: {
     description:
-      "Copie le style des textes d'un exemple que la gérante a envoyé (une photo ou une capture d'un post qu'elle aime) : Simone lit chaque texte de l'image (police la plus proche, graisse, couleurs, fond en bloc, pilule ou surlignage, contour, ombre, inclinaison, place) et l'enregistre dans les styles de texte du studio. Avec post_id, l'applique aussitôt aux textes de cette publication (texte sur photos ou montage) et refait le rendu, gratuit ; le lien part tout seul. Renvoie les styles lus avec leur nom.",
+      "Copie le style des textes d'un exemple que la gérante a envoyé (une photo ou une capture d'un post qu'elle aime) : Edith lit chaque texte de l'image (police la plus proche, graisse, couleurs, fond en bloc, pilule ou surlignage, contour, ombre, inclinaison, place) et l'enregistre dans les styles de texte du studio. Avec post_id, l'applique aussitôt aux textes de cette publication (texte sur photos ou montage) et refait le rendu, gratuit ; le lien part tout seul. Renvoie les styles lus avec leur nom.",
     input: z.object({
       media_id: z.string().uuid().describe("media_id de l'image d'exemple reçue"),
       post_id: z.string().uuid().optional().describe("La publication à laquelle appliquer ce style"),
@@ -338,12 +338,12 @@ export const toolSpecs = {
   },
   set_music: {
     description:
-      "Musique d'un Reel, composée par Simone pour ce montage (ElevenLabs, calée sur les images, libre de droits, sans voix) : on (par défaut), off (Reel muet, par ex. pour mettre un son d'Instagram en publiant elle-même), another (une nouvelle musique). Refait la vidéo, gratuit.",
+      "Musique d'un Reel, composée par Edith pour ce montage (ElevenLabs, calée sur les images, libre de droits, sans voix) : on (par défaut), off (Reel muet, par ex. pour mettre un son d'Instagram en publiant elle-même), another (une nouvelle musique). Refait la vidéo, gratuit.",
     input: z.object({ post_id: z.string().uuid(), mode: z.enum(["on", "off", "another"]) }),
   },
   set_voice: {
     description:
-      "Voix off de Simone sur les Reels (une vraie voix française qui raconte les images, texte écrit par toi, posée avant le montage, la musique passe dessous) : voix Eva, Victoria, Lucie, Koraly (chuchotée, ASMR) pour les femmes, Neto, Antonin, Jules, Mister K (chuchotée, ASMR) pour les hommes ; une voix chuchotée seulement si elle la veut (spa, massage, soin, un moment très calme). Avec post_id, pour ce Reel : mode on (en mettre une), off (sans voix, ni la sienne), redo (refaire le texte, avec wish : ce qu'elle veut qu'on dise) ; voice pour changer de voix. Sans post_id : le réglage du commerce pour ses prochains Reels (use : auto = quand ça raconte quelque chose et que personne ne parle déjà dans ses vidéos, always, never ; voice). Gratuit. off sur un Reel monté refait la vidéo tout de suite ; on, redo et voice valent pour le prochain montage du Reel : sur un Reel déjà monté, propose de le refaire (montage avec correction).",
+      "Voix off d'Edith sur les Reels (une vraie voix française qui raconte les images, texte écrit par toi, posée avant le montage, la musique passe dessous) : voix Eva, Victoria, Lucie, Koraly (chuchotée, ASMR) pour les femmes, Neto, Antonin, Jules, Mister K (chuchotée, ASMR) pour les hommes ; une voix chuchotée seulement si elle la veut (spa, massage, soin, un moment très calme). Avec post_id, pour ce Reel : mode on (en mettre une), off (sans voix, ni la sienne), redo (refaire le texte, avec wish : ce qu'elle veut qu'on dise) ; voice pour changer de voix. Sans post_id : le réglage du commerce pour ses prochains Reels (use : auto = quand ça raconte quelque chose et que personne ne parle déjà dans ses vidéos, always, never ; voice). Gratuit. off sur un Reel monté refait la vidéo tout de suite ; on, redo et voice valent pour le prochain montage du Reel : sur un Reel déjà monté, propose de le refaire (montage avec correction).",
     input: z.object({
       post_id: z.string().uuid().optional(),
       mode: z.enum(["on", "off", "redo"]).optional(),
@@ -359,7 +359,7 @@ export const toolSpecs = {
   },
   get_instagram_activity: {
     description:
-      "Lit le compte Instagram connecté du studio : derniers posts (y compris ceux publiés sans Simone) avec likes, nombre de commentaires, statistiques (vues, portée, enregistrements, partages) et les commentaires récents avec leurs réponses. Sert à analyser ce qui marche, repérer les questions sans réponse et préparer des réponses ou le bilan.",
+      "Lit le compte Instagram connecté du studio : derniers posts (y compris ceux publiés sans Edith) avec likes, nombre de commentaires, statistiques (vues, portée, enregistrements, partages) et les commentaires récents avec leurs réponses. Sert à analyser ce qui marche, repérer les questions sans réponse et préparer des réponses ou le bilan.",
     input: z.object({
       media_limit: z.number().int().min(1).max(20).default(6),
       comments_per_post: z.number().int().min(0).max(30).default(8),
@@ -367,7 +367,7 @@ export const toolSpecs = {
   },
   analyze_performance: {
     description:
-      "« Ce qui marche » : compare les derniers posts Instagram du studio (chiffres, formats, heures, légendes, recette des Reels de Simone) et en tire 2 à 5 leçons avec leurs preuves, plus des idées pour la semaine. Gratuit. Renvoie le dernier bilan s'il a moins de 3 jours, sauf refresh. Les leçons guident aussi les prochains montages.",
+      "« Ce qui marche » : compare les derniers posts Instagram du studio (chiffres, formats, heures, légendes, recette des Reels d'Edith) et en tire 2 à 5 leçons avec leurs preuves, plus des idées pour la semaine. Gratuit. Renvoie le dernier bilan s'il a moins de 3 jours, sauf refresh. Les leçons guident aussi les prochains montages.",
     input: z.object({ refresh: z.boolean().default(false).describe("true pour refaire l'analyse même si le dernier bilan est récent") }),
   },
   reply_to_comment: {
@@ -380,7 +380,7 @@ export const toolSpecs = {
   },
   get_metrics: {
     description:
-      "Statistiques entre deux dates : celles des publications de Simone (dernière mesure par publication : vues, portée, likes, enregistrements, partages, commentaires, visites du profil) et celles du compte, semaine par semaine (nouveaux abonnés, désabonnements, solde, abonnés au total, vues, visites du profil, clics sur le lien ; Instagram et TikTok). À lire dès qu'on parle d'abonnés ou de croissance.",
+      "Statistiques entre deux dates : celles des publications d'Edith (dernière mesure par publication : vues, portée, likes, enregistrements, partages, commentaires, visites du profil) et celles du compte, semaine par semaine (nouveaux abonnés, désabonnements, solde, abonnés au total, vues, visites du profil, clics sur le lien ; Instagram et TikTok). À lire dès qu'on parle d'abonnés ou de croissance.",
     input: z.object({ from: isoDateTime, to: isoDateTime }),
   },
   update_brand_profile: {
@@ -402,7 +402,7 @@ export const toolSpecs = {
   },
   add_to_moodboard: {
     description:
-      "Ajoute à son moodboard (Style) des images qu'elle t'a envoyées (posts qu'elle aime, ambiances, couleurs), puis Simone relit tout le moodboard : la lecture guide ensuite les montages et les composants. Gratuit pendant l'onboarding, 1 crédit ensuite.",
+      "Ajoute à son moodboard (Style) des images qu'elle t'a envoyées (posts qu'elle aime, ambiances, couleurs), puis Edith relit tout le moodboard : la lecture guide ensuite les montages et les composants. Gratuit pendant l'onboarding, 1 crédit ensuite.",
     input: z.object({ media_ids: z.array(z.string().uuid()).min(1).max(12) }),
   },
   set_logo: {

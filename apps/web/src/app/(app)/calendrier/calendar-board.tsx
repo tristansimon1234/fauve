@@ -493,7 +493,7 @@ export function ShotList({ shots, bare = false }: { shots: Shot[]; bare?: boolea
         ))
       ) : (
         <p className="text-sm leading-normal text-muted">
-          Rien à filmer pour l’instant. Demande à Simone sur WhatsApp des idées de tournage pour la semaine.
+          Rien à filmer pour l’instant. Demande à Edith sur WhatsApp des idées de tournage pour la semaine.
         </p>
       )}
       {error && (
@@ -503,7 +503,7 @@ export function ShotList({ shots, bare = false }: { shots: Shot[]; bare?: boolea
       )}
       <a href={whatsappLink()} className="btn btn-primary h-11 text-sm">
         <WhatsAppIcon size={18} />
-        Envoyer les vidéos à Simone
+        Envoyer les vidéos à Edith
       </a>
     </section>
   );

@@ -28,7 +28,7 @@ function byRules(text: string, previous: string | null): Reaction {
 }
 
 /**
- * Simone's instant reaction to the manager's message: her face and, when it is
+ * Edith's instant reaction to the manager's message: her face and, when it is
  * natural, an emoji on the message. Asked to Jev in parallel with the chat model,
  * so it lands in a fraction of a second; never throws.
  */

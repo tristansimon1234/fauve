@@ -181,8 +181,8 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         {header}
         <EmptyState title="Tes résultats arrivent après tes premières publications" className="max-w-[760px]">
           Dès que tes posts seront en ligne sur Instagram ou TikTok, tu verras ici ce qu’ils ont donné : les réservations
-          venues des réseaux d’abord, puis les clics sur ton lien, les visites de ton profil et le bilan de Simone. Tu peux déjà demander à
-          Simone d’analyser tes posts Instagram existants.
+          venues des réseaux d’abord, puis les clics sur ton lien, les visites de ton profil et le bilan d’Edith. Tu peux déjà demander à
+          Edith d’analyser tes posts Instagram existants.
         </EmptyState>
         <RefreshReportButton label="Analyser mes posts Instagram" />
       </>
@@ -283,7 +283,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           </>
         ) : (
           <p className="text-sm leading-relaxed text-muted">
-            Simone relève les chiffres de ton compte Instagram chaque jour (nouveaux abonnés, désabonnements, vues, visites du profil, clics) et remonte jusqu’à 30 jours en arrière.
+            Edith relève les chiffres de ton compte Instagram chaque jour (nouveaux abonnés, désabonnements, vues, visites du profil, clics) et remonte jusqu’à 30 jours en arrière.
             Les premières semaines apparaissent ici dans l’heure qui suit la connexion.
           </p>
         )}
@@ -304,7 +304,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
             <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
               <h2 className="text-base font-bold">Ce que rapporte chaque format</h2>
               <FormatTable rows={formats} labels={kindLabels} />
-              <p className="text-[12px] text-muted">Moyenne par publication de Simone sur la période, le format qui donne le plus envie en premier. Intérêt : visites du profil, enregistrements et partages rapportés aux comptes touchés, les signes qu’un futur client s’intéresse à toi.</p>
+              <p className="text-[12px] text-muted">Moyenne par publication d’Edith sur la période, le format qui donne le plus envie en premier. Intérêt : visites du profil, enregistrements et partages rapportés aux comptes touchés, les signes qu’un futur client s’intéresse à toi.</p>
             </section>
           )}
           {moments.days.length > 0 && (
@@ -394,13 +394,13 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
                   ))}
                 </div>
               )}
-              <p className="text-[13px] text-muted">Simone applique ces leçons à tes prochains montages. Le bilan se met à jour chaque dimanche.</p>
+              <p className="text-[13px] text-muted">Edith applique ces leçons à tes prochains montages. Le bilan se met à jour chaque dimanche.</p>
               <RefreshReportButton label="Refaire l’analyse" />
             </>
           ) : (
             <>
               <p className="text-[15px] leading-relaxed text-muted">
-                Simone compare tes derniers posts Instagram (formats, accroches, heures, chiffres) pour te dire ce qui marche,
+                Edith compare tes derniers posts Instagram (formats, accroches, heures, chiffres) pour te dire ce qui marche,
                 avec les preuves. Le bilan arrive chaque dimanche.
               </p>
               <RefreshReportButton />

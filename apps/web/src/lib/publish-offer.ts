@@ -6,17 +6,17 @@ import { scheduleValidated } from "@/lib/posts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // « Je le publie maintenant ? » under a delivered montage (lib/render/deliver.ts) or a
-// reminder at the moment Simone suggested (lib/reminders.ts), and the draft_ready template's
-// own buttons: her tap is answered at once, with no Simone turn. « Oui, publie-le » validates
+// reminder at the moment Edith suggested (lib/reminders.ts), and the draft_ready template's
+// own buttons: her tap is answered at once, with no Edith turn. « Oui, publie-le » validates
 // it and publishes it now; « Je regarde d'abord » points to its page. Any other answer goes
-// to Simone as usual.
+// to Edith as usual.
 
 export type OfferReply = {
   /** Sent… */
   reply: string;
   /** …with, on WhatsApp, its page behind a button (a one-time link)… */
   link?: { url: string; label: string };
-  /** …and stored without the link (Simone's history must not reuse it). */
+  /** …and stored without the link (Edith's history must not reuse it). */
   body: string;
   payload: Record<string, unknown>;
 };
@@ -55,7 +55,7 @@ export async function answerPublishOffer(
 
   const status = post.status as string;
   if (status === "published" || status === "measured") return { reply: "Il est déjà en ligne 🎉", body: "Il est déjà en ligne 🎉", payload: card };
-  // A new version on its way (a correction): Simone answers, it is not the one she watched.
+  // A new version on its way (a correction): Edith answers, it is not the one she watched.
   if (status !== "draft" && status !== "validated" && status !== "scheduled") return null;
   if (status === "draft") {
     const { data: moved } = await db.from("posts").update({ status: "validated" }).eq("id", postId).eq("studio_id", studioId).eq("status", "draft").select("id");

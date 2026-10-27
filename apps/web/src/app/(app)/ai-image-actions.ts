@@ -8,7 +8,7 @@ import { AiImageError, canAffordImages, improvePhoto, makeAmbiance, placeOnPost 
 import { renderSlides } from "@/lib/render/slides";
 import { getStudioContext } from "@/lib/studio";
 
-// Images by the image model from the app: « Améliorer avec Simone » under a photo
+// Images by the image model from the app: « Améliorer avec Edith » under a photo
 // of the carousel editor (the improved photo takes its place on the post) and
 // « Image d'ambiance » in the library. 1 credit an image, charged once it is made.
 
@@ -17,7 +17,7 @@ type Result = { ok: true; count: number } | { ok: false; error: string };
 const failure = (error: unknown): Result => {
   if (error instanceof AiImageError) return { ok: false, error: error.message };
   console.error("ai image failed", error);
-  return { ok: false, error: "Simone n’a pas réussi cette image. Réessaie dans un instant ; aucun crédit n’a été débité." };
+  return { ok: false, error: "Edith n’a pas réussi cette image. Réessaie dans un instant ; aucun crédit n’a été débité." };
 };
 
 /** Improves a photo of a carousel or photo post, one of the quick ones or her own words; it replaces the original on the post. */

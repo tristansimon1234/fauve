@@ -26,9 +26,9 @@ import type { ReviewData } from "@/lib/review";
 import type { EditStart } from "./reel-editor";
 
 // « Qu'est-ce qu'on change ? » under a Reel: what she changes herself (instant, free:
-// the texts and scenes open « Modifier ») and what Simone remakes (a new version in
+// the texts and scenes open « Modifier ») and what Edith remakes (a new version in
 // about two minutes), plus anything else said her way. One view at a time; nothing
-// Simone remakes starts on a tap: each view says what will happen, takes a précision
+// Edith remakes starts on a tap: each view says what will happen, takes a précision
 // if she wants, and asks to confirm.
 
 export type ChangeView = "menu" | "caption" | "cover" | "date" | "shorter" | "punchier" | "music" | "voice" | "words";
@@ -43,7 +43,7 @@ type Props = {
   onDone: (message: string) => void;
   /** « Modifier »: the texts and the scenes, live. */
   onEdit: (start: EditStart) => void;
-  /** « Autre chose » in her words: Simone's panel in the app, WhatsApp from its page. */
+  /** « Autre chose » in her words: Edith's panel in the app, WhatsApp from its page. */
   ask: (text: string) => void;
   cover: PostCover | null;
   shareToFeed: boolean;
@@ -119,7 +119,7 @@ function Menu({ data, onView, onEdit, ask }: Props) {
       <h2 className="text-[19px] font-extrabold tracking-[-0.01em]">Qu’est-ce qu’on change ?</h2>
       <h3 className="text-[13.5px] font-bold text-muted">Change-le toi-même, c’est immédiat</h3>
       <div className="grid grid-cols-2 gap-2">
-        {/* A Reel made by the effects agent has its texts in the image: its kit draws them again with her words; without one, she asks Simone. */}
+        {/* A Reel made by the effects agent has its texts in the image: its kit draws them again with her words; without one, she asks Edith. */}
         {!data.baked && <Tile tone="violet" icon={<TypeIcon size={18} />} label="Le texte à l’écran" onClick={() => onEdit({ text: 0 })} disabled={data.making !== null} />}
         {data.baked && data.words.length > 0 && (
           <Tile tone="violet" icon={<TypeIcon size={18} />} label="Le texte à l’écran" onClick={() => onView("words")} disabled={data.making !== null} />
@@ -128,7 +128,7 @@ function Menu({ data, onView, onEdit, ask }: Props) {
         <Tile tone="violet" icon={<ImageIcon size={18} />} label="La couverture" onClick={() => onView("cover")} disabled={!data.videoUrl} />
         <Tile tone="violet" icon={<CalendarIcon size={18} />} label="Quand te faire signe" onClick={() => onView("date")} />
       </div>
-      <h3 className="mt-1 text-[13.5px] font-bold text-muted">Simone refait la vidéo, {data.baked ? `${EFFECT_MINUTES} minutes` : `${REDO_MINUTES} minutes`}</h3>
+      <h3 className="mt-1 text-[13.5px] font-bold text-muted">Edith refait la vidéo, {data.baked ? `${EFFECT_MINUTES} minutes` : `${REDO_MINUTES} minutes`}</h3>
       <div className="grid grid-cols-2 gap-2">
         <Tile tone="peach" icon={<ScissorsIcon size={18} />} label="Plus court" onClick={() => onView("shorter")} disabled={busy} />
         <Tile tone="peach" icon={<ZapIcon size={18} />} label="Plus rythmé" onClick={() => onView("punchier")} disabled={busy} />
@@ -143,7 +143,7 @@ function Menu({ data, onView, onEdit, ask }: Props) {
         }}
       >
         <label htmlFor={`wish-${data.postId}`} className="sr-only">
-          Autre chose ? Dis-le à Simone
+          Autre chose ? Dis-le à Edith
         </label>
         <input
           id={`wish-${data.postId}`}
@@ -154,7 +154,7 @@ function Menu({ data, onView, onEdit, ask }: Props) {
         />
         <button
           type="submit"
-          aria-label="Envoyer à Simone"
+          aria-label="Envoyer à Edith"
           disabled={!wish.trim()}
           className="flex size-12 shrink-0 items-center justify-center rounded-full bg-violet text-white disabled:bg-lilac"
         >
@@ -197,7 +197,7 @@ function NoteField({ label, placeholder, value, onChange }: { label: string; pla
 
 const REDO_TEXT = {
   shorter: {
-    what: "Simone garde l’accroche et la fin, et retire les passages les moins forts : environ un tiers de moins.",
+    what: "Edith garde l’accroche et la fin, et retire les passages les moins forts : environ un tiers de moins.",
     placeholder: "Ex. garde le plan du shampoing",
     button: "Refaire la vidéo, plus courte",
   },
@@ -208,10 +208,10 @@ const REDO_TEXT = {
   },
 } as const;
 
-/** How long Simone takes to remake the video: an effect is drawn image by image again. */
+/** How long Edith takes to remake the video: an effect is drawn image by image again. */
 const redoTime = (data: Props["data"]) => `${data.baked ? EFFECT_MINUTES : REDO_MINUTES} minutes`;
 
-/** « Plus court », « Plus rythmé »: what Simone will do, a précision if she wants, then her go. */
+/** « Plus court », « Plus rythmé »: what Edith will do, a précision if she wants, then her go. */
 function RedoView({ data, onDone, kind }: Props & { kind: "shorter" | "punchier" }) {
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -222,13 +222,13 @@ function RedoView({ data, onDone, kind }: Props & { kind: "shorter" | "punchier"
       setError(null);
       const result = await redoReel(data.postId, kind, note);
       if (!result.ok) return setError(result.error);
-      onDone(`C’est parti : Simone refait la vidéo, ${redoTime(data)}. Tu peux fermer, je te préviens.`);
+      onDone(`C’est parti : Edith refait la vidéo, ${redoTime(data)}. Tu peux fermer, je te préviens.`);
     });
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-[14px] leading-snug text-muted">{text.what}</p>
       <NoteField label="Une précision ?" placeholder={text.placeholder} value={note} onChange={setNote} />
-      <p className="text-[12.5px] leading-snug text-muted">{data.baked ? `${EFFECT_MINUTES} minutes : Simone refait l’effet image par image.` : `${REDO_MINUTES} minutes.`} Ta version actuelle reste, tu pourras y revenir.</p>
+      <p className="text-[12.5px] leading-snug text-muted">{data.baked ? `${EFFECT_MINUTES} minutes : Edith refait l’effet image par image.` : `${REDO_MINUTES} minutes.`} Ta version actuelle reste, tu pourras y revenir.</p>
       {error && (
         <p role="alert" className="text-[13.5px] font-semibold text-danger">
           {error}
@@ -261,7 +261,7 @@ function WordsView({ data, onDone }: Props) {
         changed.map((w) => ({ id: w.id, text: texts[w.id] ?? "" })),
       );
       if (!result.ok) return setError(result.error);
-      onDone(`C’est parti : Simone pose tes mots sur l’effet, ${EFFECT_WORDS_MINUTES} minutes. Tu peux fermer, ta vidéo se met à jour toute seule.`);
+      onDone(`C’est parti : Edith pose tes mots sur l’effet, ${EFFECT_WORDS_MINUTES} minutes. Tu peux fermer, ta vidéo se met à jour toute seule.`);
     });
   return (
     <div className="flex flex-col gap-3">
@@ -291,7 +291,7 @@ function WordsView({ data, onDone }: Props) {
           </div>
         );
       })}
-      <p className="text-[12.5px] leading-snug text-muted">Gratuit. {EFFECT_WORDS_MINUTES} minutes : Simone redessine l’effet avec tes mots. Ta version actuelle reste, tu pourras y revenir.</p>
+      <p className="text-[12.5px] leading-snug text-muted">Gratuit. {EFFECT_WORDS_MINUTES} minutes : Edith redessine l’effet avec tes mots. Ta version actuelle reste, tu pourras y revenir.</p>
       {error && (
         <p role="alert" className="text-[13.5px] font-semibold text-danger">
           {error}
@@ -323,7 +323,7 @@ function CaptionView({ data, onDone }: Props) {
   return (
     <div className="flex flex-col gap-2.5">
       <label htmlFor={`caption-${data.postId}`} className="text-[13.5px] leading-snug text-muted">
-        Le texte sous ta vidéo. Écris par-dessus, ou dis à Simone ce que tu veux.
+        Le texte sous ta vidéo. Écris par-dessus, ou dis à Edith ce que tu veux.
       </label>
       <textarea
         id={`caption-${data.postId}`}
@@ -386,7 +386,7 @@ function fromLocalValue(value: string, timeZone: string): string | null {
   return new Date(guess - (shown - guess)).toISOString();
 }
 
-/** When Simone reminds her to post it (« Prévoir » on its page too). */
+/** When Edith reminds her to post it (« Prévoir » on its page too). */
 export function DateView({ data, onDone }: Pick<Props, "data" | "onDone">) {
   const current = data.scheduledAt;
   const [chosen, setChosen] = useState<string | null>(current);
@@ -479,9 +479,9 @@ function MusicView({ data, onDone }: Props) {
           {
             id: "another",
             title: "Une autre musique",
-            hint: "Simone en compose une nouvelle pour ce Reel.",
+            hint: "Edith en compose une nouvelle pour ce Reel.",
             button: "Composer une autre musique",
-            message: "Simone compose une autre musique. La vidéo arrive dans 3 à 8 minutes.",
+            message: "Edith compose une autre musique. La vidéo arrive dans 3 à 8 minutes.",
             apply: async () => {
               await hers();
               return setMusic(data.postId, "another");
@@ -489,10 +489,10 @@ function MusicView({ data, onDone }: Props) {
           },
           {
             id: "simone",
-            title: "La musique de Simone",
+            title: "La musique d’Edith",
             hint: "Composée pour ce Reel, libre de droits.",
-            button: "Remettre la musique de Simone",
-            message: "La musique de Simone revient. La vidéo se refait, une minute environ.",
+            button: "Remettre la musique d’Edith",
+            message: "La musique d’Edith revient. La vidéo se refait, une minute environ.",
             apply: async () => {
               await hers();
               return data.music?.on ? { ok: true } : setMusic(data.postId, "on");
@@ -603,13 +603,13 @@ function VoiceView({ data, onDone }: Props) {
       if (picked === null) {
         const result = await setVoiceOff(data.postId);
         return result.ok
-          ? onDone(data.baked ? `Sans voix : Simone refait l’effet sans la voix, ${EFFECT_MINUTES} minutes.` : `Sans voix : la vidéo se refait, ${RERENDER_MINUTES} minutes.`)
+          ? onDone(data.baked ? `Sans voix : Edith refait l’effet sans la voix, ${EFFECT_MINUTES} minutes.` : `Sans voix : la vidéo se refait, ${RERENDER_MINUTES} minutes.`)
           : setError("Ça n’a pas marché. Réessaie.");
       }
       const result = await putVoice(data.postId, picked, words);
       if (!result.ok) return setError(result.error);
       const name = SIMONE_VOICES.find((v) => v.id === picked)?.name ?? "";
-      onDone(`C’est parti : ${name} enregistre la voix et Simone refait la vidéo, ${redoTime(data)}.`);
+      onDone(`C’est parti : ${name} enregistre la voix et Edith refait la vidéo, ${redoTime(data)}.`);
     });
   const name = SIMONE_VOICES.find((v) => v.id === picked)?.name ?? "";
   const label =
@@ -617,7 +617,7 @@ function VoiceView({ data, onDone }: Props) {
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-[13.5px] leading-snug text-muted">
-        {hers ? "Ce Reel porte ta propre voix. Tu peux la retirer, ou la remplacer par une voix de Simone." : "Une voix raconte ton Reel, la musique passe dessous. Écoute et choisis."}
+        {hers ? "Ce Reel porte ta propre voix. Tu peux la retirer, ou la remplacer par une voix d’Edith." : "Une voix raconte ton Reel, la musique passe dessous. Écoute et choisis."}
       </p>
       <div role="radiogroup" aria-label="La voix" className="grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-2">
         {[{ id: null, name: "Sans voix", hint: "Juste la musique" }, ...SIMONE_VOICES.map((v) => ({ id: v.id as string | null, name: v.name, hint: `${v.hint.charAt(0).toUpperCase()}${v.hint.slice(1)}` }))].map((v) => {
@@ -645,7 +645,7 @@ function VoiceView({ data, onDone }: Props) {
       {picked !== null && (
         <NoteField label="Ce que la voix doit dire ?" placeholder="Ex. parle du cours offert pour une première venue" value={note} onChange={setNote} />
       )}
-      <p className="text-[13px] leading-snug text-muted">Ou ta propre voix : envoie un vocal à Simone sur WhatsApp, il le pose dessus.</p>
+      <p className="text-[13px] leading-snug text-muted">Ou ta propre voix : envoie un vocal à Edith sur WhatsApp, il le pose dessus.</p>
       {error && (
         <p role="alert" className="text-[13.5px] font-semibold text-danger">
           {error}

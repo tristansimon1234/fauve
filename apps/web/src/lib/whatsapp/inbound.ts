@@ -131,7 +131,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", member.studio_id).single();
     const fresh = onboardingStepOf(studio?.onboarding_step) !== "done";
     const reply = fresh
-      ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Simone, ton community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment.`
+      ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Edith, ton community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment.`
       : "C’est bon, ton ordinateur est connecté ✨";
     const waMessageId = await sendText(message.from, reply).catch(() => undefined);
     await db.from("whatsapp_messages").insert({ studio_id: member.studio_id, wa_message_id: waMessageId, direction: "outbound", phone_e164: phone, type: "text", body: reply, payload: { reply_to: message.id } });
@@ -146,7 +146,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     return null;
   });
   if (media) await db.from("whatsapp_messages").update({ media_id: media.id }).eq("wa_message_id", message.id);
-  // A voice note: Simone reads what she said (and it can go over a Reel, word by word).
+  // A voice note: Edith reads what she said (and it can go over a Reel, word by word).
   if (media && message.type === "audio") {
     const transcript = await ensureTranscript(member.studio_id, media.id);
     if (transcript?.text) await db.from("whatsapp_messages").update({ body: transcript.text }).eq("wa_message_id", message.id);
@@ -256,7 +256,7 @@ async function newerMessage(studioId: string, waMessageId: string): Promise<bool
 }
 
 /**
- * Simone's turn on WhatsApp: her answer, with its buttons and links, sent and stored, then
+ * Edith's turn on WhatsApp: her answer, with its buttons and links, sent and stored, then
  * what runs after it (a render…). Also after files dropped through her upload link (lib/upload-link.ts).
  */
 export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo }: { studioId: string; memberId: string; waId: string; phone: string; replyTo?: string }): Promise<void> {

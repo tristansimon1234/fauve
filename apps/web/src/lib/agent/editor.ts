@@ -180,7 +180,7 @@ export async function designEdit(params: {
   fromPlanId?: string;
   /** A new take, not a correction: the brief is the request, the previous plan is not shown. */
   fresh?: boolean;
-  /** Simone chose the form: « message », one key message with the music, no voice. */
+  /** Edith chose the form: « message », one key message with the music, no voice. */
   format?: ReelFormat;
   /** What she fixed for this Reel: over every default of the editor. */
   contract?: ReelContract;
@@ -275,7 +275,7 @@ export async function designEdit(params: {
       name: studio.data?.name,
       business: studio.data?.business_type ?? undefined,
       booking: Boolean(studio.data?.booking_url),
-      // What Simone knows of the business (its site, what was said): where the words on screen come from.
+      // What Edith knows of the business (its site, what was said): where the words on screen come from.
       facts: memoryLines(studio.data?.memory),
     },
     brand: {
@@ -287,7 +287,7 @@ export async function designEdit(params: {
       moodboard: profile.moodboard?.reading,
       // What worked on this studio's Instagram (weekly analysis): follow it when it applies.
       lessons: report?.lessons.map((l) => l.lesson),
-      // Reels she likes (added in Style, shared with Simone on Instagram), as read by Gemini; not a Reel she sent
+      // Reels she likes (added in Style, shared with Edith on Instagram), as read by Gemini; not a Reel she sent
       // to copy (« Steal »): that one is the model of one Reel only; nor one of hers kept as a model, for the Reels made like it.
       inspirations: (inspirations.data ?? [])
         .filter((i) => !(i.copied && SENT_TO_COPY.includes(i.source as string)) && i.source !== MODEL_SOURCE)
@@ -315,7 +315,7 @@ export async function designEdit(params: {
       // The collage form she chose for this Reel (or an older Reel's ambiance); « libre » says nothing.
       chosen_template: chosenTemplate.success && chosenTemplate.data !== "libre" ? chosenTemplate.data : undefined,
       chosen_inspiration: chosenInspiration ?? undefined,
-      // Simone chose this form: one key message held on screen, with the music, no voice.
+      // Edith chose this form: one key message held on screen, with the music, no voice.
       format: params.format === "message" ? "message clé" : undefined,
     },
     // Every shot as an editor weighs it (size, camera, beauty, energy, hook, where the subject is).
@@ -450,7 +450,7 @@ export async function designEdit(params: {
   }
 
   // The end card writes her name under her logo unless the logo already writes it (read once from its
-  // letters): a mascot or a symbol says nothing, and Simone's end card had shown its mascot without a name.
+  // letters): a mascot or a symbol says nothing, and Edith's end card had shown its mascot without a name.
   const ownLogo = profile.logo_path?.startsWith(`${params.studioId}/`) ? profile.logo_path : undefined;
   if (plan.end_card && (ownLogo || profile.logo_url)) {
     const named = await logoNamed(params.studioId, (studio.data?.name as string | null) ?? "", ownLogo ? { path: ownLogo } : { url: profile.logo_url! });

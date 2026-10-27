@@ -14,7 +14,7 @@ async function servedByGoogle(family: string): Promise<boolean> {
   "use cache";
   cacheLife("weeks");
   const res = await fetch(`https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, "+")}&display=swap`, {
-    headers: { "user-agent": "Mozilla/5.0 (compatible; Simone)" },
+    headers: { "user-agent": "Mozilla/5.0 (compatible; Edith)" },
     signal: AbortSignal.timeout(5000),
   });
   if (res.status === 400) return false;
@@ -37,7 +37,7 @@ export async function googleFont(family: string): Promise<string | null> {
 export type FontSwap = { from: string; to: string };
 
 /**
- * The charter's fonts, each one loadable: hers (a file she added), Google's, the twin Simone
+ * The charter's fonts, each one loadable: hers (a file she added), Google's, the twin Edith
  * chose by looking at her site (`twins`), a well-known twin, or the ambiance's for that role.
  */
 export async function usableFonts(

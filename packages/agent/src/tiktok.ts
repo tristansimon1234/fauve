@@ -27,7 +27,7 @@ export const readTikTokSettings = (value: unknown): TikTokSettings => tiktokSett
 /** `posts.external_ids.tiktok`: where the video is on TikTok. */
 export const tiktokExternalSchema = z.object({
   publish_id: z.string(),
-  /** draft: in her TikTok drafts (inbox); direct: posted by Simone. */
+  /** draft: in her TikTok drafts (inbox); direct: posted by Edith. */
   mode: z.enum(["draft", "direct"]),
   status: z.string(),
   sent_at: z.string(),

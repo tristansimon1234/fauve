@@ -6,10 +6,10 @@ import { ArrowLeftIcon, ArrowRightIcon, CheckIcon } from "@/components/icons";
 import { CarouselWords } from "./carousel-words";
 import { SlidePreview } from "./slide-preview";
 
-// A carousel Simone composed, edited like Instagram: the slide large, as it will be published
+// A carousel Edith composed, edited like Instagram: the slide large, as it will be published
 // (drawn live by the code that renders the image), swiped from one to the next; a tap on a text
 // of the slide opens it to type, and the slide redraws with each letter. Where a text sits is read
-// from what the browser drew (slotBoxes): Simone's code never says. A text the slide does not show
+// from what the browser drew (slotBoxes): Edith's code never says. A text the slide does not show
 // as typed (drawn in pieces it cannot recognise) stays reachable in the list under the slide.
 
 /** Room around a text's letters. */

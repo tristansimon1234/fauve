@@ -3,7 +3,7 @@ import { readOAuthState } from "@/lib/social/oauth-state";
 import { exchangeTikTokCode, TikTokError, tiktokUser } from "@/lib/social/tiktok";
 import { linkTikTokAccount } from "@/lib/social/tiktok-account";
 
-// TikTok redirects here after the manager authorised Simone. The studio comes
+// TikTok redirects here after the manager authorised Edith. The studio comes
 // from the signed state, not from a session (the page may open in another browser).
 function back(request: NextRequest, path: string, error?: string) {
   const url = new URL(path, request.url);

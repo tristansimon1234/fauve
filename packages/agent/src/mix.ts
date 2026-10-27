@@ -1,6 +1,6 @@
-// How Simone's music sits under what is said in a Reel. Loudness in LUFS (EBU R128,
+// How Edith's music sits under what is said in a Reel. Loudness in LUFS (EBU R128,
 // measured by ffmpeg on the rendered video and on the music), turned into fixed
-// gains: what is said (her voice note, Simone's voice, someone speaking in a clip)
+// gains: what is said (her voice note, Edith's voice, someone speaking in a clip)
 // is brought to SPEECH_LUFS, the music to the level of its case, then it ducks
 // under the speech (sidechain compressor). Measured on creators' Reels that work
 // (about -14 LUFS overall, the music some 8 dB under the voice in its pauses and

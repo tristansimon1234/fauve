@@ -16,7 +16,7 @@ export type MontageStatus = {
   /**
    * It has most likely died: its step's pulse has been silent too long (the watchdog had its turn), or,
    * for a montage launched before the pulse, no news for too long. Never a long step that still runs:
-   * a design takes up to 13 minutes, and Simone offered to start one again while it ran.
+   * a design takes up to 13 minutes, and Edith offered to start one again while it ran.
    */
   late: boolean;
 };

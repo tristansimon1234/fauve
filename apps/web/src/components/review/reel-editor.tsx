@@ -34,7 +34,7 @@ import { SceneStrip, type SceneSprite } from "./scene-strip";
 // alors qu'on est déjà sur montage », « j'aimerais qu'on reste au même endroit »); a
 // story's montage still opens it full screen. Touch a text to change its words, size and
 // style, drag it to place it; touch a scene to move it earlier or later, or take it
-// out. Nothing else to learn: cuts, animations and the rest are asked of Simone.
+// out. Nothing else to learn: cuts, animations and the rest are asked of Edith.
 // One « Enregistrer » makes a new version, rendered in the background, free.
 
 export type EditStart = { text?: number; scene?: number };
@@ -65,7 +65,7 @@ export function ReelEditor({
   layout?: (parts: EditorParts) => ReactNode;
   /** Closed: with a line to show her when something was saved. */
   onClose: (saved?: string) => void;
-  /** « Demander à Simone » about one scene. */
+  /** « Demander à Edith » about one scene. */
   onAsk: (scene: number, label: string) => void;
 }) {
   const [live, setLive] = useState<Live | null>(preloaded ?? null);
@@ -515,7 +515,7 @@ function ScenePanel({
           Retirer
         </button>
       </div>
-      {voiced && <p className="-mt-1.5 text-[12.5px] leading-snug text-muted">Ce Reel suit une voix : pour changer l’ordre des scènes, demande à Simone.</p>}
+      {voiced && <p className="-mt-1.5 text-[12.5px] leading-snug text-muted">Ce Reel suit une voix : pour changer l’ordre des scènes, demande à Edith.</p>}
 
       <SceneWords segment={segment} onChange={onChange} />
 
@@ -551,14 +551,14 @@ function ScenePanel({
         disabled={changed}
         className="h-11 rounded-full bg-violet-tint px-4 text-[14px] font-bold text-violet hover:bg-violet hover:text-white disabled:opacity-50 disabled:hover:bg-violet-tint disabled:hover:text-violet"
       >
-        Demander à Simone pour cette scène
+        Demander à Edith pour cette scène
       </button>
       {changed && <p className="-mt-2 text-center text-[12px] text-muted">Enregistre d’abord tes changements.</p>}
     </div>
   );
 }
 
-/** The words of a scene that has its own (an animation, a text screen); the rest is Simone's. */
+/** The words of a scene that has its own (an animation, a text screen); the rest is Edith's. */
 function SceneWords({ segment, onChange }: { segment: Segment; onChange: (segment: Segment) => void }) {
   if ("scene" in segment) {
     const s = segment.scene;

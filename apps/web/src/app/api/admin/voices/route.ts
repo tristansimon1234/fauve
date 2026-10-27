@@ -5,14 +5,14 @@ import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { levelSpeech, speak } from "@/lib/voice-over";
 
-// Voices for Simone, by ear. POST with CRON_SECRET, from the database (call_app):
+// Voices for Edith, by ear. POST with CRON_SECRET, from the database (call_app):
 //   ?use_case=social_media|conversational|narrative_story&gender=female|male
 //     the most used French voices of the ElevenLabs library for that use, with their own sample;
 //   ?say=<voice id>,<voice id>…
-//     the same lines read by each voice (Simone's text for a pizzeria, with its acting tags),
+//     the same lines read by each voice (Edith's text for a pizzeria, with its acting tags),
 //     to compare them by ear: a signed link (24 h) per voice;
 //   ?gallery=1
-//     the samples of Simone's voices heard in Style (public bucket landing/voices/);
+//     the samples of Edith's voices heard in Style (public bucket landing/voices/);
 //   ?info=<voice id>
 //     one voice's card (name, labels, description);
 //   ?clone=<name>&media=<uuid>,<uuid>…
@@ -44,7 +44,7 @@ async function clone(key: string, name: string, mediaIds: string[]) {
   if (new Set(notes.map((n) => n.studio_id)).size > 1) return Response.json({ error: "voice notes of one studio only" }, { status: 400 });
   const form = new FormData();
   form.append("name", name);
-  form.append("description", "Voix de la gérante, clonée avec son accord pour ses Reels (Simone)");
+  form.append("description", "Voix de la gérante, clonée avec son accord pour ses Reels (Edith)");
   form.append("remove_background_noise", "true");
   for (const note of notes) {
     const file = await db.storage.from("media").download(note.storage_path as string);
@@ -57,7 +57,7 @@ async function clone(key: string, name: string, mediaIds: string[]) {
   return Response.json({ ok: true, studio: notes[0]!.studio_id, notes: notes.length, ...(JSON.parse(text) as Record<string, unknown>) });
 }
 
-/** What every voice reads to be compared: a voice-over Simone wrote, acting tags included. */
+/** What every voice reads to be compared: a voice-over Edith wrote, acting tags included. */
 const SAMPLE =
   "[smiling] Cette pizza, on l'a commencée avant-hier. Ici, la pâte est pétrie le matin, puis elle repose quarante-huit heures. Le soir, on l'étire et elle file sur la pierre du four à bois. [laughs softly] Toi, t'as juste à attraper ta part. [warmly] Passe ce soir, on t'attend.";
 
@@ -88,7 +88,7 @@ async function say(voiceIds: string[]) {
   return Response.json({ samples });
 }
 
-/** What each voice of Simone's gallery reads in Style: words for any business, with acting tags. */
+/** What each voice of Edith's gallery reads in Style: words for any business, with acting tags. */
 const GALLERY_SAMPLE =
   "[smiling] Tu vois ce geste ? On le refait chaque jour, et on ne s'en lasse pas. Ici, tout est fait sur place, avec soin. [warmly] Passe nous voir cette semaine, on t'attend.";
 

@@ -68,7 +68,7 @@ async function linkWithCode(igsid: string, code: string): Promise<{ name: string
 }
 
 const SHARE_TYPES = new Set(["ig_reel", "reel", "share", "ig_post", "image", "video", "story_mention"]);
-/** Shares that can be the model of her next Reel (« Steal »): not a photo, nor a story mentioning Simone. */
+/** Shares that can be the model of her next Reel (« Steal »): not a photo, nor a story mentioning Edith. */
 const MODEL_TYPES = new Set(["ig_reel", "reel", "share", "ig_post", "video"]);
 
 /** Handles one message sent to Fauve's Instagram account. */
@@ -88,10 +88,10 @@ export async function handleDm(event: DmEvent): Promise<void> {
     const linked = code ? await linkWithCode(igsid, code) : null;
     await reply(
       linked
-        ? `C’est relié à ${linked.name} ! Partage-moi un Reel qui te plaît (bouton Partager → Simone) : je fais ton prochain Reel comme lui. Tu peux aussi m’écrire ici.`
+        ? `C’est relié à ${linked.name} ! Partage-moi un Reel qui te plaît (bouton Partager → Edith) : je fais ton prochain Reel comme lui. Tu peux aussi m’écrire ici.`
         : code
           ? "Ce code n’est plus valable. Récupère-en un nouveau dans l’app (Réglages → Instagram) et renvoie-le-moi."
-          : "Hello, je suis Simone, l’IA qui gère les réseaux de ton studio. Pour relier ton compte, envoie-moi le code affiché dans l’app (Réglages → Instagram).",
+          : "Hello, je suis Edith, l’IA qui gère les réseaux de ton studio. Pour relier ton compte, envoie-moi le code affiché dans l’app (Réglages → Instagram).",
     );
     return;
   }

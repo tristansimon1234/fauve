@@ -30,14 +30,14 @@ const examplePathOf = (studio: string, path: string | undefined) => (path && pat
 export async function changeComponent(id: string, input: { change: string; examplePath?: string }): Promise<BankResult> {
   if (!z.uuid().safeParse(id).success) return { ok: false, error: "Composant introuvable." };
   const change = z.string().trim().min(2).max(2000).safeParse(input.change);
-  if (!change.success) return { ok: false, error: "Dis à Simone ce que tu veux changer." };
+  if (!change.success) return { ok: false, error: "Dis à Edith ce que tu veux changer." };
   const studio = await studioId();
   if (!studio) return NO_STUDIO;
   const started = await startElements({ studioId: studio, mode: "edit", elementId: id, request: change.data, examplePath: examplePathOf(studio, input.examplePath), origin: "app" });
   if (started.status === "error") return { ok: false, error: started.error };
   if (started.status === "already_running") return { ok: true, message: "Ce composant est déjà en cours de modification." };
   revalidatePath(`/composants/${id}`);
-  return { ok: true, message: `Simone prépare la nouvelle version (une à deux minutes, ${started.credits} crédit).` };
+  return { ok: true, message: `Edith prépare la nouvelle version (une à deux minutes, ${started.credits} crédit).` };
 }
 
 async function patchElement(id: string, patch: Record<string, unknown>): Promise<BankResult> {

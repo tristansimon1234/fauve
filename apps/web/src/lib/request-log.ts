@@ -17,8 +17,8 @@ export async function logLaunch(studioId: string, postId: string, via: RequestEn
 }
 
 /**
- * The request every agent of a montage gets: her exchange with Simone for this Reel, word for word, Simone's brief
- * for this launch as her reading of it, and her words on her latest Reels. Simone's brief alone when nothing is kept.
+ * The request every agent of a montage gets: her exchange with Edith for this Reel, word for word, Edith's brief
+ * for this launch as her reading of it, and her words on her latest Reels. Edith's brief alone when nothing is kept.
  */
 export async function launchBrief(studioId: string, postId: string, brief: string | undefined): Promise<string | undefined> {
   const db = supabaseAdmin();

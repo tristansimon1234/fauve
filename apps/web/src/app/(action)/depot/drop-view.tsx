@@ -7,7 +7,7 @@ import { Mascot } from "@/components/mascot";
 import { whatsappLink } from "@/lib/public-env";
 import { sendDropped } from "./actions";
 
-/** Pick in her gallery, watch them go up, send them to Simone; then back to WhatsApp. */
+/** Pick in her gallery, watch them go up, send them to Edith; then back to WhatsApp. */
 export function DropView({ studioId }: { studioId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<{ count: number; answered: boolean } | null>(null);
@@ -34,12 +34,12 @@ export function DropView({ studioId }: { studioId: string }) {
           {sent.count > 1 ? `Tes ${sent.count} fichiers sont arrivés` : "Ton fichier est arrivé"} en pleine qualité.{" "}
           {sent.answered ? "Je t’ai écrit sur WhatsApp : je les regarde et je reviens vers toi." : "Envoie-moi le petit message tout prêt sur WhatsApp, et je m’y mets."}
         </p>
-        {/* WhatsApp never lets a link send a message by itself: when Simone cannot write first, hers is ready to send. */}
+        {/* WhatsApp never lets a link send a message by itself: when Edith cannot write first, hers is ready to send. */}
         <a
           href={whatsappLink(sent.answered ? "" : `C’est envoyé ! ${sent.count > 1 ? `${sent.count} fichiers` : "1 fichier"} 📎`)}
           className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-[15px] font-extrabold text-ink"
         >
-          <WhatsAppIcon size={18} /> {sent.answered ? "Retourner sur WhatsApp" : "Prévenir Simone sur WhatsApp"}
+          <WhatsAppIcon size={18} /> {sent.answered ? "Retourner sur WhatsApp" : "Prévenir Edith sur WhatsApp"}
         </a>
         <button type="button" onClick={() => setSent(null)} className="text-[13.5px] font-semibold text-white/70 underline underline-offset-3">
           En envoyer d’autres
@@ -94,7 +94,7 @@ export function DropView({ studioId }: { studioId: string }) {
         disabled={!uploads.ready.length || uploads.uploading || pending}
         className="mt-auto rounded-full bg-violet px-5 py-3.5 text-[16px] font-extrabold text-white disabled:opacity-40"
       >
-        {uploads.uploading ? "Envoi en cours…" : pending ? "J’envoie à Simone…" : uploads.ready.length ? `Envoyer à Simone (${uploads.ready.length})` : "Envoyer à Simone"}
+        {uploads.uploading ? "Envoi en cours…" : pending ? "J’envoie à Edith…" : uploads.ready.length ? `Envoyer à Edith (${uploads.ready.length})` : "Envoyer à Edith"}
       </button>
     </main>
   );

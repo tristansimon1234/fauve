@@ -127,7 +127,7 @@ export async function createPost(input: {
   inspirationId?: string | null;
   /** Photos and videos picked in the library, in order. */
   mediaIds?: string[];
-  /** A Reel's sound: Simone's music, a sound of Instagram (she publishes it herself), or none. */
+  /** A Reel's sound: Edith's music, a sound of Instagram (she publishes it herself), or none. */
   music?: "simone" | "instagram" | "none" | null;
 }): Promise<{ ok: true; id: string; title: string } | { ok: false; error: string }> {
   const kind = postKindSchema.safeParse(input.kind);
@@ -165,7 +165,7 @@ export async function createPost(input: {
       inspiration_id: inspiration?.id ?? null,
       media_ids: mediaIds,
       ...(mediaIds.length ? { status: "media_received" } : {}),
-      // A sound of Instagram: no music of Simone, and she publishes it herself (Instagram's sounds can only be added in its app).
+      // A sound of Instagram: no music of Edith, and she publishes it herself (Instagram's sounds can only be added in its app).
       ...(music ? { music: { mode: "off" } } : {}),
       ...(music === "instagram" && kind.data === "reel" ? { publish_by_hand: true } : {}),
     })
@@ -232,22 +232,22 @@ export async function getPostSheet(postId: string): Promise<PostSheet | null> {
   ];
   const todo =
     status === "failed"
-      ? "La publication a échoué : demande à Simone de réessayer."
+      ? "La publication a échoué : demande à Edith de réessayer."
       : status === "draft"
         ? "Relis le brouillon et valide-le."
         : status === "validated" && !instagram
-          ? "Connecte Instagram pour que Simone la publie."
+          ? "Connecte Instagram pour qu'Edith la publie."
           : status === "validated" || status === "scheduled"
-            ? "Rien à faire : Simone la publie à l’heure prévue."
+            ? "Rien à faire : Edith la publie à l’heure prévue."
             : status === "published" || status === "measured"
-              ? "En ligne. Simone suit ses résultats."
+              ? "En ligne. Edith suit ses résultats."
               : status === "skipped"
                 ? "Mise de côté."
                 : hasContent
-                  ? "Simone a ton contenu : demande-lui de préparer le brouillon."
+                  ? "Edith a ton contenu : demande-lui de préparer le brouillon."
                   : kind === "reel" || kind === "story"
-                    ? "Filme et envoie tes vidéos à Simone."
-                    : "Envoie tes photos à Simone.";
+                    ? "Filme et envoie tes vidéos à Edith."
+                    : "Envoie tes photos à Edith.";
   const scheduled = post.scheduled_at ? new Date(post.scheduled_at as string) : null;
   const local = scheduled ? localTimeOf(scheduled, tz) : null;
   return {

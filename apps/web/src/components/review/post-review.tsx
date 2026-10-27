@@ -22,9 +22,9 @@ type EditorModule = typeof import("./reel-editor");
 
 // « Ta publication », the page of a Reel, and nothing more (Tristan: « enlève tout sauf
 // la légende, qui doit être tout le temps visible, et la photo de couverture, et juste un
-// bouton demande une modif à Simone qui ouvre le drawer, that's it »): the video as it
+// bouton demande une modif à Edith qui ouvre le drawer, that's it »): the video as it
 // will go out, its whole caption (written over in place), its cover, « Publier », « Télécharger », « Prévoir »
-// (when Simone reminds her to post it) and « Modifier avec Simone » (Tristan: « 3 boutons publier, télécharger,
+// (when Edith reminds her to post it) and « Modifier avec Edith » (Tristan: « 3 boutons publier, télécharger,
 // prévoir + modifier avec simone »; her panel in the app, WhatsApp from the page of the links). Above the
 // video, « Revenir à l'ancienne » (and back to the newer one); under it, its scenes: a tap
 // changes that scene alone, in place (Tristan: « remettre revenir à l'ancienne version et
@@ -32,12 +32,12 @@ type EditorModule = typeof import("./reel-editor");
 // becomes the scene, « Annuler » / « Enregistrer » there (and in the bar at the bottom of a phone).
 
 const STEPS: Record<string, string> = {
-  montage: "Simone refait le montage",
-  effet: "Simone fait l’effet image par image",
-  "2e version": "Simone essaie une autre version",
-  rendu: "Simone fabrique la vidéo",
-  relecture: "Simone relit tout",
-  correction: "Simone corrige un détail",
+  montage: "Edith refait le montage",
+  effet: "Edith fait l’effet image par image",
+  "2e version": "Edith essaie une autre version",
+  rendu: "Edith fabrique la vidéo",
+  relecture: "Edith relit tout",
+  correction: "Edith corrige un détail",
 };
 
 export function PostReview({
@@ -48,7 +48,7 @@ export function PostReview({
   shareToFeed,
 }: {
   data: ReviewData;
-  /** In the app (menu, Simone's panel) or on the page opened from WhatsApp. */
+  /** In the app (menu, Edith's panel) or on the page opened from WhatsApp. */
   surface: "app" | "whatsapp";
   /** From WhatsApp, « Demander une modif » goes back to WhatsApp with her words after this. */
   whatsAppPrefix?: string;
@@ -109,7 +109,7 @@ export function PostReview({
       router.refresh();
     }
   };
-  // « Demander à Simone » about one scene: her panel in the app, WhatsApp from its page.
+  // « Demander à Edith » about one scene: her panel in the app, WhatsApp from its page.
   const askScene = (scene: number, label: string) => {
     setEditing(null);
     if (surface === "whatsapp") {
@@ -155,11 +155,11 @@ export function PostReview({
   const action = data.locked ? null : data.status === "scheduled" ? (
     <div className="flex items-start gap-3 rounded-[18px] bg-success-soft px-4 py-3.5 text-success">
       <CheckIcon size={20} className="mt-0.5 shrink-0" />
-      <p className="text-[14.5px] leading-snug font-semibold">{`C’est parti : il part sur ${where}, Simone te dit quand il est en ligne.`}</p>
+      <p className="text-[14.5px] leading-snug font-semibold">{`C’est parti : il part sur ${where}, Edith te dit quand il est en ligne.`}</p>
     </div>
   ) : data.making ? (
     <button type="button" disabled className="btn h-[54px] w-full bg-line text-[16px] text-muted">
-      Simone finit la nouvelle version…
+      Edith finit la nouvelle version…
     </button>
   ) : (
     <div className="flex flex-col gap-1.5">
@@ -189,13 +189,13 @@ export function PostReview({
           Prévoir
         </button>
       </div>
-      {data.upcoming && data.when && <p className="text-center text-[12.5px] font-semibold text-muted">Simone te fait signe {data.when.short} pour le poster.</p>}
+      {data.upcoming && data.when && <p className="text-center text-[12.5px] font-semibold text-muted">Edith te fait signe {data.when.short} pour le poster.</p>}
     </div>
   );
   const askButton = !data.locked && (
     <button type="button" onClick={ask} className="btn btn-secondary h-[50px] w-full text-[16px] font-extrabold">
       <PenIcon size={18} />
-      Modifier avec Simone
+      Modifier avec Edith
     </button>
   );
   // Its scenes, when it has several and its video is this version's: a tap changes that one.
@@ -271,7 +271,7 @@ export function PostReview({
                     <Mascot size={64} mood="sad" />
                   </span>
                   <span className="text-[16px] font-extrabold">La vidéo n’a pas pu être fabriquée</span>
-                  <span className="text-[13px] leading-snug text-white/85">Demande-le à Simone : il la relance.</span>
+                  <span className="text-[13px] leading-snug text-white/85">Demande-le à Edith : il la relance.</span>
                 </div>
               )}
               {!parts && !data.failed && (data.making || !data.videoUrl) && (
@@ -279,9 +279,9 @@ export function PostReview({
                   <span className="flex size-20 items-center justify-center rounded-full bg-white">
                     <Mascot size={64} mood="thinking" />
                   </span>
-                  <span className="text-[16px] font-extrabold">{data.making?.step ? (STEPS[data.making.step] ?? "Simone y travaille") : "La vidéo se met à jour"}</span>
+                  <span className="text-[16px] font-extrabold">{data.making?.step ? (STEPS[data.making.step] ?? "Edith y travaille") : "La vidéo se met à jour"}</span>
                   <span className="text-[13px] leading-snug text-white/85">
-                    {`Ça prend ${data.making?.step === "effet" ? EFFECT_MINUTES : data.making?.kind === "montage" ? REDO_MINUTES : RERENDER_MINUTES} minutes.`} Tu peux fermer, Simone te prévient.
+                    {`Ça prend ${data.making?.step === "effet" ? EFFECT_MINUTES : data.making?.kind === "montage" ? REDO_MINUTES : RERENDER_MINUTES} minutes.`} Tu peux fermer, Edith te prévient.
                   </span>
                 </div>
               )}
@@ -437,7 +437,7 @@ function Caption({ data, caption, onChange: setCaption, onSaved }: { data: Revie
           onChange={(e) => setCaption(e.target.value)}
           maxLength={2200}
           rows={7}
-          placeholder="Simone l’écrit avec la vidéo."
+          placeholder="Edith l’écrit avec la vidéo."
           className="w-full resize-y rounded-[14px] border-[1.5px] border-line bg-white px-3 py-2.5 text-[14.5px] leading-relaxed outline-none focus:border-violet"
         />
       )}

@@ -42,7 +42,7 @@ export const EFFORTS: Record<Effort, EffortLevel> = {
   },
   soigne: {
     label: "Soigné",
-    pitch: "Simone regarde la vidéo et la corrige si besoin",
+    pitch: "Edith regarde la vidéo et la corrige si besoin",
     versions: 1,
     review: true,
     fixRounds: 1,
@@ -51,7 +51,7 @@ export const EFFORTS: Record<Effort, EffortLevel> = {
   },
   max: {
     label: "Max",
-    pitch: "Deux versions, Simone garde la meilleure et la peaufine",
+    pitch: "Deux versions, Edith garde la meilleure et la peaufine",
     versions: 2,
     review: true,
     fixRounds: 2,
@@ -76,7 +76,7 @@ export function otherEffort(current: Effort, available: Effort[]): Effort | null
 
 /** What a level does, in one line: a correction is one version, so Max only corrects more. */
 export function effortPitch(effort: Effort, correction = false): string {
-  return correction && effort === "max" ? "Simone regarde la vidéo et la corrige jusqu’à deux fois" : EFFORTS[effort].pitch;
+  return correction && effort === "max" ? "Edith regarde la vidéo et la corrige jusqu’à deux fois" : EFFORTS[effort].pitch;
 }
 
 /** One step of the chain runs in one invocation (5 min at most, plus queueing). */

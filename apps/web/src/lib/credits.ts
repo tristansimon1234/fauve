@@ -111,7 +111,7 @@ export async function restoreChainQuote(quoteId: string): Promise<void> {
  * (launched, not yet charged, recent) may cost, so two launches cannot both
  * count on the same credits. A montage replaced by a newer request is never charged:
  * it holds nothing (three replaced corrections held 45 of Tristan's 45 credits, and
- * Simone said he had 0 while the app showed 45).
+ * Edith said he had 0 while the app showed 45).
  */
 export async function availableCredits(studioId: string, exceptQuoteId?: string): Promise<number> {
   const [balance, inFlight] = await Promise.all([
@@ -304,9 +304,9 @@ export async function acceptQuote(
     .select("id");
   if (!claimed.data?.length) return { error: "Ce montage est déjà lancé." };
   // A new request on this Reel replaces the work still running on it: that one stops, never delivered nor charged
-  // (Tristan's Simone Reel: three corrections ran side by side, each about to deliver and charge).
+  // (Tristan's Edith Reel: three corrections ran side by side, each about to deliver and charge).
   if (q.post_id && q.kind !== "variant") await supersedeRunning(q.post_id as string, q.id as string);
-  // Simone's outline goes to the editor with the brief, as her proposal (planBrief): her request comes first.
+  // Edith's outline goes to the editor with the brief, as her proposal (planBrief): her request comes first.
   const plan = montagePlanSchema.safeParse(params.plan);
   const brief = [params.brief, plan.success ? planBrief(plan.data) : null].filter(Boolean).join("\n\n") || null;
   return {

@@ -121,13 +121,13 @@ const bodySchema = z.object({
   compared: z.boolean().optional(),
   /** The critic gave a verdict at least once. */
   reviewed: z.boolean().optional(),
-  /** The voice Simone recorded over this Reel (its name), told at delivery. */
+  /** The voice Edith recorded over this Reel (its name), told at delivery. */
   voice: z.string().max(40).optional(),
   /** She wanted a voice over, but someone speaks in her videos: their words were kept, told at delivery. */
   spokenKept: z.boolean().optional(),
   /** The voice step is done: the design goes on (in its own invocation when a voice was recorded). */
   voiced: z.boolean().optional(),
-  /** Simone chose a key message with the music over a voice for this Reel (her setting is « auto »). */
+  /** Edith chose a key message with the music over a voice for this Reel (her setting is « auto »). */
   format: reelFormatSchema.optional(),
   /** What she fixed for this Reel, read once from her request at its design (the editor and the voice obey it). */
   contract: reelContractSchema.optional(),
@@ -203,7 +203,7 @@ const STEP_BUDGET_MS = (maxDuration - 70) * 1000;
  * A step with its pulse: every minute its job says it is alive, with what it needs to start again.
  * A step Vercel stops (its time is up, the machine is gone) falls silent: the watchdog sends it again
  * once, else she is told (lib/montage-watchdog.ts). Without it, a design that died at 800 s stayed
- * « en cours » and Simone offered to start it again while it still ran.
+ * « en cours » and Edith offered to start it again while it still ran.
  */
 async function run(job: Job) {
   const stop = job.quoteId ? keepAlive(job.quoteId, job) : null;
@@ -342,7 +342,7 @@ async function withContract(job: Job): Promise<void> {
   job.contract = await readContract(job.studioId, job.brief, job.correction ? await currentVoiceText(job) : null);
 }
 
-/** The words of the voice on the Reel now (hers or Simone's), for a correction's contract. */
+/** The words of the voice on the Reel now (hers or Edith's), for a correction's contract. */
 async function currentVoiceText(job: Job): Promise<string | null> {
   const db = supabaseAdmin();
   const post = await db.from("posts").select("voice_media_id").eq("id", job.postId).eq("studio_id", job.studioId).maybeSingle();
@@ -356,7 +356,7 @@ async function currentVoiceText(job: Job): Promise<string | null> {
 const scenesLeft = (job: Job) => Math.max(0, (job.maxNewScenes ?? 2) - (job.newScenes ?? 0));
 
 /**
- * Simone's voice over the Reel, before the editor (who cuts on it) when it should
+ * Edith's voice over the Reel, before the editor (who cuts on it) when it should
  * have one: recorded once, kept for the corrections and the second take. When a
  * voice was recorded, the design goes on in a new invocation with its own time
  * budget (true); otherwise right away (false).
@@ -364,7 +364,7 @@ const scenesLeft = (job: Job) => Math.max(0, (job.maxNewScenes ?? 2) - (job.newS
 async function voiceFirst(job: Job): Promise<boolean> {
   await withContract(job);
   if (job.voiced) return false;
-  // A Reel with an effect too, as any Reel (Tristan: « oui »): her choice, else her business's, else Simone's.
+  // A Reel with an effect too, as any Reel (Tristan: « oui »): her choice, else her business's, else Edith's.
   const made = await voiceOverIfWanted({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, correction: job.correction, brief: job.brief, contract: job.contract });
   if (!made) return false;
   if ("spokenKept" in made) {
@@ -501,7 +501,7 @@ async function effectsDone(job: Job, effect: NonNullable<Job["effect"]>, state: 
       studio_id: job.studioId,
       storage_path: path,
       kind: "video",
-      // Simone's montage, not one of her videos: left out of her library, the pickers and the clip sort.
+      // Edith's montage, not one of her videos: left out of her library, the pickers and the clip sort.
       source: "render",
       mime_type: "video/mp4",
       size_bytes: out.mp4.length,
@@ -731,7 +731,7 @@ function careLine(compared: boolean, outcome: Care | null): string {
   if (outcome?.effect) {
     return [
       outcome.effect.checked ? "J’ai vérifié l’effet image par image, à chaque geste, avant de te l’envoyer." : "",
-      // Its words change without redoing the effect (the agent never names its files to her): she asks, Simone calls effect_words.
+      // Its words change without redoing the effect (the agent never names its files to her): she asks, Edith calls effect_words.
       outcome.effect.words ? "Ses mots, dis-moi lesquels changer : l’effet se redessine avec eux, sans rien te coûter." : "",
     ]
       .filter(Boolean)
@@ -790,7 +790,7 @@ async function deliver(job: Job, best: Version, outcome: Care | null): Promise<b
         rationale: best.rationale,
         care: care || undefined,
         // Kept on the post within 600 characters, cut after a whole sentence (shortSentence in deliver.ts), never mid-word:
-        // a slice here left Simone's note ending on « Si tu veux, je peux encore ».
+        // a slice here left Edith's note ending on « Si tu veux, je peux encore ».
         note: [best.rationale, care].filter(Boolean).join(" ") || undefined,
         // Two versions were already compared: no variant offered on top; an effect has no hook of the engine's to change.
         offerVariant: !job.compared && !outcome?.effect,

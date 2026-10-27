@@ -44,7 +44,7 @@ export const statusLabels: Record<PostStatus, { label: string; tone: "done" | "o
   failed: { label: "Échec", tone: "error" },
 };
 
-/** What a post's format still lacks before it can go out (null: ready). One check for Simone's schedule_post and the « Valider » of its page. */
+/** What a post's format still lacks before it can go out (null: ready). One check for Edith's schedule_post and the « Valider » of its page. */
 export type MissingContent = "montage" | "photo" | "photos" | "media";
 export function missingContent(kind: "reel" | "post" | "carousel" | "story", hasRender: boolean, media: number): MissingContent | null {
   if (kind === "reel" && !hasRender) return "montage";

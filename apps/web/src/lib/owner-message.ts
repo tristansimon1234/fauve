@@ -3,7 +3,7 @@ import { isInSessionWindow } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendReply, sendTemplate } from "@/lib/whatsapp/client";
 
-// A message Simone sends on her own (the week's proposal, the day's filming
+// A message Edith sends on her own (the week's proposal, the day's filming
 // mission, a plan B): on WhatsApp while the 24 h window is open, with its
 // buttons; outside it, the Meta template if one is given, and always in the
 // app's conversation with the same buttons and memo, so nothing is lost.
@@ -12,7 +12,7 @@ export type OwnerMessage = {
   text: string;
   /** Answer buttons (3 at most on WhatsApp, a list beyond). */
   options?: string[];
-  /** Memos kept for Simone's next turns (ids she needs). */
+  /** Memos kept for Edith's next turns (ids she needs). */
   notes?: string[];
   /** What kind of message it is, kept in its payload (e.g. « nudge », counted by lib/nudge.ts). */
   kind?: string;
@@ -64,7 +64,7 @@ export async function messageOwner(studioId: string, message: OwnerMessage): Pro
     }
     if (message.template) {
       // Outside the window only an approved template opens the conversation; her answer
-      // reopens it and Simone sees the waiting message in her context.
+      // reopens it and Edith sees the waiting message in her context.
       const refused = (name: string) => (error: unknown) => {
         console.warn("template refused", name, error instanceof Error ? error.message : error);
         return undefined;

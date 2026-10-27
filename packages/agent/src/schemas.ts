@@ -229,14 +229,14 @@ export const montagePlanSchema = z.object({
 export type MontagePlan = z.infer<typeof montagePlanSchema>;
 
 /**
- * Simone's outline as the editor reads it, inside its brief: her proposal, never a plan the manager
+ * Edith's outline as the editor reads it, inside its brief: her proposal, never a plan the manager
  * validated (she never sees it as such). Presented as validated, it bound the editor to 20 s and two
  * animations a florist's 6 s of footage could not carry: what she asked herself is in the brief.
  */
 export function planBrief(plan: MontagePlan): string {
   const kinds = { clip: "vidéo", animation: "animation", end: "fin" } as const;
   return [
-    `Piste de Simone (une proposition, pas un plan validé par la gérante : sa demande et ses images passent avant) : ~${Math.round(plan.duration)} s${plan.style === "collage" ? ", en collage" : plan.style && plan.style !== "libre" ? `, ${AMBIANCES[plan.style].label.toLowerCase()}` : ""}.`,
+    `Piste d'Edith (une proposition, pas un plan validé par la gérante : sa demande et ses images passent avant) : ~${Math.round(plan.duration)} s${plan.style === "collage" ? ", en collage" : plan.style && plan.style !== "libre" ? `, ${AMBIANCES[plan.style].label.toLowerCase()}` : ""}.`,
     ...plan.scenes.map((s, i) => `${i + 1}. ${kinds[s.kind]} : ${s.what}`),
   ].join("\n");
 }
@@ -482,7 +482,7 @@ export const brandProfileSchema = z.object({
     .optional()
     .describe("Couleurs de la charte, la principale en premier (ex. tirées du site web)"),
   fonts: z.array(z.string().max(60)).max(3).optional().describe("Polices de la charte (Google Fonts) : titres d'abord, puis texte"),
-  /** Her site's fonts that Google does not serve, and the free twin Simone chose for each by looking at it (the render loads the twin). */
+  /** Her site's fonts that Google does not serve, and the free twin Edith chose for each by looking at it (the render loads the twin). */
   font_twins: z.record(z.string().max(60), z.string().regex(/^[A-Za-z0-9 ]{2,40}$/)).optional(),
   logo_url: z.url().optional(),
   /** The studio's own fonts (files uploaded in Style, private bucket): usable by name like any Google font. */
@@ -506,7 +506,7 @@ export const brandProfileSchema = z.object({
   moodboard: moodboardSchema.optional(),
   /** Text looks the manager keeps (copied from examples she sent, or set by hand). */
   text_looks: z.array(savedLookSchema).max(12).optional(),
-  /** Simone's voice over the Reels: when, and which voice (absent: auto, the first voice). */
+  /** Edith's voice over the Reels: when, and which voice (absent: auto, the first voice). */
   voice: voiceSettingSchema.optional(),
   dos: z.array(z.string()),
   donts: z.array(z.string()),

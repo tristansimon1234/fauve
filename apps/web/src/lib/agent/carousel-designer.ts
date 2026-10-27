@@ -52,7 +52,7 @@ function transpile(code: string): string {
 export type CarouselRequest = {
   studioId: string;
   postId: string;
-  /** What she asked, in her words (or Simone's brief). */
+  /** What she asked, in her words (or Edith's brief). */
   request: string;
   /** Her photos for it, in her order (default: the post's photos). */
   mediaIds?: string[];

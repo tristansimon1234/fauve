@@ -5,7 +5,7 @@ import { openSessionForPhone } from "@/lib/auth/server-login";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 
-// Opaque one-time links sent by Simone on WhatsApp (15 min, a day for a
+// Opaque one-time links sent by Edith on WhatsApp (15 min, a day for a
 // publication; single use): opening one signs the manager in on that device.
 //
 // Link previews and scanners fetch the URL seconds after it is sent, before
@@ -28,8 +28,8 @@ export function linkPage(action: string): NextResponse {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Simone</title>
-<meta property="og:title" content="Simone">
+<title>Edith</title>
+<meta property="og:title" content="Edith">
 <meta property="og:description" content="Ouvre le lien pour voir ta publication.">
 <style>
   body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; background: #1c1530; color: #fff;

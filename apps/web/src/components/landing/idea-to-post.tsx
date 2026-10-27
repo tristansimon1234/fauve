@@ -6,7 +6,7 @@ import { Mascot, type MascotMood } from "@/components/mascot";
 import { shownShare } from "./play";
 import { SHOWCASE_SLIDES } from "./showcase";
 
-// « Toi, les idées ; moi, j'exécute », in the app: she types her idea in one line, Simone works,
+// « Toi, les idées ; moi, j'exécute », in the app: she types her idea in one line, Edith works,
 // and her carousel develops on the table step by step (the texts, her colours, the retouch)
 // before it gathers into the post as Instagram shows it, then slides by itself. The real
 // carousel the app made for a demo salon. Plays when it comes on screen (« Revoir » replays it);
@@ -16,7 +16,7 @@ const BASE = "https://tfxkhktofgtljlqlksba.supabase.co/storage/v1/object/public/
 const IDEA = "Un carrousel avec 3 conseils pour les cheveux en hiver";
 const WORK = ["J’écris les textes", "Je les pose à tes couleurs", "Je retouche les photos"];
 
-/** 0 nothing yet, 1 her idea typed, 2 sent, 3 Simone at work, 4 the post. */
+/** 0 nothing yet, 1 her idea typed, 2 sent, 3 Edith at work, 4 the post. */
 type Phase = 0 | 1 | 2 | 3 | 4;
 const MOODS: Record<Phase, MascotMood> = { 0: "idle", 1: "idle", 2: "happy", 3: "thinking", 4: "laugh" };
 
@@ -106,7 +106,7 @@ export function IdeaToPost() {
         <div className="flex items-center gap-3 border-b border-line/80 bg-white/70 px-5 py-3.5 backdrop-blur">
           <Mascot size={46} mood={MOODS[phase]} />
           <span className="flex flex-col">
-            <span className="text-[16px] font-bold">Simone</span>
+            <span className="text-[16px] font-bold">Edith</span>
             <span className="text-[12.5px] text-muted">{phase === 3 ? "au travail…" : "ton community manager"}</span>
           </span>
         </div>
@@ -158,7 +158,7 @@ export function IdeaToPost() {
                 <span className="land-caret ml-px h-[17px] w-[1.5px] shrink-0 bg-violet" />
               </>
             ) : (
-              <span className="text-muted/70">Écris à Simone…</span>
+              <span className="text-muted/70">Écris à Edith…</span>
             )}
           </span>
           <span className={`flex size-11 shrink-0 items-center justify-center rounded-full transition-colors duration-300 ${draft ? "bg-violet text-white" : "bg-violet-soft text-violet/50"}`}>
@@ -225,7 +225,7 @@ export function IdeaToPost() {
           </span>
         </figure>
         <span className="flex items-center gap-3 text-[13px] font-semibold text-muted">
-          Carrousel fait par Simone · Salon de coiffure · Paris
+          Carrousel fait par Edith · Salon de coiffure · Paris
           {phase === 4 && moving && (
             <button type="button" onClick={play} className="font-bold text-violet hover:underline">
               Revoir

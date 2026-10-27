@@ -35,7 +35,7 @@ export type NewPostOptions = {
   voice: { use: "auto" | "always" | "never"; voiceId: string | null };
   /** TikTok connected: a Reel goes there too, unless she says otherwise. */
   tiktok: boolean;
-  /** The Reel she sent Simone to copy (« Steal »): her next Reel follows it, unless she says otherwise. */
+  /** The Reel she sent Edith to copy (« Steal »): her next Reel follows it, unless she says otherwise. */
   copy: { id: string; name: string | null; lines: string[] } | null;
   /** Her Reels kept as models (« Garder comme modèle »): a new Reel made like one of them. */
   models: ReelModel[];
@@ -108,7 +108,7 @@ const copyFromSchema = z.union([
 /**
  * « Comme un Reel que tu aimes » on the Créer screen: the Reel she gives there (its link, or its
  * video) becomes the model of this Reel (« Steal »), read at once in its own job, as when she
- * sends it to Simone in the chat. Her Reel can start before the reading ends: it waits for it.
+ * sends it to Edith in the chat. Her Reel can start before the reading ends: it waits for it.
  */
 export async function copyReel(input: z.input<typeof copyFromSchema>): Promise<CopyStart> {
   const from = copyFromSchema.safeParse(input);
@@ -190,7 +190,7 @@ const proposalInput = z.object({
     .array(z.union([z.object({ media: z.uuid() }), z.object({ upload: z.object({ path: z.string().max(300), mime: z.string().max(100), video: z.boolean() }) })]))
     .min(1)
     .max(20),
-  /** For a Reel: « off » just the music, a voice id, « auto » Simone chooses. */
+  /** For a Reel: « off » just the music, a voice id, « auto » Edith chooses. */
   voice: z.string().max(60).optional(),
   /** She follows a Reel she likes: its form, not her own; what her Reel takes from it, once read. */
   copying: z.boolean().optional(),
@@ -202,7 +202,7 @@ const READABLE = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"])
 const MAX_LOOKS = 6;
 
 /**
- * The last step of « Créer »: what Simone will make, said back as one plan in points with why, from
+ * The last step of « Créer »: what Edith will make, said back as one plan in points with why, from
  * her words and what is in her files (what Gemini read of her library, or the photos themselves when
  * they were just sent). Null when it could not be written: she launches from her own words.
  */
@@ -279,7 +279,7 @@ export async function proposePlan(input: z.input<typeof proposalInput>): Promise
       return url ? [{ type: "text" as const, text: `Image ${l.n}` }, { type: "image" as const, source: { type: "url" as const, url } }] : [];
     });
     const format = { reel: "un Reel", carousel: "un carrousel", post: "un post photo", story: "une story" }[kind];
-    const spoken = kind !== "reel" || !voice ? undefined : voice === "off" ? "juste la musique, sans voix" : voice === "auto" ? "elle laisse Simone choisir" : "avec une voix off qui raconte";
+    const spoken = kind !== "reel" || !voice ? undefined : voice === "off" ? "juste la musique, sans voix" : voice === "auto" ? "elle laisse Edith choisir" : "avec une voix off qui raconte";
     const response = await anthropic().beta.messages.parse({
       model: ANALYST_MODEL,
       max_tokens: 1500,

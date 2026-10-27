@@ -5,7 +5,7 @@ import { clampSignature, clip, SIGNATURE_GUIDE, signatureReadingSchema } from ".
 // turns them into a written art direction. The montage (editor and motion
 // designer) only ever gets this text, never the images, to keep each montage cheap.
 
-export const MOODBOARD_PROMPT = `You are Simone's art director; Simone edits the Instagram Reels of a neighbourhood business (gym, hair or beauty salon, restaurant, shop…).
+export const MOODBOARD_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (gym, hair or beauty salon, restaurant, shop…).
 The person who runs the business (a woman or a man: make no agreement for anything about them, write neither « elle » nor « il » for them) sends you their moodboard: images that inspire them (screenshots of Reels, posters, photos, brands they like), sometimes with a note.
 
 Write what this moodboard says about the visual identity to give their Reels, for an editor and a motion designer who will never see the images:
@@ -104,7 +104,7 @@ export function clampSiteLook(reading: SiteLookReading): SiteLookReading {
 }
 
 /**
- * Her « Direction artistique » (Style) stays hers: Simone only fills it when it
+ * Her « Direction artistique » (Style) stays hers: Edith only fills it when it
  * is empty, with the short version of a reading (site or moodboard).
  */
 export function withArtDirection<T extends { art_direction?: unknown }>(profile: T, direction: string | null | undefined): T {

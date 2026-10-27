@@ -187,7 +187,7 @@ export type ReelProps = {
   };
   /** logoNamed false: the logo does not write the name (a mascot, a symbol), the card writes it under it. */
   endCard: { title: string; subtitle: string | null; from: number; logoNamed?: false } | null;
-  /** Simone's music in the live preview (the render gets it mixed in afterwards). */
+  /** Edith's music in the live preview (the render gets it mixed in afterwards). */
   soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
   /** Her voice note over the Reel, from `from` (frames). */
   voice?: { src: string; from: number } | null;

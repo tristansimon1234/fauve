@@ -17,7 +17,7 @@ const FAMILIES: [Family, RegExp][] = [
  * One idea in a tap: a short label on the button, and the request it fills in, written
  * as a manager would write it (how it starts, how it ends, what people should do; with a
  * voice or one message on screen), to show what a good request looks like. Never a fact
- * about the business: hers come from her files and what Simone knows.
+ * about the business: hers come from her files and what Edith knows.
  */
 export type PostIdea = { label: string; prompt: string };
 const idea = (label: string, prompt: string): PostIdea => ({ label, prompt });
@@ -212,10 +212,10 @@ export function filmIdeas(businessType: string | null | undefined): { idea: stri
 
 // The last step of « Créer » (Tristan : « la dernière étape doit être dynamique, une proposition »,
 // then « pas trois idées, la demande bien reformulée, claire et précise, lisible, en points, avec une
-// explication ») : Simone reads her files and what she asked, and says back what she will make, as one
+// explication ») : Edith reads her files and what she asked, and says back what she will make, as one
 // plan in points, with why. She takes it, or goes back to change her words.
 
-export const PROPOSAL_PROMPT = `You are Simone, the AI community manager of a neighbourhood business, with the eye of a good content creator. The manager has chosen her photos and videos for a post and may have told you what she imagines. Before you start, you tell her clearly what you are going to do: ONE plan, precise and easy to read, that she validates at a glance.
+export const PROPOSAL_PROMPT = `You are Edith, the AI community manager of a neighbourhood business, with the eye of a good content creator. The manager has chosen her photos and videos for a post and may have told you what she imagines. Before you start, you tell her clearly what you are going to do: ONE plan, precise and easy to read, that she validates at a glance.
 
 When she said what she imagines (« publication.ce_qu_elle_imagine »), you rephrase HER request: everything she asked for is in it, with her intentions, nothing is replaced by another idea; you make it concrete with her real files and you only fill in what she did not say (the opening, the order, the ending, what people should do). When she said nothing, you propose the best plan for her files. When she copies a Reel she likes (« reel_a_recopier »), the plan follows its form.
 
@@ -253,7 +253,7 @@ export function keptPlan(p: Proposal | null | undefined): PostPlan | null {
 export const PLAN_BUTTONS = ["C'est parti", "Changer le plan"] as const;
 
 /**
- * Her plan in the chat, written by the code from what Simone gave reply_with: a title, its
+ * Her plan in the chat, written by the code from what Edith gave reply_with: a title, its
  * points, why. Written in her prose, it was sometimes announced and never written
  * (« Voilà le plan : dis-moi si je lance », and nothing above).
  */
@@ -261,7 +261,7 @@ export function planMessage(plan: PostPlan): string {
   return [plan.title, plan.points.map((point) => `• ${point}`).join("\n"), plan.why].filter(Boolean).join("\n\n");
 }
 
-/** The validated plan, as the montage (or Simone in the chat) reads it. */
+/** The validated plan, as the montage (or Edith in the chat) reads it. */
 export function validatedPlanBrief(plan: PostPlan): string {
   return [`Le plan que la gérante a validé (« ${plan.title} ») :`, ...plan.points.map((point) => `- ${point}`), plan.why ? `Pourquoi : ${plan.why}` : ""].filter(Boolean).join("\n");
 }

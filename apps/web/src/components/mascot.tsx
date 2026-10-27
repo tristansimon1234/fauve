@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 /**
- * Simone's mascot: just a head, drawn like an icon. A full silhouette of
+ * Edith's mascot: just a head, drawn like an icon. A full silhouette of
  * curly hair in the brand's gradient (its curls read in the scalloped edge),
  * a flat potato of a face, eyes looking over half-moon reading glasses low on
  * the nose, one eyebrow up, a smirk; the eyes blink and
@@ -25,7 +25,7 @@ const FRINGE = ring(50, 45.5, 15, 5.5, 195, 345, 6, 5.4);
 /** A potato of a face: lumpy, wider and lower on one side. */
 const FACE = "M33.5 51 C35 43.5 42.5 41.5 50.5 42.5 C59 43.5 66.5 46 67.5 54.5 C69 61.5 71 69.5 66.5 76 C61.5 82.5 52.5 84.5 45 83.5 C37 82.5 30.5 77.5 30.8 69.5 C31 63 32 57 33.5 51 Z";
 
-/** What Simone feels: at rest, writing (thinking), laughing, pleased, surprised, sad, in tears, cross, shy (a compliment). */
+/** What Edith feels: at rest, writing (thinking), laughing, pleased, surprised, sad, in tears, cross, shy (a compliment). */
 export type MascotMood = "idle" | "thinking" | "laugh" | "happy" | "surprised" | "sad" | "cry" | "angry" | "shy";
 
 const INK = "#1C1530";

@@ -5,10 +5,10 @@ import { ChartIcon, ChatIcon, CheckIcon, GridIcon, PaletteIcon, PlusIcon } from 
 import { Mascot, type MascotMood } from "@/components/mascot";
 import { PHOTOS, unsplash } from "./photos";
 
-// The landing's hero, what Simone is in one look (Tristan: « on doit mettre en avant assistant IA
+// The landing's hero, what Edith is in one look (Tristan: « on doit mettre en avant assistant IA
 // sur WhatsApp et via une app web »): WhatsApp on her phone, and the app beside it, in sync. She
-// sends her videos and asks for a Reel; Simone answers, the app shows it being made, then ready;
-// she says yes, it goes online and her profile visits come in. Then Simone suggests a post on
+// sends her videos and asks for a Reel; Edith answers, the app shows it being made, then ready;
+// she says yes, it goes online and her profile visits come in. Then Edith suggests a post on
 // his own, and it goes on, the conversation scrolling like a real one: the screen is never empty
 // and never resets. The Reel is the real one the app made for a demo studio (public/landing).
 // Still on its last picture when the device asks for less motion.
@@ -84,7 +84,7 @@ function typed(text: string, from: number, id: string, at: string): { steps: Ste
   return { steps, end };
 }
 
-/** She sends her videos and asks for a Reel; Simone makes it, she says yes, it is online. */
+/** She sends her videos and asks for a Reel; Edith makes it, she says yes, it is online. */
 function reelStory(n: number): { steps: Step[]; length: number } {
   const k = `a${n}`;
   const ask = typed("Tu m’en fais un Reel pour vendredi ?", 1900, `${k}q`, "9:42");
@@ -123,7 +123,7 @@ function reelStory(n: number): { steps: Step[]; length: number } {
   };
 }
 
-/** Simone suggests a post on his own; she says yes twice, it is online. */
+/** Edith suggests a post on his own; she says yes twice, it is online. */
 function postStory(n: number): { steps: Step[]; length: number } {
   const k = `b${n}`;
   return {
@@ -223,7 +223,7 @@ export function HeroScene() {
   }, []);
 
   return (
-    <div ref={root} role="img" aria-label="Exemple : Simone sur WhatsApp, et la grille Instagram dans l’app Simone" className="relative mx-auto h-[566px] w-[300px] sm:h-[600px] sm:w-[500px] lg:[zoom:0.86] xl:[zoom:1]">
+    <div ref={root} role="img" aria-label="Exemple : Edith sur WhatsApp, et la grille Instagram dans l’app Edith" className="relative mx-auto h-[566px] w-[300px] sm:h-[600px] sm:w-[500px] lg:[zoom:0.86] xl:[zoom:1]">
       <div aria-hidden="true">
         <AppWindow tiles={scene.tiles} />
         <Phone scene={scene} still={still} />
@@ -240,7 +240,7 @@ function Phone({ scene, still }: { scene: Scene; still: boolean }) {
     <div className="land-float absolute top-0 left-0 z-10 h-[548px] w-[262px] rounded-[46px] bg-[#16131f] p-[8px] shadow-[0_50px_90px_-30px_rgba(28,21,48,.55),0_18px_36px_-18px_rgba(28,21,48,.35),inset_0_0_0_1.5px_rgba(255,255,255,.08)] sm:top-[52px]">
       <div className="land-app-font relative flex h-full flex-col overflow-hidden rounded-[38px] bg-[#f6f6f6] text-[#111b21]">
         <StatusBar />
-        {/* Simone's conversation header, as in WhatsApp. */}
+        {/* Edith's conversation header, as in WhatsApp. */}
         <div className="flex items-center gap-2 border-b border-black/5 bg-[#f6f6f6]/95 px-2.5 pt-0.5 pb-2">
           <svg width="10" height="16" viewBox="0 0 10 16" fill="none" stroke="#1d7aef" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M8 2 2 8l6 6" />
@@ -249,7 +249,7 @@ function Phone({ scene, still }: { scene: Scene; still: boolean }) {
             <Mascot size={30} mood={scene.mood} still={still} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="text-[14px] font-semibold">Simone</span>
+            <span className="text-[14px] font-semibold">Edith</span>
             <span className="text-[11px] text-[#667781]">{scene.writing ? "écrit…" : "en ligne"}</span>
           </span>
           <svg width="20" height="14" viewBox="0 0 24 16" fill="none" stroke="#1d7aef" strokeWidth="1.8" strokeLinejoin="round" className="mr-1">
@@ -464,7 +464,7 @@ function AppWindow({ tiles }: { tiles: Tile[] }) {
         ))}
         <span className="mx-auto flex items-center gap-1.5 rounded-full bg-white px-3 py-[3px] text-[10.5px] font-semibold text-muted shadow-[0_0_0_1px_var(--color-line)]">
           <Mascot size={14} still />
-          Simone · Grille
+          Edith · Grille
         </span>
         <span className="w-[39px]" />
       </div>

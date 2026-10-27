@@ -51,7 +51,7 @@ import { postStyle, STEAL_WAIT_MS } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 
-// Simone's voice over a Reel: the script she writes from what the images show,
+// Edith's voice over a Reel: the script she writes from what the images show,
 // read by an ElevenLabs voice with the timing of every word, kept as an audio
 // media of the studio (source ai, with its transcript) and put on the post
 // (voice_media_id). The next montage is cut on it exactly like on the manager's
@@ -120,7 +120,7 @@ async function scriptInput(studioId: string, postId: string, mediaIds?: string[]
     },
     // How its voice plays (its signature): « cool et nonchalant, un brin rock ».
     ...(profile.signature?.narrator ? { intonation: profile.signature.narrator.delivery } : {}),
-    // Her whole request (the title keeps only its first words): what she imagines, or Simone's brief from the chat.
+    // Her whole request (the title keeps only its first words): what she imagines, or Edith's brief from the chat.
     publication: { idee: post.data.title, angle: post.data.agent_note ?? undefined, ...(brief ? { demande: brief.slice(0, BRIEF_MAX) } : {}) },
     images,
     ...(opening?.what ? { ouverture: opening.what } : {}),
@@ -133,7 +133,7 @@ type ScriptOptions = {
   /** What she wants the voice to say (« parle de la promo »). */
   wish?: string;
   mediaIds?: string[];
-  /** Her request for the Reel: what she imagines (Créer), or Simone's brief from the chat. */
+  /** Her request for the Reel: what she imagines (Créer), or Edith's brief from the chat. */
   brief?: string;
   whispered?: boolean;
   /** Choose the form first (her setting is « auto »). */
@@ -143,7 +143,7 @@ type ScriptOptions = {
 };
 
 /**
- * Simone writes what the voice says (a creator talking over the images, not an ad).
+ * Edith writes what the voice says (a creator talking over the images, not an ad).
  * `decide`: she first chooses the form (her setting is « auto »): a key message with the
  * music comes back with its format and nothing to read.
  */
@@ -218,7 +218,7 @@ async function ownTextScript(
   input: Pick<Awaited<ReturnType<typeof scriptInput>>, "longueur" | "commerce" | "publication">,
 ): Promise<VoiceOverScript> {
   let script = verbatimScript(contract.voice_text ?? "");
-  // She wrote only its start and described the rest: Simone writes the rest, the whole voice as long as her Reel.
+  // She wrote only its start and described the rest: Edith writes the rest, the whole voice as long as her Reel.
   const rest = contract.voice_text_rest?.trim();
   try {
     const response = await anthropic().beta.messages.parse({
@@ -348,7 +348,7 @@ export async function levelSpeech(
 }
 
 /**
- * Before a montage: Simone's voice over the Reel when it should have one
+ * Before a montage: Edith's voice over the Reel when it should have one
  * (wantsVoiceOver: the Reel's own choice, else the studio's; « auto » when nobody
  * speaks in the shots and there is enough to show). Made before the editor, which
  * then cuts on it like on her own voice note. A failure leaves the Reel without a
@@ -385,7 +385,7 @@ export async function voiceOverIfWanted(params: {
   // Someone speaking in a shot carries the Reel with their own words.
   const speechInClips = read.some((a) => (a.words?.length ?? 0) >= 6);
   const footageSeconds = videos.reduce((sum, v) => sum + (Number(v.duration) || 0), 0) || read.reduce((sum, a) => sum + a.duration, 0);
-  // The voice on the Reel now: hers (a voice note she sent) or one Simone made.
+  // The voice on the Reel now: hers (a voice note she sent) or one Edith made.
   const current = post.data.voice_media_id
     ? (await db.from("media_assets").select("source, ai").eq("id", post.data.voice_media_id as string).maybeSingle()).data
     : null;
@@ -395,7 +395,7 @@ export async function voiceOverIfWanted(params: {
     onReel: post.data.voice_media_id ? (current?.source === "ai" ? ("simone" as const) : ("hers" as const)) : null,
     correction: Boolean(params.correction),
   };
-  // Left to Simone, the Reel she copies decides (told by a voice, or not): its reading is waited for, as the editor does.
+  // Left to Edith, the Reel she copies decides (told by a voice, or not): its reading is waited for, as the editor does.
   const copied = voiceLeftToSimone(choices) ? await postStyle(params.studioId, params.postId, { waitMs: STEAL_WAIT_MS }).catch(() => undefined) : undefined;
   // Her own text for the voice asks for it (a correction too), unless it is already the one on the Reel, at her pace.
   const ownText = params.contract?.voice_text ? ownTextKey(params.contract) : null;
@@ -417,7 +417,7 @@ export async function voiceOverIfWanted(params: {
   // A voice of the gallery, or one of her own (a clone made with her consent) kept as it is.
   const voiceId = voiceFor(choice?.voice_id ?? setting.voice_id ?? DEFAULT_VOICE_ID, params.contract?.voice_gender);
   try {
-    // Her setting leaves it to Simone: told by a voice, or one key message with the music (then nothing is read nor paid);
+    // Her setting leaves it to Edith: told by a voice, or one key message with the music (then nothing is read nor paid);
     // a Reel she copies told by a voice has its form already.
     const auto = choice?.mode !== "on" && !choice?.wish && setting.use === "auto" && !copied && !ownText;
     const written = auto
@@ -435,7 +435,7 @@ export async function voiceOverIfWanted(params: {
 }
 
 /**
- * A Reel without a voice (hers or Simone's): the choice is kept on the post and,
+ * A Reel without a voice (hers or Edith's): the choice is kept on the post and,
  * when it is already montaged, its plan gets a new version without the voice (the
  * cut stays; the music is made again for a Reel without voice). True when the
  * video must be made again; "agent" when the voice is in a video the effects agent
@@ -466,7 +466,7 @@ export async function removeVoice(studioId: string, postId: string): Promise<boo
 }
 
 /**
- * Simone's voice on a Reel: the script, the voice, kept as an audio media with its
+ * Edith's voice on a Reel: the script, the voice, kept as an audio media with its
  * words, set on the post. The next montage of the post is cut on it.
  */
 export async function makeVoiceOver(params: {
@@ -477,7 +477,7 @@ export async function makeVoiceOver(params: {
   mediaIds?: string[];
   /** Her request for the Reel. */
   brief?: string;
-  /** Already written (when Simone chose the form first). */
+  /** Already written (when Edith chose the form first). */
   script?: VoiceOverScript;
   /** What she fixed for this Reel (her text, her person, her pace). */
   contract?: ReelContract;

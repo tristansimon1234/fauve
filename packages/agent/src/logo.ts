@@ -33,7 +33,7 @@ export const LOGO_WORDS_PROMPT = `Copy the letters written in this logo, in read
 
 /**
  * Whether the words a logo writes already say the business's name: the end card then does not write
- * it again under the logo. A drawing or a mascot says nothing: taken for a name, Simone's mascot left
+ * it again under the logo. A drawing or a mascot says nothing: taken for a name, Edith's mascot left
  * her end card without one.
  */
 export function logoSaysName(words: string, name: string): boolean {

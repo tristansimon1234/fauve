@@ -47,7 +47,7 @@ export const MONTHLY_COST_BUDGET_EUR = monthlyCostBudget("pro");
  */
 export const CHAT_EUR_PER_POST = 0.35;
 /**
- * WhatsApp, per publication, in euros: about 8 messages from Simone (her answers, a link button sent
+ * WhatsApp, per publication, in euros: about 8 messages from Edith (his answers, a link button sent
  * apart from reply buttons, a reminder outside the 24 hours) at about $0.03 each in France. Since
  * October 2026 Meta bills the answers in the 24 hours beyond 1 000 a month for the whole number,
  * and utility templates, at the utility rate: at a hundred studios almost all of them are billed.

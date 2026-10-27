@@ -8,9 +8,9 @@ import { CarouselStudio } from "./carousel-studio";
 import { IMAGE_IDEAS, PhotoAsk } from "./photo-ask";
 import { SlidePreview } from "./slide-preview";
 
-// A carousel Simone composed, on the publication page: the slide as it will be published, edited
+// A carousel Edith composed, on the publication page: the slide as it will be published, edited
 // like Instagram (a tap on a text of the image to change it, the slide redrawn as she types), the
-// strip of every slide under it, and on the right what she asks Simone for this image (its layout,
+// strip of every slide under it, and on the right what she asks Edith for this image (its layout,
 // a photo, a bigger title) and her changes to save.
 
 export function DesignedCarousel({

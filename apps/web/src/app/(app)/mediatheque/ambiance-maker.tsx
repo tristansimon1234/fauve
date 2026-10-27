@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { createAmbianceImages } from "../ai-image-actions";
 
 // « Image d'ambiance »: when she has no photo for a post with a text (planning,
-// offer, tip), Simone makes generic images in her colours: a background, a
+// offer, tip), Edith makes generic images in her colours: a background, a
 // material, a detail, an object. Never her place, her products or people.
 
 const IDEAS = ["Un fond de matière douce et claire", "Une nature morte avec des plantes", "Un détail de bois et de lin à la lumière du matin"];
@@ -28,7 +28,7 @@ export function AmbianceMaker() {
   const make = () =>
     start(async () => {
       setMessage(null);
-      const res = await createAmbianceImages(text, format, count).catch(() => ({ ok: false as const, error: "Simone n’a pas réussi cette fois. Réessaie dans un instant." }));
+      const res = await createAmbianceImages(text, format, count).catch(() => ({ ok: false as const, error: "Edith n’a pas réussi cette fois. Réessaie dans un instant." }));
       if (!res.ok) return setMessage({ ok: false, text: res.error });
       setMessage({ ok: true, text: res.count > 1 ? `${res.count} images ajoutées à ta médiathèque.` : "Image ajoutée à ta médiathèque." });
       setText("");
@@ -97,7 +97,7 @@ export function AmbianceMaker() {
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" disabled={busy || text.trim().length < 3} onClick={make} className="btn btn-primary h-10 px-4 text-[14px] disabled:opacity-40">
-          {busy ? "Simone crée tes images… (30 s environ)" : `Créer · ${price} crédit${price > 1 ? "s" : ""}`}
+          {busy ? "Edith crée tes images… (30 s environ)" : `Créer · ${price} crédit${price > 1 ? "s" : ""}`}
         </button>
         <button type="button" disabled={busy} onClick={() => setOpen(false)} className="text-[13px] font-semibold text-muted hover:text-ink">
           Fermer

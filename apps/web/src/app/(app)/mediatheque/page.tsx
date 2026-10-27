@@ -47,9 +47,9 @@ async function Library() {
       .from("media_assets")
       .select("id, storage_path, kind, source, duration, created_at")
       .eq("studio_id", studioId)
-      // Simone's own montages (an effect's video) are not her photos and videos.
+      // Edith's own montages (an effect's video) are not her photos and videos.
       .neq("source", "render")
-      // Nor are voices: her voice notes to Simone and Simone's voice-overs live on their Reel, not here
+      // Nor are voices: her voice notes to Edith and Edith's voice-overs live on their Reel, not here
       // (Tristan: « plein de vocaux qui servent à rien »).
       .in("kind", ["video", "image"])
       .order("created_at", { ascending: false })
@@ -79,8 +79,8 @@ async function Library() {
 
       {assets.length === 0 ? (
         <>
-          <EmptyState title="Pas encore de photo ni de vidéo" className="max-w-[760px]" cta="Envoyer mes vidéos à Simone">
-          Glisse tes photos et vidéos dans la conversation avec Simone (en pleine qualité), ou envoie-les sur WhatsApp en
+          <EmptyState title="Pas encore de photo ni de vidéo" className="max-w-[760px]" cta="Envoyer mes vidéos à Edith">
+          Glisse tes photos et vidéos dans la conversation avec Edith (en pleine qualité), ou envoie-les sur WhatsApp en
           tant que document. Elles apparaîtront ici. Pense à avoir l’accord des personnes filmées.
           </EmptyState>
           <AmbianceMaker />
@@ -89,11 +89,11 @@ async function Library() {
         <>
           <div className="flex max-w-[860px] flex-wrap items-center gap-4 rounded-[20px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-5 py-4">
             <p className="min-w-0 flex-[1_1_320px] text-sm leading-relaxed">
-              <strong>Ajoute des photos et des vidéos</strong> en les glissant dans la conversation avec Simone : elles
+              <strong>Ajoute des photos et des vidéos</strong> en les glissant dans la conversation avec Edith : elles
               arrivent en pleine qualité. Sur WhatsApp, envoie-les en tant que document.
             </p>
             <Link href="/fauve" className="btn btn-primary h-11 text-sm">
-              Ouvrir Simone
+              Ouvrir Edith
             </Link>
             <AmbianceMaker />
           </div>

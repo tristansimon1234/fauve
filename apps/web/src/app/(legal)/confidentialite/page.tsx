@@ -8,7 +8,7 @@ export default function PrivacyPage() {
     <>
       <h1>Politique de confidentialité</h1>
       <p>
-        Simone est un assistant IA qui gère les réseaux sociaux des commerces de quartier (studios, salons, restaurants, boutiques), principalement
+        Edith est un assistant IA qui gère les réseaux sociaux des commerces de quartier (studios, salons, restaurants, boutiques), principalement
         depuis WhatsApp. Cette page explique quelles données nous traitons, pourquoi, et quels sont tes droits.
       </p>
 
@@ -20,14 +20,14 @@ export default function PrivacyPage() {
       <h2>Données traitées</h2>
       <ul>
         <li>Identité et contact : numéro de téléphone WhatsApp, prénom, nom du studio.</li>
-        <li>Conversations avec Simone (WhatsApp et web app) et les fichiers envoyés : vidéos, photos, messages vocaux.</li>
+        <li>Conversations avec Edith (WhatsApp et web app) et les fichiers envoyés : vidéos, photos, messages vocaux.</li>
         <li>Contenus préparés : légendes, plans de montage, vidéos montées, calendrier de publication.</li>
         <li>Comptes Instagram et TikTok connectés et leurs statistiques (vues, portée, interactions, réservations attribuées).</li>
         <li>Données techniques : journaux de connexion, sessions, coûts de traitement.</li>
       </ul>
       <p>
         Les vidéos peuvent montrer des clients ou l’équipe du commerce. Le commerce s’engage à recueillir leur accord avant de nous les
-        transmettre ; Simone propose des cadrages sans visage et peut flouter les visages.
+        transmettre ; Edith propose des cadrages sans visage et peut flouter les visages.
       </p>
 
       <h2>Finalités et bases légales</h2>
@@ -47,7 +47,7 @@ export default function PrivacyPage() {
         <li>Anthropic (modèle d’IA Claude) : rédaction, planification et plans de montage.</li>
         <li>Google (modèle d’IA Gemini) : lecture des vidéos et des photos, images par IA.</li>
         <li>ElevenLabs : voix off, lecture des messages vocaux et musique des Reels.</li>
-        <li>TypeSafe : choix de la réaction de Simone aux messages écrits dans l’application.</li>
+        <li>TypeSafe : choix de la réaction d’Edith aux messages écrits dans l’application.</li>
         <li>Meta Platforms (Instagram) et TikTok : publication sur tes comptes, à ta demande.</li>
         <li>Stripe : paiement de l’abonnement.</li>
       </ul>
@@ -67,7 +67,7 @@ export default function PrivacyPage() {
       <h2>Tes droits</h2>
       <p>
         Tu peux demander l’accès, la rectification, l’effacement, la portabilité ou la limitation de tes données, et
-        t’opposer à certains traitements, en écrivant à {company.email} ou directement à Simone sur WhatsApp. Voir aussi{" "}
+        t’opposer à certains traitements, en écrivant à {company.email} ou directement à Edith sur WhatsApp. Voir aussi{" "}
         <a href="/suppression-des-donnees">la suppression des données</a>. Tu peux introduire une réclamation auprès de la
         CNIL (cnil.fr).
       </p>

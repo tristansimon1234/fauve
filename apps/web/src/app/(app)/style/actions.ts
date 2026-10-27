@@ -129,7 +129,7 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
       if (!free) await chargeCredits(studioId, CREDIT_PRICES.moodboard, "moodboard", "Lecture du moodboard", { images: items.length });
     } catch (error) {
       console.warn("moodboard reading failed", error);
-      warning = "Moodboard enregistré, mais Simone n’a pas pu le lire. Réessaie dans un instant.";
+      warning = "Moodboard enregistré, mais Edith n’a pas pu le lire. Réessaie dans un instant.";
     }
   }
 

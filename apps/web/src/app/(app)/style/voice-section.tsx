@@ -7,7 +7,7 @@ import { publicEnv } from "@/lib/public-env";
 import type { StyleForm } from "./style-options";
 import { FoldedSection, Segmented } from "./ui";
 
-// Simone's voice over the Reels: when she puts one, and which of her voices (each
+// Edith's voice over the Reels: when she puts one, and which of her voices (each
 // one heard reading the same lines, from the public bucket). Her own voice note,
 // when she sends one, always comes first.
 
@@ -20,7 +20,7 @@ const USE_OPTIONS = [
 ] as const;
 
 const USE_HINTS: Record<StyleForm["voice_use"], string> = {
-  auto: "Simone en pose une quand tes images racontent quelque chose (un geste, un avant/après, une histoire) et que personne ne parle déjà dans tes vidéos.",
+  auto: "Edith en pose une quand tes images racontent quelque chose (un geste, un avant/après, une histoire) et que personne ne parle déjà dans tes vidéos.",
   always: "Chaque nouveau Reel a sa voix off, sauf quand tu m’envoies ton propre vocal : c’est lui qui passe.",
   never: "Tes Reels n’ont que leur musique. Tu peux toujours en demander une pour un Reel précis.",
 };

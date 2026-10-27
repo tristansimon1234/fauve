@@ -4,14 +4,14 @@ import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "./run";
 
 /**
- * What she fixed for this Reel, read once from her request (her words, Simone's brief or
+ * What she fixed for this Reel, read once from her request (her words, Edith's brief or
  * « Ce que tu imagines »). Never blocks the montage: unreadable, nothing is fixed and the
  * usual defaults decide.
  */
 export async function readContract(studioId: string, brief: string | undefined, currentVoice?: string | null): Promise<ReelContract> {
   if (!brief?.trim()) return EMPTY_CONTRACT;
   // A correction's voice: the whole text on the Reel now, so that a quoted fragment edits it instead of
-  // replacing it (Simone quoted the first sentence to fix « plus », and his 24 s voice became 8 s, the Reel 13 s).
+  // replacing it (Edith quoted the first sentence to fix « plus », and his 24 s voice became 8 s, the Reel 13 s).
   const content = currentVoice?.trim() ? `${brief.slice(0, BRIEF_MAX)}\n\nTexte actuel de la voix : « ${currentVoice.trim().slice(0, 1500)} »` : brief.slice(0, BRIEF_MAX);
   try {
     const response = await anthropic().beta.messages.parse({

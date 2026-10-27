@@ -23,7 +23,7 @@ import { readStolenLook } from "@/lib/video/inspiration";
 import { costMeta } from "@/lib/cost-scope";
 
 // « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA », « c'est one shot ») :
-// a Reel she likes, from its link, a video she sent or a share to Simone on Instagram, is the
+// a Reel she likes, from its link, a video she sent or a share to Edith on Instagram, is the
 // model of one Reel of hers. It becomes an inspiration at once, is taken and measured in the
 // render sandbox (its cuts, tempo, loudness), then read once by Gemini (its form, hook, texts,
 // look, movement, music). The style is kept on the inspiration (inspirations.style), the video
@@ -40,14 +40,14 @@ export type StealOutcome = { ok: true; inspirationId: string; style: StolenStyle
 export const STEAL_WAIT_MS = 4 * 60_000;
 /** A Reel she sent to copy waits for her next Reel this long. */
 const PENDING_MS = 48 * 3600_000;
-/** Inspirations sent to be copied: a link or a video in the conversation, a share to Simone on Instagram. */
+/** Inspirations sent to be copied: a link or a video in the conversation, a share to Edith on Instagram. */
 export const SENT_TO_COPY = ["link", "chat", "instagram_dm"];
 /** One of her own Reels kept as a model (lib/reel-models.ts): read like a Reel to copy, never one shot. */
 export const MODEL_SOURCE = "model";
 /** A Reel still being read: it usually takes a minute or two. */
 export const READING_MS = 15 * 60_000;
 
-/** Simone's own Instagram account (shares to it become inspirations), when connected. */
+/** Edith's own Instagram account (shares to it become inspirations), when connected. */
 export async function simoneHandle(): Promise<string | null> {
   const { data } = await supabaseAdmin().from("platform_accounts").select("username").eq("key", "fauve_instagram").maybeSingle();
   return (data?.username as string | null) ?? null;
@@ -155,7 +155,7 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     if (!signed.data) return { ok: false, miss: "not_found" };
     take = { file: signed.data.signedUrl };
   } else if (url) {
-    // A share to Simone on Instagram comes as a file on Meta's CDN; a link, as a Reel to open.
+    // A share to Edith on Instagram comes as a file on Meta's CDN; a link, as a Reel to open.
     const link = reelLink(url);
     take = link ? { link: link.url } : { file: url };
   } else return { ok: false, miss: "not_found" };

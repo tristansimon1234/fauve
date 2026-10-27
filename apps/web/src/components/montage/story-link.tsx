@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { setPublishByHand } from "@/app/(app)/publications/[id]/cover-actions";
 
-// Who publishes a story. Simone, without a link (Instagram's API takes no sticker
+// Who publishes a story. Edith, without a link (Instagram's API takes no sticker
 // on a story), or the manager herself with the link sticker: at its time she gets
 // the story and her booking link on WhatsApp, shares it to her story from there
 // (Partager › Instagram › Story), adds the sticker and pastes the link. Meant for
@@ -35,7 +35,7 @@ export function StoryLink({ postId, initial, handedOffAt, bookingUrl }: { postId
       </div>
       <div role="radiogroup" aria-label="Qui publie cette story" className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">
         {[
-          { on: false, label: "Simone publie", hint: "sans lien" },
+          { on: false, label: "Edith publie", hint: "sans lien" },
           { on: true, label: "Avec un lien", hint: "tu la partages depuis WhatsApp" },
         ].map((o) => (
           <button
@@ -58,7 +58,7 @@ export function StoryLink({ postId, initial, handedOffAt, bookingUrl }: { postId
             : `À l’heure prévue, je t’envoie la story et ${bookingUrl ? "ton lien de réservation" : "un rappel du lien"} sur WhatsApp. Tu appuies sur Partager › Instagram › Story, tu ajoutes le sticker Lien et tu colles le lien : quelques secondes.`
           : "Instagram ne laisse aucune appli poser un sticker lien. Pour une story qui doit faire réserver (places libres, nouveauté, offre), choisis « Avec un lien »."}
       </p>
-      {byHand && !bookingUrl && <p className="text-[12px] font-semibold text-coral-ink">Je ne connais pas encore ton lien de réservation : donne-le à Simone pour qu’il arrive avec la story.</p>}
+      {byHand && !bookingUrl && <p className="text-[12px] font-semibold text-coral-ink">Je ne connais pas encore ton lien de réservation : donne-le à Edith pour qu’il arrive avec la story.</p>}
     </section>
   );
 }

@@ -108,7 +108,7 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
       ? "C’est validé."
       : "blocked" in scheduled
         ? NOT_SCHEDULED[scheduled.blocked]
-        : "C’est parti : Simone le publie maintenant.",
+        : "C’est parti : Edith le publie maintenant.",
   };
 }
 
@@ -156,7 +156,7 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   if (!post) return { ok: false, error: "Publication introuvable." };
   if (LOCKED.includes(postStatusSchema.parse(post.status))) return { ok: false, error: "Cette publication est déjà en ligne." };
   // A video the effects agent drew is never changed by hand (nor marked as one from the browser).
-  if (plan.baked || (await bakedReel(studioId, postId))) return { ok: false, error: "Ce Reel a un effet dessiné image par image : dis à Simone ce que tu veux changer." };
+  if (plan.baked || (await bakedReel(studioId, postId))) return { ok: false, error: "Ce Reel a un effet dessiné image par image : dis à Edith ce que tu veux changer." };
 
   // Clips, the footage under animations and the photos they compose with: the studio's own media only.
   const clipIds = planMediaIds(plan);
@@ -261,7 +261,7 @@ export async function saveCarouselTexts(postId: string, texts: Record<string, st
   const given = Object.entries(texts);
   if (given.some(([name, text]) => !slots.has(name) || typeof text !== "string")) return { ok: false, error: "Un des textes n’existe pas dans ce carrousel." };
   const tooLong = given.find(([name, text]) => text.length > slotTextLimit(slots.get(name)!));
-  if (tooLong) return { ok: false, error: "Un des textes est trop long pour sa place : raccourcis-le, ou demande à Simone de refaire la mise en page." };
+  if (tooLong) return { ok: false, error: "Un des textes est trop long pour sa place : raccourcis-le, ou demande à Edith de refaire la mise en page." };
   try {
     await saveSlides(studioId, postId, plan.data, { design: { ...design, texts: { ...design.texts, ...Object.fromEntries(given.map(([name, text]) => [name, text.trim()])) } } });
   } catch (error) {

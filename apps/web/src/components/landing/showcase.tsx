@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Real work by Simone for the landing: three Reels and a carousel made by the
+// Real work by Edith for the landing: three Reels and a carousel made by the
 // app itself (montage, motion design, review) for demo businesses, from free
-// Unsplash photos, with the music Simone composed for them (ElevenLabs). Files in
+// Unsplash photos, with the music Edith composed for them (ElevenLabs). Files in
 // the public `landing` bucket of Supabase Storage.
 
 const BASE = "https://tfxkhktofgtljlqlksba.supabase.co/storage/v1/object/public/landing";
@@ -26,7 +26,7 @@ const PLANE = "M21 3 10 14M21 3l-7 18-4-7-7-4 18-7z";
 /**
  * The Reels as on Instagram: one phone, a vertical feed that scrolls by itself
  * from one Reel to the next when it ends (or with a finger, the wheel, the
- * arrows), each with the music Simone composed for it. Muted until a tap on the
+ * arrows), each with the music Edith composed for it. Muted until a tap on the
  * sound, as browsers want; plays only while it is on screen.
  */
 export function ReelsFeed() {
@@ -94,7 +94,7 @@ export function ReelsFeed() {
           ))}
         </div>
         <div className="relative h-[min(78vh,600px)] w-[min(84vw,338px)] overflow-hidden rounded-[34px] bg-ink shadow-[0_30px_70px_rgba(28,21,48,.32)] ring-[7px] ring-ink">
-          <div ref={feed} className="h-full snap-y snap-mandatory overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Reels faits par Simone">
+          <div ref={feed} className="h-full snap-y snap-mandatory overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Reels faits par Edith">
             {SHOWCASE_REELS.map((reel, i) => (
               <div key={reel.file} data-index={i} className="relative h-full w-full snap-start snap-always">
                 <video
@@ -110,7 +110,7 @@ export function ReelsFeed() {
                   muted
                   playsInline
                   preload={i === 0 ? "auto" : "metadata"}
-                  aria-label={`Reel de ${reel.who}, monté par Simone`}
+                  aria-label={`Reel de ${reel.who}, monté par Edith`}
                   className="size-full object-cover"
                 />
                 {/* Instagram's frame: the account and the music at the bottom, the actions on the right. */}
@@ -128,7 +128,7 @@ export function ReelsFeed() {
                       <path d="M9 18V5l12-2v13M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3zm12-2a3 3 0 1 1-3-3 3 3 0 0 1 3 3z" />
                     </svg>
                     <span className="min-w-0 overflow-hidden">
-                      <span className="land-ticker block w-max whitespace-nowrap">Musique composée par Simone · son original · Musique composée par Simone · son original ·&nbsp;</span>
+                      <span className="land-ticker block w-max whitespace-nowrap">Musique composée par Edith · son original · Musique composée par Edith · son original ·&nbsp;</span>
                     </span>
                   </span>
                 </span>

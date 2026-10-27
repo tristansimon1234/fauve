@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { Mascot, type MascotMood } from "@/components/mascot";
 
-/** What Simone reacts to: the manager's message (decided at once by Jev) or her own answer arriving. */
+/** What Edith reacts to: the manager's message (decided at once by Jev) or her own answer arriving. */
 export type SimoneCue = { id: string; mood: MascotMood; fresh: boolean };
 
 /** How long each reaction lasts before she goes back to rest. */
 const REACTION_MS: Partial<Record<MascotMood, number>> = { cry: 4500, sad: 4500, angry: 3800, shy: 3200, laugh: 3200, surprised: 2400, happy: 2200 };
 
 /**
- * One Simone for the whole conversation (its header): she reacts to the
+ * One Edith for the whole conversation (its header): she reacts to the
  * manager's message as soon as it is read (laughs at a joke, is sad or cries when
  * the manager is upset), thinks while she writes, reacts again when her answer
  * arrives, then rests. A single mascot, so every change of mood is a transition.

@@ -11,7 +11,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 type Blocked = "montage" | "photos" | "instagram" | "tiktok";
 
 /**
- * Why a validated post cannot be scheduled yet (null: it can), with the same checks as Simone's
+ * Why a validated post cannot be scheduled yet (null: it can), with the same checks as Edith's
  * schedule_post. A carousel or a photo post needs its photos, not a montage: requiring a render
  * left every validated carousel at « validated », never published.
  */
@@ -26,15 +26,15 @@ async function blocked(studioId: string, post: { kind: string; render_id: string
 
 /** What she reads when her validated post cannot go out yet: the real reason and what to do. */
 export const NOT_SCHEDULED: Record<Blocked, string> = {
-  montage: "C’est validé. Simone le publie dès que la vidéo est prête.",
-  photos: "C’est validé. Il lui manque ses photos : ajoute-les pour que Simone le publie.",
-  instagram: "C’est validé. Connecte Instagram (Réglages) pour que Simone le publie.",
-  tiktok: "C’est validé. Reconnecte TikTok (Réglages), ou retire-le de « Où publier », pour que Simone le publie.",
+  montage: "C’est validé. Edith le publie dès que la vidéo est prête.",
+  photos: "C’est validé. Il lui manque ses photos : ajoute-les pour qu’Edith le publie.",
+  instagram: "C’est validé. Connecte Instagram (Réglages) pour qu’Edith le publie.",
+  tiktok: "C’est validé. Reconnecte TikTok (Réglages), ou retire-le de « Où publier », pour qu’Edith le publie.",
 };
 
 /**
  * validated → published now when possible (Tristan : « la programmation sert à rien ») : nothing
- * waits for a set time; the moment Simone suggested (scheduled_at) is only when she reminds her
+ * waits for a set time; the moment Edith suggested (scheduled_at) is only when she reminds her
  * (lib/reminders.ts). Returns « now », or why it cannot go out yet.
  */
 export async function scheduleValidated(studioId: string, postId: string): Promise<{ when: "now" } | { blocked: Blocked } | null> {

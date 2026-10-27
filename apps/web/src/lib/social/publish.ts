@@ -329,7 +329,7 @@ async function refreshExpiringTokens(): Promise<number> {
         .eq("key", row.key);
       refreshed++;
     } catch (error) {
-      console.error("Simone account token refresh failed", error instanceof InstagramError ? error.body : error);
+      console.error("Edith account token refresh failed", error instanceof InstagramError ? error.body : error);
     }
   }
   return refreshed;
@@ -411,7 +411,7 @@ export async function runPublishWorker() {
     const outcome = await publishIfDue(id as string);
     if (outcome) published.push(outcome);
   }
-  // The moment Simone suggested has come: she reminds her (nothing goes out on its own any more).
+  // The moment Edith suggested has come: she reminds her (nothing goes out on its own any more).
   const { remindDue } = await import("@/lib/reminders");
   const reminded = await remindDue().catch((error) => {
     console.error("reminders failed", error);

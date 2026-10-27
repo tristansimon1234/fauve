@@ -8,7 +8,7 @@ import { GridLayout, type ProfileView } from "./platform-switch";
 
 // Her profiles as her followers see them in the apps (Tristan: « tu peux reproduire réellement
 // les comptes Insta / TikTok ? »): Instagram's header, counters, bio, buttons, icon tabs and 3:4
-// grid; TikTok's centred header and video grid. Simone's coming posts sit where they will land,
+// grid; TikTok's centred header and video grid. Edith's coming posts sit where they will land,
 // marked by a small label only. Not linked yet: the same profile with her business's name and logo.
 
 export type Tile =
@@ -76,7 +76,7 @@ export function GridView({
 function LinkHint({ href, network }: { href: string; network: string }) {
   return (
     <p className="text-[13.5px] leading-snug text-muted">
-      Aperçu avec ce que Simone sait de ton commerce.{" "}
+      Aperçu avec ce qu’Edith sait de ton commerce.{" "}
       <a href={href} className="font-bold text-violet">
         Relier {network}
       </a>{" "}
@@ -129,11 +129,11 @@ function InstagramView({ handle, info, identity, tiles, tz }: { handle: string |
         {tiles.length ? (
           <GridTabs
             all={<TileGrid tiles={tiles.filter((t) => t.kind !== "upcoming" || t.inGrid !== false)} tz={tz} />}
-            reels={reelTiles.length ? <TileGrid tiles={reelTiles} tz={tz} tall /> : <Empty>Pas encore de Reel : demande-en un à Simone.</Empty>}
+            reels={reelTiles.length ? <TileGrid tiles={reelTiles} tz={tz} tall /> : <Empty>Pas encore de Reel : demande-en un à Edith.</Empty>}
             extra={<TagUserIcon size={24} />}
           />
         ) : (
-          <Empty>Rien à afficher pour l’instant : envoie tes vidéos à Simone pour remplir ta grille.</Empty>
+          <Empty>Rien à afficher pour l’instant : envoie tes vidéos à Edith pour remplir ta grille.</Empty>
         )}
       </section>
     </>

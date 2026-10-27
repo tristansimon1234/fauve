@@ -40,7 +40,7 @@ export async function Paywall({ db, studioId, postId, next }: { db: Db; studioId
           )
         ) : null}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-ink/30 text-center text-white">
-          <span className="font-serif text-[30px] italic leading-none">Simone</span>
+          <span className="font-serif text-[30px] italic leading-none">Edith</span>
           <span className="px-6 text-[13px] font-semibold opacity-90">Ta création est prête</span>
         </div>
       </div>

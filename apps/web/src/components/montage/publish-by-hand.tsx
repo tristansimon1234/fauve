@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import { setMusic, setPublishByHand, setVoiceOff } from "@/app/(app)/publications/[id]/cover-actions";
 
-// The sound of a Reel. Simone's music (composed by ElevenLabs for this cut, in
-// the video): on, another one, or none. And who publishes: Simone, or the manager
+// The sound of a Reel. Edith's music (composed by ElevenLabs for this cut, in
+// the video): on, another one, or none. And who publishes: Edith, or the manager
 // herself from Instagram with one of its sounds (Instagram's music can't be added
 // by another app): at its time she gets the video and its caption on WhatsApp,
 // and the Reel is then found on her account and measured like the others.
@@ -18,9 +18,9 @@ export function PublishByHand({
   music,
   voice,
 }: {
-  /** Simone's music: on or off, and whether a piece was made already; undefined without a montage or without the service. */
+  /** Edith's music: on or off, and whether a piece was made already; undefined without a montage or without the service. */
   music?: { on: boolean; made: boolean };
-  /** The voice over the Reel: Simone's (her name, the words) or her own voice note; null: none; undefined: not shown. */
+  /** The voice over the Reel: Edith's (her name, the words) or her own voice note; null: none; undefined: not shown. */
   voice?: { who: "simone"; name: string; text: string } | { who: "hers"; text: string } | null;
   postId: string;
   initial: boolean;
@@ -106,15 +106,15 @@ export function PublishByHand({
               ? voice.text
                 ? `« ${voice.text}${voice.text.length >= 280 ? "…" : ""} »`
                 : "Le montage est calé sur ses phrases."
-              : "Une autre voix, un autre texte : demande-le à Simone (tes réglages sont dans Style › Voix off)."}
+              : "Une autre voix, un autre texte : demande-le à Edith (tes réglages sont dans Style › Voix off)."}
           </span>
         </div>
       )}
       {music && (
         <div className="flex flex-col gap-2">
-          <div role="radiogroup" aria-label="Musique de Simone" className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">
+          <div role="radiogroup" aria-label="Musique d’Edith" className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">
             {[
-              { on: true, label: "Musique de Simone", hint: "composée pour ce Reel" },
+              { on: true, label: "Musique d’Edith", hint: "composée pour ce Reel" },
               { on: false, label: "Sans musique", hint: "Reel muet" },
             ].map((o) => (
               <button
@@ -146,7 +146,7 @@ export function PublishByHand({
       )}
       <div role="radiogroup" aria-label="Qui publie ce Reel" className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">
         {[
-          { on: false, label: "Simone publie", hint: musicOn && music ? "avec sa musique" : "telle quelle" },
+          { on: false, label: "Edith publie", hint: musicOn && music ? "avec sa musique" : "telle quelle" },
           { on: true, label: "Je publie moi-même", hint: "avec un son d’Instagram" },
         ].map((o) => (
           <button
