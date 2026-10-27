@@ -452,7 +452,7 @@ export default function LandingPage() {
           ))}
         </div>
         <p className="mt-6 text-center text-[14px] text-muted">
-          Les deux font tout&nbsp;: Reels montés, voix off et musique, carrousels, stories, légendes, publication sur Instagram et TikTok, bilan chaque semaine. Tu arrêtes quand tu veux.
+          Les trois font tout&nbsp;: Reels montés, voix off et musique, carrousels, stories, légendes, publication sur Instagram et TikTok, bilan chaque semaine. Tu arrêtes quand tu veux.
         </p>
       </section>
 
