@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { isInSessionWindow } from "@fauve/agent";
+import { isInSessionWindow, periodTotals, weeklySummaryParams, type DailyRow } from "@fauve/agent";
 import { after } from "next/server";
 import { env } from "@/lib/env";
 import { analyzePerformance } from "@/lib/performance";
@@ -9,7 +9,7 @@ import { sendTemplate, sendText } from "@/lib/whatsapp/client";
 
 // The Sunday report ("ce qui marche"), called weekly by pg_cron with CRON_SECRET:
 // every studio with Instagram connected gets its analysis, then a short WhatsApp
-// message (free text inside the 24 h window, the weekly_report template otherwise).
+// message (free text inside the 24 h window, the weekly_summary template with the week's numbers otherwise).
 export const maxDuration = 300;
 
 function authorized(request: Request): boolean {
@@ -45,8 +45,20 @@ async function notify(studioId: string, summary: string) {
     await db.from("whatsapp_messages").insert({ studio_id: studioId, wa_message_id: id, direction: "outbound", phone_e164: phone, type: "text", body });
   } else {
     // Outside the window only a Meta-approved template can open the conversation.
-    await sendTemplate(waId, "weekly_report", []);
+    await sendTemplate(waId, "weekly_summary", weeklySummaryParams(await lastWeek(studioId)));
   }
+}
+
+/** The last 7 days: posts put online, and the Instagram profile visits and link taps. */
+async function lastWeek(studioId: string) {
+  const db = supabaseAdmin();
+  const since = new Date(Date.now() - 7 * 86_400_000);
+  const [posts, days] = await Promise.all([
+    db.from("posts").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("status", "published").gte("published_at", since.toISOString()),
+    db.from("account_daily").select("*").eq("studio_id", studioId).eq("platform", "instagram").gte("day", since.toISOString().slice(0, 10)),
+  ]);
+  const totals = periodTotals((days.data ?? []) as DailyRow[], since.toISOString().slice(0, 10));
+  return { posts: posts.count ?? 0, profileVisits: totals.profileViews, linkTaps: totals.linkTaps };
 }
 
 async function run() {

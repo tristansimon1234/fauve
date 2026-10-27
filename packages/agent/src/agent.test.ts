@@ -4,7 +4,7 @@ import { addFacts, readMemory, removeFacts } from "./memory.ts";
 import { editPlanObjectSchema, editPlanSchema, segmentSeconds } from "./schemas.ts";
 import { canTransition } from "./status.ts";
 import { addUsage, claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
-import { isInSessionWindow } from "./whatsapp-templates.ts";
+import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
@@ -82,6 +82,11 @@ test("whatsapp: 24 h window", () => {
   assert.equal(isInSessionWindow(new Date("2026-10-12T00:00:00Z"), now), true);
   assert.equal(isInSessionWindow(new Date("2026-10-11T11:59:00Z"), now), false);
   assert.equal(isInSessionWindow(null, now), false);
+});
+
+test("whatsapp: the weekly summary says its numbers with their words", () => {
+  assert.deepEqual(weeklySummaryParams({ posts: 3, profileVisits: 42, linkTaps: 1 }), ["3 publications", "42 visites de ton profil", "1 clic sur ton lien"]);
+  assert.deepEqual(weeklySummaryParams({ posts: 0, profileVisits: null, linkTaps: null }), ["0 publication", "0 visite de ton profil", "0 clic sur ton lien"]);
 });
 
 test("phone: normalizes French and international numbers", async () => {

@@ -76,14 +76,19 @@ const TEMPLATE_DEFINITIONS = [
     ],
   },
   {
-    name: "ready_to_post",
+    // Its button opens the post's page, signed in: APP_URL/l/{one-time token} (hand-off.ts). Replaces ready_to_post.
+    name: "post_to_share",
     language: "fr",
     category: "UTILITY",
     components: [
       {
         type: "BODY",
-        text: "C’est l’heure de publier « {{1}} » ! Réponds-moi et je t’envoie la vidéo et la légende.",
+        text: "C’est l’heure de publier « {{1}} » ! Ta publication est prête : touche le bouton pour la voir, ou réponds-moi et je te l’envoie ici.",
         example: { body_text: [["Le service du soir"]] },
+      },
+      {
+        type: "BUTTONS",
+        buttons: [{ type: "URL", text: "Voir ma publication", url: "{APP_URL}/l/{{1}}", example: ["{APP_URL}/l/Xc3vR8kQ2mZp7LwT9aB4eF"] }],
       },
     ],
   },
@@ -100,12 +105,16 @@ const TEMPLATE_DEFINITIONS = [
     ],
   },
   {
-    name: "weekly_report",
+    // Its numbers make it a statement about her account, so Meta keeps it Utility (weekly_report went to Marketing).
+    name: "weekly_summary",
     language: "fr",
     category: "UTILITY",
     components: [
-      { type: "BODY", text: "Ton bilan de la semaine est prêt." },
-      { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Voir le bilan" }] },
+      {
+        type: "BODY",
+        text: "Ton bilan de la semaine : {{1}}, {{2}} et {{3}}. Le détail est dans l’app, page Résultats.",
+        example: { body_text: [["3 publications", "42 visites de ton profil", "5 clics sur ton lien"]] },
+      },
     ],
   },
 ];
@@ -188,7 +197,10 @@ async function run(params: URLSearchParams) {
       TEMPLATE_DEFINITIONS.map(async (template) => ({
         name: template.name,
         result: await attempt(() =>
-          graph(`${env("WHATSAPP_WABA_ID")}/message_templates`, { method: "POST", body: JSON.stringify(template) }),
+          graph(`${env("WHATSAPP_WABA_ID")}/message_templates`, {
+            method: "POST",
+            body: JSON.stringify(template).replaceAll("{APP_URL}", env("APP_URL")),
+          }),
         ),
       })),
     );

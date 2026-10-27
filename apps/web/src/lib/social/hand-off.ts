@@ -114,13 +114,15 @@ export async function handOff(postId: string): Promise<{ postId: string; ok: boo
       await sendOnWhatsApp(post, phone);
       via = "whatsapp";
     } else if (phone) {
-      // Outside the window: a template; her answer brings the video (deliverPendingHandOffs).
-      const id = await sendTemplate(phone.slice(1), "ready_to_post", [post.title as string]).catch((error) => {
-        console.error("ready_to_post template refused", error);
+      // Outside the window: a template whose button opens its page (signed in, /l/{token});
+      // her answer still brings the video (deliverPendingHandOffs).
+      const link = await createLoginLink(phone, `/v/${post.id}`, "open_post");
+      const id = await sendTemplate(phone.slice(1), "post_to_share", [post.title as string], "fr", link.split("/l/")[1]).catch((error) => {
+        console.error("post_to_share template refused", error);
         return undefined;
       });
       if (id) {
-        await store(studioId, phone, id, `C’est l’heure de publier « ${post.title} » ! Réponds-moi et je t’envoie ${post.kind === "story" ? "ta story et ton lien" : "la vidéo et la légende"}.`);
+        await store(studioId, phone, id, `C’est l’heure de publier « ${post.title} » ! Ta publication est prête : touche le bouton pour la voir, ou réponds-moi et je te l’envoie ici.`, { open_post: post.id });
         via = "template";
       }
     }
