@@ -12,6 +12,51 @@
  *   off   a loop that left the screen: paused where it was.
  */
 
+/* ── The page's paper: a fine grain over everything, like a printed magazine ─────────────── */
+
+.land-paper {
+  position: relative;
+}
+.land-paper::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── The manifesto under the hero: one line passing by, still when asked for less motion ── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .land-ticker-row {
+    animation: land-ticker 48s linear infinite;
+  }
+  .land-ticker-band:hover .land-ticker-row {
+    animation-play-state: paused;
+  }
+}
+
+/* ── « Zéro cringe »: each AI tic is struck out as the list comes on screen ─────────────── */
+
+.land-strike {
+  background-image: linear-gradient(var(--color-coral), var(--color-coral));
+  background-repeat: no-repeat;
+  background-position: 0 58%;
+  background-size: 100% 1.5px;
+  /* Each line of a wrapped tic gets its own stroke. */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  animation: land-strike 0.7s var(--ease-fauve) var(--d, 0s);
+}
+@keyframes land-strike {
+  from {
+    background-size: 0% 1.5px;
+  }
+}
+
 /* ── On load: the hero's lines rise in, one after the other ─────────────────────────────── */
 
 @media (prefers-reduced-motion: no-preference) {

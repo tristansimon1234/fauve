@@ -18,7 +18,7 @@ export function CopyReelVisual() {
         instagram.com/reel/… fais-moi le même
       </span>
       <span className="land-once land-rise max-w-[94%] rounded-[14px_14px_14px_4px] border border-line bg-soft px-3 py-2.5 text-[12.5px] leading-snug text-ink" style={v({ "--d": "0.8s" })}>
-        Je reprends son écran partagé, ses coupes sur le temps et ses textes en capitales. Avec ta vidéo en bas et ton offre en haut.
+        Je reprends son écran partagé, ses coupes sur le temps et ses petits textes en minuscules. Avec ta vidéo en bas.
       </span>
       <span className="mt-4 flex items-end justify-center gap-3">
         <MiniPhone label="Le Reel que tu aimes" d="1.3s">
@@ -34,12 +34,12 @@ export function CopyReelVisual() {
           <path d="M1 7h30M26 2l5 5-5 5" />
         </svg>
         <MiniPhone label="Le tien" d="2s" wipe>
-          <span className="flex h-1/2 flex-col items-center justify-center bg-[#f3ece2] px-1.5 text-center">
-            <span className="text-[8px] font-extrabold tracking-[0.06em] text-[#2f3b2e]">COURS D’ESSAI</span>
-            <span className="font-[family-name:var(--font-serif)] text-[17px] leading-none text-[#c7835b] italic">offert</span>
+          <span className="flex h-1/2 flex-col items-center justify-center bg-[#efe6da] px-1.5 text-center">
+            <span className="text-[9px] font-bold text-[#2f3b2f]">pov :</span>
+            <span className="font-[family-name:var(--font-serif)] text-[16px] leading-none text-[#b4532a] italic">ton 1er cours</span>
           </span>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/landing/post-1.webp" alt="" className="h-1/2 w-full object-cover" />
+          <img src="/landing/tile-4.webp" alt="" className="h-1/2 w-full object-cover" />
         </MiniPhone>
       </span>
     </span>
@@ -92,10 +92,10 @@ export function VoiceVisual() {
 /* ── Music: the cuts of the Reel fall on the beat ─────────────────────────────────────── */
 
 const CLIPS = [
-  { src: "/landing/post-1.webp", w: 22 },
-  { src: "/landing/post-2.webp", w: 30 },
-  { src: "/landing/post-3.webp", w: 18 },
-  { src: "/landing/post-5.webp", w: 30 },
+  { src: "/landing/tile-1.webp", w: 22 },
+  { src: "/landing/tile-2.webp", w: 30 },
+  { src: "/landing/tile-3.webp", w: 18 },
+  { src: "/landing/tile-5.webp", w: 30 },
 ];
 const CUTS = [0.22, 0.52, 0.7];
 const BARS = Array.from({ length: 44 }, (_, i) => {
@@ -163,9 +163,9 @@ export function LayoutsVisual() {
       <span className="land-loop land-lay-bg relative h-[176px] w-[99px] shrink-0 overflow-hidden rounded-[16px] border-[3px] border-ink bg-ink" aria-hidden="true">
         {(
           [
-            ["/landing/post-1.webp", "land-lay-a", "0", ""],
-            ["/landing/post-3.webp", "land-lay-b", "100% 0 -50% 0", ""],
-            ["/landing/post-5.webp", "land-lay-c", "110% 20% -40% 14%", "opacity-0 shadow-[0_6px_14px_rgba(0,0,0,.25)]"],
+            ["/landing/tile-4.webp", "land-lay-a", "0", ""],
+            ["/landing/tile-2.webp", "land-lay-b", "100% 0 -50% 0", ""],
+            ["/landing/tile-3.webp", "land-lay-c", "110% 20% -40% 14%", "opacity-0 shadow-[0_6px_14px_rgba(0,0,0,.25)]"],
           ] as const
         ).map(([src, move, inset, look]) => (
           // A box that changes place and size (an image would keep its own size), the photo filling it.
