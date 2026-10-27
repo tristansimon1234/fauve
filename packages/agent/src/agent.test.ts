@@ -2110,6 +2110,18 @@ test("bank: a clean shot that moves or hooks is kept, a dark or shaky clip is no
   assert.equal(bankWorthy({ lighting: "ok", shots: [{ ...shot, energy: 1, hook_score: 2 }] } as never), false);
 });
 
+test("stabilize: a clip that shakes a good part of the time, never a long one", async () => {
+  const { needsStabilizing, shakyShare } = await import("./stabilize.ts");
+  const shot = (start: number, end: number, shaky: boolean) => ({ start, end, quality: { blurry: false, dark: false, shaky } });
+  const clip = { duration: 10, shots: [shot(0, 4, true), shot(4, 10, false)] };
+  assert.equal(shakyShare(clip as never), 0.4);
+  assert.equal(needsStabilizing(clip as never), true);
+  // One shaky second out of ten: a camera move that is meant stays.
+  assert.equal(needsStabilizing({ duration: 10, shots: [shot(0, 1, true), shot(1, 10, false)] } as never), false);
+  assert.equal(needsStabilizing({ duration: 90, shots: [shot(0, 90, true)] } as never), false);
+  assert.equal(shakyShare({ duration: 0, shots: [] } as never), 0);
+});
+
 test("clip sort: only a sure match on a known publication is kept", async () => {
   const { acceptedSort } = await import("./clip-sort.ts");
   const candidates = new Set(["p1"]);

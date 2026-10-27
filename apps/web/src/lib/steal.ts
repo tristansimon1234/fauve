@@ -121,12 +121,15 @@ export async function dropExample(studioId: string, example: { id: string; path:
   for (const post of posts ?? []) {
     await db.from("posts").update({ media_ids: ((post.media_ids as string[] | null) ?? []).filter((id) => id !== example.id) }).eq("id", post.id);
   }
+  // Its file as it is now: a shaky one was steadied since (lib/video/stabilize.ts), its original kept beside it.
+  const { data: now } = await db.from("media_assets").select("storage_path, original_path").eq("id", example.id).maybeSingle();
   const { error } = await db.from("media_assets").delete().eq("id", example.id).eq("studio_id", studioId);
   if (error) return void console.warn("steal: example kept", example.id, error.message);
-  if (example.path.startsWith(`${studioId}/`)) {
+  const files = [example.path, now?.storage_path as string | undefined, now?.original_path as string | null | undefined].filter((p): p is string => Boolean(p?.startsWith(`${studioId}/`)));
+  if (files.length) {
     await db.storage
       .from("media")
-      .remove([example.path, tracksPath(studioId, example.id), cutoutPath(studioId, example.id, "webp"), cutoutPath(studioId, example.id, "png")])
+      .remove([...new Set(files), tracksPath(studioId, example.id), cutoutPath(studioId, example.id, "webp"), cutoutPath(studioId, example.id, "png")])
       .catch(() => {});
   }
 }

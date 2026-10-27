@@ -8,6 +8,7 @@ import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
 import { toGeminiSchema } from "@/lib/gemini-schema";
 import { studioAccess } from "@/lib/billing/access";
 import { sortClip } from "@/lib/clip-sort";
+import { stabilizeIfShaky } from "@/lib/video/stabilize";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Clip analysis with Gemini: the clip goes from Storage to the Gemini Files API,
@@ -17,7 +18,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const FPS = 3; // short studio clips: more frames give sharper shot boundaries
 const PROCESSING_TIMEOUT_MS = 120_000;
-const STALE_CLAIM_MS = 4 * 60_000;
+// Gemini, then a shaky video steadied (up to two 150 s passes) before the analysis is stored.
+const STALE_CLAIM_MS = 7 * 60_000;
 
 let client: GoogleGenAI | undefined;
 const gemini = () => (client ??= new GoogleGenAI({ apiKey: env("GEMINI_API_KEY") }));
@@ -106,6 +108,8 @@ async function runAnalysis(asset: { id: string; studio_id: string; storage_path:
     // Words are a bonus for subtitles: keep only a clean, bounded list.
     const words = wordsSchema.safeParse(raw.words);
     const analysis = readAnswer(clipAnalysisSchema, { ...raw, words: words.success ? words.data.slice(0, 400) : undefined });
+    // Steadied before the analysis is stored: whoever waits for it (a montage) tracks and cuts the steady file.
+    await stabilizeIfShaky(asset, analysis);
     const insert = await db
       .from("clip_analyses")
       .insert({ studio_id: asset.studio_id, media_id: asset.id, analysis, model });

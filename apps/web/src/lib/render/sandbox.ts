@@ -82,13 +82,17 @@ const FETCH = 'curl -fsSL --http1.1 --retry 4 --retry-all-errors --retry-delay 1
  * tone-mapped to the SDR of a Reel on the way, else its colours come out washed out. If
  * ffmpeg cannot read it, the file as it came.
  */
+/** An iPhone's HDR (HLG or PQ, 10 bits) tone-mapped to the SDR of a Reel, else its colours come out washed out. */
+const HDR_TO_SDR = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv";
+const HDR_TAGS = "-color_primaries bt709 -color_trc bt709 -colorspace bt709";
+
 const NORMALIZE = [
   "set -euo pipefail",
   `${FETCH.replace('"$1"', '"$1.src"')}`,
   `tail="fps=${REEL_FPS},tpad=stop_mode=clone:stop_duration=2,format=yuv420p"`,
   'enc="-c:v libx264 -preset veryfast -crf 16 -c:a aac -b:a 192k -movflags +faststart"',
   `plain() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "$tail" $enc "$1"; }`,
-  `hdr() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,$tail" $enc -color_primaries bt709 -color_trc bt709 -colorspace bt709 "$1"; }`,
+  `hdr() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "${HDR_TO_SDR},$tail" $enc ${HDR_TAGS} "$1"; }`,
   `info=$(${ROOT}/ffmpeg -hide_banner -i "$1.src" 2>&1 || true)`,
   'if grep -qE "arib-std-b67|smpte2084" <<<"$info"; then hdr "$1" || plain "$1" || cp "$1.src" "$1"; else plain "$1" || cp "$1.src" "$1"; fi',
   'rm -f "$1.src"',
@@ -958,6 +962,40 @@ export type TrackReading = { file: Buffer; frames: number; hands: number; faces:
  * Follows what moves in each video (signed URL), up to a minute of each: its tracks file, or
  * the error. Four clips at a time on the sandbox's CPUs, about 2.5 s of work per second of video.
  */
+/**
+ * A shaky video steadied (ffmpeg's vid.stab: its motion read, then smoothed over half a
+ * second, the picture zoomed just enough that no border shows, a touch of sharpness back),
+ * in the cut-out sandbox's 8 CPUs: about 2 s of work per second of video. Its sound and
+ * its timing stay; an HDR video comes out tone-mapped like NORMALIZE does.
+ */
+const STABILIZE = [
+  "set -euo pipefail",
+  `cd "$1" && ${FETCH.replace('"$1"', "in.src")}`,
+  // Each pass bounded: a stuck ffmpeg never holds the analysis past its claim.
+  `ff="timeout 150 ${CUTOUT_ROOT}/ffmpeg"`,
+  '$ff -v error -y -i in.src -vf "vidstabdetect=shakiness=6:accuracy=12:result=t.trf" -f null -',
+  'info=$($ff -hide_banner -i in.src 2>&1 || true)',
+  `hdr=""; tags=""; if grep -qE "arib-std-b67|smpte2084" <<<"$info"; then hdr="${HDR_TO_SDR},"; tags="${HDR_TAGS}"; fi`,
+  '$ff -v error -y -i in.src -map 0:v:0 -map "0:a:0?" -vf "${hdr}vidstabtransform=input=t.trf:smoothing=15:optzoom=1:zoomspeed=0.2:interpol=bicubic,unsharp=5:5:0.5,format=yuv420p" -c:v libx264 -preset veryfast -crf 15 $tags -c:a aac -b:a 192k -movflags +faststart out.mp4',
+].join("\n");
+
+export async function stabilizeInSandbox(id: string, url: string): Promise<{ video: Buffer; seconds: number }> {
+  const started = Date.now();
+  const sandbox = await withTimeLeft(await cutoutSandbox());
+  const dir = `${CUTOUT_ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    // A stopped sandbox resumes on that first command: now it can be given the time for the job.
+    await withTimeLeft(sandbox);
+    await bash(sandbox, STABILIZE, [dir, url]);
+    const video = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
+    if (!video?.length) throw new Error("no stabilized video");
+    return { video, seconds: (Date.now() - started) / 1000 };
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
 export async function tracksInSandbox(id: string, videos: { id: string; url: string }[]): Promise<{ results: Record<string, TrackReading | Error>; seconds: number }> {
   if (!videos.length) return { results: {}, seconds: 0 };
   const started = Date.now();

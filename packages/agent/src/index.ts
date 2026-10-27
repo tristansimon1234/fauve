@@ -29,6 +29,7 @@ export * from "./emoji.ts";
 export * from "./tool-status.ts";
 export * from "./turn.ts";
 export * from "./bank.ts";
+export * from "./stabilize.ts";
 export * from "./nudge.ts";
 export * from "./clip-sort.ts";
 export * from "./access.ts";

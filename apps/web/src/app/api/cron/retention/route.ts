@@ -32,13 +32,16 @@ async function handle(request: Request) {
   let deleted = 0;
   for (let i = 0; i < expired.length; i += BATCH) {
     const batch = expired.slice(i, i + BATCH);
+    // A steadied video keeps its shaky original beside it (lib/video/stabilize.ts).
+    const { data: originals } = await db.from("media_assets").select("original_path").in("id", batch.map((m) => m.id)).not("original_path", "is", null);
     // Files first: a row is only removed once its file is gone (a failed batch is retried next hour).
     // A photo's cut-out (collages), what was tracked in a video, an effect's kit and a recording's ref frames go with it; a path with nothing there is simply skipped.
     const removed = await db.storage
       .from("media")
-      .remove(
-        batch.flatMap((m) => [m.storage_path, cutoutPath(m.studio_id, m.id, "webp"), cutoutPath(m.studio_id, m.id, "png"), tracksPath(m.studio_id, m.id), kitPath(m.studio_id, m.id), ...refFramePaths(m.studio_id, m.id)]),
-      );
+      .remove([
+        ...batch.flatMap((m) => [m.storage_path, cutoutPath(m.studio_id, m.id, "webp"), cutoutPath(m.studio_id, m.id, "png"), tracksPath(m.studio_id, m.id), kitPath(m.studio_id, m.id), ...refFramePaths(m.studio_id, m.id)]),
+        ...(originals ?? []).map((o) => o.original_path as string),
+      ]);
     if (removed.error) {
       console.error("retention: files not removed", removed.error.message);
       continue;

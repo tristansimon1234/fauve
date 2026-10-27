@@ -14,7 +14,7 @@ export async function deleteMedia(mediaId: string): Promise<DeleteResult> {
   const studioId = member.studio.id;
   const db = supabaseAdmin();
 
-  const { data: asset } = await db.from("media_assets").select("id, storage_path").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
+  const { data: asset } = await db.from("media_assets").select("id, storage_path, original_path").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
   if (!asset) return { ok: false, error: "Fichier introuvable." };
 
   // posts.media_ids is a plain array (no foreign key): take the media out by hand.
@@ -29,8 +29,8 @@ export async function deleteMedia(mediaId: string): Promise<DeleteResult> {
     console.warn("deleteMedia failed", error.message);
     return { ok: false, error: "La suppression n’a pas abouti. Réessaie dans un instant." };
   }
-  const path = asset.storage_path as string;
-  if (path.startsWith(`${studioId}/`)) await db.storage.from("media").remove([path]).catch(() => {});
+  const paths = [asset.storage_path as string, asset.original_path as string | null].filter((p): p is string => Boolean(p?.startsWith(`${studioId}/`)));
+  if (paths.length) await db.storage.from("media").remove(paths).catch(() => {});
 
   revalidatePath("/mediatheque");
   return { ok: true };
