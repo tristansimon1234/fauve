@@ -92,7 +92,7 @@ export async function replyInConversation(params: {
   waId?: string;
   replyToMessageId?: string;
   /** Where the manager writes from (default: WhatsApp when there is a waId, else the app). */
-  channel?: "whatsapp" | "web" | "instagram";
+  channel?: "whatsapp" | "web";
   /** Live events of the turn (the app's chat). */
   onEvent?: RunFauveInput["onEvent"];
 }): Promise<RunFauveResult> {

@@ -16,7 +16,7 @@ type Pair = { code: string; url: string; qr: string };
 
 export function Pairing({ signIn, expired }: { signIn: boolean; expired: boolean }) {
   const [pair, setPair] = useState<Pair | null>(null);
-  const [state, setState] = useState<"loading" | "waiting" | "ready" | "expired" | "error">("loading");
+  const [state, setState] = useState<"loading" | "waiting" | "confirming" | "ready" | "expired" | "error">("loading");
 
   const request = () =>
     startPairing()
@@ -35,9 +35,9 @@ export function Pairing({ signIn, expired }: { signIn: boolean; expired: boolean
     void request();
   }, []);
 
-  // Wait for the message (every 2 s while the tab is open).
+  // Wait for the message, then her « Oui » on WhatsApp (every 2 s while the tab is open).
   useEffect(() => {
-    if (state !== "waiting") return;
+    if (state !== "waiting" && state !== "confirming") return;
     const timer = setInterval(() => {
       if (document.hidden) return;
       checkPairing()
@@ -47,7 +47,7 @@ export function Pairing({ signIn, expired }: { signIn: boolean; expired: boolean
             // A full navigation: the route sets the session cookies and redirects.
             // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             window.location.href = "/auth/pair";
-          } else if (s === "expired") setState("expired");
+          } else if (s === "expired" || s === "confirming") setState(s);
         })
         .catch(() => {});
     }, 2000);
@@ -104,7 +104,7 @@ export function Pairing({ signIn, expired }: { signIn: boolean; expired: boolean
           </a>
           <p className="flex items-center gap-2 text-[13px] text-muted">
             <span className="fauve-pulse size-2 rounded-full bg-violet" aria-hidden />
-            J’attends ton message…
+            {state === "confirming" ? "Touche « Oui, c’est mon écran » sur WhatsApp…" : "J’attends ton message…"}
           </p>
         </>
       )}

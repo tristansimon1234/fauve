@@ -12,9 +12,6 @@ export const INSTAGRAM_SCOPES = [
   "instagram_business_manage_insights",
 ];
 
-/** Fauve's own account also reads and answers the DMs managers send it. */
-export const FAUVE_ACCOUNT_SCOPES = ["instagram_business_basic", "instagram_business_manage_messages"];
-
 export class InstagramError extends Error {
   constructor(
     message: string,
@@ -428,25 +425,6 @@ export async function replyToComment(commentId: string, accessToken: string, mes
     body: new URLSearchParams({ message: message.slice(0, 2200), access_token: accessToken }),
   });
   return res.id;
-}
-
-// ---------------------------------------------------------------------------
-// Direct messages (Fauve's own account)
-// ---------------------------------------------------------------------------
-
-/** Subscribes the connected account to its DM webhooks (the app must have the webhook set up in Meta). */
-export async function subscribeToMessages(accessToken: string): Promise<void> {
-  await call(graphUrl(accessToken, `me/subscribed_apps?${q({ subscribed_fields: "messages", access_token: accessToken })}`), { method: "POST" });
-}
-
-/** Sends a text DM from Fauve's account (only inside the 24 h after the person wrote). */
-export async function sendDirectMessage(accessToken: string, recipientId: string, text: string): Promise<string | undefined> {
-  const res = await call<{ message_id?: string }>(graphUrl(accessToken, `me/messages?${q({ access_token: accessToken })}`), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ recipient: { id: recipientId }, message: { text: text.slice(0, 1000) } }),
-  });
-  return res.message_id;
 }
 
 // ---------------------------------------------------------------------------

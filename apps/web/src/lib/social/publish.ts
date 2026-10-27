@@ -318,20 +318,6 @@ async function refreshExpiringTokens(): Promise<number> {
       await db.from("social_accounts").update({ status: "expired" }).eq("id", row.social_account_id);
     }
   }
-  // Fauve's own account (Instagram DMs), refreshed the same way.
-  const { data: fauve } = await db.from("platform_accounts").select("key, access_token").lt("expires_at", soon);
-  for (const row of fauve ?? []) {
-    try {
-      const next = await refreshToken(row.access_token as string);
-      await db
-        .from("platform_accounts")
-        .update({ access_token: next.accessToken, expires_at: next.expiresAt.toISOString(), updated_at: new Date().toISOString() })
-        .eq("key", row.key);
-      refreshed++;
-    } catch (error) {
-      console.error("Edith account token refresh failed", error instanceof InstagramError ? error.body : error);
-    }
-  }
   return refreshed;
 }
 

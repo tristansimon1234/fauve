@@ -73,7 +73,7 @@ export type RunFauveInput = ToolContext & {
     firstName: string | null;
     instagram: string | null;
     tiktok?: TikTokContext;
-    channel?: "whatsapp" | "web" | "instagram";
+    channel?: "whatsapp" | "web";
     /** Default level of care for montages (Réglages). */
     montageEffort?: Effort;
     /** What Fauve knows about the business (site, tone, memory). */

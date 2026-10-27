@@ -278,12 +278,11 @@ export function stolenStyleMessage(style: StolenStyle, making: boolean): string 
   ].join("\n\n");
 }
 
-/** Why it could not be read, and what she can do instead. `handle`: Edith's Instagram account, when there is one. */
-export function stealMissMessage(miss: "unreachable" | "too_long" | "not_video" | "unreadable" | "not_found", handle?: string | null): string {
-  const share = handle ? `, ou partage-le à @${handle} sur Instagram (bouton Partager)` : "";
+/** Why it could not be read, and what she can do instead. */
+export function stealMissMessage(miss: "unreachable" | "too_long" | "not_video" | "unreadable" | "not_found"): string {
   switch (miss) {
     case "unreachable":
-      return `Je n’arrive pas à ouvrir ce Reel depuis son lien (Instagram et TikTok ne me laissent pas toujours entrer). Enregistre-le et envoie-moi la vidéo ici${share} : je le regarde aussitôt.`;
+      return `Je n’arrive pas à ouvrir ce Reel depuis son lien (Instagram et TikTok ne me laissent pas toujours entrer). Enregistre-le et envoie-moi la vidéo ici : je le regarde aussitôt.`;
     case "too_long":
       return "Cette vidéo dure plus de 3 minutes : envoie-moi un Reel plus court, ou juste le passage qui te plaît.";
     case "not_video":

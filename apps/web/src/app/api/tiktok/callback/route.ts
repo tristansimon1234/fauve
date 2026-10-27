@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { readOAuthState } from "@/lib/social/oauth-state";
+import { consumeOAuthState } from "@/lib/social/oauth-state";
 import { exchangeTikTokCode, TikTokError, tiktokUser } from "@/lib/social/tiktok";
 import { linkTikTokAccount } from "@/lib/social/tiktok-account";
 
@@ -14,7 +14,7 @@ function back(request: NextRequest, path: string, error?: string) {
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   if (params.get("error")) return back(request, "/connect", "refus");
-  const state = readOAuthState(params.get("state"));
+  const state = await consumeOAuthState(params.get("state"));
   if (!state) return back(request, "/connect", "lien-expire");
   const code = params.get("code");
   if (!code) return back(request, "/connect", "refus");

@@ -2,15 +2,15 @@ import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { creditBalance } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { isValidTestKey } from "@/lib/test-studio";
+import { adminKeyAuthorized } from "@/lib/test-studio";
 
-// Admin helper for credits, protected by FAUVE_TEST_KEY:
-//   ?cle=…&studio=<id>               balance and last movements
-//   ?cle=…&studio=<id>&add=50        adds (or with a negative number removes) credits
+// Admin helper for credits, protected by FAUVE_TEST_KEY (Authorization: Bearer …, never in the address):
+//   ?studio=<id>               balance and last movements
+//   ?studio=<id>&add=50        adds (or with a negative number removes) credits
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  if (!isValidTestKey(params.get("cle"))) return new Response("Forbidden", { status: 403 });
+  if (!adminKeyAuthorized(request)) return new Response("Forbidden", { status: 403 });
   const studio = z.uuid().safeParse(params.get("studio"));
   if (!studio.success) return Response.json({ error: "studio=<uuid> attendu" }, { status: 400 });
 

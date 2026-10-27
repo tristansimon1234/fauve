@@ -2,16 +2,16 @@ import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { CREDIT_VALUE_EUR, monthlyCostBudget, netRevenue, PLANS, planOf, studioMonth, TARGET_MARGIN, type PlanId } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { isValidTestKey } from "@/lib/test-studio";
+import { adminKeyAuthorized } from "@/lib/test-studio";
 
-// Admin view of the margin, protected by FAUVE_TEST_KEY:
-//   ?cle=…                  this month, every studio: what it cost (chat, work, by purpose)
-//   ?cle=…&month=2026-10    another month
+// Admin view of the margin, protected by FAUVE_TEST_KEY (Authorization: Bearer …, never in the address):
+//                   this month, every studio: what it cost (chat, work, by purpose)
+//   ?month=2026-10    another month
 // against its plan, the credits it used and the budget left before the margin falls under the target.
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  if (!isValidTestKey(params.get("cle"))) return new Response("Forbidden", { status: 403 });
+  if (!adminKeyAuthorized(request)) return new Response("Forbidden", { status: 403 });
   const month = z
     .string()
     .regex(/^\d{4}-\d{2}$/)

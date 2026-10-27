@@ -8,7 +8,6 @@ import { loadMontageInputs } from "@/lib/render/render-post";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { loadTextLooks } from "@/lib/text-looks";
 import { sanitizeProfile, toStyleForm } from "./style-profile";
-import { fauveAccount } from "@/lib/instagram-dm";
 import { CreatedSections } from "./created-section";
 import { InspirationsSection, type Inspiration } from "./inspirations-section";
 import { StyleEditor } from "./style-editor";
@@ -82,10 +81,12 @@ async function StyleLoader() {
     return url ? [{ family: f.family, path: f.path, url }] : [];
   });
 
-  const [{ data: shared }, fauve] = await Promise.all([
-    db.from("inspirations").select("id, title, url, source, analysis, storage_path, created_at, missed:style->>miss").eq("studio_id", studioId).order("created_at", { ascending: false }).limit(12),
-    fauveAccount(),
-  ]);
+  const { data: shared } = await db
+    .from("inspirations")
+    .select("id, title, url, source, analysis, storage_path, created_at, missed:style->>miss")
+    .eq("studio_id", studioId)
+    .order("created_at", { ascending: false })
+    .limit(12);
   const inspirations: Inspiration[] = (shared ?? []).map((i) => ({
     id: i.id as string,
     title: (i.title as string | null) ?? null,
@@ -99,7 +100,7 @@ async function StyleLoader() {
 
   return (
     <StyleEditor
-      inspirations={<InspirationsSection items={inspirations} fauveHandle={fauve?.username ?? null} studioId={studioId} />}
+      inspirations={<InspirationsSection items={inspirations} studioId={studioId} />}
       created={
         <Suspense fallback={null}>
           <Created studioId={studioId} />

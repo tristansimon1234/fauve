@@ -29,10 +29,10 @@ export async function setShotDone(id: string, done: boolean): Promise<{ ok: bool
   const parsed = input.safeParse({ id, done });
   if (!parsed.success) return { ok: false };
 
-  const { db, member } = await getStudioContext();
+  const { member } = await getStudioContext();
   if (!member) return { ok: false };
 
-  const { data, error } = await db
+  const { data, error } = await supabaseAdmin()
     .from("shot_requests")
     .update({ done: parsed.data.done })
     .eq("id", parsed.data.id)

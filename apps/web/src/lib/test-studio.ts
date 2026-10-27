@@ -22,6 +22,12 @@ export function isValidTestKey(key: string | undefined | null): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/** Admin routes: FAUVE_TEST_KEY in the Authorization header, never in the address (which ends up in logs and history). */
+export function adminKeyAuthorized(request: Request): boolean {
+  const header = request.headers.get("authorization") ?? "";
+  return header.startsWith("Bearer ") && isValidTestKey(header.slice("Bearer ".length));
+}
+
 export type TestMember = { memberId: string; studioId: string };
 
 export async function getOrCreateTestMember(): Promise<TestMember> {

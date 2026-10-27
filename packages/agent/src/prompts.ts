@@ -111,7 +111,7 @@ export type StudioContextForPrompt = {
   instagram: string | null;
   tiktok?: TikTokContext;
   /** Where the manager is writing from: the advice on sending files depends on it. */
-  channel?: "whatsapp" | "web" | "instagram";
+  channel?: "whatsapp" | "web";
   /** The studio's default level of care for montages (Réglages). */
   montageEffort?: Effort;
   /** What Fauve already knows about the business: never asked again. */
@@ -150,7 +150,6 @@ function tiktokLine(t: TikTokContext): string {
 const channelLines: Record<NonNullable<StudioContextForPrompt["channel"]>, string> = {
   whatsapp: "Canal : WhatsApp. Pour des photos ou des vidéos, reply_with upload ajoute sous ton message son lien de dépôt (sa galerie, en pleine qualité) ; sinon ici « en tant que document » (trombone, puis Document), car WhatsApp compresse les vidéos. Elle est sur son téléphone : ne l'envoie jamais dans l'application (« suis l'avancement dans l'app », « va dans Réglages ») ; tout se fait ici, et quand une page est utile (voir une publication, déposer des fichiers, relier ses comptes), son bouton s'affiche sous ton message (get_post_link, reply_with upload, get_connect_link).",
   web: "Canal : l'application Edith (web), pas WhatsApp. Pour envoyer des photos ou des vidéos, la gérante les glisse dans la conversation ou clique sur le trombone à gauche du champ de message : elles arrivent en pleine qualité. Ne parle pas de « document » ni de WhatsApp pour les fichiers.",
-  instagram: "Canal : messages Instagram. Pour des vidéos de montage, invite à les envoyer sur WhatsApp en tant que document ou à les déposer dans l'application ; un Reel partagé ici sert d'inspiration.",
 };
 
 /** Volatile context, sent after the cached system prompt. */

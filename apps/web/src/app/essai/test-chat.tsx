@@ -27,7 +27,7 @@ const dateFormat = new Intl.DateTimeFormat("fr-FR", {
   timeZone: "Europe/Paris",
 });
 
-export function TestChat({ testKey, initial }: { testKey: string; initial: TestState }) {
+export function TestChat({ initial }: { initial: TestState }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initial.messages);
   const [snapshot, setSnapshot] = useState<TestSnapshot>(initial.snapshot);
   const [draft, setDraft] = useState("");
@@ -46,7 +46,7 @@ export function TestChat({ testKey, initial }: { testKey: string; initial: TestS
     setError(null);
     setMessages((m) => [...m, { id: `local-${Date.now()}`, from: "me", body: text, at: new Date().toISOString() }]);
     startTransition(async () => {
-      const res = await sendTestMessage(testKey, text);
+      const res = await sendTestMessage(text);
       if (res.ok) {
         setMessages(res.state.messages);
         setSnapshot(res.state.snapshot);
@@ -60,7 +60,7 @@ export function TestChat({ testKey, initial }: { testKey: string; initial: TestS
     if (!window.confirm("Effacer le studio de test et recommencer l’onboarding ?")) return;
     setError(null);
     startTransition(async () => {
-      const res = await resetTest(testKey);
+      const res = await resetTest();
       if (res.ok) {
         setMessages(res.state.messages);
         setSnapshot(res.state.snapshot);

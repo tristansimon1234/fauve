@@ -3,10 +3,10 @@ import { type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getOrCreateTestMember, isValidTestKey } from "@/lib/test-studio";
+import { getOrCreateTestMember, adminKeyAuthorized } from "@/lib/test-studio";
 
-// Admin helper to test the chat end to end on the test studio, protected by FAUVE_TEST_KEY:
-//   ?cle=…&text=…   sends one message as the test manager and returns Fauve's reply
+// Admin helper to test the chat end to end on the test studio, protected by FAUVE_TEST_KEY (Authorization: Bearer …, never in the address):
+//   ?text=…   sends one message as the test manager and returns Fauve's reply
 // (same path as the in-app chat; jobs such as a montage start after the reply).
 //   &studio=…       on a real studio instead, as its owner, in a separate web
 //                   conversation (returned; pass &c=… to continue it).
@@ -21,7 +21,7 @@ function cronAuthorized(request: Request): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  if (!isValidTestKey(request.nextUrl.searchParams.get("cle"))) return new Response("Forbidden", { status: 403 });
+  if (!adminKeyAuthorized(request)) return new Response("Forbidden", { status: 403 });
   return chat(request.nextUrl.searchParams);
 }
 

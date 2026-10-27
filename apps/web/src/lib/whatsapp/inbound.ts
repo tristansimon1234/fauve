@@ -1,7 +1,7 @@
 import "server-only";
 import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, replyExtrasSchema } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
-import { claimPairing } from "@/lib/auth/pairing";
+import { answerPairing, claimPairing, PAIRING_YES, PAIRING_NO } from "@/lib/auth/pairing";
 import { answerPublishOffer } from "@/lib/publish-offer";
 import { deliverPendingHandOffs } from "@/lib/social/hand-off";
 import { replyInConversation } from "@/lib/agent/conversation";
@@ -125,17 +125,47 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
 
   await markReadAndTyping(message.id).catch((e) => console.warn("typing indicator failed", e));
 
-  // « Bonjour Fauve ! Code : K7P2QX » from the start screen on a computer: that screen opens
-  // her space, and the getting started goes on there.
-  if (message.type === "text" && (await claimPairing(textOf(message), phone))) {
-    const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", member.studio_id).single();
-    const fresh = onboardingStepOf(studio?.onboarding_step) !== "done";
-    const reply = fresh
-      ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Edith, ton community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment.`
-      : "C’est bon, ton ordinateur est connecté ✨";
-    const waMessageId = await sendText(message.from, reply).catch(() => undefined);
-    await db.from("whatsapp_messages").insert({ studio_id: member.studio_id, wa_message_id: waMessageId, direction: "outbound", phone_e164: phone, type: "text", body: reply, payload: { reply_to: message.id } });
-    return;
+  // « Bonjour Edith ! Code : K7P2QX » from the start screen on a computer: she confirms with a
+  // button that the code is on her own screen (a message someone else wrote for her would open
+  // her account on theirs), then that screen opens her space and the getting started goes on there.
+  const pairingReply = async (reply: string, options?: string[]) => {
+    const waMessageId = await sendReply(message.from, reply, options).catch(() => undefined);
+    await db.from("whatsapp_messages").insert({
+      studio_id: member.studio_id,
+      wa_message_id: waMessageId,
+      direction: "outbound",
+      phone_e164: phone,
+      type: "text",
+      body: reply,
+      payload: { reply_to: message.id, ...(options ? { options } : {}) },
+    });
+  };
+  if (message.type === "text") {
+    const code = await claimPairing(textOf(message), phone);
+    if (code) {
+      await pairingReply(
+        `Un ordinateur veut ouvrir ton compte Edith avec le code ${code}. Si ce code est affiché sur ton écran en ce moment, touche « ${PAIRING_YES} ». Sinon, ne touche rien : quelqu’un essaie d’entrer sur ton compte.`,
+        [PAIRING_YES, PAIRING_NO],
+      );
+      return;
+    }
+  }
+  if (message.type === "text" || message.type === "interactive") {
+    const answer = await answerPairing(textOf(message), phone);
+    if (answer === "refused") {
+      await pairingReply("C’est noté, cet ordinateur n’entrera pas sur ton compte 🔒");
+      return;
+    }
+    if (answer === "confirmed") {
+      const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", member.studio_id).single();
+      const fresh = onboardingStepOf(studio?.onboarding_step) !== "done";
+      await pairingReply(
+        fresh
+          ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Edith, ton community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment.`
+          : "C’est bon, ton ordinateur est connecté ✨",
+      );
+      return;
+    }
   }
 
   // Her answer to the « post_to_share » template: the Reels to publish herself, now.

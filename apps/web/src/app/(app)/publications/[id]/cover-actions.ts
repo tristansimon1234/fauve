@@ -9,6 +9,7 @@ import { renderPost } from "@/lib/render/render-post";
 import { removeVoice } from "@/lib/voice-over";
 import { z } from "zod";
 import { getStudioContext } from "@/lib/studio";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 /** Sets a Reel's cover (a frame of its video or one of the studio's photos); null leaves it to Edith. */
 export async function setCover(postId: string, cover: PostCover | null): Promise<{ ok: boolean }> {
@@ -22,7 +23,7 @@ export async function setCover(postId: string, cover: PostCover | null): Promise
     const { data: photo } = await db.from("media_assets").select("id").eq("id", chosen.media_id).eq("studio_id", studioId).eq("kind", "image").maybeSingle();
     if (!photo) return { ok: false };
   }
-  const { data, error } = await db
+  const { data, error } = await supabaseAdmin()
     .from("posts")
     .update({ cover: chosen })
     .eq("id", postId)
@@ -37,9 +38,9 @@ export async function setCover(postId: string, cover: PostCover | null): Promise
 /** A Reel in the profile grid too (default), or only in the Reels tab. */
 export async function setShareToFeed(postId: string, shareToFeed: boolean): Promise<{ ok: boolean }> {
   if (!z.uuid().safeParse(postId).success) return { ok: false };
-  const { db, member } = await getStudioContext();
+  const { member } = await getStudioContext();
   if (!member) return { ok: false };
-  const { data, error } = await db
+  const { data, error } = await supabaseAdmin()
     .from("posts")
     .update({ share_to_feed: Boolean(shareToFeed) })
     .eq("id", postId)
@@ -54,9 +55,9 @@ export async function setShareToFeed(postId: string, shareToFeed: boolean): Prom
 /** « Je publie moi-même » : at its time she gets the Reel and its caption (to add Instagram's music), or the story and her link (to add the link sticker), on WhatsApp. */
 export async function setPublishByHand(postId: string, byHand: boolean): Promise<{ ok: boolean }> {
   if (!z.uuid().safeParse(postId).success) return { ok: false };
-  const { db, member } = await getStudioContext();
+  const { member } = await getStudioContext();
   if (!member) return { ok: false };
-  const { data, error } = await db
+  const { data, error } = await supabaseAdmin()
     .from("posts")
     .update({ publish_by_hand: Boolean(byHand), handoff_at: null, handoff_via: null })
     .eq("id", postId)
@@ -81,7 +82,7 @@ export async function setMusic(postId: string, mode: "on" | "off" | "another"): 
   const { data: post } = await db.from("posts").select("music, edit_plan_id").eq("id", postId).eq("studio_id", studioId).eq("kind", "reel").maybeSingle();
   if (!post?.edit_plan_id) return { ok: false };
   const music = readPostMusic(post.music);
-  const { error } = await db
+  const { error } = await supabaseAdmin()
     .from("posts")
     .update({ music: { ...music, mode: mode === "off" ? "off" : "on" } })
     .eq("id", postId)

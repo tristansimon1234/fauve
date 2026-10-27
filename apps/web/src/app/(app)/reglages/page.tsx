@@ -5,7 +5,6 @@ import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTAGE_CEILING, MONTAGE_F
 import { NoStudio } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
-import { fauveAccount } from "@/lib/instagram-dm";
 import { formatPhone, platformLabels, plural, shortUrl } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
 import { getContentPlan, getSocialAccounts, getStudioContext, type SocialAccount } from "@/lib/studio";
@@ -14,7 +13,6 @@ import { EffortSetting } from "./effort-setting";
 import { SubscriptionButton } from "./subscription";
 import { billingEnabled } from "@/lib/billing/stripe";
 import { MemoryList } from "./memory-list";
-import { InstagramLinkCode } from "./instagram-link";
 import { SettingsPanels } from "./settings-panels";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import { SettingsTabs } from "@/components/settings-tabs";
@@ -63,13 +61,11 @@ async function Settings() {
   }
   const { studio } = member;
   const offer = planOf(studio.plan);
-  const [accounts, plan, balance, ledger, fauveInstagram, dmContact, care] = await Promise.all([
+  const [accounts, plan, balance, ledger, care] = await Promise.all([
     getSocialAccounts(db, studio.id),
     getContentPlan(db, studio.id),
     creditBalance(studio.id),
     db.from("credit_ledger").select("id, delta, label, created_at").eq("studio_id", studio.id).order("created_at", { ascending: false }).limit(10),
-    fauveAccount(),
-    db.from("instagram_contacts").select("igsid").eq("studio_id", studio.id).limit(1).maybeSingle(),
     db.from("studios").select("montage_effort, business_type, memory, subscription_status, trial_ends_at").eq("id", studio.id).maybeSingle(),
   ]);
   const tiktokOn = tiktokEnabled();
@@ -152,23 +148,6 @@ async function Settings() {
                   );
                 })}
               </Section>
-
-              {fauveInstagram?.username && (
-                <Section title="Edith sur Instagram">
-                  <p className="text-sm leading-normal">
-                    Quand un Reel t’inspire, partage-le à{" "}
-                    <a href={`https://ig.me/m/${fauveInstagram.username}`} target="_blank" rel="noreferrer" className="font-bold text-violet">
-                      @{fauveInstagram.username}
-                    </a>{" "}
-                    (bouton Partager) : Edith en tire des idées pour ton style. Tu peux aussi lui écrire là-bas comme sur WhatsApp.
-                  </p>
-                  {dmContact.data ? (
-                    <p className="text-sm font-semibold text-success">Ton compte Instagram est relié.</p>
-                  ) : (
-                    <InstagramLinkCode fauveHandle={fauveInstagram.username} />
-                  )}
-                </Section>
-              )}
             </>
           ),
           montages: (

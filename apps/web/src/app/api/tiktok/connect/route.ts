@@ -16,5 +16,5 @@ export async function GET(request: NextRequest) {
     login.searchParams.set("next", "/connect");
     return NextResponse.redirect(login);
   }
-  return NextResponse.redirect(tiktokAuthorizeUrl(createOAuthState(member.studio_id, member.id)));
+  return NextResponse.redirect(tiktokAuthorizeUrl(await createOAuthState(member.studio_id, member.id)));
 }

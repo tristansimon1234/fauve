@@ -17,7 +17,7 @@ const schema = {
   // Supabase Auth → Send SMS hook secret ("v1,whsec_…"); several may be joined with "|".
   SEND_SMS_HOOK_SECRET: z.string().min(1),
   APP_URL: z.url().default("http://localhost:3000"),
-  // Secret for the browser test chat (/essai?cle=…). Unset = test chat disabled.
+  // Secret for the browser test chat (/essai, typed there) and the admin routes (Authorization: Bearer …). Unset = disabled.
   FAUVE_TEST_KEY: z.string().min(16),
   USD_TO_EUR: z.coerce.number().positive().optional(),
   // Vercel AI Gateway (Kimi as a lab studio's motion designer): the project's OIDC token when unset.
@@ -41,8 +41,6 @@ const schema = {
   // accounts connected earlier through Facebook Login.
   FACEBOOK_APP_ID: z.string().regex(/^\d+$/),
   FACEBOOK_APP_SECRET: z.string().min(1),
-  // Instagram webhooks (DMs to Fauve's account): the "verify token" entered in the Meta dashboard.
-  INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().min(16),
   // TikTok for Developers app (Login Kit + Content Posting API). Unset = TikTok not offered.
   TIKTOK_CLIENT_KEY: z.string().min(1).optional(),
   TIKTOK_CLIENT_SECRET: z.string().min(1).optional(),

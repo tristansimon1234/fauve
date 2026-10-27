@@ -1,10 +1,10 @@
 import { type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { env, type EnvKey } from "@/lib/env";
-import { isValidTestKey } from "@/lib/test-studio";
+import { adminKeyAuthorized } from "@/lib/test-studio";
 import { graph, WhatsAppError } from "@/lib/whatsapp/client";
 
-// Admin helper for the WhatsApp setup, protected by FAUVE_TEST_KEY:
+// Admin helper for the WhatsApp setup, protected by FAUVE_TEST_KEY (Authorization: Bearer …, never in the address):
 //   ?action=status              phone number + subscription diagnostics
 //   ?action=register&pin=123456 register the number on the Cloud API (2-step PIN)
 //   ?action=subscribe           subscribe this app to the WABA's webhooks
@@ -148,7 +148,7 @@ async function attempt<T>(fn: () => Promise<T>) {
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  if (!isValidTestKey(params.get("cle"))) return new Response("Forbidden", { status: 403 });
+  if (!adminKeyAuthorized(request)) return new Response("Forbidden", { status: 403 });
   return run(params);
 }
 

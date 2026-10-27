@@ -2,6 +2,7 @@
 
 import { normalizePhone } from "@fauve/agent";
 import { redirect } from "next/navigation";
+import { safePath } from "@/lib/auth/link-route";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export type LoginState =
@@ -10,7 +11,7 @@ export type LoginState =
 
 function safeNext(value: FormDataEntryValue | null): string {
   const next = typeof value === "string" ? value : "";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/fauve";
+  return safePath(next) ?? "/fauve";
 }
 
 export async function sendCode(_prev: LoginState, formData: FormData): Promise<LoginState> {

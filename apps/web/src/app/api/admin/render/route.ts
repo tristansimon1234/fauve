@@ -4,12 +4,12 @@ import { designEdit } from "@/lib/agent/editor";
 import { renderPost } from "@/lib/render/render-post";
 import { dropSandbox, remotionSandbox, trackSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { isValidTestKey } from "@/lib/test-studio";
+import { adminKeyAuthorized } from "@/lib/test-studio";
 
-// Admin helper to exercise the render worker, protected by FAUVE_TEST_KEY:
-//   ?cle=…&post=<post id>  renders the post's latest edit plan and returns a 24 h link.
-//   ?cle=…&action=warm     installs the Remotion templates in the sandbox ahead of the first render.
-//   ?cle=…&post=…&design=1[&brief=…]  has the editor (Opus) write a new plan first, then renders it.
+// Admin helper to exercise the render worker, protected by FAUVE_TEST_KEY (Authorization: Bearer …, never in the address):
+//   ?post=<post id>  renders the post's latest edit plan and returns a 24 h link.
+//   ?action=warm     installs the Remotion templates in the sandbox ahead of the first render.
+//   ?post=…&design=1[&brief=…]  has the editor (Opus) write a new plan first, then renders it.
 // And POST ?action=warm with CRON_SECRET, from the database (call_app): the same warm-up,
 // in the background (a new sandbox installs everything once, a few minutes, the collages'
 // cut-out model and the tracker included). And POST
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  if (!isValidTestKey(params.get("cle"))) return new Response("Forbidden", { status: 403 });
+  if (!adminKeyAuthorized(request)) return new Response("Forbidden", { status: 403 });
   if (params.get("action") === "warm") {
     const started = Date.now();
     try {

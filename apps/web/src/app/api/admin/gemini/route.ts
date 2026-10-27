@@ -2,14 +2,14 @@ import { GoogleGenAI } from "@google/genai";
 import { type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { env } from "@/lib/env";
-import { isValidTestKey } from "@/lib/test-studio";
+import { adminKeyAuthorized } from "@/lib/test-studio";
 
-// Admin helper for the Gemini setup, protected by FAUVE_TEST_KEY:
-//   ?cle=…  lists the models this key can call, and the one GEMINI_MODEL points to.
+// Admin helper for the Gemini setup, protected by FAUVE_TEST_KEY (Authorization: Bearer …, never in the address):
+//   lists the models this key can call, and the one GEMINI_MODEL points to.
 // The same in POST with CRON_SECRET, from the database (select public.call_app('/api/admin/gemini')).
 
 export async function GET(request: NextRequest) {
-  if (!isValidTestKey(request.nextUrl.searchParams.get("cle"))) return new Response("Forbidden", { status: 403 });
+  if (!adminKeyAuthorized(request)) return new Response("Forbidden", { status: 403 });
   return models();
 }
 

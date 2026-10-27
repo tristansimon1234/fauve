@@ -20,7 +20,7 @@ export type Inspiration = {
 const MAX_BYTES = 50 * 1024 * 1024;
 
 /** Reels the manager likes (shared with Fauve on Instagram, or added here), and what Fauve takes from them. */
-export function InspirationsSection({ items: initial, fauveHandle, studioId }: { items: Inspiration[]; fauveHandle: string | null; studioId: string }) {
+export function InspirationsSection({ items: initial, studioId }: { items: Inspiration[]; studioId: string }) {
   const [items, setItems] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -58,7 +58,7 @@ export function InspirationsSection({ items: initial, fauveHandle, studioId }: {
     <Section
       id="style-inspirations"
       title="Tes inspirations"
-      hint={`Des Reels qui te plaisent : Edith s’en inspire pour tes montages (le rythme, l’accroche, les textes), sans jamais copier leurs images ni leurs mots. Pour qu’un Reel soit fait comme l’un d’eux, envoie son lien à Edith${fauveHandle ? ` ou partage-le à @${fauveHandle} sur Instagram` : ""} : elle le recopie pour ce Reel-là, avec tes couleurs et tes polices.`}
+      hint={`Des Reels qui te plaisent : Edith s’en inspire pour tes montages (le rythme, l’accroche, les textes), sans jamais copier leurs images ni leurs mots. Pour qu’un Reel soit fait comme l’un d’eux, envoie son lien à Edith : elle le recopie pour ce Reel-là, avec tes couleurs et tes polices.`}
     >
       {items.length > 0 && (
         <ul className="flex flex-col divide-y divide-line">

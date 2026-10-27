@@ -3648,8 +3648,7 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   assert.match(making, /arrive dans quelques minutes/);
   assert.doesNotMatch(making, /Envoie-moi/);
   // A link that does not open: the other ways in, with Edith's account when there is one.
-  assert.match(stealMissMessage("unreachable", "simone.studio"), /envoie-moi la vidéo ici, ou partage-le à @simone\.studio/);
-  assert.doesNotMatch(stealMissMessage("unreachable", null), /@/);
+  assert.match(stealMissMessage("unreachable"), /envoie-moi la vidéo ici : je le regarde/);
   assert.match(stealMissMessage("not_video"), /carrousel.*capture/);
 });
 

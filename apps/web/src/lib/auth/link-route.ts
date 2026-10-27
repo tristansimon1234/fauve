@@ -15,9 +15,12 @@ import { supabaseServer } from "@/lib/supabase/server";
 
 const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** A path of the app only (never another site). */
+/**
+ * A path of the app only (never another site): « //evil.com » and « /\evil.com » both open
+ * evil.com in a browser, and a control character can hide either.
+ */
 export function safePath(next: string | null | undefined): string | null {
-  return next?.startsWith("/") && !next.startsWith("//") ? next : null;
+  return next?.startsWith("/") && !next.startsWith("//") && !/[\\\u0000-\u001f\u007f]/.test(next) ? next : null;
 }
 
 /** The page a link shows before it signs in (GET): it posts itself to `action`. */

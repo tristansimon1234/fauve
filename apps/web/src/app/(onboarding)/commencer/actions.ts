@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { createPairing, PAIR_COOKIE, pairingMessage, pairingState } from "@/lib/auth/pairing";
+import { createPairing, PAIR_COOKIE, pairingMessage, pairingState, type PairingState } from "@/lib/auth/pairing";
 
 /** A new code for this browser (its secret stays in an http-only cookie). */
 export async function startPairing(): Promise<{ code: string; text: string }> {
@@ -10,6 +10,6 @@ export async function startPairing(): Promise<{ code: string; text: string }> {
   return { code, text: pairingMessage(code) };
 }
 
-export async function checkPairing(): Promise<"waiting" | "ready" | "expired"> {
+export async function checkPairing(): Promise<PairingState> {
   return pairingState((await cookies()).get(PAIR_COOKIE)?.value);
 }

@@ -80,7 +80,7 @@ export async function updatePost(postId: string, _prev: PostFormState, formData:
 
   if (Object.keys(patch).length) {
     // Only apply if nobody (Fauve included) changed the status in the meantime.
-    const { data: updated, error } = await db
+    const { data: updated, error } = await supabaseAdmin()
       .from("posts")
       .update(patch)
       .eq("id", post.id)

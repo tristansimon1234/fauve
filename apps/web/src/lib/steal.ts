@@ -40,22 +40,16 @@ export type StealOutcome = { ok: true; inspirationId: string; style: StolenStyle
 export const STEAL_WAIT_MS = 4 * 60_000;
 /** A Reel she sent to copy waits for her next Reel this long. */
 const PENDING_MS = 48 * 3600_000;
-/** Inspirations sent to be copied: a link or a video in the conversation, a share to Edith on Instagram. */
+/** Inspirations sent to be copied: a link or a video in the conversation (and shares to Edith on Instagram, before they were retired). */
 export const SENT_TO_COPY = ["link", "chat", "instagram_dm"];
 /** One of her own Reels kept as a model (lib/reel-models.ts): read like a Reel to copy, never one shot. */
 export const MODEL_SOURCE = "model";
 /** A Reel still being read: it usually takes a minute or two. */
 export const READING_MS = 15 * 60_000;
 
-/** Edith's own Instagram account (shares to it become inspirations), when connected. */
-export async function simoneHandle(): Promise<string | null> {
-  const { data } = await supabaseAdmin().from("platform_accounts").select("username").eq("key", "fauve_instagram").maybeSingle();
-  return (data?.username as string | null) ?? null;
-}
-
 /** What to tell her when a Reel could not be read. */
 export async function missMessage(miss: StealMissReason): Promise<string> {
-  return stealMissMessage(miss, miss === "unreachable" ? await simoneHandle().catch(() => null) : null);
+  return stealMissMessage(miss);
 }
 
 const read = (inspirationId: string, style: StolenStyle, reused: boolean): StealOutcome => ({ ok: true, inspirationId, style, lines: stolenStyleLines(style), reused });
