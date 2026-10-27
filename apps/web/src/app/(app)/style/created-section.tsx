@@ -11,7 +11,7 @@ import type { Creation } from "@/lib/creations";
 import { archiveAnimation, removeTextStyle } from "./created-actions";
 import { Section } from "./ui";
 
-// What Simone made for the studio and reuses, at the end of « Ton style »: the animations
+// What Edith made for the studio and reuses, at the end of « Ton style »: the animations
 // of its Reels, each drawn live by the render composition (she sees them rather than reads
 // a technical description), and the text styles taken from her examples. Shown only when
 // there is something: an empty list says nothing.
@@ -75,7 +75,7 @@ export function CreatedSections({ scenes, looks, brand }: { scenes: Creation[]; 
   return (
     <>
       {scenes.length > 0 && (
-        <Section id="tes-animations" title="Tes animations" hint="Faites pour tes Reels. Simone les réutilise avec d’autres mots, sans crédit : retire celles que tu ne veux plus revoir.">
+        <Section id="tes-animations" title="Tes animations" hint="Faites pour tes Reels. Edith les réutilise avec d’autres mots, sans crédit : retire celles que tu ne veux plus revoir.">
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
             {scenes.map((s) => (
               <li key={s.id} className="flex flex-col overflow-hidden rounded-[16px] border border-line bg-white">
@@ -95,7 +95,7 @@ export function CreatedSections({ scenes, looks, brand }: { scenes: Creation[]; 
         </Section>
       )}
       {looks.length > 0 && (
-        <Section id="tes-styles-texte" title="Tes styles de texte" hint="Repris des exemples que tu as envoyés à Simone. Elle s’en sert pour écrire sur tes Reels, et tu les retrouves quand tu changes un texte.">
+        <Section id="tes-styles-texte" title="Tes styles de texte" hint="Repris des exemples que tu as envoyés à Edith. Elle s’en sert pour écrire sur tes Reels, et tu les retrouves quand tu changes un texte.">
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
             {looks.map((s) => (
               <li key={s.name} className="group flex flex-col gap-1.5 rounded-[16px] border border-line bg-white p-2">

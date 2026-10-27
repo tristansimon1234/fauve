@@ -12,7 +12,7 @@ export const SIGNATURE_GRADES = ["natural", "warm", "bright", "flash", "film", "
 
 /** The longest words of a signature: a stored profile keeps them within these. */
 const SIGNATURE_CHARS = { music: 80, voice: 200, delivery: 140 } as const;
-/** The voices of Simone's gallery a business can sound like (SIMONE_VOICES without the whispered ones). */
+/** The voices of Edith's gallery a business can sound like (SIMONE_VOICES without the whispered ones). */
 export const NARRATOR_NAMES = ["Eva", "Victoria", "Lucie", "Neto", "Antonin", "Jules"] as const;
 
 export const narratorSchema = z

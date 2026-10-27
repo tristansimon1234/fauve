@@ -119,7 +119,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
           plan: planned ?? alignSlides({ template: "doux", slides: [] }, ids),
           photos,
           brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, logoOnDark: i.logoOnDark, fonts: i.fonts, colors: i.colors, customFonts: i.customFonts, signature: i.signature })),
-          // A carousel Simone composed: her photos as its code lays them (retouched, cut out), its zones blurred.
+          // A carousel Edith composed: her photos as its code lays them (retouched, cut out), its zones blurred.
           ...(planned?.design
             ? {
                 carousel: (

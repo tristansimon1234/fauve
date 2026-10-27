@@ -8,7 +8,7 @@ import { Orb } from "@/components/orb";
 // « Que veux-tu sur cette photo ? »: Fauve, photo by photo. The manager says it
 // in her words (a checklist of what to bring, the week's hours…), can join a
 // picture she likes as an example, and Fauve does it in her panel. On a carousel
-// Simone composed, the same for one of its images (a bigger title, another photo).
+// Edith composed, the same for one of its images (a bigger title, another photo).
 
 const IDEAS = ["Une checklist", "Un titre accrocheur", "Les horaires", "Une offre", "Un avis client"];
 /** What she may want changed on an image of a composed carousel. */
@@ -108,7 +108,7 @@ export function PhotoAsk({
           </button>
         )}
         <button type="button" disabled={!text.trim() && !example} onClick={send} className="btn btn-primary h-9 shrink-0 px-3.5 text-[13px] disabled:opacity-40">
-          Demander à Simone
+          Demander à Edith
         </button>
       </div>
       <input

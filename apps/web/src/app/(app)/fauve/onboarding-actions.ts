@@ -24,7 +24,7 @@ export type OnboardingView = {
   preview: ReelProps | null;
   /** Her site's look has been read (its signature written): until then, the style card makes her wait for her preview. */
   siteRead: boolean;
-  /** fromSite: Simone took these photos from her website (she has not made her own moodboard yet). */
+  /** fromSite: Edith took these photos from her website (she has not made her own moodboard yet). */
   moodboard: { items: { path: string; url: string }[]; reading: string | null; fromSite: boolean };
   rhythm: { posts: number; stories: number };
   /** Her offer: what its credits hold, to choose a rhythm she can keep with care. */

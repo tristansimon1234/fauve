@@ -4,7 +4,7 @@ import { MessageText } from "./chat-bubble";
 import { liveParagraphs, type LiveState } from "./live-turn";
 
 /**
- * Simone's bubbles while she answers: each paragraph appears whole, as a
+ * Edith's bubbles while she answers: each paragraph appears whole, as a
  * bubble, the moment she has finished writing it (never letter by letter),
  * then the dots (or what she is doing: « Je regarde ton calendrier… ») while
  * the next one comes. The stored message takes their place, as is, at the end.
@@ -19,7 +19,7 @@ export function LiveTyping({ live }: { live: LiveState | null }) {
         </div>
       ))}
       <div className="fauve-enter flex items-center gap-2 rounded-[18px_18px_18px_6px] border border-line bg-white py-2 pr-4 pl-2.5 text-sm text-muted [--fauve-delay:120ms]">
-        {/* Simone thinks in the header; here, what she is doing. */}
+        {/* Edith thinks in the header; here, what she is doing. */}
         <span className="fauve-dots" aria-hidden="true">
           <span />
           <span />
@@ -28,7 +28,7 @@ export function LiveTyping({ live }: { live: LiveState | null }) {
         {/* key: each new line fades in */}
         {!done.length && (
           <span key={live?.status ?? "writing"} className="fauve-fade">
-            {live?.status ?? "Simone écrit…"}
+            {live?.status ?? "Edith écrit…"}
           </span>
         )}
       </div>

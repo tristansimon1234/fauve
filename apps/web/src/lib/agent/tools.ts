@@ -99,7 +99,7 @@ export type ToolContext = {
   afterReply: (() => Promise<void>)[];
   /** Filled by reply_with: buttons and cards the caller shows under the reply. */
   extras: ReplyExtras;
-  /** Filled by reply_with: her plan before a new publication, written under Simone's words. */
+  /** Filled by reply_with: her plan before a new publication, written under Edith's words. */
   plan?: string;
   /**
    * Ids made during this turn (quote, post), stored with the reply and shown to the
@@ -155,7 +155,7 @@ async function nextVersion(table: "brand_profiles" | "edit_plans", column: "stud
 }
 
 /** Database-backed implementations of Fauve's tools, scoped to one studio. */
-/** What a post still needs before it can go out, per format, said to Simone (null when ready). */
+/** What a post still needs before it can go out, per format, said to Edith (null when ready). */
 const MISSING_FOR_SIMONE: Record<MissingContent, string> = {
   montage: "Pas encore de vidéo montée : fais d'abord le montage.",
   photo: "Il faut une photo pour ce post : ajoute son media_id (update_post media_ids).",
@@ -163,7 +163,7 @@ const MISSING_FOR_SIMONE: Record<MissingContent, string> = {
   media: "Il faut une photo, une vidéo ou un montage pour cette story.",
 };
 
-/** A composed carousel as Simone reads it: what each slide says, and its words slot by slot. */
+/** A composed carousel as Edith reads it: what each slide says, and its words slot by slot. */
 function composedLines(design: CarouselDesign) {
   const words = (slide: number) => design.slots.filter((s) => s.slide === slide).map((s) => ({ slot: s.name, texte: design.texts[s.name] ?? "", max: s.max_chars }));
   return {
@@ -212,7 +212,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
   /** A carousel composed by the carousel designer: its words and its layout change their own way. */
   const DESIGNED =
-    "Ce carrousel est composé par Simone (design_carousel) : ses mots se changent avec carousel_texts (gratuit), sa mise en page ou son style avec design_carousel (une correction, avec le changement demandé et l'exemple s'il y en a un).";
+    "Ce carrousel est composé par Edith (design_carousel) : ses mots se changent avec carousel_texts (gratuit), sa mise en page ou son style avec design_carousel (une correction, avec le changement demandé et l'exemple s'il y en a un).";
 
   /**
    * A change to a Reel the effects agent drew (its voice, its blur): the agent makes the effect again
@@ -348,7 +348,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (summary && !summaries.has(a.media_id as string)) summaries.set(a.media_id as string, summary);
       }
       const when = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: ctx.timezone ?? "Europe/Paris" });
-      const sources: Record<string, string> = { whatsapp: "WhatsApp", web_upload: "app", library: "médiathèque", website: "son site", ai: "Simone (image IA)" };
+      const sources: Record<string, string> = { whatsapp: "WhatsApp", web_upload: "app", library: "médiathèque", website: "son site", ai: "Edith (image IA)" };
       return json({
         medias: rows.map((r) => {
           const w = r.width as number | null;
@@ -669,7 +669,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         const rerender = await removeVoice(studioId, post_id);
         if (!rerender) return json({ ok: true, note: "C'est noté : pas de voix sur ce Reel." });
         // The voice is mixed into the video the effects agent drew: it makes the effect again without it.
-        if (rerender === "agent") return effectCorrection(post_id, EFFECT_VOICE_OUT, "Simone refait l'effet sans la voix");
+        if (rerender === "agent") return effectCorrection(post_id, EFFECT_VOICE_OUT, "Edith refait l'effet sans la voix");
         ctx.afterReply.push(async () => {
           await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
         });
@@ -685,7 +685,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       }
       const current = readPostVoice(post.voice_over);
       const voiceId = chosen?.id ?? current?.voice_id;
-      // Another text or another voice: the voice Simone made goes at the next montage, once.
+      // Another text or another voice: the voice Edith made goes at the next montage, once.
       const remake = Boolean(onReel) && (mode === "redo" || Boolean(chosen));
       check(
         await db
@@ -719,7 +719,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         status: "started",
         credits: started.credits,
-        note: "Simone compose le carrousel, en fait un rendu d'essai, le relit et le corrige : 3 à 6 minutes. Les crédits sont débités une fois livré et le lien part tout seul. Annonce-le en une phrase (délai et coût), sans lien.",
+        note: "Edith compose le carrousel, en fait un rendu d'essai, le relit et le corrige : 3 à 6 minutes. Les crédits sont débités une fois livré et le lien part tout seul. Annonce-le en une phrase (délai et coût), sans lien.",
       });
     },
 
@@ -821,7 +821,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
       return json({
         status: "started",
-        note: "Simone regarde les photos puis les retouche (une à deux minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase, en disant ce que tu fais (lumière, flou des visages…).",
+        note: "Edith regarde les photos puis les retouche (une à deux minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase, en disant ce que tu fais (lumière, flou des visages…).",
       });
     },
 
@@ -865,7 +865,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async blur_video({ post_id, what }) {
       // Drawn image by image by the effects agent: it blurs its own video.
-      if (await bakedReel(studioId, post_id)) return effectCorrection(post_id, effectBlurBrief(what), what.length ? "Simone floute la vidéo de l'effet" : "Simone retire le flou de l'effet");
+      if (await bakedReel(studioId, post_id)) return effectCorrection(post_id, effectBlurBrief(what), what.length ? "Edith floute la vidéo de l'effet" : "Edith retire le flou de l'effet");
       ctx.afterReply.push(async () => {
         try {
           await blurMontage(studioId, post_id, what);
@@ -877,7 +877,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         status: "started",
         note: what.length
-          ? "Simone repère les zones dans chaque vidéo puis refait le rendu avec le flou (deux à trois minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase."
+          ? "Edith repère les zones dans chaque vidéo puis refait le rendu avec le flou (deux à trois minutes) ; le lien est envoyé tout seul. Annonce-le en une phrase."
           : "Le flou est retiré et le rendu refait ; le lien est envoyé tout seul.",
       });
     },
@@ -885,7 +885,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     async remember({ add, avoid, remove }) {
       const { data } = await db.from("studios").select("memory").eq("id", studioId).single();
       let memory = readMemory(data?.memory);
-      // What was really there: Simone tells her what she forgot, or that it was never kept (never « retiré » for nothing).
+      // What was really there: Edith tells her what she forgot, or that it was never kept (never « retiré » for nothing).
       const forgotten = (remove ?? []).flatMap((n) => (memory[n - 1] ? [memory[n - 1]!.fact] : []));
       const missing = (remove ?? []).filter((n) => !memory[n - 1]);
       if (remove?.length) memory = removeFacts(memory, remove);
@@ -918,7 +918,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const items = await listInspirations(studioId, 10);
       return json({
         inspirations: items.map((i) => ({ inspiration_id: i.id, titre: i.title, a_reprendre: i.summary ?? (i.reading ? "en cours de lecture" : undefined), source: i.source })),
-        note: items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration : elle peut partager un Reel à Simone sur Instagram ou en ajouter un dans l'app.",
+        note: items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration : elle peut partager un Reel à Edith sur Instagram ou en ajouter un dans l'app.",
       });
     },
 

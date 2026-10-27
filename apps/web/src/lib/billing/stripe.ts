@@ -69,7 +69,7 @@ async function offerPrice(plan: PlanId): Promise<StripePrice> {
     old?.unit_amount === PLANS[plan].priceEur * 100
       ? old
       : await stripe<StripePrice>("POST", "/prices", {
-          product: old?.product ?? (await stripe<{ id: string }>("POST", "/products", { name: `Simone ${PLANS[plan].label}` })).id,
+          product: old?.product ?? (await stripe<{ id: string }>("POST", "/products", { name: `Edith ${PLANS[plan].label}` })).id,
           currency: "eur",
           unit_amount: PLANS[plan].priceEur * 100,
           recurring: { interval: "month" },

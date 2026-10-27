@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // What she asked for a Reel reaches every agent as she said it (Tristan: « l'information doit circuler correctement
 // entre agents »). Each launch of its montage keeps the exchange that led to it on the post: her messages word for word,
-// Simone's replies for context. Before, the agents only got Simone's summary: on the florist's Reel, « quelque part sur
+// Edith's replies for context. Before, the agents only got Edith's summary: on the florist's Reel, « quelque part sur
 // l'écran où elles écrivent sur WhatsApp » became « textes animés en bas », and his « les animations en haut », said that
 // day of another Reel, reached none of them.
 
@@ -26,7 +26,7 @@ export type RequestEntry = z.infer<typeof requestEntrySchema>;
 export const requestLogSchema = z.array(requestEntrySchema.nullable().catch(null)).catch([]).transform((log) => log.filter((e): e is RequestEntry => e !== null));
 
 /**
- * A stored message as the log reads it; `launched`: Simone's reply of a turn that started a montage; `unprompted`: a
+ * A stored message as the log reads it; `launched`: Edith's reply of a turn that started a montage; `unprompted`: a
  * message she sent on her own (a delivery, a reminder, a nudge), with the post it is about.
  */
 export type ExchangeRow = {
@@ -38,7 +38,7 @@ export type ExchangeRow = {
   unprompted?: { post?: string };
 };
 
-/** One message kept whole up to this length (Simone's plans are under 1 000 characters). */
+/** One message kept whole up to this length (Edith's plans are under 1 000 characters). */
 const LINE_MAX = 1500;
 /** One launch's exchange: its latest messages up to this length. */
 const ENTRY_MAX = 8000;
@@ -48,7 +48,7 @@ const ENTRIES_MAX = 12;
 export const REQUEST_MAX = 12000;
 /** What they get of her words on her recent Reels. */
 const RECENT_MAX = 2000;
-/** The most of a montage's brief every agent reads: her exchange, Simone's brief and her recent words, whole. */
+/** The most of a montage's brief every agent reads: her exchange, Edith's brief and her recent words, whole. */
 export const BRIEF_MAX = 18000;
 
 const MEDIA: Record<string, string> = {
@@ -62,9 +62,9 @@ const MEDIA: Record<string, string> = {
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max).replace(/\s+\S*$/, "")}…` : text);
 
 /**
- * The exchange of a launch for `post`, from her messages and Simone's replies (oldest first): what was said since the
+ * The exchange of a launch for `post`, from her messages and Edith's replies (oldest first): what was said since the
  * last montage launched in this thread (an earlier Reel's exchange is its own), its latest messages kept when it is long.
- * What Simone sent on her own about another post is left out: the florist's request carried the delivery of Inès's Reel
+ * What Edith sent on her own about another post is left out: the florist's request carried the delivery of Inès's Reel
  * and the reminder of a third one.
  */
 export function exchangeLines(rows: ExchangeRow[], post?: string): RequestLine[] {
@@ -97,13 +97,13 @@ const VIA = { chat: "dans la conversation", create: "depuis l'écran « Créer �
 
 function entryText(entry: RequestEntry, index: number): string {
   const head = `[${index === 0 ? "Demande" : `Correction ${index}`}, ${VIA[entry.via]}]`;
-  return [head, ...entry.lines.map((l) => `${l.who === "elle" ? "Elle" : "Simone"} : ${l.text}`)].join("\n");
+  return [head, ...entry.lines.map((l) => `${l.who === "elle" ? "Elle" : "Edith"} : ${l.text}`)].join("\n");
 }
 
 /**
- * What every agent gets as the request for one launch: her exchange with Simone for this Reel, word for word (its latest
- * launches whole), then Simone's brief for this launch as her reading of it, then what she said of her recent Reels (her
- * taste). Without an exchange kept, Simone's brief as it was.
+ * What every agent gets as the request for one launch: her exchange with Edith for this Reel, word for word (its latest
+ * launches whole), then Edith's brief for this launch as her reading of it, then what she said of her recent Reels (her
+ * taste). Without an exchange kept, Edith's brief as it was.
  */
 export function requestBrief(log: RequestEntry[], brief: string | undefined, recent: { title: string; log: RequestEntry[] }[] = []): string | undefined {
   const entries = log.map(entryText);
@@ -118,9 +118,9 @@ export function requestBrief(log: RequestEntry[], brief: string | undefined, rec
   if (!kept.length && !taste) return brief;
   return [
     kept.length
-      ? `Sa conversation avec Simone pour ce Reel, mot pour mot (ses messages et les réponses de Simone, dans l'ordre) : ce sont ses mots qui comptent, le brief de Simone plus bas en est la lecture.\n\n${kept.join("\n\n")}`
+      ? `Sa conversation avec Edith pour ce Reel, mot pour mot (ses messages et les réponses d'Edith, dans l'ordre) : ce sont ses mots qui comptent, le brief d'Edith plus bas en est la lecture.\n\n${kept.join("\n\n")}`
       : "",
-    brief?.trim() ? `${kept.length ? "Le brief de Simone pour ce lancement" : "Le brief de Simone"} :\n${brief.trim()}` : "",
+    brief?.trim() ? `${kept.length ? "Le brief d'Edith pour ce lancement" : "Le brief d'Edith"} :\n${brief.trim()}` : "",
     taste,
   ]
     .filter(Boolean)

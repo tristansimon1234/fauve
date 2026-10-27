@@ -56,10 +56,10 @@ export async function POST(request: Request) {
   // Only studio members can log in.
   const member = await db.from("members").select("studio_id").eq("phone_e164", phone).maybeSingle();
   if (member.error) return hookError(500, "Database error");
-  if (!member.data) return hookError(403, "Ce numéro n’est pas encore inscrit. Écris d’abord à Simone sur WhatsApp.");
+  if (!member.data) return hookError(403, "Ce numéro n’est pas encore inscrit. Écris d’abord à Edith sur WhatsApp.");
 
   const delivered = await deliverCode(phone, otp);
-  if (!delivered) return hookError(502, "Impossible d’envoyer le code sur WhatsApp. Écris d’abord « code » à Simone, puis réessaie.");
+  if (!delivered) return hookError(502, "Impossible d’envoyer le code sur WhatsApp. Écris d’abord « code » à Edith, puis réessaie.");
 
   if (delivered === "template") {
     await db.from("cost_events").insert({
@@ -95,7 +95,7 @@ async function deliverCode(phone: string, otp: string): Promise<"template" | "te
     .maybeSingle();
   if (!isInSessionWindow(last.data ? new Date(last.data.created_at) : null)) return null;
   try {
-    await sendText(phone.slice(1), `Ton code de connexion Simone : ${otp}\n\nNe le partage avec personne.`);
+    await sendText(phone.slice(1), `Ton code de connexion Edith : ${otp}\n\nNe le partage avec personne.`);
     return "text";
   } catch (error) {
     console.error("login code delivery failed", error);

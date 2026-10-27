@@ -7,7 +7,7 @@ import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { insertProfileVersion } from "./profile";
 
-// What Simone made for the studio, in « Ton style »: an animation she no longer wants to
+// What Edith made for the studio, in « Ton style »: an animation she no longer wants to
 // see again, a saved text style she no longer wants.
 
 /** Takes an animated scene out of the studio's library (the publications made with it do not change). */

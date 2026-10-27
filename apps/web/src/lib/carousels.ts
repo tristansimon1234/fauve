@@ -44,7 +44,7 @@ export async function storeCarousel(studioId: string, postId: string, design: Ca
 export type CarouselStart = {
   studioId: string;
   postId: string;
-  /** What she wants it to say, in her words (or Simone's brief). */
+  /** What she wants it to say, in her words (or Edith's brief). */
   request: string;
   /** Her photos for it, in her order (default: the post's). */
   mediaIds?: string[];

@@ -21,12 +21,12 @@ const HISTORY_STEP = 10;
 const HISTORY_READ = HISTORY_LIMIT + 4 * HISTORY_STEP;
 /** A conversation about one publication also reads this much of what was said before it elsewhere (its Reel was asked there). */
 const POST_CONTEXT = 16;
-/** A message that does not look finished (cut on a comma, on « et »…) waits this long for the rest before Simone answers. */
+/** A message that does not look finished (cut on a comma, on « et »…) waits this long for the rest before Edith answers. */
 const UNFINISHED_WAIT_MS = 12_000;
 /** The end of a message that announces more to come. */
 const UNFINISHED = /(?:[,:;]|\b(?:et|mais|ou|donc|du coup|genre|avec|puis))\s*$/i;
 /**
- * Longer earlier messages (a pasted text) are cut in the history. Simone's plans and deliveries run to
+ * Longer earlier messages (a pasted text) are cut in the history. Edith's plans and deliveries run to
  * 1,300 characters and are kept whole: at 700, a third of them lost their end, and so did a request of
  * 715 characters she was answering, which she took for a message cut by its sender and asked her to resend.
  */
@@ -54,12 +54,12 @@ const mediaLabels: Record<string, string> = {
 /** Rebuilds the conversation for the model from stored messages (text only). */
 export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessageParam[] {
   const history: Anthropic.Beta.BetaMessageParam[] = [];
-  // The messages she is answering now (after Simone's last one) are read whole, however long.
+  // The messages she is answering now (after Edith's last one) are read whole, however long.
   const answering = rows.findLastIndex((r) => r.direction === "outbound") + 1;
   for (const [i, row] of rows.entries()) {
     const role = row.direction === "inbound" ? "user" : "assistant";
     const label = row.direction === "inbound" ? mediaLabels[row.type] : undefined;
-    // A voice note whose words could not be read: Simone says so instead of guessing.
+    // A voice note whose words could not be read: Edith says so instead of guessing.
     const unheard = row.direction === "inbound" && row.type === "audio" && !row.body ? " · tu n'as pas pu l'écouter : dis-le-lui et demande-lui de l'écrire" : "";
     const text = [label && `[${label}${row.media_id ? ` · media_id ${row.media_id}` : ""}${unheard}]`, row.body]
       .filter(Boolean)
@@ -249,14 +249,14 @@ export async function replyInConversation(params: {
   });
 }
 
-/** Simone's notes of a turn that started work (a montage, a carousel, an effect's words): what was asked before was for it. */
+/** Edith's notes of a turn that started work (a montage, a carousel, an effect's words): what was asked before was for it. */
 const LAUNCHED = /lancée? (job|quote_id)=|(carrousel|mots de l'effet) en cours/;
 
-/** What Simone sends on her own, outside a turn: a reminder to post, a nudge, the team's alerts. */
+/** What Edith sends on her own, outside a turn: a reminder to post, a nudge, the team's alerts. */
 const UNPROMPTED = new Set(["reminder", "nudge", "daily_cap", "new_numbers_alert"]);
 
 /**
- * A stored message as a launch's exchange reads it: Simone's reply of a turn that started work marks where it begins;
+ * A stored message as a launch's exchange reads it: Edith's reply of a turn that started work marks where it begins;
  * a message she sent on her own (a delivery, a reminder) says which post it is about.
  */
 function toExchange(row: { direction: string; type: string; body: string | null; created_at: string; payload: unknown }): ExchangeRow {
@@ -276,7 +276,7 @@ function toExchange(row: { direction: string; type: string; body: string | null;
 
 /**
  * Her charter's fonts for the chat: the ones her visuals cannot load (not free) say which
- * twin replaces them, and Simone offers once to add the font file for the real one.
+ * twin replaces them, and Edith offers once to add the font file for the real one.
  */
 function fontsLine(brand: { fonts?: unknown; font_twins?: unknown; custom_fonts?: unknown } | null): string | null {
   const fonts = Array.isArray(brand?.fonts) ? brand.fonts.filter((f): f is string => typeof f === "string") : [];

@@ -41,7 +41,7 @@ const offers = [
     label: PLANS.essentiel.label,
     price: PLANS.essentiel.priceEur,
     pitch: "Pour être là chaque semaine avec une publication soignée, sans y penser.",
-    points: [`${weeklyPosts("essentiel")}, plus les stories`, `${PLANS.essentiel.credits} crédits par mois`, "Simone sur WhatsApp et dans l’app"],
+    points: [`${weeklyPosts("essentiel")}, plus les stories`, `${PLANS.essentiel.credits} crédits par mois`, "Edith sur WhatsApp et dans l’app"],
     dark: false,
   },
   {
@@ -55,13 +55,13 @@ const offers = [
 ] as const;
 
 const faq: [string, string][] = [
-  ["Simone, c’est une vraie personne ?", "Non, c’est un assistant IA, et il le dit. Il écrit, monte et publie comme un community manager, te fait signe au bon moment, et tu gardes toujours la main."],
+  ["Edith, c’est une vraie personne ?", "Non, c’est un assistant IA, et il le dit. Il écrit, monte et publie comme un community manager, te fait signe au bon moment, et tu gardes toujours la main."],
   ["Est-ce qu’il publie sans me demander ?", "Jamais. Chaque publication attend ta validation, sur WhatsApp ou dans l’app. Tu peux corriger un texte, déplacer une date ou demander une autre version."],
   ["Je n’ai pas de vidéo, ça marche quand même ?", "Oui. Il part des photos de ton site, de celles que tu lui envoies, ou fait un Reel tout en animation à tes couleurs. Quand tu filmes, il te dit quoi et comment."],
   ["Pour quel commerce ?", "Studios de sport ou de yoga, salons de coiffure et de beauté, restaurants, cafés, boutiques : il parle ta langue et adapte ses idées à ton activité."],
-  ["Je peux lui montrer un Reel que j’aime ?", "Oui : colle son lien. Simone en reprend la forme, le rythme, la mise en page et le style des textes, avec tes images et tes mots. Ça vaut pour ce Reel-là ; les suivants restent à ton style."],
-  ["Et la musique ?", "Simone compose une musique pour chaque Reel, calée sur les coupes et libre de droits. Pour un son tendance, Instagram ne laisse pas une autre appli l’ajouter : tu le poses en un geste au moment de publier."],
-  ["Il y a un essai ?", "Oui. Simone fait ta première publication pendant l’inscription, puis tu as 3 jours d’essai pour tout tester (ta carte est demandée, rien n’est prélevé avant la fin de l’essai). Sans engagement, tu arrêtes quand tu veux."],
+  ["Je peux lui montrer un Reel que j’aime ?", "Oui : colle son lien. Edith en reprend la forme, le rythme, la mise en page et le style des textes, avec tes images et tes mots. Ça vaut pour ce Reel-là ; les suivants restent à ton style."],
+  ["Et la musique ?", "Edith compose une musique pour chaque Reel, calée sur les coupes et libre de droits. Pour un son tendance, Instagram ne laisse pas une autre appli l’ajouter : tu le poses en un geste au moment de publier."],
+  ["Il y a un essai ?", "Oui. Edith fait ta première publication pendant l’inscription, puis tu as 3 jours d’essai pour tout tester (ta carte est demandée, rien n’est prélevé avant la fin de l’essai). Sans engagement, tu arrêtes quand tu veux."],
   ["Où vont mes photos et mes données ?", "Elles sont hébergées en Europe. Tes fichiers sont supprimés peu après la publication, et tout disparaît si tu pars."],
 ];
 
@@ -121,7 +121,7 @@ export default function LandingPage() {
             Ton assistant IA sur WhatsApp <span className="accent">qui gère tes réseaux.</span>
           </h1>
           <p className="land-intro max-w-[540px] text-[18px] leading-[1.55] text-muted sm:text-[19px]" style={vars({ "--i": 2 })}>
-            Envoie tes photos et tes vidéos à Simone sur WhatsApp, comme à un collègue. Il monte tes Reels, crée tes carrousels, écrit tes légendes et publie sur Instagram et TikTok. Le but : <strong className="font-bold text-ink">plus de clients</strong>, pas juste des vues.
+            Envoie tes photos et tes vidéos à Edith sur WhatsApp, comme à un collègue. Il monte tes Reels, crée tes carrousels, écrit tes légendes et publie sur Instagram et TikTok. Le but : <strong className="font-bold text-ink">plus de clients</strong>, pas juste des vues.
           </p>
           <ul className="land-intro grid max-w-[560px] gap-3 sm:grid-cols-2" style={vars({ "--i": 3 })}>
             {(
@@ -182,14 +182,14 @@ export default function LandingPage() {
         </ul>
       </section>
 
-      {/* Ta-da: her ideas, Simone does the rest (the real carousel) */}
+      {/* Ta-da: her ideas, Edith does the rest (the real carousel) */}
       <section className="mx-auto flex max-w-[1200px] flex-col gap-8 px-4 pb-24 sm:px-8">
         <div className="land-reveal flex flex-col gap-4">
           <SectionTitle kicker="Ta-da !">
             Toi, tu as les idées. <span className="accent">Moi, j’exécute.</span>
           </SectionTitle>
           <p className="max-w-[640px] text-[16px] leading-relaxed text-muted">
-            Une phrase suffit, sur WhatsApp ou dans l’app. Simone écrit les textes, les pose sur tes photos à tes couleurs, retouche ce qu’il faut et te montre le résultat. Tu n’as plus qu’à dire oui.
+            Une phrase suffit, sur WhatsApp ou dans l’app. Edith écrit les textes, les pose sur tes photos à tes couleurs, retouche ce qu’il faut et te montre le résultat. Tu n’as plus qu’à dire oui.
           </p>
         </div>
         <IdeaToPost />
@@ -216,11 +216,11 @@ export default function LandingPage() {
       {/* Her real work */}
       <section id="ce-qu-elle-fait" className="mx-auto flex max-w-[1200px] scroll-mt-6 flex-col gap-8 px-4 pb-24 sm:px-8">
         <div className="land-reveal flex flex-col gap-4">
-          <SectionTitle kicker="Fait par Simone">
+          <SectionTitle kicker="Fait par Edith">
             De vraies publications, <span className="accent">faites par l’app.</span>
           </SectionTitle>
           <p className="max-w-[640px] text-[16px] leading-relaxed text-muted">
-            Ces Reels sortent tels quels de Simone, pour trois commerces d’exemple : il a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
+            Ces Reels sortent tels quels d’Edith, pour trois commerces d’exemple : il a choisi les plans, écrit les textes, créé les animations à leurs couleurs, puis regardé chaque vidéo et corrigé ce qui n’allait pas.
           </p>
         </div>
         <div className="land-reveal overflow-hidden rounded-[28px] border border-line bg-[radial-gradient(ellipse_at_top,#fff_0%,#FBF7F4_70%)] px-4 py-10 sm:px-8">
@@ -237,7 +237,7 @@ export default function LandingPage() {
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card i={0} icon={RepeatIcon} title="« Refais-moi ce Reel »" className="lg:row-span-2" visual={<CopyReelVisual />} center>
-            Colle le lien d’un Reel que tu aimes : Simone reprend sa forme, son rythme, sa mise en page et le style de ses textes, avec tes images et ta marque.
+            Colle le lien d’un Reel que tu aimes : Edith reprend sa forme, son rythme, sa mise en page et le style de ses textes, avec tes images et ta marque.
           </Card>
           <Card i={1} icon={MicIcon} title="Une voix off" visual={<VoiceVisual />} loop>
             Huit voix au choix, un texte qui parle de ton commerce comme un créateur. Ou ta propre voix, envoyée en vocal.
@@ -285,7 +285,7 @@ export default function LandingPage() {
               Il apprend ton style, <span className="accent">pas un modèle.</span>
             </SectionTitle>
             <p className="max-w-[480px] text-[16px] leading-relaxed text-muted">
-              Pas de gabarit tout fait. Simone part de ton site et de ce que tu aimes, te montre un premier essai, et chaque retour affine ta direction artistique pour toutes les publications suivantes.
+              Pas de gabarit tout fait. Edith part de ton site et de ce que tu aimes, te montre un premier essai, et chaque retour affine ta direction artistique pour toutes les publications suivantes.
             </p>
           </div>
           <Play>
@@ -303,7 +303,7 @@ export default function LandingPage() {
               </StyleStep>
               <StyleStep n={2} title="Un premier essai">
                 <span className="land-once land-rise relative block h-[132px] w-[74px] overflow-hidden rounded-[12px] border-[2.5px] border-ink bg-ink shadow-[0_14px_30px_rgba(28,21,48,.22)]" style={vars({ "--d": "0.4s" })}>
-                  <video src="/landing/hero-reel.mp4" poster="/landing/post-new.webp" autoPlay muted loop playsInline preload="none" aria-label="Un Reel de Studio Lune, fait par Simone" className="size-full object-cover" />
+                  <video src="/landing/hero-reel.mp4" poster="/landing/post-new.webp" autoPlay muted loop playsInline preload="none" aria-label="Un Reel de Studio Lune, fait par Edith" className="size-full object-cover" />
                 </span>
               </StyleStep>
               <StyleStep n={3} title="Tes retours">
@@ -349,7 +349,7 @@ export default function LandingPage() {
         </ol>
         <div className="grid gap-3 md:grid-cols-2">
           <Channel icon={WhatsAppIcon} title="Sur WhatsApp">
-            Envoie tes photos et tes vidéos, réponds d’un mot, valide d’un bouton. Simone t’écrit quand ta publication est prête.
+            Envoie tes photos et tes vidéos, réponds d’un mot, valide d’un bouton. Edith t’écrit quand ta publication est prête.
           </Channel>
           <Channel icon={GridIcon} title="Dans l’app">
             Ta grille Instagram, tes résultats, et l’éditeur pour changer un texte ou une scène, sur ordinateur comme sur téléphone.
@@ -424,7 +424,7 @@ export default function LandingPage() {
         <div className="land-reveal flex flex-col items-center gap-5 rounded-[28px] bg-[radial-gradient(ellipse_at_top,#efebff_0%,#fbf7f4_70%)] px-6 py-12 text-center">
           <Mascot size={96} mood="happy" />
           <h2 className="text-[clamp(30px,4vw,44px)] leading-[1.08] font-extrabold tracking-[-0.03em]">
-            Simone <span className="accent">t’attend.</span>
+            Edith <span className="accent">t’attend.</span>
           </h2>
           <p className="max-w-[460px] text-[16px] text-muted">Donne-lui ton site : dans cinq minutes, il te montre ce qu’il ferait pour toi.</p>
           <Start waUrl={waUrl} size="lg" />
@@ -432,7 +432,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-5 gap-y-2 px-4 pb-10 text-sm font-semibold text-muted sm:px-8">
-        <span>© Simone</span>
+        <span>© Edith</span>
         <Link href="/confidentialite">Confidentialité</Link>
         <Link href="/conditions">Conditions d’utilisation</Link>
         <Link href="/suppression-des-donnees">Suppression des données</Link>

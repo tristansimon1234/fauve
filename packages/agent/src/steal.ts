@@ -6,7 +6,7 @@ import { clip, SIGNATURE_GRADES, type BrandSignature } from "./signature.ts";
 
 // « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA », « c'est one
 // shot »): a Reel the manager likes (a link sent in the chat or on WhatsApp, a video she
-// sends, a share to Simone on Instagram) is the model of one Reel of hers, the one she makes
+// sends, a share to Edith on Instagram) is the model of one Reel of hers, the one she makes
 // next, never a mode for all of them. What the frames cannot show is measured in the sandbox
 // (its cuts, its tempo, its loudness); what they show is read once by Gemini (the form, the
 // hook, the texts and how they are set, the effect, the light, the movement, the music it
@@ -178,7 +178,7 @@ export function clampLook(reading: StolenLookReading): StolenLook {
 export const stolenStyleSchema = z.object({ look: stolenLookSchema, measures: reelMeasuresSchema, outline: z.string().max(OUTLINE_CHARS).optional() });
 export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
-export const STEAL_PROMPT = `You are Simone's art director; Simone edits the Instagram Reels of a neighbourhood business (studio, salon, restaurant, shop…). The person who runs the business wants to take this Reel's style for theirs: read it as a pro editor who wants to remake its style, not its content.
+export const STEAL_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (studio, salon, restaurant, shop…). The person who runs the business wants to take this Reel's style for theirs: read it as a pro editor who wants to remake its style, not its content.
 Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, letter spacing, key word, background under the sentence, place, alignment; its font and its colours only when they make its style), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
 Copy neither its words, nor its images, nor the name of its music: describe a form another business can reuse. In your French, make no feminine or masculine agreement for the person who runs the business. In French, except « music » in English.`;
 
@@ -227,7 +227,7 @@ function paceWords(averageShot: number | null, bpm: number | null, cuts?: number
 }
 
 /**
- * What Simone tells the manager she takes from the Reel (3 short lines), before she
+ * What Edith tells the manager she takes from the Reel (3 short lines), before she
  * asks whether her next Reels follow it.
  */
 export function stolenStyleLines(style: StolenStyle): string[] {
@@ -265,7 +265,7 @@ function keptWords(look: StolenLook): string {
 }
 
 /**
- * What Simone sends once she has read the Reel: what she takes from it for hers. `making`: her
+ * What Edith sends once she has read the Reel: what she takes from it for hers. `making`: her
  * Reel is already on its way in this style; else she is asked for her videos or photos.
  */
 export function stolenStyleMessage(style: StolenStyle, making: boolean): string {
@@ -278,7 +278,7 @@ export function stolenStyleMessage(style: StolenStyle, making: boolean): string 
   ].join("\n\n");
 }
 
-/** Why it could not be read, and what she can do instead. `handle`: Simone's Instagram account, when there is one. */
+/** Why it could not be read, and what she can do instead. `handle`: Edith's Instagram account, when there is one. */
 export function stealMissMessage(miss: "unreachable" | "too_long" | "not_video" | "unreadable" | "not_found", handle?: string | null): string {
   const share = handle ? `, ou partage-le à @${handle} sur Instagram (bouton Partager)` : "";
   switch (miss) {

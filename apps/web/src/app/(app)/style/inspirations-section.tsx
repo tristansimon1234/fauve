@@ -13,7 +13,7 @@ export type Inspiration = {
   analysis: string | null;
   at: string;
   reading?: boolean;
-  /** A Reel sent by its link that Simone could not open. */
+  /** A Reel sent by its link that Edith could not open. */
   missed?: boolean;
 };
 
@@ -58,7 +58,7 @@ export function InspirationsSection({ items: initial, fauveHandle, studioId }: {
     <Section
       id="style-inspirations"
       title="Tes inspirations"
-      hint={`Des Reels qui te plaisent : Simone s’en inspire pour tes montages (le rythme, l’accroche, les textes), sans jamais copier leurs images ni leurs mots. Pour qu’un Reel soit fait comme l’un d’eux, envoie son lien à Simone${fauveHandle ? ` ou partage-le à @${fauveHandle} sur Instagram` : ""} : elle le recopie pour ce Reel-là, avec tes couleurs et tes polices.`}
+      hint={`Des Reels qui te plaisent : Edith s’en inspire pour tes montages (le rythme, l’accroche, les textes), sans jamais copier leurs images ni leurs mots. Pour qu’un Reel soit fait comme l’un d’eux, envoie son lien à Edith${fauveHandle ? ` ou partage-le à @${fauveHandle} sur Instagram` : ""} : elle le recopie pour ce Reel-là, avec tes couleurs et tes polices.`}
     >
       {items.length > 0 && (
         <ul className="flex flex-col divide-y divide-line">
@@ -72,9 +72,9 @@ export function InspirationsSection({ items: initial, fauveHandle, studioId }: {
                 <span className="text-[13px] leading-relaxed text-muted">
                   {item.analysis ??
                     (item.reading
-                      ? "Simone la regarde, sa lecture arrive dans une minute."
+                      ? "Edith la regarde, sa lecture arrive dans une minute."
                       : item.missed
-                        ? "Simone n’a pas pu l’ouvrir : enregistre la vidéo et ajoute-la ici."
+                        ? "Edith n’a pas pu l’ouvrir : enregistre la vidéo et ajoute-la ici."
                         : "Pas encore lue.")}
                 </span>
               </div>

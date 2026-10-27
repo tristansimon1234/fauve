@@ -19,7 +19,7 @@ const CODE_IN_TEXT = /\b(?:code|connexion)\s*[:：]?\s*([A-HJ-KM-NP-Z2-9]{6})\b/
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 
 export function pairingMessage(code: string): string {
-  return `Bonjour Simone ! Code : ${code}`;
+  return `Bonjour Edith ! Code : ${code}`;
 }
 
 /** A new request: its code (in the message) and its secret (kept by the browser, `id.secret`). */

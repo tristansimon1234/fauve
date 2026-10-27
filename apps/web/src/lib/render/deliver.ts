@@ -28,7 +28,7 @@ export type DeliveryTarget = {
   offerVariant?: boolean;
   /** A new piece of music rather than the one kept for this cut. */
   freshMusic?: boolean;
-  /** Simone recorded a voice over this Reel (its name): said, with how to change it. */
+  /** Edith recorded a voice over this Reel (its name): said, with how to change it. */
   voice?: string;
   /** She wanted a voice over, but someone speaks in her videos: their words were kept instead, said. */
   spokenKept?: boolean;
@@ -229,7 +229,7 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
 }
 
 /**
- * Shows images Simone made (improved photo, ambiance images): each one in the
+ * Shows images Edith made (improved photo, ambiance images): each one in the
  * conversation (an image on WhatsApp), the text on the first; with a post, its
  * card (and on WhatsApp, a link to its page) after them.
  */

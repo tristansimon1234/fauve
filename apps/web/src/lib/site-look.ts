@@ -23,7 +23,7 @@ import { pageInSandbox, screenshotInSandbox } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // The look of the studio's website, read once while it gets started, in two steps so she
-// never waits long: first its photos land in her moodboard (a few seconds), then Simone
+// never waits long: first its photos land in her moodboard (a few seconds), then Edith
 // reads the site as a visitor sees it: captures of its home page with what was measured
 // on it (the fonts its titles and texts really use, the colours that fill it), and its
 // photos. She writes its art direction and its signature (the same direction as settings

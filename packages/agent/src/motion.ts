@@ -204,7 +204,7 @@ export type ReelProps = {
   /** logoNamed false: her logo does not write her name (a mascot, a symbol), the card writes it under it. */
   endCard: { title: string; subtitle: string | null; from: number; logoNamed?: false } | null;
   /**
-   * Simone's music, played in the live preview (the render gets it mixed in afterwards):
+   * Edith's music, played in the live preview (the render gets it mixed in afterwards):
    * its volume (0–1), and the lower one while someone speaks, in `duck.windows` (frames).
    */
   soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
@@ -573,7 +573,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   }
 
   // The music of the live preview sits under what is said, as in the render's mix:
-  // when her voice (or Simone's) speaks, else in the passages that keep their sound.
+  // when her voice (or Edith's) speaks, else in the passages that keep their sound.
   const spoken = voice
     ? voice.words.map((w) => ({ from: voice.from + toFrames(w.start), to: voice.from + toFrames(w.end) }))
     : plan.segments.flatMap((s, i) => {

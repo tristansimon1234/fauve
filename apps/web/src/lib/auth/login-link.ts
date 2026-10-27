@@ -10,7 +10,7 @@ const TTL_MS = 15 * 60_000;
 const TTL_BY_PURPOSE: Record<string, number> = { open_post: 24 * 3600_000, upload: 24 * 3600_000 };
 
 /**
- * A one-time link Simone sends on WhatsApp (15 min, a day for a publication,
+ * A one-time link Edith sends on WhatsApp (15 min, a day for a publication,
  * tied to the number): it signs the manager in and opens `next`. Expired or
  * used, it opens `next` if she is still signed in, else the login page.
  */

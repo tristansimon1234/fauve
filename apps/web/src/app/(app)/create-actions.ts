@@ -36,7 +36,7 @@ import { photoRegions } from "@/lib/video/regions";
 // new files join her library, the publication is created (where it goes, and for a Reel
 // with or without a voice over, as she chose), and a Reel starts at once (her tap is her
 // yes; charged on delivery, like any montage).
-// The other formats go on with Simone in the chat, who writes their texts.
+// The other formats go on with Edith in the chat, who writes their texts.
 
 const uploadSchema = z.object({ path: z.string().max(300), mime: z.string().max(100), size: z.number().int().positive() });
 const launchSchema = z.object({
@@ -45,15 +45,15 @@ const launchSchema = z.object({
   time: z.string().max(5),
   /** What she imagines (the scenario, an offer, a message), in her words. */
   idea: z.string().max(500),
-  /** The plan Simone said back and she validated (« La proposition »): the montage follows it. */
+  /** The plan Edith said back and she validated (« La proposition »): the montage follows it. */
   plan: z.object({ title: z.string().max(80), points: z.array(z.string().max(300)).min(1).max(8), why: z.string().max(400) }).optional(),
   /** In the order she picked them: from her library, or just sent (already in Storage). */
   items: z.array(z.union([z.object({ media: z.uuid() }), z.object({ upload: uploadSchema })])).min(1).max(MAX_MONTAGE_FILES),
-  /** A Reel's voice over: as the studio's setting (auto), none, or one of Simone's voices. */
+  /** A Reel's voice over: as the studio's setting (auto), none, or one of Edith's voices. */
   voice: z.union([z.literal("auto"), z.literal("off"), z.string().regex(/^[A-Za-z0-9]{10,40}$/)]).default("auto"),
   /** Where it goes (TikTok only takes a Reel); by default the usual places. */
   platforms: z.array(z.enum(["instagram", "tiktok"])).min(1).max(2).optional(),
-  /** A Reel made like another (« Steal »): the one she chose on this screen (its inspiration), or true for the one she sent Simone, false for her own style. */
+  /** A Reel made like another (« Steal »): the one she chose on this screen (its inspiration), or true for the one she sent Edith, false for her own style. */
   copy: z.union([z.uuid(), z.boolean()]).default(true),
   /** A carousel or a post she likes, as captures or a screen recording of it (Instagram does not open a carousel's link to us): its form is followed, never its words. */
   refs: z.array(uploadSchema).max(4).default([]),
@@ -68,7 +68,7 @@ export type LaunchResult =
       title: string;
       kind: PostKind;
       mediaIds: string[];
-      /** The captures of the carousel or post she likes, for Simone (design_carousel example_media_ids). */
+      /** The captures of the carousel or post she likes, for Edith (design_carousel example_media_ids). */
       refIds: string[];
       /** A Reel: the montage that started, to follow on the working screen (effect: the effects agent makes it). */
       montage: { quoteId: string; effort: Effort; minutes: string; music: boolean; effect: boolean } | null;
@@ -100,7 +100,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
       : { ok: false, locked: "credits", error: "Tu n’as plus de crédits ce mois-ci : ils reviennent le 1er du mois." };
   }
 
-  // What she imagines, or a ref: the Reel to copy, the model of this Reel only (one shot). Simone asks before she makes anything.
+  // What she imagines, or a ref: the Reel to copy, the model of this Reel only (one shot). Edith asks before she makes anything.
   const copying = kind !== "reel" || copy === false ? null : typeof copy === "string" ? await ownInspiration(studioId, copy) : await pendingSteal(studioId).catch(() => null);
   if (!idea && !plan && !copying && !refs.length) return { ok: false, error: kind === "reel" ? "Dis-moi ce que tu imagines pour ce Reel, ou montre-moi une ref." : "Dis-moi ce que tu imagines, ou montre-moi une ref." };
 
@@ -128,7 +128,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     after(() => (video ? ensureClipAnalysis(studioId, mediaId) : photoRegions(studioId, mediaId)).then(() => undefined, (e: unknown) => console.warn("create: file read failed", e)));
   }
 
-  // The captures of the post she likes: images of hers for Simone to look at, never published.
+  // The captures of the post she likes: images of hers for Edith to look at, never published.
   const refIds: string[] = [];
   for (const file of refs) {
     if (!file.path.startsWith(`${studioId}/chat/`) || file.path.includes("..") || !/^(image|video)\//.test(file.mime)) {

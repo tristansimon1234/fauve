@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendImage, sendLinkButton, sendTemplate, sendText, sendVideo } from "@/lib/whatsapp/client";
 import { recentMedia, recentStories, InstagramError } from "./instagram";
 
-// « Je publie moi-même » : at the post's time, Simone hands the post over on
+// « Je publie moi-même » : at the post's time, Edith hands the post over on
 // WhatsApp instead of publishing it. A Reel: the video, then the caption alone to
 // copy, so the manager adds Instagram's music. A story: the picture or video, then
 // her booking link alone to copy, so she shares it to her story from WhatsApp and

@@ -30,7 +30,7 @@ export function Logo({ size = 36 }: { size?: number }) {
   return (
     <span className="flex items-center gap-2">
       <Mascot size={Math.round(size * 1.25)} />
-      <span className="text-xl font-extrabold tracking-[-0.02em]">Simone</span>
+      <span className="text-xl font-extrabold tracking-[-0.02em]">Edith</span>
     </span>
   );
 }

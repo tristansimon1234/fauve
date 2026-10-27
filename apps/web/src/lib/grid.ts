@@ -62,7 +62,7 @@ export async function loadGrid(db: Db, studioId: string) {
 
 /**
  * Her TikTok profile as followers see it: videos only (TikTok has no carousels
- * here), 3:4 tiles with their views, Simone's coming videos first, then those
+ * here), 3:4 tiles with their views, Edith's coming videos first, then those
  * waiting in her TikTok drafts. null when TikTok is not offered.
  */
 export async function loadTikTokGrid(db: Db, studioId: string) {

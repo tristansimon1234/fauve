@@ -6,7 +6,7 @@ import type { ReviewData } from "@/lib/review";
 import { DateView } from "./change-panel";
 
 // What « Prévoir » and « Publier » open on a Reel's page, the same in the app and on the page
-// opened from WhatsApp: when Simone reminds her to post it, and, before Instagram is connected,
+// opened from WhatsApp: when Edith reminds her to post it, and, before Instagram is connected,
 // the way to connect it (or to save the video and post it herself).
 
 export type ReviewSheet = "date" | "instagram";
@@ -28,14 +28,14 @@ export function ReviewSheets({
 }) {
   if (sheet === "date") {
     return (
-      <Sheet title="Quand te faire signe ?" hint="Simone te rappelle de le poster à ce moment-là, sur WhatsApp et dans l’app." onClose={onClose}>
+      <Sheet title="Quand te faire signe ?" hint="Edith te rappelle de le poster à ce moment-là, sur WhatsApp et dans l’app." onClose={onClose}>
         <DateView data={data} onDone={onPlanned} />
       </Sheet>
     );
   }
   if (sheet === "instagram") {
     return (
-      <Sheet title="Relie ton Instagram" hint="Pour que Simone publie ton Reel, relie ton compte Instagram une fois. Ou télécharge la vidéo et publie-la toi-même." onClose={onClose}>
+      <Sheet title="Relie ton Instagram" hint="Pour qu’Edith publie ton Reel, relie ton compte Instagram une fois. Ou télécharge la vidéo et publie-la toi-même." onClose={onClose}>
         <a href="/api/instagram/connect" className="btn btn-primary w-full">
           <InstagramIcon size={18} />
           Relier Instagram

@@ -4,13 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChartIcon, ChatIcon, FolderIcon, GridIcon, PaletteIcon, SlidersIcon } from "./icons";
 
-// The work (talk to Simone, the Instagram grid with every publication, the
-// results; no calendar: she does not plan, Simone does), the studio's material (media library,
-// her style with what Simone made for her) and the settings. On a phone the bar keeps four
+// The work (talk to Edith, the Instagram grid with every publication, the
+// results; no calendar: she does not plan, Edith does), the studio's material (media library,
+// her style with what Edith made for her) and the settings. On a phone the bar keeps four
 // places: Médiathèque and Ton style open from Réglages' tabs.
 // `also`: the pages that belong to a section, to highlight it.
 const nav = [
-  { href: "/fauve", label: "Simone", icon: ChatIcon, also: [], group: "work" },
+  { href: "/fauve", label: "Edith", icon: ChatIcon, also: [], group: "work" },
   { href: "/grille", label: "Grille", icon: GridIcon, also: ["/publications", "/calendrier"], group: "work" },
   { href: "/resultats", label: "Résultats", icon: ChartIcon, also: [], group: "work" },
   { href: "/mediatheque", label: "Médiathèque", icon: FolderIcon, also: [], group: "studio" },

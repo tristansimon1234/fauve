@@ -579,7 +579,7 @@ function printed(stdout: string, name: string): number | null {
 /**
  * A rendered video with its soundtrack: the picture copied as it is, the music in
  * AAC under the video's own sound, faded out over the last 0.8 s and cut at the
- * end of the video. Both are measured first: what is said (her voice, Simone's,
+ * end of the video. Both are measured first: what is said (her voice, Edith's,
  * someone in a clip) is brought to the level of a voice, the music lies under it
  * and ducks while it speaks (mixGains: well under a voice over the whole Reel,
  * at its level around a few spoken shots). A video without sound just gets the music.
@@ -999,7 +999,7 @@ export async function tracksInSandbox(id: string, videos: { id: string; url: str
 
 // ---------------------------------------------------------------------------
 // « Steal »: a Reel she likes, opened from its link (yt-dlp, for a public Reel, TikTok or
-// Short) or fetched as a file (one she sent, one shared with Simone on Instagram), then
+// Short) or fetched as a file (one she sent, one shared with Edith on Instagram), then
 // measured: its hard cuts (ffmpeg's scene detection), its loudness and its bass every 10 ms
 // (its tempo). A small copy (720 px, 30 fps, its sound) comes back for Gemini; nothing is kept.
 // ---------------------------------------------------------------------------

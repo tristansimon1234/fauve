@@ -60,7 +60,7 @@ export function StyleEditor({
   moodboard: MoodboardView;
   /** Server-rendered list of the Reels shared on Instagram. */
   inspirations: React.ReactNode;
-  /** Server-rendered: what Simone made for the studio and reuses (animations, text styles). */
+  /** Server-rendered: what Edith made for the studio and reuses (animations, text styles). */
   created?: React.ReactNode;
   /** The studio's own font files, with signed links. */
   ownFonts: OwnFont[];
@@ -123,7 +123,7 @@ export function StyleEditor({
       <header className="flex flex-col gap-1.5">
         <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Ton style</h1>
         <p className="text-[15px] leading-normal text-muted">
-          Ce que Simone suit pour tes Reels et tes carrousels : tes inspirations, ton logo, tes couleurs, tes polices, ta voix et tes mots. Et ce qu’elle a déjà créé pour toi.
+          Ce qu’Edith suit pour tes Reels et tes carrousels : tes inspirations, ton logo, tes couleurs, tes polices, ta voix et tes mots. Et ce qu’elle a déjà créé pour toi.
         </p>
       </header>
 
@@ -181,7 +181,7 @@ export function StyleEditor({
         {/* Nothing made yet: on a computer, a line says so (on a phone, the section is just absent). */}
         <div className="peer flex flex-col gap-5">{created}</div>
         <p className="hidden rounded-[18px] border border-dashed border-line px-5 py-8 text-center text-[14.5px] text-muted lg:peer-empty:block">
-          Simone n’a encore rien créé pour toi : ses animations et tes styles de texte apparaîtront ici après tes premiers Reels.
+          Edith n’a encore rien créé pour toi : ses animations et tes styles de texte apparaîtront ici après tes premiers Reels.
         </p>
       </div>
 
@@ -200,7 +200,7 @@ export function StyleEditor({
                 ? "Enregistrement…"
                 : dirty
                   ? "Modifications non enregistrées. Le prochain montage utilisera le style enregistré."
-                  : "Le prochain montage de Simone utilisera ce style."}
+                  : "Le prochain montage d’Edith utilisera ce style."}
         </p>
         <button
           type="button"

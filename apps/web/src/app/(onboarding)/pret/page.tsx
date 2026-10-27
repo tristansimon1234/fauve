@@ -66,7 +66,7 @@ async function ReadyForMember() {
   const items: Item[] = [
     instagram
       ? { icon: InstagramIcon, label: instagram.handle ? `@${instagram.handle}` : "Instagram", detail: "Instagram connecté" }
-      : { icon: InstagramIcon, label: "Instagram", detail: "Pas encore connecté : demande le lien à Simone" },
+      : { icon: InstagramIcon, label: "Instagram", detail: "Pas encore connecté : demande le lien à Edith" },
     ...(tiktok
       ? [{ icon: TikTokIcon, label: tiktok.handle ? `@${tiktok.handle}` : "TikTok", detail: "TikTok connecté" }]
       : []),
@@ -76,11 +76,11 @@ async function ReadyForMember() {
           label: `${plural(plan.posts_per_week, "post", "posts")} + ${plural(plan.stories_per_week, "story", "stories")}`,
           detail: "par semaine",
         }
-      : { icon: CalendarIcon, label: "Ton rythme", detail: "à choisir avec Simone" },
+      : { icon: CalendarIcon, label: "Ton rythme", detail: "à choisir avec Edith" },
     {
       icon: PenIcon,
       label: "Ton style",
-      detail: examples ? `appris à partir de ${plural(examples, "exemple", "exemples")}` : "Simone l’apprend au fil de vos échanges",
+      detail: examples ? `appris à partir de ${plural(examples, "exemple", "exemples")}` : "Edith l’apprend au fil de vos échanges",
       warm: true,
     },
   ];
@@ -96,8 +96,8 @@ function Ready({ firstName, items }: { firstName: string | null; items: Item[] |
           {firstName && <span className="accent">{firstName}.</span>}
         </h1>
         <p className="text-[15px] leading-[1.55] text-muted">
-          <span className="md:hidden">La suite se passe sur WhatsApp : envoie tes vidéos à Simone, il prépare tes publications avec toi.</span>
-          <span className="hidden md:inline">Ta première publication peut partir sur Instagram. La suite se passe dans l’app, avec Simone.</span>
+          <span className="md:hidden">La suite se passe sur WhatsApp : envoie tes vidéos à Edith, il prépare tes publications avec toi.</span>
+          <span className="hidden md:inline">Ta première publication peut partir sur Instagram. La suite se passe dans l’app, avec Edith.</span>
         </p>
       </div>
       {items && (

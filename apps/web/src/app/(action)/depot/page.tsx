@@ -5,10 +5,10 @@ import { getStudioContext } from "@/lib/studio";
 import { DropView } from "./drop-view";
 
 export const metadata: Metadata = { title: "Envoie tes photos et vidéos" };
-// Her files are read, then Simone answers on WhatsApp, after the page has its answer.
+// Her files are read, then Edith answers on WhatsApp, after the page has its answer.
 export const maxDuration = 300;
 
-// The upload link Simone sends on WhatsApp when she asks for files (reply_with upload): her
+// The upload link Edith sends on WhatsApp when she asks for files (reply_with upload): her
 // gallery in full quality, straight to Storage, then the files arrive in her WhatsApp conversation.
 
 export default function DropPage() {

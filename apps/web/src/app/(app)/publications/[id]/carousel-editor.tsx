@@ -274,7 +274,7 @@ export function CarouselEditor({
           </div>
           {props && !dirty && <PhotoAsk key={index} postId={postId} postTitle={postTitle} photo={index + 1} total={plan.slides.length} />}
 
-          {/* Components only on the carousels that have them: new ones are composed by Simone. */}
+          {/* Components only on the carousels that have them: new ones are composed by Edith. */}
           {props && (bank.length > 0 || elements.length > 0) && (
             <ElementsPanel
               bank={bank}
@@ -451,7 +451,7 @@ export function CarouselEditor({
                 light={Boolean(slide.edit?.adjust)}
                 faces={Boolean(slide.edit?.blur?.some((b) => b.kind === "face"))}
                 onChange={async (next) => {
-                  const res = await photoRetouch(slide.media_id, next).catch(() => ({ ok: false as const, error: "Simone n’a pas pu regarder cette photo." }));
+                  const res = await photoRetouch(slide.media_id, next).catch(() => ({ ok: false as const, error: "Edith n’a pas pu regarder cette photo." }));
                   if (!res.ok) return { ok: false, message: res.error };
                   setSlide({ edit: res.value ?? undefined });
                   return { ok: true, message: res.note };

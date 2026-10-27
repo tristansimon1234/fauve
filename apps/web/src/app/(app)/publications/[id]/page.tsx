@@ -84,7 +84,7 @@ const LOCKED: readonly PostStatus[] = ["published", "measured"];
 const handedFormat = (timeZone: string) => new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone });
 const POST_FORM = "post-form";
 
-/** The voice over a Reel, for its page: Simone's (her name, the words) or the manager's own voice note; null: none. */
+/** The voice over a Reel, for its page: Edith's (her name, the words) or the manager's own voice note; null: none. */
 async function loadVoice(db: Awaited<ReturnType<typeof getStudioContext>>["db"], studioId: string, mediaId: string | null) {
   if (!mediaId) return null;
   const { data } = await db.from("media_assets").select("source, ai, transcript").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
@@ -92,7 +92,7 @@ async function loadVoice(db: Awaited<ReturnType<typeof getStudioContext>>["db"],
   const text = ((data.transcript as { text?: string } | null)?.text ?? "").slice(0, 280);
   if (data.source !== "ai") return { who: "hers" as const, text };
   const voiceId = (data.ai as { voice_id?: string } | null)?.voice_id;
-  return { who: "simone" as const, name: findVoice(voiceId)?.name ?? "Simone", text };
+  return { who: "simone" as const, name: findVoice(voiceId)?.name ?? "Edith", text };
 }
 
 export default function PostPage({ params }: PageProps<"/publications/[id]">) {
@@ -126,7 +126,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
   if (!data) notFound();
   const post = postSchema.parse(data);
 
-  // A Reel with its montage: the simple page (the video, its caption, its cover, « Publier », « Télécharger », « Prévoir », « Modifier avec Simone »).
+  // A Reel with its montage: the simple page (the video, its caption, its cover, « Publier », « Télécharger », « Prévoir », « Modifier avec Edith »).
   if (post.kind === "reel") {
     const review = await loadReview(db, studioId, post, tz);
     if (review) {
@@ -141,7 +141,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
               action={deletePost.bind(null, post.id)}
               redirectTo="/grille"
               compact
-              confirmText={review.locked ? "Supprimer cette publication de Simone ? Elle reste en ligne sur Instagram." : "Supprimer cette publication, son montage et ses versions ?"}
+              confirmText={review.locked ? "Supprimer cette publication d’Edith ? Elle reste en ligne sur Instagram." : "Supprimer cette publication, son montage et ses versions ?"}
             />
           </div>
           <PostReview
@@ -171,10 +171,10 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
 
   const canEdit = !LOCKED.includes(post.status);
   const isVideo = post.kind === "reel" || post.kind === "story";
-  // Simone's music: offered on a Reel with a montage, when the service is set up.
+  // Edith's music: offered on a Reel with a montage, when the service is set up.
   const postMusic = readPostMusic(post.music);
   const musicState = post.kind === "reel" && plan && env("ELEVENLABS_API_KEY") ? { on: postMusic.mode === "on", made: Boolean(postMusic.track) } : undefined;
-  // The voice over the Reel: Simone's (which voice, what it says) or her own voice note.
+  // The voice over the Reel: Edith's (which voice, what it says) or her own voice note.
   const voiceState = post.kind === "reel" && canEdit ? await loadVoice(db, studioId, post.voice_media_id) : undefined;
   // The studio's text looks (copied by Fauve from examples, or kept by hand), offered on every text.
   const looks = canEdit ? await loadTextLooks(studioId).catch(() => []) : [];
@@ -190,7 +190,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         }
       : null;
 
-  // A carousel Simone composed: its slides drawn live from its code, its words editable here.
+  // A carousel Edith composed: its slides drawn live from its code, its words editable here.
   const plannedSlides = post.kind === "carousel" || post.kind === "post" ? postSlides({ slides: post.slides, media_ids: post.media_ids }) : null;
   const composed = plannedSlides?.design
     ? {
@@ -292,13 +292,13 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           <dt className="sr-only">Quand</dt>
           <dd className="inline-flex items-center gap-1.5">
             <ClockIcon size={16} className="text-violet" />
-            {post.scheduled_at ? formatDateTime(post.scheduled_at, tz) : "Date à définir avec Simone"}
+            {post.scheduled_at ? formatDateTime(post.scheduled_at, tz) : "Date à définir avec Edith"}
           </dd>
         </div>
       </dl>
       {(post.status === "draft" || post.status === "validated") && (
         <p className="-mt-2 text-[12px] leading-snug text-muted">
-          {post.status === "validated" ? "Validée : " : "Une fois validée, "}Simone la publie sur {post.platforms.map((p) => platformLabels[p]).join(" et ") || "Instagram"} à l’horaire prévu, si ton compte est connecté.
+          {post.status === "validated" ? "Validée : " : "Une fois validée, "}Edith la publie sur {post.platforms.map((p) => platformLabels[p]).join(" et ") || "Instagram"} à l’horaire prévu, si ton compte est connecté.
         </p>
       )}
 
@@ -329,7 +329,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <AskFauveButton topic={{ postId: post.id, title: post.title }} label="Modifier avec Simone" />
+          <AskFauveButton topic={{ postId: post.id, title: post.title }} label="Modifier avec Edith" />
           {canEdit && post.status === "draft" && (
             // Submits the caption form, so a caption being edited is saved with the validation.
             <button type="submit" form={POST_FORM} name="intent" value="validate" className="btn btn-primary">
@@ -343,7 +343,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
             compact
             confirmText={
               LOCKED.includes(post.status)
-                ? "Supprimer cette publication de Simone ? Elle reste en ligne sur Instagram."
+                ? "Supprimer cette publication d’Edith ? Elle reste en ligne sur Instagram."
                 : "Supprimer cette publication, son montage et ses versions ?"
             }
           />
@@ -436,13 +436,13 @@ async function loadRender(db: Db, editPlanId: string | null, preferredId: string
 
 function previewMessage(status: PostStatus, hasPlan: boolean, render: Render | null): string {
   if (render?.status === "queued" || render?.status === "rendering") return "Le montage est en cours de fabrication.";
-  if (render?.status === "failed") return "Le montage n’a pas abouti. Demande à Simone de le relancer sur WhatsApp.";
+  if (render?.status === "failed") return "Le montage n’a pas abouti. Demande à Edith de le relancer sur WhatsApp.";
   if (render?.status === "done") return "La vidéo montée n’est pas disponible pour le moment.";
   if (hasPlan) return "Le plan de montage est prêt. La vidéo montée apparaîtra ici.";
   if (status === "planned" || status === "content_requested") {
-    return "J’attends encore les vidéos pour cette publication. Envoie-les à Simone sur WhatsApp.";
+    return "J’attends encore les vidéos pour cette publication. Envoie-les à Edith sur WhatsApp.";
   }
-  if (status === "media_received") return "Vidéos bien reçues : Simone prépare le brouillon.";
+  if (status === "media_received") return "Vidéos bien reçues : Edith prépare le brouillon.";
   return "Pas d’aperçu pour cette publication.";
 }
 

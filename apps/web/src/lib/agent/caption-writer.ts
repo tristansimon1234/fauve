@@ -4,9 +4,9 @@ import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-// A Reel launched from « Créer » has no chat turn where Simone writes its caption: two of the
+// A Reel launched from « Créer » has no chat turn where Edith writes its caption: two of the
 // three Reels of Brume's test went out with none. Written here at delivery, only when the post
-// has none (hers, or Simone's from the chat, always stays), with the chat's caption rules.
+// has none (hers, or Edith's from the chat, always stays), with the chat's caption rules.
 
 /** `planId`: the version that goes out; null, the post's current one. */
 export async function ensureCaption(studioId: string, postId: string, planId: string | null, brief?: string): Promise<void> {

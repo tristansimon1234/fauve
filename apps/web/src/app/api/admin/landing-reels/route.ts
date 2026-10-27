@@ -7,7 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // The landing's demo Reels again, each in its own style with current fonts:
 // a new version of each demo post's plan (same cut and texts), rendered with the
-// music Simone composes for it, then copied to the public `landing` bucket.
+// music Edith composes for it, then copied to the public `landing` bucket.
 // One Reel per call (?reel=pilates|coiffure|trattoria, &template= to change its style), with CRON_SECRET (sent
 // from the database through pg_net).
 export const maxDuration = 300;

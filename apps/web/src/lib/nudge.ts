@@ -5,7 +5,7 @@ import { messageOwner } from "@/lib/owner-message";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // The reminder when nothing has gone out for a while (packages/agent/src/nudge.ts),
-// and what Simone sees of her presence at each turn.
+// and what Edith sees of her presence at each turn.
 
 const DAY = 86_400_000;
 const PAST = ["published", "measured", "scheduled", "validated"];
@@ -82,7 +82,7 @@ export async function nudgeIfQuiet(studioId: string, now = Date.now()): Promise<
   return true;
 }
 
-/** What Simone knows of her presence at each turn. */
+/** What Edith knows of her presence at each turn. */
 export async function presenceLines(studioId: string, now = Date.now()): Promise<string[]> {
   const db = supabaseAdmin();
   const [daysSince, { data: studio }, { data: sorted }] = await Promise.all([

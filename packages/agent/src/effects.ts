@@ -11,7 +11,7 @@ import { EFFECT_WORDS_MAX, type EditPlan, type EffectWord } from "./schemas.ts";
 // image in code, looks at its result and corrects it, and a grader of its own checks it
 // against a rubric. At the lab it beat the chain (editor, motion designer, critic) on the
 // effects that hold to a gesture: a text growing between the fingers, a kamehameha from
-// the hands (Tristan: « BCP MIEUX »). The chain keeps every other Reel; Simone's music, her
+// the hands (Tristan: « BCP MIEUX »). The chain keeps every other Reel; Edith's music, her
 // voice over, the page and the publishing stay the chain's for both.
 
 /** No session may spend more than this at list prices, in cents, whatever she can pay: the lab's kamehameha took $3.99 with one revision. */
@@ -32,7 +32,7 @@ export const EFFECT_EUR_PER_CREDIT = CREDIT_VALUE_EUR * (1 - TARGET_MARGIN);
 export const EFFECT_MAX_CREDITS = { reel: 40, fix: 25 } as const;
 /** Below this ceiling (her credits are running out), the session's budget is too small for an effect: the chain makes it. */
 export const EFFECT_MIN_CREDITS = { reel: 20, fix: 12 } as const;
-/** Besides the agent: the render of its video with Simone's music (render-post). */
+/** Besides the agent: the render of its video with Edith's music (render-post). */
 const EFFECT_EXTRAS_EUR = TYPICAL_COST_EUR.render;
 /** A typical session at list prices, in euros (the fingers $1.65, the kamehameha $3.99 at the lab): when its cost cannot be read. */
 export const EFFECT_TYPICAL_EUR = 2.4;
@@ -77,7 +77,7 @@ export type EffectRoute = z.infer<typeof effectRouteSchema>;
 
 export const EFFECT_ROUTER_PROMPT = `You decide who makes the next Reel of a neighbourhood business's manager, from what she asks.
 
-Simone's montage chain (the default) cuts and orders her shots, lays native texts, subtitles, a voice-over, music, and motion design animations over her video: animated texts, shapes, frames, counters, collage, her cut-out laid on a shot. The cut-out exists only for her photos: a text can pass behind the person in a photo, never behind a person moving in a video. These animations follow a hand or a face loosely, no more.
+Edith's montage chain (the default) cuts and orders her shots, lays native texts, subtitles, a voice-over, music, and motion design animations over her video: animated texts, shapes, frames, counters, collage, her cut-out laid on a shot. The cut-out exists only for her photos: a text can pass behind the person in a photo, never behind a person moving in a video. These animations follow a hand or a face loosely, no more.
 
 The effects workshop works frame by frame on her video: it measures what moves (the fingertips, the hands, the body, the face) and draws an effect hooked onto it at every frame, like a special effects editor: a text that is born and grows between her fingers, an energy ball in her hands and a beam shooting towards the camera, a held object that follows her gesture, an aura around her, a text set behind her in her video (her silhouette cut out at every frame, she passes in front of the words), a cartoon or film universe on her. It costs more and takes 10 to 30 minutes.
 
@@ -89,14 +89,14 @@ effect: the effect in a few words when it is the workshop, otherwise empty. why:
 
 /** What the agent is given for her Reel. */
 export type EffectsTaskInput = {
-  /** Her request (what she imagines, Simone's brief, a correction). */
+  /** Her request (what she imagines, Edith's brief, a correction). */
   request: string;
   studio: { name: string; business: string | null; facts: string[]; tone: string | null };
   /** Her charter: colours, the main one first, and fonts (titles, then text); her signature as lines. */
   brand: { colors: string[]; fonts: string[]; signature?: string };
   /** Her files, as mounted in the container, with what each one shows when it was read. */
   files: { name: string; kind: "video" | "photo"; seconds?: number | null; about?: string | null }[];
-  /** A voice over the Reel (hers or Simone's), with its words timed in a JSON file. */
+  /** A voice over the Reel (hers or Edith's), with its words timed in a JSON file. */
   voice?: { name: string; words: string; seconds: number; text: string } | null;
   /** The Reel she copies (« Steal »): its style, in lines; never its words nor its images. */
   copied?: string | null;
@@ -116,7 +116,7 @@ export const OUTPUTS = "/mnt/session/outputs";
 export const KIT_FILE = "kit.tar.gz";
 export const WORDS_FILE = "words.json";
 
-export const EFFECTS_SYSTEM = `You are the editor and motion designer of Simone, the assistant that runs the social media of neighbourhood businesses. You work alone, in a Linux container, on a manager's real videos, to make the Reel she imagines with its effect. You have bash, Python 3, ffmpeg, MediaPipe, OpenCV, Pillow and numpy; Google Fonts fonts can be downloaded (fonts.googleapis.com, fonts.gstatic.com), nothing else on the network. Nobody answers while you work: ask no question, decide.
+export const EFFECTS_SYSTEM = `You are the editor and motion designer of Edith, the assistant that runs the social media of neighbourhood businesses. You work alone, in a Linux container, on a manager's real videos, to make the Reel she imagines with its effect. You have bash, Python 3, ffmpeg, MediaPipe, OpenCV, Pillow and numpy; Google Fonts fonts can be downloaded (fonts.googleapis.com, fonts.gstatic.com), nothing else on the network. Nobody answers while you work: ask no question, decide.
 
 How you work, the way a good motion designer does:
 - look first: contact sheets of her videos (and of the earlier version, for a correction) at the moments that matter;
@@ -211,7 +211,7 @@ const cleanWord = (text: string) =>
 /**
  * words.json as the agent wrote it: each text kept within its bounds (an id to find it by, a label in
  * her words, its text, how long it may get: never under its own length); a text it cannot read is
- * left out, and a file it cannot read gives none (her texts then change by asking Simone).
+ * left out, and a file it cannot read gives none (her texts then change by asking Edith).
  */
 export function readEffectWords(json: string | null | undefined): EffectWord[] | null {
   let raw: unknown;

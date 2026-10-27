@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { improvePostPhoto } from "@/app/(app)/ai-image-actions";
 
-// « Améliorer avec Simone »: the image model retouches the photo without
+// « Améliorer avec Edith »: the image model retouches the photo without
 // changing what it shows (extended to the frame instead of cropped, a tidier
 // background, better light, or her own words). The new photo takes the
 // original's place on the post; the original stays in her library. 1 credit.
@@ -29,7 +29,7 @@ export function PhotoImprove({ postId, mediaId, url, disabled }: { postId: strin
     setBusy(label);
     setMessage(null);
     start(async () => {
-      const res = await improvePostPhoto(postId, mediaId, change).catch(() => ({ ok: false as const, error: "Simone n’a pas réussi cette fois. Réessaie dans un instant." }));
+      const res = await improvePostPhoto(postId, mediaId, change).catch(() => ({ ok: false as const, error: "Edith n’a pas réussi cette fois. Réessaie dans un instant." }));
       setBusy(null);
       if (!res.ok) return setMessage({ ok: false, text: res.error });
       setWish("");
@@ -43,12 +43,12 @@ export function PhotoImprove({ postId, mediaId, url, disabled }: { postId: strin
   return (
     <div className="flex flex-col gap-2">
       <span className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] font-bold">Améliorer avec Simone</span>
+        <span className="text-[13px] font-bold">Améliorer avec Edith</span>
         <span className="text-[11px] font-semibold text-muted">{price} · IA</span>
       </span>
       {busy ? (
         <p className="text-[13px] text-muted" aria-live="polite">
-          Simone retouche ta photo… (20 secondes environ)
+          Edith retouche ta photo… (20 secondes environ)
         </p>
       ) : (
         <>

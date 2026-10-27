@@ -29,7 +29,7 @@ const CREDIT_LINES: [string, string][] = [
   ["Correction d’un montage", `${MONTAGE_FLOOR.correction} à ${MONTAGE_CEILING.correction}`],
   ["Variante d’un montage", `${CREDIT_PRICES.variant}`],
   ["Lecture du moodboard", `${CREDIT_PRICES.moodboard}`],
-  ["Messages à Simone", "gratuit"],
+  ["Messages à Edith", "gratuit"],
 ];
 
 const accountStatusLabels: Record<SocialAccount["status"], string> = {
@@ -93,10 +93,10 @@ async function Settings() {
                 <Field label="Activité" value={(care.data?.business_type as string | null) ?? null} />
                 <Field label="Site web" value={studio.website_url} href={studio.website_url} />
                 <Field label="Lien de réservation" value={studio.booking_url} href={studio.booking_url} />
-                <p className="text-[13px] text-muted">Pour changer ces informations, dis-le à Simone.</p>
+                <p className="text-[13px] text-muted">Pour changer ces informations, dis-le à Edith.</p>
               </Section>
 
-              <Section title="Ce que Simone sait de ton commerce">
+              <Section title="Ce qu’Edith sait de ton commerce">
                 <MemoryList initial={memoryLines(care.data?.memory)} />
               </Section>
 
@@ -106,11 +106,11 @@ async function Settings() {
                     {plural(plan.posts_per_week, "post", "posts")} et {plural(plan.stories_per_week, "story", "stories")} par
                     semaine
                     {plan.platforms.length ? `, sur ${plan.platforms.map((p) => platformLabels[p]).join(" et ")}` : ""}.
-                    Demande à Simone sur WhatsApp pour le changer.
+                    Demande à Edith sur WhatsApp pour le changer.
                   </p>
                 ) : (
                   <p className="text-sm leading-normal">
-                    Pas encore de rythme choisi. Dis à Simone sur WhatsApp combien de posts et de stories tu veux par semaine.
+                    Pas encore de rythme choisi. Dis à Edith sur WhatsApp combien de posts et de stories tu veux par semaine.
                   </p>
                 )}
               </Section>
@@ -127,10 +127,10 @@ async function Settings() {
                   const href = platform === "tiktok" ? "/api/tiktok/connect" : "/api/instagram/connect";
                   const hint =
                     platform === "instagram"
-                      ? "Simone y publie tes posts validés et suit leurs résultats."
+                      ? "Edith y publie tes posts validés et suit leurs résultats."
                       : tiktokDirectPost()
                         ? "Tes Reels validés y partent aussi."
-                        : "Simone envoie tes Reels dans tes brouillons TikTok : tu ajoutes un son et tu publies.";
+                        : "Edith envoie tes Reels dans tes brouillons TikTok : tu ajoutes un son et tu publies.";
                   return (
                     <div key={platform} className="flex items-center gap-3">
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-violet-soft text-violet">
@@ -154,13 +154,13 @@ async function Settings() {
               </Section>
 
               {fauveInstagram?.username && (
-                <Section title="Simone sur Instagram">
+                <Section title="Edith sur Instagram">
                   <p className="text-sm leading-normal">
                     Quand un Reel t’inspire, partage-le à{" "}
                     <a href={`https://ig.me/m/${fauveInstagram.username}`} target="_blank" rel="noreferrer" className="font-bold text-violet">
                       @{fauveInstagram.username}
                     </a>{" "}
-                    (bouton Partager) : Simone en tire des idées pour ton style. Tu peux aussi lui écrire là-bas comme sur WhatsApp.
+                    (bouton Partager) : Edith en tire des idées pour ton style. Tu peux aussi lui écrire là-bas comme sur WhatsApp.
                   </p>
                   {dmContact.data ? (
                     <p className="text-sm font-semibold text-success">Ton compte Instagram est relié.</p>
@@ -175,14 +175,14 @@ async function Settings() {
             <>
               <Section title="Soin des montages">
                 <p className="text-sm leading-normal">
-                  Le niveau que Simone utilise par défaut pour tes Reels. Pour un Reel en particulier, dis-le à Simone.
+                  Le niveau qu’Edith utilise par défaut pour tes Reels. Pour un Reel en particulier, dis-le à Edith.
                 </p>
                 <EffortSetting initial={effortSchema.catch(DEFAULT_EFFORT).parse(care.data?.montage_effort)} />
               </Section>
 
               <Section title="Style des vidéos">
                 <p className="text-sm leading-normal">
-                  Direction artistique, couleurs, polices et logo que Simone applique à chaque publication.{" "}
+                  Direction artistique, couleurs, polices et logo qu’Edith applique à chaque publication.{" "}
                   <Link href="/style" className="font-bold text-violet">
                     Régler mon style
                   </Link>
@@ -257,7 +257,7 @@ async function Settings() {
 
       <a href={whatsappLink()} className="btn btn-secondary self-start">
         <WhatsAppIcon size={18} />
-        Écrire à Simone sur WhatsApp
+        Écrire à Edith sur WhatsApp
       </a>
     </div>
   );

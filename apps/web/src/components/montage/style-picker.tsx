@@ -7,7 +7,7 @@ import { useEffect } from "react";
 // drawn as it will look (font, colours, background, outline), on a dark photo-
 // like tile. The studio's saved styles, then the plain style of the montage (its
 // charter). No ready-made styles: they were flyer looks (a tilted block, italic,
-// boxes) against the native texts. No settings: anything finer is asked of Simone.
+// boxes) against the native texts. No settings: anything finer is asked of Edith.
 
 type Role = "hook" | "band" | "caption";
 export type StyleBrand = { accent: string; accentInk: string; displayFont: string; bodyFont: string; palette?: BrandPalette };
@@ -56,7 +56,7 @@ export function StylePicker({
     ...saved.map((s) => ({ key: `saved:${s.name}`, name: s.name, look: s.look as TextLook | undefined, preview: s.look })),
     { key: "plain", name: "Simple", look: undefined as TextLook | undefined, preview: plain },
   ];
-  // A style Simone made for this text only: shown first, so it is never lost by a tap.
+  // A style Edith made for this text only: shown first, so it is never lost by a tap.
   const own = look && !choices.some((c) => same(c.look, look)) ? { key: "own", name: "Actuel", look, preview: look } : null;
   const all = own ? [own, ...choices] : choices;
   useFonts(all.map((c) => resolveBrandLook(c.preview, brand).font));

@@ -5,7 +5,7 @@ import { finishJob, PULSE_MS } from "@/lib/studio-jobs";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // A montage step Vercel stopped (its 800 s were up, its machine went away) falls silent: no error,
-// no next step, and its work stayed « en cours » for ever while Simone offered to start it again.
+// no next step, and its work stayed « en cours » for ever while Edith offered to start it again.
 // Every 5 minutes (cron of publication): a step silent for 4 pulses is sent again once, from what
 // its pulse kept (studio_jobs.resume); silent again, she is told and nothing is charged.
 

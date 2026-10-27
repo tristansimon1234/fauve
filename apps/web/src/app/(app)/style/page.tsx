@@ -116,7 +116,7 @@ async function StyleLoader() {
   );
 }
 
-/** What Simone made for the studio and reuses: its animations and saved text styles, drawn in its brand. */
+/** What Edith made for the studio and reuses: its animations and saved text styles, drawn in its brand. */
 async function Created({ studioId }: { studioId: string }) {
   const [inputs, scenes, looks] = await Promise.all([loadMontageInputs(studioId, { segments: [] }), studioScenes(studioId), loadTextLooks(studioId)]);
   if (!scenes.length && !looks.length) return null;

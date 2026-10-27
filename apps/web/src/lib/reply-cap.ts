@@ -4,7 +4,7 @@ import { localDateOf, startOfLocalDay } from "@/lib/dates";
 import { messageOwner } from "@/lib/owner-message";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-// The day's limits on what anyone can make Simone do (packages/agent/src/reply-cap.ts): her turns
+// The day's limits on what anyone can make Edith do (packages/agent/src/reply-cap.ts): her turns
 // for a studio, counted on what they cost (one « conversation » line in cost_events per turn,
 // whatever the channel), and the team told when more numbers than usual start in a day.
 
@@ -12,7 +12,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 const today = (timeZone: string) => startOfLocalDay(localDateOf(new Date(), timeZone), timeZone).toISOString();
 
 /**
- * Whether Simone answers this studio now: « open », or its day's turns are used up and she says so
+ * Whether Edith answers this studio now: « open », or its day's turns are used up and she says so
  * once (« notice »), then nothing until tomorrow (« silent »).
  */
 export async function dayOfTurns(
@@ -42,7 +42,7 @@ export async function dayOfTurns(
   return told ? "silent" : "notice";
 }
 
-/** A new number just started with Simone: past the day's usual count, the team is told once (in its own conversation). */
+/** A new number just started with Edith: past the day's usual count, the team is told once (in its own conversation). */
 export async function alertOnNewNumbers(): Promise<void> {
   const db = supabaseAdmin();
   const { data: team } = await db.from("studios").select("id, timezone").eq("team", true).limit(1).maybeSingle();

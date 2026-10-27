@@ -12,9 +12,9 @@ import { replyOnWhatsApp } from "@/lib/whatsapp/inbound";
 
 // Her upload link from WhatsApp (/depot): the photos and videos she picks in her gallery go
 // straight to Storage in full quality (WhatsApp compresses videos), then arrive in her WhatsApp
-// conversation as if she had sent them there, one message per file, and Simone answers on WhatsApp:
+// conversation as if she had sent them there, one message per file, and Edith answers on WhatsApp:
 // at once « C'est arrivé », so a message waits when she taps back to WhatsApp, then her answer
-// once she has looked at them. Outside the 24 h window Simone cannot write first: the button
+// once she has looked at them. Outside the 24 h window Edith cannot write first: the button
 // back to WhatsApp has « C'est envoyé ! » ready, and her message opens the window.
 
 const filesSchema = z
@@ -22,7 +22,7 @@ const filesSchema = z
   .min(1)
   .max(MAX_MONTAGE_FILES);
 
-/** `answered`: Simone writes to her on WhatsApp herself; else her own message (prefilled) opens the conversation. */
+/** `answered`: Edith writes to her on WhatsApp herself; else her own message (prefilled) opens the conversation. */
 export type DropResult = { ok: true; count: number; answered: boolean } | { ok: false; error: string };
 
 /** « tes 2 vidéos et ta photo » */
@@ -44,7 +44,7 @@ export async function sendDropped(input: z.input<typeof filesSchema>): Promise<D
 
   const db = supabaseAdmin();
   const waId = member.phone_e164.replace(/^\+/, "");
-  // Before her files are stored (they count as WhatsApp messages): can Simone write first?
+  // Before her files are stored (they count as WhatsApp messages): can Edith write first?
   const { data: last } = await db
     .from("whatsapp_messages")
     .select("created_at")
@@ -82,7 +82,7 @@ export async function sendDropped(input: z.input<typeof filesSchema>): Promise<D
     if (id) await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "whatsapp", wa_message_id: id, direction: "outbound", phone_e164: member.phone_e164, type: "text", body: ack });
   }
 
-  // Read before Simone answers (as on WhatsApp), then her answer there (outside the window, her own message brings it).
+  // Read before Edith answers (as on WhatsApp), then her answer there (outside the window, her own message brings it).
   after(async () => {
     await Promise.all(
       added.map((m) =>
