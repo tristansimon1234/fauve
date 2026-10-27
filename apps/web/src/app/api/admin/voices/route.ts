@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { SIMONE_VOICES, voiceSamplePath } from "@fauve/agent";
 import { z } from "zod";
 import { cronAuthorized } from "@/lib/cron-auth";
@@ -8,9 +9,10 @@ import { levelSpeech, speak } from "@/lib/voice-over";
 // Voices for Edith, by ear. POST with CRON_SECRET, from the database (call_app):
 //   ?use_case=social_media|conversational|narrative_story&gender=female|male
 //     the most used French voices of the ElevenLabs library for that use, with their own sample;
-//   ?say=<voice id>,<voice id>…
-//     the same lines read by each voice (Edith's text for a pizzeria, with its acting tags),
-//     to compare them by ear: a signed link (24 h) per voice;
+//   ?say=<voice id>,<voice id>…[&text=<words>]
+//     the same lines read by each voice (Edith's text for a pizzeria, with its acting tags, or the
+//     words given, a landing Reel's voice), to compare them by ear: a signed link (24 h) per voice,
+//     with the time of each word when the words are given (its subtitles);
 //   ?gallery=1
 //     the samples of Edith's voices heard in Style (public bucket landing/voices/);
 //   ?info=<voice id>
@@ -61,7 +63,9 @@ async function clone(key: string, name: string, mediaIds: string[]) {
 const SAMPLE =
   "[smiling] Cette pizza, on l'a commencée avant-hier. Ici, la pâte est pétrie le matin, puis elle repose quarante-huit heures. Le soir, on l'étire et elle file sur la pierre du four à bois. [laughs softly] Toi, t'as juste à attraper ta part. [warmly] Passe ce soir, on t'attend.";
 
-async function say(voiceIds: string[]) {
+async function say(voiceIds: string[], text = SAMPLE) {
+  const own = text !== SAMPLE;
+  const tag = own ? `-${createHash("sha1").update(text).digest("hex").slice(0, 8)}` : "";
   const db = supabaseAdmin();
   const samples = [];
   // 4 at a time: the plan reads 5 texts at once.
@@ -70,14 +74,14 @@ async function say(voiceIds: string[]) {
       ...(await Promise.all(
         voiceIds.slice(i, i + 4).map(async (id) => {
           try {
-            const voice = await speak(SAMPLE, id);
+            const voice = await speak(text, id);
             // At the level of a voice in a Reel, so they are compared by ear and not by volume.
             const leveled = await levelSpeech(`sample-${id}`, voice.mp3);
-            const path = `lab/voices/${id}.mp3`;
+            const path = `lab/voices/${id}${tag}.mp3`;
             const up = await db.storage.from("media").upload(path, leveled.mp3, { contentType: "audio/mpeg", upsert: true });
             if (up.error) throw new Error(up.error.message);
             const signed = await db.storage.from("media").createSignedUrl(path, 86_400);
-            return { id, model: voice.model, seconds: voice.transcript.duration, lufs: leveled.lufs, url: signed.data?.signedUrl ?? null };
+            return { id, model: voice.model, seconds: voice.transcript.duration, lufs: leveled.lufs, url: signed.data?.signedUrl ?? null, ...(own ? { words: voice.transcript.words } : {}) };
           } catch (error) {
             return { id, error: error instanceof Error ? error.message.slice(0, 300) : String(error) };
           }
@@ -128,7 +132,9 @@ export async function POST(request: Request) {
   if (listed) {
     const ids = listed.split(",").filter((id) => /^[A-Za-z0-9]{10,40}$/.test(id)).slice(0, 8);
     if (!ids.length) return Response.json({ error: "say=<voice id>,<voice id>" }, { status: 400 });
-    return say(ids);
+    const text = params.get("text")?.trim();
+    if (text !== undefined && (text.length < 2 || text.length > 600)) return Response.json({ error: "text: 2 to 600 characters" }, { status: 400 });
+    return say(ids, text || SAMPLE);
   }
 
   // One voice's card (name, labels, description): a voice of the account, else found in the library.
