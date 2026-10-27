@@ -1,6 +1,6 @@
 "use server";
 
-import { findVoice, isBaked, readPostVoice, RESTYLE, TRIAL_DAYS, type EditPlan, type ReelInputs, type SavedLook } from "@fauve/agent";
+import { findVoice, isBaked, readPostVoice, RESTYLE, starterOffer, type EditPlan, type ReelInputs, type SavedLook } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
@@ -78,7 +78,7 @@ export async function saveEffectWords(postId: string, changes: { id: string; tex
   if (!found) return UNKNOWN;
   if (LOCKED.includes(found.post.status as string)) return ONLINE;
   // She sees the Reel before she changes it (its page waits for her subscription).
-  if (!(await studioAccess(found.studioId)).unlock) return { ok: false, error: `Pour voir ce Reel et changer ses mots, démarre ton essai : ${TRIAL_DAYS} jours offerts.` };
+  if (!(await studioAccess(found.studioId)).unlock) return { ok: false, error: `Pour voir ce Reel et changer ses mots, abonne-toi : ${starterOffer()}.` };
   const started = await startEffectWords(found.studioId, postId, parsed.data);
   if (!started.ok) return started;
   touched(postId);
@@ -166,7 +166,7 @@ export async function keepModel(postId: string): Promise<{ ok: true; model: Mode
   const found = await reel(postId);
   if (!found || found.post.kind !== "reel") return UNKNOWN;
   const access = await studioAccess(found.studioId);
-  if (!access.subscribed) return { ok: false, error: `Démarre ton essai pour garder tes Reels comme modèles : ${TRIAL_DAYS} jours offerts.` };
+  if (!access.subscribed) return { ok: false, error: `Abonne-toi pour garder tes Reels comme modèles : ${starterOffer()}.` };
   const kept = await keepAsModel(found.studioId, postId);
   if ("error" in kept) return { ok: false, error: kept.error };
   touched(postId);

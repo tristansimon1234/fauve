@@ -1,5 +1,5 @@
 import "server-only";
-import { CREDIT_PRICES, PUBLISH_OFFER_OPTIONS, publishQuestion, publishWhen, shortSentence, STYLE_CHECK_OPTIONS, TRIAL_DAYS } from "@fauve/agent";
+import { CREDIT_PRICES, PUBLISH_OFFER_OPTIONS, publishQuestion, publishWhen, shortSentence, STYLE_CHECK_OPTIONS, starterOffer } from "@fauve/agent";
 import { studioAccess } from "@/lib/billing/access";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { env } from "@/lib/env";
@@ -181,7 +181,7 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
     ? [offer.question, costLine].filter(Boolean).join("\n")
     : [
         !unlocked
-          ? `Pour le voir en entier et le publier, démarre ton essai : ${TRIAL_DAYS} jours offerts, sans engagement.`
+          ? `Pour le voir en entier et le publier, abonne-toi : ${starterOffer()}, sans engagement.`
           : styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus rapide, avec moins de texte, plus chaleureux ou autrement : je retiens ton style pour tous les prochains." : "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
         target.offerVariant === false || styleCheck || !unlocked
           ? ""

@@ -17,6 +17,18 @@ export type PlanId = keyof typeof PLANS;
  */
 export const CARED_REEL_CREDITS = 12;
 
+/**
+ * How she starts (Tristan: « 9 euros pour un essai », « 3 réels ») : her first month at €9, VAT
+ * included, on either offer, with credits for 3 Reels made with care; the offer's own price and
+ * credits from her first renewal. No free trial: a trial on Pro left 110 credits (about €12 of real
+ * cost) to spend before cancelling. Her first publication, made at the onboarding, stays free.
+ */
+export const STARTER = { priceEur: 9, reels: 3 } as const;
+/** The credits of her first month at €9. */
+export const STARTER_CREDITS = STARTER.reels * CARED_REEL_CREDITS;
+/** « ton premier mois à 9 €, 3 Reels compris » */
+export const starterOffer = () => `ton premier mois à ${STARTER.priceEur} €, ${STARTER.reels} Reels compris`;
+
 /** Reels made with care that a month of the offer pays for. */
 export const reelsPerMonth = (plan: PlanId) => Math.floor(PLANS[plan].credits / CARED_REEL_CREDITS);
 

@@ -1,8 +1,8 @@
 import "server-only";
-import { accessMessage, accessOf, isSubscribed, type Access } from "@fauve/agent";
-import { creditBalance } from "@/lib/credits";
+import { accessMessage, accessOf, isSubscribed, starterOffer, type Access } from "@fauve/agent";
+import { creditBalance, startStarter } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { billingEnabled, getSubscription, latestSubscription, planOfPrice, sessionSubscription, type StripeSubscription } from "./stripe";
+import { billingEnabled, getSubscription, latestSubscription, periodEnd, planOfPrice, sessionSubscription, type StripeSubscription } from "./stripe";
 
 // What a studio may do now (packages/agent/src/access.ts), from its subscription
 // (read back from Stripe when it may have changed), its first publication and
@@ -31,6 +31,9 @@ async function store(studioId: string, customer: string | null, subscription: St
       ...(plan ? { plan } : {}),
     })
     .eq("id", studioId);
+  // Her first month at €9 (STARTER): its credits until her first renewal.
+  const until = subscription && periodEnd(subscription);
+  if (subscription?.metadata?.starter === "1" && isSubscribed(subscription.status) && until) await startStarter(studioId, until);
 }
 
 /** Her return from Checkout: the subscription it made, kept on her studio. */
@@ -89,6 +92,6 @@ export async function accessLine(studioId: string): Promise<string | null> {
   const access = await studioAccess(studioId);
   if (access.subscribed) return access.create ? null : `Abonnement : ${accessMessage("credits")}`;
   return access.create
-    ? "Abonnement : pas encore abonnée. Sa première publication est offerte (c'est l'essai de l'onboarding) ; ensuite, la voir en entier et la publier demande l'abonnement (3 jours d'essai offerts, page /abonnement)."
+    ? `Abonnement : pas encore abonnée. Sa première publication est offerte (c'est l'essai de l'onboarding) ; ensuite, la voir en entier et la publier demande l'abonnement (${starterOffer()}, page /abonnement).`
     : `Abonnement : ${accessMessage("subscribe")}`;
 }

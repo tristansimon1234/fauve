@@ -1,9 +1,10 @@
+import { starterOffer } from "./plans.ts";
+
 // What a studio may do without paying. The onboarding goes all the way to her
 // first publication (the Reel is made in full); to see it, publish it or make
-// anything else, she subscribes (3 days of trial, card asked, Stripe). And with
-// no credits left nothing costly starts, not even watching a video.
+// anything else, she subscribes (her first month at €9, STARTER in plans.ts,
+// Stripe). And with no credits left nothing costly starts, not even watching a video.
 
-export const TRIAL_DAYS = 3;
 /** Videos watched (Gemini) before a subscription: enough for the first Reel. */
 export const FREE_ANALYSES = 8;
 
@@ -55,5 +56,5 @@ export function accessOf(input: AccessInput): Access {
 export function accessMessage(reason: Access["reason"]): string {
   return reason === "credits"
     ? "Plus de crédits ce mois-ci : rien de nouveau ne peut partir. Ils reviennent le 1er du mois ; en attendant, dis-le-lui simplement, sans rien lancer."
-    : "Pas encore abonnée : sa première publication est faite, la suite (la voir en entier, la publier, en faire d'autres) se débloque avec l'abonnement, 3 jours d'essai offerts. Dis-le-lui simplement et donne le lien de l'abonnement (page /abonnement), sans rien lancer.";
+    : `Pas encore abonnée : sa première publication est faite, la suite (la voir en entier, la publier, en faire d'autres) se débloque avec l'abonnement, ${starterOffer()}. Dis-le-lui simplement et donne le lien de l'abonnement (page /abonnement), sans rien lancer.`;
 }

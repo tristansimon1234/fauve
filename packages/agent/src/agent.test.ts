@@ -2110,6 +2110,14 @@ test("bank: a clean shot that moves or hooks is kept, a dark or shaky clip is no
   assert.equal(bankWorthy({ lighting: "ok", shots: [{ ...shot, energy: 1, hook_score: 2 }] } as never), false);
 });
 
+test("starter: the first month at €9 pays its 3 Reels and keeps a margin", async () => {
+  const { STARTER, STARTER_CREDITS, CARED_REEL_CREDITS } = await import("./plans.ts");
+  const { starterCostCeiling, starterNetRevenue } = await import("./margin.ts");
+  assert.equal(STARTER_CREDITS, STARTER.reels * CARED_REEL_CREDITS);
+  // Every credit spent and the chat of 3 Reels: still under what €9 brings in, with 15 % kept at least.
+  assert.ok(starterCostCeiling() <= starterNetRevenue() * 0.85, `${starterCostCeiling()} vs ${starterNetRevenue()}`);
+});
+
 test("stabilize: a clip that shakes a good part of the time, never a long one", async () => {
   const { needsStabilizing, shakyShare } = await import("./stabilize.ts");
   const shot = (start: number, end: number, shaky: boolean) => ({ start, end, quality: { blurry: false, dark: false, shaky } });

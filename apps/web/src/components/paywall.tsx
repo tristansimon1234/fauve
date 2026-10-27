@@ -1,4 +1,4 @@
-import { PLANS, TRIAL_DAYS } from "@fauve/agent";
+import { PLANS, STARTER } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { signMediaUrls, type Db } from "@/lib/studio";
 import { PlanChoice } from "./plan-choice";
@@ -50,14 +50,13 @@ export async function Paywall({ db, studioId, postId, next }: { db: Db; studioId
             Ta première publication est <span className="font-serif font-normal italic text-violet">prête</span>
           </h1>
           <p className="text-[15px] leading-relaxed text-muted">
-            Pour la voir en entier, la publier et en faire d’autres, démarre ton essai : {TRIAL_DAYS} jours offerts, puis l’offre choisie chaque mois. Sans engagement, tu arrêtes
-            en un clic avant la fin de l’essai et tu ne paies rien.
+            Pour la voir en entier, la publier et en faire d’autres, abonne-toi : ton premier mois coûte {STARTER.priceEur} €, avec {STARTER.reels} Reels compris, puis l’offre
+            choisie chaque mois. Sans engagement, tu arrêtes en un clic.
           </p>
         </div>
         <PlanChoice next={next} />
         <p className="text-[12px] leading-snug text-muted">
-          Ta carte est demandée pour l’essai et débitée seulement après {TRIAL_DAYS} jours ({PLANS.essentiel.priceEur} € ou {PLANS.pro.priceEur} € TTC par mois). Paiement sécurisé par
-          Stripe.
+          {STARTER.priceEur} € TTC aujourd’hui, puis {PLANS.essentiel.priceEur} € ou {PLANS.pro.priceEur} € TTC par mois selon l’offre choisie. Paiement sécurisé par Stripe.
         </p>
       </div>
     </main>

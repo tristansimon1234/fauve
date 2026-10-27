@@ -12,7 +12,7 @@ import {
   validatedPlanBrief,
   MAX_MONTAGE_FILES,
   postKindSchema,
-  TRIAL_DAYS,
+  starterOffer,
   type CreationPhase,
   type Effort,
   type PostKind,
@@ -96,7 +96,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
   const access = await studioAccess(studioId);
   if (!access.create && (access.reason === "subscribe" || kind === "reel")) {
     return access.reason === "subscribe"
-      ? { ok: false, locked: "subscribe", error: `Ta première publication est faite. Pour en créer d’autres, démarre ton essai : ${TRIAL_DAYS} jours offerts.` }
+      ? { ok: false, locked: "subscribe", error: `Ta première publication est faite. Pour en créer d’autres, abonne-toi : ${starterOffer()}.` }
       : { ok: false, locked: "credits", error: "Tu n’as plus de crédits ce mois-ci : ils reviennent le 1er du mois." };
   }
 

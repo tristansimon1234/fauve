@@ -1,5 +1,5 @@
 import { CREDIT_PRICES } from "./credits.ts";
-import { PLANS, type PlanId } from "./plans.ts";
+import { PLANS, STARTER, STARTER_CREDITS, type PlanId } from "./plans.ts";
 
 // What a studio costs against what it brings in: its offer's price once VAT and Stripe's fees
 // are out, the share kept as margin, and what a credit pays. Every priced job costs at most what
@@ -58,6 +58,14 @@ export const WHATSAPP_EUR_PER_POST = 0.22;
 export const UNPRICED_EUR_PER_POST = CHAT_EUR_PER_POST + WHATSAPP_EUR_PER_POST;
 /** Publications a month at an offer's weekly rhythm. */
 export const postsPerMonth = (plan: PlanId) => (PLANS[plan].postsPerWeek * 52) / 12;
+/** What her first month at €9 brings in, VAT and Stripe's fees out. */
+export const starterNetRevenue = () => STARTER.priceEur / (1 + VAT_RATE) - stripeFeeEur(STARTER.priceEur);
+/**
+ * The most her first month costs: its credits all spent, and the chat and WhatsApp of its Reels.
+ * It keeps a margin, thinner than an offer's (about 19 % at most spent): it is how she starts.
+ */
+export const starterCostCeiling = () => STARTER_CREDITS * EUR_PER_CREDIT_SPENT + STARTER.reels * UNPRICED_EUR_PER_POST;
+
 /** The most an offer's month costs: every credit spent, and what no credit pays at its rhythm. It stays under its budget. */
 export const monthCostCeiling = (plan: PlanId) => PLANS[plan].credits * EUR_PER_CREDIT_SPENT + postsPerMonth(plan) * UNPRICED_EUR_PER_POST;
 

@@ -10,14 +10,14 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 /** Only a path of this app (no open redirect). */
 const safeNext = (next: string) => (/^\/(?!\/)[\w\-/?=&%.]*$/.test(next) ? next : "/fauve");
 
-/** Opens Stripe Checkout for an offer: 3 days of trial, the card asked. */
+/** Opens Stripe Checkout for an offer, the card asked: her first subscription starts with its first month at €9. */
 export async function startCheckout(plan: PlanId, next: string): Promise<{ error: string } | void> {
   if (!billingEnabled()) return { error: "Le paiement n’est pas encore ouvert." };
   const { member } = await getStudioContext();
   if (!member) return { error: "Reconnecte-toi pour continuer." };
   if (member.role !== "owner") return { error: "Seule la personne qui gère le compte peut s’abonner." };
   const db = supabaseAdmin();
-  const { data: studio } = await db.from("studios").select("id, name, stripe_customer_id").eq("id", member.studio.id).single();
+  const { data: studio } = await db.from("studios").select("id, name, stripe_customer_id, stripe_subscription_id, starter_until").eq("id", member.studio.id).single();
   if (!studio) return { error: "Studio introuvable." };
   let customer = studio.stripe_customer_id as string | null;
   if (!customer) {
@@ -30,6 +30,8 @@ export async function startCheckout(plan: PlanId, next: string): Promise<{ error
     customer,
     plan: planOf(plan),
     studioId: studio.id as string,
+    // Once: never for a studio that had a subscription or its first month already.
+    starter: !studio.stripe_subscription_id && !studio.starter_until,
     successUrl: `${base}/abonnement/retour?session_id={CHECKOUT_SESSION_ID}&next=${encodeURIComponent(back)}`,
     cancelUrl: `${base}/abonnement?next=${encodeURIComponent(back)}`,
   });

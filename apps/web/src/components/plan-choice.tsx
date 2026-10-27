@@ -1,6 +1,6 @@
 "use client";
 
-import { PLANS, reelsPerMonth, TRIAL_DAYS, weeklyPosts, type PlanId } from "@fauve/agent";
+import { PLANS, reelsPerMonth, STARTER, weeklyPosts, type PlanId } from "@fauve/agent";
 import { useState, useTransition } from "react";
 import { startCheckout } from "@/app/abonnement/actions";
 import { CheckIcon } from "./icons";
@@ -59,7 +59,7 @@ export function PlanChoice({ next }: { next: string }) {
         }
         className="btn btn-primary h-12 text-[15px] disabled:opacity-50"
       >
-        {pending ? "Un instant…" : `Débloquer : ${TRIAL_DAYS} jours offerts`}
+        {pending ? "Un instant…" : `Débloquer : ${STARTER.priceEur} € le premier mois`}
       </button>
       {error ? <p className="text-[13px] font-semibold text-peach-ink">{error}</p> : null}
     </div>
