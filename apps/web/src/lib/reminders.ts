@@ -8,7 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // rappels oui ») : a post ready to go keeps the moment Edith suggested (scheduled_at), and at
 // that moment she reminds her, once, with « Oui, publie-le » / « Je regarde d'abord » (the same
 // offer a delivery makes, answered by lib/publish-offer.ts : « oui » publishes it now). On
-// WhatsApp in the 24 h window, else the draft_ready template, and always in the app.
+// WhatsApp in the 24 h window, else the post_reminder template, and always in the app.
 
 const BATCH = 10;
 
@@ -44,8 +44,8 @@ export async function remindDue(): Promise<number> {
         text: reminderMessage(post.kind as string, (post.title as string | null) ?? "", platforms),
         options: PUBLISH_OFFER_OPTIONS,
         kind: "reminder",
-        // Utility, so Meta does not cap it; draft_ready until post_reminder is approved.
-        template: { name: "post_reminder", params: [kind, title], fallback: { name: "draft_ready", params: [kind, "aujourd’hui"] } },
+        // Utility, so Meta does not cap it (draft_ready, its fallback before, was moved to Marketing).
+        template: { name: "post_reminder", params: [kind, title] },
         payload: { posts: [post.id], open_post: post.id, publish_offer: post.id },
       });
       sent++;

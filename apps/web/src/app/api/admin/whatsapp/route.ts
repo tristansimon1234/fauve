@@ -37,21 +37,16 @@ const TEMPLATE_DEFINITIONS = [
     ],
   },
   {
-    name: "draft_ready",
+    // The Reel she asked for, ready: its button opens its page, signed in (deliver.ts). Replaces draft_ready,
+    // whose « Je le programme ? » Meta moved to Marketing.
+    name: "reel_ready",
     language: "fr",
     category: "UTILITY",
     components: [
-      {
-        type: "BODY",
-        text: "Ton {{1}} pour {{2}} est prêt. Je le programme ?",
-        example: { body_text: [["Reel", "jeudi"]] },
-      },
+      { type: "BODY", text: "Ton Reel est prêt ! Touche le bouton pour le voir, le publier ou demander un changement." },
       {
         type: "BUTTONS",
-        buttons: [
-          { type: "QUICK_REPLY", text: "Oui, vas-y" },
-          { type: "QUICK_REPLY", text: "Je veux le voir" },
-        ],
+        buttons: [{ type: "URL", text: "Voir mon Reel", url: "{APP_URL}/l/{{1}}", example: ["{APP_URL}/l/Xc3vR8kQ2mZp7LwT9aB4eF"] }],
       },
     ],
   },
