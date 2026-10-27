@@ -43,6 +43,13 @@ export function anthropic() {
  */
 export const CACHE_AN_HOUR = { type: "ephemeral", ttl: "1h" } as const;
 
+/**
+ * The end of a chat request (the studio context, written fresh each turn, and the steps of the tool loop) is read
+ * again only by the next step, seconds later: never by the next turn, whose history holds the stored messages. Kept
+ * 5 minutes, it is written at 1.25x input instead of the hour's 2x. It comes after the hour-long markers, as the API asks.
+ */
+const CACHE_THIS_TURN = { type: "ephemeral" } as const;
+
 function buildTools(handlers: ToolHandlers) {
   return (Object.keys(toolSpecs) as ToolName[]).map((name) => {
     const spec = toolSpecs[name];
@@ -135,7 +142,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     // invalidates the cached history.
     system: [{ type: "text", text: FAUVE_SYSTEM_PROMPT, cache_control: CACHE_AN_HOUR }],
     // Each step of the tool loop re-reads everything before it from the cache.
-    cache_control: CACHE_AN_HOUR,
+    cache_control: CACHE_THIS_TURN,
     tools: buildTools(createToolHandlers(input)),
     messages: [
       ...withCacheBreakpoint(input.history),
@@ -169,9 +176,14 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   // Everything she wrote, step by step: an answer often starts before a tool call
   // (« D'accord, 19 h ! ») and ends after it; keeping only the last step lost the start.
   const spoken: string[] = [];
+  // What the turn cost in calls: each step reads the whole prompt again, so the steps and their tools are logged.
+  let steps = 0;
+  const called: string[] = [];
   const take = (message: Anthropic.Beta.BetaMessage) => {
     usage = addUsage(usage, message.usage);
     last = message;
+    steps++;
+    called.push(...message.content.flatMap((b) => (b.type === "tool_use" ? [b.name] : [])));
     const text = textOf(message).trim();
     if (text && spoken.at(-1) !== text) spoken.push(text);
     // The tools of this step run after it: reply_with knows whether its buttons come with any words.
@@ -237,7 +249,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     }
   }
 
-  await logClaudeCost(input.studioId, usage, "conversation", CHAT_MODEL);
+  await logClaudeCost(input.studioId, usage, "conversation", CHAT_MODEL, { steps, tools: called });
 
   if (!last || last.stop_reason === "refusal") {
     return { reply: FALLBACK_REPLY, reactions: input.reactions, extras: {}, notes: input.notes, usage, afterReply: input.afterReply };
@@ -265,7 +277,7 @@ function textOf(message: Anthropic.Beta.BetaMessage): string {
     .trim();
 }
 
-export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose = "conversation", model = CLAUDE_MODEL) {
+export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose = "conversation", model = CLAUDE_MODEL, extra: Record<string, unknown> = {}) {
   const usd = claudeCostUsd(model, usage);
   const { error } = await supabaseAdmin()
     .from("cost_events")
@@ -275,7 +287,29 @@ export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose
       provider: "anthropic",
       units: usage.input_tokens + usage.output_tokens,
       cost_eur: usdToEur(usd, env("USD_TO_EUR")),
-      meta: costMeta({ model, purpose, usage, cost_usd: usd }),
+      meta: costMeta({ model, purpose, usage, cost_usd: usd, ...extra }),
     });
   if (error) console.error("cost_events insert failed", error.message);
+}
+
+/**
+ * Keeps the start shared by every chat request warm (Simone's prompt and tools, the same for every business, about
+ * 40 000 tokens): an hour without a message and it expired, and the next message wrote it all again (0.16 € instead of
+ * about 0.03 €). The request is the chat's own up to its prompt, with max_tokens 0: it only reads that start, which
+ * gives it another hour, and bills no output.
+ */
+export async function warmChatCache(studioId: string): Promise<void> {
+  const unused = Object.fromEntries((Object.keys(toolSpecs) as ToolName[]).map((name) => [name, async () => ""])) as unknown as ToolHandlers;
+  // The definitions as the tool runner sends them: its tools as JSON, which leaves their functions out.
+  const tools = JSON.parse(JSON.stringify(buildTools(unused))) as Anthropic.Beta.BetaToolUnion[];
+  const response = await anthropic().beta.messages.create({
+    model: CHAT_MODEL,
+    max_tokens: 0,
+    output_config: { effort: CHAT_EFFORT },
+    ...(supportsServerFallback(CHAT_MODEL) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+    system: [{ type: "text", text: FAUVE_SYSTEM_PROMPT, cache_control: CACHE_AN_HOUR }],
+    tools,
+    messages: [{ role: "user", content: "." }],
+  });
+  await logClaudeCost(studioId, response.usage, "cache_warm", CHAT_MODEL);
 }
