@@ -137,7 +137,7 @@ export async function renderAndDeliver(
 
 /**
  * When it can go out in one tap (a draft, Instagram connected, not one she publishes herself):
- * « Je le publie vendredi à 18 h ? », and the day for the draft_ready template.
+ * « Je le publie vendredi à 18 h ? ».
  */
 async function publishOffer(target: DeliveryTarget): Promise<{ question: string; day: string } | null> {
   const db = supabaseAdmin();
@@ -208,7 +208,7 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
     return;
   }
   // Started from the app: WhatsApp too, so she can close the app. A free message in the 24 h
-  // window; outside it, the draft_ready template (its buttons answer the same question).
+  // window; outside it, the reel_ready template, whose button opens its page signed in.
   // Never at the cost of the delivery: the app always has it.
   const owner = target.notify ? await ownerWhatsApp(target.studioId).catch(() => null) : null;
   if (owner?.open) {
@@ -220,9 +220,10 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
       await store(target, { wa_message_id: id, type: "text", body: stored, payload }, owner.waId);
       return;
     }
-  } else if (owner && offer) {
-    await sendTemplate(owner.waId, "draft_ready", ["Reel", offer.day]).catch((error: unknown) =>
-      console.warn("draft_ready template refused", error instanceof Error ? error.message : error),
+  } else if (owner) {
+    const url = await createLoginLink(`+${owner.waId}`, page, "open_post");
+    await sendTemplate(owner.waId, "reel_ready", [], "fr", url.split("/l/")[1]).catch((error: unknown) =>
+      console.warn("reel_ready template refused", error instanceof Error ? error.message : error),
     );
   }
   await store(target, { type: "text", body: stored, payload }, undefined);

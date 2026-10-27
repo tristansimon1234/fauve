@@ -2,7 +2,10 @@
 // Names and parameter order must match what is registered in WhatsApp Manager.
 export const whatsappTemplates = {
   content_request: { category: "utility", params: ["what", "day"] },
-  draft_ready: { category: "utility", params: ["kind", "day"] },
+  // A Reel started from « Créer », ready while she is away: « Ton Reel est prêt ! Touche le bouton pour le voir, le
+  // publier ou demander un changement. » with « Voir mon Reel » to APP_URL/l/{token}. Replaces draft_ready
+  // (« Ton {{1}} pour {{2}} est prêt. Je le programme ? »), which Meta moved to Marketing.
+  reel_ready: { category: "utility", params: [] },
   // The reminder at the moment she chose (lib/reminders.ts), worded as a reminder of her own post so Meta
   // keeps it Utility (draft_ready, « Je le programme ? », was moved to Marketing and capped):
   // « Rappel : ton {{1}} « {{2}} » est prévu pour maintenant. Tu veux que je le publie ? »
