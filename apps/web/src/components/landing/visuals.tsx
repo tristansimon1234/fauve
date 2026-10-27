@@ -3,7 +3,7 @@ import { CheckIcon, PlayIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { PHOTOS, unsplash } from "./photos";
 
-// What each card of the landing shows, alive: drawings of what Simone does, played by
+// What each card of the landing shows, alive: drawings of what Edith does, played by
 // landing.css once their <Play> is on screen (land-once: plays once, land-loop: loops while
 // on screen). Their plain styles are the finished picture (the server's, and reduced motion's).
 
@@ -226,7 +226,7 @@ export function ReminderVisual() {
           <span className="flex size-[22px] items-center justify-center overflow-hidden rounded-[6px] bg-violet-soft">
             <Mascot size={20} still />
           </span>
-          <span className="text-[12px] font-bold text-ink">Simone</span>
+          <span className="text-[12px] font-bold text-ink">Edith</span>
           <span className="ml-auto text-[10.5px] text-muted">maintenant</span>
         </span>
         <span className="text-[12.5px] leading-snug text-ink">C’est le bon moment pour poster ton Reel : vendredi 18 h, tes clientes sont là. Je le publie ?</span>

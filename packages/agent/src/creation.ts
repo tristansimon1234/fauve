@@ -2,7 +2,7 @@ import { EFFORTS, type Effort } from "./effort.ts";
 import type { PostKind } from "./schemas.ts";
 import type { PublishWhen } from "./when.ts";
 
-// « Créer », in one screen: she gives her photos and videos, Simone says what she
+// « Créer », in one screen: she gives her photos and videos, Edith says what she
 // will make of them (the format she advises, the day it goes out) and starts. Then
 // what the working screen shows while the Reel is made, and the two answers to
 // « Je le publie vendredi à 18 h ? » that need no model turn.
@@ -16,7 +16,7 @@ export function advisedFormat(p: Picked): PostKind {
   return p.photos >= 2 ? "carousel" : "post";
 }
 
-/** Why Simone advises that format, in a sentence. */
+/** Why Edith advises that format, in a sentence. */
 export function formatWhy(p: Picked): string {
   const advised = advisedFormat(p);
   if (advised === "reel") return "Je te conseille un Reel : tes vidéos bougent, et c’est le format qu’Instagram montre le plus.";
@@ -109,7 +109,7 @@ export function creationPhase(stage: string | null, watched: boolean): CreationP
 
 /**
  * « Je le publie maintenant ? » (Tristan : « la programmation sert à rien », « mais les rappels
- * oui »): nothing goes out on its own at a set time; with a good moment ahead, Simone says she
+ * oui »): nothing goes out on its own at a set time; with a good moment ahead, Edith says she
  * will remind her then (« Sinon je te fais signe vendredi à 18 h »).
  */
 export function publishQuestion(when: PublishWhen | null, upcoming: boolean): string {
@@ -121,7 +121,7 @@ export const REMINDER_GRACE_HOURS = 36;
 
 const KIND_WORDS: Record<string, string> = { reel: "ton Reel", carousel: "ton carrousel", post: "ta photo", story: "ta story" };
 
-/** The reminder at the moment Simone suggested: the post, then the same question and buttons as a delivery. */
+/** The reminder at the moment Edith suggested: the post, then the same question and buttons as a delivery. */
 export function reminderMessage(kind: string, title: string, platforms: string[]): string {
   const where = platforms.includes("tiktok") ? "sur Instagram et TikTok" : "sur Instagram";
   const name = title.trim() ? ` « ${title.trim().slice(0, 60)} »` : "";
@@ -133,7 +133,7 @@ export const PUBLISH_OFFER_OPTIONS = ["Oui, publie-le", "Je regarde d’abord"];
 
 /**
  * Her answer to that question, or to the draft_ready template's buttons (« Oui, vas-y »,
- * « Je veux le voir »): only the buttons' own words; anything else goes to Simone.
+ * « Je veux le voir »): only the buttons' own words; anything else goes to Edith.
  */
 export function publishOfferAnswer(text: string | null | undefined): "yes" | "look" | null {
   const said = (text ?? "")

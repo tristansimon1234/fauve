@@ -31,16 +31,16 @@ import { ArrowLeftIcon, CalendarIcon, CheckIcon, ChevronRightIcon, FilmIcon, Ima
 import { Mascot } from "./mascot";
 import { nudgeWork } from "./work-pill";
 
-/** Where a carousel, a photo or a story goes on: by default Simone's panel; on the Simone page, its own conversation. */
+/** Where a carousel, a photo or a story goes on: by default Edith's panel; on the Edith page, its own conversation. */
 export type NewPostHandOff = (start: { postId: string; text: string; files: File[] }) => void;
 export const NewPostHandOffContext = createContext<NewPostHandOff | null>(null);
 
 // « Nouvelle publication », in four steps (Tristan : « trop d'étapes », « écrans vides ») :
 // what to make (the type, and for a Reel a voice or just the music, on one screen), her photos and videos (her library or her phone), what she imagines or a Reel she
-// likes, then Simone's proposal: her request said back as one plan in points, with why
+// likes, then Edith's proposal: her request said back as one plan in points, with why
 // (« la demande bien reformulée, claire et précise, lisible »), which she takes or changes.
 // « C'est parti »: a Reel starts at once and the screen follows it (« Je m'en occupe »);
-// a carousel, a photo or a story goes on with Simone in the chat, who writes the texts.
+// a carousel, a photo or a story goes on with Edith in the chat, who writes the texts.
 
 type Step = "what" | "files" | "idea" | "proposal";
 const STEP_LABELS: Record<Step, string> = { what: "Le format", files: "Tes fichiers", idea: "Ton idée", proposal: "La proposition" };
@@ -62,24 +62,24 @@ const SCENARIO_EXAMPLE: Record<PostKind, string> = {
 
 const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
 
-/** Her studio's voice setting (Style), as the first choice: « Simone choisit », without, or its voice. */
+/** Her studio's voice setting (Style), as the first choice: « Edith choisit », without, or its voice. */
 function defaultVoice(o: NewPostOptions | null): string {
   if (!o || o.voice.use === "auto") return "auto";
   if (o.voice.use === "never") return "off";
   return o.voice.voiceId && findVoice(o.voice.voiceId) ? o.voice.voiceId : SIMONE_VOICES[0]!.id;
 }
 
-/** « Une voix off » chosen: the studio's voice (Style), else Simone's first. */
+/** « Une voix off » chosen: the studio's voice (Style), else Edith's first. */
 function studioVoice(o: NewPostOptions): string {
   return o.voice.voiceId && findVoice(o.voice.voiceId) ? o.voice.voiceId : SIMONE_VOICES[0]!.id;
 }
 
-/** Under « Voix off »: « À choisir » until she answers, « Simone choisit », « Aucune », « Eva ». */
+/** Under « Voix off »: « À choisir » until she answers, « Edith choisit », « Aucune », « Eva ». */
 function voiceLabel(voice: string, asked: boolean): string {
   if (!asked) return "Avec ou sans ?";
-  if (voice === "auto") return "Simone choisit";
+  if (voice === "auto") return "Edith choisit";
   if (voice === "off") return "Aucune";
-  return findVoice(voice)?.name ?? "Simone choisit";
+  return findVoice(voice)?.name ?? "Edith choisit";
 }
 
 const placeLabel = (platforms: string[]) => platforms.map((p) => (p === "tiktok" ? "TikTok" : "Instagram")).join(" et ");
@@ -168,7 +168,7 @@ function Create({
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState<"subscribe" | "credits" | null>(null);
   const uploads = useChatUploads(options?.studioId ?? null, setError);
-  // A carousel or a post she likes, as captures: its form for Simone, never its words (a link of a carousel does not open).
+  // A carousel or a post she likes, as captures: its form for Edith, never its words (a link of a carousel does not open).
   const refs = useChatUploads(options?.studioId ?? null, setError);
   const refRef = useRef<HTMLInputElement>(null);
   /** Picked, in order: « m:<media id> » from her library, « u:<draft id> » from her phone. */
@@ -180,7 +180,7 @@ function Create({
   /** Her choices, else the studio's (voice) and the usual places (platforms). */
   const [voice, setVoice] = useState<string | null>(null);
   const [platforms, setPlatforms] = useState<string[] | null>(null);
-  /** Made like a Reel she likes (« Steal »): one she gives here, else the one she sent Simone (followed unless she says otherwise). */
+  /** Made like a Reel she likes (« Steal »): one she gives here, else the one she sent Edith (followed unless she says otherwise). */
   const [given, setGiven] = useState<string | null>(null);
   const [copyChoice, setCopyChoice] = useState<"mine" | "copy" | null>(null);
   const [copyRead, setCopyRead] = useState<CopyState | null>(null);
@@ -231,7 +231,7 @@ function Create({
   const [launchOnVoice, setLaunchOnVoice] = useState(false);
   const sent = options?.copy ?? null;
   const model = given ?? sent?.id ?? null;
-  // Its reading: the one she sent Simone comes read (or still being read); one given here is followed below.
+  // Its reading: the one she sent Edith comes read (or still being read); one given here is followed below.
   const reading: CopyState | null = copyRead ?? (sent && model === sent.id ? (sent.lines.length ? { state: "read", name: sent.name, lines: sent.lines } : { state: "reading" }) : null);
   // A Reel that could not be read copies nothing: her own style, and the sheet says what to send instead.
   const usable = model && reading?.state !== "missed" ? model : null;
@@ -268,19 +268,19 @@ function Create({
   const where = places.length ? places : ["instagram"];
   const sending = picked.some((k) => k.startsWith("u:") && drafts.get(k.slice(2))?.status === "uploading");
   const broken = picked.some((k) => k.startsWith("u:") && drafts.get(k.slice(2))?.status === "error");
-  // What she imagines, or a ref: Simone asks before she makes anything (Tristan: « simone part trop vite en production »).
+  // What she imagines, or a ref: Edith asks before she makes anything (Tristan: « simone part trop vite en production »).
   const refShots = kind === "reel" ? [] : refs.files.filter((f) => f.status === "ready" && f.path);
   const refSending = kind !== "reel" && refs.files.some((f) => f.status === "uploading");
   // A Reel she likes, given on « Ton idée » (its link pasted in what she imagines, or the field below).
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
-  // What she asks for: her own words, and the plan Simone said back for them (« La proposition »).
+  // What she asks for: her own words, and the plan Edith said back for them (« La proposition »).
   const finalIdea = idea.trim();
   // On « Ton idée », what she gave (her words, a Reel to copy, captures): nothing means « propose-moi ».
   const gaveIdea = Boolean(idea.trim()) || Boolean(copying) || refShots.length > 0;
 
   // One question per screen, in her order (Tristan: « un form avec stepper plutôt que tout dans une modale »);
-  // what she imagines or a Reel she likes on its own step, before Simone's proposal (« dans une étape à part entière »).
+  // what she imagines or a Reel she likes on its own step, before Edith's proposal (« dans une étape à part entière »).
   const steps: Step[] = ["what", "files", "idea", "proposal"];
   const [stepAt, setStepAt] = useState(0);
   const at = Math.min(stepAt, steps.length - 1);
@@ -294,7 +294,7 @@ function Create({
   }, [at]);
   const next = () => setStepAt(Math.min(at + 1, steps.length - 1));
 
-  // The last step: what Simone would make of the files she picked and of her idea. Asked as soon as
+  // The last step: what Edith would make of the files she picked and of her idea. Asked as soon as
   // they are picked (Tristan : « pas du tout optimisé »: three empty cards on the last step), again
   // when they, her idea, the type, the voice or the Reel she copies change.
   const proposalAsk =
@@ -413,7 +413,7 @@ function Create({
         onStarted({ postId: res.postId, title: res.title, ...res.montage, picked: counts });
         return;
       }
-      // A carousel, a photo or a story: Simone writes the texts, in the chat.
+      // A carousel, a photo or a story: Edith writes the texts, in the chat.
       const text = [
         `Nouvelle publication : ${meta.phrase} pour ${chosenWhen.full.charAt(0).toLowerCase()}${chosenWhen.full.slice(1)}.`,
         finalIdea ? `Ce que j’imagine : ${finalIdea}` : "",
@@ -523,7 +523,7 @@ function Create({
                 [
                   { key: "on", title: "Une voix off", on: voiceAsked && chosenVoice !== "auto" && chosenVoice !== "off", pick: () => setVoice(chosenVoice !== "auto" && chosenVoice !== "off" ? chosenVoice : studioVoice(options)) },
                   { key: "off", title: "Juste la musique", on: voiceAsked && chosenVoice === "off", pick: () => setVoice("off") },
-                  { key: "auto", title: "Simone choisit", on: voiceAsked && chosenVoice === "auto", pick: () => setVoice("auto") },
+                  { key: "auto", title: "Edith choisit", on: voiceAsked && chosenVoice === "auto", pick: () => setVoice("auto") },
                 ] as const
               ).map((c) => (
                 <button
@@ -699,7 +699,7 @@ function Create({
                   hint="Tes couleurs, tes polices, ta façon de faire"
                   onClick={() => setCopyChoice("mine")}
                 />
-                {/* The Reel she sent Simone, still there when she picked another one here. */}
+                {/* The Reel she sent Edith, still there when she picked another one here. */}
                 {sent && given && given !== sent.id && (
                   <Choice
                     on={false}
@@ -797,7 +797,7 @@ function Create({
 
         {step === "proposal" && (
         <section className="flex flex-col gap-2.5">
-          {/* Simone says back what she will make: one plan, in points, with why (Tristan: « la demande bien reformulée, claire et précise, lisible »). */}
+          {/* Edith says back what she will make: one plan, in points, with why (Tristan: « la demande bien reformulée, claire et précise, lisible »). */}
           <div className="flex items-end gap-2.5">
             <Mascot size={46} mood={proposing ? "thinking" : "happy"} still />
             <p aria-live="polite" className="rounded-[20px_20px_20px_6px] bg-[#F3EEF8] px-[15px] py-3 text-[15.5px] leading-[1.4] font-medium">
@@ -1037,7 +1037,7 @@ function Create({
             Je filme et je reviens
           </button>
           <Link href="/fauve" onClick={onClose} className="self-center py-2 text-[14px] font-bold text-violet">
-            Ou demande une idée à Simone
+            Ou demande une idée à Edith
           </Link>
         </Sheet>
       )}
@@ -1114,7 +1114,7 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
           </h2>
           <p className="text-[16px] leading-[1.45] text-muted">
             {failed
-              ? "Aucun crédit n’a été débité. Simone peut réessayer."
+              ? "Aucun crédit n’a été débité. Edith peut réessayer."
               : done
                 ? progress?.seconds
                   ? `Ton Reel de ${progress.seconds} secondes t’attend.`
@@ -1122,7 +1122,7 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
                 : `Ton Reel sera prêt dans ${effect ? EFFECT_MINUTES : work.minutes} minutes environ.`}
           </p>
         </div>
-        <ol aria-label="Ce que fait Simone" className="flex w-full flex-col rounded-[22px] border border-line bg-white px-[18px] py-2 text-left">
+        <ol aria-label="Ce que fait Edith" className="flex w-full flex-col rounded-[22px] border border-line bg-white px-[18px] py-2 text-left">
           {steps.map((s, i) => {
             const state = done || i < reached ? "done" : i === reached && !failed ? "now" : "later";
             return (
@@ -1161,7 +1161,7 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
           </Link>
         ) : failed ? (
           <button type="button" onClick={retry} className="btn btn-primary h-[54px] text-[17px] font-extrabold">
-            Demander à Simone de réessayer
+            Demander à Edith de réessayer
           </button>
         ) : (
           <button type="button" onClick={onClose} className="btn btn-secondary h-[54px] text-[16.5px] font-extrabold">
@@ -1173,7 +1173,7 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
   );
 }
 
-/** One line of what Simone will do (format, voice, when and where): obviously a choice to open. */
+/** One line of what Edith will do (format, voice, when and where): obviously a choice to open. */
 function Field({ icon, label, value, sub, wide, onClick }: { icon: ReactNode; label: string; value: string; sub?: string; wide?: boolean; onClick: () => void }) {
   return (
     <button
@@ -1196,7 +1196,7 @@ function Field({ icon, label, value, sub, wide, onClick }: { icon: ReactNode; la
 }
 
 /** Under the Reel to copy: its name once read, or where its reading is. */
-/** The plan Simone will follow: its title, its points in order (the rubric in bold), and why. */
+/** The plan Edith will follow: its title, its points in order (the rubric in bold), and why. */
 function PlanCard({ plan }: { plan: PostPlan }) {
   return (
     <div className="fauve-enter flex flex-col gap-3 rounded-[20px] border-[1.5px] border-violet/30 bg-white p-4">
@@ -1306,7 +1306,7 @@ function CopyGiver({ studioId, another, onGiven }: { studioId: string; another: 
   );
 }
 
-/** « Simone choisit », without, or one of her voices (each to listen to first). */
+/** « Edith choisit », without, or one of her voices (each to listen to first). */
 function VoicePicker({ value, onPick }: { value: string | null; onPick: (voice: string) => void }) {
   const [playing, setPlaying] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
@@ -1326,7 +1326,7 @@ function VoicePicker({ value, onPick }: { value: string | null; onPick: (voice: 
   };
   return (
     <div role="radiogroup" aria-label="La voix off" className="flex flex-col gap-2">
-      <Choice on={value === "auto"} title="Simone choisit" hint="Une voix quand personne ne parle dans tes vidéos" onClick={() => pick("auto")} />
+      <Choice on={value === "auto"} title="Edith choisit" hint="Une voix quand personne ne parle dans tes vidéos" onClick={() => pick("auto")} />
       <Choice on={value === "off"} title="Sans voix off" hint="Juste la musique" onClick={() => pick("off")} />
       <div className="grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-2">
         {SIMONE_VOICES.map((v) => {

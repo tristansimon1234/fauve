@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
 
 // Links a professional Instagram account to a studio once its owner authorised
-// Simone (Instagram Login): the account, its token, the end
+// Edith (Instagram Login): the account, its token, the end
 // of getting started, and a word on WhatsApp.
 
 export type LinkedAccount = { userId: string; username: string; accessToken: string; expiresAt: Date; scopes: string[] };

@@ -2,7 +2,7 @@ import type { ClipAnalysis } from "./schemas.ts";
 
 /**
  * Her bank of shots: a good video is kept after use (or after 7 days unused)
- * so Simone can cut a Reel from it later without asking her to film again.
+ * so Edith can cut a Reel from it later without asking her to film again.
  * The result of a Reel depends mostly on the living footage she sends.
  */
 export const BANK_DAYS = 180;

@@ -225,13 +225,13 @@ export function Bubble({
       )}
       <span className="flex items-center gap-1 px-1 text-[11px] text-muted">
         {message.channel === "whatsapp" && <WhatsAppIcon size={11} />}
-        {mine ? "Toi" : "Simone"} · {time}
+        {mine ? "Toi" : "Edith"} · {time}
       </span>
     </div>
   );
 }
 
-/** Her message as she reads it: the ids written for Simone (files, components) stay out of sight. */
+/** Her message as she reads it: the ids written for Edith (files, components) stay out of sight. */
 function shown(body: string, mine: boolean): string {
   if (!mine) return body;
   return body

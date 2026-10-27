@@ -23,7 +23,7 @@ import { alignMusicInSandbox, bassLevelsInSandbox, loopedReelInSandbox, muxAudio
 import { postStyle } from "@/lib/steal";
 import { costMeta } from "@/lib/cost-scope";
 
-// Simone's music on a Reel (ElevenLabs Music): composed from its brief alone, in
+// Edith's music on a Reel (ElevenLabs Music): composed from its brief alone, in
 // the mood of the Reel and the business, as the looping track of a creator's Reel
 // at the Reel's tempo, longer than the Reel so the ending it writes falls after
 // the cut. Composed watching the video, it stopped its beat before a cut to make it
@@ -174,7 +174,7 @@ const composeFromVideo = (mp4: Buffer, ask: { description: string; tags: string[
   );
 
 /**
- * The rendered video with Simone's music, when the post wants some: the piece
+ * The rendered video with Edith's music, when the post wants some: the piece
  * kept for this cut, else a new one composed from the video (`fresh` asks for a
  * new one anyway). Returns the video unchanged when music is off or unavailable.
  */

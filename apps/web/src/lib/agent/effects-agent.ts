@@ -366,7 +366,7 @@ export async function effectsState(sessionId: string): Promise<EffectsState> {
   };
 }
 
-/** Its kit's largest size kept (its script, its measures, its masks): bigger, her texts change by asking Simone. */
+/** Its kit's largest size kept (its script, its measures, its masks): bigger, her texts change by asking Edith. */
 const KIT_MAX_BYTES = 300 * 1024 * 1024;
 
 export type EffectsOutput = {
@@ -476,7 +476,7 @@ export async function replayError(sessionId: string, given: string[]): Promise<s
   return null;
 }
 
-/** Its kit and its words, as it left them: none when one is missing, unreadable or too big (her texts then change by asking Simone). */
+/** Its kit and its words, as it left them: none when one is missing, unreadable or too big (her texts then change by asking Edith). */
 async function kitOf(out: Map<string, string>, words: string | null): Promise<EffectsOutput["kit"]> {
   const id = out.get(KIT_FILE);
   const read = readEffectWords(words);

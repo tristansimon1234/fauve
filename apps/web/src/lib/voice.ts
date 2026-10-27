@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 
 // Her voice notes (WhatsApp or the app), transcribed once by ElevenLabs Scribe:
-// the text for Simone (she understands vocal messages) and every word with its
+// the text for Edith (she understands vocal messages) and every word with its
 // timing for a Reel over her voice (cuts on her phrases, subtitles). Kept in
 // media_assets.transcript; a few tenths of a cent per note.
 

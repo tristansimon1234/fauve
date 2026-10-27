@@ -15,7 +15,7 @@ import { needsInstagram, ReviewSheets, Sheet, type ReviewSheet } from "./review-
 // A Reel opened from WhatsApp (/v/{id}): a page made for her phone, not the app. The video
 // full screen as on Instagram, and only what she does from there, the same buttons as its page
 // in the app (Tristan: « la page de publication envoyée sur WhatsApp mobile doit avoir les mêmes
-// boutons »): publish it, save it, choose when Simone reminds her to post it, or tell Simone what to
+// boutons »): publish it, save it, choose when Edith reminds her to post it, or tell Edith what to
 // change, back in WhatsApp where everything else happens (« il ne doit pas envoyer de lien vers
 // une app, juste des pages optimisées »); its caption, touched, opens to be written over, as on its page in the app.
 
@@ -40,7 +40,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   const [saved, setSaved] = useState(data.captionShown);
   if (saved !== data.captionShown) {
     setSaved(data.captionShown);
-    // Its sheet closed, nothing of hers is unsaved: it follows what was saved since (by her or Simone).
+    // Its sheet closed, nothing of hers is unsaved: it follows what was saved since (by her or Edith).
     if (sheet !== "caption") setCaption(data.captionShown);
   }
   const edited = caption.trim() !== data.captionShown.trim();
@@ -286,7 +286,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
 
         {!data.locked && (
           <a href={change} className="flex h-[50px] items-center justify-center gap-2 rounded-full bg-white/15 text-[15.5px] font-extrabold backdrop-blur-sm">
-            <PenIcon size={18} /> Modifier avec Simone
+            <PenIcon size={18} /> Modifier avec Edith
           </a>
         )}
       </div>
@@ -300,7 +300,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
             maxLength={2200}
             rows={8}
             aria-label="Ta légende"
-            placeholder="Simone l’écrit avec la vidéo."
+            placeholder="Edith l’écrit avec la vidéo."
             // 16 px: under it, the phone zooms into the page as soon as she touches it.
             className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3 py-2.5 text-[16px] leading-relaxed outline-none focus:border-violet"
           />

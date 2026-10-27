@@ -227,7 +227,7 @@ export function ComponentStudio({
         <section className={card} aria-label="Demander un changement">
           <h2 className="flex items-center gap-2 text-[15px] font-bold">
             <Orb size={20} still />
-            Demander un changement à Simone
+            Demander un changement à Edith
           </h2>
           {running ? (
             <p className="flex items-center gap-2 rounded-[12px] bg-violet-tint px-3 py-2.5 text-[13px] font-semibold text-violet">
@@ -305,7 +305,7 @@ export function ComponentStudio({
               </button>
             )}
           </div>
-          <p className="-mt-1 text-[12px] text-muted">Ce qu’il affiche dans ta banque. Sur une photo, Simone met tes vrais mots.</p>
+          <p className="-mt-1 text-[12px] text-muted">Ce qu’il affiche dans ta banque. Sur une photo, Edith met tes vrais mots.</p>
           {element.slots.map((slot) => {
             const value = sample[slot.name] ?? "";
             const set = (text: string) => setSample({ ...sample, [slot.name]: text.slice(0, slot.max_chars) });

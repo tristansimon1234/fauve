@@ -2,7 +2,7 @@
 
 import { slotTextLimit, type CarouselDesign } from "@fauve/agent";
 
-// The words of one slide of a composed carousel, field by field (its layout is Simone's:
+// The words of one slide of a composed carousel, field by field (its layout is Edith's:
 // it changes by asking her). A text on every slide (a footer) shows under each.
 
 export function CarouselWords({

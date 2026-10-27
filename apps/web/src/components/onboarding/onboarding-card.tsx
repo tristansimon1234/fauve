@@ -96,7 +96,7 @@ export function OnboardingCard({
 
   // A step already passed shows as done (an older card in the conversation).
   const passed = view ? ONBOARDING_STEPS.indexOf(view.step) > ONBOARDING_STEPS.indexOf(step) : false;
-  // Moving on from the card also says so in the conversation: Simone answers and opens the next step.
+  // Moving on from the card also says so in the conversation: Edith answers and opens the next step.
   const next = (message: string) =>
     start(async () => {
       await finishStep(step);
@@ -233,7 +233,7 @@ function StyleStep({
   const fileRef = useRef<HTMLInputElement>(null);
   const items = view.moodboard.items;
   const room = MOODBOARD_MAX_ITEMS - items.length;
-  // Simone reads her site's photos and look right after its step: the photos land here in a few seconds, her
+  // Edith reads her site's photos and look right after its step: the photos land here in a few seconds, her
   // style (its preview, « Tes Reels auront ce style ») a little later. She waits for both before moving on: the
   // preview came after she had already continued (Tristan: « il apparaît un peu tard… faire attendre le user »).
   const [waited, setWaited] = useState(0);
@@ -627,7 +627,7 @@ function FirstPostStep({
   pending: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  // One thing to do: drop her photos and videos. Simone's message says why; the rest are small links.
+  // One thing to do: drop her photos and videos. Edith's message says why; the rest are small links.
   return (
     <>
       {onFiles ? (

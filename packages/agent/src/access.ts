@@ -51,7 +51,7 @@ export function accessOf(input: AccessInput): Access {
   };
 }
 
-/** What Simone says when something is refused. */
+/** What Edith says when something is refused. */
 export function accessMessage(reason: Access["reason"]): string {
   return reason === "credits"
     ? "Plus de crédits ce mois-ci : rien de nouveau ne peut partir. Ils reviennent le 1er du mois ; en attendant, dis-le-lui simplement, sans rien lancer."

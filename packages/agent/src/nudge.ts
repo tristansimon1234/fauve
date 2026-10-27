@@ -1,5 +1,5 @@
 // No planning for her: when nothing has gone out for a while, one short
-// reminder to send what she has at hand, Simone does the rest. Never more than
+// reminder to send what she has at hand, Edith does the rest. Never more than
 // one a week, none while something is about to go out, and none after two
 // left unanswered (until she writes again).
 

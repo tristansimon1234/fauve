@@ -83,7 +83,7 @@ export function TextSheet<T extends SheetText>({
         </button>
       </div>
       {looks && <StylePicker role={text.style} look={text.look} saved={looks.saved} brand={looks.brand} sample={text.text} onChange={(look) => onChange({ look })} />}
-      <p className="text-[12px] text-muted">Pour le placer, fais-le glisser du doigt. Pour le reste, demande à Simone.</p>
+      <p className="text-[12px] text-muted">Pour le placer, fais-le glisser du doigt. Pour le reste, demande à Edith.</p>
     </div>
   );
 }

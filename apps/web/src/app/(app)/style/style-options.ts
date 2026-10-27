@@ -44,12 +44,12 @@ export type StyleForm = {
   hashtags: string[];
   dos: string[];
   donts: string[];
-  /** Simone's voice over the Reels: when, and which voice of the gallery. */
+  /** Edith's voice over the Reels: when, and which voice of the gallery. */
   voice_use: (typeof VOICE_USES)[number];
   voice_id: string;
 };
 
-/** When Simone puts her voice over a Reel (brand_profiles.profile.voice.use). */
+/** When Edith puts her voice over a Reel (brand_profiles.profile.voice.use). */
 export const VOICE_USES = ["auto", "always", "never"] as const;
 
 export type Logo = { url: string; source: "upload" | "website" } | null;

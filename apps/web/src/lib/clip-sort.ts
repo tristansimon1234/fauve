@@ -6,14 +6,14 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Puts a video she sent on the publication of the coming days it fits (see
 // packages/agent/src/clip-sort.ts), ticks its filming mission, and remembers
-// where it went (media_assets.sorted_post_id) for Simone and the to-do list.
+// where it went (media_assets.sorted_post_id) for Edith and the to-do list.
 
 const OPEN = ["planned", "content_requested", "media_received"];
 
 export async function sortClip(studioId: string, mediaId: string, analysis: ClipAnalysis): Promise<{ postId: string; title: string; why: string } | null> {
   const db = supabaseAdmin();
   const { data: asset } = await db.from("media_assets").select("sorted_post_id, source").eq("id", mediaId).single();
-  // Already placed (by her, Simone or an earlier sort), or not one of hers.
+  // Already placed (by her, Edith or an earlier sort), or not one of hers.
   if (!asset || asset.sorted_post_id || asset.source === "website" || asset.source === "render") return null;
   const { data: used } = await db.from("posts").select("id").eq("studio_id", studioId).contains("media_ids", [mediaId]).limit(1);
   if (used?.length) return null;

@@ -471,14 +471,14 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
   const reviewed = seen.includes("review") || seen.includes("fix");
   const text =
     quote.stage === "effects"
-      ? "Simone fait l’effet image par image et vérifie chaque geste"
+      ? "Edith fait l’effet image par image et vérifie chaque geste"
       : quote.stage === "alternative"
       ? "Une 2e version, pour comparer"
       : quote.stage === "render"
         ? quote.kind === "variant"
           ? "La variante se fabrique"
           : quote.effect
-            ? "Simone pose la musique"
+            ? "Edith pose la musique"
             : reviewed
             ? "La version corrigée se fabrique"
             : max
@@ -486,17 +486,17 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
               : "La vidéo se fabrique"
         : quote.stage === "review"
           ? seen.includes("fix")
-            ? "Simone vérifie la correction"
+            ? "Edith vérifie la correction"
             : max
-              ? "Simone compare les deux versions"
-              : "Simone regarde la vidéo"
+              ? "Edith compare les deux versions"
+              : "Edith regarde la vidéo"
           : quote.stage === "fix"
-            ? "Simone corrige ce qu’il a repéré"
+            ? "Edith corrige ce qu’il a repéré"
             : quote.stage === "delivered"
               ? "Ta vidéo est prête"
               : quote.kind === "correction"
-                ? "Simone applique tes changements"
-                : "Simone choisit les plans et anime les scènes";
+                ? "Edith applique tes changements"
+                : "Edith choisit les plans et anime les scènes";
   const [firstText] = useState(text);
 
   const now = useNow(30_000);

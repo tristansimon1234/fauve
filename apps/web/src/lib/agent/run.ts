@@ -37,7 +37,7 @@ export function anthropic() {
 }
 
 /**
- * Cached prompts are kept an hour: she often answers Simone 5 to 60 minutes later, and the montages come minutes
+ * Cached prompts are kept an hour: she often answers Edith 5 to 60 minutes later, and the montages come minutes
  * apart; kept 5 minutes, the cache had expired and the whole prefix was written again (60 % of the chat's cost,
  * three editor calls in four). An hour's write costs 2x input instead of 1.25x; a read, almost nothing.
  */
@@ -92,7 +92,7 @@ export type RunFauveInput = ToolContext & {
 export type ChatEvent =
   | { type: "status"; label: string }
   | { type: "text"; step: number; delta: string }
-  /** Simone's instant reaction to the manager's message (Jev): her face, and an emoji on the message. */
+  /** Edith's instant reaction to the manager's message (Jev): her face, and an emoji on the message. */
   | { type: "mood"; mood: ReactionMood; emoji: string | null };
 
 export type RunFauveResult = {
@@ -193,7 +193,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   // A step that closes her message with its own words (buttons, a reaction) ends the turn: its
   // tools run, and the model is not asked again, which made it write the same answer twice.
   // Buttons or a reaction alone go back to the model: the answer they belong to is still to come.
-  // A plan given to reply_with is her message too (it is written under Simone's words); one too
+  // A plan given to reply_with is her message too (it is written under Edith's words); one too
   // short to keep is refused by the tool, and the model is asked again even after a sentence.
   const planIn = (message: Anthropic.Beta.BetaMessage): "none" | "kept" | "refused" => {
     const call = message.content.find((b) => b.type === "tool_use" && b.name === "reply_with");
@@ -293,7 +293,7 @@ export async function logClaudeCost(studioId: string, usage: TokenUsage, purpose
 }
 
 /**
- * Keeps the start shared by every chat request warm (Simone's prompt and tools, the same for every business, about
+ * Keeps the start shared by every chat request warm (Edith's prompt and tools, the same for every business, about
  * 40 000 tokens): an hour without a message and it expired, and the next message wrote it all again (0.16 € instead of
  * about 0.03 €). The request is the chat's own up to its prompt, with max_tokens 0: it only reads that start, which
  * gives it another hour, and bills no output.

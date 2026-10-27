@@ -14,8 +14,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Her new words on an effect (lib/effect-words.ts): a short session in the effects environment runs the
 // agent's own render script with them (start), is waited for (wait, as long as it takes, one look every
-// 20 s), then its video becomes the Reel's new version with the same kit, Simone's music goes on it,
-// and the page shows it (in the chat, Simone delivers it). Free for her: its cost is logged.
+// 20 s), then its video becomes the Reel's new version with the same kit, Edith's music goes on it,
+// and the page shows it (in the chat, Edith delivers it). Free for her: its cost is logged.
 export const maxDuration = 800;
 
 const bodySchema = z.object({
@@ -37,7 +37,7 @@ const bodySchema = z.object({
   conversationId: z.uuid().optional(),
   waId: z.string().regex(/^\d{6,16}$/).optional(),
   replyTo: z.string().max(200).optional(),
-  /** Asked in the chat: Simone delivers the new video there (the page shows it by itself). */
+  /** Asked in the chat: Edith delivers the new video there (the page shows it by itself). */
   tell: z.boolean().optional(),
 });
 type Job = z.infer<typeof bodySchema>;
@@ -94,7 +94,7 @@ async function wait(job: Job) {
   }
 }
 
-/** Its video with her words becomes the Reel's new version: the same kit (or the one it corrected), Simone's music on it. */
+/** Its video with her words becomes the Reel's new version: the same kit (or the one it corrected), Edith's music on it. */
 async function done(job: Job, effect: NonNullable<Job["effect"]>, state: EffectsState) {
   const db = supabaseAdmin();
   const out = await collectEffects(effect.session, effect.files);
@@ -112,7 +112,7 @@ async function done(job: Job, effect: NonNullable<Job["effect"]>, state: Effects
       studio_id: job.studioId,
       storage_path: path,
       kind: "video",
-      // Simone's montage, not one of her videos: left out of her library, the pickers and the clip sort.
+      // Edith's montage, not one of her videos: left out of her library, the pickers and the clip sort.
       source: "render",
       mime_type: "video/mp4",
       size_bytes: out.mp4.length,

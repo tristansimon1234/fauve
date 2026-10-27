@@ -101,7 +101,7 @@ export function ActionView({
   const [plan, setPlan] = useState(editor?.plan ?? null);
   const [savedSlides, setSavedSlides] = useState(slides?.plan ?? null);
   const [slidePlan, setSlidePlan] = useState(slides?.plan ?? null);
-  // A carousel Simone composed: its words change here, slide by slide; its layout by asking her.
+  // A carousel Edith composed: its words change here, slide by slide; its layout by asking her.
   const design = slides?.plan.design ?? null;
   const [savedWords, setSavedWords] = useState(design?.texts ?? {});
   const [words, setWords] = useState(design?.texts ?? {});
@@ -325,7 +325,7 @@ export function ActionView({
             />
           </div>
           <a href={whatsappLink(`Pour « ${post.title} », image ${wordsSlide + 1} : `)} className="flex items-center justify-center gap-1.5 py-1 text-[13px] font-semibold text-white/65">
-            <WhatsAppIcon size={14} /> Demander à Simone pour cette image
+            <WhatsAppIcon size={14} /> Demander à Edith pour cette image
           </a>
         </section>
       )}
@@ -372,7 +372,7 @@ export function ActionView({
             <MediaSlides media={shown} nodes={slideNodes} ratio={post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]"} />
           ) : (
             <div className="flex aspect-[9/16] w-full items-center justify-center p-6 text-center text-[14px] text-white/60">
-              Simone prépare encore cette publication.
+              Edith prépare encore cette publication.
             </div>
           )}
         </div>
@@ -540,7 +540,7 @@ export function ActionView({
                 )}
               </div>
               <a href={changeHref} className="flex items-center justify-center gap-1.5 py-1 text-[13px] font-semibold text-white/65">
-                <WhatsAppIcon size={14} /> Demander un changement à Simone
+                <WhatsAppIcon size={14} /> Demander un changement à Edith
               </a>
             </>
           )}

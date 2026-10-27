@@ -420,7 +420,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     } else {
       mp4 = await ffmpegRender();
     }
-    // Simone's music, composed for this cut (or the one kept for it), on the video.
+    // Edith's music, composed for this cut (or the one kept for it), on the video.
     const voiced = await withMusic({ studioId, postId, kind: post.kind as PostKind, plan, mp4, renderId, fresh: options.freshMusic }).catch((error: unknown) => {
       console.warn("music unavailable, silent Reel", renderId, error);
       return { mp4, music: "none" as const };

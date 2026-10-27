@@ -338,7 +338,7 @@ test("credits: a montage is charged on what it really cost, between its floor an
   assert.deepEqual([correction.base, correction.max], [2, 15]);
   // Each credit pays its share of the real cost and keeps the margin.
   assert.ok(Math.abs(EUR_PER_CREDIT_SPENT - CREDIT_VALUE_EUR * (1 - TARGET_MARGIN)) < 1e-9);
-  // Tristan's Simone Reel cost 0.94 €: 4 credits under the old list lost money; now the margin is kept.
+  // Tristan's Edith Reel cost 0.94 €: 4 credits under the old list lost money; now the margin is kept.
   const simone = meteredCredits({ costEur: 0.94, floor: quote.base, ceiling: quote.max });
   assert.ok(simone * EUR_PER_CREDIT_SPENT >= 0.94);
   assert.ok((simone - 1) * EUR_PER_CREDIT_SPENT < 0.94);
@@ -477,7 +477,7 @@ test("when a publication goes out, in her words", async () => {
   assert.equal(publishWhen("2026-11-01T17:00:00Z", "Europe/Paris", now).full, "Dimanche 1er novembre à 18 h");
 });
 
-test("créer: the format Simone advises, what fits, and the steps she shows", async () => {
+test("créer: the format Edith advises, what fits, and the steps she shows", async () => {
   const { advisedFormat, formatBlocked, mediaPhrase, creationSteps, creationPhase } = await import("./creation.ts");
   assert.equal(advisedFormat({ videos: 1, photos: 3 }), "reel");
   assert.equal(advisedFormat({ videos: 0, photos: 3 }), "carousel");
@@ -513,7 +513,7 @@ test("créer: what she imagines titles the post, and reaches the montage and the
   assert.equal(imaginedBrief("   "), undefined);
 });
 
-test("her request reaches every agent word for word: each launch's exchange, Simone's brief as its reading, her taste", async () => {
+test("her request reaches every agent word for word: each launch's exchange, Edith's brief as its reading, her taste", async () => {
   const { exchangeLines, requestBrief, withEntry, requestLogSchema, BRIEF_MAX } = await import("./request-log.ts");
   // The exchange starts after the last montage launched in the thread (an earlier Reel's exchange is its own).
   const rows = [
@@ -534,7 +534,7 @@ test("her request reaches every agent word for word: each launch's exchange, Sim
       ["elle", "C'est parti"],
     ],
   );
-  // What Simone sent on her own about another post (its delivery, a reminder) is no part of this request; about this one, it is.
+  // What Edith sent on her own about another post (its delivery, a reminder) is no part of this request; about this one, it is.
   const sent = [
     ...rows,
     { direction: "outbound" as const, type: "text", body: "Ton montage « Inès » est prêt 🎬", created_at: "2026-10-23T18:44:20Z", unprompted: { post: "ines" } },
@@ -546,19 +546,19 @@ test("her request reaches every agent word for word: each launch's exchange, Sim
   // A long exchange keeps its latest messages.
   const long = exchangeLines(Array.from({ length: 30 }, (_, i) => ({ direction: "inbound" as const, type: "text", body: `${i} ${"mot ".repeat(200)}`, created_at: `t${i}` })));
   assert.ok(long.length < 30 && long.at(-1)!.text.startsWith("29 "));
-  // Every agent gets her words first, Simone's brief as their reading, then her words on her recent Reels.
+  // Every agent gets her words first, Edith's brief as their reading, then her words on her recent Reels.
   const log = withEntry([], { at: "2026-10-23T18:44:52Z", via: "chat", lines });
   const ines = withEntry([], { at: "x", via: "chat", lines: [{ who: "elle", text: "les animations en haut" }, { who: "simone", text: "ok" }] });
   const brief = requestBrief(log, "Reel d'une fleuriste…", [{ title: "Inès ouvre son studio", log: ines }])!;
-  assert.match(brief, /^Sa conversation avec Simone pour ce Reel, mot pour mot/);
+  assert.match(brief, /^Sa conversation avec Edith pour ce Reel, mot pour mot/);
   assert.match(brief, /\[Demande, dans la conversation\]\nElle : \[elle envoie une vidéo\]/);
-  assert.match(brief, /Le brief de Simone pour ce lancement :\nReel d'une fleuriste…/);
+  assert.match(brief, /Le brief d'Edith pour ce lancement :\nReel d'une fleuriste…/);
   assert.match(brief, /Ce qu'elle a dit de ses Reels récents[^\n]*\n« Inès ouvre son studio » : les animations en haut$/);
-  assert.ok(brief.indexOf("Elle :") < brief.indexOf("Le brief de Simone"));
+  assert.ok(brief.indexOf("Elle :") < brief.indexOf("Le brief d'Edith"));
   // A correction is its own launch, after the request.
   const corrected = withEntry(log, { at: "y", via: "page", lines: [{ who: "elle", text: "« Plus court »" }] });
   assert.match(requestBrief(corrected, "Plus court.")!, /\[Correction 1, depuis la page de la publication\]\nElle : « Plus court »/);
-  // Nothing kept: Simone's brief as it was.
+  // Nothing kept: Edith's brief as it was.
   assert.equal(requestBrief([], "Le brief."), "Le brief.");
   // What the post holds is read leniently, an entry it cannot read left out.
   assert.equal(requestLogSchema.parse([{ at: "x", via: "chat", lines: [] }, { nope: 1 }]).length, 1);
@@ -571,7 +571,7 @@ test("her request reaches every agent word for word: each launch's exchange, Sim
   assert.ok(requestBrief(full, "B".repeat(1500))!.length <= BRIEF_MAX);
 });
 
-test("créer: « Oui, publie-le » and « Je regarde d’abord » are answered without Simone", async () => {
+test("créer: « Oui, publie-le » and « Je regarde d’abord » are answered without Edith", async () => {
   const { publishOfferAnswer, publishQuestion, PUBLISH_OFFER_OPTIONS } = await import("./creation.ts");
   assert.equal(publishOfferAnswer(PUBLISH_OFFER_OPTIONS[0]), "yes");
   assert.equal(publishOfferAnswer(PUBLISH_OFFER_OPTIONS[1]), "look");
@@ -601,7 +601,7 @@ test("reply_with: answer buttons and cards", async () => {
   assert.equal(replyExtrasSchema.safeParse({ posts: ["pas-un-id"] }).success, false);
 });
 
-test("montage plan: shown on the quote and read by the editor as Simone's proposal, never as validated", async () => {
+test("montage plan: shown on the quote and read by the editor as Edith's proposal, never as validated", async () => {
   const { montagePlanSchema, planBrief } = await import("./schemas.ts");
   const plan = montagePlanSchema.parse({
     duration: 15,
@@ -613,7 +613,7 @@ test("montage plan: shown on the quote and read by the editor as Simone's propos
     ],
   });
   const brief = planBrief(plan);
-  assert.match(brief, /^Piste de Simone \(une proposition, pas un plan validé par la gérante/);
+  assert.match(brief, /^Piste d'Edith \(une proposition, pas un plan validé par la gérante/);
   assert.doesNotMatch(brief, /respecte l'ordre/);
   assert.match(brief, /~15 s, coupes rapides\./); // an older style: its energy in words
   assert.match(planBrief({ ...plan, style: "collage" }), /~15 s, en collage\./);
@@ -821,13 +821,13 @@ test("onboarding: steps in order, old values read as their new step", async () =
   assert.equal(onboardingStepOf(null), "website");
 });
 
-test("funny messages make Simone laugh", async () => {
+test("funny messages make Edith laugh", async () => {
   const { isFunny } = await import("./emoji.ts");
   for (const t of ["haha trop bien", "Ahahah", "mdr", "ptdr ok", "lol", "😂", "c’est top 🤣"]) assert.equal(isFunny(t), true, t);
   for (const t of ["Bonjour", "le programme de la semaine", "", null, "chaha"]) assert.equal(isFunny(t), false, String(t));
 });
 
-test("an upset manager makes Simone sad, or cry when it is strong", async () => {
+test("an upset manager makes Edith sad, or cry when it is strong", async () => {
   const { upsetLevel } = await import("./emoji.ts");
   assert.equal(upsetLevel("franchement c'est nul"), "sad");
   assert.equal(upsetLevel("je suis déçue 😞"), "sad");
@@ -841,7 +841,7 @@ test("an upset manager makes Simone sad, or cry when it is strong", async () => 
   assert.equal(upsetLevel("OK"), null);
   const { isSweet } = await import("./emoji.ts");
   assert.equal(isSweet("merci, t'es la meilleure"), true);
-  assert.equal(isSweet("je t'adore Simone 😘"), true);
+  assert.equal(isSweet("je t'adore Edith 😘"), true);
   assert.equal(isSweet("merci"), false);
 });
 
@@ -1125,7 +1125,7 @@ test("memory keeps each fact once, drops removed ones and ignores junk", async (
   assert.equal(memoryLines([{ fact: "ok", at, kind: "nope" }]).length, 0);
 });
 
-test("Simone's instant reaction reads Jev's answers safely", async () => {
+test("Edith's instant reaction reads Jev's answers safely", async () => {
   const { moodOf, emojiOf } = await import("./mood.ts");
   assert.equal(moodOf({ choice: "laugh", confidence: 0.9 }), "laugh");
   assert.equal(moodOf({ choice: "laugh", confidence: 0.3 }), "neutral");
@@ -1217,7 +1217,7 @@ test("a montage or a correction twice as costly as usual still stays under its c
   assert.ok(2 * TYPICAL_COST_EUR.correction <= MONTAGE_CEILING.correction * EUR_PER_CREDIT_SPENT);
 });
 
-test("Simone's turns a day: none for the team, 200 for a subscriber, 30 for anyone else", () => {
+test("Edith's turns a day: none for the team, 200 for a subscriber, 30 for anyone else", () => {
   assert.equal(dailyTurnCap({ team: true, subscription: null }), null);
   assert.equal(dailyTurnCap({ team: false, subscription: "active" }), DAILY_TURNS.subscribed);
   assert.equal(dailyTurnCap({ team: false, subscription: "trialing" }), DAILY_TURNS.subscribed);
@@ -1282,9 +1282,9 @@ test("a dark one-colour logo turns white on the end card, a dark coloured one ge
 
 test("the end card writes the name unless the logo already writes it", async () => {
   const { logoSaysName } = await import("./logo.ts");
-  // Simone's mascot writes nothing: the name goes under it.
-  assert.equal(logoSaysName("", "Simone"), false);
-  assert.equal(logoSaysName("SIMONE", "Simone"), true);
+  // Edith's mascot writes nothing: the name goes under it.
+  assert.equal(logoSaysName("", "Edith"), false);
+  assert.equal(logoSaysName("EDITH", "Edith"), true);
   assert.equal(logoSaysName("Chez Lino · Pizzeria", "Chez Lino"), true);
   assert.equal(logoSaysName("LUNE", "Studio Lune"), true);
   // A monogram does not say the name.
@@ -1366,7 +1366,7 @@ test("captions: 5 hashtags at most, marks of machine writing taken out", async (
 test("captions written at delivery: the chat's rules, cleaned and capped like hers", async () => {
   const { CAPTION_RULES, CAPTION_WRITER_PROMPT, keptCaption } = await import("./caption.ts");
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
-  // One set of rules for Simone in the chat and for a Reel launched from « Créer ».
+  // One set of rules for Edith in the chat and for a Reel launched from « Créer ».
   assert.ok(FAUVE_SYSTEM_PROMPT.includes(CAPTION_RULES));
   assert.ok(CAPTION_WRITER_PROMPT.includes(CAPTION_RULES));
   assert.match(CAPTION_WRITER_PROMPT, /you never make up/);
@@ -1573,7 +1573,7 @@ test("voice: Scribe words, phrases on the Reel's clock, subtitles and speech", a
   assert.equal(plain.voice, undefined);
 });
 
-test("voice over: when Simone puts her voice on a Reel, and which voice", async () => {
+test("voice over: when Edith puts her voice on a Reel, and which voice", async () => {
   const { wantsVoiceOver, findVoice, readVoiceSetting, readPostVoice, SIMONE_VOICES, DEFAULT_VOICE_ID } = await import("./voice-over.ts");
   const base = { post: null, studio: "auto" as const, onReel: null, correction: false, speechInClips: false, footageSeconds: 14, photos: 0 };
   // Auto: a new Reel whose images tell something, with nobody speaking and enough to show.
@@ -1592,7 +1592,7 @@ test("voice over: when Simone puts her voice on a Reel, and which voice", async 
   assert.equal(wantsVoiceOver({ ...base, post: { mode: "on" }, speechInClips: true }), false);
   assert.equal(wantsVoiceOver({ ...base, post: { mode: "on", wish: "raconte le cours du matin" }, speechInClips: true }), true);
   assert.equal(wantsVoiceOver({ ...base, studio: "always", post: { mode: "off" } }), false);
-  // Her own voice note is never covered; Simone's voice is made again only when asked (another text or voice).
+  // Her own voice note is never covered; Edith's voice is made again only when asked (another text or voice).
   assert.equal(wantsVoiceOver({ ...base, onReel: "hers", post: { mode: "on", remake: true } }), false);
   assert.equal(wantsVoiceOver({ ...base, onReel: "simone", post: { mode: "on" } }), false);
   assert.equal(wantsVoiceOver({ ...base, onReel: "simone", post: { mode: "on", remake: true } }), true);
@@ -2023,7 +2023,7 @@ test("copy first: what the Reel she copies (or her request) does not have is nev
   assert.equal(texts.ok, true);
   assert.match(texts.words, /plusieurs, comme le Reel qu'elle recopie/);
 
-  // The voice: left to Simone, the Reel she copies decides; her own choices stay hers.
+  // The voice: left to Edith, the Reel she copies decides; her own choices stay hers.
   const base = { post: null, studio: "auto" as const, onReel: null, correction: false, speechInClips: false, footageSeconds: 14, photos: 0 };
   assert.equal(voiceLeftToSimone(base), true);
   assert.equal(wantsVoiceOver({ ...base, copied: "aucune" }), false);
@@ -2391,7 +2391,7 @@ test("speed: a slowed shot lasts longer on screen and its cut still lands on a b
   assert.equal(first.out, 1);
 });
 
-test("Simone's voice: character timings become words, punctuation kept for the phrases", async () => {
+test("Edith's voice: character timings become words, punctuation kept for the phrases", async () => {
   const { fromTtsAlignment, spokenWords } = await import("./voice-over.ts");
   const { voicePhrases } = await import("./voice.ts");
   const text = "Tu sais pourquoi ? Viens ce soir.";
@@ -3642,7 +3642,7 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   assert.match(making, /pour le tien/);
   assert.match(making, /arrive dans quelques minutes/);
   assert.doesNotMatch(making, /Envoie-moi/);
-  // A link that does not open: the other ways in, with Simone's account when there is one.
+  // A link that does not open: the other ways in, with Edith's account when there is one.
   assert.match(stealMissMessage("unreachable", "simone.studio"), /envoie-moi la vidéo ici, ou partage-le à @simone\.studio/);
   assert.doesNotMatch(stealMissMessage("unreachable", null), /@/);
   assert.match(stealMissMessage("not_video"), /carrousel.*capture/);
@@ -3686,7 +3686,7 @@ test("frames of a Reel are drawn with the media they show only; the engine binds
     images: [],
     segments: [
       { clip_id: "a", in: 0, out: 2, zoom: "none" },
-      { motion: { brief: "la conversation WhatsApp avec Simone", js: "function Scene(){return null}" }, duration: 3, over: { clip_id: "b" } },
+      { motion: { brief: "la conversation WhatsApp avec Edith", js: "function Scene(){return null}" }, duration: 3, over: { clip_id: "b" } },
       { clip_id: "c", in: 0, out: 3, zoom: "none" },
     ],
     layers: [{ motion: { brief: "tout le Reel en écran partagé", js: "function Scene(){return null}" }, from: 0, to: 8, compose: true }],
@@ -3717,7 +3717,7 @@ test("canvas: the motion designer sees the whole Reel before writing, its own mo
     images: [],
     segments: [
       { clip_id: "a", in: 0, out: 2, zoom: "none" },
-      { motion: { brief: "la conversation WhatsApp avec Simone" }, duration: 3, over: { clip_id: "b" } },
+      { motion: { brief: "la conversation WhatsApp avec Edith" }, duration: 3, over: { clip_id: "b" } },
       { clip_id: "c", in: 0, out: 3, zoom: "none" },
     ],
     layers: [{ motion: { brief: "un cadre qui se dessine" }, from: 5.5, to: 7.5 }],
@@ -3781,7 +3781,7 @@ test("motion designer: a base every animation gets, the parts its call needs; wh
   // What looks cheap is named; her request prevails.
   assert.match(simple.base, /What looks cheap/);
   assert.match(simple.base, /request \(when given\): what she asked for[^\n]*Her own words prevail/);
-  // Her charter's colours make the animations' palette, never Simone's own.
+  // Her charter's colours make the animations' palette, never Edith's own.
   const brand = resolveReelBrand({}, "libre", { name: "Fleurs", accent: "#C2185B", colors: ["#C2185B", "#2E7D32", "#F8E1E7", "#1B1B1B"] });
   assert.deepEqual(brand.palette, { secondary: "#2E7D32", light: "#F8E1E7", dark: "#1B1B1B" });
   assert.match(simple.base, /brand\.palette\.secondary/);
@@ -4364,7 +4364,7 @@ test("ready to go out: a carousel or a photo needs its photos, never a montage",
   assert.equal(missingContent("story", false, 0), "media");
 });
 
-test("never constrained without knowing: Simone and the editor say what a real limit changed", async () => {
+test("never constrained without knowing: Edith and the editor say what a real limit changed", async () => {
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
   const { EDITOR_SYSTEM_PROMPT } = await import("./editor.ts");
   assert.match(FAUVE_SYSTEM_PROMPT, /never a constraint she doesn't understand/);
@@ -4375,13 +4375,13 @@ test("never constrained without knowing: Simone and the editor say what a real l
   assert.ok(EDITOR_SYSTEM_PROMPT.length < 17_000);
 });
 
-test("Simone makes sure she knows what she wants, and her plan fixes only what she said", async () => {
+test("Edith makes sure she knows what she wants, and her plan fixes only what she said", async () => {
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
-  // The team works from what Simone passes on: a request left open where it changes the result gets one short question.
+  // The team works from what Edith passes on: a request left open where it changes the result gets one short question.
   // Tristan: « question essentielles toujours »: every one that changes the result, one per message, and only those.
   assert.match(FAUVE_SYSTEM_PROMPT, /Always ask the essential questions: whatever her request leaves open that changes the result .* one question per message, the most important first, two at most for one request/);
   assert.match(FAUVE_SYSTEM_PROMPT, /Only those: when the answer would change little, decide yourself/);
-  // « textes animés en bas » was Simone's own idea in the florist's plan, validated with « C'est parti ».
+  // « textes animés en bas » was Edith's own idea in the florist's plan, validated with « C'est parti ».
   assert.match(FAUVE_SYSTEM_PROMPT, /not where things go on screen nor what an animation looks like, unless she said it/);
   // A preference said of her Reels in general is kept; a wish for one Reel goes in its brief.
   assert.match(FAUVE_SYSTEM_PROMPT, /A preference she states about her Reels in general .* is lasting too/);
@@ -4477,7 +4477,7 @@ test("reminders: at the suggested moment, the post and one question", async () =
   assert.equal(reminderMessage("carousel", "", ["instagram", "tiktok"]), "C’est le bon moment pour poster ton carrousel ✨ Je le publie maintenant sur Instagram et TikTok ?");
 });
 
-test("Simone's plan: 3 to 6 short points, a title and why, kept for the montage; too little is no plan", () => {
+test("Edith's plan: 3 to 6 short points, a title and why, kept for the montage; too little is no plan", () => {
   const plan = keptPlan({
     title: "Lancement de la rentrée",
     points: [
@@ -4498,10 +4498,10 @@ test("Simone's plan: 3 to 6 short points, a title and why, kept for the montage;
   assert.ok(!plan.points.includes("Court"));
   assert.match(validatedPlanBrief(plan), /^Le plan que la gérante a validé \(« Lancement de la rentrée »\) :\n- Ouverture/);
   assert.equal(keptPlan({ title: "x", points: ["Ouverture : un seul point"], why: "" }), null);
-  // In the chat, the code writes it under Simone's words: title, points, why; buttons a WhatsApp button holds.
+  // In the chat, the code writes it under Edith's words: title, points, why; buttons a WhatsApp button holds.
   assert.equal(
-    planMessage({ title: "Pauline ouvre son studio", points: ["Ouverture : Pauline dans son studio", "Fin : « Essaie Simone »", "Le son : la voix d'Antonin"], why: "On suit quelqu'un, pas une pub." }),
-    "Pauline ouvre son studio\n\n• Ouverture : Pauline dans son studio\n• Fin : « Essaie Simone »\n• Le son : la voix d'Antonin\n\nOn suit quelqu'un, pas une pub.",
+    planMessage({ title: "Pauline ouvre son studio", points: ["Ouverture : Pauline dans son studio", "Fin : « Essaie Edith »", "Le son : la voix d'Antonin"], why: "On suit quelqu'un, pas une pub." }),
+    "Pauline ouvre son studio\n\n• Ouverture : Pauline dans son studio\n• Fin : « Essaie Edith »\n• Le son : la voix d'Antonin\n\nOn suit quelqu'un, pas une pub.",
   );
   assert.ok(PLAN_BUTTONS.every((label) => label.length <= 20));
 });
@@ -4529,7 +4529,7 @@ test("contract: only what she fixed, in plain lines", () => {
   assert.deepEqual(contractLines(EMPTY_CONTRACT), []);
   const fixed = {
     ...EMPTY_CONTRACT,
-    voice_text: "Je viens de découvrir Simone.",
+    voice_text: "Je viens de découvrir Edith.",
     voice_text_mode: "polish" as const,
     person: "je" as const,
     voice_pace: "rapide" as const,
@@ -4540,7 +4540,7 @@ test("contract: only what she fixed, in plain lines", () => {
   };
   assert.ok(!contractIsEmpty(fixed));
   const lines = contractLines(fixed);
-  assert.ok(lines.some((l) => l.includes("Je viens de découvrir Simone.") && l.includes("améliorer")));
+  assert.ok(lines.some((l) => l.includes("Je viens de découvrir Edith.") && l.includes("améliorer")));
   assert.ok(lines.some((l) => l.includes("première personne")));
   assert.ok(lines.includes("Voix plus rapide"));
   assert.ok(lines.includes("Aucune invitation à la fin"));
@@ -4548,8 +4548,8 @@ test("contract: only what she fixed, in plain lines", () => {
   assert.ok(VOICE_SPEED.rapide > 1 && VOICE_SPEED.lente < 1 && VOICE_SPEED.normale === 1);
   assert.equal(verbatimScript(" « Je lis\n tranquille  pendant qu'elle bosse » "), "Je lis tranquille pendant qu'elle bosse");
   // Her start, then the rest she described: both reach the writers, and the voice is redone when the rest changes.
-  const started = { ...EMPTY_CONTRACT, voice_text: "Je vous présente Pauline.", voice_text_rest: "la voix présente Simone" };
-  assert.ok(contractLines(started).some((l) => l.includes("Je vous présente Pauline.") && l.includes("puis la voix continue : la voix présente Simone")));
+  const started = { ...EMPTY_CONTRACT, voice_text: "Je vous présente Pauline.", voice_text_rest: "la voix présente Edith" };
+  assert.ok(contractLines(started).some((l) => l.includes("Je vous présente Pauline.") && l.includes("puis la voix continue : la voix présente Edith")));
   assert.notEqual(ownTextKey(started), ownTextKey({ ...started, voice_text_rest: null }));
   assert.equal(ownTextKey({ ...started, voice_text_rest: null }), "Je vous présente Pauline.");
 });
@@ -4600,7 +4600,7 @@ test("a text stays on screen long enough to be read, never over the next one", a
   assert.equal(readingSeconds("un ".repeat(30)), 4.5);
   const texts = [
     { from: 0, to: 1, text: "Pauline croule sous la comm toute seule" },
-    { from: 2, to: 3, text: "Simone répond sur WhatsApp" },
+    { from: 2, to: 3, text: "Edith répond sur WhatsApp" },
   ];
   // The first grows up to the next text, the second up to its reading time but not past the animation.
   const read = longEnoughToRead(texts, [{ from: 4, to: 6 }], 10);

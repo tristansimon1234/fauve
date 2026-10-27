@@ -1,6 +1,6 @@
 // The account week by week, from its daily rows (account_daily): new followers,
 // unfollows, net growth, views, profile visits, link taps. Pure, so the page,
-// Simone and the weekly analysis read the same numbers.
+// Edith and the weekly analysis read the same numbers.
 
 export type DailyRow = {
   day: string; // YYYY-MM-DD

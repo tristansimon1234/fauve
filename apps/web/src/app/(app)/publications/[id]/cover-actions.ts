@@ -10,7 +10,7 @@ import { removeVoice } from "@/lib/voice-over";
 import { z } from "zod";
 import { getStudioContext } from "@/lib/studio";
 
-/** Sets a Reel's cover (a frame of its video or one of the studio's photos); null leaves it to Simone. */
+/** Sets a Reel's cover (a frame of its video or one of the studio's photos); null leaves it to Edith. */
 export async function setCover(postId: string, cover: PostCover | null): Promise<{ ok: boolean }> {
   const parsed = z.object({ postId: z.uuid(), cover: postCoverSchema.nullable() }).safeParse({ postId, cover });
   if (!parsed.success) return { ok: false };
@@ -70,7 +70,7 @@ export async function setPublishByHand(postId: string, byHand: boolean): Promise
 }
 
 /**
- * Simone's music on a Reel: on, off, or another piece. The video is made again
+ * Edith's music on a Reel: on, off, or another piece. The video is made again
  * after the answer (about a minute), with the new music or none.
  */
 export async function setMusic(postId: string, mode: "on" | "off" | "another"): Promise<{ ok: boolean }> {
@@ -99,7 +99,7 @@ export async function setMusic(postId: string, mode: "on" | "off" | "another"): 
 }
 
 /**
- * A Reel without its voice over (Simone's or her own voice note): the montage keeps
+ * A Reel without its voice over (Edith's or her own voice note): the montage keeps
  * its cut, the video is made again after the answer (about a minute, free).
  */
 export async function setVoiceOff(postId: string): Promise<{ ok: boolean }> {

@@ -71,7 +71,7 @@ export async function generate(parts: { text?: string; inlineData?: { mimeType: 
   if (!image?.inlineData?.data) {
     const why = [candidate?.finishReason, response.promptFeedback?.blockReason, response.text].filter(Boolean).join(" · ");
     console.warn("image model gave no image", why);
-    throw new AiImageError("Simone n’a pas pu faire cette image (demande refusée ou trop floue). Essaie avec d’autres mots.");
+    throw new AiImageError("Edith n’a pas pu faire cette image (demande refusée ou trop floue). Essaie avec d’autres mots.");
   }
   return { bytes: Buffer.from(image.inlineData.data, "base64"), model };
 }
@@ -156,7 +156,7 @@ export async function makeAmbiance(studioId: string, description: string, format
   const made = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
   if (!made.length) {
     const first = results.find((r): r is PromiseRejectedResult => r.status === "rejected")?.reason;
-    throw first instanceof Error ? first : new AiImageError("Simone n’a pas pu faire ces images.");
+    throw first instanceof Error ? first : new AiImageError("Edith n’a pas pu faire ces images.");
   }
   return made;
 }

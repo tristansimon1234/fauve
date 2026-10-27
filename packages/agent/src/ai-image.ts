@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Images made with the image model, within two limits that keep Simone honest:
+// Images made with the image model, within two limits that keep Edith honest:
 // improve a real photo without changing what it shows (its place, its products,
 // its people), or make an ambiance image that never pretends to be the business
 // (no place presented as hers, no products, no people, no text). The texts go on

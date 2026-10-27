@@ -118,7 +118,7 @@ const whole = (prompt: Prompt) => [prompt.base, prompt.parts].filter(Boolean).jo
 
 async function askClaude(studioId: string, prompt: Prompt, content: string | Block[]): Promise<SceneOutput | null> {
   // Streamed, with room: a composition of a whole Reel is long code, and its answer was cut off mid-string at
-  // 16 000 tokens, then again at 32 000 (18 000 of them thinking): Simone's split screen fell back to plain shots.
+  // 16 000 tokens, then again at 32 000 (18 000 of them thinking): Edith's split screen fell back to plain shots.
   const response = await anthropic()
     .beta.messages.stream({
       model: CLAUDE_MODEL,

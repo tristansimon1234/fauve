@@ -7,7 +7,7 @@ import { photoRegions } from "@/lib/video/regions";
 
 // The carousel editors' retouch switches: Gemini reads the photo once (cached on
 // the media), and the edit comes back to the page, which shows it live and saves
-// it with the rest. A Reel's clips are blurred by Simone (blur_video).
+// it with the rest. A Reel's clips are blurred by Edith (blur_video).
 
 type Result<T> = { ok: true; value: T; note?: string } | { ok: false; error: string };
 
@@ -22,6 +22,6 @@ export async function photoRetouch(mediaId: string, options: { light: boolean; f
     const faces = edit.blur?.length ?? 0;
     return { ok: true, value: edit, note: options.faces ? (faces ? `${faces} visage${faces > 1 ? "s" : ""} flouté${faces > 1 ? "s" : ""}` : "Aucun visage repéré") : undefined };
   } catch {
-    return { ok: false, error: "Simone n’a pas pu regarder cette photo. Réessaie dans un instant." };
+    return { ok: false, error: "Edith n’a pas pu regarder cette photo. Réessaie dans un instant." };
   }
 }

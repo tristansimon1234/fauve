@@ -79,7 +79,7 @@ export function captionForTikTok(caption: string | null | undefined, hashtags: r
   return full.length <= TIKTOK_CAPTION_MAX ? full : `${full.slice(0, TIKTOK_CAPTION_MAX - 1).trimEnd()}…`;
 }
 
-/** How a caption is written: Simone in the chat and the caption writer of a Reel made from « Créer » follow the same rules. */
+/** How a caption is written: Edith in the chat and the caption writer of a Reel made from « Créer » follow the same rules. */
 export const CAPTION_RULES = `- short and airy: a hook (80 characters at most), one or two useful lines, a concrete call to action (book through the link in bio, make an appointment, drop by on Saturday); 300 characters at most, hashtags aside;
 - easy to find: her trade, her neighbourhood and her city written out in full when you know them (« coiffeuse à la Croix-Rousse, Lyon »): Instagram and TikTok read the caption to show the post to people nearby;
 - worth sending: a reason to share it or save it (a tip to keep, « à envoyer à celle qui… », a question people answer in the comments), without forcing it;
@@ -88,7 +88,7 @@ export const CAPTION_RULES = `- short and airy: a hook (80 characters at most), 
 - emojis sparingly, as her style profile says.`;
 
 // A Reel launched from « Créer » has no chat turn to write its caption: it is written at delivery,
-// when the post has none (her own caption, or Simone's from the chat, always stays).
+// when the post has none (her own caption, or Edith's from the chat, always stays).
 export const CAPTION_WRITER_PROMPT = `You write, in French, the Instagram and TikTok caption of a post for a neighbourhood business, as the person who runs it would write it themselves. You get the business (name, trade, what we know about it, its tone), what she asked for this post and what the video says (its on-screen texts, its voice-over).
 
 ${CAPTION_RULES}

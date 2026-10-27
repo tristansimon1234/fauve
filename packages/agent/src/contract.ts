@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// What she fixed for this Reel, read once from her request (Tristan, after his Simone Reel:
+// What she fixed for this Reel, read once from her request (Tristan, after his Edith Reel:
 // three writers rewrote his text in the third person, added « Écris SIMONE en commentaire »
 // and ignored « voix plus rapide »). Every step of the montage gets it as rules it never
 // overrides: the editor, the voice-over writer, the hook judge. Nothing here is guessed:
@@ -13,7 +13,7 @@ export const reelContractSchema = z.object({
   voice_text_mode: z.enum(["verbatim", "polish"]),
   /**
    * What the voice says after her words, when she wrote only its start and described the rest
-   * (« le voix off dis je vous présente Pauline… et là tu parles de Simone ») ; null when her text is all of it.
+   * (« le voix off dis je vous présente Pauline… et là tu parles d'Edith ») ; null when her text is all of it.
    * Without it her start was read alone: 9 s of voice on a 20 s Reel (Tristan: « elle aurait dû comprendre »).
    */
   voice_text_rest: z.string().max(600).nullable().default(null),
@@ -46,9 +46,9 @@ export const reelContractSchema = z.object({
 });
 export type ReelContract = z.infer<typeof reelContractSchema>;
 
-export const CONTRACT_PROMPT = `You read a person's request for a Reel and note, adding nothing, what they fixed themselves. Nothing they did not say: a field they did not fix stays empty (null, « libre », an empty list). What you note stays in their own words, in French. When the request holds their exchange with Simone, only their own messages fix something: Simone's replies, plan and brief are context, never a fixed point, even when they answered « oui » or « c'est parti » to them.
+export const CONTRACT_PROMPT = `You read a person's request for a Reel and note, adding nothing, what they fixed themselves. Nothing they did not say: a field they did not fix stays empty (null, « libre », an empty list). What you note stays in their own words, in French. When the request holds their exchange with Edith, only their own messages fix something: Edith's replies, plan and brief are context, never a fixed point, even when they answered « oui » or « c'est parti » to them.
 - voice_text: the words they want to hear in the voice-over, as they wrote them (often between quotes, after « texte : », « la voix dit : »); null if they gave no text. Loose ideas (« parle du prix ») are not a text.
-- voice_text_rest: when they write only the beginning of the voice and describe the rest instead of writing it (« … et là tu parles de Simone », « puis la voix présente l'offre », « et tu expliques que… »), what the rest must say, in their words; null when their text is the whole voice. Their beginning stays in voice_text; the rest described never goes into it.
+- voice_text_rest: when they write only the beginning of the voice and describe the rest instead of writing it (« … et là tu parles d'Edith », « puis la voix présente l'offre », « et tu expliques que… »), what the rest must say, in their words; null when their text is the whole voice. Their beginning stays in voice_text; the rest described never goes into it.
 - voice_text_mode: « polish » when they ask to improve it, to rephrase it, or say « dans l'idée », « genre »; otherwise « verbatim ».
 - person: « je » when they want to speak in their own name or their text is in the first person; « nous » or « il_elle » if they say so; otherwise « libre ».
 - voice_pace: « rapide » or « lente » if they ask for it; otherwise « normale ». voice_gender: if they say a man's or a woman's voice.

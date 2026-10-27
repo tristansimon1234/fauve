@@ -30,7 +30,7 @@ test("style: a missing or broken profile gets the required defaults", () => {
   assert.equal(form.body_font, "Inter");
   assert.deepEqual(form.colors, ["#abcdef"]);
   assert.equal("default_template" in form, false);
-  // No voice set yet: Simone puts one when it tells something, with her first voice.
+  // No voice set yet: Edith puts one when it tells something, with her first voice.
   assert.equal(form.voice_use, "auto");
   assert.equal(form.voice_id, "D6VK2PsbVdaFL5aALfRc");
 });

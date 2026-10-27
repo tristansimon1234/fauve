@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-// What Simone made for a studio and reuses, shown in « Ton style »: its animated scenes.
+// What Edith made for a studio and reuses, shown in « Ton style »: its animated scenes.
 
 /** An animated scene; fonts: the Google Fonts families its code brings besides the Reel's two. */
 export type Creation = { id: string; name: string; js: string; fonts: string[]; uses: number };

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { VOICE_MAX_SECONDS, type VoiceTranscript } from "./voice.ts";
 
-// Simone's voice over a Reel (ElevenLabs text to speech): she writes what a
+// Edith's voice over a Reel (ElevenLabs text to speech): she writes what a
 // creator would say over these images, a voice reads it with the time of every
 // word, and the Reel is cut on it exactly like on the manager's own voice note
 // (an audio media with its transcript, posts.voice_media_id): the editor cuts on
@@ -31,7 +31,7 @@ export function voiceWordsFor(footageSeconds: number, askedSeconds?: number | nu
 }
 
 /**
- * Simone's voices, ElevenLabs library voices picked by ear: natural French voices
+ * Edith's voices, ElevenLabs library voices picked by ear: natural French voices
  * that sound like someone talking to you, never like an ad, and two whispered ones
  * (ASMR) for calm places (spa, massage, beauty, a slow food moment), chosen by her,
  * never by « auto ». The first one is the default.
@@ -73,7 +73,7 @@ export const postVoiceSchema = z.object({
   voice_id: z.string().regex(/^[A-Za-z0-9]{10,40}$/).optional(),
   /** Her wish for the next text (« parle de la promo »), used once. */
   wish: z.string().max(300).optional(),
-  /** Simone's voice on the Reel is made again at the next montage (another text or voice), once. */
+  /** Edith's voice on the Reel is made again at the next montage (another text or voice), once. */
   remake: z.boolean().optional(),
 });
 export type PostVoice = z.infer<typeof postVoiceSchema>;
@@ -88,17 +88,17 @@ export type CopiedVoice = "voix off" | "quelqu'un parle" | "aucune";
 type VoiceChoice = {
   post: PostVoice | null;
   studio: VoiceSetting["use"];
-  /** The voice on the Reel now: hers (a voice note), Simone's, or none. */
+  /** The voice on the Reel now: hers (a voice note), Edith's, or none. */
   onReel: "hers" | "simone" | null;
   correction: boolean;
 };
 
-/** Simone decides (« auto »): a new montage, no voice on the Reel yet, no choice for it, her setting « auto ». */
+/** Edith decides (« auto »): a new montage, no voice on the Reel yet, no choice for it, her setting « auto ». */
 export const voiceLeftToSimone = (p: VoiceChoice): boolean => !p.onReel && !p.post && !p.correction && p.studio === "auto";
 
 /**
- * Whether a montage gets Simone's voice: never over her own voice note, nor over
- * the voice Simone made before unless the Reel asks for a new one (remake); the
+ * Whether a montage gets Edith's voice: never over her own voice note, nor over
+ * the voice Edith made before unless the Reel asks for a new one (remake); the
  * Reel's own choice first, then the studio's. « auto » only for a new montage, when
  * it helps: the Reel she copies is told by a voice (one that is not gets none), nobody
  * speaks in the shots, and there is enough to show while the voice speaks. A
@@ -148,7 +148,7 @@ export const scriptFrom = (hook: string, rest: string): VoiceOverScript => ({ ho
 export const reelFormatSchema = z.enum(["raconte", "message"]);
 export type ReelFormat = z.infer<typeof reelFormatSchema>;
 
-/** When Simone chooses (« auto »): the form first, then the words only if a voice tells it. */
+/** When Edith chooses (« auto »): the form first, then the words only if a voice tells it. */
 export const voiceOverDecisionSchema = z.object({
   format: reelFormatSchema.describe("raconte : une voix qui raconte rend ce Reel meilleur ; message : un seul message clé à l'écran, avec la musique, sans voix"),
   why: z.string().describe("Pourquoi, en une phrase"),
@@ -201,8 +201,8 @@ Answer with message (the video's message in one sentence), hooks (the 4 possible
 
 /**
  * Her own text for the voice (« contrat.voice_text »): read as she wrote it, or improved for the ear,
- * never turned into someone else's words (Tristan's « Je viens de découvrir Simone… » came back as
- * « Tristan a trouvé Simone… » with an invitation he never asked for).
+ * never turned into someone else's words (Tristan's « Je viens de découvrir Edith… » came back as
+ * « Tristan a trouvé Edith… » with an invitation he never asked for).
  */
 export const OWN_TEXT_PROMPT = `You prepare, for a French synthetic voice, the text a person wrote themselves for the voice-over of their Reel. The text stays in French.
 - mode « verbatim »: correct only the spelling, the agreements and the punctuation of a speaking voice (full stops, commas, ellipses for a short pause); write out in letters a number that reads badly in digits. Change, add or remove no word and no idea.
@@ -230,7 +230,7 @@ export type TtsAlignment = z.infer<typeof alignmentSchema>;
 const round = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * The least silence between two sentences of Simone's voice (s): read in one breath,
+ * The least silence between two sentences of Edith's voice (s): read in one breath,
  * the end of one sentence is heard as the start of the next.
  */
 export const SENTENCE_GAP = 0.35;

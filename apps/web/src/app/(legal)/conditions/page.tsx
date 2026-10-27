@@ -9,15 +9,15 @@ export default function TermsPage() {
     <>
       <h1>Conditions d’utilisation</h1>
       <p>
-        Ces conditions encadrent l’utilisation de Simone, service édité par {company.name} ({company.registration},{" "}
-        {company.address}). En utilisant Simone, le studio les accepte.
+        Ces conditions encadrent l’utilisation d’Edith, service édité par {company.name} ({company.registration},{" "}
+        {company.address}). En utilisant Edith, le studio les accepte.
       </p>
 
       <h2>Le service</h2>
       <p>
-        Simone est un assistant fondé sur l’intelligence artificielle. Il prépare le calendrier de publication, monte
+        Edith est un assistant fondé sur l’intelligence artificielle. Il prépare le calendrier de publication, monte
         les vidéos envoyées par le studio, rédige les légendes, programme les publications sur les comptes connectés et
-        envoie un bilan chaque semaine. Simone ne se fait jamais passer pour une personne : il se présente comme une IA et le redit dès qu’on le lui demande.
+        envoie un bilan chaque semaine. Edith ne se fait jamais passer pour une personne : il se présente comme une IA et le redit dès qu’on le lui demande.
       </p>
 
       <h2>Validation avant publication</h2>
@@ -42,7 +42,7 @@ export default function TermsPage() {
 
       <h2>Disponibilité et responsabilité</h2>
       <p>
-        Simone dépend de services tiers (WhatsApp, Instagram, TikTok, prestataires d’IA). Nous faisons notre possible pour
+        Edith dépend de services tiers (WhatsApp, Instagram, TikTok, prestataires d’IA). Nous faisons notre possible pour
         assurer la continuité du service, sans garantie de résultat sur l’audience ou les réservations. Les contenus
         générés par l’IA peuvent contenir des erreurs : le studio les relit avant de valider.
       </p>

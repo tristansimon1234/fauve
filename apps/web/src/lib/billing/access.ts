@@ -77,13 +77,13 @@ export async function studioAccess(studioId: string): Promise<Access> {
   return accessOf({ subscription: studio?.subscription_status as string | null, firstPostMade: Boolean(made), credits, analyses: analyses ?? 0 });
 }
 
-/** Throws AccessError (its message tells Simone what to say) when nothing costly may start. */
+/** Throws AccessError (its message tells Edith what to say) when nothing costly may start. */
 export async function assertCanCreate(studioId: string): Promise<void> {
   const access = await studioAccess(studioId);
   if (!access.create) throw new AccessError(access);
 }
 
-/** What Simone knows of the subscription at each turn. */
+/** What Edith knows of the subscription at each turn. */
 export async function accessLine(studioId: string): Promise<string | null> {
   if (!billingEnabled()) return null;
   const access = await studioAccess(studioId);

@@ -34,7 +34,7 @@ import { renderPost } from "@/lib/render/render-post";
 import { voiceNoteInSandbox } from "@/lib/render/sandbox";
 import { photoRegions } from "@/lib/video/regions";
 
-// A test bench for the whole montage chain in production: what Simone makes alone, on
+// A test bench for the whole montage chain in production: what Edith makes alone, on
 // the same media as hand-made references. Each case is a lab studio of its own (its
 // business, brand and facts; website_url lab://<case>), so its Reel is a first Reel, as
 // at onboarding. POST with CRON_SECRET, from the database (call_app):
@@ -59,7 +59,7 @@ import { photoRegions } from "@/lib/video/regions";
 //                        kept as a WhatsApp audio and read by Scribe, then put on the Reel;
 //                        steal=<url> (« Steal ») first has the style of a Reel read, from its link
 //                        (Instagram, TikTok, a Short) or a video file's URL, and the lab Reel copies it
-//                        (one shot, as when she sends Simone a Reel to copy); steal=lab:<file> a video
+//                        (one shot, as when she sends Edith a Reel to copy); steal=lab:<file> a video
 //                        uploaded to the lab studio, read as a video she sent in the chat (it leaves
 //                        the library once read); with steal_only=1, nothing more (no montage):
 //                        step=result shows what was read;
@@ -71,9 +71,9 @@ import { photoRegions } from "@/lib/video/regions";
 //                        (costs) and what the lab studio has spent over all its runs (studio_costs).
 //   ?case=…&step=music   the version kept rendered again with a newly composed piece, the
 //                        montage untouched: to hear a change to the music without a new montage.
-//   ?case=…&step=chat&text=…[&c=<conversation>]  one message of hers to Simone in the app (a web
-//                        conversation of the lab studio, made or continued), and Simone's answer with
-//                        its cards and buttons; what Simone starts runs after. It waits for the answer
+//   ?case=…&step=chat&text=…[&c=<conversation>]  one message of hers to Edith in the app (a web
+//                        conversation of the lab studio, made or continued), and Edith's answer with
+//                        its cards and buttons; what Edith starts runs after. It waits for the answer
 //                        (call net.http_post with the Vault's secret and a minute: call_app gives up at 5 s).
 //                        Never on WhatsApp: a lab studio has no member.
 //   ?case=…&step=words&words=[{"id":…,"text":…}]  her own words on the lab Reel's effect (an effect the
@@ -259,12 +259,12 @@ async function siteStudio(url: string, kind: { business: string }): Promise<stri
     .from("studios")
     .update({
       ...(read?.name ? { name: read.name.slice(0, 80) } : {}),
-      // Its activity as its site says it (« coffee shop et salon de coiffure »), like Simone saves it at onboarding.
+      // Its activity as its site says it (« coffee shop et salon de coiffure »), like Edith saves it at onboarding.
       ...(read?.business ? { business_type: read.business.slice(0, 80) } : {}),
       memory: [...(read?.facts ?? []).slice(0, 5), `Site : ${site.url}`].map((fact) => ({ fact, at })),
     })
     .eq("id", studioId);
-  // As Simone saves it after reading the site: the colours and fonts of its code, its logo (its tone comes from the reading of its look).
+  // As Edith saves it after reading the site: the colours and fonts of its code, its logo (its tone comes from the reading of its look).
   const profile = {
     colors: site.style.colors.slice(0, 6),
     fonts: site.style.fonts.slice(0, 2),
@@ -356,7 +356,7 @@ async function labMedia(studioId: string, c: LabCase): Promise<{ videos: string[
   return { videos, photos };
 }
 
-/** The voice over a lab Reel: Simone's (voice=), or a voice note of hers (own_voice=). */
+/** The voice over a lab Reel: Edith's (voice=), or a voice note of hers (own_voice=). */
 type LabVoice = { simone: string | null; hers: string | null };
 
 async function start(name: string, c: LabCase, reset: boolean, voice: LabVoice, idea: string | null, steal: { url: string | null; only: boolean }, asCarousel = false, motion?: Motion) {
@@ -416,7 +416,7 @@ async function clearPosts(studioId: string) {
 async function labSteal(studioId: string, url: string): Promise<string> {
   let outcome: Awaited<ReturnType<typeof stealStyle>>;
   if (url.startsWith("lab:")) {
-    // As a video she sends Simone in the chat: in her library first, then read (and out of it once read).
+    // As a video she sends Edith in the chat: in her library first, then read (and out of it once read).
     const file = url.slice(4);
     const path = `${studioId}/lab/${file}`;
     const db = supabaseAdmin();
@@ -504,7 +504,7 @@ async function montage(name: string, studioId: string, c: Pick<LabCase, "title" 
       scheduled_at: tomorrow.toISOString(),
       template: c.template ?? null,
       media_ids: mediaIds,
-      // The Reel it copies (« Steal »), as when she sends Simone a Reel to copy.
+      // The Reel it copies (« Steal »), as when she sends Edith a Reel to copy.
       inspiration_id: copy,
       ...(spoken ? { voice_over: spoken } : {}),
     })
@@ -670,7 +670,7 @@ async function labStudioId(key: string): Promise<string | null> {
 /** No member: nothing of the lab studio's ever reaches a phone. */
 const LAB_MEMBER = "00000000-0000-4000-8000-000000000000";
 
-/** One message of hers to Simone in the app, in a web conversation of the lab studio, and her answer. */
+/** One message of hers to Edith in the app, in a web conversation of the lab studio, and her answer. */
 async function labChat(key: string, params: URLSearchParams) {
   const text = params.get("text")?.trim().slice(0, 2000);
   if (!text) return { error: "text=…" };

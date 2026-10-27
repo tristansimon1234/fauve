@@ -3,7 +3,7 @@ import { z } from "zod";
 // What Fauve keeps about a business across conversations (studios.memory): short
 // facts the manager gave or Fauve read on the website, and what she does not want
 // (« avoid »: a phrase, a tone, a kind of image). Durable only: a request for one Reel
-// lives in that Reel's brief, never here (Tristan's « fin sur tout faire ça sur Simone »
+// lives in that Reel's brief, never here (Tristan's « fin sur tout faire ça sur Edith »
 // kept coming back in Reels that had nothing to do with it). Shown in Fauve's context on
 // every turn, given to every writer (editor, voice-over, captions, carousels, effects),
 // and in Réglages where the manager can read and remove them.
@@ -29,10 +29,10 @@ export function readMemory(raw: unknown): MemoryFact[] {
 
 const key = (fact: string) => fact.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
-/** A fact as Simone and every writer read it: what she does not want says so. */
+/** A fact as Edith and every writer read it: what she does not want says so. */
 export const factLine = (f: MemoryFact): string => (f.kind === "avoid" ? `À éviter, elle n'en veut pas : ${f.fact}` : f.fact);
 
-/** The memory as lines, in its order (the numbers Simone uses to remove one). */
+/** The memory as lines, in its order (the numbers Edith uses to remove one). */
 export const memoryLines = (raw: unknown): string[] => readMemory(raw).map(factLine);
 
 /** Adds facts (a fact already known is not repeated); past the cap, the oldest go. */

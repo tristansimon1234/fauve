@@ -64,14 +64,14 @@ export function FauveDrawerProvider({ children }: { children: React.ReactNode })
 /** The button that opens the panel: « Demander à Fauve », about this publication or scene. */
 export function AskFauveButton({
   topic,
-  label = "Demander à Simone",
+  label = "Demander à Edith",
   className = "btn btn-secondary",
   before,
 }: {
   topic: DrawerTopic;
   label?: string;
   className?: string;
-  /** Runs first (e.g. saving the changes Simone must see); the drawer opens only if it succeeds. */
+  /** Runs first (e.g. saving the changes Edith must see); the drawer opens only if it succeeds. */
   before?: () => Promise<boolean>;
 }) {
   const open = useFauveDrawer();
@@ -320,7 +320,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
       <aside
         role="dialog"
         aria-modal="true"
-        aria-label="Simone"
+        aria-label="Edith"
         data-closing={closing || undefined}
         className="fauve-sheet absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-white bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%)] shadow-[-12px_0_40px_rgba(28,21,48,0.14)]"
         // Drop zone: photos and videos dropped anywhere on the panel.
@@ -348,7 +348,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         <header className="flex items-center gap-3 border-b border-line px-5 py-3">
           <SimoneLive typing={typing} cue={null} size={44} />
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-bold leading-tight">Simone</p>
+            <p className="text-[15px] font-bold leading-tight">Edith</p>
             <p className="truncate text-[12px] text-muted">
               {topic.title}
               {topic.sceneLabel ? ` · ${topic.sceneLabel}` : ""}
@@ -446,7 +446,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
               <PaperclipIcon size={20} />
             </button>
             <label htmlFor="drawer-message" className="sr-only">
-              Message à Simone
+              Message à Edith
             </label>
             <textarea
               id="drawer-message"

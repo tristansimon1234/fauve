@@ -29,7 +29,7 @@ export type CarouselSlot = z.infer<typeof carouselSlotSchema>;
 /** The longest words a slot takes when she changes them: twice its room (its texts shrink to fit), 400 at most. */
 export const slotTextLimit = (slot: Pick<CarouselSlot, "max_chars">) => Math.min(400, 2 * Math.max(slot.max_chars, 40));
 
-/** A designed carousel as stored on the post (posts.slides.design): its code comes from Simone, never from the browser. */
+/** A designed carousel as stored on the post (posts.slides.design): its code comes from Edith, never from the browser. */
 export const carouselDesignSchema = z.object({
   name: z.string().max(80),
   js: z.string().min(1).max(80000),
@@ -40,7 +40,7 @@ export const carouselDesignSchema = z.object({
   /** Her photos its code reads, in its order (photos[0], photos[1]…). */
   photos: z.array(z.uuid()).max(MAX_CAROUSEL_SLIDES),
   count: z.number().int().min(1).max(MAX_CAROUSEL_SLIDES),
-  /** What each slide says, a line each (for Simone and the editor). */
+  /** What each slide says, a line each (for Edith and the editor). */
   outline: z.array(z.string().max(160)).max(MAX_CAROUSEL_SLIDES).default([]),
   /** Its source as the designer wrote it (`js` is compiled from it): a later correction starts from it. */
   code: z.string().max(60000).optional(),

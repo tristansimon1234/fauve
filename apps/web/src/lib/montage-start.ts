@@ -21,7 +21,7 @@ export async function correctionQuote(studioId: string, postId: string, brief: s
  * Starts the quoted work as a background job (it sends the video itself when
  * done). Shared by Fauve's montage tool and the « Lancer » button of the quote card.
  * Its request is kept on the post first (`request`: where she asked and what was said), and every agent of the
- * montage gets the exchange word for word with Simone's brief (launchBrief).
+ * montage gets the exchange word for word with Edith's brief (launchBrief).
  */
 export async function startMontage(
   studioId: string,
@@ -42,7 +42,7 @@ export async function startMontage(
   const simone = quote.brief ?? (quote.kind === "correction" ? "Correction demandée par la gérante." : undefined);
   if (target.request) await logLaunch(studioId, quote.postId, target.request.via, target.request.lines).catch((error: unknown) => console.warn("request not kept", quote.postId, error));
   const brief = await launchBrief(studioId, quote.postId, simone).catch((error: unknown) => {
-    console.warn("request not read, Simone's brief alone", quote.postId, error);
+    console.warn("request not read, Edith's brief alone", quote.postId, error);
     return simone;
   });
   return queueJob("montage", {

@@ -19,7 +19,7 @@ export default function ConnectPage({ searchParams }: PageProps<"/connect">) {
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2">
             <Orb size={28} />
-            <span className="text-[17px] font-extrabold">Simone</span>
+            <span className="text-[17px] font-extrabold">Edith</span>
           </span>
           <span className="text-[13px] font-bold text-muted">Étape 2 sur 3</span>
         </div>
@@ -38,7 +38,7 @@ export default function ConnectPage({ searchParams }: PageProps<"/connect">) {
           ))}
         </ul>
         <div className="rounded-2xl bg-soft px-4 py-3.5 text-sm leading-normal">
-          <strong>Rien n’est publié sans ton accord.</strong> Tu peux déconnecter Simone à tout moment.
+          <strong>Rien n’est publié sans ton accord.</strong> Tu peux déconnecter Edith à tout moment.
         </div>
         <Suspense fallback={<ConnectActionsFallback />}>
           <ConnectActions searchParams={searchParams} />

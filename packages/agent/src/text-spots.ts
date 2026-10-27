@@ -1,5 +1,5 @@
 // Where each text of a composed carousel sits on its slide, so that a tap on the image edits it.
-// The slide is drawn by Simone's code, which never says where it put a text: the editor reads
+// The slide is drawn by Edith's code, which never says where it put a text: the editor reads
 // the lines the browser drew (their words and boxes) and finds the slot each belongs to by its
 // words. A line, a word set apart for its colour, a text in capitals all belong to the slot whose
 // words hold them; a short word several slots could hold joins the one drawn nearest to it.

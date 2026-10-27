@@ -2,7 +2,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { warmChatCache } from "@/lib/agent/run";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-// Every few minutes in the day (pg_cron): keeps the start shared by every chat request (Simone's prompt and
+// Every few minutes in the day (pg_cron): keeps the start shared by every chat request (Edith's prompt and
 // tools) in the cache while she is in use, read again just before its hour runs out (lib/agent/run.ts,
 // warmChatCache). Only after a message in the last few hours: a quiet evening costs nothing, and the first
 // message after it writes the cache again.
@@ -11,7 +11,7 @@ export const maxDuration = 60;
 /** Read again this long after the last chat request: its hour is nearly over, not yet gone. */
 const WARM_AFTER_MIN = 45;
 const WARM_BEFORE_MIN = 58;
-/** Kept warm only this long after someone last wrote to Simone. */
+/** Kept warm only this long after someone last wrote to Edith. */
 const IN_USE_HOURS = 3;
 
 async function lastAt(purposes: string[]): Promise<number | null> {

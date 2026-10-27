@@ -238,7 +238,7 @@ export async function chatTurn(
       .single();
     if (asset.error) return { ok: false, error: "Un fichier n’a pas pu être ajouté. Réessaie.", conversationId: id };
     const mediaId = asset.data.id as string;
-    // A voice note is read before Simone answers: she knows what it says.
+    // A voice note is read before Edith answers: she knows what it says.
     const transcript = audio ? await ensureTranscript(ctx.studioId, mediaId) : null;
     const row = await db
       .from("whatsapp_messages")
@@ -249,7 +249,7 @@ export async function chatTurn(
     lastRowId = row.data.id as string;
     // Watched once by Gemini, in the background: ready for the montage.
     if (video) after(() => ensureClipAnalysis(ctx.studioId, mediaId).then(() => undefined, (e) => console.error("chat: clip analysis failed", e)));
-    // A photo is read once too (what it shows, its subject, any text on it): Simone and the editor know it before choosing.
+    // A photo is read once too (what it shows, its subject, any text on it): Edith and the editor know it before choosing.
     else if (kind === "image") after(() => photoRegions(ctx.studioId, mediaId).then(() => undefined, (e) => console.warn("chat: photo read failed", e)));
   }
   if (body) {
@@ -342,14 +342,14 @@ export async function chatTurn(
     });
   } catch (error) {
     console.error("chat: agent failed", error);
-    return { ok: false, error: "Simone n’a pas pu répondre. Réessaie dans un instant.", conversationId: id };
+    return { ok: false, error: "Edith n’a pas pu répondre. Réessaie dans un instant.", conversationId: id };
   }
   await reacting;
   const [messages, conversations] = await Promise.all([messagesOf(ctx.studioId, id), list(ctx.studioId)]);
   return { ok: true, conversationId: id, messages, conversations };
 }
 
-/** Simone's reaction to the manager's message, sent to the page the moment Jev answers. */
+/** Edith's reaction to the manager's message, sent to the page the moment Jev answers. */
 async function readReaction(studioId: string, conversationId: string | null, body: string, onEvent?: (event: ChatEvent) => void) {
   const started = Date.now();
   // Her previous message helps read a joke or a reply; only from this studio's conversation.

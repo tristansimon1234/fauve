@@ -29,7 +29,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // « Ta publication », the simple page of a Reel: the video as it will go out, its scenes,
 // when and where, its caption, and whether a new version is on its way (changes saved
-// by hand, or Simone redoing it). Everything else is a change she asks for from there.
+// by hand, or Edith redoing it). Everything else is a change she asks for from there.
 
 export type ReviewSlot = { iso: string; label: string; hint: string };
 
@@ -43,7 +43,7 @@ export type ReviewData = {
   videoUrl: string | null;
   /** The current version's render, for the page to start over when it changes. */
   renderId: string | null;
-  /** A new version on its way: a render of texts saved by hand, or Simone redoing the montage. */
+  /** A new version on its way: a render of texts saved by hand, or Edith redoing the montage. */
   making: { kind: "render" | "montage"; step: string | null; minutes?: number } | null;
   /** The video could not be made (no older one to show). */
   failed: boolean;
@@ -53,7 +53,7 @@ export type ReviewData = {
   scenes: { url: string; count: number } | null;
   /** The plan shown, whose texts she edits. */
   plan: EditPlan;
-  /** Made by the effects agent: its texts are in the image, a change is asked of Simone. */
+  /** Made by the effects agent: its texts are in the image, a change is asked of Edith. */
   baked: boolean;
   /** The texts of its effect she changes herself (its kit draws them again); none without a kit. */
   words: EffectWord[];
@@ -75,9 +75,9 @@ export type ReviewData = {
   handle: string | null;
   instagram: boolean;
   publishByHand: boolean;
-  /** Simone's music (null: the music service is not set up). */
+  /** Edith's music (null: the music service is not set up). */
   music: { on: boolean; made: boolean } | null;
-  /** The voice on the Reel: Simone's (which one) or her own voice note. */
+  /** The voice on the Reel: Edith's (which one) or her own voice note. */
   voice: { who: "simone" | "hers"; name: string | null } | null;
   /** Days to move it to: the next free days at her usual hour. */
   slots: ReviewSlot[];
@@ -208,7 +208,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
   };
 }
 
-/** The voice over the Reel: Simone's (her name) or the manager's own voice note; null: none. */
+/** The voice over the Reel: Edith's (her name) or the manager's own voice note; null: none. */
 async function loadVoice(studioId: string, mediaId: string | null): Promise<ReviewData["voice"]> {
   if (!mediaId) return null;
   const { data } = await supabaseAdmin().from("media_assets").select("source, ai").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
