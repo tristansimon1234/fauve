@@ -13,6 +13,7 @@ import {
   MAX_MONTAGE_FILES,
   postKindSchema,
   offersLine,
+  packLine,
   type CreationPhase,
   type Effort,
   type PostKind,
@@ -99,7 +100,7 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
     await supabaseAdmin().from("studios").update({ pending_creation: { input: parsed.data, at: new Date().toISOString() } }).eq("id", studioId);
     return access.reason === "subscribe"
       ? { ok: false, locked: "subscribe", error: `Ton plan est prêt. Choisis ton abonnement (${offersLine()}) : je lance ton Reel dès que c’est fait.` }
-      : { ok: false, locked: "credits", error: "Tu as utilisé tes crédits ce mois-ci. Passe à l’offre au-dessus et je lance ton Reel aussitôt ; sinon ils reviennent le 1er du mois." };
+      : { ok: false, locked: "credits", error: `Tu as utilisé tes crédits. Prends « ${packLine()} » ou passe à l’offre au-dessus, et je lance ton Reel aussitôt ; sinon ils reviennent à ton renouvellement.` };
   }
 
   // What she imagines, or a ref: the Reel to copy, the model of this Reel only (one shot). Edith asks before she makes anything.

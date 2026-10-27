@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTAGE_CEILING, MONTAGE_FLOOR, PLANS, planOf, memoryLines, reelsPerMonth, nextPlan, PLAN_ORDER } from "@fauve/agent";
+import { CREDIT_PACK, CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTAGE_CEILING, MONTAGE_FLOOR, PLANS, planOf, memoryLines, reelsPerMonth, nextPlan, PLAN_ORDER } from "@fauve/agent";
 import { NoStudio } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
@@ -11,6 +11,7 @@ import { getContentPlan, getSocialAccounts, getStudioContext, type SocialAccount
 import { signOut } from "../../(onboarding)/connexion/actions";
 import { EffortSetting } from "./effort-setting";
 import { SubscriptionButton } from "./subscription";
+import { PackButton } from "@/components/pack-button";
 import { billingEnabled } from "@/lib/billing/stripe";
 import { MemoryList } from "./memory-list";
 import { SettingsPanels } from "./settings-panels";
@@ -66,13 +67,16 @@ async function Settings() {
     getContentPlan(db, studio.id),
     creditBalance(studio.id),
     db.from("credit_ledger").select("id, delta, label, created_at").eq("studio_id", studio.id).order("created_at", { ascending: false }).limit(10),
-    db.from("studios").select("montage_effort, business_type, memory, subscription_status, trial_ends_at").eq("id", studio.id).maybeSingle(),
+    db.from("studios").select("montage_effort, business_type, memory, subscription_status, trial_ends_at, period_ends_at").eq("id", studio.id).maybeSingle(),
   ]);
   const tiktokOn = tiktokEnabled();
   const billing = billingEnabled();
   const subscription = (care.data?.subscription_status as string | null | undefined) ?? null;
   const trialEnd = care.data?.trial_ends_at
     ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: studio.timezone }).format(new Date(care.data.trial_ends_at as string))
+    : null;
+  const renewal = care.data?.period_ends_at
+    ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: studio.timezone }).format(new Date(care.data.period_ends_at as string))
     : null;
   const dateFormat = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: studio.timezone });
 
@@ -176,7 +180,7 @@ async function Settings() {
                   {subscription === "trialing"
                     ? `Essai en cours${trialEnd ? ` jusqu’au ${trialEnd}` : ""}, avec ${PLANS[offer].label}. Ensuite ${PLANS[offer].priceEur} € TTC / mois, sans engagement : arrête avant la fin de l’essai et tu ne paies rien.`
                     : subscription === "active"
-                      ? `${PLANS[offer].label} : ${PLANS[offer].priceEur} € TTC / mois, ${PLANS[offer].credits} crédits par mois (environ ${reelsPerMonth(offer)} Reels soignés ; les photos avec leurs textes ne coûtent rien), sans engagement.`
+                      ? `${PLANS[offer].label} : ${PLANS[offer].priceEur} € TTC / mois, ${PLANS[offer].credits} crédits à chaque renouvellement${renewal ? `, le prochain le ${renewal}` : ""} (environ ${reelsPerMonth(offer)} Reels soignés ; les photos avec leurs textes ne coûtent rien), sans engagement.`
                       : billing
                         ? `Pas encore d’abonnement. ${PLAN_ORDER.map((id) => `${PLANS[id].label} à ${PLANS[id].priceEur} €`).join(", ")} TTC / mois, sans engagement.`
                         : `Période d’essai en cours, avec tout ${PLANS.pro.label}. Ensuite : ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € TTC / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € TTC / mois, sans engagement.`}
@@ -187,6 +191,7 @@ async function Settings() {
                     Passer à {PLANS[nextPlan(offer)!].label}
                   </Link>
                 ) : null}
+                {billing && subscription === "active" ? <PackButton next="/reglages" primary={balance <= 0 && !nextPlan(offer)} className="self-start" /> : null}
               </Section>
 
               <Section title="Crédits" id="credits">
@@ -195,7 +200,8 @@ async function Settings() {
                   <span className="text-sm font-semibold text-muted">crédits disponibles</span>
                 </p>
                 <p className="text-sm leading-normal text-muted">
-                  Ton solde remonte à {PLANS[offer].credits} crédits le 1er de chaque mois. Un montage est débité après coup, pour ce qui a
+                  Ton solde remonte à {PLANS[offer].credits} crédits {billing && subscription ? (renewal ? `à ton renouvellement, le ${renewal}` : "à chaque renouvellement") : "chaque mois"}
+                  {billing && subscription ? ` ; ceux d’un pack « ${CREDIT_PACK.label} » qui restent passent au mois suivant` : ""}. Un montage est débité après coup, pour ce qui a
                   vraiment été fait (le message de livraison le dit) ; rien si le montage échoue.
                 </p>
                 <ul className="grid gap-x-6 gap-y-1 text-[13px] sm:grid-cols-2">

@@ -2,7 +2,7 @@ import "server-only";
 import { accessMessage, accessOf, isSubscribed, planOf, type Access } from "@fauve/agent";
 import { creditBalance, grantPlanCredits } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { billingEnabled, getSubscription, latestSubscription, planOfPrice, sessionSubscription, type StripeSubscription } from "./stripe";
+import { billingEnabled, getSubscription, latestSubscription, paidPeriod, planOfPrice, sessionSubscription, type StripeSubscription } from "./stripe";
 
 // What a studio may do now (packages/agent/src/access.ts), from its subscription
 // (read back from Stripe when it may have changed), its first publication and
@@ -16,10 +16,14 @@ export class AccessError extends Error {
   }
 }
 
-/** Writes what Stripe says of her subscription on the studio; her credits follow a new subscription or a move up. */
+/**
+ * Writes what Stripe says of her subscription on the studio, with its paid period (her credits come
+ * back when a new one starts, creditBalance); her credits follow a new subscription or a move up.
+ */
 async function store(studioId: string, customer: string | null, subscription: StripeSubscription | null) {
   const price = subscription?.items.data[0]?.price.id;
   const plan = await planOfPrice(price).catch(() => null);
+  const period = subscription ? paidPeriod(subscription) : null;
   const db = supabaseAdmin();
   const { data: before } = await db.from("studios").select("plan, stripe_subscription_id, subscription_status").eq("id", studioId).single();
   await db
@@ -30,6 +34,8 @@ async function store(studioId: string, customer: string | null, subscription: St
       subscription_status: subscription?.status ?? null,
       trial_ends_at: subscription?.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
       subscription_synced_at: new Date().toISOString(),
+      credits_period: period?.key ?? null,
+      period_ends_at: period?.endsAt ?? null,
       ...(plan ? { plan } : {}),
     })
     .eq("id", studioId);
@@ -62,18 +68,23 @@ export async function studioAccess(studioId: string): Promise<Access> {
   const db = supabaseAdmin();
   let { data: studio } = await db
     .from("studios")
-    .select("stripe_customer_id, subscription_status, trial_ends_at, subscription_synced_at")
+    .select("stripe_customer_id, subscription_status, trial_ends_at, subscription_synced_at, period_ends_at")
     .eq("id", studioId)
     .single();
-  // A trial that ended or a payment that failed may have changed since: read Stripe again.
+  // A trial that ended, a renewal (her credits come back) or a payment that failed may have changed since: read Stripe again.
   const stale =
     studio?.stripe_customer_id &&
     (!studio.subscription_synced_at ||
       Date.now() - new Date(studio.subscription_synced_at as string).getTime() > RESYNC_MS ||
+      (studio.period_ends_at && new Date(studio.period_ends_at as string).getTime() < Date.now()) ||
       (studio.subscription_status === "trialing" && studio.trial_ends_at && new Date(studio.trial_ends_at as string).getTime() < Date.now()));
   if (stale) {
     await syncSubscription(studioId).catch((error) => console.warn("subscription sync failed", studioId, error));
-    ({ data: studio } = await db.from("studios").select("stripe_customer_id, subscription_status, trial_ends_at, subscription_synced_at").eq("id", studioId).single());
+    ({ data: studio } = await db
+      .from("studios")
+      .select("stripe_customer_id, subscription_status, trial_ends_at, subscription_synced_at, period_ends_at")
+      .eq("id", studioId)
+      .single());
   }
   const [credits, { count: analyses }] = await Promise.all([
     creditBalance(studioId),

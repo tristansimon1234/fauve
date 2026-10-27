@@ -1,10 +1,13 @@
 import "server-only";
 import { studioAccess } from "@/lib/billing/access";
+import { billingEnabled } from "@/lib/billing/stripe";
 import {
   accessMessage,
+  CREDIT_PACK,
   CREDIT_PRICES,
   effectCredits,
   EFFORTS,
+  isSubscribed,
   effortSchema,
   meteredCredits,
   montageCharge,
@@ -28,7 +31,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { finishJob, setJobStage, startJob } from "@/lib/studio-jobs";
 
 // Credits (see packages/agent/src/credits.ts for the price list). The balance is
-// the sum of the ledger, topped up once a month. A montage starts at once, priced
+// the sum of the ledger, topped up at each renewal of her subscription. A montage starts at once, priced
 // between a floor and a ceiling, and is charged once delivered on what it really
 // cost: every cost logged while its job ran carries its id (cost-scope.ts).
 
@@ -37,19 +40,46 @@ const QUOTE_TTL_MS = 24 * 3600_000;
 export type Reason = "montage" | "correction" | "variant" | "moodboard" | "text_layer" | "image" | "carousel" | "adjustment";
 export type VariantChange = { template?: MotionTemplate; hook?: string };
 
-/** The studio's balance, after this month's top-up. */
+/**
+ * The studio's balance, after its top-up: subscribed, once per paid period of her subscription (her
+ * renewal date, `credits_period` read from Stripe); not subscribed yet or billing off, once per
+ * calendar month (the onboarding's); a subscription that stopped or failed to pay: no top-up.
+ */
 export async function creditBalance(studioId: string): Promise<number> {
   const db = supabaseAdmin();
-  const { data: studio } = await db.from("studios").select("plan").eq("id", studioId).maybeSingle();
-  const { data, error } = await db.rpc("ensure_monthly_credits", { p_studio: studioId, p_allowance: PLANS[planOf(studio?.plan)].credits });
+  const { data: studio } = await db
+    .from("studios")
+    .select("plan, stripe_subscription_id, subscription_status, credits_period")
+    .eq("id", studioId)
+    .maybeSingle();
+  const period = (studio?.credits_period as string | null) ?? null;
+  if (billingEnabled() && studio?.stripe_subscription_id && (!isSubscribed(studio.subscription_status as string | null) || !period)) {
+    const { data, error } = await db.rpc("credit_balance", { p_studio: studioId });
+    if (error) throw new Error(`credits: ${error.message}`);
+    return Number(data ?? 0);
+  }
+  const { data, error } = await db.rpc("ensure_period_credits", {
+    p_studio: studioId,
+    p_allowance: PLANS[planOf(studio?.plan)].credits,
+    p_period: billingEnabled() && studio?.stripe_subscription_id ? period : null,
+  });
   if (error) throw new Error(`credits: ${error.message}`);
   return data as number;
+}
+
+/** A credit pack she paid (Stripe Checkout), credited once: its session id is unique in the ledger. */
+export async function addPackCredits(studioId: string, sessionId: string, credits: number): Promise<boolean> {
+  const { error } = await supabaseAdmin()
+    .from("credit_ledger")
+    .insert({ studio_id: studioId, delta: credits, reason: "adjustment", label: CREDIT_PACK.label, ref: { stripe_session: sessionId } });
+  if (error && error.code !== "23505") throw new Error(`credit pack: ${error.message}`);
+  return !error;
 }
 
 /**
  * Her credits follow her offer: a new subscription sets her balance to its credits (whatever the
  * onboarding left, counted as Pro), a move up adds the difference at once; a move down changes
- * nothing until the next month.
+ * nothing until her renewal.
  */
 export async function grantPlanCredits(studioId: string, change: { from: PlanId | null; to: PlanId }): Promise<void> {
   const db = supabaseAdmin();

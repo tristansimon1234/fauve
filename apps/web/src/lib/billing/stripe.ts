@@ -1,11 +1,12 @@
 import "server-only";
-import { PLANS, type PlanId } from "@fauve/agent";
+import { CREDIT_PACK, PLANS, type PlanId } from "@fauve/agent";
 import { env } from "@/lib/env";
 
 // Stripe over its REST API (form-encoded), no SDK: products and prices found by
 // lookup key (created on first use), Checkout in subscription mode (no trial: one
 // of the 3 offers, Découverte at €9 the smallest), a switch to the offer above when
-// her credits run out, the customer portal to change or cancel.
+// her credits run out, a credit pack paid once (Checkout in payment mode), the customer
+// portal to change or cancel.
 // No webhook: the subscription is read back from Stripe (lib/billing/access.ts).
 
 const API = "https://api.stripe.com/v1";
@@ -123,8 +124,55 @@ export type StripeSubscription = {
   id: string;
   status: string;
   trial_end: number | null;
-  items: { data: { id: string; price: { id: string } }[] };
+  /** Before API 2025-03-31 the period is on the subscription, since then on each item. */
+  current_period_start?: number;
+  current_period_end?: number;
+  items: { data: { id: string; price: { id: string }; current_period_start?: number; current_period_end?: number }[] };
 };
+
+/** The paid period her credits belong to: its start (the key of its top-up) and its end (her renewal). */
+export function paidPeriod(subscription: StripeSubscription): { key: string; endsAt: string } | null {
+  const item = subscription.items.data[0];
+  const start = item?.current_period_start ?? subscription.current_period_start;
+  const end = item?.current_period_end ?? subscription.current_period_end;
+  if (!start || !end) return null;
+  return { key: `period:${new Date(start * 1000).toISOString()}`, endsAt: new Date(end * 1000).toISOString() };
+}
+
+/** Checkout for a credit pack, paid once; its credits are added on her return (packSession). */
+export async function packCheckout(input: { customer: string; studioId: string; successUrl: string; cancelUrl: string }): Promise<string> {
+  const session = await stripe<{ url: string }>("POST", "/checkout/sessions", {
+    mode: "payment",
+    customer: input.customer,
+    client_reference_id: input.studioId,
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: "eur",
+          unit_amount: CREDIT_PACK.priceEur * 100,
+          tax_behavior: "inclusive",
+          product_data: { name: `Edith : ${CREDIT_PACK.label} (${CREDIT_PACK.credits} crédits)` },
+        },
+      },
+    ],
+    metadata: { studio_id: input.studioId, kind: "credit_pack", credits: CREDIT_PACK.credits },
+    locale: "fr",
+    success_url: input.successUrl,
+    cancel_url: input.cancelUrl,
+  });
+  return session.url;
+}
+
+/** A credit pack's Checkout session: whose it is, whether it is paid, and its credits. */
+export async function packSession(sessionId: string): Promise<{ studioId: string | null; paid: boolean; credits: number }> {
+  const session = await stripe<{ client_reference_id: string | null; payment_status: string; mode: string; metadata: Record<string, string> | null }>(
+    "GET",
+    `/checkout/sessions/${encodeURIComponent(sessionId)}`,
+  );
+  const pack = session.mode === "payment" && session.metadata?.kind === "credit_pack";
+  return { studioId: session.client_reference_id, paid: pack && session.payment_status === "paid", credits: pack ? Number(session.metadata?.credits) || 0 : 0 };
+}
 
 /**
  * Her subscription moved to another offer at once: the difference for the rest of the period is

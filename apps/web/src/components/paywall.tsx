@@ -1,11 +1,13 @@
-import { PLANS, type PlanId } from "@fauve/agent";
+import { CREDIT_PACK, nextPlan, PLANS, type PlanId } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { signMediaUrls, type Db } from "@/lib/studio";
+import { PackButton } from "./pack-button";
 import { PlanChoice } from "./plan-choice";
 
 // Before her first Reel: Edith has prepared everything up to its plan; to make it she picks one of
 // the 3 offers (Stripe Checkout, no trial), and what she launched from « Créer » starts on her
-// return. Her credits run out (`upgradeFrom`): the offers above hers, her extra credits at once.
+// return. Her credits run out (`upgradeFrom`): « 1 Reel de plus » (a pack paid once, Pro included)
+// and the offers above hers, her extra credits at once either way.
 // A publication made before shows blurred behind it.
 
 async function previewOf(db: Db, studioId: string, postId: string | null): Promise<{ url: string; video: boolean } | null> {
@@ -30,6 +32,7 @@ async function previewOf(db: Db, studioId: string, postId: string | null): Promi
 
 export async function Paywall({ db, studioId, postId, next, upgradeFrom }: { db: Db; studioId: string; postId: string | null; next: string; upgradeFrom?: PlanId }) {
   const preview = await previewOf(db, studioId, postId);
+  const above = upgradeFrom ? nextPlan(upgradeFrom) : null;
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-soft px-4 py-10 md:flex-row md:gap-14">
       <div className="relative aspect-[9/16] w-[230px] shrink-0 overflow-hidden rounded-[22px] bg-ink shadow-lg md:w-[280px]">
@@ -43,7 +46,7 @@ export async function Paywall({ db, studioId, postId, next, upgradeFrom }: { db:
         ) : null}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-ink/30 text-center text-white">
           <span className="font-serif text-[30px] italic leading-none">Edith</span>
-          <span className="px-6 text-[13px] font-semibold opacity-90">{upgradeFrom ? "Plus de crédits ce mois-ci" : "Ton plan est prêt"}</span>
+          <span className="px-6 text-[13px] font-semibold opacity-90">{upgradeFrom ? "Plus de crédits pour l’instant" : "Ton plan est prêt"}</span>
         </div>
       </div>
       <div className="flex w-full max-w-[400px] flex-col gap-5">
@@ -61,12 +64,15 @@ export async function Paywall({ db, studioId, postId, next, upgradeFrom }: { db:
           </h1>
           <p className="text-[15px] leading-relaxed text-muted">
             {upgradeFrom
-              ? `Tu as utilisé les crédits de ${PLANS[upgradeFrom].label} ce mois-ci. Passe à l’offre au-dessus : tes nouveaux crédits sont là tout de suite, et tu paies seulement la différence pour le reste du mois. Sinon, ils reviennent le 1er du mois.`
+              ? `Tu as utilisé les crédits de ton offre ${PLANS[upgradeFrom].label}. Prends « ${CREDIT_PACK.label} » (${CREDIT_PACK.credits} crédits en paiement unique)${above ? ` ou passe à ${PLANS[above].label}, en payant seulement la différence pour le reste du mois` : ""} : tes crédits sont là tout de suite. Sinon, ils reviennent à ton renouvellement.`
               : "Choisis ton abonnement et je le fabrique aussitôt. Sans engagement, tu arrêtes en un clic."}
           </p>
         </div>
-        <PlanChoice next={next} upgradeFrom={upgradeFrom} />
-        <p className="text-[12px] leading-snug text-muted">Prix TTC, chaque mois. Paiement sécurisé par Stripe.</p>
+        {upgradeFrom ? <PackButton next={next} primary={!above} /> : null}
+        {!upgradeFrom || above ? <PlanChoice next={next} upgradeFrom={upgradeFrom} /> : null}
+        <p className="text-[12px] leading-snug text-muted">
+          {upgradeFrom ? "Prix TTC. Paiement sécurisé par Stripe." : "Prix TTC, chaque mois. Paiement sécurisé par Stripe."}
+        </p>
       </div>
     </main>
   );

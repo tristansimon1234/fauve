@@ -413,7 +413,7 @@ async function effects(job: Job) {
   const ceiling = job.quoteId ? await switchQuoteToEffect(job.quoteId, Boolean(job.correction)) : EFFECT_MAX_CREDITS[job.correction ? "fix" : "reel"];
   if (ceiling === null) {
     // A correction of her effect cannot be made by the chain: it waits for her credits (nothing is charged).
-    if (job.correction) throw new EffectUnavailable("Il ne te reste pas assez de crédits pour refaire l’effet : ils reviennent le 1er du mois.");
+    if (job.correction) throw new EffectUnavailable("Il ne te reste pas assez de crédits pour refaire l’effet : ils reviennent à ton renouvellement.");
     console.log("effects: too few credits for an effect, the chain makes it", job.postId);
     await next(job, { step: "design", route: "chain" });
     return;

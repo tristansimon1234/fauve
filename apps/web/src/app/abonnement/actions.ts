@@ -3,8 +3,8 @@
 import { PLAN_ORDER, planOf, type PlanId } from "@fauve/agent";
 import { redirect } from "next/navigation";
 import { launchPendingCreation } from "@/app/(app)/create-actions";
-import { syncSubscription } from "@/lib/billing/access";
-import { billingEnabled, checkoutSession, createCustomer, portalSession, StripeError, switchPlan } from "@/lib/billing/stripe";
+import { studioAccess, syncSubscription } from "@/lib/billing/access";
+import { billingEnabled, checkoutSession, createCustomer, packCheckout, portalSession, StripeError, switchPlan } from "@/lib/billing/stripe";
 import { env } from "@/lib/env";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -62,6 +62,28 @@ export async function upgradePlan(plan: PlanId): Promise<{ error: string } | { o
   // What she launched from « Créer » with no credits left starts now.
   await launchPendingCreation().catch((error) => console.error("pending creation not launched", error));
   return { ok: true };
+}
+
+/** « 1 Reel de plus »: a credit pack paid once (Stripe Checkout), for any subscribed studio, Pro included. */
+export async function buyCredits(next: string): Promise<{ error: string } | void> {
+  if (!billingEnabled()) return { error: "Le paiement n’est pas encore ouvert." };
+  const { member } = await getStudioContext();
+  if (!member) return { error: "Reconnecte-toi pour continuer." };
+  if (member.role !== "owner") return { error: "Seule la personne qui gère le compte peut acheter des crédits." };
+  if (!(await studioAccess(member.studio.id)).subscribed) return { error: "Choisis d’abord ton abonnement." };
+  const { data: studio } = await supabaseAdmin().from("studios").select("stripe_customer_id").eq("id", member.studio.id).single();
+  const customer = studio?.stripe_customer_id as string | null | undefined;
+  if (!customer) return { error: "Pas encore d’abonnement." };
+  const back = safeNext(next);
+  const base = env("APP_URL");
+  redirect(
+    await packCheckout({
+      customer,
+      studioId: member.studio.id,
+      successUrl: `${base}/abonnement/credits?session_id={CHECKOUT_SESSION_ID}&next=${encodeURIComponent(back)}`,
+      cancelUrl: `${base}/abonnement?next=${encodeURIComponent(back)}`,
+    }),
+  );
 }
 
 /** The Stripe portal: change the offer, the card, or stop. */

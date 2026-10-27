@@ -1,6 +1,6 @@
 "use server";
 
-import { ANALYST_MODEL, filmIdeas, keptPlan, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, memoryLines, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, offersLine, type PostIdea, type PostPlan } from "@fauve/agent";
+import { ANALYST_MODEL, filmIdeas, keptPlan, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, memoryLines, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, offersLine, packLine, type PostIdea, type PostPlan } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { z } from "zod";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
@@ -120,7 +120,7 @@ export async function copyReel(input: z.input<typeof copyFromSchema>): Promise<C
   if (!access.create) {
     return {
       ok: false,
-      error: access.reason === "credits" ? "Tu n’as plus de crédits ce mois-ci : ils reviennent le 1er du mois." : `Abonne-toi pour copier le style d’un Reel : ${offersLine()}.`,
+      error: access.reason === "credits" ? `Tu n’as plus de crédits pour l’instant : prends « ${packLine()} » sur la page Abonnement, ou ils reviennent à ton renouvellement.` : `Abonne-toi pour copier le style d’un Reel : ${offersLine()}.`,
     };
   }
   let source: StealSource;

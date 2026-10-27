@@ -1,5 +1,5 @@
 import { CREDIT_PRICES } from "./credits.ts";
-import { PLANS, type PlanId } from "./plans.ts";
+import { CREDIT_PACK, PLANS, type PlanId } from "./plans.ts";
 
 // What a studio costs against what it brings in: its offer's price once VAT and Stripe's fees
 // are out, the share kept as margin, and what a credit pays. Every priced job costs at most what
@@ -65,6 +65,11 @@ export const UNPRICED_EUR_PER_POST = CHAT_EUR_PER_POST + WHATSAPP_EUR_PER_POST;
 export const postsPerMonth = (plan: PlanId) => (PLANS[plan].postsPerWeek * 52) / 12;
 /** The most an offer's month costs: every credit spent, and what no credit pays at its rhythm. It stays under its budget. */
 export const monthCostCeiling = (plan: PlanId) => PLANS[plan].credits * EUR_PER_CREDIT_SPENT + postsPerMonth(plan) * UNPRICED_EUR_PER_POST;
+
+/** What a credit pack brings in: VAT and the card's fee out (a single payment, no Billing). */
+export const packNetRevenue = () => CREDIT_PACK.priceEur / (1 + VAT_RATE) - (CREDIT_PACK.priceEur * 0.015 + 0.25);
+/** The most a pack can cost: every credit spent, and the chat and WhatsApp of the Reel it makes. */
+export const packCostCeiling = () => CREDIT_PACK.credits * EUR_PER_CREDIT_SPENT + UNPRICED_EUR_PER_POST;
 
 /**
  * Typical cost of each priced job in euros, measured in cost_events (23–25 October 2026, the

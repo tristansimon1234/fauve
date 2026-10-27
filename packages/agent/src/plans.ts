@@ -42,5 +42,14 @@ export function nextPlan(plan: PlanId): PlanId | null {
   return PLAN_ORDER[PLAN_ORDER.indexOf(plan) + 1] ?? null;
 }
 
+/**
+ * More credits before her renewal, whatever her offer (Pro included): about one more Reel made with care,
+ * paid once by card (Stripe Checkout in payment mode). Left over at her renewal, they carry over once.
+ */
+export const CREDIT_PACK = { label: "1 Reel de plus", credits: CARED_REEL_CREDITS, priceEur: 5 } as const;
+
+/** « 1 Reel de plus : 12 crédits pour 5 € » */
+export const packLine = () => `${CREDIT_PACK.label} : ${CREDIT_PACK.credits} crédits pour ${CREDIT_PACK.priceEur} €`;
+
 /** « 3 abonnements au choix, dès 9 € par mois » */
 export const offersLine = () => `${PLAN_ORDER.length} abonnements au choix, dès ${PLANS[PLAN_ORDER[0]].priceEur} € par mois`;

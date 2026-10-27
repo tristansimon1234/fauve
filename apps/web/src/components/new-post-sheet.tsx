@@ -837,7 +837,7 @@ function Create({
             <p className="font-semibold">{error}</p>
             {locked && (
               <Link href="/abonnement" onClick={onClose} className="self-start font-bold underline underline-offset-2">
-                {locked === "subscribe" ? "Choisir mon abonnement" : "Passer à l’offre au-dessus"}
+                {locked === "subscribe" ? "Choisir mon abonnement" : "Avoir plus de crédits"}
               </Link>
             )}
           </div>

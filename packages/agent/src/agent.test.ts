@@ -2123,6 +2123,14 @@ test("offers: Découverte stays at €9 with 3 Reels, and a studio out of credit
   assert.equal(planOf(null), "pro");
 });
 
+test("credit pack: one more Reel for €5, the margin kept", async () => {
+  const { CREDIT_PACK, CARED_REEL_CREDITS, packLine } = await import("./plans.ts");
+  const { packCostCeiling, packNetRevenue } = await import("./margin.ts");
+  assert.equal(CREDIT_PACK.credits, CARED_REEL_CREDITS);
+  assert.ok(packCostCeiling() <= packNetRevenue() * (1 - TARGET_MARGIN), `${packCostCeiling()} > ${packNetRevenue() / 2}`);
+  assert.equal(packLine(), "1 Reel de plus : 12 crédits pour 5 €");
+});
+
 test("stabilize: a clip that shakes a good part of the time, never a long one", async () => {
   const { needsStabilizing, shakyShare } = await import("./stabilize.ts");
   const shot = (start: number, end: number, shaky: boolean) => ({ start, end, quality: { blurry: false, dark: false, shaky } });

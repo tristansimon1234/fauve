@@ -118,7 +118,7 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
     const { data: studio } = await supabaseAdmin().from("studios").select("onboarding_step").eq("id", studioId).single();
     const free = onboardingStepOf(studio?.onboarding_step) !== "done";
     if (!free && (await creditBalance(studioId)) < CREDIT_PRICES.moodboard) {
-      return { status: "error", message: "Plus assez de crédits pour la lecture du moodboard (1 crédit). Ton solde remonte le 1er du mois." };
+      return { status: "error", message: "Plus assez de crédits pour la lecture du moodboard (1 crédit). Ton solde remonte à ton renouvellement." };
     }
     try {
       reading = await readMoodboard(
