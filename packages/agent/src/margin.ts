@@ -40,12 +40,22 @@ export const monthlyCostBudget = (plan: PlanId) => netRevenue(plan) * (1 - TARGE
 export const MONTHLY_COST_BUDGET_EUR = monthlyCostBudget("pro");
 
 /**
- * What no credit pays, per publication, in euros: about 6 turns of chat (€0.076 a turn on average,
- * 111 turns measured from 22 to 24 October before the prompt cache was kept an hour, which removed
- * most of its rewrites) and the readings around it (her files read as they arrive, the caption, the
- * plan proposed in Créer, a Reel to copy). To measure again on real studios (/api/admin/margin).
+ * The chat and the readings no credit pays, per publication, in euros: about 6 turns of chat (€0.048 a
+ * turn on average, 24 turns measured from 24 to 27 October with the prompt cache kept an hour, its cold
+ * starts included) and the readings around it (her files read as they arrive, the caption, the plan
+ * proposed in Créer, a Reel to copy). To measure again on real studios (/api/admin/margin).
  */
-export const UNPRICED_EUR_PER_POST = 0.4;
+export const CHAT_EUR_PER_POST = 0.35;
+/**
+ * WhatsApp, per publication, in euros: about 8 messages from Edith (his answers, a link button sent
+ * apart from reply buttons, a reminder outside the 24 hours) at about $0.03 each in France. Since
+ * October 2026 Meta bills the answers in the 24 hours beyond 1 000 a month for the whole number,
+ * and utility templates, at the utility rate: at a hundred studios almost all of them are billed.
+ * Estimated, not measured: to check against Meta's invoice.
+ */
+export const WHATSAPP_EUR_PER_POST = 0.22;
+/** What no credit pays, per publication: the chat, its readings, and WhatsApp. */
+export const UNPRICED_EUR_PER_POST = CHAT_EUR_PER_POST + WHATSAPP_EUR_PER_POST;
 /** Publications a month at an offer's weekly rhythm. */
 export const postsPerMonth = (plan: PlanId) => (PLANS[plan].postsPerWeek * 52) / 12;
 /** The most an offer's month costs: every credit spent, and what no credit pays at its rhythm. It stays under its budget. */
