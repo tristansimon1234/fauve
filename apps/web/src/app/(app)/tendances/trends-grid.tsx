@@ -1,9 +1,9 @@
 "use client";
 
-import { CREDIT_PRICES, shortCount, TREND_FREE_CHANGES } from "@fauve/agent";
+import { CREDIT_PRICES, HOOK_FORM_LABELS, shortCount, TREND_FREE_CHANGES } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { EyeIcon, HeartIcon, InstagramIcon, MusicIcon, TikTokIcon } from "@/components/icons";
+import { EyeIcon, HeartIcon, InstagramIcon, MusicIcon, PlayIcon, TikTokIcon, XIcon } from "@/components/icons";
 import { NewPostSheet } from "@/components/new-post-sheet";
 import type { TrendCard, TrendLists } from "@/lib/trends";
 import { setTrendQuery } from "./actions";
@@ -74,11 +74,12 @@ export function TrendQuery({ query, left }: { query: string | null; left: number
   );
 }
 
-/** The two lists (« Ce qui cartonne », « À Paris »), the trade's hashtags and « Fais-en un comme ça ». */
+/** The wall: the most beautiful first, the hooks that work, then the most watched and her city's; each video plays in the app. */
 export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; searching: boolean; timezone: string }) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
   const [copying, setCopying] = useState<string | null>(null);
+  const [playing, setPlaying] = useState<TrendCard | null>(null);
 
   // While the first search runs, the page looks again every few seconds.
   useEffect(() => {
@@ -90,7 +91,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
   if (searching) {
     return (
       <div className="rounded-[22px] bg-soft px-6 py-10 text-center text-[15px] text-muted" aria-busy="true">
-        Je regarde ce qui marche en ce moment sur TikTok et Instagram… ça prend une petite minute.
+        Je cherche ce qui inspire en ce moment sur TikTok et Instagram… ça prend une ou deux minutes.
       </div>
     );
   }
@@ -104,6 +105,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
 
   const city = lists.words.local.split(" ").at(-1) ?? "";
   const platforms = new Set([...lists.trend, ...lists.beau, ...lists.local].map((c) => c.platform));
+  const open = (card: TrendCard) => setPlaying(card);
 
   return (
     <>
@@ -151,19 +153,88 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
         </ul>
       )}
 
-      <TrendSection title="Ce qui cartonne en ce moment" note={`« ${lists.words.trend} », partout`} cards={lists.trend} filter={filter} onCopy={setCopying} />
-      <TrendSection title="Les plus belles" note="choisies sur leur image : lumière, cadrage, couleurs" cards={lists.beau} filter={filter} onCopy={setCopying} keepOrder />
-      <TrendSection title={`À ${capitalized(city)}`} note={`« ${lists.words.local} »`} cards={lists.local} filter={filter} onCopy={setCopying} />
+      <BeautyWall cards={lists.beau.filter((c) => filter === "all" || c.platform === filter)} onOpen={open} onCopy={setCopying} />
+      <HookRow cards={lists.hooks.filter((c) => filter === "all" || c.platform === filter)} onOpen={open} />
+      <TrendSection title="Ce qui cartonne en ce moment" note={`« ${lists.words.trend} », les plus vues du mois`} cards={lists.trend} filter={filter} onOpen={open} onCopy={setCopying} />
+      <TrendSection title={`À ${capitalized(city)}`} note={`« ${lists.words.local} »`} cards={lists.local} filter={filter} onOpen={open} onCopy={setCopying} />
+      {playing && <Player card={playing} onClose={() => setPlaying(null)} onCopy={(url) => (setPlaying(null), setCopying(url))} />}
       {copying && <NewPostSheet timezone={timezone} copyLink={copying} onClose={() => setCopying(null)} />}
     </>
   );
 }
 
-function TrendSection({ title, note, cards, filter, onCopy, keepOrder = false }: { title: string; note: string; cards: TrendCard[]; filter: Filter; onCopy: (url: string) => void; keepOrder?: boolean }) {
+/** « Les plus belles », as a wall: each cover at its own size, what makes it inspiring under it. */
+function BeautyWall({ cards, onOpen, onCopy }: { cards: TrendCard[]; onOpen: (card: TrendCard) => void; onCopy: (url: string) => void }) {
+  return (
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-[22px] font-extrabold tracking-[-0.01em]">Les plus belles</h2>
+        <p className="text-[14px] text-muted">choisies sur leur image : lumière, cadrage, couleurs</p>
+      </div>
+      {cards.length ? (
+        <ul className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
+          {cards.map((card) => (
+            <li key={card.id} className="mb-5 flex break-inside-avoid flex-col gap-2">
+              <Cover card={card} onOpen={onOpen} />
+              {card.tags.length > 0 && (
+                <ul className="flex flex-wrap gap-1">
+                  {card.tags.map((tag) => (
+                    <li key={tag} className="rounded-full bg-soft px-2.5 py-1 text-[12px] font-bold text-muted">
+                      {tag}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {card.hook && <p className="font-serif text-[17px] italic leading-snug">« {card.hook} »</p>}
+              <div className="flex items-center justify-between gap-2">
+                {card.author && <p className="min-w-0 truncate text-[13px] font-bold">@{card.author}</p>}
+                <button type="button" onClick={() => onCopy(card.url)} className="shrink-0 text-[13px] font-bold text-violet hover:underline">
+                  Fais-en un
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-[16px] bg-soft px-5 py-6 text-[14px] text-muted">Je cherche encore les plus belles de ton métier : reviens dans un moment.</p>
+      )}
+    </section>
+  );
+}
+
+/** The hooks that work right now in her trade, read on the covers: their words, their form, the video behind. */
+function HookRow({ cards, onOpen }: { cards: TrendCard[]; onOpen: (card: TrendCard) => void }) {
+  if (!cards.length) return null;
+  return (
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-[22px] font-extrabold tracking-[-0.01em]">Les accroches qui marchent</h2>
+        <p className="text-[14px] text-muted">les premiers mots écrits sur les vidéos de ton métier</p>
+      </div>
+      <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+        {cards.map((card) => (
+          <li key={card.id} className="w-[240px] shrink-0 snap-start">
+            <button type="button" onClick={() => onOpen(card)} className="flex h-full w-full flex-col justify-between gap-4 rounded-[18px] border border-line p-4 text-left hover:border-violet">
+              <p className="font-serif text-[21px] italic leading-snug">« {card.hook} »</p>
+              <span className="flex items-center justify-between gap-2 text-[12px] text-muted">
+                <span className="rounded-full bg-violet-soft px-2.5 py-1 font-bold text-violet">{HOOK_FORM_LABELS[card.hookForm ?? "autre"]}</span>
+                <span className="flex items-center gap-1">
+                  {card.platform === "tiktok" ? <TikTokIcon size={13} /> : <InstagramIcon size={13} />}
+                  {card.views !== null ? `${shortCount(card.views)} vues` : card.author ? `@${card.author}` : null}
+                </span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function TrendSection({ title, note, cards, filter, onOpen, onCopy }: { title: string; note: string; cards: TrendCard[]; filter: Filter; onOpen: (card: TrendCard) => void; onCopy: (url: string) => void }) {
   const shown = cards.filter((c) => filter === "all" || c.platform === filter);
-  // The most watched first, both platforms together (likes count for twenty views when a search gives no views);
-  // the most beautiful keep the order they were chosen in.
-  const ordered = keepOrder ? shown : [...shown].sort((a, b) => (b.views ?? (b.likes ?? 0) * 20) - (a.views ?? (a.likes ?? 0) * 20));
+  // The most watched first, both platforms together (likes count for twenty views when a search gives no views).
+  const ordered = [...shown].sort((a, b) => (b.views ?? (b.likes ?? 0) * 20) - (a.views ?? (a.likes ?? 0) * 20));
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -173,7 +244,7 @@ function TrendSection({ title, note, cards, filter, onCopy, keepOrder = false }:
       {ordered.length ? (
         <ul className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {ordered.map((card) => (
-            <TrendItem key={card.id} card={card} onCopy={onCopy} />
+            <TrendItem key={card.id} card={card} onOpen={onOpen} onCopy={onCopy} />
           ))}
         </ul>
       ) : (
@@ -183,34 +254,50 @@ function TrendSection({ title, note, cards, filter, onCopy, keepOrder = false }:
   );
 }
 
-function TrendItem({ card, onCopy }: { card: TrendCard; onCopy: (url: string) => void }) {
+/** A cover that opens the video in the app, with its platform and its views. */
+function Cover({ card, onOpen, fixed = false }: { card: TrendCard; onOpen: (card: TrendCard) => void; fixed?: boolean }) {
+  return (
+    <button type="button" onClick={() => onOpen(card)} aria-label="Voir la vidéo" className={`group relative block w-full overflow-hidden rounded-[16px] bg-soft ${fixed || !card.cover ? "aspect-[9/16]" : ""}`}>
+      {card.cover ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={card.cover} alt="" loading="lazy" className={`w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${fixed ? "h-full" : "h-auto"}`} />
+      ) : (
+        <div className="flex h-full items-center justify-center px-4 text-center text-[13px] text-muted">{card.caption.slice(0, 80) || "Voir la vidéo"}</div>
+      )}
+      <span className="absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white">
+        {card.platform === "tiktok" ? <TikTokIcon size={15} /> : <InstagramIcon size={15} />}
+      </span>
+      <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white">
+          <PlayIcon size={20} />
+        </span>
+      </span>
+      <span className="absolute bottom-2 left-2 flex items-center gap-1 text-[13px] font-bold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.6)]">
+        {card.views !== null ? (
+          <>
+            <EyeIcon size={15} /> {shortCount(card.views)}
+          </>
+        ) : card.likes !== null ? (
+          <>
+            <HeartIcon size={15} /> {shortCount(card.likes)}
+          </>
+        ) : null}
+      </span>
+    </button>
+  );
+}
+
+function TrendItem({ card, onOpen, onCopy }: { card: TrendCard; onOpen: (card: TrendCard) => void; onCopy: (url: string) => void }) {
   return (
     <li className="flex min-w-0 flex-col gap-2">
-      <a href={card.url} target="_blank" rel="noopener noreferrer" className="group relative block aspect-[9/16] overflow-hidden rounded-[16px] bg-soft">
-        {card.cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={card.cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
-        ) : (
-          <div className="flex h-full items-center justify-center px-4 text-center text-[13px] text-muted">{card.caption.slice(0, 80) || "Voir la vidéo"}</div>
-        )}
-        <span className="absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white">
-          {card.platform === "tiktok" ? <TikTokIcon size={15} /> : <InstagramIcon size={15} />}
-        </span>
-        <span className="absolute bottom-2 left-2 flex items-center gap-1 text-[13px] font-bold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.6)]">
-          {card.views !== null ? (
-            <>
-              <EyeIcon size={15} /> {shortCount(card.views)}
-            </>
-          ) : card.likes !== null ? (
-            <>
-              <HeartIcon size={15} /> {shortCount(card.likes)}
-            </>
-          ) : null}
-        </span>
-      </a>
+      <Cover card={card} onOpen={onOpen} fixed />
       <div className="flex min-w-0 flex-col gap-1 px-0.5">
         {card.author && <p className="truncate text-[13px] font-bold">@{card.author}</p>}
-        {card.caption && <p className="line-clamp-2 text-[13px] leading-snug text-muted">{card.caption}</p>}
+        {card.hook ? (
+          <p className="line-clamp-2 font-serif text-[15px] italic leading-snug">« {card.hook} »</p>
+        ) : (
+          card.caption && <p className="line-clamp-2 text-[13px] leading-snug text-muted">{card.caption}</p>
+        )}
         {card.sound && (
           <p className="flex min-w-0 items-center gap-1 text-[12px] text-muted">
             <MusicIcon size={13} />
@@ -225,6 +312,44 @@ function TrendItem({ card, onCopy }: { card: TrendCard; onCopy: (url: string) =>
         Fais-en un comme ça
       </button>
     </li>
+  );
+}
+
+/** The platform's own player, in the app (TikTok's embed player, Instagram's embed): nothing stored, always the real video. */
+const playerUrl = (card: TrendCard) =>
+  card.platform === "tiktok"
+    ? `https://www.tiktok.com/player/v1/${encodeURIComponent(card.externalId)}?autoplay=1&loop=1&rel=0&description=0&music_info=1`
+    : `https://www.instagram.com/reel/${encodeURIComponent(card.externalId)}/embed/`;
+
+function Player({ card, onClose, onCopy }: { card: TrendCard; onClose: () => void; onCopy: (url: string) => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Vidéo" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="flex max-h-full w-full max-w-[400px] flex-col gap-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between text-white">
+          <p className="min-w-0 truncate text-[14px] font-bold">{card.author ? `@${card.author}` : card.platform === "tiktok" ? "TikTok" : "Instagram"}</p>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 hover:bg-white/25">
+            <XIcon size={18} />
+          </button>
+        </div>
+        <div className={`overflow-hidden rounded-[18px] bg-black ${card.platform === "tiktok" ? "aspect-[9/16]" : "aspect-[9/14]"} max-h-[72vh] w-full`}>
+          <iframe src={playerUrl(card)} title="Vidéo" className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+        </div>
+        {card.hook && <p className="font-serif text-[18px] italic leading-snug text-white">« {card.hook} »</p>}
+        <div className="flex gap-2">
+          <button type="button" onClick={() => onCopy(card.url)} className="h-11 flex-1 rounded-full bg-violet text-[14px] font-bold text-white">
+            Fais-en un comme ça
+          </button>
+          <a href={card.url} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center rounded-full bg-white/15 px-4 text-[14px] font-bold text-white hover:bg-white/25">
+            Ouvrir
+          </a>
+        </div>
+      </div>
+    </div>
   );
 }
 

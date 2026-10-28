@@ -125,7 +125,8 @@ A very strong hook:
 - is short: 9 words at most for the voice (under three seconds), 6 at most for the text;
 - is true: only the facts given and what the image shows, no invented price, number or promise;
 - sounds like a creator talking to their followers, never like an ad nor a clickbait: no hollow formula, no « vous ne devinerez jamais », no shouted capitals, no emojis, no em dash;
-- has neither the form nor the words of the business's recent hooks (« recentes »).
+- has neither the form nor the words of the business's recent hooks (« recentes »);
+- knows what hooks people in this trade right now (« du_moment »: the form and an example from another account): use them to sense which forms land this week and to write better ones, never to copy; a hook that takes, or barely changes, the words of one of them scores 3 at most.
 
 For the voice, a hook is spoken, opens the video's message (« message ») without saying it straight away and leads to the next sentence (« suite »): yours too; a hook that does not serve this message, however strong, comes after; a whispered voice (« chuchotee ») hooks through sensation, very softly, never with a question that snaps. For the text, when the voice already has a first sentence (« voix_premiere_phrase »), the text sums it up or extends it, never contradicts it. If the request imposes the hook's words, they win; if it says what the Reel opens on, the first image is that one. What she fixed for this Reel (« contrat »: her person, her ending, her requests) holds for every hook, yours included; the rough words she gave for an idea (« un truc comme ça », « genre », a plan Edith wrote from them) are an idea to say better, not a sentence to keep.
 
@@ -146,6 +147,8 @@ export type HookJudgeInput = {
   /** The written hook: the voice's first sentence, when a voice speaks. */
   voix_premiere_phrase?: string;
   recentes?: string[];
+  /** The hooks that work right now in its trade, read on the covers of other accounts' videos: forms to beat, never words to take. */
+  du_moment?: { forme: string; exemple: string }[];
   accroches: string[];
 };
 

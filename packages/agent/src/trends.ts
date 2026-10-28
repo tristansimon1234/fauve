@@ -331,28 +331,45 @@ export function hashtagVolumes(counts: HashtagCount[], order: string[]): Hashtag
 /** The key a list is kept under: its scope and its words. */
 export const scopeKey = (search: Pick<TrendSearch, "scope" | "words">) => `${search.scope}:${trendKey(search.words)}`;
 
-export const trendFilterSchema = z.object({
-  keep: z.array(z.number().int().min(1).max(60)).max(60).describe("The numbers of the videos to keep"),
-});
 
-export const trendBeautySchema = z.object({
+/** The forms a hook takes (read on a cover), with their name on screen. */
+export const HOOK_FORMS = ["question", "pov", "chiffre", "promesse", "contre_pied", "coulisses", "defi", "liste", "autre"] as const;
+export type HookForm = (typeof HOOK_FORMS)[number];
+export const HOOK_FORM_LABELS: Record<HookForm, string> = {
+  question: "Question",
+  pov: "POV",
+  chiffre: "Chiffre",
+  promesse: "Promesse",
+  contre_pied: "Contre-pied",
+  coulisses: "Coulisses",
+  defi: "Défi",
+  liste: "Liste",
+  autre: "Accroche",
+};
+
+/** What Sonnet reads on each cover: its beauty, whether it is about her trade, the hook written on it, what makes it inspiring. */
+export const coverReadSchema = z.object({
   videos: z
     .array(
       z.object({
         n: z.number().int().min(1).max(60),
         beauty: z.number().int().min(1).max(10).describe("How beautiful the image is, 1 to 10"),
         on_topic: z.boolean().describe("Really about this trade"),
+        hook: z.string().max(120).describe("The words written on the image, exactly as written; empty when none"),
+        hook_form: z.enum(HOOK_FORMS).describe("The form of that hook; autre when there is none"),
+        tags: z.array(z.string().max(24)).max(3).describe("2 or 3 short French words for what makes it inspiring"),
       }),
     )
     .max(60),
 });
+export type CoverRead = z.infer<typeof coverReadSchema>["videos"][number];
 
 /** A cover from 7 out of 10 is beautiful enough to be shown. */
 export const TREND_BEAUTY_PASS = 7;
 
-/** The beautiful ones, the most beautiful first (then the most watched); numbers are 1-based. */
-export function beautifulTrends(videos: TrendVideo[], scores: z.infer<typeof trendBeautySchema>["videos"]): TrendVideo[] {
-  const byN = new Map(scores.map((s) => [s.n, s]));
+/** The beautiful ones, the most beautiful first (then the most watched); reads are matched by their 1-based number. */
+export function beautifulTrends(videos: TrendVideo[], reads: Pick<CoverRead, "n" | "beauty" | "on_topic">[]): TrendVideo[] {
+  const byN = new Map(reads.map((s) => [s.n, s]));
   return videos
     .map((video, i) => ({ video, score: byN.get(i + 1) }))
     .filter((v) => v.score && v.score.on_topic && v.score.beauty >= TREND_BEAUTY_PASS)
@@ -360,27 +377,53 @@ export function beautifulTrends(videos: TrendVideo[], scores: z.infer<typeof tre
     .map((v) => v.video);
 }
 
-/** Sonnet's eye on the covers, for « Les plus belles ». */
-export const TREND_BEAUTY_PROMPT = `You are the art director of a small business's social media: you pick, from short videos found on TikTok and Instagram for its trade, the ones whose image is truly beautiful, the kind a high-end Parisian studio, salon or restaurant would save as a reference.
+/** A hook read on a cover, kept clean: one line, at most 120 characters; empty when it is only a handle or a hashtag. */
+export function cleanHook(text: string | null | undefined): string {
+  const line = clip(text, 120).replace(/^["«“\s]+|["»”\s]+$/g, "");
+  return /\p{L}{2}/u.test(line.replace(/[#@]\S+/g, "")) ? line : "";
+}
 
-You receive the trade (in French) and numbered covers with their caption and account.
+/** Inspiring words, as chips: lowercase, short, no duplicate, 3 at most. */
+export const cleanTags = (tags: string[] | null | undefined) =>
+  [...new Set((tags ?? []).map((t) => clip(t, 24).toLowerCase().replace(/[#.]/g, "").trim()).filter((t) => t.length >= 3))].slice(0, 3);
 
-Rate each cover's beauty from 1 to 10 on the image itself: light (natural, soft, golden, or a clear intentional mood), composition and framing, colour grade, styling and set, a single clear subject, an editorial or cinematic feel. 9–10: magazine level. 7–8: clearly crafted, a reference worth copying. 4–6: ordinary phone footage. 1–3: cluttered, dark, blurry, a screenshot, a meme, a talking head in bad light, big captions or stickers over the image, an ad or a flyer.
+/** Sonnet's eye on the covers: their beauty for « Les plus belles », the hook written on them, what makes them inspiring. */
+export const TREND_COVER_PROMPT = `You are the art director of a small business's social media. You look at the covers of short videos found on TikTok and Instagram for its trade, to build a wall of inspiration: the references a high-end Parisian studio, salon or restaurant would save.
 
-Judge the craft, never the popularity, the person's looks or the place's price. Also say whether the video is really about this trade (it shows the activity, the place, the work, a client, a professional of it), not a travel guide or a lifestyle vlog that only mentions it.
+You receive the trade (in French) and numbered covers with their caption and account. For each cover:
+
+1. beauty, from 1 to 10, on the image itself: light (natural, soft, golden, or a clear intentional mood), composition and framing, colour grade, styling and set, a single clear subject, an editorial or cinematic feel. 9–10: magazine level. 7–8: clearly crafted, a reference worth copying. 4–6: ordinary phone footage. 1–3: cluttered, dark, blurry, a screenshot, a meme, a talking head in bad light, big captions or stickers over the image, an ad or a flyer. Judge the craft, never the popularity, the person's looks or the place's price.
+2. on_topic: whether the video is really about this trade (it shows the activity, the place, the work, a client, a professional of it), not a travel guide or a lifestyle vlog that only mentions it.
+3. hook: the words written on the image, exactly as written (the hook the video opens on), or empty when nothing is written. Never the caption.
+4. hook_form: the form of that hook: question, pov (« pov : … »), chiffre (a precise number), promesse (what you will get), contre_pied (the opposite of what you expect), coulisses (what you don't usually see), defi (a challenge), liste (« 3 erreurs… »), autre (another form, or no hook).
+5. tags: 2 or 3 short words in French, lowercase, for what makes it inspiring to copy: its light, framing, colours, type, format or idea (« lumière naturelle », « plan serré », « titre serif », « noir et blanc », « collage », « pov », « avant après », « plan fixe »). Never a judgement (« beau », « joli »).
 
 Answer for every number.`;
 
-/** Sonnet's instructions to keep only the videos really about her trade. */
-export const TREND_FILTER_PROMPT = `You sort short videos found by a keyword or hashtag search on TikTok and Instagram, for a page that shows a small business what works right now in its trade.
+/** Hashtags that say nothing about a look or a trade: never followed. */
+const GENERIC_TAGS = new Set(["fyp", "foryou", "foryoupage", "pourtoi", "viral", "reels", "reel", "explore", "explorepage", "trending", "trend", "instagood", "instagram", "tiktok", "love", "aesthetic", "paris", "france", "capcut", "ootd"]);
 
-You receive the trade (in French), whether the list is worldwide or for one city, and numbered videos with their caption and account.
+/** The hashtags of a caption, as hashtags (no accent, lowercase), the generic ones left out. */
+export function captionHashtags(caption: string): string[] {
+  const found = caption.match(/#[\p{L}\p{N}_]+/gu) ?? [];
+  return [...new Set(found.map((t) => hashtagOf(t.slice(1))).filter((t) => t.length >= 4 && t.length <= 30 && !GENERIC_TAGS.has(t)))];
+}
 
-Keep a video when it is really about this trade: it shows the activity, the place, the work, a client's experience, a professional of the trade, a tip, a before/after, a behind the scenes: something a business of this trade could make its own version of. For a city list, also keep it only if it is in or about that city.
+/** Hashtags learned from the most beautiful posts of a trade: how often they came back and how beautiful those posts were. */
+export type LearnedTag = { hashtag: string; seen: number; score: number };
 
-Leave out a video that only borrows the word or the hashtag: a travel list, a city guide, a meme or a lifestyle vlog where the trade is a passing mention, an app tutorial, a product unrelated to the trade, a giveaway with nothing to see, a news piece. When in doubt with a caption that says little, keep it if the account looks like one of this trade.
+/**
+ * The hashtags to search next week for « Les plus belles », besides the trade's own: the two that
+ * keep bringing beautiful posts (seen at least twice, best score first), and one new to explore (the
+ * best seen once). Dynamic: what stops bringing beautiful posts falls behind and stops being searched.
+ */
+export function nextTags(learned: LearnedTag[], base: string[]): string[] {
+  const fresh = learned.filter((t) => !base.includes(t.hashtag));
+  const proven = fresh.filter((t) => t.seen >= 2).sort((a, b) => b.score - a.score).slice(0, 2);
+  const explore = fresh.filter((t) => t.seen === 1).sort((a, b) => b.score - a.score).slice(0, 1);
+  return [...proven, ...explore].map((t) => t.hashtag);
+}
 
-Answer with the numbers of the videos to keep.`;
 
 /**
  * The words searched for her trade: what she set, else her activity in a few words (« salon de

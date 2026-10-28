@@ -8,7 +8,7 @@ import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts"
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
-import { beautifulTrends, foreignScript, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
+import { beautifulTrends, captionHashtags, cleanHook, cleanTags, foreignScript, nextTags, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
@@ -4762,6 +4762,20 @@ test("trends: the most watched first, foreign scripts and weak ones left out, tw
     { n: 4, beauty: 9, on_topic: true },
   ]);
   assert.deepEqual(scored.map((x) => x.external_id), ["d", "a"]);
+  // The hook read on a cover, clean; nothing when it is only a handle or a hashtag.
+  assert.equal(cleanHook("« pov : ton premier cours de reformer »"), "pov : ton premier cours de reformer");
+  assert.equal(cleanHook("@studio #pilates"), "");
+  assert.deepEqual(cleanTags(["Lumière naturelle", "lumière naturelle", "#plan fixe", "ok"]), ["lumière naturelle", "plan fixe"]);
+  // Hashtags learned from the most beautiful posts: two that keep bringing beautiful ones, one new to explore.
+  assert.deepEqual(captionHashtags("Slow morning #ReformerPilates #fyp #pilates #Café_Crème"), ["reformerpilates", "pilates", "cafecreme"]);
+  const learned = [
+    { hashtag: "reformerpilates", seen: 3, score: 6 },
+    { hashtag: "pilatesstudio", seen: 2, score: 4 },
+    { hashtag: "slowliving", seen: 2, score: 1 },
+    { hashtag: "pilatesgirl", seen: 1, score: 2 },
+    { hashtag: "pilates", seen: 5, score: 9 },
+  ];
+  assert.deepEqual(nextTags(learned, ["pilatesaesthetic", "pilates"]), ["reformerpilates", "pilatesstudio", "pilatesgirl"]);
   const salon = trendPlan("salon de coiffure");
   assert.deepEqual(salon.trend.hashtags, ["salondecoiffure", "coiffure"]);
   assert.equal(salon.beau.words, "coiffure aesthetic");

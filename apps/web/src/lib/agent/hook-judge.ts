@@ -1,6 +1,7 @@
 import "server-only";
 import { CLAUDE_MODEL, HOOK_JUDGE_PROMPT, hookChoiceSchema, pickHook, type HookJudgeInput } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
+import { momentHooks } from "@/lib/trends";
 import { anthropic, logClaudeCost } from "./run";
 
 /**
@@ -10,6 +11,9 @@ import { anthropic, logClaudeCost } from "./run";
  */
 export async function judgeHooks(studioId: string, input: HookJudgeInput): Promise<ReturnType<typeof pickHook> | null> {
   if (!input.accroches.some((a) => a.trim())) return null;
+  // What hooks in her trade this week (page Tendances): forms to beat, never words to take.
+  const moment = input.du_moment ?? (await momentHooks(studioId).catch(() => []));
+  if (moment.length) input = { ...input, du_moment: moment };
   try {
     const response = await anthropic().beta.messages.parse({
       model: CLAUDE_MODEL,
