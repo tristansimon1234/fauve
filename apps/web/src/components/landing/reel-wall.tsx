@@ -8,15 +8,16 @@ import { fr } from "./fr";
 // oriented »): three Reels as accounts people follow for pleasure post them, never an offer nor a
 // « réserve ta table » card. Each with what it was made from: the brief, and the raw videos sent.
 // Demo businesses, from free stock videos (Mixkit), drawn by Edith's Reel composition; the music
-// is Edith's. Files in public/landing. Each plays muted while on screen; a tap gives it the sound.
+// is Edith's, and two of them are told by a voice of Edith's gallery (Victoria, Jules: ElevenLabs).
+// Files in public/landing. Each plays muted while on screen; a tap gives it the sound.
 
 export const WORK = [
   {
     id: "pilates",
     trade: "Studio de Pilates Reformer",
     brief: "Fais-moi vivre un premier cours. Rien qui fasse pub.",
-    sent: "8 vidéos brutes",
-    made: ["POV", "Coupes sur le temps", "Le mot clé en italique"],
+    sent: "7 vidéos brutes",
+    made: ["POV", "Voix off (Victoria)", "Coupes sur le temps"],
   },
   {
     id: "cafe",
@@ -29,8 +30,8 @@ export const WORK = [
     id: "cave",
     trade: "Cave à manger",
     brief: "Donne envie de passer ce soir, sans « réservez maintenant ».",
-    sent: "10 vidéos brutes",
-    made: ["Accroche dès la 1re image", "Grain pellicule", "Lumière du soir"],
+    sent: "8 vidéos brutes",
+    made: ["Voix off (Jules)", "Accroche dès la 1re image", "Grain pellicule"],
   },
 ] as const;
 
