@@ -4689,6 +4689,10 @@ test("trends: Treg's searches read, the most watched recent ones kept", () => {
   const insta = instagramTrends({ output: { data: { reels: [{ shortcode: "DAbc", caption: "pov", likes: 500, username: "c", thumbnail: "https://x.cdninstagram.com/t.jpg", createdUtc: t - 400 * day }] } } });
   assert.equal(insta[0]!.url, "https://www.instagram.com/reel/DAbc/");
   assert.equal(insta[0]!.views, null);
+  // A caption is cut between characters, never inside an emoji (half of one is invalid JSON).
+  const long = instagramTrends({ data: { reels: [{ shortcode: "E", caption: `${"a".repeat(299)}😀😀`, likes: 1, username: "e", thumbnail: null, createdUtc: t }] } });
+  assert.equal(Array.from(long[0]!.caption).length, 300);
+  assert.ok(long[0]!.caption.endsWith("😀"));
   // The most watched first; an old one never, even when the list stays short.
   const kept = keptTrends([...tiktok, ...insta, tiktok[0]!], "trend", now);
   assert.deepEqual(kept.map((v) => v.external_id), ["72", "71"]);
@@ -4760,6 +4764,7 @@ test("trends: the most watched first, foreign scripts and weak ones left out, tw
   assert.deepEqual(scored.map((x) => x.external_id), ["d", "a"]);
   const salon = trendPlan("salon de coiffure");
   assert.deepEqual(salon.trend.hashtags, ["salondecoiffure", "coiffure"]);
+  assert.equal(salon.beau.words, "coiffure aesthetic");
   assert.deepEqual([salon.local.words, salon.local.hashtags], ["salon de coiffure paris", ["coiffureparis"]]);
   assert.deepEqual([trendPlan("brunch lyon").trend.words, trendPlan("brunch lyon").local.words], ["brunch", "brunch lyon"]);
   assert.equal(hashtagOf("crêperie"), "creperie");

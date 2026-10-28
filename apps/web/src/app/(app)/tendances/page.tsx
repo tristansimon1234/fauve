@@ -49,7 +49,7 @@ async function Trends() {
     <>
       <Header />
       <TrendQuery query={query} left={left} />
-      <TrendsGrid lists={lists} searching={stale && !lists.trend.length && !lists.beau.length && !lists.local.length && !lists.fetchedAt} timezone={member.studio.timezone} />
+      <TrendsGrid lists={lists} searching={(stale || last.running) && !lists.trend.length && !lists.beau.length && !lists.local.length} timezone={member.studio.timezone} />
     </>
   );
 }

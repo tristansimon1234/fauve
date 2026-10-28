@@ -47,7 +47,9 @@ type Source = { id: string; body: Record<string, unknown>; read: (answer: unknow
 
 /** Where each list comes from: TikTok's keyword search (most liked of the month), Instagram's own top posts on the trade's hashtags (with their views), and its keyword search for the city. */
 function sources(search: TrendSearch, platform: TrendPlatform): Source[] {
-  if (platform === "tiktok") return [{ id: "anyapi.tiktok.search.videos", body: { query: search.words, sortBy: 1, datePosted: 30 }, read: tiktokTrends, pages: TREND_PAGES }];
+  const tiktok = (query: string) => ({ id: "anyapi.tiktok.search.videos", body: { query, sortBy: 1, datePosted: 30 }, read: tiktokTrends, pages: TREND_PAGES });
+  // The most beautiful are picked from a bigger pool: the « aesthetic » search and the trade's own.
+  if (platform === "tiktok") return search.scope === "beau" ? [tiktok(search.words), tiktok(search.trade)] : [tiktok(search.words)];
   const tops = search.hashtags.map((hashtag) => ({ id: "anyapi.instagram.hashtag_top_posts", body: { hashtag }, read: instagramTopPosts, pages: 2 }));
   return search.scope === "local" ? [...tops, { id: "anyapi.instagram.search.reels", body: { query: search.words }, read: instagramTrends, pages: 2 }] : tops;
 }
@@ -60,19 +62,58 @@ export async function studioTrendQuery(studioId: string): Promise<string | null>
   return trendQueryOf(data?.trend_query as string | null, data?.business_type as string | null);
 }
 
-type Searched = Record<TrendScope, Partial<Record<TrendPlatform, string>>>;
+type Searched = Record<TrendScope, Partial<Record<TrendPlatform, string>>> & { running: boolean };
 
-/** When each list of a trade was last searched (absent: never). */
+/** A search marked as running (found = -1) longer than this has died: it can be taken again. */
+const RUNNING_MINUTES = 10;
+const runningSince = () => new Date(Date.now() - RUNNING_MINUTES * 60_000).toISOString();
+
+/** When each list of a trade was last searched (absent: never, or a search that died), and whether one is running. */
 export async function lastSearched(query: string): Promise<Searched> {
   const plan = trendPlan(query);
   const keys = TREND_SCOPES.map((scope) => scopeKey(plan[scope]));
-  const { data } = await supabaseAdmin().from("trend_searches").select("key, platform, fetched_at").in("key", keys);
-  const out: Searched = { trend: {}, beau: {}, local: {} };
+  const { data } = await supabaseAdmin().from("trend_searches").select("key, platform, fetched_at, found").in("key", keys);
+  const out: Searched = { trend: {}, beau: {}, local: {}, running: false };
+  const dead = runningSince();
   for (const r of data ?? []) {
     const scope = TREND_SCOPES[keys.indexOf(r.key as string)];
-    if (scope) out[scope][r.platform as TrendPlatform] = r.fetched_at as string;
+    const at = r.fetched_at as string;
+    if (Number(r.found) === -1) {
+      if (at < dead) continue;
+      out.running = true;
+    }
+    if (scope) out[scope][r.platform as TrendPlatform] = at;
   }
   return out;
+}
+
+/**
+ * Takes a list to search it, so that the page (refreshed every few seconds while it waits) and the
+ * weekly run never search the same list twice at once: the first to mark it running (found = -1) wins.
+ */
+async function claimList(search: TrendSearch, platform: TrendPlatform): Promise<boolean> {
+  const db = supabaseAdmin();
+  const key = scopeKey(search);
+  const now = new Date().toISOString();
+  const { data: added } = await db
+    .from("trend_searches")
+    .upsert({ key, platform, query: search.words, fetched_at: now, found: -1 }, { onConflict: "key,platform", ignoreDuplicates: true })
+    .select("key");
+  if (added?.length) return true;
+  const stale = new Date(Date.now() - TREND_REFRESH_DAYS * 86_400_000).toISOString();
+  const { data: taken } = await db
+    .from("trend_searches")
+    .update({ fetched_at: now, found: -1 })
+    .eq("key", key)
+    .eq("platform", platform)
+    .or(`fetched_at.lt.${stale},and(found.eq.-1,fetched_at.lt.${runningSince()})`)
+    .select("key");
+  return Boolean(taken?.length);
+}
+
+/** A search that failed is given back, to be tried again at the next visit or run. */
+async function releaseList(search: TrendSearch, platform: TrendPlatform): Promise<void> {
+  await supabaseAdmin().from("trend_searches").update({ fetched_at: new Date(0).toISOString(), found: 0 }).eq("key", scopeKey(search)).eq("platform", platform);
 }
 
 /** The month « 2026-10 » in her timezone, for the free changes of her words. */
@@ -89,16 +130,39 @@ export function isStale(fetchedAt: string | undefined, now = Date.now()) {
 /** True when any list of a trade is due. */
 export const anyStale = (last: Searched) => TREND_SCOPES.some((scope) => TREND_PLATFORMS.some((p) => isStale(last[scope][p])));
 
-/** A cover as a small WebP (360 px wide); null when it cannot be read (an HEIC cover sharp cannot open). */
-async function coverImage(video: TrendVideo): Promise<Buffer | null> {
-  if (!video.cover) return null;
+/** An image at a link as a small WebP (360 px wide); null when it cannot be fetched or read. */
+async function smallWebp(link: string): Promise<Buffer | null> {
   try {
-    const res = await fetch(video.cover, { signal: AbortSignal.timeout(15_000), headers: { "user-agent": "Mozilla/5.0" } });
+    const res = await fetch(link, { signal: AbortSignal.timeout(15_000), headers: { "user-agent": "Mozilla/5.0" } });
     if (!res.ok) return null;
     return await sharp(Buffer.from(await res.arrayBuffer())).resize({ width: 360, withoutEnlargement: true }).webp({ quality: 72 }).toBuffer();
   } catch {
     return null;
   }
+}
+
+/** TikTok's public oEmbed gives a video's cover as a JPEG (free, no key). */
+async function tiktokThumbnail(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { thumbnail_url?: unknown };
+    return typeof body.thumbnail_url === "string" && body.thumbnail_url.startsWith("https://") ? body.thumbnail_url : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A cover as a small WebP; null when none can be read. TikTok often gives its covers in HEIC, which
+ * sharp cannot open here: its oEmbed JPEG is taken instead (otherwise most TikTok cards had no image,
+ * and « Les plus belles » never saw them).
+ */
+async function coverImage(video: TrendVideo): Promise<Buffer | null> {
+  const direct = video.cover ? await smallWebp(video.cover) : null;
+  if (direct || video.platform !== "tiktok") return direct;
+  const thumbnail = await tiktokThumbnail(video.url);
+  return thumbnail ? smallWebp(thumbnail) : null;
 }
 
 /** Copies a cover into our storage (the providers' links expire within hours); its path, or null. */
@@ -184,7 +248,7 @@ async function mostBeautiful(search: TrendSearch, videos: TrendVideo[]): Promise
           content: [
             { type: "text", text: JSON.stringify({ trade: search.trade }) },
             ...seen.flatMap((v, i) => [
-              { type: "text" as const, text: JSON.stringify({ n: i + 1, account: v.video.author ?? undefined, caption: v.video.caption.slice(0, 160) || "(no caption)" }) },
+              { type: "text" as const, text: JSON.stringify({ n: i + 1, account: v.video.author ?? undefined, caption: Array.from(v.video.caption).slice(0, 160).join("") || "(no caption)" }) },
               { type: "image" as const, source: { type: "base64" as const, media_type: "image/webp" as const, data: v.small.toString("base64") } },
             ]),
           ],
@@ -268,13 +332,19 @@ async function forgetVideos(query: PromiseLike<{ data: { id: unknown; cover_path
   if (paths.length) await db.storage.from("media").remove(paths);
 }
 
-/** Searches both lists of a trade on every platform whose search is stale (or all of them with `force`). */
-export async function refreshTrends(query: string, { force = false } = {}): Promise<Record<string, number | null>> {
+/** Searches every list of a trade whose search is stale, each list taken by one search at a time (claimList). */
+export async function refreshTrends(query: string): Promise<Record<string, number | null>> {
   const plan = trendPlan(query);
   const last = await lastSearched(query);
-  const due = TREND_SCOPES.flatMap((scope) => TREND_PLATFORMS.filter((p) => force || isStale(last[scope][p])).map((platform) => ({ scope, platform })));
+  const stale = TREND_SCOPES.flatMap((scope) => TREND_PLATFORMS.filter((p) => isStale(last[scope][p])).map((platform) => ({ scope, platform })));
+  const claimed = await Promise.all(stale.map(({ scope, platform }) => claimList(plan[scope], platform)));
+  const due = stale.filter((_, i) => claimed[i]);
   const found = await Promise.all([
-    ...due.map(({ scope, platform }) => refreshList(plan[scope], platform).catch((error: unknown) => (console.error("trends: refresh failed", platform, scopeKey(plan[scope]), error), null))),
+    ...due.map(async ({ scope, platform }) => {
+      const kept = await refreshList(plan[scope], platform).catch((error: unknown) => (console.error("trends: refresh failed", platform, scopeKey(plan[scope]), error), null));
+      if (kept === null) await releaseList(plan[scope], platform);
+      return kept;
+    }),
     ...(due.length ? [countHashtags(query).then(() => null)] : []),
   ]);
   return Object.fromEntries(due.map(({ scope, platform }, i) => [`${scope}:${platform}`, found[i] ?? null]));

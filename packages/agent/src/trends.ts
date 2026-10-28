@@ -102,7 +102,8 @@ function listIn(answer: unknown, key: "videos" | "reels" | "posts" | "items"): u
 }
 
 const dateOf = (seconds: number | null) => (seconds && seconds > 1_000_000_000 ? new Date(seconds * 1000).toISOString() : null);
-const clip = (s: string | null | undefined, max: number) => (s ? s.replace(/\s+/g, " ").trim().slice(0, max) : "");
+/** Cut by characters, never inside one: half an emoji is invalid JSON, and Postgres refused the whole list. */
+const clip = (s: string | null | undefined, max: number) => (s ? Array.from(s.replace(/\s+/g, " ").trim()).slice(0, max).join("") : "");
 
 /** The videos of a TikTok keyword search. */
 export function tiktokTrends(answer: unknown): TrendVideo[] {
@@ -291,7 +292,7 @@ export function trendPlan(query: string): Record<TrendScope, TrendSearch> {
   return {
     trend: { scope: "trend", words: broad, trade: broad, city: null, hashtags: tags([broad, main]) },
     // « pilates aesthetic », #pilatesaesthetic and the trade's own top posts: the pool the most beautiful are picked from.
-    beau: { scope: "beau", words: `${broad} aesthetic`, trade: broad, city: null, hashtags: tags([`${main}aesthetic`, main]) },
+    beau: { scope: "beau", words: `${main} aesthetic`, trade: broad, city: null, hashtags: tags([`${main}aesthetic`, main]) },
     local: { scope: "local", words: `${broad} ${city}`, trade: broad, city, hashtags: tags([`${main}${city}`]) },
   };
 }
