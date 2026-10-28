@@ -30,6 +30,9 @@ export async function proxy(request: NextRequest) {
     login.searchParams.set("next", path);
     return NextResponse.redirect(login);
   }
+  // The deployment's own addresses (fauve-one.vercel.app, previews) show the same pages as edith-ai.app:
+  // search engines index only the real one.
+  if (request.nextUrl.hostname.endsWith(".vercel.app")) response.headers.set("X-Robots-Tag", "noindex");
   return response;
 }
 

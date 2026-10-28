@@ -1,4 +1,4 @@
-import { PLANS, reelsPerMonth, weeklyPosts } from "@fauve/agent";
+import { PLAN_ORDER, PLANS, reelsPerMonth, weeklyPosts } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
@@ -12,11 +12,17 @@ import { CaptionVisual, CopyReelVisual, GestureVisual, LayoutsVisual, MusicVisua
 import { Mascot } from "@/components/mascot";
 import { Logo } from "@/components/orb";
 import { whatsappLink } from "@/lib/public-env";
+import { SITE_URL } from "@/lib/site";
 import "./landing.css";
 
+const description = `Edith monte tes vidéos en Reels qui n’ont pas l’air d’une IA, écrit tes légendes et publie sur Instagram et TikTok. Sur WhatsApp, dès ${PLANS.decouverte.priceEur} € par mois.`;
+
 export const metadata: Metadata = {
-  description:
-    "Edith est une IA, tes Reels n’en ont pas l’air. Envoie tes vidéos sur WhatsApp : il les monte comme un créateur, écrit tes légendes et publie sur Instagram et TikTok. Pour les commerces de quartier et les indépendants.",
+  title: { absolute: "Edith · community manager IA pour commerces et indépendants" },
+  description,
+  alternates: { canonical: "/" },
+  openGraph: { type: "website", siteName: "Edith", locale: "fr_FR", url: "/", title: "Edith est une IA. Tes Reels n’en ont pas l’air.", description },
+  robots: { index: true, follow: true },
 };
 
 const steps: [string, string][] = [
@@ -92,6 +98,34 @@ const ideas: [string, string][] = [
 /** The manifesto passing under the hero. */
 const NOT = ["pas de modèle tout fait", "pas de voix de robot", "pas de « offre exceptionnelle »", "pas de glitch", "des Reels qui te ressemblent"];
 
+/** What search engines and AI assistants read about Edith: the product, its offers and the FAQ. */
+const structuredData = () => ({
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      name: "Edith",
+      url: SITE_URL,
+      description,
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web, WhatsApp",
+      inLanguage: "fr",
+      offers: PLAN_ORDER.map((id) => ({
+        "@type": "Offer",
+        name: PLANS[id].label,
+        price: PLANS[id].priceEur,
+        priceCurrency: "EUR",
+        description: `${reelsPerMonth(id)} Reels soignés par mois`,
+        url: `${SITE_URL}/#tarif`,
+      })),
+    },
+    {
+      "@type": "FAQPage",
+      mainEntity: faq.map(([question, answer]) => ({ "@type": "Question", name: question, acceptedAnswer: { "@type": "Answer", text: answer } })),
+    },
+  ],
+});
+
 const vars = (values: Record<string, string | number>) => values as CSSProperties;
 
 export default function LandingPage() {
@@ -99,6 +133,7 @@ export default function LandingPage() {
 
   return (
     <div className="land-paper min-h-dvh overflow-x-clip bg-soft">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData()).replace(/</g, "\\u003c") }} />
       <header className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-4 py-5 sm:px-8 sm:py-6">
         <Logo />
         <nav className="flex items-center gap-7">
