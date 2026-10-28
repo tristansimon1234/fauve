@@ -10,6 +10,8 @@ export const PRIVATE_PATHS = [
   "/l/",
   "/v/",
   "/depot",
+  "/voix",
+  "/merci",
   "/essai",
   "/abonnement",
   "/fauve",

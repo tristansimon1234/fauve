@@ -55,7 +55,7 @@ export const replyExtrasSchema = z.object({
    * the link tools, not by the model; its one-time sign-in link is made when the message is sent.
    */
   link: z
-    .object({ path: z.string().startsWith("/").max(200), label: z.string().min(1).max(20), purpose: z.enum(["open_post", "connect_social", "upload"]) })
+    .object({ path: z.string().startsWith("/").max(200), label: z.string().min(1).max(20), purpose: z.enum(["open_post", "connect_social", "upload", "voice", "billing"]) })
     .optional(),
   /** What kind of message it is, kept in its payload (« daily_cap », « nudge »…), set by the code, not by the model. */
   kind: z.string().max(40).optional(),

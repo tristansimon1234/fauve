@@ -75,6 +75,11 @@ export const toolSpecs = {
       "Donne à la gérante la page où elle connecte son compte Instagram professionnel et, si elle veut, son TikTok. À proposer quand un compte n'est pas connecté. Sur WhatsApp, un bouton « Relier mes comptes » s'affiche sous ton message : n'écris aucun lien ; dans l'application, il renvoie le lien à écrire.",
     input: z.object({}),
   },
+  get_page_link: {
+    description:
+      "Sur WhatsApp, son canal principal sur téléphone, ce qui demande un écran passe par une page faite pour son téléphone, derrière un bouton sous ton message (n'écris jamais de lien) : voix, la voix de ses Reels (écouter les voix et en choisir une, quand mettre une voix off, cloner sa propre voix en lisant un petit texte) : dès qu'elle veut changer de voix, entendre les voix ou mettre sa propre voix ; abonnement, les offres et le paiement (s'abonner, « 1 Reel de plus », passer à l'offre au-dessus) : dès qu'il faut s'abonner ou reprendre des crédits. Dans l'application, il renvoie où aller.",
+    input: z.object({ page: z.enum(["voix", "abonnement"]) }),
+  },
   get_post_link: {
     description:
       "Donne à la gérante la page mobile d'une publication : elle y regarde la vidéo, lit la légende, valide, ou déplace et corrige un texte du doigt. Quand elle veut revoir ou modifier une publication (« renvoie-moi le lien », « je veux voir le rendu »). Sur WhatsApp, un bouton « Voir la publication » s'affiche sous ton message ; dans l'application, sa carte. N'écris jamais de lien.",

@@ -94,7 +94,7 @@ async function say(voiceIds: string[], text = SAMPLE) {
 
 /** What each voice of Edith's gallery reads in Style: words for any business, with acting tags. */
 const GALLERY_SAMPLE =
-  "[smiling] Tu vois ce geste ? On le refait chaque jour, et on ne s'en lasse pas. Ici, tout est fait sur place, avec soin. [warmly] Passe nous voir cette semaine, on t'attend.";
+  "Tu vois ce geste ? On le refait chaque jour, et on ne s'en lasse pas. Ici, tout est fait sur place, avec soin. [warmly] Passe nous voir cette semaine, on t'attend.";
 
 /** What the whispered voices (ASMR) read: a whisper, close to the ear. */
 const GALLERY_WHISPER =

@@ -188,7 +188,7 @@ function durationOf(url: string): Promise<number | null> {
   });
 }
 
-function CloneVoice({
+export function CloneVoice({
   studioId,
   open,
   onOpen,

@@ -309,6 +309,21 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({ url, expires_in_minutes: 15 });
     },
 
+    async get_page_link({ page }) {
+      // WhatsApp is her interface on her phone: what needs a screen is a page made for it, behind a button.
+      // The offers bring her back to /merci, which sends her back to WhatsApp with her message ready.
+      const pages = {
+        voix: { path: "/voix", label: "Choisir ma voix", purpose: "voice" as const, app: "Style › Voix et ton (/style#voix)" },
+        abonnement: { path: "/abonnement?next=/merci", label: "Voir les offres", purpose: "billing" as const, app: "la page des offres (/abonnement)" },
+      };
+      const target = pages[page];
+      if (ctx.waId) {
+        ctx.extras.link = { path: target.path, label: target.label, purpose: target.purpose };
+        return json({ bouton: `« ${target.label} » sous ton message`, note: "N'écris aucun lien : le bouton ouvre la page." });
+      }
+      return json({ ou: target.app, note: "Elle est dans l'application : dis-lui où aller en quelques mots." });
+    },
+
     async get_post_link({ post_id }) {
       const { data: post } = await db.from("posts").select("id").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
       if (!post) return json({ error: "Publication introuvable dans ce studio." });
@@ -498,7 +513,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           solde: job.balance,
           credits_necessaires: job.needed,
           // credits_necessaires is already the simplest version's price: a lighter one offered instead would not start either.
-          note: "Pas assez de crédits pour ce montage, même dans sa version la plus simple (credits_necessaires). Dis-le simplement, sans rien lancer et sans proposer une version plus simple ou plus courte, qui ne passerait pas non plus : ses crédits reviennent à son renouvellement, ou elle prend « 1 Reel de plus » (12 crédits pour 5 €) ou l'offre au-dessus sur la page /abonnement.",
+          note: "Pas assez de crédits pour ce montage, même dans sa version la plus simple (credits_necessaires). Dis-le simplement, sans rien lancer et sans proposer une version plus simple ou plus courte, qui ne passerait pas non plus : ses crédits reviennent à son renouvellement, ou elle prend « 1 Reel de plus » (12 crédits pour 5 €) ou l'offre au-dessus sur la page des offres (get_page_link abonnement).",
         });
       }
       const accepted = await acceptQuote(studioId, job.id, turnStartedAt, { immediate: true });

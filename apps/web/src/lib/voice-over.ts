@@ -272,6 +272,12 @@ async function settingsOf(voiceId: string, key: string): Promise<Record<string, 
   return settings;
 }
 
+/** Stability at least « natural » (0.5) and no style exaggeration: the voice talks, it does not act. Eleven v3 takes 0, 0.5 or 1 only. */
+function calmer(own: Record<string, unknown>, model: string): { stability: number; style: number } {
+  const stability = Math.max(typeof own.stability === "number" ? own.stability : 0.5, 0.5);
+  return { stability: model === "eleven_v3" ? (stability >= 0.75 ? 1 : 0.5) : stability, style: 0 };
+}
+
 /** The models tried in turn: the one configured, then older ones whose word timings are documented. */
 const fallbackModels = () => [...new Set([env("ELEVENLABS_TTS_MODEL"), "eleven_v3", "eleven_multilingual_v2"])];
 
@@ -289,25 +295,27 @@ export async function speak(
 ): Promise<{ mp3: Buffer; transcript: VoiceTranscript; model: string; voiceId: string }> {
   const key = env("ELEVENLABS_API_KEY");
   if (!key) throw new Error("ELEVENLABS_API_KEY missing");
-  // A pace she asked for: the voice's own settings, its speed changed (refused by a model, the voice is read at its pace).
-  const paced = speed !== 1 ? { ...((await settingsOf(voiceId, key)) ?? {}), speed } : null;
+  // Each voice's own settings, a little calmer (Tristan: « un poil moins expressif, ça fait presque surjouer »):
+  // steadier, never exaggerated; and the pace she asked for. Refused by a model, the voice is read as it is.
+  const own = (await settingsOf(voiceId, key)) ?? {};
   let failure = "";
   for (const model of fallbackModels()) {
+    const paced = { ...own, ...calmer(own, model), ...(speed !== 1 ? { speed } : {}) };
     let res: Response;
-    let withPace = Boolean(paced);
+    let withPace = true;
     for (let attempt = 0; ; attempt++) {
       res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps?output_format=mp3_44100_128`, {
         method: "POST",
         headers: { "xi-api-key": key, "content-type": "application/json" },
         // Multilingual v2 finds the language itself (it refuses language_code) and would read the acting tags aloud.
-        // Each voice keeps its own tone (its library settings): Tristan picked them by ear as they are.
+        // Each voice keeps its own tone (its library settings, picked by ear by Tristan), only steadier (calmer).
         body: JSON.stringify({
           ...(model === "eleven_multilingual_v2" ? { text: stripAudioTags(text), model_id: model } : { text, model_id: model, language_code: "fr" }),
-          ...(withPace && paced ? { voice_settings: paced } : {}),
+          ...(withPace ? { voice_settings: paced } : {}),
         }),
       });
       if ((res.status === 400 || res.status === 422) && withPace) {
-        console.warn("voice pace refused by", model, (await res.text().catch(() => "")).slice(0, 200));
+        console.warn("voice settings refused by", model, (await res.text().catch(() => "")).slice(0, 200));
         withPace = false;
         continue;
       }
