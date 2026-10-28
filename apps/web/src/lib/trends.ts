@@ -83,7 +83,7 @@ async function refreshPlatform(query: string, platform: TrendPlatform): Promise<
   const kept = keptTrends(search.read(called.answer));
   // A failed search keeps last week's videos; it is tried again the next time.
   if (!kept.length) {
-    console.warn("trends: nothing found", platform, key);
+    console.warn("trends: nothing found", platform, key, JSON.stringify(called.answer ?? null).slice(0, 600));
     return 0;
   }
   const { data: before } = await db.from("trend_videos").select("id, cover_path, external_id").eq("key", key).eq("platform", platform);
