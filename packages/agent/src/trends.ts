@@ -354,6 +354,25 @@ export function trendQueryOf(set: string | null | undefined, businessType: strin
   return head.split(" ").slice(0, 5).join(" ").toLowerCase() || null;
 }
 
+/** Changes of her words on the page Tendances each month before one costs a credit (each is a whole new search). */
+export const TREND_FREE_CHANGES = 3;
+
+/**
+ * Whether changing her words counts, is paid (CREDIT_PRICES.trends), and the month's count after it:
+ * free the first time (no words yet), for the same words, and for the first TREND_FREE_CHANGES of
+ * the month (`month` as « 2026-10 » in her timezone).
+ */
+export function trendChange(input: { current: string | null; next: string | null; month: string; counted: { month: string | null; changes: number } }): { counts: boolean; paid: boolean; changes: number } {
+  const same = trendKey(input.current ?? "") === trendKey(input.next ?? "");
+  const used = input.counted.month === input.month ? input.counted.changes : 0;
+  if (!input.current || same) return { counts: false, paid: false, changes: used };
+  return { counts: true, paid: used >= TREND_FREE_CHANGES, changes: used + 1 };
+}
+
+/** Free changes left this month. */
+export const trendChangesLeft = (counted: { month: string | null; changes: number }, month: string) =>
+  Math.max(0, TREND_FREE_CHANGES - (counted.month === month ? counted.changes : 0));
+
 /** The key a search is kept under (the same words, whatever their case and spaces). */
 export const trendKey = (query: string) => query.replace(/\s+/g, " ").trim().toLowerCase();
 

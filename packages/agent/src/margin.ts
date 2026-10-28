@@ -95,6 +95,7 @@ export const TYPICAL_COST_EUR: Record<keyof typeof CREDIT_PRICES, number> = {
   fixRound: 0.26, // the editor, a render with its new music, the critic again
   alternative: 0.23, // the editor and a render with its music
   image: 0.05, // the image model at 2K (about $0.05), with the photo read in
+  trends: 0.03, // a whole new search for her words: TikTok and Instagram through Treg (both lists, about $0.01, 28 October), the hashtag counts and Sonnet reading the captions (four small calls)
 };
 
 /** Jobs charged on what they really cost (meteredCredits keeps their margin): a montage, a correction, and the steps they are made of. */

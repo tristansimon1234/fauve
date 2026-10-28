@@ -72,6 +72,12 @@ export async function lastSearched(query: string): Promise<Searched> {
   return out;
 }
 
+/** The month « 2026-10 » in her timezone, for the free changes of her words. */
+export function monthIn(timezone: string, now = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit" }).formatToParts(now);
+  return `${parts.find((p) => p.type === "year")?.value}-${parts.find((p) => p.type === "month")?.value}`;
+}
+
 /** True when a platform's search is missing or older than TREND_REFRESH_DAYS. */
 export function isStale(fetchedAt: string | undefined, now = Date.now()) {
   return !fetchedAt || now - Date.parse(fetchedAt) > TREND_REFRESH_DAYS * 86_400_000;

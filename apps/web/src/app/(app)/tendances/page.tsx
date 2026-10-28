@@ -1,11 +1,11 @@
-import { trendQueryOf } from "@fauve/agent";
+import { trendChangesLeft, trendQueryOf } from "@fauve/agent";
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { NoStudio } from "@/components/empty-state";
 import { PageSuspense } from "@/components/page-suspense";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { anyStale, lastSearched, refreshTrends, trendCards } from "@/lib/trends";
+import { anyStale, lastSearched, monthIn, refreshTrends, trendCards } from "@/lib/trends";
 import { TrendQuery, TrendsGrid } from "./trends-grid";
 
 export const metadata: Metadata = { title: "Tendances" };
@@ -26,15 +26,16 @@ export default function TrendsPage() {
 async function Trends() {
   const { member } = await getStudioContext();
   if (!member) return <NoStudio />;
-  const { data } = await supabaseAdmin().from("studios").select("trend_query, business_type").eq("id", member.studio.id).maybeSingle();
+  const { data } = await supabaseAdmin().from("studios").select("trend_query, business_type, trend_query_month, trend_query_changes").eq("id", member.studio.id).maybeSingle();
   const own = (data?.trend_query as string | null) ?? null;
   const query = trendQueryOf(own, data?.business_type as string | null);
+  const left = trendChangesLeft({ month: (data?.trend_query_month as string | null) ?? null, changes: Number(data?.trend_query_changes ?? 0) }, monthIn(member.studio.timezone));
 
   if (!query) {
     return (
       <>
         <Header />
-        <TrendQuery query={null} />
+        <TrendQuery query={null} left={left} />
       </>
     );
   }
@@ -47,7 +48,7 @@ async function Trends() {
   return (
     <>
       <Header />
-      <TrendQuery query={query} />
+      <TrendQuery query={query} left={left} />
       <TrendsGrid lists={lists} searching={stale && !lists.trend.length && !lists.local.length && !lists.fetchedAt} timezone={member.studio.timezone} />
     </>
   );

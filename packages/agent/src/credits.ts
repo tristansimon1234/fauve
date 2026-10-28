@@ -40,6 +40,8 @@ export const CREDIT_PRICES = {
   alternative: 3,
   /** An image from the image model: a real photo improved, or an ambiance image. */
   image: 1,
+  /** New words for her trade on the page Tendances, past the free ones of the month (TREND_FREE_CHANGES): a whole new search, about $0.03. */
+  trends: 1,
 } as const;
 
 /** Each month the balance goes back up to the plan's credits (unused credits do not pile up beyond it); this is Pro's. */

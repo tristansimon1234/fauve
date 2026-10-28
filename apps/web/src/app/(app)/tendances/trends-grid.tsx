@@ -1,6 +1,6 @@
 "use client";
 
-import { shortCount } from "@fauve/agent";
+import { CREDIT_PRICES, shortCount, TREND_FREE_CHANGES } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { EyeIcon, HeartIcon, InstagramIcon, MusicIcon, TikTokIcon } from "@/components/icons";
@@ -11,7 +11,7 @@ import { setTrendQuery } from "./actions";
 type Filter = "all" | "tiktok" | "instagram";
 
 /** The words searched for her trade, which she can change. */
-export function TrendQuery({ query }: { query: string | null }) {
+export function TrendQuery({ query, left }: { query: string | null; left: number }) {
   const router = useRouter();
   const [editing, setEditing] = useState(query === null);
   const [words, setWords] = useState(query ?? "");
@@ -62,6 +62,13 @@ export function TrendQuery({ query }: { query: string | null }) {
           {pending ? "…" : "Voir"}
         </button>
       </div>
+      {query !== null && (
+        <p className="text-[13px] text-muted">
+          {left > 0
+            ? `Chaque changement relance une recherche : encore ${left} gratuit${left > 1 ? "s" : ""} ce mois-ci.`
+            : `Tes ${TREND_FREE_CHANGES} changements gratuits du mois sont passés : celui-ci coûte ${CREDIT_PRICES.trends} crédit.`}
+        </p>
+      )}
       {error && <p className="text-[14px] text-peach-ink">{error}</p>}
     </form>
   );

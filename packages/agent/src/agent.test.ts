@@ -8,7 +8,7 @@ import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts"
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
-import { foreignScript, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
+import { foreignScript, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
@@ -4707,6 +4707,19 @@ test("trends: Treg's searches read, the most watched recent ones kept", () => {
   assert.equal(top[0]!.url, "https://www.instagram.com/reel/C8a/");
   assert.equal(top[0]!.views, 4_820_000);
   assert.equal(top[0]!.cover, "https://x.cdninstagram.com/c.jpg");
+});
+
+test("trends: three free changes of her words a month, then a credit", () => {
+  const counted = { month: "2026-10", changes: 2 };
+  // The first words, or the same ones, never count.
+  assert.deepEqual(trendChange({ current: null, next: "pilates", month: "2026-10", counted }), { counts: false, paid: false, changes: 2 });
+  assert.deepEqual(trendChange({ current: "Pilates ", next: "pilates", month: "2026-10", counted }), { counts: false, paid: false, changes: 2 });
+  assert.deepEqual(trendChange({ current: "pilates", next: "reformer", month: "2026-10", counted }), { counts: true, paid: false, changes: 3 });
+  assert.deepEqual(trendChange({ current: "pilates", next: "reformer", month: "2026-10", counted: { month: "2026-10", changes: 3 } }), { counts: true, paid: true, changes: 4 });
+  // A new month starts again from zero.
+  assert.deepEqual(trendChange({ current: "pilates", next: "reformer", month: "2026-11", counted: { month: "2026-10", changes: 9 } }), { counts: true, paid: false, changes: 1 });
+  assert.equal(trendChangesLeft({ month: "2026-10", changes: 2 }, "2026-10"), 1);
+  assert.equal(trendChangesLeft({ month: "2026-09", changes: 5 }, "2026-10"), 3);
 });
 
 test("trends: the words searched for a trade", () => {

@@ -38,7 +38,7 @@ import { withSlot } from "@/lib/work-slots";
 
 const QUOTE_TTL_MS = 24 * 3600_000;
 
-export type Reason = "montage" | "correction" | "variant" | "moodboard" | "text_layer" | "image" | "carousel" | "adjustment";
+export type Reason = "montage" | "correction" | "variant" | "moodboard" | "text_layer" | "image" | "carousel" | "trends" | "adjustment";
 export type VariantChange = { template?: MotionTemplate; hook?: string };
 
 /**
