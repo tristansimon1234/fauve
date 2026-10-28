@@ -107,6 +107,14 @@ type Out = { text: string; frames: number[]; box: [number, number, number, numbe
  */
 const isMark = (text: string) => [...text].length <= 1 || ([...text].length <= 3 && !/\p{L}/u.test(text));
 
+/**
+ * Decoration, not words to read: what a scene marks with data-fauve-decor (the filler letters of a
+ * word-search grid, a pattern, a texture of type). It may cover the whole frame, under Instagram's
+ * caption and buttons, over a face, small or brief: only the words to read keep the checks (Tristan,
+ * on a crossword grid squeezed into the safe zone: « pourquoi l'animation a pas pris toute la place ? »).
+ */
+const inDecor = (node: Node) => Boolean(node.parentElement?.closest("[data-fauve-decor]"));
+
 /** A text over a face of the footage: the frames it is on it, and the face's box (px). */
 type OnFace = { text: string; frames: number[]; face: [number, number, number, number] };
 
@@ -126,7 +134,7 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
   const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node.textContent?.trim();
-    if (!text || !node.parentElement) continue;
+    if (!text || !node.parentElement || inDecor(node)) continue;
     // Effective opacity: a text faded out does not count.
     let opacity = 1;
     for (let el: HTMLElement | null = node.parentElement; el && el !== copy; el = el.parentElement) {
@@ -188,7 +196,7 @@ function tooQuick(frames: number[], step: number, last: number): { text: string;
     const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
     const blocks = new Set<HTMLElement>();
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      if (!node.textContent?.trim()) continue;
+      if (!node.textContent?.trim() || inDecor(node)) continue;
       let opacity = 1;
       for (let el: HTMLElement | null = node.parentElement; el && el !== copy; el = el.parentElement) {
         const style = getComputedStyle(el);
@@ -234,7 +242,7 @@ function sizes(copy: HTMLElement, largest: Map<string, number>) {
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node.textContent?.replace(/\s+/g, " ").trim();
     const el = node.parentElement;
-    if (!text || !el || (text.match(/\p{L}/gu)?.length ?? 0) < 3) continue;
+    if (!text || !el || (text.match(/\p{L}/gu)?.length ?? 0) < 3 || inDecor(node)) continue;
     let opacity = 1;
     let scale = 1;
     for (let up: HTMLElement | null = el; up && up !== copy; up = up.parentElement) {
@@ -285,7 +293,8 @@ function drawn(copy: HTMLElement, width: number, height: number): number[] {
   const opacity = new Map<Element, number>();
   const visit = (el: Element, parent: number) => {
     const style = getComputedStyle(el);
-    if (style.display === "none") return;
+    // A decoration is read like a backdrop: subtitles read over it, as over her footage.
+    if (style.display === "none" || el.hasAttribute("data-fauve-decor")) return;
     const seen = style.visibility === "hidden" ? 0 : parent * Number(style.opacity);
     if (seen < 0.15) return;
     opacity.set(el, seen);
