@@ -577,7 +577,10 @@ function MusicView({ data, onDone }: Props) {
 
 function VoiceView({ data, onDone }: Props) {
   const hers = data.voice?.who === "hers";
-  const onReel = data.voice?.who === "simone" ? (SIMONE_VOICES.find((v) => v.name === data.voice?.name)?.id ?? null) : null;
+  const onReel = data.voice?.who === "simone" ? (data.voice.id ?? SIMONE_VOICES.find((v) => v.name === data.voice?.name)?.id ?? null) : null;
+  // Her own voice (a clone) first, then Edith's.
+  const own = data.ownVoice;
+  const nameOf = (id: string | null) => (id && id === own?.id ? "ta voix" : (SIMONE_VOICES.find((v) => v.id === id)?.name ?? ""));
   const [picked, setPicked] = useState<string | null>(onReel);
   const [note, setNote] = useState("");
   const [playing, setPlaying] = useState<string | null>(null);
@@ -588,7 +591,9 @@ function VoiceView({ data, onDone }: Props) {
   const listen = (id: string) => {
     audio.current?.pause();
     if (playing === id) return setPlaying(null);
-    const sample = new Audio(`${SAMPLES}/${voiceSamplePath(id)}`);
+    const url = id === own?.id ? own.sampleUrl : `${SAMPLES}/${voiceSamplePath(id)}`;
+    if (!url) return;
+    const sample = new Audio(url);
     audio.current = sample;
     sample.onended = () => setPlaying((p) => (p === id ? null : p));
     setPlaying(id);
@@ -608,19 +613,34 @@ function VoiceView({ data, onDone }: Props) {
       }
       const result = await putVoice(data.postId, picked, words);
       if (!result.ok) return setError(result.error);
-      const name = SIMONE_VOICES.find((v) => v.id === picked)?.name ?? "";
-      onDone(`C’est parti : ${name} enregistre la voix et Edith refait la vidéo, ${redoTime(data)}.`);
+      onDone(picked === own?.id ? `C’est parti : Edith enregistre le texte avec ta voix et refait la vidéo, ${redoTime(data)}.` : `C’est parti : ${nameOf(picked)} enregistre la voix et Edith refait la vidéo, ${redoTime(data)}.`);
     });
-  const name = SIMONE_VOICES.find((v) => v.id === picked)?.name ?? "";
+  const name = nameOf(picked);
   const label =
-    picked === null ? (onReel || hers ? "Retirer la voix" : "C’est bon") : picked === onReel && !note.trim() ? "C’est bon" : picked === onReel ? `Refaire la voix de ${name}` : `Mettre la voix de ${name}`;
+    picked === null
+      ? onReel || hers
+        ? "Retirer la voix"
+        : "C’est bon"
+      : picked === onReel && !note.trim()
+        ? "C’est bon"
+        : picked === own?.id
+          ? picked === onReel
+            ? "Refaire avec ma voix"
+            : "Mettre ma voix"
+          : picked === onReel
+            ? `Refaire la voix de ${name}`
+            : `Mettre la voix de ${name}`;
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-[13.5px] leading-snug text-muted">
         {hers ? "Ce Reel porte ta propre voix. Tu peux la retirer, ou la remplacer par une voix d’Edith." : "Une voix raconte ton Reel, la musique passe dessous. Écoute et choisis."}
       </p>
       <div role="radiogroup" aria-label="La voix" className="grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-2">
-        {[{ id: null, name: "Sans voix", hint: "Juste la musique" }, ...SIMONE_VOICES.map((v) => ({ id: v.id as string | null, name: v.name, hint: `${v.hint.charAt(0).toUpperCase()}${v.hint.slice(1)}` }))].map((v) => {
+        {[
+          { id: null, name: "Sans voix", hint: "Juste la musique" },
+          ...(own ? [{ id: own.id as string | null, name: "Ta voix", hint: "Clonée, rien qu’à toi" }] : []),
+          ...SIMONE_VOICES.map((v) => ({ id: v.id as string | null, name: v.name as string, hint: `${v.hint.charAt(0).toUpperCase()}${v.hint.slice(1)}` })),
+        ].map((v) => {
           const on = picked === v.id;
           return (
             <div key={v.id ?? "none"} className={`flex items-center gap-1.5 rounded-[14px] border-[1.5px] py-1 pr-1 pl-3 ${on ? "border-violet bg-violet-tint" : "border-line bg-white"}`}>

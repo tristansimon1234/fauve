@@ -1,7 +1,7 @@
 import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { resolveReelBrand } from "@fauve/agent";
+import { readOwnVoice, resolveReelBrand } from "@fauve/agent";
 import { NoStudio } from "@/components/empty-state";
 import { studioScenes } from "@/lib/creations";
 import { loadMontageInputs } from "@/lib/render/render-post";
@@ -81,6 +81,11 @@ async function StyleLoader() {
     return url ? [{ family: f.family, path: f.path, url }] : [];
   });
 
+  // Her own voice (a clone), heard by its sample.
+  const own = readOwnVoice((data?.profile as { own_voice?: unknown } | null)?.own_voice);
+  const ownSample = own?.sample_path ? (await signMediaUrls(db, studioId, [own.sample_path])).get(own.sample_path) : undefined;
+  const ownVoice = own ? { id: own.id, name: own.name, sampleUrl: ownSample ?? null } : null;
+
   const { data: shared } = await db
     .from("inspirations")
     .select("id, title, url, source, analysis, storage_path, created_at, missed:style->>miss")
@@ -113,6 +118,7 @@ async function StyleLoader() {
       version={(data?.version as number | undefined) ?? null}
       logo={logo}
       ownFonts={ownFonts}
+      ownVoice={ownVoice}
     />
   );
 }

@@ -5,7 +5,7 @@ import { CheckIcon } from "@/components/icons";
 import { saveStyle } from "./actions";
 import { ArtDirectionSection } from "./art-direction-section";
 import { ColorsSection } from "./colors-section";
-import type { OwnFont } from "./actions";
+import type { OwnFont, OwnVoiceView } from "./actions";
 import { FontsSection } from "./fonts-section";
 import { OwnFonts } from "./own-fonts";
 import { LogoSection } from "./logo-section";
@@ -51,6 +51,7 @@ export function StyleEditor({
   inspirations,
   created,
   ownFonts,
+  ownVoice,
 }: {
   studioId: string;
   studioName: string;
@@ -64,6 +65,8 @@ export function StyleEditor({
   created?: React.ReactNode;
   /** The studio's own font files, with signed links. */
   ownFonts: OwnFont[];
+  /** Her own voice (a clone), with its sample's signed link. */
+  ownVoice: OwnVoiceView | null;
 }) {
   const [form, setForm] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -174,7 +177,17 @@ export function StyleEditor({
         />
       </div>
       <div role="tabpanel" className={panel("voix")}>
-        <VoiceSection value={form} onChange={update} />
+        <VoiceSection
+          value={form}
+          onChange={update}
+          studioId={studioId}
+          ownVoice={ownVoice}
+          // Her clone is kept by the server, which also moves a setting off a deleted one: the saved form follows.
+          onOwnVoice={(patch) => {
+            update(patch);
+            setSaved((s) => ({ ...s, ...patch }));
+          }}
+        />
         <ToneSection value={form} onChange={update} />
       </div>
       <div role="tabpanel" className={panel("creations")}>

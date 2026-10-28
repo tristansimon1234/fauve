@@ -32,7 +32,7 @@ import {
   withAdjustment,
   VOICE_MAX_SECONDS,
   accessMessage,
-  findVoice,
+  voiceIn,
   readPostVoice,
   readVoiceSetting,
   SIMONE_VOICES,
@@ -66,6 +66,7 @@ import { queueJob } from "@/lib/jobs";
 import { missMessage, startSteal } from "@/lib/steal";
 import { readPostMusic } from "@/lib/render/music";
 import { removeVoice } from "@/lib/voice-over";
+import { ownVoiceOf } from "@/lib/voice-clone";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
 import { mediaComments, mediaInsights, recentMedia, replyToComment } from "@/lib/social/instagram";
 import { instagramAccount, publishIfDue } from "@/lib/social/publish";
@@ -649,8 +650,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async set_voice({ post_id, mode, wish, voice, use }) {
-      const chosen = voice ? findVoice(voice) : undefined;
-      if (voice && !chosen) return json({ error: `Voix inconnue. Voix possibles : ${SIMONE_VOICES.map((v) => v.name).join(", ")}.` });
+      // One of Edith's voices, or her own clone (« sa voix », made in Style › Voix off).
+      const own = voice ? await ownVoiceOf(studioId) : null;
+      const chosen = voice ? voiceIn(voice, own) : undefined;
+      if (voice && !chosen) {
+        return json({
+          error: `Voix inconnue. Voix possibles : ${[...(own ? ["sa voix (clonée)"] : []), ...SIMONE_VOICES.map((v) => v.name)].join(", ")}.${own ? "" : " Pour sa propre voix, elle la clone d'abord dans Style › Voix off (une minute à lire)."}`,
+        });
+      }
       // The studio's setting, for its next Reels.
       if (!post_id) {
         if (!use && !chosen) return json({ error: "Dis ce qui change : use (auto, always, never) et/ou voice." });

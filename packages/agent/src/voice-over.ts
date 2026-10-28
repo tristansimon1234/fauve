@@ -58,6 +58,49 @@ export function findVoice(idOrName: string | null | undefined): SimoneVoice | un
   return key ? SIMONE_VOICES.find((v) => v.id.toLowerCase() === key || v.name.toLowerCase() === key) : undefined;
 }
 
+/**
+ * Her own voice, cloned by ElevenLabs (instant voice cloning) from a minute or so she
+ * recorded or sent in Style, with her consent: a voice of the account, kept in the
+ * brand profile (profile.own_voice) and heard in Style by its sample. Only this
+ * studio's Reels may use it.
+ */
+export const ownVoiceSchema = z.object({
+  id: z.string().regex(/^[A-Za-z0-9]{10,40}$/),
+  name: z.string().max(60),
+  /** Its sample, read by the clone (media bucket, the studio's folder). */
+  sample_path: z.string().max(300).optional(),
+  made_at: z.string().max(40),
+});
+export type OwnVoice = z.infer<typeof ownVoiceSchema>;
+export const readOwnVoice = (value: unknown): OwnVoice | null => ownVoiceSchema.nullable().catch(null).parse(value ?? null);
+
+/** What she reads aloud to be cloned: about a minute, varied sounds, said like she talks. */
+export const CLONE_SCRIPT =
+  "Bonjour ! Je vous présente mon métier, celui que je fais chaque jour avec plaisir. Le matin, j'ouvre, je prépare tout, et j'attends les premiers clients. Certains viennent depuis des années, d'autres passent la porte pour la première fois. Ce que je préfère ? Le moment où quelqu'un repart avec le sourire. Franchement, ça n'a pas de prix. Alors si vous passez dans le quartier, venez me dire bonjour : je vous montrerai tout, et on prendra le temps. À très vite !";
+/** ElevenLabs asks for a minute or two of clean speech; under 30 s the clone does not sound like her. */
+export const CLONE_MIN_SECONDS = 30;
+export const CLONE_MAX_SECONDS = 180;
+
+/** A voice a Reel can be read with: one of the gallery, or her own clone. */
+export type UsableVoice = { id: string; name: string; gender: "f" | "m" | null; asmr: boolean; own: boolean };
+
+/** Words that mean her own voice (« ma voix », « sa voix »…) when Edith names it. */
+const OWN_WORDS = /^(ma|ta|sa|mon|own|moi|la mienne|ma propre) ?(voix|clone)?$/;
+
+/**
+ * A voice by its id or its name, from the gallery or her own clone: anything else (another
+ * studio's clone, a voice deleted since) is undefined, so it is never read for her.
+ */
+export function voiceIn(idOrName: string | null | undefined, own: OwnVoice | null): UsableVoice | undefined {
+  const key = (idOrName ?? "").trim().toLowerCase();
+  if (!key) return undefined;
+  if (own && (own.id.toLowerCase() === key || own.name.toLowerCase() === key || OWN_WORDS.test(key))) {
+    return { id: own.id, name: own.name, gender: null, asmr: false, own: true };
+  }
+  const gallery = findVoice(key);
+  return gallery ? { id: gallery.id, name: gallery.name, gender: gallery.gender, asmr: gallery.asmr, own: false } : undefined;
+}
+
 /** The studio's voice over its Reels (Style): when, and which voice. */
 export const voiceSettingSchema = z.object({
   /** auto: when it helps the Reel (see wantsVoiceOver); always; never. */

@@ -1,7 +1,7 @@
 import "server-only";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readVoiceSetting, stableWindow, type ExchangeRow } from "@fauve/agent";
+import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readOwnVoice, readVoiceSetting, stableWindow, type ExchangeRow } from "@fauve/agent";
 import { dayOfTurns } from "@/lib/reply-cap";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
@@ -124,7 +124,7 @@ export async function replyInConversation(params: {
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
-    db.from("brand_profiles").select("profile->>tone, profile->voice, profile->fonts, profile->font_twins, profile->custom_fonts").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+    db.from("brand_profiles").select("profile->>tone, profile->voice, profile->own_voice, profile->fonts, profile->font_twins, profile->custom_fonts").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     runningJobs(params.studioId).catch(() => []),
     db.from("social_accounts").select("handle, status").eq("studio_id", params.studioId).eq("platform", "tiktok").maybeSingle(),
     // The Reel she sent to copy (« Steal »), for her next Reel only.
@@ -234,7 +234,10 @@ export async function replyInConversation(params: {
       work: describeJobs(jobs.map((j) => ({ ...j, title: j.postId ? jobTitles.get(j.postId) : undefined }))),
       voice: (() => {
         const setting = readVoiceSetting((brand.data as { voice?: unknown } | null)?.voice);
-        return { use: setting.use, name: findVoice(setting.voice_id ?? DEFAULT_VOICE_ID)?.name ?? "sa voix" };
+        // Her own voice (a clone made in Style) is named so: Edith knows she can lay it.
+        const own = readOwnVoice((brand.data as { own_voice?: unknown } | null)?.own_voice);
+        const name = own && setting.voice_id === own.id ? "sa propre voix (clonée)" : (findVoice(setting.voice_id ?? DEFAULT_VOICE_ID)?.name ?? "sa voix");
+        return { use: setting.use, name: own && setting.voice_id !== own.id ? `${name} (elle a aussi cloné sa propre voix : voice « sa voix »)` : name };
       })(),
       copying: copying ? { inspirationId: copying.id, name: copying.name, lines: copying.lines } : undefined,
       models: models.map((m) => ({ inspirationId: m.id, title: m.title, name: m.name })),

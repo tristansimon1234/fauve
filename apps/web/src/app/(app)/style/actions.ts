@@ -1,12 +1,13 @@
 "use server";
 
-import { CREDIT_PRICES, findVoice, MOODBOARD_MAX_ITEMS, onboardingStepOf, withArtDirection, type MoodboardReading } from "@fauve/agent";
+import { CLONE_MAX_SECONDS, CLONE_MIN_SECONDS, CREDIT_PRICES, findVoice, MOODBOARD_MAX_ITEMS, onboardingStepOf, withArtDirection, type MoodboardReading } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { readMoodboard } from "@/lib/agent/moodboard";
 import { chargeCredits, creditBalance } from "@/lib/credits";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { cloneOwnVoice, forgetOwnVoice } from "@/lib/voice-clone";
 import { insertProfileVersion } from "./profile";
 import { MOODBOARD_NOTE_MAX } from "./style-options";
 import { applyStyleForm, styleFormSchema } from "./style-profile";
@@ -188,6 +189,53 @@ export async function saveCustomFonts(input: unknown): Promise<SaveFontsResult> 
   } catch (error) {
     console.warn("saveCustomFonts failed", error);
     return { status: "error", message: FAILED };
+  }
+}
+
+export type OwnVoiceView = { id: string; name: string; sampleUrl: string | null };
+export type CloneVoiceResult = { status: "ok"; voice: OwnVoiceView } | { status: "error"; message: string };
+
+const cloneInput = z.object({
+  paths: z.array(z.string().max(300)).min(1).max(5),
+  /** What the browser measured: ElevenLabs needs about a minute to sound like her. */
+  seconds: z.number().min(CLONE_MIN_SECONDS, `Il faut au moins ${CLONE_MIN_SECONDS} secondes de ta voix.`).max(CLONE_MAX_SECONDS * 2),
+  consent: z.literal(true, "Coche la case pour confirmer que c’est ta voix."),
+});
+
+/**
+ * Her own voice for her Reels (Style › Voix off): the recordings she just uploaded to
+ * `{studio}/voice-clone/` are cloned by ElevenLabs, with her consent, then deleted.
+ */
+export async function cloneMyVoice(input: unknown): Promise<CloneVoiceResult> {
+  const parsed = cloneInput.safeParse(input);
+  if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "Enregistrement invalide." };
+  const { db, member } = await getStudioContext();
+  if (!member) return { status: "error", message: NO_STUDIO };
+  const studioId = member.studio.id;
+  const expected = new RegExp(`^${studioId}/voice-clone/rec-\\d{10,16}-[a-z0-9]{4,12}\\.(webm|ogg|mp3|m4a|mp4|wav|aac|flac)$`);
+  if (parsed.data.paths.some((p) => !expected.test(p))) return { status: "error", message: "Fichier audio invalide." };
+  try {
+    const own = await cloneOwnVoice(studioId, "Ta voix", parsed.data.paths);
+    const sampleUrl = own.sample_path ? ((await db.storage.from("media").createSignedUrl(own.sample_path, SIGNED_URL_SECONDS)).data?.signedUrl ?? null) : null;
+    revalidatePath("/style");
+    return { status: "ok", voice: { id: own.id, name: own.name, sampleUrl } };
+  } catch (error) {
+    console.warn("cloneMyVoice failed", error);
+    return { status: "error", message: "Ta voix n’a pas pu être clonée. Réessaie avec un enregistrement au calme, sans musique." };
+  }
+}
+
+/** Forgets her voice (deleted from ElevenLabs too); her Reels go back to Edith's voices. */
+export async function deleteMyVoice(): Promise<{ ok: boolean; message?: string }> {
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, message: NO_STUDIO };
+  try {
+    await forgetOwnVoice(member.studio.id);
+    revalidatePath("/style");
+    return { ok: true };
+  } catch (error) {
+    console.warn("deleteMyVoice failed", error);
+    return { ok: false, message: FAILED };
   }
 }
 

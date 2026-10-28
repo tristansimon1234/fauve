@@ -1,6 +1,6 @@
 "use server";
 
-import { findVoice, isBaked, readPostVoice, RESTYLE, offersLine, type EditPlan, type ReelInputs, type SavedLook } from "@fauve/agent";
+import { isBaked, voiceIn, readPostVoice, RESTYLE, offersLine, type EditPlan, type ReelInputs, type SavedLook } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
@@ -10,6 +10,7 @@ import { loadEditorData } from "@/lib/montage-editor-data";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { forgetModel, keepAsModel, type ModelState } from "@/lib/reel-models";
 import { loadTextLooks } from "@/lib/text-looks";
+import { ownVoiceOf } from "@/lib/voice-clone";
 import { removeVoice } from "@/lib/voice-over";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -98,11 +99,12 @@ export async function redoReel(postId: string, kind: keyof typeof REDO_BRIEFS, n
 
 /** One of Edith's voices on the Reel (what it should say, if she said): kept on the post, then a new version cut on it. */
 export async function putVoice(postId: string, voiceId: string, note?: string): Promise<ReviewResult> {
-  const voice = findVoice(voiceId);
-  if (!voice) return { ok: false, error: "Cette voix n’existe pas." };
   const found = await reel(postId);
   if (!found) return UNKNOWN;
   const { studioId, post } = found;
+  // One of Edith's voices, or her own clone.
+  const voice = voiceIn(voiceId, await ownVoiceOf(studioId));
+  if (!voice) return { ok: false, error: "Cette voix n’existe pas." };
   if (post.kind !== "reel") return { ok: false, error: "La voix off se met sur un Reel." };
   if (LOCKED.includes(post.status as string)) return ONLINE;
   const db = supabaseAdmin();
@@ -129,8 +131,8 @@ export async function putVoice(postId: string, voiceId: string, note?: string): 
   return correct(
     studioId,
     postId,
-    `La gérante veut la voix off de ${voice.name} sur ce Reel.${extra ? ` Ce qu'elle veut que la voix dise : ${extra}.` : ""} Garde le même sujet, l'accroche et les plans, et cale le montage sur la voix.`,
-    `« Voix off : ${voice.name} »${extra ? ` : ${extra}` : ""}`,
+    `${voice.own ? "Elle veut sa propre voix (clonée) en voix off" : `Elle veut la voix off de ${voice.name}`} sur ce Reel.${extra ? ` Ce qu'elle veut que la voix dise : ${extra}.` : ""} Garde le même sujet, l'accroche et les plans, et cale le montage sur la voix.`,
+    `« Voix off : ${voice.own ? "sa voix" : voice.name} »${extra ? ` : ${extra}` : ""}`,
   );
 }
 

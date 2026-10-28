@@ -19,9 +19,11 @@ import {
   VOICE_SPEED,
   verbatimScript,
   scriptFrom,
+  readOwnVoice,
   readPostVoice,
   readVoiceSetting,
   sentencePauses,
+  voiceIn,
   voiceLeftToSimone,
   wantsVoiceOver,
   withPauses,
@@ -414,8 +416,12 @@ export async function voiceOverIfWanted(params: {
   // She chose a voice (for this Reel, or always) but someone speaks in her videos: their words stay, and the delivery says so.
   if (!wanted && speechInClips && !choices.onReel && !choices.correction && choice?.mode !== "off" && (choice?.mode === "on" || setting.use === "always")) return { spokenKept: true };
   if (!wanted) return null;
-  // A voice of the gallery, or one of her own (a clone made with her consent) kept as it is.
-  const voiceId = voiceFor(choice?.voice_id ?? setting.voice_id ?? DEFAULT_VOICE_ID, params.contract?.voice_gender);
+  // A voice of the gallery, or her own (a clone made with her consent) kept as it is; anything else
+  // (a voice deleted since, another studio's clone) is read with the default voice.
+  const own = readOwnVoice((brand.data?.profile as { own_voice?: unknown } | null)?.own_voice);
+  const picked = voiceIn(choice?.voice_id ?? setting.voice_id, own);
+  const voiceId = picked?.own && !params.contract?.voice_gender ? picked.id : voiceFor(picked?.id ?? DEFAULT_VOICE_ID, params.contract?.voice_gender);
+  const voiceName = voiceId === own?.id ? "ta voix" : (findVoice(voiceId)?.name ?? "ta voix");
   try {
     // Her setting leaves it to Edith: told by a voice, or one key message with the music (then nothing is read nor paid);
     // a Reel she copies told by a voice has its form already.
@@ -427,7 +433,7 @@ export async function voiceOverIfWanted(params: {
     const made = await makeVoiceOver({ studioId: params.studioId, postId: params.postId, wish: choice?.wish, voiceId, mediaIds: ids, brief: params.brief, script: written, contract: params.contract });
     // Her wish and the remake were for this voice: used once.
     if (choice?.wish || choice?.remake) await db.from("posts").update({ voice_over: { mode: choice.mode, ...(choice.voice_id ? { voice_id: choice.voice_id } : {}) } }).eq("id", params.postId);
-    return { mediaId: made.mediaId, voice: findVoice(voiceId)?.name ?? "ta voix" };
+    return { mediaId: made.mediaId, voice: voiceName };
   } catch (error) {
     console.error("voice over failed, the montage goes on without it", params.postId, error);
     return null;

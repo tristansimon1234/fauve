@@ -26,6 +26,7 @@ import { tiktokPanel } from "@/lib/social/tiktok-panel";
 import { signMediaUrls, type Db } from "@/lib/studio";
 import { runningJobs } from "@/lib/studio-jobs";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { ownVoiceOf } from "@/lib/voice-clone";
 
 // « Ta publication », the simple page of a Reel: the video as it will go out, its scenes,
 // when and where, its caption, and whether a new version is on its way (changes saved
@@ -78,7 +79,9 @@ export type ReviewData = {
   /** Edith's music (null: the music service is not set up). */
   music: { on: boolean; made: boolean } | null;
   /** The voice on the Reel: Edith's (which one) or her own voice note. */
-  voice: { who: "simone" | "hers"; name: string | null } | null;
+  voice: { who: "simone" | "hers"; name: string | null; /** Edith's voice (or her clone) it was read with. */ id?: string | null } | null;
+  /** Her own voice (a clone made in Style), to pick for this Reel. */
+  ownVoice: { id: string; sampleUrl: string | null } | null;
   /** Days to move it to: the next free days at her usual hour. */
   slots: ReviewSlot[];
   timezone: string;
@@ -138,16 +141,18 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     after(() => ensureSceneSprite(studioId, renderId));
   }
   const fileName = `${post.title.replace(/[^\p{L}\p{N} _-]+/gu, "").trim() || "reel"}.mp4`;
-  const [jobs, replays, account, slots, voice, tiktok, download, model] = await Promise.all([
+  const ownVoice = await ownVoiceOf(studioId);
+  const [jobs, replays, account, slots, voice, tiktok, download, model, ownSample] = await Promise.all([
     locked ? Promise.resolve([]) : montageStatus(studioId, post.id),
     // Her new words on its effect, drawn again by its own script.
     locked || !isBaked(plan.data) ? Promise.resolve([]) : runningJobs(studioId, { postId: post.id, kind: "effect_words" }),
     instagramAccount(studioId),
     locked ? Promise.resolve([]) : freeSlots(studioId, timezone, 4),
-    loadVoice(studioId, post.voice_media_id),
+    loadVoice(studioId, post.voice_media_id, ownVoice?.id ?? null),
     tiktokPanel(studioId, { kind: "reel", platforms: post.platforms, caption: post.caption, hashtags: post.hashtags, tiktok: post.tiktok, external_ids: post.external_ids }, !locked),
     shown?.storage_path ? admin.storage.from("media").createSignedUrl(shown.storage_path as string, 3600, { download: fileName }) : Promise.resolve(null),
     modelState(studioId, post.id).catch(() => null),
+    ownVoice?.sample_path ? admin.storage.from("media").createSignedUrl(ownVoice.sample_path, 3600) : Promise.resolve(null),
   ]);
   const running = jobs.find((j) => j.step !== "livré" && !j.late);
   const latest = (renders.data ?? []).find((r) => r.edit_plan_id === current.id);
@@ -195,6 +200,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     publishByHand: post.publish_by_hand,
     music: env("ELEVENLABS_API_KEY") ? { on: music.mode === "on", made: Boolean(music.track) } : null,
     voice,
+    ownVoice: ownVoice ? { id: ownVoice.id, sampleUrl: ownSample?.data?.signedUrl ?? null } : null,
     slots: slots.flatMap((s) => {
       const day = parseIsoDate(s.date);
       const [h, m] = s.time.split(":").map(Number);
@@ -209,10 +215,12 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
 }
 
 /** The voice over the Reel: Edith's (her name) or the manager's own voice note; null: none. */
-async function loadVoice(studioId: string, mediaId: string | null): Promise<ReviewData["voice"]> {
+async function loadVoice(studioId: string, mediaId: string | null, ownId: string | null): Promise<ReviewData["voice"]> {
   if (!mediaId) return null;
   const { data } = await supabaseAdmin().from("media_assets").select("source, ai").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
   if (!data) return null;
   if (data.source !== "ai") return { who: "hers", name: null };
-  return { who: "simone", name: findVoice((data.ai as { voice_id?: string } | null)?.voice_id)?.name ?? null };
+  const id = (data.ai as { voice_id?: string } | null)?.voice_id ?? null;
+  // Read by her clone: her voice, as she hears it in Style.
+  return { who: "simone", name: id && id === ownId ? "Ta voix" : (findVoice(id)?.name ?? null), id };
 }

@@ -66,12 +66,15 @@ const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
 function defaultVoice(o: NewPostOptions | null): string {
   if (!o || o.voice.use === "auto") return "auto";
   if (o.voice.use === "never") return "off";
-  return o.voice.voiceId && findVoice(o.voice.voiceId) ? o.voice.voiceId : SIMONE_VOICES[0]!.id;
+  return knownVoice(o, o.voice.voiceId) ? o.voice.voiceId! : SIMONE_VOICES[0]!.id;
 }
+
+/** One of Edith's voices, or her own (her clone). */
+const knownVoice = (o: NewPostOptions, id: string | null) => Boolean(id && (findVoice(id) || id === o.ownVoice?.id));
 
 /** « Une voix off » chosen: the studio's voice (Style), else Edith's first. */
 function studioVoice(o: NewPostOptions): string {
-  return o.voice.voiceId && findVoice(o.voice.voiceId) ? o.voice.voiceId : SIMONE_VOICES[0]!.id;
+  return knownVoice(o, o.voice.voiceId) ? o.voice.voiceId! : SIMONE_VOICES[0]!.id;
 }
 
 /** Under « Voix off »: « À choisir » until she answers, « Edith choisit », « Aucune », « Eva ». */
@@ -542,7 +545,7 @@ function Create({
             </div>
             {voiceAsked && chosenVoice !== "auto" && chosenVoice !== "off" && (
               <button type="button" onClick={() => setSheet("voice")} className="self-start text-[13.5px] font-bold text-violet">
-                Avec la voix de {voiceLabel(chosenVoice, true)} · écouter ou changer
+                {chosenVoice === options?.ownVoice?.id ? "Avec ta voix" : `Avec la voix de ${voiceLabel(chosenVoice, true)}`} · écouter ou changer
               </button>
             )}
           </section>
@@ -997,6 +1000,7 @@ function Create({
             }}
           />
           <VoicePicker
+            own={options?.ownVoice ?? null}
             value={voiceAsked ? chosenVoice : null}
             onPick={(v) => {
               setVoice(v);
@@ -1307,14 +1311,14 @@ function CopyGiver({ studioId, another, onGiven }: { studioId: string; another: 
 }
 
 /** « Edith choisit », without, or one of her voices (each to listen to first). */
-function VoicePicker({ value, onPick }: { value: string | null; onPick: (voice: string) => void }) {
+function VoicePicker({ own, value, onPick }: { own: NewPostOptions["ownVoice"]; value: string | null; onPick: (voice: string) => void }) {
   const [playing, setPlaying] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => audio.current?.pause(), []);
-  const listen = (id: string) => {
+  const listen = (id: string, url: string) => {
     audio.current?.pause();
     if (playing === id) return setPlaying(null);
-    const sample = new Audio(`${SAMPLES}/${voiceSamplePath(id)}`);
+    const sample = new Audio(url);
     audio.current = sample;
     sample.onended = () => setPlaying((p) => (p === id ? null : p));
     setPlaying(id);
@@ -1329,7 +1333,10 @@ function VoicePicker({ value, onPick }: { value: string | null; onPick: (voice: 
       <Choice on={value === "auto"} title="Edith choisit" hint="Une voix quand personne ne parle dans tes vidéos" onClick={() => pick("auto")} />
       <Choice on={value === "off"} title="Sans voix off" hint="Juste la musique" onClick={() => pick("off")} />
       <div className="grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-2">
-        {SIMONE_VOICES.map((v) => {
+        {[
+          ...(own ? [{ id: own.id, name: "Ta voix", hint: "clonée, rien qu’à toi", url: own.sampleUrl }] : []),
+          ...SIMONE_VOICES.map((v) => ({ id: v.id as string, name: v.name as string, hint: v.hint as string, url: `${SAMPLES}/${voiceSamplePath(v.id)}` as string | null })),
+        ].map((v) => {
           const on = value === v.id;
           return (
             <div key={v.id} className={`flex items-center gap-1.5 rounded-[14px] border-[1.5px] py-1 pr-1 pl-3 ${on ? "border-violet bg-violet-tint" : "border-line bg-white"}`}>
@@ -1337,14 +1344,16 @@ function VoicePicker({ value, onPick }: { value: string | null; onPick: (voice: 
                 <span className="text-[14.5px] font-extrabold">{v.name}</span>
                 <span className="truncate text-[12.5px] text-muted">{`${v.hint.charAt(0).toUpperCase()}${v.hint.slice(1)}`}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => listen(v.id)}
-                aria-label={playing === v.id ? `Arrêter ${v.name}` : `Écouter ${v.name}`}
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-chip text-ink hover:bg-violet-tint"
-              >
-                {playing === v.id ? <PauseIcon size={14} /> : <PlayIcon size={14} />}
-              </button>
+              {v.url && (
+                <button
+                  type="button"
+                  onClick={() => listen(v.id, v.url!)}
+                  aria-label={playing === v.id ? `Arrêter ${v.name}` : `Écouter ${v.name}`}
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-chip text-ink hover:bg-violet-tint"
+                >
+                  {playing === v.id ? <PauseIcon size={14} /> : <PlayIcon size={14} />}
+                </button>
+              )}
             </div>
           );
         })}
