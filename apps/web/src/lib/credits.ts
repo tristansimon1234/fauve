@@ -29,6 +29,7 @@ import {
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { finishJob, setJobStage, startJob } from "@/lib/studio-jobs";
+import { withSlot } from "@/lib/work-slots";
 
 // Credits (see packages/agent/src/credits.ts for the price list). The balance is
 // the sum of the ledger, topped up at each renewal of her subscription. A montage starts at once, priced
@@ -325,32 +326,37 @@ export async function acceptQuote(
     return { error: `Le niveau ${EFFORTS[effort].label} n'est pas possible avec le solde : garde le niveau prévu.` };
   }
   const params = (q.params ?? {}) as { media_ids?: string[]; brief?: string | null; max_new_scenes?: number; variant?: VariantChange | null; plan?: unknown };
-  const available = await availableCredits(studioId, quoteId);
-  const chosen = level ? effort! : current;
-  // The level's price again, against what can be spent now (other montages may have run since the quote):
-  // its corrections must fit, and fewer new scenes are allowed when they no longer all fit.
-  const price =
-    q.kind === "variant" || !chosen
-      ? { base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[], maxNewScenes: params.max_new_scenes ?? 0 }
-      : priceAt(
-          { correction: q.kind === "correction", maxNewScenes: level ? level.maxNewScenes : (params.max_new_scenes ?? 0) },
-          chosen,
-          available,
-        );
-  if (!price || available < price.base) {
-    return { error: "Pas assez de crédits pour ce montage, même dans sa version la plus simple : dis-le simplement, sans rien lancer ni proposer une version plus simple." };
-  }
-  const repriced = q.kind !== "variant" && chosen && (level || price.max !== q.max);
-  const claimed = await db
-    .from("credit_quotes")
-    .update({
-      used_at: new Date().toISOString(),
-      ...(repriced ? { effort: chosen, base: price.base, max: price.max, lines: price.lines, params: { ...params, max_new_scenes: price.maxNewScenes, metered: true } } : {}),
-    })
-    .eq("id", quoteId)
-    .is("used_at", null)
-    .select("id");
-  if (!claimed.data?.length) return { error: "Ce montage est déjà lancé." };
+  // Checked and claimed under the studio's lock: two launches at the same moment never count on the same credits.
+  const claim = await withSlot({ kind: `credits:${studioId}`, slots: 1, perSlot: 1, leaseMs: 30_000, waitMs: 20_000 }, async (): Promise<{ error: string } | { maxNewScenes: number }> => {
+    const available = await availableCredits(studioId, quoteId);
+    const chosen = level ? effort! : current;
+    // The level's price again, against what can be spent now (other montages may have run since the quote):
+    // its corrections must fit, and fewer new scenes are allowed when they no longer all fit.
+    const price =
+      q.kind === "variant" || !chosen
+        ? { base: q.base as number, max: q.max as number, lines: q.lines as QuoteLine[], maxNewScenes: params.max_new_scenes ?? 0 }
+        : priceAt(
+            { correction: q.kind === "correction", maxNewScenes: level ? level.maxNewScenes : (params.max_new_scenes ?? 0) },
+            chosen,
+            available,
+          );
+    if (!price || available < price.base) {
+      return { error: "Pas assez de crédits pour ce montage, même dans sa version la plus simple : dis-le simplement, sans rien lancer ni proposer une version plus simple." };
+    }
+    const repriced = q.kind !== "variant" && chosen && (level || price.max !== q.max);
+    const claimed = await db
+      .from("credit_quotes")
+      .update({
+        used_at: new Date().toISOString(),
+        ...(repriced ? { effort: chosen, base: price.base, max: price.max, lines: price.lines, params: { ...params, max_new_scenes: price.maxNewScenes, metered: true } } : {}),
+      })
+      .eq("id", quoteId)
+      .is("used_at", null)
+      .select("id");
+    if (!claimed.data?.length) return { error: "Ce montage est déjà lancé." };
+    return { maxNewScenes: price.maxNewScenes };
+  });
+  if ("error" in claim) return claim;
   // A new request on this Reel replaces the work still running on it: that one stops, never delivered nor charged
   // (Tristan's Edith Reel: three corrections ran side by side, each about to deliver and charge).
   if (q.post_id && q.kind !== "variant") await supersedeRunning(q.post_id as string, q.id as string);
@@ -363,7 +369,7 @@ export async function acceptQuote(
     kind: q.kind as AcceptedQuote["kind"],
     mediaIds: params.media_ids ?? [],
     brief,
-    maxNewScenes: price.maxNewScenes,
+    maxNewScenes: claim.maxNewScenes,
     variant: params.variant ?? null,
     effort: q.kind === "variant" ? null : level ? effort! : current,
   };

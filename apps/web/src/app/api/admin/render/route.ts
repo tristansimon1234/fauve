@@ -2,13 +2,13 @@ import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
 import { renderPost } from "@/lib/render/render-post";
-import { dropSandbox, remotionSandbox, trackSandbox } from "@/lib/render/sandbox";
+import { dropSandbox, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { adminKeyAuthorized } from "@/lib/test-studio";
 
 // Admin helper to exercise the render worker, protected by FAUVE_TEST_KEY (Authorization: Bearer …, never in the address):
 //   ?post=<post id>  renders the post's latest edit plan and returns a 24 h link.
-//   ?action=warm     installs the Remotion templates in the sandbox ahead of the first render.
+//   ?action=warm     installs the Remotion templates in the render sandboxes (all three) ahead of the first render.
 //   ?post=…&design=1[&brief=…]  has the editor (Opus) write a new plan first, then renders it.
 // And POST ?action=warm with CRON_SECRET, from the database (call_app): the same warm-up,
 // in the background (a new sandbox installs everything once, a few minutes, the collages'
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   after(async () => {
     const started = Date.now();
     try {
-      await remotionSandbox();
+      await warmRemotionPool();
       // The cut-out model too (onnxruntime-node and 224 MB of weights, once), and the tracker in the same sandbox (Python, MediaPipe and its models).
       await trackSandbox();
       console.log("render sandbox warm", { elapsedMs: Date.now() - started });
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   if (params.get("action") === "warm") {
     const started = Date.now();
     try {
-      await remotionSandbox();
+      await warmRemotionPool();
       return Response.json({ ok: true, elapsedMs: Date.now() - started });
     } catch (error) {
       return Response.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });

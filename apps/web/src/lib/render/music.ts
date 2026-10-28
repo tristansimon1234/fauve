@@ -22,6 +22,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { alignMusicInSandbox, bassLevelsInSandbox, loopedReelInSandbox, muxAudioInSandbox } from "./sandbox";
 import { postStyle } from "@/lib/steal";
 import { costMeta } from "@/lib/cost-scope";
+import { withSlot } from "@/lib/work-slots";
 
 // Edith's music on a Reel (ElevenLabs Music): composed from its brief alone, in
 // the mood of the Reel and the business, as the looping track of a creator's Reel
@@ -124,8 +125,17 @@ const ATTACK_LEAD = 0.005;
 
 type Composed = { mp3: Uint8Array; songId: string | null; ms: number; engine: "text" | "video" };
 
-/** A call to ElevenLabs Music. The plan allows 2 compositions at once: a third one waits and tries again. */
-async function musicCall(path: string, init: () => RequestInit, engine: Composed["engine"]): Promise<Composed> {
+/**
+ * ElevenLabs composes 2 pieces at once on its plan: a third one waits for its place here (work_slots)
+ * instead of being refused and giving up after a minute (a Reel then went out without music when
+ * several were rendered together).
+ */
+const MUSIC_SLOT = { kind: "elevenlabs_music", slots: 1, perSlot: 2, leaseMs: 4 * 60_000, waitMs: 5 * 60_000 };
+
+/** A call to ElevenLabs Music, once one of its places is free; still refused (another app on the key): it waits and tries again. */
+const musicCall = (path: string, init: () => RequestInit, engine: Composed["engine"]) => withSlot(MUSIC_SLOT, () => musicCallNow(path, init, engine));
+
+async function musicCallNow(path: string, init: () => RequestInit, engine: Composed["engine"]): Promise<Composed> {
   const key = env("ELEVENLABS_API_KEY");
   if (!key) throw new Error("ELEVENLABS_API_KEY missing");
   const started = Date.now();

@@ -31,8 +31,13 @@ import { createToolHandlers, type ToolContext } from "./tools";
 import { costMeta } from "@/lib/cost-scope";
 
 let client: Anthropic | undefined;
+/**
+ * The Claude client. A rate limit or an overload (429, 529) is waited out a little longer than the
+ * SDK's 2 tries (it follows the retry-after the API sends): ten montages started together share the
+ * account's Opus limits, and a refused editor call used to end the whole montage.
+ */
 export function anthropic() {
-  client ??= new Anthropic({ apiKey: env("ANTHROPIC_API_KEY") });
+  client ??= new Anthropic({ apiKey: env("ANTHROPIC_API_KEY"), maxRetries: 4 });
   return client;
 }
 

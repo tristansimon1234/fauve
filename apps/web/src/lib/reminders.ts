@@ -15,17 +15,11 @@ const BATCH = 10;
 /** Reminds the posts whose moment has come (called by the publish cron); returns how many. */
 export async function remindDue(): Promise<number> {
   const db = supabaseAdmin();
-  const now = Date.now();
-  // Due in the last hours, and not reminded since its moment (a moment moved after a reminder is a new one).
-  const { data: candidates } = await db
-    .from("posts")
-    .select("id, studio_id, kind, title, platforms, render_id, media_ids, scheduled_at, reminded_at")
-    .in("status", ["draft", "validated"])
-    .lte("scheduled_at", new Date(now).toISOString())
-    .gt("scheduled_at", new Date(now - REMINDER_GRACE_HOURS * 3600_000).toISOString())
-    .order("scheduled_at")
-    .limit(50);
-  const posts = (candidates ?? []).filter((p) => !p.reminded_at || Date.parse(p.reminded_at as string) < Date.parse(p.scheduled_at as string)).slice(0, BATCH);
+  // Due in the last hours, and not reminded since its moment (a moment moved after a reminder is a new one),
+  // read in SQL: read 50 then filtered here, the same 50 could hold the batch while the others waited.
+  const { data: candidates, error } = await db.rpc("due_reminders", { p_grace_hours: REMINDER_GRACE_HOURS, p_limit: BATCH });
+  if (error) throw new Error(`reminders: ${error.message}`);
+  const posts = (candidates ?? []) as { id: string; studio_id: string; kind: string; title: string | null; platforms: string[] | null; render_id: string | null; media_ids: string[] | null; scheduled_at: string; reminded_at: string | null }[];
   let sent = 0;
   for (const post of posts) {
     // Claimed first: two cron runs never remind the same post twice.

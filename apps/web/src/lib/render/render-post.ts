@@ -37,6 +37,7 @@ import {
 } from "@fauve/agent";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { meterWaits } from "@/lib/work-slots";
 import { logoTone } from "./logo-tone";
 import { withMusic } from "./music";
 import { usableFonts } from "@/lib/fonts";
@@ -332,6 +333,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   check(await db.from("renders").insert({ id: renderId, studio_id: studioId, edit_plan_id: planRow.id, status: "rendering" }));
 
   const started = Date.now();
+  const waited = meterWaits();
   try {
     // The ffmpeg engine has no motion-design scenes: it renders the clips only.
     // Blurred zones (faces, plates) only exist in the Remotion composition: never fall back without them.
@@ -441,7 +443,8 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       await makeSceneSprite({ studioId, renderId, videoUrl: url, plan }).catch((error: unknown) => console.warn("scenes strip failed", renderId, error));
     }
 
-    const seconds = Math.round((Date.now() - started) / 1000);
+    // The time it worked: a render that queued for a sandbox is not charged for the wait.
+    const seconds = Math.round(Math.max(0, Date.now() - started - waited.ms) / 1000);
     await db.from("cost_events").insert({
       studio_id: studioId,
       kind: "render",

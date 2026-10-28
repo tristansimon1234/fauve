@@ -330,19 +330,25 @@ const MEASURE_FOR_MS = 30 * 24 * 3600_000;
  */
 async function captureMetrics(): Promise<number> {
   const db = supabaseAdmin();
+  // Read longest ago first, and only those due (never read, or 6 h ago): ordered by updated_at, which a
+  // capture never touched, the same 50 posts were read again and again, the others never.
   const { data: posts } = await db
     .from("posts")
     .select("id, studio_id, status, external_ids")
     .in("status", ["published", "measured"])
     .not("external_ids->instagram->>media_id", "is", null)
-    .order("updated_at", { ascending: true })
-    .limit(50);
+    .gte("published_at", new Date(Date.now() - MEASURE_FOR_MS).toISOString())
+    .or(`metrics_at.is.null,metrics_at.lt.${new Date(Date.now() - MEASURE_EVERY_MS).toISOString()}`)
+    .order("metrics_at", { ascending: true, nullsFirst: true })
+    .limit(20);
   let captured = 0;
   for (const post of posts ?? []) {
     if (captured >= 10) break;
     const ig = (post.external_ids as { instagram?: { media_id?: string; published_at?: string } }).instagram;
     const publishedAt = ig?.published_at ? new Date(ig.published_at).getTime() : 0;
     if (!ig?.media_id || Date.now() - publishedAt > MEASURE_FOR_MS) continue;
+    // Its turn comes back in 6 h, whatever this read gives (a failed read is not retried at once).
+    await db.from("posts").update({ metrics_at: new Date().toISOString() }).eq("id", post.id);
     const last = await db
       .from("metrics")
       .select("captured_at")

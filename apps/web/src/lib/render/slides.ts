@@ -13,6 +13,7 @@ import {
 } from "@fauve/agent";
 import { jpegPath } from "@/lib/social/media-urls";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { meterWaits } from "@/lib/work-slots";
 import { carouselPhotos } from "./carousel";
 import { loadMontageInputs, towardsDraft } from "./render-post";
 import { renderStillsInSandbox, sandboxCostEur } from "./sandbox";
@@ -170,6 +171,7 @@ export async function renderSlides(studioId: string, postId: string): Promise<Sl
   if (previous && rendersPlan(previous.key, plan)) return previous;
 
   const started = Date.now();
+  const waited = meterWaits();
   try {
     let paths: (string | null)[] = plan.slides.map(() => null);
     if (hasTexts(plan)) {
@@ -190,7 +192,7 @@ export async function renderSlides(studioId: string, postId: string): Promise<Sl
           return path;
         }),
       );
-      const seconds = Math.round((Date.now() - started) / 1000);
+      const seconds = Math.round(Math.max(0, Date.now() - started - waited.ms) / 1000);
       await db.from("cost_events").insert({
         studio_id: studioId,
         kind: "render",

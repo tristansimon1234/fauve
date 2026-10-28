@@ -28,6 +28,7 @@ import {
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
+import { withSlot } from "@/lib/work-slots";
 
 // The render worker: a persistent Vercel Sandbox (Firecracker microVM) holding a
 // static ffmpeg build and the fonts. Nothing heavy runs in the Vercel function
@@ -36,6 +37,14 @@ import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.g
 // "fauve-render", was left in the default region (Virginia).
 
 const NAME = "fauve-render-paris";
+/**
+ * The render sandboxes Chrome runs in (renders, scene checks, stills, frames of a Reel, a site read):
+ * the first one, then two more woken only when it is full. Two Chrome jobs at a time in each (each
+ * render opens 4 tabs in its 8 GB): ten montages at once used to start forty tabs in one sandbox.
+ * The ffmpeg jobs (music, mixing, frames of a video) stay in the first one, outside the queue.
+ */
+const REMOTION_POOL = [NAME, `${NAME}-2`, `${NAME}-3`];
+const CHROME_PER_SANDBOX = 2;
 /** vCPUs of the render sandbox (2 GB of memory each). */
 const VCPUS = 4;
 /** A session stops at its deadline, even in the middle of a render: each job starts with this much time left. */
@@ -108,13 +117,15 @@ async function bash(sandbox: Sandbox, script: string, args: string[] = []) {
   return result;
 }
 
-let ready: Promise<Sandbox> | undefined;
+const ready = new Map<string, Promise<Sandbox>>();
 
-/** The render sandbox, created on first use and resumed afterwards; setup is idempotent. */
-export function renderSandbox(): Promise<Sandbox> {
-  ready ??= (async () => {
+/** A render sandbox (the first one by default), created on first use and resumed afterwards; setup is idempotent. */
+export function renderSandbox(name = NAME): Promise<Sandbox> {
+  const known = ready.get(name);
+  if (known) return known;
+  const making = (async () => {
     const sandbox = await Sandbox.getOrCreate({
-      name: NAME,
+      name,
       persistent: true,
       region: SANDBOX_REGION,
       resources: { vcpus: VCPUS },
@@ -124,10 +135,11 @@ export function renderSandbox(): Promise<Sandbox> {
     await bash(sandbox, EMOJI_FONTS).catch((error: unknown) => console.warn("render sandbox: emoji fonts not set", error));
     return sandbox;
   })().catch((error: unknown) => {
-    ready = undefined;
+    ready.delete(name);
     throw error;
   });
-  return ready;
+  ready.set(name, making);
+  return making;
 }
 
 /**
@@ -153,7 +165,7 @@ const jobSandbox = async () => withTimeLeft(await renderSandbox());
  * only it holds. Never the one in service; "missing" when none has that name.
  */
 export async function dropSandbox(name: string): Promise<"deleted" | "missing"> {
-  if (name === NAME || name === CUTOUT_NAME) throw new Error(`${name} is a sandbox in service`);
+  if (REMOTION_POOL.includes(name) || name === CUTOUT_NAME) throw new Error(`${name} is a sandbox in service`);
   let sandbox: Sandbox;
   try {
     sandbox = await Sandbox.get({ name });
@@ -212,12 +224,15 @@ const CHROME_DEPS = [
   "libpango-1.0-0", "libcairo2", "libcups2t64", "libcups2", "fonts-noto-color-emoji",
 ];
 
-let remotionReady: Promise<Sandbox> | undefined;
+const remotionReady = new Map<string, Promise<Sandbox>>();
 
-async function prepareRemotion(): Promise<Sandbox> {
-  const sandbox = await jobSandbox();
+async function prepareRemotion(name: string): Promise<Sandbox> {
+  const sandbox = await withTimeLeft(await renderSandbox(name));
   const current = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cat ${REMOTION}/.hash 2>/dev/null || true`] });
   if ((await current.stdout()).trim() === REMOTION_SOURCE_HASH) return sandbox;
+  // New templates (a deploy changed them): the other render sandboxes are updated alongside, in the
+  // background, so that they are ready before the first time a busy moment needs them.
+  if (name === NAME) for (const other of REMOTION_POOL.slice(1)) void remotionSandbox(other).catch((error: unknown) => console.warn("render pool: warm-up failed", other, error));
 
   await bash(
     sandbox,
@@ -232,14 +247,34 @@ async function prepareRemotion(): Promise<Sandbox> {
   return sandbox;
 }
 
-/** Installs or updates the Remotion templates in the sandbox (idempotent; slow only the first time). */
-export function remotionSandbox(): Promise<Sandbox> {
-  remotionReady ??= prepareRemotion().catch((error: unknown) => {
-    remotionReady = undefined;
+/** Installs or updates the Remotion templates in a render sandbox (idempotent; slow only the first time). */
+export function remotionSandbox(name = NAME): Promise<Sandbox> {
+  const known = remotionReady.get(name);
+  if (known) return known;
+  const making = prepareRemotion(name).catch((error: unknown) => {
+    remotionReady.delete(name);
     throw error;
   });
-  return remotionReady;
+  remotionReady.set(name, making);
+  return making;
 }
+
+/** Installs the Remotion templates in every render sandbox (the warm-up after a deploy that changed them). */
+export const warmRemotionPool = () => Promise.all(REMOTION_POOL.map((name) => remotionSandbox(name)));
+
+/**
+ * Runs a Chrome job in a render sandbox with a free place (two jobs each, the first sandbox filled
+ * first); a job that waited `waitMs` runs anyway on the least busy one.
+ */
+function withRemotion<T>(waitMs: number, work: (sandbox: Sandbox) => Promise<T>): Promise<T> {
+  return withSlot(
+    { kind: "remotion", slots: REMOTION_POOL.length, perSlot: CHROME_PER_SANDBOX, leaseMs: JOB_MS + 6 * 60_000, waitMs },
+    async (slot) => work(await withTimeLeft(await remotionSandbox(REMOTION_POOL[slot] ?? NAME))),
+  );
+}
+/** How long a render waits for a place: it is the step's main work. A quick check (scenes, frames) waits less. */
+const RENDER_WAIT_MS = 6 * 60_000;
+const CHECK_WAIT_MS = 2 * 60_000;
 
 /**
  * Copies the Reel's clips and photos (and the footage under its animations) into the
@@ -279,24 +314,25 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps): Promi
 
 /** Renders the Reel composition with the given props and returns the MP4 bytes. */
 export async function renderReelInSandbox(job: { id: string; props: ReelProps }): Promise<Buffer> {
-  const sandbox = await withTimeLeft(await remotionSandbox());
-  const dir = `${ROOT}/jobs/${job.id}`;
-  const media = `${REMOTION}/build/public/jobs/${job.id}`;
-  try {
-    await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
-    const props = await localMedia(sandbox, job.id, job.props);
-    await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(props) }]);
-    await bash(
-      sandbox,
-      `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=4 --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --enforce-audio-track --log=error`,
-      [dir],
-    );
-    const mp4 = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
-    if (!mp4?.length) throw new Error("render produced no file");
-    return mp4;
-  } finally {
-    await bash(sandbox, 'rm -rf "$1" "$2"', [dir, media]).catch(() => {});
-  }
+  return withRemotion(RENDER_WAIT_MS, async (sandbox) => {
+    const dir = `${ROOT}/jobs/${job.id}`;
+    const media = `${REMOTION}/build/public/jobs/${job.id}`;
+    try {
+      await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
+      const props = await localMedia(sandbox, job.id, job.props);
+      await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(props) }]);
+      await bash(
+        sandbox,
+        `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=4 --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --enforce-audio-track --log=error`,
+        [dir],
+      );
+      const mp4 = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
+      if (!mp4?.length) throw new Error("render produced no file");
+      return mp4;
+    } finally {
+      await bash(sandbox, 'rm -rf "$1" "$2"', [dir, media]).catch(() => {});
+    }
+  });
 }
 
 export type SmokeScene = {
@@ -339,28 +375,29 @@ export async function smokeTestScenes(
   brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl" | "logoOnDark">,
 ): Promise<SceneChecks> {
   if (!scenes.length) return { errors: {}, faces: {}, cover: {} };
-  const sandbox = await withTimeLeft(await remotionSandbox());
-  const file = `${ROOT}/jobs/smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
-  try {
-    await sandbox.writeFiles([{ path: file, content: JSON.stringify(scenes.map((s) => ({ ...s, brand }))) }]);
-    const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 150 node smoke.mjs "$1"`, "bash", file] });
-    const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
+  return withRemotion(CHECK_WAIT_MS, async (sandbox) => {
+    const file = `${ROOT}/jobs/smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
     try {
-      const parsed = JSON.parse(lastLine) as {
-        results?: Record<string, string | null>;
-        faces?: Record<string, string>;
-        cover?: Record<string, number[]>;
-      } & Record<string, unknown>;
-      // A workshop still on the previous checker prints the errors alone.
-      if (parsed.results && typeof parsed.results === "object") return { errors: parsed.results, faces: parsed.faces ?? {}, cover: parsed.cover ?? {} };
-      return { errors: parsed as Record<string, string | null>, faces: {}, cover: {} };
-    } catch {
-      const output = (await result.output("both").catch(() => "")).slice(-400);
-      return { errors: Object.fromEntries(scenes.map((s) => [s.id, `smoke test failed: ${output}`])), faces: {}, cover: {} };
+      await sandbox.writeFiles([{ path: file, content: JSON.stringify(scenes.map((s) => ({ ...s, brand }))) }]);
+      const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 150 node smoke.mjs "$1"`, "bash", file] });
+      const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
+      try {
+        const parsed = JSON.parse(lastLine) as {
+          results?: Record<string, string | null>;
+          faces?: Record<string, string>;
+          cover?: Record<string, number[]>;
+        } & Record<string, unknown>;
+        // A workshop still on the previous checker prints the errors alone.
+        if (parsed.results && typeof parsed.results === "object") return { errors: parsed.results, faces: parsed.faces ?? {}, cover: parsed.cover ?? {} };
+        return { errors: parsed as Record<string, string | null>, faces: {}, cover: {} };
+      } catch {
+        const output = (await result.output("both").catch(() => "")).slice(-400);
+        return { errors: Object.fromEntries(scenes.map((s) => [s.id, `smoke test failed: ${output}`])), faces: {}, cover: {} };
+      }
+    } finally {
+      await bash(sandbox, 'rm -f "$1"', [file]).catch(() => {});
     }
-  } finally {
-    await bash(sandbox, 'rm -f "$1"', [file]).catch(() => {});
-  }
+  });
 }
 
 /**
@@ -372,35 +409,36 @@ export async function renderStillsInSandbox(
   jobs: { id: string; frame: number; props: ReelProps }[],
 ): Promise<Record<string, Buffer | Error>> {
   if (!jobs.length) return {};
-  const sandbox = await withTimeLeft(await remotionSandbox());
-  const dir = `${ROOT}/jobs/${id}`;
-  try {
-    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
-    const list = jobs.map((j) => ({ id: j.id, frame: j.frame, props: j.props, out: `${dir}/${j.id}.jpg` }));
-    await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(list) }]);
-    const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 240 node stills.mjs "$1/jobs.json"`, "bash", dir] });
-    const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
-    let errors: Record<string, string | null>;
+  return withRemotion(CHECK_WAIT_MS, async (sandbox) => {
+    const dir = `${ROOT}/jobs/${id}`;
     try {
-      errors = JSON.parse(lastLine) as Record<string, string | null>;
-    } catch {
-      const output = (await result.output("both").catch(() => "")).slice(-600);
-      throw new Error(`stills failed: ${output}`);
-    }
-    const images: Record<string, Buffer | Error> = {};
-    for (const job of list) {
-      const error = errors[job.id];
-      if (error) {
-        images[job.id] = new Error(error);
-        continue;
+      await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+      const list = jobs.map((j) => ({ id: j.id, frame: j.frame, props: j.props, out: `${dir}/${j.id}.jpg` }));
+      await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(list) }]);
+      const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 240 node stills.mjs "$1/jobs.json"`, "bash", dir] });
+      const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
+      let errors: Record<string, string | null>;
+      try {
+        errors = JSON.parse(lastLine) as Record<string, string | null>;
+      } catch {
+        const output = (await result.output("both").catch(() => "")).slice(-600);
+        throw new Error(`stills failed: ${output}`);
       }
-      const jpeg = await sandbox.readFileToBuffer({ path: job.out });
-      images[job.id] = jpeg?.length ? jpeg : new Error("still produced no file");
+      const images: Record<string, Buffer | Error> = {};
+      for (const job of list) {
+        const error = errors[job.id];
+        if (error) {
+          images[job.id] = new Error(error);
+          continue;
+        }
+        const jpeg = await sandbox.readFileToBuffer({ path: job.out });
+        images[job.id] = jpeg?.length ? jpeg : new Error("still produced no file");
+      }
+      return images;
+    } finally {
+      await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
     }
-    return images;
-  } finally {
-    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
-  }
+  });
 }
 
 /**
@@ -411,37 +449,38 @@ export async function renderStillsInSandbox(
  */
 export async function reelFramesInSandbox(id: string, props: ReelProps, frames: number[], scale = 0.5): Promise<Record<number, Buffer | Error>> {
   if (!frames.length) return {};
-  const sandbox = await withTimeLeft(await remotionSandbox());
-  const dir = `${ROOT}/jobs/${id}`;
-  const media = `${REMOTION}/build/public/jobs/${id}`;
-  try {
-    await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
-    const local = await localMedia(sandbox, id, props);
-    const jobs = frames.map((frame, i) => ({ id: `f${i}`, frame, out: `${dir}/f${i}.jpg`, scale }));
-    await sandbox.writeFiles([{ path: `${dir}/frames.json`, content: JSON.stringify({ props: local, jobs }) }]);
-    const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 240 node stills.mjs "$1/frames.json"`, "bash", dir] });
-    const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
-    let errors: Record<string, string | null>;
+  return withRemotion(CHECK_WAIT_MS, async (sandbox) => {
+    const dir = `${ROOT}/jobs/${id}`;
+    const media = `${REMOTION}/build/public/jobs/${id}`;
     try {
-      errors = JSON.parse(lastLine) as Record<string, string | null>;
-    } catch {
-      const output = (await result.output("both").catch(() => "")).slice(-600);
-      throw new Error(`frames failed: ${output}`);
-    }
-    const images: Record<number, Buffer | Error> = {};
-    for (const job of jobs) {
-      const error = errors[job.id];
-      if (error) {
-        images[job.frame] = new Error(error);
-        continue;
+      await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
+      const local = await localMedia(sandbox, id, props);
+      const jobs = frames.map((frame, i) => ({ id: `f${i}`, frame, out: `${dir}/f${i}.jpg`, scale }));
+      await sandbox.writeFiles([{ path: `${dir}/frames.json`, content: JSON.stringify({ props: local, jobs }) }]);
+      const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 240 node stills.mjs "$1/frames.json"`, "bash", dir] });
+      const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
+      let errors: Record<string, string | null>;
+      try {
+        errors = JSON.parse(lastLine) as Record<string, string | null>;
+      } catch {
+        const output = (await result.output("both").catch(() => "")).slice(-600);
+        throw new Error(`frames failed: ${output}`);
       }
-      const jpeg = await sandbox.readFileToBuffer({ path: job.out }).catch(() => null);
-      images[job.frame] = jpeg?.length ? jpeg : new Error("frame produced no file");
+      const images: Record<number, Buffer | Error> = {};
+      for (const job of jobs) {
+        const error = errors[job.id];
+        if (error) {
+          images[job.frame] = new Error(error);
+          continue;
+        }
+        const jpeg = await sandbox.readFileToBuffer({ path: job.out }).catch(() => null);
+        images[job.frame] = jpeg?.length ? jpeg : new Error("frame produced no file");
+      }
+      return images;
+    } finally {
+      await bash(sandbox, 'rm -rf "$1" "$2"', [dir, media]).catch(() => {});
     }
-    return images;
-  } finally {
-    await bash(sandbox, 'rm -rf "$1" "$2"', [dir, media]).catch(() => {});
-  }
+  });
 }
 
 /**
@@ -693,45 +732,46 @@ export async function voiceNoteInSandbox(id: string, mp3: Buffer): Promise<Buffe
  * buttons). The URL was checked to be public before; null when the page could not be read.
  */
 export async function pageInSandbox(id: string, url: string): Promise<{ capture: Buffer; full: Buffer | null; measured: unknown } | null> {
-  const sandbox = await withTimeLeft(await remotionSandbox());
-  const dir = `${ROOT}/jobs/${id}`;
-  try {
-    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
-    const result = await sandbox.runCommand({
-      cmd: "bash",
-      args: [
-        "-c",
-        `chrome=$(find ${REMOTION}/node_modules/.remotion -type f -name chrome-headless-shell 2>/dev/null | head -1)
-[ -n "$chrome" ] || { echo "no chrome"; exit 3; }
-cd ${REMOTION} && BROWSER_EXECUTABLE="$chrome" timeout 75 node page.mjs "$2" "$1"`,
-        "bash",
-        dir,
-        url,
-      ],
-    });
-    if (result.exitCode !== 0) {
-      console.warn("site page reading failed", url, result.exitCode, (await result.output("both").catch(() => "")).slice(-400));
-      return null;
-    }
-    const [capture, full, json] = await Promise.all([
-      sandbox.readFileToBuffer({ path: `${dir}/page.png` }),
-      sandbox.readFileToBuffer({ path: `${dir}/full.jpg` }).catch(() => null),
-      sandbox.readFileToBuffer({ path: `${dir}/page.json` }),
-    ]);
-    if (!capture?.length || !json?.length) return null;
-    let measured: unknown = null;
+  return withRemotion(CHECK_WAIT_MS, async (sandbox) => {
+    const dir = `${ROOT}/jobs/${id}`;
     try {
-      measured = JSON.parse(json.toString("utf8"));
-    } catch {
-      measured = null;
+      await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+      const result = await sandbox.runCommand({
+        cmd: "bash",
+        args: [
+          "-c",
+          `chrome=$(find ${REMOTION}/node_modules/.remotion -type f -name chrome-headless-shell 2>/dev/null | head -1)
+  [ -n "$chrome" ] || { echo "no chrome"; exit 3; }
+  cd ${REMOTION} && BROWSER_EXECUTABLE="$chrome" timeout 75 node page.mjs "$2" "$1"`,
+          "bash",
+          dir,
+          url,
+        ],
+      });
+      if (result.exitCode !== 0) {
+        console.warn("site page reading failed", url, result.exitCode, (await result.output("both").catch(() => "")).slice(-400));
+        return null;
+      }
+      const [capture, full, json] = await Promise.all([
+        sandbox.readFileToBuffer({ path: `${dir}/page.png` }),
+        sandbox.readFileToBuffer({ path: `${dir}/full.jpg` }).catch(() => null),
+        sandbox.readFileToBuffer({ path: `${dir}/page.json` }),
+      ]);
+      if (!capture?.length || !json?.length) return null;
+      let measured: unknown = null;
+      try {
+        measured = JSON.parse(json.toString("utf8"));
+      } catch {
+        measured = null;
+      }
+      return { capture, full: full?.length ? full : null, measured };
+    } catch (error) {
+      console.warn("site page reading failed", url, error instanceof Error ? error.message.slice(0, 300) : error);
+      return null;
+    } finally {
+      await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
     }
-    return { capture, full: full?.length ? full : null, measured };
-  } catch (error) {
-    console.warn("site page reading failed", url, error instanceof Error ? error.message.slice(0, 300) : error);
-    return null;
-  } finally {
-    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
-  }
+  });
 }
 
 /**
@@ -740,26 +780,27 @@ cd ${REMOTION} && BROWSER_EXECUTABLE="$chrome" timeout 75 node page.mjs "$2" "$1
  * The URL was checked to be public before; null when the capture fails.
  */
 export async function screenshotInSandbox(id: string, url: string): Promise<Buffer | null> {
-  const sandbox = await withTimeLeft(await remotionSandbox());
-  const dir = `${ROOT}/jobs/${id}`;
-  try {
-    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
-    await bash(
-      sandbox,
-      `chrome=$(find ${REMOTION}/node_modules/.remotion -type f -name chrome-headless-shell 2>/dev/null | head -1)
-[ -n "$chrome" ] || { echo "no chrome"; exit 3; }
-timeout 60 "$chrome" --headless --no-sandbox --disable-gpu --hide-scrollbars --mute-audio --lang=fr-FR --window-size=1280,1600 --virtual-time-budget=12000 --screenshot="$1/page.png" "$2" >/dev/null 2>&1 || true
-[ -s "$1/page.png" ]`,
-      [dir, url],
-    );
-    const png = await sandbox.readFileToBuffer({ path: `${dir}/page.png` });
-    return png?.length ? png : null;
-  } catch (error) {
-    console.warn("site screenshot failed", url, error instanceof Error ? error.message.slice(0, 300) : error);
-    return null;
-  } finally {
-    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
-  }
+  return withRemotion(CHECK_WAIT_MS, async (sandbox) => {
+    const dir = `${ROOT}/jobs/${id}`;
+    try {
+      await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+      await bash(
+        sandbox,
+        `chrome=$(find ${REMOTION}/node_modules/.remotion -type f -name chrome-headless-shell 2>/dev/null | head -1)
+  [ -n "$chrome" ] || { echo "no chrome"; exit 3; }
+  timeout 60 "$chrome" --headless --no-sandbox --disable-gpu --hide-scrollbars --mute-audio --lang=fr-FR --window-size=1280,1600 --virtual-time-budget=12000 --screenshot="$1/page.png" "$2" >/dev/null 2>&1 || true
+  [ -s "$1/page.png" ]`,
+        [dir, url],
+      );
+      const png = await sandbox.readFileToBuffer({ path: `${dir}/page.png` });
+      return png?.length ? png : null;
+    } catch (error) {
+      console.warn("site screenshot failed", url, error instanceof Error ? error.message.slice(0, 300) : error);
+      return null;
+    } finally {
+      await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -771,6 +812,14 @@ timeout 60 "$chrome" --headless --no-sandbox --disable-gpu --hide-scrollbars --m
 // ---------------------------------------------------------------------------
 
 const CUTOUT_NAME = "fauve-cutout-paris";
+/**
+ * Places in the cut-out sandbox: one cut-out at a time (its model takes 6.5 GB of the 16), two
+ * trackings and two stabilizations (a few processes each), so that montages started together queue
+ * instead of killing it for memory.
+ */
+const CUTOUT_SLOT = { kind: "cutout", slots: 1, perSlot: 1, leaseMs: 12 * 60_000, waitMs: 5 * 60_000 };
+const TRACK_SLOT = { kind: "track", slots: 1, perSlot: 2, leaseMs: 10 * 60_000, waitMs: 4 * 60_000 };
+const STABILIZE_SLOT = { kind: "stabilize", slots: 1, perSlot: 2, leaseMs: 6 * 60_000, waitMs: 4 * 60_000 };
 /** vCPUs of the cut-out sandbox: 16 GB of memory for the model, and 8 threads. */
 const CUTOUT_VCPUS = 8;
 const CUTOUT_ROOT = "/vercel/sandbox/cutout";
@@ -838,44 +887,47 @@ export async function cutoutsInSandbox(
   photos: { id: string; url: string }[],
 ): Promise<{ results: Record<string, { image: Buffer; type: "image/webp" | "image/png"; reading: CutoutReading } | Error>; seconds: number }> {
   if (!photos.length) return { results: {}, seconds: 0 };
-  const started = Date.now();
-  const sandbox = await withTimeLeft(await cutoutSandbox());
-  const dir = `${CUTOUT_ROOT}/jobs/${id}`;
-  try {
-    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
-    // A stopped sandbox resumes on that first command: now it can be given the time for the job.
-    await withTimeLeft(sandbox);
-    await Promise.all(photos.map((p, i) => bash(sandbox, FETCH, [`${dir}/in${i}`, p.url])));
-    const jobs = photos.map((p, i) => ({ id: p.id, src: `${dir}/in${i}`, out: `${dir}/out${i}` }));
-    await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
-    const run = await sandbox.runCommand({
-      cmd: "bash",
-      args: ["-c", `cd ${CUTOUT_ROOT} && CUTOUT_HOME=${CUTOUT_ROOT} FFMPEG=${CUTOUT_ROOT}/ffmpeg timeout 600 node cutout.mjs "$1/jobs.json"`, "bash", dir],
-    });
-    const lastLine = (await run.stdout()).trim().split("\n").at(-1) ?? "";
-    let readings: Record<string, (CutoutReading & { file: string }) | { error: string }>;
+  return withSlot(CUTOUT_SLOT, async () => {
+    // The time it worked, not the time it waited for its place.
+    const started = Date.now();
+    const sandbox = await withTimeLeft(await cutoutSandbox());
+    const dir = `${CUTOUT_ROOT}/jobs/${id}`;
     try {
-      readings = JSON.parse(lastLine);
-    } catch {
-      // 137: killed, most often for memory.
-      const output = (await run.output("both").catch(() => "")).slice(-400);
-      throw new Error(`cut-out failed (${run.exitCode}): ${output}`);
-    }
-    const results: Record<string, { image: Buffer; type: "image/webp" | "image/png"; reading: CutoutReading } | Error> = {};
-    for (const p of photos) {
-      const r = readings[p.id];
-      if (!r || "error" in r) {
-        results[p.id] = new Error(r && "error" in r ? r.error : "no cut-out");
-        continue;
+      await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+      // A stopped sandbox resumes on that first command: now it can be given the time for the job.
+      await withTimeLeft(sandbox);
+      await Promise.all(photos.map((p, i) => bash(sandbox, FETCH, [`${dir}/in${i}`, p.url])));
+      const jobs = photos.map((p, i) => ({ id: p.id, src: `${dir}/in${i}`, out: `${dir}/out${i}` }));
+      await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
+      const run = await sandbox.runCommand({
+        cmd: "bash",
+        args: ["-c", `cd ${CUTOUT_ROOT} && CUTOUT_HOME=${CUTOUT_ROOT} FFMPEG=${CUTOUT_ROOT}/ffmpeg timeout 600 node cutout.mjs "$1/jobs.json"`, "bash", dir],
+      });
+      const lastLine = (await run.stdout()).trim().split("\n").at(-1) ?? "";
+      let readings: Record<string, (CutoutReading & { file: string }) | { error: string }>;
+      try {
+        readings = JSON.parse(lastLine);
+      } catch {
+        // 137: killed, most often for memory.
+        const output = (await run.output("both").catch(() => "")).slice(-400);
+        throw new Error(`cut-out failed (${run.exitCode}): ${output}`);
       }
-      const { file, ...reading } = r;
-      const image = await sandbox.readFileToBuffer({ path: file }).catch(() => null);
-      results[p.id] = image?.length ? { image, type: file.endsWith(".webp") ? "image/webp" : "image/png", reading } : new Error("cut-out file missing");
+      const results: Record<string, { image: Buffer; type: "image/webp" | "image/png"; reading: CutoutReading } | Error> = {};
+      for (const p of photos) {
+        const r = readings[p.id];
+        if (!r || "error" in r) {
+          results[p.id] = new Error(r && "error" in r ? r.error : "no cut-out");
+          continue;
+        }
+        const { file, ...reading } = r;
+        const image = await sandbox.readFileToBuffer({ path: file }).catch(() => null);
+        results[p.id] = image?.length ? { image, type: file.endsWith(".webp") ? "image/webp" : "image/png", reading } : new Error("cut-out file missing");
+      }
+      return { results, seconds: (Date.now() - started) / 1000 };
+    } finally {
+      await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
     }
-    return { results, seconds: (Date.now() - started) / 1000 };
-  } finally {
-    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -980,59 +1032,65 @@ const STABILIZE = [
 ].join("\n");
 
 export async function stabilizeInSandbox(id: string, url: string): Promise<{ video: Buffer; seconds: number }> {
-  const started = Date.now();
-  const sandbox = await withTimeLeft(await cutoutSandbox());
-  const dir = `${CUTOUT_ROOT}/jobs/${id}`;
-  try {
-    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
-    // A stopped sandbox resumes on that first command: now it can be given the time for the job.
-    await withTimeLeft(sandbox);
-    await bash(sandbox, STABILIZE, [dir, url]);
-    const video = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
-    if (!video?.length) throw new Error("no stabilized video");
-    return { video, seconds: (Date.now() - started) / 1000 };
-  } finally {
-    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
-  }
+  return withSlot(STABILIZE_SLOT, async () => {
+    // The time it worked, not the time it waited for its place.
+    const started = Date.now();
+    const sandbox = await withTimeLeft(await cutoutSandbox());
+    const dir = `${CUTOUT_ROOT}/jobs/${id}`;
+    try {
+      await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+      // A stopped sandbox resumes on that first command: now it can be given the time for the job.
+      await withTimeLeft(sandbox);
+      await bash(sandbox, STABILIZE, [dir, url]);
+      const video = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
+      if (!video?.length) throw new Error("no stabilized video");
+      return { video, seconds: (Date.now() - started) / 1000 };
+    } finally {
+      await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+    }
+  });
 }
 
 export async function tracksInSandbox(id: string, videos: { id: string; url: string }[]): Promise<{ results: Record<string, TrackReading | Error>; seconds: number }> {
   if (!videos.length) return { results: {}, seconds: 0 };
-  const started = Date.now();
-  const sandbox = await withTimeLeft(await trackSandbox());
-  const dir = `${TRACK_ROOT}/jobs/${id}`;
-  try {
-    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
-    await withTimeLeft(sandbox);
-    await Promise.all(videos.map((v, i) => bash(sandbox, FETCH, [`${dir}/in${i}`, v.url])));
-    const jobs = videos.map((v, i) => ({ id: v.id, src: `${dir}/in${i}`, out: `${dir}/out${i}.json` }));
-    await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
-    const run = await sandbox.runCommand({
-      cmd: "bash",
-      args: ["-c", `cd ${TRACK_ROOT} && TRACK_MODELS=${TRACK_ROOT}/models FFMPEG=${CUTOUT_ROOT}/ffmpeg timeout 480 py/bin/python -I track.py "$1/jobs.json"`, "bash", dir],
-    });
-    const lastLine = (await run.stdout()).trim().split("\n").at(-1) ?? "";
-    let readings: Record<string, { file: string; frames: number; hands: number; faces: number; bodies: number } | { error: string }>;
+  return withSlot(TRACK_SLOT, async () => {
+    // The time it worked, not the time it waited for its place.
+    const started = Date.now();
+    const sandbox = await withTimeLeft(await trackSandbox());
+    const dir = `${TRACK_ROOT}/jobs/${id}`;
     try {
-      readings = JSON.parse(lastLine);
-    } catch {
-      const output = (await run.output("both").catch(() => "")).slice(-400);
-      throw new Error(`tracking failed (${run.exitCode}): ${output}`);
-    }
-    const results: Record<string, TrackReading | Error> = {};
-    for (const v of videos) {
-      const r = readings[v.id];
-      if (!r || "error" in r) {
-        results[v.id] = new Error(r && "error" in r ? r.error : "nothing tracked");
-        continue;
+      await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+      await withTimeLeft(sandbox);
+      await Promise.all(videos.map((v, i) => bash(sandbox, FETCH, [`${dir}/in${i}`, v.url])));
+      const jobs = videos.map((v, i) => ({ id: v.id, src: `${dir}/in${i}`, out: `${dir}/out${i}.json` }));
+      await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
+      const run = await sandbox.runCommand({
+        cmd: "bash",
+        args: ["-c", `cd ${TRACK_ROOT} && TRACK_MODELS=${TRACK_ROOT}/models FFMPEG=${CUTOUT_ROOT}/ffmpeg timeout 480 py/bin/python -I track.py "$1/jobs.json"`, "bash", dir],
+      });
+      const lastLine = (await run.stdout()).trim().split("\n").at(-1) ?? "";
+      let readings: Record<string, { file: string; frames: number; hands: number; faces: number; bodies: number } | { error: string }>;
+      try {
+        readings = JSON.parse(lastLine);
+      } catch {
+        const output = (await run.output("both").catch(() => "")).slice(-400);
+        throw new Error(`tracking failed (${run.exitCode}): ${output}`);
       }
-      const file = await sandbox.readFileToBuffer({ path: r.file }).catch(() => null);
-      results[v.id] = file?.length ? { file, frames: r.frames, hands: r.hands, faces: r.faces, bodies: r.bodies } : new Error("tracks file missing");
+      const results: Record<string, TrackReading | Error> = {};
+      for (const v of videos) {
+        const r = readings[v.id];
+        if (!r || "error" in r) {
+          results[v.id] = new Error(r && "error" in r ? r.error : "nothing tracked");
+          continue;
+        }
+        const file = await sandbox.readFileToBuffer({ path: r.file }).catch(() => null);
+        results[v.id] = file?.length ? { file, frames: r.frames, hands: r.hands, faces: r.faces, bodies: r.bodies } : new Error("tracks file missing");
+      }
+      return { results, seconds: (Date.now() - started) / 1000 };
+    } finally {
+      await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
     }
-    return { results, seconds: (Date.now() - started) / 1000 };
-  } finally {
-    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------

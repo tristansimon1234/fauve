@@ -50,6 +50,7 @@ import { levelSpeechInSandbox } from "@/lib/render/sandbox";
 import { postStyle, STEAL_WAIT_MS } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
+import { withSlot } from "@/lib/work-slots";
 
 // Edith's voice over a Reel: the script she writes from what the images show,
 // read by an ElevenLabs voice with the timing of every word, kept as an audio
@@ -280,10 +281,17 @@ const BUSY_RETRIES = 5;
  * ElevenLabs reads the script: the audio (as it comes, its loudness varies by voice,
  * see levelSpeech) and the time of every word.
  */
-export async function speak(
+/** ElevenLabs reads 5 texts at once on its plan: a sixth waits for its place here (work_slots) rather than on refusals. */
+const VOICE_SLOT = { kind: "elevenlabs_voice", slots: 1, perSlot: 5, leaseMs: 3 * 60_000, waitMs: 4 * 60_000 };
+
+export function speak(text: string, voiceId = env("ELEVENLABS_VOICE_ID"), speed = 1) {
+  return withSlot(VOICE_SLOT, () => speakNow(text, voiceId, speed));
+}
+
+async function speakNow(
   text: string,
-  voiceId = env("ELEVENLABS_VOICE_ID"),
-  speed = 1,
+  voiceId: string,
+  speed: number,
 ): Promise<{ mp3: Buffer; transcript: VoiceTranscript; model: string; voiceId: string }> {
   const key = env("ELEVENLABS_API_KEY");
   if (!key) throw new Error("ELEVENLABS_API_KEY missing");
