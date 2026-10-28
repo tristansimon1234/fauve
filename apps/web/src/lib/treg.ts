@@ -46,13 +46,22 @@ export async function tregCall(id: string, body: Record<string, unknown>, maxCos
     headers: { "X-Treg-Token": token, "X-Treg-Route-Max-Cost": String(maxCostUsd), "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(45_000),
-  }).catch(() => null);
+  }).catch((error: unknown) => {
+    console.warn("treg: call failed", id, error instanceof Error ? error.message : error);
+    return null;
+  });
   if (!response) return { answer: null, costUsd: 0 };
   const costUsd = Number(response.headers.get("x-treg-cost-micro") ?? 0) / 1_000_000;
   const cost = Number.isFinite(costUsd) ? costUsd : 0;
+  const text = await response.text().catch(() => "");
   if (!response.ok) {
-    console.warn("treg: call refused", id, response.status, (await response.text().catch(() => "")).slice(0, 300));
+    console.warn("treg: call refused", id, response.status, text.slice(0, 300));
     return { answer: null, costUsd: cost };
   }
-  return { answer: await response.json().catch(() => null), costUsd: cost };
+  try {
+    return { answer: JSON.parse(text) as unknown, costUsd: cost };
+  } catch {
+    console.warn("treg: not JSON", id, response.status, response.headers.get("content-type"), text.slice(0, 300));
+    return { answer: null, costUsd: cost };
+  }
 }
