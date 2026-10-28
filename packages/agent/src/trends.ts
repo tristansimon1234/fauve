@@ -148,35 +148,52 @@ export function instagramTrends(answer: unknown): TrendVideo[] {
 /** How much a video caught on: its views, else its likes as if one view in twenty liked. */
 export const reach = (v: Pick<TrendVideo, "views" | "likes">) => v.views ?? (v.likes ?? 0) * 20;
 
+/** Pages read per search (AnyAPI gives 10 to 30 videos a page): a bigger pool, so the top is the real top. */
+export const TREND_PAGES = 3;
+/** Fewer views than this is not a trend, whatever the search found (kept only when too few others are left). */
+export const TREND_MIN_VIEWS: Record<TrendPlatform, number> = { tiktok: 50_000, instagram: 30_000 };
+
 /**
- * The ones worth showing: no duplicate, the recent ones (under TREND_MAX_AGE_DAYS) first when there
- * are enough of them, the most watched first, TREND_KEEP at most.
+ * The ones worth showing (Tristan: « j'aimerais les plus vus »): no duplicate, the recent ones (under
+ * TREND_MAX_AGE_DAYS) when there are enough of them, above TREND_MIN_VIEWS when there are enough of
+ * them, the most watched first, TREND_KEEP at most. A caption in another script (Persian, Amharic…)
+ * is not her audience.
  */
 export function keptTrends(videos: TrendVideo[], now = new Date()): TrendVideo[] {
-  const unique = [...new Map(videos.map((v) => [`${v.platform}:${v.external_id}`, v])).values()];
+  const unique = [...new Map(videos.map((v) => [`${v.platform}:${v.external_id}`, v])).values()].filter((v) => !foreignScript(v.caption));
   const ranked = unique.sort((a, b) => reach(b) - reach(a));
   const limit = now.getTime() - TREND_MAX_AGE_DAYS * 86_400_000;
+  const enough = (list: TrendVideo[]) => list.length >= Math.min(6, ranked.length);
   const recent = ranked.filter((v) => v.posted_at && Date.parse(v.posted_at) >= limit);
-  const pool = recent.length >= Math.min(6, ranked.length) ? recent : ranked;
-  // Hers is a French audience: the French ones first, the rest of the world after them.
-  const french = pool.filter(isFrench);
-  return [...french, ...pool.filter((v) => !isFrench(v))].slice(0, TREND_KEEP);
+  const pool = enough(recent) ? recent : ranked;
+  const strong = pool.filter((v) => reach(v) >= TREND_MIN_VIEWS[v.platform]);
+  return (enough(strong) ? strong : pool).slice(0, TREND_KEEP);
 }
 
-const FRENCH_WORDS = new Set(
-  "le la les des une un du et est pour avec chez dans sur qui que pas plus tu ton ta tes vous nous je on ce cette c'est j'ai trop très mon ma mes au aux".split(" "),
-);
+/** Mostly written in a script other than the Latin one (emoji, digits and hashtags aside). */
+export function foreignScript(caption: string): boolean {
+  const letters = caption.replace(/#\S+|@\S+/g, "").match(/\p{L}/gu) ?? [];
+  if (letters.length < 6) return false;
+  const latin = letters.filter((c) => /\p{Script=Latin}/u.test(c)).length;
+  return latin / letters.length < 0.5;
+}
 
-/**
- * Posted in French: TikTok says France (or Belgium, Switzerland…), else its caption reads as French
- * (three of its common words, or two with French accents). A caption of hashtags alone says nothing.
- */
-export function isFrench(v: Pick<TrendVideo, "caption" | "region">): boolean {
-  if (v.region && /^(FR|BE|CH|LU|MC|CA)$/i.test(v.region)) return true;
-  const words = v.caption.toLowerCase().replace(/#\S+|@\S+/g, " ").split(/[^a-zà-ÿ']+/).filter(Boolean);
-  const common = words.filter((w) => FRENCH_WORDS.has(w)).length;
-  const accents = /[éèêàùçœ]/i.test(v.caption);
-  return common >= 3 || (common >= 2 && accents);
+/** The cursor of the next page in a search's answer (AnyAPI's nextCursor), if any. */
+export function nextCursorIn(answer: unknown): string | null {
+  const seen = new Set<unknown>();
+  const walk = (v: unknown, depth: number): string | null => {
+    if (!v || typeof v !== "object" || depth > 4 || seen.has(v)) return null;
+    seen.add(v);
+    const own = (v as Record<string, unknown>).nextCursor;
+    if (typeof own === "string" && own) return own;
+    for (const child of Object.values(v as Record<string, unknown>)) {
+      if (Array.isArray(child)) continue;
+      const found = walk(child, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(answer, 0);
 }
 
 /**

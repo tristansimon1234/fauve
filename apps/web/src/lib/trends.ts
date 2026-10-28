@@ -2,6 +2,8 @@ import "server-only";
 import {
   instagramTrends,
   keptTrends,
+  nextCursorIn,
+  TREND_PAGES,
   TREND_PLATFORMS,
   TREND_REFRESH_DAYS,
   tiktokTrends,
@@ -63,6 +65,20 @@ async function keepCover(key: string, video: TrendVideo): Promise<string | null>
   }
 }
 
+/** One search read page after page (TREND_PAGES at most, while there is a next one); null without a Treg key. */
+async function searchPages(search: (typeof SEARCH)[TrendPlatform], words: string): Promise<{ answer: unknown; costUsd: number }[] | null> {
+  const pages: { answer: unknown; costUsd: number }[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < TREND_PAGES; page++) {
+    const called = await tregCall(search.id, { ...search.body(words), ...(cursor ? { cursor } : {}) }, 0.02);
+    if (!called) return page ? pages : null;
+    pages.push(called);
+    cursor = nextCursorIn(called.answer);
+    if (!cursor || !called.answer) break;
+  }
+  return pages;
+}
+
 /**
  * Searches a trade again on one platform: its videos replace the ones kept before (and their covers).
  * Logs what Treg charged. Returns how many were kept; null without a Treg key.
@@ -70,9 +86,10 @@ async function keepCover(key: string, video: TrendVideo): Promise<string | null>
 async function refreshPlatform(query: string, platform: TrendPlatform): Promise<number | null> {
   const key = trendKey(query);
   const search = SEARCH[platform];
-  const calls = await Promise.all(trendSearches(query).map((words) => tregCall(search.id, search.body(words), 0.02)));
-  if (calls.some((c) => !c)) return null;
-  const called = calls.filter((c) => c !== null);
+  // Each search read over a few pages: the top of a bigger pool is the real top.
+  const pages = await Promise.all(trendSearches(query).map((words) => searchPages(search, words)));
+  if (pages.some((p) => !p)) return null;
+  const called = pages.flatMap((p) => p ?? []);
   const costUsd = called.reduce((sum, c) => sum + c.costUsd, 0);
   const db = supabaseAdmin();
   await db.from("cost_events").insert({
