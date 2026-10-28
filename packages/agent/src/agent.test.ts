@@ -8,7 +8,7 @@ import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts"
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
-import { foreignScript, instagramTrends, keptTrends, nextCursorIn, shortCount, tiktokTrends, trendQueryOf, trendSearches } from "./trends.ts";
+import { foreignScript, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
@@ -4689,9 +4689,24 @@ test("trends: Treg's searches read, the most watched recent ones kept", () => {
   const insta = instagramTrends({ output: { data: { reels: [{ shortcode: "DAbc", caption: "pov", likes: 500, username: "c", thumbnail: "https://x.cdninstagram.com/t.jpg", createdUtc: t - 400 * day }] } } });
   assert.equal(insta[0]!.url, "https://www.instagram.com/reel/DAbc/");
   assert.equal(insta[0]!.views, null);
-  // The most watched first; an old one only when too few recent ones are left.
-  const kept = keptTrends([...tiktok, ...insta, tiktok[0]!], now);
-  assert.deepEqual(kept.map((v) => v.external_id), ["72", "71", "DAbc"]);
+  // The most watched first; an old one never, even when the list stays short.
+  const kept = keptTrends([...tiktok, ...insta, tiktok[0]!], "trend", now);
+  assert.deepEqual(kept.map((v) => v.external_id), ["72", "71"]);
+  // Instagram's top posts on a hashtag: the videos, with their views; photos left out.
+  const top = instagramTopPosts({
+    found: true,
+    data: {
+      nextCursor: "QV",
+      posts: [
+        { shortcode: "C8a", caption: "reformer day", username: "d", views: 4_820_000, likes: 318_400, createdUtc: t - 2 * day, durationSeconds: 42.5, media: [{ type: "video", url: "https://x.cdninstagram.com/c.jpg" }] },
+        { shortcode: "C8b", caption: "chart", username: "e", likes: 94_100, createdUtc: t - 2 * day, media: [{ type: "photo", url: "https://x.cdninstagram.com/p.jpg" }] },
+      ],
+    },
+  });
+  assert.equal(top.length, 1);
+  assert.equal(top[0]!.url, "https://www.instagram.com/reel/C8a/");
+  assert.equal(top[0]!.views, 4_820_000);
+  assert.equal(top[0]!.cover, "https://x.cdninstagram.com/c.jpg");
 });
 
 test("trends: the words searched for a trade", () => {
@@ -4704,15 +4719,39 @@ test("trends: the words searched for a trade", () => {
   assert.equal(shortCount(950), "950");
 });
 
-test("trends: the most watched first, foreign scripts and weak ones left out, more pages", () => {
+test("trends: the most watched first, foreign scripts and weak ones left out, two lists", () => {
   assert.equal(foreignScript("هرچقدر از لذتش بگم کم گفتم بهتون 🤤"), true);
   assert.equal(foreignScript("La cliente parfaite existe… #coiffure"), false);
-  const v = (id: string, views: number, caption: string) => ({ platform: "tiktok" as const, external_id: id, url: `https://t/${id}`, caption, author: null, views, likes: null, comments: null, shares: null, sound: null, duration: null, posted_at: null, cover: null });
-  const many = [1, 2, 3, 4, 5, 6].map((i) => v(`s${i}`, 100_000 * i, "le meilleur brunch de paris"));
-  const kept = keptTrends([v("weak", 900, "petit brunch"), v("fa", 9_000_000, "هرچقدر از لذتش بگم کم گفتم بهتون"), ...many]);
-  assert.deepEqual(kept.map((k) => k.external_id), ["s6", "s5", "s4", "s3", "s2", "s1"]);
+  const now = new Date("2026-10-28T12:00:00Z");
+  const v = (id: string, views: number, caption: string) => ({ platform: "tiktok" as const, external_id: id, url: `https://t/${id}`, caption, author: null, views, likes: null, comments: null, shares: null, sound: null, duration: null, posted_at: "2026-10-20T10:00:00Z", cover: null });
+  const all = [v("weak", 900, "petit brunch"), v("local", 8_000, "brunch rue des martyrs"), v("fa", 9_000_000, "هرچقدر از لذتش بگم کم گفتم بهتون"), v("s1", 120_000, "le meilleur brunch"), v("s2", 400_000, "brunch")];
+  // Worldwide, 100 k views at least; near her, 5 k: never padded with weak ones.
+  assert.deepEqual(keptTrends(all, "trend", now).map((k) => k.external_id), ["s2", "s1"]);
+  assert.deepEqual(keptTrends(all, "local", now).map((k) => k.external_id), ["s2", "s1", "local"]);
   assert.equal(nextCursorIn({ output: { data: { videos: [], nextCursor: "abc" } } }), "abc");
   assert.equal(nextCursorIn({ output: { data: { videos: [], nextCursor: null } } }), null);
-  assert.deepEqual(trendSearches("restaurant"), ["restaurant", "restaurant paris"]);
-  assert.deepEqual(trendSearches("brunch lyon"), ["brunch lyon"]);
+  // « pilates paris »: the trade worldwide, then near her; the city's hashtag for the local list.
+  const pilates = trendPlan("Pilates Paris");
+  assert.deepEqual([pilates.trend.words, pilates.local.words], ["pilates", "pilates paris"]);
+  assert.deepEqual([pilates.trend.hashtags, pilates.local.hashtags], [["pilates"], ["pilatesparis"]]);
+  assert.equal(scopeKey(pilates.local), "local:pilates paris");
+  const salon = trendPlan("salon de coiffure");
+  assert.deepEqual(salon.trend.hashtags, ["salondecoiffure", "coiffure"]);
+  assert.deepEqual([salon.local.words, salon.local.hashtags], ["salon de coiffure paris", ["coiffureparis"]]);
+  assert.deepEqual([trendPlan("brunch lyon").trend.words, trendPlan("brunch lyon").local.words], ["brunch", "brunch lyon"]);
+  assert.equal(hashtagOf("crêperie"), "creperie");
+  assert.deepEqual(trendHashtags("salon de coiffure"), ["salondecoiffure", "coiffure", "coiffureparis"]);
+  // The number of posts on a hashtag, and how many were added in about a week.
+  assert.equal(hashtagPostsIn({ found: true, data: { items: [{ name: "pilates", postsCount: 52_300_000 }] } }), 52_300_000);
+  assert.equal(hashtagPostsIn({ found: false, reason: "not_found" }), null);
+  const counts = [
+    { hashtag: "pilates", counted_on: "2026-10-28", posts: 52_420_000 },
+    { hashtag: "pilates", counted_on: "2026-10-21", posts: 52_300_000 },
+    { hashtag: "pilates", counted_on: "2026-09-01", posts: 51_000_000 },
+    { hashtag: "pilatesparis", counted_on: "2026-10-28", posts: 310_000 },
+  ];
+  assert.deepEqual(hashtagVolumes(counts, ["pilates", "pilatesparis", "none"]), [
+    { hashtag: "pilates", posts: 52_420_000, gained: 120_000, days: 7 },
+    { hashtag: "pilatesparis", posts: 310_000, gained: null, days: null },
+  ]);
 });

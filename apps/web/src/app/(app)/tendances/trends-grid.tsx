@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { EyeIcon, HeartIcon, InstagramIcon, MusicIcon, TikTokIcon } from "@/components/icons";
 import { NewPostSheet } from "@/components/new-post-sheet";
-import type { TrendCard } from "@/lib/trends";
+import type { TrendCard, TrendLists } from "@/lib/trends";
 import { setTrendQuery } from "./actions";
 
 type Filter = "all" | "tiktok" | "instagram";
@@ -67,13 +67,13 @@ export function TrendQuery({ query }: { query: string | null }) {
   );
 }
 
-/** The videos that work, the most watched first, with « Fais-en un comme ça ». */
-export function TrendsGrid({ cards, fetchedAt, searching, timezone }: { cards: TrendCard[]; fetchedAt: string | null; searching: boolean; timezone: string }) {
+/** The two lists (« Ce qui cartonne », « À Paris »), the trade's hashtags and « Fais-en un comme ça ». */
+export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; searching: boolean; timezone: string }) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
   const [copying, setCopying] = useState<string | null>(null);
 
-  // While the first search runs, the page looks again every few seconds (about 20 s in all).
+  // While the first search runs, the page looks again every few seconds.
   useEffect(() => {
     if (!searching) return;
     const timer = setInterval(() => router.refresh(), 6000);
@@ -87,18 +87,16 @@ export function TrendsGrid({ cards, fetchedAt, searching, timezone }: { cards: T
       </div>
     );
   }
-  if (!cards.length) {
+  if (!lists.trend.length && !lists.local.length) {
     return (
       <div className="rounded-[22px] bg-soft px-6 py-10 text-center text-[15px] text-muted">
-        Rien trouvé pour ces mots cette semaine. Essaie d’autres mots, plus simples (« coiffeur », « brunch », « pilates »).
+        Rien de vraiment fort pour ces mots cette semaine. Essaie d’autres mots, plus simples (« coiffeur », « brunch », « pilates »).
       </div>
     );
   }
 
-  const platforms = new Set(cards.map((c) => c.platform));
-  const shown = cards.filter((c) => filter === "all" || c.platform === filter);
-  // The most watched first, both platforms together (likes count for twenty views when a search gives no views).
-  const ordered = [...shown].sort((a, b) => (b.views ?? (b.likes ?? 0) * 20) - (a.views ?? (a.likes ?? 0) * 20));
+  const city = lists.words.local.split(" ").at(-1) ?? "";
+  const platforms = new Set([...lists.trend, ...lists.local].map((c) => c.platform));
 
   return (
     <>
@@ -127,61 +125,101 @@ export function TrendsGrid({ cards, fetchedAt, searching, timezone }: { cards: T
         ) : (
           <span />
         )}
-        {fetchedAt && <p className="text-[13px] text-muted">Mis à jour {since(fetchedAt)}</p>}
+        {lists.fetchedAt && <p className="text-[13px] text-muted">Mis à jour {since(lists.fetchedAt)}</p>}
       </div>
 
-      <ul className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {ordered.map((card) => (
-          <li key={card.id} className="flex min-w-0 flex-col gap-2">
-            <a href={card.url} target="_blank" rel="noopener noreferrer" className="group relative block aspect-[9/16] overflow-hidden rounded-[16px] bg-soft">
-              {card.cover ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={card.cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
-              ) : (
-                <div className="flex h-full items-center justify-center px-4 text-center text-[13px] text-muted">{card.caption.slice(0, 80) || "Voir la vidéo"}</div>
+      {lists.hashtags.length > 0 && (
+        <ul className="flex flex-wrap gap-2" aria-label="Hashtags sur Instagram">
+          {lists.hashtags.map((h) => (
+            <li key={h.hashtag} className="flex items-baseline gap-2 rounded-full border border-line px-4 py-2 text-[14px]">
+              <span className="font-bold">#{h.hashtag}</span>
+              <span className="text-muted">{shortCount(h.posts)} publications</span>
+              {h.gained !== null && h.gained > 0 && h.days !== null && (
+                <span className="font-bold text-violet">
+                  +{shortCount(h.gained)} en {h.days} jours
+                </span>
               )}
-              <span className="absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white">
-                {card.platform === "tiktok" ? <TikTokIcon size={15} /> : <InstagramIcon size={15} />}
-              </span>
-              <span className="absolute bottom-2 left-2 flex items-center gap-1 text-[13px] font-bold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.6)]">
-                {card.views !== null ? (
-                  <>
-                    <EyeIcon size={15} /> {shortCount(card.views)}
-                  </>
-                ) : card.likes !== null ? (
-                  <>
-                    <HeartIcon size={15} /> {shortCount(card.likes)}
-                  </>
-                ) : null}
-              </span>
-            </a>
-            <div className="flex min-w-0 flex-col gap-1 px-0.5">
-              {card.author && <p className="truncate text-[13px] font-bold">@{card.author}</p>}
-              {card.caption && <p className="line-clamp-2 text-[13px] leading-snug text-muted">{card.caption}</p>}
-              {card.sound && (
-                <p className="flex min-w-0 items-center gap-1 text-[12px] text-muted">
-                  <MusicIcon size={13} />
-                  <span className="truncate">{card.sound}</span>
-                </p>
-              )}
-              <p className="text-[12px] text-muted">
-                {[card.postedAt ? since(card.postedAt) : null, card.likes !== null && card.views !== null ? `${shortCount(card.likes)} j’aime` : null].filter(Boolean).join(" · ")}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setCopying(card.url)}
-              className="h-9 rounded-full border border-line text-[13px] font-bold text-violet hover:bg-violet-soft"
-            >
-              Fais-en un comme ça
-            </button>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <TrendSection title="Ce qui cartonne en ce moment" note={`« ${lists.words.trend} », partout`} cards={lists.trend} filter={filter} onCopy={setCopying} />
+      <TrendSection title={`À ${capitalized(city)}`} note={`« ${lists.words.local} »`} cards={lists.local} filter={filter} onCopy={setCopying} />
       {copying && <NewPostSheet timezone={timezone} copyLink={copying} onClose={() => setCopying(null)} />}
     </>
   );
 }
+
+function TrendSection({ title, note, cards, filter, onCopy }: { title: string; note: string; cards: TrendCard[]; filter: Filter; onCopy: (url: string) => void }) {
+  const shown = cards.filter((c) => filter === "all" || c.platform === filter);
+  // The most watched first, both platforms together (likes count for twenty views when a search gives no views).
+  const ordered = [...shown].sort((a, b) => (b.views ?? (b.likes ?? 0) * 20) - (a.views ?? (a.likes ?? 0) * 20));
+  return (
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-[22px] font-extrabold tracking-[-0.01em]">{title}</h2>
+        <p className="text-[14px] text-muted">{note}</p>
+      </div>
+      {ordered.length ? (
+        <ul className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {ordered.map((card) => (
+            <TrendItem key={card.id} card={card} onCopy={onCopy} />
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-[16px] bg-soft px-5 py-6 text-[14px] text-muted">Rien d’assez fort ici cette semaine.</p>
+      )}
+    </section>
+  );
+}
+
+function TrendItem({ card, onCopy }: { card: TrendCard; onCopy: (url: string) => void }) {
+  return (
+    <li className="flex min-w-0 flex-col gap-2">
+      <a href={card.url} target="_blank" rel="noopener noreferrer" className="group relative block aspect-[9/16] overflow-hidden rounded-[16px] bg-soft">
+        {card.cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={card.cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+        ) : (
+          <div className="flex h-full items-center justify-center px-4 text-center text-[13px] text-muted">{card.caption.slice(0, 80) || "Voir la vidéo"}</div>
+        )}
+        <span className="absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white">
+          {card.platform === "tiktok" ? <TikTokIcon size={15} /> : <InstagramIcon size={15} />}
+        </span>
+        <span className="absolute bottom-2 left-2 flex items-center gap-1 text-[13px] font-bold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.6)]">
+          {card.views !== null ? (
+            <>
+              <EyeIcon size={15} /> {shortCount(card.views)}
+            </>
+          ) : card.likes !== null ? (
+            <>
+              <HeartIcon size={15} /> {shortCount(card.likes)}
+            </>
+          ) : null}
+        </span>
+      </a>
+      <div className="flex min-w-0 flex-col gap-1 px-0.5">
+        {card.author && <p className="truncate text-[13px] font-bold">@{card.author}</p>}
+        {card.caption && <p className="line-clamp-2 text-[13px] leading-snug text-muted">{card.caption}</p>}
+        {card.sound && (
+          <p className="flex min-w-0 items-center gap-1 text-[12px] text-muted">
+            <MusicIcon size={13} />
+            <span className="truncate">{card.sound}</span>
+          </p>
+        )}
+        <p className="text-[12px] text-muted">
+          {[card.postedAt ? since(card.postedAt) : null, card.likes !== null && card.views !== null ? `${shortCount(card.likes)} j’aime` : null].filter(Boolean).join(" · ")}
+        </p>
+      </div>
+      <button type="button" onClick={() => onCopy(card.url)} className="h-9 rounded-full border border-line text-[13px] font-bold text-violet hover:bg-violet-soft">
+        Fais-en un comme ça
+      </button>
+    </li>
+  );
+}
+
+const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** « il y a 3 jours », « il y a 2 semaines », « il y a 4 mois ». */
 function since(iso: string): string {

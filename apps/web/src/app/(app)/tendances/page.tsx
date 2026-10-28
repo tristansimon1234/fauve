@@ -5,7 +5,7 @@ import { NoStudio } from "@/components/empty-state";
 import { PageSuspense } from "@/components/page-suspense";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { isStale, lastSearched, refreshTrends, trendCards } from "@/lib/trends";
+import { anyStale, lastSearched, refreshTrends, trendCards } from "@/lib/trends";
 import { TrendQuery, TrendsGrid } from "./trends-grid";
 
 export const metadata: Metadata = { title: "Tendances" };
@@ -39,16 +39,16 @@ async function Trends() {
     );
   }
 
-  const [{ cards, fetchedAt }, last] = await Promise.all([trendCards(query), lastSearched(query)]);
+  const [lists, last] = await Promise.all([trendCards(query), lastSearched(query)]);
   // Never searched, or last week's: searched again now, after the page is sent.
-  const stale = isStale(last.tiktok) || isStale(last.instagram);
+  const stale = anyStale(last);
   if (stale) after(() => refreshTrends(query).catch((e: unknown) => console.error("trends: refresh failed", query, e)));
 
   return (
     <>
       <Header />
       <TrendQuery query={query} />
-      <TrendsGrid cards={cards} fetchedAt={fetchedAt} searching={stale && cards.length === 0} timezone={member.studio.timezone} />
+      <TrendsGrid lists={lists} searching={stale && !lists.trend.length && !lists.local.length && !lists.fetchedAt} timezone={member.studio.timezone} />
     </>
   );
 }
@@ -57,7 +57,7 @@ function Header() {
   return (
     <div className="flex flex-col gap-1.5">
       <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Tendances</h1>
-      <p className="text-[15px] text-muted">Ce qui marche en ce moment dans ton métier, sur TikTok et Instagram. Mis à jour chaque semaine.</p>
+      <p className="text-[15px] text-muted">Les vidéos les plus vues de ton métier ce mois-ci, partout et près de chez toi, sur TikTok et Instagram. Mis à jour chaque semaine.</p>
     </div>
   );
 }
