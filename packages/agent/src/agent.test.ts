@@ -1327,7 +1327,7 @@ test("history: the window's start stays put for several turns, then jumps ahead"
   assert.equal(stableWindow(all.slice(0, 5), 10, 4).length, 5); // fewer than the limit: all of them
 });
 
-test("plans: Essentiel at 19 € and Pro at 49 € VAT included, each month keeps half of what it brings in", async () => {
+test("plans: Essentiel at 19 € and Pro at 49 € VAT included, each month keeps 40 % of what it brings in", async () => {
   const { PLANS, planOf, weeklyPosts } = await import("./plans.ts");
   const { monthCostCeiling } = await import("./margin.ts");
   assert.equal(planOf("trial"), "pro");
@@ -1336,12 +1336,12 @@ test("plans: Essentiel at 19 € and Pro at 49 € VAT included, each month keep
   // What they bring in, VAT (20 %) and Stripe's fees out.
   assert.ok(Math.abs(netRevenue("essentiel") - 15.17) < 0.01);
   assert.ok(Math.abs(netRevenue("pro") - 39.51) < 0.01);
-  // Every credit spent, and the chat and readings no credit pays at its rhythm: still half of it kept.
+  // Every credit spent, and the chat and readings no credit pays at its rhythm: still 40 % of it kept.
   for (const plan of ["decouverte", "essentiel", "pro"] as const) assert.ok(monthCostCeiling(plan) <= monthlyCostBudget(plan), plan);
-  // A credit costs her about the same on either offer.
+  // A credit costs her about the same on either offer (a little less in Pro).
   const perCredit = (plan: "essentiel" | "pro") => PLANS[plan].priceEur / PLANS[plan].credits;
   assert.ok(Math.abs(perCredit("essentiel") - perCredit("pro")) / perCredit("pro") < 0.05);
-  assert.equal(studioMonth([{ purpose: "editor", eur: monthlyCostBudget("essentiel") }], "essentiel").margin, 0.5);
+  assert.equal(studioMonth([{ purpose: "editor", eur: monthlyCostBudget("essentiel") }], "essentiel").margin, 0.4);
   assert.deepEqual([weeklyPosts("essentiel"), weeklyPosts("pro")], ["1 publication soignée par semaine", "3 publications soignées par semaine"]);
 });
 
@@ -2110,12 +2110,16 @@ test("bank: a clean shot that moves or hooks is kept, a dark or shaky clip is no
   assert.equal(bankWorthy({ lighting: "ok", shots: [{ ...shot, energy: 1, hook_score: 2 }] } as never), false);
 });
 
-test("offers: Découverte stays at €9 with 3 Reels, and a studio out of credits is offered the next one", async () => {
-  const { PLANS, CARED_REEL_CREDITS, nextPlan, planOf, reelsPerMonth, weeklyPosts } = await import("./plans.ts");
+test("offers: Découverte stays at €9 with 2 Reels, a Reel is cheaper in each offer above, and a studio out of credits is offered the next one", async () => {
+  const { PLANS, PLAN_ORDER, CARED_REEL_CREDITS, CREDIT_PACK, nextPlan, planOf, reelsPerMonth, weeklyPosts } = await import("./plans.ts");
   assert.equal(PLANS.decouverte.priceEur, 9);
-  assert.equal(PLANS.decouverte.credits, 3 * CARED_REEL_CREDITS);
-  assert.equal(reelsPerMonth("decouverte"), 3);
-  assert.equal(weeklyPosts("decouverte"), "3 Reels soignés par mois");
+  assert.equal(PLANS.decouverte.credits, 2 * CARED_REEL_CREDITS);
+  assert.equal(reelsPerMonth("decouverte"), 2);
+  assert.equal(weeklyPosts("decouverte"), "2 Reels soignés par mois");
+  // Moving up always pays: each offer's credit costs less than the one below, the pack more than any offer.
+  const perCredit = PLAN_ORDER.map((id) => PLANS[id].priceEur / PLANS[id].credits);
+  perCredit.slice(1).forEach((price, i) => assert.ok(price < perCredit[i]!, `${PLAN_ORDER[i + 1]} dearer per credit than ${PLAN_ORDER[i]}`));
+  assert.ok(CREDIT_PACK.priceEur / CREDIT_PACK.credits > perCredit[0]!);
   assert.equal(nextPlan("decouverte"), "essentiel");
   assert.equal(nextPlan("essentiel"), "pro");
   assert.equal(nextPlan("pro"), null);

@@ -1,4 +1,4 @@
-import { offersLine, packLine } from "./plans.ts";
+import { offersLine, packLine, reelsPerMonth } from "./plans.ts";
 
 // What a studio may do without paying (Tristan: « tu vas jusqu'au plan et pour le premier il
 // faut payer, tu as le choix entre 3 abonnements »). The onboarding goes all the way to the plan
@@ -54,5 +54,5 @@ export function accessOf(input: AccessInput): Access {
 export function accessMessage(reason: Access["reason"]): string {
   return reason === "credits"
     ? `Plus de crédits pour l'instant : rien de nouveau ne peut partir. Propose-lui « ${packLine()} » (paiement unique, ses crédits arrivent aussitôt) ou de passer à l'offre au-dessus (la différence au prorata), tous deux sur la page /abonnement ; sinon ses crédits reviennent au renouvellement de son abonnement. Dis-le-lui simplement, sans rien lancer.`
-    : `Pas encore abonnée : tout est prêt jusqu'au plan de son Reel, mais rien n'est fabriqué avant l'abonnement (${offersLine()} : Découverte 3 Reels, Essentiel, Pro ; sans engagement). Dis-le-lui simplement et donne le lien de l'abonnement (page /abonnement), sans rien lancer : dès qu'elle est abonnée, lance le plan qu'elle a validé sans le lui redemander.`;
+    : `Pas encore abonnée : tout est prêt jusqu'au plan de son Reel, mais rien n'est fabriqué avant l'abonnement (${offersLine()} : Découverte ${reelsPerMonth("decouverte")} Reels par mois, Essentiel, Pro ; sans engagement). Dis-le-lui simplement et donne le lien de l'abonnement (page /abonnement), sans rien lancer : dès qu'elle est abonnée, lance le plan qu'elle a validé sans le lui redemander.`;
 }

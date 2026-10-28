@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
-import { CREDIT_VALUE_EUR, monthlyCostBudget, netRevenue, PLANS, planOf, studioMonth, TARGET_MARGIN, type PlanId } from "@fauve/agent";
+import { CREDIT_VALUE_EUR, monthlyCostBudget, netRevenue, OFFER_MARGIN, PLAN_MARGIN, PLANS, planOf, studioMonth, type PlanId } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { adminKeyAuthorized } from "@/lib/test-studio";
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       credits_used: creditsUsed,
       // What the work cost per credit used (it must stay under half a credit's worth).
       cost_per_credit: creditsUsed ? Math.round((result.work / creditsUsed) * 1000) / 1000 : null,
-      under_target: result.margin < TARGET_MARGIN,
+      under_target: result.margin < PLAN_MARGIN[plan],
     };
   });
   rows.sort((a, b) => b.total - a.total);
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     plans: Object.fromEntries(
       (Object.keys(PLANS) as PlanId[]).map((p) => [p, { ...PLANS[p], net_revenue_eur: Math.round(netRevenue(p) * 100) / 100, cost_budget_eur: Math.round(monthlyCostBudget(p) * 100) / 100 }]),
     ),
-    target_margin: TARGET_MARGIN,
+    target_margin: OFFER_MARGIN,
     credit_value_eur: Math.round(CREDIT_VALUE_EUR * 1000) / 1000,
     studios: rows,
   });

@@ -1,13 +1,18 @@
-// The two offers, VAT included. Each has its price and its monthly credits, sized so that a
+// The three offers, VAT included. Each has its price and its monthly credits, sized so that a
 // month keeps the margin once VAT, Stripe's fees, the chat and WhatsApp are paid (margin.ts): a credit is
 // worth about the same in both. Quality over quantity: the credits pay for each Reel to be made
 // with care at the rhythm of the offer, not for more posts. A studio not subscribed yet counts as Pro (its onboarding).
 
 export const PLANS = {
-  /** The way in (Tristan: « 9 euros », « 3 réels », « il faut laisser à 9 »): 3 Reels made with care a month, at €9 every month. */
-  decouverte: { label: "Découverte", priceEur: 9, credits: 36, postsPerWeek: 0.75 },
-  essentiel: { label: "Essentiel", priceEur: 19, credits: 44, postsPerWeek: 1 },
-  pro: { label: "Pro", priceEur: 49, credits: 110, postsPerWeek: 3 },
+  /**
+   * The way in at €9 (Tristan: « il faut laisser à 9 »): 2 Reels made with care a month. Each offer
+   * above makes a Reel cheaper (€4.50, €4.22, €4.08), the credit pack dearer (€5): at 3 Reels for
+   * €9, Découverte was the best deal of all and nobody had a reason to move up (Tristan: « l'offre
+   * a 19 n'est pas intéressante »).
+   */
+  decouverte: { label: "Découverte", priceEur: 9, credits: 24, postsPerWeek: 0.5 },
+  essentiel: { label: "Essentiel", priceEur: 19, credits: 54, postsPerWeek: 1 },
+  pro: { label: "Pro", priceEur: 49, credits: 144, postsPerWeek: 3 },
 } as const;
 
 /** The offers from the smallest: a studio with no credits left is offered the next one up. */
@@ -25,7 +30,7 @@ export const CARED_REEL_CREDITS = 12;
 /** Reels made with care that a month of the offer pays for. */
 export const reelsPerMonth = (plan: PlanId) => Math.floor(PLANS[plan].credits / CARED_REEL_CREDITS);
 
-/** « 3 Reels soignés par mois », « 1 publication soignée par semaine », « 3 publications soignées par semaine ». */
+/** « 2 Reels soignés par mois », « 1 publication soignée par semaine », « 3 publications soignées par semaine ». */
 export function weeklyPosts(plan: PlanId): string {
   const n = PLANS[plan].postsPerWeek;
   if (n < 1) return `${reelsPerMonth(plan)} Reels soignés par mois`;

@@ -4,11 +4,11 @@ import { CREDIT_PACK, PLANS, type PlanId } from "./plans.ts";
 // What a studio costs against what it brings in: its offer's price once VAT and Stripe's fees
 // are out, the share kept as margin, and what a credit pays. Every priced job costs at most what
 // its credits pay, and each offer's credits are sized so that a whole month (every credit spent,
-// the chat and the readings no credit pays) costs at most half of what the offer brings in.
+// the chat and the readings no credit pays) costs at most 60 % of what the offer brings in.
 
 /** Pro's monthly price, in euros, VAT included. */
 export const PLAN_PRICE_EUR = PLANS.pro.priceEur;
-/** Share of what an offer brings in kept, at least: costs stay under the other half. */
+/** Share of a job's credits kept as margin: a credit pays at most half its worth of real cost (offers: OFFER_MARGIN). */
 export const TARGET_MARGIN = 0.5;
 /**
  * What a credit is worth, the margin included: every job is priced against it. Fixed at what it was
@@ -35,10 +35,12 @@ export const stripeFeeEur = (priceEur: number) => priceEur * (0.015 + 0.007) + 0
 /** What an offer brings in a month, VAT and Stripe's fees out. */
 export const netRevenue = (plan: PlanId) => PLANS[plan].priceEur / (1 + VAT_RATE) - stripeFeeEur(PLANS[plan].priceEur);
 /**
- * The margin each offer keeps at least. Découverte, the way in at €9, keeps a thinner one (its 3
- * Reels, every credit spent, cost about 81 % of what it brings in): it is how studios start.
+ * The margin each offer keeps at least, every credit spent (the worst case: credits left unspent
+ * are margin): 40 %, so that a Reel costs less in each offer above (Tristan chose it over 3 Reels
+ * at €9 with about 18 % on every offer).
  */
-export const PLAN_MARGIN: Record<PlanId, number> = { decouverte: 0.15, essentiel: TARGET_MARGIN, pro: TARGET_MARGIN };
+export const OFFER_MARGIN = 0.4;
+export const PLAN_MARGIN: Record<PlanId, number> = { decouverte: OFFER_MARGIN, essentiel: OFFER_MARGIN, pro: OFFER_MARGIN };
 /** The most a studio's month may cost (AI, render, chat…) while keeping its offer's margin. */
 export const monthlyCostBudget = (plan: PlanId) => netRevenue(plan) * (1 - PLAN_MARGIN[plan]);
 /** Pro's month budget. */
