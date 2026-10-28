@@ -137,6 +137,7 @@ export function SiteFooter() {
         <Link href="/confidentialite">Confidentialité</Link>
         <Link href="/conditions">Conditions d’utilisation</Link>
         <Link href="/suppression-des-donnees">Suppression des données</Link>
+        <Link href="/mentions-legales">Mentions légales</Link>
         {OPEN && <Link href="/connexion">Se connecter</Link>}
         <span className="font-normal">Vidéos d’exemple : Mixkit · Photos : Unsplash</span>
       </div>

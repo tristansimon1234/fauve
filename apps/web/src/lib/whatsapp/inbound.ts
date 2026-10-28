@@ -2,6 +2,8 @@ import "server-only";
 import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, replyExtrasSchema } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { answerPairing, claimPairing, PAIRING_YES, PAIRING_NO } from "@/lib/auth/pairing";
+import { TERMS_LINE } from "@/lib/legal";
+import { acceptShownTerms, acceptTerms, markTermsShown, termsToShow } from "@/lib/terms";
 import { answerPublishOffer } from "@/lib/publish-offer";
 import { deliverPendingHandOffs } from "@/lib/social/hand-off";
 import { replyInConversation } from "@/lib/agent/conversation";
@@ -124,6 +126,8 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   }
 
   await markReadAndTyping(message.id).catch((e) => console.warn("typing indicator failed", e));
+  // She wrote again after Edith showed her the terms: going on accepts them.
+  await acceptShownTerms(member.studio_id).catch((e) => console.warn("terms acceptance not kept", e));
 
   // « Bonjour Edith ! Code : K7P2QX » from the start screen on a computer: she confirms with a
   // button that the code is on her own screen (a message someone else wrote for her would open
@@ -157,6 +161,8 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
       return;
     }
     if (answer === "confirmed") {
+      // The QR page said that going on accepts the terms; her « Oui » is going on.
+      await acceptTerms(member.studio_id).catch((e) => console.warn("terms acceptance not kept", e));
       const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", member.studio_id).single();
       const fresh = onboardingStepOf(studio?.onboarding_step) !== "done";
       await pairingReply(
@@ -308,6 +314,9 @@ export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo
   const superseded = replyTo && !result.afterReply.length && !result.notes.length ? await newerMessage(studioId, replyTo).catch(() => false) : false;
   if (result.reply && superseded) console.info("whatsapp: reply left to the newer turn", replyTo);
   if (result.reply && !superseded) {
+    // Someone new, or terms that changed: Edith's message says that going on accepts them.
+    const terms = await termsToShow(studioId).catch(() => false);
+    if (terms) result.reply = `${result.reply}\n\n${TERMS_LINE}`;
     // The grid is the app's: never a link from WhatsApp, only the pages made for her phone.
     const { posts, quote } = result.extras;
     // A quote gets its yes / other level / no buttons, unless Fauve chose others.
@@ -348,6 +357,7 @@ export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo
       body: result.reply,
       payload: { ...(replyTo ? { reply_to: replyTo } : {}), ...result.extras, notes: result.notes },
     });
+    if (terms && waMessageId) await markTermsShown(studioId).catch((e) => console.warn("terms not marked shown", e));
   }
   // E.g. a render: the video follows the "je monte ta vidéo" reply.
   for (const job of result.afterReply) await job().catch((e) => console.error("after-reply job failed", e));
