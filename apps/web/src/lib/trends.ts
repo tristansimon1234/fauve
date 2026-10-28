@@ -7,6 +7,7 @@ import {
   tiktokTrends,
   trendKey,
   trendQueryOf,
+  trendSearches,
   usdToEur,
   type TrendPlatform,
   type TrendVideo,
@@ -69,21 +70,23 @@ async function keepCover(key: string, video: TrendVideo): Promise<string | null>
 async function refreshPlatform(query: string, platform: TrendPlatform): Promise<number | null> {
   const key = trendKey(query);
   const search = SEARCH[platform];
-  const called = await tregCall(search.id, search.body(query), 0.02);
-  if (!called) return null;
+  const calls = await Promise.all(trendSearches(query).map((words) => tregCall(search.id, search.body(words), 0.02)));
+  if (calls.some((c) => !c)) return null;
+  const called = calls.filter((c) => c !== null);
+  const costUsd = called.reduce((sum, c) => sum + c.costUsd, 0);
   const db = supabaseAdmin();
   await db.from("cost_events").insert({
     studio_id: null,
     kind: "trends",
     provider: "treg",
-    units: 1,
-    cost_eur: usdToEur(called.costUsd, env("USD_TO_EUR")),
-    meta: { query: key, platform, cost_usd: called.costUsd },
+    units: called.length,
+    cost_eur: usdToEur(costUsd, env("USD_TO_EUR")),
+    meta: { query: key, platform, cost_usd: costUsd },
   });
-  const kept = keptTrends(search.read(called.answer));
+  const kept = keptTrends(called.flatMap((c) => search.read(c.answer)));
   // A failed search keeps last week's videos; it is tried again the next time.
   if (!kept.length) {
-    console.warn("trends: nothing found", platform, key, JSON.stringify(called.answer ?? null).slice(0, 600));
+    console.warn("trends: nothing found", platform, key, JSON.stringify(called[0]?.answer ?? null).slice(0, 600));
     return 0;
   }
   const { data: before } = await db.from("trend_videos").select("id, cover_path, external_id").eq("key", key).eq("platform", platform);
@@ -116,7 +119,7 @@ async function refreshPlatform(query: string, platform: TrendPlatform): Promise<
     const paths = gone.flatMap((r) => (r.cover_path ? [r.cover_path as string] : []));
     if (paths.length) await db.storage.from("media").remove(paths);
   }
-  await db.from("trend_searches").upsert({ key, platform, query, fetched_at: fetchedAt, found: kept.length, cost_usd: called.costUsd }, { onConflict: "key,platform" });
+  await db.from("trend_searches").upsert({ key, platform, query, fetched_at: fetchedAt, found: kept.length, cost_usd: costUsd }, { onConflict: "key,platform" });
   return kept.length;
 }
 

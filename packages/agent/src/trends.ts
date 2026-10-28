@@ -30,6 +30,8 @@ export type TrendVideo = {
   posted_at: string | null;
   /** The cover's link at the provider (short-lived): copied to our storage when kept. */
   cover: string | null;
+  /** Where TikTok says it was posted (« FR »), when it says. */
+  region?: string | null;
 };
 
 const count = z.preprocess((v) => (typeof v === "string" && /^\d+$/.test(v) ? Number(v) : v), z.number().nonnegative().finite()).nullable().catch(null);
@@ -50,6 +52,7 @@ const tiktokRow = z.object({
   durationSeconds: count,
   soundTitle: text,
   soundAuthor: text,
+  region: text.optional(),
 });
 
 const instagramRow = z.object({
@@ -110,6 +113,7 @@ export function tiktokTrends(answer: unknown): TrendVideo[] {
         duration: v.durationSeconds,
         posted_at: dateOf(v.createdUtc),
         cover: v.image,
+        region: v.region ?? null,
       },
     ];
   });
@@ -154,7 +158,33 @@ export function keptTrends(videos: TrendVideo[], now = new Date()): TrendVideo[]
   const limit = now.getTime() - TREND_MAX_AGE_DAYS * 86_400_000;
   const recent = ranked.filter((v) => v.posted_at && Date.parse(v.posted_at) >= limit);
   const pool = recent.length >= Math.min(6, ranked.length) ? recent : ranked;
-  return pool.slice(0, TREND_KEEP);
+  // Hers is a French audience: the French ones first, the rest of the world after them.
+  const french = pool.filter(isFrench);
+  return [...french, ...pool.filter((v) => !isFrench(v))].slice(0, TREND_KEEP);
+}
+
+const FRENCH_WORDS = new Set(
+  "le la les des une un du et est pour avec chez dans sur qui que pas plus tu ton ta tes vous nous je on ce cette c'est j'ai trop très mon ma mes au aux".split(" "),
+);
+
+/**
+ * Posted in French: TikTok says France (or Belgium, Switzerland…), else its caption reads as French
+ * (three of its common words, or two with French accents). A caption of hashtags alone says nothing.
+ */
+export function isFrench(v: Pick<TrendVideo, "caption" | "region">): boolean {
+  if (v.region && /^(FR|BE|CH|LU|MC|CA)$/i.test(v.region)) return true;
+  const words = v.caption.toLowerCase().replace(/#\S+|@\S+/g, " ").split(/[^a-zà-ÿ']+/).filter(Boolean);
+  const common = words.filter((w) => FRENCH_WORDS.has(w)).length;
+  const accents = /[éèêàùçœ]/i.test(v.caption);
+  return common >= 3 || (common >= 2 && accents);
+}
+
+/**
+ * The searches for a trade: its words, and the same with « paris » for French videos (a word like
+ * « restaurant » finds the whole world), unless they already name a place.
+ */
+export function trendSearches(query: string): string[] {
+  return /\b(paris|lyon|marseille|france|bordeaux|lille|nantes|toulouse|nice)\b/i.test(query) ? [query] : [query, `${query} paris`];
 }
 
 /**

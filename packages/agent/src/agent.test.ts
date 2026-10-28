@@ -8,7 +8,7 @@ import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts"
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
-import { instagramTrends, keptTrends, shortCount, tiktokTrends, trendQueryOf } from "./trends.ts";
+import { instagramTrends, isFrench, keptTrends, shortCount, tiktokTrends, trendQueryOf, trendSearches } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
@@ -4702,4 +4702,16 @@ test("trends: the words searched for a trade", () => {
   assert.equal(shortCount(1_240_000), "1,2 M");
   assert.equal(shortCount(48_200), "48 k");
   assert.equal(shortCount(950), "950");
+});
+
+test("trends: French videos first, and a search with « paris »", () => {
+  assert.equal(isFrench({ caption: "La cliente parfaite existe… et on l’a trouvée chez nous", region: null }), true);
+  assert.equal(isFrench({ caption: "POV: Visiting Your Favorite Local Sushi Restaurant in Tokyo", region: null }), false);
+  assert.equal(isFrench({ caption: "#coiffure #paris #fyp", region: "FR" }), true);
+  assert.equal(isFrench({ caption: "#coiffure #paris #fyp", region: null }), false);
+  const v = (id: string, views: number, caption: string) => ({ platform: "tiktok" as const, external_id: id, url: `https://t/${id}`, caption, author: null, views, likes: null, comments: null, shares: null, sound: null, duration: null, posted_at: null, cover: null });
+  const kept = keptTrends([v("a", 9_000_000, "Sushi in Tokyo, best spot"), v("b", 20_000, "le meilleur brunch de paris pour les gourmands")]);
+  assert.deepEqual(kept.map((k) => k.external_id), ["b", "a"]);
+  assert.deepEqual(trendSearches("restaurant"), ["restaurant", "restaurant paris"]);
+  assert.deepEqual(trendSearches("brunch lyon"), ["brunch lyon"]);
 });

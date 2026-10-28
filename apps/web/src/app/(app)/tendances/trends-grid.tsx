@@ -97,8 +97,8 @@ export function TrendsGrid({ cards, fetchedAt, searching, timezone }: { cards: T
 
   const platforms = new Set(cards.map((c) => c.platform));
   const shown = cards.filter((c) => filter === "all" || c.platform === filter);
-  // Both platforms side by side, the most watched first.
-  const ordered = filter === "all" ? [...shown].sort((a, b) => (b.views ?? (b.likes ?? 0) * 20) - (a.views ?? (a.likes ?? 0) * 20)) : shown;
+  // In their order: French ones first, then the most watched, both platforms side by side (by rank).
+  const ordered = shown;
 
   return (
     <>
