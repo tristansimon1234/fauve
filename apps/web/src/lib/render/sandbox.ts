@@ -1,5 +1,5 @@
 import "server-only";
-import { APIError, Sandbox } from "@vercel/sandbox";
+import { APIError, Sandbox, Snapshot } from "@vercel/sandbox";
 import {
   bassLevelsFilter,
   BEAT_STEP,
@@ -108,6 +108,47 @@ async function bash(sandbox: Sandbox, script: string, args: string[] = []) {
   return result;
 }
 
+/**
+ * Each time a persistent sandbox stops, Vercel keeps a snapshot of its disk to resume from
+ * (2.5 GB for the render one, 1.6 GB for the cut-outs), by default for 30 days after its last
+ * use: dozens a day, 2.4 TB billed in October. Only the last two of each are kept; a sandbox
+ * idle for two weeks starts over from its setup (a few minutes, once).
+ */
+const KEEP_SNAPSHOTS = { count: 2, expiration: 14 * 24 * 3600_000, deleteEvicted: true };
+
+/** The policy on a sandbox made before it (getOrCreate only sets it on a new one). */
+async function keepFewSnapshots(sandbox: Sandbox): Promise<void> {
+  if (sandbox.keepLastSnapshots?.count === KEEP_SNAPSHOTS.count) return;
+  await sandbox.update({ keepLastSnapshots: KEEP_SNAPSHOTS }).catch((error: unknown) => console.warn("sandbox: snapshot policy not set", error));
+}
+
+/**
+ * Deletes the snapshots the policy would not keep, now, for the sandboxes in service (their
+ * current one and the newest other one stay), and sets the policy on them.
+ */
+export async function pruneSnapshots(): Promise<{ sandbox: string; kept: number; deleted: number; freedGb: number }[]> {
+  const report = [];
+  for (const name of [NAME, CUTOUT_NAME]) {
+    const sandbox = await Sandbox.get({ name });
+    await keepFewSnapshots(sandbox);
+    const all = (await (await Snapshot.list({ name })).toArray()).filter((s) => s.status === "created").sort((a, b) => b.createdAt - a.createdAt);
+    const keep = new Set([sandbox.currentSnapshotId, ...all.slice(0, KEEP_SNAPSHOTS.count).map((s) => s.id)].filter(Boolean));
+    let deleted = 0;
+    let freed = 0;
+    for (const old of all.filter((s) => !keep.has(s.id))) {
+      try {
+        await (await Snapshot.get({ snapshotId: old.id })).delete();
+        deleted++;
+        freed += old.sizeBytes;
+      } catch (error) {
+        console.warn("sandbox: snapshot not deleted", old.id, error);
+      }
+    }
+    report.push({ sandbox: name, kept: keep.size, deleted, freedGb: Math.round(freed / 1e8) / 10 });
+  }
+  return report;
+}
+
 let ready: Promise<Sandbox> | undefined;
 
 /** The render sandbox, created on first use and resumed afterwards; setup is idempotent. */
@@ -119,7 +160,9 @@ export function renderSandbox(): Promise<Sandbox> {
       region: SANDBOX_REGION,
       resources: { vcpus: VCPUS },
       timeout: 15 * 60_000,
+      keepLastSnapshots: KEEP_SNAPSHOTS,
     });
+    await keepFewSnapshots(sandbox);
     await bash(sandbox, SETUP);
     await bash(sandbox, EMOJI_FONTS).catch((error: unknown) => console.warn("render sandbox: emoji fonts not set", error));
     return sandbox;
@@ -798,7 +841,9 @@ export function cutoutSandbox(): Promise<Sandbox> {
       region: SANDBOX_REGION,
       resources: { vcpus: CUTOUT_VCPUS },
       timeout: 5 * 60_000,
+      keepLastSnapshots: KEEP_SNAPSHOTS,
     });
+    await keepFewSnapshots(sandbox);
     await bash(sandbox, CUTOUT_SETUP);
     // The script ships with the render source (apps/render/cutout.mjs), written as this deploy has it.
     const script = REMOTION_SOURCE_FILES["cutout.mjs"];
