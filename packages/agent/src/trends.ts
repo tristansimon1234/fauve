@@ -12,8 +12,8 @@ import { z } from "zod";
 export const TREND_PLATFORMS = ["tiktok", "instagram"] as const;
 export type TrendPlatform = (typeof TREND_PLATFORMS)[number];
 
-/** « trend »: what works in her trade, everywhere; « local »: what is posted in her city. */
-export const TREND_SCOPES = ["trend", "local"] as const;
+/** « trend »: what works in her trade, everywhere; « beau »: the most beautiful ones, chosen on their image; « local »: what is posted in her city. */
+export const TREND_SCOPES = ["trend", "beau", "local"] as const;
 export type TrendScope = (typeof TREND_SCOPES)[number];
 
 /** Searched again after this many days (a cron each week, or her page when it is older). */
@@ -25,6 +25,8 @@ export const TREND_MAX_AGE_DAYS = 120;
 /** Fewer views than this is not shown, even when the list stays short. */
 export const TREND_MIN_VIEWS: Record<TrendScope, Record<TrendPlatform, number>> = {
   trend: { tiktok: 100_000, instagram: 50_000 },
+  // A beautiful post is chosen on its image: enough views to have found its public, no more.
+  beau: { tiktok: 20_000, instagram: 10_000 },
   local: { tiktok: 5_000, instagram: 5_000 },
 };
 
@@ -288,6 +290,8 @@ export function trendPlan(query: string): Record<TrendScope, TrendSearch> {
   const tags = (list: string[]) => [...new Set(list.map(hashtagOf).filter((t) => t.length >= 3))].slice(0, 2);
   return {
     trend: { scope: "trend", words: broad, trade: broad, city: null, hashtags: tags([broad, main]) },
+    // « pilates aesthetic », #pilatesaesthetic and the trade's own top posts: the pool the most beautiful are picked from.
+    beau: { scope: "beau", words: `${broad} aesthetic`, trade: broad, city: null, hashtags: tags([`${main}aesthetic`, main]) },
     local: { scope: "local", words: `${broad} ${city}`, trade: broad, city, hashtags: tags([`${main}${city}`]) },
   };
 }
@@ -329,6 +333,42 @@ export const scopeKey = (search: Pick<TrendSearch, "scope" | "words">) => `${sea
 export const trendFilterSchema = z.object({
   keep: z.array(z.number().int().min(1).max(60)).max(60).describe("The numbers of the videos to keep"),
 });
+
+export const trendBeautySchema = z.object({
+  videos: z
+    .array(
+      z.object({
+        n: z.number().int().min(1).max(60),
+        beauty: z.number().int().min(1).max(10).describe("How beautiful the image is, 1 to 10"),
+        on_topic: z.boolean().describe("Really about this trade"),
+      }),
+    )
+    .max(60),
+});
+
+/** A cover from 7 out of 10 is beautiful enough to be shown. */
+export const TREND_BEAUTY_PASS = 7;
+
+/** The beautiful ones, the most beautiful first (then the most watched); numbers are 1-based. */
+export function beautifulTrends(videos: TrendVideo[], scores: z.infer<typeof trendBeautySchema>["videos"]): TrendVideo[] {
+  const byN = new Map(scores.map((s) => [s.n, s]));
+  return videos
+    .map((video, i) => ({ video, score: byN.get(i + 1) }))
+    .filter((v) => v.score && v.score.on_topic && v.score.beauty >= TREND_BEAUTY_PASS)
+    .sort((a, b) => b.score!.beauty - a.score!.beauty || reach(b.video) - reach(a.video))
+    .map((v) => v.video);
+}
+
+/** Sonnet's eye on the covers, for « Les plus belles ». */
+export const TREND_BEAUTY_PROMPT = `You are the art director of a small business's social media: you pick, from short videos found on TikTok and Instagram for its trade, the ones whose image is truly beautiful, the kind a high-end Parisian studio, salon or restaurant would save as a reference.
+
+You receive the trade (in French) and numbered covers with their caption and account.
+
+Rate each cover's beauty from 1 to 10 on the image itself: light (natural, soft, golden, or a clear intentional mood), composition and framing, colour grade, styling and set, a single clear subject, an editorial or cinematic feel. 9–10: magazine level. 7–8: clearly crafted, a reference worth copying. 4–6: ordinary phone footage. 1–3: cluttered, dark, blurry, a screenshot, a meme, a talking head in bad light, big captions or stickers over the image, an ad or a flyer.
+
+Judge the craft, never the popularity, the person's looks or the place's price. Also say whether the video is really about this trade (it shows the activity, the place, the work, a client, a professional of it), not a travel guide or a lifestyle vlog that only mentions it.
+
+Answer for every number.`;
 
 /** Sonnet's instructions to keep only the videos really about her trade. */
 export const TREND_FILTER_PROMPT = `You sort short videos found by a keyword or hashtag search on TikTok and Instagram, for a page that shows a small business what works right now in its trade.

@@ -94,7 +94,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
       </div>
     );
   }
-  if (!lists.trend.length && !lists.local.length) {
+  if (!lists.trend.length && !lists.beau.length && !lists.local.length) {
     return (
       <div className="rounded-[22px] bg-soft px-6 py-10 text-center text-[15px] text-muted">
         Rien de vraiment fort pour ces mots cette semaine. Essaie d’autres mots, plus simples (« coiffeur », « brunch », « pilates »).
@@ -103,7 +103,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
   }
 
   const city = lists.words.local.split(" ").at(-1) ?? "";
-  const platforms = new Set([...lists.trend, ...lists.local].map((c) => c.platform));
+  const platforms = new Set([...lists.trend, ...lists.beau, ...lists.local].map((c) => c.platform));
 
   return (
     <>
@@ -152,16 +152,18 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
       )}
 
       <TrendSection title="Ce qui cartonne en ce moment" note={`« ${lists.words.trend} », partout`} cards={lists.trend} filter={filter} onCopy={setCopying} />
+      <TrendSection title="Les plus belles" note="choisies sur leur image : lumière, cadrage, couleurs" cards={lists.beau} filter={filter} onCopy={setCopying} keepOrder />
       <TrendSection title={`À ${capitalized(city)}`} note={`« ${lists.words.local} »`} cards={lists.local} filter={filter} onCopy={setCopying} />
       {copying && <NewPostSheet timezone={timezone} copyLink={copying} onClose={() => setCopying(null)} />}
     </>
   );
 }
 
-function TrendSection({ title, note, cards, filter, onCopy }: { title: string; note: string; cards: TrendCard[]; filter: Filter; onCopy: (url: string) => void }) {
+function TrendSection({ title, note, cards, filter, onCopy, keepOrder = false }: { title: string; note: string; cards: TrendCard[]; filter: Filter; onCopy: (url: string) => void; keepOrder?: boolean }) {
   const shown = cards.filter((c) => filter === "all" || c.platform === filter);
-  // The most watched first, both platforms together (likes count for twenty views when a search gives no views).
-  const ordered = [...shown].sort((a, b) => (b.views ?? (b.likes ?? 0) * 20) - (a.views ?? (a.likes ?? 0) * 20));
+  // The most watched first, both platforms together (likes count for twenty views when a search gives no views);
+  // the most beautiful keep the order they were chosen in.
+  const ordered = keepOrder ? shown : [...shown].sort((a, b) => (b.views ?? (b.likes ?? 0) * 20) - (a.views ?? (a.likes ?? 0) * 20));
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">

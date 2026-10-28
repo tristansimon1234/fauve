@@ -1,6 +1,7 @@
 import "server-only";
 import {
   ANALYST_MODEL,
+  beautifulTrends,
   claudeCostUsd,
   hashtagPostsIn,
   hashtagVolumes,
@@ -9,12 +10,14 @@ import {
   keptTrends,
   nextCursorIn,
   scopeKey,
+  TREND_BEAUTY_PROMPT,
   TREND_FILTER_PROMPT,
   TREND_KEEP,
   TREND_PAGES,
   TREND_PLATFORMS,
   TREND_REFRESH_DAYS,
   TREND_SCOPES,
+  trendBeautySchema,
   trendFilterSchema,
   trendHashtags,
   tiktokTrends,
@@ -64,7 +67,7 @@ export async function lastSearched(query: string): Promise<Searched> {
   const plan = trendPlan(query);
   const keys = TREND_SCOPES.map((scope) => scopeKey(plan[scope]));
   const { data } = await supabaseAdmin().from("trend_searches").select("key, platform, fetched_at").in("key", keys);
-  const out: Searched = { trend: {}, local: {} };
+  const out: Searched = { trend: {}, beau: {}, local: {} };
   for (const r of data ?? []) {
     const scope = TREND_SCOPES[keys.indexOf(r.key as string)];
     if (scope) out[scope][r.platform as TrendPlatform] = r.fetched_at as string;
@@ -86,20 +89,26 @@ export function isStale(fetchedAt: string | undefined, now = Date.now()) {
 /** True when any list of a trade is due. */
 export const anyStale = (last: Searched) => TREND_SCOPES.some((scope) => TREND_PLATFORMS.some((p) => isStale(last[scope][p])));
 
-/** Copies a cover into our storage as a small WebP; null when it cannot be read (an HEIC cover sharp cannot open). */
-async function keepCover(key: string, video: TrendVideo): Promise<string | null> {
+/** A cover as a small WebP (360 px wide); null when it cannot be read (an HEIC cover sharp cannot open). */
+async function coverImage(video: TrendVideo): Promise<Buffer | null> {
   if (!video.cover) return null;
   try {
     const res = await fetch(video.cover, { signal: AbortSignal.timeout(15_000), headers: { "user-agent": "Mozilla/5.0" } });
     if (!res.ok) return null;
-    const webp = await sharp(Buffer.from(await res.arrayBuffer())).resize({ width: 360, withoutEnlargement: true }).webp({ quality: 72 }).toBuffer();
-    const slug = key.replace(/[^a-z0-9]+/g, "-").slice(0, 60) || "trade";
-    const path = `${COVERS}/${slug}/${video.platform}-${video.external_id.replace(/[^\w-]/g, "")}.webp`;
-    const { error } = await supabaseAdmin().storage.from("media").upload(path, webp, { contentType: "image/webp", upsert: true });
-    return error ? null : path;
+    return await sharp(Buffer.from(await res.arrayBuffer())).resize({ width: 360, withoutEnlargement: true }).webp({ quality: 72 }).toBuffer();
   } catch {
     return null;
   }
+}
+
+/** Copies a cover into our storage (the providers' links expire within hours); its path, or null. */
+async function keepCover(key: string, video: TrendVideo, image?: Buffer | null): Promise<string | null> {
+  const webp = image === undefined ? await coverImage(video) : image;
+  if (!webp) return null;
+  const slug = key.replace(/[^a-z0-9]+/g, "-").slice(0, 60) || "trade";
+  const path = `${COVERS}/${slug}/${video.platform}-${video.external_id.replace(/[^\w-]/g, "")}.webp`;
+  const { error } = await supabaseAdmin().storage.from("media").upload(path, webp, { contentType: "image/webp", upsert: true });
+  return error ? null : path;
 }
 
 /** One source read page after page (while there is a next one); null without a Treg key. */
@@ -152,6 +161,49 @@ async function onTopic(search: TrendSearch, videos: TrendVideo[]): Promise<Trend
 }
 
 /**
+ * « Les plus belles »: Sonnet looks at the covers and keeps the truly beautiful ones that are about her
+ * trade (TREND_BEAUTY_PROMPT), the most beautiful first. Videos without a readable cover are left out.
+ * On a failure, the list stays empty this week rather than showing ordinary ones.
+ */
+async function mostBeautiful(search: TrendSearch, videos: TrendVideo[]): Promise<{ video: TrendVideo; image: Buffer }[]> {
+  const read = await Promise.all(videos.map(async (video) => ({ video, image: await coverImage(video) })));
+  // Looked at 240 px wide (about 140 tokens a cover): enough to judge light, framing and colour.
+  const seen = await Promise.all(
+    read.flatMap((v) => (v.image ? [v as { video: TrendVideo; image: Buffer }] : [])).map(async (v) => ({ ...v, small: await sharp(v.image).resize({ width: 240 }).webp({ quality: 70 }).toBuffer() })),
+  );
+  if (!seen.length) return [];
+  try {
+    const response = await anthropic().beta.messages.parse({
+      model: ANALYST_MODEL,
+      max_tokens: 1500,
+      output_config: { effort: "low", format: outputFormat(trendBeautySchema) },
+      system: TREND_BEAUTY_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: JSON.stringify({ trade: search.trade }) },
+            ...seen.flatMap((v, i) => [
+              { type: "text" as const, text: JSON.stringify({ n: i + 1, account: v.video.author ?? undefined, caption: v.video.caption.slice(0, 160) || "(no caption)" }) },
+              { type: "image" as const, source: { type: "base64" as const, media_type: "image/webp" as const, data: v.small.toString("base64") } },
+            ]),
+          ],
+        },
+      ],
+    });
+    const usd = claudeCostUsd(ANALYST_MODEL, response.usage);
+    await supabaseAdmin()
+      .from("cost_events")
+      .insert({ studio_id: null, kind: "llm", provider: "anthropic", units: response.usage.input_tokens + response.usage.output_tokens, cost_eur: usdToEur(usd, env("USD_TO_EUR")), meta: { model: ANALYST_MODEL, purpose: "trends_beauty", cost_usd: usd, key: scopeKey(search) } });
+    const order = beautifulTrends(seen.map((v) => v.video), response.parsed_output?.videos ?? []);
+    return order.flatMap((video) => seen.filter((v) => v.video === video).map(({ video: kept, image }) => ({ video: kept, image })));
+  } catch (error) {
+    console.warn("trends: beauty read failed", scopeKey(search), error);
+    return [];
+  }
+}
+
+/**
  * Searches one list on one platform again: its videos replace the ones kept before (and their
  * covers). Logs what Treg charged. Returns how many were kept; null without a Treg key.
  */
@@ -171,10 +223,13 @@ async function refreshList(search: TrendSearch, platform: TrendPlatform): Promis
     meta: { query: key, platform, cost_usd: costUsd },
   });
   const strong = keptTrends(read.flatMap((r) => (r.pages ?? []).flatMap((page) => r.source.read(page.answer))), search.scope);
-  const kept = (await onTopic(search, strong.slice(0, 20))).slice(0, TREND_KEEP);
+  // The most beautiful are chosen on their covers; the others on their captions.
+  const chosen: { video: TrendVideo; image?: Buffer }[] =
+    search.scope === "beau" ? await mostBeautiful(search, strong.slice(0, 24)) : (await onTopic(search, strong.slice(0, 20))).map((video) => ({ video }));
+  const kept = chosen.slice(0, TREND_KEEP).map((c) => c.video);
   const fetchedAt = new Date().toISOString();
   if (!kept.length) console.warn("trends: nothing kept", platform, key, JSON.stringify(called[0]?.answer ?? null).slice(0, 400));
-  const covers = await Promise.all(kept.map((v) => keepCover(key, v)));
+  const covers = await Promise.all(chosen.slice(0, TREND_KEEP).map((c) => keepCover(key, c.video, c.image)));
   const rows = kept.map((v, rank) => ({
     key,
     platform,
@@ -257,9 +312,9 @@ export async function forgetOldTrends(): Promise<void> {
     await forgetVideos(db.from("trend_videos").select("id, cover_path").eq("key", r.key as string).eq("platform", r.platform as string));
     await db.from("trend_searches").delete().eq("key", r.key as string).eq("platform", r.platform as string);
   }
-  // The lists of before the two scopes (keys without « trend: » or « local: »).
-  await forgetVideos(db.from("trend_videos").select("id, cover_path").not("key", "like", "trend:%").not("key", "like", "local:%"));
-  await db.from("trend_searches").delete().not("key", "like", "trend:%").not("key", "like", "local:%");
+  // The lists of before the scopes (keys without « trend: », « beau: » or « local: »).
+  await forgetVideos(db.from("trend_videos").select("id, cover_path").not("key", "like", "trend:%").not("key", "like", "beau:%").not("key", "like", "local:%"));
+  await db.from("trend_searches").delete().not("key", "like", "trend:%").not("key", "like", "beau:%").not("key", "like", "local:%");
 }
 
 export type TrendCard = {
@@ -277,7 +332,7 @@ export type TrendCard = {
   cover: string | null;
 };
 
-export type TrendLists = { trend: TrendCard[]; local: TrendCard[]; words: Record<TrendScope, string>; hashtags: HashtagVolume[]; fetchedAt: string | null };
+export type TrendLists = { trend: TrendCard[]; beau: TrendCard[]; local: TrendCard[]; words: Record<TrendScope, string>; hashtags: HashtagVolume[]; fetchedAt: string | null };
 
 /** Both lists of a trade, the most watched first, with signed covers. */
 export async function trendCards(query: string): Promise<TrendLists> {
@@ -314,7 +369,7 @@ export async function trendCards(query: string): Promise<TrendLists> {
   const of = (scope: TrendScope) => (rows ?? []).filter((r) => r.key === scopeKey(plan[scope])).map(card);
   const dates = (searched ?? []).map((r) => r.fetched_at as string).sort();
   const volumes = hashtagVolumes(((counts ?? []) as { hashtag: string; counted_on: string; posts: number | string }[]).map((c): HashtagCount => ({ ...c, posts: Number(c.posts) })), tags);
-  return { trend: of("trend"), local: of("local"), words: { trend: plan.trend.words, local: plan.local.words }, hashtags: volumes, fetchedAt: dates.at(-1) ?? null };
+  return { trend: of("trend"), beau: of("beau"), local: of("local"), words: { trend: plan.trend.words, beau: plan.beau.words, local: plan.local.words }, hashtags: volumes, fetchedAt: dates.at(-1) ?? null };
 }
 
 /** The trades to search each week: those of the real studios (lab studios aside), each once. */

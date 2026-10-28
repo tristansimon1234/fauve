@@ -8,7 +8,7 @@ import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts"
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
-import { foreignScript, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
+import { beautifulTrends, foreignScript, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
@@ -4748,6 +4748,16 @@ test("trends: the most watched first, foreign scripts and weak ones left out, tw
   assert.deepEqual([pilates.trend.words, pilates.local.words], ["pilates", "pilates paris"]);
   assert.deepEqual([pilates.trend.hashtags, pilates.local.hashtags], [["pilates"], ["pilatesparis"]]);
   assert.equal(scopeKey(pilates.local), "local:pilates paris");
+  assert.deepEqual([pilates.beau.words, pilates.beau.hashtags], ["pilates aesthetic", ["pilatesaesthetic", "pilates"]]);
+  // The most beautiful: 7 out of 10 at least and about her trade, the most beautiful first.
+  const nice = [v("a", 30_000, "reformer"), v("b", 90_000, "reformer"), v("c", 50_000, "paris guide"), v("d", 60_000, "reformer")];
+  const scored = beautifulTrends(nice, [
+    { n: 1, beauty: 9, on_topic: true },
+    { n: 2, beauty: 5, on_topic: true },
+    { n: 3, beauty: 10, on_topic: false },
+    { n: 4, beauty: 9, on_topic: true },
+  ]);
+  assert.deepEqual(scored.map((x) => x.external_id), ["d", "a"]);
   const salon = trendPlan("salon de coiffure");
   assert.deepEqual(salon.trend.hashtags, ["salondecoiffure", "coiffure"]);
   assert.deepEqual([salon.local.words, salon.local.hashtags], ["salon de coiffure paris", ["coiffureparis"]]);
