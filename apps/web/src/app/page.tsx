@@ -1,16 +1,14 @@
 import { PLAN_ORDER, PLANS, reelsPerMonth, weeklyPosts } from "@fauve/agent";
 import type { Metadata } from "next";
-import Link from "next/link";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
-import { ChartIcon, CheckIcon, ClockIcon, EyeIcon, LayersIcon, MicIcon, MusicIcon, PenIcon, RepeatIcon, WhatsAppIcon, ZapIcon } from "@/components/icons";
+import { ChartIcon, CheckIcon, ClockIcon, EyeIcon, LayersIcon, MicIcon, MusicIcon, PenIcon, RepeatIcon, ZapIcon } from "@/components/icons";
 import { HeroScene } from "@/components/landing/hero-scene";
 import { IdeaToPost } from "@/components/landing/idea-to-post";
 import { Play } from "@/components/landing/play";
 import { ReelWall } from "@/components/landing/reel-wall";
 import { fr, frNodes } from "@/components/landing/fr";
+import { faqPage, JsonLd, LastCall, SectionTitle, SiteFooter, SiteHeader, Start } from "@/components/landing/site";
 import { CaptionVisual, CopyReelVisual, GestureVisual, LayoutsVisual, MusicVisual, ReminderVisual, ReportVisual, RetouchVisual, VoiceVisual } from "@/components/landing/visuals";
-import { Mascot } from "@/components/mascot";
-import { Logo } from "@/components/orb";
 import { whatsappLink } from "@/lib/public-env";
 import { SITE_URL } from "@/lib/site";
 import "./landing.css";
@@ -119,10 +117,7 @@ const structuredData = () => ({
         url: `${SITE_URL}/#tarif`,
       })),
     },
-    {
-      "@type": "FAQPage",
-      mainEntity: faq.map(([question, answer]) => ({ "@type": "Question", name: question, acceptedAnswer: { "@type": "Answer", text: answer } })),
-    },
+    faqPage(faq),
   ],
 });
 
@@ -133,28 +128,8 @@ export default function LandingPage() {
 
   return (
     <div className="land-paper min-h-dvh overflow-x-clip bg-soft">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData()).replace(/</g, "\\u003c") }} />
-      <header className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-4 py-5 sm:px-8 sm:py-6">
-        <Logo />
-        <nav className="flex items-center gap-7">
-          {[
-            ["#travail", "Ses Reels"],
-            ["#cringe", "Zéro cringe"],
-            ["#comment", "Comment ça marche"],
-            ["#tarif", "Tarif"],
-          ].map(([href, label]) => (
-            <a key={href} href={href} className="hidden text-[14.5px] font-semibold text-ink/80 transition-colors hover:text-ink lg:inline">
-              {label}
-            </a>
-          ))}
-          {OPEN && (
-            <Link href="/commencer?connexion" className="hidden text-[14.5px] font-semibold md:inline">
-              Se connecter
-            </Link>
-          )}
-          <Start waUrl={waUrl} size="sm" />
-        </nav>
-      </header>
+      <JsonLd data={structuredData()} />
+      <SiteHeader waUrl={waUrl} home />
 
       {/*
         Hero: the promise first, in her words (Tristan: « des reels top quali et pas ai cringe »), what it is
@@ -417,72 +392,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Last call */}
-      <section className="mx-auto max-w-[1240px] px-4 pb-16 sm:px-8">
-        <div className="land-reveal relative isolate flex flex-col items-center gap-6 overflow-hidden rounded-[32px] bg-ink px-6 py-16 text-center text-white sm:py-20">
-          <span className="pointer-events-none absolute -bottom-40 left-1/2 -z-10 size-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(91,63,217,.55),transparent_65%)]" aria-hidden="true" />
-          <Mascot size={92} mood="happy" />
-          <h2 className="max-w-[760px] text-[clamp(34px,5vw,64px)] leading-[1.02] font-extrabold tracking-[-0.04em]">
-            Tes vidéos sont déjà là. <span className="font-[family-name:var(--font-serif)] font-normal tracking-[-0.01em] text-lilac italic">Edith en fait des Reels.</span>
-          </h2>
-          <p className="max-w-[460px] text-[16px] text-white/70">Dis-lui ce que tu fais&nbsp;: dans cinq minutes, il te montre ce qu’il ferait pour toi.</p>
-          <Start waUrl={waUrl} size="lg" light />
-        </div>
-      </section>
+      <LastCall waUrl={waUrl} line="Dis-lui ce que tu fais : dans cinq minutes, il te montre ce qu’il ferait pour toi.">
+        Tes vidéos sont déjà là. <span className="font-[family-name:var(--font-serif)] font-normal tracking-[-0.01em] text-lilac italic">Edith en fait des Reels.</span>
+      </LastCall>
 
-      <footer className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-5 gap-y-2 px-4 pb-10 text-sm font-semibold text-muted sm:px-8">
-        <span>© Edith</span>
-        <Link href="/confidentialite">Confidentialité</Link>
-        <Link href="/conditions">Conditions d’utilisation</Link>
-        <Link href="/suppression-des-donnees">Suppression des données</Link>
-        {OPEN && <Link href="/connexion">Se connecter</Link>}
-        <span className="font-normal">Vidéos d’exemple : Mixkit · Photos : Unsplash</span>
-      </footer>
-    </div>
-  );
-}
-
-/**
- * Whether the landing lets anyone in. Closed while WhatsApp and Instagram are set up again on the new
- * Meta account (Tristan: « enlève le bouton d'accès pour l'instant… rien n'est branché »): no
- * « Commencer » nor « Se connecter », a « Bientôt disponible » in place of the big buttons.
- */
-const OPEN = false;
-
-/** Getting started: in the app on a computer (a code sent from the phone), on WhatsApp on a phone. */
-function Start({ waUrl, size, light = false }: { waUrl: string; size: "sm" | "lg"; light?: boolean }) {
-  if (!OPEN) {
-    if (size === "sm") return null;
-    return (
-      <span className={`inline-flex h-14 items-center rounded-full px-7 text-base font-bold ${light ? "bg-white/10 text-white" : "bg-violet-soft text-violet"}`}>
-        Bientôt disponible
-      </span>
-    );
-  }
-  const look = `${size === "lg" ? "h-14 px-7 text-base" : "h-11 px-5"} ${light ? "bg-white text-ink hover:bg-soft" : "btn-primary"}`;
-  return (
-    <>
-      <Link href="/commencer" className={`btn hidden md:inline-flex ${look}`}>
-        Commencer
-      </Link>
-      <a href={waUrl} className={`btn md:hidden ${look}`}>
-        <WhatsAppIcon size={size === "lg" ? 20 : 18} />
-        {size === "lg" ? "Commencer sur WhatsApp" : "Essayer"}
-      </a>
-    </>
-  );
-}
-
-/** A section's title, numbered like a magazine's pages: N° 01, a hairline, its name, then the line. */
-function SectionTitle({ n, kicker, children }: { n: number; kicker: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-4">
-      <span className="flex items-center gap-3 text-[12px] font-bold tracking-[0.16em] text-muted uppercase">
-        <span className="font-[family-name:var(--font-serif)] text-[17px] font-normal tracking-normal text-ink normal-case italic">N° {String(n).padStart(2, "0")}</span>
-        <span className="h-px w-8 bg-ink/25" />
-        {fr(kicker)}
-      </span>
-      <h2 className="max-w-[760px] text-[clamp(34px,4.4vw,58px)] leading-[1.02] font-extrabold tracking-[-0.04em]">{frNodes(children)}</h2>
+      <SiteFooter />
     </div>
   );
 }

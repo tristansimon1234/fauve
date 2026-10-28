@@ -35,10 +35,15 @@ export const WORK = [
   },
 ] as const;
 
-export function ReelWall() {
+/** The wall's columns on a computer, by how many Reels it shows. */
+const COLUMNS = ["", "md:grid-cols-1 md:max-w-[360px]", "md:grid-cols-2 md:max-w-[780px]", "md:grid-cols-3"];
+
+/** The landing's three Reels, or only some of them (a trade's page shows those of its trade). */
+export function ReelWall({ only }: { only?: readonly string[] } = {}) {
+  const work = only ? WORK.filter((w) => only.includes(w.id)) : WORK;
   const root = useRef<HTMLDivElement>(null);
   const videos = useRef<(HTMLVideoElement | null)[]>([]);
-  const [seen, setSeen] = useState<boolean[]>(WORK.map(() => false));
+  const [seen, setSeen] = useState<boolean[]>(work.map(() => false));
   const [sound, setSound] = useState<number | null>(null);
 
   // Each Reel plays while it is on screen (on a phone, the one scrolled to), muted until tapped.
@@ -80,9 +85,9 @@ export function ReelWall() {
   return (
     <div
       ref={root}
-      className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:-mx-8 sm:px-8 md:mx-0 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:px-0 lg:gap-10 [&::-webkit-scrollbar]:hidden"
+      className={`-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:-mx-8 sm:px-8 md:mx-0 md:grid ${COLUMNS[work.length]} md:gap-6 md:overflow-visible md:px-0 lg:gap-10 [&::-webkit-scrollbar]:hidden`}
     >
-      {WORK.map((w, i) => (
+      {work.map((w, i) => (
         <article key={w.id} data-index={i} className="flex w-[76vw] max-w-[340px] shrink-0 snap-center flex-col md:w-auto md:max-w-none">
           <button
             type="button"
