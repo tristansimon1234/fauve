@@ -8,6 +8,7 @@ import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts"
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
+import { instagramTrends, keptTrends, shortCount, tiktokTrends, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
@@ -4661,4 +4662,44 @@ test("a text stays on screen long enough to be read, never over the next one", a
   assert.deepEqual(read.map((t) => [t.from, t.to]), [[0, 2], [2, 4]]);
   // Long enough already: untouched.
   assert.deepEqual(longEnoughToRead([{ from: 0, to: 3, text: "Bonjour" }], [], 10)[0], { from: 0, to: 3, text: "Bonjour" });
+});
+
+test("trends: Treg's searches read, the most watched recent ones kept", () => {
+  const now = new Date("2026-10-28T12:00:00Z");
+  const day = 86_400;
+  const t = now.getTime() / 1000;
+  const tiktok = tiktokTrends({
+    output: {
+      found: true,
+      data: {
+        videos: [
+          { id: "71", url: "https://www.tiktok.com/@a/video/71", caption: "balayage  du jour", views: 120000, likes: 9000, author: "a", image: "https://p.tiktokcdn.com/1.heic", createdUtc: t - 3 * day, soundTitle: "original sound - a" },
+          { id: 72, caption: "coupe", views: "450000", likes: 30000, author: "b", createdUtc: t - 10 * day, soundTitle: "Espresso", soundAuthor: "Sabrina Carpenter" },
+          { caption: "sans id" },
+        ],
+      },
+    },
+  });
+  assert.equal(tiktok.length, 2);
+  assert.equal(tiktok[0]!.caption, "balayage du jour");
+  assert.equal(tiktok[0]!.sound, null);
+  assert.equal(tiktok[1]!.url, "https://www.tiktok.com/@b/video/72");
+  assert.equal(tiktok[1]!.views, 450000);
+  assert.equal(tiktok[1]!.sound, "Espresso · Sabrina Carpenter");
+  const insta = instagramTrends({ output: { data: { reels: [{ shortcode: "DAbc", caption: "pov", likes: 500, username: "c", thumbnail: "https://x.cdninstagram.com/t.jpg", createdUtc: t - 400 * day }] } } });
+  assert.equal(insta[0]!.url, "https://www.instagram.com/reel/DAbc/");
+  assert.equal(insta[0]!.views, null);
+  // The most watched first; an old one only when too few recent ones are left.
+  const kept = keptTrends([...tiktok, ...insta, tiktok[0]!], now);
+  assert.deepEqual(kept.map((v) => v.external_id), ["72", "71", "DAbc"]);
+});
+
+test("trends: the words searched for a trade", () => {
+  assert.equal(trendQueryOf(null, "salon de coiffure"), "salon de coiffure");
+  assert.equal(trendQueryOf("  brunch  paris ", "restaurant"), "brunch paris");
+  assert.equal(trendQueryOf(null, "assistant IA sur WhatsApp qui gère les réseaux sociaux des commerces"), "assistant ia sur whatsapp");
+  assert.equal(trendQueryOf(null, null), null);
+  assert.equal(shortCount(1_240_000), "1,2 M");
+  assert.equal(shortCount(48_200), "48 k");
+  assert.equal(shortCount(950), "950");
 });

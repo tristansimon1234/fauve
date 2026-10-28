@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartIcon, ChatIcon, FolderIcon, GridIcon, PaletteIcon, SlidersIcon } from "./icons";
+import { ChartIcon, ChatIcon, FolderIcon, GridIcon, PaletteIcon, SlidersIcon, TrendIcon } from "./icons";
 
 // The work (talk to Edith, the Instagram grid with every publication, the
 // results; no calendar: she does not plan, Edith does), the studio's material (media library,
-// her style with what Edith made for her) and the settings. On a phone the bar keeps four
+// her style with what Edith made for her) and the settings. What works in her trade (Tendances).
+// On a phone the bar keeps five
 // places: Médiathèque and Ton style open from Réglages' tabs.
 // `also`: the pages that belong to a section, to highlight it.
 const nav = [
   { href: "/fauve", label: "Edith", icon: ChatIcon, also: [], group: "work" },
   { href: "/grille", label: "Grille", icon: GridIcon, also: ["/publications", "/calendrier"], group: "work" },
   { href: "/resultats", label: "Résultats", icon: ChartIcon, also: [], group: "work" },
+  { href: "/tendances", label: "Tendances", icon: TrendIcon, also: [], group: "work" },
   { href: "/mediatheque", label: "Médiathèque", icon: FolderIcon, also: [], group: "studio" },
   { href: "/style", label: "Ton style", icon: PaletteIcon, also: ["/composants"], group: "studio" },
   { href: "/reglages", label: "Réglages", icon: SlidersIcon, also: [], group: "settings" },

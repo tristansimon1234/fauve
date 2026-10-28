@@ -69,3 +69,4 @@ export * from "./cutout.ts";
 export * from "./compose.ts";
 export * from "./tracking.ts";
 export * from "./rework.ts";
+export * from "./trends.ts";

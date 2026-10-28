@@ -111,7 +111,8 @@ function defaultWhen(o: NewPostOptions | null, date?: string): When | null {
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
 
-export function NewPostSheet({ date, onClose }: { date?: string; timezone: string; onClose: () => void }) {
+/** `copyLink`: a Reel to make one like (from the page Tendances), read as the Reel she copies. */
+export function NewPostSheet({ date, copyLink, onClose }: { date?: string; copyLink?: string; timezone: string; onClose: () => void }) {
   const titleId = useId();
   const [options, setOptions] = useState<NewPostOptions | null>(null);
   const [work, setWork] = useState<Work | null>(null);
@@ -145,7 +146,7 @@ export function NewPostSheet({ date, onClose }: { date?: string; timezone: strin
         {work ? (
           <Working work={work} titleId={titleId} onClose={onClose} />
         ) : (
-          <Create date={date} options={options} titleId={titleId} onClose={onClose} onStarted={setWork} />
+          <Create date={date} copyLink={copyLink} options={options} titleId={titleId} onClose={onClose} onStarted={setWork} />
         )}
       </div>
     </div>
@@ -154,12 +155,14 @@ export function NewPostSheet({ date, onClose }: { date?: string; timezone: strin
 
 function Create({
   date,
+  copyLink,
   options,
   titleId,
   onClose,
   onStarted,
 }: {
   date?: string;
+  copyLink?: string;
   options: NewPostOptions | null;
   titleId: string;
   onClose: () => void;
@@ -177,7 +180,7 @@ function Create({
   /** Picked, in order: « m:<media id> » from her library, « u:<draft id> » from her phone. */
   const [order, setOrder] = useState<string[]>([]);
   const [idea, setIdea] = useState("");
-  const [format, setFormat] = useState<PostKind | null>(null);
+  const [format, setFormat] = useState<PostKind | null>(copyLink ? "reel" : null);
   const [when, setWhen] = useState<When | null>(null);
   const [other, setOther] = useState("");
   /** Her choices, else the studio's (voice) and the usual places (platforms). */
@@ -275,7 +278,7 @@ function Create({
   const refShots = kind === "reel" ? [] : refs.files.filter((f) => f.status === "ready" && f.path);
   const refSending = kind !== "reel" && refs.files.some((f) => f.status === "uploading");
   // A Reel she likes, given on « Ton idée » (its link pasted in what she imagines, or the field below).
-  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(Boolean(copyLink));
   const [linkError, setLinkError] = useState<string | null>(null);
   // What she asks for: her own words, and the plan Edith said back for them (« La proposition »).
   const finalIdea = idea.trim();
@@ -359,6 +362,17 @@ function Create({
       .catch(() => setLinkError("Ce Reel n’est pas passé. Réessaie dans un instant."))
       .finally(() => setLinkBusy(false));
   };
+
+  // A Reel from the page Tendances: a Reel, made like it, as soon as the sheet opens.
+  const askedCopy = useRef(false);
+  useEffect(() => {
+    if (!copyLink || askedCopy.current) return;
+    askedCopy.current = true;
+    copyReel({ link: copyLink })
+      .then((res) => (res.ok ? followGiven(res.id) : setLinkError(res.error)))
+      .catch(() => setLinkError("Ce Reel n’est pas passé. Réessaie dans un instant."))
+      .finally(() => setLinkBusy(false));
+  }, [copyLink]);
 
   const toggle = (key: string) => setOrder((o) => (o.includes(key) ? o.filter((k) => k !== key) : picked.length >= MAX_FILES ? o : [...o, key]));
   const add = (list: FileList | File[]) => {

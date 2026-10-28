@@ -21,6 +21,7 @@ export const PRIVATE_PATHS = [
   "/mediatheque",
   "/composants",
   "/resultats",
+  "/tendances",
   "/style",
   "/reglages",
 ];

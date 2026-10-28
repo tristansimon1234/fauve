@@ -206,6 +206,7 @@ export const ScissorsIcon = make(
     <path d="M8.6 8.4 19 17M8.6 15.6 19 7" />
   </>,
 );
+export const TrendIcon = make(<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />);
 export const ZapIcon = make(<path d="M13 3 5 13.5h6L10 21l8-10.5h-6z" />);
 export const MusicIcon = make(
   <>
