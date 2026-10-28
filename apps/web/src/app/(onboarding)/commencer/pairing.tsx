@@ -106,6 +106,19 @@ export function Pairing({ signIn, expired }: { signIn: boolean; expired: boolean
             <span className="fauve-pulse size-2 rounded-full bg-violet" aria-hidden />
             {state === "confirming" ? "Touche « Oui, c’est mon écran » sur WhatsApp…" : "J’attends ton message…"}
           </p>
+          {!signIn && (
+            <p className="max-w-[340px] text-[12px] leading-snug text-muted">
+              En continuant, tu acceptes les{" "}
+              <Link href="/conditions" target="_blank" className="underline underline-offset-2">
+                conditions d’utilisation
+              </Link>{" "}
+              et la{" "}
+              <Link href="/confidentialite" target="_blank" className="underline underline-offset-2">
+                politique de confidentialité
+              </Link>{" "}
+              d’Edith.
+            </p>
+          )}
         </>
       )}
 

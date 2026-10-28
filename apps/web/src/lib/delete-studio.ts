@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { forgetOwnVoice } from "@/lib/voice-clone";
 
 // A studio that leaves (RGPD: complete deletion): every file it has in Storage
 // ({studio}/… in the media bucket, through the Storage API), then the studio row
@@ -28,6 +29,9 @@ export async function deleteStudio(studioId: string): Promise<{ files: number; u
   const { data: studio } = await db.from("studios").select("id").eq("id", studioId).maybeSingle();
   if (!studio) throw new Error("Studio introuvable");
   const { data: members } = await db.from("members").select("user_id").eq("studio_id", studioId);
+
+  // Her cloned voice lives in the ElevenLabs account: deleted there too.
+  await forgetOwnVoice(studioId, { keepProfile: true });
 
   const files = await filesUnder(studioId);
   for (let i = 0; i < files.length; i += 100) {

@@ -6,7 +6,7 @@ import {
   EFFECT_MINUTES,
   EFFORTS,
   effortSchema,
-  findVoice,
+  voiceIn,
   imaginedBrief,
   JOB_STALE_MINUTES,
   validatedPlanBrief,
@@ -32,6 +32,7 @@ import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { photoRegions } from "@/lib/video/regions";
+import { ownVoiceOf } from "@/lib/voice-clone";
 
 // « C'est parti » on the Créer screen, once she said what she imagines (or gave a ref): her
 // new files join her library, the publication is created (where it goes, and for a Reel
@@ -150,7 +151,9 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
   if (!created.ok) return created;
   // Her choices, before anything is made: where it goes, and the voice over of a Reel.
   const where = platforms ? [...new Set(platforms.filter((p) => p === "instagram" || kind === "reel"))] : [];
-  const spoken = kind === "reel" && voice !== "auto" ? (voice === "off" ? { mode: "off" as const } : findVoice(voice) ? { mode: "on" as const, voice_id: voice } : null) : null;
+  // One of Edith's voices, or her own clone.
+  const chosenVoice = kind === "reel" && voice !== "auto" && voice !== "off" ? voiceIn(voice, await ownVoiceOf(studioId)) : undefined;
+  const spoken = kind === "reel" && voice !== "auto" ? (voice === "off" ? { mode: "off" as const } : chosenVoice ? { mode: "on" as const, voice_id: chosenVoice.id } : null) : null;
   if (where.length || spoken) {
     const patch = { ...(where.length ? { platforms: where } : {}), ...(spoken ? { voice_over: spoken } : {}) };
     const { error } = await db.from("posts").update(patch).eq("id", created.id).eq("studio_id", studioId);

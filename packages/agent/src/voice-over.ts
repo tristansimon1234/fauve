@@ -58,6 +58,49 @@ export function findVoice(idOrName: string | null | undefined): SimoneVoice | un
   return key ? SIMONE_VOICES.find((v) => v.id.toLowerCase() === key || v.name.toLowerCase() === key) : undefined;
 }
 
+/**
+ * Her own voice, cloned by ElevenLabs (instant voice cloning) from a minute or so she
+ * recorded or sent in Style, with her consent: a voice of the account, kept in the
+ * brand profile (profile.own_voice) and heard in Style by its sample. Only this
+ * studio's Reels may use it.
+ */
+export const ownVoiceSchema = z.object({
+  id: z.string().regex(/^[A-Za-z0-9]{10,40}$/),
+  name: z.string().max(60),
+  /** Its sample, read by the clone (media bucket, the studio's folder). */
+  sample_path: z.string().max(300).optional(),
+  made_at: z.string().max(40),
+});
+export type OwnVoice = z.infer<typeof ownVoiceSchema>;
+export const readOwnVoice = (value: unknown): OwnVoice | null => ownVoiceSchema.nullable().catch(null).parse(value ?? null);
+
+/** What she reads aloud to be cloned: about a minute, varied sounds, said like she talks. */
+export const CLONE_SCRIPT =
+  "Bonjour ! Je vous présente mon métier, celui que je fais chaque jour avec plaisir. Le matin, j'ouvre, je prépare tout, et j'attends les premiers clients. Certains viennent depuis des années, d'autres passent la porte pour la première fois. Ce que je préfère ? Le moment où quelqu'un repart avec le sourire. Franchement, ça n'a pas de prix. Alors si vous passez dans le quartier, venez me dire bonjour : je vous montrerai tout, et on prendra le temps. À très vite !";
+/** ElevenLabs asks for a minute or two of clean speech; under 30 s the clone does not sound like her. */
+export const CLONE_MIN_SECONDS = 30;
+export const CLONE_MAX_SECONDS = 180;
+
+/** A voice a Reel can be read with: one of the gallery, or her own clone. */
+export type UsableVoice = { id: string; name: string; gender: "f" | "m" | null; asmr: boolean; own: boolean };
+
+/** Words that mean her own voice (« ma voix », « sa voix »…) when Edith names it. */
+const OWN_WORDS = /^(ma|ta|sa|mon|own|moi|la mienne|ma propre) ?(voix|clone)?$/;
+
+/**
+ * A voice by its id or its name, from the gallery or her own clone: anything else (another
+ * studio's clone, a voice deleted since) is undefined, so it is never read for her.
+ */
+export function voiceIn(idOrName: string | null | undefined, own: OwnVoice | null): UsableVoice | undefined {
+  const key = (idOrName ?? "").trim().toLowerCase();
+  if (!key) return undefined;
+  if (own && (own.id.toLowerCase() === key || own.name.toLowerCase() === key || OWN_WORDS.test(key))) {
+    return { id: own.id, name: own.name, gender: null, asmr: false, own: true };
+  }
+  const gallery = findVoice(key);
+  return gallery ? { id: gallery.id, name: gallery.name, gender: gallery.gender, asmr: gallery.asmr, own: false } : undefined;
+}
+
 /** The studio's voice over its Reels (Style): when, and which voice. */
 export const voiceSettingSchema = z.object({
   /** auto: when it helps the Reel (see wantsVoiceOver); always; never. */
@@ -193,8 +236,8 @@ Rules:
 - write numbers in letters when they read badly in digits (« dix-huit mois »), a web address as it is read (« fauve-one point vercel point app » is written « fauve-one.vercel.app »), and the punctuation of a speaking voice: full stops, commas, ellipses for a short pause, one question at most;
 - correct, natural French, as a French person would say it: every sentence has its subject and its verb, no calque from English, no awkward or elliptical turn of phrase (« Une phrase tapée, et ce studio a son Reel. »), no wrong preposition (you do something « avec » an app, not « sur » it); reread each sentence and rewrite the one a French person would not say as it is;
 - it sounds like someone talking to a friend in a voice note or to camera, never like an ad read into a microphone: reread it in your head; if it sounds like an announcement, a brochure or a radio spot, rewrite it;
-- « intonation » gives the rhythm and the attitude of the voice for this business (« cool et nonchalant, un brin rock », « posé et doux »): write for it (sentence length, words, pauses) and choose your performance tags to carry it; never the tone of a TV host nor of an ad;
-- for a human voice, slip in 1 or 2 performance tags between square brackets, in English, just before the sentence they colour: [warmly], [smiling], [softly], [excited], [casually], [confident], [playful], [deadpan], [laughs softly], [whispers], [sighs]; never more than 2, never in the middle of a word, never other square brackets;
+- « intonation » gives the rhythm and the attitude of the voice for this business (« cool et nonchalant, un brin rock », « posé et doux »): write for it (sentence length, words, pauses) and let the words carry it, not the tags; never the tone of a TV host nor of an ad;
+- the voice talks like someone telling a friend, never acting: understated, even, a smile you hear rather than a show (Tristan: « un poil moins expressif, ça fait presque surjouer »). For a human voice, at most one soft performance tag between square brackets, in English, just before the sentence it colours, and only when the text needs it: [warmly], [softly], [casually], [deadpan]; never an emphatic one ([excited], [playful], [laughs], [sighs], [smiling]), never in the middle of a word, never other square brackets;
 - if you are told the voice is whispered (ASMR), write for a murmur right by the ear: even shorter and slower sentences, ellipses, what you hear and feel (the sound of the scissors, the foam, the warmth of a towel), no question that snaps nor exclamation mark, [whispers] or [softly] as tags.
 
 Answer with message (the video's message in one sentence), hooks (the 4 possible first sentences) and rest (everything after the first sentence, tags included), all in French apart from the tags.`;

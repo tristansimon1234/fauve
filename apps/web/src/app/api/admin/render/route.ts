@@ -2,7 +2,7 @@ import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
 import { renderPost } from "@/lib/render/render-post";
-import { dropSandbox, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
+import { dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { adminKeyAuthorized } from "@/lib/test-studio";
 
@@ -13,7 +13,8 @@ import { adminKeyAuthorized } from "@/lib/test-studio";
 // And POST ?action=warm with CRON_SECRET, from the database (call_app): the same warm-up,
 // in the background (a new sandbox installs everything once, a few minutes, the collages'
 // cut-out model and the tracker included). And POST
-// ?action=drop&sandbox=<name>: deletes an old render sandbox (never the one in service).
+// ?action=drop&sandbox=<name>: deletes an old render sandbox (never the one in service). And POST
+// ?action=prune: deletes the snapshots the sandboxes in service no longer need (the last two stay).
 
 export const maxDuration = 800;
 
@@ -27,6 +28,13 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: true, sandbox: name, result: await dropSandbox(name) });
     } catch (error) {
       return Response.json({ ok: false, sandbox: name, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    }
+  }
+  if (action === "prune") {
+    try {
+      return Response.json({ ok: true, sandboxes: await pruneSnapshots() });
+    } catch (error) {
+      return Response.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
   }
   if (action !== "warm") return Response.json({ error: "unknown action" }, { status: 400 });

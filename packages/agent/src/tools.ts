@@ -75,6 +75,11 @@ export const toolSpecs = {
       "Donne à la gérante la page où elle connecte son compte Instagram professionnel et, si elle veut, son TikTok. À proposer quand un compte n'est pas connecté. Sur WhatsApp, un bouton « Relier mes comptes » s'affiche sous ton message : n'écris aucun lien ; dans l'application, il renvoie le lien à écrire.",
     input: z.object({}),
   },
+  get_page_link: {
+    description:
+      "Sur WhatsApp, son canal principal sur téléphone, ce qui demande un écran passe par une page faite pour son téléphone, derrière un bouton sous ton message (n'écris jamais de lien) : voix, la voix de ses Reels (écouter les voix et en choisir une, quand mettre une voix off, cloner sa propre voix en lisant un petit texte) : dès qu'elle veut changer de voix, entendre les voix ou mettre sa propre voix ; abonnement, les offres et le paiement (s'abonner, « 1 Reel de plus », passer à l'offre au-dessus) : dès qu'il faut s'abonner ou reprendre des crédits. Dans l'application, il renvoie où aller.",
+    input: z.object({ page: z.enum(["voix", "abonnement"]) }),
+  },
   get_post_link: {
     description:
       "Donne à la gérante la page mobile d'une publication : elle y regarde la vidéo, lit la légende, valide, ou déplace et corrige un texte du doigt. Quand elle veut revoir ou modifier une publication (« renvoie-moi le lien », « je veux voir le rendu »). Sur WhatsApp, un bouton « Voir la publication » s'affiche sous ton message ; dans l'application, sa carte. N'écris jamais de lien.",
@@ -343,7 +348,7 @@ export const toolSpecs = {
   },
   set_voice: {
     description:
-      "Voix off d'Edith sur les Reels (une vraie voix française qui raconte les images, texte écrit par toi, posée avant le montage, la musique passe dessous) : voix Eva, Victoria, Lucie, Koraly (chuchotée, ASMR) pour les femmes, Neto, Antonin, Jules, Mister K (chuchotée, ASMR) pour les hommes ; une voix chuchotée seulement si elle la veut (spa, massage, soin, un moment très calme). Avec post_id, pour ce Reel : mode on (en mettre une), off (sans voix, ni la sienne), redo (refaire le texte, avec wish : ce qu'elle veut qu'on dise) ; voice pour changer de voix. Sans post_id : le réglage du commerce pour ses prochains Reels (use : auto = quand ça raconte quelque chose et que personne ne parle déjà dans ses vidéos, always, never ; voice). Gratuit. off sur un Reel monté refait la vidéo tout de suite ; on, redo et voice valent pour le prochain montage du Reel : sur un Reel déjà monté, propose de le refaire (montage avec correction).",
+      "Voix off d'Edith sur les Reels (une vraie voix française qui raconte les images, texte écrit par toi, posée avant le montage, la musique passe dessous) : voix Eva, Victoria, Lucie, Koraly (chuchotée, ASMR) pour les femmes, Neto, Antonin, Jules, Mister K (chuchotée, ASMR) pour les hommes ; « sa voix » quand elle a cloné sa propre voix dans Style › Voix off (sa ligne « Voix off » le dit) ; une voix chuchotée seulement si elle la veut (spa, massage, soin, un moment très calme). Avec post_id, pour ce Reel : mode on (en mettre une), off (sans voix, ni la sienne), redo (refaire le texte, avec wish : ce qu'elle veut qu'on dise) ; voice pour changer de voix. Sans post_id : le réglage du commerce pour ses prochains Reels (use : auto = quand ça raconte quelque chose et que personne ne parle déjà dans ses vidéos, always, never ; voice). Gratuit. off sur un Reel monté refait la vidéo tout de suite ; on, redo et voice valent pour le prochain montage du Reel : sur un Reel déjà monté, propose de le refaire (montage avec correction).",
     input: z.object({
       post_id: z.string().uuid().optional(),
       mode: z.enum(["on", "off", "redo"]).optional(),

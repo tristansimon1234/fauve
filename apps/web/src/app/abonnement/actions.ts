@@ -8,6 +8,7 @@ import { billingEnabled, checkoutSession, createCustomer, packCheckout, portalSe
 import { env } from "@/lib/env";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { acceptTerms } from "@/lib/terms";
 
 /** Only a path of this app (no open redirect). */
 const safeNext = (next: string) => (/^\/(?!\/)[\w\-/?=&%.]*$/.test(next) ? next : "/fauve");
@@ -26,6 +27,8 @@ export async function startCheckout(plan: PlanId, next: string): Promise<{ error
     customer = await createCustomer({ id: studio.id as string, name: studio.name as string | null, phone: member.phone_e164 });
     await db.from("studios").update({ stripe_customer_id: customer }).eq("id", studio.id);
   }
+  // The offers page says that subscribing accepts the terms.
+  await acceptTerms(member.studio.id).catch((e) => console.warn("terms acceptance not kept", e));
   const back = safeNext(next);
   const base = env("APP_URL");
   const url = await checkoutSession({

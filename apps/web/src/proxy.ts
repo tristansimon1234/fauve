@@ -4,7 +4,7 @@ import { publicEnv } from "@/lib/public-env";
 
 // Refreshes the Supabase session cookie on every request and keeps the web app
 // behind login. Pages still check the user themselves; this is the fast path.
-const PROTECTED = ["/fauve", "/calendrier", "/publications", "/grille", "/mediatheque", "/composants", "/resultats", "/style", "/reglages", "/v", "/depot"];
+const PROTECTED = ["/fauve", "/calendrier", "/publications", "/grille", "/mediatheque", "/composants", "/resultats", "/style", "/reglages", "/v", "/depot", "/voix", "/merci", "/abonnement"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -30,6 +30,9 @@ export async function proxy(request: NextRequest) {
     login.searchParams.set("next", path);
     return NextResponse.redirect(login);
   }
+  // The deployment's own addresses (fauve-one.vercel.app, previews) show the same pages as edith-ai.app:
+  // search engines index only the real one.
+  if (request.nextUrl.hostname.endsWith(".vercel.app")) response.headers.set("X-Robots-Tag", "noindex");
   return response;
 }
 

@@ -109,7 +109,10 @@
 [data-play="on"] .land-loop {
   animation-play-state: running;
 }
-.land-loop {
+/* Above each scene's `animation` shorthand (declared further down, which resets the count to 1):
+   with a plain .land-loop, every loop played once and held its last picture, the three names of
+   « Bien plus qu'un diaporama » shown on top of each other. */
+[data-play] .land-loop {
   animation-iteration-count: infinite;
 }
 

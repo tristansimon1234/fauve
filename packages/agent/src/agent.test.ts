@@ -1578,6 +1578,22 @@ test("voice: Scribe words, phrases on the Reel's clock, subtitles and speech", a
   assert.equal(plain.voice, undefined);
 });
 
+test("voice over: her own cloned voice is usable by her studio only", async () => {
+  const { voiceIn, readOwnVoice } = await import("./voice-over.ts");
+  const own = readOwnVoice({ id: "Abc123Def456Ghi789", name: "Ta voix", made_at: "2026-10-28T10:00:00Z" });
+  assert.ok(own);
+  assert.equal(voiceIn("Abc123Def456Ghi789", own)?.own, true);
+  // Edith names it in her words.
+  assert.equal(voiceIn("sa voix", own)?.id, own.id);
+  assert.equal(voiceIn("ma voix", own)?.id, own.id);
+  // Edith's voices stay; another studio's clone, or her clone once deleted, is never read.
+  assert.equal(voiceIn("Jules", own)?.id, "8qnuneLiGjGrT4A62CCe");
+  assert.equal(voiceIn("Abc123Def456Ghi789", null), undefined);
+  assert.equal(voiceIn("Zzz999Yyy888Xxx777", own), undefined);
+  assert.equal(voiceIn("sa voix", null), undefined);
+  assert.equal(readOwnVoice({ id: "../x" }), null);
+});
+
 test("voice over: when Edith puts her voice on a Reel, and which voice", async () => {
   const { wantsVoiceOver, findVoice, readVoiceSetting, readPostVoice, SIMONE_VOICES, DEFAULT_VOICE_ID } = await import("./voice-over.ts");
   const base = { post: null, studio: "auto" as const, onReel: null, correction: false, speechInClips: false, footageSeconds: 14, photos: 0 };

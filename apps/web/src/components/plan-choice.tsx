@@ -69,6 +69,17 @@ export function PlanChoice({ next, upgradeFrom }: { next: string; upgradeFrom?: 
       >
         {pending ? "Un instant…" : upgradeFrom ? `Passer à ${PLANS[plan].label}` : `Choisir ${PLANS[plan].label} : ${PLANS[plan].priceEur} € / mois`}
       </button>
+      <p className="text-center text-[12px] leading-snug text-muted">
+        {upgradeFrom ? "En changeant d’offre" : "En t’abonnant"}, tu acceptes les{" "}
+        <a href="/conditions" target="_blank" className="underline underline-offset-2">
+          conditions d’utilisation et de vente
+        </a>{" "}
+        et la{" "}
+        <a href="/confidentialite" target="_blank" className="underline underline-offset-2">
+          politique de confidentialité
+        </a>
+        . Sans engagement.
+      </p>
       {error ? <p className="text-[13px] font-semibold text-peach-ink">{error}</p> : null}
     </div>
   );

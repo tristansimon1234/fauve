@@ -10,6 +10,7 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   update_onboarding: "Je note ça…",
   read_website: "Je lis ton site…",
   get_connect_link: "Je prépare le lien de connexion…",
+  get_page_link: "Je prépare la page…",
   get_post_link: "Je prépare le lien…",
   list_media: "Je regarde ta médiathèque…",
   list_inspirations: "Je regarde tes inspirations…",

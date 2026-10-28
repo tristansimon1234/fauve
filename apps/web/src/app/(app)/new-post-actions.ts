@@ -1,6 +1,6 @@
 "use server";
 
-import { ANALYST_MODEL, filmIdeas, keptPlan, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, memoryLines, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, offersLine, packLine, type PostIdea, type PostPlan } from "@fauve/agent";
+import { ANALYST_MODEL, filmIdeas, keptPlan, postIdeas, postKindSchema, PROPOSAL_PROMPT, proposalSchema, publishWhen, memoryLines, readOwnVoice, readVoiceSetting, reelLink, stolenStyleLines, stolenStyleSchema, offersLine, packLine, type PostIdea, type PostPlan } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { z } from "zod";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
@@ -33,6 +33,8 @@ export type NewPostOptions = {
   ideas: Record<"reel" | "carousel" | "post" | "story", PostIdea[]>;
   /** Her voice-over setting (Style), the first choice for a Reel. */
   voice: { use: "auto" | "always" | "never"; voiceId: string | null };
+  /** Her own voice (a clone made in Style), heard by its sample. */
+  ownVoice: { id: string; sampleUrl: string | null } | null;
   /** TikTok connected: a Reel goes there too, unless she says otherwise. */
   tiktok: boolean;
   /** The Reel she sent Edith to copy (« Steal »): her next Reel follows it, unless she says otherwise. */
@@ -60,6 +62,8 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     studioModels(studioId).catch(() => []),
   ]);
   const voice = readVoiceSetting((brand?.profile as { voice?: unknown } | null)?.voice);
+  const own = readOwnVoice((brand?.profile as { own_voice?: unknown } | null)?.own_voice);
+  const ownSample = own?.sample_path ? ((await signMediaUrls(db, studioId, [own.sample_path])).get(own.sample_path) ?? null) : null;
 
   const media = (assets.data ?? []).map((a) => ({
     id: a.id as string,
@@ -90,6 +94,7 @@ export async function newPostOptions(): Promise<NewPostOptions | null> {
     }),
     ideas: postIdeas(studio?.business_type as string | null),
     voice: { use: voice.use, voiceId: voice.voice_id ?? null },
+    ownVoice: own ? { id: own.id, sampleUrl: ownSample } : null,
     tiktok: tiktok?.status === "connected",
     copy: copy ? { id: copy.id, name: copy.name, lines: copy.lines } : null,
     models,
