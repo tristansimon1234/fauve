@@ -19,6 +19,7 @@ import {
   VOICE_SPEED,
   verbatimScript,
   scriptFrom,
+  SCRIPT_PASS,
   readOwnVoice,
   readPostVoice,
   readVoiceSetting,
@@ -170,26 +171,30 @@ export async function writeVoiceScript(
   };
   // She wrote the words herself: read as written (or improved for the ear when she asked), never rewritten into another voice.
   if (contract?.voice_text) return ownTextScript(studioId, contract, fixed, input);
-  let draft: VoiceOverDraft & Partial<Pick<VoiceOverDecision, "format" | "why">>;
-  for (let attempt = 0; ; attempt++) {
+  type Draft = VoiceOverDraft & Partial<Pick<VoiceOverDecision, "format" | "why">>;
+  const write = async (extra: Record<string, unknown> = {}, withForm = decide): Promise<Draft> => {
     const response = await anthropic().beta.messages.parse({
       model: CLAUDE_MODEL,
       // Its thinking counts in this budget: at 2000 it took nearly all of it, and the script came back cut (no voice on the Reel).
       max_tokens: 8000,
-      output_config: { effort: "medium", format: outputFormat(decide ? voiceOverDecisionSchema : voiceOverScriptSchema) },
-      system: decide ? `${VOICE_OVER_PROMPT}\n\n${VOICE_FORMAT_PROMPT}` : VOICE_OVER_PROMPT,
-      messages: [{ role: "user", content: JSON.stringify(input) }],
+      output_config: { effort: "medium", format: outputFormat(withForm ? voiceOverDecisionSchema : voiceOverScriptSchema) },
+      system: withForm ? `${VOICE_OVER_PROMPT}\n\n${VOICE_FORMAT_PROMPT}` : VOICE_OVER_PROMPT,
+      messages: [{ role: "user", content: JSON.stringify({ ...input, ...extra }) }],
     });
     await logClaudeCost(studioId, response.usage, "voice_script");
-    const parsed = response.parsed_output as (VoiceOverDraft & Partial<Pick<VoiceOverDecision, "format" | "why">>) | null;
+    const parsed = response.parsed_output as Draft | null;
     if (!parsed) throw new Error("La voix off n'a pas pu être écrite");
-    if (parsed.format === "message") return { format: "message", why: parsed.why, hook: "", script: "" };
-    draft = { ...parsed, hooks: parsed.hooks.map((h) => h.trim()).filter(Boolean) };
-    const words = spokenWords(scriptFrom(draft.hooks[0] ?? "", draft.rest).script);
-    // Too long, it would not fit in a Reel; too short, it says nothing: once more.
-    const { mots_min: min, mots_max: max } = input.longueur;
-    if ((words >= min - 6 && words <= max + 4) || attempt >= 1) break;
-    input.publication = { ...input.publication, angle: `${input.publication.angle ?? ""} La version précédente faisait ${words} mots : vise ${min} à ${max}.`.trim() };
+    return { ...parsed, hooks: (parsed.hooks ?? []).map((h) => h.trim()).filter(Boolean) };
+  };
+  let draft = await write();
+  if (draft.format === "message") return { format: "message", why: draft.why, hook: "", script: "" };
+  // Too long, it would not fit in a Reel: once more. Shorter than its target is fine: the length is a ceiling,
+  // a voice that filled it described the images (Tristan: « le scénariste des reels est un peu naze »).
+  const { mots_min: min, mots_max: max } = input.longueur;
+  const words = spokenWords(scriptFrom(draft.hooks[0] ?? "", draft.rest).script);
+  if (words > max + 4 || words < Math.round(min * 0.5)) {
+    const again = await write({ longueur_precedente: `La version précédente faisait ${words} mots : ${max} au plus.` }).catch(() => draft);
+    if (again.format !== "message" && again.hooks.length) draft = again;
   }
   // Its first sentence decides whether anyone stays: the strongest of its hooks (and the judge's own), for the image it opens on.
   const next = stripAudioTags(draft.rest).split(/(?<=[.!?…])\s+/)[0];
@@ -205,12 +210,24 @@ export async function writeVoiceScript(
           ...(fixed.length ? { contrat: fixed } : {}),
           premiere_image: input.ouverture,
           message: draft.message || undefined,
+          angle: draft.angle || undefined,
           suite: next || undefined,
+          reste: stripAudioTags(draft.rest) || undefined,
           chuchotee: whispered || undefined,
           accroches: draft.hooks,
         })
       : null;
-  return { ...scriptFrom(chosen?.text ?? draft.hooks[0] ?? "", draft.rest), format: draft.format, why: draft.why };
+  const hook = chosen?.text ?? draft.hooks[0] ?? "";
+  let rest = draft.rest;
+  // The whole text judged weak (it describes the images, has no angle, fills): rewritten once with the judge's fixes, its hook kept.
+  if (chosen?.script && chosen.script.score < SCRIPT_PASS && chosen.script.fixes.length) {
+    const fixed = await write(
+      { version_precedente: { accroche: hook, reste: draft.rest }, accroche_gardee: hook, a_corriger: chosen.script.fixes },
+      false,
+    ).catch((error: unknown) => (console.warn("voice script kept as first written", error), null));
+    if (fixed?.rest.trim() && spokenWords(scriptFrom(hook, fixed.rest).script) <= max + 4) rest = fixed.rest;
+  }
+  return { ...scriptFrom(hook, rest), format: draft.format, why: draft.why };
 }
 
 /** Her own text, prepared for the voice: corrected only (verbatim), or improved for the ear keeping her meaning and her person (polish). */
