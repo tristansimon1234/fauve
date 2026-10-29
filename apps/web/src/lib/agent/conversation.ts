@@ -56,6 +56,8 @@ export type StoredMessage = {
   notes?: string[];
   /** Emoji reactions on the message: the manager's on Fauve's messages, Fauve's on hers. */
   reactions?: { fauve?: string; me?: string } | null;
+  /** A reply WhatsApp refused to send (kept, so she can read it in the app): she never got it there. */
+  undelivered?: boolean;
 };
 
 const mediaLabels: Record<string, string> = {
@@ -84,7 +86,9 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
     const cut = i < answering && text.length > MESSAGE_MAX_CHARS ? `${text.slice(0, MESSAGE_MAX_CHARS)}… [la suite est coupée dans ton historique]` : text;
     // A reaction is part of the conversation: she liked a message, Fauve already answered one with an emoji.
     const reacted = row.direction === "outbound" ? row.reactions?.me && `[elle a réagi ${row.reactions.me}]` : row.reactions?.fauve && `[tu as réagi ${row.reactions.fauve}]`;
-    const short = [row.notes?.length ? `${cut}\n[mémo : ${row.notes.join(" ; ")}]` : cut, reacted].filter(Boolean).join("\n");
+    // Never received on WhatsApp: the next answer says again what she missed, never « comme je te disais ».
+    const missed = row.direction === "outbound" && row.undelivered ? "[WhatsApp a refusé l'envoi de ce message : elle ne l'a pas reçu ; redis-lui l'essentiel]" : null;
+    const short = [row.notes?.length ? `${cut}\n[mémo : ${row.notes.join(" ; ")}]` : cut, reacted, missed].filter(Boolean).join("\n");
     const last = history.at(-1);
     if (last?.role === role && typeof last.content === "string") {
       last.content = `${last.content}\n${short}`;
@@ -182,6 +186,7 @@ export async function replyInConversation(params: {
     ...(r as StoredMessage & { wa_message_id: string | null }),
     reply_to: (r.payload as { reply_to?: string } | null)?.reply_to ?? null,
     notes: (r.payload as { notes?: string[] } | null)?.notes,
+    undelivered: Boolean((r.payload as { undelivered?: unknown } | null)?.undelivered),
   }));
   const history = toModelHistory(orderReplies(stored));
   const silent: RunFauveResult = { reply: null, reactions: [], extras: {}, notes: [], usage: { input_tokens: 0, output_tokens: 0 }, afterReply: [] };

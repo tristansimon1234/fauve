@@ -291,6 +291,16 @@ async function newerMessage(studioId: string, waMessageId: string): Promise<bool
   return Boolean(later?.length);
 }
 
+/** What WhatsApp said when it refused a reply: its code and its words (« (#131037) … needs display name approval »). */
+function deliveryError(error: unknown): { code: number | null; message: string; at: string } {
+  const body = (error as { body?: { error?: { code?: unknown; message?: unknown } } } | null)?.body?.error;
+  return {
+    code: typeof body?.code === "number" ? body.code : null,
+    message: (typeof body?.message === "string" ? body.message : error instanceof Error ? error.message : String(error)).slice(0, 300),
+    at: new Date().toISOString(),
+  };
+}
+
 /**
  * Edith's turn on WhatsApp: her answer, with its buttons and links, sent and stored, then
  * what runs after it (a render…). Also after files dropped through her upload link (lib/upload-link.ts).
@@ -339,24 +349,37 @@ export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo
       ...(posts && posts.length > 1 ? posts.map((id) => `${env("APP_URL")}/v/${id}`) : []),
       ...(!url && button ? [`${env("APP_URL")}${button.path}`] : []),
     ];
-    const waMessageId = url
-      ? options?.length
-        ? // WhatsApp puts one kind of button on a message: the answers on hers, then the page.
-          await sendReply(waId, result.reply, options, links).then(async (id) => {
-            await sendLinkButton(waId, button!.purpose === "upload" ? "En pleine qualité, depuis ta galerie :" : "C’est ici :", { url, label: button!.label });
-            return id;
-          })
-        : await sendLinkButton(waId, [result.reply, ...links].join("\n\n"), { url, label: button!.label })
-      : await sendReply(waId, result.reply, options, links);
+    const send = () =>
+      url
+        ? options?.length
+          ? // WhatsApp puts one kind of button on a message: the answers on hers, then the page.
+            sendReply(waId, result.reply!, options, links).then(async (id) => {
+              await sendLinkButton(waId, button!.purpose === "upload" ? "En pleine qualité, depuis ta galerie :" : "C’est ici :", { url, label: button!.label });
+              return id;
+            })
+          : sendLinkButton(waId, [result.reply, ...links].join("\n\n"), { url, label: button!.label })
+        : sendReply(waId, result.reply!, options, links);
+    // A reply WhatsApp refuses (its number's display name awaiting Meta's approval, error 131037) is still kept,
+    // marked: it shows in the app, the next turn knows she never read it, and what it started still runs below.
+    // Lost, each of her « Alors ? » ran the whole turn again (her site read four times) and her site's look,
+    // started after the reply, never came: the app's style card waited for it.
+    const delivered = await send().then(
+      (id) => ({ id, error: null }),
+      (error: unknown) => {
+        console.error("whatsapp: reply not delivered", replyTo, error);
+        return { id: undefined, error: deliveryError(error) };
+      },
+    );
     await db.from("whatsapp_messages").insert({
       studio_id: studioId,
-      wa_message_id: waMessageId,
+      wa_message_id: delivered.id ?? null,
       direction: "outbound",
       phone_e164: phone,
       type: "text",
       body: result.reply,
-      payload: { ...(replyTo ? { reply_to: replyTo } : {}), ...result.extras, notes: result.notes },
+      payload: { ...(replyTo ? { reply_to: replyTo } : {}), ...result.extras, notes: result.notes, ...(delivered.error ? { undelivered: delivered.error } : {}) },
     });
+    const waMessageId = delivered.id;
     if (terms && waMessageId) await markTermsShown(studioId).catch((e) => console.warn("terms not marked shown", e));
   }
   // E.g. a render: the video follows the "je monte ta vidéo" reply.
