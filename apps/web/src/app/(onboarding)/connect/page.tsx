@@ -6,10 +6,12 @@ import { ConnectActions, ConnectActionsFallback } from "./connect-actions";
 
 export const metadata: Metadata = { title: "Connecte ton Instagram" };
 
+// Connecting is mostly for her results: she posts herself from her phone (« Publier » opens Instagram
+// with the Reel ready, a trending sound added there), and Edith publishes at a word only if she wants.
 const permissions = [
-  "Publier tes posts, Reels et stories",
-  "Lire tes statistiques pour le bilan de la semaine",
-  "Te montrer les résultats de tes publications",
+  "Suivre tes résultats : visites du profil, clics sur ton lien, nouveaux abonnés",
+  "Retrouver chaque publication pour te dire ce qui marche",
+  "Publier pour toi d’un mot, si tu préfères",
 ];
 
 export default function ConnectPage({ searchParams }: PageProps<"/connect">) {
@@ -27,7 +29,7 @@ export default function ConnectPage({ searchParams }: PageProps<"/connect">) {
           <h1 className="text-[32px] leading-[1.1] font-extrabold tracking-[-0.02em]">
             Connecte ton <span className="accent">Instagram</span>
           </h1>
-          <p className="text-[15px] leading-[1.55] text-muted">Une seule fois. Ensuite, tout se passe sur WhatsApp.</p>
+          <p className="text-[15px] leading-[1.55] text-muted">Pour suivre tes résultats. Une seule fois, ensuite tout se passe sur WhatsApp.</p>
         </div>
         <ul className="flex flex-col gap-3">
           {permissions.map((p) => (

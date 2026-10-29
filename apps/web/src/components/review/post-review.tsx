@@ -122,8 +122,19 @@ export function PostReview({
 
   const where = data.platforms.length ? data.platforms.map((p) => (p === "tiktok" ? "TikTok" : "Instagram")).join(" et ") : "Instagram";
 
+  const sharing = useVideoShare(data.videoUrl, data.title);
+  const shareVideo = async () => {
+    setError(null);
+    const result = await sharing.share(caption);
+    if (result === "shared" || result === "failed") setSheet(null);
+    const line = shareMessage(result, caption);
+    if (line) (result === "failed" ? setError : setToast)(line);
+  };
+  const canShare = sharing.can && Boolean(data.videoUrl) && !data.making && !data.failed;
+
   const publish = () => {
-    if (needsInstagram(data)) return setSheet("instagram");
+    // Not connected: she posts it herself, her phone's share sheet straight away (share-video.ts).
+    if (needsInstagram(data)) return canShare ? void shareVideo() : setSheet("instagram");
     start(async () => {
       setError(null);
       const form = new FormData();
@@ -152,16 +163,6 @@ export function PostReview({
       router.refresh();
     });
 
-  const sharing = useVideoShare(data.videoUrl, data.title);
-  const shareVideo = async () => {
-    setError(null);
-    const result = await sharing.share(caption);
-    if (result === "shared" || result === "failed") setSheet(null);
-    const line = shareMessage(result, caption);
-    if (line) (result === "failed" ? setError : setToast)(line);
-  };
-  const canShare = sharing.can && Boolean(data.videoUrl) && !data.making && !data.failed;
-
   const tile = "fauve-press flex h-[60px] min-w-0 flex-col items-center justify-center gap-1 rounded-[18px] px-1 text-[13.5px] font-extrabold disabled:opacity-60";
   const action = data.locked ? null : data.status === "scheduled" ? (
     <div className="flex items-start gap-3 rounded-[18px] bg-success-soft px-4 py-3.5 text-success">
@@ -182,9 +183,9 @@ export function PostReview({
           className={`${tile} bg-violet text-white shadow-[0_8px_22px_rgba(91,63,217,0.26)] hover:bg-violet-hover`}
         >
           <ArrowUpIcon size={19} />
-          {pending ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
+          {pending || sharing.busy ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
         </button>
-        {canShare ? (
+        {canShare && !needsInstagram(data) ? (
           <button type="button" onClick={shareVideo} disabled={sharing.busy} className={`${tile} border-[1.5px] border-line bg-white text-ink hover:border-lilac`}>
             <ShareIcon size={19} />
             {sharing.busy ? "Un instant…" : "Partager"}

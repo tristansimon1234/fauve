@@ -609,7 +609,7 @@ function ConnectStep({ handle, onNext, pending }: { handle: string | null; onNex
   }
   return (
     <>
-      <p className="text-[14px] leading-relaxed text-muted">Dernière étape : branche ton Instagram pour que je publie ta publication d’un mot et que je lise tes résultats. Il faut un compte professionnel ou créateur ; rien ne part sans ta validation.</p>
+      <p className="text-[14px] leading-relaxed text-muted">Dernière étape : branche ton Instagram pour que je suive tes résultats (visites du profil, clics, nouveaux abonnés). Tu postes toi-même depuis ton téléphone, avec le son que tu veux ; je peux aussi publier d’un mot si tu préfères. Il faut un compte professionnel ou créateur.</p>
       <div className="flex flex-wrap items-center gap-3">
         <a href="/api/instagram/connect" className="btn btn-primary h-11 px-5">
           <InstagramIcon size={18} />

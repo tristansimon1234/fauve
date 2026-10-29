@@ -66,7 +66,7 @@ export async function answerPublishOffer(
   let line: string;
   if (status === "scheduled") line = `Il part déjà ${where(platforms)}, je te dis quand il est en ligne.`;
   else if (result && "when" in result) line = `C’est parti ✅ Je le publie ${where(platforms)} maintenant.`;
-  else if (result && "blocked" in result && result.blocked === "instagram") line = "C’est validé ✅ Connecte ton Instagram dans Réglages pour que je le publie.";
+  else if (result && "blocked" in result && result.blocked === "instagram") line = "C’est validé ✅ Pour le poster, ouvre sa page sur ton téléphone et touche « Publier » : Instagram s’ouvre avec ta vidéo prête. Ou relie ton Instagram pour que je le publie.";
   else if (result && "blocked" in result && result.blocked === "tiktok") line = "C’est validé ✅ Reconnecte TikTok dans Réglages (ou retire-le de « Où publier ») pour que je le publie.";
   else line = "C’est validé ✅ Je le publie dès que la vidéo est prête.";
   return { reply: line, body: line, payload: card };

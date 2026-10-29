@@ -73,7 +73,7 @@ export function useVideoShare(url: string | null, title: string): VideoShare {
 /** The line shown after her touch. */
 export function shareMessage(result: Awaited<ReturnType<VideoShare["share"]>>, caption: string): string | null {
   if (result === "shared") return caption.trim() ? "Ta légende est copiée : colle-la au moment de publier." : null;
-  if (result === "again") return "Ta vidéo est prête : touche « Partager » encore une fois.";
+  if (result === "again") return "Ta vidéo est prête : touche le bouton encore une fois.";
   if (result === "failed") return "Le partage n’a pas marché. Télécharge la vidéo à la place.";
   return null;
 }

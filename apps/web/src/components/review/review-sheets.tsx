@@ -7,7 +7,7 @@ import { DateView } from "./change-panel";
 
 // What « Prévoir » and « Publier » open on a Reel's page, the same in the app and on the page
 // opened from WhatsApp: when Edith reminds her to post it, and, before Instagram is connected,
-// the way to connect it (or, on a phone, to open it in Instagram; else to save the video and post it herself).
+// how she posts it herself (her phone's share sheet, else the video to save) and connecting it, for her results.
 
 export type ReviewSheet = "date" | "instagram";
 
@@ -37,32 +37,31 @@ export function ReviewSheets({
     );
   }
   if (sheet === "instagram") {
-    // On a phone, the quickest: Instagram opens with her Reel ready (share-video.ts).
-    if (share?.can) {
-      return (
-        <Sheet title="Publie-le sur Instagram" hint="Instagram s’ouvre avec ton Reel prêt, et ta légende copiée : tu n’as plus qu’à la coller et publier." onClose={onClose}>
+    // A phone shares it straight away (« Publier » opens its share sheet): this sheet is a computer's,
+    // or a phone whose browser cannot share a video. She posts it herself; connecting is for her results.
+    return (
+      <Sheet
+        title="Publie-le toi-même"
+        hint="Ouvre ce Reel sur ton téléphone et touche « Publier » : Instagram s’ouvre avec ta vidéo prête, et tu peux y ajouter un son tendance. Ou télécharge la vidéo."
+        onClose={onClose}
+      >
+        {share?.can ? (
           <button type="button" onClick={share.onShare} disabled={share.busy} className="btn btn-primary w-full disabled:opacity-60">
             <InstagramIcon size={18} />
             {share.busy ? "Un instant…" : share.waiting ? "Partager maintenant" : "Ouvrir dans Instagram"}
           </button>
-          <a href="/api/instagram/connect" className="btn btn-secondary w-full">
-            Ou relie ton compte pour qu’Edith publie
-          </a>
-        </Sheet>
-      );
-    }
-    return (
-      <Sheet title="Relie ton Instagram" hint="Pour qu’Edith publie ton Reel, relie ton compte Instagram une fois. Ou télécharge la vidéo et publie-la toi-même." onClose={onClose}>
-        <a href="/api/instagram/connect" className="btn btn-primary w-full">
-          <InstagramIcon size={18} />
-          Relier Instagram
-        </a>
-        {data.downloadUrl && (
-          <a href={data.downloadUrl} download className="btn btn-secondary w-full">
-            <DownloadIcon size={18} />
-            Télécharger la vidéo
-          </a>
+        ) : (
+          data.downloadUrl && (
+            <a href={data.downloadUrl} download className="btn btn-primary w-full">
+              <DownloadIcon size={18} />
+              Télécharger la vidéo
+            </a>
+          )
         )}
+        <a href="/api/instagram/connect" className="btn btn-secondary w-full">
+          <InstagramIcon size={18} />
+          Relier Instagram pour suivre tes résultats
+        </a>
       </Sheet>
     );
   }

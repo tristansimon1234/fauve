@@ -67,7 +67,8 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   }, [toast]);
 
   const publish = () => {
-    if (needsInstagram(data)) return setSheet("instagram");
+    // Not connected: she posts it herself, her phone's share sheet straight away (share-video.ts).
+    if (needsInstagram(data)) return sharing.can && ready ? void shareVideo() : setSheet("instagram");
     start(async () => {
       setError(null);
       const form = new FormData();
@@ -271,9 +272,10 @@ export function PhoneReview({ data }: { data: ReviewData }) {
             <div className="grid grid-cols-3 gap-2">
               <button type="button" onClick={publish} disabled={pending || !ready} className={`${tile} bg-violet shadow-[0_8px_22px_rgba(91,63,217,0.4)]`}>
                 <ArrowUpIcon size={19} />
-                {pending ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
+                {pending || sharing.busy ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
               </button>
-              {sharing.can && ready ? (
+              {/* Not connected, « Publier » already shares: this one saves it. */}
+              {sharing.can && ready && !needsInstagram(data) ? (
                 <button type="button" onClick={shareVideo} disabled={sharing.busy} className={`${tile} bg-white/15 backdrop-blur-sm`}>
                   <ShareIcon size={19} />
                   {sharing.busy ? "Un instant…" : "Partager"}
