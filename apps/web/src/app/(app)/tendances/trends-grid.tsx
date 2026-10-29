@@ -88,7 +88,7 @@ export function TrendQuery({ query, lang, left }: { query: string | null; lang: 
   );
 }
 
-/** The wall: the most beautiful first, the hooks that work, then the most watched and her city's; each video plays in the app. */
+/** The hooks that work, then the most watched and her city's; each video plays in the app. */
 export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; searching: boolean; timezone: string }) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
@@ -109,7 +109,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
       </div>
     );
   }
-  if (!lists.trend.length && !lists.beau.length && !lists.local.length) {
+  if (!lists.trend.length && !lists.local.length) {
     return (
       <div className="rounded-[22px] bg-soft px-6 py-10 text-center text-[15px] text-muted">
         Rien de vraiment fort pour ces mots cette semaine. Essaie d’autres mots, plus simples (« coiffeur », « brunch », « pilates »).
@@ -118,7 +118,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
   }
 
   const city = lists.words.local.split(" ").at(-1) ?? "";
-  const platforms = new Set([...lists.trend, ...lists.beau, ...lists.local].map((c) => c.platform));
+  const platforms = new Set([...lists.trend, ...lists.local].map((c) => c.platform));
   const open = (card: TrendCard) => setPlaying(card);
 
   return (
@@ -167,52 +167,12 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
         </ul>
       )}
 
-      <BeautyWall cards={lists.beau.filter((c) => filter === "all" || c.platform === filter)} onOpen={open} onCopy={setCopying} />
       <HookRow cards={lists.hooks.filter((c) => filter === "all" || c.platform === filter)} onOpen={open} />
       <TrendSection title="Ce qui cartonne en ce moment" note={`« ${lists.words.trend} », les plus vues du mois`} cards={lists.trend} filter={filter} onOpen={open} onCopy={setCopying} />
       <TrendSection title={`À ${capitalized(city)}`} note={`« ${lists.words.local} »`} cards={lists.local} filter={filter} onOpen={open} onCopy={setCopying} />
       {playing && <Player card={playing} onClose={() => setPlaying(null)} onCopy={(url) => (setPlaying(null), setCopying(url))} />}
       {copying && <NewPostSheet timezone={timezone} copyLink={copying} onClose={() => setCopying(null)} />}
     </>
-  );
-}
-
-/** « Les plus belles », as a wall: each cover at its own size, what makes it inspiring under it. */
-function BeautyWall({ cards, onOpen, onCopy }: { cards: TrendCard[]; onOpen: (card: TrendCard) => void; onCopy: (url: string) => void }) {
-  return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-[22px] font-extrabold tracking-[-0.01em]">Les plus belles</h2>
-        <p className="text-[14px] text-muted">choisies sur leur image : lumière, cadrage, couleurs</p>
-      </div>
-      {cards.length ? (
-        <ul className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
-          {cards.map((card) => (
-            <li key={card.id} className="mb-5 flex break-inside-avoid flex-col gap-2">
-              <Cover card={card} onOpen={onOpen} />
-              {card.tags.length > 0 && (
-                <ul className="flex flex-wrap gap-1">
-                  {card.tags.map((tag) => (
-                    <li key={tag} className="rounded-full bg-soft px-2.5 py-1 text-[12px] font-bold text-muted">
-                      {tag}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {card.hook && <p className="font-serif text-[17px] italic leading-snug">« {card.hook} »</p>}
-              <div className="flex items-center justify-between gap-2">
-                {card.author && <p className="min-w-0 truncate text-[13px] font-bold">@{card.author}</p>}
-                <button type="button" onClick={() => onCopy(card.url)} className="shrink-0 text-[13px] font-bold text-violet hover:underline">
-                  Fais-en un
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="rounded-[16px] bg-soft px-5 py-6 text-[14px] text-muted">Je cherche encore les plus belles de ton métier : reviens dans un moment.</p>
-      )}
-    </section>
   );
 }
 
@@ -272,12 +232,12 @@ function TrendSection({ title, note, cards, filter, onOpen, onCopy }: { title: s
 }
 
 /** A cover that opens the video in the app, with its platform and its views. */
-function Cover({ card, onOpen, fixed = false }: { card: TrendCard; onOpen: (card: TrendCard) => void; fixed?: boolean }) {
+function Cover({ card, onOpen }: { card: TrendCard; onOpen: (card: TrendCard) => void }) {
   return (
-    <button type="button" onClick={() => onOpen(card)} aria-label="Voir la vidéo" className={`group relative block w-full overflow-hidden rounded-[16px] bg-soft ${fixed || !card.cover ? "aspect-[9/16]" : ""}`}>
+    <button type="button" onClick={() => onOpen(card)} aria-label="Voir la vidéo" className="group relative block aspect-[9/16] w-full overflow-hidden rounded-[16px] bg-soft">
       {card.cover ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={card.cover} alt="" loading="lazy" className={`w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${fixed ? "h-full" : "h-auto"}`} />
+        <img src={card.cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
       ) : (
         <div className="flex h-full items-center justify-center px-4 text-center text-[13px] text-muted">{card.caption.slice(0, 80) || "Voir la vidéo"}</div>
       )}
@@ -307,13 +267,22 @@ function Cover({ card, onOpen, fixed = false }: { card: TrendCard; onOpen: (card
 function TrendItem({ card, onOpen, onCopy }: { card: TrendCard; onOpen: (card: TrendCard) => void; onCopy: (url: string) => void }) {
   return (
     <li className="flex min-w-0 flex-col gap-2">
-      <Cover card={card} onOpen={onOpen} fixed />
+      <Cover card={card} onOpen={onOpen} />
       <div className="flex min-w-0 flex-col gap-1 px-0.5">
         {card.author && <p className="truncate text-[13px] font-bold">@{card.author}</p>}
         {card.hook ? (
           <p className="line-clamp-2 font-serif text-[15px] italic leading-snug">« {card.hook} »</p>
         ) : (
           card.caption && <p className="line-clamp-2 text-[13px] leading-snug text-muted">{card.caption}</p>
+        )}
+        {card.tags.length > 0 && (
+          <ul className="flex flex-wrap gap-1">
+            {card.tags.map((tag) => (
+              <li key={tag} className="rounded-full bg-soft px-2 py-0.5 text-[11px] font-bold text-muted">
+                {tag}
+              </li>
+            ))}
+          </ul>
         )}
         {card.sound && (
           <p className="flex min-w-0 items-center gap-1 text-[12px] text-muted">

@@ -8,7 +8,7 @@ import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts"
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
-import { beautifulTrends, captionHashtags, captionLang, cleanHook, cleanTags, cleanWhy, foreignScript, inTrendLang, minViews, nextTags, otherLang, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
+import { captionLang, cleanHook, cleanTags, cleanWhy, foreignScript, inTrendLang, minViews, otherLang, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
@@ -4735,8 +4735,6 @@ test("trends: in her language, and only hooks that work", () => {
   const pool = [t("en", 900_000, "the only thing I look forward to hearing"), t("maybe", 800_000, "✨ #pilates"), t("fr", 200_000, "on vous attend pour le cours de 19 h"), t("us", 700_000, "✨", "US")];
   assert.deepEqual(keptTrends(pool, "trend", now, "fr").map((k) => k.external_id), ["fr", "maybe"]);
   assert.deepEqual(keptTrends(pool, "trend", now).map((k) => k.external_id), ["en", "maybe", "us", "fr"]);
-  // « Les plus belles » are chosen on their image: any language until their cover says otherwise.
-  assert.deepEqual(keptTrends(pool, "beau", now, "fr").map((k) => k.external_id), ["en", "maybe", "us", "fr"]);
   // In French, a country's audience: a third of the world's bar, a city's unchanged.
   assert.deepEqual([minViews("trend", "tiktok", "fr"), minViews("trend", "tiktok", "en"), minViews("local", "tiktok", "fr")], [30_000, 100_000, 5_000]);
   // Its cover in another language than hers: left out; no words on it: it can stay.
@@ -4789,36 +4787,15 @@ test("trends: the most watched first, foreign scripts and weak ones left out, tw
   assert.deepEqual([pilates.trend.hashtags, pilates.local.hashtags], [["pilates", "pilatesfrance"], ["pilatesparis"]]);
   assert.deepEqual([pilates.trend.country, pilates.local.country], ["pilates france", null]);
   assert.equal(scopeKey(pilates.local), "local:fr:pilates paris");
-  assert.deepEqual([pilates.beau.words, pilates.beau.hashtags], ["pilates aesthetic", ["pilatesaesthetic", "pilates", "pilatesfrance"]]);
   // In every language, or in English: no country.
   assert.deepEqual([trendPlan("Pilates Paris", "all").trend.hashtags, trendPlan("Pilates Paris", "en").trend.country], [["pilates"], null]);
   assert.equal(scopeKey(trendPlan("pilates", "en").trend), "trend:en:pilates");
-  // The most beautiful: 7 out of 10 at least and about her trade, the most beautiful first.
-  const nice = [v("a", 30_000, "reformer"), v("b", 90_000, "reformer"), v("c", 50_000, "paris guide"), v("d", 60_000, "reformer")];
-  const scored = beautifulTrends(nice, [
-    { n: 1, beauty: 9, on_topic: true },
-    { n: 2, beauty: 5, on_topic: true },
-    { n: 3, beauty: 10, on_topic: false },
-    { n: 4, beauty: 9, on_topic: true },
-  ]);
-  assert.deepEqual(scored.map((x) => x.external_id), ["d", "a"]);
   // The hook read on a cover, clean; nothing when it is only a handle or a hashtag.
   assert.equal(cleanHook("« pov : ton premier cours de reformer »"), "pov : ton premier cours de reformer");
   assert.equal(cleanHook("@studio #pilates"), "");
   assert.deepEqual(cleanTags(["Lumière naturelle", "lumière naturelle", "#plan fixe", "ok"]), ["lumière naturelle", "plan fixe"]);
-  // Hashtags learned from the most beautiful posts: two that keep bringing beautiful ones, one new to explore.
-  assert.deepEqual(captionHashtags("Slow morning #ReformerPilates #fyp #pilates #Café_Crème"), ["reformerpilates", "pilates", "cafecreme"]);
-  const learned = [
-    { hashtag: "reformerpilates", seen: 3, score: 6 },
-    { hashtag: "pilatesstudio", seen: 2, score: 4 },
-    { hashtag: "slowliving", seen: 2, score: 1 },
-    { hashtag: "pilatesgirl", seen: 1, score: 2 },
-    { hashtag: "pilates", seen: 5, score: 9 },
-  ];
-  assert.deepEqual(nextTags(learned, ["pilatesaesthetic", "pilates"]), ["reformerpilates", "pilatesstudio", "pilatesgirl"]);
   const salon = trendPlan("salon de coiffure");
   assert.deepEqual(salon.trend.hashtags, ["salondecoiffure", "coiffure", "coiffurefrance"]);
-  assert.equal(salon.beau.words, "coiffure aesthetic");
   assert.deepEqual([salon.local.words, salon.local.hashtags], ["salon de coiffure paris", ["coiffureparis"]]);
   assert.deepEqual([trendPlan("brunch lyon").trend.words, trendPlan("brunch lyon").local.words], ["brunch", "brunch lyon"]);
   assert.equal(hashtagOf("crêperie"), "creperie");

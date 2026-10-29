@@ -1,8 +1,6 @@
 import "server-only";
 import {
   ANALYST_MODEL,
-  beautifulTrends,
-  captionHashtags,
   cleanHook,
   cleanTags,
   cleanWhy,
@@ -15,7 +13,6 @@ import {
   instagramTrends,
   keptTrends,
   nextCursorIn,
-  nextTags,
   otherLang,
   scopeKey,
   TREND_COVER_PROMPT,
@@ -35,7 +32,6 @@ import {
   type CoverRead,
   type HashtagCount,
   type HookForm,
-  type LearnedTag,
   type HashtagVolume,
   type TrendLang,
   type TrendPlatform,
@@ -59,14 +55,13 @@ import { tregCall } from "@/lib/treg";
 type Source = { id: string; body: Record<string, unknown>; read: (answer: unknown) => TrendVideo[]; pages: number };
 
 /** Where each list comes from: TikTok's keyword search (most liked of the month), Instagram's own top posts on the trade's hashtags (with their views), and its keyword search for the city. */
-function sources(search: TrendSearch, platform: TrendPlatform, extra: string[] = []): Source[] {
+function sources(search: TrendSearch, platform: TrendPlatform): Source[] {
   const tiktok = (query: string) => ({ id: "anyapi.tiktok.search.videos", body: { query, sortBy: 1, datePosted: 30 }, read: tiktokTrends, pages: TREND_PAGES });
   // TikTok has no language filter: in French, the trade's words are also searched with « france »
   // (« pilates france »), and the videos posted elsewhere are left out (inTrendLang).
   const national = search.country ? [tiktok(search.country)] : [];
-  // The most beautiful are picked from a bigger pool: the « aesthetic » search and the trade's own.
-  if (platform === "tiktok") return search.scope === "beau" ? [tiktok(search.words), tiktok(search.trade), ...national, ...extra.slice(0, 1).map((tag) => tiktok(tag))] : [tiktok(search.words), ...national];
-  const tops = [...search.hashtags, ...extra].map((hashtag) => ({ id: "anyapi.instagram.hashtag_top_posts", body: { hashtag }, read: instagramTopPosts, pages: 2 }));
+  if (platform === "tiktok") return [tiktok(search.words), ...national];
+  const tops = search.hashtags.map((hashtag) => ({ id: "anyapi.instagram.hashtag_top_posts", body: { hashtag }, read: instagramTopPosts, pages: 2 }));
   return search.scope === "local" ? [...tops, { id: "anyapi.instagram.search.reels", body: { query: search.words }, read: instagramTrends, pages: 2 }] : tops;
 }
 
@@ -90,7 +85,7 @@ export async function lastSearched(query: string, lang: TrendLang): Promise<Sear
   const plan = trendPlan(query, lang);
   const keys = TREND_SCOPES.map((scope) => scopeKey(plan[scope]));
   const { data } = await supabaseAdmin().from("trend_searches").select("key, platform, fetched_at, found").in("key", keys);
-  const out: Searched = { trend: {}, beau: {}, local: {}, running: false };
+  const out: Searched = { trend: {}, local: {}, running: false };
   const dead = runningSince();
   for (const r of data ?? []) {
     const scope = TREND_SCOPES[keys.indexOf(r.key as string)];
@@ -209,18 +204,16 @@ async function sourcePages(source: Source): Promise<{ answer: unknown; costUsd: 
 type Chosen = { video: TrendVideo; image: Buffer | null; read?: CoverRead };
 
 /**
- * Sonnet looks at the covers (240 px wide, about 140 tokens each): their beauty, whether they are about
- * her trade, the hook written on them and what makes them inspiring (TREND_COVER_PROMPT). « Les plus
- * belles » keeps the truly beautiful ones, the most beautiful first, and stays empty on a failure rather
- * than showing ordinary ones; the other lists keep the ones about her trade, the most watched first, and
- * all of them on a failure.
+ * Sonnet looks at the covers (240 px wide, about 140 tokens each): whether they are about her trade,
+ * the hook written on them and its strength, the language of their words and what makes them
+ * inspiring (TREND_COVER_PROMPT). Kept: the ones about her trade and in her language, the most watched
+ * first; all of them on a failure.
  */
 async function readCovers(search: TrendSearch, videos: TrendVideo[]): Promise<Chosen[]> {
   const fetched = await Promise.all(videos.map(async (video) => ({ video, image: await coverImage(video) })));
   const seen = await Promise.all(
     fetched.flatMap((v) => (v.image ? [v as { video: TrendVideo; image: Buffer }] : [])).map(async (v) => ({ ...v, small: await sharp(v.image).resize({ width: 240 }).webp({ quality: 70 }).toBuffer() })),
   );
-  const beau = search.scope === "beau";
   let reads: CoverRead[] | null = null;
   if (seen.length) {
     try {
@@ -254,47 +247,12 @@ async function readCovers(search: TrendSearch, videos: TrendVideo[]): Promise<Ch
   const readOf = (i: number) => reads?.find((r) => r.n === i + 1);
   // Its cover is in another language than hers (the caption did not tell): left out.
   const foreign = (i: number) => otherLang(readOf(i), search.lang);
-  if (beau) {
-    if (!reads) return [];
-    const order = beautifulTrends(seen.map((v) => v.video), reads.filter((r) => !foreign(r.n - 1)));
-    return order.flatMap((video) => {
-      const i = seen.findIndex((v) => v.video === video);
-      return i < 0 ? [] : [{ video, image: seen[i]!.image, read: readOf(i) }];
-    });
-  }
-  // The others: about her trade (when Sonnet could tell), in their order (the most watched first).
+  // About her trade (when Sonnet could tell), in their order (the most watched first).
   return fetched.flatMap((v) => {
     const i = seen.findIndex((s) => s.video === v.video);
     const read = i < 0 ? undefined : readOf(i);
     return (read && !read.on_topic) || (i >= 0 && foreign(i)) ? [] : [{ video: v.video, image: v.image, read }];
   });
-}
-
-/** The hashtags learned for a trade's « Les plus belles » (trend_tags). */
-async function learnedTags(key: string): Promise<LearnedTag[]> {
-  const { data } = await supabaseAdmin().from("trend_tags").select("hashtag, seen, score").eq("key", key);
-  return (data ?? []).map((r) => ({ hashtag: r.hashtag as string, seen: Number(r.seen), score: Number(r.score) }));
-}
-
-/**
- * Learns from the most beautiful posts of the week: each hashtag of a post rated 8 or more counts once
- * more, with the beauty above 7 added to its score; the ones that stop coming back fade (×0.7 a week).
- */
-async function learnTags(key: string, chosen: Chosen[]): Promise<void> {
-  const tags = new Map<string, number>();
-  for (const c of chosen) {
-    if (!c.read || c.read.beauty < 8) continue;
-    for (const tag of captionHashtags(c.video.caption)) tags.set(tag, (tags.get(tag) ?? 0) + (c.read.beauty - 7));
-  }
-  const before = await learnedTags(key);
-  const now = new Date().toISOString();
-  const rows = [
-    ...before.map((t) => ({ key, hashtag: t.hashtag, seen: t.seen + (tags.has(t.hashtag) ? 1 : 0), score: Math.round((t.score * 0.7 + (tags.get(t.hashtag) ?? 0)) * 100) / 100, updated_at: now })),
-    ...[...tags].filter(([tag]) => !before.some((t) => t.hashtag === tag)).map(([hashtag, score]) => ({ key, hashtag, seen: 1, score, updated_at: now })),
-  ]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 40);
-  if (rows.length) await supabaseAdmin().from("trend_tags").upsert(rows, { onConflict: "key,hashtag" });
 }
 
 /**
@@ -303,9 +261,7 @@ async function learnTags(key: string, chosen: Chosen[]): Promise<void> {
  */
 async function refreshList(search: TrendSearch, platform: TrendPlatform): Promise<number | null> {
   const key = scopeKey(search);
-  // « Les plus belles » also searches the hashtags its most beautiful posts brought (nextTags).
-  const extra = search.scope === "beau" ? nextTags(await learnedTags(key), search.hashtags) : [];
-  const read = await Promise.all(sources(search, platform, extra).map(async (source) => ({ source, pages: await sourcePages(source) })));
+  const read = await Promise.all(sources(search, platform).map(async (source) => ({ source, pages: await sourcePages(source) })));
   if (read.some((r) => !r.pages)) return null;
   const called = read.flatMap((r) => r.pages ?? []);
   const costUsd = called.reduce((sum, c) => sum + c.costUsd, 0);
@@ -319,9 +275,8 @@ async function refreshList(search: TrendSearch, platform: TrendPlatform): Promis
     meta: { query: key, platform, cost_usd: costUsd },
   });
   const strong = keptTrends(read.flatMap((r) => (r.pages ?? []).flatMap((page) => r.source.read(page.answer))), search.scope, new Date(), search.lang);
-  // Every list is read on its covers: the most beautiful chosen there, the others kept when about her trade.
-  const looked = await readCovers(search, strong.slice(0, search.scope === "beau" ? 24 : 16));
-  if (search.scope === "beau") await learnTags(key, looked).catch((error: unknown) => console.warn("trends: tags not learned", key, error));
+  // Every list is read on its covers: kept when about her trade and in her language.
+  const looked = await readCovers(search, strong.slice(0, 16));
   const chosen = looked.slice(0, TREND_KEEP);
   const kept = chosen.map((c) => c.video);
   const fetchedAt = new Date().toISOString();
@@ -342,7 +297,6 @@ async function refreshList(search: TrendSearch, platform: TrendPlatform): Promis
     duration: v.duration,
     posted_at: v.posted_at,
     cover_path: covers[rank],
-    beauty: chosen[rank]?.read?.beauty ?? null,
     hook: cleanHook(chosen[rank]?.read?.hook) || null,
     hook_form: cleanHook(chosen[rank]?.read?.hook) ? (chosen[rank]?.read?.hook_form ?? null) : null,
     hook_score: cleanHook(chosen[rank]?.read?.hook) ? (chosen[rank]?.read?.hook_score ?? null) : null,
@@ -422,8 +376,8 @@ export async function forgetOldTrends(): Promise<void> {
     await forgetVideos(db.from("trend_videos").select("id, cover_path").eq("key", r.key as string).eq("platform", r.platform as string));
     await db.from("trend_searches").delete().eq("key", r.key as string).eq("platform", r.platform as string);
   }
-  // The lists of before the scopes and languages (keys without « trend:xx: », « beau:xx: » or « local:xx: »).
-  const current = "^(trend|beau|local):[a-z]+:";
+  // The lists of before the languages, and « Les plus belles » (retired): keys without « trend:xx: » or « local:xx: ».
+  const current = "^(trend|local):[a-z]+:";
   await forgetVideos(db.from("trend_videos").select("id, cover_path").not("key", "match", current));
   await db.from("trend_searches").delete().not("key", "match", current);
 }
@@ -453,7 +407,6 @@ export type TrendCard = {
 
 export type TrendLists = {
   trend: TrendCard[];
-  beau: TrendCard[];
   local: TrendCard[];
   /** The hooks that work right now in her trade (read on the covers), the most watched first. */
   hooks: TrendCard[];
@@ -512,7 +465,7 @@ export async function trendCards(query: string, lang: TrendLang): Promise<TrendL
     firstOf(ranked, (c) => c.author?.toLowerCase() ?? c.id),
     (c) => c.hook!.toLowerCase(),
   ).slice(0, 10);
-  return { trend: of("trend"), beau: of("beau"), local: of("local"), hooks, words: { trend: plan.trend.words, beau: plan.beau.words, local: plan.local.words }, hashtags: volumes, fetchedAt: dates.at(-1) ?? null };
+  return { trend: of("trend"), local: of("local"), hooks, words: { trend: plan.trend.words, local: plan.local.words }, hashtags: volumes, fetchedAt: dates.at(-1) ?? null };
 }
 
 /** The first of each key, in order. */
@@ -537,7 +490,7 @@ export async function momentHooks(studioId: string): Promise<{ forme: string; ex
   const { data } = await supabaseAdmin()
     .from("trend_videos")
     .select("hook, hook_form, views")
-    .in("key", [scopeKey(plan.trend), scopeKey(plan.beau), scopeKey(plan.local)])
+    .in("key", [scopeKey(plan.trend), scopeKey(plan.local)])
     .not("hook", "is", null)
     .gte("hook_score", TREND_HOOK_PASS)
     .order("hook_score", { ascending: false })
