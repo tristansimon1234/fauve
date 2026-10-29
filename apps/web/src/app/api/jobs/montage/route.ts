@@ -48,6 +48,7 @@ import { deliverMontage, notifyFailure, renderAndDeliver } from "@/lib/render/de
 import { renderPost } from "@/lib/render/render-post";
 import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { startWaitingMontages } from "@/lib/montage-queue";
 import { finishJob, keepAlive } from "@/lib/studio-jobs";
 import { withStepDeadline } from "@/lib/step-clock";
 import { withCostScope } from "@/lib/cost-scope";
@@ -190,7 +191,14 @@ export async function POST(request: Request) {
   const job = parsed.data;
   // Every cost this step logs is counted for its montage: it is charged on what it really cost.
   // Its long calls start only with the time to finish (step-clock), and its pulse says it is alive.
-  after(() => withCostScope(job.quoteId, () => withStepDeadline(STEP_BUDGET_MS, () => run(job))));
+  after(async () => {
+    try {
+      await withCostScope(job.quoteId, () => withStepDeadline(STEP_BUDGET_MS, () => run(job)));
+    } finally {
+      // A montage that ended (or moved on) may free a slot for one waiting its turn.
+      await startWaitingMontages().catch((e: unknown) => console.warn("montage queue: not moved", e));
+    }
+  });
   return Response.json({ queued: job.step }, { status: 202 });
 }
 

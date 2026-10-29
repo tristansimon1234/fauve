@@ -9,6 +9,7 @@ import {
   formatWhy,
   imagineQuestion,
   publishWhen,
+  queuedLine,
   reelLink,
   SIMONE_VOICES,
   validatedPlanBrief,
@@ -1137,7 +1138,9 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
                 ? progress?.seconds
                   ? `Ton Reel de ${progress.seconds} secondes t’attend.`
                   : "Ton Reel t’attend."
-                : `Ton Reel sera prêt dans ${effect ? EFFECT_MINUTES : work.minutes} minutes environ.`}
+                : progress?.waiting
+                  ? queuedLine(progress.waiting)
+                  : `Ton Reel sera prêt dans ${effect ? EFFECT_MINUTES : work.minutes} minutes environ.`}
           </p>
         </div>
         <ol aria-label="Ce que fait Edith" className="flex w-full flex-col rounded-[22px] border border-line bg-white px-[18px] py-2 text-left">

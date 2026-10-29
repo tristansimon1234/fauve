@@ -7,6 +7,7 @@ import { addUsage, claudeCostUsd, supportsServerFallback, usdToEur } from "./pri
 import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
+import { freeStudio, ourStudio, queueMinutes, queuedLine } from "./brakes.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
 import { captionLang, cleanHook, cleanTags, cleanWhy, foreignScript, inTrendLang, minViews, otherLang, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
@@ -1230,6 +1231,21 @@ test("Edith's turns a day: none for the team, 200 for a subscriber, 30 for anyon
   assert.equal(dailyTurnCap({ team: false, subscription: "past_due" }), DAILY_TURNS.open);
   assert.equal(dailyTurnCap({ team: false, subscription: null }), DAILY_TURNS.open);
   assert.match(newNumbersAlert(21), /^21 nouveaux numéros .* 30 réponses par jour/);
+});
+
+test("the brakes of a rush: our studios never braked, a waiting Reel says when it comes", () => {
+  assert.equal(ourStudio({ team: true }), true);
+  assert.equal(ourStudio({ website_url: "lab://pizzeria" }), true);
+  assert.equal(ourStudio({ website_url: null }), false);
+  assert.equal(freeStudio({ subscription_status: null, website_url: null }), true);
+  assert.equal(freeStudio({ subscription_status: "active" }), false);
+  assert.equal(freeStudio({ subscription_status: "past_due" }), true);
+  assert.equal(freeStudio({ team: true, subscription_status: null }), false);
+  // Next in line with 6 slots: a slot frees in about 1.5 min, then its own 9 min, rounded up to 5.
+  assert.equal(queueMinutes(1, 6), 15);
+  assert.equal(queueMinutes(12, 6), 30);
+  assert.equal(queueMinutes(0, 0), 20);
+  assert.match(queuedLine(25), /dans 25 minutes environ/);
 });
 
 test("a studio's month splits the chat from the work and says what is left", () => {

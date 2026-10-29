@@ -11,7 +11,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export type MontageStatus = {
   postId: string;
   title: string;
-  step: "montage" | "effet" | "2e version" | "rendu" | "relecture" | "correction" | "livré";
+  step: "en file" | "montage" | "effet" | "2e version" | "rendu" | "relecture" | "correction" | "livré";
   minutes: number;
   /**
    * It has most likely died: its step's pulse has been silent too long (the watchdog had its turn), or,
@@ -51,7 +51,7 @@ export async function montageStatus(studioId: string, postId?: string): Promise<
     const planned = (plans ?? []).some((p) => p.post_id === q.post_id && new Date(p.created_at as string).getTime() > startedAt);
     const post = q.posts as { title?: string | null } | { title?: string | null }[] | null;
     const minutes = Math.round((Date.now() - startedAt) / 60_000);
-    const stages = { design: "montage", effects: "effet", alternative: "2e version", render: "rendu", review: "relecture", fix: "correction", delivered: "livré" } as const;
+    const stages = { waiting: "en file", design: "montage", effects: "effet", alternative: "2e version", render: "rendu", review: "relecture", fix: "correction", delivered: "livré" } as const;
     const recorded = stages[q.stage as keyof typeof stages] as MontageStatus["step"] | undefined;
     const step = q.charged_at ? "livré" : (recorded ?? (planned ? "rendu" : "montage"));
     const effort = effortSchema.catch("rapide").parse(q.effort ?? "rapide");
@@ -62,6 +62,7 @@ export async function montageStatus(studioId: string, postId?: string): Promise<
       minutes,
       late:
         step !== "livré" &&
+        step !== "en file" &&
         (job?.pulsed
           ? Boolean(job.failed) || (!job.finished_at && silent(job.updated_at as string))
           : montageLate({ startedAt, stageAt: q.stage_at ? new Date(q.stage_at as string).getTime() : null, effort, now: Date.now() })),

@@ -63,5 +63,7 @@ export const JOB_KIND_LABELS: Record<JobKind, string> = {
 export const JOB_STALE_MINUTES = 12;
 
 export function jobStepLabel(kind: JobKind, stage: string): string {
+  // A montage waiting its turn in the queue of a rush (brakes.ts): not one of its steps.
+  if (stage === "waiting") return "En file";
   return JOB_STEPS[kind].find((s) => s.stage === stage)?.label ?? stage;
 }

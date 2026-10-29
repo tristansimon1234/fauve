@@ -307,6 +307,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
         const step = onboardingStepOf(studio?.onboarding_step);
         const photos = site.logo ? images.filter((i) => i.split("?")[0] !== site.logo!.split("?")[0]) : images;
+        // A rush: the day's spending brake (brakes.ts) leaves the reading of its look (the render machine, a model) for tomorrow.
+        if ((images.length || site.url) && (await studioAccess(studioId)).reason === "busy") {
+          return json({ ...site, photos_du_site: `Pas lues aujourd'hui, ni le style de son site : ${accessMessage("busy")} Demande-lui de te renvoyer le lien demain pour que tu les lises.` });
+        }
         // Her site redone (she says so): its look is read again, at any step (a new address is read again by update_onboarding).
         if (refresh && (images.length || site.url)) {
           ctx.afterReply.push(() => rereadSite(studioId, site.url, photos));
@@ -591,7 +595,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (!montages.length) return json({ montages: [], note: "Aucun montage lancé récemment." });
       return json({
         montages: montages.map((m) => ({ post_id: m.postId, publication: m.title, etape: m.step, depuis_minutes: m.minutes, late: m.late })),
-        note: "En montage, en rendu, en relecture ou en correction : tout va bien, il tourne et la vidéo arrive toute seule, même après 15 ou 20 minutes ; ne propose jamais de le relancer. late (seulement) : il s'est arrêté ; dis-le-lui simplement et propose de le refaire (montage).",
+        note: "En file : beaucoup de commerces en même temps, il attend son tour et partira tout seul ; dis-lui qu'il arrive, sans proposer de le relancer. En montage, en rendu, en relecture ou en correction : tout va bien, il tourne et la vidéo arrive toute seule, même après 15 ou 20 minutes ; ne propose jamais de le relancer. late (seulement) : il s'est arrêté ; dis-le-lui simplement et propose de le refaire (montage).",
       });
     },
 

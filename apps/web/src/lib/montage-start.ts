@@ -1,7 +1,9 @@
 import "server-only";
-import { DEFAULT_EFFORT, effortSchema, type RequestEntry, type RequestLine } from "@fauve/agent";
+import { DEFAULT_EFFORT, effortSchema, queuedLine, type RequestEntry, type RequestLine } from "@fauve/agent";
 import { acceptQuote, createMontageQuote, type AcceptedQuote } from "@/lib/credits";
 import { queueJob } from "@/lib/jobs";
+import { queueWait, takeTurn } from "@/lib/montage-queue";
+import { messageStudio } from "@/lib/render/deliver";
 import { launchBrief, logLaunch } from "@/lib/request-log";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -45,7 +47,7 @@ export async function startMontage(
     console.warn("request not read, Edith's brief alone", quote.postId, error);
     return simone;
   });
-  return queueJob("montage", {
+  const job = {
     // A variant skips the editor: same cut, another style and hook, then the render.
     step: quote.kind === "variant" ? "variant" : "design",
     variant: quote.variant ?? undefined,
@@ -63,5 +65,15 @@ export async function startMontage(
     notify: target.notify || undefined,
     route: target.route,
     conversationId: target.waId ? undefined : target.conversationId,
+  };
+  // A rush: past a few montages at once, this one waits its turn (montage-queue.ts), and she is told when it comes.
+  const turn = await takeTurn(studioId, quote.id, quote.postId, job).catch((error: unknown) => {
+    console.warn("montage queue unread, started now", quote.id, error);
+    return "start" as const;
   });
+  if (turn === "start") return queueJob("montage", job);
+  if (turn === "waiting" && target.waId) {
+    const minutes = await queueWait(quote.id).catch(() => null);
+    if (minutes) await messageStudio({ studioId, waId: target.waId, replyTo: target.replyTo }, queuedLine(minutes)).catch((e: unknown) => console.warn("queue notice not sent", quote.id, e));
+  }
 }

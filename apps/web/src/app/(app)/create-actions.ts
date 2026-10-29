@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  BUSY_TEXT,
   creationPhase,
   DEFAULT_EFFORT,
   EFFECT_MINUTES,
@@ -25,6 +26,7 @@ import { effectRoute } from "@/lib/agent/effects-agent";
 import { studioAccess } from "@/lib/billing/access";
 import { acceptQuote, createMontageQuote, pricedAsEffect } from "@/lib/credits";
 import { env } from "@/lib/env";
+import { queueWait } from "@/lib/montage-queue";
 import { startMontage } from "@/lib/montage-start";
 import { isFirstReel } from "@/lib/onboarding";
 import { pendingSteal } from "@/lib/steal";
@@ -97,6 +99,8 @@ export async function launchCreation(input: LaunchInput): Promise<LaunchResult> 
   // Nothing is made before a subscription; without credits, no Reel (texts on photos are free). What
   // she asked is kept and starts on its own once she has subscribed or moved up (launchPendingCreation).
   const access = await studioAccess(studioId);
+  // A rush: the day's spending brake for studios not subscribed (brakes.ts).
+  if (access.reason === "busy") return { ok: false, error: BUSY_TEXT };
   if (!access.create && (access.reason === "subscribe" || kind === "reel")) {
     await supabaseAdmin().from("studios").update({ pending_creation: { input: parsed.data, at: new Date().toISOString() } }).eq("id", studioId);
     return access.reason === "subscribe"
@@ -207,6 +211,8 @@ export type CreationProgress = {
   effect: boolean;
   done: boolean;
   failed: boolean;
+  /** Waiting its turn in a rush (montage-queue.ts): in how many minutes it should be ready. */
+  waiting: number | null;
   /** The Reel's length once made. */
   seconds: number | null;
 };
@@ -237,12 +243,14 @@ export async function creationProgress(quoteId: string, postId: string): Promise
   const silent = job.data ? !finished && now - new Date(job.data.updated_at as string).getTime() > JOB_STALE_MINUTES * 60_000 : now - new Date(quote.data.created_at as string).getTime() > START_MS;
   const failed = Boolean(job.data?.failed) || (silent && stage !== "delivered");
   const done = !failed && (stage === "delivered" || finished);
+  const waiting = !done && !failed && stage === "waiting" ? await queueWait(quoteId).catch(() => null) : null;
   const render = done && post.data.render_id ? (await db.from("renders").select("duration_ms").eq("id", post.data.render_id as string).maybeSingle()).data : null;
   return {
     phase: creationPhase(stage, watched),
     effect: pricedAsEffect(quote.data.params),
     done,
     failed,
+    waiting,
     seconds: render?.duration_ms ? Math.round((render.duration_ms as number) / 1000) : null,
   };
 }

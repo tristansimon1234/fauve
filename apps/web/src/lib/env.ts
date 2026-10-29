@@ -57,6 +57,10 @@ const schema = {
   // A new Reel whose effect holds to what moves in her video goes to the effects agent (Managed Agents); false: the chain
   // (a correction of a Reel the agent made still goes back to it).
   EFFECTS_AGENT: z.stringbool().default(true),
+  // The brakes for a rush (packages/agent/src/brakes.ts): their defaults, changed without a release.
+  DAILY_SIGNUPS: z.coerce.number().int().nonnegative().optional(),
+  MONTAGES_AT_ONCE: z.coerce.number().int().positive().optional(),
+  FREE_SPEND_EUR_PER_DAY: z.coerce.number().nonnegative().optional(),
   // Image model: real photos improved and ambiance images (lib/ai-images.ts), and its price per 2K image in USD.
   GEMINI_IMAGE_MODEL: z.string().default("gemini-nano-banana-2.1"),
   GEMINI_IMAGE_USD: z.coerce.number().nonnegative().default(0.05),

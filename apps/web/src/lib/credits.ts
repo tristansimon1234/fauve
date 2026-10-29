@@ -114,7 +114,7 @@ export type Quote = {
 };
 
 /** Where a launched montage is in the chain (montage_status, the quote card). */
-export type QuoteStage = "design" | "effects" | "alternative" | "render" | "review" | "fix" | "delivered" | "superseded";
+export type QuoteStage = "waiting" | "design" | "effects" | "alternative" | "render" | "review" | "fix" | "delivered" | "superseded";
 
 /**
  * Her Reel goes to the effects agent: the launched work is priced as one (quoteEffect: the chain's price

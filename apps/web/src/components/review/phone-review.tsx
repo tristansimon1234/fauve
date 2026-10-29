@@ -337,6 +337,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
 
 /** Where the montage is, said plainly: its step, how long it has been going, what it usually takes. */
 const STEPS: Record<string, string> = {
+  "en file": "Ton Reel attend son tour",
   montage: "Je monte ton Reel",
   effet: "Je fais l’effet image par image",
   "2e version": "J’essaie une autre version",

@@ -44,19 +44,30 @@ export async function dayOfTurns(
 
 /** A new number just started with Edith: past the day's usual count, the team is told once (in its own conversation). */
 export async function alertOnNewNumbers(): Promise<void> {
+  const { count } = await supabaseAdmin().from("members").select("id", { count: "exact", head: true }).gte("created_at", await teamToday());
+  if ((count ?? 0) <= NEW_NUMBERS_ALERT) return;
+  console.warn("new numbers alert", count);
+  await tellTeamOnce("new_numbers_alert", newNumbersAlert(count ?? 0));
+}
+
+/** Local midnight today for the team (Paris without a team studio): the day the brakes count in. */
+export async function teamToday(): Promise<string> {
+  const { data: team } = await supabaseAdmin().from("studios").select("timezone").eq("team", true).limit(1).maybeSingle();
+  return today((team?.timezone as string | null) ?? "Europe/Paris");
+}
+
+/** A message to the team's studio, once a day per kind (an alert of the reply cap or of a brake). */
+export async function tellTeamOnce(kind: string, text: string): Promise<void> {
   const db = supabaseAdmin();
   const { data: team } = await db.from("studios").select("id, timezone").eq("team", true).limit(1).maybeSingle();
-  const since = today((team?.timezone as string | null) ?? "Europe/Paris");
-  const { count } = await db.from("members").select("id", { count: "exact", head: true }).gte("created_at", since);
-  if ((count ?? 0) <= NEW_NUMBERS_ALERT) return;
-  if (!team) return void console.error("new numbers alert: no team studio", count);
+  if (!team) return void console.error("team alert: no team studio", kind, text);
+  const since = today((team.timezone as string | null) ?? "Europe/Paris");
   const { count: told } = await db
     .from("whatsapp_messages")
     .select("id", { count: "exact", head: true })
     .eq("studio_id", team.id)
-    .eq("payload->>kind", "new_numbers_alert")
+    .eq("payload->>kind", kind)
     .gte("created_at", since);
   if (told) return;
-  console.warn("new numbers alert", count);
-  await messageOwner(team.id as string, { text: newNumbersAlert(count ?? 0), kind: "new_numbers_alert" });
+  await messageOwner(team.id as string, { text, kind });
 }

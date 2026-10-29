@@ -1,6 +1,7 @@
 import "server-only";
 import { accessMessage, accessOf, isSubscribed, planOf, type Access } from "@fauve/agent";
 import { creditBalance, grantPlanCredits } from "@/lib/credits";
+import { spendBraked } from "@/lib/spend-brake";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { billingEnabled, getSubscription, latestSubscription, paidPeriod, planOfPrice, sessionSubscription, type StripeSubscription } from "./stripe";
 
@@ -63,7 +64,19 @@ export async function syncSubscription(studioId: string): Promise<void> {
   await store(studioId, customer, subscription);
 }
 
+/**
+ * What a studio may do now: its subscription and credits, then the day's spending brake of a rush
+ * (lib/spend-brake.ts) for a studio not subscribed (billing on or off).
+ */
 export async function studioAccess(studioId: string): Promise<Access> {
+  const access = await billingAccess(studioId);
+  if (!access.create && !access.analyze) return access;
+  const { data: studio } = await supabaseAdmin().from("studios").select("team, website_url, subscription_status").eq("id", studioId).maybeSingle();
+  if (studio && (await spendBraked(studio))) return { ...access, create: false, analyze: false, reason: "busy" };
+  return access;
+}
+
+async function billingAccess(studioId: string): Promise<Access> {
   if (!billingEnabled()) return { subscribed: true, create: true, analyze: true, unlock: true, reason: null };
   const db = supabaseAdmin();
   let { data: studio } = await db
@@ -101,8 +114,9 @@ export async function assertCanCreate(studioId: string): Promise<void> {
 
 /** What Edith knows of the subscription at each turn. */
 export async function accessLine(studioId: string): Promise<string | null> {
-  if (!billingEnabled()) return null;
   const access = await studioAccess(studioId);
+  if (access.reason === "busy") return `Aujourd'hui : ${accessMessage("busy")}`;
+  if (!billingEnabled()) return null;
   if (access.subscribed) return access.create ? null : `Abonnement : ${accessMessage("credits")}`;
   return `Abonnement : ${accessMessage("subscribe")}`;
 }

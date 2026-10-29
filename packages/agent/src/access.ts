@@ -31,7 +31,8 @@ export type Access = {
   /** See the finished work in full, download it, publish it. */
   unlock: boolean;
   /** Why not, in her words, when something is refused. */
-  reason: "subscribe" | "credits" | null;
+  /** busy: the day's spending brake for studios not subscribed (brakes.ts), until tomorrow. */
+  reason: "subscribe" | "credits" | "busy" | null;
 };
 
 export function accessOf(input: AccessInput): Access {
@@ -52,6 +53,7 @@ export function accessOf(input: AccessInput): Access {
 
 /** What Edith says when something is refused. */
 export function accessMessage(reason: Access["reason"]): string {
+  if (reason === "busy") return "Beaucoup de nouveaux commerces aujourd'hui : rien de nouveau (lecture de vidéo, création) ne peut partir pour elle avant demain matin, tout ce qu'elle a envoyé est gardé. Dis-le-lui simplement, sans rien lancer ni proposer d'autre façon.";
   return reason === "credits"
     ? `Plus de crédits pour l'instant : rien de nouveau ne peut partir. Propose-lui « ${packLine()} » (paiement unique, ses crédits arrivent aussitôt) ou de passer à l'offre au-dessus (la différence au prorata), tous deux sur la page des offres (get_page_link abonnement) ; sinon ses crédits reviennent au renouvellement de son abonnement. Dis-le-lui simplement, sans rien lancer.`
     : `Pas encore abonnée : tout est prêt jusqu'au plan de son Reel, mais rien n'est fabriqué avant l'abonnement (${offersLine()} : Découverte ${reelsPerMonth("decouverte")} Reels par mois, Essentiel, Pro ; sans engagement). Dis-le-lui simplement et donne la page des offres (get_page_link abonnement), sans rien lancer : dès qu'elle est abonnée, lance le plan qu'elle a validé sans le lui redemander.`;
