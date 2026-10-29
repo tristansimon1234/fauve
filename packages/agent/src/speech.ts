@@ -40,13 +40,15 @@ export function hasSpeech(analysis: Pick<ClipAnalysis, "words" | "transcript">):
 /**
  * The ffmpeg audio filter that cleans a voice, from the noise floor measured on it (`floor`,
  * dBFS, null when unknown): its rumble always (under 70 Hz: handling, traffic, a fan); the
- * denoiser only on a noisy recording, mixed with a little of the original so it never sounds
- * underwater, its 10 ms delay taken back. `model`: the model file in the sandbox.
+ * denoiser only on a noisy recording (`force`: on any recording, when she asks for it), mixed
+ * with a little of the original so it never sounds underwater, its 10 ms delay taken back.
+ * `model`: the model file in the sandbox.
  */
-export function speechCleanFilter(floor: number | null, model: string): { filter: string; denoised: boolean } {
+export function speechCleanFilter(floor: number | null, model: string, force = false): { filter: string; denoised: boolean } {
   const rumble = "highpass=f=70";
-  if (floor === null || floor < CLEAN_FLOOR) return { filter: rumble, denoised: false };
-  const mix = floor >= NOISY_FLOOR ? 0.9 : 0.7;
+  const clean = floor === null || floor < CLEAN_FLOOR;
+  if (clean && !force) return { filter: rumble, denoised: false };
+  const mix = clean ? 0.6 : floor >= NOISY_FLOOR ? 0.9 : 0.7;
   return {
     filter: `${rumble},aresample=48000,arnndn=m=${model}:mix=${mix},atrim=start=${RNNOISE_DELAY},asetpts=PTS-STARTPTS,apad=pad_dur=${RNNOISE_DELAY}`,
     denoised: true,
@@ -213,6 +215,8 @@ export function speechCuts(facts: SpeechFacts, from: number, to: number, options
  */
 export function jumpCut(segment: ClipSegment, facts: SpeechFacts | undefined, options: { clipDuration?: number; last?: boolean } = {}): ClipSegment[] {
   if (!facts || (segment.speed && Math.abs(segment.speed - 1) > 0.01)) return [segment];
+  // The passage as the editor wrote it, kept on each piece: the cuts can be undone.
+  const jump = segment.jump ?? { in: segment.in, out: segment.out, ...(segment.move ? { move: segment.move } : {}) };
   const max = options.clipDuration ?? Infinity;
   let { in: from, out: to } = segment;
   // Its edges on silences: a word under its start begins it, one under its end ends it (or ends before it, when long).
@@ -237,7 +241,7 @@ export function jumpCut(segment: ClipSegment, facts: SpeechFacts | undefined, op
   }
   const kept = pieces.filter((p) => p.end - p.start >= MIN_PIECE || wordsIn(facts.words, p.start, p.end).length > 0);
   if (!kept.length) return [segment];
-  const base = { ...segment, zoom: "none" as const };
+  const base = { ...segment, zoom: "none" as const, jump };
   if (kept.length === 1) {
     if (Math.abs(kept[0]!.start - segment.in) < 0.01 && Math.abs(kept[0]!.end - segment.out) < 0.01) return [segment];
     return [{ ...base, in: round(kept[0]!.start), out: round(kept[0]!.end) }];
@@ -269,31 +273,39 @@ export function spokenShot(s: PlanSegment, facts: Record<string, SpeechFacts> | 
  * jump cuts, the cuts are clean (a crossfade between two pieces of one sentence reads as a glitch).
  */
 export function applySpeechCuts(plan: EditPlan, facts: Record<string, SpeechFacts> | undefined, clipDurations: Record<string, number>): EditPlan {
-  if (plan.voice || !facts || !Object.keys(facts).length) return plan;
+  // She wants her words as she said them, hesitations and silences included.
+  if (plan.voice || plan.finish?.cuts === "off" || !facts || !Object.keys(facts).length) return plan;
   const before = planTimeline(plan);
   const lastClip = plan.segments.map(isClipSegment).lastIndexOf(true);
-  const map: { from: number; to: number; length: number }[] = [];
+  const map: Moved[] = [];
   let changed = false;
   let split = false;
   const segments = plan.segments.flatMap((s, i): PlanSegment[] => {
     const at = before.segments[i]!;
+    const index = map.length ? map.at(-1)!.segment + 1 : 0;
     if (!isClipSegment(s)) {
-      map.push({ from: at.start, to: at.start + at.length, length: at.length });
+      map.push({ from: at.start, to: at.start + at.length, segment: index, at: 0, length: at.length });
       return [s];
     }
     const pieces = jumpCut(s, facts[s.clip_id], { clipDuration: clipDurations[s.clip_id], last: i === lastClip });
     if (pieces.length > 1) split = true;
     if (pieces.length !== 1 || pieces[0] !== s) changed = true;
-    for (const p of pieces) map.push({ from: at.start + (p.in - s.in), to: at.start + (p.out - s.in), length: p.out - p.in });
+    pieces.forEach((p, k) => map.push({ from: at.start + (p.in - s.in), to: at.start + (p.out - s.in), segment: index + k, at: 0, length: p.out - p.in }));
     return pieces;
   });
   if (!changed) return plan;
-  const transitions = split ? ("cut" as const) : plan.transitions;
-  // Where each piece now starts (one entry of the map per new segment).
+  return retimed(plan, segments, map, split ? "cut" : plan.transitions);
+}
+
+/** Where a span of the old Reel (`from`, `to`) lands on the new one: in new segment `segment`, `at` seconds into it. */
+type Moved = { from: number; to: number; segment: number; at: number; length: number };
+
+/** The plan on its new segments, its texts and animations over several shots moved with the picture they were on. */
+function retimed(plan: EditPlan, segments: PlanSegment[], map: Moved[], transitions: EditPlan["transitions"]): EditPlan {
   const after = planTimeline({ segments, transitions });
-  const placed = map.map((m, k) => ({ ...m, start: after.segments[k]!.start }));
+  const placed = map.map((m) => ({ ...m, start: after.segments[m.segment]!.start + m.at }));
   const cursor = after.duration;
-  // A moment of the old Reel on the new one: inside a piece it moves with it; in a cut, a start goes to the next piece, an end to the previous one.
+  // A moment of the old Reel on the new one: inside a span it moves with it; in a cut, a start goes to the next span, an end to the previous one.
   const moved = (t: number, side: "start" | "end") => {
     const inside = placed.find((m) => t >= m.from - 0.001 && t <= m.to + 0.001);
     if (inside) return round(inside.start + Math.min(inside.length, Math.max(0, t - inside.from)));
@@ -313,4 +325,34 @@ export function applySpeechCuts(plan: EditPlan, facts: Record<string, SpeechFact
     texts: plan.texts.map((t) => ({ ...t, from: moved(t.from, "start"), to: Math.min(duration, moved(t.to, "end")) })).filter((t) => t.to > t.from),
     ...(plan.layers ? { layers: plan.layers.map((l) => ({ ...l, from: moved(l.from, "start"), to: Math.min(duration, l.compose ? duration : moved(l.to, "end")) })) } : {}),
   };
+}
+
+/**
+ * The passages where someone speaks as the editor wrote them, their « euh » and silences back (the
+ * pieces of one passage, side by side, made one shot again; their texts moved with their picture):
+ * when she wants her words as she said them, and what a correction shows the editor.
+ */
+export function undoSpeechCuts(plan: EditPlan): EditPlan {
+  if (!plan.segments.some((s) => isClipSegment(s) && s.jump)) return plan;
+  const before = planTimeline(plan);
+  const same = (a: PlanSegment | undefined, b: ClipSegment) =>
+    Boolean(a && isClipSegment(a) && a.jump && b.jump && a.clip_id === b.clip_id && a.jump.in === b.jump.in && a.jump.out === b.jump.out);
+  const segments: PlanSegment[] = [];
+  const map: Moved[] = [];
+  plan.segments.forEach((s, i) => {
+    const at = before.segments[i]!;
+    if (isClipSegment(s) && s.jump) {
+      const head = segments.at(-1);
+      const joined = head && isClipSegment(head) && same(plan.segments[i - 1], s) && head.in === s.jump.in;
+      if (!joined) {
+        const { jump, move: _move, ...rest } = s;
+        segments.push({ ...rest, in: jump.in, out: jump.out, ...(jump.move ? { move: jump.move } : {}) });
+      }
+      map.push({ from: at.start, to: at.start + at.length, segment: segments.length - 1, at: s.in - s.jump.in, length: at.length });
+      return;
+    }
+    segments.push(s);
+    map.push({ from: at.start, to: at.start + at.length, segment: segments.length - 1, at: 0, length: at.length });
+  });
+  return retimed(plan, segments, map, plan.transitions);
 }

@@ -519,8 +519,11 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     const src = inputs.clipUrls[s.clip_id];
     if (!src) throw new Error(`No URL for clip ${s.clip_id}`);
     const speed = s.speed && Math.abs(s.speed - 1) > 0.01 ? s.speed : undefined;
-    // Someone speaks in this passage: its sound stays (unless her voice is over the Reel, or the shot plays at another speed).
-    const speech = !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out);
+    // Someone speaks in this passage: its sound stays (unless her voice is over the Reel, or the shot plays at another speed);
+    // or she wants the sound of her videos all along (never slowed down), or none of it.
+    const heard = plan.finish?.video_sound ?? "speech";
+    const speech =
+      heard === "all" ? !speed : heard === "speech" && !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out);
     const zoom = s.zoom === "light" || plan.transitions === "light_zoom";
     const move: CameraMove = s.move ?? (zoom ? "in" : "none");
     // A photo in a Reel: the move the engine chose (photoMoves: most held still); a plan from before those moves keeps its slow zoom.
@@ -538,7 +541,9 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         // A collage lays its subject over its print as a sticker (placed by the photo's framing, so only with it).
         ...(inputs.template === "collage" && s.photo && inputs.cutouts?.[s.clip_id] ? { cutout: inputs.cutouts[s.clip_id] } : {}),
         // Anywhere else, a moving photo whose subject cuts out cleanly plays in relief.
-        ...(inputs.template !== "collage" && s.photo && !s.photo.blur?.length && s.move && DEPTH_MOVES.includes(s.move) && inputs.depth?.[s.clip_id] ? { depth: inputs.depth[s.clip_id] } : {}),
+        ...(inputs.template !== "collage" && plan.finish?.relief !== "off" && s.photo && !s.photo.blur?.length && s.move && DEPTH_MOVES.includes(s.move) && inputs.depth?.[s.clip_id]
+          ? { depth: inputs.depth[s.clip_id] }
+          : {}),
       };
     }
     const ramp = rampFrames(s, lengths[i]!);
@@ -627,7 +632,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           .filter((w) => w.start >= s.in && w.end <= s.out)
           .map((w) => ({ from: segment.startAt + toFrames(w.start - s.in), to: segment.startAt + toFrames(w.end - s.in) }));
       });
-  const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : "music";
+  const ambient = plan.finish?.video_sound === "all" && segments.some((s) => s.type === "clip" && s.speech);
+  const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : ambient ? "ambient" : "music";
   const music = previewMusic(mix, speechWindows(spoken.filter((w) => w.from < durationInFrames), toFrames(0.5)));
 
   const endCardFrames = toFrames(END_CARD_SECONDS);

@@ -27,6 +27,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
     voice: plan.data.voice,
     template: plan.data.template,
     layers: plan.data.layers,
+    finish: plan.data.finish,
   }, { postId: data?.post_id as string | undefined });
   // Edith's music plays in the live preview too (the piece kept for this post).
   const { data: post } = data?.post_id ? await db.from("posts").select("music").eq("id", data.post_id).maybeSingle() : { data: null };

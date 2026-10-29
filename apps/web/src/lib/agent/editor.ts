@@ -57,6 +57,7 @@ import {
   SUBTITLE_ROW,
   speechFacts,
   asAsked,
+  undoSpeechCuts,
   type ReelProps,
   type TracksByClip,
   honestLength,
@@ -255,9 +256,9 @@ export async function designEdit(params: {
   // Her voice note over the Reel: read once (her words with their timings), the editor cuts on her phrases.
   // Its first word is heard at once: the silence a voice note opens on is cut.
   const voiceId = post.data.voice_media_id as string | null;
-  // Her own voice note recorded in a noisy place: cleaned once, its words keep their timing.
-  if (voiceId) await ensureCleanVoice(params.studioId, voiceId);
   const voice = voiceId ? await ensureTranscript(params.studioId, voiceId) : null;
+  // Her own voice note recorded in a noisy place: a cleaned copy beside it, its words keep their timing.
+  if (voiceId && voice) await ensureCleanVoice(params.studioId, voiceId);
   const voiceStart = voice ? voiceAt(voice) : 0;
   const spoken = voice ? voiceForEditor(voice, voiceStart) : null;
   // The strongest moments to open on, best first (a voice over was written for the first one).
@@ -290,6 +291,8 @@ export async function designEdit(params: {
     if (read) clips = read;
   }
   const tracks: TracksByClip = clips.length ? await loadTracks(params.studioId, clips.map((c) => c.media_id)).catch(() => ({})) : {};
+  // The version to correct as the editor wrote it: its ramps and its cuts of the « euh » undone (the engine makes them again).
+  const asWritten = previousPlan.success ? undoSpeechCuts({ ...previousPlan.data, segments: previousPlan.data.segments.map(asAsked) }) : null;
   const input = {
     studio: {
       name: studio.data?.name,
@@ -352,11 +355,10 @@ export async function designEdit(params: {
     recent_hooks: hooks.length ? hooks : undefined,
     // Motion code stays out of the editor's context: it only needs the briefs.
     previous_plan:
-      correction && previousPlan.success
+      correction && asWritten
         ? {
-            ...previousPlan.data,
-            // A ramped slow motion as it was asked (the engine ramps it again).
-            segments: previousPlan.data.segments.map(asAsked).map((s) =>
+            ...asWritten,
+            segments: asWritten.segments.map((s) =>
               isMotionSegment(s)
                 ? {
                     motion: {
@@ -370,7 +372,7 @@ export async function designEdit(params: {
                 : s,
             ),
             // Its animations over several shots, by their brief and span (a collage's composition named as such).
-            layers: previousPlan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, ...(l.compose ? { composition_du_reel: true } : {}) })),
+            layers: asWritten.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, ...(l.compose ? { composition_du_reel: true } : {}) })),
           }
         : undefined,
     request: params.brief ?? "Premier montage de cette publication.",
@@ -419,10 +421,14 @@ export async function designEdit(params: {
   // Retouch and blur stay on their clips from one version to the next.
   // A correction also keeps the texts' styles and places (the editor names looks, it does not copy them).
   const base = previousPlan.success ? previousPlan.data : null;
+  // Her finishing touches (the sound, the « euh » cut or not, the ramps, the relief, the steadying): her defaults
+  // for all her Reels, then this Reel's own, carried from version to version (never written by the editor).
+  const finish = { ...profile.finish, ...base?.finish };
   // Its animations whose brief did not change keep their code before the new ones are counted;
   // one rewritten (its shots changed, or the request touched it) takes the place of the one it replaces.
   const toPlan = (answer: EditorOutput | EditorOutputLegacy) => {
-    const withWritten = keepWrittenAnimations(fromEditorPlan(answer.plan, profile.text_looks ?? []), params.fresh ? null : base);
+    const written = fromEditorPlan(answer.plan, profile.text_looks ?? []);
+    const withWritten = keepWrittenAnimations(Object.keys(finish).length ? { ...written, finish } : written, params.fresh ? null : base);
     // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
     const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;
     const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));

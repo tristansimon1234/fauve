@@ -18,7 +18,9 @@ import {
   splitFillers,
   spokenShot,
   type SpeechFacts,
+  undoSpeechCuts,
 } from "./speech.ts";
+import { mixFilter, mixGains } from "./mix.ts";
 import { fromEditorPlan, normalizeEditPlan } from "./editor.ts";
 import { depthPhotoIds } from "./depth.ts";
 import { dayIn, lookStamp } from "./looks.ts";
@@ -418,4 +420,112 @@ test("story express: a video's story starts on its best moment, inside the clip"
   const plan = storyPlan({ mediaId: "v1", photo: false, analysis: { duration: 20, best_moments: [{ start: 3, end: 6, why: "" }], shots: [] }, text: "Le plat du jour" });
   assert.deepEqual([plan.segments[0] && "clip_id" in plan.segments[0] ? [plan.segments[0].in, plan.segments[0].out] : null, plan.duration], [[3, 10], 7]);
   assert.equal(plan.texts[0]!.items, undefined);
+});
+
+// ---------------------------------------------------------------------------
+// Her finishing touches: everything the engine adds by itself, hers to change.
+// ---------------------------------------------------------------------------
+
+const talkPlan = (finish?: EditPlan["finish"]): EditPlan =>
+  editPlanSchema.parse({
+    format: "9:16",
+    duration: 9,
+    template: "libre",
+    tempo: 100,
+    segments: [clip({ move: "in" }), { clip_id: "broll", in: 0, out: 2, zoom: "none" }],
+    texts: [
+      { text: "le hook", from: 0, to: 2, style: "hook" },
+      { text: "sur le b-roll", from: 7.2, to: 8.8, style: "caption" },
+    ],
+    images: [],
+    transitions: "cut",
+    subtitles: true,
+    music: null,
+    ...(finish ? { finish } : {}),
+  });
+
+test("finish: the « euh » cuts are marked and undone, the passage and its texts back as written", () => {
+  const plan = talkPlan();
+  const cut = applySpeechCuts(plan, { talk: facts }, { talk: 7, broll: 4 });
+  assert.ok(cut.segments.slice(0, 4).every((s) => "clip_id" in s && s.jump?.in === 0 && s.jump.out === 7 && s.jump.move === "in"));
+  const back = undoSpeechCuts(cut);
+  assert.equal(back.segments.length, 2);
+  const [talk] = back.segments;
+  assert.ok(talk && "clip_id" in talk);
+  assert.deepEqual([talk.in, talk.out, talk.move, talk.jump], [0, 7, "in", undefined]);
+  // The b-roll's caption is back on the b-roll (7.2 s in the Reel as written).
+  assert.ok(Math.abs(back.texts.find((t) => t.style === "caption")!.from - 7.2) < 0.05);
+  // Nothing to undo: the same plan.
+  assert.equal(undoSpeechCuts(plan), plan);
+  // Her words as she said them: no cut at all.
+  assert.equal(applySpeechCuts(talkPlan({ cuts: "off" }), { talk: facts }, { talk: 7, broll: 4 }).segments.length, 2);
+  assert.equal(normalizeEditPlan(talkPlan({ cuts: "off" }), { talk: 7, broll: 4 }, 8, { talk: facts }).segments.length, 2);
+});
+
+test("finish: plain slow motion when she wants no ramp", () => {
+  const analysis = {
+    duration: 10,
+    orientation: "portrait" as const,
+    summary: "",
+    setting: "",
+    lighting: "good" as const,
+    shots: [],
+    best_moments: [],
+    transcript: "",
+    issues: [],
+    actions: [{ start: 4.2, end: 4.8, what: "geste" }],
+  };
+  const plan = editPlanSchema.parse({ ...validPlanBase, duration: 3, segments: [{ clip_id: "a", in: 4, out: 5, zoom: "none", speed: 0.5 }] });
+  const ramped = finishPlan(plan, { clips: { a: analysis }, photos: {} }, { a: 10 });
+  assert.ok("clip_id" in ramped.segments[0]! && ramped.segments[0].ramp);
+  const plain = finishPlan({ ...plan, finish: { ramp: "off" } }, { clips: { a: analysis }, photos: {} }, { a: 10 });
+  assert.ok("clip_id" in plain.segments[0]! && !plain.segments[0].ramp);
+});
+
+test("finish: the sound of her videos (speech, all along, none) and a photo kept flat", () => {
+  const plan = editPlanSchema.parse({
+    ...validPlanBase,
+    duration: 5,
+    segments: [
+      { clip_id: "v", in: 0, out: 3, zoom: "none" },
+      { clip_id: "p", in: 0, out: 2, zoom: "none", move: "in", photo: photoEdit },
+    ],
+  });
+  const inputs = {
+    template: "libre" as const,
+    clipUrls: { v: "https://x/v.mp4", p: "https://x/p.jpg" },
+    photoIds: ["p"],
+    brand: { name: "Studio" },
+    depth: { p: { src: "https://x/p.webp", box: { x: 0.2, y: 0.2, w: 0.5, h: 0.7 } } },
+  };
+  const heard = (finish?: EditPlan["finish"]) => {
+    const first = buildReelProps({ ...plan, ...(finish ? { finish } : {}) }, inputs).segments[0]!;
+    return first.type === "clip" ? Boolean(first.speech) : null;
+  };
+  // Nobody speaks: muted by default, heard all along when she keeps the ambience, never with « none ».
+  assert.equal(heard(), false);
+  assert.equal(heard({ video_sound: "all" }), true);
+  assert.equal(heard({ video_sound: "none" }), false);
+  const relief = (finish?: EditPlan["finish"]) => {
+    const photo = buildReelProps({ ...plan, ...(finish ? { finish } : {}) }, inputs).segments[1]!;
+    return photo.type === "image" ? Boolean(photo.depth) : null;
+  };
+  assert.equal(relief(), true);
+  assert.equal(relief({ relief: "off" }), false);
+  assert.deepEqual(depthPhotoIds({ ...plan, finish: { relief: "off" } }), []);
+});
+
+test("finish: an ambience under the music, and the sound cleaned on demand", () => {
+  const ambient = mixGains({ speech: -30, music: -12 }, false, true);
+  assert.equal(ambient.kind, "ambient");
+  assert.equal(ambient.speechGain, 9);
+  assert.equal(ambient.musicGain, -4);
+  assert.match(mixFilter(ambient, 10), /^\[0:a\].*volume=9dB\[own\];\[1:a\].*amix=inputs=2/);
+  assert.doesNotMatch(mixFilter(ambient, 10), /sidechaincompress/);
+  // Someone speaks: a voice's level, ducking as before.
+  assert.equal(mixGains({ speech: -30, music: -12 }, false).kind, "speech_in_clips");
+  // A clean recording is cleaned too when she asks for it, lightly.
+  const forced = speechCleanFilter(-62, "/m.rnnn", true);
+  assert.equal(forced.denoised, true);
+  assert.match(forced.filter, /mix=0\.6/);
 });

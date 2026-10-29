@@ -230,8 +230,8 @@ export function asAsked<S extends PlanSegment>(s: S): S {
 export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Record<string, number> = {}): EditPlan {
   let still = 0;
   const photoMove = photoMoves(plan, facts.photos);
-  // A composed Reel lays its shots itself, at their own pace: no ramp there.
-  const composed = Boolean(plan.layers?.some((l) => l.compose));
+  // A composed Reel lays its shots itself, at their own pace: no ramp there; nor when she wants plain slow motion.
+  const composed = Boolean(plan.layers?.some((l) => l.compose)) || plan.finish?.ramp === "off";
   const segments = plan.segments.map((s, i): PlanSegment => {
     if (isMotionSegment(s)) {
       const over = footageUnder(plan, i, facts, clipDurations);

@@ -359,6 +359,19 @@ export const toolSpecs = {
       scheduled_at: isoDateTime.optional(),
     }),
   },
+  set_finish: {
+    description:
+      "Les finitions que le moteur ajoute tout seul à un Reel, chacune à régler à sa demande. sound : auto (nettoyé quand c'est bruyant), clean (toujours nettoyé : « enlève le bruit de fond »), original (le son tel qu'enregistré). video_sound : speech (le son de ses vidéos seulement quand quelqu'un parle, par défaut), all (le son de ses vidéos tout du long sous la musique : « garde le son d'ambiance »), none (jamais : juste la musique ou la voix). cuts : auto (les « euh », faux départs et blancs coupés quand quelqu'un parle), off (ses mots tels qu'elle les a dits, hésitations comprises). ramp : auto (un ralenti part en rampe sur le geste), off (ralenti simple). relief : auto (une photo qui bouge passe en relief), off (à plat). steady : auto (une vidéo qui tremble est stabilisée), off (telle que filmée). Avec post_id : ce Reel seulement, la vidéo se refait sans nouveau montage, gratuit. Sans post_id : ses prochains Reels (réglage gardé). Seulement ce qu'elle demande.",
+    input: z.object({
+      post_id: z.string().uuid().optional(),
+      sound: z.enum(["auto", "clean", "original"]).optional(),
+      video_sound: z.enum(["speech", "all", "none"]).optional(),
+      cuts: z.enum(["auto", "off"]).optional(),
+      ramp: z.enum(["auto", "off"]).optional(),
+      relief: z.enum(["auto", "off"]).optional(),
+      steady: z.enum(["auto", "off"]).optional(),
+    }),
+  },
   set_look: {
     description:
       "Le look d'une vidéo montée (Reel ou story), sur toute l'image, sous ses textes, comme les filtres de Prequel : disposable (appareil photo jetable : flash chaud, grain, date orange dans le coin), vhs (cassette VHS : couleurs qui bavent, lignes, « PLAY ▶ » et la date), y2k (flash direct des années 2000), cine (couleurs de cinéma), bw (noir et blanc contrasté), dust (poussière de pellicule), none (l'enlever). Seulement quand elle le demande (« effet VHS », « façon appareil jetable », « en noir et blanc »…), jamais de toi-même. Refait la vidéo, gratuit.",

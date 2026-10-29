@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { DeleteResult } from "@/components/delete-button";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { cleanedPaths } from "@/lib/video/speech";
 
 /** Deletes a photo or video: the file, its analysis, and its place in the posts that used it. */
 export async function deleteMedia(mediaId: string): Promise<DeleteResult> {
@@ -29,7 +30,8 @@ export async function deleteMedia(mediaId: string): Promise<DeleteResult> {
     console.warn("deleteMedia failed", error.message);
     return { ok: false, error: "La suppression n’a pas abouti. Réessaie dans un instant." };
   }
-  const paths = [asset.storage_path as string, asset.original_path as string | null].filter((p): p is string => Boolean(p?.startsWith(`${studioId}/`)));
+  // Its steadied original and its copy with the sound cleaned go with it.
+  const paths = [asset.storage_path as string, asset.original_path as string | null, ...cleanedPaths(studioId, mediaId)].filter((p): p is string => Boolean(p?.startsWith(`${studioId}/`)));
   if (paths.length) await db.storage.from("media").remove(paths).catch(() => {});
 
   revalidatePath("/mediatheque");

@@ -22,6 +22,7 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   update_post: "Je mets la publication à jour…",
   set_music: "Je m’occupe de la musique…",
   set_look: "Je pose le look…",
+  set_finish: "Je règle les finitions…",
   story_express: "Je prépare ta story…",
   set_voice: "Je m’occupe de la voix off…",
   analyze_clips: "Je regarde tes vidéos…",

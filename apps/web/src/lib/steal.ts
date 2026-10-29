@@ -17,6 +17,7 @@ import { googleFont } from "@/lib/fonts";
 import { cutoutPath } from "@/lib/render/cutout";
 import { sandboxCostEur, stealReelInSandbox, type StealMiss } from "@/lib/render/sandbox";
 import { tracksPath } from "@/lib/render/tracks";
+import { cleanedPaths } from "@/lib/video/speech";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { instagramVideo } from "@/lib/treg";
 import { readStolenLook } from "@/lib/video/inspiration";
@@ -129,7 +130,7 @@ export async function dropExample(studioId: string, example: { id: string; path:
   if (files.length) {
     await db.storage
       .from("media")
-      .remove([...new Set(files), tracksPath(studioId, example.id), cutoutPath(studioId, example.id, "webp"), cutoutPath(studioId, example.id, "png")])
+      .remove([...new Set(files), tracksPath(studioId, example.id), cutoutPath(studioId, example.id, "webp"), cutoutPath(studioId, example.id, "png"), ...cleanedPaths(studioId, example.id)])
       .catch(() => {});
   }
 }

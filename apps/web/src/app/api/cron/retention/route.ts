@@ -4,6 +4,7 @@ import { kitPath } from "@/lib/effect-words";
 import { cutoutPath } from "@/lib/render/cutout";
 import { refFramePaths } from "@/lib/render/ref-frames";
 import { tracksPath } from "@/lib/render/tracks";
+import { cleanedPaths } from "@/lib/video/speech";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Media retention, called every hour by pg_cron with CRON_SECRET: the photos and
@@ -39,7 +40,16 @@ async function handle(request: Request) {
     const removed = await db.storage
       .from("media")
       .remove([
-        ...batch.flatMap((m) => [m.storage_path, cutoutPath(m.studio_id, m.id, "webp"), cutoutPath(m.studio_id, m.id, "png"), tracksPath(m.studio_id, m.id), kitPath(m.studio_id, m.id), ...refFramePaths(m.studio_id, m.id)]),
+        ...batch.flatMap((m) => [
+          m.storage_path,
+          cutoutPath(m.studio_id, m.id, "webp"),
+          cutoutPath(m.studio_id, m.id, "png"),
+          tracksPath(m.studio_id, m.id),
+          kitPath(m.studio_id, m.id),
+          ...refFramePaths(m.studio_id, m.id),
+          // Its copy with the sound cleaned (a video, a voice note).
+          ...cleanedPaths(m.studio_id, m.id),
+        ]),
         ...(originals ?? []).map((o) => o.original_path as string),
       ]);
     if (removed.error) {

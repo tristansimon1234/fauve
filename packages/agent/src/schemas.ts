@@ -110,7 +110,30 @@ export const editPlanSegmentSchema = z.object({
   ramp: z
     .object({ at: z.number().min(0), hold: z.number().positive().max(5), asked: z.tuple([z.number().min(0), z.number().positive()]) })
     .optional(),
+  /**
+   * A piece of a passage where someone speaks, cut by the engine (speech.ts: its « euh » and long pauses
+   * out): the passage as the editor wrote it, its in, out and move, so the cuts can be undone
+   * (`finish.cuts` off, and what a correction shows the editor).
+   */
+  jump: z.object({ in: z.number().min(0), out: z.number().positive(), move: cameraMoveSchema.optional() }).optional(),
 });
+
+/**
+ * The finishing touches the engine adds to a Reel by itself, each one hers to change (Edith's
+ * set_finish; her defaults for every Reel in her profile): the sound of what is said (cleaned when
+ * noisy, always, or as recorded), the sound of her videos (only where someone speaks, all along, or
+ * none), the « euh » and silences cut, the speed ramps, the photos in relief, the steadied videos.
+ * Absent: « auto » (and « speech » for the sound of her videos).
+ */
+export const reelFinishSchema = z.object({
+  sound: z.enum(["auto", "clean", "original"]).optional(),
+  video_sound: z.enum(["speech", "all", "none"]).optional(),
+  cuts: z.enum(["auto", "off"]).optional(),
+  ramp: z.enum(["auto", "off"]).optional(),
+  relief: z.enum(["auto", "off"]).optional(),
+  steady: z.enum(["auto", "off"]).optional(),
+});
+export type ReelFinish = z.infer<typeof reelFinishSchema>;
 
 /** Full motion-design screen (animated typography in the studio's colours, no video). */
 export const sceneSchema = z.object({
@@ -324,6 +347,8 @@ export const editPlanObjectSchema = z.object({
   effect: z.enum(REEL_EFFECTS).optional(),
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height), set by the engine off the faces: they never move from shot to shot. */
   subtitle_y: z.number().min(0.1).max(0.8).optional(),
+  /** Her finishing touches for this Reel (reelFinishSchema): carried from one version to the next, never written by the editor. */
+  finish: reelFinishSchema.optional(),
   /** Animations over several shots (see editPlanLayerSchema). */
   layers: z.array(editPlanLayerSchema).max(3).optional(),
   /** A Reel made by the effects agent (effects.ts): its one shot is the finished video, played as it is. Set by the engine. */
@@ -477,6 +502,8 @@ export const clipSpeechSchema = z.object({
   floor: z.number().nullable(),
   fillers: z.array(z.object({ w: z.string(), start: z.number().min(0), end: z.number().min(0) })).max(200),
   pauses: z.array(timedSpan).max(300),
+  /** The copy with its sound cleaned, in Storage beside the video (the video keeps its sound as recorded). */
+  path: z.string().max(300).optional(),
 });
 export type ClipSpeech = z.infer<typeof clipSpeechSchema>;
 
@@ -568,6 +595,8 @@ export const brandProfileSchema = z.object({
   text_looks: z.array(savedLookSchema).max(12).optional(),
   /** Edith's voice over the Reels: when, and which voice (absent: auto, the first voice). */
   voice: voiceSettingSchema.optional(),
+  /** Her finishing touches for all her Reels (each Reel can change them): set by Edith's set_finish without a Reel. */
+  finish: reelFinishSchema.optional(),
   dos: z.array(z.string()),
   donts: z.array(z.string()),
 });

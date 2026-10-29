@@ -13,7 +13,10 @@ export const SPEECH_LUFS = -14;
 /** A music track as ElevenLabs composes it (the live preview cannot measure it). */
 export const MUSIC_AS_COMPOSED_LUFS = -15;
 
-export type MixCase = "music" | "voice_over" | "speech_in_clips";
+export type MixCase = "music" | "voice_over" | "speech_in_clips" | "ambient";
+
+/** The sound of her videos kept all along (finish.video_sound « all ») with nobody speaking: an ambience, under a voice's level. */
+export const AMBIENT_LUFS = -21;
 
 export type Ducking = { threshold: number; ratio: number; attack: number; release: number };
 
@@ -24,6 +27,8 @@ export const MIX_CASES: Record<MixCase, { music: number; duck: Ducking | null; u
   voice_over: { music: -20, duck: { threshold: 0.03, ratio: 1.6, attack: 20, release: 600 }, under: -26 },
   /** Someone speaks in a few shots: the music keeps its level and ducks well under them. */
   speech_in_clips: { music: -15, duck: { threshold: 0.016, ratio: 8, attack: 20, release: 600 }, under: -33 },
+  /** The sound of her videos kept all along, nobody speaking: the music over the ambience, both heard, nothing ducks. */
+  ambient: { music: -16, duck: null, under: -16 },
 };
 
 /** Peaks of the mix held under -1 dBFS. */
@@ -46,14 +51,16 @@ export function speechGain(lufs: number | null): number | null {
  * no sound track) and of the music: which case, how many dB each one moves,
  * and the ducking.
  */
-export function mixGains(loudness: { speech: number | null; music: number | null }, voiceOver: boolean): {
+export function mixGains(loudness: { speech: number | null; music: number | null }, voiceOver: boolean, ambient = false): {
   kind: MixCase;
   speechGain: number;
   musicGain: number;
   duck: Ducking | null;
 } {
-  const gain = speechGain(loudness.speech);
-  const kind: MixCase = gain === null ? "music" : voiceOver ? "voice_over" : "speech_in_clips";
+  const voiced = speechGain(loudness.speech);
+  const kind: MixCase = voiced === null ? "music" : voiceOver ? "voice_over" : ambient ? "ambient" : "speech_in_clips";
+  // An ambience sits under a voice's level, bounded like a voice.
+  const gain = kind === "ambient" && measured(loudness.speech) ? round1(clamp(AMBIENT_LUFS - loudness.speech, -12, 20)) : voiced;
   const settings = MIX_CASES[kind];
   return {
     kind,
@@ -72,6 +79,8 @@ export function mixFilter(gains: ReturnType<typeof mixGains>, fadeAt: number | n
   const fade = fadeAt === null ? "" : `,afade=t=out:st=${Math.max(0, fadeAt).toFixed(2)}:d=0.8`;
   const limit = `alimiter=limit=${MIX_CEILING}:level=false`;
   const music = `[1:a]${stereo},volume=${gains.musicGain}dB`;
+  // The ambience of her videos under the music, both as they are.
+  if (gains.kind === "ambient") return `[0:a]${stereo},volume=${gains.speechGain}dB[own];${music}[m];[m][own]amix=inputs=2:duration=first:normalize=0,${limit}${fade}[a]`;
   if (!gains.duck) return `${music},${limit}${fade}[a]`;
   const d = gains.duck;
   return (

@@ -132,13 +132,13 @@ const editorRhythm = {
  * refuses the current schema (structured-output grammars have limits of their own).
  */
 export const editorOutputSchemaLegacy = z.object({
-  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true }).extend({
+  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true, finish: true }).extend({
     ...editorRhythm,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
     // No signature transition field here: the structured-output grammar is at the API's
     // limit (400 « compiled grammar is too large »); the engine places it (signatureShot).
-    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true, ramp: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
+    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true, ramp: true, jump: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
   }),
   rationale: z.string(),
 });

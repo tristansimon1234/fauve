@@ -196,6 +196,8 @@ export async function withMusic(params: {
   mp4: Buffer;
   renderId: string;
   fresh?: boolean;
+  /** The sound of her videos kept all along, nobody speaking: mixed as an ambience under the music. */
+  ambient?: boolean;
 }): Promise<{ mp4: Buffer; music: "kept" | "new" | "none" }> {
   if (!env("ELEVENLABS_API_KEY") || (params.kind !== "reel" && params.kind !== "story")) return { mp4: params.mp4, music: "none" };
   const db = supabaseAdmin();
@@ -284,5 +286,5 @@ export async function withMusic(params: {
       .update({ music: { mode: "on", track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString() } } })
       .eq("id", params.postId);
   }
-  return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice) }), music: made };
+  return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice), ambient: params.ambient }), music: made };
 }

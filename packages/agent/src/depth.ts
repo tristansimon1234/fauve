@@ -10,8 +10,8 @@ import { isClipSegment, type CameraMove, type EditPlan } from "./schemas.ts";
 export const DEPTH_MOVES: CameraMove[] = ["in", "out", "left", "right"];
 
 /** The photos of a plan that move (and are not blurred): their subject is cut out before the render, to play them in relief. */
-export function depthPhotoIds(plan: Pick<EditPlan, "segments"> & { template?: EditPlan["template"] }): string[] {
-  if (plan.template === "collage") return [];
+export function depthPhotoIds(plan: Pick<EditPlan, "segments"> & { template?: EditPlan["template"]; finish?: EditPlan["finish"] }): string[] {
+  if (plan.template === "collage" || plan.finish?.relief === "off") return [];
   return [
     ...new Set(plan.segments.flatMap((s) => (isClipSegment(s) && s.photo && !s.photo.blur?.length && s.move && DEPTH_MOVES.includes(s.move) ? [s.clip_id] : []))),
   ];

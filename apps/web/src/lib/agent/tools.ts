@@ -50,6 +50,8 @@ import {
   type ExchangeRow,
   EFFECT_LABELS,
   isBaked,
+  reelFinishSchema,
+  type ReelFinish,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -68,6 +70,7 @@ import { queueJob } from "@/lib/jobs";
 import { missMessage, startSteal } from "@/lib/steal";
 import { readPostMusic } from "@/lib/render/music";
 import { deliverStoryExpress, prepareStoryExpress, StoryExpressError } from "@/lib/story-express";
+import { refinishPost } from "@/lib/finish-options";
 import { removeVoice } from "@/lib/voice-over";
 import { ownVoiceOf } from "@/lib/voice-clone";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
@@ -688,6 +691,40 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         }
       });
       return json({ status: "started", note: "La story se prépare (une à deux minutes) et part toute seule dans la conversation. Dis-le en une phrase." });
+    },
+
+    async set_finish({ post_id, ...asked }) {
+      const change = Object.fromEntries(Object.entries(asked).filter(([, v]) => v !== undefined)) as ReelFinish;
+      if (!Object.keys(change).length) return json({ error: "Dis ce qui change : sound, video_sound, cuts, ramp, relief ou steady." });
+      // Her defaults, for all her next Reels.
+      if (!post_id) {
+        await insertProfileVersion(studioId, (profile) => ({ ...profile, finish: { ...reelFinishSchema.catch({}).parse(profile.finish ?? {}), ...change } }));
+        return json({ ok: true, note: "Gardé pour ses prochains Reels. Dis-le en une phrase ; pour un Reel déjà fait, propose de le refaire ainsi (set_finish avec son post_id)." });
+      }
+      const post = unwrap(await db.from("posts").select("id, kind, status, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
+      if (post.kind !== "reel" && post.kind !== "story") return json({ error: "Les finitions se règlent sur une vidéo montée (un Reel ou une story)." });
+      if (["published", "measured"].includes(post.status as string)) return json({ error: "Cette vidéo est déjà en ligne." });
+      if (!post.edit_plan_id) {
+        return json({ error: "Pas encore de montage : règle-le pour ses prochains Reels (set_finish sans post_id), il s'appliquera à celui-ci." });
+      }
+      const current = unwrap(await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).eq("studio_id", studioId).single());
+      const plan = editPlanSchema.safeParse(current.plan);
+      if (!plan.success) return json({ error: "Montage illisible : relance montage." });
+      if (isBaked(plan.data)) return json({ error: "Cette vidéo est un effet dessiné image par image : demande ce changement en correction (montage)." });
+      // The blurred zones follow the steadied picture: the shaky original would show what they hide.
+      if (change.steady === "off" && plan.data.segments.some((s) => "clip_id" in s && s.blur?.tracks.length)) {
+        return json({ error: "Ce Reel floute des zones qui suivent l'image stabilisée : sans stabilisation, elles ne seraient plus au bon endroit. Retire d'abord le floutage (blur_video) si elle le veut." });
+      }
+      ctx.afterReply.push(async () => {
+        const target = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId };
+        try {
+          await refinishPost(studioId, post_id, change);
+          await renderAndDeliver({ ...target, offerVariant: false });
+        } catch (error) {
+          await notifyFailure(target, "Les finitions n’ont pas pu être appliquées cette fois. Tu veux que je réessaie ?", error);
+        }
+      });
+      return json({ status: "started", note: "La vidéo se refait avec ces finitions, sans nouveau montage (1 à 3 min, gratuit), et part toute seule. Dis-le en une phrase." });
     },
 
     async set_look({ post_id, look }) {

@@ -45,6 +45,7 @@ import { withMusic } from "./music";
 import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
 import { ensureCutouts, sceneCutoutInputs, stickerInputs } from "./cutout";
+import { ensureCleanCopies } from "@/lib/video/speech";
 import { loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
@@ -84,14 +85,32 @@ export function towardsDraft(status: PostStatus): PostStatus[] {
  */
 export async function loadMontageInputs(
   studioId: string,
-  plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"]; layers?: EditPlan["layers"] },
+  plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"]; layers?: EditPlan["layers"]; finish?: EditPlan["finish"] },
   options: { postId?: string } = {},
 ) {
   const db = supabaseAdmin();
   const clipIds = planMediaIds(plan);
-  const assets = clipIds.length
-    ? check(await db.from("media_assets").select("id, storage_path, mime_type, duration, kind, regions").eq("studio_id", studioId).in("id", clipIds)).data!
-    : [];
+  const [assetRows, analyses] = await Promise.all([
+    clipIds.length
+      ? db.from("media_assets").select("id, storage_path, original_path, stabilized, mime_type, duration, kind, regions").eq("studio_id", studioId).in("id", clipIds)
+      : Promise.resolve({ data: [], error: null }),
+    clipIds.length
+      ? db.from("clip_analyses").select("media_id, analysis").in("media_id", clipIds).order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as { media_id: string; analysis: unknown }[] }),
+  ]);
+  const assets = check(assetRows).data ?? [];
+  // Which file of each video plays (her finishing touches, finish): its copy with the sound cleaned
+  // (unless she wants it as recorded), and its shaky original when she does not want it steadied.
+  const cleaned = new Map<string, string>();
+  for (const row of analyses.data ?? []) {
+    const path = clipAnalysisSchema.safeParse(row.analysis).data?.speech?.path;
+    if (path && !cleaned.has(row.media_id as string)) cleaned.set(row.media_id as string, path);
+  }
+  const fileOf = (asset: (typeof assets)[number]): string => {
+    if (plan.finish?.steady === "off" && asset.stabilized && asset.original_path) return asset.original_path as string;
+    const copy = cleaned.get(asset.id as string);
+    return copy && plan.finish?.sound !== "original" && copy.startsWith(`${studioId}/`) ? copy : (asset.storage_path as string);
+  };
   const clipFiles: Record<string, string> = {};
   const clips: Record<string, string> = {};
   const clipUrls: Record<string, string> = {};
@@ -99,7 +118,7 @@ export async function loadMontageInputs(
   for (const [i, id] of clipIds.entries()) {
     const asset = assets.find((a) => a.id === id);
     if (!asset) throw new Error(`Clip ${id} introuvable dans la médiathèque du studio`);
-    const signed = check(await db.storage.from("media").createSignedUrl(asset.storage_path, 3600)).data!;
+    const signed = check(await db.storage.from("media").createSignedUrl(fileOf(asset), 3600)).data!;
     const file = `clip${i}.${extensionByMime[asset.mime_type ?? ""] ?? "mp4"}`;
     clipFiles[id] = file;
     clips[file] = signed.signedUrl;
@@ -109,12 +128,9 @@ export async function loadMontageInputs(
   // Photos play still in a Reel, with a slow zoom.
   const photoIds = assets.filter((a) => a.kind === "image").map((a) => a.id as string);
 
-  const [brand, studio, analyses] = await Promise.all([
+  const [brand, studio] = await Promise.all([
     db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
     db.from("studios").select("name").eq("id", studioId).single(),
-    clipIds.length
-      ? db.from("clip_analyses").select("media_id, analysis").in("media_id", clipIds).order("created_at", { ascending: false })
-      : Promise.resolve({ data: [] as { media_id: string; analysis: unknown }[] }),
   ]);
   const style = brandProfileSchema
     .pick({ colors: true, logo_url: true, logo_path: true, fonts: true, custom_fonts: true, font_twins: true, signature: true })
@@ -138,7 +154,7 @@ export async function loadMontageInputs(
   const template = motionTemplateSchema.catch("doux").parse(plan.template);
   const { fonts } = await usableFonts(style.fonts, ownFonts.map((f) => f.family), template, style.font_twins);
   // Her voice note over the Reel: signed for the render and the preview, with her words.
-  const voice = plan.voice ? await voiceInput(studioId, plan.voice.media_id) : undefined;
+  const voice = plan.voice ? await voiceInput(studioId, plan.voice.media_id, plan.finish?.sound !== "original") : undefined;
   // A collage lays the subject of a photo as a sticker when its cut-out is clean; in any Reel, an
   // animation composes with the photos it names, and their clean cut-outs.
   const withPhotos = scenePhotoIds(plan);
@@ -295,12 +311,14 @@ async function bakedVideo(studioId: string, plan: EditPlan): Promise<Buffer> {
 }
 
 /** A voice note as the composition plays it: its signed link and its words; undefined if it is gone or not read. */
-async function voiceInput(studioId: string, mediaId: string): Promise<ReelInputs["voice"]> {
+async function voiceInput(studioId: string, mediaId: string, cleaned = true): Promise<ReelInputs["voice"]> {
   const db = supabaseAdmin();
   const { data: asset } = await db.from("media_assets").select("storage_path, transcript").eq("id", mediaId).eq("studio_id", studioId).maybeSingle();
   const transcript = voiceTranscriptSchema.safeParse(asset?.transcript);
   if (!asset || !transcript.success) return undefined;
-  const signed = await db.storage.from("media").createSignedUrl(asset.storage_path as string, 7200);
+  // Her voice note's copy with its sound cleaned, unless she wants it as recorded.
+  const copy = cleaned && transcript.data.clean?.path?.startsWith(`${studioId}/`) ? transcript.data.clean.path : null;
+  const signed = await db.storage.from("media").createSignedUrl(copy ?? (asset.storage_path as string), 7200);
   return signed.data ? { src: signed.data.signedUrl, words: transcript.data.words } : undefined;
 }
 
@@ -331,6 +349,8 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   // composed Reel's, and those an animation composes with (the design step has usually made them already).
   const toCut = plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : [...new Set([...scenePhotoIds(plan), ...depthPhotoIds(plan)])];
   if (toCut.length) await ensureCutouts(studioId, toCut);
+  // She wants the sound cleaned, even where it was not noisy: the cleaned copies are made first.
+  if (plan.finish?.sound === "clean") await ensureCleanCopies(studioId, planMediaIds(plan), plan.voice?.media_id);
   const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, depth, photoAspects, tracks, facts } =
     await loadMontageInputs(studioId, plan, { postId });
   const motion = motionTemplateSchema.safeParse(plan.template);
@@ -430,8 +450,13 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     } else {
       mp4 = await ffmpegRender();
     }
-    // Edith's music, composed for this cut (or the one kept for it), on the video.
-    const voiced = await withMusic({ studioId, postId, kind: post.kind as PostKind, plan, mp4, renderId, fresh: options.freshMusic }).catch((error: unknown) => {
+    // Edith's music, composed for this cut (or the one kept for it), on the video; the sound of her videos kept all along
+    // with nobody speaking (finish.video_sound « all ») stays under it as an ambience.
+    const ambient =
+      plan.finish?.video_sound === "all" &&
+      !plan.voice &&
+      !plan.segments.some((s) => isClipSegment(s) && (words[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out));
+    const voiced = await withMusic({ studioId, postId, kind: post.kind as PostKind, plan, mp4, renderId, fresh: options.freshMusic, ambient }).catch((error: unknown) => {
       console.warn("music unavailable, silent Reel", renderId, error);
       return { mp4, music: "none" as const };
     });

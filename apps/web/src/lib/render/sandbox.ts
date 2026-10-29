@@ -744,7 +744,7 @@ function printed(stdout: string, name: string): number | null {
  * and ducks while it speaks (mixGains: well under a voice over the whole Reel,
  * at its level around a few spoken shots). A video without sound just gets the music.
  */
-export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Array, options: { voiceOver?: boolean } = {}): Promise<Buffer> {
+export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Array, options: { voiceOver?: boolean; ambient?: boolean } = {}): Promise<Buffer> {
   const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${id}-mux`;
   try {
@@ -760,7 +760,7 @@ export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Arr
       [dir],
     );
     const measured = await probe.stdout();
-    const gains = mixGains({ speech: printed(measured, "speech"), music: printed(measured, "music") }, Boolean(options.voiceOver));
+    const gains = mixGains({ speech: printed(measured, "speech"), music: printed(measured, "music") }, Boolean(options.voiceOver), Boolean(options.ambient));
     console.info("mix", id, measured.trim(), gains);
     await bash(
       sandbox,
@@ -841,11 +841,11 @@ export type CleanedSpeech = {
 
 /**
  * The sound of a video where someone speaks (or of her voice note), cleaned the way speech.ts
- * says: its noise floor measured first (astats), the denoiser only on a noisy recording, the
- * picture copied untouched; then its pauses (silencedetect, under the voice's level) and its
- * sound as WAV for Scribe. A few seconds of work; null when it has no sound.
+ * says: its noise floor measured first (astats), the denoiser only on a noisy recording (`force`:
+ * on any, when she asks for it), the picture copied untouched; then its pauses (silencedetect,
+ * above the noise left) and its sound as WAV for Scribe. A few seconds of work; null when it has no sound.
  */
-export async function cleanSpeechInSandbox(id: string, url: string, kind: "video" | "audio"): Promise<CleanedSpeech | null> {
+export async function cleanSpeechInSandbox(id: string, url: string, kind: "video" | "audio", options: { force?: boolean } = {}): Promise<CleanedSpeech | null> {
   const started = Date.now();
   const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${id}-speech`;
@@ -870,7 +870,7 @@ export async function cleanSpeechInSandbox(id: string, url: string, kind: "video
     if (/noaudio=1/.test(measured)) return null;
     const { level, floor } = parseAudioStats(measured);
     const duration = printed(measured, "duration");
-    const { filter, denoised } = speechCleanFilter(floor, `${SPEECH_DIR}/${RNNOISE_MODEL.file}`);
+    const { filter, denoised } = speechCleanFilter(floor, `${SPEECH_DIR}/${RNNOISE_MODEL.file}`, options.force);
     const out = kind === "video" ? "out.mp4" : "out.m4a";
     const encode =
       kind === "video"
