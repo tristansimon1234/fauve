@@ -1,0 +1,40 @@
+{
+  "voice": "intro-voice.mp3",
+  "scenes": [
+    {
+      "id": "hello",
+      "from": 0.0,
+      "to": 4.9
+    },
+    {
+      "id": "whatsapp",
+      "from": 4.9,
+      "to": 11.7
+    },
+    {
+      "id": "reel",
+      "from": 11.7,
+      "to": 16.1
+    },
+    {
+      "id": "carousel",
+      "from": 16.1,
+      "to": 21.1
+    },
+    {
+      "id": "publish",
+      "from": 21.1,
+      "to": 26.12
+    },
+    {
+      "id": "app",
+      "from": 26.12,
+      "to": 29.52
+    },
+    {
+      "id": "start",
+      "from": 29.52,
+      "to": 32.52
+    }
+  ]
+}

@@ -167,12 +167,10 @@ function WebsiteStep({ onSend, pending }: { onSend: (text: string) => void; pend
   const valid = Boolean(instagram) || /\.[a-z]{2,}/i.test(given);
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-      {/* Who Edith is and what he does, in 30 seconds: the same video as the welcome on WhatsApp. */}
+      {/* Who Edith is and what he does, in 30 seconds, read by his voice: the same video as the welcome on WhatsApp, played with its sound. */}
       <video
         src={INTRO_VIDEO.path}
         poster={INTRO_VIDEO.poster}
-        autoPlay
-        muted
         playsInline
         controls
         preload="metadata"

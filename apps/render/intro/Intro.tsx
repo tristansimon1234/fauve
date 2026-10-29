@@ -12,10 +12,17 @@ import jakarta800 from "../../web/src/app/_og/jakarta-800.ttf";
 // Reels, the carousels and the captions, nothing goes out without her « oui », and the app on a
 // computer; then how to start. Motion design in the app's colours, her real landing work inside.
 //
-// Rendered by hand, once, from apps/render:
-//   npx remotion render intro/index.ts EdithIntro ../web/public/onboarding/edith-intro.mp4 \
-//     --public-dir ../web/public/landing --crf 22 [--props '{"soundtrack":"…"}']
-//   ffmpeg -ss 1.5 -i ../web/public/onboarding/edith-intro.mp4 -frames:v 1 -q:v 3 ../web/public/onboarding/edith-intro.jpg
+// Made by hand, once:
+//   1. Edith's voice reads the script (its charter's narrator, Lucie): POST /api/admin/voices?say=<voice>&text=<script>
+//      (CRON_SECRET, from the database), which answers the voice and the time of each word;
+//   2. python3 intro/place-voice.py <voice.mp3>: each sentence on its scene → ../web/public/landing/intro-voice.mp3 and
+//      intro/voice.json (the scenes' timings, this composition's props);
+//   3. from apps/render: npx remotion render intro/index.ts EdithIntro <out.mp4> --public-dir ../web/public/landing
+//      --crf 22 --props intro/voice.json
+//   4. Edith's music under it, mixed as for any Reel (the voice-over case): the video uploaded to the lab studio of
+//      edith-ai.app (/api/admin/lab?site=edith-ai.app&step=upload), set as a played-as-is post (a « baked » plan,
+//      its voice flagged), then &step=music; its render is apps/web/public/onboarding/edith-intro.mp4, its poster:
+//      ffmpeg -ss 2.2 -i edith-intro.mp4 -frames:v 1 -vf scale=540:-1 -q:v 4 edith-intro.jpg
 
 const FPS = 30;
 const s = (seconds: number) => Math.round(seconds * FPS);
@@ -52,8 +59,11 @@ function loadBrandFonts() {
     .finally(() => continueRender(handle));
 }
 
-/** The scenes, end to end (seconds). */
-const SCENES = [
+type SceneId = "hello" | "whatsapp" | "reel" | "carousel" | "publish" | "app" | "start";
+type Timed = { id: SceneId; from: number; to: number };
+
+/** The scenes, end to end (seconds), when no voice sets them: with one, each starts on its own sentence (props.scenes). */
+const SCENES: readonly Timed[] = [
   { id: "hello", from: 0, to: 3.6 },
   { id: "whatsapp", from: 3.6, to: 10 },
   { id: "reel", from: 10, to: 14.4 },
@@ -61,8 +71,17 @@ const SCENES = [
   { id: "publish", from: 19.4, to: 24.2 },
   { id: "app", from: 24.2, to: 27.6 },
   { id: "start", from: 27.6, to: 30 },
-] as const;
+];
 export const INTRO_SECONDS = 30;
+
+type IntroProps = {
+  /** The voice-over, read by Edith (a file of the public dir): it goes out with the video, the music is mixed under it by the app. */
+  voice?: string | null;
+  /** The scenes set on the voice's sentences. */
+  scenes?: Timed[] | null;
+  soundtrack?: string | null;
+};
+const lengthOf = (scenes: readonly Timed[]) => scenes[scenes.length - 1]!.to;
 
 /** A soft entrance, never a bounce. */
 function useIn(delay = 0, duration = 14) {
@@ -231,7 +250,7 @@ function WhatsAppScene() {
       <Phone>
         <ChatHeader />
         <div style={{ display: "flex", flexDirection: "column", gap: 18, padding: "34px 24px" }}>
-          <Bubble mine delay={s(0.7)} style={{ padding: 10 }}>
+          <Bubble mine delay={s(1.9)} style={{ padding: 10 }}>
             <div style={{ display: "flex", gap: 8 }}>
               {[0, 1, 2].map((i) => (
                 <div key={i} style={{ position: "relative", width: 132, height: 196, borderRadius: 16, overflow: "hidden" }}>
@@ -241,11 +260,11 @@ function WhatsAppScene() {
               ))}
             </div>
           </Bubble>
-          <Bubble mine delay={s(1.5)}>
+          <Bubble mine delay={s(3.4)}>
             <VoiceNote />
           </Bubble>
-          <Bubble mine delay={s(2.3)}>Un Reel pour vendredi ? Le café du matin, l’ambiance du comptoir</Bubble>
-          <Bubble delay={s(3.4)}>Je m’en occupe ✨ Je te l’envoie dès qu’il est prêt.</Bubble>
+          <Bubble mine delay={s(4.4)}>Un Reel pour vendredi ? Le café du matin, l’ambiance du comptoir</Bubble>
+          <Bubble delay={s(5.4)}>Je m’en occupe ✨ Je te l’envoie dès qu’il est prêt.</Bubble>
         </div>
       </Phone>
     </>
@@ -272,7 +291,7 @@ function CarouselScene() {
   const frame = useCurrentFrame();
   const slides = [1, 2, 3];
   const caption = "Trois gestes pour garder tes cheveux en forme tout l’hiver. Enregistre-le pour ta prochaine douche !";
-  const typed = Math.max(0, Math.floor(interpolate(frame, [s(2), s(4.2)], [0, caption.length], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })));
+  const typed = Math.max(0, Math.floor(interpolate(frame, [s(1.7), s(4.2)], [0, caption.length], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })));
   const card = useIn(s(1.7));
   return (
     <>
@@ -316,24 +335,25 @@ function CarouselScene() {
 
 function PublishScene() {
   const frame = useCurrentFrame();
-  const tap = s(2.0);
+  // On her « oui » in the voice.
+  const tap = s(1.35);
   const pressed = frame >= tap && frame < tap + 6;
   const ring = interpolate(frame, [tap, tap + 14], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const online = useIn(s(3.0));
+  const online = useIn(s(2.3));
   return (
     <>
       <Title before="Je publie quand tu me dis " accent="oui" sub="sur Instagram et TikTok" />
       <Phone>
         <ChatHeader />
         <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "34px 24px" }}>
-          <Bubble delay={s(0.5)} style={{ padding: 10 }}>
+          <Bubble delay={s(0.2)} style={{ padding: 10 }}>
             <div style={{ width: 300, height: 420, borderRadius: 18, overflow: "hidden", marginBottom: 12 }}>
               <Img src={staticFile("work-pilates.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             <div style={{ padding: "0 10px 6px" }}>Ton Reel est prêt ! Je le publie vendredi à 18 h ?</div>
           </Bubble>
           {["Oui, publie-le", "Je regarde d’abord"].map((label, i) => {
-            const p = ease(frame, s(0.9) + i * 3, 12);
+            const p = ease(frame, s(0.5) + i * 3, 12);
             const hit = i === 0;
             return (
               <div key={label} style={{ position: "relative", opacity: p, transform: `translateY(${(1 - p) * 20}px)`, width: "82%", textAlign: "center", padding: "18px 0", borderRadius: 22, background: hit && pressed ? "#E8F0EC" : "#fff", fontFamily: SANS, fontSize: 31, fontWeight: 700, color: "#0A7C5A", boxShadow: "0 2px 4px rgba(0,0,0,.06)" }}>
@@ -439,7 +459,7 @@ function StartScene() {
   );
 }
 
-const SCENE_VIEWS: Record<(typeof SCENES)[number]["id"], () => ReactNode> = {
+const SCENE_VIEWS: Record<SceneId, () => ReactNode> = {
   hello: HelloScene,
   whatsapp: WhatsAppScene,
   reel: ReelScene,
@@ -449,14 +469,16 @@ const SCENE_VIEWS: Record<(typeof SCENES)[number]["id"], () => ReactNode> = {
   start: StartScene,
 };
 
-export function Intro({ soundtrack }: { soundtrack?: string | null }) {
+export function Intro({ soundtrack, voice, scenes }: IntroProps) {
   loadBrandFonts();
+  const timed = scenes?.length ? scenes : SCENES;
+  const seconds = lengthOf(timed);
   return (
     <AbsoluteFill style={{ background: C.bg }}>
       {/* The mascot's sizing, from the app's stylesheet (its motion is drawn here, frame by frame). */}
       <style>{".fauve-cat{display:inline-block;flex-shrink:0;width:var(--cat);height:var(--cat)}.fauve-cat svg{display:block;width:100%;height:100%}"}</style>
       <Orb />
-      {SCENES.map((scene, i) => {
+      {timed.map((scene, i) => {
         const View = SCENE_VIEWS[scene.id];
         // Each scene starts a little before the last one ends: they cross-fade.
         const from = s(scene.from) - (i ? 4 : 0);
@@ -469,11 +491,23 @@ export function Intro({ soundtrack }: { soundtrack?: string | null }) {
           </Sequence>
         );
       })}
-      {soundtrack && <Audio src={soundtrack} volume={(f) => interpolate(f, [0, 6, s(INTRO_SECONDS) - 24, s(INTRO_SECONDS)], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} />}
+      {voice && <Audio src={staticFile(voice)} />}
+      {soundtrack && <Audio src={soundtrack} volume={(f) => interpolate(f, [0, 6, s(seconds) - 24, s(seconds)], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} />}
     </AbsoluteFill>
   );
 }
 
 export function IntroRoot() {
-  return <Composition id="EdithIntro" component={Intro} durationInFrames={s(INTRO_SECONDS)} fps={FPS} width={1080} height={1920} defaultProps={{ soundtrack: null as string | null }} />;
+  return (
+    <Composition
+      id="EdithIntro"
+      component={Intro}
+      durationInFrames={s(INTRO_SECONDS)}
+      fps={FPS}
+      width={1080}
+      height={1920}
+      defaultProps={{ soundtrack: null, voice: null, scenes: null } as IntroProps}
+      calculateMetadata={({ props }) => ({ durationInFrames: s(lengthOf(props.scenes?.length ? props.scenes : SCENES)) })}
+    />
+  );
 }
