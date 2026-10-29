@@ -187,13 +187,16 @@ async function keepCover(key: string, video: TrendVideo, image?: Buffer | null):
   return error ? null : path;
 }
 
-/** One source read page after page (while there is a next one); null without a Treg key. */
+/**
+ * One source read page after page (while there is a next one); null without a Treg key or when its
+ * first page is refused (an empty balance answers 402): the list kept before stays, never emptied.
+ */
 async function sourcePages(source: Source): Promise<{ answer: unknown; costUsd: number }[] | null> {
   const pages: { answer: unknown; costUsd: number }[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < source.pages; page++) {
     const called = await tregCall(source.id, { ...source.body, ...(cursor ? { cursor } : {}) }, 0.02);
-    if (!called) return page ? pages : null;
+    if (!called || called.answer === null) return page ? pages : null;
     pages.push(called);
     cursor = nextCursorIn(called.answer);
     if (!cursor || !called.answer) break;
