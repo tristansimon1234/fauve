@@ -23,7 +23,7 @@ import {
 import { mixFilter, mixGains } from "./mix.ts";
 import { fromEditorPlan, normalizeEditPlan } from "./editor.ts";
 import { depthPhotoIds } from "./depth.ts";
-import { dayIn, LOOK_PRESETS, lookChoice, lookFromDesign, lookMatrix, lookStamp, planLook, reelLookSchema, type LookDesign } from "./looks.ts";
+import { dayIn, LOOK_PRESETS, lookChoice, lookFromDesign, lookMatrix, lookStamp, planLook, reelLookSchema, withLook, type LookDesign } from "./looks.ts";
 import { clampLook, followedFilter, followedForEditor, followedFrom, followedLine, stolenStyleLines, type StolenLookReading } from "./steal.ts";
 import { editorLook } from "./editor.ts";
 import { snapToTempo } from "./tempo.ts";
@@ -430,6 +430,9 @@ test("looks: a plan made before keeps its preset, a new one its own settings", (
   assert.equal(planLook({ look: own, effect: "vhs" }), own);
   assert.equal(planLook({}), null);
   assert.ok(editPlanSchema.safeParse({ ...validPlanBase, look: own }).success);
+  // A new look replaces an older plan's preset; none takes both off.
+  assert.deepEqual(withLook({ effect: "vhs" as const, duration: 4 }, own), { duration: 4, look: own });
+  assert.deepEqual(withLook({ effect: "vhs" as const, look: own, duration: 4 }, null), { duration: 4 });
   assert.equal(editPlanSchema.safeParse({ ...validPlanBase, look: { ...own, warmth: 3 } }).success, false);
 });
 

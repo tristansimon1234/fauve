@@ -50,6 +50,7 @@ import {
   type ExchangeRow,
   planLook,
   sameLook,
+  withLook,
   isBaked,
   reelFinishSchema,
   type ReelFinish,
@@ -790,8 +791,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // Her default, for all her next Reels.
       if (!post_id) {
         await insertProfileVersion(studioId, (profile) => {
-          const { look: _old, ...rest } = profile;
-          return chosen.look ? { ...rest, look: chosen.look } : rest;
+          const next = { ...profile, look: chosen.look ?? undefined };
+          if (!chosen.look) delete next.look;
+          return next;
         });
         return json({
           ok: true,
@@ -809,8 +811,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (isBaked(plan.data)) return json({ error: "Cette vidéo est un effet dessiné image par image : demande ce look en correction (montage), l'atelier le redessinera." });
       if (sameLook(planLook(plan.data), chosen.look)) return json({ ok: true, note: "C'est déjà son look. Dis-le en une phrase." });
       // A new version of the same cut with its look: the music stays, the video is made again for free.
-      const { effect: _preset, look: _old, ...cut } = plan.data;
-      const { id } = await insertPlanVersion(studioId, post_id, chosen.look ? { ...cut, look: chosen.look } : cut);
+      const { id } = await insertPlanVersion(studioId, post_id, withLook(plan.data, chosen.look));
       check(await db.from("posts").update({ edit_plan_id: id }).eq("id", post_id).eq("studio_id", studioId));
       ctx.afterReply.push(async () => {
         await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });

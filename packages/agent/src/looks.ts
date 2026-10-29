@@ -178,6 +178,14 @@ export function lookChoice(words: string | null | undefined): { look: ReelLook |
   return { design: said.slice(0, 400) };
 }
 
+/** A plan with this look (none: without one), the preset an older plan named in `effect` gone with it. */
+export function withLook<P extends { look?: ReelLook; effect?: ReelEffect }>(plan: P, look: ReelLook | null): P {
+  const next = { ...plan };
+  delete next.effect;
+  delete next.look;
+  return look ? { ...next, look } : next;
+}
+
 /** Whether two looks draw the same. */
 export const sameLook = (a: ReelLook | null, b: ReelLook | null) => JSON.stringify(a) === JSON.stringify(b);
 

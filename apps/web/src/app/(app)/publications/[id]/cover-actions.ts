@@ -1,6 +1,6 @@
 "use server";
 
-import { EFFECT_VOICE_OUT, editPlanSchema, isBaked, planLook, postCoverSchema, sameLook, type PostCover } from "@fauve/agent";
+import { EFFECT_VOICE_OUT, editPlanSchema, isBaked, planLook, postCoverSchema, sameLook, withLook, type PostCover } from "@fauve/agent";
 import { resolveLook } from "@/lib/agent/look-designer";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { revalidatePath } from "next/cache";
@@ -99,8 +99,8 @@ export async function setLook(postId: string, words: string): Promise<{ ok: bool
   if ("missed" in chosen) return { ok: false };
   const named = { ...(chosen.look ? { name: chosen.look.name } : {}), ...(chosen.note ? { note: chosen.note } : {}) };
   if (sameLook(planLook(plan.data), chosen.look)) return { ok: true, ...named };
-  const { effect: _preset, look: _old, ...cut } = plan.data;
-  const { id } = await insertPlanVersion(studioId, postId, chosen.look ? { ...cut, look: chosen.look } : cut);
+  const cut = withLook(plan.data, chosen.look);
+  const { id } = await insertPlanVersion(studioId, postId, cut);
   const { error } = await supabaseAdmin().from("posts").update({ edit_plan_id: id }).eq("id", postId).eq("studio_id", studioId);
   if (error) return { ok: false };
   after(() =>
