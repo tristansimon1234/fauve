@@ -1,5 +1,5 @@
 import "server-only";
-import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, replyExtrasSchema } from "@fauve/agent";
+import { awaitsAnswer, echoFor, emojiOnly, justHello, onboardingStepOf, replyExtrasSchema, WHATSAPP_WELCOME } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { answerPairing, claimPairing, PAIRING_YES, PAIRING_NO } from "@/lib/auth/pairing";
 import { TERMS_LINE } from "@/lib/legal";
@@ -217,7 +217,13 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     await analysis;
     return;
   }
+  // Her first message ever: the welcome first (what Edith does, how to start); a plain « Bonjour » needs nothing more.
+  const welcomed = await welcomeIfNew(member.studio_id, phone, message).catch((e: unknown) => {
+    console.warn("welcome failed", e);
+    return null;
+  });
   await analysis;
+  if (welcomed === "enough") return;
 
   // Only emojis (« 🔥 », « ❤️ ») that answer nothing: a reaction back at once, no turn needed.
   const text = textOf(message);
@@ -271,6 +277,44 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   }
 
   await replyOnWhatsApp({ studioId: member.studio_id, memberId: member.id, waId: message.from, phone, replyTo: message.id });
+}
+
+/**
+ * Her very first message (no message from Edith yet): the welcome written once for everyone
+ * (WHATSAPP_WELCOME), sent and stored like a reply. "enough" when she only said hello (nothing
+ * else to answer), "sent" when her message gets its own turn after it (her site, a photo, a
+ * question), null when she is not new.
+ */
+async function welcomeIfNew(studioId: string, phone: string, message: InboundMessage): Promise<"enough" | "sent" | null> {
+  const db = supabaseAdmin();
+  const [{ count }, { data: studio }] = await Promise.all([
+    db.from("whatsapp_messages").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("direction", "outbound"),
+    db.from("studios").select("onboarding_step").eq("id", studioId).single(),
+  ]);
+  if (count || onboardingStepOf(studio?.onboarding_step) !== "website") return null;
+  const { data: inbound } = await db.from("whatsapp_messages").select("type, body").eq("studio_id", studioId).eq("direction", "inbound").neq("type", "reaction").limit(20);
+  const enough = (inbound ?? []).every((m) => m.type === "text" && justHello(m.body as string | null));
+  // The terms go under the last message of her first exchange: here only when no turn follows.
+  const terms = enough && (await termsToShow(studioId).catch(() => false));
+  const body = terms ? `${WHATSAPP_WELCOME}\n\n${TERMS_LINE}` : WHATSAPP_WELCOME;
+  const delivered = await sendText(message.from, body).then(
+    (id) => ({ id, error: null }),
+    (error: unknown) => {
+      console.error("whatsapp: welcome not delivered", error);
+      return { id: undefined, error: deliveryError(error) };
+    },
+  );
+  await db.from("whatsapp_messages").insert({
+    studio_id: studioId,
+    wa_message_id: delivered.id ?? null,
+    direction: "outbound",
+    phone_e164: phone,
+    type: "text",
+    body,
+    payload: { reply_to: message.id, kind: "welcome", ...(delivered.error ? { undelivered: delivered.error } : {}) },
+  });
+  if (terms && delivered.id) await markTermsShown(studioId).catch((e) => console.warn("terms not marked shown", e));
+  return enough ? "enough" : "sent";
 }
 
 /** Whether she sent another message after this one (on WhatsApp, its own turn answers it). */

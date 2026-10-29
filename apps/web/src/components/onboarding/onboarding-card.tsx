@@ -143,7 +143,7 @@ export function OnboardingCard({
       {step === "first_post" && (
         <FirstPostStep
           timezone={timezone}
-          sitePhotos={Boolean(view?.moodboard.fromSite)}
+          sitePhotos={view?.moodboard.photosFrom ?? null}
           onFiles={onFiles}
           onSite={() => onSend("Je n’ai rien sous la main : pars des photos de mon site.")}
           onLater={() => next("Je ferai ma première publication plus tard.")}
@@ -313,8 +313,8 @@ function StyleStep({
       <div className="flex flex-col gap-2">
         <span className="text-[14px] font-bold">Ton moodboard</span>
         <p className="-mt-1 text-[13px] leading-snug text-muted">
-          {items.length && view.moodboard.fromSite
-            ? "J’ai pris les photos de ton site pour commencer. Ajoute ou retire ce que tu veux : je m’en sers pour tous tes visuels."
+          {items.length && view.moodboard.photosFrom
+            ? `J’ai pris ${view.moodboard.photosFrom === "instagram" ? "tes dernières photos Instagram" : "les photos de ton site"} pour commencer. Ajoute ou retire ce que tu veux : je m’en sers pour tous tes visuels.`
             : "Des images de ce que tu aimes : des posts, des ambiances, des couleurs. Je m’en sers pour tous tes visuels."}
         </p>
         {lookingAtSite && !items.length && (
@@ -588,7 +588,8 @@ function FirstPostStep({
   pending,
 }: {
   timezone: string;
-  sitePhotos: boolean;
+  /** Her site's photos, or her Instagram's, are in her library. */
+  sitePhotos: "site" | "instagram" | null;
   onFiles?: (files: FileList | File[]) => void;
   onSite: () => void;
   onLater: () => void;
@@ -614,7 +615,7 @@ function FirstPostStep({
         ) : null}
         {sitePhotos ? (
           <button type="button" disabled={pending} onClick={onSite} className="hover:text-ink">
-            Partir des photos de mon site
+            {sitePhotos === "instagram" ? "Partir de mes photos Instagram" : "Partir des photos de mon site"}
           </button>
         ) : null}
         <button type="button" disabled={pending} onClick={onLater} className="hover:text-ink">

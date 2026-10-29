@@ -2,6 +2,7 @@ import "server-only";
 import {
   APP_GUIDES,
   cleanCaption,
+  instagramProfileHandle,
   periodTotals,
   weeklyGrowth,
   type CarouselDesign,
@@ -83,6 +84,7 @@ import { freeSlots } from "@/lib/slots";
 import { studioAccess } from "@/lib/billing/access";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
 import { readSiteLook, sitePage } from "@/lib/site-look";
+import { fetchInstagramProfile } from "@/lib/instagram-profile";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
 import { usableFonts } from "@/lib/fonts";
 import { readWebsite, WebsiteError } from "./website";
@@ -206,8 +208,17 @@ const COSTLY_TOOLS = [
   "steal_style",
 ] as const satisfies readonly ToolName[];
 
+/** Reels she likes read before she subscribes: what she shows during her getting started (Tristan: « logos / images / reels ? »). */
+const EARLY_STEALS = 2;
+
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   const db = supabaseAdmin();
+  /** A Reel she likes, sent before she subscribes: read for her first Reel, like her first videos (two at most). */
+  const earlySteal = async (access: Awaited<ReturnType<typeof studioAccess>>) => {
+    if (access.subscribed || !access.analyze) return false;
+    const { count } = await db.from("inspirations").select("id", { count: "exact", head: true }).eq("studio_id", studioId);
+    return (count ?? 0) < EARLY_STEALS;
+  };
   const json = jsonIn(ctx.timezone ?? "Europe/Paris");
   const { studioId } = ctx;
   // A quote made during this turn cannot be started in it: the manager must see the price first.
@@ -222,6 +233,45 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     const { data } = await db.from("media_assets").select("id").eq("studio_id", studioId).in("id", ids);
     if ((data?.length ?? 0) !== new Set(ids).size) throw new Error("Un des media_id n'appartient pas à ce studio.");
   }
+
+  /**
+   * Her Instagram profile, given at read_website instead of a site: who she is, what she does, how
+   * she talks (her latest captions), and, while getting started, her latest photos into her moodboard
+   * and her library, her style read from them after the reply, like a site's.
+   */
+  const readInstagram = async (handle: string) => {
+    const read = await fetchInstagramProfile(studioId, handle).catch((e: unknown) => {
+      console.warn("instagram profile failed", handle, e);
+      return null;
+    });
+    if (!read) return json({ error: "Je ne peux pas lire Instagram pour le moment : demande-lui le lien de son site, ou son logo et quelques photos." });
+    const { profile, posts } = read;
+    if (!profile) return json({ error: `Je ne trouve pas de profil Instagram public @${handle} : vérifie le nom avec elle, ou demande-lui son site.` });
+    const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
+    const step = onboardingStepOf(studio?.onboarding_step);
+    const starting = (step === "website" || step === "style") && posts.length > 0 && !profile.private;
+    if (starting) {
+      ctx.afterReply.push(() =>
+        readSiteLook(studioId, `https://www.instagram.com/${profile.handle}/`, posts.map((p) => p.image), { instagram: true }).then(
+          (r) => console.info("instagram look", studioId, r),
+          (e: unknown) => console.warn("instagram look failed", e),
+        ),
+      );
+    }
+    return json({
+      instagram: `@${profile.handle}`,
+      nom: profile.name,
+      bio: profile.bio,
+      categorie: profile.category,
+      abonnes: profile.followers,
+      publications: profile.posts,
+      ...(profile.site ? { lien_de_sa_bio: profile.site, note_lien: "Son site, sa page de réservation ou un Linktree : si c'est son site, enregistre-le (update_onboarding website_url) et lis-le aussi (read_website), sa charte en vient ; une page de réservation, booking_url." } : {}),
+      ...(profile.private ? { compte_prive: "Son compte est privé : je ne vois pas ses publications. Demande-lui son site, ou son logo et quelques photos." } : {}),
+      legendes_recentes: posts.flatMap((p) => (p.caption ? [p.caption.slice(0, 280)] : [])).slice(0, 5),
+      ...(starting ? { photos_du_profil: `${posts.length} trouvées : je les mets dans son moodboard et sa médiathèque juste après ta réponse, puis je lis son style (couleurs, typographie de ses visuels, direction artistique). Elles serviront pour sa première publication (list_media).` } : {}),
+      logo: "pas lu sur Instagram (sa photo de profil n'est pas toujours son logo) : demande-le-lui",
+    });
+  };
 
   /** A carousel composed by the carousel designer: its words and its layout change their own way. */
   const DESIGNED =
@@ -266,6 +316,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async update_onboarding(input) {
+      // Her Instagram is not her site: her site's address opens her site, and Instagram is read on its own.
+      if (input.website_url && instagramProfileHandle(input.website_url)) {
+        return json({ error: "C'est son Instagram, pas un site : lis-le avec read_website, et garde website_url pour son site (le lien de sa bio quand c'en est un)." });
+      }
       // Her site's address changes (a new site): its look is read again after the reply (her first site is read by read_website).
       let newSite: string | null = null;
       if (input.website_url) {
@@ -302,6 +356,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async read_website({ url, refresh }) {
+      // Her Instagram profile instead of a site (or beside it).
+      const handle = instagramProfileHandle(url);
+      if (handle) return readInstagram(handle);
       try {
         const { images, ...site } = await readWebsite(url);
         const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
@@ -1399,7 +1456,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     const run = handlers[name] as (input: unknown) => Promise<string>;
     (handlers as Record<string, (input: unknown) => Promise<string>>)[name] = async (input) => {
       const access = await studioAccess(studioId);
-      if (!access.create) return json({ refused: true, message: accessMessage(access.reason) });
+      if (!access.create && !(name === "steal_style" && (await earlySteal(access)))) return json({ refused: true, message: accessMessage(access.reason) });
       return run(input);
     };
   }
