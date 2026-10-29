@@ -265,6 +265,22 @@ test("ramp: a slow motion ramps on its gesture in the time the editor gave it, n
   // As filmed: nothing to do.
   const normal: ClipSegment = { clip_id: "a", in: 4, out: 5, zoom: "none" };
   assert.equal(speedRamp(normal, analysis, [], 10), normal);
+  // A video of several shots: the run-up stays in the shot filmed (here from 3.9 s), never across its cut.
+  const shots = [3.9, 6.5].map((end, k) => ({
+    start: k ? 3.9 : 0,
+    end,
+    description: "",
+    subject: "",
+    energy: 3,
+    hook_score: 3,
+    quality: { blurry: false, dark: false, shaky: false },
+    faces_visible: false,
+  }));
+  const inShot = speedRamp(slow, { ...analysis, shots }, [], 10);
+  assert.ok(inShot.ramp && inShot.in >= 3.9, `starts at ${inShot.in}`);
+  assert.ok(Math.abs(segmentSeconds(inShot) - segmentSeconds(slow)) < 0.034);
+  // Its gesture on the cut itself: plain slow motion.
+  assert.equal(speedRamp({ ...slow, in: 3.6, out: 4.6 }, { ...analysis, shots: [{ ...shots[0]!, end: 4.4 }, { ...shots[1]!, start: 4.4 }] }, [], 10).ramp, undefined);
 });
 
 test("ramp: its passages in frames fill the shot exactly", () => {

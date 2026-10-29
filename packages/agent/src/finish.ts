@@ -182,7 +182,8 @@ const RAMP_HOLD = { min: 0.35, max: 0.9 };
  * up to its gesture, easing into slow motion on it (the gesture Gemini read that the shot covers
  * most, else a hand move measured on the tracks, else its best moment, else its middle), and back.
  * The same time on screen as the slow motion asked for: the passage as filmed comes from the clip
- * around it, never from a passage another shot of the Reel shows. Unchanged when there is no room.
+ * around it, inside the shot filmed (a video of several shots: never across one of its cuts), never
+ * from a passage another shot of the Reel shows. Unchanged when there is no room.
  */
 export function speedRamp(s: ClipSegment, analysis: ClipAnalysis | undefined, others: { from: number; to: number }[], clipDuration: number, tracks?: TracksFile): ClipSegment {
   const speed = s.speed ?? 1;
@@ -203,8 +204,11 @@ export function speedRamp(s: ClipSegment, analysis: ClipAnalysis | undefined, ot
   const coreFrom = at - hold / 2 - RAMP_EASE;
   const coreTo = at + hold / 2 + RAMP_EASE;
   if (coreFrom < 0 || coreTo > clipDuration || others.some((o) => o.from < coreTo && o.to > coreFrom)) return s;
-  const limitBefore = Math.max(0, ...others.filter((o) => o.to <= coreFrom).map((o) => o.to));
-  const limitAfter = Math.min(clipDuration, ...others.filter((o) => o.from >= coreTo).map((o) => o.from));
+  // The shot filmed it belongs to: the run-up never crosses a cut of the video.
+  const filmed = analysis.shots.find((x) => at >= x.start && at <= x.end);
+  if (filmed && (coreFrom < filmed.start - 0.02 || coreTo > filmed.end + 0.02)) return s;
+  const limitBefore = Math.max(0, filmed?.start ?? 0, ...others.filter((o) => o.to <= coreFrom).map((o) => o.to));
+  const limitAfter = Math.min(clipDuration, filmed?.end ?? clipDuration, ...others.filter((o) => o.from >= coreTo).map((o) => o.from));
   let before = Math.min(coreFrom - limitBefore, run * 0.6);
   let after = run - before;
   if (after > limitAfter - coreTo) {

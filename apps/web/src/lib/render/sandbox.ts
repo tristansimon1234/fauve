@@ -117,11 +117,12 @@ const SLOW_LEAD = 9;
 /** The frame rate of a slow motion's own file: half speed shows a frame of its own on every frame of the Reel. */
 const SLOW_FPS = 60;
 /**
- * Making the frames in between costs about 35 s per second of a 1080 × 1920 clip (ffmpeg's motion
- * interpolation, one core; measured): this much of the clips in slow motion in one render at most.
- * Past it, or if it fails, each frame of a 30 fps video is shown twice, as before.
+ * Making the frames in between is slow (ffmpeg's motion interpolation, on one core; measured: 35 s
+ * per second of a 1080 × 1920 test pattern, 29 s per second of a real 720 × 1280 florist's video,
+ * more for a real 1080p one): this much of the clips in slow motion in one render at most. Past it,
+ * or past its time, each frame of a 30 fps video is shown twice, as before.
  */
-const SMOOTH_BUDGET_SECONDS = 4;
+const SMOOTH_BUDGET_SECONDS = 3;
 
 /**
  * The passage of the video $2 from $3 seconds, $4 seconds long, at 60 frames a second, written to $1
@@ -141,7 +142,7 @@ const SLOW_NORMALIZE = [
   'enc="-an -c:v libx264 -preset veryfast -crf 16 -movflags +faststart"',
   `cut() { timeout "$1" ${ROOT}/ffmpeg -v error -y -ss "$SS" -t "$T" -i "$SRC.src" -map 0:v:0 -vf "$2" $enc $tags "$SRC"; }`,
   'SRC="$1"; SS="$3"; T="$4"',
-  `cut 150 "\${hdr}$motion,$tail" || cut 90 "\${hdr}fps=${SLOW_FPS},$tail"`,
+  `cut 240 "\${hdr}$motion,$tail" || cut 90 "\${hdr}fps=${SLOW_FPS},$tail"`,
   'rm -f "$1.src"',
 ].join("\n");
 
