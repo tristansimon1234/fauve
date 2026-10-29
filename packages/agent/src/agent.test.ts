@@ -4905,4 +4905,8 @@ test("her Instagram profile at her getting started: its link, the providers' ans
   assert.match(WHATSAPP_WELCOME, /notes vocales/);
   assert.match(WHATSAPP_WELCOME, /site ou de ton profil Instagram/);
   assert.match(WHATSAPP_WELCOME, /ton logo, des photos ou des Reels que tu aimes/);
+  // The caption of the intro video: WhatsApp keeps 1 024 characters, the terms line included.
+  assert.ok(WHATSAPP_WELCOME.length + 200 < 1024);
+  const { INTRO_VIDEO } = await import("./onboarding.ts");
+  assert.match(INTRO_VIDEO.path, /^\/onboarding\/.+\.mp4$/);
 });
