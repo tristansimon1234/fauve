@@ -51,6 +51,13 @@ async function handle(request: Request) {
     else deleted += batch.length;
   }
   if (deleted) console.info(`retention: ${deleted} media deleted`);
+  // The waitlist keeps a number and its first message no longer than needed (GDPR): a week after
+  // being let in, 30 days for someone still waiting who never wrote again.
+  const waitlist = await db
+    .from("waitlist")
+    .delete()
+    .or(`admitted_at.lt.${new Date(Date.now() - 7 * 86_400_000).toISOString()},last_message_at.lt.${new Date(Date.now() - 30 * 86_400_000).toISOString()}`);
+  if (waitlist.error) console.error("retention: waitlist not cleaned", waitlist.error.message);
   return Response.json({ ok: true, deleted });
 }
 

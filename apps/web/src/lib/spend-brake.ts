@@ -1,6 +1,6 @@
 import "server-only";
-import { FREE_SPEND_EUR_PER_DAY, freeStudio, spendBrakeAlert } from "@fauve/agent";
-import { env } from "@/lib/env";
+import { freeStudio, spendBrakeAlert } from "@fauve/agent";
+import { brakeSettings } from "@/lib/brake-settings";
 import { teamToday, tellTeamOnce } from "@/lib/reply-cap";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -12,7 +12,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 const READ_EVERY_MS = 60_000;
 let read: { at: number; spent: number } | null = null;
 
-const cap = () => env("FREE_SPEND_EUR_PER_DAY") ?? FREE_SPEND_EUR_PER_DAY;
+const cap = async () => (await brakeSettings()).freeSpendEurPerDay;
 
 /** Today's spending of studios not subscribed, in euros (0 on a failed read: never brake on a doubt). */
 async function spentToday(): Promise<number> {
@@ -29,8 +29,8 @@ async function spentToday(): Promise<number> {
 /** Nothing costly may start for this studio today: it pays nothing yet, and the day's spending is past its cap. */
 export async function spendBraked(studio: { team?: boolean | null; website_url?: string | null; subscription_status?: string | null }): Promise<boolean> {
   if (!freeStudio(studio)) return false;
-  const spent = await spentToday();
-  if (spent < cap()) return false;
-  await tellTeamOnce("spend_brake", spendBrakeAlert(spent, cap())).catch((e: unknown) => console.warn("spend brake alert failed", e));
+  const [spent, limit] = await Promise.all([spentToday(), cap()]);
+  if (spent < limit) return false;
+  await tellTeamOnce("spend_brake", spendBrakeAlert(spent, limit)).catch((e: unknown) => console.warn("spend brake alert failed", e));
   return true;
 }

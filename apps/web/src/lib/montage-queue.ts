@@ -1,6 +1,6 @@
 import "server-only";
-import { JOB_STALE_MINUTES, MONTAGES_AT_ONCE, ourStudio, queueMinutes } from "@fauve/agent";
-import { env } from "@/lib/env";
+import { JOB_STALE_MINUTES, ourStudio, queueMinutes } from "@fauve/agent";
+import { brakeSettings } from "@/lib/brake-settings";
 import { queueJob } from "@/lib/jobs";
 import { finishJob } from "@/lib/studio-jobs";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -13,7 +13,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // and lab studios never wait, but count. A waiting montage is « en file » for Edith and its screens,
 // with when it should be ready (queueMinutes).
 
-const slots = () => env("MONTAGES_AT_ONCE") ?? MONTAGES_AT_ONCE;
+const slots = async () => (await brakeSettings()).montagesAtOnce;
 const fresh = () => new Date(Date.now() - JOB_STALE_MINUTES * 60_000).toISOString();
 
 /** Montages running now (heard from recently), every studio together. */
@@ -43,7 +43,7 @@ export async function takeTurn(studioId: string, quoteId: string, postId: string
   ]);
   // Room, and nobody waiting before it: it starts now.
   const now = new Date().toISOString();
-  if (busy < slots() && !(waiting.count ?? 0)) {
+  if (busy < (await slots()) && !(waiting.count ?? 0)) {
     // Counted as running from now, before its first step records itself: a burst of launches sees it.
     await db.from("studio_jobs").upsert({ id: quoteId, studio_id: studioId, post_id: postId, kind: "montage", stage: "design", started_at: now, updated_at: now, finished_at: null, failed: false });
     return "start";
@@ -67,7 +67,7 @@ export async function takeTurn(studioId: string, quoteId: string, postId: string
 /** Starts the waiting montages there is room for, oldest first, and keeps the others alive. */
 export async function startWaitingMontages(): Promise<string[]> {
   const db = supabaseAdmin();
-  const room = slots() - (await running());
+  const room = (await slots()) - (await running());
   const started: string[] = [];
   if (room > 0) {
     const { data: next } = await db
@@ -121,5 +121,5 @@ export async function queueWait(quoteId: string): Promise<number | null> {
     .eq("stage", "waiting")
     .is("finished_at", null)
     .lt("started_at", job.started_at as string);
-  return queueMinutes((before ?? 0) + 1, slots());
+  return queueMinutes((before ?? 0) + 1, await slots());
 }

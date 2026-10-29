@@ -67,7 +67,7 @@ async function Settings() {
     getContentPlan(db, studio.id),
     creditBalance(studio.id),
     db.from("credit_ledger").select("id, delta, label, created_at").eq("studio_id", studio.id).order("created_at", { ascending: false }).limit(10),
-    db.from("studios").select("montage_effort, business_type, memory, subscription_status, trial_ends_at, period_ends_at").eq("id", studio.id).maybeSingle(),
+    db.from("studios").select("montage_effort, business_type, memory, subscription_status, trial_ends_at, period_ends_at, team").eq("id", studio.id).maybeSingle(),
   ]);
   const tiktokOn = tiktokEnabled();
   const billing = billingEnabled();
@@ -239,6 +239,12 @@ async function Settings() {
               <Field label="Prénom" value={member.first_name} />
               <Field label="Téléphone" value={formatPhone(member.phone_e164)} />
               <Field label="Rôle" value={member.role === "owner" ? "Gérante" : "Équipe"} />
+              {/* The team's studio only: the brakes, the waitlist, the montages (/admin). */}
+              {care.data?.team ? (
+                <Link href="/admin" className="btn btn-secondary self-start">
+                  Admin
+                </Link>
+              ) : null}
               <SignOut />
             </Section>
           ),

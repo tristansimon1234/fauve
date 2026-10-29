@@ -5,10 +5,10 @@ import { isSubscribed } from "./access.ts";
 // numbers, the next ones wait their turn (waitlist); montages run a few at a time, the others in a
 // queue that says when theirs comes (one machine renders them all); and past a day's spending by
 // studios not subscribed, nothing costly starts for them until tomorrow. Each number can be
-// changed without a release (DAILY_SIGNUPS, MONTAGES_AT_ONCE, FREE_SPEND_EUR_PER_DAY).
+// changed from the admin page (/admin, app_settings), or by an environment variable of the same name.
 
 /** New numbers let in a day (local midnight to midnight); the next ones go on the waitlist. */
-export const DAILY_SIGNUPS = 100;
+export const DAILY_SIGNUPS = 10;
 /** Montages running at once, every studio together: the render machine takes about this many. */
 export const MONTAGES_AT_ONCE = 6;
 /** What studios not subscribed may cost in a day, in euros, before nothing costly starts for them. */
@@ -42,12 +42,11 @@ export function queuedLine(minutes: number): string {
   return `Beaucoup de commerces me découvrent en ce moment : ton Reel attend son tour. Il sera prêt dans ${minutes} minutes environ, je te préviens dès qu’il est là.`;
 }
 
-/** The first message of a number that came on a full day. */
-export const WAITLIST_REPLY =
-  "Bonjour ! Moi c’est Edith, le community manager (une IA) des commerces de quartier ✨ Beaucoup de commerces me découvrent en ce moment : je t’ai gardé une place et je t’écris ici dès que c’est ton tour, sûrement demain matin. Tu n’as rien à faire d’ici là.";
-
-/** Said once a day when she writes again while she waits. */
-export const WAITLIST_AGAIN = "Toujours complet pour aujourd’hui, désolé ! Ta place est gardée : je t’écris ici dès que c’est ton tour.";
+/**
+ * The message of a number that came on a full day, once a day while it waits (Tristan : « un
+ * simple message : nous avons beaucoup de demandes, nous t'avons mis sur liste d'attente »).
+ */
+export const WAITLIST_REPLY = "Nous avons beaucoup de demandes en ce moment : tu es sur liste d’attente. On t’écrit ici dès que c’est ton tour.";
 
 /** Her turn came: the onboarding starts with her answer. */
 export const WAITLIST_WELCOME =
@@ -58,10 +57,10 @@ export const BUSY_TEXT = "Beaucoup de commerces me découvrent aujourd’hui : j
 
 /** The team, the first time in a day the waitlist starts. */
 export function waitlistAlert(cap: number): string {
-  return `${cap} nouveaux numéros sont entrés aujourd’hui : les suivants sont en liste d’attente. Edith les fait entrer dès qu’il y a de la place, ${cap} par jour, de ${WAITLIST_HOURS.from} h à ${WAITLIST_HOURS.to} h (DAILY_SIGNUPS pour changer ce nombre).`;
+  return `${cap} nouveaux numéros sont entrés aujourd’hui : les suivants sont en liste d’attente. Edith les fait entrer dès qu’il y a de la place, ${cap} par jour, de ${WAITLIST_HOURS.from} h à ${WAITLIST_HOURS.to} h (page Admin pour changer ce nombre).`;
 }
 
 /** The team, the first time in a day the spending brake stops new work. */
 export function spendBrakeAlert(spent: number, cap: number): string {
-  return `Les commerces pas encore abonnés ont coûté ${Math.round(spent)} € aujourd’hui (plafond ${cap} €) : plus de nouvelle lecture de vidéo ni de création pour eux jusqu’à demain. Les abonnés ne sont pas touchés (FREE_SPEND_EUR_PER_DAY pour changer ce plafond).`;
+  return `Les commerces pas encore abonnés ont coûté ${Math.round(spent)} € aujourd’hui (plafond ${cap} €) : plus de nouvelle lecture de vidéo ni de création pour eux jusqu’à demain. Les abonnés ne sont pas touchés (page Admin pour changer ce plafond).`;
 }
