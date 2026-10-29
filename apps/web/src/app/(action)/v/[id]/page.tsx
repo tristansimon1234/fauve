@@ -1,14 +1,11 @@
 import { versionKey } from "@/lib/version-key";
-import { alignSlides, postCoverSchema, postStatusSchema, type PostKind } from "@fauve/agent";
+import { postCoverSchema, postStatusSchema, type PostKind } from "@fauve/agent";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { z } from "zod";
 import { formatDateTime } from "@/lib/format";
 import { loadEditorData } from "@/lib/montage-editor-data";
-import { carouselPhotos } from "@/lib/render/carousel";
-import { loadMontageInputs } from "@/lib/render/render-post";
-import { postSlides } from "@/lib/render/slides";
 import { whatsappLink } from "@/lib/public-env";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { loadTextLooks } from "@/lib/text-looks";
@@ -18,6 +15,8 @@ import { ActionView, type ActionMedia } from "./action-view";
 import { Paywall } from "@/components/paywall";
 import { studioAccess } from "@/lib/billing/access";
 import { PhoneMaking, PhoneReview } from "@/components/review/phone-review";
+import { PhoneCarousel } from "@/components/review/phone-carousel";
+import { loadCarouselReview } from "@/lib/carousel-review";
 import { montageStatus } from "@/lib/montage-status";
 import { loadReview } from "@/lib/review";
 
@@ -45,7 +44,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
 
   const { data: post } = await db
     .from("posts")
-    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides, agent_note, cover, share_to_feed, platforms, publish_by_hand, music, voice_media_id, tiktok, external_ids")
+    .select("id, title, kind, status, caption, hashtags, scheduled_at, edit_plan_id, render_id, media_ids, slides, slides_render, agent_note, cover, share_to_feed, platforms, publish_by_hand, music, voice_media_id, tiktok, external_ids")
     .eq("id", id)
     .eq("studio_id", studioId)
     .maybeSingle();
@@ -81,6 +80,29 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
     if (running) return <PhoneMaking title={post.title as string} step={running.step} minutes={running.minutes} />;
   }
 
+  // A carousel or a photo post: its slides large, as the feed shows them, and the same buttons as a Reel.
+  if (post.kind === "carousel" || post.kind === "post") {
+    const data = await loadCarouselReview(
+      db,
+      studioId,
+      {
+        id: post.id as string,
+        title: post.title as string,
+        kind: post.kind,
+        status: post.status as string,
+        caption: (post.caption as string | null) ?? null,
+        hashtags: (post.hashtags as string[] | null) ?? [],
+        scheduled_at: (post.scheduled_at as string | null) ?? null,
+        platforms: (post.platforms as string[] | null) ?? [],
+        media_ids: (post.media_ids as string[] | null) ?? [],
+        slides: post.slides,
+        slides_render: post.slides_render,
+      },
+      member.studio.timezone,
+    );
+    return <PhoneCarousel data={data} looks={data.plan && !data.locked ? await loadTextLooks(studioId).catch(() => []) : []} />;
+  }
+
   const planId =
     (post.edit_plan_id as string | null) ??
     ((await db.from("edit_plans").select("id").eq("post_id", id).order("version", { ascending: false }).limit(1).maybeSingle()).data?.id as
@@ -105,30 +127,6 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
   const signed = await signMediaUrls(db, studioId, [...(path ? [path] : []), ...(assets.data ?? []).map((a) => a.storage_path as string)]);
   const videoUrl = path ? (signed.get(path) ?? null) : null;
   const byId = new Map((assets.data ?? []).map((a) => [a.id as string, a]));
-  // Text over the photos (carousel, photo post): the plan, or an empty one to start from by hand.
-  const photos: Record<string, string> = {};
-  for (const mid of ids) {
-    const a = byId.get(mid);
-    const url = a ? signed.get(a.storage_path as string) : undefined;
-    if (a && url && a.kind !== "video" && !String(a.mime_type ?? "").startsWith("video/")) photos[mid] = url;
-  }
-  const planned = post.kind === "carousel" || post.kind === "post" ? postSlides({ slides: post.slides, media_ids: ids }) : null;
-  const slides =
-    (post.kind === "carousel" || post.kind === "post") && (Object.keys(photos).length || planned?.design)
-      ? {
-          plan: planned ?? alignSlides({ template: "doux", slides: [] }, ids),
-          photos,
-          brand: await loadMontageInputs(studioId, { segments: [] }).then((i) => ({ name: i.studioName, accent: i.accent, logoUrl: i.logoUrl, logoOnDark: i.logoOnDark, fonts: i.fonts, colors: i.colors, customFonts: i.customFonts, signature: i.signature })),
-          // A carousel Edith composed: her photos as its code lays them (retouched, cut out), its zones blurred.
-          ...(planned?.design
-            ? {
-                carousel: (
-                  await carouselPhotos(studioId, planned.design.photos, Object.fromEntries(planned.slides.flatMap((s) => (s.edit?.blur?.length ? [[s.media_id, s.edit.blur]] : []))))
-                ).map((p) => p.photo),
-              }
-            : {}),
-        }
-      : null;
   const media: ActionMedia[] = ids.flatMap((mid) => {
     const a = byId.get(mid);
     const url = a ? signed.get(a.storage_path as string) : undefined;
@@ -143,7 +141,7 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
 
   return (
     <ActionView
-      key={versionKey(post.caption, status, editor?.plan ?? null, slides?.plan ?? null)}
+      key={versionKey(post.caption, status, editor?.plan ?? null)}
       post={{
         id: post.id as string,
         title: post.title as string,
@@ -157,7 +155,6 @@ async function Action({ params }: { params: PageProps<"/v/[id]">["params"] }) {
       videoUrl={videoUrl}
       media={media}
       grid={post.kind === "story" ? null : grid}
-      slides={slides}
       looks={locked ? [] : await loadTextLooks(studioId).catch(() => [])}
       note={(post.agent_note as string | null) ?? null}
       cover={postCoverSchema.nullable().catch(null).parse(post.cover ?? null)}

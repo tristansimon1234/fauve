@@ -387,7 +387,10 @@ function fromLocalValue(value: string, timeZone: string): string | null {
 }
 
 /** When Edith reminds her to post it (« Prévoir » on its page too). */
-export function DateView({ data, onDone }: Pick<Props, "data" | "onDone">) {
+/** What « Prévoir » needs: a Reel's page data, or a carousel's. */
+export type DateData = Pick<ReviewData, "postId" | "scheduledAt" | "timezone" | "when" | "slots" | "platforms"> & { tiktok?: ReviewData["tiktok"] };
+
+export function DateView({ data, onDone }: { data: DateData; onDone: Props["onDone"] }) {
   const current = data.scheduledAt;
   const [chosen, setChosen] = useState<string | null>(current);
   const [other, setOther] = useState(() => (current ? localValue(current, data.timezone) : ""));
