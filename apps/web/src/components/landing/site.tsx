@@ -136,6 +136,7 @@ export function SiteFooter() {
         <span>© Edith</span>
         <Link href="/confidentialite">Confidentialité</Link>
         <Link href="/conditions">Conditions d’utilisation</Link>
+        <Link href="/sous-traitance">Traitement des données</Link>
         <Link href="/suppression-des-donnees">Suppression des données</Link>
         <Link href="/mentions-legales">Mentions légales</Link>
         {OPEN && <Link href="/connexion">Se connecter</Link>}

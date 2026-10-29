@@ -29,7 +29,7 @@ export const host = {
  * The version of the terms she accepts by going on (kept on the studio with the date, studios.terms_*).
  * Changed when the terms change in a way that matters: the next ones are shown again.
  */
-export const TERMS_VERSION = "2026-10-28";
+export const TERMS_VERSION = "2026-10-29";
 
 /** What Edith adds under her first WhatsApp message to someone new: going on accepts the terms. */
 export const TERMS_LINE = "En continuant, tu acceptes les conditions d’utilisation et la politique de confidentialité d’Edith : edith-ai.app/conditions";

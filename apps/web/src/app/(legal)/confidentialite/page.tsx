@@ -31,7 +31,8 @@ export default function PrivacyPage() {
         <li>Données techniques : sessions de connexion, journaux, coûts de traitement.</li>
       </ul>
       <p>
-        Les vidéos peuvent montrer des clients ou l’équipe du commerce : tu t’engages à avoir leur accord avant de nous les envoyer. Edith peut flouter un visage à ta demande.
+        Les vidéos peuvent montrer des clients ou l’équipe du commerce : tu t’engages à avoir leur accord avant de nous les envoyer. Pour ces personnes, c’est toi le responsable du
+        traitement et nous ton sous-traitant (voir l’<Link href="/sous-traitance">accord de traitement des données</Link>). Edith peut flouter un visage à ta demande.
         Pour placer ses textes et ses animations, Edith repère dans tes vidéos les visages, les mains et les corps (leur position, image par image) : ce repérage ne sert pas à
         reconnaître qui que ce soit et reste attaché à la vidéo.
       </p>
