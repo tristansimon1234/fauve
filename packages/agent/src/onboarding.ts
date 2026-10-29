@@ -30,7 +30,7 @@ export function onboardingStepOf(value: unknown): OnboardingStep {
 /**
  * Her very first message on WhatsApp, written once for everyone rather than by the model
  * (Tristan: « comment on pourrait apporter de la clarté à l'onboarding sur WhatsApp, je pense aux
- * capacités »), under Edith's 30-second introduction video (« bienvenue, voici tout ce qu'il faut
+ * capacités »), under Edith's introduction video (33 s, read by his voice, Edith's music under it) (« bienvenue, voici tout ce qu'il faut
  * savoir sur moi, et là tu balances la vidéo »; INTRO_VIDEO): who Edith is, what he does, how to
  * talk to him, the app on a computer, and how to start, with what she has: her site or her
  * Instagram, else her logo, photos or Reels she likes. It is the video's caption (1 024 characters
@@ -50,7 +50,7 @@ export const WHATSAPP_WELCOME = [
 ].join("\n\n");
 
 /** Edith's introduction video (apps/render/intro), served by the app: sent with the welcome, shown at the start of the getting started in the app. */
-export const INTRO_VIDEO = { path: "/onboarding/edith-intro.mp4", poster: "/onboarding/edith-intro.jpg", seconds: 30 } as const;
+export const INTRO_VIDEO = { path: "/onboarding/edith-intro.mp4", poster: "/onboarding/edith-intro.jpg", seconds: 33 } as const;
 
 const GREETINGS = new Set(["bonjour", "bonsoir", "salut", "coucou", "hello", "hey", "hi", "yo", "re", "cc", "slt", "bjr", "allo", "hola", "edith"]);
 
