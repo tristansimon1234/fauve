@@ -46,7 +46,7 @@ async function clone(key: string, name: string, mediaIds: string[]) {
   if (new Set(notes.map((n) => n.studio_id)).size > 1) return Response.json({ error: "voice notes of one studio only" }, { status: 400 });
   const form = new FormData();
   form.append("name", name);
-  form.append("description", "Voix de la gérante, clonée avec son accord pour ses Reels (Edith)");
+  form.append("description", "Voix de la personne, clonée avec son accord pour ses Reels (Edith)");
   form.append("remove_background_noise", "true");
   for (const note of notes) {
     const file = await db.storage.from("media").download(note.storage_path as string);

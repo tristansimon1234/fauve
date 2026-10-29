@@ -238,7 +238,7 @@ async function Settings() {
             <Section title="Mon compte">
               <Field label="Prénom" value={member.first_name} />
               <Field label="Téléphone" value={formatPhone(member.phone_e164)} />
-              <Field label="Rôle" value={member.role === "owner" ? "Gérante" : "Équipe"} />
+              <Field label="Rôle" value={member.role === "owner" ? "Responsable" : "Équipe"} />
               <SignOut />
             </Section>
           ),

@@ -52,7 +52,7 @@ export async function SidebarAccount() {
         <span className="flex min-w-0 flex-col">
           <span className="truncate text-[15px] font-bold">{studioName}</span>
           <span className="truncate text-[13px] text-muted">
-            {[member.first_name, member.role === "owner" ? "Gérante" : "Équipe"].filter(Boolean).join(" · ")}
+            {[member.first_name, member.role === "owner" ? "Responsable" : "Équipe"].filter(Boolean).join(" · ")}
           </span>
         </span>
       </Link>

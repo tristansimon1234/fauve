@@ -4579,7 +4579,7 @@ test("Edith's plan: 3 to 6 short points, a title and why, kept for the montage; 
   assert.equal(plan.points.length, 6);
   assert.ok(plan.points.every((p) => p.length <= 220 && !p.includes("—") && !p.startsWith("-")));
   assert.ok(!plan.points.includes("Court"));
-  assert.match(validatedPlanBrief(plan), /^Le plan que la gérante a validé \(« Lancement de la rentrée »\) :\n- Ouverture/);
+  assert.match(validatedPlanBrief(plan), /^Le plan validé \(« Lancement de la rentrée »\) :\n- Ouverture/);
   assert.equal(keptPlan({ title: "x", points: ["Ouverture : un seul point"], why: "" }), null);
   // In the chat, the code writes it under Edith's words: title, points, why; buttons a WhatsApp button holds.
   assert.equal(
