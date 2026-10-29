@@ -263,5 +263,5 @@ export function planMessage(plan: PostPlan): string {
 
 /** The validated plan, as the montage (or Edith in the chat) reads it. */
 export function validatedPlanBrief(plan: PostPlan): string {
-  return [`Le plan que la gérante a validé (« ${plan.title} ») :`, ...plan.points.map((point) => `- ${point}`), plan.why ? `Pourquoi : ${plan.why}` : ""].filter(Boolean).join("\n");
+  return [`Le plan validé (« ${plan.title} ») :`, ...plan.points.map((point) => `- ${point}`), plan.why ? `Pourquoi : ${plan.why}` : ""].filter(Boolean).join("\n");
 }
