@@ -37,7 +37,7 @@ export function onboardingStepOf(value: unknown): OnboardingStep {
  * at most, terms line included): one message, so the two never arrive out of order.
  */
 export const WHATSAPP_WELCOME = [
-  "Bienvenue ! Moi c’est Edith, ton community manager IA ✨ Voici tout ce qu’il faut savoir sur moi, en 30 secondes 👆",
+  "Bienvenue ! Moi c’est Edith, ton community manager IA ✨ Voici tout ce qu’il faut savoir sur moi, en 25 secondes 👆",
   [
     "🎬 Je monte tes Reels avec tes vidéos, avec une voix off si tu veux",
     "🖼️ Je compose tes carrousels avec tes photos",
@@ -50,7 +50,7 @@ export const WHATSAPP_WELCOME = [
 ].join("\n\n");
 
 /** Edith's introduction video (apps/render/intro), served by the app: sent with the welcome, shown at the start of the getting started in the app. */
-export const INTRO_VIDEO = { path: "/onboarding/edith-intro.mp4", poster: "/onboarding/edith-intro.jpg", seconds: 33 } as const;
+export const INTRO_VIDEO = { path: "/onboarding/edith-intro.mp4", poster: "/onboarding/edith-intro.jpg", seconds: 24 } as const;
 
 const GREETINGS = new Set(["bonjour", "bonsoir", "salut", "coucou", "hello", "hey", "hi", "yo", "re", "cc", "slt", "bjr", "allo", "hola", "edith"]);
 
