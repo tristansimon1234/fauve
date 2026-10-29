@@ -412,8 +412,8 @@ const CHAT: Message[] = [
 ];
 
 function ChatScene({ from }: { from: number }) {
-  const phoneTop = 520;
-  const phoneHeight = 1420;
+  const phoneTop = 440;
+  const phoneHeight = 1340;
   const inner = phoneHeight - 32;
   const bar = 104;
   return (
