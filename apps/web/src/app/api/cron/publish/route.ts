@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 import { startWaitingMontages } from "@/lib/montage-queue";
 import { reviveStalledMontages } from "@/lib/montage-watchdog";
+import { checkBudgets } from "@/lib/provider-budgets";
 import { admitWaitlist } from "@/lib/waitlist";
 import { runPublishWorker } from "@/lib/social/publish";
 
@@ -21,7 +22,9 @@ async function handle(request: Request) {
   // The brakes of a rush: montages waiting their turn, numbers waiting theirs (in the day).
   const queue = await startWaitingMontages().catch((e: unknown) => ({ error: String(e) }));
   const waitlist = await admitWaitlist().catch((e: unknown) => ({ error: String(e) }));
-  return Response.json({ ...(await runPublishWorker()), montages, queue, waitlist });
+  // The providers' balances, once an hour: one running low, the team is told before it stops.
+  const budgets = new Date().getUTCMinutes() < 5 ? await checkBudgets().catch((e: unknown) => ({ error: String(e) })) : null;
+  return Response.json({ ...(await runPublishWorker()), montages, queue, waitlist, budgets });
 }
 
 export const GET = handle;

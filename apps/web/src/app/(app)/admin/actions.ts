@@ -5,6 +5,8 @@ import { z } from "zod";
 import { teamMember } from "@/lib/admin";
 import { brakeSettingsSchema, saveBrakeSettings } from "@/lib/brake-settings";
 import { startWaitingMontages } from "@/lib/montage-queue";
+import { PROVIDERS, type ProviderKey } from "@fauve/agent";
+import { forgetBudget, saveBudget } from "@/lib/provider-budgets";
 import { admitNow, dropFromWaitlist } from "@/lib/waitlist";
 
 // The admin page's actions: the team's studio only (lib/admin.ts), checked again on each one.
@@ -42,5 +44,24 @@ export async function dropWaiting(form: FormData): Promise<void> {
   const phone = phoneSchema.safeParse(form.get("phone"));
   if (!phone.success) return;
   await dropFromWaitlist(phone.data);
+  revalidatePath("/admin");
+}
+
+const providerSchema = z.enum(PROVIDERS.map((p) => p.key) as [ProviderKey, ...ProviderKey[]]);
+
+/** The balance a provider's console shows now (dollars), after a top-up: what is left is counted from it. Empty: forgotten. */
+export async function setBudget(form: FormData): Promise<void> {
+  await guard();
+  const provider = providerSchema.safeParse(form.get("provider"));
+  if (!provider.success) return;
+  const raw = String(form.get("balance") ?? "").replace(",", ".").trim();
+  if (!raw) {
+    await forgetBudget(provider.data);
+  } else {
+    const balance = z.coerce.number().min(0).max(1_000_000).safeParse(raw);
+    const days = z.coerce.number().int().min(1).max(90).catch(7).parse(form.get("alertDays"));
+    if (!balance.success) return;
+    await saveBudget(provider.data, balance.data, days);
+  }
   revalidatePath("/admin");
 }

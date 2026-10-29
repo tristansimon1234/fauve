@@ -24,6 +24,10 @@ const schema = {
   AI_GATEWAY_API_KEY: z.string().min(1).optional(),
   // Treg (treg.to, pay per call): the video of an Instagram Reel from its link when yt-dlp cannot open it. Unset = she sends the video.
   TREG_API_KEY: z.string().min(1).optional(),
+  // Treg's organisation, to read its balance on the admin page (the first of GET /orgs when unset).
+  TREG_ORG_ID: z.string().min(1).optional(),
+  // Anthropic Admin API key (sk-ant-admin…, an organisation's): Claude's cost as Anthropic bills it, on the admin page. Unset = our own count only.
+  ANTHROPIC_ADMIN_KEY: z.string().min(1).optional(),
   // ElevenLabs Music: each Reel's soundtrack, composed from the rendered video. Unset = silent Reels.
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
   ELEVENLABS_MUSIC_MODEL: z.string().default("music_v2_5"),

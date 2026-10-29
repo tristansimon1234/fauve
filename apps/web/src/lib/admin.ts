@@ -1,6 +1,7 @@
 import "server-only";
 import { JOB_STALE_MINUTES } from "@fauve/agent";
 import { brakeSettings, type BrakeSettings } from "@/lib/brake-settings";
+import { providerBudgets, type ProviderBudget } from "@/lib/provider-budgets";
 import { teamToday } from "@/lib/reply-cap";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -18,6 +19,7 @@ export async function teamMember() {
 
 export type AdminView = {
   settings: BrakeSettings;
+  providers: ProviderBudget[];
   today: { signups: number; spent: number; running: number; waiting: number };
   /** reachable: WhatsApp lets Edith write within 24 h of their last message only. */
   waitlist: { phone: string; firstName: string | null; firstText: string | null; since: string; reachable: boolean }[];
@@ -35,8 +37,9 @@ export async function adminView(): Promise<AdminView> {
   const db = supabaseAdmin();
   const since = await teamToday();
   const fresh = new Date(Date.now() - JOB_STALE_MINUTES * 60_000).toISOString();
-  const [settings, signups, spent, montages, waitlist, recent] = await Promise.all([
+  const [settings, providers, signups, spent, montages, waitlist, recent] = await Promise.all([
     brakeSettings(),
+    providerBudgets(),
     db.from("members").select("id", { count: "exact", head: true }).gte("created_at", since),
     db.rpc("free_spend_since", { since }),
     db
@@ -53,6 +56,7 @@ export async function adminView(): Promise<AdminView> {
   const jobs = montages.data ?? [];
   return {
     settings,
+    providers,
     today: {
       signups: signups.count ?? 0,
       spent: Number(spent.data ?? 0),

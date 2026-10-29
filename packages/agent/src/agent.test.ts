@@ -8,6 +8,7 @@ import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts"
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { freeStudio, ourStudio, queueMinutes, queuedLine } from "./brakes.ts";
+import { anthropicOutOfMoney, budgetState } from "./budgets.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
 import { captionLang, cleanHook, cleanTags, cleanWhy, foreignScript, inTrendLang, minViews, otherLang, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
@@ -1246,6 +1247,16 @@ test("the brakes of a rush: our studios never braked, a waiting Reel says when i
   assert.equal(queueMinutes(12, 6), 30);
   assert.equal(queueMinutes(0, 0), 20);
   assert.match(queuedLine(25), /dans 25 minutes environ/);
+});
+
+test("a provider's budget: what is left, for how many days, and when Claude refuses for money", () => {
+  assert.deepEqual(budgetState(null, 5, 1), { remaining: null, daysLeft: null, low: false });
+  assert.deepEqual(budgetState({ balance: 100, setAt: "", alertDays: 7 }, 40, 10), { remaining: 60, daysLeft: 6, low: true });
+  assert.equal(budgetState({ balance: 100, setAt: "", alertDays: 7 }, 20, 10).low, false);
+  assert.equal(budgetState({ balance: 10, setAt: "", alertDays: 7 }, 12, 0).low, true);
+  assert.equal(anthropicOutOfMoney(400, '{"error":{"message":"Your credit balance is too low to access the Anthropic API."}}'), true);
+  assert.equal(anthropicOutOfMoney(400, '{"error":{"message":"max_tokens: must be positive"}}'), false);
+  assert.equal(anthropicOutOfMoney(429, "rate limit"), false);
 });
 
 test("a studio's month splits the chat from the work and says what is left", () => {

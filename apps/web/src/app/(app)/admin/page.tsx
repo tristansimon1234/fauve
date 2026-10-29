@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { PageSuspense } from "@/components/page-suspense";
 import { adminView, teamMember, type AdminView } from "@/lib/admin";
 import { formatPhone, formatShortDateTime } from "@/lib/format";
-import { dropWaiting, letIn, saveBrakes } from "./actions";
+import type { ProviderBudget } from "@/lib/provider-budgets";
+import { dropWaiting, letIn, saveBrakes, setBudget } from "./actions";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -39,6 +40,7 @@ async function Admin() {
     <>
       <h1 className="text-[28px] leading-tight font-extrabold tracking-[-0.02em]">Admin</h1>
       <Today view={view} />
+      <Providers providers={view.providers} />
       <Brakes view={view} />
       <Waitlist view={view} />
       <Montages view={view} />
@@ -213,5 +215,90 @@ function Signups({ view }: { view: AdminView }) {
         ))}
       </ul>
     </Section>
+  );
+}
+
+const usd = (n: number) => `${n.toFixed(2).replace(".", ",")} $`;
+
+function Providers({ providers }: { providers: ProviderBudget[] }) {
+  return (
+    <Section
+      title="Budgets des fournisseurs"
+      hint="Dépensé d’après ce qu’Edith note de chaque appel. Un solde lu en direct se met à jour tout seul ; sinon, saisis le solde que montre la console du fournisseur après chaque recharge. Tu es prévenu sur WhatsApp avant qu’il soit à sec, et tout de suite si Claude refuse les appels."
+    >
+      <ul className="flex flex-col divide-y divide-line">
+        {providers.map((p) => (
+          <ProviderRow key={p.key} p={p} />
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+function ProviderRow({ p }: { p: ProviderBudget }) {
+  const { state } = p;
+  const left =
+    state.remaining === null
+      ? null
+      : state.remaining <= 0
+        ? "Solde sans doute épuisé"
+        : `Reste ${usd(state.remaining)}${state.daysLeft !== null ? ` · ≈ ${Math.floor(state.daysLeft)} jours` : ""}`;
+  return (
+    <li className="flex flex-col gap-2 py-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <span className="flex flex-col">
+          <span className="font-semibold">{p.label}</span>
+          <span className="text-[13px] text-muted">{p.role}</span>
+        </span>
+        <span className="text-sm tabular-nums text-muted">
+          Aujourd’hui {usd(p.today)} · 7 jours {usd(p.week)} ({usd(p.perDay)} / jour) · ce mois {usd(p.month)}
+          {typeof p.billed === "number" ? ` · facturé par Anthropic ce mois ${usd(p.billed)}` : ""}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {left && <span className={`text-sm font-bold tabular-nums ${state.low ? "text-peach-ink" : ""}`}>{left}</span>}
+        {p.quota && (
+          <span className={`text-sm tabular-nums ${p.quota.limit && p.quota.used / p.quota.limit > 0.85 ? "font-bold text-peach-ink" : ""}`}>
+            Crédits du mois : {p.quota.used.toLocaleString("fr-FR")} / {p.quota.limit.toLocaleString("fr-FR")}
+            {p.quota.resetsAt ? ` · remis à zéro le ${formatShortDateTime(p.quota.resetsAt, ZONE)}` : ""}
+            {p.quota.overage ? " · dépassement autorisé" : ""}
+          </span>
+        )}
+        {p.live === null && <span className="text-sm text-muted">Solde illisible pour l’instant</span>}
+        {p.live === undefined && p.key !== "elevenlabs" && (
+          <form action={setBudget} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="provider" value={p.key} />
+            <label className="flex items-center gap-1.5 text-sm">
+              Solde actuel
+              <input
+                name="balance"
+                inputMode="decimal"
+                placeholder="en $"
+                defaultValue={p.budget ? String(Math.max(0, Math.round((state.remaining ?? 0) * 100) / 100)) : ""}
+                className="h-9 w-24 rounded-[12px] border border-line bg-white px-2.5 text-[14px] tabular-nums outline-none focus:border-violet"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-sm">
+              alerte à
+              <input
+                name="alertDays"
+                type="number"
+                min={1}
+                max={90}
+                defaultValue={p.budget?.alertDays ?? 7}
+                className="h-9 w-16 rounded-[12px] border border-line bg-white px-2.5 text-[14px] tabular-nums outline-none focus:border-violet"
+              />
+              jours
+            </label>
+            <button type="submit" className="btn btn-secondary h-9 px-3.5 text-sm">
+              Enregistrer
+            </button>
+          </form>
+        )}
+        <a href={p.topUp} target="_blank" rel="noreferrer" className="text-sm font-semibold text-violet">
+          Recharger
+        </a>
+      </div>
+    </li>
   );
 }
