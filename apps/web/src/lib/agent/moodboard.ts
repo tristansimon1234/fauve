@@ -1,12 +1,12 @@
 import "server-only";
-import { clampReading, clampSiteLook, CLAUDE_MODEL, MOODBOARD_PROMPT, moodboardReadingSchema, siteLookSchema, type MoodboardReading, type SiteLookReading } from "@fauve/agent";
+import { brandLookSchema, clampBrandLook, clampSiteLook, CLAUDE_MODEL, MOODBOARD_PROMPT, siteLookSchema, type BrandLookReading, type SiteLookReading } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "./run";
 
-type ReadImage = { url: string; note?: string } | { jpeg: Buffer; note?: string };
+export type ReadImage = { url: string; note?: string } | { jpeg: Buffer; note?: string };
 
 /** The images as one user message: each one numbered, with its note. */
-function imagesMessage(intro: string, images: ReadImage[], label: (i: number, image: ReadImage) => string) {
+function imagesMessage<T extends ReadImage>(intro: string, images: T[], label: (i: number, image: T) => string) {
   return [
     { type: "text" as const, text: intro },
     ...images.flatMap((image, i) => [
@@ -19,30 +19,24 @@ function imagesMessage(intro: string, images: ReadImage[], label: (i: number, im
 }
 
 /**
- * Fauve reads the studio's moodboard (signed image URLs + the manager's notes)
- * and writes the art direction it implies, and the same direction as settings
- * (its signature). Runs once per moodboard change.
+ * Fauve reads the studio's brand from what it shows (lib/brand-read.ts): its logo, its moodboard
+ * (signed image URLs + the manager's notes), or an ambiance it picked, all said in the intro; and
+ * writes the art direction it implies, the same direction as settings (its signature), its palette,
+ * its fonts and an example in its words. Runs once per change.
  */
-export async function readMoodboard(studioId: string, studioName: string, images: ReadImage[]): Promise<MoodboardReading> {
+export async function readBrandImages(studioId: string, intro: string, images: (ReadImage & { label: string })[]): Promise<BrandLookReading> {
   const response = await anthropic().beta.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: 8000,
-    output_config: { effort: "medium", format: outputFormat(moodboardReadingSchema) },
+    output_config: { effort: "medium", format: outputFormat(brandLookSchema) },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: MOODBOARD_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: imagesMessage(`Moodboard du studio « ${studioName} » (${images.length} image${images.length > 1 ? "s" : ""}).`, images, (i, image) =>
-          `Image ${i + 1}${image.note ? ` — note de la gérante : ${image.note}` : ""}`,
-        ),
-      },
-    ],
+    messages: [{ role: "user", content: imagesMessage(intro, images, (_, image) => image.label) }],
   });
   await logClaudeCost(studioId, response.usage, "moodboard", CLAUDE_MODEL);
-  if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error(`moodboard reading failed (${response.stop_reason})`);
-  return clampReading(response.parsed_output);
+  if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error(`brand reading failed (${response.stop_reason})`);
+  return clampBrandLook(response.parsed_output);
 }
 
 /**

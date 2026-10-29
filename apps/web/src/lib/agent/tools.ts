@@ -75,16 +75,28 @@ import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { ensureTranscript } from "@/lib/voice";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { startCarousel } from "@/lib/carousels";
+import { charterFromImages, rereadBrand } from "@/lib/brand-read";
 import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
 import { listInspirations } from "@/lib/inspirations";
 import { freeSlots } from "@/lib/slots";
 import { studioAccess } from "@/lib/billing/access";
 import { blurMontage, retouchPostPhotos } from "@/lib/retouch";
-import { readSiteLook } from "@/lib/site-look";
+import { readSiteLook, sitePage } from "@/lib/site-look";
 import { insertProfileVersion } from "@/app/(app)/style/profile";
 import { usableFonts } from "@/lib/fonts";
 import { readWebsite, WebsiteError } from "./website";
+
+/** A new site, or hers redone: what Edith is told, and its look read again (lib/site-look.ts). */
+const SITE_AGAIN = "Je relis son style après ta réponse (photos, couleurs, polices, direction artistique) ; ce qu'elle a réglé à la main reste.";
+const SITE_CHANGED =
+  "Compare tout avec ce que tu savais (nom, activité, offre et prix, lien de réservation, Instagram, ton, logo) et mets à jour dans ce même tour tout ce qui a changé : le nom et le reste avec update_onboarding ; dans ta Mémoire, retire (remember remove, avec leurs numéros) chaque note que son site contredit ou qui parle de l'ancien, et ajoute la nouvelle : ce que dit son site maintenant passe avant tes notes. Puis dis en deux ou trois phrases ce qui a changé, seulement ce que tes outils ont fait.";
+const rereadSite = (studioId: string, url: string, photos: string[]) =>
+  readSiteLook(studioId, url, photos, { again: true }).then(
+    (r) => console.info("site look again", studioId, r),
+    (e: unknown) => console.warn("site look failed", e),
+  );
+
 
 export type ToolContext = {
   studioId: string;
@@ -254,6 +266,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async update_onboarding(input) {
+      // Her site's address changes (a new site): its look is read again after the reply (her first site is read by read_website).
+      let newSite: string | null = null;
+      if (input.website_url) {
+        const { data: before } = await db.from("studios").select("website_url, onboarding_step").eq("id", studioId).single();
+        const known = before?.website_url as string | null;
+        const firstRead = !known && ["website", "style"].includes(onboardingStepOf(before?.onboarding_step));
+        if (!firstRead && (!known || sitePage(known) !== sitePage(input.website_url))) newSite = input.website_url;
+      }
       const studioUpdate: Record<string, unknown> = {};
       if (input.studio_name) studioUpdate.name = input.studio_name;
       if (input.business_type) studioUpdate.business_type = input.business_type;
@@ -269,19 +289,34 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (input.platforms) planUpdate.platforms = input.platforms;
         check(await db.from("content_plans").upsert(planUpdate, { onConflict: "studio_id" }));
       }
+      if (newSite) {
+        const url = newSite;
+        ctx.afterReply.push(() =>
+          readWebsite(url)
+            .then(({ images, ...site }) => rereadSite(studioId, site.url, site.logo ? images.filter((i) => i.split("?")[0] !== site.logo!.split("?")[0]) : images))
+            .catch((e: unknown) => console.warn("new site unreadable", url, e)),
+        );
+        return json({ ok: true, nouveau_site: SITE_AGAIN, note: SITE_CHANGED });
+      }
       return "ok";
     },
 
-    async read_website({ url }) {
+    async read_website({ url, refresh }) {
       try {
         const { images, ...site } = await readWebsite(url);
-        // Getting started: the site's photos and look become her moodboard (after the reply, never over hers).
         const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
         const step = onboardingStepOf(studio?.onboarding_step);
+        const photos = site.logo ? images.filter((i) => i.split("?")[0] !== site.logo!.split("?")[0]) : images;
+        // Her site redone (she says so): its look is read again, at any step (a new address is read again by update_onboarding).
+        if (refresh && (images.length || site.url)) {
+          ctx.afterReply.push(() => rereadSite(studioId, site.url, photos));
+          return json({ ...site, nouveau_site: SITE_AGAIN, note: SITE_CHANGED, ...(site.logo ? {} : { logo: "aucun logo trouvé sur le site : demande-le-lui" }) });
+        }
+        // Getting started: the site's photos and look become her moodboard (after the reply, never over hers).
         if ((step === "website" || step === "style") && (images.length || site.url)) {
           ctx.afterReply.push(() =>
             // Its logo is not one of its photos.
-            readSiteLook(studioId, site.url, site.logo ? images.filter((i) => i.split("?")[0] !== site.logo!.split("?")[0]) : images).then(
+            readSiteLook(studioId, site.url, photos).then(
               (r) => console.info("site look", studioId, r),
               (e: unknown) => console.warn("site look failed", e),
             ),
@@ -616,14 +651,25 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async update_brand_profile({ titles, ...changes }) {
       // Only what changed: the moodboard, logo, fonts and saved text looks stay as they are; its titles' settings merge into its charter.
+      let ambiance: string | null = null;
       const { version } = await insertProfileVersion(studioId, (profile) => {
         const signature = profile.signature as { titles?: Record<string, unknown> } | undefined;
+        // A new ambiance while her charter is still her images' (no site): her charter is drawn from it.
+        const notes = changes.visual_notes?.trim();
+        ambiance = notes && notes !== (profile.visual_notes as string | undefined)?.trim() && charterFromImages(profile) ? notes : null;
         return {
           ...profile,
           ...changes,
+          // Colours or fonts set on her word are hers: no reading of her site or images rewrites them.
+          ...(changes.colors || changes.fonts ? { charter_from: "hand" } : {}),
           ...(titles && signature ? { signature: { ...signature, titles: { ...signature.titles, ...titles } } } : {}),
         };
       });
+      if (ambiance) {
+        const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
+        const chosen: string = ambiance;
+        if (onboardingStepOf(studio?.onboarding_step) !== "done") ctx.afterReply.push(() => rereadBrand(studioId, chosen).then(() => undefined));
+      }
       // A font Google does not serve (a site's Adobe font): the Reels use its closest free twin; she can add her file.
       const fonts = Array.isArray(changes.fonts) ? changes.fonts.filter((f): f is string => typeof f === "string") : [];
       const { swaps } = fonts.length ? await usableFonts(fonts, [], "doux").catch(() => ({ swaps: [] })) : { swaps: [] };
@@ -917,13 +963,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       check(await db.from("studios").update({ memory }).eq("id", studioId));
       return json({
         ok: `${memory.length} info${memory.length > 1 ? "s" : ""} en mémoire`,
+        // What is there now: what she sees in Réglages, so Edith never describes a memory she did not make.
+        memoire: memory.map((m, i) => `${i + 1}. ${m.kind === "avoid" ? "À éviter : " : ""}${m.fact}`),
         ...(forgotten.length ? { oublie: forgotten } : {}),
         ...(missing.length ? { pas_en_memoire: missing } : {}),
         note: missing.length
           ? "Ces numéros n'étaient pas dans ta Mémoire : ne dis jamais que tu les as retirés."
           : forgotten.length || avoid?.length
             ? "Dis-lui en une phrase ce qui est oublié ou noté à éviter, avec ses mots."
-            : "Ne l'annonce pas, continue la conversation.",
+            : "Tu n'as rien retiré : ne dis jamais que tu as retiré, supprimé ou fusionné une note (pour le faire, remove avec ses numéros). Ne l'annonce pas, continue la conversation.",
       });
     },
 
@@ -988,7 +1036,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const path = `${studioId}/brand/logo-${Date.now()}.${ext}`;
       const { error } = await db.storage.from("media").copy(asset.storage_path as string, path);
       if (error) return json({ error: "Le logo n'a pas pu être enregistré." });
-      await insertProfileVersion(studioId, (profile) => ({ ...profile, logo_path: path }));
+      let fromImages = false;
+      await insertProfileVersion(studioId, (profile) => ((fromImages = charterFromImages(profile)), { ...profile, logo_path: path }));
+      // With no charter of her site's (no site), her colours and fonts are drawn from her logo, free while she gets started.
+      const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
+      if (fromImages && onboardingStepOf(studio?.onboarding_step) !== "done") {
+        ctx.afterReply.push(() => rereadBrand(studioId).then(() => undefined));
+        return json({ ok: true, note: "Son logo est enregistré, et je tire de lui ses couleurs et sa police juste après ta réponse (avec ses images s'il y en a). Dis-le en une phrase." });
+      }
       return json({ ok: true, note: "Son logo est enregistré : il finira ses Reels et peut se poser sur ses photos." });
     },
 

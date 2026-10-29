@@ -6,9 +6,9 @@ import { clampSignature, clip, SIGNATURE_GUIDE, signatureReadingSchema } from ".
 // designer) only ever gets this text, never the images, to keep each montage cheap.
 
 export const MOODBOARD_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (gym, hair or beauty salon, restaurant, shop…).
-The person who runs the business (a woman or a man: make no agreement for anything about them, write neither « elle » nor « il » for them) sends you their moodboard: images that inspire them (screenshots of Reels, posters, photos, brands they like), sometimes with a note.
+The person who runs the business (a woman or a man: make no agreement for anything about them, write neither « elle » nor « il » for them) sends you what shows their style: their moodboard (images that inspire them: screenshots of Reels, posters, photos, brands they like, sometimes with a note), their logo, or only the atmosphere they want, in words. The message says what you have.
 
-Write what this moodboard says about the visual identity to give their Reels, for an editor and a motion designer who will never see the images:
+Write what this says about the visual identity to give their Reels, for an editor and a motion designer who will never see the images:
 - mood and energy (calm, edgy, luxury, raw, sunny…);
 - colours: dominants, accents, contrasts (with hex codes);
 - typography: families (serif, grotesque, script…), weight, case, size, placement; name 1 or 2 Google Fonts close in the drawing of their letters, not only in their width or their mood;
@@ -51,7 +51,7 @@ const SAMPLE_CHARS = { hook: 60, key: 30, band: 50 } as const;
 const SAMPLE_WORDS = {
   hook: "Une accroche de Reel courte, avec un verbe, comme ce commerce parle (6 mots au plus)",
   key: "Le mot de l'accroche qui ressort (un mot de hook, tel quel)",
-  band: "Une phrase courte posée sur la vidéo : une offre, une adresse ou une invitation vraie, tirée du site",
+  band: "Une phrase courte posée sur la vidéo : une offre, une adresse ou une invitation vraie, tirée de son site ou de ce qu'on sait du commerce ; sans fait connu, une invitation simple, jamais un prix, une adresse ni un horaire inventés",
 } as const;
 
 /** A hook and a line in the business's own words, drawn in its signature on one of its photos (the Style step). */
@@ -86,11 +86,22 @@ export function clampReading<T extends MoodboardReading>(reading: T): T {
   };
 }
 
-/** The reading of a site: the same, and which of its photos show the business itself. */
-export const siteLookSchema = moodboardReadingSchema.extend({
+/** The reading of her brand from her logo and her images (or an ambiance she picked): the same, and an example in her words. */
+export const brandLookSchema = moodboardReadingSchema.extend({
   sample: z
     .object({ hook: z.string().describe(SAMPLE_WORDS.hook), key: z.string().describe(SAMPLE_WORDS.key), band: z.string().describe(SAMPLE_WORDS.band) })
     .describe("Un exemple dans ses mots, pour lui montrer son style sur une de ses photos"),
+});
+export type BrandLookReading = z.infer<typeof brandLookSchema>;
+
+/** A brand reading within what a profile keeps (its example in its words too). */
+export function clampBrandLook<T extends BrandLookReading>(reading: T): T {
+  const sample = { hook: clip(reading.sample.hook, SAMPLE_CHARS.hook), key: clip(reading.sample.key, SAMPLE_CHARS.key), band: clip(reading.sample.band, SAMPLE_CHARS.band) };
+  return { ...clampReading(reading), sample };
+}
+
+/** The reading of a site: the same, and which of its photos show the business itself. */
+export const siteLookSchema = brandLookSchema.extend({
   photos: z
     .array(z.number().int().min(1))
     .describe("Les numéros des photos du site (« photo N ») qui montrent vraiment le commerce, les plus belles et les plus parlantes d'abord, 8 au plus"),
@@ -98,9 +109,22 @@ export const siteLookSchema = moodboardReadingSchema.extend({
 export type SiteLookReading = z.infer<typeof siteLookSchema>;
 
 /** A site's reading within what a profile keeps (its example in its words too). */
-export function clampSiteLook(reading: SiteLookReading): SiteLookReading {
-  const sample = { hook: clip(reading.sample.hook, SAMPLE_CHARS.hook), key: clip(reading.sample.key, SAMPLE_CHARS.key), band: clip(reading.sample.band, SAMPLE_CHARS.band) };
-  return { ...clampReading(reading), sample };
+export const clampSiteLook = (reading: SiteLookReading): SiteLookReading => clampBrandLook(reading);
+
+/** Where her charter (colours, fonts) comes from: her site's reading, her logo and images, or her own hand (Style, or asked of Edith). */
+export const CHARTER_SOURCES = ["site", "images", "hand"] as const;
+export type CharterSource = (typeof CHARTER_SOURCES)[number];
+
+/**
+ * Which parts of her charter a reading of her logo and images may write (Tristan: « si le gars a
+ * pas de site… il peut envoyer son logo et on crée sa DA à partir de ça ») : all of it once it came
+ * from them; never what her site's reading or her hand set; and, on a profile from before this
+ * mark, only what is still empty.
+ */
+export function imagesOwnCharter(profile: { charter_from?: unknown; colors?: unknown[]; fonts?: unknown[] }): { colors: boolean; fonts: boolean } {
+  if (profile.charter_from === "images") return { colors: true, fonts: true };
+  if (profile.charter_from === "site" || profile.charter_from === "hand") return { colors: false, fonts: false };
+  return { colors: !profile.colors?.length, fonts: !profile.fonts?.length };
 }
 
 /**

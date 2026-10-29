@@ -1,9 +1,9 @@
 "use server";
 
-import { CLONE_MAX_SECONDS, CLONE_MIN_SECONDS, CREDIT_PRICES, findVoice, MOODBOARD_MAX_ITEMS, onboardingStepOf, withArtDirection, type MoodboardReading } from "@fauve/agent";
+import { CLONE_MAX_SECONDS, CLONE_MIN_SECONDS, CREDIT_PRICES, MOODBOARD_MAX_ITEMS, onboardingStepOf } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { readMoodboard } from "@/lib/agent/moodboard";
+import { charterFromImages, readBrand, rereadBrand, withBrandRead, type BrandRead } from "@/lib/brand-read";
 import { chargeCredits, creditBalance } from "@/lib/credits";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -13,7 +13,7 @@ import { MOODBOARD_NOTE_MAX } from "./style-options";
 import { applyStyleForm, styleFormSchema } from "./style-profile";
 
 export type SaveStyleResult = { status: "ok"; version: number } | { status: "error"; message: string };
-export type SaveLogoResult = { status: "ok"; version: number; logoUrl: string | null } | { status: "error"; message: string };
+export type SaveLogoResult = { status: "ok"; version: number; logoUrl: string | null; read: boolean } | { status: "error"; message: string };
 
 const NO_STUDIO = "Ton numéro n’est relié à aucun studio.";
 const FAILED = "L’enregistrement a échoué. Réessaie dans un instant.";
@@ -41,7 +41,9 @@ const SIGNED_URL_SECONDS = 60 * 60;
 /**
  * Sets the logo the browser just uploaded to `media` (or removes it with null),
  * as a new version of the brand profile. Removing also drops the logo found on
- * the website, so the Reels end on the studio name.
+ * the website, so the Reels end on the studio name. While she gets started with no
+ * charter of her site's nor of her hand, her brand is read again with it (her colours
+ * and fonts start from her logo), free.
  */
 export async function saveLogo(path: string | null): Promise<SaveLogoResult> {
   const { db, member } = await getStudioContext();
@@ -61,8 +63,10 @@ export async function saveLogo(path: string | null): Promise<SaveLogoResult> {
   }
 
   try {
+    let fromImages = false;
     const { version } = await insertProfileVersion(studioId, (current) => {
       const next: Record<string, unknown> = { ...current };
+      fromImages = charterFromImages(current);
       if (path) {
         next.logo_path = path;
       } else {
@@ -71,8 +75,13 @@ export async function saveLogo(path: string | null): Promise<SaveLogoResult> {
       }
       return next;
     });
+    let read = false;
+    if (path && fromImages) {
+      const { data: studio } = await supabaseAdmin().from("studios").select("onboarding_step").eq("id", studioId).single();
+      if (onboardingStepOf(studio?.onboarding_step) !== "done") read = Boolean(await rereadBrand(studioId).catch((error: unknown) => (console.warn("brand read from logo failed", error), null)));
+    }
     revalidatePath("/style");
-    return { status: "ok", version, logoUrl };
+    return { status: "ok", version, logoUrl, read };
   } catch (error) {
     console.warn("saveLogo failed", error);
     return { status: "error", message: FAILED };
@@ -103,7 +112,7 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
   const expected = new RegExp(`^${studioId}/brand/mood-\\d{10,16}-[a-z0-9]{4,12}\\.jpg$`);
   if (items.some((item) => !expected.test(item.path))) return { status: "error", message: "Image invalide." };
 
-  let reading: MoodboardReading | null = null;
+  let read: BrandRead | null = null;
   let warning: string | undefined;
   if (items.length) {
     // Signed with the member's own client (storage RLS): also proves the files exist.
@@ -122,11 +131,10 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
       return { status: "error", message: "Plus assez de crédits pour la lecture du moodboard (1 crédit). Ton solde remonte à ton renouvellement." };
     }
     try {
-      reading = await readMoodboard(
-        studioId,
-        member.studio.name ?? "Ton studio",
-        items.map((item) => ({ url: urls.get(item.path)!, note: item.note })),
-      );
+      // Her logo with her images: with no site, her charter starts from it.
+      const { data: latest } = await supabaseAdmin().from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle();
+      const logoPath = (latest?.profile as { logo_path?: string } | null)?.logo_path ?? null;
+      read = await readBrand(studioId, { items, logoPath });
       if (!free) await chargeCredits(studioId, CREDIT_PRICES.moodboard, "moodboard", "Lecture du moodboard", { images: items.length });
     } catch (error) {
       console.warn("moodboard reading failed", error);
@@ -136,21 +144,15 @@ export async function saveMoodboard(input: unknown): Promise<SaveMoodboardResult
 
   try {
     const { version } = await insertProfileVersion(studioId, (current) => {
-      const next: Record<string, unknown> = withArtDirection({ ...current } as Record<string, unknown>, reading?.direction);
-      // Her moodboard is her art direction: its settings (signature) follow its reading.
-      if (reading) {
-        next.signature = reading.signature;
-        // The voice that sounds like it, unless she chose one.
-        const voice = (next.voice ?? {}) as { use?: string; voice_id?: string };
-        const narrator = findVoice(reading.signature.narrator.voice);
-        if (!voice.voice_id && narrator) next.voice = { use: voice.use ?? "auto", voice_id: narrator.id };
-      }
+      // Her moodboard is her art direction: its settings (signature) follow its reading, and her charter too while it is her images'.
+      if (read) return withBrandRead(current, read, items);
+      const next: Record<string, unknown> = { ...current };
       if (!items.length) delete next.moodboard;
-      else next.moodboard = { items, ...(reading ? { reading: reading.reading, palette: reading.palette, ...(reading.fonts ? { fonts: reading.fonts } : {}), read_at: new Date().toISOString() } : {}) };
+      else next.moodboard = { items };
       return next;
     });
     revalidatePath("/style");
-    return { status: "ok", version, reading: reading?.reading ?? null, palette: reading?.palette ?? [], warning };
+    return { status: "ok", version, reading: read?.reading.reading ?? null, palette: read?.reading.palette ?? [], warning };
   } catch (error) {
     console.warn("saveMoodboard failed", error);
     return { status: "error", message: FAILED };

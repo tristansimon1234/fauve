@@ -1286,6 +1286,34 @@ test("a dark one-colour logo turns white on the end card, a dark coloured one ge
   assert.equal(logoOnDark(logo([10, 10, 10], 100)), "as_is");
 });
 
+test("with no site, her charter starts from her logo's colours, and never over her hand or her site", async () => {
+  const { logoColors } = await import("./logo.ts");
+  const { imagesOwnCharter } = await import("./moodboard.ts");
+  // 10×10 RGBA: a terracotta mark (30 px) and black letters (20 px) on a transparent background.
+  const px = new Uint8Array(400);
+  for (let i = 0; i < 100; i++) {
+    if (i >= 10 && i < 40) px.set([196, 98, 45, 255], i * 4);
+    else if (i >= 50 && i < 70) px.set([20, 20, 20, 255], i * 4);
+  }
+  const drawn = logoColors(px, 10, 10);
+  assert.deepEqual(drawn.map((c) => c.color), ["#c4622d", "#141414"]);
+  assert.equal(drawn[0]!.share, 0.6);
+  // Saved on white: the white all around is not hers. White letters on a red square: the red is.
+  const onWhite = new Uint8Array(400).fill(255);
+  for (let i = 44; i < 56; i++) onWhite.set([30, 60, 150, 255], i * 4);
+  assert.deepEqual(logoColors(onWhite, 10, 10).map((c) => c.color), ["#1e3c96"]);
+  const square = new Uint8Array(400);
+  for (let i = 0; i < 100; i++) square.set(i >= 44 && i < 56 ? [255, 255, 255, 255] : [200, 30, 40, 255], i * 4);
+  const red = logoColors(square, 10, 10);
+  assert.deepEqual([red[0]!.color, red[0]!.background], ["#c81e28", true]);
+  // Who may write her colours and fonts: her images while the charter is theirs or empty, never her site's nor her hand's.
+  assert.deepEqual(imagesOwnCharter({}), { colors: true, fonts: true });
+  assert.deepEqual(imagesOwnCharter({ colors: ["#000000"] }), { colors: false, fonts: true });
+  assert.deepEqual(imagesOwnCharter({ charter_from: "images", colors: ["#000000"], fonts: ["Inter"] }), { colors: true, fonts: true });
+  assert.deepEqual(imagesOwnCharter({ charter_from: "site" }), { colors: false, fonts: false });
+  assert.deepEqual(imagesOwnCharter({ charter_from: "hand" }), { colors: false, fonts: false });
+});
+
 test("the end card writes the name unless the logo already writes it", async () => {
   const { logoSaysName } = await import("./logo.ts");
   // Edith's mascot writes nothing: the name goes under it.
