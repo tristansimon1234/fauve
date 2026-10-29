@@ -462,17 +462,89 @@ function ChatScene({ from }: { from: number }) {
   );
 }
 
-/** « je m'occupe de tout »: the screen goes violet. */
+/** Where Edith stands in « je m'occupe de tout », and where everything she is sent goes. */
+const EDITH_AT = { x: 540, y: 700 };
+
+/**
+ * One of the things she sent, scattered around the screen, then drawn into Edith along a curve
+ * (faster as it gets close, smaller, gone as it reaches her).
+ */
+function Gathered({ x, y, at, spin, children }: { x: number; y: number; at: number; spin: number; children: ReactNode }) {
+  const frame = useCurrentFrame();
+  const t = interpolate(frame, [F(at), F(at + 0.5)], [0, 1], { ...clamp, easing: Easing.in(Easing.cubic) });
+  if (t >= 1) return null;
+  // Waiting for its turn, it drifts a little.
+  const drift = (1 - t) * Math.sin((frame + x) / 9) * 6;
+  const { x: ex, y: ey } = EDITH_AT;
+  const cx = (x + ex) / 2 + (ey - y) * 0.3;
+  const cy = (y + ey) / 2 - (ex - x) * 0.3;
+  const u = 1 - t;
+  const left = u * u * x + 2 * u * t * cx + t * t * ex;
+  const top = u * u * y + 2 * u * t * cy + t * t * ey + drift;
+  const appear = enter(frame, F(T.ensemble) + 3, 8);
+  return (
+    <div style={{ position: "absolute", left: px(left), top: px(top), opacity: appear * Math.min(1, (1 - t) / 0.2), transform: `translate(-50%, -50%) rotate(${spin * (1 - t * 0.5)}deg) scale(${(0.7 + 0.3 * appear) * (1 - 0.8 * t)})` }}>
+      {children}
+    </div>
+  );
+}
+
+const card: CSSProperties = { borderRadius: 18, overflow: "hidden", border: "7px solid #fff", boxShadow: "0 24px 50px rgba(0,0,0,.35)" };
+
+/** « je m'occupe de tout »: everything she sent flies into Edith, who takes it all on. */
 function FlashScene() {
   const frame = useCurrentFrame();
-  const pop = enterAt(frame, T.occupe - 0.1, 12);
+  const pop = enterAt(frame, T.ensemble + 0.15, 12);
+  // Edith swallows the last of it on « tout »: a small gulp and a ring going out.
+  const gulp = interpolate(frame, [F(T.tout) - 4, F(T.tout), F(T.tout) + 8], [0, 1, 0], clamp);
+  const ring = interpolate(frame, [F(T.tout), F(T.tout) + 16], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
+  const glow = 0.45 + 0.35 * gulp;
   return (
     <>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 380, display: "flex", justifyContent: "center", opacity: pop, transform: `translateY(${px((1 - pop) * 80)}px)` }}>
-        <Mascot size={380} mood="laugh" still />
+      <div style={{ position: "absolute", left: EDITH_AT.x - 520, top: EDITH_AT.y - 520, width: 1040, height: 1040, borderRadius: "50%", background: `radial-gradient(circle, ${C.violet} 0%, ${C.coral} 45%, transparent 70%)`, opacity: glow, filter: "blur(90px)" }} />
+      {ring > 0 && ring < 1 && (
+        <div style={{ position: "absolute", left: EDITH_AT.x - (220 + ring * 520), top: EDITH_AT.y - (220 + ring * 520), width: 2 * (220 + ring * 520), height: 2 * (220 + ring * 520), borderRadius: "50%", border: `6px solid ${C.peach}`, opacity: 1 - ring }} />
+      )}
+      <Gathered x={190} y={300} at={T.ensemble + 0.3} spin={-12}>
+        <div style={{ ...card, width: 170, height: 226 }}>
+          <Img src={staticFile("tile-2.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </div>
+      </Gathered>
+      <Gathered x={870} y={290} at={T.ensemble + 0.35} spin={8}>
+        <div style={{ borderRadius: 999, background: C.mine, padding: "6px 22px", boxShadow: "0 24px 50px rgba(0,0,0,.35)" }}>
+          <VoiceNote at={T.ensemble} />
+        </div>
+      </Gathered>
+      <Gathered x={190} y={1560} at={T.ensemble + 0.4} spin={10}>
+        <div style={{ ...card, border: "7px solid #fff" }}>
+          <Clip />
+        </div>
+      </Gathered>
+      <Gathered x={890} y={1520} at={T.ensemble + 0.45} spin={-9}>
+        <div style={{ ...card, width: 170, height: 226 }}>
+          <Img src={staticFile("tile-3.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </div>
+      </Gathered>
+      <Gathered x={900} y={930} at={T.ensemble + 0.5} spin={6}>
+        <BubbleBox height={textHeight(["", ""])}>
+          <div style={bubbleText}>{"Idée : « pov : ton premier\ncafé du matin » ☕"}</div>
+        </BubbleBox>
+      </Gathered>
+      <Gathered x={170} y={940} at={T.ensemble + 0.55} spin={-7}>
+        <div style={{ ...card, width: 150, height: 200 }}>
+          <Img src={staticFile("tile-4.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </div>
+      </Gathered>
+      <Gathered x={560} y={1760} at={T.ensemble + 0.6} spin={4}>
+        <BubbleBox mine height={textHeight([""])}>
+          <div style={bubbleText}>Trop bien, go ! 🔥</div>
+        </BubbleBox>
+      </Gathered>
+      <div style={{ position: "absolute", left: 0, right: 0, top: EDITH_AT.y - 200, display: "flex", justifyContent: "center", opacity: pop, transform: `translateY(${px((1 - pop) * 60)}px) scale(${(0.6 + 0.4 * pop) * (1 + 0.1 * gulp)})` }}>
+        <Mascot size={400} mood={frame >= F(T.tout) ? "laugh" : "happy"} still />
       </div>
-      <Say top={880} size={100} color="#fff" bits={[{ text: "je m’occupe", at: T.occupe }]} />
-      <Say top={990} size={210} accent={C.peach} bits={[{ text: "de tout", at: T.tout, accent: true }]} style={{ lineHeight: 1 }} />
+      <Say top={1010} size={104} color="#fff" bits={[{ text: "je m’occupe", at: T.occupe }]} />
+      <Say top={1120} size={220} accent={C.coral} bits={[{ text: "de tout", at: T.tout, accent: true }]} style={{ lineHeight: 1 }} />
     </>
   );
 }
@@ -713,7 +785,7 @@ type SceneDef = { id: string; from: number; background: string; orb?: number; Vi
 const SCENES: SceneDef[] = [
   { id: "hello", from: -LEAD, background: C.bg, View: HelloScene },
   { id: "chat", from: T.parles - 0.3, background: C.bg, View: ChatScene },
-  { id: "flash", from: T.occupe - 0.3, background: C.violet, orb: 0, View: FlashScene, wipe: true },
+  { id: "flash", from: T.ensemble + 0.1, background: C.ink, orb: 0, View: FlashScene, wipe: true },
   { id: "work", from: T.tesReels - 0.25, background: C.lilac, orb: 0.12, View: WorkScene },
   { id: "publish", from: T.dis - 0.3, background: C.bg, View: PublishScene },
   { id: "app", from: T.etOrdi - 0.2, background: C.peach, orb: 0.12, View: AppScene },
