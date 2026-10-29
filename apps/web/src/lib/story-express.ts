@@ -6,7 +6,7 @@ import {
   storyPlan,
   STORY_TEXT_MAX,
   type MediaFacts,
-  type ReelEffect,
+  type ReelLook,
 } from "@fauve/agent";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { defaultPlatforms } from "@/lib/social/tiktok-account";
@@ -30,7 +30,7 @@ export async function prepareStoryExpress(params: {
   mediaId: string;
   text: string;
   detail?: string;
-  effect?: ReelEffect;
+  look?: ReelLook | null;
   postId?: string;
   scheduledAt?: string;
 }): Promise<{ postId: string; title: string }> {
@@ -78,7 +78,7 @@ export async function prepareStoryExpress(params: {
   }
 
   const durations = { [params.mediaId]: photo ? PHOTO_MAX_SECONDS : (analysis?.duration ?? 0) };
-  const written = storyPlan({ mediaId: params.mediaId, photo, analysis, text: params.text, detail: params.detail, effect: params.effect });
+  const written = storyPlan({ mediaId: params.mediaId, photo, analysis, text: params.text, detail: params.detail, look: params.look });
   const plan = finishPlan(normalizeEditPlan(written, durations, 0), facts, durations);
   const { id } = await insertPlanVersion(params.studioId, postId, plan);
   const { error } = await db.from("posts").update({ edit_plan_id: id, media_ids: [params.mediaId] }).eq("id", postId).eq("studio_id", params.studioId);

@@ -23,8 +23,9 @@ import {
 import { mixFilter, mixGains } from "./mix.ts";
 import { fromEditorPlan, normalizeEditPlan } from "./editor.ts";
 import { depthPhotoIds } from "./depth.ts";
-import { dayIn, lookStamp } from "./looks.ts";
-import { followedEffect } from "./steal.ts";
+import { dayIn, LOOK_PRESETS, lookChoice, lookFromDesign, lookMatrix, lookStamp, planLook, reelLookSchema, type LookDesign } from "./looks.ts";
+import { clampLook, followedFilter, followedForEditor, followedFrom, followedLine, stolenStyleLines, type StolenLookReading } from "./steal.ts";
+import { editorLook } from "./editor.ts";
 import { snapToTempo } from "./tempo.ts";
 
 // ---------------------------------------------------------------------------
@@ -348,19 +349,91 @@ test("depth and looks: the render gets the cut-out of a moving photo, the effect
   const [first, second] = props.segments;
   assert.equal(first?.type === "image" && first.depth?.src, cut.src);
   assert.equal(second?.type === "image" && second.depth, undefined);
-  assert.equal(props.effect, "disposable");
+  // A plan made before names a preset: drawn from its settings, its grade as one matrix.
+  assert.equal(props.look?.preset, "disposable");
+  assert.equal(props.look?.matrix.length, 20);
   assert.equal(props.stamp, "'26 10 29");
 });
 
-test("looks: the date a look prints, only a disposable's or a camcorder's", () => {
-  assert.equal(lookStamp("disposable", "2026-10-29"), "'26 10 29");
-  assert.equal(lookStamp("vhs", "2026-02-03"), "3 FÉVR. 2026");
-  assert.equal(lookStamp("bw", "2026-10-29"), undefined);
-  assert.equal(lookStamp("disposable", undefined), undefined);
+test("looks: the date a look prints, in its camera's format", () => {
+  assert.equal(lookStamp(LOOK_PRESETS.disposable, "2026-10-29"), "'26 10 29");
+  assert.equal(lookStamp(LOOK_PRESETS.vhs, "2026-02-03"), "3 FÉVR. 2026");
+  assert.equal(lookStamp(LOOK_PRESETS.bw, "2026-10-29"), undefined);
+  assert.equal(lookStamp(LOOK_PRESETS.disposable, undefined), undefined);
+  const stamp = { style: "typed" as const, format: "dd_mm_yyyy" as const, color: "#FFFFFF", corner: "top_left" as const, label: "", clock: false };
+  assert.equal(lookStamp({ ...LOOK_PRESETS.bw, stamp }, "2026-10-29"), "29/10/2026");
+  // Seven segments draw only digits: a month in letters falls back to its digits.
+  assert.equal(lookStamp({ ...LOOK_PRESETS.bw, stamp: { ...stamp, style: "digital", format: "d_mon_yyyy" } }, "2026-10-29"), "'26 10 29");
+  assert.equal(lookStamp({ ...LOOK_PRESETS.bw, stamp: { ...stamp, style: "digital" } }, "2026-10-29"), "29 10 2026");
   assert.match(dayIn("Europe/Paris", new Date("2026-10-29T23:30:00Z")), /^2026-10-30$/);
 });
 
-test("looks: the editor's effect is kept when it is one, the copied Reel brings its own", () => {
+/** A colour through a feColorMatrix, as the render applies it (clamped to 0–1). */
+const apply = (m: number[], [r, g, b]: [number, number, number]) =>
+  [0, 1, 2].map((i) => Math.min(1, Math.max(0, m[i * 5]! * r + m[i * 5 + 1]! * g + m[i * 5 + 2]! * b + m[i * 5 + 4]!)));
+
+test("looks: its grade is one colour matrix, 0 leaving her image as it is", () => {
+  const plain = reelLookSchema.parse({ name: "rien" });
+  assert.deepEqual(lookMatrix(plain), [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]);
+  // Black and white: every colour comes out grey.
+  const [r, g, b] = apply(lookMatrix(LOOK_PRESETS.bw), [0.8, 0.3, 0.2]);
+  assert.ok(Math.abs(r! - g!) < 1e-3 && Math.abs(g! - b!) < 1e-3);
+  // Warm: a grey turns orange; cool: blue.
+  const [wr, , wb] = apply(lookMatrix(reelLookSchema.parse({ name: "chaud", warmth: 1 })), [0.5, 0.5, 0.5]);
+  assert.ok(wr! > 0.5 && wb! < 0.5);
+  // Faded: the blacks lift, the whites dim.
+  const faded = lookMatrix(reelLookSchema.parse({ name: "délavé", fade: 1 }));
+  assert.ok(apply(faded, [0, 0, 0])[0]! > 0.1 && apply(faded, [1, 1, 1])[0]! < 0.95);
+  // Split toning: a teal in the shadows, an orange in the highlights.
+  const split = lookMatrix(reelLookSchema.parse({ name: "ciné", shadows: "#0F6E7A", highlights: "#FF9A50", split: 1 }));
+  const [sr, , sb] = apply(split, [0.1, 0.1, 0.1]);
+  const [hr, , hb] = apply(split, [0.9, 0.9, 0.9]);
+  assert.ok(sb! > sr! && hr! > hb!);
+});
+
+test("looks: her words are none, a preset or a look to design; the designer's answer is a look", () => {
+  assert.deepEqual(lookChoice("none"), { look: null });
+  assert.deepEqual(lookChoice("Sans look"), { look: null });
+  assert.deepEqual(lookChoice("vhs"), { look: LOOK_PRESETS.vhs });
+  assert.deepEqual(lookChoice("Appareil jetable"), { look: LOOK_PRESETS.disposable });
+  assert.deepEqual(lookChoice("pellicule Kodak des années 70"), { design: "pellicule Kodak des années 70" });
+  assert.equal(lookChoice("  "), null);
+  // The editor names it in « look », an older answer in « effect ».
+  assert.deepEqual(editorLook({ look: "bw" }), { look: LOOK_PRESETS.bw });
+  assert.deepEqual(editorLook({ effect: "dust" }), { look: LOOK_PRESETS.dust });
+  assert.deepEqual(editorLook({ look: "façon Polaroid" }), { design: "façon Polaroid" });
+  assert.equal(editorLook({}), null);
+  const design: LookDesign = {
+    ...LOOK_PRESETS.disposable,
+    name: "Polaroid des années 70",
+    hint: "couleurs délavées et chaudes",
+    shadows: "#0f6e7a",
+    highlights: "orange",
+    glow_color: "nope",
+    leak_color: "#FF7828",
+    stamp: { style: "digital", format: "yy_mm_dd", color: "#ff8a1e", corner: "bottom_right", label: "", clock: false },
+    note: "",
+  };
+  const { look, note } = lookFromDesign(design);
+  assert.equal(look.name, "Polaroid des années 70");
+  assert.equal(look.shadows, "#0F6E7A");
+  assert.equal(look.highlights, null);
+  assert.equal(look.glow_color, "#FF6A3D");
+  assert.equal(look.stamp?.color, "#FF8A1E");
+  assert.equal(look.preset, undefined);
+  assert.equal(note, "");
+});
+
+test("looks: a plan made before keeps its preset, a new one its own settings", () => {
+  assert.equal(planLook({ effect: "vhs" }), LOOK_PRESETS.vhs);
+  const own = reelLookSchema.parse({ name: "Portra", warmth: 0.3, grain: 0.4 });
+  assert.equal(planLook({ look: own, effect: "vhs" }), own);
+  assert.equal(planLook({}), null);
+  assert.ok(editPlanSchema.safeParse({ ...validPlanBase, look: own }).success);
+  assert.equal(editPlanSchema.safeParse({ ...validPlanBase, look: { ...own, warmth: 3 } }).success, false);
+});
+
+test("looks: the editor's look is kept when it is one, the copied Reel brings its own", () => {
   const written = {
     duration: 4,
     tempo: 100,
@@ -370,14 +443,56 @@ test("looks: the editor's effect is kept when it is one, the copied Reel brings 
     transitions: "cut" as const,
     subtitles: false,
   };
-  assert.equal(fromEditorPlan({ ...written, effect: "vhs" }).effect, "vhs");
-  assert.equal(fromEditorPlan({ ...written, effect: "none" }).effect, undefined);
-  const followed = { look: { effect: "bw" } } as unknown as Parameters<typeof followedEffect>[1];
-  assert.deepEqual(followedEffect({}, followed), { effect: "bw" });
-  assert.deepEqual(followedEffect({ effect: "dust" }, followed), {});
-  assert.deepEqual(followedEffect({}, { look: { effect: "grain" } } as unknown as Parameters<typeof followedEffect>[1]), {});
+  assert.equal(fromEditorPlan({ ...written, look: "vhs" }).look, LOOK_PRESETS.vhs);
+  assert.equal(fromEditorPlan({ ...written, look: "none" }).look, undefined);
+  // Her words for a look are designed after (the editor's plan carries no settings it did not write).
+  assert.equal(fromEditorPlan({ ...written, look: "façon Polaroid" }).look, undefined);
+  const followed = { look: { effect: "bw" } } as unknown as Parameters<typeof followedFilter>[1];
+  assert.deepEqual(followedFilter({}, followed), { look: LOOK_PRESETS.bw });
+  assert.deepEqual(followedFilter({ effect: "dust" }, followed), {});
+  assert.deepEqual(followedFilter({}, { look: { effect: "grain" } } as unknown as Parameters<typeof followedFilter>[1]), {});
+  // Its filter designed from what Gemini saw comes before the preset it named.
+  const own = reelLookSchema.parse({ name: "Pellicule délavée", fade: 0.5 });
+  assert.deepEqual(followedFilter({}, { look: { effect: "bw" }, filter_look: own } as unknown as Parameters<typeof followedFilter>[1]), { look: own });
   assert.ok(editPlanSchema.safeParse({ ...validPlanBase, effect: "y2k" }).success);
   assert.equal(editPlanSchema.safeParse({ ...validPlanBase, effect: "sepia" }).success, false);
+});
+
+test("steal: its filter in words, and what it makes with generative AI, said and never imitated", () => {
+  const reading: StolenLookReading = {
+    name: "transformation manga",
+    format: "autre",
+    voice: "aucune",
+    hook: { kind: "geste", what: "elle claque des doigts" },
+    text: { amount: "une ligne", composition: "une phrase au tiers haut", case: "normal", weight: "bold", tracking: "normal", align: "center", stress: "color", band: "none", subtitles: false, font: "" },
+    colors: [],
+    effect: "none",
+    filter: "couleurs délavées et chaudes, grain fort, coins sombres.",
+    generative: "la personne est redessinée en personnage de manga image par image.",
+    moments: [],
+    grade: "warm",
+    motion: "energique",
+    layout: "plein cadre",
+    camera: "à la main",
+    transitions: "coupes nettes",
+    music: "upbeat j-pop",
+    ending: "elle sourit à la caméra.",
+    why: "La transformation surprend.",
+  };
+  const look = clampLook(reading);
+  assert.equal(look.filter, "couleurs délavées et chaudes, grain fort, coins sombres.");
+  const style = { look, measures: { duration: 9, cuts: [1.2, 4.4], bpm: null, lufs: -14 } };
+  const lines = stolenStyleLines(style);
+  assert.match(lines[2]!, /couleurs délavées et chaudes/);
+  assert.match(lines[3]!, /^Ce que je ne refais pas : la personne est redessinée en personnage de manga image par image : c'est de l'IA qui fabrique ou transforme les images, et moi je monte tes vraies images\. Je reprends tout le reste\.$/);
+  const followed = followedFrom("11111111-2222-4333-8444-555555555555", style);
+  assert.match(followedForEditor(followed).ia_generative ?? "", /à ne jamais imiter/);
+  assert.match(followedLine(followed), /images d'IA générative du Reel recopié, volontairement non refaites/);
+  // Without either, nothing is said (an older reading has neither).
+  const plain = clampLook({ ...reading, filter: "", generative: "" });
+  assert.equal("generative" in plain, false);
+  assert.equal(stolenStyleLines({ ...style, look: plain }).length, 3);
+  assert.equal(followedForEditor(followedFrom("11111111-2222-4333-8444-555555555555", { ...style, look: plain })).ia_generative, undefined);
 });
 
 const validPlanBase = {
@@ -397,13 +512,13 @@ const validPlanBase = {
 // ---------------------------------------------------------------------------
 
 test("story express: a photo and a sentence become a 5 s animated story, its detail under its sentence", () => {
-  const plan = storyPlan({ mediaId: "p1", photo: true, text: "2 places ce soir", detail: "19 h · cours débutant", effect: "disposable" });
+  const plan = storyPlan({ mediaId: "p1", photo: true, text: "2 places ce soir", detail: "19 h · cours débutant", look: LOOK_PRESETS.disposable });
   assert.equal(plan.duration, 5);
   assert.deepEqual(plan.segments, [{ clip_id: "p1", in: 0, out: 5, zoom: "none" }]);
   assert.equal(plan.texts[0]!.text, "2 places ce soir");
   assert.equal(plan.texts[0]!.from, 0);
   assert.deepEqual(plan.texts[0]!.items, [{ title: "19 h · cours débutant" }]);
-  assert.equal(plan.effect, "disposable");
+  assert.deepEqual(plan.look, LOOK_PRESETS.disposable);
   // Normalized and finished like a montage: the photo is framed and moves (its one slow push).
   const detection = { regions: [], adjust: { exposure: 0, contrast: 0, saturation: 0, warmth: 0, straighten: 0 }, subject: { x: 500, y: 450 }, notes: "", text_boxes: [] };
   const photoFacts = { p1: { width: 1200, height: 1600, detection } };

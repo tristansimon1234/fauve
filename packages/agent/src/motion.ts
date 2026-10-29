@@ -7,7 +7,7 @@ import type { BrandSignature } from "./signature.ts";
 import { previewMusic, speechWindows, type MixCase } from "./mix.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 import { DEPTH_MOVES } from "./depth.ts";
-import { lookStamp, type ReelEffect } from "./looks.ts";
+import { lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -245,9 +245,9 @@ export type ReelProps = {
   soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
   /** Her voice note over the Reel, from `from` (frames), in the render and the preview. */
   voice?: { src: string; from: number } | null;
-  /** Over the whole video, under the texts: film dust, or a look (looks.ts: a grade over the footage, its overlay). */
-  effect?: ReelEffect | null;
-  /** The date a look prints (a disposable camera's « '26 10 29 », a VHS camcorder's « 29 OCT. 2026 »). */
+  /** A look over the whole video (looks.ts): its settings, and its grade as one colour matrix over the footage; its texture under the texts. */
+  look?: (ReelLook & { matrix: number[] }) | null;
+  /** The date a look prints, in its camera's format (« '26 10 29 », « 29 OCT. 2026 »). */
   stamp?: string;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
@@ -480,6 +480,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const fps = REEL_FPS;
   const brand = resolveReelBrand(plan, inputs.template, inputs.brand);
   const { lengths, fadeFrames } = frameLengths(plan);
+  const look = planLook(plan);
 
   // The footage under an animation: the passage of her clip (or the photo) the plan names.
   const underOf = (over: { clip_id: string; in?: number } | undefined): ReelUnder | undefined => {
@@ -717,8 +718,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     endCard,
     ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack, ...music } } : {}),
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
-    ...(plan.effect ? { effect: plan.effect } : {}),
-    ...(lookStamp(plan.effect, inputs.today) ? { stamp: lookStamp(plan.effect, inputs.today)! } : {}),
+    ...(look ? { look: { ...look, matrix: lookMatrix(look) } } : {}),
+    ...(lookStamp(look, inputs.today) ? { stamp: lookStamp(look, inputs.today)! } : {}),
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),
     ...(layers.length ? { layers } : {}),
   };

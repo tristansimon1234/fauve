@@ -3,7 +3,7 @@ import { MAX_AVERAGE_SHOT, type QualityOptions } from "./critic.ts";
 import { BEAT_STEP } from "./mix.ts";
 import { OUTLINE_CHARS } from "./reel-model.ts";
 import { clip, SIGNATURE_GRADES, type BrandSignature } from "./signature.ts";
-import { isReelEffect, type ReelEffect } from "./looks.ts";
+import { isReelEffect, LOOK_PRESETS, planLook, reelLookSchema, type ReelEffect, type ReelLook } from "./looks.ts";
 
 // « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA », « c'est one
 // shot »): a Reel the manager likes (a link sent in the chat or on WhatsApp, a video she
@@ -83,6 +83,16 @@ export const stolenLookReadingSchema = z.object({
     .describe(
       "Un effet ou un look sur toute la vidéo : dust (poussière et rayures de pellicule), grain, disposable (appareil photo jetable : flash chaud, grain, date orange dans le coin), vhs (cassette VHS : couleurs qui bavent, lignes, « PLAY »), y2k (flash direct des années 2000), cine (couleurs de cinéma, ombres bleu-vert), bw (noir et blanc), none",
     ),
+  filter: z
+    .string()
+    .describe(
+      "Le filtre de ses images en mots, seulement quand il se voit au-delà d'une lumière naturelle : ses couleurs (délavées, chaudes, sépia, désaturées, virées au vert ou au bleu, très contrastées…), son grain, un flash, un halo autour des lumières, des coins sombres, des traînées de lumière, des lignes, des bandes noires ou un cadre blanc, une date incrustée et son style (chiffres orange d'un appareil jetable, caméscope…), précis comme pour le refaire ; une chaîne vide sinon",
+    ),
+  generative: z
+    .string()
+    .describe(
+      "Seulement quand des images de ce Reel sont fabriquées ou transformées par une IA générative : la personne redessinée image par image en dessin animé, en manga, en pâte à modeler ou en peinture ; un visage, un corps, des vêtements ou un lieu changés ; une scène, une personne ou un objet qui n'ont jamais été filmés (une vidéo générée, un avatar qui parle, un visage qui se change en un autre) : ce qui l'est, en une phrase courte. Une chaîne vide sinon : des textes, des formes, des animations, des autocollants, des photos détourées, un filtre ou un effet dessiné sur la vraie vidéo ne sont pas de l'IA générative",
+    ),
   moments: z
     .array(
       z.object({
@@ -117,7 +127,7 @@ export const stolenLookReadingSchema = z.object({
 export type StolenLookReading = z.infer<typeof stolenLookReadingSchema>;
 
 /** The longest words of a stolen look, as it is kept. */
-const LOOK_CHARS = { name: 40, what: 200, composition: 240, layout: 200, music: 80, ending: 160, why: 300, moment: 220 } as const;
+const LOOK_CHARS = { name: 40, what: 200, composition: 240, layout: 200, music: 80, ending: 160, why: 300, moment: 220, filter: 300, generative: 200 } as const;
 /** The most moments a look keeps (a Reel of 9 effects, its ending). */
 export const MAX_MOMENTS = 12;
 
@@ -137,6 +147,9 @@ export const stolenLookSchema = stolenLookReadingSchema.extend({
     .array(z.object({ at: z.number().min(0).max(600), what: z.string().min(1).max(LOOK_CHARS.moment) }))
     .max(MAX_MOMENTS)
     .optional(),
+  // A look read before its filter and its generated images were read has neither.
+  filter: z.string().max(LOOK_CHARS.filter).optional(),
+  generative: z.string().max(LOOK_CHARS.generative).optional(),
   music: z.string().max(LOOK_CHARS.music),
   ending: z.string().max(LOOK_CHARS.ending),
   why: z.string().max(LOOK_CHARS.why),
@@ -152,8 +165,10 @@ function hexColor(written: string): string | null {
 }
 
 /** Structured outputs do not enforce lengths: the reading is taken as written, then clamped. */
-export function clampLook(reading: StolenLookReading): StolenLook {
-  const { colors: written, text: { font: named, ...text }, moments: read, ...rest } = reading;
+export function clampLook(reading: Omit<StolenLookReading, "filter" | "generative"> & Partial<Pick<StolenLookReading, "filter" | "generative">>): StolenLook {
+  const { colors: written, text: { font: named, ...text }, moments: read, filter: seen, generative: made, ...rest } = reading;
+  const filter = clip(seen ?? "", LOOK_CHARS.filter);
+  const generative = clip(made ?? "", LOOK_CHARS.generative);
   const font = named.trim();
   const colors = [...new Set(written.flatMap((c) => hexColor(c) ?? []))].slice(0, 3);
   const moments = read
@@ -170,6 +185,8 @@ export function clampLook(reading: StolenLookReading): StolenLook {
     layout: clip(reading.layout, LOOK_CHARS.layout) || "plein cadre",
     // One moment is not a sequence: a Reel built on one effect says it in its hook and its layout.
     ...(moments.length > 1 ? { moments } : {}),
+    ...(filter ? { filter } : {}),
+    ...(generative ? { generative } : {}),
     music: clip(reading.music, LOOK_CHARS.music),
     ending: clip(reading.ending, LOOK_CHARS.ending),
     why: clip(reading.why, LOOK_CHARS.why),
@@ -180,11 +197,17 @@ export function clampLook(reading: StolenLookReading): StolenLook {
  * A stolen style as it is kept on its inspiration (inspirations.style): the reading and the
  * measures; for one of her own Reels kept as a model (reel-model.ts), its plan's structure too.
  */
-export const stolenStyleSchema = z.object({ look: stolenLookSchema, measures: reelMeasuresSchema, outline: z.string().max(OUTLINE_CHARS).optional() });
+export const stolenStyleSchema = z.object({
+  look: stolenLookSchema,
+  measures: reelMeasuresSchema,
+  outline: z.string().max(OUTLINE_CHARS).optional(),
+  /** Its filter as a look's settings (looks.ts), designed once from its words when it was read. */
+  filter_look: reelLookSchema.optional(),
+});
 export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
 export const STEAL_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (studio, salon, restaurant, shop…). The person who runs the business wants to take this Reel's style for theirs: read it as a pro editor who wants to remake its style, not its content.
-Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, letter spacing, key word, background under the sentence, place, alignment; its font and its colours only when they make its style), the subtitles, the effect on the video (film dust, grain, or a look: a disposable camera, a VHS tape, the flash of the 2000s, cinema colours, black and white), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
+Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, letter spacing, key word, background under the sentence, place, alignment; its font and its colours only when they make its style), the subtitles, the effect on the video (film dust, grain, or a look: a disposable camera, a VHS tape, the flash of the 2000s, cinema colours, black and white) and the filter of its images in precise words (its colours, its grain, its light, its marks), whether any of its images are made or transformed by generative AI (a person redrawn as a cartoon, a face or a place changed, a scene never filmed), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
 Copy neither its words, nor its images, nor the name of its music: describe a form another business can reuse. In your French, make no feminine or masculine agreement for the person who runs the business. In French, except « music » in English.`;
 
 /** The style one Reel copies (from its inspiration's stolen style): its look and its pace. */
@@ -197,6 +220,8 @@ export const followedStyleSchema = z.object({
   /** One of her own Reels, kept as a model: redone with her new images, its structure known. */
   own: z.boolean().optional(),
   outline: z.string().max(OUTLINE_CHARS).optional(),
+  /** Its filter as a look's settings, when it has one (stolenStyleSchema.filter_look). */
+  filter_look: reelLookSchema.optional(),
 });
 export type FollowedStyle = z.infer<typeof followedStyleSchema>;
 
@@ -209,6 +234,7 @@ export function followedFrom(inspirationId: string, style: StolenStyle, own = fa
     bpm: style.measures.bpm === null ? null : Math.round(style.measures.bpm),
     ...(own ? { own: true } : {}),
     ...(style.outline ? { outline: style.outline } : {}),
+    ...(style.filter_look ? { filter_look: style.filter_look } : {}),
   };
 }
 
@@ -232,11 +258,25 @@ const EFFECT_WORDS: Record<StolenLook["effect"], string> = {
   none: "",
 };
 
-/** The look the copied Reel wears, as this Reel wears it (« ce qu'il a, son Reel l'a »): when the editor set none. */
-export function followedEffect(plan: { effect?: ReelEffect }, followed: Pick<FollowedStyle, "look"> | undefined): { effect?: ReelEffect } {
-  const effect = followed?.look.effect;
-  return !plan.effect && effect && isReelEffect(effect) ? { effect } : {};
+/**
+ * The look the copied Reel wears, as this Reel wears it (« ce qu'il a, son Reel l'a »), when the editor set
+ * none: its filter's settings, designed from its words when it was read, else the preset Gemini named.
+ */
+export function followedFilter(plan: { look?: ReelLook; effect?: ReelEffect }, followed: Pick<FollowedStyle, "look" | "filter_look"> | undefined): { look?: ReelLook } {
+  if (!followed || planLook(plan)) return {};
+  if (followed.filter_look) return { look: followed.filter_look };
+  const effect = followed.look.effect;
+  return isReelEffect(effect) ? { look: LOOK_PRESETS[effect] } : {};
 }
+
+/** Its filter in words: what Gemini saw, else the preset it named, else nothing. */
+export function filterWords(look: Pick<StolenLook, "effect" | "filter">): string {
+  return look.filter?.trim() || EFFECT_WORDS[look.effect];
+}
+
+/** What a Reel she copies makes with generative AI, which Edith does not make (she edits real images). */
+export const generativeWords = (look: Pick<StolenLook, "generative">) =>
+  look.generative ? `${look.generative.replace(/[.\s]+$/, "")} : c'est de l'IA qui fabrique ou transforme les images, et moi je monte tes vraies images. Je reprends tout le reste.` : null;
 
 const seconds = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(n);
 
@@ -252,11 +292,13 @@ function paceWords(averageShot: number | null, bpm: number | null, cuts?: number
  */
 export function stolenStyleLines(style: StolenStyle): string[] {
   const { look, measures } = style;
-  const effect = EFFECT_WORDS[look.effect];
+  const effect = filterWords(look);
+  const generative = generativeWords(look);
   return [
     `La forme : ${FORMAT_WORDS[look.format]}, ${paceWords(secondsPerShot(measures), measures.bpm, measures.cuts.length)}${look.moments?.length ? `, ${look.moments.length} effets ou temps enchaînés, que je refais avec tes images` : ""}.`,
     `Le texte : ${look.text.composition.replace(/[.\s]+$/, "")}${look.text.subtitles ? ", avec des sous-titres" : ""}.`,
     [`L'ambiance : ${look.music}`, effect, look.why.replace(/[.\s]+$/, "")].filter(Boolean).join(" ; ") + ".",
+    ...(generative ? [`Ce que je ne refais pas : ${generative}`] : []),
   ];
 }
 
@@ -408,7 +450,9 @@ export function followedForEditor(followed: FollowedStyle) {
     ...(takenFont(look) ? { police: takenFont(look)! } : {}),
     // Its colours are the editor's call: it has her charter and her request in front of it.
     ...(offeredColors(look, "editor") ? { couleurs: offeredColors(look, "editor")! } : {}),
-    ...(look.effect !== "none" ? { effet: EFFECT_WORDS[look.effect] } : {}),
+    ...(filterWords(look) ? { effet: filterWords(look) } : {}),
+    // Images made or changed by generative AI: never imitated (Edith edits her real images, never redraws them).
+    ...(look.generative ? { ia_generative: `${look.generative} : images fabriquées ou transformées par une IA générative, à ne jamais imiter (rien n'est redessiné ni inventé) ; refais tout le reste avec ses vraies images` } : {}),
     camera: look.camera,
     transitions: look.transitions,
     fin: look.ending,
@@ -434,7 +478,8 @@ export function followedLine(followed: FollowedStyle): string {
     look.voice === "aucune" ? "voix : aucune" : `voix : ${look.voice}, ${look.text.subtitles ? "avec" : "sans"} sous-titres`,
     ...(takenFont(look) ? [takenFont(look)!] : []),
     ...(offeredColors(look, "critic") ? [offeredColors(look, "critic")!] : []),
-    ...(look.effect !== "none" ? [EFFECT_WORDS[look.effect]] : []),
+    ...(filterWords(look) ? [filterWords(look)] : []),
+    ...(look.generative ? [`images d'IA générative du Reel recopié, volontairement non refaites (jamais un défaut) : ${look.generative}`] : []),
     `transitions : ${look.transitions}`,
     `fin : ${look.ending.replace(/[.\s]+$/, "")}`,
   ].join(" ; ");

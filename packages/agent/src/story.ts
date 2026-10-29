@@ -1,5 +1,5 @@
 import { editPlanSchema, type ClipAnalysis, type EditPlan } from "./schemas.ts";
-import type { ReelEffect } from "./looks.ts";
+import type { ReelLook } from "./looks.ts";
 
 // A story made in one go (Instories' animated stories, the engine's way): one of her photos or a
 // passage of her video, one sentence over it (« 2 places ce soir », « le plat du jour ») and a detail
@@ -36,7 +36,7 @@ export function storyPassage(analysis: Pick<ClipAnalysis, "duration" | "best_mom
  * from the first image (a key message with its detail under it when she gives one), a look when
  * she asks for one. To be normalized and finished like any plan (framing, light, the photo's move).
  */
-export function storyPlan(input: { mediaId: string; photo: boolean; analysis?: Pick<ClipAnalysis, "duration" | "best_moments" | "shots">; text: string; detail?: string; effect?: ReelEffect }): EditPlan {
+export function storyPlan(input: { mediaId: string; photo: boolean; analysis?: Pick<ClipAnalysis, "duration" | "best_moments" | "shots">; text: string; detail?: string; look?: ReelLook | null }): EditPlan {
   const passage = input.photo || !input.analysis ? { in: 0, out: STORY_PHOTO_SECONDS } : storyPassage(input.analysis);
   const duration = round(passage.out - passage.in);
   const text = input.text.trim().slice(0, STORY_TEXT_MAX);
@@ -52,6 +52,6 @@ export function storyPlan(input: { mediaId: string; photo: boolean; analysis?: P
     transitions: "cut",
     subtitles: false,
     music: null,
-    ...(input.effect ? { effect: input.effect } : {}),
+    ...(input.look ? { look: input.look } : {}),
   });
 }

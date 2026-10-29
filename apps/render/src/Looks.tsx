@@ -1,60 +1,106 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import type { ReelProps } from "./types";
+import { FilmDust } from "./FilmDust";
+import type { ReelLookDraw } from "./types";
 
-// The looks a Reel can wear, the way Prequel's filters dress a phone video (a disposable camera
-// with its date in orange, a VHS tape, the flash of the 2000s, cinema colours, black and white),
-// drawn by the engine: a grade over her footage and its animations, an overlay under the texts
-// (grain, light, vignette, the camera's own marks), the texts left clean. Only on her request or
-// when the Reel she copies has one. Drawn from the frame number alone: the render and the preview match.
-
-export type Look = "disposable" | "vhs" | "y2k" | "cine" | "bw";
+// The look a Reel wears over its whole video (looks.ts in @fauve/agent), drawn from its settings, the way
+// Prequel's filters dress a phone video: its grade over her footage and its animations (one colour matrix,
+// colours slipping apart, highlights that bloom, a softness), then over it, under the texts, its texture
+// (grain, light, vignette, a flash, a light leak, lines, dust, a frame, the date its camera prints). A look
+// grades and textures her real images, never redraws them. Drawn from the frame number alone: the render
+// and the preview match.
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+const IDENTITY = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
 
-/** The grade each look gives her footage and its animations (CSS filters, after the Reel's own). */
-export function lookFilter(look: Look | null | undefined): string | undefined {
-  switch (look) {
-    case "disposable":
-      return "sepia(0.18) saturate(1.25) contrast(1.06) brightness(1.06)";
-    case "vhs":
-      return "url(#fauve-vhs) saturate(1.3) contrast(1.08) brightness(1.04) blur(0.5px)";
-    case "y2k":
-      return "contrast(1.2) saturate(1.25) brightness(1.08) hue-rotate(-8deg)";
-    case "cine":
-      return "contrast(1.12) saturate(0.95) brightness(0.98)";
-    case "bw":
-      return "grayscale(1) contrast(1.28) brightness(1.04)";
-    default:
-      return undefined;
-  }
+/** A short stable name for a look's filter (two Reels with different looks can share a page: the preview, Tes créations). */
+function filterId(look: ReelLookDraw): string {
+  const key = JSON.stringify([look.matrix, look.bleed, look.glow, look.glow_color]);
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (Math.imul(h, 31) + key.charCodeAt(i)) | 0;
+  return `fauve-look-${(h >>> 0).toString(36)}`;
 }
 
-/** Whether an effect is a look (the dust is drawn on its own). */
-export const isLook = (effect: ReelProps["effect"]): effect is Look => Boolean(effect && effect !== "dust");
+/** Whether a look changes her footage at all (film dust alone only lays its specks over it). */
+export const gradesFootage = (look: ReelLookDraw) =>
+  look.bleed > 0 || look.glow > 0 || look.soft > 0 || look.matrix.some((v, i) => Math.abs(v - IDENTITY[i]!) > 1e-4);
 
-/** The SVG filters a look's grade names (VHS: its colours slipping apart, red one way, blue the other). */
-export function LookDefs({ k }: { k: number }) {
-  const shift = (3 * k).toFixed(2);
+/** The CSS filter its grade lays on her footage and its animations. */
+export function lookFilter(look: ReelLookDraw, k: number): string {
+  return [`url(#${filterId(look)})`, ...(look.soft > 0 ? [`blur(${(look.soft * 1.1 * k).toFixed(2)}px)`] : [])].join(" ");
+}
+
+const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+
+/**
+ * The SVG filter of a look's grade: its colour matrix, then its colours slipping apart (red one way,
+ * blue the other), then its highlights blooming in their colour (the bright parts, blurred, added back).
+ */
+export function LookDefs({ look, k }: { look: ReelLookDraw; k: number }) {
+  const shift = (3 * k * look.bleed).toFixed(2);
+  const [gr, gg, gb] = channels(look.glow_color);
+  // Only what is brighter than 70 %, stretched back to the full range.
+  const gain = 1 / 0.3;
+  const luma = (w: number) => (w * gain).toFixed(4);
   return (
     <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden>
       <defs>
-        <filter id="fauve-vhs" colorInterpolationFilters="sRGB" x="0" y="0" width="100%" height="100%">
-          <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red" />
-          <feOffset in="red" dx={shift} dy="0" result="redShifted" />
-          <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="green" />
-          <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blue" />
-          <feOffset in="blue" dx={`-${shift}`} dy="0" result="blueShifted" />
-          <feBlend in="redShifted" in2="green" mode="screen" result="redGreen" />
-          <feBlend in="redGreen" in2="blueShifted" mode="screen" />
+        <filter id={filterId(look)} colorInterpolationFilters="sRGB" x="0" y="0" width="100%" height="100%">
+          <feColorMatrix in="SourceGraphic" type="matrix" values={look.matrix.join(" ")} result="graded" />
+          {look.bleed > 0 ? (
+            <>
+              <feColorMatrix in="graded" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red" />
+              <feOffset in="red" dx={shift} dy="0" result="redShifted" />
+              <feColorMatrix in="graded" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="green" />
+              <feColorMatrix in="graded" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blue" />
+              <feOffset in="blue" dx={`-${shift}`} dy="0" result="blueShifted" />
+              <feBlend in="redShifted" in2="green" mode="screen" result="redGreen" />
+              <feBlend in="redGreen" in2="blueShifted" mode="screen" result="bled" />
+            </>
+          ) : null}
+          {look.glow > 0 ? (
+            <>
+              <feColorMatrix
+                in={look.bleed > 0 ? "bled" : "graded"}
+                type="matrix"
+                values={[0, 1, 2]
+                  .map(() => `${luma(0.2126)} ${luma(0.7152)} ${luma(0.0722)} 0 ${(-0.7 * gain).toFixed(4)}`)
+                  .concat("0 0 0 0 1")
+                  .join("  ")}
+                result="bright"
+              />
+              <feGaussianBlur in="bright" stdDeviation={(14 * k * (0.6 + 0.4 * look.glow)).toFixed(1)} result="bloom" />
+              <feColorMatrix
+                in="bloom"
+                type="matrix"
+                values={`${gr!.toFixed(3)} 0 0 0 0  0 ${gg!.toFixed(3)} 0 0 0  0 0 ${gb!.toFixed(3)} 0 0  0 0 0 0 1`}
+                result="tinted"
+              />
+              <feComposite in={look.bleed > 0 ? "bled" : "graded"} in2="tinted" operator="arithmetic" k1="0" k2="1" k3={(0.75 * look.glow).toFixed(3)} k4="0" />
+            </>
+          ) : null}
         </filter>
       </defs>
     </svg>
   );
 }
 
+/** A small seeded random generator (mulberry32): the same frame always draws the same. */
+function seeded(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const GRAIN_SIZE = { fine: 1.2, medium: 0.85, coarse: 0.55 } as const;
+
 /** Film grain that changes every two frames, at `opacity`. */
-function Grain({ opacity, size = 0.85 }: { opacity: number; size?: number }) {
+function Grain({ opacity, size }: { opacity: number; size: number }) {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   const seed = Math.floor(frame / 2) % 97;
@@ -75,11 +121,12 @@ function Grain({ opacity, size = 0.85 }: { opacity: number; size?: number }) {
   );
 }
 
-const Vignette = ({ strength }: { strength: number }) => (
-  <AbsoluteFill style={{ background: `radial-gradient(ellipse 80% 70% at 50% 46%, rgba(0,0,0,0) 50%, rgba(0,0,0,${strength}) 100%)` }} />
-);
+const rgba = (hex: string, alpha: number) => {
+  const [r, g, b] = channels(hex).map((v) => Math.round(v * 255));
+  return `rgba(${r},${g},${b},${Math.max(0, alpha).toFixed(3)})`;
+};
 
-/** A seven-segment digit or mark, as a disposable camera prints its date: a b c d e f g on, from the top clockwise, g the middle. */
+/** A seven-segment digit, as a disposable camera prints its date: a b c d e f g on, from the top clockwise, g the middle. */
 const SEGMENTS: Record<string, string> = {
   "0": "abcdef",
   "1": "bc",
@@ -93,8 +140,12 @@ const SEGMENTS: Record<string, string> = {
   "9": "abcdfg",
 };
 
-/** The date the way a disposable camera prints it (« '26 10 29 »), in glowing orange seven-segment digits. */
-function DateStamp({ text, x, y, h, color }: { text: string; x: number; y: number; h: number; color: string }) {
+/** How wide a date in seven segments is, at height h. */
+const digitalWidth = (text: string, h: number) =>
+  [...text].reduce((w, ch) => w + (ch === " " ? h * 0.32 : ch === "'" ? h * 0.33 : h * 0.72), 0);
+
+/** The date the way a disposable camera prints it (« '26 10 29 »), in glowing seven-segment digits. */
+function DigitalDate({ text, x, y, h, color }: { text: string; x: number; y: number; h: number; color: string }) {
   const w = h * 0.52;
   const t = h * 0.13;
   const gap = h * 0.2;
@@ -130,78 +181,88 @@ function DateStamp({ text, x, y, h, color }: { text: string; x: number; y: numbe
   return <g style={{ filter: `drop-shadow(0 0 ${(h * 0.18).toFixed(1)}px ${color})` }}>{shapes}</g>;
 }
 
-/** The overlay of a look, over her footage and under the texts. `stamp`: the date it prints (a disposable, a VHS). */
-export function LookOverlay({ look, stamp, k }: { look: Look; stamp?: string; k: number }) {
+/** The date a camera prints and what it writes beside it, in its corner, clear of the app's buttons on the right and at the bottom. */
+function Stamp({ stamp, text, k }: { stamp: NonNullable<ReelLookDraw["stamp"]>; text?: string; k: number }) {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
-  if (look === "disposable") {
-    // A light leak that breathes on one edge, a flash on the subject, the date in the corner (clear of the app's buttons).
-    const leak = 0.12 + 0.06 * Math.sin((frame / fps) * 1.3);
+  const right = stamp.corner.endsWith("right");
+  const bottom = stamp.corner.startsWith("bottom");
+  const side = right ? 150 * k : 72 * k;
+  const low = height * 0.7;
+  const high = 64 * k;
+  const seconds = Math.floor(frame / fps);
+  const clock = `${stamp.style === "camcorder" ? "SP " : ""}0:${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const font: CSSProperties =
+    stamp.style === "camcorder"
+      ? { fontFamily: "VT323, monospace", fontSize: 50 * k, lineHeight: 1.05, letterSpacing: 2 * k, textShadow: `${2 * k}px 0 rgba(255,0,80,0.6), ${-2 * k}px 0 rgba(0,200,255,0.6)` }
+      : { fontFamily: '"Courier Prime", "Courier New", monospace', fontSize: 40 * k, lineHeight: 1.15, fontWeight: 700, textShadow: `0 0 ${3 * k}px rgba(0,0,0,0.45)` };
+  const place = (top: number): CSSProperties => ({ position: "absolute", top, ...(right ? { right: side, textAlign: "right" } : { left: side }), color: stamp.color, ...font });
+  const label = stamp.label && stamp.style !== "digital" ? <div style={place(bottom ? high : low)}>{stamp.label}</div> : null;
+  if (stamp.style === "digital") {
+    if (!text) return null;
     const h = 46 * k;
-    const text = stamp ?? "";
+    const x = right ? width - side - digitalWidth(text, h) : side;
     return (
-      <AbsoluteFill style={{ pointerEvents: "none" }}>
-        <AbsoluteFill style={{ background: "rgba(255,170,90,0.10)", mixBlendMode: "soft-light" }} />
-        <AbsoluteFill style={{ background: "radial-gradient(ellipse 60% 40% at 50% 40%, rgba(255,250,235,0.20), rgba(255,250,235,0) 70%)", mixBlendMode: "screen" }} />
-        <AbsoluteFill style={{ background: `linear-gradient(90deg, rgba(255,120,40,${leak.toFixed(3)}) 0%, rgba(255,120,40,0) 28%)`, mixBlendMode: "screen" }} />
-        <Vignette strength={0.45} />
-        <Grain opacity={0.1} />
-        {text ? (
-          <svg width={width} height={height} style={{ position: "absolute", inset: 0 }} aria-hidden>
-            <DateStamp text={text} x={width - 150 * k - text.length * h * 0.62} y={height * 0.7} h={h} color="#FF8A1E" />
-          </svg>
-        ) : null}
-      </AbsoluteFill>
-    );
-  }
-  if (look === "vhs") {
-    // Scanlines, a tracking band that rolls down now and then, the camcorder's PLAY and date.
-    const cycle = Math.round(fps * 3.4);
-    const t = frame % cycle;
-    const band = t < 10 ? interpolate(t, [0, 10], [0.15, 0.85], clamp) : null;
-    const seconds = Math.floor(frame / fps);
-    const clock = `0:${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-    const font = { fontFamily: "VT323, monospace", color: "#F4F4F4", textShadow: `${2 * k}px 0 rgba(255,0,80,0.6), ${-2 * k}px 0 rgba(0,200,255,0.6)` };
-    return (
-      <AbsoluteFill style={{ pointerEvents: "none" }}>
-        <AbsoluteFill style={{ background: `repeating-linear-gradient(0deg, rgba(0,0,0,0.13) 0px, rgba(0,0,0,0.13) ${2 * k}px, rgba(0,0,0,0) ${2 * k}px, rgba(0,0,0,0) ${4 * k}px)` }} />
-        {band !== null ? (
-          <div style={{ position: "absolute", left: 0, right: 0, top: `${band * 100}%`, height: 26 * k, background: "rgba(255,255,255,0.10)", filter: `blur(${3 * k}px)` }} />
-        ) : null}
-        <Vignette strength={0.3} />
-        <Grain opacity={0.12} size={1.2} />
-        <div style={{ ...font, position: "absolute", left: 72 * k, top: 64 * k, fontSize: 52 * k, letterSpacing: 2 * k }}>PLAY ▶</div>
-        <div style={{ ...font, position: "absolute", left: 72 * k, top: height * 0.7, fontSize: 46 * k, lineHeight: 1.1 }}>
-          {stamp ? <div>{stamp}</div> : null}
-          <div>SP {clock}</div>
-        </div>
-      </AbsoluteFill>
-    );
-  }
-  if (look === "y2k") {
-    return (
-      <AbsoluteFill style={{ pointerEvents: "none" }}>
-        <AbsoluteFill style={{ background: "radial-gradient(ellipse 55% 38% at 50% 42%, rgba(255,255,255,0.22), rgba(255,255,255,0) 70%)", mixBlendMode: "screen" }} />
-        <AbsoluteFill style={{ background: "rgba(120,170,255,0.08)", mixBlendMode: "soft-light" }} />
-        <Vignette strength={0.38} />
-        <Grain opacity={0.06} size={1.1} />
-      </AbsoluteFill>
-    );
-  }
-  if (look === "cine") {
-    return (
-      <AbsoluteFill style={{ pointerEvents: "none" }}>
-        <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(0,95,115,0.22), rgba(0,95,115,0.12))", mixBlendMode: "soft-light" }} />
-        <AbsoluteFill style={{ background: "radial-gradient(ellipse 70% 55% at 50% 45%, rgba(255,150,70,0.12), rgba(255,150,70,0) 75%)", mixBlendMode: "soft-light" }} />
-        <Vignette strength={0.35} />
-        <Grain opacity={0.07} />
-      </AbsoluteFill>
+      <svg width={width} height={height} style={{ position: "absolute", inset: 0 }} aria-hidden>
+        <DigitalDate text={text} x={x} y={bottom ? low : high} h={h} color={stamp.color} />
+      </svg>
     );
   }
   return (
+    <>
+      {label}
+      <div style={place(bottom ? low : high)}>
+        {text ? <div>{text}</div> : null}
+        {stamp.clock ? <div>{clock}</div> : null}
+      </div>
+    </>
+  );
+}
+
+/** A look's texture, over her footage and under the texts. `stamp`: the date its camera prints. */
+export function LookOverlay({ look, stamp, k }: { look: ReelLookDraw; stamp?: string; k: number }) {
+  const frame = useCurrentFrame();
+  const { height, fps } = useVideoConfig();
+  const rand = seeded(Math.floor(frame / 2) * 4973 + 7);
+  // A tape's tracking band, rolling down for a third of a second every 3.4 s.
+  const cycle = Math.round(fps * 3.4);
+  const band = look.tracking && frame % cycle < 10 ? interpolate(frame % cycle, [0, 10], [0.15, 0.85], clamp) : null;
+  const leak = look.leak > 0 ? look.leak * (0.2 + 0.1 * Math.sin((frame / fps) * 1.3)) : 0;
+  return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
-      <Vignette strength={0.35} />
-      <Grain opacity={0.12} />
+      {look.flash > 0 ? (
+        <AbsoluteFill
+          style={{ background: `radial-gradient(ellipse 58% 40% at 50% 41%, rgba(255,252,240,${(0.3 * look.flash).toFixed(3)}), rgba(255,252,240,0) 70%)`, mixBlendMode: "screen" }}
+        />
+      ) : null}
+      {leak > 0 ? <AbsoluteFill style={{ background: `linear-gradient(90deg, ${rgba(look.leak_color, leak)} 0%, ${rgba(look.leak_color, 0)} 30%)`, mixBlendMode: "screen" }} /> : null}
+      {look.lines > 0 ? (
+        <AbsoluteFill
+          style={{
+            background: `repeating-linear-gradient(0deg, rgba(0,0,0,${(0.13 * look.lines).toFixed(3)}) 0px, rgba(0,0,0,${(0.13 * look.lines).toFixed(3)}) ${2 * k}px, rgba(0,0,0,0) ${2 * k}px, rgba(0,0,0,0) ${4 * k}px)`,
+          }}
+        />
+      ) : null}
+      {band !== null ? <div style={{ position: "absolute", left: 0, right: 0, top: `${band * 100}%`, height: 26 * k, background: "rgba(255,255,255,0.10)", filter: `blur(${3 * k}px)` }} /> : null}
+      {look.flicker > 0 ? <AbsoluteFill style={{ background: `rgba(0,0,0,${(0.09 * look.flicker * rand()).toFixed(3)})` }} /> : null}
+      {look.vignette > 0 ? (
+        <AbsoluteFill style={{ background: `radial-gradient(ellipse 80% 70% at 50% 46%, rgba(0,0,0,0) 50%, rgba(0,0,0,${(0.6 * look.vignette).toFixed(3)}) 100%)` }} />
+      ) : null}
+      {look.grain > 0 ? <Grain opacity={0.2 * look.grain} size={GRAIN_SIZE[look.grain_size]} /> : null}
+      {look.dust > 0 ? (
+        <AbsoluteFill style={{ opacity: Math.min(1, look.dust) }}>
+          <FilmDust k={k} />
+        </AbsoluteFill>
+      ) : null}
+      {look.frame === "bars" ? (
+        <>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: height * 0.065, background: "#000" }} />
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: height * 0.065, background: "#000" }} />
+        </>
+      ) : look.frame === "border" ? (
+        <AbsoluteFill style={{ boxShadow: `inset 0 0 0 ${26 * k}px #F6F3EC, inset 0 0 ${10 * k}px ${26 * k}px rgba(0,0,0,0.12)` }} />
+      ) : null}
+      {look.stamp ? <Stamp stamp={look.stamp} text={stamp} k={k} /> : null}
     </AbsoluteFill>
   );
 }

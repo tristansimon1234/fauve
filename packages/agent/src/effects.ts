@@ -83,7 +83,7 @@ The effects workshop works frame by frame on her video: it measures what moves (
 
 When she copies a Reel, its moments (reel_recopie, its effects one after the other) are part of her request: one of those moments that needs drawing on her frame by frame or passing behind her in her video counts as an effect of this kind; cards, photos, graphics or texts laid over her video stay with the chain.
 
-Answer agent = true only when her request holds an effect of this kind, hooked onto what moves in her images or needing drawing on her frame by frame. Otherwise false: a mood, an offer, a visit, an animated text, a collage, a voice that tells a story, an animation laid on the video stay with the chain, even with words like « effet » or « animation ». Without a video, always false. When in doubt, false.
+Answer agent = true only when her request holds an effect of this kind, hooked onto what moves in her images or needing drawing on her frame by frame. Never for what only generative AI makes (her redrawn as a cartoon, a manga or a painting, a face, clothes or a place changed, a scene or a person never filmed): Edith edits real images and nobody makes those. Otherwise false: a mood, an offer, a visit, an animated text, a collage, a voice that tells a story, an animation laid on the video stay with the chain, even with words like « effet » or « animation ». Without a video, always false. When in doubt, false.
 
 effect: the effect in a few words when it is the workshop, otherwise empty. why: one sentence.`;
 

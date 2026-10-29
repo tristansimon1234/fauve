@@ -76,7 +76,8 @@ Making a Reel.
 - Her own voice: you understand her voice notes (« [Message vocal reçu · media_id …] » followed by what she said). Her voice telling (a tip, behind the scenes, what we see) makes a Reel more alive and closer than text alone: propose it, without insisting, for a tip, behind-the-scenes or before/after Reel, if she hasn't said she prefers not to speak (Memory). Ask for a 10 to 25 second voice note telling what we see, as to a client (on WhatsApp, a voice message; in the app, she can send it on WhatsApp). When it arrives for a post, set it with update_post voice_media_id, then launch the montage (a correction for a Reel already made): the editor cuts on her phrases, the subtitles follow her words and the music drops when she speaks. A voice note that isn't about a Reel is a message: answer it.
 - Story express: for an everyday story (« 2 places ce soir », the dish of the day, a new arrival), one of her photos or videos and one sentence in her words make an animated story at once (story_express, free, delivered in a minute or two), with a detail under it when she gives one; with « Avec un lien » when it must make people book.
 - Finishing touches: what the engine adds by itself (the sound of what is said cleaned when noisy, the « euh » and silences cut when someone speaks, a slow motion ramped on its gesture, a moving photo in relief, a shaky video steadied, her videos heard only where someone speaks) is hers to change when she asks, on a Reel (set_finish with post_id: free, no new montage) or for all her next Reels (without post_id): « laisse mes hésitations », « garde le son d'ambiance », « enlève le bruit de fond », « sans effet 3D », « ne stabilise pas »…
-- Looks: a look over a whole video (a disposable camera with its date, a VHS tape, the flash of the 2000s, cinema colours, black and white, film dust) only when she asks for one: set_look on a montaged Reel or story (free, the video is made again), or in the montage's brief when it is not made yet. Never one of your own accord.
+- Looks: any look over a whole video, like a filter (a film stock, a camera and its date, a VHS tape, an era, a film's colours, black and white, film dust), only when she asks: set_look with a ready one or her words, on a montaged Reel or story, or without post_id for all her next Reels (free); in the montage's brief when it is not made yet. Never of your own accord.
+- You edit her real images, never generate or transform them: her redrawn as a cartoon or a painting, a face, clothes or a place changed, a scene or a person never filmed, a talking avatar is generative AI, not what you do. Say so in one sentence, no lecture, and offer the closest (a look, an animation over her video, an effect on her gestures).
 - Music: each Reel has its own music composed for it (no singing, set on the images, royalty-free, in the video); she can change it (set_music another), cut it (off) or bring it back (on), for free. For a trending Instagram sound, propose « Je publie moi-même » (update_post publish_by_hand true, and set_music off): when she publishes, she gets the video and the caption on WhatsApp, adds the sound in Instagram and posts; you find the Reel by yourself for its results.
 - What the montage can do (promise nothing else, never send her to CapCut or Canva): each Reel at its own pace (the editor chooses its tempo from her request and her images; « plus calme » or « plus rythmé » is a correction), in her charter's look, which gives way for one Reel when her request or a Reel she copies needs something else (a universe, a font, colours), never an atmosphere to pick from a list; the collage form when she wants it, also with a voice or a key message (her images assembled like a collage, in a form that comes from her request and her art direction: a scrapbook, a poster, a magazine…; plan.style collage); made-to-measure motion design (kinetic typography, shapes, animated lines), Reels all in motion design, Reels of her photos, mixed with videos if she wants (pass them all in media_ids), split screens and other layouts, effects drawn frame by frame on what moves in her video (a text that grows between her fingers), any Google font, animated texts, word-by-word subtitles when someone speaks, an end card with her name and logo, music composed for each Reel. Not yet: Instagram's trending sounds (added in the app, « Je publie moi-même »), stickers, 3D effects.
 - After a delivery. A correction (« enlève le 2e plan », « plus doux », « change la police », « plus de motion ») is montage with correction: true and her request in brief: it starts at once, her request is her consent; when you can't tell what she wants changed (« change ça », « c'est pas ça »), ask what first, in one question. A criticism without a request (« c'est plat », « bof ») is not a yes: propose in one sentence what you would change, with two buttons, and launch on her yes. A small touch-up of a text (move it, fix it, resize it, put a background behind it): she can do it on the post's page (get_post_link puts its button under your message), rather than a new montage. A variant: at delivery Edith offers one (same cut, another style and hook, 1 credit); if she wants it, montage with variant (a different short hook), then choose_version when she prefers one of the two.
@@ -129,7 +130,23 @@ export type StudioContextForPrompt = {
   copying?: { inspirationId: string; name: string | null; lines: string[] };
   /** Her Reels kept as models (« Garder comme modèle »), read: a new Reel can be made like one of them. */
   models?: { inspirationId: string; title: string; name: string }[];
+  /** What she set for all her Reels (set_look, set_finish without a Reel), in words. */
+  defaults?: string[];
 };
+
+/** Her finishing touches set for all her Reels, in words (only what differs from the engine's own). */
+export function finishDefaultWords(finish: Partial<Record<"sound" | "video_sound" | "cuts" | "ramp" | "relief" | "steady", string>> | undefined): string[] {
+  if (!finish) return [];
+  const words: Record<string, Record<string, string>> = {
+    sound: { clean: "son toujours nettoyé", original: "son tel qu'enregistré" },
+    video_sound: { all: "son de ses vidéos tout du long", none: "jamais le son de ses vidéos" },
+    cuts: { off: "hésitations gardées" },
+    ramp: { off: "ralenti simple" },
+    relief: { off: "photos à plat" },
+    steady: { off: "vidéos non stabilisées" },
+  };
+  return Object.entries(finish).flatMap(([key, value]) => (value && words[key]?.[value] ? [words[key][value]] : []));
+}
 
 const VOICE_USE_LINES: Record<NonNullable<StudioContextForPrompt["voice"]>["use"], string> = {
   auto: "quand ses images (au moins 12 s de vidéos ou de photos) racontent quelque chose et que personne ne parle déjà dans ses vidéos ; jamais sur un Reel entièrement en motion design, sauf si elle en demande une",
@@ -187,6 +204,7 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     ...(ctx.voice
       ? [`Voix off de ses Reels : ${VOICE_USE_LINES[ctx.voice.use]}, avec la voix de ${ctx.voice.name} (posée avant le montage ; son propre vocal passe toujours en premier ; set_voice pour changer).`]
       : []),
+    ...(ctx.defaults?.length ? [`Ses réglages pour tous ses Reels (set_look et set_finish sans post_id pour les changer) : ${ctx.defaults.join(" ; ")}.`] : []),
     ...(ctx.copying
       ? [
           `Reel à recopier : elle t'a envoyé un Reel à recopier${ctx.copying.name ? ` (« ${ctx.copying.name} » : ${ctx.copying.lines.join(" ; ")})` : " (tu le regardes encore)"}. Son prochain Reel le suit, une seule fois : montage avec inspiration_id ${ctx.copying.inspirationId}, sauf si elle ne veut plus de ce style ; ses Reels suivants restent sur sa charte.`,

@@ -48,7 +48,8 @@ import {
   PLAN_BUTTONS,
   exchangeLines,
   type ExchangeRow,
-  EFFECT_LABELS,
+  planLook,
+  sameLook,
   isBaked,
   reelFinishSchema,
   type ReelFinish,
@@ -71,6 +72,7 @@ import { missMessage, startSteal } from "@/lib/steal";
 import { readPostMusic } from "@/lib/render/music";
 import { deliverStoryExpress, prepareStoryExpress, StoryExpressError } from "@/lib/story-express";
 import { refinishPost } from "@/lib/finish-options";
+import { resolveLook } from "./look-designer";
 import { removeVoice } from "@/lib/voice-over";
 import { ownVoiceOf } from "@/lib/voice-clone";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
@@ -726,17 +728,25 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (post?.kind !== "story") return json({ error: "Cette publication n'est pas une story : sans post_id, une nouvelle story est créée." });
         if (["published", "measured"].includes(post.status as string)) return json({ error: "Cette story est déjà en ligne." });
       }
+      // A look in her words is designed now: what it does instead of what it cannot (redraw her image) is said with the answer.
+      const chosen = look ? await resolveLook(studioId, look) : null;
+      const storyLook = chosen && "look" in chosen ? chosen.look : null;
       ctx.afterReply.push(async () => {
         const target = { studioId, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId };
         try {
-          const story = await prepareStoryExpress({ studioId, mediaId: media_id, text, detail, effect: look, postId: post_id, scheduledAt: scheduled_at });
+          const story = await prepareStoryExpress({ studioId, mediaId: media_id, text, detail, look: storyLook, postId: post_id, scheduledAt: scheduled_at });
           await deliverStoryExpress({ ...target, postId: story.postId });
         } catch (error) {
           const said = error instanceof StoryExpressError ? error.message : "La story n’a pas abouti cette fois, je regarde ce qui coince. Tu veux que je réessaie ?";
           await notifyFailure({ ...target, postId: post_id ?? "" }, said, error);
         }
       });
-      return json({ status: "started", note: "La story se prépare (une à deux minutes) et part toute seule dans la conversation. Dis-le en une phrase." });
+      return json({
+        status: "started",
+        note: `La story se prépare (une à deux minutes) et part toute seule dans la conversation. Dis-le en une phrase.${
+          chosen && "missed" in chosen ? " Le look demandé n'a pas pu être fait : elle part sans look, dis-le." : chosen && "note" in chosen && chosen.note ? ` Dis-lui aussi : « ${chosen.note} »` : ""
+        }`,
+      });
     },
 
     async set_finish({ post_id, ...asked }) {
@@ -773,7 +783,21 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({ status: "started", note: "La vidéo se refait avec ces finitions, sans nouveau montage (1 à 3 min, gratuit), et part toute seule. Dis-le en une phrase." });
     },
 
-    async set_look({ post_id, look }) {
+    async set_look({ post_id, look: words }) {
+      const chosen = await resolveLook(studioId, words);
+      if ("missed" in chosen) return json({ error: "Je n'ai pas réussi à faire ce look : redis-le avec d'autres mots, ou propose un look tout prêt." });
+      const said = chosen.note ? ` Dis-lui aussi : « ${chosen.note} »` : "";
+      // Her default, for all her next Reels.
+      if (!post_id) {
+        await insertProfileVersion(studioId, (profile) => {
+          const { look: _old, ...rest } = profile;
+          return chosen.look ? { ...rest, look: chosen.look } : rest;
+        });
+        return json({
+          ok: true,
+          note: `${chosen.look ? `Gardé pour tous ses prochains Reels : look « ${chosen.look.name} »` : "Plus de look sur ses prochains Reels"}. Dis-le en une phrase ; pour un Reel déjà fait, propose de le refaire ainsi (set_look avec son post_id).${said}`,
+        });
+      }
       const post = unwrap(await db.from("posts").select("id, kind, status, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
       if (post.kind !== "reel" && post.kind !== "story") return json({ error: "Un look se pose sur une vidéo montée (un Reel ou une story)." });
       if (["published", "measured"].includes(post.status as string)) return json({ error: "Cette vidéo est déjà en ligne." });
@@ -783,17 +807,17 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (!plan.success) return json({ error: "Montage illisible : relance montage." });
       // Drawn image by image by the effects workshop: a look is a correction of its effect.
       if (isBaked(plan.data)) return json({ error: "Cette vidéo est un effet dessiné image par image : demande ce look en correction (montage), l'atelier le redessinera." });
-      const effect = look === "none" ? undefined : look;
-      if ((plan.data.effect ?? null) === (effect ?? null)) return json({ ok: true, note: "C'est déjà son look. Dis-le en une phrase." });
+      if (sameLook(planLook(plan.data), chosen.look)) return json({ ok: true, note: "C'est déjà son look. Dis-le en une phrase." });
       // A new version of the same cut with its look: the music stays, the video is made again for free.
-      const { id } = await insertPlanVersion(studioId, post_id, { ...plan.data, effect });
+      const { effect: _preset, look: _old, ...cut } = plan.data;
+      const { id } = await insertPlanVersion(studioId, post_id, chosen.look ? { ...cut, look: chosen.look } : cut);
       check(await db.from("posts").update({ edit_plan_id: id }).eq("id", post_id).eq("studio_id", studioId));
       ctx.afterReply.push(async () => {
         await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
       });
       return json({
         status: "started",
-        note: `La vidéo se refait ${effect ? `en look « ${EFFECT_LABELS[effect].label} »` : "sans look"} (1 à 2 min) et le lien part tout seul. Dis-le en une phrase.`,
+        note: `La vidéo se refait ${chosen.look ? `en look « ${chosen.look.name} » (${chosen.look.hint})` : "sans look"} (1 à 2 min) et le lien part tout seul. Dis-le en une phrase.${said}`,
       });
     },
 

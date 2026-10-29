@@ -19,7 +19,6 @@ import { brandSignatureSchema } from "./signature.ts";
 import { ONBOARDING_STEPS } from "./onboarding.ts";
 import { slideTextSchema } from "./slides.ts";
 import { textLookSchema } from "./text-look.ts";
-import { REEL_EFFECTS } from "./looks.ts";
 
 /** Changes to a text look: only the fields given change; null removes a fill, an outline or an emphasis style. */
 const lookPatchSchema = textLookSchema.partial().extend({
@@ -357,7 +356,7 @@ export const toolSpecs = {
       media_id: z.string().uuid().describe("La photo ou la vidéo (list_media)"),
       text: z.string().min(1).max(60).describe("La phrase sur la story, courte, avec ses mots"),
       detail: z.string().max(40).optional().describe("Un détail sous la phrase : une heure, un prix, « 2 places »"),
-      look: z.enum(REEL_EFFECTS).optional().describe("Seulement si elle demande un look (appareil jetable, VHS…)"),
+      look: z.string().max(300).optional().describe("Seulement si elle demande un look : un de set_look (disposable, vhs…) ou ses mots"),
       post_id: z.string().uuid().optional().describe("Une story déjà prévue ; sinon une nouvelle est créée"),
       scheduled_at: isoDateTime.optional(),
     }),
@@ -377,8 +376,8 @@ export const toolSpecs = {
   },
   set_look: {
     description:
-      "Le look d'une vidéo montée (Reel ou story), sur toute l'image, sous ses textes, comme les filtres de Prequel : disposable (appareil photo jetable : flash chaud, grain, date orange dans le coin), vhs (cassette VHS : couleurs qui bavent, lignes, « PLAY ▶ » et la date), y2k (flash direct des années 2000), cine (couleurs de cinéma), bw (noir et blanc contrasté), dust (poussière de pellicule), none (l'enlever). Seulement quand elle le demande (« effet VHS », « façon appareil jetable », « en noir et blanc »…), jamais de toi-même. Refait la vidéo, gratuit.",
-    input: z.object({ post_id: z.string().uuid(), look: z.enum(["none", ...REEL_EFFECTS]) }),
+      "Le look d'une vidéo montée (Reel ou story), sur toute l'image, sous ses textes, comme les filtres de Prequel : n'importe quel look qui change les couleurs et la texture de ses vraies images (une pellicule, un appareil, une époque, un film, un réalisateur). look : un tout prêt, disposable (appareil photo jetable : flash chaud, grain, date orange), vhs (cassette VHS : couleurs qui bavent, lignes, « PLAY ▶ » et la date), y2k (flash direct des années 2000), cine (couleurs de cinéma), bw (noir et blanc contrasté), dust (poussière de pellicule) ; sinon ses mots, précis (« pellicule Kodak Portra des années 70 », « Polaroid délavé », « comme un film de Wes Anderson ») ; none pour l'enlever. Un look ne redessine jamais ses images (dessin animé, peinture, visage ou lieu changés) : la réponse dit ce qu'il fait à la place. Avec post_id : cette vidéo, refaite sans nouveau montage. Sans post_id : tous ses prochains Reels (réglage gardé, none l'enlève). Seulement quand elle le demande, jamais de toi-même. Gratuit.",
+    input: z.object({ post_id: z.string().uuid().optional(), look: z.string().min(1).max(300) }),
   },
   set_voice: {
     description:

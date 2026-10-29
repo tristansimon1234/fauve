@@ -21,6 +21,7 @@ import { cleanedPaths } from "@/lib/video/speech";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { instagramVideo } from "@/lib/treg";
 import { readStolenLook } from "@/lib/video/inspiration";
+import { designLook } from "@/lib/agent/look-designer";
 import { costMeta } from "@/lib/cost-scope";
 
 // « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA », « c'est one shot ») :
@@ -196,7 +197,9 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   // A font that makes its style, by the name Google Fonts serves it under (the render loads it from there); else hers stay.
   const { font: named, ...text } = look.text;
   const font = named ? await googleFont(named).catch(() => null) : null;
-  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, ...outline };
+  // Its filter as a look's settings, designed once from what Gemini saw (its Reel wears it, unless she asks for another).
+  const filterLook = look.filter ? (await designLook(studioId, look.filter, { copied: true }))?.look : undefined;
+  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, ...outline, ...(filterLook ? { filter_look: filterLook } : {}) };
   // Its three lines also stand as its reading (the inspirations list, the editor's chosen inspiration).
   const analysis = stolenStyleLines(style).join(" ");
   await db

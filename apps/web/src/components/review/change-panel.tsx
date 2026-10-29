@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_COVER_SECONDS, EFFECT_LABELS, EFFECT_MINUTES, EFFECT_WORDS_MINUTES, REDO_MINUTES, REEL_EFFECTS, RERENDER_MINUTES, SIMONE_VOICES, voiceSamplePath, type PostCover, type ReelEffect } from "@fauve/agent";
+import { DEFAULT_COVER_SECONDS, EFFECT_MINUTES, LOOK_PRESETS, EFFECT_WORDS_MINUTES, REDO_MINUTES, REEL_EFFECTS, RERENDER_MINUTES, SIMONE_VOICES, voiceSamplePath, type PostCover, type ReelEffect } from "@fauve/agent";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { setLook, setMusic, setPublishByHand, setVoiceOff } from "@/app/(app)/publications/[id]/cover-actions";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
@@ -182,11 +182,23 @@ function Done({ children, disabled, onClick, pending }: { children: React.ReactN
 }
 
 /** What she adds in her words, sent with the request (optional). */
-function NoteField({ label, placeholder, value, onChange }: { label: string; placeholder: string; value: string; onChange: (value: string) => void }) {
+function NoteField({
+  label,
+  placeholder,
+  value,
+  onChange,
+  required = false,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[13.5px] font-bold">
-        {label} <span className="font-semibold text-muted">facultatif</span>
+        {label} {required ? null : <span className="font-semibold text-muted">facultatif</span>}
       </span>
       <textarea
         value={value}
@@ -580,28 +592,39 @@ function MusicView({ data, onDone }: Props) {
   );
 }
 
-/** A look over the whole video, like a filter (a disposable camera, a VHS tape…): she picks, then confirms (the video is made again, free). */
+/**
+ * A look over the whole video, like a filter: a ready one (a disposable camera, a VHS tape…) or her own in her
+ * words (« pellicule Kodak des années 70 »), then she confirms (the video is made again, free).
+ */
 function LookView({ data, onDone }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const current: ReelEffect | "none" = data.effect ?? "none";
-  const [choice, setChoice] = useState<ReelEffect | "none">(current);
-  const options: { id: ReelEffect | "none"; title: string; hint: string }[] = [
+  type Choice = ReelEffect | "none" | "own";
+  const current: Choice = data.look ? (data.look.preset ?? "own") : "none";
+  const [choice, setChoice] = useState<Choice>(current);
+  const [words, setWords] = useState("");
+  const options: { id: Choice; title: string; hint: string }[] = [
     { id: "none", title: "Sans look", hint: "Ta vidéo telle quelle, avec la lumière de ta charte." },
-    ...REEL_EFFECTS.map((id) => ({ id, title: EFFECT_LABELS[id].label, hint: EFFECT_LABELS[id].hint })),
+    ...REEL_EFFECTS.map((id) => ({ id, title: LOOK_PRESETS[id].name, hint: LOOK_PRESETS[id].hint })),
+    {
+      id: "own",
+      title: current === "own" && data.look ? data.look.name : "Un autre look",
+      hint: current === "own" && data.look ? data.look.hint : "Décris-le avec tes mots : une pellicule, un appareil, une époque, un film.",
+    },
   ];
-  const changed = choice !== current;
+  const changed = choice === "own" ? Boolean(words.trim()) : choice !== current;
   const apply = () =>
     start(async () => {
       if (!changed) return onDone("");
       setError(null);
-      const result = await setLook(data.postId, choice);
-      if (!result.ok) return setError("Ça n’a pas marché. Réessaie dans un instant.");
-      onDone(choice === "none" ? `Sans look : la vidéo se refait, ${RERENDER_MINUTES} minutes environ.` : `Look « ${EFFECT_LABELS[choice].label} » : la vidéo se refait, ${RERENDER_MINUTES} minutes environ.`);
+      const result = await setLook(data.postId, choice === "own" ? words.trim() : choice);
+      if (!result.ok) return setError(choice === "own" ? "Je n’ai pas réussi à faire ce look. Redis-le avec d’autres mots." : "Ça n’a pas marché. Réessaie dans un instant.");
+      const done = choice === "none" ? "Sans look" : `Look « ${result.name ?? ""} »`;
+      onDone(`${result.note ? `${result.note} ` : ""}${done} : la vidéo se refait, ${RERENDER_MINUTES} minutes environ.`);
     });
   return (
     <div className="flex flex-col gap-2.5">
-      <p className="text-[13.5px] leading-snug text-muted">Sur toute la vidéo, sous tes textes, comme un filtre. Gratuit.</p>
+      <p className="text-[13.5px] leading-snug text-muted">Sur toute la vidéo, sous tes textes, comme un filtre : ses couleurs et sa texture, jamais tes images redessinées. Gratuit.</p>
       <div role="radiogroup" aria-label="Le look" className="flex flex-col gap-2">
         {options.map((o) => {
           const on = choice === o.id;
@@ -629,13 +652,22 @@ function LookView({ data, onDone }: Props) {
           );
         })}
       </div>
+      {choice === "own" && (
+        <NoteField
+          label={current === "own" ? "Un autre look ?" : "Ton look"}
+          placeholder="Ex. pellicule Kodak des années 70, Polaroid délavé, comme un film de Wes Anderson"
+          value={words}
+          onChange={setWords}
+          required
+        />
+      )}
       {error && (
         <p role="alert" className="text-[13.5px] font-semibold text-danger">
           {error}
         </p>
       )}
       <Done onClick={apply} pending={pending}>
-        {changed ? (choice === "none" ? "Retirer le look" : `Mettre le look « ${EFFECT_LABELS[choice].label} »`) : "C’est bon"}
+        {changed ? (choice === "none" ? "Retirer le look" : choice === "own" ? "Mettre ce look" : `Mettre le look « ${LOOK_PRESETS[choice].name} »`) : "C’est bon"}
       </Done>
     </div>
   );

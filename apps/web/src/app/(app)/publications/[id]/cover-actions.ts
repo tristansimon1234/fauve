@@ -1,6 +1,7 @@
 "use server";
 
-import { EFFECT_VOICE_OUT, editPlanSchema, isBaked, isReelEffect, postCoverSchema, type PostCover, type ReelEffect } from "@fauve/agent";
+import { EFFECT_VOICE_OUT, editPlanSchema, isBaked, planLook, postCoverSchema, sameLook, type PostCover } from "@fauve/agent";
+import { resolveLook } from "@/lib/agent/look-designer";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -72,11 +73,12 @@ export async function setPublishByHand(postId: string, byHand: boolean): Promise
 }
 
 /**
- * A look over the whole video (looks.ts: a disposable camera, a VHS tape…), or none: a new version of
- * the same cut, the video made again after the answer (about a minute, free; the music stays).
+ * A look over the whole video (looks.ts): « none », a preset (« vhs »), or her words, designed into its settings
+ * (« pellicule Kodak des années 70 »); a new version of the same cut, the video made again after the answer
+ * (about a minute, free; the music stays). Answers its name, and what it does instead of what a look cannot do.
  */
-export async function setLook(postId: string, look: ReelEffect | "none"): Promise<{ ok: boolean }> {
-  if (!z.uuid().safeParse(postId).success || (look !== "none" && !isReelEffect(look))) return { ok: false };
+export async function setLook(postId: string, words: string): Promise<{ ok: boolean; name?: string; note?: string }> {
+  if (!z.uuid().safeParse(postId).success || !words.trim() || words.length > 300) return { ok: false };
   const { db, member } = await getStudioContext();
   if (!member) return { ok: false };
   const studioId = member.studio.id;
@@ -93,9 +95,12 @@ export async function setLook(postId: string, look: ReelEffect | "none"): Promis
   const plan = editPlanSchema.safeParse(current?.plan);
   // A video drawn image by image by the effects workshop: its look is a correction of the effect.
   if (!plan.success || isBaked(plan.data)) return { ok: false };
-  const effect = look === "none" ? undefined : look;
-  if ((plan.data.effect ?? null) === (effect ?? null)) return { ok: true };
-  const { id } = await insertPlanVersion(studioId, postId, { ...plan.data, effect });
+  const chosen = await resolveLook(studioId, words);
+  if ("missed" in chosen) return { ok: false };
+  const named = { ...(chosen.look ? { name: chosen.look.name } : {}), ...(chosen.note ? { note: chosen.note } : {}) };
+  if (sameLook(planLook(plan.data), chosen.look)) return { ok: true, ...named };
+  const { effect: _preset, look: _old, ...cut } = plan.data;
+  const { id } = await insertPlanVersion(studioId, postId, chosen.look ? { ...cut, look: chosen.look } : cut);
   const { error } = await supabaseAdmin().from("posts").update({ edit_plan_id: id }).eq("id", postId).eq("studio_id", studioId);
   if (error) return { ok: false };
   after(() =>
@@ -105,7 +110,7 @@ export async function setLook(postId: string, look: ReelEffect | "none"): Promis
     ),
   );
   revalidatePath(`/publications/${postId}`);
-  return { ok: true };
+  return { ok: true, ...named };
 }
 
 /**

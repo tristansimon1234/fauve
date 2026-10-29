@@ -4,7 +4,7 @@ import { listFields, LOOK_FONT, savedLookSchema, textLookSchema } from "./text-l
 import { brandSignatureSchema } from "./signature.ts";
 import { styleSampleSchema } from "./moodboard.ts";
 import { voiceSettingSchema } from "./voice-over.ts";
-import { REEL_EFFECTS } from "./looks.ts";
+import { REEL_EFFECTS, reelLookSchema } from "./looks.ts";
 
 // Mirrors the Postgres enums in supabase/migrations.
 export const postStatusSchema = z.enum([
@@ -341,9 +341,11 @@ export const editPlanObjectSchema = z.object({
   // `at`: where the recording starts on the Reel's clock; negative, the silence before its first word is cut.
   voice: z.object({ media_id: z.string().min(1), at: z.number().min(-30).max(10) }).optional(),
   /**
-   * Over the whole video, under the texts: dust (film dust and a rare scratch: a key message, a vintage or night mood),
-   * or a look on her request or the Reel she copies (looks.ts: a disposable camera, a VHS tape, the flash of the 2000s, cinema, black and white).
+   * A look over the whole video, under the texts (looks.ts: its grade and its texture, as settings written from her
+   * words, the Reel she copies, or a preset), on her request, the Reel she copies, or her default for all her Reels.
    */
+  look: reelLookSchema.optional(),
+  /** The preset a plan made before named for its look (film dust, a disposable camera, a VHS tape…): planLook reads it. */
   effect: z.enum(REEL_EFFECTS).optional(),
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height), set by the engine off the faces: they never move from shot to shot. */
   subtitle_y: z.number().min(0.1).max(0.8).optional(),
@@ -603,6 +605,8 @@ export const brandProfileSchema = z.object({
   voice: voiceSettingSchema.optional(),
   /** Her finishing touches for all her Reels (each Reel can change them): set by Edith's set_finish without a Reel. */
   finish: reelFinishSchema.optional(),
+  /** A look on all her Reels, when she asked for one (Edith's set_look without a Reel): each Reel can change it. */
+  look: reelLookSchema.optional(),
   dos: z.array(z.string()),
   donts: z.array(z.string()),
 });

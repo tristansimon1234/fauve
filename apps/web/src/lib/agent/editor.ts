@@ -1,5 +1,6 @@
 import "server-only";
 import { insertPlanVersion } from "@/lib/edit-plans";
+import { designLook } from "./look-designer";
 import {
   contractLines,
   type ReelContract,
@@ -7,7 +8,10 @@ import {
   signatureLines,
   followedForEditor,
   followedLook,
-  followedEffect,
+  followedFilter,
+  editorLook,
+  lookChoice,
+  planLook,
   signatureOf,
   editorOutputSchemaLegacy,
   finishPlan,
@@ -358,6 +362,9 @@ export async function designEdit(params: {
       correction && asWritten
         ? {
             ...asWritten,
+            // Its look by its name (« look » of the answer: the same name keeps it as it is).
+            look: planLook(asWritten)?.preset ?? planLook(asWritten)?.name,
+            effect: undefined,
             segments: asWritten.segments.map((s) =>
               isMotionSegment(s)
                 ? {
@@ -455,9 +462,27 @@ export async function designEdit(params: {
   if (!plan.colors && base?.colors && !params.fresh) plan.colors = base.colors;
   // The Reel she copies takes its own font over her charter's when it makes its style (the animations get it too); its colours were offered to the editor.
   Object.assign(plan, followedLook(plan, followed));
-  // A correction keeps its look unless the editor changed it (« none » takes it off); the Reel she copies brings its own.
-  if (correction && !params.fresh && base?.effect && (output.plan as { effect?: string }).effect === undefined) plan.effect = base.effect;
-  Object.assign(plan, followedEffect(plan, followed));
+  // Its look: a preset is already on the plan; one in her words is designed now (named again in a correction, it is
+  // kept as it was). A correction keeps its look unless the editor changed it (« none » takes it off); a new Reel
+  // takes the look of the Reel she copies, else her default for all her Reels, when she asked for one.
+  const baseLook = base && !params.fresh ? planLook(base) : null;
+  const askedLook = editorLook(output.plan);
+  let lookNote = "";
+  if (askedLook && "design" in askedLook) {
+    const named = lookChoice(baseLook?.name);
+    if (baseLook && named && "design" in named && named.design.toLowerCase() === askedLook.design.toLowerCase()) plan.look = baseLook;
+    else {
+      const designed = await designLook(params.studioId, askedLook.design);
+      if (designed) {
+        plan.look = designed.look;
+        lookNote = designed.note;
+      } else if (baseLook) plan.look = baseLook;
+    }
+  } else if (!askedLook && correction && baseLook) plan.look = baseLook;
+  if (!correction || params.fresh) {
+    Object.assign(plan, followedFilter(plan, followed));
+    if (!planLook(plan) && profile.look) plan.look = profile.look;
+  }
 
   // The hook's words decide whether anyone stays: a new Reel's written hook is weighed against
   // other forms by the hook judge, who keeps the strongest (an opening animation is its own hook).
@@ -842,7 +867,7 @@ export async function designEdit(params: {
       ? "Je n'ai pas réussi à refaire l'animation du haut avec tes changements : je garde celle de la version d'avant, avec tes nouveaux textes et ta nouvelle voix. Dis-moi « refais l'animation » et je la reprends."
       : compositionMissed
         ? "Je n'ai pas réussi à composer la mise en page demandée : cette version passe tes plans en plein cadre. Dis-moi « réessaie la mise en page » et je la refais."
-        : honestLength(output.rationale, plan.duration, params.contract?.duration),
+        : [honestLength(output.rationale, plan.duration, params.contract?.duration), lookNote].filter(Boolean).join(" "),
     // A collage's composition is the ambiance itself, never a paid animation.
     newScenes: requests.filter((r) => !r.compose).length,
     reusedScenes: reused.size,

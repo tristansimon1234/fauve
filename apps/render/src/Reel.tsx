@@ -14,8 +14,7 @@ import {
 import { CarouselDesign } from "./Carousel";
 import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, CollageMessage, Grain, printSize, stickerTop, type Sticker } from "./Collage";
 import { DEPTH_MOVES, DepthPhoto } from "./Depth";
-import { FilmDust } from "./FilmDust";
-import { isLook, LookDefs, LookOverlay, lookFilter } from "./Looks";
+import { gradesFootage, LookDefs, LookOverlay, lookFilter } from "./Looks";
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
 import { Marker } from "./Marker";
@@ -71,9 +70,10 @@ export function Reel(props: ReelProps) {
     ...(props.layers ?? []).flatMap((l) => l.fonts ?? []),
   ]);
   const k = props.width / 1080;
-  // A look on the whole Reel (on her request): a grade over her footage and its animations, its overlay under the texts.
-  const look = isLook(props.effect) ? props.effect : null;
-  if (look === "vhs") loadFonts(["VT323"]);
+  // A look on the whole Reel (on her request): a grade over her footage and its animations, its texture under the texts.
+  const look = props.look ?? null;
+  if (look?.stamp?.style === "camcorder") loadFonts(["VT323"]);
+  if (look?.stamp?.style === "typed") loadFonts(["Courier Prime"]);
   // A free collage, or another composed Reel (a split screen…): its composition lays the shots (the fixed prints,
   // or the plain montage, only if its code cannot run).
   const compose = props.layers?.find((l) => l.compose);
@@ -245,9 +245,8 @@ export function Reel(props: ReelProps) {
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       <ExposureFilters />
-      {look ? <LookDefs k={k} /> : null}
-      {look ? <AbsoluteFill style={{ filter: lookFilter(look) }}>{footage}</AbsoluteFill> : footage}
-      {props.effect === "dust" ? <FilmDust k={k} /> : null}
+      {look && gradesFootage(look) ? <LookDefs look={look} k={k} /> : null}
+      {look && gradesFootage(look) ? <AbsoluteFill style={{ filter: lookFilter(look, k) }}>{footage}</AbsoluteFill> : footage}
       {look ? <LookOverlay look={look} stamp={props.stamp} k={k} /> : null}
 
       {whole ? null : engineTexts}

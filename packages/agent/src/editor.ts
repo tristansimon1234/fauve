@@ -4,7 +4,7 @@ import { planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
 import { hookAtStart } from "./hook.ts";
 import { snapToTempo, TEMPLATE_BPM } from "./tempo.ts";
-import { isReelEffect, REEL_EFFECTS } from "./looks.ts";
+import { lookChoice, type ReelLook } from "./looks.ts";
 import { applySpeechCuts, spokenShot, type SpeechFacts } from "./speech.ts";
 import {
   cameraMoveSchema,
@@ -80,7 +80,7 @@ Her voice (« voice »): the Reel is cut on it and lasts at least « ends_at » 
 
 Her first Reel (« first_reel ») is how she discovers what Edith can do: it should make her say « waouh » within a second: her most beautiful shot with the promise in an animation over it, her best shots in a real story, little text, a lively pace, an ending on the most beautiful shot, the animations allowed (usually 2) over her images. Her request and « reel_a_recopier » still come first.
 
-Transitions and effects stay invisible: « transitions » « cut » almost always, « fade » only for a calm Reel with long shots; no strong zoom on every shot. The engine puts one signature transition on the shot where your « band » appears. « effect »: « dust » (a discreet film dust) for a key message or a retro, night or handmade mood; a look (« disposable » camera, « vhs », « y2k » flash, « cine », « bw ») only when her request or « reel_a_recopier » has one; « none » most of the time.
+Transitions and effects stay invisible: « transitions » « cut » almost always, « fade » only for a calm Reel with long shots; no strong zoom on every shot. The engine puts one signature transition on the shot where your « band » appears. « look »: « dust » (a discreet film dust) for a key message or a retro, night or handmade mood; a look only when her request or « reel_a_recopier » has one: « disposable », « vhs », « y2k », « cine », « bw », else in her words, in French (« pellicule Kodak années 70 »); « none » most of the time.
 
 « duration »: the sum of the shots' lengths on screen. 7 to 15 s for an announcement or a mood, 20 to 30 s for a story; up to 45 s only when someone speaks or a voice tells it all along, or when the Reel she copies is that long; never over 45 s.
 
@@ -132,7 +132,7 @@ const editorRhythm = {
  * refuses the current schema (structured-output grammars have limits of their own).
  */
 export const editorOutputSchemaLegacy = z.object({
-  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true, finish: true }).extend({
+  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true, finish: true, look: true }).extend({
     ...editorRhythm,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
@@ -187,11 +187,21 @@ export const editorOutputSchema = z.object({
         "This Reel's own colours (hex, the main one first, 3 at most), only when it needs others than her charter's: the Reel she copies has its own (« reel_a_recopier.couleurs ») and they serve this Reel and her request, or her request asks for a world of its own. Otherwise leave it out. A correction keeps the previous version's unless you write others (her charter's to go back to them)",
       ),
     end_card: z.object({ title: z.string(), subtitle: z.string().optional() }).optional(),
-    effect: z.enum(["none", ...REEL_EFFECTS]).optional(),
+    look: z.string().optional(),
     layers: z.array(z.object({ brief: z.string(), from: z.number(), to: z.number() })).optional(),
   }),
   rationale: z.string(),
 });
+
+/**
+ * The look the editor asks for: none, a preset (its key), or her words for another, which the look
+ * designer turns into settings (lookChoice). An editor output of the older form names a preset in `effect`.
+ */
+export function editorLook(plan: unknown): { look: ReelLook | null } | { design: string } | null {
+  const written = plan as { look?: unknown; effect?: unknown };
+  const words = typeof written.look === "string" ? written.look : typeof written.effect === "string" ? written.effect : undefined;
+  return lookChoice(words);
+}
 
 /**
  * The Reel's signature transition: a short zoom for a lively Reel (and a collage), a
@@ -374,7 +384,8 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
   const ownColors = (plan as { colors?: unknown }).colors;
   const colors = Array.isArray(ownColors) ? [...new Set(ownColors.flatMap((c) => (typeof c === "string" && HEX_COLOR.test(c.trim().toLowerCase()) ? [c.trim().toLowerCase()] : [])))].slice(0, 3) : [];
   const { end_card: _endCard, fonts: _fonts, colors: _colors, ...rest } = plan as typeof plan & { colors?: unknown };
-  const { effect: _effect, layers: asked, ...kept } = rest as typeof rest & { effect?: string; layers?: { brief: string; from: number; to: number }[] };
+  const { effect: _effect, look: _look, layers: asked, ...kept } = rest as typeof rest & { effect?: string; look?: unknown; layers?: { brief: string; from: number; to: number }[] };
+  const askedLook = editorLook(plan);
   // Animations over several shots: a brief and a span, the code comes later (like a scene's).
   const layers = (asked ?? []).filter((l) => l.brief?.trim() && Number.isFinite(l.from) && Number.isFinite(l.to)).slice(0, 3);
   // A composition: the animation over the whole Reel lays its shots (one is added when the editor wrote none).
@@ -391,8 +402,8 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
     format: "9:16",
     images: [],
     music: null,
-    // Film dust or a look over the whole video, when the editor asks for it.
-    ...("effect" in plan && isReelEffect(plan.effect) ? { effect: plan.effect } : {}),
+    // A preset look over the whole video, when the editor asks for one (a look in her words is designed after: editorLook).
+    ...(askedLook && "look" in askedLook && askedLook.look ? { look: askedLook.look } : {}),
     ...(fonts && Object.keys(fonts).length ? { fonts } : {}),
     ...(colors.length ? { colors } : {}),
     ...(endCard ? { end_card: endCard } : {}),

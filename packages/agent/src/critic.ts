@@ -4,7 +4,7 @@ import { AMBIANCES, isClipSegment, isMotionSegment, motionTemplateSchema, screen
 import { HOOK_LATEST, OPENING_MAX_SECONDS } from "./hook.ts";
 import { voicePhrases, type VoiceTranscript } from "./voice.ts";
 import { planBeat, planBpm } from "./tempo.ts";
-import { EFFECT_LABELS } from "./looks.ts";
+import { lookWords, planLook } from "./looks.ts";
 import type { ReelFormat } from "./voice-over.ts";
 
 // The critic: before a Soigné or Max montage goes out, Opus watches key frames
@@ -348,11 +348,7 @@ export function rhythmLine(plan: EditPlan): string {
     camera.length ? `caméra : ${camera.join(", ")}` : "",
     plan.voice ? "coupes sur les phrases de sa voix" : onBeat !== null ? `${onBeat} coupes sur ${cuts.length} sur un temps (${planBpm(plan)} BPM)` : "",
     accents.length ? `transition signature : ${accents.join(", ")}` : "aucune transition signature",
-    plan.effect === "dust"
-      ? "effet voulu : poussière de pellicule sur toute la vidéo"
-      : plan.effect
-        ? `look voulu (sa demande ou le Reel qu'elle recopie, jamais un défaut) : ${EFFECT_LABELS[plan.effect].label.toLowerCase()}, ${EFFECT_LABELS[plan.effect].hint}`
-        : "",
+    lookLine(planLook(plan)),
   ]
     .filter(Boolean)
     .join(" ; ")
@@ -448,6 +444,13 @@ export function qualityChecks(plan: EditPlan, options: QualityOptions = {}): Qua
     },
     { key: "loop", must: false, ok: loops, words: loops ? "la fin reboucle sur la 1re image" : "la fin ne reboucle pas sur la 1re image" },
   ];
+}
+
+/** A look over the whole video, for the critic: wanted (her request, the Reel she copies, her default), never a defect. */
+function lookLine(look: ReturnType<typeof planLook>): string {
+  if (!look) return "";
+  if (look.preset === "dust") return "effet voulu : poussière de pellicule sur toute la vidéo";
+  return `look voulu (sa demande, le Reel qu'elle recopie ou son réglage, jamais un défaut) : ${lookWords(look)}`;
 }
 
 /** The quality checks in one line for the critic: what is fine, what to look at again, what to try if the footage allows. */

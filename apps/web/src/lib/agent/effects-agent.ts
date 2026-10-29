@@ -119,7 +119,10 @@ export async function effectRoute(studioId: string, input: { postId: string; cor
   const videos = (media ?? []).filter((m) => m.kind === "video").length;
   // The Reel she copies is part of her request: its moments (an effect after another) say what it takes.
   const followed = await postStyle(studioId, input.postId).catch(() => undefined);
-  const copied = followed ? momentsLine(followed.look) : null;
+  // What it makes with generative AI is never made: said, so that it does not send the Reel to the workshop.
+  const copied = followed
+    ? [momentsLine(followed.look), followed.look.generative ? `fait par IA générative, que personne ne refait : ${followed.look.generative}` : null].filter(Boolean).join(" ; ") || null
+    : null;
   const route = await routeEffect(studioId, input.brief ?? undefined, { videos, photos: (media ?? []).length - videos }, copied);
   if (route.agent) console.log("montage: effects agent", input.postId, route.effect, "—", route.why);
   return route.agent ? "agent" : "chain";
