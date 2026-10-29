@@ -1,6 +1,6 @@
 "use client";
 
-import { MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STEPS, RHYTHM_PRESETS, sampleWeek, STYLE_PREVIEW_FRAME, type OnboardingStep } from "@fauve/agent";
+import { instagramProfileHandle, INTRO_VIDEO, MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STEPS, RHYTHM_PRESETS, sampleWeek, STYLE_PREVIEW_FRAME, type OnboardingStep } from "@fauve/agent";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -162,34 +162,50 @@ export function OnboardingCard({
 
 function WebsiteStep({ onSend, pending }: { onSend: (text: string) => void; pending: boolean }) {
   const [url, setUrl] = useState("");
-  const valid = /\.[a-z]{2,}/i.test(url.trim());
+  const given = url.trim();
+  const instagram = instagramProfileHandle(given);
+  const valid = Boolean(instagram) || /\.[a-z]{2,}/i.test(given);
   return (
-    <>
-      <p className="text-[14px] leading-relaxed text-muted">Ton site me dit qui tu es, ce que tu proposes, tes couleurs et ton ton. Je le lis et je te résume ce que j’ai compris.</p>
-      <form
-        className="flex flex-col gap-2 sm:flex-row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (valid) onSend(`Voici mon site : ${url.trim()}`);
-        }}
-      >
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          inputMode="url"
-          autoComplete="url"
-          placeholder="monsite.fr"
-          aria-label="Ton site"
-          className="h-12 min-w-0 flex-1 rounded-full border border-line bg-white px-4 text-[15px] outline-none focus:border-violet"
-        />
-        <button type="submit" disabled={!valid || pending} className="btn btn-primary h-12 px-5 disabled:opacity-40">
-          Lire mon site
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+      {/* Who Edith is and what he does, in 30 seconds: the same video as the welcome on WhatsApp. */}
+      <video
+        src={INTRO_VIDEO.path}
+        poster={INTRO_VIDEO.poster}
+        autoPlay
+        muted
+        playsInline
+        controls
+        preload="metadata"
+        aria-label="Tout ce qu’il faut savoir sur Edith, en 30 secondes"
+        className="aspect-[9/16] w-full max-w-[200px] shrink-0 self-center rounded-[18px] bg-soft object-cover sm:self-start"
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <p className="text-[14px] leading-relaxed text-muted">Tout ce qu’il faut savoir sur moi est dans la vidéo. Pour commencer, ton site ou ton Instagram me disent qui tu es, ce que tu proposes et ton style : je les lis et je te résume ce que j’ai compris.</p>
+        <form
+          className="flex flex-col gap-2 sm:flex-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (valid) onSend(instagram ? `Voici mon Instagram : ${given}` : `Voici mon site : ${given}`);
+          }}
+        >
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            inputMode="url"
+            autoComplete="url"
+            placeholder="monsite.fr ou @moninstagram"
+            aria-label="Ton site ou ton Instagram"
+            className="h-12 min-w-0 flex-1 rounded-full border border-line bg-white px-4 text-[15px] outline-none focus:border-violet"
+          />
+          <button type="submit" disabled={!valid || pending} className="btn btn-primary h-12 px-5 disabled:opacity-40">
+            {instagram ? "Lire mon Instagram" : "Lire mon site"}
+          </button>
+        </form>
+        <button type="button" disabled={pending} onClick={() => onSend("Je n’ai ni site ni Instagram.")} className="self-start text-[13px] font-semibold text-muted hover:text-ink">
+          Ni site ni Instagram
         </button>
-      </form>
-      <button type="button" disabled={pending} onClick={() => onSend("Je n’ai pas de site internet.")} className="self-start text-[13px] font-semibold text-muted hover:text-ink">
-        Je n’ai pas de site
-      </button>
-    </>
+      </div>
+    </div>
   );
 }
 
