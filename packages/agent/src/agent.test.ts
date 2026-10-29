@@ -8,7 +8,7 @@ import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts"
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
-import { beautifulTrends, captionHashtags, captionLang, cleanHook, cleanTags, cleanWhy, foreignScript, inTrendLang, nextTags, otherLang, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
+import { beautifulTrends, captionHashtags, captionLang, cleanHook, cleanTags, cleanWhy, foreignScript, inTrendLang, minViews, nextTags, otherLang, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
@@ -4735,6 +4735,10 @@ test("trends: in her language, and only hooks that work", () => {
   const pool = [t("en", 900_000, "the only thing I look forward to hearing"), t("maybe", 800_000, "✨ #pilates"), t("fr", 200_000, "on vous attend pour le cours de 19 h"), t("us", 700_000, "✨", "US")];
   assert.deepEqual(keptTrends(pool, "trend", now, "fr").map((k) => k.external_id), ["fr", "maybe"]);
   assert.deepEqual(keptTrends(pool, "trend", now).map((k) => k.external_id), ["en", "maybe", "us", "fr"]);
+  // « Les plus belles » are chosen on their image: any language until their cover says otherwise.
+  assert.deepEqual(keptTrends(pool, "beau", now, "fr").map((k) => k.external_id), ["en", "maybe", "us", "fr"]);
+  // In French, a country's audience: a third of the world's bar, a city's unchanged.
+  assert.deepEqual([minViews("trend", "tiktok", "fr"), minViews("trend", "tiktok", "en"), minViews("local", "tiktok", "fr")], [30_000, 100_000, 5_000]);
   // Its cover in another language than hers: left out; no words on it: it can stay.
   assert.equal(otherLang({ lang: "en" }, "fr"), true);
   assert.equal(otherLang({ lang: "none" }, "fr"), false);

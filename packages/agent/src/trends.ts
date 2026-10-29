@@ -288,13 +288,27 @@ export const TREND_PAGES = 3;
 export function keptTrends(videos: TrendVideo[], scope: TrendScope, now = new Date(), lang: TrendLang = "all"): TrendVideo[] {
   const limit = now.getTime() - TREND_MAX_AGE_DAYS * 86_400_000;
   const unique = [...new Map(videos.map((v) => [`${v.platform}:${v.external_id}`, v])).values()];
-  const sure = (v: TrendVideo) => (inTrendLang(v, lang) === "yes" ? 1 : 0);
+  // « Les plus belles » are chosen on their image: a beautiful video without words is hers in any
+  // language, only words on its cover in another one leave it out (otherLang, once read).
+  const spoken = scope === "beau" ? "all" : lang;
+  const sure = (v: TrendVideo) => (inTrendLang(v, spoken) === "yes" ? 1 : 0);
   return unique
-    .filter((v) => !foreignScript(v.caption) && inTrendLang(v, lang) !== "no")
+    .filter((v) => !foreignScript(v.caption) && inTrendLang(v, spoken) !== "no")
     .filter((v) => v.posted_at !== null && Date.parse(v.posted_at) >= limit)
-    .filter((v) => reach(v) >= TREND_MIN_VIEWS[scope][v.platform])
+    .filter((v) => reach(v) >= minViews(scope, v.platform, lang))
     .sort((a, b) => sure(b) - sure(a) || reach(b) - reach(a));
 }
+
+/**
+ * Fewer views than this is not shown. In a language other than English, a trade's audience is a
+ * country's, not the world's: 100 000 views is the world's bar (in French, « Ce qui cartonne » au
+ * pilates kept one or two videos), so its lists keep a third of it; a city's list stays as it is.
+ */
+export function minViews(scope: TrendScope, platform: TrendPlatform, lang: TrendLang): number {
+  const bar = TREND_MIN_VIEWS[scope][platform];
+  return scope === "local" || lang === "all" || lang === "en" ? bar : Math.round(bar * LANG_AUDIENCE);
+}
+const LANG_AUDIENCE = 0.3;
 
 /** Mostly written in a script other than the Latin one (emoji, digits and hashtags aside). */
 export function foreignScript(caption: string): boolean {
@@ -438,7 +452,7 @@ export const coverReadSchema = z.object({
         hook_form: z.enum(HOOK_FORMS).describe("The form of that hook; autre when there is none"),
         hook_score: z.number().int().min(1).max(10).describe("How strongly the hook makes you keep watching, 1 to 10; 1 when there is none"),
         hook_why: z.string().max(90).describe("In French, why it stops the thumb, in a few words; empty under 7"),
-        lang: z.enum(COVER_LANGS).describe("The language of the words on the image and in the caption; none when there are none"),
+        lang: z.enum(COVER_LANGS).describe("The language of the words written on the image; none when there are none"),
         tags: z.array(z.string().max(24)).max(3).describe("2 or 3 short French words for what makes it inspiring"),
       }),
     )
@@ -451,7 +465,7 @@ export const TREND_BEAUTY_PASS = 7;
 /** A hook from 7 out of 10 is shown as a hook that works; under it, a title or a label (« PINK CLUB », « pilates girl »). */
 export const TREND_HOOK_PASS = 7;
 
-/** Whether its cover says it is in another language than hers (no words on it: it can be any). */
+/** Whether the words on its cover are in another language than hers (no words on it: it can be any). */
 export const otherLang = (read: Pick<CoverRead, "lang"> | undefined, lang: TrendLang) => lang !== "all" && !!read && read.lang !== "none" && read.lang !== lang;
 
 /** Why a hook works, as Sonnet wrote it: one line, 90 characters at most, only for a hook that passes. */
@@ -488,7 +502,7 @@ You receive the trade (in French) and numbered covers with their caption and acc
 4. hook_form: the form of that hook: question, pov (« pov : … »), chiffre (a precise number), promesse (what you will get), contre_pied (the opposite of what you expect), coulisses (what you don't usually see), defi (a challenge), liste (« 3 erreurs… »), autre (another form, or no hook).
 5. hook_score, from 1 to 10: how strongly those words alone make someone stop scrolling and watch to the end, judged as a seasoned short-form creator would. 9–10: impossible to scroll past: a sharp tension, a surprising precise number, a reversal, a question you need answered, a situation everyone recognises said in a few words (« 180€ pour faire ÇA avec une paille ?! », « Ma copine le fait chaque semaine, ça doit pas être si dur »). 7–8: clearly opens a loop and is specific. 4–6: informs but does not pull (« Tuto carré bob »). 1–3: a title, a label, a place or brand name, one or two words, a hashtag, a vague mood (« PINK CLUB », « pilates girl », « Pilates in Paris », « La plus BELLE »), clickbait that the video cannot keep, unreadable, or no hook. The views never count: judge the words.
 6. hook_why: only when hook_score is 7 or more, in French, at most 90 characters, what makes it work, concretely (« Une note Google catastrophique : on veut voir le désastre. », « Le prix choque, on reste pour comprendre. »). Never « accrocheur », never a dash. Empty under 7.
-7. lang: the language of the words written on the image and in the caption (fr, en, es, it, de, pt, other), or none when there are no words but hashtags, names and emojis.
+7. lang: the language of the words written on the image itself (fr, en, es, it, de, pt, other), or none when nothing is written on it but a name, a handle or emojis. Never the caption's.
 8. tags: 2 or 3 short words in French, lowercase, for what makes it inspiring to copy: its light, framing, colours, type, format or idea (« lumière naturelle », « plan serré », « titre serif », « noir et blanc », « collage », « pov », « avant après », « plan fixe »). Never a judgement (« beau », « joli »).
 
 Answer for every number.`;
