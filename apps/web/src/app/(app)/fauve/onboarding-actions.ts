@@ -27,8 +27,8 @@ export type OnboardingView = {
   preview: ReelProps | null;
   /** Her site's look has been read (its signature written): until then, the style card makes her wait for her preview. */
   siteRead: boolean;
-  /** fromSite: Edith took these photos from her website (she has not made her own moodboard yet). */
-  moodboard: { items: { path: string; url: string }[]; reading: string | null; fromSite: boolean };
+  /** photosFrom: Edith took these photos from her website or her Instagram (she has not made her own moodboard yet). */
+  moodboard: { items: { path: string; url: string }[]; reading: string | null; photosFrom: "site" | "instagram" | null };
   rhythm: { posts: number; stories: number };
   /** Her offer: what its credits hold, to choose a rhythm she can keep with care. */
   offer: { label: string; credits: number; postsPerWeek: number; reels: number };
@@ -84,7 +84,7 @@ export async function onboardingView(): Promise<OnboardingView | null> {
     direction: profile.art_direction?.trim() || null,
     preview,
     siteRead: Boolean(profile.signature),
-    moodboard: { items: items.flatMap((i) => (urls.get(i.path) ? [{ path: i.path, url: urls.get(i.path)! }] : [])), reading: profile.moodboard?.reading ?? null, fromSite: items.some((i) => i.note === "Photo de ton site") },
+    moodboard: { items: items.flatMap((i) => (urls.get(i.path) ? [{ path: i.path, url: urls.get(i.path)! }] : [])), reading: profile.moodboard?.reading ?? null, photosFrom: items.some((i) => i.note === "Photo de ton site") ? "site" : items.some((i) => i.note === "Photo de ton Instagram") ? "instagram" : null },
     rhythm: { posts: (plan.data?.posts_per_week as number | null) ?? offer.postsPerWeek, stories: (plan.data?.stories_per_week as number | null) ?? 4 },
     offer: { label: offer.label, credits: offer.credits, postsPerWeek: offer.postsPerWeek, reels: reelsPerMonth(offerId) },
     instagram: (account.data?.handle as string | null) ?? null,

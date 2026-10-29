@@ -67,9 +67,9 @@ export const toolSpecs = {
   },
   read_website: {
     description:
-      "Lit une page web publique (le site du studio, ou une page précise comme les tarifs) : titre, description, texte, liens Instagram / TikTok, lien de réservation, pages du site, logo, couleurs dominantes et polices. À utiliser dès que la gérante donne son site, pour pré-remplir l'onboarding et le profil de style au lieu de reposer des questions. Un nouveau site (une autre adresse que le sien) est aussi relu pour son style après ta réponse : photos, couleurs, polices, direction artistique ; refresh : true quand elle dit que son site a changé ou a été refait à la même adresse.",
+      "Lit une page web publique (le site du studio, ou une page précise comme les tarifs) : titre, description, texte, liens Instagram / TikTok, lien de réservation, pages du site, logo, couleurs dominantes et polices. Lit aussi son profil Instagram (instagram.com/son_nom ou @son_nom) : nom, bio, activité, lien de sa bio, ses dernières légendes, et pendant l'onboarding ses photos pour son style. À utiliser dès que la gérante donne son site ou son Instagram, pour pré-remplir l'onboarding et le profil de style au lieu de reposer des questions. Un nouveau site (une autre adresse que le sien) est aussi relu pour son style après ta réponse : photos, couleurs, polices, direction artistique ; refresh : true quand elle dit que son site a changé ou a été refait à la même adresse.",
     input: z.object({
-      url: z.string().min(4).max(500).describe("Adresse de la page, avec ou sans https://"),
+      url: z.string().min(2).max(500).describe("Adresse de la page, avec ou sans https://, ou son profil Instagram (lien ou @son_nom)"),
       refresh: z.boolean().optional().describe("true quand elle dit que son site a changé ou a été refait : son style est relu même à la même adresse"),
     }),
   },

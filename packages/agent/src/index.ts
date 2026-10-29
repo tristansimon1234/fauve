@@ -40,6 +40,7 @@ export * from "./access.ts";
 export * from "./reply-cap.ts";
 export * from "./memory.ts";
 export * from "./jobs.ts";
+export * from "./instagram-profile.ts";
 export * from "./onboarding.ts";
 export * from "./mood.ts";
 export * from "./restyle.ts";

@@ -3,6 +3,7 @@ import {
   brandColorsFromLook,
   CHAT_MODEL,
   findVoice,
+  instagramProfileHandle,
   measuredTitles,
   pageFacts,
   pageFonts,
@@ -39,6 +40,9 @@ const MAX_PHOTOS = 6;
 const MAX_LIBRARY = 8;
 const MAX_CANDIDATES = 14;
 const SITE_NOTE = "Photo de ton site";
+const INSTAGRAM_NOTE = "Photo de ton Instagram";
+/** Photos a reading put in her moodboard (her site's, her Instagram's), not hers. */
+const READ_NOTES = new Set([SITE_NOTE, INSTAGRAM_NOTE]);
 
 /** A real photo: large enough, not a banner strip nor a sliver. */
 async function toPhoto(bytes: Buffer): Promise<{ jpeg: Buffer; width: number; height: number } | null> {
@@ -109,7 +113,7 @@ export function sitePage(url: string): string {
     return url.trim().toLowerCase();
   }
 }
-const hersOwn = (moodboard: MoodItems) => (moodboard?.items ?? []).some((i) => i.note !== SITE_NOTE);
+const hersOwn = (moodboard: MoodItems) => (moodboard?.items ?? []).some((i) => !READ_NOTES.has(i.note ?? ""));
 const smaller = (jpeg: Buffer, width: number) => sharp(jpeg).resize({ width, withoutEnlargement: true }).jpeg({ quality: 78 }).toBuffer();
 const key = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -139,7 +143,11 @@ async function siteFonts(page: PageMeasure | null, reading: SiteLookReading): Pr
   return { fonts, twins };
 }
 
-export async function readSiteLook(studioId: string, pageUrl: string, imageUrls: string[], options: { again?: boolean } = {}): Promise<{ photos: number; reading: boolean }> {
+/**
+ * `instagram`: her Instagram profile instead of a site (its latest photos, no page to open: Instagram
+ * shows a server its login wall). Her site given after it is read all the same, over what it gave.
+ */
+export async function readSiteLook(studioId: string, pageUrl: string, imageUrls: string[], options: { again?: boolean; instagram?: boolean } = {}): Promise<{ photos: number; reading: boolean }> {
   const db = supabaseAdmin();
   const started = Date.now();
   const [{ data: latest }, { data: studio }, { count: fromSite }] = await Promise.all([
@@ -148,13 +156,17 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
     db.from("media_assets").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("source", "website"),
   ]);
   const moodboard = (latest?.profile as { moodboard?: MoodItems } | null)?.moodboard;
+  // Her site after her Instagram: the better source, read over what her profile gave.
+  const readFirst = (latest?.profile as { site_read?: { url?: string } } | null)?.site_read?.url;
+  const again = options.again || Boolean(!options.instagram && readFirst && instagramProfileHandle(readFirst));
   // Read once: her own moodboard wins, and a second reading of the same site adds nothing; a new site is read again.
-  if (!options.again && ((moodboard?.items?.length ?? 0) > 0 || (fromSite ?? 0) > 0)) return { photos: 0, reading: false };
+  if (!again && ((moodboard?.items?.length ?? 0) > 0 || (fromSite ?? 0) > 0)) return { photos: 0, reading: false };
+  const note = options.instagram ? INSTAGRAM_NOTE : SITE_NOTE;
   // The old site's photos in her moodboard, replaced by the new one's (hers stay).
-  const oldSite = (moodboard?.items ?? []).filter((i) => i.note === SITE_NOTE && i.path).map((i) => i.path!);
+  const oldSite = (moodboard?.items ?? []).filter((i) => READ_NOTES.has(i.note ?? "") && i.path).map((i) => i.path!);
 
   // The page takes the longest (the sandbox's browser): it is read while the photos come in.
-  const reading$ = pageInSandbox(`site-${studioId.slice(0, 8)}-${Date.now()}`, pageUrl).catch(() => null);
+  const reading$ = options.instagram ? Promise.resolve(null) : pageInSandbox(`site-${studioId.slice(0, 8)}-${Date.now()}`, pageUrl).catch(() => null);
   const signal = AbortSignal.timeout(12_000);
   const downloads = await Promise.all(
     imageUrls.slice(0, 20).map((url) =>
@@ -169,7 +181,7 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
   const moodItem = async (photo: { jpeg: Buffer }) => {
     const path = `${studioId}/brand/mood-${key()}.jpg`;
     const { error } = await db.storage.from("media").upload(path, photo.jpeg, { contentType: "image/jpeg" });
-    return error ? null : { path, note: SITE_NOTE };
+    return error ? null : { path, note };
   };
   // One slot per photo (null when its upload failed), so a photo finds its moodboard file again.
   const slots = await Promise.all(photos.slice(0, MAX_PHOTOS).map(moodItem));
@@ -179,7 +191,7 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
       // She made her own moodboard meanwhile: hers wins.
       hersOwn((profile as { moodboard?: MoodItems }).moodboard) ? profile : { ...profile, moodboard: { items: first } },
     );
-    if (options.again && oldSite.length && !hersOwn(moodboard)) await db.storage.from("media").remove(oldSite).catch(() => undefined);
+    if (again && oldSite.length && !hersOwn(moodboard)) await db.storage.from("media").remove(oldSite).catch(() => undefined);
   }
   const photosAt = Date.now() - started;
 
@@ -187,7 +199,7 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
   const page = await reading$;
   const measured = pageMeasureSchema.safeParse(page?.measured);
   const measures = measured.success ? measured.data : null;
-  const capture = page?.capture ?? (await screenshotInSandbox(`site-${studioId.slice(0, 8)}-${Date.now()}`, pageUrl).catch(() => null));
+  const capture = page?.capture ?? (options.instagram ? null : await screenshotInSandbox(`site-${studioId.slice(0, 8)}-${Date.now()}`, pageUrl).catch(() => null));
   const pages = (
     await Promise.all([
       capture ? smaller(capture, 1000).catch(() => null) : null,
@@ -202,14 +214,16 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
   if (pages.length || photos.length) {
     const fonts = measures ? pageFonts(measures) : { display: null, body: null };
     const intro = [
-      `Le site de « ${name} »${business ? ` (${business})` : ""} : la gérante n'a pas encore fait de moodboard, son site est le meilleur indice de son style. Lis-en la direction artistique comme pour un moodboard (lumière, couleurs, typographie, cadrages, mise en page, ambiance) : ses Reels et ses visuels doivent lui ressembler au point qu'on reconnaisse son commerce sans voir son nom.`,
+      options.instagram
+        ? `Le profil Instagram de « ${name} »${business ? ` (${business})` : ""} : pas de capture de page, seulement ses dernières publications, qui suivent. La gérante n'a pas encore fait de moodboard, et ce qu'elle publie est le meilleur indice de son style. Lis-en la direction artistique comme pour un moodboard (lumière, couleurs, typographie de ses visuels, cadrages, ambiance) : ses Reels et ses visuels doivent lui ressembler au point qu'on reconnaisse son commerce sans voir son nom.`
+        : `Le site de « ${name} »${business ? ` (${business})` : ""} : la gérante n'a pas encore fait de moodboard, son site est le meilleur indice de son style. Lis-en la direction artistique comme pour un moodboard (lumière, couleurs, typographie, cadrages, mise en page, ambiance) : ses Reels et ses visuels doivent lui ressembler au point qu'on reconnaisse son commerce sans voir son nom.`,
       measures ? `Mesuré sur sa page (des faits, pas des suppositions) :\n${pageFacts(measures, pixels)}` : "",
       "La palette de sa charte vient de ce qu'on voit : les couleurs mesurées, son logo, son enseigne et ce qui porte son nom ; la principale en premier (celle qui la signe, pas forcément la plus étendue) ; jamais la couleur d'un objet photographié par hasard (un plat, le vêtement d'un client, une fleur).",
       fonts.display
         ? `Ses polices sont celles mesurées : « ${fonts.display.raw} » pour les titres${fonts.body && fonts.body.raw !== fonts.display.raw ? `, « ${fonts.body.raw} » pour le texte` : ""}. Dans « fonts », donne pour chacune la famille Google Fonts qui lui ressemble le plus à l'œil (même largeur, mêmes formes, même contraste, avec ou sans empattements), ou la même si Google Fonts la sert. Décris dans ta lecture comment elles sont employées (graisse, capitales, espacement, taille).`
         : "",
       photos.length
-        ? `Ses ${photos.length} photos suivent les captures. Dans « photos », garde celles qui montrent vraiment le commerce (son lieu, son travail, ses produits, son équipe, ses clients), les plus belles et les plus parlantes d'abord, ${MAX_LIBRARY} au plus : jamais un logo, une affiche, un article de presse, ni un objet dérivé (sweat, tote bag, casquette) qui n'est pas son métier.`
+        ? `Ses ${photos.length} photos suivent${pages.length ? " les captures" : ""}. Dans « photos », garde celles qui montrent vraiment le commerce (son lieu, son travail, ses produits, son équipe, ses clients), les plus belles et les plus parlantes d'abord, ${MAX_LIBRARY} au plus : jamais un logo, une affiche, un article de presse, ni un objet dérivé (sweat, tote bag, casquette) qui n'est pas son métier.`
         : "",
     ]
       .filter(Boolean)
@@ -262,7 +276,7 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
     const current = (profile as { moodboard?: MoodItems & Record<string, unknown> }).moodboard;
     const own = hersOwn(current);
     // First reading: never over her own moodboard. A new site: its facts (charter, example) still replace the old site's.
-    if (own && !options.again) return profile;
+    if (own && !again) return profile;
     saved = true;
     const p = profile as {
       fonts?: string[];
@@ -279,9 +293,9 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
     // Colours and fonts she set by hand are hers; otherwise her site's palette becomes the brand's colours (the first is the accent).
     const byHand = p.charter_from === "hand";
     const colors = palette.length && !byHand ? brandColorsFromLook(palette) : null;
-    const siteFonts = byHand ? null : fonts ? { fonts: fonts.fonts.slice(0, 2), font_twins: { ...(p.font_twins ?? {}), ...fonts.twins } } : p.fonts?.length && !options.again ? null : { fonts: [...new Set([reading.fonts.display, reading.fonts.body])] };
+    const siteFonts = byHand ? null : fonts ? { fonts: fonts.fonts.slice(0, 2), font_twins: { ...(p.font_twins ?? {}), ...fonts.twins } } : p.fonts?.length && !again ? null : { fonts: [...new Set([reading.fonts.display, reading.fonts.body])] };
     // A new site replaces the art direction and the tone the old one wrote (her own moodboard's and hers stay).
-    const fromOldSite = (value: string | undefined, written: string | undefined) => Boolean(options.again && value?.trim() && (written ? written === value : !own));
+    const fromOldSite = (value: string | undefined, written: string | undefined) => Boolean(again && value?.trim() && (written ? written === value : !own));
     const direction = p.art_direction_from !== "hand" && fromOldSite(p.art_direction, p.site_read?.direction) ? { ...profile, art_direction: reading.direction.slice(0, 600) } : withArtDirection(profile as { art_direction?: unknown }, reading.direction);
     const tone = fromOldSite(p.tone, p.site_read?.tone) || !p.tone?.trim() || p.tone === DEFAULT_TONE ? signature.voice : null;
     return {
