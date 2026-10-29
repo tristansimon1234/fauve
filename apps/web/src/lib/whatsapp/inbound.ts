@@ -167,7 +167,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
       const fresh = onboardingStepOf(studio?.onboarding_step) !== "done";
       await pairingReply(
         fresh
-          ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Edith, ton community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment.`
+          ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Edith, ton community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment, ou m’envoyer des notes vocales 🎙️`
           : "C’est bon, ton ordinateur est connecté ✨",
       );
       return;
