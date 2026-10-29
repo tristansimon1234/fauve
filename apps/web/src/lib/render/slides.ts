@@ -54,7 +54,9 @@ export const slidesKey = (plan: SlidesPlan) => digest(canonical(asStored(plan)))
 
 /** Whether a render was made from this plan (read back from its post): its key, or the one renders were stored with before. */
 export const rendersPlan = (key: string | null | undefined, plan: SlidesPlan) => Boolean(key) && (key === slidesKey(plan) || key === digest(JSON.stringify(plan)));
-export const hasTexts = (plan: SlidesPlan) => Boolean(plan.design) || plan.slides.some((s) => s.texts.length > 0 || s.layer || s.elements?.length || s.logo || s.edit);
+/** A photo with something drawn on it (texts, a layout, components, the logo, a retouch): its final image is rendered. */
+export const slideWritten = (s: SlidesPlan["slides"][number]) => s.texts.length > 0 || Boolean(s.layer || s.elements?.length || s.logo || s.edit);
+export const hasTexts = (plan: SlidesPlan) => Boolean(plan.design) || plan.slides.some(slideWritten);
 
 /** A post's slides plan, one slide per photo in order; null without one. */
 export function postSlides(post: { slides: unknown; media_ids: string[] | null }): SlidesPlan | null {

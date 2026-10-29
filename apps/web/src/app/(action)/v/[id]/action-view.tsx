@@ -3,9 +3,7 @@
 import { coverSrc } from "@/lib/cover-src";
 import { CoverPicker } from "@/components/montage/cover-picker";
 import {
-  buildCarouselProps,
   buildReelProps,
-  buildSlideProps,
   DEFAULT_COVER_SECONDS,
   editPlanSchema,
   segmentKind,
@@ -16,26 +14,21 @@ import {
   type PostKind,
   type PostStatus,
   type ReelInputs,
-  type CarouselPhoto,
   type SavedLook,
-  type SlidesPlan,
 } from "@fauve/agent";
 import type { PlayerRef } from "@remotion/player";
-import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { CheckIcon, PenIcon, PlusIcon, WhatsAppIcon } from "@/components/icons";
 import { FormatBadge } from "@/components/format-badge";
-import { CarouselStudio } from "@/components/montage/carousel-studio";
-import { SlidePreview } from "@/components/montage/slide-preview";
-import { SlidesEditor } from "@/components/montage/slides-editor";
 import { TextBoxes } from "@/components/montage/text-boxes";
 import { TextSheet } from "@/components/montage/text-sheet";
 import { Orb } from "@/components/orb";
-import { whatsappLink } from "@/lib/public-env";
 import { ReelPlayer } from "@/components/reel-player";
-import { saveCarouselTexts, saveEditPlan, saveSlidesPlan, updatePost } from "@/app/(app)/publications/[id]/actions";
+import { saveEditPlan, updatePost } from "@/app/(app)/publications/[id]/actions";
 
 // The page a WhatsApp link opens, made for a phone: watch the montage, then one
-// thumb away from validating it, moving a text, or asking Fauve for a change.
+// thumb away from validating it, moving a text, or asking Fauve for a change. A story,
+// or a Reel before its simple page (a Reel has PhoneReview, a carousel or a photo PhoneCarousel).
 
 type Text = EditPlan["texts"][number];
 type Mode = "view" | "edit" | "done";
@@ -63,7 +56,6 @@ export function ActionView({
   videoUrl,
   media,
   grid,
-  slides,
   changeHref,
   backHref,
   looks = [],
@@ -78,8 +70,6 @@ export function ActionView({
   media: ActionMedia[];
   /** The latest Instagram posts, for the grid preview; null when it does not apply (story). */
   grid: GridTile[] | null;
-  /** Text over the photos (carousel or photo post): the plan, the photos by media id, the brand; a composed carousel's photos in its order. */
-  slides: { plan: SlidesPlan; photos: Record<string, string>; brand: ReelInputs["brand"]; carousel?: CarouselPhoto[] } | null;
   changeHref: string;
   backHref: string;
   /** The studio's saved text looks (copied by Fauve from examples, or kept by hand). */
@@ -99,13 +89,6 @@ export function ActionView({
   const [status, setStatus] = useState(post.status);
   const [saved, setSaved] = useState(editor?.plan ?? null);
   const [plan, setPlan] = useState(editor?.plan ?? null);
-  const [savedSlides, setSavedSlides] = useState(slides?.plan ?? null);
-  const [slidePlan, setSlidePlan] = useState(slides?.plan ?? null);
-  // A carousel Edith composed: its words change here, slide by slide; its layout by asking her.
-  const design = slides?.plan.design ?? null;
-  const [savedWords, setSavedWords] = useState(design?.texts ?? {});
-  const [words, setWords] = useState(design?.texts ?? {});
-  const [wordsSlide, setWordsSlide] = useState(0);
   const [caption, setCaption] = useState(post.caption);
   const [savedCaption, setSavedCaption] = useState(post.caption);
   const [editingCaption, setEditingCaption] = useState(false);
@@ -122,9 +105,7 @@ export function ActionView({
   const dirty = plan !== null && JSON.stringify(plan) !== JSON.stringify(saved);
   const valid = plan === null || editPlanSchema.safeParse(plan).success;
   const canValidate = status === "draft";
-  const editable = (editor !== null || slides !== null) && status !== "published" && status !== "measured";
-  const slidesDirty = design ? JSON.stringify(words) !== JSON.stringify(savedWords) : slidePlan !== null && JSON.stringify(slidePlan) !== JSON.stringify(savedSlides);
-  const composedProps = (slide: number) => (design && slides ? buildCarouselProps({ ...design, texts: words }, slide, { template: slides.plan.template, brand: slides.brand, photos: slides.carousel ?? [] }) : null);
+  const editable = editor !== null && status !== "published" && status !== "measured";
 
   const seek = (seconds: number) => props && playerRef.current?.seekTo(Math.round(seconds * props.fps));
   const setText = (i: number, patch: Partial<Text>) => {
@@ -159,30 +140,11 @@ export function ActionView({
 
   const cancelEdit = () => {
     setPlan(saved);
-    setSlidePlan(savedSlides);
-    setWords(savedWords);
     setActive(null);
     setMode("view");
   };
   const saveEdit = () =>
     start(async () => {
-      if (design) {
-        const changed = Object.fromEntries(Object.entries(words).filter(([k, v]) => savedWords[k] !== v));
-        const res = await saveCarouselTexts(post.id, changed).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
-        if (!res.ok) return setToast({ ok: false, text: res.error });
-        setSavedWords(words);
-        setMode("view");
-        setToast({ ok: true, text: "C’est enregistré. Les images finales se mettent à jour en une minute environ." });
-        return;
-      }
-      if (slides && slidePlan) {
-        const res = await saveSlidesPlan(post.id, slidePlan).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
-        if (!res.ok) return setToast({ ok: false, text: res.error });
-        setSavedSlides(slidePlan);
-        setMode("view");
-        setToast({ ok: true, text: "C’est enregistré. Les images finales se mettent à jour en une minute environ." });
-        return;
-      }
       if (!plan) return;
       const res = await saveEditPlan(post.id, plan).catch(() => ({ ok: false as const, error: "L’enregistrement a échoué. Réessaie." }));
       if (!res.ok) return setToast({ ok: false, text: res.error });
@@ -230,35 +192,20 @@ export function ActionView({
     );
   }
 
-  const editingSlides = mode === "edit" && slides !== null && slidePlan !== null;
-  const editing = mode === "edit" && !editingSlides && plan !== null;
-  // The photos as published: with their texts when there are some (drawn live); a composed carousel, its slides.
-  const slideNodes = design
-    ? Array.from({ length: design.count }, (_, i): ReactNode => <SlidePreview key={i} props={composedProps(i)!} />)
-    : slides && slidePlan?.slides.some((s) => s.texts.length)
-      ? slidePlan.slides.map((s, i): ReactNode => {
-          const url = slides.photos[s.media_id];
-          return url ? (
-            <SlidePreview props={buildSlideProps(s, { template: slidePlan.template, imageUrl: url, brand: slides.brand })} />
-          ) : media[i]?.video ? (
-            <video src={media[i]!.url} controls playsInline preload="metadata" className="size-full object-cover" />
-          ) : null;
-        })
-      : undefined;
+  const editing = mode === "edit" && plan !== null;
   const activeText = editing && active !== null ? plan.texts[active] : undefined;
   const sceneIndex = Math.min(scene, Math.max(0, spans.length - 1));
   const span = spans[sceneIndex];
   const sceneTexts = editing && span ? plan.texts.map((t, i) => ({ t, i })).filter(({ t }) => t.from >= span.start && t.from < span.end) : [];
   // The preview leaves room for the controls under it, so everything fits one screen.
   // Photos keep the feed's 4:5, a montage or a story is 9:16.
-  // A composed carousel shows its slides (drawn live), not its photos.
-  const shown: ActionMedia[] = design ? Array.from({ length: design.count }, () => ({ url: "", video: false })) : media;
+  const shown = media;
   const photos = !props && !videoUrl && shown.length > 0 && post.kind !== "story";
   const ratio = photos ? 4 / 5 : 9 / 16;
   const mediaWidth = editing
     ? "min(100%, max(190px, calc((100dvh - 440px) * 9 / 16)))"
     : `min(100%, calc((100dvh - ${grid ? 390 : 340}px) * ${ratio}))`;
-  const showGrid = inGrid && !editing && !editingSlides && grid !== null;
+  const showGrid = inGrid && !editing && grid !== null;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-[480px] flex-col px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+132px)]">
@@ -280,7 +227,7 @@ export function ActionView({
         </p>
       )}
 
-      {grid && !editing && !editingSlides && (
+      {grid && !editing && (
         <div role="tablist" aria-label="Aperçu" className="mt-3 flex self-center rounded-full bg-white/10 p-1">
           {[
             { on: !inGrid, label: "Publication", set: false },
@@ -303,51 +250,9 @@ export function ActionView({
         </div>
       )}
 
-      {showGrid && <GridPreview cover={coverPhoto ? { url: coverPhoto.url, video: false } : videoUrl ? { url: videoUrl, video: true, at: cover && "at" in cover ? cover.at : DEFAULT_COVER_SECONDS } : (media[0] ?? null)} coverNode={slideNodes?.[0]} kind={post.kind} tiles={grid} />}
+      {showGrid && <GridPreview cover={coverPhoto ? { url: coverPhoto.url, video: false } : videoUrl ? { url: videoUrl, video: true, at: cover && "at" in cover ? cover.at : DEFAULT_COVER_SECONDS } : (media[0] ?? null)} kind={post.kind} tiles={grid} />}
 
-      {editingSlides && design && slides && (
-        <section aria-label="Les textes du carrousel" className="mt-3 flex flex-col items-center gap-2">
-          <div className="w-full" style={{ maxWidth: "min(100%, max(220px, calc((100dvh - 330px) * 4 / 5)))" }}>
-            <CarouselStudio
-              design={design}
-              texts={words}
-              onChange={(slot, text) => {
-                setWords((w) => ({ ...w, [slot]: text }));
-                setToast(null);
-              }}
-              template={slides.plan.template}
-              brand={slides.brand}
-              photos={slides.carousel ?? []}
-              slide={wordsSlide}
-              onSlide={setWordsSlide}
-              canEdit
-              dark
-            />
-          </div>
-          <a href={whatsappLink(`Pour « ${post.title} », image ${wordsSlide + 1} : `)} className="flex items-center justify-center gap-1.5 py-1 text-[13px] font-semibold text-white/65">
-            <WhatsAppIcon size={14} /> Demander à Edith pour cette image
-          </a>
-        </section>
-      )}
-
-      {editingSlides && !design && (
-        <section aria-label="Texte sur les photos" className="mt-3">
-          <SlidesEditor
-            plan={slidePlan}
-            onChange={(next) => {
-              setSlidePlan(next);
-              setToast(null);
-            }}
-            photos={slides.photos}
-            brand={slides.brand}
-            looks={looks}
-            dark
-            previewWidth="min(100%, max(200px, calc((100dvh - 470px) * 4 / 5)))"
-          />
-        </section>
-      )}
-
-      <div className={`mt-3 justify-center ${showGrid || editingSlides ? "hidden" : "flex"}`}>
+      <div className={`mt-3 justify-center ${showGrid ? "hidden" : "flex"}`}>
         <div ref={previewRef} className="relative overflow-hidden rounded-[22px] bg-black" style={{ width: mediaWidth }}>
           {props ? (
             <>
@@ -369,7 +274,7 @@ export function ActionView({
           ) : videoUrl ? (
             <video src={videoUrl} controls playsInline loop className="aspect-[9/16] w-full object-cover" />
           ) : shown.length > 0 ? (
-            <MediaSlides media={shown} nodes={slideNodes} ratio={post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]"} />
+            <MediaSlides media={shown} ratio={post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]"} />
           ) : (
             <div className="flex aspect-[9/16] w-full items-center justify-center p-6 text-center text-[14px] text-white/60">
               Edith prépare encore cette publication.
@@ -378,7 +283,7 @@ export function ActionView({
         </div>
       </div>
 
-      {editingSlides ? null : editing ? (
+      {editing ? (
         <section aria-label="Modifier" className="mt-4 flex flex-col gap-3">
           {plan.segments.length > 1 && (
             <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
@@ -465,7 +370,7 @@ export function ActionView({
         </>
       )}
 
-      {note && !editing && !editingSlides && !showGrid && (
+      {note && !editing && !showGrid && (
         <div className="mt-3 flex items-start gap-2.5 rounded-[16px] border border-white/10 p-3">
           <Orb size={20} className="mt-0.5" />
           <p className="text-[13px] leading-snug text-white/70">{note}</p>
@@ -484,14 +389,14 @@ export function ActionView({
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ink/95 backdrop-blur">
         <div className="mx-auto flex max-w-[480px] flex-col gap-2 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
-          {editing || editingSlides ? (
+          {editing ? (
             <div className="flex gap-2">
               <button type="button" onClick={cancelEdit} className="flex-1 rounded-full border border-white/25 py-3.5 text-[15px] font-bold">
                 Annuler
               </button>
               <button
                 type="button"
-                disabled={(editingSlides ? !slidesDirty : !dirty || !valid) || pending}
+                disabled={!dirty || !valid || pending}
                 onClick={saveEdit}
                 className="flex-[2] rounded-full bg-violet py-3.5 text-[15px] font-bold disabled:opacity-40"
               >
@@ -552,7 +457,7 @@ export function ActionView({
 
 
 /** The photos of a post, swiped one by one like on Instagram, with a counter and dots. */
-function MediaSlides({ media, nodes, ratio }: { media: ActionMedia[]; nodes?: ReactNode[]; ratio: string }) {
+function MediaSlides({ media, ratio }: { media: ActionMedia[]; ratio: string }) {
   const [index, setIndex] = useState(0);
   const track = useRef<HTMLUListElement>(null);
   const go = (i: number) => track.current?.scrollTo({ left: i * track.current.clientWidth, behavior: "smooth" });
@@ -566,9 +471,7 @@ function MediaSlides({ media, nodes, ratio }: { media: ActionMedia[]; nodes?: Re
       >
         {media.map((m, i) => (
           <li key={i} className="h-full w-full shrink-0 snap-center">
-            {nodes?.[i] ? (
-              nodes[i]
-            ) : m.video ? (
+            {m.video ? (
               <video src={m.url} controls playsInline preload="metadata" className="size-full object-cover" />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
@@ -602,13 +505,10 @@ function MediaSlides({ media, nodes, ratio }: { media: ActionMedia[]; nodes?: Re
 /** The post at the top of the Instagram grid, before the latest ones: how the feed will look. */
 function GridPreview({
   cover,
-  coverNode,
   kind,
   tiles,
 }: {
   cover: ActionMedia | null;
-  /** The first slide with its text, when it has some. */
-  coverNode?: ReactNode;
   kind: PostKind;
   tiles: GridTile[];
 }) {
@@ -616,10 +516,7 @@ function GridPreview({
     <section aria-label="Dans ta grille" className="mt-3 flex flex-col gap-2">
       <ul className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-[18px] bg-white/5">
         <li className="relative aspect-[3/4] overflow-hidden bg-white/10">
-          {coverNode ? (
-            // A 4:5 slide in a 3:4 tile: centred, cropped at the sides like Instagram does.
-            <div className="absolute inset-y-0 left-1/2 aspect-[4/5] h-full -translate-x-1/2">{coverNode}</div>
-          ) : cover?.video ? (
+          {cover?.video ? (
             <video src={coverSrc(cover)} muted playsInline preload="metadata" className="size-full object-cover" />
           ) : cover ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL

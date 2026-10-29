@@ -151,7 +151,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     // Her new words on its effect, drawn again by its own script.
     locked || !isBaked(plan.data) ? Promise.resolve([]) : runningJobs(studioId, { postId: post.id, kind: "effect_words" }),
     instagramAccount(studioId),
-    locked ? Promise.resolve([]) : freeSlots(studioId, timezone, 4),
+    locked ? Promise.resolve([]) : reviewSlots(studioId, timezone),
     loadVoice(studioId, post.voice_media_id, ownVoice?.id ?? null),
     tiktokPanel(studioId, { kind: "reel", platforms: post.platforms, caption: post.caption, hashtags: post.hashtags, tiktok: post.tiktok, external_ids: post.external_ids }, !locked),
     shown?.storage_path ? admin.storage.from("media").createSignedUrl(shown.storage_path as string, 3600, { download: fileName }) : Promise.resolve(null),
@@ -173,7 +173,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
   const previous = versions.filter((v) => v < (current.version as number)).at(-1);
   const next = versions.find((v) => v > (current.version as number));
   const music = readPostMusic(post.music);
-  const handle = ((await admin.from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").maybeSingle()).data?.handle as string | null) ?? null;
+  const handle = await instagramHandle(studioId);
 
   return {
     postId: post.id,
@@ -206,17 +206,28 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     music: env("ELEVENLABS_API_KEY") ? { on: music.mode === "on", made: Boolean(music.track) } : null,
     voice,
     ownVoice: ownVoice ? { id: ownVoice.id, sampleUrl: ownSample?.data?.signedUrl ?? null } : null,
-    slots: slots.flatMap((s) => {
-      const day = parseIsoDate(s.date);
-      const [h, m] = s.time.split(":").map(Number);
-      if (!day || h === undefined || m === undefined) return [];
-      const iso = localInstant(day, h, m, timezone).toISOString();
-      return [{ iso, label: publishWhen(iso, timezone).full, hint: s.hint }];
-    }),
+    slots,
     timezone,
     tiktok,
     model,
   };
+}
+
+/** Days to move a post to: the next free days at her usual hour. */
+export async function reviewSlots(studioId: string, timezone: string): Promise<ReviewSlot[]> {
+  return (await freeSlots(studioId, timezone, 4)).flatMap((s) => {
+    const day = parseIsoDate(s.date);
+    const [h, m] = s.time.split(":").map(Number);
+    if (!day || h === undefined || m === undefined) return [];
+    const iso = localInstant(day, h, m, timezone).toISOString();
+    return [{ iso, label: publishWhen(iso, timezone).full, hint: s.hint }];
+  });
+}
+
+/** Her Instagram name, as the feed shows it over her posts. */
+export async function instagramHandle(studioId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin().from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").maybeSingle();
+  return (data?.handle as string | null) ?? null;
 }
 
 /** The voice over the Reel: Edith's (her name) or the manager's own voice note; null: none. */
