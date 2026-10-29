@@ -8,7 +8,7 @@ import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts"
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
-import { beautifulTrends, captionHashtags, cleanHook, cleanTags, foreignScript, nextTags, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
+import { beautifulTrends, captionHashtags, captionLang, cleanHook, cleanTags, cleanWhy, foreignScript, inTrendLang, nextTags, otherLang, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
 import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
@@ -4713,6 +4713,37 @@ test("trends: Treg's searches read, the most watched recent ones kept", () => {
   assert.equal(top[0]!.cover, "https://x.cdninstagram.com/c.jpg");
 });
 
+test("trends: in her language, and only hooks that work", () => {
+  // The language of a caption, when its words say so clearly.
+  assert.equal(captionLang("60€ par mois pour du pilates à Paris 👀 @studio.on.paris"), "fr");
+  assert.equal(captionLang("the only thing I look forward to hearing 🥲 #pilates"), "en");
+  assert.equal(captionLang("Quoi de mieux qu’un black cherry pour l’automne ? 🍒"), "fr");
+  assert.equal(captionLang("pilates girl✨ #pilates #girl"), null);
+  assert.equal(captionLang("Becoming a Pilates girl in Paris"), null);
+  // Her language: the caption first, else where TikTok says it was posted, else its cover decides.
+  const v = (caption: string, region: string | null = null) => ({ caption, region });
+  assert.equal(inTrendLang(v("on vous attend pour le cours de 19 h"), "fr"), "yes");
+  assert.equal(inTrendLang(v("the only thing I look forward to hearing"), "fr"), "no");
+  assert.equal(inTrendLang(v("✨ #pilates", "FR"), "fr"), "yes");
+  assert.equal(inTrendLang(v("✨ #pilates", "US"), "fr"), "no");
+  assert.equal(inTrendLang(v("✨ #pilates"), "fr"), "maybe");
+  assert.equal(inTrendLang(v("the only thing I look forward to hearing"), "all"), "yes");
+  assert.equal(inTrendLang(v("#berber #coiffure ناض على 14h ناض على الساعة"), "fr"), "no");
+  // Kept in her language, the sure ones first, then the most watched.
+  const now = new Date("2026-10-28T12:00:00Z");
+  const t = (id: string, views: number, caption: string, region: string | null = null) => ({ platform: "tiktok" as const, external_id: id, url: `https://t/${id}`, caption, author: null, views, likes: null, comments: null, shares: null, sound: null, duration: null, posted_at: "2026-10-20T10:00:00Z", cover: null, region });
+  const pool = [t("en", 900_000, "the only thing I look forward to hearing"), t("maybe", 800_000, "✨ #pilates"), t("fr", 200_000, "on vous attend pour le cours de 19 h"), t("us", 700_000, "✨", "US")];
+  assert.deepEqual(keptTrends(pool, "trend", now, "fr").map((k) => k.external_id), ["fr", "maybe"]);
+  assert.deepEqual(keptTrends(pool, "trend", now).map((k) => k.external_id), ["en", "maybe", "us", "fr"]);
+  // Its cover in another language than hers: left out; no words on it: it can stay.
+  assert.equal(otherLang({ lang: "en" }, "fr"), true);
+  assert.equal(otherLang({ lang: "none" }, "fr"), false);
+  assert.equal(otherLang({ lang: "en" }, "all"), false);
+  // Why a hook works, only for one that passes.
+  assert.equal(cleanWhy({ hook_score: 8, hook_why: "Le prix choque, on reste pour comprendre." }), "Le prix choque, on reste pour comprendre.");
+  assert.equal(cleanWhy({ hook_score: 4, hook_why: "Un titre." }), "");
+});
+
 test("trends: three free changes of her words a month, then a credit", () => {
   const counted = { month: "2026-10", changes: 2 };
   // The first words, or the same ones, never count.
@@ -4750,9 +4781,14 @@ test("trends: the most watched first, foreign scripts and weak ones left out, tw
   // « pilates paris »: the trade worldwide, then near her; the city's hashtag for the local list.
   const pilates = trendPlan("Pilates Paris");
   assert.deepEqual([pilates.trend.words, pilates.local.words], ["pilates", "pilates paris"]);
-  assert.deepEqual([pilates.trend.hashtags, pilates.local.hashtags], [["pilates"], ["pilatesparis"]]);
-  assert.equal(scopeKey(pilates.local), "local:pilates paris");
-  assert.deepEqual([pilates.beau.words, pilates.beau.hashtags], ["pilates aesthetic", ["pilatesaesthetic", "pilates"]]);
+  // In French (by default): the country's hashtag too, and « pilates france » on TikTok.
+  assert.deepEqual([pilates.trend.hashtags, pilates.local.hashtags], [["pilates", "pilatesfrance"], ["pilatesparis"]]);
+  assert.deepEqual([pilates.trend.country, pilates.local.country], ["pilates france", null]);
+  assert.equal(scopeKey(pilates.local), "local:fr:pilates paris");
+  assert.deepEqual([pilates.beau.words, pilates.beau.hashtags], ["pilates aesthetic", ["pilatesaesthetic", "pilates", "pilatesfrance"]]);
+  // In every language, or in English: no country.
+  assert.deepEqual([trendPlan("Pilates Paris", "all").trend.hashtags, trendPlan("Pilates Paris", "en").trend.country], [["pilates"], null]);
+  assert.equal(scopeKey(trendPlan("pilates", "en").trend), "trend:en:pilates");
   // The most beautiful: 7 out of 10 at least and about her trade, the most beautiful first.
   const nice = [v("a", 30_000, "reformer"), v("b", 90_000, "reformer"), v("c", 50_000, "paris guide"), v("d", 60_000, "reformer")];
   const scored = beautifulTrends(nice, [
@@ -4777,12 +4813,12 @@ test("trends: the most watched first, foreign scripts and weak ones left out, tw
   ];
   assert.deepEqual(nextTags(learned, ["pilatesaesthetic", "pilates"]), ["reformerpilates", "pilatesstudio", "pilatesgirl"]);
   const salon = trendPlan("salon de coiffure");
-  assert.deepEqual(salon.trend.hashtags, ["salondecoiffure", "coiffure"]);
+  assert.deepEqual(salon.trend.hashtags, ["salondecoiffure", "coiffure", "coiffurefrance"]);
   assert.equal(salon.beau.words, "coiffure aesthetic");
   assert.deepEqual([salon.local.words, salon.local.hashtags], ["salon de coiffure paris", ["coiffureparis"]]);
   assert.deepEqual([trendPlan("brunch lyon").trend.words, trendPlan("brunch lyon").local.words], ["brunch", "brunch lyon"]);
   assert.equal(hashtagOf("crêperie"), "creperie");
-  assert.deepEqual(trendHashtags("salon de coiffure"), ["salondecoiffure", "coiffure", "coiffureparis"]);
+  assert.deepEqual(trendHashtags("salon de coiffure"), ["salondecoiffure", "coiffure", "coiffurefrance", "coiffureparis"]);
   // The number of posts on a hashtag, and how many were added in about a week.
   assert.equal(hashtagPostsIn({ found: true, data: { items: [{ name: "pilates", postsCount: 52_300_000 }] } }), 52_300_000);
   assert.equal(hashtagPostsIn({ found: false, reason: "not_found" }), null);

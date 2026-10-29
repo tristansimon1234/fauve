@@ -1,6 +1,6 @@
 "use client";
 
-import { CREDIT_PRICES, HOOK_FORM_LABELS, shortCount, TREND_FREE_CHANGES } from "@fauve/agent";
+import { CREDIT_PRICES, HOOK_FORM_LABELS, shortCount, TREND_FREE_CHANGES, TREND_LANG_LABELS, TREND_LANGS, trendLangIn, type TrendLang } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { EyeIcon, HeartIcon, InstagramIcon, MusicIcon, PlayIcon, TikTokIcon, XIcon } from "@/components/icons";
@@ -10,18 +10,19 @@ import { setTrendQuery } from "./actions";
 
 type Filter = "all" | "tiktok" | "instagram";
 
-/** The words searched for her trade, which she can change. */
-export function TrendQuery({ query, left }: { query: string | null; left: number }) {
+/** The words searched for her trade and the language of the videos, which she can change. */
+export function TrendQuery({ query, lang, left }: { query: string | null; lang: TrendLang; left: number }) {
   const router = useRouter();
   const [editing, setEditing] = useState(query === null);
   const [words, setWords] = useState(query ?? "");
+  const [language, setLanguage] = useState<TrendLang>(lang);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const save = () =>
     start(async () => {
       setError(null);
-      const res = await setTrendQuery(words);
+      const res = await setTrendQuery(words, language);
       if (!res.ok) return setError(res.error);
       setEditing(false);
       router.refresh();
@@ -32,6 +33,7 @@ export function TrendQuery({ query, left }: { query: string | null; left: number
       <div className="flex flex-wrap items-center gap-2 text-[15px]">
         <span className="text-muted">Pour</span>
         <span className="font-serif text-[22px] italic leading-none">« {query} »</span>
+        <span className="text-muted">{trendLangIn(lang)}</span>
         <button type="button" onClick={() => setEditing(true)} className="rounded-full px-3 py-1.5 text-[14px] font-bold text-violet hover:bg-violet-soft">
           Changer
         </button>
@@ -49,15 +51,27 @@ export function TrendQuery({ query, left }: { query: string | null; left: number
       <label htmlFor="trend-words" className="text-[15px] font-bold">
         Ton métier, en quelques mots
       </label>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <input
           id="trend-words"
           value={words}
           onChange={(e) => setWords(e.target.value)}
           maxLength={60}
           placeholder="salon de coiffure, café, studio de pilates…"
-          className="h-11 min-w-0 flex-1 rounded-full border border-line px-4 text-[16px] outline-none focus:border-violet"
+          className="h-11 min-w-[200px] flex-1 rounded-full border border-line px-4 text-[16px] outline-none focus:border-violet"
         />
+        <select
+          aria-label="Langue des vidéos"
+          value={language}
+          onChange={(e) => setLanguage(e.target.value as TrendLang)}
+          className="h-11 rounded-full border border-line bg-white px-4 text-[16px] outline-none focus:border-violet"
+        >
+          {TREND_LANGS.map((l) => (
+            <option key={l} value={l}>
+              {TREND_LANG_LABELS[l]}
+            </option>
+          ))}
+        </select>
         <button type="submit" disabled={pending} className="h-11 rounded-full bg-violet px-5 text-[15px] font-bold text-white disabled:opacity-50">
           {pending ? "…" : "Voir"}
         </button>
@@ -209,13 +223,16 @@ function HookRow({ cards, onOpen }: { cards: TrendCard[]; onOpen: (card: TrendCa
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-[22px] font-extrabold tracking-[-0.01em]">Les accroches qui marchent</h2>
-        <p className="text-[14px] text-muted">les premiers mots écrits sur les vidéos de ton métier</p>
+        <p className="text-[14px] text-muted">les premiers mots qui font rester, et pourquoi ils marchent</p>
       </div>
       <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
         {cards.map((card) => (
-          <li key={card.id} className="w-[240px] shrink-0 snap-start">
+          <li key={card.id} className="w-[260px] shrink-0 snap-start">
             <button type="button" onClick={() => onOpen(card)} className="flex h-full w-full flex-col justify-between gap-4 rounded-[18px] border border-line p-4 text-left hover:border-violet">
-              <p className="font-serif text-[21px] italic leading-snug">« {card.hook} »</p>
+              <span className="flex flex-col gap-2">
+                <p className="font-serif text-[21px] italic leading-snug">« {card.hook} »</p>
+                {card.hookWhy && <p className="text-[13px] leading-snug text-muted">{card.hookWhy}</p>}
+              </span>
               <span className="flex items-center justify-between gap-2 text-[12px] text-muted">
                 <span className="rounded-full bg-violet-soft px-2.5 py-1 font-bold text-violet">{HOOK_FORM_LABELS[card.hookForm ?? "autre"]}</span>
                 <span className="flex items-center gap-1">

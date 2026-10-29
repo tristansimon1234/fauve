@@ -30,6 +30,72 @@ export const TREND_MIN_VIEWS: Record<TrendScope, Record<TrendPlatform, number>> 
   local: { tiktok: 5_000, instagram: 5_000 },
 };
 
+/**
+ * The language of the videos she sees (Tristan: « il faut du contenu en français ou choisir sa
+ * langue »): French by default, or another, or all of them. Part of a list's key: a French list is
+ * shared by every studio that reads French, never mixed with the English one.
+ */
+export const TREND_LANGS = ["fr", "en", "es", "it", "de", "pt", "all"] as const;
+export type TrendLang = (typeof TREND_LANGS)[number];
+type Spoken = Exclude<TrendLang, "all">;
+export const DEFAULT_TREND_LANG: TrendLang = "fr";
+export const TREND_LANG_LABELS: Record<TrendLang, string> = { fr: "Français", en: "Anglais", es: "Espagnol", it: "Italien", de: "Allemand", pt: "Portugais", all: "Toutes les langues" };
+/** « en français », « en anglais »…, « dans toutes les langues ». */
+export const trendLangIn = (lang: TrendLang) => (lang === "all" ? "dans toutes les langues" : `en ${TREND_LANG_LABELS[lang].toLowerCase()}`);
+export const trendLangOf = (value: unknown): TrendLang => ((TREND_LANGS as readonly unknown[]).includes(value) ? (value as TrendLang) : DEFAULT_TREND_LANG);
+
+/** Where a language is posted from (TikTok's region of a video), and the country word of its hashtags (#pilatesfrance). */
+const LANG_PLACES: Record<Spoken, { regions: string[]; country: string | null }> = {
+  fr: { regions: ["FR", "BE", "CH", "LU", "MC", "CA", "MA", "DZ", "TN", "SN", "CI", "RE", "GP", "MQ", "GF", "YT", "NC", "PF"], country: "france" },
+  en: { regions: ["US", "GB", "IE", "AU", "NZ", "CA", "ZA"], country: null },
+  es: { regions: ["ES", "MX", "AR", "CO", "CL", "PE", "UY", "VE", "EC"], country: "espana" },
+  it: { regions: ["IT", "SM", "CH"], country: "italia" },
+  de: { regions: ["DE", "AT", "CH"], country: "deutschland" },
+  pt: { regions: ["PT", "BR"], country: "portugal" },
+};
+
+/** Words only one of these languages writes often (none shared: « tu », « non », « mais », « in » left out). */
+const LANG_WORDS: Record<Spoken, Set<string>> = {
+  fr: new Set("les des est et pour pas qui avec dans sur cette mon mes ton tes je vous nous ça très plus quand chez fait faire tout toi moi notre votre par à au aux ici être une le ce quoi mieux bien rien vraiment encore toujours jamais aussi après cours séance".split(" ")),
+  en: new Set("the and you your my this that with for what when how it's i'm i'll i to of is are was just get got why who we our it be all about from after before can can't don't if these they their will have has".split(" ")),
+  es: new Set("el los las del y muy pero esto este esta cómo qué porque mis hay ser más también aquí hoy nuestro nuestra cuando donde".split(" ")),
+  it: new Set("che è gli della delle dei sono questo questa perché anche molto sempre oggi alla nella ho hai cosa più mio mia".split(" ")),
+  de: new Set("der das und ist nicht ich mit für ein eine auf auch sich wie mein meine heute sehr noch zu dem den bei".split(" ")),
+  pt: new Set("não você vocês uma muito isso meu minha também está são hoje aqui nossa nosso é pra tá tô obrigado obrigada".split(" ")),
+};
+const SPOKEN = Object.keys(LANG_WORDS) as Spoken[];
+
+/** The language a caption is written in, when its words say so clearly (two of its own words at least, twice as many as any other); null otherwise. */
+export function captionLang(caption: string): Spoken | null {
+  const words = caption
+    .toLowerCase()
+    .replace(/[’`]/g, "'")
+    .replace(/#\S+|@\S+|https?:\/\/\S+/g, " ")
+    .split(/[^\p{L}']+/u)
+    .filter(Boolean);
+  // « qu'un », « j'ai », « c'est », « n'est »: only French elides these (Italian shares « l' » and « d' »).
+  const elided = (w: string) => /^(qu|j|c|n|m|t|s)'\p{L}/u.test(w);
+  const hits = SPOKEN.map((lang) => ({ lang, n: words.filter((w) => LANG_WORDS[lang].has(w) || (lang === "fr" && elided(w))).length })).sort((a, b) => b.n - a.n);
+  const [best, second] = hits;
+  if (!best || best.n < 2 || best.n < (second?.n ?? 0) * 2) return null;
+  return best.lang;
+}
+
+/**
+ * Whether a video is in her language: « yes » when its caption is written in it (or, without words,
+ * when TikTok says it was posted where it is spoken), « no » when written in another or posted
+ * elsewhere, « maybe » when nothing tells (an Instagram post with only hashtags): its cover decides.
+ */
+export function inTrendLang(video: Pick<TrendVideo, "caption" | "region">, lang: TrendLang): "yes" | "maybe" | "no" {
+  if (lang === "all") return "yes";
+  const said = captionLang(video.caption);
+  if (said) return said === lang ? "yes" : "no";
+  if (foreignScript(video.caption)) return "no";
+  const region = video.region?.trim().toUpperCase();
+  if (!region) return "maybe";
+  return LANG_PLACES[lang].regions.includes(region) ? "yes" : "no";
+}
+
 export type TrendVideo = {
   platform: TrendPlatform;
   external_id: string;
@@ -214,18 +280,20 @@ export const TREND_PAGES = 3;
 
 /**
  * The ones worth showing (Tristan: « j'aimerais les plus vus »): no duplicate, posted in the last
- * TREND_MAX_AGE_DAYS, above the scope's TREND_MIN_VIEWS, the most watched first. Never padded
- * with weak ones: a short list beats videos at a thousand views. A caption in another script
- * (Persian, Amharic…) is not her audience.
+ * TREND_MAX_AGE_DAYS, above the scope's TREND_MIN_VIEWS, in her language (inTrendLang: the sure
+ * ones first, then the ones whose cover will tell), the most watched first. Never padded with weak
+ * ones: a short list beats videos at a thousand views. A caption in another script (Persian,
+ * Amharic…) is not her audience.
  */
-export function keptTrends(videos: TrendVideo[], scope: TrendScope, now = new Date()): TrendVideo[] {
+export function keptTrends(videos: TrendVideo[], scope: TrendScope, now = new Date(), lang: TrendLang = "all"): TrendVideo[] {
   const limit = now.getTime() - TREND_MAX_AGE_DAYS * 86_400_000;
   const unique = [...new Map(videos.map((v) => [`${v.platform}:${v.external_id}`, v])).values()];
+  const sure = (v: TrendVideo) => (inTrendLang(v, lang) === "yes" ? 1 : 0);
   return unique
-    .filter((v) => !foreignScript(v.caption))
+    .filter((v) => !foreignScript(v.caption) && inTrendLang(v, lang) !== "no")
     .filter((v) => v.posted_at !== null && Date.parse(v.posted_at) >= limit)
     .filter((v) => reach(v) >= TREND_MIN_VIEWS[scope][v.platform])
-    .sort((a, b) => reach(b) - reach(a));
+    .sort((a, b) => sure(b) - sure(a) || reach(b) - reach(a));
 }
 
 /** Mostly written in a script other than the Latin one (emoji, digits and hashtags aside). */
@@ -273,33 +341,41 @@ export type TrendSearch = {
   trade: string;
   city: string | null;
   hashtags: string[];
+  /** The language of its videos. */
+  lang: TrendLang;
+  /** A second TikTok search in her language's country (« pilates france »), when it has one. */
+  country: string | null;
 };
 
 /**
- * The two searches for a trade. « trend »: its words without the city (« pilates paris » →
- * « pilates »), worldwide, and its hashtags (the words joined, and its main word: « salon de
- * coiffure » → #salondecoiffure, #coiffure). « local »: the same words with her city (Paris
- * unless her words name another), and the main word's city hashtag (#coiffureparis).
+ * The searches for a trade, in her language. « trend »: its words without the city (« pilates
+ * paris » → « pilates »), and its hashtags (the words joined, its main word, and in French its
+ * country's: « salon de coiffure » → #salondecoiffure, #coiffure, #coiffurefrance). « beau »: the
+ * « aesthetic » search and hashtag. « local »: the same words with her city (Paris unless her words
+ * name another), and the main word's city hashtag (#coiffureparis).
  */
-export function trendPlan(query: string): Record<TrendScope, TrendSearch> {
+export function trendPlan(query: string, lang: TrendLang = DEFAULT_TREND_LANG): Record<TrendScope, TrendSearch> {
   const clean = query.replace(/\s+/g, " ").trim().toLowerCase();
   const named = clean.match(CITIES)?.[1];
   const city = !named || named === "france" ? "paris" : named;
   const broad = clean.replace(new RegExp(CITIES.source, "gi"), " ").replace(/\s+(à|a|sur|in)\s*$/, "").replace(/\s+/g, " ").trim() || clean;
   const words = broad.split(" ").filter((w) => !SMALL_WORDS.has(w));
   const main = [...words].sort((a, b) => b.length - a.length)[0] ?? broad;
-  const tags = (list: string[]) => [...new Set(list.map(hashtagOf).filter((t) => t.length >= 3))].slice(0, 2);
+  const tags = (list: string[], most = 2) => [...new Set(list.map(hashtagOf).filter((t) => t.length >= 3))].slice(0, most);
+  const country = lang === "all" ? null : LANG_PLACES[lang].country;
+  const national = country ? [`${main}${country}`] : [];
+  const base = { trade: broad, lang, country: country ? `${broad} ${country}` : null };
   return {
-    trend: { scope: "trend", words: broad, trade: broad, city: null, hashtags: tags([broad, main]) },
+    trend: { ...base, scope: "trend", words: broad, city: null, hashtags: tags([broad, main, ...national], 3) },
     // « pilates aesthetic », #pilatesaesthetic and the trade's own top posts: the pool the most beautiful are picked from.
-    beau: { scope: "beau", words: `${main} aesthetic`, trade: broad, city: null, hashtags: tags([`${main}aesthetic`, main]) },
-    local: { scope: "local", words: `${broad} ${city}`, trade: broad, city, hashtags: tags([`${main}${city}`]) },
+    beau: { ...base, scope: "beau", words: `${main} aesthetic`, city: null, hashtags: tags([`${main}aesthetic`, main, ...national], 3) },
+    local: { ...base, scope: "local", words: `${broad} ${city}`, city, country: null, hashtags: tags([`${main}${city}`]) },
   };
 }
 
 /** The hashtags whose number of posts is followed each week: the trade's, then its city's. */
-export const trendHashtags = (query: string) => {
-  const plan = trendPlan(query);
+export const trendHashtags = (query: string, lang: TrendLang = DEFAULT_TREND_LANG) => {
+  const plan = trendPlan(query, lang);
   return [...new Set([...plan.trend.hashtags, ...plan.local.hashtags])];
 };
 
@@ -328,8 +404,8 @@ export function hashtagVolumes(counts: HashtagCount[], order: string[]): Hashtag
   });
 }
 
-/** The key a list is kept under: its scope and its words. */
-export const scopeKey = (search: Pick<TrendSearch, "scope" | "words">) => `${search.scope}:${trendKey(search.words)}`;
+/** The key a list is kept under: its scope, its language and its words (« trend:fr:pilates »). */
+export const scopeKey = (search: Pick<TrendSearch, "scope" | "words" | "lang">) => `${search.scope}:${search.lang}:${trendKey(search.words)}`;
 
 
 /** The forms a hook takes (read on a cover), with their name on screen. */
@@ -347,7 +423,10 @@ export const HOOK_FORM_LABELS: Record<HookForm, string> = {
   autre: "Accroche",
 };
 
-/** What Sonnet reads on each cover: its beauty, whether it is about her trade, the hook written on it, what makes it inspiring. */
+/** The languages Sonnet tells on a cover: hers, another (« other »), or no words at all. */
+const COVER_LANGS = ["fr", "en", "es", "it", "de", "pt", "other", "none"] as const;
+
+/** What Sonnet reads on each cover: its beauty, whether it is about her trade, the hook written on it and its strength, its language, what makes it inspiring. */
 export const coverReadSchema = z.object({
   videos: z
     .array(
@@ -357,6 +436,9 @@ export const coverReadSchema = z.object({
         on_topic: z.boolean().describe("Really about this trade"),
         hook: z.string().max(120).describe("The words written on the image, exactly as written; empty when none"),
         hook_form: z.enum(HOOK_FORMS).describe("The form of that hook; autre when there is none"),
+        hook_score: z.number().int().min(1).max(10).describe("How strongly the hook makes you keep watching, 1 to 10; 1 when there is none"),
+        hook_why: z.string().max(90).describe("In French, why it stops the thumb, in a few words; empty under 7"),
+        lang: z.enum(COVER_LANGS).describe("The language of the words on the image and in the caption; none when there are none"),
         tags: z.array(z.string().max(24)).max(3).describe("2 or 3 short French words for what makes it inspiring"),
       }),
     )
@@ -366,6 +448,14 @@ export type CoverRead = z.infer<typeof coverReadSchema>["videos"][number];
 
 /** A cover from 7 out of 10 is beautiful enough to be shown. */
 export const TREND_BEAUTY_PASS = 7;
+/** A hook from 7 out of 10 is shown as a hook that works; under it, a title or a label (« PINK CLUB », « pilates girl »). */
+export const TREND_HOOK_PASS = 7;
+
+/** Whether its cover says it is in another language than hers (no words on it: it can be any). */
+export const otherLang = (read: Pick<CoverRead, "lang"> | undefined, lang: TrendLang) => lang !== "all" && !!read && read.lang !== "none" && read.lang !== lang;
+
+/** Why a hook works, as Sonnet wrote it: one line, 90 characters at most, only for a hook that passes. */
+export const cleanWhy = (read: Pick<CoverRead, "hook_score" | "hook_why"> | undefined) => (read && read.hook_score >= TREND_HOOK_PASS ? clip(read.hook_why, 90) : "");
 
 /** The beautiful ones, the most beautiful first (then the most watched); reads are matched by their 1-based number. */
 export function beautifulTrends(videos: TrendVideo[], reads: Pick<CoverRead, "n" | "beauty" | "on_topic">[]): TrendVideo[] {
@@ -396,7 +486,10 @@ You receive the trade (in French) and numbered covers with their caption and acc
 2. on_topic: whether the video is really about this trade (it shows the activity, the place, the work, a client, a professional of it), not a travel guide or a lifestyle vlog that only mentions it.
 3. hook: the words written on the image, exactly as written (the hook the video opens on), or empty when nothing is written. Never the caption.
 4. hook_form: the form of that hook: question, pov (« pov : … »), chiffre (a precise number), promesse (what you will get), contre_pied (the opposite of what you expect), coulisses (what you don't usually see), defi (a challenge), liste (« 3 erreurs… »), autre (another form, or no hook).
-5. tags: 2 or 3 short words in French, lowercase, for what makes it inspiring to copy: its light, framing, colours, type, format or idea (« lumière naturelle », « plan serré », « titre serif », « noir et blanc », « collage », « pov », « avant après », « plan fixe »). Never a judgement (« beau », « joli »).
+5. hook_score, from 1 to 10: how strongly those words alone make someone stop scrolling and watch to the end, judged as a seasoned short-form creator would. 9–10: impossible to scroll past: a sharp tension, a surprising precise number, a reversal, a question you need answered, a situation everyone recognises said in a few words (« 180€ pour faire ÇA avec une paille ?! », « Ma copine le fait chaque semaine, ça doit pas être si dur »). 7–8: clearly opens a loop and is specific. 4–6: informs but does not pull (« Tuto carré bob »). 1–3: a title, a label, a place or brand name, one or two words, a hashtag, a vague mood (« PINK CLUB », « pilates girl », « Pilates in Paris », « La plus BELLE »), clickbait that the video cannot keep, unreadable, or no hook. The views never count: judge the words.
+6. hook_why: only when hook_score is 7 or more, in French, at most 90 characters, what makes it work, concretely (« Une note Google catastrophique : on veut voir le désastre. », « Le prix choque, on reste pour comprendre. »). Never « accrocheur », never a dash. Empty under 7.
+7. lang: the language of the words written on the image and in the caption (fr, en, es, it, de, pt, other), or none when there are no words but hashtags, names and emojis.
+8. tags: 2 or 3 short words in French, lowercase, for what makes it inspiring to copy: its light, framing, colours, type, format or idea (« lumière naturelle », « plan serré », « titre serif », « noir et blanc », « collage », « pov », « avant après », « plan fixe »). Never a judgement (« beau », « joli »).
 
 Answer for every number.`;
 

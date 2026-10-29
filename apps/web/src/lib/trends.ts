@@ -5,6 +5,7 @@ import {
   captionHashtags,
   cleanHook,
   cleanTags,
+  cleanWhy,
   coverReadSchema,
   claudeCostUsd,
   hashtagPostsIn,
@@ -15,15 +16,19 @@ import {
   keptTrends,
   nextCursorIn,
   nextTags,
+  otherLang,
   scopeKey,
   TREND_COVER_PROMPT,
+  TREND_HOOK_PASS,
   TREND_KEEP,
+  TREND_LANG_LABELS,
   TREND_PAGES,
   TREND_PLATFORMS,
   TREND_REFRESH_DAYS,
   TREND_SCOPES,
   trendHashtags,
   tiktokTrends,
+  trendLangOf,
   trendPlan,
   trendQueryOf,
   usdToEur,
@@ -32,6 +37,7 @@ import {
   type HookForm,
   type LearnedTag,
   type HashtagVolume,
+  type TrendLang,
   type TrendPlatform,
   type TrendScope,
   type TrendSearch,
@@ -45,27 +51,32 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { tregCall } from "@/lib/treg";
 
 // The page Tendances: what works right now in her trade, on TikTok and Instagram, searched each week
-// through Treg (packages/agent/src/trends.ts): « Ce qui cartonne » (her trade's words, worldwide) and
-// « Près de chez toi » (with her city). Each list is shared by every studio with the same words;
-// covers copied once into our storage (the providers' links expire within hours).
+// through Treg (packages/agent/src/trends.ts): « Les plus belles », « Ce qui cartonne » (her trade's
+// words, everywhere her language is spoken) and her city's. Each list is shared by every studio with
+// the same words and language; covers copied once into our storage (the providers' links expire
+// within hours).
 
 type Source = { id: string; body: Record<string, unknown>; read: (answer: unknown) => TrendVideo[]; pages: number };
 
 /** Where each list comes from: TikTok's keyword search (most liked of the month), Instagram's own top posts on the trade's hashtags (with their views), and its keyword search for the city. */
 function sources(search: TrendSearch, platform: TrendPlatform, extra: string[] = []): Source[] {
   const tiktok = (query: string) => ({ id: "anyapi.tiktok.search.videos", body: { query, sortBy: 1, datePosted: 30 }, read: tiktokTrends, pages: TREND_PAGES });
+  // TikTok has no language filter: in French, the trade's words are also searched with « france »
+  // (« pilates france »), and the videos posted elsewhere are left out (inTrendLang).
+  const national = search.country ? [tiktok(search.country)] : [];
   // The most beautiful are picked from a bigger pool: the « aesthetic » search and the trade's own.
-  if (platform === "tiktok") return search.scope === "beau" ? [tiktok(search.words), tiktok(search.trade), ...extra.slice(0, 1).map((tag) => tiktok(tag))] : [tiktok(search.words)];
+  if (platform === "tiktok") return search.scope === "beau" ? [tiktok(search.words), tiktok(search.trade), ...national, ...extra.slice(0, 1).map((tag) => tiktok(tag))] : [tiktok(search.words), ...national];
   const tops = [...search.hashtags, ...extra].map((hashtag) => ({ id: "anyapi.instagram.hashtag_top_posts", body: { hashtag }, read: instagramTopPosts, pages: 2 }));
   return search.scope === "local" ? [...tops, { id: "anyapi.instagram.search.reels", body: { query: search.words }, read: instagramTrends, pages: 2 }] : tops;
 }
 
 const COVERS = "trends";
 
-/** The words searched for a studio's trade: hers, else its activity; null when nothing is known. */
-export async function studioTrendQuery(studioId: string): Promise<string | null> {
-  const { data } = await supabaseAdmin().from("studios").select("trend_query, business_type").eq("id", studioId).maybeSingle();
-  return trendQueryOf(data?.trend_query as string | null, data?.business_type as string | null);
+/** The words searched for a studio's trade (hers, else its activity) and the language of its videos; null when nothing is known. */
+export async function studioTrends(studioId: string): Promise<{ query: string; lang: TrendLang } | null> {
+  const { data } = await supabaseAdmin().from("studios").select("trend_query, trend_lang, business_type").eq("id", studioId).maybeSingle();
+  const query = trendQueryOf(data?.trend_query as string | null, data?.business_type as string | null);
+  return query ? { query, lang: trendLangOf(data?.trend_lang) } : null;
 }
 
 type Searched = Record<TrendScope, Partial<Record<TrendPlatform, string>>> & { running: boolean };
@@ -75,8 +86,8 @@ const RUNNING_MINUTES = 10;
 const runningSince = () => new Date(Date.now() - RUNNING_MINUTES * 60_000).toISOString();
 
 /** When each list of a trade was last searched (absent: never, or a search that died), and whether one is running. */
-export async function lastSearched(query: string): Promise<Searched> {
-  const plan = trendPlan(query);
+export async function lastSearched(query: string, lang: TrendLang): Promise<Searched> {
+  const plan = trendPlan(query, lang);
   const keys = TREND_SCOPES.map((scope) => scopeKey(plan[scope]));
   const { data } = await supabaseAdmin().from("trend_searches").select("key, platform, fetched_at, found").in("key", keys);
   const out: Searched = { trend: {}, beau: {}, local: {}, running: false };
@@ -222,7 +233,7 @@ async function readCovers(search: TrendSearch, videos: TrendVideo[]): Promise<Ch
           {
             role: "user",
             content: [
-              { type: "text", text: JSON.stringify({ trade: search.trade, list: search.city ? `videos from ${search.city}` : "worldwide" }) },
+              { type: "text", text: JSON.stringify({ trade: search.trade, list: search.city ? `videos from ${search.city}` : "her trade everywhere", her_language: search.lang === "all" ? "any" : TREND_LANG_LABELS[search.lang] }) },
               ...seen.flatMap((v, i) => [
                 { type: "text" as const, text: JSON.stringify({ n: i + 1, account: v.video.author ?? undefined, caption: Array.from(v.video.caption).slice(0, 160).join("") || "(no caption)" }) },
                 { type: "image" as const, source: { type: "base64" as const, media_type: "image/webp" as const, data: v.small.toString("base64") } },
@@ -241,9 +252,11 @@ async function readCovers(search: TrendSearch, videos: TrendVideo[]): Promise<Ch
     }
   }
   const readOf = (i: number) => reads?.find((r) => r.n === i + 1);
+  // Its cover is in another language than hers (the caption did not tell): left out.
+  const foreign = (i: number) => otherLang(readOf(i), search.lang);
   if (beau) {
     if (!reads) return [];
-    const order = beautifulTrends(seen.map((v) => v.video), reads);
+    const order = beautifulTrends(seen.map((v) => v.video), reads.filter((r) => !foreign(r.n - 1)));
     return order.flatMap((video) => {
       const i = seen.findIndex((v) => v.video === video);
       return i < 0 ? [] : [{ video, image: seen[i]!.image, read: readOf(i) }];
@@ -253,7 +266,7 @@ async function readCovers(search: TrendSearch, videos: TrendVideo[]): Promise<Ch
   return fetched.flatMap((v) => {
     const i = seen.findIndex((s) => s.video === v.video);
     const read = i < 0 ? undefined : readOf(i);
-    return read && !read.on_topic ? [] : [{ video: v.video, image: v.image, read }];
+    return (read && !read.on_topic) || (i >= 0 && foreign(i)) ? [] : [{ video: v.video, image: v.image, read }];
   });
 }
 
@@ -305,7 +318,7 @@ async function refreshList(search: TrendSearch, platform: TrendPlatform): Promis
     cost_eur: usdToEur(costUsd, env("USD_TO_EUR")),
     meta: { query: key, platform, cost_usd: costUsd },
   });
-  const strong = keptTrends(read.flatMap((r) => (r.pages ?? []).flatMap((page) => r.source.read(page.answer))), search.scope);
+  const strong = keptTrends(read.flatMap((r) => (r.pages ?? []).flatMap((page) => r.source.read(page.answer))), search.scope, new Date(), search.lang);
   // Every list is read on its covers: the most beautiful chosen there, the others kept when about her trade.
   const looked = await readCovers(search, strong.slice(0, search.scope === "beau" ? 24 : 16));
   if (search.scope === "beau") await learnTags(key, looked).catch((error: unknown) => console.warn("trends: tags not learned", key, error));
@@ -332,6 +345,9 @@ async function refreshList(search: TrendSearch, platform: TrendPlatform): Promis
     beauty: chosen[rank]?.read?.beauty ?? null,
     hook: cleanHook(chosen[rank]?.read?.hook) || null,
     hook_form: cleanHook(chosen[rank]?.read?.hook) ? (chosen[rank]?.read?.hook_form ?? null) : null,
+    hook_score: cleanHook(chosen[rank]?.read?.hook) ? (chosen[rank]?.read?.hook_score ?? null) : null,
+    hook_why: cleanWhy(chosen[rank]?.read) || null,
+    lang: chosen[rank]?.read?.lang ?? null,
     tags: cleanTags(chosen[rank]?.read?.tags),
     rank,
     fetched_at: fetchedAt,
@@ -357,9 +373,9 @@ async function forgetVideos(query: PromiseLike<{ data: { id: unknown; cover_path
 }
 
 /** Searches every list of a trade whose search is stale, each list taken by one search at a time (claimList). */
-export async function refreshTrends(query: string): Promise<Record<string, number | null>> {
-  const plan = trendPlan(query);
-  const last = await lastSearched(query);
+export async function refreshTrends(query: string, lang: TrendLang): Promise<Record<string, number | null>> {
+  const plan = trendPlan(query, lang);
+  const last = await lastSearched(query, lang);
   const stale = TREND_SCOPES.flatMap((scope) => TREND_PLATFORMS.filter((p) => isStale(last[scope][p])).map((platform) => ({ scope, platform })));
   const claimed = await Promise.all(stale.map(({ scope, platform }) => claimList(plan[scope], platform)));
   const due = stale.filter((_, i) => claimed[i]);
@@ -369,7 +385,7 @@ export async function refreshTrends(query: string): Promise<Record<string, numbe
       if (kept === null) await releaseList(plan[scope], platform);
       return kept;
     }),
-    ...(due.length ? [countHashtags(query).then(() => null)] : []),
+    ...(due.length ? [countHashtags(query, lang).then(() => null)] : []),
   ]);
   return Object.fromEntries(due.map(({ scope, platform }, i) => [`${scope}:${platform}`, found[i] ?? null]));
 }
@@ -378,9 +394,9 @@ export async function refreshTrends(query: string): Promise<Record<string, numbe
  * Counts the posts on the trade's hashtags today (Instagram, AnyAPI's hashtag analytics, about
  * $0.0011 each), kept day by day so the page shows how many were added in a week.
  */
-async function countHashtags(query: string): Promise<void> {
+async function countHashtags(query: string, lang: TrendLang): Promise<void> {
   const today = new Date().toISOString().slice(0, 10);
-  const tags = trendHashtags(query);
+  const tags = trendHashtags(query, lang);
   const db = supabaseAdmin();
   const { data: done } = await db.from("trend_hashtags").select("hashtag").in("hashtag", tags).eq("counted_on", today);
   const due = tags.filter((t) => !(done ?? []).some((d) => d.hashtag === t));
@@ -406,9 +422,10 @@ export async function forgetOldTrends(): Promise<void> {
     await forgetVideos(db.from("trend_videos").select("id, cover_path").eq("key", r.key as string).eq("platform", r.platform as string));
     await db.from("trend_searches").delete().eq("key", r.key as string).eq("platform", r.platform as string);
   }
-  // The lists of before the scopes (keys without « trend: », « beau: » or « local: »).
-  await forgetVideos(db.from("trend_videos").select("id, cover_path").not("key", "like", "trend:%").not("key", "like", "beau:%").not("key", "like", "local:%"));
-  await db.from("trend_searches").delete().not("key", "like", "trend:%").not("key", "like", "beau:%").not("key", "like", "local:%");
+  // The lists of before the scopes and languages (keys without « trend:xx: », « beau:xx: » or « local:xx: »).
+  const current = "^(trend|beau|local):[a-z]+:";
+  await forgetVideos(db.from("trend_videos").select("id, cover_path").not("key", "match", current));
+  await db.from("trend_searches").delete().not("key", "match", current);
 }
 
 export type TrendCard = {
@@ -426,9 +443,11 @@ export type TrendCard = {
   duration: number | null;
   postedAt: string | null;
   cover: string | null;
-  /** The words written on its first image, and their form; what makes it inspiring. */
+  /** The words written on its first image when they make a hook that works (TREND_HOOK_PASS), their form and why they work; what makes it inspiring. */
   hook: string | null;
   hookForm: HookForm | null;
+  hookScore: number | null;
+  hookWhy: string | null;
   tags: string[];
 };
 
@@ -443,16 +462,16 @@ export type TrendLists = {
   fetchedAt: string | null;
 };
 
-/** Both lists of a trade, the most watched first, with signed covers. */
-export async function trendCards(query: string): Promise<TrendLists> {
-  const plan = trendPlan(query);
+/** The lists of a trade in her language, the most watched first, with signed covers. */
+export async function trendCards(query: string, lang: TrendLang): Promise<TrendLists> {
+  const plan = trendPlan(query, lang);
   const keys = TREND_SCOPES.map((scope) => scopeKey(plan[scope]));
   const db = supabaseAdmin();
-  const tags = trendHashtags(query);
+  const tags = trendHashtags(query, lang);
   const [{ data: rows }, { data: searched }, { data: counts }] = await Promise.all([
     db
       .from("trend_videos")
-      .select("id, key, platform, external_id, url, caption, author, views, likes, comments, sound, duration, posted_at, cover_path, hook, hook_form, tags")
+      .select("id, key, platform, external_id, url, caption, author, views, likes, comments, sound, duration, posted_at, cover_path, hook, hook_form, hook_score, hook_why, tags")
       .in("key", keys)
       .order("rank", { ascending: true }),
     db.from("trend_searches").select("fetched_at").in("key", keys),
@@ -461,6 +480,8 @@ export async function trendCards(query: string): Promise<TrendLists> {
   const paths = (rows ?? []).flatMap((r) => (r.cover_path ? [r.cover_path as string] : []));
   const signed = paths.length ? ((await db.storage.from("media").createSignedUrls(paths, 3600)).data ?? []) : [];
   const urls = new Map(signed.flatMap((s) => (s.path && s.signedUrl ? [[s.path, s.signedUrl] as const] : [])));
+  // Only a hook that works is shown as one: a title or a label is not.
+  const strong = (r: NonNullable<typeof rows>[number]) => Boolean(r.hook) && Number(r.hook_score ?? 0) >= TREND_HOOK_PASS;
   const card = (r: NonNullable<typeof rows>[number]): TrendCard => ({
     id: r.id as string,
     platform: r.platform as TrendPlatform,
@@ -475,16 +496,34 @@ export async function trendCards(query: string): Promise<TrendLists> {
     duration: r.duration === null ? null : Number(r.duration),
     postedAt: r.posted_at as string | null,
     cover: r.cover_path ? (urls.get(r.cover_path as string) ?? null) : null,
-    hook: (r.hook as string | null) || null,
-    hookForm: (r.hook_form as HookForm | null) ?? null,
+    hook: strong(r) ? (r.hook as string) : null,
+    hookForm: strong(r) ? ((r.hook_form as HookForm | null) ?? null) : null,
+    hookScore: strong(r) ? Number(r.hook_score) : null,
+    hookWhy: strong(r) ? ((r.hook_why as string | null) || null) : null,
     tags: (r.tags as string[] | null) ?? [],
   });
   const of = (scope: TrendScope) => (rows ?? []).filter((r) => r.key === scopeKey(plan[scope])).map(card);
   const dates = (searched ?? []).map((r) => r.fetched_at as string).sort();
   const volumes = hashtagVolumes(((counts ?? []) as { hashtag: string; counted_on: string; posts: number | string }[]).map((c): HashtagCount => ({ ...c, posts: Number(c.posts) })), tags);
   const all = (rows ?? []).map(card);
-  const hooks = [...new Map(all.filter((c) => c.hook).sort((a, b) => (b.views ?? (b.likes ?? 0) * 20) - (a.views ?? (a.likes ?? 0) * 20)).map((c) => [c.hook!.toLowerCase(), c])).values()].slice(0, 10);
+  // The strongest first, then the most watched; one per account (a series repeats its hook) and per hook.
+  const ranked = all.filter((c) => c.hook).sort((a, b) => (b.hookScore ?? 0) - (a.hookScore ?? 0) || (b.views ?? (b.likes ?? 0) * 20) - (a.views ?? (a.likes ?? 0) * 20));
+  const hooks = firstOf(
+    firstOf(ranked, (c) => c.author?.toLowerCase() ?? c.id),
+    (c) => c.hook!.toLowerCase(),
+  ).slice(0, 10);
   return { trend: of("trend"), beau: of("beau"), local: of("local"), hooks, words: { trend: plan.trend.words, beau: plan.beau.words, local: plan.local.words }, hashtags: volumes, fetchedAt: dates.at(-1) ?? null };
+}
+
+/** The first of each key, in order. */
+function firstOf<T>(list: T[], key: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  return list.filter((item) => {
+    const k = key(item);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 /**
@@ -492,27 +531,29 @@ export async function trendCards(query: string): Promise<TrendLists> {
  * judge: their form and the example, never words to take (HOOK_JUDGE_PROMPT says so). Empty when none.
  */
 export async function momentHooks(studioId: string): Promise<{ forme: string; exemple: string }[]> {
-  const query = await studioTrendQuery(studioId).catch(() => null);
-  if (!query) return [];
-  const plan = trendPlan(query);
+  const trends = await studioTrends(studioId).catch(() => null);
+  if (!trends) return [];
+  const plan = trendPlan(trends.query, trends.lang);
   const { data } = await supabaseAdmin()
     .from("trend_videos")
     .select("hook, hook_form, views")
-    .in("key", [scopeKey(plan.trend), scopeKey(plan.beau)])
+    .in("key", [scopeKey(plan.trend), scopeKey(plan.beau), scopeKey(plan.local)])
     .not("hook", "is", null)
+    .gte("hook_score", TREND_HOOK_PASS)
+    .order("hook_score", { ascending: false })
     .order("views", { ascending: false, nullsFirst: false })
     .limit(8);
   return (data ?? []).map((r) => ({ forme: HOOK_FORM_LABELS[(r.hook_form as HookForm | null) ?? "autre"] ?? "Accroche", exemple: r.hook as string }));
 }
 
-/** The trades to search each week: those of the real studios (lab studios aside), each once. */
-export async function tradesToSearch(): Promise<string[]> {
-  const { data } = await supabaseAdmin().from("studios").select("trend_query, business_type, website_url");
-  const queries = (data ?? [])
+/** The trades to search each week, with their language: those of the real studios (lab studios aside), each once. */
+export async function tradesToSearch(): Promise<{ query: string; lang: TrendLang }[]> {
+  const { data } = await supabaseAdmin().from("studios").select("trend_query, trend_lang, business_type, website_url");
+  const trades = (data ?? [])
     .filter((s) => !String(s.website_url ?? "").startsWith("lab://"))
     .flatMap((s) => {
-      const q = trendQueryOf(s.trend_query as string | null, s.business_type as string | null);
-      return q ? [q] : [];
+      const query = trendQueryOf(s.trend_query as string | null, s.business_type as string | null);
+      return query ? [{ query, lang: trendLangOf(s.trend_lang) }] : [];
     });
-  return [...new Map(queries.map((q) => [q.replace(/\s+/g, " ").trim().toLowerCase(), q])).values()];
+  return [...new Map(trades.map((t) => [`${t.lang}:${t.query.replace(/\s+/g, " ").trim().toLowerCase()}`, t])).values()];
 }
