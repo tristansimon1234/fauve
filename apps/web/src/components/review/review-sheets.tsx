@@ -7,7 +7,7 @@ import { DateView } from "./change-panel";
 
 // What « Prévoir » and « Publier » open on a Reel's page, the same in the app and on the page
 // opened from WhatsApp: when Edith reminds her to post it, and, before Instagram is connected,
-// the way to connect it (or to save the video and post it herself).
+// the way to connect it (or, on a phone, to open it in Instagram; else to save the video and post it herself).
 
 export type ReviewSheet = "date" | "instagram";
 
@@ -19,12 +19,15 @@ export function ReviewSheets({
   data,
   onClose,
   onPlanned,
+  share,
 }: {
   sheet: ReviewSheet | null;
   data: ReviewData;
   onClose: () => void;
   /** The moment changed: the line to show her (empty when nothing changed). */
   onPlanned: (message: string) => void;
+  /** On a phone, the share sheet with her video (share-video.ts). */
+  share?: { can: boolean; busy: boolean; waiting: boolean; onShare: () => void };
 }) {
   if (sheet === "date") {
     return (
@@ -34,6 +37,20 @@ export function ReviewSheets({
     );
   }
   if (sheet === "instagram") {
+    // On a phone, the quickest: Instagram opens with her Reel ready (share-video.ts).
+    if (share?.can) {
+      return (
+        <Sheet title="Publie-le sur Instagram" hint="Instagram s’ouvre avec ton Reel prêt, et ta légende copiée : tu n’as plus qu’à la coller et publier." onClose={onClose}>
+          <button type="button" onClick={share.onShare} disabled={share.busy} className="btn btn-primary w-full disabled:opacity-60">
+            <InstagramIcon size={18} />
+            {share.busy ? "Un instant…" : share.waiting ? "Partager maintenant" : "Ouvrir dans Instagram"}
+          </button>
+          <a href="/api/instagram/connect" className="btn btn-secondary w-full">
+            Ou relie ton compte pour qu’Edith publie
+          </a>
+        </Sheet>
+      );
+    }
     return (
       <Sheet title="Relie ton Instagram" hint="Pour qu’Edith publie ton Reel, relie ton compte Instagram une fois. Ou télécharge la vidéo et publie-la toi-même." onClose={onClose}>
         <a href="/api/instagram/connect" className="btn btn-primary w-full">

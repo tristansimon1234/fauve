@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
 import { useFauveDrawer } from "@/components/fauve-drawer";
-import { ArrowUpIcon, CalendarIcon, CheckIcon, DownloadIcon, PauseIcon, PenIcon, PlayIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
+import { ArrowUpIcon, CalendarIcon, CheckIcon, DownloadIcon, PauseIcon, PenIcon, PlayIcon, ShareIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { CoverPicker } from "@/components/montage/cover-picker";
 import { PausedSign, Scrubber, useReelPlayback } from "@/components/review/reel-player";
@@ -16,6 +16,7 @@ import { OpeningEditor, type EditorParts } from "./editor-parts";
 import type { EditStart } from "./reel-editor";
 import { needsInstagram, ReviewSheets, type ReviewSheet } from "./review-sheets";
 import { SceneStrip } from "./scene-strip";
+import { shareMessage, useVideoShare } from "./share-video";
 
 // « Modifier » plays the montage live (Remotion): its code is loaded only when she opens it.
 type EditorModule = typeof import("./reel-editor");
@@ -23,7 +24,7 @@ type EditorModule = typeof import("./reel-editor");
 // « Ta publication », the page of a Reel, and nothing more (Tristan: « enlève tout sauf
 // la légende, qui doit être tout le temps visible, et la photo de couverture, et juste un
 // bouton demande une modif à Edith qui ouvre le drawer, that's it »): the video as it
-// will go out, its whole caption (written over in place), its cover, « Publier », « Télécharger », « Prévoir »
+// will go out, its whole caption (written over in place), its cover, « Publier », « Télécharger » (« Partager » on a phone), « Prévoir »
 // (when Edith reminds her to post it) and « Modifier avec Edith » (Tristan: « 3 boutons publier, télécharger,
 // prévoir + modifier avec simone »; her panel in the app, WhatsApp from the page of the links). Above the
 // video, « Revenir à l'ancienne » (and back to the newer one); under it, its scenes: a tap
@@ -151,6 +152,16 @@ export function PostReview({
       router.refresh();
     });
 
+  const sharing = useVideoShare(data.videoUrl, data.title);
+  const shareVideo = async () => {
+    setError(null);
+    const result = await sharing.share(caption);
+    if (result === "shared" || result === "failed") setSheet(null);
+    const line = shareMessage(result, caption);
+    if (line) (result === "failed" ? setError : setToast)(line);
+  };
+  const canShare = sharing.can && Boolean(data.videoUrl) && !data.making && !data.failed;
+
   const tile = "fauve-press flex h-[60px] min-w-0 flex-col items-center justify-center gap-1 rounded-[18px] px-1 text-[13.5px] font-extrabold disabled:opacity-60";
   const action = data.locked ? null : data.status === "scheduled" ? (
     <div className="flex items-start gap-3 rounded-[18px] bg-success-soft px-4 py-3.5 text-success">
@@ -173,7 +184,12 @@ export function PostReview({
           <ArrowUpIcon size={19} />
           {pending ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
         </button>
-        {data.downloadUrl ? (
+        {canShare ? (
+          <button type="button" onClick={shareVideo} disabled={sharing.busy} className={`${tile} border-[1.5px] border-line bg-white text-ink hover:border-lilac`}>
+            <ShareIcon size={19} />
+            {sharing.busy ? "Un instant…" : "Partager"}
+          </button>
+        ) : data.downloadUrl ? (
           <a href={data.downloadUrl} download className={`${tile} border-[1.5px] border-line bg-white text-ink hover:border-lilac`}>
             <DownloadIcon size={19} />
             Télécharger
@@ -353,7 +369,13 @@ export function PostReview({
           </div>
         )}
 
-        <ReviewSheets sheet={sheet} data={data} onClose={() => setSheet(null)} onPlanned={planned} />
+        <ReviewSheets
+          sheet={sheet}
+          data={data}
+          onClose={() => setSheet(null)}
+          onPlanned={planned}
+          share={{ can: canShare, busy: sharing.busy, waiting: sharing.waiting, onShare: shareVideo }}
+        />
 
         {toast && (
           <p
