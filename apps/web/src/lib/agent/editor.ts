@@ -7,6 +7,7 @@ import {
   signatureLines,
   followedForEditor,
   followedLook,
+  followedEffect,
   signatureOf,
   editorOutputSchemaLegacy,
   finishPlan,
@@ -54,6 +55,8 @@ import {
   gestureMoments,
   handMoves,
   SUBTITLE_ROW,
+  speechFacts,
+  asAsked,
   type ReelProps,
   type TracksByClip,
   honestLength,
@@ -69,6 +72,7 @@ import { usableFonts } from "@/lib/fonts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { ensureTranscript } from "@/lib/voice";
+import { ensureCleanVoice, ensureSpeech } from "@/lib/video/speech";
 import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
@@ -161,6 +165,8 @@ const COMPOSE_RETRY_NEEDS_MS = 420_000;
 
 /** How long the montage waits for what moves in her videos (its faces, its hands) before the editor cuts. */
 const TRACKS_WAIT_MS = 180_000;
+/** …and for the speech of a video analysed before it was read (its sound cleaned, its words timed). */
+const SPEECH_WAIT_MS = 90_000;
 
 /**
  * Fauve's editor: watches the analyses, picks a motion template and writes the
@@ -224,12 +230,19 @@ export async function designEdit(params: {
     Promise.all(videoIds.map((id) => ensureClipAnalysis(params.studioId, id))),
     Promise.all(photoIds.map((id) => photoRegions(params.studioId, id).catch(() => null))),
   ]);
-  const clips = analyses.flatMap((a) => ("analysis" in a ? [{ media_id: a.media_id, analysis: a.analysis }] : []));
+  let clips = analyses.flatMap((a) => ("analysis" in a ? [{ media_id: a.media_id, analysis: a.analysis }] : []));
   if (videoIds.length && !clips.length && !photoIds.length) throw new Error("Les vidéos ne sont pas encore analysées, réessaie dans une minute");
   // What moves in her videos (hands, faces, bodies), followed once per clip with someone in it (the cut-out sandbox),
   // started now so it runs while the rest is read: an animation can then start from a gesture, hold on to it or follow it.
   const earlyTracks = clips.length
     ? ensureTracks(params.studioId, clips.map((c) => c.media_id)).catch((e: unknown) => console.warn("tracks: not ready", e))
+    : null;
+  // Someone speaking in a video analysed before its speech was read: read now (its sound cleaned, its « euh » timed).
+  const earlySpeech = clips.length
+    ? ensureSpeech(params.studioId, clips).catch((e: unknown) => {
+        console.warn("speech: not read", e);
+        return null;
+      })
     : null;
   const photos = photoIds.map((id, i) => {
     const read = photoReads[i];
@@ -242,6 +255,8 @@ export async function designEdit(params: {
   // Her voice note over the Reel: read once (her words with their timings), the editor cuts on her phrases.
   // Its first word is heard at once: the silence a voice note opens on is cut.
   const voiceId = post.data.voice_media_id as string | null;
+  // Her own voice note recorded in a noisy place: cleaned once, its words keep their timing.
+  if (voiceId) await ensureCleanVoice(params.studioId, voiceId);
   const voice = voiceId ? await ensureTranscript(params.studioId, voiceId) : null;
   const voiceStart = voice ? voiceAt(voice) : 0;
   const spoken = voice ? voiceForEditor(voice, voiceStart) : null;
@@ -269,6 +284,11 @@ export async function designEdit(params: {
   // (the texts keep off them) and what the animations follow. Never more than a few minutes of waiting (a sandbox
   // installing the tracker for the first time): without them, the faces are Gemini's and the animations follow nothing.
   if (earlyTracks) await Promise.race([earlyTracks, new Promise((resolve) => setTimeout(resolve, TRACKS_WAIT_MS))]);
+  // Her speech read (the hesitations and pauses the engine cuts): a minute and a half at most, else cut as it is.
+  if (earlySpeech) {
+    const read = await Promise.race([earlySpeech, new Promise<null>((resolve) => setTimeout(() => resolve(null), SPEECH_WAIT_MS))]);
+    if (read) clips = read;
+  }
   const tracks: TracksByClip = clips.length ? await loadTracks(params.studioId, clips.map((c) => c.media_id)).catch(() => ({})) : {};
   const input = {
     studio: {
@@ -335,7 +355,8 @@ export async function designEdit(params: {
       correction && previousPlan.success
         ? {
             ...previousPlan.data,
-            segments: previousPlan.data.segments.map((s) =>
+            // A ramped slow motion as it was asked (the engine ramps it again).
+            segments: previousPlan.data.segments.map(asAsked).map((s) =>
               isMotionSegment(s)
                 ? {
                     motion: {
@@ -393,6 +414,8 @@ export async function designEdit(params: {
   let output = response.parsed_output;
 
   const durations = { ...Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.duration])), ...Object.fromEntries(photoIds.map((id) => [id, PHOTO_MAX_SECONDS])) };
+  // Where someone speaks: the hesitations and long pauses the engine cuts out.
+  const speech = speechFacts(clips);
   // Retouch and blur stay on their clips from one version to the next.
   // A correction also keeps the texts' styles and places (the editor names looks, it does not copy them).
   const base = previousPlan.success ? previousPlan.data : null;
@@ -403,7 +426,7 @@ export async function designEdit(params: {
     // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
     const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;
     const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
-    return carryRetouch(carryTextStyle(normalizeEditPlan(drafted, durations, allowed), params.fresh ? null : base), base);
+    return carryRetouch(carryTextStyle(normalizeEditPlan(drafted, durations, allowed, speech), params.fresh ? null : base), base);
   };
   let plan = toPlan(output);
   // The length she asked for is measured on the plan, never taken from the editor's words: missed, it
@@ -426,6 +449,9 @@ export async function designEdit(params: {
   if (!plan.colors && base?.colors && !params.fresh) plan.colors = base.colors;
   // The Reel she copies takes its own font over her charter's when it makes its style (the animations get it too); its colours were offered to the editor.
   Object.assign(plan, followedLook(plan, followed));
+  // A correction keeps its look unless the editor changed it (« none » takes it off); the Reel she copies brings its own.
+  if (correction && !params.fresh && base?.effect && (output.plan as { effect?: string }).effect === undefined) plan.effect = base.effect;
+  Object.assign(plan, followedEffect(plan, followed));
 
   // The hook's words decide whether anyone stays: a new Reel's written hook is weighed against
   // other forms by the hook judge, who keeps the strongest (an opening animation is its own hook).

@@ -19,6 +19,7 @@ import { brandSignatureSchema } from "./signature.ts";
 import { ONBOARDING_STEPS } from "./onboarding.ts";
 import { slideTextSchema } from "./slides.ts";
 import { textLookSchema } from "./text-look.ts";
+import { REEL_EFFECTS } from "./looks.ts";
 
 /** Changes to a text look: only the fields given change; null removes a fill, an outline or an emphasis style. */
 const lookPatchSchema = textLookSchema.partial().extend({
@@ -345,6 +346,23 @@ export const toolSpecs = {
     description:
       "Musique d'un Reel, composée par Edith pour ce montage (ElevenLabs, calée sur les images, libre de droits, sans voix) : on (par défaut), off (Reel muet, par ex. pour mettre un son d'Instagram en publiant elle-même), another (une nouvelle musique). Refait la vidéo, gratuit.",
     input: z.object({ post_id: z.string().uuid(), mode: z.enum(["on", "off", "another"]) }),
+  },
+  story_express: {
+    description:
+      "Une story animée en un geste, gratuite : une de ses photos ou un passage de sa vidéo, sa phrase dessus dès la première image (« 2 places ce soir », « Le plat du jour : … ») et un détail dessous si elle en donne un (une heure, un prix), dans sa charte, avec un mouvement lent (en relief quand le sujet se détoure), sa musique, et un look si elle en demande un. Sans montage : prête en une ou deux minutes, livrée comme un montage (son lien, sa carte). Pour les stories du quotidien qui donnent envie de venir ; ses mots, jamais un fait inventé (prix, horaire). Sur une story existante (post_id), sinon une nouvelle story (scheduled_at : quand lui faire signe, par défaut maintenant).",
+    input: z.object({
+      media_id: z.string().uuid().describe("La photo ou la vidéo (list_media)"),
+      text: z.string().min(1).max(60).describe("La phrase sur la story, courte, avec ses mots"),
+      detail: z.string().max(40).optional().describe("Un détail sous la phrase : une heure, un prix, « 2 places »"),
+      look: z.enum(REEL_EFFECTS).optional().describe("Seulement si elle demande un look (appareil jetable, VHS…)"),
+      post_id: z.string().uuid().optional().describe("Une story déjà prévue ; sinon une nouvelle est créée"),
+      scheduled_at: isoDateTime.optional(),
+    }),
+  },
+  set_look: {
+    description:
+      "Le look d'une vidéo montée (Reel ou story), sur toute l'image, sous ses textes, comme les filtres de Prequel : disposable (appareil photo jetable : flash chaud, grain, date orange dans le coin), vhs (cassette VHS : couleurs qui bavent, lignes, « PLAY ▶ » et la date), y2k (flash direct des années 2000), cine (couleurs de cinéma), bw (noir et blanc contrasté), dust (poussière de pellicule), none (l'enlever). Seulement quand elle le demande (« effet VHS », « façon appareil jetable », « en noir et blanc »…), jamais de toi-même. Refait la vidéo, gratuit.",
+    input: z.object({ post_id: z.string().uuid(), look: z.enum(["none", ...REEL_EFFECTS]) }),
   },
   set_voice: {
     description:

@@ -11,6 +11,7 @@ import {
   type EffectWord,
   type PostStatus,
   type PublishWhen,
+  type ReelEffect,
 } from "@fauve/agent";
 import { after } from "next/server";
 import type { TikTokPanel } from "@/components/montage/where-to-post";
@@ -56,6 +57,8 @@ export type ReviewData = {
   plan: EditPlan;
   /** Made by the effects agent: its texts are in the image, a change is asked of Edith. */
   baked: boolean;
+  /** The look over its whole video (or the film dust), null: none. */
+  effect: ReelEffect | null;
   /** The texts of its effect she changes herself (its kit draws them again); none without a kit. */
   words: EffectWord[];
   version: number;
@@ -184,6 +187,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     scenes: spriteUrl ? { url: spriteUrl, count: plan.data.segments.length } : null,
     plan: plan.data,
     baked: isBaked(plan.data),
+    effect: plan.data.effect ?? null,
     words: effectWords(plan.data),
     version: current.version as number,
     previous: previous ?? null,

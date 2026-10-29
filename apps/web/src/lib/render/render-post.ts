@@ -14,6 +14,8 @@ import {
   planMediaIds,
   PHOTO_MAX_SECONDS,
   scenePhotoIds,
+  depthPhotoIds,
+  dayIn,
   withoutScenes,
   type ClipAnalysis,
   buildFfmpegArgs,
@@ -143,6 +145,9 @@ export async function loadMontageInputs(
   const cutouts = (template === "collage" && plan.template === "collage") || isComposed(plan) ? await stickerInputs(studioId, photoIds).catch(() => ({})) : undefined;
   // The animations' cut-outs: a clean edge is enough, even cut by the photo's frame (the animation brings the subject in from there).
   const sceneCutouts = withPhotos.length ? await sceneCutoutInputs(studioId, withPhotos).catch(() => ({})) : undefined;
+  // A moving photo whose subject cuts out cleanly plays in relief (the same clean cut-out).
+  const moving = depthPhotoIds(plan);
+  const depth = moving.length ? await sceneCutoutInputs(studioId, moving).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
   const photoAspects = Object.fromEntries(
     assets.flatMap((a) => {
@@ -192,6 +197,7 @@ export async function loadMontageInputs(
     voice,
     cutouts,
     sceneCutouts,
+    depth,
     photoAspects,
     tracks,
     facts,
@@ -323,9 +329,9 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   const plan = editPlanSchema.parse(planRow.plan);
   // Photos have their subject cut out once (an open model in its own sandbox): a collage's, laid as stickers, a
   // composed Reel's, and those an animation composes with (the design step has usually made them already).
-  const toCut = plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : scenePhotoIds(plan);
+  const toCut = plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : [...new Set([...scenePhotoIds(plan), ...depthPhotoIds(plan)])];
   if (toCut.length) await ensureCutouts(studioId, toCut);
-  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, photoAspects, tracks, facts } =
+  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, depth, photoAspects, tracks, facts } =
     await loadMontageInputs(studioId, plan, { postId });
   const motion = motionTemplateSchema.safeParse(plan.template);
 
@@ -366,6 +372,8 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         ...(voice ? { voice } : {}),
         ...(cutouts ? { cutouts } : {}),
         ...(sceneCutouts ? { sceneCutouts } : {}),
+        ...(depth ? { depth } : {}),
+        today: dayIn(),
         photoAspects,
         ...(Object.keys(tracks).length ? { tracks } : {}),
       });

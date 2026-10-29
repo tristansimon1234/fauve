@@ -1,6 +1,6 @@
 import { avoidPhotoText, boxFrom2d, headZone, photoBoxInFrame, photoEditFrom, reelSubtitleRow, SUBTITLE_ROW, type Adjust, type Box, type PhotoDetection, type PhotoEdit } from "./retouch.ts";
 import { planTimeline } from "./motion.ts";
-import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type EditPlan, type PlanSegment } from "./schemas.ts";
+import { isClipSegment, isMotionSegment, RAMP_EASE, segmentSeconds, type CameraMove, type ClipAnalysis, type ClipSegment, type EditPlan, type PlanSegment } from "./schemas.ts";
 import { handMoves, type TracksByClip, type TracksFile } from "./tracking.ts";
 
 // The finishing touches a professional editor gives every cut, decided by the engine from
@@ -172,9 +172,62 @@ export function photoMoves(plan: Pick<EditPlan, "segments">, photos: MediaFacts[
   return moves;
 }
 
+/** A ramp needs this much time on screen as filmed, around its slow passage and its ease (seconds), else the shot stays in plain slow motion. */
+const RAMP_MIN_RUN = 0.5;
+/** The slow passage around the gesture, in seconds of the clip. */
+const RAMP_HOLD = { min: 0.35, max: 0.9 };
+
+/**
+ * A shot the editor slowed down, ramped the way creators do it (CapCut's « Velocity »): as filmed
+ * up to its gesture, easing into slow motion on it (the gesture Gemini read that the shot covers
+ * most, else a hand move measured on the tracks, else its best moment, else its middle), and back.
+ * The same time on screen as the slow motion asked for: the passage as filmed comes from the clip
+ * around it, never from a passage another shot of the Reel shows. Unchanged when there is no room.
+ */
+export function speedRamp(s: ClipSegment, analysis: ClipAnalysis | undefined, others: { from: number; to: number }[], clipDuration: number, tracks?: TracksFile): ClipSegment {
+  const speed = s.speed ?? 1;
+  if (speed >= 0.99 || s.ramp || !analysis) return s;
+  const covered = (a: { start: number; end: number }) => Math.max(0, Math.min(a.end, s.out) - Math.max(a.start, s.in));
+  const best = (list: { start: number; end: number }[]) => list.filter((a) => covered(a) > 0.1).sort((a, b) => covered(b) - covered(a))[0];
+  const measured = tracks ? handMoves({ fps: tracks.fps, from: tracks.from, frames: tracks.frames, aspect: tracks.w / tracks.h }) : [];
+  const gesture = best(analysis.actions ?? []) ?? best(measured) ?? best(analysis.best_moments);
+  const from = gesture ? Math.max(gesture.start, s.in) : s.in;
+  const to = gesture ? Math.min(gesture.end, s.out) : s.out;
+  const at = (from + to) / 2;
+  const ease = (2 * RAMP_EASE) / ((1 + speed) / 2);
+  // The slow passage shortens when it must, to leave the shot its passage as filmed.
+  const room = (segmentSeconds(s) - ease - RAMP_MIN_RUN) * speed;
+  const hold = Math.min(RAMP_HOLD.max, s.out - s.in, room, Math.max(RAMP_HOLD.min, to - from));
+  if (hold < RAMP_HOLD.min) return s;
+  const run = segmentSeconds(s) - hold / speed - ease;
+  const coreFrom = at - hold / 2 - RAMP_EASE;
+  const coreTo = at + hold / 2 + RAMP_EASE;
+  if (coreFrom < 0 || coreTo > clipDuration || others.some((o) => o.from < coreTo && o.to > coreFrom)) return s;
+  const limitBefore = Math.max(0, ...others.filter((o) => o.to <= coreFrom).map((o) => o.to));
+  const limitAfter = Math.min(clipDuration, ...others.filter((o) => o.from >= coreTo).map((o) => o.from));
+  let before = Math.min(coreFrom - limitBefore, run * 0.6);
+  let after = run - before;
+  if (after > limitAfter - coreTo) {
+    after = limitAfter - coreTo;
+    before = Math.min(coreFrom - limitBefore, run - after);
+  }
+  if (before + after < run - 0.01) return s;
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return { ...s, in: round(coreFrom - before), out: round(coreTo + after), ramp: { at: round(at), hold: round(hold), asked: [s.in, s.out] } };
+}
+
+/** A ramped shot as the editor wrote it (its slow motion over the passage it asked for): what a correction shows it. */
+export function asAsked<S extends PlanSegment>(s: S): S {
+  if (!isClipSegment(s) || !s.ramp) return s;
+  const { ramp, ...rest } = s;
+  return { ...rest, in: ramp.asked[0], out: ramp.asked[1] } as S;
+}
+
 export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Record<string, number> = {}): EditPlan {
   let still = 0;
   const photoMove = photoMoves(plan, facts.photos);
+  // A composed Reel lays its shots itself, at their own pace: no ramp there.
+  const composed = Boolean(plan.layers?.some((l) => l.compose));
   const segments = plan.segments.map((s, i): PlanSegment => {
     if (isMotionSegment(s)) {
       const over = footageUnder(plan, i, facts, clipDurations);
@@ -199,11 +252,15 @@ export function finishPlan(plan: EditPlan, facts: MediaFacts, clipDurations: Rec
     const move: CameraMove | undefined =
       (s.move ?? (s.zoom === "light" ? "in" : "none")) === "none" && filmedStill && segmentSeconds(s) >= 1.5 ? (["in", "none", "out", "none"] as const)[still++ % 4] : s.move;
     const { adjust: _carried, ...rest } = s;
-    return {
+    const finished: ClipSegment = {
       ...rest,
       ...(Object.keys(adjust).length ? { adjust } : {}),
       ...(move ? { move } : {}),
     };
+    // A slow motion ramps in and out of its gesture, in the time on screen the editor gave it.
+    if (composed || !s.speed || s.speed >= 1) return finished;
+    const others = plan.segments.flatMap((x, j) => (j !== i && isClipSegment(x) && x.clip_id === s.clip_id ? [{ from: x.in, to: x.out }] : []));
+    return speedRamp(finished, analysis, others, clipDurations[s.clip_id] ?? analysis.duration, facts.tracks?.[s.clip_id]);
   });
   const finished = { ...plan, segments };
 
@@ -246,11 +303,11 @@ export function busyTimeline(plan: EditPlan, facts: MediaFacts) {
   return plan.segments.map((s, i) => {
     const at = timeline.segments[i]!;
     const boxes = isClipSegment(s)
-      ? busyZones(facts, s.clip_id, s.in, segmentSeconds(s) * (s.speed ?? 1), s.photo)
+      ? busyZones(facts, s.clip_id, s.in, s.out - s.in, s.photo)
       : isMotionSegment(s) && s.over
         ? busyZones(facts, s.over.clip_id, s.over.in ?? 0, s.duration, plan.segments.find((x): x is Extract<PlanSegment, { clip_id: string }> => isClipSegment(x) && x.clip_id === s.over!.clip_id)?.photo)
         : [];
-    const windows = isClipSegment(s) ? busyWindows(facts, s.clip_id, s.in, segmentSeconds(s) * (s.speed ?? 1), at) : null;
+    const windows = isClipSegment(s) ? busyWindows(facts, s.clip_id, s.in, s.out - s.in, at) : null;
     return { start: at.start, length: at.length, boxes, windows: windows ?? [{ start: at.start, length: at.length, boxes }], motion: isMotionSegment(s) };
   });
 }
@@ -358,7 +415,8 @@ export function handsInFrame(file: TracksFile, analysis: ClipAnalysis, start: nu
  * measured on their points (`mains_suivies`: the gestures read can miss one).
  */
 export function editorClip(mediaId: string, analysis: ClipAnalysis, tracks?: TracksFile) {
-  const { correction: _correction, words, shots, actions, ...rest } = analysis;
+  // Its measured speech stays the engine's: the editor gives whole sentences, the engine cuts the « euh ».
+  const { correction: _correction, words, shots, actions, speech: _speech, ...rest } = analysis;
   const hands = (a: { start: number; end: number }) => {
     const share = tracks ? handsInFrame(tracks, analysis, a.start, a.end) : null;
     return share === null ? {} : { mains: share >= 0.75 ? "dans le cadre" : share >= 0.3 ? "en partie" : "hors du cadre" };

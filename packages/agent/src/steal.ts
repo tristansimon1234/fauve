@@ -3,6 +3,7 @@ import { MAX_AVERAGE_SHOT, type QualityOptions } from "./critic.ts";
 import { BEAT_STEP } from "./mix.ts";
 import { OUTLINE_CHARS } from "./reel-model.ts";
 import { clip, SIGNATURE_GRADES, type BrandSignature } from "./signature.ts";
+import { isReelEffect, type ReelEffect } from "./looks.ts";
 
 // « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA », « c'est one
 // shot »): a Reel the manager likes (a link sent in the chat or on WhatsApp, a video she
@@ -77,7 +78,11 @@ export const stolenLookReadingSchema = z.object({
     .describe(
       "Seulement si les couleurs de ses textes et de ses formes font son style (un jaune cerné de noir, un néon, une palette rétro…) : 1 à 3 couleurs hex (#RRGGBB), la plus visible d'abord. Sinon une liste vide : les couleurs de ses images ne comptent pas, ni un texte blanc ou noir ordinaire",
     ),
-  effect: z.enum(["dust", "grain", "none"]).describe("Un effet sur toute la vidéo : dust (poussière et rayures de pellicule), grain, none"),
+  effect: z
+    .enum(["dust", "grain", "disposable", "vhs", "y2k", "cine", "bw", "none"])
+    .describe(
+      "Un effet ou un look sur toute la vidéo : dust (poussière et rayures de pellicule), grain, disposable (appareil photo jetable : flash chaud, grain, date orange dans le coin), vhs (cassette VHS : couleurs qui bavent, lignes, « PLAY »), y2k (flash direct des années 2000), cine (couleurs de cinéma, ombres bleu-vert), bw (noir et blanc), none",
+    ),
   moments: z
     .array(
       z.object({
@@ -179,7 +184,7 @@ export const stolenStyleSchema = z.object({ look: stolenLookSchema, measures: re
 export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
 export const STEAL_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (studio, salon, restaurant, shop…). The person who runs the business wants to take this Reel's style for theirs: read it as a pro editor who wants to remake its style, not its content.
-Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, letter spacing, key word, background under the sentence, place, alignment; its font and its colours only when they make its style), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
+Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, letter spacing, key word, background under the sentence, place, alignment; its font and its colours only when they make its style), the subtitles, the effect on the video (film dust, grain, or a look: a disposable camera, a VHS tape, the flash of the 2000s, cinema colours, black and white), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
 Copy neither its words, nor its images, nor the name of its music: describe a form another business can reuse. In your French, make no feminine or masculine agreement for the person who runs the business. In French, except « music » in English.`;
 
 /** The style one Reel copies (from its inspiration's stolen style): its look and its pace. */
@@ -216,7 +221,22 @@ const FORMAT_WORDS: Record<StolenLook["format"], string> = {
   collage: "du motion design fait main",
   autre: "son propre format",
 };
-const EFFECT_WORDS: Record<StolenLook["effect"], string> = { dust: "une poussière de pellicule", grain: "du grain", none: "" };
+const EFFECT_WORDS: Record<StolenLook["effect"], string> = {
+  dust: "une poussière de pellicule",
+  grain: "du grain",
+  disposable: "le look appareil jetable (flash chaud, grain, date orange)",
+  vhs: "le look cassette VHS",
+  y2k: "le look flash des années 2000",
+  cine: "des couleurs de cinéma",
+  bw: "du noir et blanc",
+  none: "",
+};
+
+/** The look the copied Reel wears, as this Reel wears it (« ce qu'il a, son Reel l'a »): when the editor set none. */
+export function followedEffect(plan: { effect?: ReelEffect }, followed: Pick<FollowedStyle, "look"> | undefined): { effect?: ReelEffect } {
+  const effect = followed?.look.effect;
+  return !plan.effect && effect && isReelEffect(effect) ? { effect } : {};
+}
 
 const seconds = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(n);
 

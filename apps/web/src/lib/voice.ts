@@ -12,6 +12,41 @@ import { costMeta } from "@/lib/cost-scope";
 /** Notes longer than this are not transcribed (a voice note, not a podcast). */
 const MAX_BYTES = 25 * 1024 * 1024;
 
+/**
+ * Every word said in a recording with its timing, hesitations included (Scribe is verbatim by
+ * default): the speech of a video, sent as WAV once its sound is cleaned (speech.ts). Logged
+ * like a voice note's transcription; null without the service, or when it fails.
+ */
+export async function transcribeSpeech(studioId: string, mediaId: string, wav: Buffer): Promise<VoiceTranscript | null> {
+  const key = env("ELEVENLABS_API_KEY");
+  if (!key || wav.length > MAX_BYTES) return null;
+  try {
+    const form = new FormData();
+    form.append("model_id", env("ELEVENLABS_STT_MODEL"));
+    form.append("file", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "speech.wav");
+    form.append("timestamps_granularity", "word");
+    form.append("tag_audio_events", "false");
+    const started = Date.now();
+    const res = await fetch("https://api.elevenlabs.io/v1/speech-to-text", { method: "POST", headers: { "xi-api-key": key }, body: form });
+    if (!res.ok) throw new Error(`ElevenLabs speech to text ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
+    const transcript = fromScribe(await res.json());
+    await supabaseAdmin()
+      .from("cost_events")
+      .insert({
+        studio_id: studioId,
+        kind: "transcription",
+        provider: "elevenlabs",
+        units: transcript.duration,
+        cost_eur: usdToEur(transcriptionCostUsd(transcript.duration), env("USD_TO_EUR")),
+        meta: costMeta({ media_id: mediaId, model: env("ELEVENLABS_STT_MODEL"), purpose: "clip_speech", ms: Date.now() - started }),
+      });
+    return transcript;
+  } catch (error) {
+    console.warn("clip speech transcription failed", mediaId, error instanceof Error ? error.message.slice(0, 300) : error);
+    return null;
+  }
+}
+
 /** The transcript of a voice note, made once; null without the service, or when it fails. */
 export async function ensureTranscript(studioId: string, mediaId: string): Promise<VoiceTranscript | null> {
   const db = supabaseAdmin();

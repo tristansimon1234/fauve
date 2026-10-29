@@ -48,12 +48,14 @@ import {
   PLAN_BUTTONS,
   exchangeLines,
   type ExchangeRow,
+  EFFECT_LABELS,
+  isBaked,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { acceptQuote, createMontageQuote } from "@/lib/credits";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
-import { bakedReel } from "@/lib/edit-plans";
+import { bakedReel, insertPlanVersion } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus } from "@/lib/montage-status";
@@ -65,6 +67,7 @@ import { deliverImages, notifyFailure, renderAndDeliver, renderSlidesAndDeliver 
 import { queueJob } from "@/lib/jobs";
 import { missMessage, startSteal } from "@/lib/steal";
 import { readPostMusic } from "@/lib/render/music";
+import { deliverStoryExpress, prepareStoryExpress, StoryExpressError } from "@/lib/story-express";
 import { removeVoice } from "@/lib/voice-over";
 import { ownVoiceOf } from "@/lib/voice-clone";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
@@ -192,6 +195,7 @@ const COSTLY_TOOLS = [
   "style_texts",
   "analyze_performance",
   "steal_style",
+  "story_express",
 ] as const satisfies readonly ToolName[];
 
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
@@ -662,6 +666,52 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, freshMusic: mode === "another", conversationId: ctx.conversationId });
       });
       return json({ status: "started", note: "La vidéo se refait (1 à 2 min) et le lien part tout seul. Dis-le en une phrase." });
+    },
+
+    async story_express({ media_id, text, detail, look, post_id, scheduled_at }) {
+      // Quick checks now (what to tell her); the story is made after the answer and delivered like a montage.
+      const { data: media } = await db.from("media_assets").select("kind").eq("id", media_id).eq("studio_id", studioId).maybeSingle();
+      if (!media || (media.kind !== "image" && media.kind !== "video")) return json({ error: "Ce media_id n'est ni une photo ni une vidéo de ce commerce (list_media)." });
+      if (post_id) {
+        const { data: post } = await db.from("posts").select("kind, status").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
+        if (post?.kind !== "story") return json({ error: "Cette publication n'est pas une story : sans post_id, une nouvelle story est créée." });
+        if (["published", "measured"].includes(post.status as string)) return json({ error: "Cette story est déjà en ligne." });
+      }
+      ctx.afterReply.push(async () => {
+        const target = { studioId, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId };
+        try {
+          const story = await prepareStoryExpress({ studioId, mediaId: media_id, text, detail, effect: look, postId: post_id, scheduledAt: scheduled_at });
+          await deliverStoryExpress({ ...target, postId: story.postId });
+        } catch (error) {
+          const said = error instanceof StoryExpressError ? error.message : "La story n’a pas abouti cette fois, je regarde ce qui coince. Tu veux que je réessaie ?";
+          await notifyFailure({ ...target, postId: post_id ?? "" }, said, error);
+        }
+      });
+      return json({ status: "started", note: "La story se prépare (une à deux minutes) et part toute seule dans la conversation. Dis-le en une phrase." });
+    },
+
+    async set_look({ post_id, look }) {
+      const post = unwrap(await db.from("posts").select("id, kind, status, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
+      if (post.kind !== "reel" && post.kind !== "story") return json({ error: "Un look se pose sur une vidéo montée (un Reel ou une story)." });
+      if (["published", "measured"].includes(post.status as string)) return json({ error: "Cette vidéo est déjà en ligne." });
+      if (!post.edit_plan_id) return json({ error: "Pas encore de montage : dis le look dans la demande du montage (montage), il le posera." });
+      const current = unwrap(await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).eq("studio_id", studioId).single());
+      const plan = editPlanSchema.safeParse(current.plan);
+      if (!plan.success) return json({ error: "Montage illisible : relance montage." });
+      // Drawn image by image by the effects workshop: a look is a correction of its effect.
+      if (isBaked(plan.data)) return json({ error: "Cette vidéo est un effet dessiné image par image : demande ce look en correction (montage), l'atelier le redessinera." });
+      const effect = look === "none" ? undefined : look;
+      if ((plan.data.effect ?? null) === (effect ?? null)) return json({ ok: true, note: "C'est déjà son look. Dis-le en une phrase." });
+      // A new version of the same cut with its look: the music stays, the video is made again for free.
+      const { id } = await insertPlanVersion(studioId, post_id, { ...plan.data, effect });
+      check(await db.from("posts").update({ edit_plan_id: id }).eq("id", post_id).eq("studio_id", studioId));
+      ctx.afterReply.push(async () => {
+        await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
+      });
+      return json({
+        status: "started",
+        note: `La vidéo se refait ${effect ? `en look « ${EFFECT_LABELS[effect].label} »` : "sans look"} (1 à 2 min) et le lien part tout seul. Dis-le en une phrase.`,
+      });
     },
 
     async set_voice({ post_id, mode, wish, voice, use }) {

@@ -40,19 +40,24 @@ const MOTION_MAX = 8;
  * The plan with every cut on a beat: each segment lasts a whole number of beats
  * (plus the crossfade it overlaps, so the cuts stay on the grid), a clip never past
  * its end; the texts start and end on beats too, 1.5 s at least. Unchanged over
- * her voice or for a template without a tempo.
+ * her voice or for a template without a tempo. A `fixed` shot (someone speaking, cut between
+ * two words) keeps its length: the grid goes on from where it ends, and the next cut lands back on a beat.
  */
-export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number>): EditPlan {
+export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number>, fixed?: (s: EditPlan["segments"][number]) => boolean): EditPlan {
   const beat = planBeat(plan);
   if (!beat || plan.voice || !plan.segments.length) return plan;
   // Worked in frames, as the composition plays it (a crossfade overlaps whole frames).
   const frames = (t: number) => Math.round(t * REEL_FPS);
   const fade = usesFades(plan) ? frames(FADE) : 0;
   const last = plan.segments.length - 1;
-  let beats = 0; // beats before the current segment's cut
+  let beats = 0; // beats before the current segment's cut (a fraction after a fixed shot)
   const segments = plan.segments.map((s, i) => {
     // The last segment's length moves no cut, but its end still lands on a beat.
     const extra = i === last ? 0 : fade;
+    if (fixed?.(s)) {
+      beats += (segmentSeconds(s) - extra / REEL_FPS) / beat;
+      return s;
+    }
     const scene = !isClipSegment(s);
     const minBeats = scene ? Math.ceil(SCENE_MIN / beat) : 1;
     // A shot at another speed lasts its clip time divided by the speed.
@@ -63,8 +68,11 @@ export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number
         ? MOTION_MAX
         : SCENE_MAX;
     const lengthOf = (n: number) => (frames((beats + n) * beat) - frames(beats * beat) + extra) / REEL_FPS;
-    let n = Math.max(minBeats, Math.round((segmentSeconds(s) - extra / REEL_FPS) / beat));
-    while (n > minBeats && lengthOf(n) > maxLen + 0.001) n--;
+    // Back on the grid after a fixed shot: its end on the nearest beat (whole beats otherwise, as before).
+    const offGrid = beats - Math.floor(beats + 1e-9);
+    let n = Math.max(minBeats, Math.round(beats + (segmentSeconds(s) - extra / REEL_FPS) / beat) - beats);
+    if (offGrid > 1e-9 && n < minBeats + 1e-9) n = Math.ceil(beats + minBeats) - beats;
+    while (n - 1 >= minBeats - 1e-9 && lengthOf(n) > maxLen + 0.001) n--;
     const length = round(lengthOf(n));
     if (length > maxLen + 0.001) {
       // Too short to hold even one beat: kept as it is, the grid goes on from where it ends.

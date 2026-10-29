@@ -1,6 +1,6 @@
 import "server-only";
 import { readPostMusic } from "@/lib/render/music";
-import { editPlanSchema, isClipSegment, motionTemplateSchema, type ReelInputs } from "@fauve/agent";
+import { dayIn, editPlanSchema, isClipSegment, motionTemplateSchema, type ReelInputs } from "@fauve/agent";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -48,6 +48,9 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       // A collage's stickers and the cut-outs its animations compose with, so the preview shows them as the video does.
       ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
       ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
+      // A moving photo in relief, as in the video.
+      ...(inputs.depth ? { depth: inputs.depth } : {}),
+      today: dayIn(),
       photoAspects: inputs.photoAspects,
       // What moves under its animations, so an animation that follows a hand follows it in the preview too.
       ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),

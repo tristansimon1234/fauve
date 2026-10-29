@@ -7,13 +7,18 @@ import {
   MIX_CEILING,
   mixFilter,
   mixGains,
+  parseAudioStats,
   parseSceneCuts,
+  parseSilences,
   pauseFilter,
   quietPauses,
   REEL_FPS,
   RENDER_FONTS,
+  RNNOISE_MODEL,
   SANDBOX_REGION,
   sandboxCostUsd,
+  pauseThreshold,
+  speechCleanFilter,
   speechGain,
   speechLevelsFilter,
   usdToEur,
@@ -104,6 +109,39 @@ const NORMALIZE = [
   `hdr() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "${HDR_TO_SDR},$tail" $enc ${HDR_TAGS} "$1"; }`,
   `info=$(${ROOT}/ffmpeg -hide_banner -i "$1.src" 2>&1 || true)`,
   'if grep -qE "arib-std-b67|smpte2084" <<<"$info"; then hdr "$1" || plain "$1" || cp "$1.src" "$1"; else plain "$1" || cp "$1.src" "$1"; fi',
+  'rm -f "$1.src"',
+].join("\n");
+
+/** A slow motion's own file starts this many frames before its shot (seeking lands on a frame it has). */
+const SLOW_LEAD = 9;
+/** The frame rate of a slow motion's own file: half speed shows a frame of its own on every frame of the Reel. */
+const SLOW_FPS = 60;
+/**
+ * Making the frames in between costs about 35 s per second of a 1080 × 1920 clip (ffmpeg's motion
+ * interpolation, one core; measured): this much of the clips in slow motion in one render at most.
+ * Past it, or if it fails, each frame of a 30 fps video is shown twice, as before.
+ */
+const SMOOTH_BUDGET_SECONDS = 4;
+
+/**
+ * The passage of the video $2 from $3 seconds, $4 seconds long, at 60 frames a second, written to $1
+ * for a shot in slow motion (CapCut's smooth slow motion): a video filmed at 50 fps or more keeps its
+ * own frames; a 30 fps one gets the frames in between made by motion interpolation ($5 = 1), else
+ * repeated. Its last image held a second; an iPhone's HDR tone-mapped like NORMALIZE.
+ */
+const SLOW_NORMALIZE = [
+  "set -euo pipefail",
+  `${FETCH.replace('"$1"', '"$1.src"')}`,
+  `info=$(${ROOT}/ffmpeg -hide_banner -i "$1.src" 2>&1 || true)`,
+  'fps=$(grep -m1 -oE "[0-9.]+ fps" <<<"$info" | cut -d" " -f1 || true)',
+  `hdr=""; tags=""; if grep -qE "arib-std-b67|smpte2084" <<<"$info"; then hdr="${HDR_TO_SDR},"; tags="${HDR_TAGS}"; fi`,
+  `motion="fps=${SLOW_FPS}"`,
+  `if [ "$5" = "1" ] && ! awk -v f="\${fps:-30}" 'BEGIN{exit !(f >= 48)}'; then motion="minterpolate=fps=${SLOW_FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"; fi`,
+  'tail="tpad=stop_mode=clone:stop_duration=1,format=yuv420p"',
+  'enc="-an -c:v libx264 -preset veryfast -crf 16 -movflags +faststart"',
+  `cut() { timeout "$1" ${ROOT}/ffmpeg -v error -y -ss "$SS" -t "$T" -i "$SRC.src" -map 0:v:0 -vf "$2" $enc $tags "$SRC"; }`,
+  'SRC="$1"; SS="$3"; T="$4"',
+  `cut 150 "\${hdr}$motion,$tail" || cut 90 "\${hdr}fps=${SLOW_FPS},$tail"`,
   'rm -f "$1.src"',
 ].join("\n");
 
@@ -333,9 +371,9 @@ const CHECK_WAIT_MS = 2 * 60_000;
  * a slow or broken stream used to time the render out. Each file once, however many shots
  * use it; videos re-encoded so that every frame the plan asks for exists (NORMALIZE).
  */
-async function localMedia(sandbox: Sandbox, id: string, props: ReelProps): Promise<ReelProps> {
+async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, options: { smooth?: boolean } = {}): Promise<ReelProps> {
   const files = new Map<string, string>();
-  const work: Promise<unknown>[] = [];
+  const jobs = new Map<string, Promise<unknown>>();
   const local = (src: string, video: boolean): string => {
     if (!/^https?:/.test(src)) return src;
     const known = files.get(src);
@@ -343,22 +381,50 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps): Promi
     const ext = video ? "mp4" : (/\.(png|webp|jpe?g)(?:\?|$)/i.exec(src)?.[1]?.toLowerCase() ?? "jpg");
     const file = `jobs/${id}/m${files.size}.${ext}`;
     files.set(src, `/public/${file}`);
-    work.push(bash(sandbox, video ? NORMALIZE : FETCH, [`${REMOTION}/build/public/${file}`, src]));
+    jobs.set(src, bash(sandbox, video ? NORMALIZE : FETCH, [`${REMOTION}/build/public/${file}`, src]));
     return `/public/${file}`;
   };
+  // A shot in slow motion gets its own file at 60 frames a second (made smooth, SLOW_NORMALIZE), for a final render only.
+  const slow: { index: number; src: string; srcFrom: number; seconds: number }[] = [];
   const under = (u: ReelUnder | undefined) => (u ? { ...u, src: local(u.src, u.type === "clip") } : u);
   // The photos an animation composes with, and their cut-outs.
   const photos = (list: ScenePhoto[]) => list.map((p) => ({ ...p, src: local(p.src, false), ...(p.cutout ? { cutout: local(p.cutout, false) } : {}) }));
-  const segments = props.segments.map((segment) => {
+  const segments = props.segments.map((segment, index) => {
     if (segment.type === "image" && segment.cutout) return { ...segment, src: local(segment.src, false), cutout: { ...segment.cutout, src: local(segment.cutout.src, false) } };
+    if (segment.type === "image" && segment.depth) return { ...segment, src: local(segment.src, false), depth: { ...segment.depth, src: local(segment.depth.src, false) } };
+    if (segment.type === "clip" && options.smooth && /^https?:/.test(segment.src) && (segment.ramp ?? [{ speed: segment.speed ?? 1 }]).some((p) => p.speed < 0.99)) {
+      const passages = segment.ramp ?? [{ at: 0, length: segment.durationInFrames, startFrom: segment.startFrom, speed: segment.speed ?? 1 }];
+      const end = Math.max(...passages.map((p) => p.startFrom + Math.ceil(p.length * p.speed)));
+      const srcFrom = Math.max(0, segment.startFrom - SLOW_LEAD);
+      slow.push({ index, src: segment.src, srcFrom, seconds: (end - srcFrom) / REEL_FPS + 0.5 });
+      return segment;
+    }
     if (segment.type === "clip" || segment.type === "image") return { ...segment, src: local(segment.src, segment.type === "clip") };
     const moved = segment.under ? { ...segment, under: under(segment.under) } : segment;
     return moved.type === "motion" && moved.photos ? { ...moved, photos: photos(moved.photos) } : moved;
   });
   const layers = props.layers?.map((l) => (l.photos ? { ...l, photos: photos(l.photos) } : l));
-  if (!work.length) return props;
+  if (!jobs.size && !slow.length) return props;
   await bash(sandbox, 'mkdir -p "$1"', [`${REMOTION}/build/public/jobs/${id}`]);
-  await Promise.all(work);
+  // The frames in between are made for a few seconds of clip in all (SMOOTH_BUDGET_SECONDS); past them, each frame is shown twice.
+  let budget = SMOOTH_BUDGET_SECONDS;
+  const smoothed = slow.map(async (job) => {
+    const interpolate = budget >= job.seconds;
+    if (interpolate) budget -= job.seconds;
+    const file = `jobs/${id}/s${job.index}.mp4`;
+    const segment = segments[job.index] as Extract<ReelProps["segments"][number], { type: "clip" }>;
+    try {
+      await bash(sandbox, SLOW_NORMALIZE, [`${REMOTION}/build/public/${file}`, job.src, (job.srcFrom / REEL_FPS).toFixed(3), job.seconds.toFixed(3), interpolate ? "1" : "0"]);
+      segments[job.index] = { ...segment, src: `/public/${file}`, srcFrom: job.srcFrom };
+    } catch (error) {
+      // Its frames as they are, from the whole clip normalized like any other.
+      console.warn("slow motion not smoothed", id, job.index, error instanceof Error ? error.message.slice(0, 300) : error);
+      const path = local(job.src, true);
+      await jobs.get(job.src);
+      segments[job.index] = { ...segment, src: path };
+    }
+  });
+  await Promise.all([...jobs.values(), ...smoothed]);
   return { ...props, segments, ...(layers ? { layers } : {}) };
 }
 
@@ -369,7 +435,7 @@ export async function renderReelInSandbox(job: { id: string; props: ReelProps })
     const media = `${REMOTION}/build/public/jobs/${job.id}`;
     try {
       await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
-      const props = await localMedia(sandbox, job.id, job.props);
+      const props = await localMedia(sandbox, job.id, job.props, { smooth: true });
       await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(props) }]);
       await bash(
         sandbox,
@@ -746,6 +812,94 @@ export async function levelSpeechInSandbox(
     const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp3` });
     if (!out?.length) throw new Error("leveling produced no file");
     return { mp3: out, lufs, paused: pauses.length > 0, pauses };
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/** RNNoise's model in the render sandbox, fetched once and checked by its checksum (speech.ts). */
+const SPEECH_DIR = `${ROOT}/speech`;
+const SPEECH_SETUP = [
+  "set -euo pipefail",
+  `mkdir -p ${SPEECH_DIR} && cd ${SPEECH_DIR}`,
+  `echo "${RNNOISE_MODEL.sha256}  ${RNNOISE_MODEL.file}" > model.sha256`,
+  `sha256sum -c --status model.sha256 2>/dev/null || { curl -fsSL --retry 3 -o model.tmp '${RNNOISE_MODEL.url}' && mv model.tmp ${RNNOISE_MODEL.file} && sha256sum -c --status model.sha256; }`,
+].join("\n");
+
+export type CleanedSpeech = {
+  /** The file with its sound cleaned (the picture copied as it is), when the denoiser ran; null for a clean recording. */
+  media: Buffer | null;
+  /** Its sound as 16 kHz mono WAV, for Scribe (cleaned when the denoiser ran). */
+  wav: Buffer;
+  level: number | null;
+  floor: number | null;
+  pauses: { start: number; end: number }[];
+  duration: number | null;
+  seconds: number;
+};
+
+/**
+ * The sound of a video where someone speaks (or of her voice note), cleaned the way speech.ts
+ * says: its noise floor measured first (astats), the denoiser only on a noisy recording, the
+ * picture copied untouched; then its pauses (silencedetect, under the voice's level) and its
+ * sound as WAV for Scribe. A few seconds of work; null when it has no sound.
+ */
+export async function cleanSpeechInSandbox(id: string, url: string, kind: "video" | "audio"): Promise<CleanedSpeech | null> {
+  const started = Date.now();
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}-speech`;
+  const ff = `timeout 150 ${ROOT}/ffmpeg`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await bash(sandbox, SPEECH_SETUP);
+    await bash(sandbox, `cd "$1" && ${FETCH.replace('"$1"', "in.src")}`, [dir, url]);
+    const probe = await bash(
+      sandbox,
+      [
+        'cd "$1"',
+        `info=$(${ff} -hide_banner -i in.src 2>&1 || true)`,
+        'grep -q "Audio:" <<<"$info" || { echo "noaudio=1"; exit 0; }',
+        `echo "duration=$(sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' <<<"$info" | awk -F: '{print $1*3600+$2*60+$3}')"`,
+        'grep -q "Video: hevc" <<<"$info" && echo "hevc=1" || echo "hevc=0"',
+        `${ff} -hide_banner -nostats -i in.src -vn -af "highpass=f=70,astats=measure_overall=RMS_level+RMS_trough:measure_perchannel=none" -f null - 2>&1 | grep -E "RMS (level|trough)" || true`,
+      ].join("\n"),
+      [dir],
+    );
+    const measured = await probe.stdout();
+    if (/noaudio=1/.test(measured)) return null;
+    const { level, floor } = parseAudioStats(measured);
+    const duration = printed(measured, "duration");
+    const { filter, denoised } = speechCleanFilter(floor, `${SPEECH_DIR}/${RNNOISE_MODEL.file}`);
+    const out = kind === "video" ? "out.mp4" : "out.m4a";
+    const encode =
+      kind === "video"
+        ? // The picture copied (an HEVC one tagged so browsers play it), its sound cleaned.
+          `${ff} -v error -y -i in.src -map 0:v:0 -map 0:a:0 -c:v copy ${printed(measured, "hevc") === 1 ? "-tag:v hvc1" : ""} -af "$2" -c:a aac -b:a 192k -movflags +faststart ${out}`
+        : `${ff} -v error -y -i in.src -vn -map 0:a:0 -af "$2" -c:a aac -b:a 160k -movflags +faststart ${out}`;
+    const source = denoised ? out : "in.src";
+    // Cleaned, then measured again: its pauses are found above the noise left between the words.
+    const cleanedStats = await bash(
+      sandbox,
+      [
+        'cd "$1"',
+        ...(denoised ? [encode] : []),
+        `${ff} -v error -y -i ${source} -vn -map 0:a:0 -ac 1 -ar 16000 -c:a pcm_s16le speech.wav`,
+        `${ff} -hide_banner -nostats -i speech.wav -af "astats=measure_overall=RMS_level+RMS_trough:measure_perchannel=none" -f null - 2>&1 | grep -E "RMS (level|trough)" || true`,
+      ].join("\n"),
+      [dir, filter],
+    );
+    const after = parseAudioStats(await cleanedStats.stdout());
+    const run = await bash(
+      sandbox,
+      `cd "$1" && { ${ff} -hide_banner -nostats -i speech.wav -af "silencedetect=noise=$2dB:d=0.25" -f null - 2>&1 | grep -E "silence_(start|end)" || true; }`,
+      [dir, String(pauseThreshold(after.level, after.floor))],
+    );
+    const [media, wav] = await Promise.all([
+      denoised ? sandbox.readFileToBuffer({ path: `${dir}/${out}` }) : Promise.resolve(null),
+      sandbox.readFileToBuffer({ path: `${dir}/speech.wav` }),
+    ]);
+    if (!wav?.length || (denoised && !media?.length)) throw new Error("speech cleaning produced no file");
+    return { media: media ?? null, wav, level, floor, pauses: parseSilences(await run.stdout(), duration ?? Infinity), duration, seconds: (Date.now() - started) / 1000 };
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }

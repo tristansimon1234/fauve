@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { planTimeline } from "./motion.ts";
-import { AMBIANCES, isClipSegment, isMotionSegment, motionTemplateSchema, type EditPlan, type MotionTemplate } from "./schemas.ts";
+import { AMBIANCES, isClipSegment, isMotionSegment, motionTemplateSchema, screenTime, type EditPlan, type MotionTemplate } from "./schemas.ts";
 import { HOOK_LATEST, OPENING_MAX_SECONDS } from "./hook.ts";
 import { voicePhrases, type VoiceTranscript } from "./voice.ts";
 import { planBeat, planBpm } from "./tempo.ts";
+import { EFFECT_LABELS } from "./looks.ts";
 import type { ReelFormat } from "./voice-over.ts";
 
 // The critic: before a Soigné or Max montage goes out, Opus watches key frames
@@ -179,11 +180,13 @@ export function gestureMoments(plan: EditPlan, actions: Record<string, { start: 
     const at = timeline.segments[i]!;
     const end = at.start + at.length;
     if (isClipSegment(s)) {
-      const speed = s.speed ?? 1;
       // Under the animations over several shots that play during this shot.
       const spans = layers.flatMap((l): [number, number][] => (l.to > at.start && l.from < end ? [[Math.max(l.from, at.start), Math.min(l.to, end)]] : []));
       if (!spans.length) return;
-      for (const g of actions[s.clip_id] ?? []) keep(at.start + (g.start - s.in) / speed, at.start + (g.end - s.in) / speed, g.what, spans);
+      for (const g of actions[s.clip_id] ?? []) {
+        if (g.end <= s.in || g.start >= s.out) continue;
+        keep(at.start + screenTime(s, g.start), at.start + screenTime(s, g.end), g.what, spans);
+      }
     } else if (isMotionSegment(s) && s.over?.in !== undefined) {
       // Under a scene drawn over her footage, which plays on from `in`.
       const from = s.over.in;
@@ -334,7 +337,7 @@ export function rhythmLine(plan: EditPlan): string {
     isClipSegment(s)
       ? [
           ...(s.move && s.move !== "none" ? [`${MOVE_WORDS[s.move] ?? s.move} scène ${i + 1}`] : []),
-          ...(s.speed && s.speed < 1 ? [`ralenti scène ${i + 1}`] : s.speed && s.speed > 1 ? [`accéléré scène ${i + 1}`] : []),
+          ...(s.speed && s.speed < 1 ? [s.ramp ? `rampe de ralenti scène ${i + 1} (vitesse normale, ralenti sur le geste, vitesse normale)` : `ralenti scène ${i + 1}`] : s.speed && s.speed > 1 ? [`accéléré scène ${i + 1}`] : []),
         ]
       : isMotionSegment(s) && s.over
         ? [`animation par-dessus la vidéo scène ${i + 1}`]
@@ -345,7 +348,11 @@ export function rhythmLine(plan: EditPlan): string {
     camera.length ? `caméra : ${camera.join(", ")}` : "",
     plan.voice ? "coupes sur les phrases de sa voix" : onBeat !== null ? `${onBeat} coupes sur ${cuts.length} sur un temps (${planBpm(plan)} BPM)` : "",
     accents.length ? `transition signature : ${accents.join(", ")}` : "aucune transition signature",
-    plan.effect === "dust" ? "effet voulu : poussière de pellicule sur toute la vidéo" : "",
+    plan.effect === "dust"
+      ? "effet voulu : poussière de pellicule sur toute la vidéo"
+      : plan.effect
+        ? `look voulu (sa demande ou le Reel qu'elle recopie, jamais un défaut) : ${EFFECT_LABELS[plan.effect].label.toLowerCase()}, ${EFFECT_LABELS[plan.effect].hint}`
+        : "",
   ]
     .filter(Boolean)
     .join(" ; ")

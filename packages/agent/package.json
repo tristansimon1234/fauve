@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/agent.test.ts"
+    "test": "node --test src/agent.test.ts src/features.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

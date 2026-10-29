@@ -4,6 +4,8 @@ import { planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
 import { hookAtStart } from "./hook.ts";
 import { snapToTempo, TEMPLATE_BPM } from "./tempo.ts";
+import { isReelEffect, REEL_EFFECTS } from "./looks.ts";
+import { applySpeechCuts, spokenShot, type SpeechFacts } from "./speech.ts";
 import {
   cameraMoveSchema,
   MAX_SPEED,
@@ -56,8 +58,8 @@ What you know as an editor (defaults, not a checklist: the footage and her reque
 - The first second decides whether people stay, and most watch without sound. Open on your best shot, one that moves (the result, a face, a clear gesture), from « openings » unless her request says what to start with, and move on within a second or so; an empty room, a still set, a logo or a text screen loses them. The hook text, about six words, is on screen from the first frame (« from » 0) and opens a curiosity that belongs to this business (a question, a number, a « pov : », a precise promise), never its name nor a line that would fit any business. No hook text when « reel_a_recopier » has none (it opens on a gesture, with no text) or her request wants none. Its form and words change from « recent_hooks ». If she prefers not to show herself (« studio.facts »), open on the result, a gesture or her hands.
 - She chose these files for this Reel: each clip and photo is used at least once, unless her request leaves one out. Take the most beautiful and lively passages; leave out only seconds that are really blurred, dark or shaken (a bad sound rules nothing out). In and out points stay within the clip.
 - The order tells the story: from wide to close, grouped by place, cutting in the movement; two shots of the same size on the same subject in a row read as a mistake, unless it is a jump cut you mean (« punch »).
-- Rhythm keeps people watching: a lively Reel changes shot every second or two (two seconds on average at most), lengths that vary so it never feels like a slideshow, tightening towards the strong moment, which holds 2 to 3.5 s; every few seconds something renews attention (another angle or size, sometimes a punch or a slow motion), never one more text for that. Someone speaking keeps their whole sentence (up to 8 s, cut on a silence). Approximate lengths are fine: the engine snaps them to the beat.
-- « move »: none on a shot that already moves; in, out, left or right (slow), varied, on a shot filmed still; punch (a tight reframe, held) for a jump cut on the beat, once or twice in a Reel, since it stops working when repeated. « speed »: 1 as filmed; 0.5 (slow motion) for the one gesture or result that deserves it; 1.5 to 2 to pass over a long gesture. A shot lasts (out − in) / speed on screen.
+- Rhythm keeps people watching: a lively Reel changes shot every second or two (two seconds on average at most), lengths that vary so it never feels like a slideshow, tightening towards the strong moment, which holds 2 to 3.5 s; every few seconds something renews attention (another angle or size, sometimes a punch or a slow motion), never one more text for that. Someone speaking keeps their whole sentence (up to 8 s, cut on a silence): the engine cuts its « euh » and long pauses (jump cuts), never you. Approximate lengths are fine: the engine snaps them to the beat.
+- « move »: none on a shot that already moves; in, out, left or right (slow), varied, on a shot filmed still; punch (a tight reframe, held) for a jump cut on the beat, once or twice in a Reel, since it stops working when repeated. « speed »: 1 as filmed; 0.5 (slow motion, made smooth and ramped on the gesture by the engine) for the one gesture or result that deserves it, over that gesture; 1.5 to 2 to pass over a long gesture. A shot lasts (out − in) / speed on screen.
 - The ending rewards: the most beautiful shot, held 2 to 3 s, with a short invitation (a precise act drawn from her offer: come, book, try) or a reason to send it to someone; the last image echoes the first when the footage allows. « end_card » only for an offer or an announcement, or when she asks: a final card looks like an ad.
 - The examples in quotes in these instructions show a form, never words to reuse.
 
@@ -78,7 +80,7 @@ Her voice (« voice »): the Reel is cut on it and lasts at least « ends_at » 
 
 Her first Reel (« first_reel ») is how she discovers what Edith can do: it should make her say « waouh » within a second: her most beautiful shot with the promise in an animation over it, her best shots in a real story, little text, a lively pace, an ending on the most beautiful shot, the animations allowed (usually 2) over her images. Her request and « reel_a_recopier » still come first.
 
-Transitions and effects stay invisible: « transitions » « cut » almost always, « fade » only for a calm Reel with long shots; no strong zoom on every shot. The engine puts one signature transition on the shot where your « band » appears. « effect »: « dust » (a discreet film dust) for a key message or a retro, night or handmade mood; « none » most of the time.
+Transitions and effects stay invisible: « transitions » « cut » almost always, « fade » only for a calm Reel with long shots; no strong zoom on every shot. The engine puts one signature transition on the shot where your « band » appears. « effect »: « dust » (a discreet film dust) for a key message or a retro, night or handmade mood; a look (« disposable » camera, « vhs », « y2k » flash, « cine », « bw ») only when her request or « reel_a_recopier » has one; « none » most of the time.
 
 « duration »: the sum of the shots' lengths on screen. 7 to 15 s for an announcement or a mood, 20 to 30 s for a story; up to 45 s only when someone speaks or a voice tells it all along, or when the Reel she copies is that long; never over 45 s.
 
@@ -136,7 +138,7 @@ export const editorOutputSchemaLegacy = z.object({
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
     // No signature transition field here: the structured-output grammar is at the API's
     // limit (400 « compiled grammar is too large »); the engine places it (signatureShot).
-    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
+    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true, ramp: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
   }),
   rationale: z.string(),
 });
@@ -185,7 +187,7 @@ export const editorOutputSchema = z.object({
         "This Reel's own colours (hex, the main one first, 3 at most), only when it needs others than her charter's: the Reel she copies has its own (« reel_a_recopier.couleurs ») and they serve this Reel and her request, or her request asks for a world of its own. Otherwise leave it out. A correction keeps the previous version's unless you write others (her charter's to go back to them)",
       ),
     end_card: z.object({ title: z.string(), subtitle: z.string().optional() }).optional(),
-    effect: z.enum(["none", "dust"]).optional(),
+    effect: z.enum(["none", ...REEL_EFFECTS]).optional(),
     layers: z.array(z.object({ brief: z.string(), from: z.number(), to: z.number() })).optional(),
   }),
   rationale: z.string(),
@@ -389,8 +391,8 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
     format: "9:16",
     images: [],
     music: null,
-    // Film dust over the whole video, when the editor asks for it.
-    ...("effect" in plan && plan.effect === "dust" ? { effect: "dust" as const } : {}),
+    // Film dust or a look over the whole video, when the editor asks for it.
+    ...("effect" in plan && isReelEffect(plan.effect) ? { effect: plan.effect } : {}),
     ...(fonts && Object.keys(fonts).length ? { fonts } : {}),
     ...(colors.length ? { colors } : {}),
     ...(endCard ? { end_card: endCard } : {}),
@@ -476,7 +478,11 @@ const FADE_MIN_AVERAGE = 2.4;
 export const END_CARD_SECONDS = 1.6;
 const END_CARD_HOLD = 2.2;
 
-export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>, maxFreeScenes = MAX_FREE_SCENES): EditPlan {
+/**
+ * `speech`: what was measured of the speech in her videos (speech.ts): the hesitations and long
+ * pauses are cut out of the passages where someone speaks, and those cuts never move onto the beat.
+ */
+export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>, maxFreeScenes = MAX_FREE_SCENES, speech?: Record<string, SpeechFacts>): EditPlan {
   let freeScenes = 0;
   const shownTemplates = new Set<string>();
   const segments = plan.segments.flatMap((s): PlanSegment[] => {
@@ -528,18 +534,20 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
   // A crossfade between short shots reads as a double exposure: cuts, unless the shots breathe.
   const average = segments.reduce((sum, x) => sum + segmentSeconds(x), 0) / segments.length;
   const transitions = plan.transitions === "fade" && average < FADE_MIN_AVERAGE ? "cut" : plan.transitions;
-  // The cuts on the ambiance's beats (not over her voice), then at most one signature transition.
-  const tempo = snapToTempo({ ...plan, transitions, segments }, clipDurations);
+  // Someone speaking: the « euh » and long silences cut out (jump cuts), the texts moved with their picture.
+  const spoken = applySpeechCuts({ ...plan, transitions, segments }, speech, clipDurations);
+  // The cuts on the ambiance's beats (not over her voice, nor between two of someone's words), then at most one signature transition.
+  const tempo = snapToTempo(spoken, clipDurations, speech ? (s) => spokenShot(s, speech) : undefined);
   segments.splice(0, segments.length, ...oneAccent(tempo.segments));
   // Too long to render in time: the plans before the last one go, the last (the end) stays.
-  while (segments.length > 2 && renderDuration({ ...plan, transitions, segments }) > MAX_REEL_SECONDS) segments.splice(segments.length - 2, 1);
+  while (segments.length > 2 && renderDuration({ ...plan, transitions: spoken.transitions, segments }) > MAX_REEL_SECONDS) segments.splice(segments.length - 2, 1);
 
-  const draft = { ...plan, transitions, segments, images: [], music: null };
+  const draft = { ...plan, transitions: spoken.transitions, segments, images: [], music: null };
   const duration = Math.max(3, renderDuration(draft));
 
   // Animations over several shots: inside the Reel, a second at least, each a new animation within the budget;
   // a collage's composition is the ambiance itself, over the whole Reel, never counted.
-  const layers = composedLayers(plan, duration).flatMap((l) => {
+  const layers = composedLayers({ ...plan, layers: spoken.layers }, duration).flatMap((l) => {
     if (l.compose) return [l];
     const from = round(Math.max(0, l.from));
     const to = round(Math.min(duration, l.to));

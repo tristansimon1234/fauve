@@ -140,8 +140,9 @@ export function buildFfmpegArgs(plan: EditPlan, options: RenderOptions): string[
 
   const kenBurns = (s: ClipSegment) => s.zoom === "light" || plan.transitions === "light_zoom";
   const filters = clips.map((s, i) => {
-    // A shot at another speed: its frames are spread (slow motion) or packed (faster).
-    const speed = s.speed && s.speed !== 1 ? `setpts=(PTS-STARTPTS)/${s.speed},` : "";
+    // A shot at another speed: its frames are spread (slow motion) or packed (faster); a ramp, at its average speed.
+    const rate = s.ramp ? round((s.out - s.in) / segmentSeconds(s)) : s.speed;
+    const speed = rate && rate !== 1 ? `setpts=(PTS-STARTPTS)/${rate},` : "";
     const frame = `[${i}:v]${speed}scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1,fps=${FPS},setpts=PTS-STARTPTS`;
     // fps again at the end: xfade needs a constant frame rate, which per-frame scaling drops.
     // Slow push-in (Ken Burns): the frame grows a little every frame, the centre stays put.

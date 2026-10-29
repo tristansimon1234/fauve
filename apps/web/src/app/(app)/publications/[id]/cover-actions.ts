@@ -1,6 +1,7 @@
 "use server";
 
-import { EFFECT_VOICE_OUT, postCoverSchema, type PostCover } from "@fauve/agent";
+import { EFFECT_VOICE_OUT, editPlanSchema, isBaked, isReelEffect, postCoverSchema, type PostCover, type ReelEffect } from "@fauve/agent";
+import { insertPlanVersion } from "@/lib/edit-plans";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
@@ -66,6 +67,43 @@ export async function setPublishByHand(postId: string, byHand: boolean): Promise
     .not("status", "in", "(published,measured)")
     .select("id");
   if (error || !data.length) return { ok: false };
+  revalidatePath(`/publications/${postId}`);
+  return { ok: true };
+}
+
+/**
+ * A look over the whole video (looks.ts: a disposable camera, a VHS tape…), or none: a new version of
+ * the same cut, the video made again after the answer (about a minute, free; the music stays).
+ */
+export async function setLook(postId: string, look: ReelEffect | "none"): Promise<{ ok: boolean }> {
+  if (!z.uuid().safeParse(postId).success || (look !== "none" && !isReelEffect(look))) return { ok: false };
+  const { db, member } = await getStudioContext();
+  if (!member) return { ok: false };
+  const studioId = member.studio.id;
+  const { data: post } = await db
+    .from("posts")
+    .select("edit_plan_id")
+    .eq("id", postId)
+    .eq("studio_id", studioId)
+    .in("kind", ["reel", "story"])
+    .not("status", "in", "(published,measured)")
+    .maybeSingle();
+  if (!post?.edit_plan_id) return { ok: false };
+  const { data: current } = await supabaseAdmin().from("edit_plans").select("plan").eq("id", post.edit_plan_id as string).eq("studio_id", studioId).maybeSingle();
+  const plan = editPlanSchema.safeParse(current?.plan);
+  // A video drawn image by image by the effects workshop: its look is a correction of the effect.
+  if (!plan.success || isBaked(plan.data)) return { ok: false };
+  const effect = look === "none" ? undefined : look;
+  if ((plan.data.effect ?? null) === (effect ?? null)) return { ok: true };
+  const { id } = await insertPlanVersion(studioId, postId, { ...plan.data, effect });
+  const { error } = await supabaseAdmin().from("posts").update({ edit_plan_id: id }).eq("id", postId).eq("studio_id", studioId);
+  if (error) return { ok: false };
+  after(() =>
+    renderPost(studioId, postId).then(
+      () => revalidatePath(`/publications/${postId}`),
+      (e: unknown) => console.error("setLook: render failed", postId, e),
+    ),
+  );
   revalidatePath(`/publications/${postId}`);
   return { ok: true };
 }

@@ -1,4 +1,5 @@
 import { isClipSegment, isMotionSegment, segmentSeconds, type EditPlan } from "./schemas.ts";
+import { EFFECT_LABELS } from "./looks.ts";
 
 // Her own Reels as models (Tristan : « ça serait bien de pouvoir enregistrer des modèles pour
 // le user aussi ? »): a Reel of hers she likes is kept as a model, and a new Reel made « comme
@@ -36,7 +37,7 @@ export function planOutline(plan: EditPlan): string {
     ...(composed ? ["tout le Reel en collage"] : []),
     ...(animations ? [`${animations} animation${animations > 1 ? "s" : ""}`] : []),
     ...(plan.voice ? [`une voix sur tout le Reel${plan.subtitles ? ", sous-titrée" : ""}`] : []),
-    ...(plan.effect === "dust" ? ["une poussière de pellicule"] : []),
+    ...(plan.effect === "dust" ? ["une poussière de pellicule"] : plan.effect ? [`le look ${EFFECT_LABELS[plan.effect].label.toLowerCase()}`] : []),
     ...(plan.end_card ? ["un écran de fin"] : []),
   ];
   const line = parts.join(" ; ");

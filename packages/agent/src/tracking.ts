@@ -195,22 +195,27 @@ export function layerTrack(plan: Pick<EditPlan, "segments">, segments: ReelSegme
     if (segment.type === "clip" && s && isClipSegment(s)) {
       const file = tracks[s.clip_id];
       if (!file) return [];
-      const speed = segment.speed ?? 1;
-      const first = Math.max(0, from - segment.startAt);
-      const last = Math.min(segment.durationInFrames, from + length - segment.startAt);
-      const sliced = sliceTracks(file, segment.startFrom + Math.floor(first * speed), segment.startFrom + Math.ceil(last * speed) + 2);
-      if (!sliced) return [];
-      return [
-        {
-          at: segment.startAt - from,
-          length: segment.durationInFrames,
-          startFrom: segment.startFrom,
-          ...(segment.speed ? { speed: segment.speed } : {}),
-          look: clipLook(segment, file),
-          tracks: sliced,
-          clip: s.clip_id,
-        },
-      ];
+      // A ramped shot is its passages at each speed, each a piece of its own.
+      const passages = segment.ramp ?? [{ at: 0, length: segment.durationInFrames, startFrom: segment.startFrom, speed: segment.speed ?? 1 }];
+      return passages.flatMap((p): TrackPiece[] => {
+        const begin = segment.startAt + p.at;
+        if (begin >= from + length || begin + p.length <= from) return [];
+        const first = Math.max(0, from - begin);
+        const last = Math.min(p.length, from + length - begin);
+        const sliced = sliceTracks(file, p.startFrom + Math.floor(first * p.speed), p.startFrom + Math.ceil(last * p.speed) + 2);
+        if (!sliced) return [];
+        return [
+          {
+            at: begin - from,
+            length: p.length,
+            startFrom: p.startFrom,
+            ...(p.speed !== 1 ? { speed: p.speed } : {}),
+            look: clipLook(segment, file),
+            tracks: sliced,
+            clip: s.clip_id,
+          },
+        ];
+      });
     }
     return sceneTrack(plan, segments, i, tracks).map((p) => ({ ...p, at: segment.startAt - from }));
   });
