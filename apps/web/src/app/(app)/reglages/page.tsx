@@ -13,6 +13,7 @@ import { EffortSetting } from "./effort-setting";
 import { SubscriptionButton } from "./subscription";
 import { PackButton } from "@/components/pack-button";
 import { billingEnabled } from "@/lib/billing/stripe";
+import { DeleteAccount } from "./delete-account";
 import { MemoryList } from "./memory-list";
 import { SettingsPanels } from "./settings-panels";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
@@ -246,6 +247,7 @@ async function Settings() {
                 </Link>
               ) : null}
               <SignOut />
+              {member.role === "owner" && !care.data?.team ? <DeleteAccount /> : null}
             </Section>
           ),
         }}

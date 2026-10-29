@@ -1,6 +1,5 @@
 import "server-only";
 import { BUDGET_ALERT_DAYS, budgetAlert, budgetState, DEFAULT_USD_TO_EUR, PROVIDERS, providerDownAlert, type Budget, type BudgetState, type ProviderKey } from "@fauve/agent";
-import { getVercelOidcToken } from "@vercel/oidc";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { teamToday, tellTeamOnce } from "@/lib/reply-cap";
@@ -31,14 +30,14 @@ export type ProviderBudget = {
   state: BudgetState;
   /** ElevenLabs only: its plan's credits this period, read live. */
   quota?: { used: number; limit: number; resetsAt: string | null; overage: boolean } | null;
-  /** Its balance read live from its own API, in dollars (AI Gateway, Treg): no balance to enter. */
+  /** Its balance read live from its own API, in dollars (Treg): no balance to enter. */
   live?: number | null;
   /** Anthropic only, with ANTHROPIC_ADMIN_KEY: this month's cost as Anthropic bills it (its Cost API), in dollars. */
   billed?: number | null;
 };
 
 /** The providers whose balance is read from their own API: nothing to enter for them. */
-export const LIVE_BALANCE: ProviderKey[] = ["moonshot", "treg"];
+export const LIVE_BALANCE: ProviderKey[] = ["treg"];
 
 /** What each provider cost since `since`, in dollars. */
 async function spentSince(since: string): Promise<Map<string, number>> {
@@ -72,19 +71,6 @@ async function elevenLabsQuota(): Promise<ProviderBudget["quota"]> {
       resetsAt: s.next_character_count_reset_unix ? new Date(s.next_character_count_reset_unix * 1000).toISOString() : null,
       overage: s.max_credit_limit_extension === "unlimited" || Number(s.max_credit_limit_extension) > 0,
     };
-  } catch {
-    return null;
-  }
-}
-
-/** The Vercel AI Gateway credits left (GET /v1/credits), with the project's OIDC token or AI_GATEWAY_API_KEY. */
-async function gatewayBalance(): Promise<number | null> {
-  try {
-    const token = env("AI_GATEWAY_API_KEY") ?? (await getVercelOidcToken());
-    const res = await fetch("https://ai-gateway.vercel.sh/v1/credits", { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const balance = Number(((await res.json()) as { balance?: string }).balance);
-    return Number.isFinite(balance) ? balance : null;
   } catch {
     return null;
   }
@@ -146,17 +132,16 @@ export async function providerBudgets(): Promise<ProviderBudget[]> {
   const kept = await budgets();
   const month = new Date(await teamToday());
   month.setUTCDate(1);
-  const [today, week, thisMonth, quota, gateway, treg, billed, ...since] = await Promise.all([
+  const [today, week, thisMonth, quota, treg, billed, ...since] = await Promise.all([
     spentSince(await teamToday()),
     spentSince(new Date(now - 7 * DAY).toISOString()),
     spentSince(month.toISOString()),
     elevenLabsQuota(),
-    gatewayBalance(),
     tregBalance(),
     anthropicBilled(month.toISOString()),
     ...PROVIDERS.map((p) => (kept.get(p.key) ? spentSince(kept.get(p.key)!.setAt) : Promise.resolve(new Map<string, number>()))),
   ]);
-  const lives: Partial<Record<ProviderKey, number | null>> = { moonshot: gateway, treg };
+  const lives: Partial<Record<ProviderKey, number | null>> = { treg };
   return PROVIDERS.map((p, i) => {
     const perDay = (week.get(p.key) ?? 0) / 7;
     const live = LIVE_BALANCE.includes(p.key) ? (lives[p.key] ?? null) : undefined;

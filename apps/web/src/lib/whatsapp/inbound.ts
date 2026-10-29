@@ -9,6 +9,7 @@ import { deliverPendingHandOffs } from "@/lib/social/hand-off";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { quoteButtons } from "@/lib/credits";
 import { memberOrRoom, waitlist } from "@/lib/waitlist";
+import { answerDeletion } from "@/lib/account-deletion";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureTranscript } from "@/lib/voice";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
@@ -104,6 +105,9 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   await markReadAndTyping(message.id).catch((e) => console.warn("typing indicator failed", e));
   // She wrote again after Edith showed her the terms: going on accepts them.
   await acceptShownTerms(member.studio_id).catch((e) => console.warn("terms acceptance not kept", e));
+
+  // « Supprimer mes données » (the deletion page), and her yes to it: nothing else answers.
+  if ((message.type === "text" || message.type === "interactive") && (await answerDeletion(member.studio_id, member.id, phone, message.from, textOf(message)))) return;
 
   // « Bonjour Edith ! Code : K7P2QX » from the start screen on a computer: she confirms with a
   // button that the code is on her own screen (a message someone else wrote for her would open

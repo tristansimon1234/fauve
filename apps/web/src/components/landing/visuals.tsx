@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { CheckIcon, PlayIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
-import { PHOTOS, unsplash } from "./photos";
 
 // What each card of the landing shows, alive: drawings of what Edith does, played by
 // landing.css once their <Play> is on screen (land-once: plays once, land-loop: loops while
@@ -277,7 +276,8 @@ export function ReportVisual() {
 /* ── Retouch: the line between before and after ──────────────────────────────────────── */
 
 export function RetouchVisual() {
-  const photo = unsplash(PHOTOS.cafe, 320, 200);
+  // Served from the app (an Unsplash photo, free licence): a visitor's browser never calls a third party.
+  const photo = "/landing/retouch-cafe.jpg";
   return (
     <span className="relative mt-4 block h-[132px] overflow-hidden rounded-[14px]">
       {/* eslint-disable-next-line @next/next/no-img-element */}

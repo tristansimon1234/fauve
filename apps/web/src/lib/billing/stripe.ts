@@ -35,7 +35,7 @@ function encode(params: Params, prefix = "", out = new URLSearchParams()): URLSe
 
 export class StripeError extends Error {}
 
-export async function stripe<T>(method: "GET" | "POST", path: string, params: Params = {}): Promise<T> {
+export async function stripe<T>(method: "GET" | "POST" | "DELETE", path: string, params: Params = {}): Promise<T> {
   const key = env("STRIPE_SECRET_KEY");
   if (!key) throw new StripeError("Stripe is not configured");
   const body = encode(params);
@@ -207,6 +207,11 @@ export async function getSubscription(id: string): Promise<StripeSubscription> {
 export async function latestSubscription(customer: string): Promise<StripeSubscription | null> {
   const list = await stripe<{ data: StripeSubscription[] }>("GET", "/subscriptions", { customer, status: "all", limit: 1 });
   return list.data[0] ?? null;
+}
+
+/** Stops a subscription at once (her account deleted): nothing more is charged. */
+export async function cancelSubscription(id: string): Promise<void> {
+  await stripe("DELETE", `/subscriptions/${encodeURIComponent(id)}`);
 }
 
 export async function portalSession(customer: string, returnUrl: string): Promise<string> {

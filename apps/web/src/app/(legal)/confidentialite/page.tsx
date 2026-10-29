@@ -66,7 +66,7 @@ export default function PrivacyPage() {
 
       <h2>Durées de conservation</h2>
       <ul>
-        <li>Compte, conversations, contenus préparés et statistiques : pendant l’abonnement, puis supprimés sous 30 jours après sa fin ou une demande de suppression.</li>
+        <li>Compte, conversations, contenus préparés et statistiques : pendant l’abonnement, puis supprimés 30 jours après sa fin. Un compte qui ne s’abonne pas est supprimé 30 jours après son dernier message. À ta demande, tout est supprimé aussitôt.</li>
         <li>
           Photos et vidéos envoyées : supprimées 24 h après la mise en ligne de la publication qui les utilise, ou 7 jours après leur envoi si aucune ne les utilise (jusqu’à 6 mois
           pour tes meilleures vidéos, gardées pour tes prochains Reels). Les photos de ton site restent tant que ton compte existe.

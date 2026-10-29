@@ -12,7 +12,10 @@ export default function DataDeletionPage() {
       <h2>Comment faire</h2>
       <ul>
         <li>
-          Écris « <strong>Supprimer mes données</strong> » à Edith sur WhatsApp, depuis le numéro de ton compte ;
+          Écris « <strong>Supprimer mes données</strong> » à Edith sur WhatsApp, depuis le numéro de ton compte, puis touche « Oui, tout supprimer » ;
+        </li>
+        <li>
+          ou, dans l’app, va dans Réglages › Mon compte › <strong>Supprimer mon compte</strong> ;
         </li>
         <li>ou envoie un e-mail à {company.email} en indiquant ton numéro WhatsApp et le nom de ton commerce.</li>
       </ul>
@@ -26,8 +29,8 @@ export default function DataDeletionPage() {
 
       <h2>Délai</h2>
       <p>
-        La suppression est effectuée sous 30 jours. Seules les factures sont conservées, pendant la durée imposée par la
-        loi.
+        Sur WhatsApp et dans l’app, la suppression est immédiate et ton abonnement est arrêté ; par e-mail, elle est faite sous 30 jours. Seules les factures sont
+        conservées, pendant la durée imposée par la loi.
       </p>
     </>
   );

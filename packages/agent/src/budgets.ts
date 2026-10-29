@@ -1,11 +1,10 @@
 // The providers' budgets (Tristan : « un moyen de gérer mes budgets des providers facilement pour
-// éviter la panne »): most of them are prepaid (Anthropic, Google AI Studio, Treg, the Vercel
-// AI Gateway credits) and stop answering when their balance is gone, and Edith with them. Every cost
+// éviter la panne »): most of them are prepaid (Anthropic, Google AI Studio, Treg) and stop answering when their balance is gone, and Edith with them. Every cost
 // is already logged by provider (cost_events), so the team enters a balance when it tops one up (on
 // the admin page), and what was spent since says what is left and how many days it lasts at the
 // pace of the last 7 days; low, the team is told once a day.
 
-export type ProviderKey = "anthropic" | "google" | "elevenlabs" | "vercel_sandbox" | "treg" | "moonshot";
+export type ProviderKey = "anthropic" | "google" | "elevenlabs" | "vercel_sandbox" | "treg";
 
 /** The providers Edith pays (cost_events.provider), what they do for her, and where to top them up. */
 export const PROVIDERS: { key: ProviderKey; label: string; role: string; topUp: string }[] = [
@@ -13,7 +12,6 @@ export const PROVIDERS: { key: ProviderKey; label: string; role: string; topUp: 
   { key: "google", label: "Google (Gemini)", role: "La lecture des vidéos et des photos", topUp: "https://aistudio.google.com/usage" },
   { key: "elevenlabs", label: "ElevenLabs", role: "La musique, les voix off, la lecture des vocaux", topUp: "https://elevenlabs.io/app/subscription" },
   { key: "vercel_sandbox", label: "Vercel (rendus)", role: "Les ateliers qui fabriquent les vidéos", topUp: "https://vercel.com/dashboard/usage" },
-  { key: "moonshot", label: "Vercel AI Gateway (Kimi)", role: "Les animations par Kimi (labo)", topUp: "https://vercel.com/dashboard/ai-gateway" },
   { key: "treg", label: "Treg", role: "Les Reels Instagram à recopier, les tendances", topUp: "https://treg.to" },
 ];
 

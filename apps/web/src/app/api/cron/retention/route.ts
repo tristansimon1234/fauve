@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { deleteExpiredAccounts } from "@/lib/account-deletion";
 import { env } from "@/lib/env";
 import { kitPath } from "@/lib/effect-words";
 import { cutoutPath } from "@/lib/render/cutout";
@@ -10,7 +11,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // videos no publication needs any more (24 h after the last one using them went
 // online, 7 days when none uses them; see expired_media) are deleted, files then
 // rows. Final renders are kept.
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const BATCH = 100;
 
@@ -58,7 +59,16 @@ async function handle(request: Request) {
     .delete()
     .or(`admitted_at.lt.${new Date(Date.now() - 7 * 86_400_000).toISOString()},last_message_at.lt.${new Date(Date.now() - 30 * 86_400_000).toISOString()}`);
   if (waitlist.error) console.error("retention: waitlist not cleaned", waitlist.error.message);
-  return Response.json({ ok: true, deleted });
+  // Computer pairings a day after they expired, sign-in links after a month (an old link still leads to its page
+  // while her session is open): a phone number kept for nothing.
+  await db.from("pairing_requests").delete().lt("expires_at", new Date(Date.now() - 86_400_000).toISOString());
+  await db.from("login_tokens").delete().lt("expires_at", new Date(Date.now() - 30 * 86_400_000).toISOString());
+  // Accounts whose subscription ended 30 days ago, or that never subscribed and went quiet (the privacy policy).
+  const accounts = await deleteExpiredAccounts().catch((e: unknown) => {
+    console.error("retention: accounts not deleted", e);
+    return [] as string[];
+  });
+  return Response.json({ ok: true, deleted, accounts: accounts.length });
 }
 
 export const GET = handle;

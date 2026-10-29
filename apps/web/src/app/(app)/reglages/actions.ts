@@ -2,7 +2,10 @@
 
 import { addFacts, effortSchema, factLine, MAX_FACT_CHARS, readMemory, type Effort } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { deleteAccount } from "@/lib/account-deletion";
 import { getStudioContext } from "@/lib/studio";
+import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 /** The level of care Fauve proposes for montages by default (each quote can still pick another one). */
@@ -32,4 +35,24 @@ export async function editMemory(change: { add?: string; remove?: string }): Pro
   const { error } = await db.from("studios").update({ memory }).eq("id", member.studio.id);
   if (error) return { ok: false, error: "Ce n’est pas enregistré. Réessaie dans un instant." };
   return { ok: true, facts: memory.map(factLine) };
+}
+
+/**
+ * « Supprimer mon compte » (Réglages › Mon compte): everything of her commerce deleted for good, her
+ * subscription stopped (lib/account-deletion.ts), after she typed SUPPRIMER. The owner only.
+ */
+export async function deleteMyAccount(confirm: string): Promise<{ ok: false; error: string } | never> {
+  if (confirm.trim().toUpperCase() !== "SUPPRIMER") return { ok: false, error: "Écris SUPPRIMER pour confirmer." };
+  const { member } = await getStudioContext();
+  if (!member) return { ok: false, error: "Ton numéro n’est relié à aucun studio." };
+  if (member.role !== "owner") return { ok: false, error: "Seul le propriétaire du compte peut le supprimer." };
+  try {
+    if (!(await deleteAccount(member.studio.id, "asked"))) return { ok: false, error: "Ce compte ne peut pas être supprimé ici." };
+  } catch (error) {
+    console.error("account deletion failed", member.studio.id, error);
+    return { ok: false, error: "La suppression n’a pas abouti. Réessaie dans un instant, ou écris à l’équipe." };
+  }
+  // Her login account is gone with it: the session cookies go too.
+  await (await supabaseServer()).auth.signOut().catch(() => {});
+  redirect("/");
 }
