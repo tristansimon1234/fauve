@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { DropCard } from "@/app/(app)/fauve/drop-card";
-import { finishStep, onboardingView, saveRhythm, type OnboardingView } from "@/app/(app)/fauve/onboarding-actions";
+import { finishStep, lookAtSite, onboardingView, saveRhythm, type OnboardingView } from "@/app/(app)/fauve/onboarding-actions";
 import { addCharterFont, saveLogo, saveMoodboard } from "@/app/(app)/style/actions";
 import { LOGO_MAX_BYTES, LOGO_TYPES } from "@/app/(app)/style/style-options";
 import { CheckIcon, InstagramIcon, PlusIcon } from "@/components/icons";
@@ -236,16 +236,23 @@ function StyleStep({
   // Edith reads her site's photos and look right after its step: the photos land here in a few seconds, her
   // style (its preview, « Tes Reels auront ce style ») a little later. She waits for both before moving on: the
   // preview came after she had already continued (Tristan: « il apparaît un peu tard… faire attendre le user »).
+  // Nothing from her site after about 25 s (its photos land in a few): the reading never started (an answer WhatsApp
+  // refused had lost it), so the card starts it, once, and waits for it a little longer.
   const [waited, setWaited] = useState(0);
-  const lookingAtSite = Boolean(view.website) && (!items.length || !view.siteRead) && waited < 30;
+  const [kicked, setKicked] = useState(false);
+  const lookingAtSite = Boolean(view.website) && (!items.length || !view.siteRead) && waited < (kicked ? 45 : 30);
   useEffect(() => {
     if (!lookingAtSite) return;
     const timer = setTimeout(() => {
+      if (waited === 6 && !items.length && !kicked) {
+        setKicked(true);
+        void lookAtSite().catch(() => {});
+      }
       onChange();
       setWaited((n) => n + 1);
     }, 4000);
     return () => clearTimeout(timer);
-  }, [lookingAtSite, waited, onChange]);
+  }, [lookingAtSite, waited, onChange, items.length, kicked]);
 
   const add = async (files: File[]) => {
     const picked = files.filter((f) => f.type.startsWith("image/")).slice(0, room);
