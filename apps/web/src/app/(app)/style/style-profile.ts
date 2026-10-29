@@ -152,6 +152,10 @@ export function applyStyleForm(current: StoredProfile, form: z.output<typeof sty
   );
   // A Reel has no ambiance any more (each one its own rhythm): an older default goes.
   set("default_template", undefined);
+  // Colours or fonts she changed are hers: no reading of her site or images rewrites them (imagesOwnCharter).
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  if (!same(next.colors, current.colors) || !same(next.fonts, current.fonts)) next.charter_from = "hand";
+  if (!same(next.art_direction, current.art_direction)) next.art_direction_from = "hand";
   return next;
 }
 

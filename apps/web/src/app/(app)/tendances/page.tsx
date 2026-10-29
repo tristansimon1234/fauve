@@ -1,4 +1,4 @@
-import { trendChangesLeft, trendQueryOf } from "@fauve/agent";
+import { trendChangesLeft, trendLangOf, trendQueryOf } from "@fauve/agent";
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { NoStudio } from "@/components/empty-state";
@@ -26,30 +26,31 @@ export default function TrendsPage() {
 async function Trends() {
   const { member } = await getStudioContext();
   if (!member) return <NoStudio />;
-  const { data } = await supabaseAdmin().from("studios").select("trend_query, business_type, trend_query_month, trend_query_changes").eq("id", member.studio.id).maybeSingle();
+  const { data } = await supabaseAdmin().from("studios").select("trend_query, trend_lang, business_type, trend_query_month, trend_query_changes").eq("id", member.studio.id).maybeSingle();
   const own = (data?.trend_query as string | null) ?? null;
   const query = trendQueryOf(own, data?.business_type as string | null);
+  const lang = trendLangOf(data?.trend_lang);
   const left = trendChangesLeft({ month: (data?.trend_query_month as string | null) ?? null, changes: Number(data?.trend_query_changes ?? 0) }, monthIn(member.studio.timezone));
 
   if (!query) {
     return (
       <>
         <Header />
-        <TrendQuery query={null} left={left} />
+        <TrendQuery query={null} lang={lang} left={left} />
       </>
     );
   }
 
-  const [lists, last] = await Promise.all([trendCards(query), lastSearched(query)]);
+  const [lists, last] = await Promise.all([trendCards(query, lang), lastSearched(query, lang)]);
   // Never searched, or last week's: searched again now, after the page is sent.
   const stale = anyStale(last);
-  if (stale) after(() => refreshTrends(query).catch((e: unknown) => console.error("trends: refresh failed", query, e)));
+  if (stale) after(() => refreshTrends(query, lang).catch((e: unknown) => console.error("trends: refresh failed", query, lang, e)));
 
   return (
     <>
       <Header />
-      <TrendQuery query={query} left={left} />
-      <TrendsGrid lists={lists} searching={(stale || last.running) && !lists.trend.length && !lists.beau.length && !lists.local.length} timezone={member.studio.timezone} />
+      <TrendQuery query={query} lang={lang} left={left} />
+      <TrendsGrid lists={lists} searching={(stale || last.running) && !lists.trend.length && !lists.local.length} timezone={member.studio.timezone} />
     </>
   );
 }
@@ -58,7 +59,7 @@ function Header() {
   return (
     <div className="flex flex-col gap-1.5">
       <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Tendances</h1>
-      <p className="text-[15px] text-muted">Les vidéos les plus vues de ton métier ce mois-ci, partout et près de chez toi, sur TikTok et Instagram. Mis à jour chaque semaine.</p>
+      <p className="text-[15px] text-muted">Les vidéos les plus vues de ton métier ce mois-ci, dans ta langue et près de chez toi, sur TikTok et Instagram, avec leurs accroches. Mis à jour chaque semaine.</p>
     </div>
   );
 }

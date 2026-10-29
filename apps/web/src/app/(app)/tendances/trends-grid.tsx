@@ -1,6 +1,6 @@
 "use client";
 
-import { CREDIT_PRICES, HOOK_FORM_LABELS, shortCount, TREND_FREE_CHANGES } from "@fauve/agent";
+import { CREDIT_PRICES, HOOK_FORM_LABELS, shortCount, TREND_FREE_CHANGES, TREND_LANG_LABELS, TREND_LANGS, trendLangIn, type TrendLang } from "@fauve/agent";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { EyeIcon, HeartIcon, InstagramIcon, MusicIcon, PlayIcon, TikTokIcon, XIcon } from "@/components/icons";
@@ -10,18 +10,19 @@ import { setTrendQuery } from "./actions";
 
 type Filter = "all" | "tiktok" | "instagram";
 
-/** The words searched for her trade, which she can change. */
-export function TrendQuery({ query, left }: { query: string | null; left: number }) {
+/** The words searched for her trade and the language of the videos, which she can change. */
+export function TrendQuery({ query, lang, left }: { query: string | null; lang: TrendLang; left: number }) {
   const router = useRouter();
   const [editing, setEditing] = useState(query === null);
   const [words, setWords] = useState(query ?? "");
+  const [language, setLanguage] = useState<TrendLang>(lang);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const save = () =>
     start(async () => {
       setError(null);
-      const res = await setTrendQuery(words);
+      const res = await setTrendQuery(words, language);
       if (!res.ok) return setError(res.error);
       setEditing(false);
       router.refresh();
@@ -32,6 +33,7 @@ export function TrendQuery({ query, left }: { query: string | null; left: number
       <div className="flex flex-wrap items-center gap-2 text-[15px]">
         <span className="text-muted">Pour</span>
         <span className="font-serif text-[22px] italic leading-none">« {query} »</span>
+        <span className="text-muted">{trendLangIn(lang)}</span>
         <button type="button" onClick={() => setEditing(true)} className="rounded-full px-3 py-1.5 text-[14px] font-bold text-violet hover:bg-violet-soft">
           Changer
         </button>
@@ -49,15 +51,27 @@ export function TrendQuery({ query, left }: { query: string | null; left: number
       <label htmlFor="trend-words" className="text-[15px] font-bold">
         Ton métier, en quelques mots
       </label>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <input
           id="trend-words"
           value={words}
           onChange={(e) => setWords(e.target.value)}
           maxLength={60}
           placeholder="salon de coiffure, café, studio de pilates…"
-          className="h-11 min-w-0 flex-1 rounded-full border border-line px-4 text-[16px] outline-none focus:border-violet"
+          className="h-11 min-w-[200px] flex-1 rounded-full border border-line px-4 text-[16px] outline-none focus:border-violet"
         />
+        <select
+          aria-label="Langue des vidéos"
+          value={language}
+          onChange={(e) => setLanguage(e.target.value as TrendLang)}
+          className="h-11 rounded-full border border-line bg-white px-4 text-[16px] outline-none focus:border-violet"
+        >
+          {TREND_LANGS.map((l) => (
+            <option key={l} value={l}>
+              {TREND_LANG_LABELS[l]}
+            </option>
+          ))}
+        </select>
         <button type="submit" disabled={pending} className="h-11 rounded-full bg-violet px-5 text-[15px] font-bold text-white disabled:opacity-50">
           {pending ? "…" : "Voir"}
         </button>
@@ -74,7 +88,7 @@ export function TrendQuery({ query, left }: { query: string | null; left: number
   );
 }
 
-/** The wall: the most beautiful first, the hooks that work, then the most watched and her city's; each video plays in the app. */
+/** The hooks that work, then the most watched and her city's; each video plays in the app. */
 export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; searching: boolean; timezone: string }) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
@@ -95,7 +109,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
       </div>
     );
   }
-  if (!lists.trend.length && !lists.beau.length && !lists.local.length) {
+  if (!lists.trend.length && !lists.local.length) {
     return (
       <div className="rounded-[22px] bg-soft px-6 py-10 text-center text-[15px] text-muted">
         Rien de vraiment fort pour ces mots cette semaine. Essaie d’autres mots, plus simples (« coiffeur », « brunch », « pilates »).
@@ -104,7 +118,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
   }
 
   const city = lists.words.local.split(" ").at(-1) ?? "";
-  const platforms = new Set([...lists.trend, ...lists.beau, ...lists.local].map((c) => c.platform));
+  const platforms = new Set([...lists.trend, ...lists.local].map((c) => c.platform));
   const open = (card: TrendCard) => setPlaying(card);
 
   return (
@@ -153,52 +167,12 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
         </ul>
       )}
 
-      <BeautyWall cards={lists.beau.filter((c) => filter === "all" || c.platform === filter)} onOpen={open} onCopy={setCopying} />
       <HookRow cards={lists.hooks.filter((c) => filter === "all" || c.platform === filter)} onOpen={open} />
       <TrendSection title="Ce qui cartonne en ce moment" note={`« ${lists.words.trend} », les plus vues du mois`} cards={lists.trend} filter={filter} onOpen={open} onCopy={setCopying} />
       <TrendSection title={`À ${capitalized(city)}`} note={`« ${lists.words.local} »`} cards={lists.local} filter={filter} onOpen={open} onCopy={setCopying} />
       {playing && <Player card={playing} onClose={() => setPlaying(null)} onCopy={(url) => (setPlaying(null), setCopying(url))} />}
       {copying && <NewPostSheet timezone={timezone} copyLink={copying} onClose={() => setCopying(null)} />}
     </>
-  );
-}
-
-/** « Les plus belles », as a wall: each cover at its own size, what makes it inspiring under it. */
-function BeautyWall({ cards, onOpen, onCopy }: { cards: TrendCard[]; onOpen: (card: TrendCard) => void; onCopy: (url: string) => void }) {
-  return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-[22px] font-extrabold tracking-[-0.01em]">Les plus belles</h2>
-        <p className="text-[14px] text-muted">choisies sur leur image : lumière, cadrage, couleurs</p>
-      </div>
-      {cards.length ? (
-        <ul className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
-          {cards.map((card) => (
-            <li key={card.id} className="mb-5 flex break-inside-avoid flex-col gap-2">
-              <Cover card={card} onOpen={onOpen} />
-              {card.tags.length > 0 && (
-                <ul className="flex flex-wrap gap-1">
-                  {card.tags.map((tag) => (
-                    <li key={tag} className="rounded-full bg-soft px-2.5 py-1 text-[12px] font-bold text-muted">
-                      {tag}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {card.hook && <p className="font-serif text-[17px] italic leading-snug">« {card.hook} »</p>}
-              <div className="flex items-center justify-between gap-2">
-                {card.author && <p className="min-w-0 truncate text-[13px] font-bold">@{card.author}</p>}
-                <button type="button" onClick={() => onCopy(card.url)} className="shrink-0 text-[13px] font-bold text-violet hover:underline">
-                  Fais-en un
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="rounded-[16px] bg-soft px-5 py-6 text-[14px] text-muted">Je cherche encore les plus belles de ton métier : reviens dans un moment.</p>
-      )}
-    </section>
   );
 }
 
@@ -209,13 +183,16 @@ function HookRow({ cards, onOpen }: { cards: TrendCard[]; onOpen: (card: TrendCa
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-[22px] font-extrabold tracking-[-0.01em]">Les accroches qui marchent</h2>
-        <p className="text-[14px] text-muted">les premiers mots écrits sur les vidéos de ton métier</p>
+        <p className="text-[14px] text-muted">les premiers mots qui font rester, et pourquoi ils marchent</p>
       </div>
       <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
         {cards.map((card) => (
-          <li key={card.id} className="w-[240px] shrink-0 snap-start">
+          <li key={card.id} className="w-[260px] shrink-0 snap-start">
             <button type="button" onClick={() => onOpen(card)} className="flex h-full w-full flex-col justify-between gap-4 rounded-[18px] border border-line p-4 text-left hover:border-violet">
-              <p className="font-serif text-[21px] italic leading-snug">« {card.hook} »</p>
+              <span className="flex flex-col gap-2">
+                <p className="font-serif text-[21px] italic leading-snug">« {card.hook} »</p>
+                {card.hookWhy && <p className="text-[13px] leading-snug text-muted">{card.hookWhy}</p>}
+              </span>
               <span className="flex items-center justify-between gap-2 text-[12px] text-muted">
                 <span className="rounded-full bg-violet-soft px-2.5 py-1 font-bold text-violet">{HOOK_FORM_LABELS[card.hookForm ?? "autre"]}</span>
                 <span className="flex items-center gap-1">
@@ -255,12 +232,12 @@ function TrendSection({ title, note, cards, filter, onOpen, onCopy }: { title: s
 }
 
 /** A cover that opens the video in the app, with its platform and its views. */
-function Cover({ card, onOpen, fixed = false }: { card: TrendCard; onOpen: (card: TrendCard) => void; fixed?: boolean }) {
+function Cover({ card, onOpen }: { card: TrendCard; onOpen: (card: TrendCard) => void }) {
   return (
-    <button type="button" onClick={() => onOpen(card)} aria-label="Voir la vidéo" className={`group relative block w-full overflow-hidden rounded-[16px] bg-soft ${fixed || !card.cover ? "aspect-[9/16]" : ""}`}>
+    <button type="button" onClick={() => onOpen(card)} aria-label="Voir la vidéo" className="group relative block aspect-[9/16] w-full overflow-hidden rounded-[16px] bg-soft">
       {card.cover ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={card.cover} alt="" loading="lazy" className={`w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${fixed ? "h-full" : "h-auto"}`} />
+        <img src={card.cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
       ) : (
         <div className="flex h-full items-center justify-center px-4 text-center text-[13px] text-muted">{card.caption.slice(0, 80) || "Voir la vidéo"}</div>
       )}
@@ -290,13 +267,22 @@ function Cover({ card, onOpen, fixed = false }: { card: TrendCard; onOpen: (card
 function TrendItem({ card, onOpen, onCopy }: { card: TrendCard; onOpen: (card: TrendCard) => void; onCopy: (url: string) => void }) {
   return (
     <li className="flex min-w-0 flex-col gap-2">
-      <Cover card={card} onOpen={onOpen} fixed />
+      <Cover card={card} onOpen={onOpen} />
       <div className="flex min-w-0 flex-col gap-1 px-0.5">
         {card.author && <p className="truncate text-[13px] font-bold">@{card.author}</p>}
         {card.hook ? (
           <p className="line-clamp-2 font-serif text-[15px] italic leading-snug">« {card.hook} »</p>
         ) : (
           card.caption && <p className="line-clamp-2 text-[13px] leading-snug text-muted">{card.caption}</p>
+        )}
+        {card.tags.length > 0 && (
+          <ul className="flex flex-wrap gap-1">
+            {card.tags.map((tag) => (
+              <li key={tag} className="rounded-full bg-soft px-2 py-0.5 text-[11px] font-bold text-muted">
+                {tag}
+              </li>
+            ))}
+          </ul>
         )}
         {card.sound && (
           <p className="flex min-w-0 items-center gap-1 text-[12px] text-muted">

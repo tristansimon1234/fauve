@@ -12,9 +12,9 @@ const MAX_TRADES = 40;
 async function run() {
   await forgetOldTrends().catch((error: unknown) => console.error("trends: cleanup failed", error));
   const trades = (await tradesToSearch()).slice(0, MAX_TRADES);
-  for (const query of trades) {
-    const found = await refreshTrends(query).catch((error: unknown) => (console.error("trends: failed", query, error), null));
-    console.log("trends", query, found);
+  for (const { query, lang } of trades) {
+    const found = await refreshTrends(query, lang).catch((error: unknown) => (console.error("trends: failed", query, lang, error), null));
+    console.log("trends", query, lang, found);
   }
 }
 

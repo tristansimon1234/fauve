@@ -30,7 +30,9 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // every Reel applies), keeps the photos that show the business itself (its place, its
 // work, its products, not its merch nor its press) for her media library, and gives each
 // of its fonts that Google does not serve its closest free twin. Never over a moodboard
-// the manager already made.
+// the manager already made. A new site, or hers redone (`again`), is read once more: its photos
+// replace the old site's in her moodboard, and its charter, signature and example replace the old
+// site's; what she set by hand (colours, fonts, art direction) and her own moodboard stay.
 
 /** Photos kept for her moodboard and her library; candidates shown to the reading. */
 const MAX_PHOTOS = 6;
@@ -97,6 +99,16 @@ export async function pageColors(jpeg: Buffer): Promise<{ color: string; share: 
 }
 
 type MoodItems = { items?: { note?: string; path?: string }[] } | undefined;
+
+/** A site's page as a key: its host without « www. » and its path without the last slash (https://www.studio.fr/ = studio.fr). */
+export function sitePage(url: string): string {
+  try {
+    const u = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+    return `${u.hostname.toLowerCase().replace(/^www\./, "")}${u.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return url.trim().toLowerCase();
+  }
+}
 const hersOwn = (moodboard: MoodItems) => (moodboard?.items ?? []).some((i) => i.note !== SITE_NOTE);
 const smaller = (jpeg: Buffer, width: number) => sharp(jpeg).resize({ width, withoutEnlargement: true }).jpeg({ quality: 78 }).toBuffer();
 const key = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -127,7 +139,7 @@ async function siteFonts(page: PageMeasure | null, reading: SiteLookReading): Pr
   return { fonts, twins };
 }
 
-export async function readSiteLook(studioId: string, pageUrl: string, imageUrls: string[]): Promise<{ photos: number; reading: boolean }> {
+export async function readSiteLook(studioId: string, pageUrl: string, imageUrls: string[], options: { again?: boolean } = {}): Promise<{ photos: number; reading: boolean }> {
   const db = supabaseAdmin();
   const started = Date.now();
   const [{ data: latest }, { data: studio }, { count: fromSite }] = await Promise.all([
@@ -136,8 +148,10 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
     db.from("media_assets").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("source", "website"),
   ]);
   const moodboard = (latest?.profile as { moodboard?: MoodItems } | null)?.moodboard;
-  // Read once: her own moodboard wins, and a second reading of the same site adds nothing.
-  if ((moodboard?.items?.length ?? 0) > 0 || (fromSite ?? 0) > 0) return { photos: 0, reading: false };
+  // Read once: her own moodboard wins, and a second reading of the same site adds nothing; a new site is read again.
+  if (!options.again && ((moodboard?.items?.length ?? 0) > 0 || (fromSite ?? 0) > 0)) return { photos: 0, reading: false };
+  // The old site's photos in her moodboard, replaced by the new one's (hers stay).
+  const oldSite = (moodboard?.items ?? []).filter((i) => i.note === SITE_NOTE && i.path).map((i) => i.path!);
 
   // The page takes the longest (the sandbox's browser): it is read while the photos come in.
   const reading$ = pageInSandbox(`site-${studioId.slice(0, 8)}-${Date.now()}`, pageUrl).catch(() => null);
@@ -165,6 +179,7 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
       // She made her own moodboard meanwhile: hers wins.
       hersOwn((profile as { moodboard?: MoodItems }).moodboard) ? profile : { ...profile, moodboard: { items: first } },
     );
+    if (options.again && oldSite.length && !hersOwn(moodboard)) await db.storage.from("media").remove(oldSite).catch(() => undefined);
   }
   const photosAt = Date.now() - started;
 
@@ -245,26 +260,47 @@ export async function readSiteLook(studioId: string, pageUrl: string, imageUrls:
   let saved = false;
   await insertProfileVersion(studioId, (profile) => {
     const current = (profile as { moodboard?: MoodItems & Record<string, unknown> }).moodboard;
-    if (hersOwn(current)) return profile;
+    const own = hersOwn(current);
+    // First reading: never over her own moodboard. A new site: its facts (charter, example) still replace the old site's.
+    if (own && !options.again) return profile;
     saved = true;
-    const p = profile as { fonts?: string[]; tone?: string; font_twins?: Record<string, string>; voice?: { use?: string; voice_id?: string } };
+    const p = profile as {
+      fonts?: string[];
+      tone?: string;
+      art_direction?: string;
+      art_direction_from?: string;
+      charter_from?: string;
+      font_twins?: Record<string, string>;
+      voice?: { use?: string; voice_id?: string };
+      site_read?: { direction?: string; tone?: string };
+    };
     // The voice that sounds like it, unless she chose one (Style › Voix off).
     const narrator = findVoice(signature.narrator?.voice);
-    // What she sees on her site beats the CSS: the palette becomes the brand's colours (the first is the accent).
-    const colors = palette.length ? brandColorsFromLook(palette) : null;
+    // Colours and fonts she set by hand are hers; otherwise her site's palette becomes the brand's colours (the first is the accent).
+    const byHand = p.charter_from === "hand";
+    const colors = palette.length && !byHand ? brandColorsFromLook(palette) : null;
+    const siteFonts = byHand ? null : fonts ? { fonts: fonts.fonts.slice(0, 2), font_twins: { ...(p.font_twins ?? {}), ...fonts.twins } } : p.fonts?.length && !options.again ? null : { fonts: [...new Set([reading.fonts.display, reading.fonts.body])] };
+    // A new site replaces the art direction and the tone the old one wrote (her own moodboard's and hers stay).
+    const fromOldSite = (value: string | undefined, written: string | undefined) => Boolean(options.again && value?.trim() && (written ? written === value : !own));
+    const direction = p.art_direction_from !== "hand" && fromOldSite(p.art_direction, p.site_read?.direction) ? { ...profile, art_direction: reading.direction.slice(0, 600) } : withArtDirection(profile as { art_direction?: unknown }, reading.direction);
+    const tone = fromOldSite(p.tone, p.site_read?.tone) || !p.tone?.trim() || p.tone === DEFAULT_TONE ? signature.voice : null;
     return {
       // Her « Direction artistique » too, when she has not written one.
-      ...withArtDirection(profile as { art_direction?: unknown }, reading.direction),
+      ...direction,
       ...(colors?.length ? { colors } : {}),
       // The fonts measured on her pages (their twins for the render), else the reading's look-alikes.
-      ...(fonts ? { fonts: fonts.fonts.slice(0, 2), font_twins: { ...(p.font_twins ?? {}), ...fonts.twins } } : p.fonts?.length ? {} : { fonts: [...new Set([reading.fonts.display, reading.fonts.body])] }),
-      signature,
+      ...(siteFonts ?? {}),
+      // Her charter is her site's: a reading of her logo or images never rewrites it.
+      ...(colors?.length || siteFonts ? { charter_from: "site" } : {}),
+      // Her own moodboard keeps the settings it gave her.
+      ...(own ? {} : { signature }),
       // A hook and a line in her words: her style shown on one of her photos at the Style step.
       style_sample: reading.sample,
       ...(p.voice?.voice_id || !narrator ? {} : { voice: { use: p.voice?.use ?? "auto", voice_id: narrator.id } }),
       // How it talks, read in its site's words, unless someone already said it.
-      ...(p.tone?.trim() && p.tone !== DEFAULT_TONE ? {} : { tone: signature.voice }),
-      moodboard: { ...(current ?? {}), items: items.length ? items : (current?.items ?? first), reading: reading.reading, palette: reading.palette, read_at: new Date().toISOString() },
+      ...(tone ? { tone } : {}),
+      site_read: { url: pageUrl.slice(0, 500), at: new Date().toISOString(), direction: reading.direction.slice(0, 600), ...(tone ? { tone: tone.slice(0, 300) } : {}) },
+      ...(own ? {} : { moodboard: { ...(current ?? {}), items: items.length ? items : (current?.items ?? first), reading: reading.reading, palette: reading.palette, read_at: new Date().toISOString() } }),
     };
   });
   // The site's photos her moodboard no longer shows (they were not about the business).

@@ -585,6 +585,12 @@ export const brandProfileSchema = z.object({
     .max(1500)
     .optional()
     .describe("Direction artistique libre : ambiance, couleurs, typographie, rythme, ce qu'on aime et ce qu'on évite"),
+  /** Where her colours and fonts come from: her site, her logo and images, or her hand (imagesOwnCharter). */
+  charter_from: z.enum(["site", "images", "hand"]).optional(),
+  /** The site her look was last read from, and what that reading wrote (a new site's reading replaces only those). */
+  site_read: z.object({ url: z.string().max(500), at: z.string(), direction: z.string().max(600).optional(), tone: z.string().max(300).optional() }).optional(),
+  /** She wrote her art direction herself (Style): no reading replaces it. */
+  art_direction_from: z.literal("hand").optional(),
   /** The art direction as settings (read from her site or her moodboard): what every Reel and photo applies. */
   signature: brandSignatureSchema.optional(),
   /** A hook and a line in her own words, to show her style on one of her photos (Style step). */

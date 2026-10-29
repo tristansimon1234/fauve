@@ -312,7 +312,9 @@ function StyleStep({
           <div className="flex min-w-0 flex-col gap-2">
             <span className="text-[14px] font-bold">Tes Reels auront ce style</span>
             {view.direction && <p className="text-[13px] leading-relaxed text-muted">{view.direction}</p>}
-            <span className="text-[12px] text-muted">Tes titres, tes couleurs et ta lumière, comme sur ton site. Tu peux tout changer dans Style.</span>
+            <span className="text-[12px] text-muted">
+              {view.website ? "Tes titres, tes couleurs et ta lumière, comme sur ton site." : "Tes titres, tes couleurs et ta lumière, tirés de ton logo et de tes images."} Tu peux tout changer dans Style.
+            </span>
           </div>
         </div>
       )}
@@ -321,7 +323,7 @@ function StyleStep({
         .map((f) => (
           <CharterFontAsk key={f.name} studioId={studioId} font={f.name} twin={f.twin!} onSaved={onChange} setError={setError} />
         ))}
-      {!view.brand.logoUrl && <LogoAsk studioId={studioId} onSaved={onChange} setError={setError} />}
+      {!view.brand.logoUrl && <LogoAsk studioId={studioId} hasSite={Boolean(view.website)} onSaved={onChange} setError={setError} />}
       <div className="flex flex-col gap-2">
         <span className="text-[14px] font-bold">Ton moodboard</span>
         <p className="-mt-1 text-[13px] leading-snug text-muted">
@@ -453,20 +455,22 @@ function CharterFontAsk({ studioId, font, twin, onSaved, setError }: { studioId:
   );
 }
 
-/** No logo on her site: she adds it here (it ends her Reels and goes on her photos). */
-function LogoAsk({ studioId, onSaved, setError }: { studioId: string; onSaved: () => void; setError: (e: string | null) => void }) {
-  const [busy, setBusy] = useState(false);
+/** No logo on her site, or no site: she adds it here (it ends her Reels; with no site, her colours and fonts start from it). */
+function LogoAsk({ studioId, hasSite, onSaved, setError }: { studioId: string; hasSite: boolean; onSaved: () => void; setError: (e: string | null) => void }) {
+  const [busy, setBusy] = useState<"sending" | "reading" | false>(false);
   const ref = useRef<HTMLInputElement>(null);
   const upload = async (file: File) => {
     const ext = LOGO_TYPES[file.type];
     if (!ext) return setError("Ton logo : PNG, SVG, WebP ou JPEG.");
     if (file.size > LOGO_MAX_BYTES) return setError("Le logo dépasse 5 Mo.");
     setError(null);
-    setBusy(true);
+    setBusy("sending");
     try {
       const path = `${studioId}/brand/logo-${Date.now()}.${ext}`;
       const { error } = await supabaseBrowser().storage.from("media").upload(path, file, { contentType: file.type });
       if (error) throw error;
+      // Without a site, Edith reads her colours and fonts in it before the card shows them.
+      if (!hasSite) setBusy("reading");
       const res = await saveLogo(path);
       if (res.status === "error") setError(res.message);
       onSaved();
@@ -479,11 +483,19 @@ function LogoAsk({ studioId, onSaved, setError }: { studioId: string; onSaved: (
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-[16px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-3.5 py-3">
       <span className="min-w-0 flex-1 text-[13px] leading-snug text-violet">
-        <b>Ton logo</b> : je ne l’ai pas trouvé sur ton site. Ajoute-le, il signera tes Reels et tes photos.
+        {hasSite ? (
+          <>
+            <b>Ton logo</b> : je ne l’ai pas trouvé sur ton site. Ajoute-le, il signera tes Reels et tes photos.
+          </>
+        ) : (
+          <>
+            <b>Ton logo</b> : ajoute-le, j’en tire tes couleurs et tes polices, et il signera tes Reels.
+          </>
+        )}
       </span>
-      <button type="button" disabled={busy} onClick={() => ref.current?.click()} className="btn btn-primary h-10 px-4 text-[13px] disabled:opacity-50">
+      <button type="button" disabled={Boolean(busy)} onClick={() => ref.current?.click()} className="btn btn-primary h-10 px-4 text-[13px] disabled:opacity-50">
         {busy ? <Orb size={18} /> : <PlusIcon size={16} />}
-        {busy ? "Envoi…" : "Ajouter mon logo"}
+        {busy === "reading" ? "Je le regarde…" : busy ? "Envoi…" : "Ajouter mon logo"}
       </button>
       <input ref={ref} type="file" accept={Object.keys(LOGO_TYPES).join(",")} className="sr-only" onChange={(e) => (e.target.files?.[0] && void upload(e.target.files[0]), (e.target.value = ""))} />
     </div>
