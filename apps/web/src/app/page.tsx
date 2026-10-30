@@ -13,7 +13,7 @@ import { whatsappLink } from "@/lib/public-env";
 import { SITE_URL } from "@/lib/site";
 import "./landing.css";
 
-const description = `Edith monte tes vidéos en Reels qui n’ont pas l’air d’une IA, écrit tes légendes et publie sur Instagram et TikTok. Sur WhatsApp, dès ${PLANS.decouverte.priceEur} € par mois.`;
+const description = `Edith monte tes vidéos en Reels qui n’ont pas l’air d’une IA, écrit tes légendes et te fait signe au bon moment pour poster. Sur WhatsApp, dès ${PLANS.decouverte.priceEur} € par mois.`;
 
 export const metadata: Metadata = {
   title: { absolute: "Edith · community manager IA pour commerces et indépendants" },
@@ -75,7 +75,7 @@ const faq: [string, string][] = [
   ["Ça ne va pas faire « contenu IA » ?", "C’est tout le travail d’Edith : ta meilleure image en premier, des coupes sur le temps, des mots de créateur, ta charte. Et si quelque chose ne te ressemble pas, tu le lui dis d’un mot."],
   ["C’est pour qui ?", "Les commerces de quartier comme les indépendants : studio, salon, resto, boutique, prof de yoga, coach, photographe, céramiste… Tous ceux qui vivent de leurs clients, avec ou sans site."],
   ["Edith, c’est une vraie personne ?", "Non, c’est un assistant IA, et il le dit. Tu gardes toujours la main."],
-  ["Est-ce qu’il publie sans me demander ?", "Jamais. Chaque publication attend ton oui, sur WhatsApp ou dans l’app."],
+  ["Qui publie sur Instagram ?", "Toi, d’un toucher : ton Reel s’ouvre dans Instagram, sa légende déjà copiée, et tu peux y ajouter un son tendance. Edith suit ensuite ses chiffres depuis ton @."],
   ["Je n’ai pas de vidéo, ça marche quand même ?", "Oui : il part de tes photos, ou fait un Reel tout en animation. Quand tu filmes, il te dit quoi."],
   ["Il y a un essai ?", `Edith découvre ton activité, trouve ton style et te propose le plan de ton premier Reel, sans rien payer. Pour le fabriquer, tu t’abonnes, dès ${PLANS.decouverte.priceEur} € par mois pour ${reelsPerMonth("decouverte")} Reels, sans engagement.`],
   ["Où vont mes photos et mes données ?", "En Europe. Tes fichiers sont supprimés peu après la publication, et tout disparaît si tu pars."],
@@ -146,7 +146,7 @@ export default function LandingPage() {
             <span className="mt-1 block font-[family-name:var(--font-serif)] text-[1.22em] leading-[0.95] font-normal tracking-[-0.02em] text-violet italic">Tes Reels n’en ont pas l’air.</span>
           </h1>
           <p className="land-intro max-w-[540px] text-[18px] leading-[1.6] text-muted sm:text-[19px]" style={vars({ "--i": 2 })}>
-            Envoie tes vidéos sur WhatsApp, telles quelles. Edith les monte comme un créateur, écrit la légende et publie sur Instagram et TikTok quand tu dis oui.
+            Envoie tes vidéos sur WhatsApp, telles quelles. Edith les monte comme un créateur, écrit la légende, et tu postes d’un toucher sur Instagram et TikTok.
           </p>
           <div className="land-intro flex flex-wrap items-center gap-3" style={vars({ "--i": 3 })}>
             <Start waUrl={waUrl} size="lg" />
@@ -298,7 +298,7 @@ export default function LandingPage() {
             Dans ton ton, avec ton lien de réservation.
           </Card>
           <Card i={1} icon={ClockIcon} title="Un signe au bon moment" visual={<ReminderVisual />}>
-            Il te prévient quand poster, et publie d’un « oui ».
+            Il te prévient quand poster, tout est prêt en un toucher.
           </Card>
           <Card i={2} icon={ChartIcon} title="Ce qui marche, chaque dimanche" visual={<ReportVisual />}>
             Ce qui a marché, et ce qu’on ajuste.

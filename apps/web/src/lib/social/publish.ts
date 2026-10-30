@@ -7,6 +7,7 @@ import { InstagramError, mediaInsights, publishMedia, refreshToken, type Publish
 import { slidesToPublish } from "@/lib/render/slides";
 import { designedItems, publishItems } from "./media-urls";
 import { handOff, matchHandPublished } from "./hand-off";
+import { socialConnect } from "./connect";
 import { TikTokError } from "./tiktok";
 import { captureTikTokMetrics, matchTikTokDrafts, refreshIdleTikTokTokens, sendToTikTok, tiktokCanTake, trackTikTok } from "./tiktok-account";
 
@@ -103,6 +104,8 @@ async function notify(studioId: string, text: string) {
 
 /** Instagram account and token of a studio, or null when not connected. */
 export async function instagramAccount(studioId: string) {
+  // Put aside (connect.ts): no account is read, so nothing is published nor offered through the API.
+  if (!socialConnect()) return null;
   const db = supabaseAdmin();
   const account = await db
     .from("social_accounts")

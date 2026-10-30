@@ -32,12 +32,12 @@ const Price = `Dès ${PLANS.decouverte.priceEur} € par mois`;
 
 /** Questions every trade asks, after its own. */
 export const COMMON_FAQ: [string, string][] = [
-  ["Est-ce qu’il publie sans me demander ?", "Jamais. Chaque publication attend ton oui, sur WhatsApp ou dans l’app. Tu peux aussi la télécharger et la publier toi-même."],
+  ["Qui publie sur Instagram ?", "Toi, d’un toucher : ta publication s’ouvre dans Instagram avec sa légende déjà copiée. Tu peux aussi la télécharger."],
   [
     "Combien ça coûte ?",
     `Trois offres sans engagement : ${PLANS.decouverte.label} à ${PLANS.decouverte.priceEur} € par mois (${reelsPerMonth("decouverte")} Reels soignés), ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € (${reelsPerMonth("essentiel")} Reels) et ${PLANS.pro.label} à ${PLANS.pro.priceEur} € (${reelsPerMonth("pro")} Reels). Les photos avec leurs textes ne comptent pas.`,
   ],
-  ["Et la musique ?", "Chaque Reel a sa musique, composée pour lui et calée sur ses coupes. Si tu préfères un son tendance, tu publies toi-même et tu l’ajoutes dans Instagram : Edith t’envoie la vidéo et la légende."],
+  ["Et la musique ?", "Chaque Reel a sa musique, composée pour lui et calée sur ses coupes. Si tu préfères un son tendance, tu l’ajoutes dans Instagram au moment de poster."],
 ];
 
 export const TRADES: Trade[] = [
@@ -45,11 +45,11 @@ export const TRADES: Trade[] = [
     slug: "restaurant",
     menu: "Restaurant, café, bar",
     title: "Community manager pour restaurant, sur WhatsApp",
-    description: `Edith monte tes vidéos de cuisine et de salle en Reels qui donnent faim, écrit les légendes et publie quand tu dis oui. ${Price}.`,
+    description: `Edith monte tes vidéos de cuisine et de salle en Reels qui donnent faim, écrit les légendes et te fait signe au bon moment pour poster. ${Price}.`,
     kicker: "Restaurant, café, bar",
     h1: "Le community manager de ton restaurant.",
     accent: "Toi, tu restes en cuisine.",
-    intro: "Filme dix secondes entre deux services et envoie-les sur WhatsApp. Edith en fait un Reel qui donne faim, écrit la légende et te demande avant de publier sur Instagram et TikTok.",
+    intro: "Filme dix secondes entre deux services et envoie-les sur WhatsApp. Edith en fait un Reel qui donne faim, écrit la légende et te le donne prêt à poster sur Instagram et TikTok.",
     business: "restaurant",
     points: [
       ["Ce qui donne faim", "Le plat qui arrive, le geste en cuisine, la salle qui se remplit. Pas une affiche : l’envie de venir ce soir."],
@@ -60,7 +60,7 @@ export const TRADES: Trade[] = [
     faq: [
       ["Je n’ai pas le temps de filmer pendant le service.", "Dix secondes suffisent : un plat qui sort, un geste, la salle avant d’ouvrir. Edith te dit quoi filmer et monte avec ce que tu as."],
       ["Il peut parler de ma carte et de mes prix ?", "De ce que tu lui as dit ou de ce qui est sur ton site, oui. Il n’invente jamais un plat, un prix ni un horaire."],
-      ["Et TikTok ?", "Une fois ton compte relié, chaque Reel peut partir aussi sur TikTok : directement, ou dans tes brouillons TikTok selon ton compte, où tu ajoutes un son et tu publies."],
+      ["Et TikTok ?", "Chaque Reel se partage aussi sur TikTok d’un toucher, où tu peux ajouter un son. Donne ton @ à Edith : il suit tes vues et tes abonnés."],
     ],
     guides: ["idees-reels-restaurant", "legende-instagram-commerce"],
   },
@@ -68,11 +68,11 @@ export const TRADES: Trade[] = [
     slug: "coiffeur",
     menu: "Salon de coiffure, barbier, beauté",
     title: "Community manager pour salon de coiffure, sur WhatsApp",
-    description: `Avant, geste, après : Edith monte tes vidéos de salon en Reels soignés, écrit les légendes et publie quand tu dis oui. ${Price}.`,
+    description: `Avant, geste, après : Edith monte tes vidéos de salon en Reels soignés, écrit les légendes et te fait signe au bon moment pour poster. ${Price}.`,
     kicker: "Coiffure, barbier, beauté",
     h1: "Le community manager de ton salon.",
     accent: "Tes mains restent sur les cheveux.",
-    intro: "Un avant, un geste, un après : envoie tes vidéos sur WhatsApp entre deux rendez-vous. Edith les monte, corrige la lumière, écrit la légende et attend ton oui pour publier.",
+    intro: "Un avant, un geste, un après : envoie tes vidéos sur WhatsApp entre deux rendez-vous. Edith les monte, corrige la lumière, écrit la légende et te le donne prêt à poster.",
     business: "salon de coiffure",
     points: [
       ["L’avant / après, bien fait", "Le résultat d’abord, les étapes ensuite, ta lumière corrigée. Le genre de Reel qu’on enregistre pour le montrer à son coiffeur."],
@@ -91,11 +91,11 @@ export const TRADES: Trade[] = [
     slug: "studio-pilates-yoga",
     menu: "Studio de Pilates ou de yoga",
     title: "Community manager pour studio de Pilates et de yoga",
-    description: `Edith monte tes vidéos de cours en Reels qui donnent envie d’essayer, écrit les légendes et publie quand tu dis oui. ${Price}.`,
+    description: `Edith monte tes vidéos de cours en Reels qui donnent envie d’essayer, écrit les légendes et te fait signe au bon moment pour poster. ${Price}.`,
     kicker: "Pilates, yoga, sport",
     h1: "Le community manager de ton studio.",
     accent: "Toi, tu donnes cours.",
-    intro: "Quelques secondes filmées pendant le cours, envoyées sur WhatsApp : Edith en fait un Reel qui donne envie de réserver le premier, écrit la légende et attend ton oui pour publier.",
+    intro: "Quelques secondes filmées pendant le cours, envoyées sur WhatsApp : Edith en fait un Reel qui donne envie de réserver le premier, écrit la légende et te le donne prêt à poster.",
     business: "studio de pilates",
     points: [
       ["Donner envie du premier cours", "Un POV, un mouvement, le studio avant que ça commence : ce qui fait franchir la porte à quelqu’un qui hésite."],
@@ -114,11 +114,11 @@ export const TRADES: Trade[] = [
     slug: "boutique",
     menu: "Boutique et concept store",
     title: "Community manager pour boutique, sur WhatsApp",
-    description: `Edith fait de tes photos et vidéos de boutique des Reels et des carrousels, écrit les légendes et publie quand tu dis oui. ${Price}.`,
+    description: `Edith fait de tes photos et vidéos de boutique des Reels et des carrousels, écrit les légendes et te fait signe au bon moment pour poster. ${Price}.`,
     kicker: "Boutique, fleuriste, concept store",
     h1: "Le community manager de ta boutique.",
     accent: "Tes nouveautés méritent mieux qu’une photo.",
-    intro: "Une nouveauté qu’on déballe, ta vitrine, un coup de cœur en main : envoie-les sur WhatsApp. Edith en fait des Reels et des carrousels, écrit la légende et attend ton oui pour publier.",
+    intro: "Une nouveauté qu’on déballe, ta vitrine, un coup de cœur en main : envoie-les sur WhatsApp. Edith en fait des Reels et des carrousels, écrit la légende et te le donne prêt à poster.",
     business: "boutique",
     points: [
       ["Les nouveautés, de près", "La matière, le détail, porté ou utilisé. Ce qu’on ne voit pas sur une photo de catalogue."],
@@ -137,11 +137,11 @@ export const TRADES: Trade[] = [
     slug: "independant",
     menu: "Indépendants",
     title: "Community manager pour indépendants : coach, prof, artisan",
-    description: "Coach, prof, photographe, artisan : Edith monte tes vidéos en Reels, écrit tes légendes et publie quand tu dis oui. Avec ou sans site.",
+    description: "Coach, prof, photographe, artisan : Edith monte tes vidéos en Reels, écrit tes légendes et te fait signe au bon moment pour poster. Avec ou sans site.",
     kicker: "Indépendants",
     h1: "Le community manager des indépendants.",
     accent: "Toi, tu fais ton métier.",
-    intro: "Prof de yoga, coach, photographe, céramiste, coiffure à domicile… Tu vis de tes clients, pas de ton temps sur Instagram. Envoie tes vidéos sur WhatsApp, Edith fait le reste et attend ton oui pour publier.",
+    intro: "Prof de yoga, coach, photographe, céramiste, coiffure à domicile… Tu vis de tes clients, pas de ton temps sur Instagram. Envoie tes vidéos sur WhatsApp, Edith fait le reste et te le donne prêt à poster.",
     business: "indépendant",
     points: [
       ["Toi au centre, sans te forcer", "Tes mains, ton travail, ton lieu. Pas besoin de parler face caméra : Edith peut poser une voix off."],

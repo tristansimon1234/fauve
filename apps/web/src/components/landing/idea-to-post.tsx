@@ -138,9 +138,9 @@ export function IdeaToPost() {
           {phase >= 4 && (
             <Row key={`t${run}`} fresh={moving}>
               <Her>
-                <strong className="font-bold text-violet">Ta-da.</strong> Ton carrousel est prêt : tes photos retouchées, tes couleurs, ta police. Je le publie ?
+                <strong className="font-bold text-violet">Ta-da.</strong> Ton carrousel est prêt : tes photos retouchées, tes couleurs, ta police. Il est prêt à partager.
                 <span className="mt-2.5 flex flex-wrap gap-1.5">
-                  {["Oui, publie-le", "Change un texte"].map((label) => (
+                  {["Voir mon carrousel", "Change un texte"].map((label) => (
                     <span key={label} className="rounded-full border border-line bg-white px-3 py-1.5 text-[12px] font-bold text-violet">
                       {label}
                     </span>

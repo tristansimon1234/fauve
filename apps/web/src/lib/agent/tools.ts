@@ -1,6 +1,7 @@
 import "server-only";
 import {
   APP_GUIDES,
+  BY_HAND_GUIDE,
   cleanCaption,
   cleanHandle,
   periodTotals,
@@ -78,6 +79,7 @@ import { ensureTranscript } from "@/lib/voice";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { startCarousel } from "@/lib/carousels";
 import { charterFromImages, rereadBrand } from "@/lib/brand-read";
+import { socialConnect } from "@/lib/social/connect";
 import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
 import { listInspirations } from "@/lib/inspirations";
@@ -247,7 +249,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
   const handlers: ToolHandlers = {
     async app_guide({ topic }) {
-      return APP_GUIDES[topic];
+      // Connecting not offered (lib/social/connect.ts): the guide still describes it, so it says so.
+      return socialConnect() ? APP_GUIDES[topic] : `${APP_GUIDES[topic]}\n\n${BY_HAND_GUIDE}`;
     },
 
     async get_studio_context() {
@@ -255,7 +258,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         db.from("studios").select("name, timezone, onboarding_step, website_url, booking_url").eq("id", studioId).single(),
         db.from("members").select("first_name, role").eq("id", ctx.memberId).single(),
         db.from("content_plans").select("posts_per_week, stories_per_week, platforms, themes").eq("studio_id", studioId).maybeSingle(),
-        db.from("social_accounts").select("platform, handle, status").eq("studio_id", studioId),
+        socialConnect() ? db.from("social_accounts").select("platform, handle, status").eq("studio_id", studioId) : Promise.resolve({ data: [], error: null }),
         db.from("brand_profiles").select("version, profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
       ]);
       return json({
@@ -359,6 +362,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async get_connect_link() {
+      if (!socialConnect()) return json({ refused: "La connexion d'Instagram et de TikTok n'est pas proposée en ce moment : elle poste elle-même (« Partager » sur la page de sa publication, get_post_link). Pour ses chiffres, demande son @ et enregistre-le (update_onboarding instagram_handle / tiktok_handle)." });
       // On WhatsApp, a button under her message (the one-time link is made when it is sent).
       if (ctx.waId) {
         ctx.extras.link = { path: "/connect", label: "Relier mes comptes", purpose: "connect_social" };

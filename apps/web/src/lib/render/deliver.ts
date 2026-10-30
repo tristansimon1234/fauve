@@ -2,6 +2,7 @@ import "server-only";
 import { CREDIT_PRICES, PUBLISH_OFFER_OPTIONS, publishQuestion, publishWhen, shortSentence, STYLE_CHECK_OPTIONS, offersLine } from "@fauve/agent";
 import { studioAccess } from "@/lib/billing/access";
 import { createLoginLink } from "@/lib/auth/login-link";
+import { socialConnect } from "@/lib/social/connect";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isFirstReel } from "@/lib/onboarding";
@@ -182,7 +183,7 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
     : [
         !unlocked
           ? `Pour le voir en entier et le publier, abonne-toi : ${offersLine()}, sans engagement.`
-          : styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus rapide, avec moins de texte, plus chaleureux ou autrement : je retiens ton style pour tous les prochains." : "Valide-le sur sa page, ou dis-moi ce que tu veux changer.",
+          : styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus rapide, avec moins de texte, plus chaleureux ou autrement : je retiens ton style pour tous les prochains." : socialConnect() ? "Valide-le sur sa page, ou dis-moi ce que tu veux changer." : "Pour le poster, touche « Partager » sur sa page depuis ton téléphone : Instagram s’ouvre avec, sa légende déjà copiée. Ou dis-moi ce que tu veux changer.",
         target.offerVariant === false || styleCheck || !unlocked
           ? ""
           : `Je peux aussi te faire une variante avec une autre accroche pour ${CREDIT_PRICES.variant} crédit${CREDIT_PRICES.variant > 1 ? "s" : ""}.`,

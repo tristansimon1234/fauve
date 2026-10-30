@@ -58,10 +58,12 @@ export function ReviewSheets({
             </a>
           )
         )}
-        <a href="/api/instagram/connect" className="btn btn-secondary w-full">
-          <InstagramIcon size={18} />
-          Relier Instagram pour suivre tes résultats
-        </a>
+        {data.connect && (
+          <a href="/api/instagram/connect" className="btn btn-secondary w-full">
+            <InstagramIcon size={18} />
+            Relier Instagram pour suivre tes résultats
+          </a>
+        )}
       </Sheet>
     );
   }

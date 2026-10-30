@@ -38,6 +38,8 @@ const schema = {
   ELEVENLABS_VOICE_ID: z.string().default("D6VK2PsbVdaFL5aALfRc"),
   ELEVENLABS_TTS_USD_PER_KCHAR: z.coerce.number().nonnegative().default(0.08),
   // Instagram API with Instagram Login (Meta app → Instagram product).
+  // Connecting Instagram / TikTok and publishing through their APIs (lib/social/connect.ts): « on » to offer them again.
+  SOCIAL_CONNECT: z.enum(["on", "off"]).default("off"),
   INSTAGRAM_APP_ID: z.string().regex(/^\d+$/),
   INSTAGRAM_APP_SECRET: z.string().min(1),
   INSTAGRAM_GRAPH_VERSION: z.string().default("v26.0"),

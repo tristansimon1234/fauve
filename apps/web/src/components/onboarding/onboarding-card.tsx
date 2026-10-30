@@ -8,6 +8,7 @@ import { DropCard } from "@/app/(app)/fauve/drop-card";
 import { finishStep, onboardingView, saveRhythm, type OnboardingView } from "@/app/(app)/fauve/onboarding-actions";
 import { addCharterFont, saveLogo, saveMoodboard } from "@/app/(app)/style/actions";
 import { LOGO_MAX_BYTES, LOGO_TYPES } from "@/app/(app)/style/style-options";
+import { HandlesForm } from "@/components/handles-form";
 import { CheckIcon, InstagramIcon, PlusIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { SlidePreview } from "@/components/montage/slide-preview";
@@ -139,7 +140,12 @@ export function OnboardingCard({
           }
         />
       )}
-      {step === "connect" && view && <ConnectStep handle={view.instagram} onNext={() => next(view.instagram ? "Mon Instagram est connecté." : "Je brancherai Instagram plus tard.")} pending={pending} />}
+      {step === "connect" && view &&
+        (view.connect ? (
+          <ConnectStep handle={view.instagram} onNext={() => next(view.instagram ? "Mon Instagram est connecté." : "Je brancherai Instagram plus tard.")} pending={pending} />
+        ) : (
+          <HandlesStep handles={view.handles} onNext={(saved) => next(saved ? "Voilà mon @." : "Je te donnerai mon @ plus tard.")} pending={pending} />
+        ))}
       {step === "first_post" && (
         <FirstPostStep
           timezone={timezone}
@@ -619,6 +625,21 @@ function ConnectStep({ handle, onNext, pending }: { handle: string | null; onNex
           Plus tard
         </button>
       </div>
+    </>
+  );
+}
+
+// Connecting not offered (lib/social/connect.ts): her @, from which Edith follows her public numbers.
+function HandlesStep({ handles, onNext, pending }: { handles: { instagram: string | null; tiktok: string | null }; onNext: (saved: boolean) => void; pending: boolean }) {
+  return (
+    <>
+      <p className="text-[14px] leading-relaxed text-muted">
+        Dernière étape : ton @ Instagram, et TikTok si tu y es. Je suis tes abonnés, tes vues et tes j’aime pour te dire ce qui marche. Tu postes toi-même depuis ton téléphone, d’un toucher, avec le son que tu veux.
+      </p>
+      <HandlesForm instagram={handles.instagram} tiktok={handles.tiktok} submit="C’est mon compte" onSaved={() => onNext(true)} />
+      <button type="button" disabled={pending} onClick={() => onNext(false)} className="self-start text-[13px] font-semibold text-muted hover:text-ink">
+        Plus tard
+      </button>
     </>
   );
 }

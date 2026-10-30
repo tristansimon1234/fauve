@@ -35,3 +35,9 @@ export const APP_GUIDES = {
 
 export type AppGuideTopic = keyof typeof APP_GUIDES;
 export const APP_GUIDE_TOPICS = Object.keys(APP_GUIDES) as AppGuideTopic[];
+
+/**
+ * Added to every topic while connecting accounts is not offered (SOCIAL_CONNECT off in the app):
+ * the topics above still describe connecting, kept for when it comes back.
+ */
+export const BY_HAND_GUIDE = `En ce moment, la connexion d'Instagram et de TikTok n'est pas proposée (ce qui en est dit plus haut ne vaut pas) : Réglages › Réseaux, l'accueil et la page des comptes demandent seulement son @ Instagram (et TikTok), d'où Edith suit ses abonnés, ses vues et ses j'aime une fois par jour. Edith ne publie rien : sur la page d'une publication, « Partager » (sur son téléphone) ouvre Instagram ou TikTok avec sa publication prête et sa légende copiée, et elle peut y ajouter un son tendance ; sur ordinateur, « Télécharger ». Au moment prévu, Edith lui fait signe sur WhatsApp avec un bouton vers sa page. La Grille montre son commerce et ses publications prévues, sans ses vraies publications.`;

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { socialConnect } from "@/lib/social/connect";
 
 // Getting started in the app: where the studio is, and the steps' own actions
 // (rhythm, moving on, « plus tard »). Fauve does the same in the chat.
@@ -30,6 +31,9 @@ export type OnboardingView = {
   /** Her offer: what its credits hold, to choose a rhythm she can keep with care. */
   offer: { label: string; credits: number; postsPerWeek: number; reels: number };
   instagram: string | null;
+  /** Connecting accounts offered (lib/social/connect.ts); else the step asks her @. */
+  connect: boolean;
+  handles: { instagram: string | null; tiktok: string | null };
 };
 
 export async function onboardingView(): Promise<OnboardingView | null> {
@@ -38,10 +42,12 @@ export async function onboardingView(): Promise<OnboardingView | null> {
   const studioId = member.studio.id;
   const admin = supabaseAdmin();
   const [studio, profileRow, plan, account] = await Promise.all([
-    admin.from("studios").select("onboarding_step, website_url, business_type, plan").eq("id", studioId).single(),
+    admin.from("studios").select("onboarding_step, website_url, business_type, plan, instagram_handle, tiktok_handle").eq("id", studioId).single(),
     admin.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     admin.from("content_plans").select("posts_per_week, stories_per_week").eq("studio_id", studioId).maybeSingle(),
-    admin.from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").eq("status", "connected").limit(1).maybeSingle(),
+    socialConnect()
+      ? admin.from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").eq("status", "connected").limit(1).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   const profile = brandProfileSchema.partial().catch({}).parse(profileRow.data?.profile ?? {});
   const offerId = planOf(studio.data?.plan);
@@ -85,6 +91,8 @@ export async function onboardingView(): Promise<OnboardingView | null> {
     rhythm: { posts: (plan.data?.posts_per_week as number | null) ?? offer.postsPerWeek, stories: (plan.data?.stories_per_week as number | null) ?? 4 },
     offer: { label: offer.label, credits: offer.credits, postsPerWeek: offer.postsPerWeek, reels: reelsPerMonth(offerId) },
     instagram: (account.data?.handle as string | null) ?? null,
+    connect: socialConnect(),
+    handles: { instagram: (studio.data?.instagram_handle as string | null) ?? null, tiktok: (studio.data?.tiktok_handle as string | null) ?? null },
   };
 }
 

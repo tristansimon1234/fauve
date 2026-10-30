@@ -122,10 +122,13 @@ export const REMINDER_GRACE_HOURS = 36;
 const KIND_WORDS: Record<string, string> = { reel: "ton Reel", carousel: "ton carrousel", post: "ta photo", story: "ta story" };
 
 /** The reminder at the moment Edith suggested: the post, then the same question and buttons as a delivery. */
-export function reminderMessage(kind: string, title: string, platforms: string[]): string {
+export function reminderMessage(kind: string, title: string, platforms: string[], byHand = false): string {
   const where = platforms.includes("tiktok") ? "sur Instagram et TikTok" : "sur Instagram";
   const name = title.trim() ? ` « ${title.trim().slice(0, 60)} »` : "";
-  return `C’est le bon moment pour poster ${KIND_WORDS[kind] ?? "ta publication"}${name} ✨ Je le publie maintenant ${where} ?`;
+  const what = `C’est le bon moment pour poster ${KIND_WORDS[kind] ?? "ta publication"}${name} ✨`;
+  // She posts it herself: one touch on « Partager » on its page, its caption copied before.
+  if (byHand) return `${what} Ouvre sa page sur ton téléphone et touche « Partager » : Instagram s’ouvre avec, sa légende déjà copiée.`;
+  return `${what} Je le publie maintenant ${where} ?`;
 }
 
 /** The buttons under that question, on WhatsApp and in the app. */

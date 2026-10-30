@@ -27,6 +27,7 @@ import { signMediaUrls, type Db } from "@/lib/studio";
 import { runningJobs } from "@/lib/studio-jobs";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ownVoiceOf } from "@/lib/voice-clone";
+import { socialConnect } from "@/lib/social/connect";
 
 // « Ta publication », the simple page of a Reel: the video as it will go out, its scenes,
 // when and where, its caption, and whether a new version is on its way (changes saved
@@ -75,6 +76,8 @@ export type ReviewData = {
   captionShown: string;
   handle: string | null;
   instagram: boolean;
+  /** Connecting Instagram offered (lib/social/connect.ts). */
+  connect: boolean;
   publishByHand: boolean;
   /** Edith's music (null: the music service is not set up). */
   music: { on: boolean; made: boolean } | null;
@@ -169,7 +172,9 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
   const previous = versions.filter((v) => v < (current.version as number)).at(-1);
   const next = versions.find((v) => v > (current.version as number));
   const music = readPostMusic(post.music);
-  const handle = ((await admin.from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").maybeSingle()).data?.handle as string | null) ?? null;
+  const handle = socialConnect()
+    ? (((await admin.from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").maybeSingle()).data?.handle as string | null) ?? null)
+    : null;
 
   return {
     postId: post.id,
@@ -197,6 +202,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     captionShown: captionForInstagram(post.caption, post.hashtags),
     handle,
     instagram: Boolean(account),
+    connect: socialConnect(),
     publishByHand: post.publish_by_hand,
     music: env("ELEVENLABS_API_KEY") ? { on: music.mode === "on", made: Boolean(music.track) } : null,
     voice,

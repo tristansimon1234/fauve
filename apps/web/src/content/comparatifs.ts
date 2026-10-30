@@ -37,7 +37,7 @@ export const COMPARISONS: Comparison[] = [
     h1: "Edith ou un community manager freelance ?",
     accent: "Une comparaison honnête.",
     intro:
-      "Un bon community manager freelance connaît ton quartier, vient filmer, a des idées en te parlant. Edith ne remplace pas tout ça. Il fait autre chose : monter tes vidéos, écrire tes légendes et publier, tout de suite, pour une fraction du prix. Voici ce que chacun fait vraiment.",
+      "Un bon community manager freelance connaît ton quartier, vient filmer, a des idées en te parlant. Edith ne remplace pas tout ça. Il fait autre chose : monter tes vidéos, écrire tes légendes et te dire quand poster, tout de suite, pour une fraction du prix. Voici ce que chacun fait vraiment.",
     other: "Freelance",
     rows: [
       ["Prix", "Le plus souvent quelques centaines d’euros par mois, selon le volume et la ville", Price],
@@ -62,7 +62,7 @@ export const COMPARISONS: Comparison[] = [
     together: "Les deux se combinent bien : un freelance pour un shooting ou un lancement de temps en temps, Edith pour tenir le rythme entre les deux.",
     faq: [
       ["Un Reel d’Edith est-il aussi bon que celui d’un pro ?", "Il est monté comme un créateur le ferait : la meilleure image en premier, des coupes sur la musique, ta charte, des mots qui ne sentent pas la pub. Ce qu’un pro apporte en plus, c’est le tournage : la qualité de ce que tu filmes compte autant que le montage."],
-      ["Edith répond-il aux commentaires et aux messages ?", "Non. Il crée et publie tes Reels, carrousels et légendes ; les échanges avec tes clients restent à toi."],
+      ["Edith répond-il aux commentaires et aux messages ?", "Non. Il crée tes Reels, carrousels et légendes ; les échanges avec tes clients restent à toi."],
       ["Combien coûte un community manager freelance ?", "Ça dépend beaucoup du volume, de la ville et de ce qui est compris (tournage, réponses, publicité). Demande plusieurs devis : les écarts sont grands."],
     ],
   },
@@ -83,7 +83,7 @@ export const COMPARISONS: Comparison[] = [
       ["Modèles", "Des milliers, partagés par des milliers de comptes", "Aucun : chaque Reel part de tes images"],
       ["Musique", "Leur bibliothèque", "Composée pour chaque Reel, calée sur ses coupes"],
       ["Légende et hashtags", "À écrire toi-même", "Écrits dans ton ton, cinq hashtags au plus"],
-      ["Publication", "Tu exportes, puis tu publies", "Publié sur Instagram et TikTok quand tu dis oui"],
+      ["Publication", "Tu exportes, puis tu publies", "Prêt à poster : un toucher, et il s’ouvre dans Instagram avec sa légende"],
       ["Prix", "Gratuits ou avec un abonnement", Price],
     ],
     otherChoice: "Choisis Canva ou CapCut si…",
@@ -111,7 +111,7 @@ export const COMPARISONS: Comparison[] = [
     h1: "Edith ou une agence ?",
     accent: "Pas le même métier.",
     intro:
-      "Une agence pense une marque, organise des shootings, lance des campagnes et de la publicité. Edith fait une chose, au quotidien : transformer ce que tu filmes en Reels et en posts soignés, publiés quand tu dis oui.",
+      "Une agence pense une marque, organise des shootings, lance des campagnes et de la publicité. Edith fait une chose, au quotidien : transformer ce que tu filmes en Reels et en posts soignés, prêts à poster d’un toucher.",
     other: "Agence",
     rows: [
       ["Pour quoi faire", "Identité, campagnes, shootings, publicité", "Tes Reels, carrousels et légendes, au quotidien"],
@@ -131,7 +131,7 @@ export const COMPARISONS: Comparison[] = [
     ],
     together: "Une agence pour poser ta marque, Edith pour la faire vivre chaque semaine : il suit la charte que l’agence a créée.",
     faq: [
-      ["Edith fait-il de la publicité payante ?", "Non. Il crée et publie tes publications ; la publicité sponsorisée n’en fait pas partie."],
+      ["Edith fait-il de la publicité payante ?", "Non. Il crée tes publications ; la publicité sponsorisée n’en fait pas partie."],
       ["Il peut suivre la charte de mon agence ?", "Oui : tes couleurs, tes polices (même les tiennes, que tu peux ajouter) et ta direction artistique sont appliquées à chaque Reel."],
     ],
   },

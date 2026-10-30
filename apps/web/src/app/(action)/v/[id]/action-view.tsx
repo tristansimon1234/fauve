@@ -639,7 +639,7 @@ function GridPreview({
           </li>
         ))}
       </ul>
-      {tiles.length === 0 && <p className="text-center text-[13px] text-white/60">Connecte Instagram pour voir tes dernières publications autour.</p>}
+      {tiles.length === 0 && <p className="text-center text-[13px] text-white/60">Elle arrivera en haut de ta grille.</p>}
     </section>
   );
 }

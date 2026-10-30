@@ -7,6 +7,7 @@ import { cache } from "react";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
+import { socialConnect } from "@/lib/social/connect";
 
 // Data access for the signed-in web app. Every read goes through the user's own
 // Supabase client, so RLS (is_studio_member) scopes it to their studio; queries
@@ -128,6 +129,8 @@ export const socialAccountSchema = z.object({
 export type SocialAccount = z.infer<typeof socialAccountSchema>;
 
 export async function getSocialAccounts(db: Db, studioId: string): Promise<SocialAccount[]> {
+  // Connecting accounts is put aside (lib/social/connect.ts): none shows, even one connected before.
+  if (!socialConnect()) return [];
   return rows(
     socialAccountSchema,
     await db.from("social_accounts").select("platform, handle, status, provider").eq("studio_id", studioId).order("platform"),

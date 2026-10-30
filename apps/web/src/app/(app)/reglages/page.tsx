@@ -18,6 +18,8 @@ import { MemoryList } from "./memory-list";
 import { SettingsPanels } from "./settings-panels";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import { SettingsTabs } from "@/components/settings-tabs";
+import { HandlesForm } from "@/components/handles-form";
+import { socialConnect } from "@/lib/social/connect";
 
 export const metadata: Metadata = { title: "Réglages" };
 
@@ -68,7 +70,7 @@ async function Settings() {
     getContentPlan(db, studio.id),
     creditBalance(studio.id),
     db.from("credit_ledger").select("id, delta, label, created_at").eq("studio_id", studio.id).order("created_at", { ascending: false }).limit(10),
-    db.from("studios").select("montage_effort, business_type, memory, subscription_status, trial_ends_at, period_ends_at, team").eq("id", studio.id).maybeSingle(),
+    db.from("studios").select("montage_effort, business_type, memory, subscription_status, trial_ends_at, period_ends_at, team, instagram_handle, tiktok_handle").eq("id", studio.id).maybeSingle(),
   ]);
   const tiktokOn = tiktokEnabled();
   const billing = billingEnabled();
@@ -117,7 +119,15 @@ async function Settings() {
               </Section>
             </>
           ),
-          reseaux: (
+          reseaux: !socialConnect() ? (
+            // Connecting not offered (lib/social/connect.ts): her @, her public numbers read from it.
+            <Section title="Tes comptes">
+              <p className="text-sm leading-normal text-muted">
+                Edith suit tes abonnés, tes vues et tes j’aime depuis ton @. Tu postes toi-même depuis ton téléphone : « Partager » ouvre Instagram avec ta publication prête.
+              </p>
+              <HandlesForm instagram={(care.data?.instagram_handle as string | null) ?? null} tiktok={(care.data?.tiktok_handle as string | null) ?? null} />
+            </Section>
+          ) : (
             <>
               <Section title="Comptes connectés">
                 {(["instagram", "tiktok"] as const).map((platform) => {

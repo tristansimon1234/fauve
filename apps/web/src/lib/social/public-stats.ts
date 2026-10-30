@@ -4,6 +4,7 @@ import { billingEnabled } from "@/lib/billing/stripe";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { tregCall } from "@/lib/treg";
+import { socialConnect } from "./connect";
 
 // Her public numbers without connecting her accounts (Tristan: « nombre d'abonnés / vue / j'aime
 // c'est suffisant »): from her @ (studios.instagram_handle, tiktok_handle), once a day, through
@@ -158,7 +159,7 @@ export async function capturePublicStats(): Promise<number> {
   for (const studio of studios) {
     // Its turn comes back tomorrow, whatever this read gives (a failed read is not retried every 5 min).
     await db.from("studios").update({ public_stats_at: new Date().toISOString() }).eq("id", studio.id);
-    const linked = new Set((connected ?? []).filter((c) => c.studio_id === studio.id).map((c) => c.platform as string));
+    const linked = new Set(socialConnect() ? (connected ?? []).filter((c) => c.studio_id === studio.id).map((c) => c.platform as string) : []);
     for (const platform of ["instagram", "tiktok"] as const) {
       const handle = studio[`${platform}_handle`] as string | null;
       if (!handle || linked.has(platform)) continue;
@@ -193,7 +194,7 @@ export async function publicAccounts(studioId: string): Promise<PublicAccount[] 
     db.from("social_accounts").select("platform").eq("studio_id", studioId).eq("status", "connected"),
   ]);
   if (!studio || !publicStatsFor(studio)) return null;
-  const linked = new Set((connected ?? []).map((c) => c.platform as string));
+  const linked = new Set(socialConnect() ? (connected ?? []).map((c) => c.platform as string) : []);
   const wanted = (["instagram", "tiktok"] as const).flatMap((platform) => {
     const handle = studio[`${platform}_handle`] as string | null;
     return handle && !linked.has(platform) ? [{ platform, handle }] : [];

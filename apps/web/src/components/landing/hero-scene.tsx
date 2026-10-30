@@ -7,7 +7,8 @@ import { Mascot, type MascotMood } from "@/components/mascot";
 // The landing's hero, what Edith is in one look (Tristan: « on doit mettre en avant assistant IA
 // sur WhatsApp et via une app web »): WhatsApp on her phone, and the app beside it, in sync. She
 // sends her videos and asks for a Reel; Edith answers, the app shows it being made, then ready;
-// she says yes, it goes online and her profile visits come in. Then Edith suggests a post on
+// one touch on « Partager » opens Instagram with it, she posts it and her profile visits come in
+// (Edith publishes nothing himself: Tristan, « l'interface doit refléter la réalité »). Then Edith suggests a post on
 // his own (a carousel of advice, never a promotion), and it goes on, the conversation scrolling
 // like a real one: the screen is never empty and never resets. The Reel and the grid come from the
 // landing's demo studio (public/landing). Still on its last picture when the device asks for less motion.
@@ -83,7 +84,7 @@ function typed(text: string, from: number, id: string, at: string): { steps: Ste
   return { steps, end };
 }
 
-/** She sends her videos and asks for a Reel; Edith makes it, she says yes, it is online. */
+/** She sends her videos and asks for a Reel; Edith makes it, she shares it to Instagram herself. */
 function reelStory(n: number): { steps: Step[]; length: number } {
   const k = `a${n}`;
   const ask = typed("Tu m’en fais un Reel pour vendredi ?", 1900, `${k}q`, "9:42");
@@ -103,18 +104,18 @@ function reelStory(n: number): { steps: Step[]; length: number } {
         all(
           set({ writing: false, mood: "happy" }),
           patchTile(`${k}t`, { state: "ready", step: 3 }),
-          add({ id: `${k}v`, kind: "ask", at: "9:58", video: REEL, text: "Ton Reel est prêt. Je le publie maintenant ?", options: ["Oui, publie-le", "Je regarde d’abord"] }),
+          add({ id: `${k}v`, kind: "ask", at: "9:58", video: REEL, text: "Ton Reel est prêt, légende comprise. Touche « Partager » sur sa page : il s’ouvre dans Instagram.", options: ["Voir mon Reel", "Plus tard"] }),
         ),
       ],
       [ask.end + 6900, set({ tap: `${k}v` })],
-      [ask.end + 7250, all(set({ tap: null }), patchMsg(`${k}v`, { picked: true }), add({ id: `${k}y`, kind: "text", me: true, text: "Oui, publie-le", at: "10:01" }))],
+      [ask.end + 7250, all(set({ tap: null }), patchMsg(`${k}v`, { picked: true }), add({ id: `${k}y`, kind: "text", me: true, text: "Posté ! Avec un son tendance en plus", at: "10:04" }))],
       [ask.end + 7900, set({ writing: true, mood: "thinking" })],
       [
         ask.end + 8600,
         all(
           set({ writing: false, mood: "laugh", card: true, visits: 41 }),
           patchTile(`${k}t`, { state: "live" }),
-          add({ id: `${k}o`, kind: "text", text: "C’est en ligne sur Instagram et TikTok.", at: "10:01" }),
+          add({ id: `${k}o`, kind: "text", text: "Bien vu pour le son. Je suis ses chiffres et je te dis dimanche ce qu’il a donné.", at: "10:04" }),
         ),
       ],
       [ask.end + 11000, set({ mood: "idle" })],
@@ -122,7 +123,7 @@ function reelStory(n: number): { steps: Step[]; length: number } {
   };
 }
 
-/** Edith suggests a carousel on his own (advice people save, not an offer); she says yes twice, it is online. */
+/** Edith suggests a carousel on his own (advice people save, not an offer); she says yes, then posts it herself. */
 function postStory(n: number): { steps: Step[]; length: number } {
   const k = `b${n}`;
   return {
@@ -147,18 +148,18 @@ function postStory(n: number): { steps: Step[]; length: number } {
         all(
           set({ writing: false, mood: "happy" }),
           patchTile(`${k}t`, { state: "ready", step: 3 }),
-          add({ id: `${k}p`, kind: "ask", at: "18:05", image: POST, text: "Le voilà, à tes couleurs. Je le publie ?", options: ["Oui, publie-le", "Je regarde d’abord"] }),
+          add({ id: `${k}p`, kind: "ask", at: "18:05", image: POST, text: "Le voilà, à tes couleurs. Ses images et sa légende sont prêtes à partager.", options: ["Voir mon carrousel", "Plus tard"] }),
         ),
       ],
       [9300, set({ tap: `${k}p` })],
-      [9650, all(set({ tap: null }), patchMsg(`${k}p`, { picked: true }), add({ id: `${k}z`, kind: "text", me: true, text: "Oui, publie-le", at: "18:06" }))],
+      [9650, all(set({ tap: null }), patchMsg(`${k}p`, { picked: true }), add({ id: `${k}z`, kind: "text", me: true, text: "C’est posté", at: "18:09" }))],
       [10200, set({ writing: true, mood: "thinking" })],
       [
         10900,
         all(
           set({ writing: false, mood: "happy", visits: 58 }),
           patchTile(`${k}t`, { state: "live" }),
-          add({ id: `${k}o`, kind: "text", text: "En ligne. Je te dis dimanche ce qu’il a donné.", at: "18:06" }),
+          add({ id: `${k}o`, kind: "text", text: "Top. Je te dis dimanche ce qu’il a donné.", at: "18:09" }),
         ),
       ],
       [12800, set({ mood: "idle" })],

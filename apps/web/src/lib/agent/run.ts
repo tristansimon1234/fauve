@@ -28,6 +28,7 @@ import {
 } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { providerDown } from "@/lib/provider-budgets";
+import { socialConnect } from "@/lib/social/connect";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createToolHandlers, type ToolContext } from "./tools";
 import { costMeta } from "@/lib/cost-scope";
@@ -183,6 +184,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           instagram: input.studio.instagram,
           tiktok: input.studio.tiktok,
           publicHandles: input.studio.publicHandles,
+          connect: socialConnect(),
           channel: input.studio.channel,
           montageEffort: input.studio.montageEffort,
           known: input.studio.known,

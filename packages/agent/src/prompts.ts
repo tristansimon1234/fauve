@@ -115,6 +115,8 @@ export type StudioContextForPrompt = {
   tiktok?: TikTokContext;
   /** Her @ for the accounts she has not connected: her public numbers are read from it (public-stats.ts). */
   publicHandles?: { instagram: string | null; tiktok: string | null; paid: boolean };
+  /** Connecting Instagram and TikTok offered (false: she posts herself, her @ gives her numbers). */
+  connect?: boolean;
   /** Where the manager is writing from: the advice on sending files depends on it. */
   channel?: "whatsapp" | "web";
   /** The studio's default level of care for montages (Réglages). */
@@ -159,11 +161,12 @@ const channelLines: Record<NonNullable<StudioContextForPrompt["channel"]>, strin
 
 /** Volatile context, sent after the cached system prompt. */
 /** Instagram not connected: what her @ already gives, or the one question that gets it (paid plans only). */
-function instagramPublicLine(handle: string | null, paid: boolean): string {
-  if (!paid) return "pas encore connecté (l'analyse de son profil depuis son @ et le suivi de ses abonnés viennent avec l'abonnement)";
+function instagramPublicLine(handle: string | null, paid: boolean, connect = true): string {
+  const state = connect ? "pas connecté" : "pas relié (et la connexion n'est pas proposée)";
+  if (!paid) return `${handle ? `@${handle}, ` : ""}${state} (l'analyse de son profil depuis son @ et le suivi de ses abonnés viennent avec l'abonnement)`;
   return handle
-    ? `@${handle}, pas connecté : tu suis ses abonnés et les vues, j'aime et commentaires de ses Reels sur son compte public, une fois par jour (page Résultats), et analyze_performance lit son profil public ; le connecter ajoute les visites du profil et les clics sur son lien`
-    : "pas encore connecté, et son @ n'est pas connu : demande-lui une fois, en une phrase (« Envoie-moi ton profil Insta, et TikTok si tu y es, que j'analyse ce qui marche chez toi »), au moment où elle parle de ses résultats ou une fois son premier Reel prêt ; enregistre-le avec update_onboarding instagram_handle / tiktok_handle (son lien ou son @)";
+    ? `@${handle}, ${state} : tu suis ses abonnés et les vues, j'aime et commentaires de ses Reels sur son compte public, une fois par jour (page Résultats), et analyze_performance lit son profil public${connect ? " ; le connecter ajoute les visites du profil et les clics sur son lien" : " ; les visites du profil et les clics sur son lien ne se voient pas d'ici"}`
+    : `${state}, et son @ n'est pas connu : demande-lui une fois, en une phrase (« Envoie-moi ton profil Insta, et TikTok si tu y es, que j'analyse ce qui marche chez toi »), au moment où elle parle de ses résultats ou une fois son premier Reel prêt ; enregistre-le avec update_onboarding instagram_handle / tiktok_handle (son lien ou son @)`;
 }
 
 export function studioContextPrompt(ctx: StudioContextForPrompt): string {
@@ -190,7 +193,12 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     ...(ctx.routine?.length ? [`Sa présence sur les réseaux :\n${ctx.routine.map((r) => `- ${r}`).join("\n")}`] : []),
     `Prénom de la personne qui gère : ${ctx.firstName ?? "pas encore connu"}.`,
     `Étape d'onboarding : ${ctx.onboardingStep}.`,
-    `Instagram : ${ctx.instagram ? `@${ctx.instagram} connecté` : instagramPublicLine(ctx.publicHandles?.instagram ?? null, ctx.publicHandles?.paid ?? false)}.`,
+    `Instagram : ${ctx.instagram ? `@${ctx.instagram} connecté` : instagramPublicLine(ctx.publicHandles?.instagram ?? null, ctx.publicHandles?.paid ?? false, ctx.connect !== false)}.`,
+    ...(ctx.connect === false
+      ? [
+          "Connexion des comptes : pas proposée en ce moment, ni Instagram ni TikTok (ce que tes consignes disent de get_connect_link, de relier un compte, de « Je le publie ? » et de schedule_post ne vaut pas) : elle poste elle-même, d'un toucher : sur la page de la publication (get_post_link), « Partager » sur son téléphone ouvre Instagram ou TikTok avec sa publication prête et sa légende copiée, et elle peut y ajouter un son tendance. Ne lui propose jamais de relier un compte. Son @ suffit pour ses chiffres (update_onboarding instagram_handle / tiktok_handle). À l'étape connect : demande son @, enregistre-le, puis passe l'onboarding à done.",
+        ]
+      : []),
     ...(ctx.tiktok ? [tiktokLine(ctx.tiktok)] : []),
     ...(ctx.publicHandles?.tiktok && ctx.publicHandles.paid && ctx.tiktok?.state !== "connected"
       ? [`Son @ TikTok : @${ctx.publicHandles.tiktok} (pas connecté) : tu suis ses abonnés, ses j'aime et les vues de ses vidéos sur son compte public, une fois par jour.`]
