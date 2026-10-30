@@ -123,7 +123,7 @@ async function Settings() {
             // Connecting not offered (lib/social/connect.ts): her @, her public numbers read from it.
             <Section title="Tes comptes">
               <p className="text-sm leading-normal text-muted">
-                Edith suit tes abonnés, tes vues et tes j’aime depuis ton @. Tu postes toi-même depuis ton téléphone : « Partager » ouvre Instagram avec ta publication prête.
+                Edith suit tes abonnés, tes vues et tes j’aime depuis ton @. Tu postes toi-même depuis ton téléphone : « Partager » ouvre Instagram avec ta publication prête.
               </p>
               <HandlesForm instagram={(care.data?.instagram_handle as string | null) ?? null} tiktok={(care.data?.tiktok_handle as string | null) ?? null} />
             </Section>

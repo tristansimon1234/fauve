@@ -7,7 +7,7 @@ import { Mascot, type MascotMood } from "@/components/mascot";
 // The landing's hero, what Edith is in one look (Tristan: « on doit mettre en avant assistant IA
 // sur WhatsApp et via une app web »): WhatsApp on her phone, and the app beside it, in sync. She
 // sends her videos and asks for a Reel; Edith answers, the app shows it being made, then ready;
-// one touch on « Partager » opens Instagram with it, she posts it and her profile visits come in
+// one touch on « Partager » opens Instagram with it, she posts it and her profile visits come in
 // (Edith publishes nothing himself: Tristan, « l'interface doit refléter la réalité »). Then Edith suggests a post on
 // his own (a carousel of advice, never a promotion), and it goes on, the conversation scrolling
 // like a real one: the screen is never empty and never resets. The Reel and the grid come from the
@@ -104,7 +104,7 @@ function reelStory(n: number): { steps: Step[]; length: number } {
         all(
           set({ writing: false, mood: "happy" }),
           patchTile(`${k}t`, { state: "ready", step: 3 }),
-          add({ id: `${k}v`, kind: "ask", at: "9:58", video: REEL, text: "Ton Reel est prêt, légende comprise. Touche « Partager » sur sa page : il s’ouvre dans Instagram.", options: ["Voir mon Reel", "Plus tard"] }),
+          add({ id: `${k}v`, kind: "ask", at: "9:58", video: REEL, text: "Ton Reel est prêt, légende comprise. Touche « Partager » sur sa page : il s’ouvre dans Instagram.", options: ["Voir mon Reel", "Plus tard"] }),
         ),
       ],
       [ask.end + 6900, set({ tap: `${k}v` })],
