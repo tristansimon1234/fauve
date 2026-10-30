@@ -96,6 +96,7 @@ export type RunFauveInput = ToolContext & {
     firstName: string | null;
     instagram: string | null;
     tiktok?: TikTokContext;
+    publicHandles?: StudioContextForPrompt["publicHandles"];
     channel?: "whatsapp" | "web";
     /** Default level of care for montages (Réglages). */
     montageEffort?: Effort;
@@ -181,6 +182,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           onboardingStep: input.studio.onboardingStep,
           instagram: input.studio.instagram,
           tiktok: input.studio.tiktok,
+          publicHandles: input.studio.publicHandles,
           channel: input.studio.channel,
           montageEffort: input.studio.montageEffort,
           known: input.studio.known,

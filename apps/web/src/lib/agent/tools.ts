@@ -2,6 +2,7 @@ import "server-only";
 import {
   APP_GUIDES,
   cleanCaption,
+  cleanHandle,
   periodTotals,
   weeklyGrowth,
   type CarouselDesign,
@@ -280,6 +281,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (input.step) studioUpdate.onboarding_step = input.step;
       if (input.website_url) studioUpdate.website_url = input.website_url;
       if (input.booking_url) studioUpdate.booking_url = input.booking_url;
+      for (const platform of ["instagram", "tiktok"] as const) {
+        const raw = input[`${platform}_handle`];
+        if (raw === undefined) continue;
+        const handle = cleanHandle(platform, raw);
+        if (!handle) return json({ refused: `« ${raw} » n'est pas un @ ${platform === "instagram" ? "Instagram" : "TikTok"} : redemande-le-lui (son nom de compte, ou le lien de son profil).` });
+        studioUpdate[`${platform}_handle`] = handle;
+      }
       if (Object.keys(studioUpdate).length) check(await db.from("studios").update(studioUpdate).eq("id", studioId));
       if (input.first_name) check(await db.from("members").update({ first_name: input.first_name }).eq("id", ctx.memberId));
       if (input.posts_per_week !== undefined || input.stories_per_week !== undefined || input.platforms) {

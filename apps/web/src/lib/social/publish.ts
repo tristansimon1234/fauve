@@ -426,5 +426,11 @@ export async function runPublishWorker() {
     console.error("account stats failed", error);
     return 0;
   });
-  return { due: due.length, published, reminded, handPublished, tiktok, measured, refreshed, account };
+  // Her public numbers from her @, for the accounts she has not connected (Treg, once a day).
+  const { capturePublicStats } = await import("./public-stats");
+  const publicStats = await capturePublicStats().catch((error) => {
+    console.error("public stats failed", error);
+    return 0;
+  });
+  return { due: due.length, published, reminded, handPublished, tiktok, measured, refreshed, account, publicStats };
 }

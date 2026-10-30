@@ -120,7 +120,7 @@ export async function replyInConversation(params: {
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
   const [studio, member, rows, instagram, brand, jobs, tiktok, copying, models] = await Promise.all([
-    db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory, team, subscription_status").eq("id", params.studioId).single(),
+    db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory, team, subscription_status, instagram_handle, tiktok_handle").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
     db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
@@ -215,6 +215,7 @@ export async function replyInConversation(params: {
       onboardingStep: studio.data.onboarding_step,
       firstName: member.data?.first_name ?? null,
       instagram: (instagram.data?.handle as string | null | undefined) ?? null,
+      publicHandles: { instagram: (studio.data.instagram_handle as string | null) ?? null, tiktok: (studio.data.tiktok_handle as string | null) ?? null },
       tiktok: tiktokEnabled()
         ? {
             state: tiktok.data?.status === "connected" ? "connected" : tiktok.data?.status === "expired" ? "expired" : "not_connected",

@@ -4882,3 +4882,43 @@ test("trends: the most watched first, foreign scripts and weak ones left out, tw
     { hashtag: "pilatesparis", posts: 310_000, gained: null, days: null },
   ]);
 });
+
+test("public stats: her @, her numbers and her Reels found by their caption", async () => {
+  const { cleanHandle, readPublicProfile, readPublicVideos, matchPublicVideos } = await import("./public-stats.ts");
+  assert.equal(cleanHandle("instagram", "@Lune.Pilates"), "lune.pilates");
+  assert.equal(cleanHandle("instagram", "https://www.instagram.com/lune.pilates/?hl=fr"), "lune.pilates");
+  assert.equal(cleanHandle("instagram", "https://instagram.com/reel/DdRyQxKteC1"), null);
+  assert.equal(cleanHandle("tiktok", "https://www.tiktok.com/@chez.lino?lang=fr"), "chez.lino");
+  assert.equal(cleanHandle("tiktok", "Chez Lino"), null);
+
+  assert.deepEqual(readPublicProfile({ output: { found: true, data: { followers: 1240, likes: 9800, private: false } } }), { followers: 1240, likes: 9800, private: false });
+  assert.equal(readPublicProfile({ output: { found: false } }), null);
+
+  const reels = readPublicVideos(
+    "instagram",
+    {
+      output: {
+        data: {
+          reels: [
+            { id: "1", shortcode: "AAA", caption: "Nouvelle coupe d'automne ✂️ réserve ton créneau cette semaine", createdUtc: 1_800_000_000, views: 5200, likes: 140, comments: 9, username: "lune" },
+            { id: "2", shortcode: "BBB", caption: "collab", createdUtc: 1_800_000_500, views: 90, likes: 3, comments: 0, username: "someone.else" },
+          ],
+        },
+      },
+    },
+    "lune",
+  );
+  assert.equal(reels.length, 1);
+  assert.equal(reels[0]!.url, "https://www.instagram.com/reel/AAA/");
+  assert.equal(reels[0]!.at, 1_800_000_000_000);
+
+  const created = 1_800_000_000_000 - 3600_000;
+  const posts = [
+    { id: "p1", caption: "Nouvelle coupe d'automne, réserve ton créneau cette semaine #coiffure", createdAt: created },
+    { id: "p2", caption: "Une tout autre légende sur le brunch du dimanche", createdAt: created },
+  ];
+  assert.deepEqual(matchPublicVideos(posts, reels, new Set()).map((m) => [m.postId, m.video.id]), [["p1", "1"]]);
+  assert.deepEqual(matchPublicVideos(posts, reels, new Set(["1"])), []);
+  // Posted before the post was made: not it.
+  assert.deepEqual(matchPublicVideos([{ ...posts[0]!, createdAt: 1_800_000_000_000 + 3 * 3600_000 }], reels, new Set()), []);
+});
