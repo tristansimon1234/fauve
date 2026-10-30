@@ -1,5 +1,6 @@
 import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { CREDIT_PACK, CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTAGE_CEILING, MONTAGE_FLOOR, PLANS, planOf, memoryLines, reelsPerMonth, nextPlan, PLAN_ORDER } from "@fauve/agent";
 import { priceTax } from "@/lib/legal";
@@ -14,6 +15,8 @@ import { EffortSetting } from "./effort-setting";
 import { SubscriptionButton } from "./subscription";
 import { PackButton } from "@/components/pack-button";
 import { billingEnabled } from "@/lib/billing/stripe";
+import { studioInvoices } from "@/lib/billing/invoices";
+import { InvoiceList } from "@/components/invoice-list";
 import { DeleteAccount } from "./delete-account";
 import { MemoryList } from "./memory-list";
 import { SettingsPanels } from "./settings-panels";
@@ -206,6 +209,14 @@ async function Settings() {
                 {billing && subscription === "active" ? <PackButton next="/reglages" primary={balance <= 0 && !nextPlan(offer)} className="self-start" /> : null}
               </Section>
 
+              {billing ? (
+                <Section title="Mes factures" id="factures">
+                  <Suspense fallback={<p className="text-sm text-muted">Je regarde tes factures…</p>}>
+                    <Invoices studioId={studio.id} timeZone={studio.timezone} />
+                  </Suspense>
+                </Section>
+              ) : null}
+
               <Section title="Crédits" id="credits">
                 <p className="flex items-baseline gap-2">
                   <span className="text-[34px] font-extrabold tracking-[-0.02em] tabular-nums">{balance}</span>
@@ -270,6 +281,11 @@ async function Settings() {
       </a>
     </div>
   );
+}
+
+/** Her invoices, read from Stripe apart from the rest of the page. */
+async function Invoices({ studioId, timeZone }: { studioId: string; timeZone: string }) {
+  return <InvoiceList rows={await studioInvoices(studioId)} timeZone={timeZone} />;
 }
 
 function SignOut() {

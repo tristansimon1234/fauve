@@ -12,5 +12,5 @@ export const publicEnv = {
 
 export function whatsappLink(text = "Bonjour Edith !"): string {
   const number = publicEnv.fauveWhatsAppNumber.replace(/\D/g, "");
-  return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
+  return text ? `https://wa.me/${number}?text=${encodeURIComponent(text)}` : `https://wa.me/${number}`;
 }

@@ -1,5 +1,5 @@
 import "server-only";
-import { CREDIT_PACK, PLANS, type PlanId } from "@fauve/agent";
+import { CREDIT_PACK, invoiceRows, PLAN_ORDER, PLANS, type InvoiceRow, type PlanId, type StripeInvoice } from "@fauve/agent";
 import { env } from "@/lib/env";
 import { VAT_EXEMPTION } from "@/lib/legal";
 
@@ -244,4 +244,12 @@ export async function cancelSubscription(id: string): Promise<void> {
 export async function portalSession(customer: string, returnUrl: string): Promise<string> {
   const session = await stripe<{ url: string }>("POST", "/billing_portal/sessions", { customer, return_url: returnUrl, locale: "fr" });
   return session.url;
+}
+
+/** Her invoices (subscription and credit packs), newest first, each with Stripe's PDF. */
+export async function customerInvoices(customer: string): Promise<InvoiceRow[]> {
+  const { data } = await stripe<{ data: StripeInvoice[] }>("GET", "/invoices", { customer, limit: 24 });
+  const offers: Record<string, string> = {};
+  for (const plan of PLAN_ORDER) offers[(await offerPrice(plan)).product] = PLANS[plan].label;
+  return invoiceRows(data, offers);
 }
