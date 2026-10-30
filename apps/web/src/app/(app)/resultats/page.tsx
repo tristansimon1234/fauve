@@ -16,6 +16,7 @@ import { RefreshReportButton } from "./refresh-button";
 import { FollowersChart, FormatTable, Ranking, WeeklyBars } from "./growth";
 import { FollowersLine } from "./followers-line";
 import { PlatformCard, VideoTable, type VideoRow } from "./public-results";
+import { VideoBars } from "./video-bars";
 
 export const metadata: Metadata = { title: "Résultats" };
 
@@ -368,7 +369,10 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
             <span className="text-[13px] font-semibold text-muted">publiés ces {period.days} derniers jours, du plus récent au plus ancien</span>
           </div>
           {periodVideos.length ? (
-            <VideoTable videos={periodVideos} followers={followers} timeZone={tz} />
+            <>
+              <VideoBars videos={periodVideos} timeZone={tz} />
+              <VideoTable videos={periodVideos} followers={followers} timeZone={tz} />
+            </>
           ) : (
             <p className="text-sm text-muted">Aucune vidéo publiée sur la période.{videos.length ? " Choisis 90 jours pour voir les plus anciennes." : " Elles apparaissent ici dès le prochain relevé de ton profil."}</p>
           )}
