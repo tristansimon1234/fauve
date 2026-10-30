@@ -16,6 +16,7 @@ import { logoOnDark } from "./logo.ts";
 import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED, verbatimScript } from "./contract.ts";
 import { montageJobSteps } from "./jobs.ts";
 import { quietPauses } from "./mix.ts";
+import { invoiceRows } from "./invoices.ts";
 
 const validPlan = {
   format: "9:16",
@@ -4927,4 +4928,26 @@ test("public stats: her @, her numbers and her Reels found by their caption", as
   assert.deepEqual(matchPublicVideos(posts, reels, new Set(["1"])), []);
   // Posted before the post was made: not it.
   assert.deepEqual(matchPublicVideos([{ ...posts[0]!, createdAt: 1_800_000_000_000 + 3 * 3600_000 }], reels, new Set()), []);
+});
+
+test("invoices: paid or to pay, newest first, an offer by its product, a pack by its line", () => {
+  const rows = invoiceRows(
+    [
+      { id: "in_1", number: "A-0001", status: "paid", created: 1_800_000_000, total: 900, invoice_pdf: "https://pdf/1", hosted_invoice_url: "https://page/1", status_transitions: { paid_at: 1_800_000_060 }, lines: { data: [{ description: "1 × Edith Découverte (at €9.00 / month)", pricing: { price_details: { product: "prod_dec" } } }] } },
+      { id: "in_2", number: "A-0002", status: "paid", created: 1_800_100_000, total: 500, invoice_pdf: "https://pdf/2", lines: { data: [{ description: "1 × Edith : 1 Reel de plus (12 crédits)" }] } },
+      { id: "in_3", number: null, status: "draft", created: 1_800_200_000, total: 1900, lines: { data: [] } },
+      { id: "in_4", number: "A-0003", status: "open", created: 1_800_300_000, total: 1900, hosted_invoice_url: "https://page/4", lines: { data: [{ price: { product: "prod_ess" } }] } },
+    ],
+    { prod_dec: "Découverte", prod_ess: "Essentiel" },
+  );
+  assert.deepEqual(
+    rows.map((r) => [r.id, r.label, r.amount, r.paid]),
+    [
+      ["in_4", "Abonnement Essentiel", 19, false],
+      ["in_2", "1 Reel de plus (12 crédits)", 5, true],
+      ["in_1", "Abonnement Découverte", 9, true],
+    ],
+  );
+  assert.equal(rows[2]!.date, new Date(1_800_000_060_000).toISOString());
+  assert.equal(rows[0]!.page, "https://page/4");
 });

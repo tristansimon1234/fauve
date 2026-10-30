@@ -379,6 +379,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const pages = {
         voix: { path: "/voix", label: "Choisir ma voix", purpose: "voice" as const, app: "Style › Voix et ton (/style#voix)" },
         abonnement: { path: "/abonnement?next=/merci", label: "Voir les offres", purpose: "billing" as const, app: "la page des offres (/abonnement)" },
+        factures: { path: "/factures", label: "Voir mes factures", purpose: "billing" as const, app: "Réglages › Abonnement et crédits, « Mes factures »" },
       };
       const target = pages[page];
       if (ctx.waId) {

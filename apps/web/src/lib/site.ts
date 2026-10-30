@@ -12,6 +12,7 @@ export const PRIVATE_PATHS = [
   "/depot",
   "/voix",
   "/merci",
+  "/factures",
   "/essai",
   "/abonnement",
   "/fauve",

@@ -33,6 +33,7 @@ export * from "./stabilize.ts";
 export * from "./nudge.ts";
 export * from "./clip-sort.ts";
 export * from "./access.ts";
+export * from "./invoices.ts";
 export * from "./reply-cap.ts";
 export * from "./brakes.ts";
 export * from "./budgets.ts";
