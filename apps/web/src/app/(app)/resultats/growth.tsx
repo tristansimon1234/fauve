@@ -82,11 +82,51 @@ export function WeeklyBars({ weeks, pick, label, timeZone }: { weeks: Week[]; pi
   );
 }
 
-export type FormatRow = { kind: string; posts: number; views: number | null; reach: number | null; saves: number | null; shares: number | null; profileVisits: number | null; interest: number | null };
+export type FormatRow = {
+  kind: string;
+  posts: number;
+  views: number | null;
+  reach: number | null;
+  likes: number | null;
+  comments: number | null;
+  saves: number | null;
+  shares: number | null;
+  profileVisits: number | null;
+  interest: number | null;
+};
 
-export function FormatTable({ rows, labels }: { rows: FormatRow[]; labels: Record<string, string> }) {
+/** `publicOnly`: her numbers read from her @ (views, likes, comments), no connected account. */
+export function FormatTable({ rows, labels, publicOnly = false }: { rows: FormatRow[]; labels: Record<string, string>; publicOnly?: boolean }) {
   const percent = (v: number | null) => (v === null ? "—" : `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(v * 100)} %`);
   const show = (v: number | null) => (v === null ? "—" : formatNumber(v));
+  if (publicOnly) {
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[360px] text-left text-[13px]">
+          <thead className="text-[11px] font-extrabold tracking-[.05em] text-muted uppercase">
+            <tr>
+              <th className="py-2 pr-3 font-extrabold">Format</th>
+              <th className="py-2 pr-3 text-right font-extrabold">Vues</th>
+              <th className="py-2 pr-3 text-right font-extrabold">J’aime</th>
+              <th className="py-2 text-right font-extrabold">Commentaires</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.kind} className="border-t border-line">
+                <td className="py-2.5 pr-3 font-bold">
+                  {labels[r.kind] ?? r.kind} <span className="font-semibold text-muted">· {r.posts}</span>
+                </td>
+                <td className="py-2.5 pr-3 text-right font-bold tabular-nums">{show(r.views)}</td>
+                <td className="py-2.5 pr-3 text-right tabular-nums">{show(r.likes)}</td>
+                <td className="py-2.5 text-right tabular-nums">{show(r.comments)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[480px] text-left text-[13px]">

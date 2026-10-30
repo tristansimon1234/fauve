@@ -7,7 +7,10 @@ import { EmptyState, NoStudio } from "@/components/empty-state";
 import { CheckIcon } from "@/components/icons";
 import { Orb } from "@/components/orb";
 import { daysBefore } from "@/lib/dates";
-import { formatNumber, formatShortDate, kindLabels } from "@/lib/format";
+import { formatNumber, formatShortDate, kindLabels, plural } from "@/lib/format";
+import { HandlesForm } from "@/components/handles-form";
+import { publicStatsFor } from "@/lib/social/public-stats";
+import { instagramAccount } from "@/lib/social/publish";
 import { getStudioContext, rows } from "@/lib/studio";
 import { RefreshReportButton } from "./refresh-button";
 import { FollowersChart, FormatTable, Ranking, WeeklyBars } from "./growth";
@@ -98,7 +101,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   const period = periods.find((p) => p.key === periode) ?? periods[1];
   const since = daysBefore(new Date(), period.days).toISOString();
 
-  const [metricsResult, bookingsResult, reportResult, dailyResult, audienceResult] = await Promise.all([
+  const [metricsResult, bookingsResult, reportResult, dailyResult, audienceResult, account, studioResult] = await Promise.all([
     db
       .from("metrics")
       .select("post_id, platform, captured_at, views, reach, likes, saves, shares, comments, profile_visits")
@@ -124,7 +127,18 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
       .gte("day", daysBefore(new Date(), WEEKS * 7 + 7).toISOString().slice(0, 10))
       .order("day"),
     db.from("account_audience").select("data").eq("studio_id", studioId).eq("platform", "instagram").order("captured_on", { ascending: false }).limit(1).maybeSingle(),
+    instagramAccount(studioId).catch(() => null),
+    db.from("studios").select("instagram_handle, tiktok_handle, subscription_status, team").eq("id", studioId).maybeSingle(),
   ]);
+  // Without a connected account (connect.ts, put aside), her numbers come from her @ only: followers
+  // each day, and the views, likes and comments of her publications (public-stats.ts). Link taps,
+  // profile visits and her audience need a connection, and no booking is recorded yet: the page
+  // shows what is really measured (Tristan: « je vois encore clic sur le lien »).
+  const connected = Boolean(account);
+  const studioRow = studioResult.data;
+  const handles = { instagram: (studioRow?.instagram_handle as string | null) ?? null, tiktok: (studioRow?.tiktok_handle as string | null) ?? null };
+  const followed = Boolean(handles.instagram || handles.tiktok);
+  const readable = studioRow ? publicStatsFor(studioRow) : false;
   if (bookingsResult.error) throw new Error(`bookings_attribution: ${bookingsResult.error.message}`);
   const report = rows(reportSchema, reportResult, "weekly_reports")[0] ?? null;
 
@@ -156,7 +170,12 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="flex flex-col gap-1.5">
         <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Résultats</h1>
-        <p className="text-[15px] text-muted">Instagram et TikTok · {period.days} derniers jours</p>
+        <p className="text-[15px] text-muted">
+          {connected
+            ? "Instagram et TikTok"
+            : [handles.instagram && `@${handles.instagram} sur Instagram`, handles.tiktok && `@${handles.tiktok} sur TikTok`].filter(Boolean).join(" · ") || "Instagram et TikTok"}{" "}
+          · {period.days} derniers jours
+        </p>
       </div>
       <nav aria-label="Période" className="flex gap-1.5 rounded-full bg-soft p-1">
         {periods.map((p) => (
@@ -175,16 +194,42 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
     </div>
   );
 
+  // No @ yet: the one thing to do, first.
+  const handlesCard =
+    !connected && !followed ? (
+      <section className="flex max-w-[640px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
+        <h2 className="text-base font-bold">Ton @, et Edith suit tes chiffres</h2>
+        <p className="text-sm leading-relaxed text-muted">
+          Sans rien connecter : chaque jour, tes abonnés, et les vues, j’aime et commentaires de tes publications, lus sur ton profil public.
+          {readable ? "" : " C’est compris dans ton abonnement."}
+        </p>
+        <HandlesForm instagram={null} tiktok={null} />
+      </section>
+    ) : null;
+
   if (!snapshots.length && !bookings && !report && !daily.length) {
     return (
       <>
         {header}
-        <EmptyState title="Tes résultats arrivent après tes premières publications" className="max-w-[760px]">
-          Dès que tes posts seront en ligne sur Instagram ou TikTok, tu verras ici ce qu’ils ont donné : les réservations
-          venues des réseaux d’abord, puis les clics sur ton lien, les visites de ton profil et le bilan d’Edith. Tu peux déjà demander à
-          Edith d’analyser tes posts Instagram existants.
-        </EmptyState>
-        <RefreshReportButton label="Analyser mes posts Instagram" />
+        {handlesCard}
+        {connected ? (
+          <>
+            <EmptyState title="Tes résultats arrivent après tes premières publications" className="max-w-[760px]">
+              Dès que tes posts seront en ligne sur Instagram ou TikTok, tu verras ici ce qu’ils ont donné : les réservations venues des réseaux d’abord, puis les clics sur
+              ton lien, les visites de ton profil et le bilan d’Edith. Tu peux déjà demander à Edith d’analyser tes posts Instagram existants.
+            </EmptyState>
+            <RefreshReportButton label="Analyser mes posts Instagram" />
+          </>
+        ) : followed ? (
+          <>
+            <EmptyState title="Tes premiers chiffres arrivent" className="max-w-[760px]">
+              {readable
+                ? "Edith lit ton profil dans les minutes qui suivent, puis chaque jour : tes abonnés, et les vues, j’aime et commentaires de tes publications. Tu peux déjà lui demander d’analyser tes derniers posts."
+                : "Edith lira ton profil chaque jour dès ton abonnement : tes abonnés, et les vues, j’aime et commentaires de tes publications."}
+            </EmptyState>
+            {readable && <RefreshReportButton label="Analyser mes derniers posts" />}
+          </>
+        ) : null}
       </>
     );
   }
@@ -194,9 +239,15 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   for (const m of snapshots) byPost.set(m.post_id, [...(byPost.get(m.post_id) ?? []), m]);
   // Ranked by what brings clients (profile visits, saves, shares), not by views.
   const interest = (t: Totals) => (t.profile_visits ?? 0) + (t.saves ?? 0) + (t.shares ?? 0);
+  // From her @ only (no visits, saves or shares): likes and comments, then views.
+  const liked = (t: Totals) => (t.likes ?? 0) + (t.comments ?? 0);
   const ranked = [...byPost.entries()]
     .map(([postId, list]) => ({ postId, totals: sum(list) }))
-    .sort((a, b) => interest(b.totals) - interest(a.totals) || (b.totals.views ?? b.totals.reach ?? 0) - (a.totals.views ?? a.totals.reach ?? 0))
+    .sort((a, b) =>
+      connected
+        ? interest(b.totals) - interest(a.totals) || (b.totals.views ?? b.totals.reach ?? 0) - (a.totals.views ?? a.totals.reach ?? 0)
+        : liked(b.totals) - liked(a.totals) || (b.totals.views ?? 0) - (a.totals.views ?? 0),
+    )
     .slice(0, 3);
 
   const titles = new Map<string, { title: string; kind: z.infer<typeof postKindSchema>; published_at: string | null }>();
@@ -218,7 +269,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
     const m = list.find((x) => x.platform === "instagram") ?? list[0]!;
     return post ? [{ kind: post.kind, publishedAt: post.published_at, views: m.views, reach: m.reach, likes: m.likes, comments: m.comments, saves: m.saves, shares: m.shares, profileVisits: m.profile_visits }] : [];
   });
-  const formats = byFormat(postStats);
+  const formats = connected ? byFormat(postStats) : byFormat(postStats).sort((a, b) => (b.views ?? -1) - (a.views ?? -1));
   const moments = bestMoments(postStats, tz);
   const moment = suggestedMoment(moments);
   const momentUnit = moments.by === "visits" ? "visites" : "vues";
@@ -242,15 +293,31 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           : "Instagram, relevé chaque jour",
     ],
   ];
-  // The first KPI (bookings from social media) is the product's headline number.
+  // From her @: followers, and her publications' views, likes and comments.
+  const tiktokShown = Boolean(handles.tiktok || ttDaily.length);
+  const publicKpis: [string, string, string][] = [
+    [
+      "Abonnés Instagram",
+      show(ig.followers),
+      ig.net !== null ? `${signed(ig.net)} sur la période` : handles.instagram ? "relevés chaque jour sur ton profil" : "donne ton @ Instagram",
+    ],
+    ...(tiktokShown
+      ? [["Abonnés TikTok", show(tt?.followers ?? null), tt && tt.net !== null ? `${signed(tt.net)} sur la période` : "relevés chaque jour sur ton profil"] as [string, string, string]]
+      : []),
+    ["Vues de tes publications", show(totals.views), byPost.size ? `sur ${plural(byPost.size, "publication mesurée", "publications mesurées")}` : "dès ta première publication en ligne"],
+    ["J’aime", show(totals.likes), totals.comments !== null ? `et ${plural(totals.comments, "commentaire", "commentaires")}` : "et les commentaires"],
+  ];
+  const shownKpis = connected ? kpis : publicKpis;
+  // The first KPI (bookings from social media, or her followers) is the page's headline number.
   const kpiStyles = ["bg-violet text-white", "bg-peach text-ink", "bg-soft text-ink", "bg-soft text-ink"];
   const hasWeeks = weeks.some((w) => w.days > 0);
 
   return (
     <>
       {header}
+      {handlesCard}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
-        {kpis.map(([label, value, detail], i) => (
+        {shownKpis.map(([label, value, detail], i) => (
           <div key={label} className={`flex flex-col gap-2 rounded-[20px] p-5 ${kpiStyles[i]}`}>
             <span className="text-sm font-semibold opacity-85">{label}</span>
             <span className="text-4xl font-extrabold tracking-[-0.02em]">{value}</span>
@@ -274,17 +341,22 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           <>
             <span className="text-xs font-extrabold tracking-[.06em] text-muted">CHAQUE SEMAINE</span>
             <FollowersChart weeks={weeks} timeZone={tz} />
-            <div className="flex flex-wrap gap-3">
-              <WeeklyBars weeks={weeks} pick={(w) => w.linkTaps} label="Clics sur ton lien" timeZone={tz} />
-              <WeeklyBars weeks={weeks} pick={(w) => w.profileViews} label="Visites du profil" timeZone={tz} />
-              <WeeklyBars weeks={weeks} pick={(w) => w.interactions} label="Interactions" timeZone={tz} />
-              <WeeklyBars weeks={weeks} pick={(w) => w.views} label="Vues" timeZone={tz} />
-            </div>
+            {connected && (
+              <div className="flex flex-wrap gap-3">
+                <WeeklyBars weeks={weeks} pick={(w) => w.linkTaps} label="Clics sur ton lien" timeZone={tz} />
+                <WeeklyBars weeks={weeks} pick={(w) => w.profileViews} label="Visites du profil" timeZone={tz} />
+                <WeeklyBars weeks={weeks} pick={(w) => w.interactions} label="Interactions" timeZone={tz} />
+                <WeeklyBars weeks={weeks} pick={(w) => w.views} label="Vues" timeZone={tz} />
+              </div>
+            )}
           </>
         ) : (
           <p className="text-sm leading-relaxed text-muted">
-            Edith relève les chiffres de ton compte Instagram chaque jour (nouveaux abonnés, désabonnements, vues, visites du profil, clics) et remonte jusqu’à 30 jours en arrière.
-            Les premières semaines apparaissent ici dans l’heure qui suit la connexion.
+            {connected
+              ? "Edith relève les chiffres de ton compte Instagram chaque jour (nouveaux abonnés, désabonnements, vues, visites du profil, clics) et remonte jusqu’à 30 jours en arrière. Les premières semaines apparaissent ici dans l’heure qui suit la connexion."
+              : followed
+                ? "Edith relève tes abonnés chaque jour sur ton profil public : les semaines apparaissent ici au fil des relevés."
+                : "Donne ton @ ci-dessus pour suivre tes abonnés semaine par semaine."}
           </p>
         )}
         {tt && ttWeeks && (
@@ -303,8 +375,12 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           {formats.length > 0 && (
             <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
               <h2 className="text-base font-bold">Ce que rapporte chaque format</h2>
-              <FormatTable rows={formats} labels={kindLabels} />
-              <p className="text-[12px] text-muted">Moyenne par publication d’Edith sur la période, le format qui donne le plus envie en premier. Intérêt : visites du profil, enregistrements et partages rapportés aux comptes touchés, les signes qu’un futur client s’intéresse à toi.</p>
+              <FormatTable rows={formats} labels={kindLabels} publicOnly={!connected} />
+              <p className="text-[12px] text-muted">
+                {connected
+                  ? "Moyenne par publication d’Edith sur la période, le format qui donne le plus envie en premier. Intérêt : visites du profil, enregistrements et partages rapportés aux comptes touchés, les signes qu’un futur client s’intéresse à toi."
+                  : "Moyenne par publication d’Edith sur la période, lue sur ton profil public, le format le plus vu en premier."}
+              </p>
             </section>
           )}
           {moments.days.length > 0 && (
@@ -330,7 +406,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         </div>
       )}
 
-      {Boolean(audience.city?.length || audience.age?.length) && (
+      {connected && Boolean(audience.city?.length || audience.age?.length) && (
         <section className="flex flex-col gap-4 rounded-[22px] border border-line p-5.5">
           <h2 className="text-base font-bold">Qui te suit</h2>
           <div className="flex flex-wrap gap-6">
@@ -397,11 +473,12 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
               <p className="text-[13px] text-muted">Edith applique ces leçons à tes prochains montages. Le bilan se met à jour chaque dimanche.</p>
               <RefreshReportButton label="Refaire l’analyse" />
             </>
+          ) : !connected && !followed ? (
+            <p className="text-[15px] leading-relaxed text-muted">Donne ton @ et Edith compare tes derniers posts (formats, accroches, heures, chiffres) pour te dire ce qui marche, avec les preuves.</p>
           ) : (
             <>
               <p className="text-[15px] leading-relaxed text-muted">
-                Edith compare tes derniers posts Instagram (formats, accroches, heures, chiffres) pour te dire ce qui marche,
-                avec les preuves. Le bilan arrive chaque dimanche.
+                Edith compare tes derniers posts (formats, accroches, heures, chiffres) pour te dire ce qui marche, avec les preuves. Le bilan arrive chaque dimanche.
               </p>
               <RefreshReportButton />
             </>
@@ -423,11 +500,14 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
                     </span>
                   </span>
                   <span className="text-right text-[13px] font-bold whitespace-nowrap text-violet">
-                    {[
-                      t.profile_visits ? `${formatNumber(t.profile_visits)} visites du profil` : null,
-                      t.saves ? `${formatNumber(t.saves)} enreg.` : null,
-                      t.shares ? `${formatNumber(t.shares)} partages` : null,
-                    ]
+                    {(connected
+                      ? [
+                          t.profile_visits ? `${formatNumber(t.profile_visits)} visites du profil` : null,
+                          t.saves ? `${formatNumber(t.saves)} enreg.` : null,
+                          t.shares ? `${formatNumber(t.shares)} partages` : null,
+                        ]
+                      : [t.likes ? `${formatNumber(t.likes)} j’aime` : null, t.comments ? `${formatNumber(t.comments)} comm.` : null]
+                    )
                       .filter(Boolean)
                       .join(" · ") || "—"}
                   </span>
@@ -437,10 +517,18 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           ) : (
             <p className="text-sm text-muted">Pas encore de statistiques sur cette période.</p>
           )}
-          {ranked.length > 0 && <p className="text-[12px] text-muted">Classées par visites du profil, enregistrements et partages : ce qui fait venir des clients, plus que les vues.</p>}
+          {ranked.length > 0 && (
+            <p className="text-[12px] text-muted">
+              {connected
+                ? "Classées par visites du profil, enregistrements et partages : ce qui fait venir des clients, plus que les vues."
+                : "Classées par j’aime et commentaires, puis par vues, lus sur ton profil public."}
+            </p>
+          )}
         </section>
       </div>
-      <p className="text-[13px] text-muted">Chiffres du compte : relevés chaque jour. Pour chaque publication : le dernier relevé des {period.days} derniers jours.</p>
+      <p className="text-[13px] text-muted">
+        {connected ? "Chiffres du compte : relevés chaque jour." : "Abonnés : relevés chaque jour sur ton profil public."} Pour chaque publication : le dernier relevé des {period.days} derniers jours.
+      </p>
     </>
   );
 }

@@ -120,7 +120,7 @@ export function byFormat(posts: PostStat[]) {
   for (const p of posts) groups.set(p.kind, [...(groups.get(p.kind) ?? []), p]);
   return [...groups.entries()]
     .map(([kind, list]) => {
-      const avg = (key: "views" | "reach" | "saves" | "shares" | "profileVisits") => {
+      const avg = (key: "views" | "reach" | "likes" | "comments" | "saves" | "shares" | "profileVisits") => {
         const known = list.map((p) => p[key] ?? null).filter((v): v is number => v !== null);
         return known.length ? Math.round(known.reduce((a, b) => a + b, 0) / known.length) : null;
       };
@@ -128,7 +128,19 @@ export function byFormat(posts: PostStat[]) {
       const mean = (f: (p: PostStat) => number) => (rated.length ? rated.reduce((acc, p) => acc + f(p), 0) / rated.length : null);
       const engagement = mean((p) => ((p.likes ?? 0) + (p.comments ?? 0) + (p.saves ?? 0) + (p.shares ?? 0)) / p.reach!);
       const interest = mean((p) => interestOf(p)!);
-      return { kind, posts: list.length, views: avg("views"), reach: avg("reach"), saves: avg("saves"), shares: avg("shares"), profileVisits: avg("profileVisits"), interest, engagement };
+      return {
+        kind,
+        posts: list.length,
+        views: avg("views"),
+        reach: avg("reach"),
+        likes: avg("likes"),
+        comments: avg("comments"),
+        saves: avg("saves"),
+        shares: avg("shares"),
+        profileVisits: avg("profileVisits"),
+        interest,
+        engagement,
+      };
     })
     .sort((a, b) => (b.interest ?? -1) - (a.interest ?? -1) || (b.views ?? b.reach ?? 0) - (a.views ?? a.reach ?? 0));
 }
