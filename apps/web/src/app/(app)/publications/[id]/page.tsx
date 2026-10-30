@@ -30,6 +30,7 @@ import { WhereToPost } from "@/components/montage/where-to-post";
 import { EditMontageButton } from "@/components/review/edit-montage-button";
 import { tiktokPanel } from "@/lib/social/tiktok-panel";
 import { PostReview } from "@/components/review/post-review";
+import { ShareImages } from "@/components/review/share-images";
 import { loadReview } from "@/lib/review";
 import { PostEditor } from "./post-editor";
 import { CarouselEditor } from "./carousel-editor";
@@ -245,6 +246,8 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           bookingUrl={bookingUrl}
         />
       )}
+
+      {(post.kind === "carousel" || post.kind === "post") && canEdit && <ShareImages postId={post.id} />}
 
       <div className="flex flex-col gap-2">
         <PostEditor

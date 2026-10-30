@@ -7,6 +7,7 @@ import { z } from "zod";
 import { studioAccess } from "@/lib/billing/access";
 import { startEffectWords } from "@/lib/effect-words";
 import { loadEditorData } from "@/lib/montage-editor-data";
+import { postImages, type PostImages } from "@/lib/post-images";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { forgetModel, keepAsModel, type ModelState } from "@/lib/reel-models";
 import { loadTextLooks } from "@/lib/text-looks";
@@ -227,4 +228,12 @@ export async function reschedule(postId: string, iso: string): Promise<ReviewRes
   if (error || !data?.length) return { ok: false, error: "La date n’a pas pu changer. Réessaie." };
   touched(postId);
   return { ok: true };
+}
+
+/** A carousel or photo post's images as she publishes it herself (share sheet, download), with her caption. */
+export async function imagesToShare(postId: string): Promise<PostImages | null> {
+  if (!z.uuid().safeParse(postId).success) return null;
+  const { member } = await getStudioContext();
+  if (!member) return null;
+  return postImages(member.studio.id, postId);
 }

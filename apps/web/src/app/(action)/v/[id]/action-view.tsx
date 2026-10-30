@@ -27,6 +27,7 @@ import { FormatBadge } from "@/components/format-badge";
 import { CarouselStudio } from "@/components/montage/carousel-studio";
 import { SlidePreview } from "@/components/montage/slide-preview";
 import { SlidesEditor } from "@/components/montage/slides-editor";
+import { ShareImages } from "@/components/review/share-images";
 import { TextBoxes } from "@/components/montage/text-boxes";
 import { TextSheet } from "@/components/montage/text-sheet";
 import { Orb } from "@/components/orb";
@@ -539,6 +540,7 @@ export function ActionView({
                   </p>
                 )}
               </div>
+              {(post.kind === "carousel" || post.kind === "post") && <ShareImages postId={post.id} tone="dark" />}
               <a href={changeHref} className="flex items-center justify-center gap-1.5 py-1 text-[13px] font-semibold text-white/65">
                 <WhatsAppIcon size={14} /> Demander un changement à Edith
               </a>
