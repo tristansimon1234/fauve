@@ -210,7 +210,7 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
   const dirty = design ? wordsChanged : planChanged;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-[480px] flex-col pb-[calc(env(safe-area-inset-bottom)+140px)]">
+    <main className="mx-auto flex min-h-dvh max-w-[480px] flex-col pb-[calc(env(safe-area-inset-bottom)+170px)]">
       {/* Top: back to WhatsApp, and whose post it is, as the feed shows it. */}
       <header className="sticky top-0 z-20 flex items-center gap-2.5 bg-ink/90 px-3 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-2 backdrop-blur">
         <a href={whatsappLink("")} aria-label="Retourner sur WhatsApp" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10">
@@ -358,7 +358,6 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
               {caption.trim() ? "Modifier la légende" : "Écrire la légende"}
             </button>
           )}
-          {!data.locked && !sent && data.upcoming && data.when && <p className="mt-1 text-[13px] text-white/55">Je te fais signe {data.when.short} pour le poster.</p>}
         </section>
       )}
 
@@ -406,6 +405,10 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
                     Prévoir
                   </button>
                 </div>
+              )}
+              {/* Under its buttons, as on a Reel's page: at the end of the page it sat half under the bar. */}
+              {!data.locked && !sent && data.upcoming && data.when && (
+                <p className="text-center text-[12.5px] font-semibold text-white/80">Je te fais signe {data.when.short} pour le poster.</p>
               )}
               {!data.locked && (
                 <a href={whatsappLink(`Pour « ${data.title} » : `)} className="flex h-[46px] items-center justify-center gap-2 rounded-full bg-white/12 text-[15px] font-extrabold">
