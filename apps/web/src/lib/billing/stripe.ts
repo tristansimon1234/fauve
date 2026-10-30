@@ -6,8 +6,8 @@ import { env } from "@/lib/env";
 // lookup key (created on first use), Checkout in subscription mode (no trial: one
 // of the 3 offers, Découverte at €9 the smallest), a switch to the offer above when
 // her credits run out, a credit pack paid once (Checkout in payment mode), the customer
-// portal to change or cancel.
-// No webhook: the subscription is read back from Stripe (lib/billing/access.ts).
+// portal to change or cancel. Her subscription is read back from Stripe (lib/billing/access.ts),
+// at once when Stripe tells us something changed (webhook, app/api/stripe/webhook/route.ts).
 
 const API = "https://api.stripe.com/v1";
 
@@ -104,6 +104,16 @@ export async function createCustomer(studio: { id: string; name: string | null; 
   return customer.id;
 }
 
+/**
+ * A professional's invoice in France names her business and its address (and its VAT number when it
+ * has one): Checkout asks for them and keeps them on her Stripe customer, for every invoice after.
+ */
+const B2B_DETAILS = {
+  billing_address_collection: "required",
+  tax_id_collection: { enabled: true },
+  customer_update: { name: "auto", address: "auto" },
+} satisfies Params;
+
 /** Checkout for an offer, the card always asked. */
 export async function checkoutSession(input: { customer: string; plan: PlanId; studioId: string; successUrl: string; cancelUrl: string }): Promise<string> {
   const session = await stripe<{ url: string }>("POST", "/checkout/sessions", {
@@ -113,6 +123,7 @@ export async function checkoutSession(input: { customer: string; plan: PlanId; s
     line_items: [{ price: await priceFor(input.plan), quantity: 1 }],
     subscription_data: { metadata: { studio_id: input.studioId } },
     payment_method_collection: "always",
+    ...B2B_DETAILS,
     locale: "fr",
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,
@@ -157,6 +168,8 @@ export async function packCheckout(input: { customer: string; studioId: string; 
       },
     ],
     metadata: { studio_id: input.studioId, kind: "credit_pack", credits: CREDIT_PACK.credits },
+    invoice_creation: { enabled: true },
+    ...B2B_DETAILS,
     locale: "fr",
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,

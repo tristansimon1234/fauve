@@ -42,8 +42,9 @@ async function store(studioId: string, customer: string | null, subscription: St
     .eq("id", studioId);
   if (!plan || !subscription || !isSubscribed(subscription.status)) return;
   const wasLive = before?.stripe_subscription_id === subscription.id && isSubscribed(before?.subscription_status as string | null);
-  if (!wasLive) await grantPlanCredits(studioId, { from: null, to: plan });
-  else if (planOf(before?.plan) !== plan) await grantPlanCredits(studioId, { from: planOf(before?.plan), to: plan });
+  const grant = (from: string) => `${subscription.id}:${period?.key ?? ""}:${from}>${plan}`;
+  if (!wasLive) await grantPlanCredits(studioId, { from: null, to: plan }, grant("new"));
+  else if (planOf(before?.plan) !== plan) await grantPlanCredits(studioId, { from: planOf(before?.plan), to: plan }, grant(planOf(before?.plan) ?? ""));
 }
 
 /** Her return from Checkout: the subscription it made, kept on her studio. */
@@ -54,13 +55,20 @@ export async function syncFromCheckout(studioId: string, sessionId: string): Pro
   return isSubscribed(subscription?.status);
 }
 
+/** The studio of a Stripe customer (the webhook's events name the customer). */
+export async function studioOfCustomer(customer: string): Promise<string | null> {
+  const { data } = await supabaseAdmin().from("studios").select("id").eq("stripe_customer_id", customer).limit(1).maybeSingle();
+  return (data?.id as string | undefined) ?? null;
+}
+
 /** Reads her subscription back from Stripe. */
-export async function syncSubscription(studioId: string): Promise<void> {
+export async function syncSubscription(studioId: string, options: { latest?: boolean } = {}): Promise<void> {
   const { data: studio } = await supabaseAdmin().from("studios").select("stripe_customer_id, stripe_subscription_id").eq("id", studioId).single();
   const customer = studio?.stripe_customer_id as string | null | undefined;
   if (!customer) return;
   const id = studio?.stripe_subscription_id as string | null | undefined;
-  const subscription = id ? await getSubscription(id) : await latestSubscription(customer);
+  // `latest` (a webhook event): her newest subscription, so an old one's late event never wins over a new one.
+  const subscription = id && !options.latest ? await getSubscription(id) : await latestSubscription(customer);
   await store(studioId, customer, subscription);
 }
 

@@ -54,7 +54,10 @@ const schema = {
   // Bearer secret for /api/cron/* (pg_cron sends it from Supabase Vault).
   CRON_SECRET: z.string().min(32),
   // Stripe (subscriptions with a 3-day trial). Unset = billing off: every studio has full access.
-  STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
+  // A restricted key (rk_…) with only what billing uses is better than the secret key (sk_…).
+  STRIPE_SECRET_KEY: z.string().regex(/^(sk|rk)_/).optional(),
+  // The signing secret of the Stripe webhook endpoint (/api/stripe/webhook, « whsec_… »). Unset = the webhook refuses everything.
+  STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional(),
   // Google AI Studio key and model for video analysis.
   GEMINI_API_KEY: z.string().min(1),
   GEMINI_MODEL: z.string().default("gemini-3.7-flash"),
