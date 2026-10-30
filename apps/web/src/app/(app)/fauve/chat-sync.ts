@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
 import type { ChatCard } from "@/lib/chat-cards";
 import { quoteProgress, type ChatMessage, type QuoteProgress } from "./chat-actions";
 
@@ -131,4 +131,29 @@ export function useQuoteProgress(messages: ChatMessage[], setMessages: Dispatch<
 export function runningQuote(messages: ChatMessage[]) {
   for (const m of messages) for (const c of m.cards) if (c.type === "quote" && c.quote.state === "launched") return c.quote;
   return null;
+}
+
+/**
+ * Refreshes that overlap one of her turns are dropped. Read just before her message was saved, a
+ * fresh conversation replaced the list and took away the message she had just sent (shown at once,
+ * saved during the turn) until Edith answered (Tristan: « mon message disparaît quand Edith
+ * réfléchit »); read during the turn, it could take away Edith's answer once it had landed.
+ */
+export function useTurnGuard() {
+  const turn = useRef({ seq: 0, busy: false });
+  return useMemo(
+    () => ({
+      begin: () => {
+        turn.current = { seq: turn.current.seq + 1, busy: true };
+      },
+      end: () => {
+        turn.current = { seq: turn.current.seq + 1, busy: false };
+      },
+      /** Taken when a refresh starts. */
+      stamp: () => turn.current.seq,
+      /** A refresh that started at `stamp` is stale: a turn began or ended since, or one is running. */
+      stale: (stamp: number) => turn.current.busy || turn.current.seq !== stamp,
+    }),
+    [],
+  );
 }

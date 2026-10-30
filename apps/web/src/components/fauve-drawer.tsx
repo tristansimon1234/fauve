@@ -9,7 +9,7 @@ import { applyLive, enteringAfterLive, liveTurn, type LiveState } from "@/app/(a
 import { SimoneLive } from "@/app/(app)/fauve/simone-avatar";
 import { LiveTyping } from "@/app/(app)/fauve/live-typing";
 import { montageStep } from "@/app/(app)/fauve/chat-cards";
-import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "@/app/(app)/fauve/chat-sync";
+import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress, useTurnGuard } from "@/app/(app)/fauve/chat-sync";
 import {
   launchQuote,
   loadConversation,
@@ -178,12 +178,14 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+  const turns = useTurnGuard();
   const refresh = useCallback(
     (id: string) => {
+      const stamp = turns.stamp();
       loadConversation(id)
         .then((fresh) => {
           const current = messagesRef.current;
-          if (!fresh || chatSignature(fresh) === chatSignature(current)) return;
+          if (!fresh || turns.stale(stamp) || chatSignature(fresh) === chatSignature(current)) return;
           const known = new Set(current.map((m) => m.id));
           setArrived(arrivals(current, fresh));
           setMessages(mergeMessages(current, fresh));
@@ -191,7 +193,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         })
         .catch(() => {});
     },
-    [router],
+    [router, turns],
   );
   useEffect(() => {
     if (!conversationId) return;
@@ -238,6 +240,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         ...files.map((f, i) => local({ type: f.video ? "video" : "image", media: { url: f.preview, video: f.video } }, i)),
         ...(text ? [local({ body: text }, files.length)] : []),
       ];
+      turns.begin();
       setArrived(new Set(locals.map((m) => m.id)));
       setMessages((m) => [...m, ...locals]);
       start(async () => {
@@ -263,10 +266,11 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
           setError("Ton message n’est pas parti. Vérifie ta connexion et réessaie.");
         } finally {
           setLive(null);
+          turns.end();
         }
       });
     },
-    [conversationId, pending, topic.postId, topic.scene, uploads],
+    [conversationId, pending, topic.postId, topic.scene, uploads, turns],
   );
 
   // A new publication: its files go up with the panel's own uploads, then the first message leaves on its own.
@@ -291,8 +295,10 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
     new Promise<string | null>((resolve) => {
       if (!conversationId || pending) return resolve("Attends la fin du message en cours, puis relance.");
       setLaunching(true);
+      turns.begin();
       start(async () => {
         const res = await launchQuote(quoteId, conversationId, effort).catch(() => null);
+        turns.end();
         if (res?.ok) {
           // What she started after her answer shows in the pill now, and once more when it has begun.
           nudgeWork();

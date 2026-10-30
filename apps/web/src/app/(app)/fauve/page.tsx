@@ -10,6 +10,7 @@ import { getStudioContext, rows } from "@/lib/studio";
 import { listConversations, loadConversation } from "./chat-actions";
 import { FauveWorkspace, type Suggestion } from "./fauve-workspace";
 import { onboardingView } from "./onboarding-actions";
+import { ChatLoading } from "./chat-loading";
 
 export const metadata: Metadata = { title: "Edith" };
 // The chat runs Fauve (and may queue a montage) inside a server action.
@@ -19,7 +20,7 @@ export default function FauvePage({ searchParams }: PageProps<"/fauve">) {
   return (
     // Full height: the composer stays at the bottom (phone: minus the header and the tab bar).
     <main className="flex h-[calc(100dvh-134px)] min-h-[480px] flex-col lg:h-dvh">
-      <PageSuspense title="Bonjour">
+      <PageSuspense title="Edith" skeleton={<ChatLoading />}>
         <Home searchParams={searchParams} />
       </PageSuspense>
     </main>

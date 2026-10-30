@@ -27,7 +27,7 @@ import { Orb } from "@/components/orb";
 import type { CardQuote } from "@/lib/chat-cards";
 import { Bubble } from "./chat-bubble";
 import { montageStep } from "./chat-cards";
-import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress } from "./chat-sync";
+import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress, useTurnGuard } from "./chat-sync";
 import { isFunny, isSweet, upsetLevel } from "@fauve/agent";
 import { FileStrip, useChatUploads } from "./chat-uploads";
 import type { OnboardingView } from "./onboarding-actions";
@@ -177,12 +177,14 @@ export function FauveWorkspace({
   }, [messages, active, draft, files.length]);
   const openWhenReady = useRef<string | null>(null);
   const openTimer = useRef(0);
+  const turns = useTurnGuard();
   useEffect(() => () => window.clearTimeout(openTimer.current), []);
   const refresh = useCallback(
     (id: string) => {
+      const stamp = turns.stamp();
       loadConversation(id)
         .then((fresh) => {
-          if (!fresh || activeRef.current !== id) return;
+          if (!fresh || activeRef.current !== id || turns.stale(stamp)) return;
           const current = messagesRef.current;
           const known = new Set(current.map((m) => m.id));
           const delivered = fresh.find((m) => !known.has(m.id) && m.openPost)?.openPost;
@@ -203,7 +205,7 @@ export function FauveWorkspace({
         })
         .catch(() => {});
     },
-    [router],
+    [router, turns],
   );
   useEffect(() => {
     if (!active) return;
@@ -292,6 +294,7 @@ export function FauveWorkspace({
       ...ready.map((f, i) => local({ type: f.video ? "video" : "image", media: { url: f.preview, video: f.video } }, i)),
       ...(text ? [local({ body: text }, ready.length)] : []),
     ];
+    turns.begin();
     setArrived(new Set(locals.map((m) => m.id)));
     setMessages((m) => [...m, ...locals]);
     const attachments: Attachment[] = ready.map((f) => ({ path: f.path!, mime: f.file.type, size: f.file.size }));
@@ -336,6 +339,7 @@ export function FauveWorkspace({
         setError("Ton message n’est pas parti. Vérifie ta connexion et réessaie.");
       } finally {
         setLive(null);
+        turns.end();
       }
     });
   };
@@ -348,6 +352,7 @@ export function FauveWorkspace({
       setError(null);
       setLaunching(quoteId);
       const conversationId = active;
+      turns.begin();
       startTransition(async () => {
         try {
           const res = await launchQuote(quoteId, conversationId, effort);
@@ -363,6 +368,8 @@ export function FauveWorkspace({
           } else resolve(res.error);
         } catch {
           resolve("Le montage n’a pas pu démarrer. Vérifie ta connexion et réessaie.");
+        } finally {
+          turns.end();
         }
       });
     });
