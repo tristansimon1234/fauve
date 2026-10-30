@@ -14,6 +14,11 @@ import take from "./voice.json";
 // brainstorme et je m'occupe de tout »): her voice in one take, and everything on screen lands on
 // its words (cue). Motion design in the app's colours, her real landing work inside.
 //
+// Edith no longer publishes (she posts herself): « Tu dis oui, je publie sur Instagram et TikTok » and its
+// scene are gone, and the voice says « Toi, tu n'as plus qu'à poster ». The script breathes by itself (« On
+// brainstorme ensemble. Et après ? Je m'occupe de tout. Tes Reels. Tes carrousels. Tes légendes. ») so each
+// scene can be seen in one take (Tristan: « on a pas le temps de voir ce qu'il y a à l'écran »); what she sends
+// floats in view until « je m'occupe », then flies into Edith.
 // Made by hand, once:
 //   1. Edith's voice reads the script (its charter's narrator, Lucie): POST /api/admin/voices?say=<voice>&text=<script>
 //      (CRON_SECRET, from the database), which answers the voice and the time of each word;
@@ -53,42 +58,37 @@ const ENDS = VOICE_END + TAIL;
 export const INTRO_SECONDS = LEAD + ENDS;
 
 /** The words everything lands on. */
-const T = {
-  moi: cue("moi"),
-  edith: cue("edith"),
-  ton: cue("ton"),
-  community: cue("community"),
-  enGros: cue("en", 3),
-  explique: cue("t'explique"),
-  parles: cue("tu", 5),
-  whatsapp: cue("whatsapp"),
-  comme: cue("comme"),
-  vraie: cue("vraie"),
-  envoies: cue("tu", 7),
-  photos: cue("photos"),
-  videos: cue("videos"),
-  notes: cue("notes"),
-  on: cue("on", 10),
-  brainstorme: cue("brainstorme"),
-  ensemble: cue("ensemble"),
-  occupe: cue("m'occupe"),
-  tout: cue("tout", 12.5),
-  tesReels: cue("tes", 13),
-  reels: cue("reels"),
-  carrousels: cue("carrousels"),
-  legendes: cue("legendes"),
-  dis: cue("tu", 15),
-  oui: cue("oui"),
-  publie: cue("publie"),
-  instagram: cue("instagram"),
-  tiktok: cue("tiktok"),
-  etOrdi: cue("et", 18),
-  ordi: cue("ordi"),
-  toutApp: cue("tout", 19),
-  app: cue("l'app"),
-  allez: cue("allez"),
-  commence: cue("on", 20.5),
-};
+// Each word is looked for after the one before it, so a new take or a reworded script keeps its cues.
+const T0 = { moi: cue("moi") };
+const T1 = { ...T0, edith: cue("edith", T0.moi) };
+const T2 = { ...T1, ton: cue("ton", T1.edith) };
+const T3 = { ...T2, community: cue("community", T2.ton) };
+const T4 = { ...T3, enGros: cue("en", T3.community) };
+const T5 = { ...T4, explique: cue("t'explique", T4.enGros) };
+const T6 = { ...T5, parles: cue("tu", T5.explique) };
+const T7 = { ...T6, whatsapp: cue("whatsapp", T6.parles) };
+const T8 = { ...T7, comme: cue("comme", T7.whatsapp) };
+const T9 = { ...T8, vraie: cue("vraie", T8.comme) };
+const T10 = { ...T9, envoies: cue("tu", T9.vraie) };
+const T11 = { ...T10, photos: cue("photos", T10.envoies) };
+const T12 = { ...T11, videos: cue("videos", T11.photos) };
+const T13 = { ...T12, notes: cue("notes", T12.videos) };
+const T14 = { ...T13, on: cue("on", T13.notes) };
+const T15 = { ...T14, brainstorme: cue("brainstorme", T14.on) };
+const T16 = { ...T15, ensemble: cue("ensemble", T15.brainstorme) };
+const T17 = { ...T16, occupe: cue("m'occupe", T16.ensemble) };
+const T18 = { ...T17, tout: cue("tout", T17.occupe) };
+const T19 = { ...T18, tesReels: cue("tes", T18.tout) };
+const T20 = { ...T19, reels: cue("reels", T19.tesReels) };
+const T21 = { ...T20, carrousels: cue("carrousels", T20.reels) };
+const T22 = { ...T21, legendes: cue("legendes", T21.carrousels) };
+const T22b = { ...T22, toi: cue("toi", T22.legendes), poster: cue("poster", T22.legendes) };
+const T23 = { ...T22b, ordi: cue("ordi", T22b.poster) };
+const T24 = { ...T23, etOrdi: [...WORDS].reverse().find((x) => x.start < T23.ordi && plain(x.w) === "et")?.start ?? T23.ordi - 0.4 };
+const T25 = { ...T24, toutApp: cue("tout", T24.ordi) };
+const T26 = { ...T25, app: cue("l'app", T25.toutApp) };
+const T27 = { ...T26, allez: cue("allez", T26.app) };
+const T = { ...T27, commence: cue("on", T27.allez + 0.01) };
 
 const C = {
   bg: "#FBF7F4",
@@ -505,37 +505,37 @@ function FlashScene() {
       {ring > 0 && ring < 1 && (
         <div style={{ position: "absolute", left: EDITH_AT.x - (220 + ring * 520), top: EDITH_AT.y - (220 + ring * 520), width: 2 * (220 + ring * 520), height: 2 * (220 + ring * 520), borderRadius: "50%", border: `6px solid ${C.peach}`, opacity: 1 - ring }} />
       )}
-      <Gathered x={190} y={300} at={T.ensemble + 0.3} spin={-12}>
+      <Gathered x={190} y={300} at={T.occupe - 0.05} spin={-12}>
         <div style={{ ...card, width: 170, height: 226 }}>
           <Img src={staticFile("tile-2.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       </Gathered>
-      <Gathered x={870} y={290} at={T.ensemble + 0.35} spin={8}>
+      <Gathered x={870} y={290} at={T.occupe} spin={8}>
         <div style={{ borderRadius: 999, background: C.mine, padding: "6px 22px", boxShadow: "0 24px 50px rgba(0,0,0,.35)" }}>
           <VoiceNote at={T.ensemble} />
         </div>
       </Gathered>
-      <Gathered x={190} y={1560} at={T.ensemble + 0.4} spin={10}>
+      <Gathered x={190} y={1560} at={T.occupe + 0.05} spin={10}>
         <div style={{ ...card, border: "7px solid #fff" }}>
           <Clip />
         </div>
       </Gathered>
-      <Gathered x={890} y={1520} at={T.ensemble + 0.45} spin={-9}>
+      <Gathered x={890} y={1520} at={T.occupe + 0.1} spin={-9}>
         <div style={{ ...card, width: 170, height: 226 }}>
           <Img src={staticFile("tile-3.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       </Gathered>
-      <Gathered x={900} y={930} at={T.ensemble + 0.5} spin={6}>
+      <Gathered x={900} y={930} at={T.occupe + 0.15} spin={6}>
         <BubbleBox height={textHeight(["", ""])}>
           <div style={bubbleText}>{"Idée : « pov : ton premier\ncafé du matin » ☕"}</div>
         </BubbleBox>
       </Gathered>
-      <Gathered x={170} y={940} at={T.ensemble + 0.55} spin={-7}>
+      <Gathered x={170} y={940} at={T.occupe + 0.2} spin={-7}>
         <div style={{ ...card, width: 150, height: 200 }}>
           <Img src={staticFile("tile-4.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       </Gathered>
-      <Gathered x={560} y={1760} at={T.ensemble + 0.6} spin={4}>
+      <Gathered x={560} y={1760} at={T.occupe + 0.25} spin={4}>
         <BubbleBox mine height={textHeight([""])}>
           <div style={bubbleText}>Trop bien, go ! 🔥</div>
         </BubbleBox>
@@ -600,6 +600,8 @@ function WorkScene({ from }: { from: number }) {
           </div>
         );
       })}
+      {/* She posts it herself (Edith publishes nothing): what the voice says, under her caption. */}
+      <Say top={1680} size={64} bits={[{ text: "Toi, tu n’as plus qu’à", at: T.toi }, { text: "poster", at: T.poster, accent: true }]} />
       {/* The caption, written as she listens. */}
       <div style={{ position: "absolute", left: 90, right: 90, top: 1300, height: 300, boxSizing: "border-box", opacity: card, transform: `translateY(${px((1 - card) * 120)}px)`, borderRadius: 32, background: "#fff", padding: "32px 38px", boxShadow: "0 24px 50px rgba(28,21,48,.14)", fontFamily: SANS }}>
         <div style={{ fontSize: 28, fontWeight: 800, color: C.violet, marginBottom: 12 }}>Ta légende</div>
@@ -607,86 +609,6 @@ function WorkScene({ from }: { from: number }) {
           {caption.slice(0, typed)}
           <span style={{ opacity: Math.floor(frame / 6) % 2 ? 0 : 1, color: C.violet }}>|</span>
         </div>
-      </div>
-    </>
-  );
-}
-
-/** Instagram's and TikTok's own marks, simplified. */
-function PlatformMark({ name }: { name: "Instagram" | "TikTok" }) {
-  return name === "Instagram" ? (
-    <div style={{ width: 52, height: 52, borderRadius: 15, background: "linear-gradient(45deg, #FEDA75, #FA7E1E 30%, #D62976 60%, #962FBF 85%, #4F5BD5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 26, height: 26, borderRadius: "50%", border: "4px solid #fff", boxSizing: "border-box" }} />
-    </div>
-  ) : (
-    <div style={{ width: 52, height: 52, borderRadius: 15, background: "#000", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <svg width="30" height="32" viewBox="0 0 30 32" aria-hidden>
-        <path d="M17 2v19a5.5 5.5 0 1 1-5.5-5.5" stroke="#25F4EE" strokeWidth="4.5" fill="none" transform="translate(-1.5,-1)" />
-        <path d="M17 2v19a5.5 5.5 0 1 1-5.5-5.5M17 2c1 4.5 4 7 8.5 7.5" stroke="#FE2C55" strokeWidth="4.5" fill="none" transform="translate(1.5,1)" />
-        <path d="M17 2v19a5.5 5.5 0 1 1-5.5-5.5M17 2c1 4.5 4 7 8.5 7.5" stroke="#fff" strokeWidth="4.5" fill="none" />
-      </svg>
-    </div>
-  );
-}
-
-function PublishScene({ from }: { from: number }) {
-  const frame = useCurrentFrame();
-  const tap = F(T.oui);
-  const pressed = frame >= tap && frame < tap + 7;
-  const ring = interpolate(frame, [tap, tap + 14], [0, 1], clamp);
-  const live = enterAt(frame, T.publie, 9);
-  return (
-    <>
-      <Say
-        top={110}
-        size={80}
-        bits={[
-          { text: "Tu dis", at: T.dis },
-          { text: "oui,", at: T.oui, accent: true },
-          { text: "je publie", at: T.publie, br: true },
-        ]}
-      />
-      <Phone top={430} height={1150} at={F(from)}>
-        <ChatHeader />
-        <div style={{ position: "absolute", left: 20, top: HEADER + 30 }}>
-          <BubbleBox height={400 + 12 + 2 * LINE + PAD + 10} padding="10px">
-            <div style={{ position: "relative", width: 300, height: 400, borderRadius: 18, overflow: "hidden" }}>
-              <Img src={staticFile("work-pilates.webp")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              {/* Out: a tick on it when she says « je publie ». */}
-              <div style={{ position: "absolute", right: 14, top: 14, display: "flex", alignItems: "center", gap: 8, padding: "8px 16px 8px 10px", borderRadius: 999, background: "#fff", opacity: live, transform: `translateY(${px((1 - live) * -16)}px)`, fontFamily: SANS, fontSize: 22, fontWeight: 800, color: C.ink }}>
-                <span style={{ width: 30, height: 30, borderRadius: "50%", background: C.green, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>✓</span>
-                En ligne
-              </div>
-            </div>
-            <div style={{ ...bubbleText, padding: "12px 10px 0" }}>{"Ton Reel est prêt !\nJe le publie vendredi à 18 h ?"}</div>
-          </BubbleBox>
-        </div>
-        {["Oui, publie-le", "Je regarde d’abord"].map((label, i) => {
-          const hit = i === 0;
-          return (
-            <div
-              key={label}
-              style={{ position: "absolute", left: 20, top: HEADER + 30 + 518 + 14 + i * 84, width: 440, height: 70, borderRadius: 22, background: hit && pressed ? "#DCEBE3" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: SANS, fontSize: 30, fontWeight: 800, color: "#0A7C5A", boxShadow: "0 2px 4px rgba(0,0,0,.06)" }}
-            >
-              {label}
-              {hit && ring > 0 && ring < 1 && (
-                <div style={{ position: "absolute", left: "50%", top: "50%", width: 90 + ring * 140, height: 90 + ring * 140, marginLeft: -(45 + ring * 70), marginTop: -(45 + ring * 70), borderRadius: "50%", border: `5px solid ${C.violet}`, opacity: 1 - ring }} />
-              )}
-            </div>
-          );
-        })}
-        <Chat bottom={HEADER + 30 + 518 + 14 + 168 + 14 + 72 + 4} messages={[{ mine: true, at: T.oui + 0.2, lines: ["Oui, publie-le"] }]} />
-      </Phone>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 1650, display: "flex", justifyContent: "center", gap: 26 }}>
-        {(["Instagram", "TikTok"] as const).map((name) => {
-          const p = enterAt(frame, name === "Instagram" ? T.instagram : T.tiktok, 9);
-          return (
-            <div key={name} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 30px 16px 16px", borderRadius: 999, background: "#fff", boxShadow: "0 18px 40px rgba(28,21,48,.14)", opacity: p, transform: `translateY(${px((1 - p) * 60)}px)`, fontFamily: SANS, fontSize: 38, fontWeight: 800, color: C.ink }}>
-              <PlatformMark name={name} />
-              {name}
-            </div>
-          );
-        })}
       </div>
     </>
   );
@@ -787,7 +709,6 @@ const SCENES: SceneDef[] = [
   { id: "chat", from: T.parles - 0.3, background: C.bg, View: ChatScene },
   { id: "flash", from: T.ensemble + 0.1, background: C.ink, orb: 0, View: FlashScene, wipe: true },
   { id: "work", from: T.tesReels - 0.25, background: C.lilac, orb: 0.12, View: WorkScene },
-  { id: "publish", from: T.dis - 0.3, background: C.bg, View: PublishScene },
   { id: "app", from: T.etOrdi - 0.2, background: C.peach, orb: 0.12, View: AppScene },
   { id: "start", from: T.allez - 0.2, background: C.bg, View: StartScene },
 ];

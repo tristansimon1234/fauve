@@ -42,7 +42,7 @@ export const WHATSAPP_WELCOME = [
     "🎬 Je monte tes Reels avec tes vidéos, avec une voix off si tu veux",
     "🖼️ Je compose tes carrousels avec tes photos",
     "✍️ J’écris tes légendes",
-    "📲 Je publie sur Instagram et TikTok quand tu me dis oui",
+    "📲 Tu postes d’un toucher : ton Reel s’ouvre dans Instagram ou TikTok, légende copiée",
     "💻 Sur ordi, tout est aussi dans l’app : edith-ai.app",
   ].join("\n"),
   "Écris-moi ou envoie-moi des notes vocales, comme à quelqu’un de ton équipe.",
@@ -50,7 +50,7 @@ export const WHATSAPP_WELCOME = [
 ].join("\n\n");
 
 /** Edith's introduction video (apps/render/intro), served by the app: sent with the welcome, shown at the start of the getting started in the app. */
-export const INTRO_VIDEO = { path: "/onboarding/edith-intro.mp4", poster: "/onboarding/edith-intro.jpg", seconds: 24 } as const;
+export const INTRO_VIDEO = { path: "/onboarding/edith-intro.mp4", poster: "/onboarding/edith-intro.jpg", seconds: 25 } as const;
 
 const GREETINGS = new Set(["bonjour", "bonsoir", "salut", "coucou", "hello", "hey", "hi", "yo", "re", "cc", "slt", "bjr", "allo", "hola", "edith"]);
 
