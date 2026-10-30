@@ -13,7 +13,7 @@ import { PlanChoice } from "./plan-choice";
 // does (Tristan, on « Ton plan est prêt » shown to everyone: « ça veut dire quoi ? »); otherwise the
 // offers, with no promise. On a phone the card is left out: above the offers it pushed them
 // below the fold (Tristan: « t'es obligé de scroll down pour tout voir »). Before subscribing, one
-// line puts the price beside a community manager's (Tristan: « une phrase smart »), in the words of
+// line puts the price beside a community manager's (Tristan: « une phrase smart », « Mets si tu hésites »), in the words of
 // the comparison page (content/comparatifs.ts): a range, never another business's price.
 
 async function previewOf(db: Db, studioId: string, postId: string | null): Promise<{ url: string; video: boolean } | null> {
@@ -101,9 +101,9 @@ export async function Paywall({ db, studioId, postId, next, upgradeFrom }: { db:
           </p>
           {upgradeFrom ? null : (
             <p className="text-[14px] font-semibold leading-snug">
-              Un community manager coûte le plus souvent quelques centaines d’euros par mois. Edith, dès{" "}
+              Tu hésites ? Un community manager, c’est souvent quelques centaines d’euros par mois. Edith, ça commence{" "}
               <span className="font-serif text-[16px] font-normal italic text-violet">
-                {weekly <= 2.5 ? "le prix d’un café par semaine" : `${PLANS.decouverte.priceEur} € par mois`}
+                {weekly <= 2.5 ? "au prix d’un café par semaine" : `à ${PLANS.decouverte.priceEur} € par mois`}
               </span>
               .
             </p>
