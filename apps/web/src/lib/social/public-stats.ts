@@ -9,8 +9,9 @@ import { socialConnect } from "./connect";
 // Her public numbers without connecting her accounts (Tristan: « nombre d'abonnés / vue / j'aime
 // c'est suffisant »): from her @ (studios.instagram_handle, tiktok_handle), once a day, through
 // Treg (about $0.004 a day for Instagram, $0.0024 for TikTok): her follower count on yesterday's
-// row of account_daily, as the connected capture does, and the views, likes and comments of the
-// Reels she posted herself, each found by its caption (posts published, measured in metrics).
+// row of account_daily, as the connected capture does, the views, likes and comments of the
+// Reels she posted herself, each found by its caption (posts published, measured in metrics), and
+// her profile's latest videos, every day, Edith's or not (public_videos, listed in Résultats).
 // A platform she connected is read by its own API (account-stats.ts), never twice. Paid plans
 // only (Tristan: « ce sera dans le plan payant uniquement »), and the team's studio.
 
@@ -83,8 +84,7 @@ async function capturePlatform(studioId: string, platform: Platform, handle: str
     const e = external(p);
     return e.public_id && e.published_at && Date.now() - new Date(e.published_at).getTime() < MEASURE_FOR_MS;
   });
-  // Nothing of ours to find or to measure: no need to read her videos.
-  if (!waiting.length && !measured.length) return done;
+  // Her latest videos, read every day: Edith's to find and measure, and all of them for Résultats.
   const videos = readPublicVideos(platform, await call(studioId, platform, "videos", handle), handle);
   if (!videos.length) return done;
   const byId = new Map(videos.map((v) => [v.id, v]));
@@ -114,6 +114,32 @@ async function capturePlatform(studioId: string, platform: Platform, handle: str
     );
     toMeasure.push({ postId, video, status: online ? (post.status as string) : "published" });
     done++;
+  }
+
+  // Every video of the page, Edith's or not, with its numbers today (public_videos): Résultats lists
+  // them all with their ratios. Edith's are marked with their publication.
+  const now = new Date().toISOString();
+  check(
+    await db.from("public_videos").upsert(
+      videos.map((v) => ({
+        studio_id: studioId,
+        platform,
+        video_id: v.id,
+        url: v.url,
+        caption: v.caption.slice(0, 500),
+        published_at: new Date(v.at).toISOString(),
+        seconds: v.seconds,
+        views: v.views,
+        likes: v.likes,
+        comments: v.comments,
+        saves: v.saves,
+        captured_at: now,
+      })),
+      { onConflict: "studio_id,platform,video_id" },
+    ),
+  );
+  for (const { postId, video } of toMeasure) {
+    await db.from("public_videos").update({ post_id: postId }).eq("studio_id", studioId).eq("platform", platform).eq("video_id", video.id);
   }
 
   for (const { postId, video, status } of toMeasure) {

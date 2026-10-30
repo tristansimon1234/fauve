@@ -1,5 +1,5 @@
 import { PageSuspense } from "@/components/page-suspense";
-import { bestMoments, byFormat, followerSeries, periodTotals, platformSchema, postKindSchema, suggestedMoment, weeklyGrowth, type PostStat } from "@fauve/agent";
+import { bestMoments, byFormat, followerSeries, periodTotals, platformSchema, platformSummary, postKindSchema, suggestedMoment, weeklyGrowth, type PostStat } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { z } from "zod";
@@ -7,7 +7,7 @@ import { EmptyState, NoStudio } from "@/components/empty-state";
 import { CheckIcon } from "@/components/icons";
 import { Orb } from "@/components/orb";
 import { daysBefore } from "@/lib/dates";
-import { formatNumber, formatShortDate, kindLabels, plural } from "@/lib/format";
+import { formatNumber, formatShortDate, kindLabels } from "@/lib/format";
 import { HandlesForm } from "@/components/handles-form";
 import { publicStatsFor } from "@/lib/social/public-stats";
 import { instagramAccount } from "@/lib/social/publish";
@@ -15,6 +15,7 @@ import { getStudioContext, rows } from "@/lib/studio";
 import { RefreshReportButton } from "./refresh-button";
 import { FollowersChart, FormatTable, Ranking, WeeklyBars } from "./growth";
 import { FollowersLine } from "./followers-line";
+import { PlatformCard, VideoTable, type VideoRow } from "./public-results";
 
 export const metadata: Metadata = { title: "Résultats" };
 
@@ -37,6 +38,18 @@ const dailySchema = z.object({
   profile_views: nullableInt,
   link_taps: nullableInt,
   interactions: nullableInt,
+});
+const videoSchema = z.object({
+  platform: z.enum(["instagram", "tiktok"]),
+  video_id: z.string(),
+  url: z.string().nullable(),
+  caption: z.string(),
+  published_at: z.string(),
+  views: z.number().nullable(),
+  likes: z.number().nullable(),
+  comments: z.number().nullable(),
+  saves: z.number().nullable(),
+  post_id: z.string().nullable(),
 });
 const audienceSchema = z.record(z.string(), z.array(z.object({ key: z.string(), value: z.number() }))).catch({});
 
@@ -101,7 +114,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   const period = periods.find((p) => p.key === periode) ?? periods[1];
   const since = daysBefore(new Date(), period.days).toISOString();
 
-  const [metricsResult, bookingsResult, reportResult, dailyResult, audienceResult, account, studioResult] = await Promise.all([
+  const [metricsResult, bookingsResult, reportResult, dailyResult, audienceResult, account, studioResult, videosResult] = await Promise.all([
     db
       .from("metrics")
       .select("post_id, platform, captured_at, views, reach, likes, saves, shares, comments, profile_visits")
@@ -129,6 +142,13 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
     db.from("account_audience").select("data").eq("studio_id", studioId).eq("platform", "instagram").order("captured_on", { ascending: false }).limit(1).maybeSingle(),
     instagramAccount(studioId).catch(() => null),
     db.from("studios").select("instagram_handle, tiktok_handle, subscription_status, team").eq("id", studioId).maybeSingle(),
+    // Her profile's latest Reels and videos, Edith's or not (public-stats.ts).
+    db
+      .from("public_videos")
+      .select("platform, video_id, url, caption, published_at, views, likes, comments, saves, post_id")
+      .eq("studio_id", studioId)
+      .order("published_at", { ascending: false })
+      .limit(200),
   ]);
   // Without a connected account (connect.ts, put aside), her numbers come from her @ only: followers
   // each day, and the views, likes and comments of her publications (public-stats.ts). Link taps,
@@ -164,6 +184,24 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   const ttLine = followerSeries(ttDaily, period.days);
   const ttWeeks = ttDaily.length ? weeklyGrowth(ttDaily, WEEKS) : null;
   const audience = audienceSchema.parse((audienceResult.data as { data?: unknown } | null)?.data ?? {});
+  const videos: VideoRow[] = rows(videoSchema, videosResult, "public_videos").map((v) => ({
+    platform: v.platform,
+    id: v.video_id,
+    url: v.url,
+    caption: v.caption,
+    publishedAt: v.published_at,
+    views: v.views,
+    likes: v.likes,
+    comments: v.comments,
+    saves: v.saves,
+    postId: v.post_id,
+  }));
+  const periodVideos = videos.filter((v) => v.publishedAt >= since);
+  const followers = { instagram: ig.followers, tiktok: tt?.followers ?? null };
+  const summaries = {
+    instagram: platformSummary(periodVideos.filter((v) => v.platform === "instagram"), followers.instagram),
+    tiktok: platformSummary(periodVideos.filter((v) => v.platform === "tiktok"), followers.tiktok),
+  };
   const tz = member.studio.timezone;
 
   const header = (
@@ -207,7 +245,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
       </section>
     ) : null;
 
-  if (!snapshots.length && !bookings && !report && !daily.length) {
+  if (!snapshots.length && !bookings && !report && !daily.length && !videos.length) {
     return (
       <>
         {header}
@@ -271,8 +309,6 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   });
   const formats = connected ? byFormat(postStats) : byFormat(postStats).sort((a, b) => (b.views ?? -1) - (a.views ?? -1));
   const moments = bestMoments(postStats, tz);
-  const moment = suggestedMoment(moments);
-  const momentUnit = moments.by === "visits" ? "visites" : "vues";
 
   const show = (value: number | null) => (value === null ? "—" : formatNumber(value));
   const signed = (n: number | null) => (n === null ? "—" : `${n > 0 ? "+" : n < 0 ? "−" : ""}${formatNumber(Math.abs(n))}`);
@@ -293,21 +329,13 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           : "Instagram, relevé chaque jour",
     ],
   ];
-  // From her @: followers, and her publications' views, likes and comments.
-  const tiktokShown = Boolean(handles.tiktok || ttDaily.length);
-  const publicKpis: [string, string, string][] = [
-    [
-      "Abonnés Instagram",
-      show(ig.followers),
-      ig.net !== null ? `${signed(ig.net)} sur la période` : handles.instagram ? "relevés chaque jour sur ton profil" : "donne ton @ Instagram",
-    ],
-    ...(tiktokShown
-      ? [["Abonnés TikTok", show(tt?.followers ?? null), tt && tt.net !== null ? `${signed(tt.net)} sur la période` : "relevés chaque jour sur ton profil"] as [string, string, string]]
-      : []),
-    ["Vues de tes publications", show(totals.views), byPost.size ? `sur ${plural(byPost.size, "publication mesurée", "publications mesurées")}` : "dès ta première publication en ligne"],
-    ["J’aime", show(totals.likes), totals.comments !== null ? `et ${plural(totals.comments, "commentaire", "commentaires")}` : "et les commentaires"],
-  ];
-  const shownKpis = connected ? kpis : publicKpis;
+  // From her @ (no connected account): her best moments from all her videos, not only Edith's.
+  const publicMoments = bestMoments(
+    periodVideos.map((v) => ({ kind: "reel", publishedAt: v.publishedAt, views: v.views, reach: null, likes: v.likes, comments: v.comments, saves: v.saves, shares: null })),
+    tz,
+  );
+  const shownMoments = connected ? moments : publicMoments;
+  const shownMoment = suggestedMoment(shownMoments);
   // The first KPI (bookings from social media, or her followers) is the page's headline number.
   const kpiStyles = ["bg-violet text-white", "bg-peach text-ink", "bg-soft text-ink", "bg-soft text-ink"];
   const hasWeeks = weeks.some((w) => w.days > 0);
@@ -316,15 +344,39 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
     <>
       {header}
       {handlesCard}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
-        {shownKpis.map(([label, value, detail], i) => (
-          <div key={label} className={`flex flex-col gap-2 rounded-[20px] p-5 ${kpiStyles[i]}`}>
-            <span className="text-sm font-semibold opacity-85">{label}</span>
-            <span className="text-4xl font-extrabold tracking-[-0.02em]">{value}</span>
-            <span className="text-[13px] font-semibold opacity-85">{detail}</span>
+      {connected ? (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
+          {kpis.map(([label, value, detail], i) => (
+            <div key={label} className={`flex flex-col gap-2 rounded-[20px] p-5 ${kpiStyles[i]}`}>
+              <span className="text-sm font-semibold opacity-85">{label}</span>
+              <span className="text-4xl font-extrabold tracking-[-0.02em]">{value}</span>
+              <span className="text-[13px] font-semibold opacity-85">{detail}</span>
+            </div>
+          ))}
+        </div>
+      ) : followed ? (
+        // Instagram and TikTok on the same footing, side by side.
+        <div className="grid gap-4 md:grid-cols-2">
+          <PlatformCard platform="instagram" handle={handles.instagram} followers={followers.instagram} net={ig.net} summary={summaries.instagram} />
+          <PlatformCard platform="tiktok" handle={handles.tiktok} followers={followers.tiktok} net={tt?.net ?? null} summary={summaries.tiktok} />
+        </div>
+      ) : null}
+      {!connected && followed && (
+        <section className="flex flex-col gap-3 rounded-[22px] border border-line p-5 sm:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-bold">Tes Reels et vidéos</h2>
+            <span className="text-[13px] font-semibold text-muted">publiés ces {period.days} derniers jours, du plus récent au plus ancien</span>
           </div>
-        ))}
-      </div>
+          {periodVideos.length ? (
+            <VideoTable videos={periodVideos} followers={followers} timeZone={tz} />
+          ) : (
+            <p className="text-sm text-muted">Aucune vidéo publiée sur la période.{videos.length ? " Choisis 90 jours pour voir les plus anciennes." : " Elles apparaissent ici dès le prochain relevé de ton profil."}</p>
+          )}
+          <p className="text-[12px] text-muted">
+            Lus chaque jour sur ton profil public, faites avec Edith ou non. Engagement : j’aime, commentaires et enregistrements pour chaque vue. Vues / abonnés : au-dessus de 1×, la vidéo est allée au-delà de tes abonnés.
+          </p>
+        </section>
+      )}
 
       <section className="flex flex-col gap-4 rounded-[22px] border border-line p-5 sm:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -370,9 +422,9 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         )}
       </section>
 
-      {(formats.length > 0 || moments.days.length > 0) && (
+      {((connected && formats.length > 0) || shownMoments.days.length > 0) && (
         <div className="flex flex-wrap items-start gap-6">
-          {formats.length > 0 && (
+          {connected && formats.length > 0 && (
             <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
               <h2 className="text-base font-bold">Ce que rapporte chaque format</h2>
               <FormatTable rows={formats} labels={kindLabels} publicOnly={!connected} />
@@ -383,23 +435,23 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
               </p>
             </section>
           )}
-          {moments.days.length > 0 && (
+          {shownMoments.days.length > 0 && (
             <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
               <h2 className="text-base font-bold">Tes meilleurs moments</h2>
-              {moment && (
+              {shownMoment && (
                 <p className="rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[14px] font-semibold text-violet">
-                  D’après tes posts, publie plutôt {moment}.
+                  D’après tes posts, publie plutôt {shownMoment}.
                 </p>
               )}
-              <Ranking items={moments.days.slice(0, 4)} unit={momentUnit} />
-              {moments.slots.length > 1 && (
+              <Ranking items={shownMoments.days.slice(0, 4)} unit={shownMoments.by === "visits" ? "visites" : "vues"} />
+              {shownMoments.slots.length > 1 && (
                 <>
                   <span className="text-xs font-extrabold tracking-[.06em] text-muted">DANS LA JOURNÉE</span>
-                  <Ranking items={moments.slots} unit={momentUnit} />
+                  <Ranking items={shownMoments.slots} unit={shownMoments.by === "visits" ? "visites" : "vues"} />
                 </>
               )}
               <p className="text-[12px] text-muted">
-                {moments.by === "visits" ? "Visites du profil" : "Vues"} moyennes selon le jour et l’heure de publication. Plus il y a de posts, plus c’est fiable.
+                {shownMoments.by === "visits" ? "Visites du profil" : "Vues"} moyennes selon le jour et l’heure de publication{connected ? "" : ", sur toutes tes vidéos"}. Plus il y a de posts, plus c’est fiable.
               </p>
             </section>
           )}
@@ -485,6 +537,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           )}
         </section>
 
+        {connected && (
         <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3.5 rounded-[22px] border border-line p-5.5">
           <h2 className="text-base font-bold">Ce qui a le plus donné envie</h2>
           {ranked.length ? (
@@ -525,9 +578,12 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
             </p>
           )}
         </section>
+        )}
       </div>
       <p className="text-[13px] text-muted">
-        {connected ? "Chiffres du compte : relevés chaque jour." : "Abonnés : relevés chaque jour sur ton profil public."} Pour chaque publication : le dernier relevé des {period.days} derniers jours.
+        {connected
+          ? `Chiffres du compte : relevés chaque jour. Pour chaque publication : le dernier relevé des ${period.days} derniers jours.`
+          : "Abonnés et vidéos : relevés chaque jour sur ton profil public, Instagram et TikTok."}
       </p>
     </>
   );

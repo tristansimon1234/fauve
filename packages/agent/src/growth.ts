@@ -230,3 +230,37 @@ export function followerSeries(rows: DailyRow[], days: number, today: Date = new
   }
   return points.reverse();
 }
+
+/** A video of her public profile, with its numbers (public_videos): what her @ shows of it. */
+export type PublicVideoStat = { views: number | null; likes: number | null; comments: number | null; saves?: number | null };
+
+/** Interactions over views (likes, comments and saves for each view), the engagement of a Reel; null without views. */
+export function engagementOf(video: PublicVideoStat): number | null {
+  if (!video.views) return null;
+  return ((video.likes ?? 0) + (video.comments ?? 0) + (video.saves ?? 0)) / video.views;
+}
+
+/**
+ * One platform's videos over a period: how many, their views, likes and comments, the average views
+ * per video, the engagement over all of them (interactions over views), and how far a video goes
+ * compared with her followers (average views over followers: above 1, beyond them).
+ */
+export function platformSummary(videos: PublicVideoStat[], followers: number | null) {
+  const total = (pick: (v: PublicVideoStat) => number | null | undefined) => {
+    const known = videos.map(pick).filter((n): n is number => typeof n === "number");
+    return known.length ? known.reduce((a, b) => a + b, 0) : null;
+  };
+  const counted = videos.filter((v) => v.views !== null);
+  const views = total((v) => v.views);
+  const interactions = counted.reduce((a, v) => a + (v.likes ?? 0) + (v.comments ?? 0) + (v.saves ?? 0), 0);
+  const perVideo = counted.length && views !== null ? Math.round(views / counted.length) : null;
+  return {
+    videos: videos.length,
+    views,
+    likes: total((v) => v.likes),
+    comments: total((v) => v.comments),
+    perVideo,
+    engagement: views ? interactions / views : null,
+    reach: perVideo !== null && followers ? perVideo / followers : null,
+  };
+}

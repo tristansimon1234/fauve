@@ -17,6 +17,7 @@ import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED
 import { montageJobSteps } from "./jobs.ts";
 import { quietPauses } from "./mix.ts";
 import { invoiceRows } from "./invoices.ts";
+import { engagementOf, platformSummary } from "./growth.ts";
 
 const validPlan = {
   format: "9:16",
@@ -5018,4 +5019,25 @@ test("invoices: paid or to pay, newest first, an offer by its product, a pack by
   );
   assert.equal(rows[2]!.date, new Date(1_800_000_060_000).toISOString());
   assert.equal(rows[0]!.page, "https://page/4");
+});
+
+test("public videos: engagement per view, a platform's summary against its followers", () => {
+  assert.equal(engagementOf({ views: 1000, likes: 80, comments: 15, saves: 5 }), 0.1);
+  assert.equal(engagementOf({ views: 0, likes: 3, comments: 0 }), null);
+  assert.equal(engagementOf({ views: null, likes: 3, comments: 0 }), null);
+  const summary = platformSummary(
+    [
+      { views: 2000, likes: 150, comments: 30, saves: 20 },
+      { views: 1000, likes: 40, comments: 10, saves: null },
+      { views: null, likes: 5, comments: 1 },
+    ],
+    1000,
+  );
+  assert.equal(summary.videos, 3);
+  assert.equal(summary.views, 3000);
+  assert.equal(summary.likes, 195);
+  assert.equal(summary.perVideo, 1500);
+  assert.equal(summary.engagement, 250 / 3000);
+  assert.equal(summary.reach, 1.5);
+  assert.deepEqual(platformSummary([], null), { videos: 0, views: null, likes: null, comments: null, perVideo: null, engagement: null, reach: null });
 });
