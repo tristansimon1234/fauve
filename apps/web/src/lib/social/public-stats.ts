@@ -1,5 +1,6 @@
 import "server-only";
-import { matchPublicVideos, readPublicProfile, readPublicVideos, usdToEur, type Platform, type PublicVideo } from "@fauve/agent";
+import { isSubscribed, matchPublicVideos, nextVideosCursor, readPublicProfile, readPublicVideos, usdToEur, type Platform, type PublicVideo } from "@fauve/agent";
+import { billingEnabled } from "@/lib/billing/stripe";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { tregCall } from "@/lib/treg";
@@ -9,7 +10,8 @@ import { tregCall } from "@/lib/treg";
 // Treg (about $0.004 a day for Instagram, $0.0024 for TikTok): her follower count on yesterday's
 // row of account_daily, as the connected capture does, and the views, likes and comments of the
 // Reels she posted herself, each found by its caption (posts published, measured in metrics).
-// A platform she connected is read by its own API (account-stats.ts), never twice.
+// A platform she connected is read by its own API (account-stats.ts), never twice. Paid plans
+// only (Tristan: « ce sera dans le plan payant uniquement »), and the team's studio.
 
 function check<T extends { error: { message: string } | null }>(result: T): T {
   if (result.error) throw new Error(result.error.message);
@@ -35,8 +37,13 @@ type External = { public_id?: string; media_id?: string; post_id?: string; publi
 
 const isoDay = (t: number) => new Date(t).toISOString().slice(0, 10);
 
-async function call(studioId: string, platform: Platform, tool: "profile" | "videos", handle: string): Promise<unknown> {
-  const done = await tregCall(TOOLS[platform][tool], { handle }, MAX_COST_USD);
+/** A studio whose public numbers are read: subscribed (or the team's), and everyone while billing is off. */
+export function publicStatsFor(studio: { subscription_status?: unknown; team?: unknown }): boolean {
+  return !billingEnabled() || studio.team === true || isSubscribed(studio.subscription_status as string | null);
+}
+
+async function call(studioId: string, platform: Platform, tool: "profile" | "videos", handle: string, cursor?: string): Promise<unknown> {
+  const done = await tregCall(TOOLS[platform][tool], { handle, ...(cursor ? { cursor } : {}) }, MAX_COST_USD);
   if (!done) return null;
   if (done.costUsd > 0) {
     await supabaseAdmin()
@@ -132,9 +139,10 @@ export async function capturePublicStats(): Promise<number> {
   const db = supabaseAdmin();
   const { data: studios } = await db
     .from("studios")
-    .select("id, instagram_handle, tiktok_handle")
+    .select("id, instagram_handle, tiktok_handle, subscription_status, team")
     .or("instagram_handle.not.is.null,tiktok_handle.not.is.null")
     .or(`public_stats_at.is.null,public_stats_at.lt.${new Date(Date.now() - EVERY_MS).toISOString()}`)
+    .or(billingEnabled() ? "subscription_status.in.(active,trialing),team.is.true" : "id.not.is.null")
     .order("public_stats_at", { ascending: true, nullsFirst: true })
     .limit(STUDIOS_PER_RUN);
   if (!studios?.length) return 0;
@@ -161,4 +169,50 @@ export async function capturePublicStats(): Promise<number> {
     }
   }
   return done;
+}
+
+/** What the analyst reads of an account she did not connect: its profile and its latest videos, with their numbers. */
+export type PublicAccount = {
+  platform: Platform;
+  handle: string;
+  profile: NonNullable<ReturnType<typeof readPublicProfile>>;
+  videos: PublicVideo[];
+};
+
+/** Videos read for an analysis, per account: about 24 on Instagram (two pages), the latest page on TikTok. */
+const ANALYSIS_PAGES = { instagram: 2, tiktok: 1 } as const;
+
+/**
+ * Her public accounts for « Ce qui marche » (performance.ts), the platforms she did not connect:
+ * null when she gave no @, or on a free plan.
+ */
+export async function publicAccounts(studioId: string): Promise<PublicAccount[] | null> {
+  const db = supabaseAdmin();
+  const [{ data: studio }, { data: connected }] = await Promise.all([
+    db.from("studios").select("instagram_handle, tiktok_handle, subscription_status, team").eq("id", studioId).maybeSingle(),
+    db.from("social_accounts").select("platform").eq("studio_id", studioId).eq("status", "connected"),
+  ]);
+  if (!studio || !publicStatsFor(studio)) return null;
+  const linked = new Set((connected ?? []).map((c) => c.platform as string));
+  const wanted = (["instagram", "tiktok"] as const).flatMap((platform) => {
+    const handle = studio[`${platform}_handle`] as string | null;
+    return handle && !linked.has(platform) ? [{ platform, handle }] : [];
+  });
+  if (!wanted.length) return null;
+  const accounts = await Promise.all(
+    wanted.map(async ({ platform, handle }): Promise<PublicAccount | null> => {
+      const profile = readPublicProfile(await call(studioId, platform, "profile", handle));
+      if (!profile) return null;
+      const videos: PublicVideo[] = [];
+      let cursor: string | undefined;
+      for (let page = 0; page < ANALYSIS_PAGES[platform] && !profile.private; page++) {
+        const answer = await call(studioId, platform, "videos", handle, cursor);
+        videos.push(...readPublicVideos(platform, answer, handle));
+        cursor = nextVideosCursor(answer) ?? undefined;
+        if (!cursor) break;
+      }
+      return { platform, handle, profile, videos: [...new Map(videos.map((v) => [v.id, v])).values()].sort((a, b) => b.at - a.at) };
+    }),
+  );
+  return accounts.filter((a): a is PublicAccount => a !== null);
 }

@@ -20,7 +20,17 @@ export function cleanHandle(platform: Platform, raw: string | null | undefined):
 }
 
 /** One of her public videos: its numbers, its caption and when it went up. */
-export type PublicVideo = { id: string; caption: string; at: number; url: string | null; views: number | null; likes: number | null; comments: number | null; saves: number | null };
+export type PublicVideo = {
+  id: string;
+  caption: string;
+  at: number;
+  url: string | null;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  saves: number | null;
+  seconds: number | null;
+};
 
 const count = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v) : null);
 const record = (v: unknown): Record<string, unknown> => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
@@ -33,12 +43,21 @@ function dataOf(answer: unknown): Record<string, unknown> | null {
   return Object.keys(data).length ? data : null;
 }
 
-/** Her follower count (and, on TikTok, all the likes her videos got) from the profile tool; null when not found or private. */
-export function readPublicProfile(answer: unknown): { followers: number; likes: number | null; private: boolean } | null {
+/** Her public profile from the profile tool: followers (and, on TikTok, all the likes her videos got), posts, bio; null when not found. */
+export function readPublicProfile(
+  answer: unknown,
+): { followers: number; likes: number | null; posts: number | null; bio: string | null; private: boolean } | null {
   const data = dataOf(answer);
   const followers = count(data?.followers);
   if (!data || followers === null) return null;
-  return { followers, likes: count(data.likes), private: data.private === true };
+  const bio = typeof data.bio === "string" && data.bio.trim() ? data.bio.trim().slice(0, 300) : null;
+  return { followers, likes: count(data.likes), posts: count(data.posts ?? data.videos), bio, private: data.private === true };
+}
+
+/** The cursor of the next page of her videos, when there is one. */
+export function nextVideosCursor(answer: unknown): string | null {
+  const cursor = dataOf(answer)?.nextCursor;
+  return typeof cursor === "string" && cursor ? cursor : null;
 }
 
 /**
@@ -58,7 +77,7 @@ export function readPublicVideos(platform: Platform, answer: unknown, handle: st
       if (!id || created === null) return [];
       const shortcode = typeof v.shortcode === "string" ? v.shortcode : null;
       const url = platform === "instagram" ? (shortcode ? `https://www.instagram.com/reel/${shortcode}/` : null) : typeof v.url === "string" ? v.url : null;
-      return [{ id, caption: typeof v.caption === "string" ? v.caption : "", at: created * 1000, url, views: count(v.views), likes: count(v.likes), comments: count(v.comments), saves: count(v.saves) }];
+      return [{ id, caption: typeof v.caption === "string" ? v.caption : "", at: created * 1000, url, views: count(v.views), likes: count(v.likes), comments: count(v.comments), saves: count(v.saves), seconds: typeof v.durationSeconds === "number" ? Math.round(v.durationSeconds) : null }];
     })
     .sort((a, b) => b.at - a.at);
 }

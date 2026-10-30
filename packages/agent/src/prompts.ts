@@ -114,7 +114,7 @@ export type StudioContextForPrompt = {
   instagram: string | null;
   tiktok?: TikTokContext;
   /** Her @ for the accounts she has not connected: her public numbers are read from it (public-stats.ts). */
-  publicHandles?: { instagram: string | null; tiktok: string | null };
+  publicHandles?: { instagram: string | null; tiktok: string | null; paid: boolean };
   /** Where the manager is writing from: the advice on sending files depends on it. */
   channel?: "whatsapp" | "web";
   /** The studio's default level of care for montages (Réglages). */
@@ -158,11 +158,12 @@ const channelLines: Record<NonNullable<StudioContextForPrompt["channel"]>, strin
 };
 
 /** Volatile context, sent after the cached system prompt. */
-/** Instagram not connected: what her @ already gives, or the one question that gets it. */
-function instagramPublicLine(handle: string | null): string {
+/** Instagram not connected: what her @ already gives, or the one question that gets it (paid plans only). */
+function instagramPublicLine(handle: string | null, paid: boolean): string {
+  if (!paid) return "pas encore connecté (l'analyse de son profil depuis son @ et le suivi de ses abonnés viennent avec l'abonnement)";
   return handle
-    ? `@${handle}, pas connecté : tu suis ses abonnés et les vues, j'aime et commentaires de ses Reels sur son compte public, une fois par jour (page Résultats) ; le connecter ajoute les visites du profil et les clics sur son lien`
-    : "pas encore connecté, et son @ n'est pas connu : demande-le-lui une fois, en une phrase, au moment où elle parle de ses résultats ou une fois son premier Reel prêt (update_onboarding instagram_handle) : ses abonnés et les vues de ses Reels se suivent alors sans rien connecter";
+    ? `@${handle}, pas connecté : tu suis ses abonnés et les vues, j'aime et commentaires de ses Reels sur son compte public, une fois par jour (page Résultats), et analyze_performance lit son profil public ; le connecter ajoute les visites du profil et les clics sur son lien`
+    : "pas encore connecté, et son @ n'est pas connu : demande-lui une fois, en une phrase (« Envoie-moi ton profil Insta, et TikTok si tu y es, que j'analyse ce qui marche chez toi »), au moment où elle parle de ses résultats ou une fois son premier Reel prêt ; enregistre-le avec update_onboarding instagram_handle / tiktok_handle (son lien ou son @)";
 }
 
 export function studioContextPrompt(ctx: StudioContextForPrompt): string {
@@ -189,9 +190,9 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     ...(ctx.routine?.length ? [`Sa présence sur les réseaux :\n${ctx.routine.map((r) => `- ${r}`).join("\n")}`] : []),
     `Prénom de la personne qui gère : ${ctx.firstName ?? "pas encore connu"}.`,
     `Étape d'onboarding : ${ctx.onboardingStep}.`,
-    `Instagram : ${ctx.instagram ? `@${ctx.instagram} connecté` : instagramPublicLine(ctx.publicHandles?.instagram ?? null)}.`,
+    `Instagram : ${ctx.instagram ? `@${ctx.instagram} connecté` : instagramPublicLine(ctx.publicHandles?.instagram ?? null, ctx.publicHandles?.paid ?? false)}.`,
     ...(ctx.tiktok ? [tiktokLine(ctx.tiktok)] : []),
-    ...(ctx.publicHandles?.tiktok && ctx.tiktok?.state !== "connected"
+    ...(ctx.publicHandles?.tiktok && ctx.publicHandles.paid && ctx.tiktok?.state !== "connected"
       ? [`Son @ TikTok : @${ctx.publicHandles.tiktok} (pas connecté) : tu suis ses abonnés, ses j'aime et les vues de ses vidéos sur son compte public, une fois par jour.`]
       : []),
     ...(ctx.channel ? [channelLines[ctx.channel]] : []),

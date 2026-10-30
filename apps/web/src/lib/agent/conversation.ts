@@ -8,6 +8,7 @@ import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
 import { presenceLines } from "@/lib/nudge";
 import { accessLine } from "@/lib/billing/access";
+import { publicStatsFor } from "@/lib/social/public-stats";
 import { studioModels } from "@/lib/reel-models";
 import { pendingSteal } from "@/lib/steal";
 
@@ -215,7 +216,11 @@ export async function replyInConversation(params: {
       onboardingStep: studio.data.onboarding_step,
       firstName: member.data?.first_name ?? null,
       instagram: (instagram.data?.handle as string | null | undefined) ?? null,
-      publicHandles: { instagram: (studio.data.instagram_handle as string | null) ?? null, tiktok: (studio.data.tiktok_handle as string | null) ?? null },
+      publicHandles: {
+        instagram: (studio.data.instagram_handle as string | null) ?? null,
+        tiktok: (studio.data.tiktok_handle as string | null) ?? null,
+        paid: publicStatsFor(studio.data),
+      },
       tiktok: tiktokEnabled()
         ? {
             state: tiktok.data?.status === "connected" ? "connected" : tiktok.data?.status === "expired" ? "expired" : "not_connected",

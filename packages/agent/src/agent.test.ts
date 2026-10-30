@@ -4891,7 +4891,13 @@ test("public stats: her @, her numbers and her Reels found by their caption", as
   assert.equal(cleanHandle("tiktok", "https://www.tiktok.com/@chez.lino?lang=fr"), "chez.lino");
   assert.equal(cleanHandle("tiktok", "Chez Lino"), null);
 
-  assert.deepEqual(readPublicProfile({ output: { found: true, data: { followers: 1240, likes: 9800, private: false } } }), { followers: 1240, likes: 9800, private: false });
+  assert.deepEqual(readPublicProfile({ output: { found: true, data: { followers: 1240, likes: 9800, videos: 31, bio: "Pilates · Paris 11", private: false } } }), {
+    followers: 1240,
+    likes: 9800,
+    posts: 31,
+    bio: "Pilates · Paris 11",
+    private: false,
+  });
   assert.equal(readPublicProfile({ output: { found: false } }), null);
 
   const reels = readPublicVideos(

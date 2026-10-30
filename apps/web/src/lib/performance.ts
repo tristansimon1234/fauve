@@ -16,11 +16,13 @@ import { z } from "zod";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { mediaInsights, recentMedia } from "@/lib/social/instagram";
 import { instagramAccount } from "@/lib/social/publish";
+import { publicAccounts } from "@/lib/social/public-stats";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // "Ce qui marche": reads the studio's latest Instagram posts with their numbers,
 // adds the recipe of the Reels Fauve made, and has the analyst say what works.
-// The report is kept in weekly_reports; its lessons feed the editor.
+// The report is kept in weekly_reports; its lessons feed the editor. Without Instagram connected,
+// her public profiles from her @ (public-stats.ts, paid plans only): views, likes, comments.
 
 const POSTS = 30;
 const INSIGHT_CONCURRENCY = 6;
@@ -71,7 +73,7 @@ export async function latestReport(studioId: string): Promise<StoredReport | nul
 /** Runs the analysis now and stores it. */
 export async function analyzePerformance(studioId: string): Promise<StoredReport | { error: string }> {
   const account = await instagramAccount(studioId);
-  if (!account) return { error: "Instagram n'est pas connecté." };
+  if (!account) return analyzePublic(studioId);
 
   const media = await recentMedia(account.userId, account.accessToken, POSTS);
   if (media.length < MIN_POSTS_FOR_ANALYSIS) return { error: `Pas encore assez de posts (${media.length}) pour en tirer des leçons.` };
@@ -122,6 +124,59 @@ export async function analyzePerformance(studioId: string): Promise<StoredReport
     .filter((w) => w.days > 0)
     .map((w) => ({ semaine_du: w.start, nouveaux_abonnes: w.newFollowers, desabonnements: w.unfollows, solde: w.net, abonnes: w.followers, vues: w.views, visites_profil: w.profileViews, clics_lien: w.linkTaps }));
 
+  return writeReport(studioId, { posts: rows, ...(compte_par_semaine.length ? { compte_par_semaine } : {}) }, rows.length);
+}
+
+const NO_ACCOUNT =
+  "Ni Instagram relié ni son @ : demande-lui le lien de son profil Instagram (et TikTok si elle y publie), enregistre-le avec update_onboarding, puis relance l'analyse.";
+
+/** Her public profiles (no connection): her latest videos with views, likes and comments, and her profile. */
+async function analyzePublic(studioId: string): Promise<StoredReport | { error: string }> {
+  const accounts = await publicAccounts(studioId);
+  if (!accounts) return { error: NO_ACCOUNT };
+  if (!accounts.length) return { error: "Son profil est introuvable avec ce @ : demande-lui de vérifier son nom de compte." };
+  const db = supabaseAdmin();
+  const [{ data: studio }, { data: fauvePosts }] = await Promise.all([
+    db.from("studios").select("timezone").eq("id", studioId).single(),
+    db.from("posts").select("external_ids, edit_plan_id").eq("studio_id", studioId).not("edit_plan_id", "is", null),
+  ]);
+  // Reels Fauve made, found online by their caption: the recipe of their montage.
+  const planIds = (fauvePosts ?? []).map((p) => p.edit_plan_id as string);
+  const { data: plans } = planIds.length ? await db.from("edit_plans").select("id, plan").in("id", planIds) : { data: [] };
+  const planById = new Map((plans ?? []).map((p) => [p.id as string, p.plan]));
+  const recipes = new Map<string, unknown>();
+  for (const p of fauvePosts ?? []) {
+    for (const external of Object.values((p.external_ids as Record<string, { public_id?: string }> | null) ?? {})) {
+      if (external?.public_id) recipes.set(external.public_id, recipeOf(planById.get(p.edit_plan_id as string)));
+    }
+  }
+  const timezone = (studio?.timezone as string | undefined) ?? "Europe/Paris";
+  const when = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", timeZone: timezone });
+  const rows = accounts.flatMap((a) =>
+    a.videos.slice(0, POSTS).map((v) => ({
+      id: v.id,
+      reseau: a.platform,
+      type: a.platform === "instagram" ? "reel" : "vidéo",
+      date: when.format(new Date(v.at)),
+      duree_s: v.seconds ?? undefined,
+      legende: v.caption.slice(0, 140),
+      longueur_legende: v.caption.length,
+      hashtags: (v.caption.match(/#\w+/gu) ?? []).length,
+      views: v.views,
+      likes: v.likes,
+      comments: v.comments,
+      ...(v.saves !== null ? { saves: v.saves } : {}),
+      fauve: recipes.get(v.id),
+    })),
+  );
+  if (rows.length < MIN_POSTS_FOR_ANALYSIS) return { error: `Pas encore assez de vidéos publiques (${rows.length}) pour en tirer des leçons.` };
+  const profils = accounts.map((a) => ({ reseau: a.platform, compte: `@${a.handle}`, abonnes: a.profile.followers, publications: a.profile.posts, bio: a.profile.bio, prive: a.profile.private || undefined }));
+  return writeReport(studioId, { source: "public", profils, posts: rows }, rows.length);
+}
+
+/** The analyst's report on what it read, kept in weekly_reports. */
+async function writeReport(studioId: string, input: Record<string, unknown>, posts: number): Promise<StoredReport | { error: string }> {
+  const db = supabaseAdmin();
   const response = await anthropic().beta.messages.parse({
     model: ANALYST_MODEL,
     max_tokens: 8000,
@@ -129,7 +184,7 @@ export async function analyzePerformance(studioId: string): Promise<StoredReport
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: PERFORMANCE_PROMPT,
-    messages: [{ role: "user", content: JSON.stringify({ posts: rows, ...(compte_par_semaine.length ? { compte_par_semaine } : {}) }) }],
+    messages: [{ role: "user", content: JSON.stringify(input) }],
   });
   await logClaudeCost(studioId, response.usage, "performance", ANALYST_MODEL);
   if (response.stop_reason === "refusal" || !response.parsed_output) return { error: "L'analyse n'a pas abouti." };
@@ -144,11 +199,11 @@ export async function analyzePerformance(studioId: string): Promise<StoredReport
       period_start: day(start),
       period_end: day(today),
       summary: report.summary,
-      suggestions: { lessons: report.lessons, ideas: report.ideas, best: report.best, posts: rows.length },
+      suggestions: { lessons: report.lessons, ideas: report.ideas, best: report.best, posts },
       created_at: today.toISOString(),
     },
     { onConflict: "studio_id,period_start,period_end" },
   );
   if (error) console.warn("weekly_reports: not stored", error.message);
-  return { ...report, createdAt: today.toISOString(), posts: rows.length };
+  return { ...report, createdAt: today.toISOString(), posts };
 }

@@ -58,6 +58,7 @@ import { bakedReel } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus } from "@/lib/montage-status";
+import { publicStatsFor } from "@/lib/social/public-stats";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
@@ -281,12 +282,14 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (input.step) studioUpdate.onboarding_step = input.step;
       if (input.website_url) studioUpdate.website_url = input.website_url;
       if (input.booking_url) studioUpdate.booking_url = input.booking_url;
+      const handles: string[] = [];
       for (const platform of ["instagram", "tiktok"] as const) {
         const raw = input[`${platform}_handle`];
         if (raw === undefined) continue;
         const handle = cleanHandle(platform, raw);
         if (!handle) return json({ refused: `« ${raw} » n'est pas un @ ${platform === "instagram" ? "Instagram" : "TikTok"} : redemande-le-lui (son nom de compte, ou le lien de son profil).` });
         studioUpdate[`${platform}_handle`] = handle;
+        handles.push(`@${handle}`);
       }
       if (Object.keys(studioUpdate).length) check(await db.from("studios").update(studioUpdate).eq("id", studioId));
       if (input.first_name) check(await db.from("members").update({ first_name: input.first_name }).eq("id", ctx.memberId));
@@ -305,6 +308,16 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             .catch((e: unknown) => console.warn("new site unreadable", url, e)),
         );
         return json({ ok: true, nouveau_site: SITE_AGAIN, note: SITE_CHANGED });
+      }
+      if (handles.length) {
+        const { data: billing } = await db.from("studios").select("subscription_status, team").eq("id", studioId).single();
+        return json({
+          ok: true,
+          profil: handles.join(", "),
+          note: publicStatsFor(billing ?? {})
+            ? "Son profil est enregistré : lance analyze_performance (refresh: true) dans ce même tour et donne-lui le bilan en 2-3 phrases ; ses abonnés et les vues de ses Reels se suivent maintenant chaque jour (page Résultats)."
+            : "Son profil est enregistré. L'analyse de son profil et le suivi de ses abonnés viennent avec l'abonnement : dis-le en une phrase, sans insister.",
+        });
       }
       return "ok";
     },
