@@ -1,5 +1,5 @@
 import "server-only";
-import { awaitsAnswer, echoFor, emojiOnly, onboardingStepOf, replyExtrasSchema } from "@fauve/agent";
+import { awaitsAnswer, echoFor, emojiOnly, INTRO_VIDEO, justHello, onboardingStepOf, replyExtrasSchema, WHATSAPP_WELCOME } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { answerPairing, claimPairing, PAIRING_YES, PAIRING_NO } from "@/lib/auth/pairing";
 import { TERMS_LINE } from "@/lib/legal";
@@ -16,7 +16,7 @@ import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { photoRegions } from "@/lib/video/regions";
 import { setReaction } from "@/lib/reactions";
 import { env } from "@/lib/env";
-import { downloadMedia, markReadAndTyping, sendLinkButton, sendReaction, sendReply, sendText } from "./client";
+import { downloadMedia, markReadAndTyping, sendLinkButton, sendReaction, sendReply, sendText, sendVideo } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 
 // Several messages often arrive together (a caption + 5 clips). We wait briefly and
@@ -147,7 +147,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
       const fresh = onboardingStepOf(studio?.onboarding_step) !== "done";
       await pairingReply(
         fresh
-          ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Edith, ton community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment.`
+          ? `Bonjour${member.first_name ? ` ${member.first_name}` : ""} ! Moi c’est Edith, ton community manager (une IA) ✨ Ton ordinateur est connecté : on fait connaissance sur l’écran, je t’y attends. Tu pourras m’écrire ici aussi, à tout moment, ou m’envoyer des notes vocales 🎙️`
           : "C’est bon, ton ordinateur est connecté ✨",
       );
       return;
@@ -197,7 +197,13 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     await analysis;
     return;
   }
+  // Her first message ever: the welcome first (what Edith does, how to start); a plain « Bonjour » needs nothing more.
+  const welcomed = await welcomeIfNew(member.studio_id, phone, message).catch((e: unknown) => {
+    console.warn("welcome failed", e);
+    return null;
+  });
   await analysis;
+  if (welcomed === "enough") return;
 
   // Only emojis (« 🔥 », « ❤️ ») that answer nothing: a reaction back at once, no turn needed.
   const text = textOf(message);
@@ -253,6 +259,52 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   await replyOnWhatsApp({ studioId: member.studio_id, memberId: member.id, waId: message.from, phone, replyTo: message.id });
 }
 
+/**
+ * Her very first message (no message from Edith yet): Edith's 30-second introduction video with
+ * the welcome written once for everyone as its caption (INTRO_VIDEO, WHATSAPP_WELCOME; the text
+ * alone if WhatsApp refuses the video), sent and stored like a reply. "enough" when she only said hello (nothing
+ * else to answer), "sent" when her message gets its own turn after it (her site, a photo, a
+ * question), null when she is not new.
+ */
+async function welcomeIfNew(studioId: string, phone: string, message: InboundMessage): Promise<"enough" | "sent" | null> {
+  const db = supabaseAdmin();
+  const [{ count }, { data: studio }] = await Promise.all([
+    db.from("whatsapp_messages").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("direction", "outbound"),
+    db.from("studios").select("onboarding_step").eq("id", studioId).single(),
+  ]);
+  if (count || onboardingStepOf(studio?.onboarding_step) !== "website") return null;
+  const { data: inbound } = await db.from("whatsapp_messages").select("type, body").eq("studio_id", studioId).eq("direction", "inbound").neq("type", "reaction").limit(20);
+  const enough = (inbound ?? []).every((m) => m.type === "text" && justHello(m.body as string | null));
+  // The terms go under the last message of her first exchange: here only when no turn follows.
+  const terms = enough && (await termsToShow(studioId).catch(() => false));
+  const body = terms ? `${WHATSAPP_WELCOME}\n\n${TERMS_LINE}` : WHATSAPP_WELCOME;
+  const video = `${env("APP_URL")}${INTRO_VIDEO.path}`;
+  const sent = await sendVideo(message.from, video, body).then(
+    (id) => ({ id, video: true, error: null }),
+    (refused: unknown) => {
+      console.warn("whatsapp: welcome video refused, the text alone", refused);
+      return sendText(message.from, body).then(
+        (id) => ({ id, video: false, error: null }),
+        (error: unknown) => {
+          console.error("whatsapp: welcome not delivered", error);
+          return { id: undefined, video: false, error: deliveryError(error) };
+        },
+      );
+    },
+  );
+  await db.from("whatsapp_messages").insert({
+    studio_id: studioId,
+    wa_message_id: sent.id ?? null,
+    direction: "outbound",
+    phone_e164: phone,
+    type: sent.video ? "video" : "text",
+    body,
+    payload: { reply_to: message.id, kind: "welcome", ...(sent.video ? { video } : {}), ...(sent.error ? { undelivered: sent.error } : {}) },
+  });
+  if (terms && sent.id) await markTermsShown(studioId).catch((e) => console.warn("terms not marked shown", e));
+  return enough ? "enough" : "sent";
+}
+
 /** Whether she sent another message after this one (on WhatsApp, its own turn answers it). */
 async function newerMessage(studioId: string, waMessageId: string): Promise<boolean> {
   const db = supabaseAdmin();
@@ -269,6 +321,16 @@ async function newerMessage(studioId: string, waMessageId: string): Promise<bool
     .gt("created_at", mine.created_at as string)
     .limit(1);
   return Boolean(later?.length);
+}
+
+/** What WhatsApp said when it refused a reply: its code and its words (« (#131037) … needs display name approval »). */
+function deliveryError(error: unknown): { code: number | null; message: string; at: string } {
+  const body = (error as { body?: { error?: { code?: unknown; message?: unknown } } } | null)?.body?.error;
+  return {
+    code: typeof body?.code === "number" ? body.code : null,
+    message: (typeof body?.message === "string" ? body.message : error instanceof Error ? error.message : String(error)).slice(0, 300),
+    at: new Date().toISOString(),
+  };
 }
 
 /**
@@ -319,24 +381,37 @@ export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo
       ...(posts && posts.length > 1 ? posts.map((id) => `${env("APP_URL")}/v/${id}`) : []),
       ...(!url && button ? [`${env("APP_URL")}${button.path}`] : []),
     ];
-    const waMessageId = url
-      ? options?.length
-        ? // WhatsApp puts one kind of button on a message: the answers on hers, then the page.
-          await sendReply(waId, result.reply, options, links).then(async (id) => {
-            await sendLinkButton(waId, button!.purpose === "upload" ? "En pleine qualité, depuis ta galerie :" : "C’est ici :", { url, label: button!.label });
-            return id;
-          })
-        : await sendLinkButton(waId, [result.reply, ...links].join("\n\n"), { url, label: button!.label })
-      : await sendReply(waId, result.reply, options, links);
+    const send = () =>
+      url
+        ? options?.length
+          ? // WhatsApp puts one kind of button on a message: the answers on hers, then the page.
+            sendReply(waId, result.reply!, options, links).then(async (id) => {
+              await sendLinkButton(waId, button!.purpose === "upload" ? "En pleine qualité, depuis ta galerie :" : "C’est ici :", { url, label: button!.label });
+              return id;
+            })
+          : sendLinkButton(waId, [result.reply, ...links].join("\n\n"), { url, label: button!.label })
+        : sendReply(waId, result.reply!, options, links);
+    // A reply WhatsApp refuses (its number's display name awaiting Meta's approval, error 131037) is still kept,
+    // marked: it shows in the app, the next turn knows she never read it, and what it started still runs below.
+    // Lost, each of her « Alors ? » ran the whole turn again (her site read four times) and her site's look,
+    // started after the reply, never came: the app's style card waited for it.
+    const delivered = await send().then(
+      (id) => ({ id, error: null }),
+      (error: unknown) => {
+        console.error("whatsapp: reply not delivered", replyTo, error);
+        return { id: undefined, error: deliveryError(error) };
+      },
+    );
     await db.from("whatsapp_messages").insert({
       studio_id: studioId,
-      wa_message_id: waMessageId,
+      wa_message_id: delivered.id ?? null,
       direction: "outbound",
       phone_e164: phone,
       type: "text",
       body: result.reply,
-      payload: { ...(replyTo ? { reply_to: replyTo } : {}), ...result.extras, notes: result.notes },
+      payload: { ...(replyTo ? { reply_to: replyTo } : {}), ...result.extras, notes: result.notes, ...(delivered.error ? { undelivered: delivered.error } : {}) },
     });
+    const waMessageId = delivered.id;
     if (terms && waMessageId) await markTermsShown(studioId).catch((e) => console.warn("terms not marked shown", e));
   }
   // E.g. a render: the video follows the "je monte ta vidéo" reply.

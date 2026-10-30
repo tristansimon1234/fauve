@@ -268,5 +268,5 @@ export function planMessage(plan: PostPlan): string {
 export function validatedPlanBrief(plan: PostPlan): string {
   // Edith's advice on the hook (« Conseil : … ») was only advice: validating the plan keeps her opening, never the advice.
   const why = plan.why.replace(/\s*Conseil\s*:[\s\S]*$/, "").trim();
-  return [`Le plan que la gérante a validé (« ${plan.title} ») :`, ...plan.points.map((point) => `- ${point}`), why ? `Pourquoi : ${why}` : ""].filter(Boolean).join("\n");
+  return [`Le plan validé (« ${plan.title} ») :`, ...plan.points.map((point) => `- ${point}`), why ? `Pourquoi : ${why}` : ""].filter(Boolean).join("\n");
 }

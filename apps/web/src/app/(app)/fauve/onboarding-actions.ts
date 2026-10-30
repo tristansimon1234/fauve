@@ -2,8 +2,11 @@
 
 import { brandProfileSchema, nextOnboardingStep, ONBOARDING_STEPS, onboardingStepOf, PLANS, planOf, reelsPerMonth, stylePreviewProps, type OnboardingStep, type ReelProps } from "@fauve/agent";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { readWebsite } from "@/lib/agent/website";
 import { loadMontageInputs } from "@/lib/render/render-post";
+import { readSiteLook } from "@/lib/site-look";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { socialConnect } from "@/lib/social/connect";
@@ -25,8 +28,8 @@ export type OnboardingView = {
   preview: ReelProps | null;
   /** Her site's look has been read (its signature written): until then, the style card makes her wait for her preview. */
   siteRead: boolean;
-  /** fromSite: Edith took these photos from her website (she has not made her own moodboard yet). */
-  moodboard: { items: { path: string; url: string }[]; reading: string | null; fromSite: boolean };
+  /** photosFrom: Edith took these photos from her website or her Instagram (she has not made her own moodboard yet). */
+  moodboard: { items: { path: string; url: string }[]; reading: string | null; photosFrom: "site" | "instagram" | null };
   rhythm: { posts: number; stories: number };
   /** Her offer: what its credits hold, to choose a rhythm she can keep with care. */
   offer: { label: string; credits: number; postsPerWeek: number; reels: number };
@@ -87,7 +90,7 @@ export async function onboardingView(): Promise<OnboardingView | null> {
     direction: profile.art_direction?.trim() || null,
     preview,
     siteRead: Boolean(profile.signature),
-    moodboard: { items: items.flatMap((i) => (urls.get(i.path) ? [{ path: i.path, url: urls.get(i.path)! }] : [])), reading: profile.moodboard?.reading ?? null, fromSite: items.some((i) => i.note === "Photo de ton site") },
+    moodboard: { items: items.flatMap((i) => (urls.get(i.path) ? [{ path: i.path, url: urls.get(i.path)! }] : [])), reading: profile.moodboard?.reading ?? null, photosFrom: items.some((i) => i.note === "Photo de ton site") ? "site" : items.some((i) => i.note === "Photo de ton Instagram") ? "instagram" : null },
     rhythm: { posts: (plan.data?.posts_per_week as number | null) ?? offer.postsPerWeek, stories: (plan.data?.stories_per_week as number | null) ?? 4 },
     offer: { label: offer.label, credits: offer.credits, postsPerWeek: offer.postsPerWeek, reels: reelsPerMonth(offerId) },
     instagram: (account.data?.handle as string | null) ?? null,
@@ -112,6 +115,30 @@ export async function goToStep(step: OnboardingStep): Promise<{ ok: boolean }> {
   if (ONBOARDING_STEPS.indexOf(step) <= ONBOARDING_STEPS.indexOf(current)) return { ok: true };
   await db.from("studios").update({ onboarding_step: step }).eq("id", studioId);
   revalidatePath("/fauve");
+  return { ok: true };
+}
+
+/**
+ * Her site's photos and look, read now when the style card waited for them in vain: the reading starts after
+ * Edith's answer, and an answer WhatsApp refused once lost it (the card waited for a reading that never started).
+ * Never twice: readSiteLook stops when her moodboard or her site's photos are already there.
+ */
+export async function lookAtSite(): Promise<{ ok: boolean }> {
+  const studioId = await studioOf();
+  if (!studioId) return { ok: false };
+  const { data } = await supabaseAdmin().from("studios").select("website_url, onboarding_step").eq("id", studioId).single();
+  const url = data?.website_url as string | null | undefined;
+  const step = onboardingStepOf(data?.onboarding_step);
+  if (!url || (step !== "website" && step !== "style")) return { ok: false };
+  after(() =>
+    readWebsite(url)
+      // Its logo is not one of its photos.
+      .then(({ images, ...site }) => readSiteLook(studioId, site.url, site.logo ? images.filter((i) => i.split("?")[0] !== site.logo!.split("?")[0]) : images))
+      .then(
+        (r) => console.info("site look from the style card", studioId, r),
+        (e: unknown) => console.warn("site look from the style card failed", studioId, e),
+      ),
+  );
   return { ok: true };
 }
 

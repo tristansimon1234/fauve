@@ -89,8 +89,8 @@ export function TestChat({ initial }: { initial: TestState }) {
               <div className="flex flex-col items-center gap-3 py-10 text-center">
                 <Orb size={64} />
                 <p className="max-w-[420px] text-[15px] leading-relaxed text-muted">
-                  Tu es une gérante qui écrit à Edith pour la première fois. Dis bonjour : Edith va te guider pour
-                  configurer ton studio, comme sur WhatsApp.
+                  Tu as un commerce et tu écris à Edith pour la première fois. Dis bonjour : Edith va te guider pour
+                  configurer ton compte, comme sur WhatsApp.
                 </p>
               </div>
             )}
@@ -187,7 +187,7 @@ function Panel({ snapshot }: { snapshot: TestSnapshot }) {
 
       <Card title="Studio">
         <Row label="Nom" value={studio.name ?? "—"} />
-        <Row label="Gérante" value={snapshot.manager ?? "—"} />
+        <Row label="Prénom" value={snapshot.manager ?? "—"} />
         <Row label="Site web" value={studio.websiteUrl ? shortUrl(studio.websiteUrl) : "—"} />
         <Row label="Réservation" value={studio.bookingUrl ? shortUrl(studio.bookingUrl) : "—"} />
         <Row label="Onboarding" value={onboardingLabels[studio.onboardingStep] ?? studio.onboardingStep} />

@@ -1,11 +1,11 @@
 "use client";
 
-import { MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STEPS, RHYTHM_PRESETS, sampleWeek, STYLE_PREVIEW_FRAME, type OnboardingStep } from "@fauve/agent";
+import { instagramProfileHandle, INTRO_VIDEO, MOODBOARD_MAX_ITEMS, ONBOARDING_LABELS, ONBOARDING_STEPS, RHYTHM_PRESETS, sampleWeek, STYLE_PREVIEW_FRAME, type OnboardingStep } from "@fauve/agent";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { DropCard } from "@/app/(app)/fauve/drop-card";
-import { finishStep, onboardingView, saveRhythm, type OnboardingView } from "@/app/(app)/fauve/onboarding-actions";
+import { finishStep, lookAtSite, onboardingView, saveRhythm, type OnboardingView } from "@/app/(app)/fauve/onboarding-actions";
 import { addCharterFont, saveLogo, saveMoodboard } from "@/app/(app)/style/actions";
 import { LOGO_MAX_BYTES, LOGO_TYPES } from "@/app/(app)/style/style-options";
 import { HandlesForm } from "@/components/handles-form";
@@ -124,7 +124,7 @@ export function OnboardingCard({
         <h3 className="text-[16px] font-bold">{ONBOARDING_LABELS[step]}</h3>
       </div>
       {step === "website" && <WebsiteStep onSend={onSend} pending={pending} />}
-      {step === "style" && view && <StyleStep studioId={view.studioId} view={view} onChange={reload} onNext={() => next(view.moodboard.items.length ? "C’est mon style, on continue." : "On continue sans moodboard.")} onSend={onSend} pending={pending} setError={setError} />}
+      {step === "style" && view && <StyleStep studioId={view.studioId} view={view} onChange={reload} onNext={() => next(view.moodboard.items.length ? "C’est mon style, on continue." : "On continue sans moodboard.")} pending={pending} setError={setError} />}
       {step === "rhythm" && view && (
         <RhythmStep
           initial={view.rhythm}
@@ -149,7 +149,7 @@ export function OnboardingCard({
       {step === "first_post" && (
         <FirstPostStep
           timezone={timezone}
-          sitePhotos={Boolean(view?.moodboard.fromSite)}
+          sitePhotos={view?.moodboard.photosFrom ?? null}
           onFiles={onFiles}
           onSite={() => onSend("Je n’ai rien sous la main : pars des photos de mon site.")}
           onLater={() => next("Je ferai ma première publication plus tard.")}
@@ -168,53 +168,48 @@ export function OnboardingCard({
 
 function WebsiteStep({ onSend, pending }: { onSend: (text: string) => void; pending: boolean }) {
   const [url, setUrl] = useState("");
-  const valid = /\.[a-z]{2,}/i.test(url.trim());
+  const given = url.trim();
+  const instagram = instagramProfileHandle(given);
+  const valid = Boolean(instagram) || /\.[a-z]{2,}/i.test(given);
   return (
-    <>
-      <p className="text-[14px] leading-relaxed text-muted">Ton site me dit qui tu es, ce que tu proposes, tes couleurs et ton ton. Je le lis et je te résume ce que j’ai compris.</p>
-      <form
-        className="flex flex-col gap-2 sm:flex-row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (valid) onSend(`Voici mon site : ${url.trim()}`);
-        }}
-      >
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          inputMode="url"
-          autoComplete="url"
-          placeholder="monsite.fr"
-          aria-label="Ton site"
-          className="h-12 min-w-0 flex-1 rounded-full border border-line bg-white px-4 text-[15px] outline-none focus:border-violet"
-        />
-        <button type="submit" disabled={!valid || pending} className="btn btn-primary h-12 px-5 disabled:opacity-40">
-          Lire mon site
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+      {/* Who Edith is and what he does, in 30 seconds, read by his voice: the same video as the welcome on WhatsApp, played with its sound. */}
+      <video
+        src={INTRO_VIDEO.path}
+        poster={INTRO_VIDEO.poster}
+        playsInline
+        controls
+        preload="metadata"
+        aria-label="Tout ce qu’il faut savoir sur Edith, en 25 secondes"
+        className="aspect-[9/16] w-full max-w-[200px] shrink-0 self-center rounded-[18px] bg-soft object-cover sm:self-start"
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <p className="text-[14px] leading-relaxed text-muted">Tout ce qu’il faut savoir sur moi est dans la vidéo. Pour commencer, ton site ou ton Instagram me disent qui tu es, ce que tu proposes et ton style : je les lis et je te résume ce que j’ai compris.</p>
+        <form
+          className="flex flex-col gap-2 sm:flex-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (valid) onSend(instagram ? `Voici mon Instagram : ${given}` : `Voici mon site : ${given}`);
+          }}
+        >
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            inputMode="url"
+            autoComplete="url"
+            placeholder="monsite.fr ou @moninstagram"
+            aria-label="Ton site ou ton Instagram"
+            className="h-12 min-w-0 flex-1 rounded-full border border-line bg-white px-4 text-[15px] outline-none focus:border-violet"
+          />
+          <button type="submit" disabled={!valid || pending} className="btn btn-primary h-12 px-5 disabled:opacity-40">
+            {instagram ? "Lire mon Instagram" : "Lire mon site"}
+          </button>
+        </form>
+        <button type="button" disabled={pending} onClick={() => onSend("Je n’ai ni site ni Instagram.")} className="self-start text-[13px] font-semibold text-muted hover:text-ink">
+          Ni site ni Instagram
         </button>
-      </form>
-      <button type="button" disabled={pending} onClick={() => onSend("Je n’ai pas de site internet.")} className="self-start text-[13px] font-semibold text-muted hover:text-ink">
-        Je n’ai pas de site
-      </button>
-    </>
-  );
-}
-
-/** Ambiances to pick from when she has no images at hand: a word and a small palette. */
-const AMBIANCES = [
-  { label: "Épuré et lumineux", hint: "blanc, beige, beaucoup d’air", colors: ["#FFFFFF", "#EDE6DC", "#B8B1A8"] },
-  { label: "Chaleureux et naturel", hint: "bois, lin, terracotta, lumière douce", colors: ["#E9DCC8", "#C98B5B", "#7A4E33"] },
-  { label: "Chic et éditorial", hint: "noir et crème, grands titres, comme un magazine", colors: ["#F3EDE3", "#A88B5D", "#1C1C1C"] },
-  { label: "Doux et apaisant", hint: "pastels, rondeurs, calme", colors: ["#F6EFE6", "#E8D5E0", "#C9DCE6"] },
-  { label: "Énergique et coloré", hint: "couleurs vives, rythme, contrastes", colors: ["#FFC93C", "#FF5A36", "#2E5BFF"] },
-];
-
-function Swatches({ colors }: { colors: string[] }) {
-  return (
-    <span className="flex shrink-0 -space-x-1.5" aria-hidden="true">
-      {colors.slice(0, 3).map((c) => (
-        <span key={c} className="size-5 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(28,21,48,0.08)]" style={{ background: c }} />
-      ))}
-    </span>
+      </div>
+    </div>
   );
 }
 
@@ -223,7 +218,6 @@ function StyleStep({
   view,
   onChange,
   onNext,
-  onSend,
   pending,
   setError,
 }: {
@@ -231,7 +225,6 @@ function StyleStep({
   view: OnboardingView;
   onChange: () => void;
   onNext: () => void;
-  onSend: (text: string) => void;
   pending: boolean;
   setError: (e: string | null) => void;
 }) {
@@ -242,16 +235,23 @@ function StyleStep({
   // Edith reads her site's photos and look right after its step: the photos land here in a few seconds, her
   // style (its preview, « Tes Reels auront ce style ») a little later. She waits for both before moving on: the
   // preview came after she had already continued (Tristan: « il apparaît un peu tard… faire attendre le user »).
+  // Nothing from her site after about 25 s (its photos land in a few): the reading never started (an answer WhatsApp
+  // refused had lost it), so the card starts it, once, and waits for it a little longer.
   const [waited, setWaited] = useState(0);
-  const lookingAtSite = Boolean(view.website) && (!items.length || !view.siteRead) && waited < 30;
+  const [kicked, setKicked] = useState(false);
+  const lookingAtSite = Boolean(view.website) && (!items.length || !view.siteRead) && waited < (kicked ? 45 : 30);
   useEffect(() => {
     if (!lookingAtSite) return;
     const timer = setTimeout(() => {
+      if (waited === 6 && !items.length && !kicked) {
+        setKicked(true);
+        void lookAtSite().catch(() => {});
+      }
       onChange();
       setWaited((n) => n + 1);
     }, 4000);
     return () => clearTimeout(timer);
-  }, [lookingAtSite, waited, onChange]);
+  }, [lookingAtSite, waited, onChange, items.length, kicked]);
 
   const add = async (files: File[]) => {
     const picked = files.filter((f) => f.type.startsWith("image/")).slice(0, room);
@@ -333,8 +333,8 @@ function StyleStep({
       <div className="flex flex-col gap-2">
         <span className="text-[14px] font-bold">Ton moodboard</span>
         <p className="-mt-1 text-[13px] leading-snug text-muted">
-          {items.length && view.moodboard.fromSite
-            ? "J’ai pris les photos de ton site pour commencer. Ajoute ou retire ce que tu veux : je m’en sers pour tous tes visuels."
+          {items.length && view.moodboard.photosFrom
+            ? `J’ai pris ${view.moodboard.photosFrom === "instagram" ? "tes dernières photos Instagram" : "les photos de ton site"} pour commencer. Ajoute ou retire ce que tu veux : je m’en sers pour tous tes visuels.`
             : "Des images de ce que tu aimes : des posts, des ambiances, des couleurs. Je m’en sers pour tous tes visuels."}
         </p>
         {lookingAtSite && !items.length && (
@@ -374,38 +374,8 @@ function StyleStep({
         {!view.preview && view.direction && <p className="rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[13px] leading-relaxed text-violet">{view.direction}</p>}
         <input ref={fileRef} type="file" accept="image/*" multiple className="sr-only" onChange={(e) => (void add([...(e.target.files ?? [])]), (e.target.value = ""))} />
       </div>
-      {!items.length && !lookingAtSite && (
-        <div className="flex flex-col gap-2">
-          <span className="text-[14px] font-bold">Pas d’images sous la main ? Choisis une ambiance</span>
-          <div className="flex flex-wrap gap-2">
-            {view.brand.colors.length > 0 && (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => onSend("L’ambiance que je veux : fidèle à mon site, avec mes couleurs.")}
-                className="fauve-press inline-flex h-10 items-center gap-2 rounded-full border border-line bg-white pr-3.5 pl-2 text-[13px] font-semibold hover:border-lilac disabled:opacity-50"
-              >
-                <Swatches colors={view.brand.colors} />
-                Comme mon site
-              </button>
-            )}
-            {AMBIANCES.map((a) => (
-              <button
-                key={a.label}
-                type="button"
-                disabled={pending}
-                title={a.hint}
-                onClick={() => onSend(`L’ambiance que je veux : ${a.label.toLowerCase()} (${a.hint}).`)}
-                className="fauve-press inline-flex h-10 items-center gap-2 rounded-full border border-line bg-white pr-3.5 pl-2 text-[13px] font-semibold hover:border-lilac disabled:opacity-50"
-              >
-                <Swatches colors={a.colors} />
-                {a.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-[12px] text-muted">Ou décris-la en une phrase en bas, à ta façon.</p>
-        </div>
-      )}
+      {/* No atmospheres to pick (Tristan: « je comprends pas trop l'utilité »): her style comes from what she has, or her words. */}
+      {!items.length && !lookingAtSite && <p className="text-[13px] text-muted">Pas d’images sous la main ? Décris en bas, à ta façon, le style que tu veux.</p>}
       <div className="flex flex-wrap items-center gap-3">
         {lookingAtSite ? (
           // Not the moment to skip: what she is waiting for arrives in a few seconds.
@@ -653,7 +623,8 @@ function FirstPostStep({
   pending,
 }: {
   timezone: string;
-  sitePhotos: boolean;
+  /** Her site's photos, or her Instagram's, are in her library. */
+  sitePhotos: "site" | "instagram" | null;
   onFiles?: (files: FileList | File[]) => void;
   onSite: () => void;
   onLater: () => void;
@@ -679,7 +650,7 @@ function FirstPostStep({
         ) : null}
         {sitePhotos ? (
           <button type="button" disabled={pending} onClick={onSite} className="hover:text-ink">
-            Partir des photos de mon site
+            {sitePhotos === "instagram" ? "Partir de mes photos Instagram" : "Partir des photos de mon site"}
           </button>
         ) : null}
         <button type="button" disabled={pending} onClick={onLater} className="hover:text-ink">

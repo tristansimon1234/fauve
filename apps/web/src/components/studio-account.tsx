@@ -84,7 +84,7 @@ function StudioLink({ name, firstName, role }: { name: string; firstName: string
       <Avatar name={name} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate text-[15px] font-bold">{name}</span>
-        <span className="truncate text-[13px] text-muted">{[firstName, role === "owner" ? "Gérante" : "Équipe"].filter(Boolean).join(" · ")}</span>
+        <span className="truncate text-[13px] text-muted">{[firstName, role === "owner" ? "Responsable" : "Équipe"].filter(Boolean).join(" · ")}</span>
       </span>
     </Link>
   );

@@ -4615,7 +4615,7 @@ test("Edith's plan: 3 to 6 short points, a title and why, kept for the montage; 
   assert.equal(plan.points.length, 6);
   assert.ok(plan.points.every((p) => p.length <= 220 && !p.includes("—") && !p.startsWith("-")));
   assert.ok(!plan.points.includes("Court"));
-  assert.match(validatedPlanBrief(plan), /^Le plan que la gérante a validé \(« Lancement de la rentrée »\) :\n- Ouverture/);
+  assert.match(validatedPlanBrief(plan), /^Le plan validé \(« Lancement de la rentrée »\) :\n- Ouverture/);
   assert.equal(keptPlan({ title: "x", points: ["Ouverture : un seul point"], why: "" }), null);
   // Edith's advice on the hook is shown to her, never passed on as validated: her opening stays (« jamais en obligeant »).
   const advised = keptPlan({ title: "Le salon", points: ["Accroche : ton logo", "Ensuite : la coupe", "Fin : réserve"], why: "On voit tout le travail. Conseil : ouvrir sur la coupe finie retiendrait plus." })!;
@@ -4882,6 +4882,74 @@ test("trends: the most watched first, foreign scripts and weak ones left out, tw
     { hashtag: "pilates", posts: 52_420_000, gained: 120_000, days: 7 },
     { hashtag: "pilatesparis", posts: 310_000, gained: null, days: null },
   ]);
+});
+
+test("her Instagram profile at her getting started: its link, the providers' answers, her first hello", async () => {
+  const { instagramProfileHandle, readInstagramProfile, readInstagramPosts } = await import("./instagram-profile.ts");
+  const { justHello, WHATSAPP_WELCOME } = await import("./onboarding.ts");
+  // Her profile, however she pastes it; a post, a Reel or another site is not one.
+  assert.equal(instagramProfileHandle("https://www.instagram.com/Maison.Maya/?igsh=abc"), "maison.maya");
+  assert.equal(instagramProfileHandle("instagram.com/maisonmaya_paris"), "maisonmaya_paris");
+  assert.equal(instagramProfileHandle("@maisonmaya"), "maisonmaya");
+  assert.equal(instagramProfileHandle("https://www.instagram.com/maisonmaya/reels/"), "maisonmaya");
+  assert.equal(instagramProfileHandle("https://www.instagram.com/reel/C8xYz/"), null);
+  assert.equal(instagramProfileHandle("https://www.instagram.com/p/C8xYz/"), null);
+  assert.equal(instagramProfileHandle("https://maisonmaya.fr"), null);
+
+  // A provider's rows (crawl4ai's columns) and Instagram's own shape both read.
+  const rows = {
+    output: {
+      data: [{ username: "maisonmaya", full_name: "Maison Maya", biography: "Salon de coiffure, Paris 11", category: "Salon de coiffure", external_url: "https://maisonmaya.fr", profile_pic_url: "https://cdn.example/pic.jpg", followers: 1200, posts: 84, is_private: false }],
+    },
+  };
+  assert.deepEqual(readInstagramProfile(rows, "maisonmaya"), {
+    handle: "maisonmaya",
+    name: "Maison Maya",
+    bio: "Salon de coiffure, Paris 11",
+    category: "Salon de coiffure",
+    site: "https://maisonmaya.fr",
+    picture: "https://cdn.example/pic.jpg",
+    private: false,
+    followers: 1200,
+    posts: 84,
+  });
+  const graph = { data: { user: { full_name: "Chez Lino", biography: "", bio_links: [{ url: "https://linktr.ee/lino" }], edge_followed_by: { count: 530 }, edge_owner_to_timeline_media: { count: 12 }, is_private: true } } };
+  const lino = readInstagramProfile(graph, "chezlino");
+  assert.equal(lino?.handle, "chezlino");
+  assert.equal(lino?.site, "https://linktr.ee/lino");
+  assert.equal(lino?.followers, 530);
+  assert.equal(lino?.private, true);
+  assert.equal(readInstagramProfile({ output: { found: false } }, "x"), null);
+
+  // Her posts, in order, each once; a carousel's own slides are not more posts.
+  const posts = readInstagramPosts({
+    rows: [
+      { code: "A", caption: "Le balayage de Léa", image: "https://cdn.example/a.jpg?x=1", kind: "image" },
+      { code: "B", caption: { text: "Avant / après" }, image_versions2: { candidates: [{ url: "https://cdn.example/b.jpg" }] }, media_type: 8, carousel_media: [{ image_versions2: { candidates: [{ url: "https://cdn.example/b2.jpg" }] } }] },
+      { code: "C", caption: "", thumbnail_url: "https://cdn.example/c.jpg", video_url: "https://cdn.example/c.mp4" },
+      { code: "A2", image: "https://cdn.example/a.jpg?x=2" },
+    ],
+  });
+  assert.deepEqual(posts, [
+    { image: "https://cdn.example/a.jpg?x=1", caption: "Le balayage de Léa", video: false },
+    { image: "https://cdn.example/b.jpg", caption: "Avant / après", video: false },
+    { image: "https://cdn.example/c.jpg", caption: "", video: true },
+  ]);
+
+  // Her first « Bonjour » gets the welcome alone; anything more gets its own answer after it.
+  assert.equal(justHello("Bonjour !"), true);
+  assert.equal(justHello("coucou Edith 👋"), true);
+  assert.equal(justHello("Salut, voici mon site maisonmaya.fr"), false);
+  assert.equal(justHello("Bonjour, ça marche comment ?"), false);
+  assert.equal(justHello(""), false);
+  assert.match(WHATSAPP_WELCOME, /community manager IA/);
+  assert.match(WHATSAPP_WELCOME, /notes vocales/);
+  assert.match(WHATSAPP_WELCOME, /site ou de ton profil Instagram/);
+  assert.match(WHATSAPP_WELCOME, /ton logo, des photos ou des Reels que tu aimes/);
+  // The caption of the intro video: WhatsApp keeps 1 024 characters, the terms line included.
+  assert.ok(WHATSAPP_WELCOME.length + 200 < 1024);
+  const { INTRO_VIDEO } = await import("./onboarding.ts");
+  assert.match(INTRO_VIDEO.path, /^\/onboarding\/.+\.mp4$/);
 });
 
 test("public stats: her @, her numbers and her Reels found by their caption", async () => {

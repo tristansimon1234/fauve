@@ -1,7 +1,7 @@
 import { CREDIT_PACK, PLAN_ORDER, PLANS, reelsPerMonth } from "@fauve/agent";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { company } from "@/lib/legal";
+import { company, priceTax, VAT_EXEMPTION } from "@/lib/legal";
 
 export const metadata: Metadata = { title: "Conditions d’utilisation et de vente", alternates: { canonical: "/conditions" } };
 
@@ -71,13 +71,14 @@ export default function TermsPage() {
       <ul>
         {PLAN_ORDER.map((id) => (
           <li key={id}>
-            {PLANS[id].label} : {PLANS[id].priceEur} € TTC par mois, {PLANS[id].credits} crédits à chaque renouvellement (environ {reelsPerMonth(id)} Reels soignés par mois).
+            {PLANS[id].label} : {PLANS[id].priceEur} €{priceTax} par mois, {PLANS[id].credits} crédits à chaque renouvellement (environ {reelsPerMonth(id)} Reels soignés par mois).
           </li>
         ))}
         <li>
-          « {CREDIT_PACK.label} » : {CREDIT_PACK.credits} crédits pour {CREDIT_PACK.priceEur} € TTC, en paiement unique, pour un abonnement en cours.
+          « {CREDIT_PACK.label} » : {CREDIT_PACK.credits} crédits pour {CREDIT_PACK.priceEur} €{priceTax}, en paiement unique, pour un abonnement en cours.
         </li>
       </ul>
+      {VAT_EXEMPTION ? <p>Ces prix sont nets : {VAT_EXEMPTION} (franchise en base de TVA).</p> : null}
       <p>
         Les crédits paient le travail d’Edith (montages, corrections, carrousels composés, images). Le prix d’un montage dépend de ce qu’il a vraiment demandé, entre un minimum et
         un maximum indiqués à son lancement ; le message de livraison dit combien il a utilisé et ce qu’il reste. Un montage qui échoue n’est pas débité. La conversation avec Edith,

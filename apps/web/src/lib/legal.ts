@@ -1,19 +1,28 @@
-// What the legal pages say about who runs Edith. The fields between brackets wait for the company
-// (Tristan: no SIREN yet); once they are filled, `complete` is true and the pages go into the sitemap.
-// The SIREN goes in `registration` once the registration (formality J00296131972, URSSAF and INSEE) is validated.
+// What the legal pages say about who runs Edith. The fields between brackets wait for the company;
+// once they are filled, `complete` is true and the pages go into the sitemap. Its registration
+// (formality J00296131972) was validated by INSEE on 30 October 2026: a micro-entreprise, under the
+// VAT threshold (franchise en base de TVA, art. 293 B du CGI), so no VAT is charged.
 export const company = {
   name: "Tristan Simon",
   /** Its legal form and capital, if any (« SAS au capital de 1 000 € », « Entrepreneur individuel »). */
   form: "entrepreneur individuel (micro-entreprise)",
   address: "59 rue de Ponthieu, 75008 Paris",
-  registration: "SIREN en cours d’attribution",
+  registration: "SIREN 904 467 578",
+  /** Its establishment (SIREN + NIC 00038), asked by banks and Stripe; shown in the legal notice. */
+  siret: "904 467 578 00038",
   /** Intra-community VAT number, once there is one. */
   vat: "",
   email: "contact@edith-ai.app",
   /** Who answers for what the site publishes (LCEN, art. 6). */
   publisher: "Tristan Simon",
-  updatedAt: "29 octobre 2026",
+  updatedAt: "30 octobre 2026",
 };
+
+/** Under the VAT threshold (franchise en base): prices are net, and every invoice says why (CGI, art. 242 nonies A). */
+export const VAT_EXEMPTION = company.vat ? null : "TVA non applicable, art. 293 B du CGI";
+
+/** What follows a price: « TTC » once VAT is charged; nothing before, since no VAT is included. */
+export const priceTax = company.vat ? " TTC" : "";
 
 /** True once the company's details are filled in (no « [ » placeholder left). */
 export const complete = ![company.name, company.form, company.address, company.registration, company.email, company.publisher].some((v) => v.includes("["));

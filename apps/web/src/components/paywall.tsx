@@ -1,4 +1,5 @@
 import { CREDIT_PACK, nextPlan, PLAN_BUTTONS, PLANS, type PlanId } from "@fauve/agent";
+import { priceTax } from "@/lib/legal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { signMediaUrls, type Db } from "@/lib/studio";
 import { PackButton } from "./pack-button";
@@ -111,7 +112,7 @@ export async function Paywall({ db, studioId, postId, next, upgradeFrom }: { db:
         {upgradeFrom ? <PackButton next={next} primary={!above} /> : null}
         {!upgradeFrom || above ? <PlanChoice next={next} upgradeFrom={upgradeFrom} /> : null}
         <p className="text-[12px] leading-snug text-muted">
-          {upgradeFrom ? "Prix TTC. Paiement sécurisé par Stripe." : "Prix TTC, chaque mois. Paiement sécurisé par Stripe."}
+          {`${priceTax ? "Prix TTC" : "Prix nets (TVA non applicable)"}${upgradeFrom ? "" : ", chaque mois"}. Paiement sécurisé par Stripe.`}
         </p>
       </div>
     </main>

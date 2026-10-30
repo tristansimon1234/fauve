@@ -1,4 +1,5 @@
 import { filmIdeas, PLAN_ORDER, PLANS, postIdeas, reelsPerMonth } from "@fauve/agent";
+import { priceTax } from "@/lib/legal";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -148,7 +149,7 @@ export default async function TradePage({ params }: PageProps<"/community-manage
             <Link key={id} href="/#tarif" className="flex flex-col gap-2 rounded-[22px] bg-white p-6 transition-shadow hover:shadow-[0_24px_50px_-28px_rgba(28,21,48,.35)]">
               <span className="text-[12px] font-bold tracking-[0.16em] text-violet uppercase">{PLANS[id].label}</span>
               <span className="text-[34px] leading-none font-extrabold tracking-[-0.03em]">
-                {PLANS[id].priceEur}&nbsp;€<span className="ml-1 text-[15px] font-semibold text-muted">TTC / mois</span>
+                {PLANS[id].priceEur}&nbsp;€<span className="ml-1 text-[15px] font-semibold text-muted">{priceTax ? "TTC / mois" : "par mois"}</span>
               </span>
               <span className="flex items-center gap-2 text-[15px] text-muted">
                 <CheckIcon size={15} />

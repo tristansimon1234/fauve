@@ -1,4 +1,5 @@
 import { PLAN_ORDER, PLANS, reelsPerMonth, weeklyPosts } from "@fauve/agent";
+import { priceTax } from "@/lib/legal";
 import type { Metadata } from "next";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { ChartIcon, CheckIcon, ClockIcon, EyeIcon, LayersIcon, MicIcon, MusicIcon, PenIcon, RepeatIcon, ZapIcon } from "@/components/icons";
@@ -350,7 +351,7 @@ export default function LandingPage() {
                 {o.dark && <span className="rounded-full bg-white/10 px-3 py-1 text-[12px] font-bold">Le plus complet</span>}
               </div>
               <span className="text-[56px] leading-none font-extrabold tracking-[-0.04em]">
-                {o.price} € <span className={`text-xl font-semibold tracking-normal ${o.dark ? "text-lilac-ink" : "text-muted"}`}>TTC / mois</span>
+                {o.price} € <span className={`text-xl font-semibold tracking-normal ${o.dark ? "text-lilac-ink" : "text-muted"}`}>{priceTax ? "TTC / mois" : "par mois"}</span>
               </span>
               <p className={`text-[15px] ${o.dark ? "text-[#E4DFF2]" : "text-muted"}`}>{fr(o.pitch)}</p>
               <ul className={`grid gap-2 text-[15px] ${o.dark ? "text-[#E4DFF2]" : "text-ink/85"}`}>

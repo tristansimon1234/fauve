@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { company, host } from "@/lib/legal";
+import { company, host, VAT_EXEMPTION } from "@/lib/legal";
 
 export const metadata: Metadata = { title: "Mentions légales", alternates: { canonical: "/mentions-legales" } };
 
@@ -17,10 +17,21 @@ export default function LegalNoticePage() {
         Siège : {company.address}
         <br />
         Immatriculation : {company.registration}
+        {company.siret ? (
+          <>
+            <br />
+            SIRET : {company.siret}
+          </>
+        ) : null}
         {company.vat ? (
           <>
             <br />
             TVA intracommunautaire : {company.vat}
+          </>
+        ) : VAT_EXEMPTION ? (
+          <>
+            <br />
+            {VAT_EXEMPTION}
           </>
         ) : null}
         <br />
