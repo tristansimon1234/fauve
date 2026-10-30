@@ -17,6 +17,12 @@ export default function LegalNoticePage() {
         Siège : {company.address}
         <br />
         Immatriculation : {company.registration}
+        {company.siret ? (
+          <>
+            <br />
+            SIRET : {company.siret}
+          </>
+        ) : null}
         {company.vat ? (
           <>
             <br />

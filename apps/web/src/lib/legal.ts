@@ -8,6 +8,8 @@ export const company = {
   form: "entrepreneur individuel (micro-entreprise)",
   address: "59 rue de Ponthieu, 75008 Paris",
   registration: "SIREN 904 467 578",
+  /** Its establishment (SIREN + NIC 00038), asked by banks and Stripe; shown in the legal notice. */
+  siret: "904 467 578 00038",
   /** Intra-community VAT number, once there is one. */
   vat: "",
   email: "contact@edith-ai.app",
