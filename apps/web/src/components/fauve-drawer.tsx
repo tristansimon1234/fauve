@@ -9,7 +9,7 @@ import { applyLive, enteringAfterLive, liveTurn, type LiveState } from "@/app/(a
 import { SimoneLive } from "@/app/(app)/fauve/simone-avatar";
 import { LiveTyping } from "@/app/(app)/fauve/live-typing";
 import { montageStep } from "@/app/(app)/fauve/chat-cards";
-import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress, useTurnGuard } from "@/app/(app)/fauve/chat-sync";
+import { arrivals, chatSignature, mergeMessages, runningQuote, useNarrow, useQuoteProgress, useTurnGuard } from "@/app/(app)/fauve/chat-sync";
 import {
   launchQuote,
   loadConversation,
@@ -120,6 +120,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
   const fileRef = useRef<HTMLInputElement>(null);
   const [studioId, setStudioId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const narrow = useNarrow();
   // Photos and videos, like on the Fauve page: uploaded at once, sent with the message.
   const uploads = useChatUploads(studioId, setError);
   const timeFormat = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone });
@@ -470,7 +471,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
                   send(draft, true);
                 }
               }}
-              placeholder={topic.scene !== undefined ? "Ce que tu veux pour cette scène…" : "Ce que tu veux changer, ou glisse une photo…"}
+              placeholder={topic.scene !== undefined ? "Ce que tu veux pour cette scène…" : narrow ? "Ce que tu veux changer…" : "Ce que tu veux changer, ou glisse une photo…"}
               // 16 px: iOS Safari does not zoom the page on focus.
               className="max-h-[160px] min-h-10 flex-1 resize-none bg-transparent py-2 text-[16px] outline-none placeholder:text-muted/70"
             />

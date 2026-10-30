@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import type { ChatCard } from "@/lib/chat-cards";
 import { quoteProgress, type ChatMessage, type QuoteProgress } from "./chat-actions";
 
@@ -156,4 +156,16 @@ export function useTurnGuard() {
     }),
     [],
   );
+}
+
+const NARROW = "(max-width: 639px)";
+const onNarrowChange = (change: () => void) => {
+  const query = window.matchMedia(NARROW);
+  query.addEventListener("change", change);
+  return () => query.removeEventListener("change", change);
+};
+
+/** A phone's width: the composer's hint is shortened there (wrapped on two lines, it was cut off). */
+export function useNarrow(): boolean {
+  return useSyncExternalStore(onNarrowChange, () => window.matchMedia(NARROW).matches, () => false);
 }

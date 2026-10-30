@@ -31,7 +31,9 @@ export function AppShell({
         <div className="mt-auto flex flex-col gap-3.5">{account}</div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col pb-20 lg:pb-0">
+      {/* Room under the content for the phone's tab bar, its home bar included. A page that fills the
+          screen (data-fill: the chat) gets exactly what is left between the header and the bar. */}
+      <div className="flex min-w-0 flex-1 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0 [&:has(>[data-fill])]:h-dvh">
         <header className="flex items-center justify-between border-b border-line px-4 py-3 lg:hidden">
           <Logo size={30} />
           {avatar}

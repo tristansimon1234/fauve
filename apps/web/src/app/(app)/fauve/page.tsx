@@ -18,8 +18,10 @@ export const maxDuration = 300;
 
 export default function FauvePage({ searchParams }: PageProps<"/fauve">) {
   return (
-    // Full height: the composer stays at the bottom (phone: minus the header and the tab bar).
-    <main className="flex h-[calc(100dvh-134px)] min-h-[480px] flex-col lg:h-dvh">
+    // Full height: the composer stays at the bottom, the space left between the header and the
+    // phone's tab bar (data-fill, app-shell.tsx); measured by hand (100dvh − 134 px), it was taller
+    // than the space on a phone and the composer slid under the tab bar on a small one.
+    <main data-fill className="flex min-h-[320px] flex-1 flex-col">
       <PageSuspense title="Edith" skeleton={<ChatLoading />}>
         <Home searchParams={searchParams} />
       </PageSuspense>

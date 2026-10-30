@@ -27,7 +27,7 @@ import { Orb } from "@/components/orb";
 import type { CardQuote } from "@/lib/chat-cards";
 import { Bubble } from "./chat-bubble";
 import { montageStep } from "./chat-cards";
-import { arrivals, chatSignature, mergeMessages, runningQuote, useQuoteProgress, useTurnGuard } from "./chat-sync";
+import { arrivals, chatSignature, mergeMessages, runningQuote, useNarrow, useQuoteProgress, useTurnGuard } from "./chat-sync";
 import { isFunny, isSweet, upsetLevel } from "@fauve/agent";
 import { FileStrip, useChatUploads } from "./chat-uploads";
 import type { OnboardingView } from "./onboarding-actions";
@@ -128,6 +128,7 @@ export function FauveWorkspace({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const narrow = useNarrow();
   const timeFormat = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone });
 
   // Photos and videos: uploaded to Storage as soon as they are added, sent with the message.
@@ -716,7 +717,15 @@ export function FauveWorkspace({
                     send(draft, true);
                   }
                 }}
-                placeholder={files.length ? "Dis à Edith ce que tu veux en faire : un Reel, un carrousel…" : "Demande à Edith, ou glisse tes photos et vidéos ici…"}
+                placeholder={
+                  files.length
+                    ? narrow
+                      ? "Dis-moi quoi en faire…"
+                      : "Dis à Edith ce que tu veux en faire : un Reel, un carrousel…"
+                    : narrow
+                      ? "Écris à Edith…"
+                      : "Demande à Edith, ou glisse tes photos et vidéos ici…"
+                }
                 className="max-h-[180px] min-h-11 flex-1 resize-none bg-transparent py-2.5 text-[16px] outline-none placeholder:text-muted/70"
               />
               <button
