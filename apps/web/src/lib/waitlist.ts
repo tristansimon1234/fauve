@@ -25,6 +25,15 @@ async function room(): Promise<number> {
   return Math.max(0, (await cap()) - (count ?? 0));
 }
 
+/**
+ * One of the team's numbers (app_settings « team_phones »): never kept waiting, and its studio is the
+ * team's again when it is made anew (the trigger members_team_by_phone), its /admin and alerts with it.
+ */
+async function teamPhone(phone: string): Promise<boolean> {
+  const { data } = await supabaseAdmin().from("app_settings").select("value").eq("key", "team_phones").maybeSingle();
+  return Array.isArray(data?.value) && (data.value as unknown[]).includes(phone);
+}
+
 /** A fresh studio and its owner for a new number (null: a concurrent first message made it first). */
 async function createMember(phone: string, firstName: string | null): Promise<Member | null> {
   const db = supabaseAdmin();
@@ -50,7 +59,7 @@ export async function memberOrRoom(phone: string, profileName?: string): Promise
   const db = supabaseAdmin();
   const existing = await db.from("members").select("id, studio_id, first_name").eq("phone_e164", phone).maybeSingle();
   if (existing.data) return existing.data;
-  if ((await room()) <= 0) return null;
+  if ((await room()) <= 0 && !(await teamPhone(phone))) return null;
   const made = await createMember(phone, profileName?.split(/\s+/)[0] ?? null);
   if (made) return made;
   // Lost a race with a concurrent first message: use the winner.
