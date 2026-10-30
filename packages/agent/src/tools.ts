@@ -82,7 +82,7 @@ export const toolSpecs = {
   },
   get_page_link: {
     description:
-      "Sur WhatsApp, son canal principal sur téléphone, ce qui demande un écran passe par une page faite pour son téléphone, derrière un bouton sous ton message (n'écris jamais de lien) : voix, la voix de ses Reels (écouter les voix et en choisir une, quand mettre une voix off, cloner sa propre voix en lisant un petit texte) : dès qu'elle veut changer de voix, entendre les voix ou mettre sa propre voix ; abonnement, les offres et le paiement (s'abonner, « 1 Reel de plus », passer à l'offre au-dessus) : dès qu'il faut s'abonner ou reprendre des crédits ; factures, ses factures en PDF (abonnement et packs) : dès qu'elle demande une facture ou un reçu. Dans l'application, il renvoie où aller.",
+      "Sur WhatsApp, son canal principal sur téléphone, ce qui demande un écran passe par une page faite pour son téléphone, derrière un bouton sous ton message (n'écris jamais de lien) : voix, la voix de ses Reels (écouter les voix et en choisir une, quand mettre une voix off, cloner sa propre voix en lisant un petit texte) : dès qu'elle veut changer de voix, entendre les voix ou mettre sa propre voix ; abonnement, les offres et le paiement (s'abonner, « 1 Reel de plus », passer à l'offre au-dessus) : dès qu'il faut s'abonner ou reprendre des crédits ; factures, ses factures en PDF (abonnement et packs) et « Gérer mon abonnement » (sa carte, son offre, l'arrêter) : dès qu'elle demande une facture, un reçu, ou de changer sa carte ou d'arrêter. Dans l'application, il renvoie où aller.",
     input: z.object({ page: z.enum(["voix", "abonnement", "factures"]) }),
   },
   get_post_link: {

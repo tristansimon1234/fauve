@@ -23,7 +23,7 @@ export default function ReadyPage() {
         </Suspense>
       </div>
       <div className="flex flex-col gap-2.5 border-t border-line px-6 pt-3.5 pb-7.5">
-        {/* On a computer the app goes on (the next step waits on the Fauve page); on a phone, WhatsApp. */}
+        {/* On a computer the app goes on (the next step waits on the Fauve page); on a phone, WhatsApp only (no app there, proxy.ts). */}
         <Link
           href="/fauve"
           className="hidden h-[54px] items-center justify-center rounded-full bg-violet text-base font-bold text-white md:flex"
@@ -38,12 +38,6 @@ export default function ReadyPage() {
           <span className="md:hidden">Retourner sur WhatsApp</span>
           <span className="hidden md:inline">Continuer sur WhatsApp</span>
         </a>
-        <Link
-          href="/fauve"
-          className="flex h-12 items-center justify-center rounded-full border-[1.5px] border-line text-[15px] font-semibold md:hidden"
-        >
-          Continuer dans l’app
-        </Link>
       </div>
     </>
   );

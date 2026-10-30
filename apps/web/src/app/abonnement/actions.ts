@@ -89,12 +89,12 @@ export async function buyCredits(next: string): Promise<{ error: string } | void
   );
 }
 
-/** The Stripe portal: change the offer, the card, or stop. */
-export async function openPortal(): Promise<{ error: string } | void> {
+/** The Stripe portal: change the offer, the card, or stop; back to Réglages, or to her invoices on her phone. */
+export async function openPortal(back: "/reglages" | "/factures" = "/reglages"): Promise<{ error: string } | void> {
   const { member } = await getStudioContext();
   if (!member) return { error: "Reconnecte-toi pour continuer." };
   const { data: studio } = await supabaseAdmin().from("studios").select("stripe_customer_id").eq("id", member.studio.id).single();
   const customer = studio?.stripe_customer_id as string | null | undefined;
   if (!customer) return { error: "Pas encore d’abonnement." };
-  redirect(await portalSession(customer, `${env("APP_URL")}/reglages`));
+  redirect(await portalSession(customer, `${env("APP_URL")}${back === "/factures" ? "/factures" : "/reglages"}`));
 }

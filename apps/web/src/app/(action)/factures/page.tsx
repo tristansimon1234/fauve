@@ -6,12 +6,16 @@ import { InvoiceList } from "@/components/invoice-list";
 import { studioInvoices } from "@/lib/billing/invoices";
 import { whatsappLink } from "@/lib/public-env";
 import { getStudioContext } from "@/lib/studio";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isSubscribed } from "@fauve/agent";
+import { PortalButton } from "./portal-button";
 
 export const metadata: Metadata = { title: "Mes factures" };
 
 // Her invoices on her phone, behind « Voir mes factures » under Edith's message on WhatsApp
 // (get_page_link factures): each payment with Stripe's PDF, then back to WhatsApp with nothing
 // written (a message would make Edith answer, and each answer past the free 1,000 a month is paid).
+// On a phone the app's Réglages are not there: « Gérer mon abonnement » (Stripe's portal) is here.
 
 export default function InvoicesPage() {
   return (
@@ -24,7 +28,11 @@ export default function InvoicesPage() {
 async function Invoices() {
   const { member } = await getStudioContext();
   if (!member) redirect("/connexion?next=/factures");
-  const rows = await studioInvoices(member.studio.id);
+  const [rows, { data: studio }] = await Promise.all([
+    studioInvoices(member.studio.id),
+    supabaseAdmin().from("studios").select("stripe_customer_id, subscription_status").eq("id", member.studio.id).maybeSingle(),
+  ]);
+  const subscribed = Boolean(studio?.stripe_customer_id) && isSubscribed(studio?.subscription_status as string | null);
   return (
     <main className="mx-auto flex min-h-dvh max-w-[420px] flex-col gap-5 px-5 py-8">
       <div className="flex flex-col gap-1">
@@ -32,6 +40,7 @@ async function Invoices() {
         <p className="text-[14px] leading-snug text-white/70">{member.studio.name ?? "Ton commerce"}, chaque paiement en PDF.</p>
       </div>
       <InvoiceList rows={rows} timeZone={member.studio.timezone} dark />
+      {subscribed ? <PortalButton /> : null}
       <a
         href={whatsappLink("")}
         className="mt-auto inline-flex items-center justify-center gap-2 self-center rounded-full bg-white px-5 py-3 text-[15px] font-extrabold text-ink"

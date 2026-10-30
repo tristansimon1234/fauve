@@ -13,6 +13,7 @@ export const PRIVATE_PATHS = [
   "/voix",
   "/merci",
   "/factures",
+  "/sur-whatsapp",
   "/essai",
   "/abonnement",
   "/fauve",
