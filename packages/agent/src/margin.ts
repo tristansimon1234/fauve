@@ -63,10 +63,18 @@ export const CHAT_EUR_PER_POST = 0.35;
 export const WHATSAPP_EUR_PER_POST = 0.22;
 /** What no credit pays, per publication: the chat, its readings, and WhatsApp. */
 export const UNPRICED_EUR_PER_POST = CHAT_EUR_PER_POST + WHATSAPP_EUR_PER_POST;
+/**
+ * Her public numbers read each day from her @ through Treg (lib/social/public-stats.ts), for a
+ * subscriber: about $0.004 a day for Instagram and $0.0024 for TikTok (Treg's catalog, October
+ * 2026), about €0.17 a month with both. Treg's other calls cost a tenth of a cent (a Reel to copy
+ * by its link, her profile at the onboarding); the trends are shared by every studio of a trade.
+ */
+export const PUBLIC_STATS_EUR_PER_MONTH = 0.17;
 /** Publications a month at an offer's weekly rhythm. */
 export const postsPerMonth = (plan: PlanId) => (PLANS[plan].postsPerWeek * 52) / 12;
-/** The most an offer's month costs: every credit spent, and what no credit pays at its rhythm. It stays under its budget. */
-export const monthCostCeiling = (plan: PlanId) => PLANS[plan].credits * EUR_PER_CREDIT_SPENT + postsPerMonth(plan) * UNPRICED_EUR_PER_POST;
+/** The most an offer's month costs: every credit spent, what no credit pays at its rhythm, and her daily numbers. It stays under its budget. */
+export const monthCostCeiling = (plan: PlanId) =>
+  PLANS[plan].credits * EUR_PER_CREDIT_SPENT + postsPerMonth(plan) * UNPRICED_EUR_PER_POST + PUBLIC_STATS_EUR_PER_MONTH;
 
 /** What a credit pack brings in: VAT and the card's fee out (a single payment, no Billing). */
 export const packNetRevenue = () => CREDIT_PACK.priceEur / (1 + VAT_RATE) - (CREDIT_PACK.priceEur * 0.015 + 0.25);
