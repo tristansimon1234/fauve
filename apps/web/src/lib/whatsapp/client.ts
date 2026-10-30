@@ -198,6 +198,23 @@ export async function sendTemplate(
   return res.messages[0]?.id;
 }
 
+/**
+ * The first of these templates WhatsApp sends: a new version while Meta still reviews it (or refused
+ * it), then the one before. A refused send costs nothing.
+ */
+export async function sendFirstTemplate(toWaId: string, tries: { name: string; params: string[]; urlSuffix?: string }[]): Promise<{ id: string | undefined; name: string }> {
+  let last: unknown = new Error("no template");
+  for (const t of tries) {
+    try {
+      return { id: await sendTemplate(toWaId, t.name, t.params, "fr", t.urlSuffix), name: t.name };
+    } catch (error) {
+      console.warn("template refused, trying the next", t.name, error instanceof Error ? error.message : error);
+      last = error;
+    }
+  }
+  throw last;
+}
+
 /** Downloads an inbound media file (the URL from Graph is short-lived and needs the token). */
 export async function downloadMedia(mediaId: string): Promise<{ bytes: ArrayBuffer; mimeType: string; size: number }> {
   const meta = await graph<{ url: string; mime_type: string; file_size: number }>(mediaId);

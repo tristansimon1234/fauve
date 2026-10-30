@@ -2,7 +2,7 @@ import "server-only";
 import { captionForInstagram, captionMatch, isInSessionWindow } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { sendImage, sendLinkButton, sendTemplate, sendText, sendVideo } from "@/lib/whatsapp/client";
+import { sendFirstTemplate, sendImage, sendLinkButton, sendText, sendVideo } from "@/lib/whatsapp/client";
 import { recentMedia, recentStories, InstagramError } from "./instagram";
 
 // « Je publie moi-même » : at the post's time, Edith hands the post over on
@@ -117,12 +117,20 @@ export async function handOff(postId: string): Promise<{ postId: string; ok: boo
       // Outside the window: a template whose button opens its page (signed in, /l/{token});
       // her answer still brings the video (deliverPendingHandOffs).
       const link = await createLoginLink(phone, `/v/${post.id}`, "open_post");
-      const id = await sendTemplate(phone.slice(1), "post_to_share", [post.title as string], "fr", link.split("/l/")[1]).catch((error) => {
-        console.error("post_to_share template refused", error);
-        return undefined;
+      const token = link.split("/l/")[1];
+      const sent = await sendFirstTemplate(phone.slice(1), [
+        { name: "post_due", params: [post.title as string], urlSuffix: token },
+        { name: "post_to_share", params: [post.title as string], urlSuffix: token },
+      ]).catch((error) => {
+        console.error("post_due template refused", error);
+        return null;
       });
-      if (id) {
-        await store(studioId, phone, id, `C’est l’heure de publier « ${post.title} » ! Ta publication est prête : touche le bouton pour la voir, ou réponds-moi et je te l’envoie ici.`, { open_post: post.id });
+      if (sent?.id) {
+        const body =
+          sent.name === "post_due"
+            ? `Rappel : ta publication « ${post.title} » est prévue pour maintenant. Touche le bouton pour l’ouvrir, ou réponds à ce message pour la recevoir ici.`
+            : `C’est l’heure de publier « ${post.title} » ! Ta publication est prête : touche le bouton pour la voir, ou réponds-moi et je te l’envoie ici.`;
+        await store(studioId, phone, sent.id, body, { open_post: post.id });
         via = "template";
       }
     }

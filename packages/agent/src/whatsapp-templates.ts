@@ -20,6 +20,17 @@ export const whatsappTemplates = {
   // « Ça fait {{1}} jours sans publication. Envoie-moi les photos ou vidéos que tu as sous la main, je m’occupe du reste. »
   nudge: { category: "utility", params: ["days"] },
   login_code: { category: "authentication", params: ["code"] },
+  // Neutral versions, after Meta moved reel_ready, weekly_summary and post_to_share to Marketing (Utility: « non-
+  // promotional » and « specific to or requested by the user »; no « ! », no invitation to do more). Each is sent
+  // first, its older version while Meta reviews it (sendFirstTemplate).
+  // « Ton Reel « {{1}} » est terminé. Touche le bouton pour le voir. » with « Voir mon Reel ».
+  reel_done: { category: "utility", params: ["title"] },
+  // « Le relevé hebdomadaire de ton compte Edith : {{1}}, {{2}} et {{3}}. Tu reçois ce relevé chaque semaine avec
+  // ton abonnement. » (weeklyPublicParams, weeklySummaryParams)
+  weekly_statement: { category: "utility", params: ["first", "second", "third"] },
+  // « Rappel : ta publication « {{1}} » est prévue pour maintenant. Touche le bouton pour l’ouvrir, ou réponds à
+  // ce message pour la recevoir ici. » with « Voir ma publication ».
+  post_due: { category: "utility", params: ["title"] },
 } as const;
 
 export type WhatsAppTemplateName = keyof typeof whatsappTemplates;

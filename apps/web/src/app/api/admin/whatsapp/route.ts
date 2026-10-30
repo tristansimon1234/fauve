@@ -9,7 +9,7 @@ import { graph, WhatsAppError } from "@/lib/whatsapp/client";
 //   ?action=register&pin=123456 register the number on the Cloud API (2-step PIN)
 //   ?action=subscribe           subscribe this app to the WABA's webhooks
 //   ?action=templates           list message templates and their review status
-//   ?action=create_templates    submit Fauve's templates (see whatsappTemplates) for review
+//   ?action=create_templates    submit Fauve's templates (see whatsappTemplates) for review (&only=a,b: just these)
 // POST with CRON_SECRET (select public.call_app('/api/admin/whatsapp?action=…')): templates and create_templates only.
 
 // Must match whatsappTemplates (packages/agent) and the senders in lib/whatsapp/client.ts.
@@ -112,6 +112,48 @@ const TEMPLATE_DEFINITIONS = [
       },
     ],
   },
+  // Neutral versions of the three Meta moved to Marketing (« non-promotional », « specific to or requested by the
+  // user »): no « ! », no invitation to do more, her own Reel, post or account named.
+  {
+    name: "reel_done",
+    language: "fr",
+    category: "UTILITY",
+    components: [
+      { type: "BODY", text: "Ton Reel « {{1}} » est terminé. Touche le bouton pour le voir.", example: { body_text: [["Le service du soir"]] } },
+      {
+        type: "BUTTONS",
+        buttons: [{ type: "URL", text: "Voir mon Reel", url: "{APP_URL}/l/{{1}}", example: ["{APP_URL}/l/Xc3vR8kQ2mZp7LwT9aB4eF"] }],
+      },
+    ],
+  },
+  {
+    name: "weekly_statement",
+    language: "fr",
+    category: "UTILITY",
+    components: [
+      {
+        type: "BODY",
+        text: "Le relevé hebdomadaire de ton compte Edith : {{1}}, {{2}} et {{3}}. Tu reçois ce relevé chaque semaine avec ton abonnement.",
+        example: { body_text: [["3 vidéos publiées (2 la semaine d’avant)", "4 300 vues (+39 % sur la semaine d’avant)", "12 nouveaux abonnés (+5 la semaine d’avant)"]] },
+      },
+    ],
+  },
+  {
+    name: "post_due",
+    language: "fr",
+    category: "UTILITY",
+    components: [
+      {
+        type: "BODY",
+        text: "Rappel : ta publication « {{1}} » est prévue pour maintenant. Touche le bouton pour l’ouvrir, ou réponds à ce message pour la recevoir ici.",
+        example: { body_text: [["Le service du soir"]] },
+      },
+      {
+        type: "BUTTONS",
+        buttons: [{ type: "URL", text: "Voir ma publication", url: "{APP_URL}/l/{{1}}", example: ["{APP_URL}/l/Xc3vR8kQ2mZp7LwT9aB4eF"] }],
+      },
+    ],
+  },
 ];
 
 const REQUIRED: EnvKey[] = [
@@ -188,8 +230,10 @@ async function run(params: URLSearchParams) {
   }
 
   if (action === "create_templates") {
+    // &only=a,b: just these (the others are already registered and would only answer « already exists »).
+    const only = params.get("only")?.split(",").filter(Boolean);
     const results = await Promise.all(
-      TEMPLATE_DEFINITIONS.map(async (template) => ({
+      TEMPLATE_DEFINITIONS.filter((template) => !only || only.includes(template.name)).map(async (template) => ({
         name: template.name,
         result: await attempt(() =>
           graph(`${env("WHATSAPP_WABA_ID")}/message_templates`, {

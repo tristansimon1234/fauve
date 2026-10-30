@@ -6,6 +6,7 @@ import { TERMS_LINE } from "@/lib/legal";
 import { acceptShownTerms, acceptTerms, markTermsShown, termsToShow } from "@/lib/terms";
 import { answerPublishOffer } from "@/lib/publish-offer";
 import { deliverPendingHandOffs } from "@/lib/social/hand-off";
+import { deliverWaitingReport } from "@/lib/weekly-report";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { quoteButtons } from "@/lib/credits";
 import { memberOrRoom, waitlist } from "@/lib/waitlist";
@@ -413,6 +414,8 @@ export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo
     });
     const waMessageId = delivered.id;
     if (terms && waMessageId) await markTermsShown(studioId).catch((e) => console.warn("terms not marked shown", e));
+    // Her Sunday report that waited for her (outside the window): right after her answer, « Au fait, … ».
+    if (waMessageId) await deliverWaitingReport(studioId, waId).catch((e) => console.warn("waiting weekly report not sent", e));
   }
   // E.g. a render: the video follows the "je monte ta vidéo" reply.
   for (const job of result.afterReply) await job().catch((e) => console.error("after-reply job failed", e));

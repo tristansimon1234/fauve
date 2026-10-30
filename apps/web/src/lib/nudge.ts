@@ -75,8 +75,9 @@ export async function nudgeIfQuiet(studioId: string, now = Date.now()): Promise<
   const text = nudgeMessage(daysSince, banked ?? 0);
   await messageOwner(studioId, {
     text,
+    // No template outside the 24 h window: Meta classes a « come back » as Marketing whatever its words
+    // (billed, capped per person); there it waits in the app's conversation.
     kind: "nudge",
-    template: { name: "nudge", params: [daysSince === null ? "quelques" : String(daysSince)] },
   });
   await db.from("studios").update({ nudged_at: new Date(now).toISOString() }).eq("id", studioId);
   return true;

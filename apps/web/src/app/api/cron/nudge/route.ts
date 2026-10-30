@@ -2,9 +2,11 @@ import { after } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { nudgeIfQuiet } from "@/lib/nudge";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { sendDueReports } from "@/lib/weekly-report";
 
 // Each morning (pg_cron): a short reminder to the studios with nothing out for
-// a while (lib/nudge.ts), at most one a week each.
+// a while (lib/nudge.ts), at most one a week each; and the Sunday reports that
+// waited three days for a message from her (lib/weekly-report.ts).
 export const maxDuration = 300;
 
 const PAGE = 500;
@@ -27,6 +29,7 @@ async function run() {
     }
   }
   console.log("nudges sent", sent);
+  console.log("weekly reports sent late", await sendDueReports().catch((error) => void console.error("weekly reports due failed", error)));
 }
 
 async function handle(request: Request) {

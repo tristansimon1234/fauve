@@ -8,7 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isFirstReel } from "@/lib/onboarding";
 import { ownerWhatsApp } from "@/lib/owner-message";
 import { instagramAccount } from "@/lib/social/publish";
-import { sendImage, sendLinkButton, sendLinkThenReply, sendReply, sendTemplate, sendText } from "@/lib/whatsapp/client";
+import { sendFirstTemplate, sendImage, sendLinkButton, sendLinkThenReply, sendReply, sendText } from "@/lib/whatsapp/client";
 import { renderPost } from "./render-post";
 import { renderSlides } from "./slides";
 
@@ -209,7 +209,7 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
     return;
   }
   // Started from the app: WhatsApp too, so she can close the app. A free message in the 24 h
-  // window; outside it, the reel_ready template, whose button opens its page signed in.
+  // window; outside it, the reel_done template (reel_ready while Meta reviews it), whose button opens its page signed in.
   // Never at the cost of the delivery: the app always has it.
   const owner = target.notify ? await ownerWhatsApp(target.studioId).catch(() => null) : null;
   if (owner?.open) {
@@ -223,9 +223,11 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
     }
   } else if (owner) {
     const url = await createLoginLink(`+${owner.waId}`, page, "open_post");
-    await sendTemplate(owner.waId, "reel_ready", [], "fr", url.split("/l/")[1]).catch((error: unknown) =>
-      console.warn("reel_ready template refused", error instanceof Error ? error.message : error),
-    );
+    const token = url.split("/l/")[1];
+    await sendFirstTemplate(owner.waId, [
+      { name: "reel_done", params: [r.title], urlSuffix: token },
+      { name: "reel_ready", params: [], urlSuffix: token },
+    ]).catch((error: unknown) => console.warn("reel_done template refused", error instanceof Error ? error.message : error));
   }
   await store(target, { type: "text", body: stored, payload }, undefined);
 }
