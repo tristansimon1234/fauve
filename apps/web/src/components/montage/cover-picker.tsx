@@ -34,6 +34,13 @@ export function CoverPicker({
   const at = cover && "at" in cover ? cover.at : defaultAt;
   const photo = cover && "media_id" in cover ? photos.find((p) => p.id === cover.media_id) : undefined;
 
+  // Its length, also when the video read it before the page came alive (its event then went
+  // unheard and the slider stayed greyed out at the end).
+  useEffect(() => {
+    const el = video.current;
+    if (el && el.readyState >= 1 && Number.isFinite(el.duration)) setDuration(el.duration);
+  }, [videoUrl, photo]);
+
   // The preview follows the chosen frame.
   useEffect(() => {
     const el = video.current;
@@ -92,9 +99,10 @@ export function CoverPicker({
             <input
               type="range"
               min={0}
-              max={Math.max(0.1, duration - 0.05)}
+              max={duration ? Math.max(0.1, duration - 0.05) : 1}
               step={0.05}
-              value={Math.min(at, Math.max(0.1, duration - 0.05))}
+              // Until its length is known, at the start (not stuck at the end).
+              value={duration ? Math.min(at, Math.max(0.1, duration - 0.05)) : 0}
               disabled={!duration}
               onChange={(e) => setLocal({ at: Number(e.target.value) })}
               onPointerUp={() => cover && "at" in cover && save(cover)}

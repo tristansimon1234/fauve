@@ -402,7 +402,7 @@ export function FauveWorkspace({
   const fresh = !active && messages.length === 0;
   const running = runningQuote(messages);
   const list = (
-    <ConversationList conversations={conversations} active={active} onOpen={open} onNew={startNew} onDelete={remove} />
+    <ConversationList conversations={conversations} active={active} onOpen={open} onNew={startNew} onDelete={remove} timezone={timezone} />
   );
 
   // « Confier à Edith » from a new publication on this page: it goes on in this conversation
@@ -772,7 +772,10 @@ function ConversationList({
   onOpen,
   onNew,
   onDelete,
+  timezone,
 }: {
+  /** Her time zone: the day of a conversation is the same on the server and in her browser. */
+  timezone: string;
   conversations: ConversationSummary[];
   active: string | null;
   onOpen: (id: string) => void;
@@ -805,7 +808,7 @@ function ConversationList({
                 c.id === active ? "bg-violet-soft font-semibold text-ink" : "text-ink/85 hover:bg-soft"
               }`}
             >
-              {c.title ?? `Conversation du ${new Date(c.lastAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
+              {c.title ?? `Conversation du ${new Date(c.lastAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: timezone })}`}
             </button>
             <button
               type="button"
