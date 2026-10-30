@@ -10,6 +10,13 @@ import { env } from "@/lib/env";
 // at once when Stripe tells us something changed (webhook, app/api/stripe/webhook/route.ts).
 
 const API = "https://api.stripe.com/v1";
+/**
+ * Every call on this API version, whatever the account's default (« fixe », Tristan). Checked
+ * against its changelog for the calls below (October 2026): periods on subscription items (read by
+ * paidPeriod), flexible billing mode by default, no payment_method_types on Checkout (never sent).
+ * The webhook endpoint is created on the same version.
+ */
+export const STRIPE_API_VERSION = "2026-10-28.endive";
 
 export const billingEnabled = () => Boolean(env("STRIPE_SECRET_KEY"));
 
@@ -42,7 +49,11 @@ export async function stripe<T>(method: "GET" | "POST" | "DELETE", path: string,
   const url = method === "GET" && body.size ? `${API}${path}?${body}` : `${API}${path}`;
   const res = await fetch(url, {
     method,
-    headers: { Authorization: `Bearer ${key}`, ...(method === "POST" ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Stripe-Version": STRIPE_API_VERSION,
+      ...(method === "POST" ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+    },
     body: method === "POST" ? body : undefined,
     cache: "no-store",
   });
