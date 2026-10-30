@@ -10,7 +10,8 @@ import { PlanChoice } from "./plan-choice";
 // and the offers above hers, her extra credits at once either way.
 // A publication made before shows blurred behind it. « Ton premier Reel t'attend » only when one
 // does (Tristan, on « Ton plan est prêt » shown to everyone: « ça veut dire quoi ? »); otherwise the
-// offers, with no promise.
+// offers, with no promise. On a phone the card is left out: above the offers it pushed them
+// below the fold (Tristan: « t'es obligé de scroll down pour tout voir »).
 
 async function previewOf(db: Db, studioId: string, postId: string | null): Promise<{ url: string; video: boolean } | null> {
   const admin = supabaseAdmin();
@@ -54,8 +55,8 @@ export async function Paywall({ db, studioId, postId, next, upgradeFrom }: { db:
   const preview = upgradeFrom || waiting ? await previewOf(db, studioId, postId) : null;
   const above = upgradeFrom ? nextPlan(upgradeFrom) : null;
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-soft px-4 py-10 md:flex-row md:gap-14">
-      <div className="relative aspect-[9/16] w-[230px] shrink-0 overflow-hidden rounded-[22px] bg-ink shadow-lg md:w-[280px]">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-soft px-4 py-6 md:flex-row md:gap-14 md:py-10">
+      <div className="relative hidden aspect-[9/16] w-[280px] shrink-0 overflow-hidden rounded-[22px] bg-ink shadow-lg md:block">
         {preview ? (
           preview.video ? (
             <video src={preview.url} autoPlay muted loop playsInline className="size-full scale-110 object-cover blur-xl" />
