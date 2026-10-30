@@ -61,7 +61,7 @@ function Columns({
         <div className="relative flex h-[160px] items-end border-b border-line" onPointerLeave={() => onHover(null)}>
           <span className="pointer-events-none absolute inset-x-0 top-0 border-t border-line" />
           {videos.map((v, i) => {
-            const n = values[i];
+            const n = values[i] ?? null;
             return (
               <button
                 key={`${v.platform}:${v.id}`}
@@ -81,13 +81,13 @@ function Columns({
               </button>
             );
           })}
-          {hover !== null && values[hover] !== undefined && (
+          {hover !== null && hover < values.length && (
             <span
               className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-[10px] bg-ink px-2.5 py-1.5 text-[12px] font-semibold whitespace-nowrap text-white shadow-sm"
               // Just above its column, inside the plot (above the plot it sat on the chart's title).
               style={{ left: `${((hover + 0.5) / videos.length) * 100}%`, bottom: `calc(${Math.min(84, Math.max(2, ((values[hover] ?? 0) / top) * 100))}% + 6px)` }}
             >
-              {values[hover] === null ? "—" : label(values[hover]!)}
+              {values[hover] == null ? "—" : label(values[hover])}
             </span>
           )}
         </div>
