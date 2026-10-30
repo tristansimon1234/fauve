@@ -64,7 +64,7 @@ export async function stripe<T>(method: "GET" | "POST" | "DELETE", path: string,
 
 const lookupKey = (plan: PlanId) => `simone_${plan}_monthly`;
 
-type StripePrice = { id: string; unit_amount: number | null; product: string };
+type StripePrice = { id: string; unit_amount: number | null; product: string; livemode?: boolean };
 
 const prices = new Map<PlanId, StripePrice>();
 
@@ -73,7 +73,7 @@ const prices = new Map<PlanId, StripePrice>();
  * price changed, a new price on its product takes the lookup key: new subscriptions pay the new
  * amount, the ones already running keep theirs.
  */
-async function offerPrice(plan: PlanId): Promise<StripePrice> {
+export async function offerPrice(plan: PlanId): Promise<StripePrice> {
   const known = prices.get(plan);
   if (known) return known;
   const found = await stripe<{ data: StripePrice[] }>("GET", "/prices", { "lookup_keys[]": lookupKey(plan), active: true });
