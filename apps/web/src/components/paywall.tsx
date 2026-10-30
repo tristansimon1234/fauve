@@ -11,7 +11,9 @@ import { PlanChoice } from "./plan-choice";
 // A publication made before shows blurred behind it. « Ton premier Reel t'attend » only when one
 // does (Tristan, on « Ton plan est prêt » shown to everyone: « ça veut dire quoi ? »); otherwise the
 // offers, with no promise. On a phone the card is left out: above the offers it pushed them
-// below the fold (Tristan: « t'es obligé de scroll down pour tout voir »).
+// below the fold (Tristan: « t'es obligé de scroll down pour tout voir »). Before subscribing, one
+// line puts the price beside a community manager's (Tristan: « une phrase smart »), in the words of
+// the comparison page (content/comparatifs.ts): a range, never another business's price.
 
 async function previewOf(db: Db, studioId: string, postId: string | null): Promise<{ url: string; video: boolean } | null> {
   const admin = supabaseAdmin();
@@ -54,6 +56,8 @@ export async function Paywall({ db, studioId, postId, next, upgradeFrom }: { db:
   const waiting = !upgradeFrom && (postId !== null || (await reelWaiting(studioId)));
   const preview = upgradeFrom || waiting ? await previewOf(db, studioId, postId) : null;
   const above = upgradeFrom ? nextPlan(upgradeFrom) : null;
+  // The entry offer a week: under €2.50 it is a coffee (€9 a month: €2.08).
+  const weekly = (PLANS.decouverte.priceEur * 12) / 52;
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-soft px-4 py-6 md:flex-row md:gap-14 md:py-10">
       <div className="relative hidden aspect-[9/16] w-[280px] shrink-0 overflow-hidden rounded-[22px] bg-ink shadow-lg md:block">
@@ -94,6 +98,15 @@ export async function Paywall({ db, studioId, postId, next, upgradeFrom }: { db:
                 ? "Choisis ton abonnement et je le fabrique aussitôt. Sans engagement, tu arrêtes en un clic."
                 : "Sans engagement, tu arrêtes en un clic."}
           </p>
+          {upgradeFrom ? null : (
+            <p className="text-[14px] font-semibold leading-snug">
+              Un community manager coûte le plus souvent quelques centaines d’euros par mois. Edith, dès{" "}
+              <span className="font-serif text-[16px] font-normal italic text-violet">
+                {weekly <= 2.5 ? "le prix d’un café par semaine" : `${PLANS.decouverte.priceEur} € par mois`}
+              </span>
+              .
+            </p>
+          )}
         </div>
         {upgradeFrom ? <PackButton next={next} primary={!above} /> : null}
         {!upgradeFrom || above ? <PlanChoice next={next} upgradeFrom={upgradeFrom} /> : null}
