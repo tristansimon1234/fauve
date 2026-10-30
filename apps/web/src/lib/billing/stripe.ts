@@ -1,6 +1,7 @@
 import "server-only";
 import { CREDIT_PACK, PLANS, type PlanId } from "@fauve/agent";
 import { env } from "@/lib/env";
+import { VAT_EXEMPTION } from "@/lib/legal";
 
 // Stripe over its REST API (form-encoded), no SDK: products and prices found by
 // lookup key (created on first use), Checkout in subscription mode (no trial: one
@@ -111,6 +112,8 @@ export async function createCustomer(studio: { id: string; name: string | null; 
     name: studio.name ?? undefined,
     phone: studio.phone ?? undefined,
     metadata: { studio_id: studio.id },
+    // Under the VAT threshold, each of her invoices (offer and pack) says why there is no VAT.
+    ...(VAT_EXEMPTION ? { invoice_settings: { footer: VAT_EXEMPTION } } : {}),
   });
   return customer.id;
 }
@@ -179,7 +182,7 @@ export async function packCheckout(input: { customer: string; studioId: string; 
       },
     ],
     metadata: { studio_id: input.studioId, kind: "credit_pack", credits: CREDIT_PACK.credits },
-    invoice_creation: { enabled: true },
+    invoice_creation: { enabled: true, ...(VAT_EXEMPTION ? { invoice_data: { footer: VAT_EXEMPTION } } : {}) },
     ...B2B_DETAILS,
     locale: "fr",
     success_url: input.successUrl,

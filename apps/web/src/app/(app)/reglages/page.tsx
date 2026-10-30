@@ -2,6 +2,7 @@ import { PageSuspense } from "@/components/page-suspense";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CREDIT_PACK, CREDIT_PRICES, DEFAULT_EFFORT, effortSchema, MONTAGE_CEILING, MONTAGE_FLOOR, PLANS, planOf, memoryLines, reelsPerMonth, nextPlan, PLAN_ORDER } from "@fauve/agent";
+import { priceTax } from "@/lib/legal";
 import { NoStudio } from "@/components/empty-state";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 import { creditBalance } from "@/lib/credits";
@@ -189,12 +190,12 @@ async function Settings() {
               <Section title="Abonnement">
                 <p className="text-sm leading-normal">
                   {subscription === "trialing"
-                    ? `Essai en cours${trialEnd ? ` jusqu’au ${trialEnd}` : ""}, avec ${PLANS[offer].label}. Ensuite ${PLANS[offer].priceEur} € TTC / mois, sans engagement : arrête avant la fin de l’essai et tu ne paies rien.`
+                    ? `Essai en cours${trialEnd ? ` jusqu’au ${trialEnd}` : ""}, avec ${PLANS[offer].label}. Ensuite ${PLANS[offer].priceEur} €${priceTax} / mois, sans engagement : arrête avant la fin de l’essai et tu ne paies rien.`
                     : subscription === "active"
-                      ? `${PLANS[offer].label} : ${PLANS[offer].priceEur} € TTC / mois, ${PLANS[offer].credits} crédits à chaque renouvellement${renewal ? `, le prochain le ${renewal}` : ""} (environ ${reelsPerMonth(offer)} Reels soignés ; les photos avec leurs textes ne coûtent rien), sans engagement.`
+                      ? `${PLANS[offer].label} : ${PLANS[offer].priceEur} €${priceTax} / mois, ${PLANS[offer].credits} crédits à chaque renouvellement${renewal ? `, le prochain le ${renewal}` : ""} (environ ${reelsPerMonth(offer)} Reels soignés ; les photos avec leurs textes ne coûtent rien), sans engagement.`
                       : billing
-                        ? `Pas encore d’abonnement. ${PLAN_ORDER.map((id) => `${PLANS[id].label} à ${PLANS[id].priceEur} €`).join(", ")} TTC / mois, sans engagement.`
-                        : `Période d’essai en cours, avec tout ${PLANS.pro.label}. Ensuite : ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} € TTC / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € TTC / mois, sans engagement.`}
+                        ? `Pas encore d’abonnement. ${PLAN_ORDER.map((id) => `${PLANS[id].label} à ${PLANS[id].priceEur} €`).join(", ")}${priceTax} / mois, sans engagement.`
+                        : `Période d’essai en cours, avec tout ${PLANS.pro.label}. Ensuite : ${PLANS.essentiel.label} à ${PLANS.essentiel.priceEur} €${priceTax} / mois ou ${PLANS.pro.label} à ${PLANS.pro.priceEur} € TTC / mois, sans engagement.`}
                 </p>
                 {billing ? <SubscriptionButton subscribed={subscription === "trialing" || subscription === "active" || subscription === "past_due"} /> : null}
                 {billing && subscription === "active" && balance <= 0 && nextPlan(offer) ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { PLAN_ORDER, PLANS, reelsPerMonth, weeklyPosts, type PlanId } from "@fauve/agent";
+import { priceTax } from "@/lib/legal";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { startCheckout, upgradePlan } from "@/app/abonnement/actions";
@@ -43,7 +44,7 @@ export function PlanChoice({ next, upgradeFrom }: { next: string; upgradeFrom?: 
               </span>
               <span className="flex shrink-0 flex-col items-end">
                 <span className="text-[15px] font-extrabold tabular-nums">{PLANS[id].priceEur} €</span>
-                <span className="text-[11px] text-muted">TTC / mois</span>
+                <span className="text-[11px] text-muted">{priceTax ? "TTC / mois" : "par mois"}</span>
               </span>
             </button>
           );
