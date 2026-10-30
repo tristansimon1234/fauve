@@ -4,7 +4,7 @@ import { addFacts, readMemory, removeFacts } from "./memory.ts";
 import { editPlanObjectSchema, editPlanSchema, segmentSeconds } from "./schemas.ts";
 import { canTransition } from "./status.ts";
 import { addUsage, claudeCostUsd, supportsServerFallback, usdToEur } from "./pricing.ts";
-import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts";
+import { isInSessionWindow, weeklyPublicParams, weeklyReportText, weeklySummaryParams } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
 import { freeStudio, ourStudio, queueMinutes, queuedLine } from "./brakes.ts";
@@ -17,7 +17,7 @@ import { contractIsEmpty, contractLines, EMPTY_CONTRACT, ownTextKey, VOICE_SPEED
 import { montageJobSteps } from "./jobs.ts";
 import { quietPauses } from "./mix.ts";
 import { invoiceRows } from "./invoices.ts";
-import { engagementOf, platformSummary } from "./growth.ts";
+import { engagementOf, platformSummary, publicWeeks, viewsGained } from "./growth.ts";
 
 const validPlan = {
   format: "9:16",
@@ -5040,4 +5040,78 @@ test("public videos: engagement per view, a platform's summary against its follo
   assert.equal(summary.engagement, 250 / 3000);
   assert.equal(summary.reach, 1.5);
   assert.deepEqual(platformSummary([], null), { videos: 0, views: null, likes: null, comments: null, perVideo: null, engagement: null, reach: null });
+});
+
+test("growth: the views a week gained, from each video's views day by day", () => {
+  const videos = [
+    { platform: "instagram", video_id: "old", published_at: "2026-10-01T10:00:00Z" },
+    { platform: "instagram", video_id: "new", published_at: "2026-10-28T10:00:00Z" },
+    { platform: "instagram", video_id: "unknown", published_at: "2026-10-10T10:00:00Z" },
+  ];
+  const snapshots = [
+    { platform: "instagram", video_id: "old", day: "2026-10-23", views: 1000 },
+    { platform: "instagram", video_id: "old", day: "2026-10-30", views: 1300 },
+    // Put online during the week: all its views are new.
+    { platform: "instagram", video_id: "new", day: "2026-10-30", views: 2500 },
+    // Older than the history, first read during the week: what it gained is not known.
+    { platform: "instagram", video_id: "unknown", day: "2026-10-29", views: 9000 },
+  ];
+  assert.equal(viewsGained(snapshots, videos, "2026-10-23", "2026-10-30"), 300 + 2500);
+  // The history does not reach the week's start: not known, rather than a partial count.
+  assert.equal(viewsGained(snapshots, videos, "2026-10-16", "2026-10-23"), null);
+});
+
+test("growth: her last weeks from her @, each against the one before", () => {
+  const row = (platform: string, day: string, followers: number) => ({
+    platform, day, followers, new_followers: null, unfollows: null, views: null, reach: null, profile_views: null, link_taps: null, interactions: null,
+  });
+  const weeks = publicWeeks({
+    snapshots: [
+      { platform: "instagram", video_id: "a", day: "2026-10-16", views: 100 },
+      { platform: "instagram", video_id: "a", day: "2026-10-23", views: 400 },
+      { platform: "instagram", video_id: "a", day: "2026-10-30", views: 500 },
+      { platform: "tiktok", video_id: "t", day: "2026-10-30", views: 800 },
+    ],
+    videos: [
+      { platform: "instagram", video_id: "a", published_at: "2026-10-15T09:00:00Z" },
+      { platform: "tiktok", video_id: "t", published_at: "2026-10-27T09:00:00Z" },
+    ],
+    days: [row("instagram", "2026-10-16", 200), row("instagram", "2026-10-23", 210), row("instagram", "2026-10-29", 222), row("tiktok", "2026-10-29", 50)],
+    today: "2026-10-30",
+    count: 2,
+  });
+  assert.deepEqual(weeks[0], { start: "2026-10-16", end: "2026-10-23", videos: 0, views: 300, net: 10, followers: 210 });
+  // TikTok's first count is inside the week: its followers count, its gain is not known.
+  assert.deepEqual(weeks[1], { start: "2026-10-23", end: "2026-10-30", videos: 1, views: 100 + 800, net: 12, followers: 272 });
+});
+
+test("whatsapp: the Sunday report from her @, against the week before, warm", () => {
+  assert.deepEqual(weeklyPublicParams({ videos: 3, views: 4300, net: 12, followers: 1240 }, { videos: 2, views: 3100, net: 5, followers: 1228 }), [
+    "3 vidéos publiées (2 la semaine d’avant)",
+    "4\u202f300 vues (+39\u202f% sur la semaine d’avant)",
+    "12 nouveaux abonnés (+5 la semaine d’avant)",
+  ]);
+  // The first weeks: no views history yet, what this week's video has so far; a dip said plainly.
+  assert.deepEqual(weeklyPublicParams({ videos: 1, views: null, net: -2, followers: 300, fresh: 640 }, { videos: 0, views: null, net: null, followers: null }), [
+    "1 vidéo publiée (0 la semaine d’avant)",
+    "640 vues sur cette vidéo",
+    "2 abonnés en moins",
+  ]);
+  assert.deepEqual(weeklyPublicParams({ videos: 0, views: null, net: null, followers: null }, null), [
+    "pas de nouvelle vidéo",
+    "tes vues comparées dès la semaine prochaine",
+    "tes abonnés suivis dès cette semaine",
+  ]);
+  const text = weeklyReportText({
+    figures: ["3 vidéos publiées", "4 300 vues", "12 nouveaux abonnés"],
+    summary: "Tes Reels face caméra vont deux fois plus loin que les autres",
+    lesson: "Montre-toi dès la première seconde.",
+    idea: "Un Reel où tu réponds à la question qu'on te pose le plus",
+  });
+  assert.equal(
+    text,
+    "Ton bilan de la semaine : 3 vidéos publiées, 4 300 vues et 12 nouveaux abonnés.\n\nTes Reels face caméra vont deux fois plus loin que les autres.\n\nCe que je retiens : Montre-toi dès la première seconde.\n\nMon idée pour cette semaine : Un Reel où tu réponds à la question qu'on te pose le plus. Je te la prépare ?",
+  );
+  // Template parameters: no line break (Meta refuses them).
+  for (const p of weeklyPublicParams({ videos: 3, views: 4300, net: 12, followers: 1240 }, { videos: 2, views: 3100, net: 5, followers: 1228 })) assert.ok(!/\n/.test(p));
 });

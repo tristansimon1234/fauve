@@ -108,6 +108,7 @@ export type RunFauveInput = ToolContext & {
     voice?: StudioContextForPrompt["voice"];
     copying?: StudioContextForPrompt["copying"];
     models?: StudioContextForPrompt["models"];
+    results?: StudioContextForPrompt["results"];
   };
   /** Live: what Fauve is doing, and her words as she writes them (the app's chat). */
   onEvent?: (event: ChatEvent) => void;
@@ -193,6 +194,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           voice: input.studio.voice,
           copying: input.studio.copying,
           models: input.studio.models,
+          results: input.studio.results,
         }),
       },
     ],

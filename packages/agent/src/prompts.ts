@@ -133,6 +133,8 @@ export type StudioContextForPrompt = {
   copying?: { inspirationId: string; name: string | null; lines: string[] };
   /** Her Reels kept as models (« Garder comme modèle »), read: a new Reel can be made like one of them. */
   models?: { inspirationId: string; title: string; name: string }[];
+  /** Her latest « Ce qui marche » (the Sunday report): what Edith's ideas and advice lean on. */
+  results?: { date: string; summary: string; lessons: string[]; ideas: string[] };
 };
 
 const VOICE_USE_LINES: Record<NonNullable<StudioContextForPrompt["voice"]>["use"], string> = {
@@ -165,7 +167,7 @@ function instagramPublicLine(handle: string | null, paid: boolean, connect = tru
   const state = connect ? "pas connecté" : "pas relié (et la connexion n'est pas proposée)";
   if (!paid) return `${handle ? `@${handle}, ` : ""}${state} (l'analyse de son profil depuis son @ et le suivi de ses abonnés viennent avec l'abonnement)`;
   return handle
-    ? `@${handle}, ${state} : tu suis ses abonnés et les vues, j'aime et commentaires de ses Reels sur son compte public, une fois par jour (page Résultats), et analyze_performance lit son profil public${connect ? " ; le connecter ajoute les visites du profil et les clics sur son lien" : " ; les visites du profil et les clics sur son lien ne se voient pas d'ici"}`
+    ? `@${handle}, ${state} : tu suis ses abonnés et les vues, j'aime et commentaires de ses Reels sur son compte public, une fois par jour (page Résultats ; get_metrics donne chaque vidéo avec ses vues, ses ratios et ses semaines comparées), et analyze_performance lit son profil public${connect ? " ; le connecter ajoute les visites du profil et les clics sur son lien" : " ; les visites du profil et les clics sur son lien ne se voient pas d'ici"}`
     : `${state}, et son @ n'est pas connu : demande-lui une fois, en une phrase (« Envoie-moi ton profil Insta, et TikTok si tu y es, que j'analyse ce qui marche chez toi »), au moment où elle parle de ses résultats ou une fois son premier Reel prêt ; enregistre-le avec update_onboarding instagram_handle / tiktok_handle (son lien ou son @)`;
 }
 
@@ -211,6 +213,11 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     ...(ctx.copying
       ? [
           `Reel à recopier : elle t'a envoyé un Reel à recopier${ctx.copying.name ? ` (« ${ctx.copying.name} » : ${ctx.copying.lines.join(" ; ")})` : " (tu le regardes encore)"}. Son prochain Reel le suit, une seule fois : montage avec inspiration_id ${ctx.copying.inspirationId}, sauf si elle ne veut plus de ce style ; ses Reels suivants restent sur sa charte.`,
+        ]
+      : []),
+    ...(ctx.results
+      ? [
+          `Ce qui marche chez elle (bilan du ${ctx.results.date}, page Résultats) : ${ctx.results.summary}${ctx.results.lessons.length ? ` Leçons : ${ctx.results.lessons.map((l, i) => `${i + 1}. ${l}`).join(" ")}` : ""}${ctx.results.ideas.length ? ` Idées proposées : ${ctx.results.ideas.join(" ; ")}` : ""} Sers-t'en quand tu proposes une idée ou donnes un conseil, avec le chiffre qui le prouve (get_metrics pour le détail d'une vidéo) ; si elle répond à une idée du bilan (« Oui, prépare-la »), c'est la première idée proposée.`,
         ]
       : []),
     ...(ctx.models?.length

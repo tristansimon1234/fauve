@@ -264,3 +264,106 @@ export function platformSummary(videos: PublicVideoStat[], followers: number | n
     reach: perVideo !== null && followers ? perVideo / followers : null,
   };
 }
+
+/** A video's views on one day (public_video_days, read from her @ each day). */
+export type ViewSnapshot = { platform: string; video_id: string; day: string; views: number | null };
+/** A video of her profile and the day it went online. */
+export type PublishedVideo = { platform: string; video_id: string; published_at: string };
+/** Seven days of her public profiles, all platforms given together. */
+export type PublicWeek = {
+  /** The day before the week (excluded) and its last day (included), YYYY-MM-DD. */
+  start: string;
+  end: string;
+  /** Videos put online during the week. */
+  videos: number;
+  /** Views her recent videos gained during the week; null while the history does not reach its start. */
+  views: number | null;
+  /** Followers gained minus lost over the week; null without a count on both ends. */
+  net: number | null;
+  /** Followers at the end of the week (last count known). */
+  followers: number | null;
+};
+
+const shiftDay = (day: string, days: number) => new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
+
+/** The last row on or before `day` (rows sorted by day). */
+function onOrBefore<T extends { day: string }>(rows: T[], day: string): T | undefined {
+  let found: T | undefined;
+  for (const r of rows) {
+    if (r.day > day) break;
+    found = r;
+  }
+  return found;
+}
+
+/**
+ * Views her videos gained between two days (after `from`, up to `to` included): each video's views
+ * on the last snapshot up to `to`, minus those on the last one up to `from` (0 for a video put online
+ * since). A video's total alone says nothing of a week: last week's Reel has more views than
+ * Tuesday's only for being older. Null while no snapshot reaches `from`.
+ */
+export function viewsGained(snapshots: ViewSnapshot[], videos: PublishedVideo[], from: string, to: string): number | null {
+  if (!snapshots.some((s) => s.day <= from)) return null;
+  const online = new Map(videos.map((v) => [`${v.platform}:${v.video_id}`, v.published_at.slice(0, 10)]));
+  const byVideo = new Map<string, ViewSnapshot[]>();
+  for (const s of [...snapshots].sort((a, b) => a.day.localeCompare(b.day))) {
+    if (s.views === null) continue;
+    const key = `${s.platform}:${s.video_id}`;
+    byVideo.set(key, [...(byVideo.get(key) ?? []), s]);
+  }
+  let total = 0;
+  for (const [key, list] of byVideo) {
+    const end = onOrBefore(list, to);
+    if (!end || end.day <= from) continue;
+    const start = onOrBefore(list, from);
+    const since = online.get(key);
+    const base = start ? start.views! : since && since > from ? 0 : null;
+    if (base === null) continue;
+    total += Math.max(0, end.views! - base);
+  }
+  return total;
+}
+
+/**
+ * Her last `count` weeks of seven days ending on `today` (oldest first), from her @: the videos she
+ * put online, the views they gained, her followers gained or lost. The Sunday report compares the
+ * last one with the one before (Tristan: « vs la semaine précédente hein ? »).
+ */
+export function publicWeeks(input: {
+  snapshots: ViewSnapshot[];
+  videos: PublishedVideo[];
+  days: (DailyRow & { platform: string })[];
+  today: string;
+  count: number;
+}): PublicWeek[] {
+  const counts = new Map<string, DailyRow[]>();
+  for (const d of [...input.days].filter((r) => r.followers !== null).sort((a, b) => a.day.localeCompare(b.day))) {
+    counts.set(d.platform, [...(counts.get(d.platform) ?? []), d]);
+  }
+  const followersOn = (day: string) => {
+    let sum: number | null = null;
+    for (const list of counts.values()) sum = add(sum, onOrBefore(list, day)?.followers ?? null);
+    return sum;
+  };
+  return Array.from({ length: input.count }, (_, i) => {
+    const end = shiftDay(input.today, -7 * (input.count - 1 - i));
+    const start = shiftDay(end, -7);
+    let net: number | null = null;
+    for (const list of counts.values()) {
+      const a = onOrBefore(list, start)?.followers;
+      const b = onOrBefore(list, end);
+      if (a != null && b && b.day > start && b.followers !== null) net = add(net, b.followers - a);
+    }
+    return {
+      start,
+      end,
+      videos: input.videos.filter((v) => {
+        const day = v.published_at.slice(0, 10);
+        return day > start && day <= end;
+      }).length,
+      views: viewsGained(input.snapshots, input.videos, start, end),
+      net,
+      followers: followersOn(end),
+    };
+  });
+}

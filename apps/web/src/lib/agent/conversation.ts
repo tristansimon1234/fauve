@@ -12,6 +12,10 @@ import { publicStatsFor } from "@/lib/social/public-stats";
 import { studioModels } from "@/lib/reel-models";
 import { pendingSteal } from "@/lib/steal";
 import { socialConnect } from "@/lib/social/connect";
+import { latestReport } from "@/lib/performance";
+
+/** A « Ce qui marche » older than this no longer speaks for her: Edith does not lean on it. */
+const REPORT_FRESH_MS = 35 * 86_400_000;
 
 // Shared by every channel (WhatsApp webhook, web test chat): rebuild the
 // conversation from stored messages and let Fauve answer the last one.
@@ -125,7 +129,7 @@ export async function replyInConversation(params: {
     .limit(ownThread ? HISTORY_READ : HISTORY_READ * 2);
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
-  const [studio, member, rows, instagram, brand, jobs, tiktok, copying, models] = await Promise.all([
+  const [studio, member, rows, instagram, brand, jobs, tiktok, copying, models, report] = await Promise.all([
     db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory, team, subscription_status, instagram_handle, tiktok_handle").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
@@ -139,6 +143,8 @@ export async function replyInConversation(params: {
     pendingSteal(params.studioId).catch(() => null),
     // Her Reels kept as models, to make new ones like them.
     studioModels(params.studioId, 5).catch(() => []),
+    // Her latest « Ce qui marche »: Edith's ideas and advice lean on it.
+    latestReport(params.studioId).catch(() => null),
   ]);
   const jobTitles = jobs.length
     ? new Map(
@@ -255,6 +261,15 @@ export async function replyInConversation(params: {
       })(),
       copying: copying ? { inspirationId: copying.id, name: copying.name, lines: copying.lines } : undefined,
       models: models.map((m) => ({ inspirationId: m.id, title: m.title, name: m.name })),
+      results:
+        report && Date.now() - Date.parse(report.createdAt) < REPORT_FRESH_MS
+          ? {
+              date: new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: studio.data.timezone as string }).format(new Date(report.createdAt)),
+              summary: report.summary,
+              lessons: report.lessons.map((l) => l.lesson),
+              ideas: report.ideas,
+            }
+          : undefined,
       routine: await Promise.all([
         accessLine(params.studioId).catch(() => null),
         presenceLines(params.studioId).catch((error) => {

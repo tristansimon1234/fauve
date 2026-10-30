@@ -1,5 +1,18 @@
 import "server-only";
-import { isSubscribed, matchPublicVideos, nextVideosCursor, readPublicProfile, readPublicVideos, usdToEur, type Platform, type PublicVideo } from "@fauve/agent";
+import {
+  isSubscribed,
+  matchPublicVideos,
+  nextVideosCursor,
+  publicWeeks,
+  readPublicProfile,
+  readPublicVideos,
+  usdToEur,
+  type DailyRow,
+  type Platform,
+  type PublicVideo,
+  type PublicWeek,
+  type ViewSnapshot,
+} from "@fauve/agent";
 import { billingEnabled } from "@/lib/billing/stripe";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -11,7 +24,8 @@ import { socialConnect } from "./connect";
 // Treg (about $0.004 a day for Instagram, $0.0024 for TikTok): her follower count on yesterday's
 // row of account_daily, as the connected capture does, the views, likes and comments of the
 // Reels she posted herself, each found by its caption (posts published, measured in metrics), and
-// her profile's latest videos, every day, Edith's or not (public_videos, listed in Résultats).
+// her profile's latest videos, every day, Edith's or not (public_videos, listed in Résultats), with
+// their views of the day (public_video_days: the views gained each week).
 // A platform she connected is read by its own API (account-stats.ts), never twice. Paid plans
 // only (Tristan: « ce sera dans le plan payant uniquement »), and the team's studio.
 
@@ -27,6 +41,8 @@ const STUDIOS_PER_RUN = 8;
 /** Posts made in the last 60 days may still be found online; each one is measured for 30 days. */
 const LOOK_BACK_MS = 60 * DAY_MS;
 const MEASURE_FOR_MS = 30 * DAY_MS;
+/** Each video's views day by day are kept 10 weeks: the analysis reads 8. */
+const VIEWS_KEPT_MS = 70 * DAY_MS;
 /** What one call may cost at most (Treg's catalog, October 2026: $0.002 a call on Instagram, $0.0012 on TikTok). */
 const MAX_COST_USD = 0.01;
 
@@ -141,6 +157,17 @@ async function capturePlatform(studioId: string, platform: Platform, handle: str
   for (const { postId, video } of toMeasure) {
     await db.from("public_videos").update({ post_id: postId }).eq("studio_id", studioId).eq("platform", platform).eq("video_id", video.id);
   }
+  // Their views today, kept day by day: the views gained in a week, compared with the week before
+  // (publicWeeks). A failure here never loses the rest of the read.
+  const today = isoDay(Date.now());
+  const days = await db
+    .from("public_video_days")
+    .upsert(
+      videos.map((v) => ({ studio_id: studioId, platform, video_id: v.id, day: today, views: v.views })),
+      { onConflict: "studio_id,platform,video_id,day" },
+    );
+  if (days.error) console.warn("public video days not kept", studioId, platform, days.error.message);
+  else await db.from("public_video_days").delete().eq("studio_id", studioId).eq("platform", platform).lt("day", isoDay(Date.now() - VIEWS_KEPT_MS));
 
   for (const { postId, video, status } of toMeasure) {
     const last = await db
@@ -242,4 +269,66 @@ export async function publicAccounts(studioId: string): Promise<PublicAccount[] 
     }),
   );
   return accounts.filter((a): a is PublicAccount => a !== null);
+}
+
+/** Rows a query returns at most: the views history is read page by page. */
+const PAGE = 1000;
+
+/**
+ * Her last `count` weeks of seven days from her @ (publicWeeks), all her platforms together and each
+ * apart, and the views this week's videos have so far (`fresh`, while the history is too short).
+ */
+export async function publicHistory(studioId: string, count: number): Promise<{ all: PublicWeek[]; byPlatform: Partial<Record<Platform, PublicWeek[]>>; fresh: number | null }> {
+  const db = supabaseAdmin();
+  const now = Date.now();
+  const today = isoDay(now);
+  const since = isoDay(now - (7 * count + 7) * DAY_MS);
+  const snapshots: (ViewSnapshot & { platform: Platform })[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from("public_video_days")
+      .select("platform, video_id, day, views")
+      .eq("studio_id", studioId)
+      .gte("day", since)
+      .order("day")
+      .order("video_id")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    snapshots.push(...((data ?? []) as (ViewSnapshot & { platform: Platform })[]));
+    if ((data ?? []).length < PAGE) break;
+  }
+  const [{ data: videos }, { data: days }] = await Promise.all([
+    db.from("public_videos").select("platform, video_id, published_at, views").eq("studio_id", studioId).gte("published_at", `${since}T00:00:00Z`),
+    db
+      .from("account_daily")
+      .select("platform, day, followers, new_followers, unfollows, views, reach, profile_views, link_taps, interactions")
+      .eq("studio_id", studioId)
+      .gte("day", since)
+      .order("day"),
+  ]);
+  const listed = (videos ?? []) as { platform: Platform; video_id: string; published_at: string; views: number | null }[];
+  const daily = (days ?? []) as (DailyRow & { platform: Platform })[];
+  const weeks = (platform?: Platform) =>
+    publicWeeks({
+      snapshots: platform ? snapshots.filter((s) => s.platform === platform) : snapshots,
+      videos: platform ? listed.filter((v) => v.platform === platform) : listed,
+      days: platform ? daily.filter((d) => d.platform === platform) : daily,
+      today,
+      count,
+    });
+  const all = weeks();
+  const platforms = [...new Set([...listed.map((v) => v.platform), ...snapshots.map((s) => s.platform)])];
+  const last = all.at(-1);
+  const recent = last ? listed.filter((v) => v.published_at.slice(0, 10) > last.start && v.views !== null) : [];
+  return {
+    all,
+    byPlatform: Object.fromEntries(platforms.map((p) => [p, weeks(p)])),
+    fresh: recent.length ? recent.reduce((sum, v) => sum + v.views!, 0) : null,
+  };
+}
+
+/** A week as Edith and the analyst read it, in French. */
+export function weekForModel(w: PublicWeek) {
+  // `start` is the day before the week.
+  return { du: isoDay(Date.parse(`${w.start}T00:00:00Z`) + DAY_MS), au: w.end, videos_publiees: w.videos, vues_gagnees: w.views, solde_abonnes: w.net, abonnes: w.followers };
 }

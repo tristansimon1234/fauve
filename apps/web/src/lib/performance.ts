@@ -10,13 +10,14 @@ import {
   performanceReportSchema,
   segmentSeconds,
   type PerformanceReport,
+  type Platform,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { z } from "zod";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { mediaInsights, recentMedia } from "@/lib/social/instagram";
 import { instagramAccount } from "@/lib/social/publish";
-import { publicAccounts } from "@/lib/social/public-stats";
+import { publicAccounts, publicHistory, weekForModel } from "@/lib/social/public-stats";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // "Ce qui marche": reads the studio's latest Instagram posts with their numbers,
@@ -25,6 +26,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // her public profiles from her @ (public-stats.ts, paid plans only): views, likes, comments.
 
 const POSTS = 30;
+/** Her videos read on earlier days, up to this old, join the latest ones. */
+const HISTORY_DAYS = 90;
+/** Weeks of seven days given with her public profiles. */
+const WEEKS = 8;
 const INSIGHT_CONCURRENCY = 6;
 
 export type StoredReport = PerformanceReport & { createdAt: string; posts: number };
@@ -136,9 +141,20 @@ async function analyzePublic(studioId: string): Promise<StoredReport | { error: 
   if (!accounts) return { error: NO_ACCOUNT };
   if (!accounts.length) return { error: "Son profil est introuvable avec ce @ : demande-lui de vérifier son nom de compte." };
   const db = supabaseAdmin();
-  const [{ data: studio }, { data: fauvePosts }] = await Promise.all([
+  const followed = accounts.map((a) => a.platform);
+  const [{ data: studio }, { data: fauvePosts }, { data: stored }, history] = await Promise.all([
     db.from("studios").select("timezone").eq("id", studioId).single(),
     db.from("posts").select("external_ids, edit_plan_id").eq("studio_id", studioId).not("edit_plan_id", "is", null),
+    // Her videos read on earlier days: the ones the latest page no longer shows (one page on TikTok).
+    db
+      .from("public_videos")
+      .select("platform, video_id, caption, published_at, seconds, views, likes, comments, saves")
+      .eq("studio_id", studioId)
+      .in("platform", followed)
+      .gte("published_at", new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString())
+      .order("published_at", { ascending: false })
+      .limit(POSTS * 2),
+    publicHistory(studioId, WEEKS).catch(() => null),
   ]);
   // Reels Fauve made, found online by their caption: the recipe of their montage.
   const planIds = (fauvePosts ?? []).map((p) => p.edit_plan_id as string);
@@ -152,8 +168,32 @@ async function analyzePublic(studioId: string): Promise<StoredReport | { error: 
   }
   const timezone = (studio?.timezone as string | undefined) ?? "Europe/Paris";
   const when = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", timeZone: timezone });
+  const seen = new Set(accounts.flatMap((a) => a.videos.map((v) => `${a.platform}:${v.id}`)));
+  const earlier = (stored ?? []).flatMap((v) =>
+    seen.has(`${v.platform}:${v.video_id}`)
+      ? []
+      : [
+          {
+            platform: v.platform as Platform,
+            video: {
+              id: v.video_id as string,
+              at: Date.parse(v.published_at as string),
+              seconds: (v.seconds as number | null) ?? null,
+              caption: (v.caption as string) ?? "",
+              url: null,
+              views: v.views as number | null,
+              likes: v.likes as number | null,
+              comments: v.comments as number | null,
+              saves: v.saves as number | null,
+            },
+          },
+        ],
+  );
   const rows = accounts.flatMap((a) =>
-    a.videos.slice(0, POSTS).map((v) => ({
+    [...a.videos, ...earlier.filter((e) => e.platform === a.platform).map((e) => e.video)]
+      .sort((x, y) => y.at - x.at)
+      .slice(0, POSTS)
+      .map((v) => ({
       id: v.id,
       reseau: a.platform,
       type: a.platform === "instagram" ? "reel" : "vidéo",
@@ -171,7 +211,13 @@ async function analyzePublic(studioId: string): Promise<StoredReport | { error: 
   );
   if (rows.length < MIN_POSTS_FOR_ANALYSIS) return { error: `Pas encore assez de vidéos publiques (${rows.length}) pour en tirer des leçons.` };
   const profils = accounts.map((a) => ({ reseau: a.platform, compte: `@${a.handle}`, abonnes: a.profile.followers, publications: a.profile.posts, bio: a.profile.bio, prive: a.profile.private || undefined }));
-  return writeReport(studioId, { source: "public", profils, posts: rows }, rows.length);
+  // Her weeks: videos put online, views her videos gained, followers gained or lost.
+  const par_semaine = Object.fromEntries(
+    Object.entries(history?.byPlatform ?? {})
+      .filter(([platform]) => followed.includes(platform as Platform))
+      .map(([platform, weeks]) => [platform, weeks.map(weekForModel)]),
+  );
+  return writeReport(studioId, { source: "public", profils, posts: rows, ...(Object.keys(par_semaine).length ? { par_semaine } : {}) }, rows.length);
 }
 
 /** The analyst's report on what it read, kept in weekly_reports. */

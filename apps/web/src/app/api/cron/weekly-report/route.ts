@@ -1,15 +1,20 @@
 import { timingSafeEqual } from "node:crypto";
-import { isInSessionWindow, periodTotals, weeklySummaryParams, type DailyRow } from "@fauve/agent";
+import { periodTotals, WEEKLY_IDEA_OPTIONS, weeklyPublicParams, weeklyReportText, weeklySummaryParams, type DailyRow } from "@fauve/agent";
 import { after } from "next/server";
 import { env } from "@/lib/env";
-import { analyzePerformance } from "@/lib/performance";
+import { analyzePerformance, type StoredReport } from "@/lib/performance";
 import { studioAccess } from "@/lib/billing/access";
+import { messageOwner } from "@/lib/owner-message";
+import { publicHistory } from "@/lib/social/public-stats";
+import { instagramAccount } from "@/lib/social/publish";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { sendTemplate, sendText } from "@/lib/whatsapp/client";
 
-// The Sunday report ("ce qui marche"), called weekly by pg_cron with CRON_SECRET:
-// every studio with Instagram connected gets its analysis, then a short WhatsApp
-// message (free text inside the 24 h window, the weekly_summary template with the week's numbers otherwise).
+// The Sunday report ("ce qui marche"), called weekly by pg_cron with CRON_SECRET: every studio with
+// Instagram connected or followed from its @ gets its analysis, then a message from Edith, always warm
+// and encouraging (Tristan: « friendly et encourageant toujours »): the week's figures against the week
+// before, the analyst's summary, the lesson that matters most and one idea she can say yes to
+// (messageOwner: on WhatsApp with its buttons inside the 24 h window, else the weekly_summary template
+// with the figures; always in the app's conversation, where Edith reads it at her next answer).
 // Each studio in its own invocation (?studio=…): one after the other in a single 300 s function, the
 // studios past the fiftieth or so were never reached.
 export const maxDuration = 300;
@@ -20,39 +25,28 @@ function authorized(request: Request): boolean {
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
-async function notify(studioId: string, summary: string) {
-  const db = supabaseAdmin();
-  const { data: owner } = await db
-    .from("members")
-    .select("phone_e164")
-    .eq("studio_id", studioId)
-    .eq("role", "owner")
-    .limit(1)
-    .maybeSingle();
-  const phone = owner?.phone_e164 as string | undefined;
-  if (!phone) return;
-  const { data: last } = await db
-    .from("whatsapp_messages")
-    .select("created_at")
-    .eq("studio_id", studioId)
-    .eq("channel", "whatsapp")
-    .eq("direction", "inbound")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const waId = phone.replace(/^\+/, "");
-  const body = `Ton bilan de la semaine : ${summary}\n\nLe détail (leçons et idées de posts) est dans l'app, page Résultats.`;
-  if (isInSessionWindow(last ? new Date(last.created_at as string) : null)) {
-    const id = await sendText(waId, body);
-    await db.from("whatsapp_messages").insert({ studio_id: studioId, wa_message_id: id, direction: "outbound", phone_e164: phone, type: "text", body });
-  } else {
-    // Outside the window only a Meta-approved template can open the conversation.
-    await sendTemplate(waId, "weekly_summary", weeklySummaryParams(await lastWeek(studioId)));
-  }
+async function notify(studioId: string, report: StoredReport) {
+  const figures = await weekFigures(studioId);
+  const idea = report.ideas[0];
+  await messageOwner(studioId, {
+    text: weeklyReportText({ figures, summary: report.summary, lesson: report.lessons[0]?.lesson, idea }),
+    kind: "weekly_report",
+    ...(idea ? { options: WEEKLY_IDEA_OPTIONS } : {}),
+    template: { name: "weekly_summary", params: figures },
+  });
 }
 
-/** The last 7 days: posts put online, and the Instagram profile visits and link taps. */
-async function lastWeek(studioId: string) {
+/**
+ * The week's three figures. Instagram connected: posts put online, profile visits and link taps. From
+ * her @: the videos she put online, the views her videos gained and her followers, each against the
+ * week before (Tristan: « vs la semaine précédente hein ? »).
+ */
+async function weekFigures(studioId: string): Promise<string[]> {
+  if (!(await instagramAccount(studioId))) {
+    const { all, fresh } = await publicHistory(studioId, 2);
+    const [before, week] = all;
+    return weeklyPublicParams({ ...week!, fresh }, before ?? null);
+  }
   const db = supabaseAdmin();
   const since = new Date(Date.now() - 7 * 86_400_000);
   const [posts, days] = await Promise.all([
@@ -60,7 +54,7 @@ async function lastWeek(studioId: string) {
     db.from("account_daily").select("*").eq("studio_id", studioId).eq("platform", "instagram").gte("day", since.toISOString().slice(0, 10)),
   ]);
   const totals = periodTotals((days.data ?? []) as DailyRow[], since.toISOString().slice(0, 10));
-  return { posts: posts.count ?? 0, profileVisits: totals.profileViews, linkTaps: totals.linkTaps };
+  return weeklySummaryParams({ posts: posts.count ?? 0, profileVisits: totals.profileViews, linkTaps: totals.linkTaps });
 }
 
 /** One studio's report and its message. */
@@ -72,7 +66,7 @@ async function reportOne(studioId: string) {
       console.warn("weekly report not made", studioId, report.error);
       return;
     }
-    await notify(studioId, report.summary).catch((e) => console.warn("weekly report: notification failed", studioId, e));
+    await notify(studioId, report).catch((e) => console.warn("weekly report: notification failed", studioId, e));
   } catch (error) {
     console.error("weekly report failed", studioId, error);
   }

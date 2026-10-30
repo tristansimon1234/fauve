@@ -390,7 +390,7 @@ export const toolSpecs = {
   },
   get_metrics: {
     description:
-      "Statistiques entre deux dates : celles des publications d'Edith (dernière mesure par publication : vues, portée, likes, enregistrements, partages, commentaires, visites du profil) et celles du compte, semaine par semaine (nouveaux abonnés, désabonnements, solde, abonnés au total, vues, visites du profil, clics sur le lien ; Instagram et TikTok). À lire dès qu'on parle d'abonnés ou de croissance.",
+      "Statistiques entre deux dates : celles des publications d'Edith (dernière mesure par publication : vues, portée, likes, enregistrements, partages, commentaires, visites du profil), celles du compte, semaine par semaine (nouveaux abonnés, désabonnements, solde, abonnés au total, vues, visites du profil, clics sur le lien ; Instagram et TikTok), et, d'après son @, chacune de ses vidéos publiées sur la période (les siennes et celles d'Edith : vues, j'aime, commentaires, engagement, vues par rapport à ses abonnés), avec par réseau sa moyenne et ses dernières semaines comparées. À lire dès qu'on parle d'abonnés, de croissance ou de « ça a marché ? ».",
     input: z.object({ from: isoDateTime, to: isoDateTime }),
   },
   update_brand_profile: {

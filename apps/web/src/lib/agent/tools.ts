@@ -7,6 +7,9 @@ import {
   cleanHandle,
   periodTotals,
   weeklyGrowth,
+  engagementOf,
+  platformSummary,
+  type PublicVideoStat,
   type CarouselDesign,
   type DailyRow,
   assertTransition,
@@ -60,7 +63,7 @@ import { bakedReel } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus } from "@/lib/montage-status";
-import { publicStatsFor } from "@/lib/social/public-stats";
+import { publicHistory, publicStatsFor, weekForModel } from "@/lib/social/public-stats";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
@@ -1427,7 +1430,62 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             : [];
         }),
       );
-      return json({ metrics: [...latest.values()], account });
+      // Her videos from her @ (not connected), Edith's or not: each with its numbers to date and its ratios.
+      const followed = unwrap(
+        await db
+          .from("public_videos")
+          .select("platform, video_id, url, caption, published_at, views, likes, comments, saves, post_id")
+          .eq("studio_id", studioId)
+          .gte("published_at", from)
+          .lte("published_at", to)
+          .order("published_at", { ascending: false })
+          .limit(60),
+      );
+      if (!followed.length) return json({ metrics: [...latest.values()], account });
+      const followersOf = (platform: string) => days.filter((d) => d.platform === platform && d.followers !== null).at(-1)?.followers ?? null;
+      const round = (n: number | null, digits: number) => (n === null ? null : Math.round(n * 10 ** digits) / 10 ** digits);
+      const platforms = [...new Set(followed.map((v) => v.platform as "instagram" | "tiktok"))];
+      const history = await publicHistory(studioId, 4).catch(() => null);
+      return json({
+        metrics: [...latest.values()],
+        account,
+        videos_de_son_compte: followed.map((v) => {
+          const followers = followersOf(v.platform as string);
+          return {
+            reseau: v.platform,
+            date: (v.published_at as string).slice(0, 10),
+            legende: ((v.caption as string) ?? "").slice(0, 100),
+            vues: v.views,
+            j_aime: v.likes,
+            commentaires: v.comments,
+            ...(v.saves !== null ? { enregistrements: v.saves } : {}),
+            engagement: round(engagementOf(v as PublicVideoStat), 3),
+            vues_sur_abonnes: v.views !== null && followers ? round((v.views as number) / followers, 2) : null,
+            ...(v.post_id ? { publication_edith: v.post_id } : {}),
+          };
+        }),
+        par_reseau: Object.fromEntries(
+          platforms.map((platform) => {
+            const summary = platformSummary(
+              followed.filter((v) => v.platform === platform) as PublicVideoStat[],
+              followersOf(platform),
+            );
+            return [
+              platform,
+              {
+                videos: summary.videos,
+                vues: summary.views,
+                vues_par_video: summary.perVideo,
+                engagement: round(summary.engagement, 3),
+                vues_par_video_sur_abonnes: round(summary.reach, 2),
+                semaines: history?.byPlatform[platform]?.map(weekForModel) ?? [],
+              },
+            ];
+          }),
+        ),
+        note:
+          "videos_de_son_compte : ses vidéos publiées sur la période, d'après son @ (les siennes et celles d'Edith, publication_edith), avec leurs vues à ce jour ; engagement = (j'aime + commentaires + enregistrements) / vues. Une vidéo se juge contre sa moyenne (par_reseau.vues_par_video) et contre ses abonnés, pas en absolu ; semaines compare chaque semaine à la précédente (vues_gagnees : les vues prises par ses vidéos cette semaine-là, null tant que l'historique ne remonte pas assez). Dis-le avec chaleur : d'abord ce qui marche, une baisse simplement avec quoi essayer, jamais un reproche.",
+      });
     },
 
     async react_to_message({ emoji }) {
