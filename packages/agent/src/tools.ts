@@ -52,7 +52,7 @@ export const toolSpecs = {
   },
   update_onboarding: {
     description:
-      "Enregistre une information d'onboarding (nom et activité du commerce, prénom de la gérante, site web, lien de réservation, rythme de publication, plateformes) et fait avancer l'étape.",
+      "Enregistre une information d'onboarding (nom et activité du commerce, prénom de la gérante, site web, lien de réservation, son @ Instagram et TikTok, rythme de publication, plateformes) et fait avancer l'étape.",
     input: z.object({
       studio_name: z.string().min(1).max(80).optional(),
       business_type: z.string().min(2).max(80).optional().describe("Activité, en quelques mots : « studio de Pilates », « salon de coiffure », « restaurant italien »…"),
@@ -62,6 +62,8 @@ export const toolSpecs = {
       platforms: z.array(platformSchema).min(1).optional(),
       website_url: z.url().optional().describe("Site web du studio"),
       booking_url: z.url().optional().describe("Lien de réservation ou de prise de rendez-vous (bsport, Planity, TheFork, Momoyoga…), utilisé dans la bio et les stories"),
+      instagram_handle: z.string().min(1).max(120).optional().describe("Son @ Instagram (« @lune.pilates » ou le lien de son profil) : ses abonnés et les vues de ses Reels se suivent sans connecter son compte"),
+      tiktok_handle: z.string().min(1).max(120).optional().describe("Son @ TikTok, de même"),
       step: z.enum(ONBOARDING_STEPS).optional().describe("L'étape d'onboarding où elle en est maintenant (avance-la dès qu'une étape est faite)"),
     }),
   },
@@ -375,7 +377,7 @@ export const toolSpecs = {
   },
   analyze_performance: {
     description:
-      "« Ce qui marche » : compare les derniers posts Instagram du studio (chiffres, formats, heures, légendes, recette des Reels d'Edith) et en tire 2 à 5 leçons avec leurs preuves, plus des idées pour la semaine. Gratuit. Renvoie le dernier bilan s'il a moins de 3 jours, sauf refresh. Les leçons guident aussi les prochains montages.",
+      "« Ce qui marche » : compare les derniers posts Instagram du studio (chiffres, formats, heures, légendes, recette des Reels d'Edith ; sans Instagram relié, ses Reels et vidéos TikTok publics depuis son @, avec leurs vues, j'aime et commentaires) et en tire 2 à 5 leçons avec leurs preuves, plus des idées pour la semaine. Gratuit. Renvoie le dernier bilan s'il a moins de 3 jours, sauf refresh. Les leçons guident aussi les prochains montages.",
     input: z.object({ refresh: z.boolean().default(false).describe("true pour refaire l'analyse même si le dernier bilan est récent") }),
   },
   reply_to_comment: {

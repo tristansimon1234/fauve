@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HandlesForm } from "@/components/handles-form";
 import { CheckIcon, InstagramIcon, TikTokIcon } from "@/components/icons";
 import { currentMember } from "@/lib/social/current-member";
 import { instagramAccount } from "@/lib/social/publish";
@@ -111,6 +112,29 @@ export async function ConnectActions({ searchParams }: { searchParams: Promise<R
             Connecter un autre compte
           </a>
         )}
+      </div>
+    </>
+  );
+}
+
+/** Connecting not offered (lib/social/connect.ts): her @ instead, then on to the end of the onboarding. */
+export async function HandlesActions() {
+  const member = await currentMember();
+  const studio = member
+    ? (await supabaseAdmin().from("studios").select("instagram_handle, tiktok_handle").eq("id", member.studio_id).maybeSingle()).data
+    : null;
+  return (
+    <>
+      {member ? (
+        <HandlesForm instagram={(studio?.instagram_handle as string | null) ?? null} tiktok={(studio?.tiktok_handle as string | null) ?? null} />
+      ) : null}
+      <div className="mt-auto -mx-6 border-t border-line px-6 pt-3.5 pb-7.5">
+        <Link
+          href={member ? "/pret" : "/connexion?next=/connect"}
+          className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-ink text-base font-bold text-white"
+        >
+          {member ? "Continuer" : "Se connecter pour continuer"}
+        </Link>
       </div>
     </>
   );

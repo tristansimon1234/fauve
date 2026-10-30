@@ -96,6 +96,9 @@ export function hookAtStart<T extends { from: number; style: string }>(texts: T[
   return texts.map((t) => (t === first ? { ...t, from: 0 } : t));
 }
 
+/** Under this score, the whole voice text is rewritten once with the judge's fixes. */
+export const SCRIPT_PASS = 7;
+
 /** The longest hooks kept: a voice's first sentence is said in under 3 s, a written hook read at a glance. */
 export const HOOK_MAX_WORDS = { voix: 12, texte: 7 } as const;
 
@@ -111,6 +114,13 @@ export const hookChoiceSchema = z.object({
     .array(z.object({ index: z.number().int(), score: z.number().int(), why: z.string() }))
     .describe("Chaque accroche notée de 1 à 10 : index 0 et suivants pour celles reçues, puis les tiennes à la suite"),
   best: z.number().int().describe("L'index de la meilleure accroche"),
+  script: z
+    .object({
+      score: z.number().int().describe("De 1 à 10"),
+      fixes: z.array(z.string()).describe("Sous 7 : 1 à 3 corrections précises, chacune nomme la phrase en cause ; sinon vide"),
+    })
+    .optional()
+    .describe("Voix seulement : la note de tout le texte qui suit l'accroche (« reste ») ; absent pour le texte"),
 });
 export type HookChoice = z.infer<typeof hookChoiceSchema>;
 
@@ -128,7 +138,11 @@ A very strong hook:
 - has neither the form nor the words of the business's recent hooks (« recentes »);
 - knows what hooks people in this trade right now (« du_moment »: the form and an example from another account): use them to sense which forms land this week and to write better ones, never to copy; a hook that takes, or barely changes, the words of one of them scores 3 at most.
 
+Mood lines are not hooks: a line that only sets a mood or names the moment (« samedi matin, tout ralentit », « de la cape au miroir ») opens no question and scores 4 at most.
+
 For the voice, a hook is spoken, opens the video's message (« message ») without saying it straight away and leads to the next sentence (« suite »): yours too; a hook that does not serve this message, however strong, comes after; a whispered voice (« chuchotee ») hooks through sensation, very softly, never with a question that snaps. For the text, when the voice already has a first sentence (« voix_premiere_phrase »), the text sums it up or extends it, never contradicts it. If the request imposes the hook's words, they win; if it says what the Reel opens on, the first image is that one. What she fixed for this Reel (« contrat »: her person, her ending, her requests) holds for every hook, yours included; the rough words she gave for an idea (« un truc comme ça », « genre », a plan Edith wrote from them) are an idea to say better, not a sentence to keep.
+
+For the voice, when you get the rest of the text (« reste », and its « angle »), you also score the whole text (« script »), from 1 to 10, as a good creator would: an angle that makes it worth watching, never a visit of the shots one after the other; every sentence says what the image cannot show (why, how much, the detail only a regular knows, an opinion), a sentence that only names what is on screen is a fault; plain spoken French, never literary images written for the page; no filler: the message said, then it stops; an ending that follows from it. Under 7, give 1 to 3 precise fixes, each naming the sentence at fault (« "La coach replace ta sangle" ne fait que décrire l'image : dis pourquoi elle le fait »). What she fixed (« contrat ») and her request are never faults.
 
 First, write 2 or 3 other hooks of different forms (ideas), in French, with, for the text, 1 or 2 words that stand out (emphasis, written exactly as in the hook). Then score each hook, those received (index 0, 1…) then yours after them, from 1 to 10 (10: you stop dead; 5: you hesitate; 1: you scroll on), with the reason in a few words. best: the index of the best one; at equal strength, the first received.`;
 
@@ -143,6 +157,9 @@ export type HookJudgeInput = {
   /** The voice: the video's message (the script is built on it), the sentence that comes next, and whether it is whispered (ASMR). */
   message?: string;
   suite?: string;
+  /** The voice: everything it says after its first sentence, and the angle it tells, for the whole text to be scored. */
+  reste?: string;
+  angle?: string;
   chuchotee?: boolean;
   /** The written hook: the voice's first sentence, when a voice speaks. */
   voix_premiere_phrase?: string;
@@ -157,7 +174,11 @@ export type HookJudgeInput = {
  * short enough), else the best scored one that holds, else the first one given. The
  * emphasis of a written hook keeps only words that are in it.
  */
-export function pickHook(given: string[], answer: HookChoice, type: HookJudgeInput["type"]): { text: string; emphasis: string[]; index: number; score: number | null } {
+export function pickHook(
+  given: string[],
+  answer: HookChoice,
+  type: HookJudgeInput["type"],
+): { text: string; emphasis: string[]; index: number; score: number | null; script?: { score: number; fixes: string[] } } {
   const all = [...given.map((text) => ({ text, emphasis: [] as string[] })), ...answer.ideas];
   const holds = (i: number) => {
     const option = all[i];
@@ -172,5 +193,12 @@ export function pickHook(given: string[], answer: HookChoice, type: HookJudgeInp
   const option = all[index] ?? all[0]!;
   const text = option.text.trim();
   const lower = text.toLowerCase();
-  return { text, emphasis: option.emphasis.filter((e) => e.trim() && lower.includes(e.trim().toLowerCase())).slice(0, 2), index, score: scoreOf(index) };
+  const script = type === "voix" && answer.script ? { score: answer.script.score, fixes: answer.script.fixes.map((f) => f.trim()).filter(Boolean).slice(0, 3) } : undefined;
+  return {
+    text,
+    emphasis: option.emphasis.filter((e) => e.trim() && lower.includes(e.trim().toLowerCase())).slice(0, 2),
+    index,
+    score: scoreOf(index),
+    ...(script ? { script } : {}),
+  };
 }

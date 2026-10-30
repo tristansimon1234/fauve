@@ -5,17 +5,18 @@ import { unstable_rethrow, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { restoreVersion } from "@/app/(app)/publications/[id]/review-actions";
-import { ArrowLeftIcon, ArrowUpIcon, CalendarIcon, CaptionIcon, CheckIcon, DownloadIcon, PenIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
+import { ArrowLeftIcon, ArrowUpIcon, CalendarIcon, CaptionIcon, CheckIcon, DownloadIcon, PenIcon, ShareIcon, UndoIcon, VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { PausedSign, useReelPlayback } from "@/components/review/reel-player";
 import { whatsappLink } from "@/lib/public-env";
 import type { ReviewData } from "@/lib/review";
 import { needsInstagram, ReviewSheets, Sheet, type ReviewSheet } from "./review-sheets";
+import { shareMessage, useVideoShare } from "./share-video";
 
 // A Reel opened from WhatsApp (/v/{id}): a page made for her phone, not the app. The video
 // full screen as on Instagram, and only what she does from there, the same buttons as its page
 // in the app (Tristan: « la page de publication envoyée sur WhatsApp mobile doit avoir les mêmes
-// boutons »): publish it, save it, choose when Edith reminds her to post it, or tell Edith what to
+// boutons »): publish it, share it to Instagram from the phone (or save it), choose when Edith reminds her to post it, or tell Edith what to
 // change, back in WhatsApp where everything else happens (« il ne doit pas envoyer de lien vers
 // une app, juste des pages optimisées »); its caption, touched, opens to be written over, as on its page in the app.
 
@@ -44,6 +45,14 @@ export function PhoneReview({ data }: { data: ReviewData }) {
     if (sheet !== "caption") setCaption(data.captionShown);
   }
   const edited = caption.trim() !== data.captionShown.trim();
+  const sharing = useVideoShare(data.videoUrl, data.title);
+  const shareVideo = async () => {
+    setError(null);
+    const result = await sharing.share(caption);
+    if (result === "shared" || result === "failed") setSheet(null);
+    const line = shareMessage(result, caption);
+    if (line) (result === "failed" ? setError : setToast)(line);
+  };
 
   // A new version on its way: the page follows it until the video is there.
   useEffect(() => {
@@ -58,7 +67,8 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   }, [toast]);
 
   const publish = () => {
-    if (needsInstagram(data)) return setSheet("instagram");
+    // Not connected: she posts it herself, her phone's share sheet straight away (share-video.ts).
+    if (needsInstagram(data)) return sharing.can && ready ? void shareVideo() : setSheet("instagram");
     start(async () => {
       setError(null);
       const form = new FormData();
@@ -262,9 +272,15 @@ export function PhoneReview({ data }: { data: ReviewData }) {
             <div className="grid grid-cols-3 gap-2">
               <button type="button" onClick={publish} disabled={pending || !ready} className={`${tile} bg-violet shadow-[0_8px_22px_rgba(91,63,217,0.4)]`}>
                 <ArrowUpIcon size={19} />
-                {pending ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
+                {pending || sharing.busy ? "Un instant…" : data.publishByHand ? "Me l’envoyer" : "Publier"}
               </button>
-              {data.downloadUrl ? (
+              {/* Not connected, « Publier » already shares: this one saves it. */}
+              {sharing.can && ready && !needsInstagram(data) ? (
+                <button type="button" onClick={shareVideo} disabled={sharing.busy} className={`${tile} bg-white/15 backdrop-blur-sm`}>
+                  <ShareIcon size={19} />
+                  {sharing.busy ? "Un instant…" : "Partager"}
+                </button>
+              ) : data.downloadUrl ? (
                 <a href={data.downloadUrl} download className={`${tile} bg-white/15 backdrop-blur-sm`}>
                   <DownloadIcon size={19} />
                   Télécharger
@@ -291,7 +307,13 @@ export function PhoneReview({ data }: { data: ReviewData }) {
         )}
       </div>
 
-      <ReviewSheets sheet={sheet === "caption" ? null : sheet} data={data} onClose={() => setSheet(null)} onPlanned={planned} />
+      <ReviewSheets
+        sheet={sheet === "caption" ? null : sheet}
+        data={data}
+        onClose={() => setSheet(null)}
+        onPlanned={planned}
+        share={{ can: sharing.can && ready, busy: sharing.busy, waiting: sharing.waiting, onShare: shareVideo }}
+      />
       {sheet === "caption" && (
         <Sheet title="Ta légende" hint="Telle qu’elle partira avec ton Reel." onClose={keepCaption}>
           <textarea
@@ -337,6 +359,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
 
 /** Where the montage is, said plainly: its step, how long it has been going, what it usually takes. */
 const STEPS: Record<string, string> = {
+  "en file": "Ton Reel attend son tour",
   montage: "Je monte ton Reel",
   effet: "Je fais l’effet image par image",
   "2e version": "J’essaie une autre version",

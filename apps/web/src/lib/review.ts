@@ -27,6 +27,7 @@ import { signMediaUrls, type Db } from "@/lib/studio";
 import { runningJobs } from "@/lib/studio-jobs";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ownVoiceOf } from "@/lib/voice-clone";
+import { socialConnect } from "@/lib/social/connect";
 
 // « Ta publication », the simple page of a Reel: the video as it will go out, its scenes,
 // when and where, its caption, and whether a new version is on its way (changes saved
@@ -75,6 +76,8 @@ export type ReviewData = {
   captionShown: string;
   handle: string | null;
   instagram: boolean;
+  /** Connecting Instagram offered (lib/social/connect.ts). */
+  connect: boolean;
   publishByHand: boolean;
   /** Edith's music (null: the music service is not set up). */
   music: { on: boolean; made: boolean } | null;
@@ -197,6 +200,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     captionShown: captionForInstagram(post.caption, post.hashtags),
     handle,
     instagram: Boolean(account),
+    connect: socialConnect(),
     publishByHand: post.publish_by_hand,
     music: env("ELEVENLABS_API_KEY") ? { on: music.mode === "on", made: Boolean(music.track) } : null,
     voice,
@@ -219,10 +223,14 @@ export async function reviewSlots(studioId: string, timezone: string): Promise<R
   });
 }
 
-/** Her Instagram name, as the feed shows it over her posts. */
+/** Her Instagram name, as the feed shows it over her posts: her connected account's while connecting is on, else the @ she gave Edith. */
 export async function instagramHandle(studioId: string): Promise<string | null> {
-  const { data } = await supabaseAdmin().from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").maybeSingle();
-  return (data?.handle as string | null) ?? null;
+  const db = supabaseAdmin();
+  const [account, studio] = await Promise.all([
+    socialConnect() ? db.from("social_accounts").select("handle").eq("studio_id", studioId).eq("platform", "instagram").maybeSingle() : null,
+    db.from("studios").select("instagram_handle").eq("id", studioId).maybeSingle(),
+  ]);
+  return (account?.data?.handle as string | null) ?? (studio.data?.instagram_handle as string | null) ?? null;
 }
 
 /** The voice over the Reel: Edith's (her name) or the manager's own voice note; null: none. */

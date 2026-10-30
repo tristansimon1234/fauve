@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { socialConnect } from "./connect";
 import { accountDay, followerAudience, InstagramError, profile } from "./instagram";
 import { instagramAccount } from "./publish";
 import { TikTokError, tiktokUser } from "./tiktok";
@@ -124,6 +125,8 @@ async function captureTikTok(studioId: string): Promise<number> {
 
 /** Cron entry: a few studios per run, those read longest ago first. */
 export async function captureAccountStats(): Promise<number> {
+  // Put aside (connect.ts): her numbers come from her @ (public-stats.ts).
+  if (!socialConnect()) return 0;
   const db = supabaseAdmin();
   const { data: accounts } = await db.from("social_accounts").select("studio_id, platform").eq("status", "connected");
   if (!accounts?.length) return 0;

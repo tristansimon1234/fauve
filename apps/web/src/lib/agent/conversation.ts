@@ -8,8 +8,10 @@ import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
 import { presenceLines } from "@/lib/nudge";
 import { accessLine } from "@/lib/billing/access";
+import { publicStatsFor } from "@/lib/social/public-stats";
 import { studioModels } from "@/lib/reel-models";
 import { pendingSteal } from "@/lib/steal";
+import { socialConnect } from "@/lib/social/connect";
 
 // Shared by every channel (WhatsApp webhook, web test chat): rebuild the
 // conversation from stored messages and let Fauve answer the last one.
@@ -124,10 +126,12 @@ export async function replyInConversation(params: {
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
   const [studio, member, rows, instagram, brand, jobs, tiktok, copying, models] = await Promise.all([
-    db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory, team, subscription_status").eq("id", params.studioId).single(),
+    db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory, team, subscription_status, instagram_handle, tiktok_handle").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
-    db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle(),
+    socialConnect()
+      ? db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle()
+      : Promise.resolve({ data: null }),
     db.from("brand_profiles").select("profile->>tone, profile->voice, profile->own_voice, profile->fonts, profile->font_twins, profile->custom_fonts").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     runningJobs(params.studioId).catch(() => []),
     db.from("social_accounts").select("handle, status").eq("studio_id", params.studioId).eq("platform", "tiktok").maybeSingle(),
@@ -220,6 +224,11 @@ export async function replyInConversation(params: {
       onboardingStep: studio.data.onboarding_step,
       firstName: member.data?.first_name ?? null,
       instagram: (instagram.data?.handle as string | null | undefined) ?? null,
+      publicHandles: {
+        instagram: (studio.data.instagram_handle as string | null) ?? null,
+        tiktok: (studio.data.tiktok_handle as string | null) ?? null,
+        paid: publicStatsFor(studio.data),
+      },
       tiktok: tiktokEnabled()
         ? {
             state: tiktok.data?.status === "connected" ? "connected" : tiktok.data?.status === "expired" ? "expired" : "not_connected",

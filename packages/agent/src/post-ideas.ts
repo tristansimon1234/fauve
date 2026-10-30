@@ -221,15 +221,18 @@ When she said what she imagines (« publication.ce_qu_elle_imagine »), you reph
 
 The plan:
 - title: the post's title, 2 to 6 words, as she would call it;
-- points: 4 to 6 points in order, each « Rubrique : ce qu'on fait », in one short, concrete sentence, for example « Ouverture : … », « Ensuite : … », « Fin : … », « Le son : … » (a voice-over that tells, her own words or just the music, as she chose if it is given), « À l'écran : … » (the text laid on screen, in a few words, between quotes); name the precise shots that are in her files (« la vidéo où elle ajuste le reformer »), and for a file you know nothing about, just say « ta 2e vidéo »;
+- points: 4 to 6 points in order, each « Rubrique : ce qu'on fait », in one short, concrete sentence, for example « Accroche : … », « Ensuite : … », « Fin : … », « Le son : … » (a voice-over that tells, her own words or just the music, as she chose if it is given), « À l'écran : … » (the text laid on screen, in a few words, between quotes); name the precise shots that are in her files (« la vidéo où elle ajuste le reformer »), and for a file you know nothing about, just say « ta 2e vidéo »;
+- the first point is « Accroche : … »: what is seen and what is read or heard in the first second, the moment that decides whether people stay or scroll on;
 - why: one or two simple sentences, why this plan works for her (what stops the thumb, what makes people want to come).
+
+Advise on the hook, never force it (Tristan: « il faut qu'il conseille sur la nécessité du hook… jamais en obligeant »). When what she imagines opens weakly (her logo or her name first, « bienvenue », a slow wide shot, a mood line, the result kept for the end, nothing happening in the first second), keep HER opening in the plan and add one sentence of advice at the end of « why », starting with « Conseil : »: what would hook better with her own files and why (a person or the result in the first second, a question, a contrast, a precise number, what you don't usually see), in simple words; she decides (« Changer ma demande »). A strong opening gets no advice.
 
 Really look at her files (« fichiers_dans_l_ordre »: their shots, their best passages, what is said in them, and the photos below); when someone speaks in a video, their words count (and no voice-over on top). Don't redo her recent posts (« publications_recentes »). Nothing invented about the business: no price, opening time, offer, name or review that neither she nor her files give. Native and true, never an ad nor a flyer. The goal: clients, not buzz. Write it all in French, using « tu », in simple words, with no em dash.`;
 
 export const proposalSchema = z.object({
   title: z.string().describe("Le titre de la publication, 2 à 6 mots"),
   points: z.array(z.string()).describe("4 à 6 points dans l'ordre, chacun « Rubrique : ce qu'on fait »"),
-  why: z.string().describe("Pourquoi ce plan marche, en une ou deux phrases"),
+  why: z.string().describe("Pourquoi ce plan marche, en une ou deux phrases ; puis « Conseil : … » quand son ouverture accroche mal"),
 });
 export type Proposal = z.infer<typeof proposalSchema>;
 
@@ -246,7 +249,7 @@ export function keptPlan(p: Proposal | null | undefined): PostPlan | null {
   if (!p) return null;
   const points = p.points.map((point) => tidy(point, 220)).filter((point) => point.length >= 8).slice(0, 6);
   if (points.length < 3) return null;
-  return { title: tidy(p.title, 60) || "Ta publication", points, why: tidy(p.why, 280) };
+  return { title: tidy(p.title, 60) || "Ta publication", points, why: tidy(p.why, 420) };
 }
 
 /** The buttons under a plan in the chat (20 characters at most: a WhatsApp button). */
@@ -263,5 +266,7 @@ export function planMessage(plan: PostPlan): string {
 
 /** The validated plan, as the montage (or Edith in the chat) reads it. */
 export function validatedPlanBrief(plan: PostPlan): string {
-  return [`Le plan validé (« ${plan.title} ») :`, ...plan.points.map((point) => `- ${point}`), plan.why ? `Pourquoi : ${plan.why}` : ""].filter(Boolean).join("\n");
+  // Edith's advice on the hook (« Conseil : … ») was only advice: validating the plan keeps her opening, never the advice.
+  const why = plan.why.replace(/\s*Conseil\s*:[\s\S]*$/, "").trim();
+  return [`Le plan validé (« ${plan.title} ») :`, ...plan.points.map((point) => `- ${point}`), why ? `Pourquoi : ${why}` : ""].filter(Boolean).join("\n");
 }

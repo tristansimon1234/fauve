@@ -2,6 +2,7 @@ import "server-only";
 import { missingContent, PUBLISH_OFFER_OPTIONS, REMINDER_GRACE_HOURS, reminderMessage, type PostKind } from "@fauve/agent";
 import { studioAccess } from "@/lib/billing/access";
 import { messageOwner } from "@/lib/owner-message";
+import { socialConnect } from "@/lib/social/connect";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // No more publishing on a schedule (Tristan : « la programmation sert à rien », « mais les
@@ -9,6 +10,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // that moment she reminds her, once, with « Oui, publie-le » / « Je regarde d'abord » (the same
 // offer a delivery makes, answered by lib/publish-offer.ts : « oui » publishes it now). On
 // WhatsApp in the 24 h window, else the post_reminder template, and always in the app.
+// Connecting accounts not offered (lib/social/connect.ts): she posts it herself, so the reminder
+// says how (« Partager » on its page) under a button to that page, no « Oui, publie-le ».
 
 const BATCH = 10;
 
@@ -34,13 +37,14 @@ export async function remindDue(): Promise<number> {
     const kind = post.kind === "carousel" ? "carrousel" : post.kind === "story" ? "story" : post.kind === "post" ? "post" : "Reel";
     const title = ((post.title as string | null) ?? "").replace(/\s+/g, " ").trim().slice(0, 60) || "ta publication";
     try {
+      const byHand = !socialConnect();
       await messageOwner(studioId, {
-        text: reminderMessage(post.kind as string, (post.title as string | null) ?? "", platforms),
-        options: PUBLISH_OFFER_OPTIONS,
+        text: reminderMessage(post.kind as string, (post.title as string | null) ?? "", platforms, byHand),
+        ...(byHand ? { link: { page: `/v/${post.id}`, label: kind === "Reel" ? "Voir mon Reel" : "Voir ma publication" } } : { options: PUBLISH_OFFER_OPTIONS }),
         kind: "reminder",
         // Utility, so Meta does not cap it (draft_ready, its fallback before, was moved to Marketing).
         template: { name: "post_reminder", params: [kind, title] },
-        payload: { posts: [post.id], open_post: post.id, publish_offer: post.id },
+        payload: { posts: [post.id], open_post: post.id, ...(byHand ? {} : { publish_offer: post.id }) },
       });
       sent++;
     } catch (error) {

@@ -1,5 +1,6 @@
 import "server-only";
 import { env } from "@/lib/env";
+import { socialConnect } from "./connect";
 
 // TikTok API v2 (Login Kit + Content Posting API). Each studio connects its own
 // account (OAuth); the access token lasts a day and is renewed with the refresh
@@ -24,7 +25,7 @@ export class TikTokError extends Error {
 }
 
 /** Whether the app has its TikTok keys (otherwise TikTok is not offered). */
-export const tiktokEnabled = () => Boolean(env("TIKTOK_CLIENT_KEY") && env("TIKTOK_CLIENT_SECRET"));
+export const tiktokEnabled = () => socialConnect() && Boolean(env("TIKTOK_CLIENT_KEY") && env("TIKTOK_CLIENT_SECRET"));
 
 /** Posts go straight to her account (audited app) rather than to her drafts. */
 export const tiktokDirectPost = () => env("TIKTOK_DIRECT_POST");

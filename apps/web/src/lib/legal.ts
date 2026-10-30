@@ -1,17 +1,18 @@
 // What the legal pages say about who runs Edith. The fields between brackets wait for the company
 // (Tristan: no SIREN yet); once they are filled, `complete` is true and the pages go into the sitemap.
+// The SIREN goes in `registration` once the registration (formality J00296131972, URSSAF and INSEE) is validated.
 export const company = {
-  name: "[Raison sociale]",
+  name: "Tristan Simon",
   /** Its legal form and capital, if any (« SAS au capital de 1 000 € », « Entrepreneur individuel »). */
-  form: "[Forme juridique]",
-  address: "[Adresse du siège]",
-  registration: "[SIREN / RCS]",
+  form: "entrepreneur individuel (micro-entreprise)",
+  address: "59 rue de Ponthieu, 75008 Paris",
+  registration: "SIREN en cours d’attribution",
   /** Intra-community VAT number, once there is one. */
   vat: "",
-  email: "[email de contact]",
+  email: "contact@edith-ai.app",
   /** Who answers for what the site publishes (LCEN, art. 6). */
-  publisher: "[Directeur de la publication]",
-  updatedAt: "28 octobre 2026",
+  publisher: "Tristan Simon",
+  updatedAt: "29 octobre 2026",
 };
 
 /** True once the company's details are filled in (no « [ » placeholder left). */
@@ -28,7 +29,7 @@ export const host = {
  * The version of the terms she accepts by going on (kept on the studio with the date, studios.terms_*).
  * Changed when the terms change in a way that matters: the next ones are shown again.
  */
-export const TERMS_VERSION = "2026-10-28";
+export const TERMS_VERSION = "2026-10-29";
 
 /** What Edith adds under her first WhatsApp message to someone new: going on accepts the terms. */
 export const TERMS_LINE = "En continuant, tu acceptes les conditions d’utilisation et la politique de confidentialité d’Edith : edith-ai.app/conditions";

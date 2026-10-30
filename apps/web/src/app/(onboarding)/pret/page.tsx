@@ -6,6 +6,7 @@ import { CalendarIcon, InstagramIcon, PenIcon, TikTokIcon, WhatsAppIcon } from "
 import { Mascot } from "@/components/mascot";
 import { plural } from "@/lib/format";
 import { whatsappLink } from "@/lib/public-env";
+import { socialConnect } from "@/lib/social/connect";
 import { getContentPlan, getOptionalStudioContext, getSocialAccounts } from "@/lib/studio";
 
 export const metadata: Metadata = { title: "C’est prêt" };
@@ -53,20 +54,32 @@ async function ReadyForMember() {
   if (!member) return <Ready firstName={null} items={null} />;
   const studioId = member.studio.id;
 
-  const [accounts, plan, brand] = await Promise.all([
+  const [accounts, plan, brand, handles] = await Promise.all([
     getSocialAccounts(db, studioId),
     getContentPlan(db, studioId),
     db.from("brand_profiles").select("examples").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
+    db.from("studios").select("instagram_handle, tiktok_handle").eq("id", studioId).maybeSingle(),
   ]);
+  const igHandle = (handles.data?.instagram_handle as string | null) ?? null;
+  const ttHandle = (handles.data?.tiktok_handle as string | null) ?? null;
   const examples = z.array(z.unknown()).catch([]).parse(brand.data?.[0]?.examples).length;
   const account = (platform: "instagram" | "tiktok") => accounts.find((a) => a.platform === platform && a.status === "connected");
   const instagram = account("instagram");
   const tiktok = account("tiktok");
 
   const items: Item[] = [
-    instagram
+    // Connecting not offered (lib/social/connect.ts): her @, from which Edith follows her numbers.
+    ...(!socialConnect()
+      ? [
+          igHandle
+            ? { icon: InstagramIcon, label: `@${igHandle}`, detail: "Edith suit tes abonnés et tes vues" }
+            : { icon: InstagramIcon, label: "Instagram", detail: "Donne ton @ à Edith pour suivre tes chiffres" },
+          ...(ttHandle ? [{ icon: TikTokIcon, label: `@${ttHandle}`, detail: "Edith suit tes abonnés et tes vues" }] : []),
+        ]
+      : []),
+    ...(socialConnect() ? [instagram
       ? { icon: InstagramIcon, label: instagram.handle ? `@${instagram.handle}` : "Instagram", detail: "Instagram connecté" }
-      : { icon: InstagramIcon, label: "Instagram", detail: "Pas encore connecté : demande le lien à Edith" },
+      : { icon: InstagramIcon, label: "Instagram", detail: "Pas encore connecté : demande le lien à Edith" }] : []),
     ...(tiktok
       ? [{ icon: TikTokIcon, label: tiktok.handle ? `@${tiktok.handle}` : "TikTok", detail: "TikTok connecté" }]
       : []),
@@ -97,7 +110,7 @@ function Ready({ firstName, items }: { firstName: string | null; items: Item[] |
         </h1>
         <p className="text-[15px] leading-[1.55] text-muted">
           <span className="md:hidden">La suite se passe sur WhatsApp : envoie tes vidéos à Edith, il prépare tes publications avec toi.</span>
-          <span className="hidden md:inline">Ta première publication peut partir sur Instagram. La suite se passe dans l’app, avec Edith.</span>
+          <span className="hidden md:inline">Ta première publication est prête à poster. La suite se passe dans l’app, avec Edith.</span>
         </p>
       </div>
       {items && (

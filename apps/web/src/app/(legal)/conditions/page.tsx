@@ -39,7 +39,9 @@ export default function TermsPage() {
       <ul>
         <li>Le client garde la propriété de ses photos, vidéos, textes, logo et voix. Il nous autorise à les traiter, les modifier et les héberger le temps nécessaire au service.</li>
         <li>
-          Il garantit en avoir les droits, et avoir l’accord des personnes qui y apparaissent (clients, élèves, équipe). Edith peut flouter un visage à sa demande.
+          Il garantit en avoir les droits, et avoir l’accord des personnes qui y apparaissent (clients, élèves, équipe). Edith peut flouter un visage à sa demande. Pour ces
+          personnes, le client est responsable du traitement et Edith son sous-traitant : voir l’<Link href="/sous-traitance">accord de traitement des données</Link>, qui fait partie de
+          ces conditions.
         </li>
         <li>
           Un Reel envoyé en exemple (son lien ou sa vidéo) ne sert qu’à en reprendre la forme pour un Reel du client : ni ses images ni ses mots ne sont repris, et la vidéo n’est
@@ -113,7 +115,8 @@ export default function TermsPage() {
 
       <h2>10. Données personnelles</h2>
       <p>
-        Voir la <Link href="/confidentialite">politique de confidentialité</Link> et la <Link href="/suppression-des-donnees">suppression des données</Link>.
+        Voir la <Link href="/confidentialite">politique de confidentialité</Link>, l’<Link href="/sous-traitance">accord de traitement des données</Link> (annexe à ces conditions) et
+        la <Link href="/suppression-des-donnees">suppression des données</Link>.
       </p>
 
       <h2>11. Changements de ces conditions</h2>

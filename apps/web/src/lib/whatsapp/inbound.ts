@@ -8,7 +8,8 @@ import { answerPublishOffer } from "@/lib/publish-offer";
 import { deliverPendingHandOffs } from "@/lib/social/hand-off";
 import { replyInConversation } from "@/lib/agent/conversation";
 import { quoteButtons } from "@/lib/credits";
-import { alertOnNewNumbers } from "@/lib/reply-cap";
+import { memberOrRoom, waitlist } from "@/lib/waitlist";
+import { answerDeletion } from "@/lib/account-deletion";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureTranscript } from "@/lib/voice";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
@@ -24,35 +25,6 @@ const BURST_DEBOUNCE_MS = 4000;
 
 const TECHNICAL_ISSUE_REPLY =
   "Petit souci technique de mon côté, je n’ai pas pu traiter ton message. Réessaie dans quelques minutes, désolé !";
-
-type Member = { id: string; studio_id: string; first_name: string | null };
-
-async function findOrCreateMember(phone: string, profileName?: string): Promise<Member> {
-  const db = supabaseAdmin();
-  const existing = await db.from("members").select("id, studio_id, first_name").eq("phone_e164", phone).maybeSingle();
-  if (existing.data) return existing.data;
-
-  // Unknown number: start onboarding with a fresh studio.
-  const studio = await db.from("studios").insert({}).select("id").single();
-  if (studio.error) throw new Error(studio.error.message);
-  const firstName = profileName?.split(/\s+/)[0] ?? null;
-  const created = await db
-    .from("members")
-    .insert({ studio_id: studio.data.id, phone_e164: phone, first_name: firstName, role: "owner" })
-    .select("id, studio_id, first_name")
-    .single();
-  if (created.data) {
-    // More numbers than usual starting today (a launch, or spam): the team is told once.
-    await alertOnNewNumbers().catch((e) => console.warn("new numbers alert failed", e));
-    return created.data;
-  }
-
-  // Lost a race with a concurrent first message: use the winner and drop our studio.
-  await db.from("studios").delete().eq("id", studio.data.id);
-  const winner = await db.from("members").select("id, studio_id, first_name").eq("phone_e164", phone).single();
-  if (winner.error) throw new Error(winner.error.message);
-  return winner.data;
-}
 
 const extensionByMime: Record<string, string> = {
   "video/mp4": "mp4",
@@ -98,7 +70,12 @@ async function storeMedia(studioId: string, message: InboundMessage): Promise<{ 
 export async function handleInboundMessage(message: InboundMessage, profileName?: string): Promise<void> {
   const db = supabaseAdmin();
   const phone = toE164(message.from);
-  const member = await findOrCreateMember(phone, profileName);
+  const member = await memberOrRoom(phone, profileName);
+  // A new number on a full day (a rush): her place is kept and she is told once a day, nothing else runs.
+  if (!member) {
+    if (message.type !== "reaction") await waitlist(phone, message.from, profileName, textOf(message));
+    return;
+  }
 
   // Idempotency: Meta retries deliveries, wa_message_id is unique.
   const inserted = await db
@@ -128,6 +105,9 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
   await markReadAndTyping(message.id).catch((e) => console.warn("typing indicator failed", e));
   // She wrote again after Edith showed her the terms: going on accepts them.
   await acceptShownTerms(member.studio_id).catch((e) => console.warn("terms acceptance not kept", e));
+
+  // « Supprimer mes données » (the deletion page), and her yes to it: nothing else answers.
+  if ((message.type === "text" || message.type === "interactive") && (await answerDeletion(member.studio_id, member.id, phone, message.from, textOf(message)))) return;
 
   // « Bonjour Edith ! Code : K7P2QX » from the start screen on a computer: she confirms with a
   // button that the code is on her own screen (a message someone else wrote for her would open

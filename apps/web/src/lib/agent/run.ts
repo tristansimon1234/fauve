@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import {
+  anthropicOutOfMoney,
   addUsage,
   CHAT_EFFORT,
   CHAT_MODEL,
@@ -26,6 +27,8 @@ import {
   proposalSchema,
 } from "@fauve/agent";
 import { env } from "@/lib/env";
+import { providerDown } from "@/lib/provider-budgets";
+import { socialConnect } from "@/lib/social/connect";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createToolHandlers, type ToolContext } from "./tools";
 import { costMeta } from "@/lib/cost-scope";
@@ -37,9 +40,25 @@ let client: Anthropic | undefined;
  * account's Opus limits, and a refused editor call used to end the whole montage.
  */
 export function anthropic() {
-  client ??= new Anthropic({ apiKey: env("ANTHROPIC_API_KEY"), maxRetries: 4 });
+  client ??= new Anthropic({ apiKey: env("ANTHROPIC_API_KEY"), maxRetries: 4, fetch: watchedFetch });
   return client;
 }
+
+/**
+ * Claude refusing a call for money (its credit balance gone, or the account's spending limit reached)
+ * means Edith answers no one: the team is told at once (lib/provider-budgets.ts, once a day).
+ */
+const watchedFetch: typeof fetch = async (input, init) => {
+  const res = await fetch(input, init);
+  if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+    const body = await res
+      .clone()
+      .text()
+      .catch(() => "");
+    if (anthropicOutOfMoney(res.status, body)) void providerDown("anthropic");
+  }
+  return res;
+};
 
 /**
  * Cached prompts are kept an hour: she often answers Edith 5 to 60 minutes later, and the montages come minutes
@@ -78,6 +97,7 @@ export type RunFauveInput = ToolContext & {
     firstName: string | null;
     instagram: string | null;
     tiktok?: TikTokContext;
+    publicHandles?: StudioContextForPrompt["publicHandles"];
     channel?: "whatsapp" | "web";
     /** Default level of care for montages (Réglages). */
     montageEffort?: Effort;
@@ -163,6 +183,8 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           onboardingStep: input.studio.onboardingStep,
           instagram: input.studio.instagram,
           tiktok: input.studio.tiktok,
+          publicHandles: input.studio.publicHandles,
+          connect: socialConnect(),
           channel: input.studio.channel,
           montageEffort: input.studio.montageEffort,
           known: input.studio.known,

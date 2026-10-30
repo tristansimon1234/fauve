@@ -82,16 +82,21 @@ export async function addPackCredits(studioId: string, sessionId: string, credit
  * onboarding left, counted as Pro), a move up adds the difference at once; a move down changes
  * nothing until her renewal.
  */
-export async function grantPlanCredits(studioId: string, change: { from: PlanId | null; to: PlanId }): Promise<void> {
+export async function grantPlanCredits(studioId: string, change: { from: PlanId | null; to: PlanId }, grant?: string): Promise<void> {
   const db = supabaseAdmin();
+  // Once per grant (the Stripe webhook and her return from Checkout may read the same subscription at once).
+  const ref = grant ? { grant } : {};
+  const once = (error: { code?: string; message: string } | null) => {
+    if (error && error.code !== "23505") throw new Error(`plan credits: ${error.message}`);
+  };
   if (change.from === null) {
     const { data: balance } = await db.rpc("credit_balance", { p_studio: studioId });
     const delta = PLANS[change.to].credits - Number(balance ?? 0);
-    if (delta) await db.from("credit_ledger").insert({ studio_id: studioId, delta, reason: "adjustment", label: `Abonnement ${PLANS[change.to].label}` });
+    if (delta) once((await db.from("credit_ledger").insert({ studio_id: studioId, delta, reason: "adjustment", label: `Abonnement ${PLANS[change.to].label}`, ref })).error);
     return;
   }
   const delta = PLANS[change.to].credits - PLANS[change.from].credits;
-  if (delta > 0) await db.from("credit_ledger").insert({ studio_id: studioId, delta, reason: "adjustment", label: `Passage à ${PLANS[change.to].label}` });
+  if (delta > 0) once((await db.from("credit_ledger").insert({ studio_id: studioId, delta, reason: "adjustment", label: `Passage à ${PLANS[change.to].label}`, ref })).error);
 }
 
 export async function chargeCredits(studioId: string, credits: number, reason: Reason, label: string, ref: Record<string, unknown> = {}) {
@@ -114,7 +119,7 @@ export type Quote = {
 };
 
 /** Where a launched montage is in the chain (montage_status, the quote card). */
-export type QuoteStage = "design" | "effects" | "alternative" | "render" | "review" | "fix" | "delivered" | "superseded";
+export type QuoteStage = "waiting" | "design" | "effects" | "alternative" | "render" | "review" | "fix" | "delivered" | "superseded";
 
 /**
  * Her Reel goes to the effects agent: the launched work is priced as one (quoteEffect: the chain's price

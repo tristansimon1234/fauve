@@ -12,6 +12,7 @@ import {
 } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendText } from "@/lib/whatsapp/client";
+import { socialConnect } from "./connect";
 import {
   creatorInfo,
   publishStatus,
@@ -94,6 +95,8 @@ export async function linkTikTokAccount(
 
 /** The studio's TikTok account with a valid access token, or null when not connected. */
 export async function tiktokAccount(studioId: string): Promise<{ id: string; handle: string | null; openId: string; accessToken: string } | null> {
+  // Put aside (connect.ts): nothing is sent to TikTok nor read from its API.
+  if (!socialConnect()) return null;
   const db = supabaseAdmin();
   const account = await db.from("social_accounts").select("id, handle, provider_ref, status").eq("studio_id", studioId).eq("platform", "tiktok").maybeSingle();
   if (!account.data || account.data.status !== "connected" || !account.data.provider_ref) return null;
@@ -382,7 +385,7 @@ export async function captureTikTokMetrics(): Promise<number> {
 
 /** Where a new post goes by default: Instagram, and TikTok too for a Reel once TikTok is connected. */
 export async function defaultPlatforms(studioId: string, kind: PostKind): Promise<("instagram" | "tiktok")[]> {
-  if (kind !== "reel") return ["instagram"];
+  if (kind !== "reel" || !socialConnect()) return ["instagram"];
   const { data } = await supabaseAdmin().from("social_accounts").select("status").eq("studio_id", studioId).eq("platform", "tiktok").maybeSingle();
   return data?.status === "connected" ? ["instagram", "tiktok"] : ["instagram"];
 }

@@ -16,6 +16,7 @@ import { carouselPhotos } from "@/lib/render/carousel";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { hasTexts, postSlides, rendersPlan, slideWritten, type SlidesRender } from "@/lib/render/slides";
 import { instagramHandle, reviewSlots, type ReviewSlot } from "@/lib/review";
+import { socialConnect } from "@/lib/social/connect";
 import { instagramAccount } from "@/lib/social/publish";
 import { signMediaUrls, type Db } from "@/lib/studio";
 import { runningJobs } from "@/lib/studio-jobs";
@@ -57,6 +58,8 @@ export type CarouselReviewData = {
   captionShown: string;
   handle: string | null;
   instagram: boolean;
+  /** Connecting Instagram is offered (connect.ts): when it is not, she posts herself. */
+  connect: boolean;
   platforms: string[];
   scheduledAt: string | null;
   when: PublishWhen | null;
@@ -167,6 +170,7 @@ export async function loadCarouselReview(db: Db, studioId: string, post: Carouse
     captionShown: captionForInstagram(post.caption, post.hashtags),
     handle,
     instagram: Boolean(account),
+    connect: socialConnect(),
     platforms: post.platforms,
     scheduledAt: post.scheduled_at,
     when: post.scheduled_at ? publishWhen(post.scheduled_at, timezone) : null,

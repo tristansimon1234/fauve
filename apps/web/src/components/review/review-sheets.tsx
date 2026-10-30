@@ -7,7 +7,7 @@ import { DateView } from "./change-panel";
 
 // What « Prévoir » and « Publier » open on a Reel's page, the same in the app and on the page
 // opened from WhatsApp: when Edith reminds her to post it, and, before Instagram is connected,
-// the way to connect it (or to save the video and post it herself).
+// how she posts it herself (her phone's share sheet, else the video to save) and connecting it, for her results.
 
 export type ReviewSheet = "date" | "instagram";
 
@@ -19,12 +19,15 @@ export function ReviewSheets({
   data,
   onClose,
   onPlanned,
+  share,
 }: {
   sheet: ReviewSheet | null;
   data: ReviewData;
   onClose: () => void;
   /** The moment changed: the line to show her (empty when nothing changed). */
   onPlanned: (message: string) => void;
+  /** On a phone, the share sheet with her video (share-video.ts). */
+  share?: { can: boolean; busy: boolean; waiting: boolean; onShare: () => void };
 }) {
   if (sheet === "date") {
     return (
@@ -34,16 +37,31 @@ export function ReviewSheets({
     );
   }
   if (sheet === "instagram") {
+    // A phone shares it straight away (« Publier » opens its share sheet): this sheet is a computer's,
+    // or a phone whose browser cannot share a video. She posts it herself; connecting is for her results.
     return (
-      <Sheet title="Relie ton Instagram" hint="Pour qu’Edith publie ton Reel, relie ton compte Instagram une fois. Ou télécharge la vidéo et publie-la toi-même." onClose={onClose}>
-        <a href="/api/instagram/connect" className="btn btn-primary w-full">
-          <InstagramIcon size={18} />
-          Relier Instagram
-        </a>
-        {data.downloadUrl && (
-          <a href={data.downloadUrl} download className="btn btn-secondary w-full">
-            <DownloadIcon size={18} />
-            Télécharger la vidéo
+      <Sheet
+        title="Publie-le toi-même"
+        hint="Ouvre ce Reel sur ton téléphone et touche « Publier » : Instagram s’ouvre avec ta vidéo prête, et tu peux y ajouter un son tendance. Ou télécharge la vidéo."
+        onClose={onClose}
+      >
+        {share?.can ? (
+          <button type="button" onClick={share.onShare} disabled={share.busy} className="btn btn-primary w-full disabled:opacity-60">
+            <InstagramIcon size={18} />
+            {share.busy ? "Un instant…" : share.waiting ? "Partager maintenant" : "Ouvrir dans Instagram"}
+          </button>
+        ) : (
+          data.downloadUrl && (
+            <a href={data.downloadUrl} download className="btn btn-primary w-full">
+              <DownloadIcon size={18} />
+              Télécharger la vidéo
+            </a>
+          )
+        )}
+        {data.connect && (
+          <a href="/api/instagram/connect" className="btn btn-secondary w-full">
+            <InstagramIcon size={18} />
+            Relier Instagram pour suivre tes résultats
           </a>
         )}
       </Sheet>

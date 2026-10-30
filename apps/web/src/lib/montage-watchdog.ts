@@ -24,6 +24,8 @@ export async function reviveStalledMontages(): Promise<{ revived: string[]; fail
     .eq("kind", "montage")
     .is("finished_at", null)
     .not("resume", "is", null)
+    // Waiting its turn is not silent (montage-queue.ts keeps it alive).
+    .neq("stage", "waiting")
     .lt("updated_at", new Date(now - SILENT_MS).toISOString())
     .gt("updated_at", new Date(now - 6 * 3600_000).toISOString())
     .limit(5);

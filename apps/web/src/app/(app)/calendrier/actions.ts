@@ -236,7 +236,7 @@ export async function getPostSheet(postId: string): Promise<PostSheet | null> {
       : status === "draft"
         ? "Relis le brouillon et valide-le."
         : status === "validated" && !instagram
-          ? "Connecte Instagram pour qu'Edith la publie."
+          ? "Poste-la depuis ton téléphone, ou relie Instagram pour qu'Edith la publie."
           : status === "validated" || status === "scheduled"
             ? "Rien à faire : Edith la publie à l’heure prévue."
             : status === "published" || status === "measured"

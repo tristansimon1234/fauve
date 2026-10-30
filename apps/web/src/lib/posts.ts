@@ -28,7 +28,7 @@ async function blocked(studioId: string, post: { kind: string; render_id: string
 export const NOT_SCHEDULED: Record<Blocked, string> = {
   montage: "C’est validé. Edith le publie dès que la vidéo est prête.",
   photos: "C’est validé. Il lui manque ses photos : ajoute-les pour qu’Edith le publie.",
-  instagram: "C’est validé. Connecte Instagram (Réglages) pour qu’Edith le publie.",
+  instagram: "C’est validé. Poste-le depuis ton téléphone : « Publier » ouvre Instagram avec ta publication prête, sa légende déjà copiée.",
   tiktok: "C’est validé. Reconnecte TikTok (Réglages), ou retire-le de « Où publier », pour qu’Edith le publie.",
 };
 

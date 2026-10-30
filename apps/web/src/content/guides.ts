@@ -110,7 +110,7 @@ export const GUIDES: Guide[] = [
         ],
       },
       {
-        p: "Avec Edith, tu envoies tes vidéos sur WhatsApp telles quelles : il choisit les plans, les coupe sur la musique, trouve l’accroche, écrit la légende et attend ton oui pour publier. Tu peux lui demander n’importe laquelle de ces idées avec tes mots.",
+        p: "Avec Edith, tu envoies tes vidéos sur WhatsApp telles quelles : il choisit les plans, les coupe sur la musique, trouve l’accroche, écrit la légende et te le donne prêt à poster. Tu peux lui demander n’importe laquelle de ces idées avec tes mots.",
       },
     ],
     trade: "restaurant",

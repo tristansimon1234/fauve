@@ -112,7 +112,7 @@ export default async function GuidePage({ params }: PageProps<"/guides/[slug]">)
         )}
       </article>
 
-      <LastCall waUrl={whatsappLink()} line="Tu filmes, Edith monte, écrit la légende et attend ton oui pour publier.">
+      <LastCall waUrl={whatsappLink()} line="Tu filmes, Edith monte, écrit la légende et te le donne prêt à poster.">
         Pas le temps de tout ça ? <span className="font-[family-name:var(--font-serif)] font-normal tracking-[-0.01em] text-lilac italic">Edith s’en occupe.</span>
       </LastCall>
     </main>

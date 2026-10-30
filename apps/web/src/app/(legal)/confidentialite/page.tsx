@@ -31,7 +31,8 @@ export default function PrivacyPage() {
         <li>Données techniques : sessions de connexion, journaux, coûts de traitement.</li>
       </ul>
       <p>
-        Les vidéos peuvent montrer des clients ou l’équipe du commerce : tu t’engages à avoir leur accord avant de nous les envoyer. Edith peut flouter un visage à ta demande.
+        Les vidéos peuvent montrer des clients ou l’équipe du commerce : tu t’engages à avoir leur accord avant de nous les envoyer. Pour ces personnes, c’est toi le responsable du
+        traitement et nous ton sous-traitant (voir l’<Link href="/sous-traitance">accord de traitement des données</Link>). Edith peut flouter un visage à ta demande.
         Pour placer ses textes et ses animations, Edith repère dans tes vidéos les visages, les mains et les corps (leur position, image par image) : ce repérage ne sert pas à
         reconnaître qui que ce soit et reste attaché à la vidéo.
       </p>
@@ -66,7 +67,7 @@ export default function PrivacyPage() {
 
       <h2>Durées de conservation</h2>
       <ul>
-        <li>Compte, conversations, contenus préparés et statistiques : pendant l’abonnement, puis supprimés sous 30 jours après sa fin ou une demande de suppression.</li>
+        <li>Compte, conversations, contenus préparés et statistiques : pendant l’abonnement, puis supprimés 30 jours après sa fin. Un compte qui ne s’abonne pas est supprimé 30 jours après son dernier message. À ta demande, tout est supprimé aussitôt.</li>
         <li>
           Photos et vidéos envoyées : supprimées 24 h après la mise en ligne de la publication qui les utilise, ou 7 jours après leur envoi si aucune ne les utilise (jusqu’à 6 mois
           pour tes meilleures vidéos, gardées pour tes prochains Reels). Les photos de ton site restent tant que ton compte existe.

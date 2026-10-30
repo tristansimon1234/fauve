@@ -28,7 +28,15 @@ export async function deleteStudio(studioId: string): Promise<{ files: number; u
   const db = supabaseAdmin();
   const { data: studio } = await db.from("studios").select("id").eq("id", studioId).maybeSingle();
   if (!studio) throw new Error("Studio introuvable");
-  const { data: members } = await db.from("members").select("user_id").eq("studio_id", studioId);
+  const { data: members } = await db.from("members").select("user_id, phone_e164").eq("studio_id", studioId);
+  // Its numbers everywhere else they were kept: the waitlist, its sign-in links and its computer pairings.
+  const phones = (members ?? []).map((m) => m.phone_e164 as string | null).filter((p): p is string => Boolean(p));
+  if (phones.length) {
+    await db.from("waitlist").delete().in("phone_e164", phones);
+    await db.from("login_tokens").delete().in("phone_e164", phones);
+    await db.from("pairing_requests").delete().in("phone_e164", phones);
+    await db.from("pending_server_logins").delete().in("phone_e164", phones);
+  }
 
   // Her cloned voice lives in the ElevenLabs account: deleted there too.
   await forgetOwnVoice(studioId, { keepProfile: true });

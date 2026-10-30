@@ -7,6 +7,7 @@ import { InstagramError, mediaInsights, publishMedia, refreshToken, type Publish
 import { slidesToPublish } from "@/lib/render/slides";
 import { designedItems, publishItems } from "./media-urls";
 import { handOff, matchHandPublished } from "./hand-off";
+import { socialConnect } from "./connect";
 import { TikTokError } from "./tiktok";
 import { captureTikTokMetrics, matchTikTokDrafts, refreshIdleTikTokTokens, sendToTikTok, tiktokCanTake, trackTikTok } from "./tiktok-account";
 
@@ -103,6 +104,8 @@ async function notify(studioId: string, text: string) {
 
 /** Instagram account and token of a studio, or null when not connected. */
 export async function instagramAccount(studioId: string) {
+  // Put aside (connect.ts): no account is read, so nothing is published nor offered through the API.
+  if (!socialConnect()) return null;
   const db = supabaseAdmin();
   const account = await db
     .from("social_accounts")
@@ -426,5 +429,11 @@ export async function runPublishWorker() {
     console.error("account stats failed", error);
     return 0;
   });
-  return { due: due.length, published, reminded, handPublished, tiktok, measured, refreshed, account };
+  // Her public numbers from her @, for the accounts she has not connected (Treg, once a day).
+  const { capturePublicStats } = await import("./public-stats");
+  const publicStats = await capturePublicStats().catch((error) => {
+    console.error("public stats failed", error);
+    return 0;
+  });
+  return { due: due.length, published, reminded, handPublished, tiktok, measured, refreshed, account, publicStats };
 }

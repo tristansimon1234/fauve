@@ -470,7 +470,9 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
   const max = quote.effort === "max" && quote.kind === "montage";
   const reviewed = seen.includes("review") || seen.includes("fix");
   const text =
-    quote.stage === "effects"
+    quote.stage === "waiting"
+      ? "Beaucoup de commerces en ce moment : ton Reel attend son tour"
+      : quote.stage === "effects"
       ? "Edith fait l’effet image par image et vérifie chaque geste"
       : quote.stage === "alternative"
       ? "Une 2e version, pour comparer"
@@ -505,6 +507,7 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
   const late =
     now !== null &&
     quote.startedAt !== null &&
+    quote.stage !== "waiting" &&
     montageLate({ startedAt: Date.parse(quote.startedAt), stageAt: quote.stageAt ? Date.parse(quote.stageAt) : null, effort: quote.effort, now });
 
   // Launched from this card: the keyboard focus lands on the progress (the button it was on is gone).

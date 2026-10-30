@@ -18,6 +18,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
         <nav className="mt-6 flex flex-wrap gap-5 text-sm font-semibold text-muted">
           <Link href="/confidentialite">Confidentialité</Link>
           <Link href="/conditions">Conditions d’utilisation et de vente</Link>
+          <Link href="/sous-traitance">Accord de traitement des données</Link>
           <Link href="/mentions-legales">Mentions légales</Link>
           <Link href="/suppression-des-donnees">Suppression des données</Link>
         </nav>

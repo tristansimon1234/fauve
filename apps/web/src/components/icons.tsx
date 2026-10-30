@@ -85,6 +85,12 @@ export const DownloadIcon = make(
     <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
   </>,
 );
+export const ShareIcon = make(
+  <>
+    <path d="M12 15V4M7 8l5-5 5 5" />
+    <path d="M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" />
+  </>,
+);
 export const CheckIcon = make(<path d="M20 6 9 17l-5-5" />, { strokeWidth: 2.2 });
 export const PlusIcon = make(<path d="M12 5v14M5 12h14" />);
 export const ArrowLeftIcon = make(<path d="M19 12H5M11 18l-6-6 6-6" />);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChevronDownIcon, GridIcon, HeartIcon, LayersIcon, LinkIcon, LockIcon, MenuIcon, PlayIcon, PlusIcon, ReelIcon, TagUserIcon } from "@/components/icons";
 import { GridTabs } from "./grid-tabs";
+import { socialConnect } from "@/lib/social/connect";
 import { formatCompact, formatShortDateTime } from "@/lib/format";
 import type { InstagramMedia, InstagramProfile } from "@/lib/social/instagram";
 import type { TikTokUser, TikTokVideo } from "@/lib/social/tiktok";
@@ -48,7 +49,7 @@ export function GridView({
   const views: ProfileView[] = [
     {
       key: "instagram",
-      hint: connected ? null : <LinkHint href="/connect" network="Instagram" />,
+      hint: connected ? null : socialConnect() ? <LinkHint href="/connect" network="Instagram" /> : <HandleHint />,
       profile: <InstagramView handle={handle} info={info} identity={identity} tiles={tiles} tz={tz} />,
     },
   ];
@@ -69,6 +70,19 @@ export function GridView({
       }
       views={views}
     />
+  );
+}
+
+/** Connecting not offered (lib/social/connect.ts): her numbers come from her @, given in Réglages. */
+function HandleHint() {
+  return (
+    <p className="text-[13.5px] leading-snug text-muted">
+      Aperçu avec ce qu’Edith sait de ton commerce.{" "}
+      <Link href="/reglages#reseaux" className="font-bold text-violet">
+        Donne ton @
+      </Link>{" "}
+      pour qu’Edith suive tes abonnés et tes vues.
+    </p>
   );
 }
 

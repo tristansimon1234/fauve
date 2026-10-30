@@ -1,7 +1,8 @@
 import "server-only";
 import { isInSessionWindow } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { sendReply, sendTemplate } from "@/lib/whatsapp/client";
+import { createLoginLink } from "@/lib/auth/login-link";
+import { sendLinkButton, sendReply, sendTemplate } from "@/lib/whatsapp/client";
 
 // A message Edith sends on her own (the week's proposal, the day's filming
 // mission, a plan B): on WhatsApp while the 24 h window is open, with its
@@ -18,6 +19,8 @@ export type OwnerMessage = {
   kind?: string;
   /** Outside the 24 h window: an approved template and its parameters, and another if Meta refuses it (not approved yet). */
   template?: { name: string; params: string[]; fallback?: { name: string; params: string[] } };
+  /** On WhatsApp, a button under it that opens this page signed in (« Voir mon Reel »), instead of answer buttons. */
+  link?: { page: string; label: string };
   /** More of the message's payload (a post's card, the publish offer its buttons answer). */
   payload?: Record<string, unknown>;
 };
@@ -58,7 +61,8 @@ export async function messageOwner(studioId: string, message: OwnerMessage): Pro
   if (owner) {
     const waId = owner.waId;
     if (owner.open) {
-      const id = await sendReply(waId, message.text, message.options);
+      const url = message.link ? await createLoginLink(phone!, message.link.page, "open_post").catch(() => null) : null;
+      const id = url ? await sendLinkButton(waId, message.text, { url, label: message.link!.label }) : await sendReply(waId, message.text, message.options);
       await db.from("whatsapp_messages").insert({ studio_id: studioId, channel: "whatsapp", wa_message_id: id, direction: "outbound", phone_e164: phone, type: "text", body: message.text, payload });
       return "whatsapp";
     }

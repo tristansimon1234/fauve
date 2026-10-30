@@ -24,6 +24,10 @@ const schema = {
   AI_GATEWAY_API_KEY: z.string().min(1).optional(),
   // Treg (treg.to, pay per call): the video of an Instagram Reel from its link when yt-dlp cannot open it. Unset = she sends the video.
   TREG_API_KEY: z.string().min(1).optional(),
+  // Treg's organisation, to read its balance on the admin page (the first of GET /orgs when unset).
+  TREG_ORG_ID: z.string().min(1).optional(),
+  // Anthropic Admin API key (sk-ant-admin…, an organisation's): Claude's cost as Anthropic bills it, on the admin page. Unset = our own count only.
+  ANTHROPIC_ADMIN_KEY: z.string().min(1).optional(),
   // ElevenLabs Music: each Reel's soundtrack, composed from the rendered video. Unset = silent Reels.
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
   ELEVENLABS_MUSIC_MODEL: z.string().default("music_v2_5"),
@@ -34,6 +38,8 @@ const schema = {
   ELEVENLABS_VOICE_ID: z.string().default("D6VK2PsbVdaFL5aALfRc"),
   ELEVENLABS_TTS_USD_PER_KCHAR: z.coerce.number().nonnegative().default(0.08),
   // Instagram API with Instagram Login (Meta app → Instagram product).
+  // Connecting Instagram / TikTok and publishing through their APIs (lib/social/connect.ts): « on » to offer them again.
+  SOCIAL_CONNECT: z.enum(["on", "off"]).default("off"),
   INSTAGRAM_APP_ID: z.string().regex(/^\d+$/),
   INSTAGRAM_APP_SECRET: z.string().min(1),
   INSTAGRAM_GRAPH_VERSION: z.string().default("v26.0"),
@@ -50,13 +56,20 @@ const schema = {
   // Bearer secret for /api/cron/* (pg_cron sends it from Supabase Vault).
   CRON_SECRET: z.string().min(32),
   // Stripe (subscriptions with a 3-day trial). Unset = billing off: every studio has full access.
-  STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
+  // A restricted key (rk_…) with only what billing uses is better than the secret key (sk_…).
+  STRIPE_SECRET_KEY: z.string().regex(/^(sk|rk)_/).optional(),
+  // The signing secret of the Stripe webhook endpoint (/api/stripe/webhook, « whsec_… »). Unset = the webhook refuses everything.
+  STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional(),
   // Google AI Studio key and model for video analysis.
   GEMINI_API_KEY: z.string().min(1),
   GEMINI_MODEL: z.string().default("gemini-3.7-flash"),
   // A new Reel whose effect holds to what moves in her video goes to the effects agent (Managed Agents); false: the chain
   // (a correction of a Reel the agent made still goes back to it).
   EFFECTS_AGENT: z.stringbool().default(true),
+  // The brakes for a rush (packages/agent/src/brakes.ts): their defaults, changed without a release.
+  DAILY_SIGNUPS: z.coerce.number().int().nonnegative().optional(),
+  MONTAGES_AT_ONCE: z.coerce.number().int().positive().optional(),
+  FREE_SPEND_EUR_PER_DAY: z.coerce.number().nonnegative().optional(),
   // Image model: real photos improved and ambiance images (lib/ai-images.ts), and its price per 2K image in USD.
   GEMINI_IMAGE_MODEL: z.string().default("gemini-nano-banana-2.1"),
   GEMINI_IMAGE_USD: z.coerce.number().nonnegative().default(0.05),

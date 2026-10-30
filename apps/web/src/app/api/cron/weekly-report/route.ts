@@ -88,7 +88,7 @@ const HAND_OVER_MS = 220_000;
 const call = (query: string) =>
   fetch(`${env("APP_URL")}/api/cron/weekly-report?${query}`, { method: "POST", headers: { authorization: `Bearer ${env("CRON_SECRET")}` } });
 
-/** Every studio with Instagram connected (page by page: a query returns 1 000 rows at most), each sent to its own invocation. */
+/** Every studio with Instagram connected or an @ (page by page: a query returns 1 000 rows at most), each sent to its own invocation. */
 async function fanOut(start: number) {
   const began = Date.now();
   const studios = new Set<string>();
@@ -104,7 +104,19 @@ async function fanOut(start: number) {
     for (const row of data ?? []) studios.add(row.studio_id as string);
     if ((data ?? []).length < PAGE) break;
   }
-  const list = [...studios];
+  // And those followed from their @ without connecting (public-stats.ts: paid plans only, checked by the analysis).
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin()
+      .from("studios")
+      .select("id")
+      .or("instagram_handle.not.is.null,tiktok_handle.not.is.null")
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) studios.add(row.id as string);
+    if ((data ?? []).length < PAGE) break;
+  }
+  const list = [...studios].sort();
   for (let i = start; i < list.length; i += FAN_OUT) {
     if (Date.now() - began > HAND_OVER_MS) {
       const res = await call(`from=${i}`).catch((error: unknown) => error as Error);

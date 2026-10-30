@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { CheckIcon, PlayIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
-import { PHOTOS, unsplash } from "./photos";
 
 // What each card of the landing shows, alive: drawings of what Edith does, played by
 // landing.css once their <Play> is on screen (land-once: plays once, land-loop: loops while
@@ -229,21 +228,21 @@ export function ReminderVisual() {
           <span className="text-[12px] font-bold text-ink">Edith</span>
           <span className="ml-auto text-[10.5px] text-muted">maintenant</span>
         </span>
-        <span className="text-[12.5px] leading-snug text-ink">C’est le bon moment pour poster ton Reel : vendredi 18 h, tes clientes sont là. Je le publie ?</span>
+        <span className="text-[12.5px] leading-snug text-ink">C’est le bon moment pour poster ton Reel : vendredi 18 h, tes clientes sont là. Sa légende est copiée.</span>
       </span>
       <span className="mt-2 flex gap-1.5">
         <span className="land-once land-rise flex-1 overflow-hidden rounded-full" style={v({ "--d": "0.9s" })}>
           <span className="land-once land-press block rounded-full bg-violet py-1.5 text-center text-[11.5px] font-bold text-white" style={v({ "--d": "1.7s" })}>
-            Oui, publie-le
+            Partager
           </span>
         </span>
         <span className="land-once land-rise flex-1 rounded-full bg-white/12 py-1.5 text-center text-[11.5px] font-bold text-white/80" style={v({ "--d": "1s" })}>
-          Je regarde d’abord
+          Plus tard
         </span>
       </span>
       <span className="land-once land-rise mt-2.5 flex items-center justify-center gap-1.5 text-[11.5px] font-semibold text-lilac-ink" style={v({ "--d": "2.4s" })}>
         <CheckIcon size={13} />
-        Publié sur Instagram
+        Posté sur Instagram
       </span>
     </span>
   );
@@ -277,7 +276,8 @@ export function ReportVisual() {
 /* ── Retouch: the line between before and after ──────────────────────────────────────── */
 
 export function RetouchVisual() {
-  const photo = unsplash(PHOTOS.cafe, 320, 200);
+  // Served from the app (an Unsplash photo, free licence): a visitor's browser never calls a third party.
+  const photo = "/landing/retouch-cafe.jpg";
   return (
     <span className="relative mt-4 block h-[132px] overflow-hidden rounded-[14px]">
       {/* eslint-disable-next-line @next/next/no-img-element */}

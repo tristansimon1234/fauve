@@ -7,6 +7,8 @@ import { addUsage, claudeCostUsd, supportsServerFallback, usdToEur } from "./pri
 import { isInSessionWindow, weeklySummaryParams } from "./whatsapp-templates.ts";
 import { CREDIT_PRICES, MONTAGE_CEILING } from "./credits.ts";
 import { DAILY_TURNS, dailyTurnCap, newNumbersAlert } from "./reply-cap.ts";
+import { freeStudio, ourStudio, queueMinutes, queuedLine } from "./brakes.ts";
+import { anthropicOutOfMoney, budgetState } from "./budgets.ts";
 import { businessFamily, filmIdeas, keptPlan, validatedPlanBrief, postIdeas, planMessage, PLAN_BUTTONS } from "./post-ideas.ts";
 import { captionLang, cleanHook, cleanTags, cleanWhy, foreignScript, inTrendLang, minViews, otherLang, hashtagOf, hashtagPostsIn, hashtagVolumes, instagramTopPosts, instagramTrends, keptTrends, nextCursorIn, scopeKey, shortCount, tiktokTrends, trendChange, trendChangesLeft, trendHashtags, trendPlan, trendQueryOf } from "./trends.ts";
 import { EUR_PER_CREDIT_SPENT, jobMargin, monthlyCostBudget, netRevenue, studioMonth, TARGET_MARGIN, TYPICAL_COST_EUR } from "./margin.ts";
@@ -1232,6 +1234,31 @@ test("Edith's turns a day: none for the team, 200 for a subscriber, 30 for anyon
   assert.match(newNumbersAlert(21), /^21 nouveaux numéros .* 30 réponses par jour/);
 });
 
+test("the brakes of a rush: our studios never braked, a waiting Reel says when it comes", () => {
+  assert.equal(ourStudio({ team: true }), true);
+  assert.equal(ourStudio({ website_url: "lab://pizzeria" }), true);
+  assert.equal(ourStudio({ website_url: null }), false);
+  assert.equal(freeStudio({ subscription_status: null, website_url: null }), true);
+  assert.equal(freeStudio({ subscription_status: "active" }), false);
+  assert.equal(freeStudio({ subscription_status: "past_due" }), true);
+  assert.equal(freeStudio({ team: true, subscription_status: null }), false);
+  // Next in line with 6 slots: a slot frees in about 1.5 min, then its own 9 min, rounded up to 5.
+  assert.equal(queueMinutes(1, 6), 15);
+  assert.equal(queueMinutes(12, 6), 30);
+  assert.equal(queueMinutes(0, 0), 20);
+  assert.match(queuedLine(25), /dans 25 minutes environ/);
+});
+
+test("a provider's budget: what is left, for how many days, and when Claude refuses for money", () => {
+  assert.deepEqual(budgetState(null, 5, 1), { remaining: null, daysLeft: null, low: false });
+  assert.deepEqual(budgetState({ balance: 100, setAt: "", alertDays: 7 }, 40, 10), { remaining: 60, daysLeft: 6, low: true });
+  assert.equal(budgetState({ balance: 100, setAt: "", alertDays: 7 }, 20, 10).low, false);
+  assert.equal(budgetState({ balance: 10, setAt: "", alertDays: 7 }, 12, 0).low, true);
+  assert.equal(anthropicOutOfMoney(400, '{"error":{"message":"Your credit balance is too low to access the Anthropic API."}}'), true);
+  assert.equal(anthropicOutOfMoney(400, '{"error":{"message":"max_tokens: must be positive"}}'), false);
+  assert.equal(anthropicOutOfMoney(429, "rate limit"), false);
+});
+
 test("a studio's month splits the chat from the work and says what is left", () => {
   const month = studioMonth([
     { purpose: "conversation", eur: 10 },
@@ -1875,7 +1902,7 @@ test("formats: a key message held all along, film dust when the editor asks, Fre
   assert.equal(checks.find((c) => c.key === "texts")!.ok, true);
   // The writer chooses the form first: a key message comes back with nothing to read.
   assert.deepEqual(reelFormatSchema.options, ["raconte", "message"]);
-  assert.equal(voiceOverDecisionSchema.safeParse({ format: "message", why: "une offre", message: "", hooks: [], rest: "" }).success, true);
+  assert.equal(voiceOverDecisionSchema.safeParse({ format: "message", why: "une offre", message: "", angle: "", hooks: [], rest: "" }).success, true);
 });
 
 test("lab fixes: lines that hold together, a breath between sentences, subtitles off faces, the format told to the critic", async () => {
@@ -2891,9 +2918,17 @@ test("hooks: the strongest shot opens, the hook is read from the first image, th
 
   // The voice: its first sentence chosen, then all that follows; written as hooks and the rest.
   assert.equal(scriptFrom(" Pourquoi cette file ? ", "Ici, tout passe au toaster.").script, "Pourquoi cette file ? Ici, tout passe au toaster.");
-  assert.equal(voiceOverScriptSchema.safeParse({ message: "ici, la pâte a deux jours", hooks: ["a", "b"], rest: "c" }).success, true);
-  // The message comes first: a script without it is not read.
+  assert.equal(voiceOverScriptSchema.safeParse({ message: "ici, la pâte a deux jours", angle: "un pourquoi : la pâte qui attend", hooks: ["a", "b"], rest: "c" }).success, true);
+  // The message and the angle come first: a script without them is not read (Tristan: « le scénariste des reels est un peu naze »).
   assert.equal(voiceOverScriptSchema.safeParse({ hooks: ["a"], rest: "c" }).success, false);
+  assert.equal(voiceOverScriptSchema.safeParse({ message: "m", hooks: ["a"], rest: "c" }).success, false);
+  const { VOICE_OVER_PROMPT } = await import("./voice-over.ts");
+  assert.match(VOICE_OVER_PROMPT, /« La visite » \(the shots one after the other, with adjectives\) and « une ambiance » are not angles/);
+  assert.match(VOICE_OVER_PROMPT, /« longueur » is a ceiling, not a target/);
+  // The judge also scores the whole voice text, and only the voice's: its fixes come back with the hook.
+  const scored = pickHook(["Personne ne te dit pourquoi"], { ideas: [], scores: [{ index: 0, score: 8, why: "un pourquoi" }], best: 0, script: { score: 5, fixes: [" décrit l'image ", "", "a", "b", "c"] } }, "voix");
+  assert.deepEqual(scored.script, { score: 5, fixes: ["décrit l'image", "a", "b"] });
+  assert.equal(pickHook(["samedi matin"], { ideas: [], scores: [], best: 0, script: { score: 3, fixes: ["x"] } }, "texte").script, undefined);
 
   // A voice note that opens on silence: its first word is heard at once (the silence is cut).
   const note = { text: "Pourquoi cette file ?", duration: 3, words: [{ w: "Pourquoi", start: 0.9, end: 1.3 }, { w: "cette", start: 1.3, end: 1.5 }, { w: "file ?", start: 1.5, end: 1.9 }] };
@@ -4581,6 +4616,11 @@ test("Edith's plan: 3 to 6 short points, a title and why, kept for the montage; 
   assert.ok(!plan.points.includes("Court"));
   assert.match(validatedPlanBrief(plan), /^Le plan validé \(« Lancement de la rentrée »\) :\n- Ouverture/);
   assert.equal(keptPlan({ title: "x", points: ["Ouverture : un seul point"], why: "" }), null);
+  // Edith's advice on the hook is shown to her, never passed on as validated: her opening stays (« jamais en obligeant »).
+  const advised = keptPlan({ title: "Le salon", points: ["Accroche : ton logo", "Ensuite : la coupe", "Fin : réserve"], why: "On voit tout le travail. Conseil : ouvrir sur la coupe finie retiendrait plus." })!;
+  assert.match(planMessage(advised), /Conseil : ouvrir sur la coupe finie/);
+  assert.doesNotMatch(validatedPlanBrief(advised), /Conseil/);
+  assert.match(validatedPlanBrief(advised), /- Accroche : ton logo\n[\s\S]*\nPourquoi : On voit tout le travail\.$/);
   // In the chat, the code writes it under Edith's words: title, points, why; buttons a WhatsApp button holds.
   assert.equal(
     planMessage({ title: "Pauline ouvre son studio", points: ["Ouverture : Pauline dans son studio", "Fin : « Essaie Edith »", "Le son : la voix d'Antonin"], why: "On suit quelqu'un, pas une pub." }),
@@ -4909,4 +4949,50 @@ test("her Instagram profile at her getting started: its link, the providers' ans
   assert.ok(WHATSAPP_WELCOME.length + 200 < 1024);
   const { INTRO_VIDEO } = await import("./onboarding.ts");
   assert.match(INTRO_VIDEO.path, /^\/onboarding\/.+\.mp4$/);
+});
+
+test("public stats: her @, her numbers and her Reels found by their caption", async () => {
+  const { cleanHandle, readPublicProfile, readPublicVideos, matchPublicVideos } = await import("./public-stats.ts");
+  assert.equal(cleanHandle("instagram", "@Lune.Pilates"), "lune.pilates");
+  assert.equal(cleanHandle("instagram", "https://www.instagram.com/lune.pilates/?hl=fr"), "lune.pilates");
+  assert.equal(cleanHandle("instagram", "https://instagram.com/reel/DdRyQxKteC1"), null);
+  assert.equal(cleanHandle("tiktok", "https://www.tiktok.com/@chez.lino?lang=fr"), "chez.lino");
+  assert.equal(cleanHandle("tiktok", "Chez Lino"), null);
+
+  assert.deepEqual(readPublicProfile({ output: { found: true, data: { followers: 1240, likes: 9800, videos: 31, bio: "Pilates · Paris 11", private: false } } }), {
+    followers: 1240,
+    likes: 9800,
+    posts: 31,
+    bio: "Pilates · Paris 11",
+    private: false,
+  });
+  assert.equal(readPublicProfile({ output: { found: false } }), null);
+
+  const reels = readPublicVideos(
+    "instagram",
+    {
+      output: {
+        data: {
+          reels: [
+            { id: "1", shortcode: "AAA", caption: "Nouvelle coupe d'automne ✂️ réserve ton créneau cette semaine", createdUtc: 1_800_000_000, views: 5200, likes: 140, comments: 9, username: "lune" },
+            { id: "2", shortcode: "BBB", caption: "collab", createdUtc: 1_800_000_500, views: 90, likes: 3, comments: 0, username: "someone.else" },
+          ],
+        },
+      },
+    },
+    "lune",
+  );
+  assert.equal(reels.length, 1);
+  assert.equal(reels[0]!.url, "https://www.instagram.com/reel/AAA/");
+  assert.equal(reels[0]!.at, 1_800_000_000_000);
+
+  const created = 1_800_000_000_000 - 3600_000;
+  const posts = [
+    { id: "p1", caption: "Nouvelle coupe d'automne, réserve ton créneau cette semaine #coiffure", createdAt: created },
+    { id: "p2", caption: "Une tout autre légende sur le brunch du dimanche", createdAt: created },
+  ];
+  assert.deepEqual(matchPublicVideos(posts, reels, new Set()).map((m) => [m.postId, m.video.id]), [["p1", "1"]]);
+  assert.deepEqual(matchPublicVideos(posts, reels, new Set(["1"])), []);
+  // Posted before the post was made: not it.
+  assert.deepEqual(matchPublicVideos([{ ...posts[0]!, createdAt: 1_800_000_000_000 + 3 * 3600_000 }], reels, new Set()), []);
 });

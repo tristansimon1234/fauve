@@ -37,6 +37,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Skip static assets and the server-to-server endpoints (Meta, Supabase hooks).
-  matcher: ["/((?!_next/static|_next/image|icon.svg|manifest.webmanifest|api/whatsapp|api/auth).*)"],
+  // Skip static assets and the server-to-server endpoints (Meta, Supabase hooks, Stripe).
+  matcher: ["/((?!_next/static|_next/image|icon.svg|manifest.webmanifest|api/whatsapp|api/auth|api/stripe).*)"],
 };

@@ -4,7 +4,7 @@ import { buildCarouselProps, buildSlideProps, statusLabels, type SavedLook, type
 import { unstable_rethrow, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { saveCarouselTexts, saveSlidesPlan, updatePost } from "@/app/(app)/publications/[id]/actions";
-import { ArrowLeftIcon, ArrowUpIcon, CalendarIcon, CaptionIcon, CheckIcon, DownloadIcon, InstagramIcon, PenIcon, TypeIcon } from "@/components/icons";
+import { ArrowLeftIcon, ArrowUpIcon, CalendarIcon, CaptionIcon, CheckIcon, DownloadIcon, InstagramIcon, PenIcon, ShareIcon, TypeIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { CarouselStudio } from "@/components/montage/carousel-studio";
 import { SlidePreview } from "@/components/montage/slide-preview";
@@ -22,7 +22,7 @@ import { Sheet } from "./review-sheets";
 // it, save its images, choose when Edith reminds her to post it, tell Edith what to change. Its
 // words change on the image itself (« Changer un texte »), as on its page in the app.
 
-type Sheets = "caption" | "date" | "instagram" | "save";
+type Sheets = "caption" | "date" | "publish" | "save";
 
 /** Composing it, in her words (its job's steps). */
 const MAKING: Record<string, string> = { design: "Je compose ton carrousel", review: "Je relis chaque image", fix: "Je corrige un détail" };
@@ -132,7 +132,8 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
             : statusLabels[data.status].label;
 
   const publish = () => {
-    if (needsInstagram) return setSheet("instagram");
+    // Not connected: she posts it herself, her images shared from her phone with her caption copied.
+    if (needsInstagram) return setSheet("publish");
     start(async () => {
       setError(null);
       const form = new FormData();
@@ -463,16 +464,7 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
           />
         </Sheet>
       )}
-      {sheet === "instagram" && (
-        <Sheet title="Relie ton Instagram" hint={`Pour qu’Edith publie ${noun}, relie ton compte Instagram une fois. Ou enregistre les images et publie-les toi-même.`} onClose={() => setSheet(null)}>
-          <a href="/api/instagram/connect" className="btn btn-primary w-full">
-            <InstagramIcon size={18} />
-            Relier Instagram
-          </a>
-          {data.downloads.length > 0 && <SaveButton data={data} className="btn btn-secondary w-full" onMany={() => setSheet("save")} />}
-        </Sheet>
-      )}
-      {sheet === "save" && <SaveSheet data={data} onClose={() => setSheet(null)} />}
+      {(sheet === "save" || sheet === "publish") && <SaveSheet data={data} publish={sheet === "publish"} caption={captionEdited ? caption : data.captionShown} onClose={() => setSheet(null)} />}
     </main>
   );
 }
@@ -501,7 +493,7 @@ function SaveButton({ data, className, onMany }: { data: CarouselReviewData; cla
  * « Enregistrer les images »), else one by one. The files are fetched when the sheet opens, so
  * the share follows her tap at once (a phone refuses it after a wait).
  */
-function SaveSheet({ data, onClose }: { data: CarouselReviewData; onClose: () => void }) {
+function SaveSheet({ data, publish = false, caption, onClose }: { data: CarouselReviewData; publish?: boolean; caption: string; onClose: () => void }) {
   const [files, setFiles] = useState<File[] | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -521,8 +513,13 @@ function SaveSheet({ data, onClose }: { data: CarouselReviewData; onClose: () =>
       live = false;
     };
   }, [data.downloads]);
+  // Instagram drops any text shared with files: her caption goes to the clipboard first.
+  const copyCaption = () => {
+    if (publish && caption.trim()) navigator.clipboard?.writeText(caption).catch(() => {});
+  };
   const share = async () => {
     if (!files?.length) return;
+    copyCaption();
     try {
       await navigator.share({ files });
       onClose();
@@ -532,13 +529,23 @@ function SaveSheet({ data, onClose }: { data: CarouselReviewData; onClose: () =>
     }
   };
   return (
-    <Sheet title="Tes images" hint="Pour les publier toi-même, ou les garder." onClose={onClose}>
+    <Sheet
+      title={publish ? "Publie-le toi-même" : "Tes images"}
+      hint={
+        publish
+          ? data.downloads.length > 1
+            ? "Choisis Instagram : ta légende est copiée, colle-la au moment de publier. S’il ne garde qu’une photo : « Enregistrer les images », puis + › Publication et coche-les dans l’ordre."
+            : "Choisis Instagram : ta légende est copiée, colle-la au moment de publier."
+          : "Pour les publier toi-même, ou les garder."
+      }
+      onClose={onClose}
+    >
       {files === null ? (
         <p className="text-[14px] font-semibold text-muted">Je prépare tes images…</p>
       ) : files.length > 0 && !failed ? (
         <button type="button" onClick={share} className="btn btn-primary w-full">
-          <DownloadIcon size={18} />
-          Enregistrer les {files.length} images
+          {publish ? <ShareIcon size={18} /> : <DownloadIcon size={18} />}
+          {publish ? "Partager sur Instagram" : `Enregistrer les ${files.length} images`}
         </button>
       ) : null}
       <ul className="grid grid-cols-5 gap-1.5">
@@ -559,6 +566,12 @@ function SaveSheet({ data, onClose }: { data: CarouselReviewData; onClose: () =>
         ))}
       </ul>
       <p className="text-[12.5px] leading-snug text-muted">{files?.length && !failed ? "Ou touche une image pour l’enregistrer seule." : "Touche chaque image pour l’enregistrer."}</p>
+      {publish && data.connect && (
+        <a href="/api/instagram/connect" className="btn btn-secondary w-full">
+          <InstagramIcon size={18} />
+          Relier Instagram pour suivre tes résultats
+        </a>
+      )}
     </Sheet>
   );
 }

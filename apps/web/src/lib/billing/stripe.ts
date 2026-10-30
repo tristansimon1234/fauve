@@ -6,10 +6,17 @@ import { env } from "@/lib/env";
 // lookup key (created on first use), Checkout in subscription mode (no trial: one
 // of the 3 offers, Découverte at €9 the smallest), a switch to the offer above when
 // her credits run out, a credit pack paid once (Checkout in payment mode), the customer
-// portal to change or cancel.
-// No webhook: the subscription is read back from Stripe (lib/billing/access.ts).
+// portal to change or cancel. Her subscription is read back from Stripe (lib/billing/access.ts),
+// at once when Stripe tells us something changed (webhook, app/api/stripe/webhook/route.ts).
 
 const API = "https://api.stripe.com/v1";
+/**
+ * Every call on this API version, whatever the account's default (« fixe », Tristan). Checked
+ * against its changelog for the calls below (October 2026): periods on subscription items (read by
+ * paidPeriod), flexible billing mode by default, no payment_method_types on Checkout (never sent).
+ * The webhook endpoint is created on the same version.
+ */
+export const STRIPE_API_VERSION = "2026-10-28.endive";
 
 export const billingEnabled = () => Boolean(env("STRIPE_SECRET_KEY"));
 
@@ -35,14 +42,18 @@ function encode(params: Params, prefix = "", out = new URLSearchParams()): URLSe
 
 export class StripeError extends Error {}
 
-export async function stripe<T>(method: "GET" | "POST", path: string, params: Params = {}): Promise<T> {
+export async function stripe<T>(method: "GET" | "POST" | "DELETE", path: string, params: Params = {}): Promise<T> {
   const key = env("STRIPE_SECRET_KEY");
   if (!key) throw new StripeError("Stripe is not configured");
   const body = encode(params);
   const url = method === "GET" && body.size ? `${API}${path}?${body}` : `${API}${path}`;
   const res = await fetch(url, {
     method,
-    headers: { Authorization: `Bearer ${key}`, ...(method === "POST" ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Stripe-Version": STRIPE_API_VERSION,
+      ...(method === "POST" ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+    },
     body: method === "POST" ? body : undefined,
     cache: "no-store",
   });
@@ -104,6 +115,16 @@ export async function createCustomer(studio: { id: string; name: string | null; 
   return customer.id;
 }
 
+/**
+ * A professional's invoice in France names her business and its address (and its VAT number when it
+ * has one): Checkout asks for them and keeps them on her Stripe customer, for every invoice after.
+ */
+const B2B_DETAILS = {
+  billing_address_collection: "required",
+  tax_id_collection: { enabled: true },
+  customer_update: { name: "auto", address: "auto" },
+} satisfies Params;
+
 /** Checkout for an offer, the card always asked. */
 export async function checkoutSession(input: { customer: string; plan: PlanId; studioId: string; successUrl: string; cancelUrl: string }): Promise<string> {
   const session = await stripe<{ url: string }>("POST", "/checkout/sessions", {
@@ -113,6 +134,7 @@ export async function checkoutSession(input: { customer: string; plan: PlanId; s
     line_items: [{ price: await priceFor(input.plan), quantity: 1 }],
     subscription_data: { metadata: { studio_id: input.studioId } },
     payment_method_collection: "always",
+    ...B2B_DETAILS,
     locale: "fr",
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,
@@ -157,6 +179,8 @@ export async function packCheckout(input: { customer: string; studioId: string; 
       },
     ],
     metadata: { studio_id: input.studioId, kind: "credit_pack", credits: CREDIT_PACK.credits },
+    invoice_creation: { enabled: true },
+    ...B2B_DETAILS,
     locale: "fr",
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,
@@ -207,6 +231,11 @@ export async function getSubscription(id: string): Promise<StripeSubscription> {
 export async function latestSubscription(customer: string): Promise<StripeSubscription | null> {
   const list = await stripe<{ data: StripeSubscription[] }>("GET", "/subscriptions", { customer, status: "all", limit: 1 });
   return list.data[0] ?? null;
+}
+
+/** Stops a subscription at once (her account deleted): nothing more is charged. */
+export async function cancelSubscription(id: string): Promise<void> {
+  await stripe("DELETE", `/subscriptions/${encodeURIComponent(id)}`);
 }
 
 export async function portalSession(customer: string, returnUrl: string): Promise<string> {

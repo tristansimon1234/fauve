@@ -1,8 +1,10 @@
 import "server-only";
 import {
   APP_GUIDES,
+  BY_HAND_GUIDE,
   cleanCaption,
   instagramProfileHandle,
+  cleanHandle,
   periodTotals,
   weeklyGrowth,
   type CarouselDesign,
@@ -58,6 +60,7 @@ import { bakedReel } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus } from "@/lib/montage-status";
+import { publicStatsFor } from "@/lib/social/public-stats";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
@@ -77,6 +80,7 @@ import { ensureTranscript } from "@/lib/voice";
 import { blockFor, keepTextLooks, loadTextLooks, lookDefaults, readTextExample, restyleTexts } from "@/lib/text-looks";
 import { startCarousel } from "@/lib/carousels";
 import { charterFromImages, rereadBrand } from "@/lib/brand-read";
+import { socialConnect } from "@/lib/social/connect";
 import { addToMoodboard } from "@/lib/moodboard-add";
 import { completeFirstPost, isFirstReel } from "@/lib/onboarding";
 import { listInspirations } from "@/lib/inspirations";
@@ -247,8 +251,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     if (!read) return json({ error: "Je ne peux pas lire Instagram pour le moment : demande-lui le lien de son site, ou son logo et quelques photos." });
     const { profile, posts } = read;
     if (!profile) return json({ error: `Je ne trouve pas de profil Instagram public @${handle} : vérifie le nom avec elle, ou demande-lui son site.` });
-    const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
+    const { data: studio } = await db.from("studios").select("onboarding_step, instagram_handle").eq("id", studioId).single();
     const step = onboardingStepOf(studio?.onboarding_step);
+    // Her own profile at her getting started: her @ also follows her public numbers (public-stats.ts), unless she gave one already.
+    if ((step === "website" || step === "style") && !studio?.instagram_handle) {
+      const saved = await db.from("studios").update({ instagram_handle: profile.handle }).eq("id", studioId);
+      if (saved.error) console.warn("instagram handle not saved", handle, saved.error.message);
+    }
     const starting = (step === "website" || step === "style") && posts.length > 0 && !profile.private;
     if (starting) {
       ctx.afterReply.push(() =>
@@ -295,7 +304,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
   const handlers: ToolHandlers = {
     async app_guide({ topic }) {
-      return APP_GUIDES[topic];
+      // Connecting not offered (lib/social/connect.ts): the guide still describes it, so it says so.
+      return socialConnect() ? APP_GUIDES[topic] : `${APP_GUIDES[topic]}\n\n${BY_HAND_GUIDE}`;
     },
 
     async get_studio_context() {
@@ -303,7 +313,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         db.from("studios").select("name, timezone, onboarding_step, website_url, booking_url").eq("id", studioId).single(),
         db.from("members").select("first_name, role").eq("id", ctx.memberId).single(),
         db.from("content_plans").select("posts_per_week, stories_per_week, platforms, themes").eq("studio_id", studioId).maybeSingle(),
-        db.from("social_accounts").select("platform, handle, status").eq("studio_id", studioId),
+        socialConnect() ? db.from("social_accounts").select("platform, handle, status").eq("studio_id", studioId) : Promise.resolve({ data: [], error: null }),
         db.from("brand_profiles").select("version, profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1),
       ]);
       return json({
@@ -318,7 +328,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     async update_onboarding(input) {
       // Her Instagram is not her site: her site's address opens her site, and Instagram is read on its own.
       if (input.website_url && instagramProfileHandle(input.website_url)) {
-        return json({ error: "C'est son Instagram, pas un site : lis-le avec read_website, et garde website_url pour son site (le lien de sa bio quand c'en est un)." });
+        return json({ error: "C'est son Instagram, pas un site : lis-le avec read_website (pendant l'accueil, son @ est enregistré en même temps ; sinon instagram_handle), et garde website_url pour son site (le lien de sa bio quand c'en est un)." });
       }
       // Her site's address changes (a new site): its look is read again after the reply (her first site is read by read_website).
       let newSite: string | null = null;
@@ -334,6 +344,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (input.step) studioUpdate.onboarding_step = input.step;
       if (input.website_url) studioUpdate.website_url = input.website_url;
       if (input.booking_url) studioUpdate.booking_url = input.booking_url;
+      const handles: string[] = [];
+      for (const platform of ["instagram", "tiktok"] as const) {
+        const raw = input[`${platform}_handle`];
+        if (raw === undefined) continue;
+        const handle = cleanHandle(platform, raw);
+        if (!handle) return json({ refused: `« ${raw} » n'est pas un @ ${platform === "instagram" ? "Instagram" : "TikTok"} : redemande-le-lui (son nom de compte, ou le lien de son profil).` });
+        studioUpdate[`${platform}_handle`] = handle;
+        handles.push(`@${handle}`);
+      }
       if (Object.keys(studioUpdate).length) check(await db.from("studios").update(studioUpdate).eq("id", studioId));
       if (input.first_name) check(await db.from("members").update({ first_name: input.first_name }).eq("id", ctx.memberId));
       if (input.posts_per_week !== undefined || input.stories_per_week !== undefined || input.platforms) {
@@ -352,6 +371,16 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         );
         return json({ ok: true, nouveau_site: SITE_AGAIN, note: SITE_CHANGED });
       }
+      if (handles.length) {
+        const { data: billing } = await db.from("studios").select("subscription_status, team").eq("id", studioId).single();
+        return json({
+          ok: true,
+          profil: handles.join(", "),
+          note: publicStatsFor(billing ?? {})
+            ? "Son profil est enregistré : lance analyze_performance (refresh: true) dans ce même tour et donne-lui le bilan en 2-3 phrases ; ses abonnés et les vues de ses Reels se suivent maintenant chaque jour (page Résultats)."
+            : "Son profil est enregistré. L'analyse de son profil et le suivi de ses abonnés viennent avec l'abonnement : dis-le en une phrase, sans insister.",
+        });
+      }
       return "ok";
     },
 
@@ -364,6 +393,10 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         const { data: studio } = await db.from("studios").select("onboarding_step").eq("id", studioId).single();
         const step = onboardingStepOf(studio?.onboarding_step);
         const photos = site.logo ? images.filter((i) => i.split("?")[0] !== site.logo!.split("?")[0]) : images;
+        // A rush: the day's spending brake (brakes.ts) leaves the reading of its look (the render machine, a model) for tomorrow.
+        if ((images.length || site.url) && (await studioAccess(studioId)).reason === "busy") {
+          return json({ ...site, photos_du_site: `Pas lues aujourd'hui, ni le style de son site : ${accessMessage("busy")} Demande-lui de te renvoyer le lien demain pour que tu les lises.` });
+        }
         // Her site redone (she says so): its look is read again, at any step (a new address is read again by update_onboarding).
         if (refresh && (images.length || site.url)) {
           ctx.afterReply.push(() => rereadSite(studioId, site.url, photos));
@@ -391,6 +424,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async get_connect_link() {
+      if (!socialConnect()) return json({ refused: "La connexion d'Instagram et de TikTok n'est pas proposée en ce moment : elle poste elle-même (« Partager » sur la page de sa publication, get_post_link). Pour ses chiffres, demande son @ et enregistre-le (update_onboarding instagram_handle / tiktok_handle)." });
       // On WhatsApp, a button under her message (the one-time link is made when it is sent).
       if (ctx.waId) {
         ctx.extras.link = { path: "/connect", label: "Relier mes comptes", purpose: "connect_social" };
@@ -648,7 +682,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (!montages.length) return json({ montages: [], note: "Aucun montage lancé récemment." });
       return json({
         montages: montages.map((m) => ({ post_id: m.postId, publication: m.title, etape: m.step, depuis_minutes: m.minutes, late: m.late })),
-        note: "En montage, en rendu, en relecture ou en correction : tout va bien, il tourne et la vidéo arrive toute seule, même après 15 ou 20 minutes ; ne propose jamais de le relancer. late (seulement) : il s'est arrêté ; dis-le-lui simplement et propose de le refaire (montage).",
+        note: "En file : beaucoup de commerces en même temps, il attend son tour et partira tout seul ; dis-lui qu'il arrive, sans proposer de le relancer. En montage, en rendu, en relecture ou en correction : tout va bien, il tourne et la vidéo arrive toute seule, même après 15 ou 20 minutes ; ne propose jamais de le relancer. late (seulement) : il s'est arrêté ; dis-le-lui simplement et propose de le refaire (montage).",
       });
     },
 
