@@ -17,6 +17,8 @@ export const PLANS = {
 
 /** The offers from the smallest: a studio with no credits left is offered the next one up. */
 export const PLAN_ORDER = ["decouverte", "essentiel", "pro"] as const;
+/** The offer chosen by default on the offers page, marked « recommandé » (Tristan: « mets par défaut 19 euros (recommandé) »). */
+export const RECOMMENDED_PLAN: PlanId = "essentiel";
 
 export type PlanId = keyof typeof PLANS;
 
