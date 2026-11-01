@@ -689,14 +689,16 @@ export function clearOfAnimations<T extends { from: number; to: number; text?: s
       if (text.to - from >= 1.2 && clear && free(from, text.to)) kept.push({ ...text, from });
       continue;
     }
-    // The animation already says it (an animated hook and the same words written after it).
-    if (repeats(text, hit.words)) continue;
     const length = text.to - text.from;
-    // Starts before the animation: stops just before it, if that still reads.
+    // Starts before the animation: stops just before it, if that still reads. On screen first, it never
+    // goes for « repeating » the animation: a brief that quotes the held message for context (the end
+    // card of Tristan's Reel quoted « Pas d'app à télécharger… ») took the whole message off the Reel.
     if (text.from < hit.from && hit.from - text.from >= 1.2 && free(text.from, hit.from)) {
       kept.push({ ...text, to: round(hit.from) });
       continue;
     }
+    // The animation already says it (an animated hook and the same words written after it).
+    if (repeats(text, hit.words)) continue;
     // Else right after it, the same length.
     const from = round(hit.to);
     const to = round(Math.min(end, hit.to + length));

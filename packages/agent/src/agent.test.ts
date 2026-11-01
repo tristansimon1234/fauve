@@ -2582,6 +2582,10 @@ test("texts and animations: an animated hook is not written again after it, and 
     { text: "la rentrée est là", from: 1.67, to: 3.17 },
     { text: "ton reformer t'attend pour la rentrée", from: 3.17, to: 12.2 },
   ]);
+  // A message held from the start is never dropped because the end card's brief quotes it for context: it stops before it.
+  const held = { text: "Pas d'app à télécharger. Pas de montage. Juste un message sur WhatsApp.", from: 0, to: 11.95 };
+  const endCard = { from: 9.68, to: 11.95, words: "Écris à Edith sur WhatsApp | Pas d'app à télécharger. Pas de montage. Juste un message sur WhatsApp." };
+  assert.deepEqual(clearOfAnimations([held], [endCard], 11.95), [{ ...held, to: 9.68 }]);
   // Two texts at once without any animation: the later one waits, or goes when it would not be read.
   assert.deepEqual(
     clearOfAnimations(
@@ -3700,7 +3704,8 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   const lines = stolenStyleLines(style);
   assert.equal(lines.length, 3);
   assert.match(lines[0]!, /message clé.*un plan toutes les 1,5 s, coupé sur une musique à 118 BPM/);
-  assert.match(lines[2]!, /french house.*poussière de pellicule/);
+  assert.match(lines[2]!, /une musique dans son genre, composée pour ton Reel ; .*poussière de pellicule/);
+  assert.doesNotMatch(lines[2]!, /french house/);
 
   // Copied by one Reel (its inspiration), with its pace; never a setting of her profile.
   const followed = followedFrom("11111111-2222-4333-8444-555555555555", style);

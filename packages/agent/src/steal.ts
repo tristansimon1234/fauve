@@ -236,7 +236,8 @@ export function stolenStyleLines(style: StolenStyle): string[] {
   return [
     `La forme : ${FORMAT_WORDS[look.format]}, ${paceWords(secondsPerShot(measures), measures.bpm, measures.cuts.length)}${look.moments?.length ? `, ${look.moments.length} effets ou temps enchaînés, que je refais avec tes images` : ""}.`,
     `Le texte : ${look.text.composition.replace(/[.\s]+$/, "")}${look.text.subtitles ? ", avec des sous-titres" : ""}.`,
-    [`L'ambiance : ${look.music}`, effect, look.why.replace(/[.\s]+$/, "")].filter(Boolean).join(" ; ") + ".",
+    // Its music is an English brief for the composer (« dreamy indie pop, soft female vocals »): never shown to her.
+    [`L'ambiance : une musique dans son genre, composée pour ton Reel`, effect, look.why.replace(/[.\s]+$/, "")].filter(Boolean).join(" ; ") + ".",
   ];
 }
 
