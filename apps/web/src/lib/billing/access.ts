@@ -1,5 +1,5 @@
 import "server-only";
-import { accessMessage, accessOf, isSubscribed, planOf, type Access } from "@fauve/agent";
+import { accessMessage, accessOf, isSubscribed, ourStudio, planOf, type Access } from "@fauve/agent";
 import { creditBalance, grantPlanCredits } from "@/lib/credits";
 import { spendBraked } from "@/lib/spend-brake";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -89,7 +89,7 @@ async function billingAccess(studioId: string): Promise<Access> {
   const db = supabaseAdmin();
   let { data: studio } = await db
     .from("studios")
-    .select("stripe_customer_id, subscription_status, trial_ends_at, subscription_synced_at, period_ends_at")
+    .select("stripe_customer_id, subscription_status, trial_ends_at, subscription_synced_at, period_ends_at, team, website_url")
     .eq("id", studioId)
     .single();
   // A trial that ended, a renewal (her credits come back) or a payment that failed may have changed since: read Stripe again.
@@ -103,7 +103,7 @@ async function billingAccess(studioId: string): Promise<Access> {
     await syncSubscription(studioId).catch((error) => console.warn("subscription sync failed", studioId, error));
     ({ data: studio } = await db
       .from("studios")
-      .select("stripe_customer_id, subscription_status, trial_ends_at, subscription_synced_at, period_ends_at")
+      .select("stripe_customer_id, subscription_status, trial_ends_at, subscription_synced_at, period_ends_at, team, website_url")
       .eq("id", studioId)
       .single());
   }
@@ -111,7 +111,10 @@ async function billingAccess(studioId: string): Promise<Access> {
     creditBalance(studioId),
     db.from("clip_analyses").select("id", { count: "exact", head: true }).eq("studio_id", studioId),
   ]);
-  return accessOf({ subscription: studio?.subscription_status as string | null, credits, analyses: analyses ?? 0 });
+  // The team's studio and the lab's (ourStudio) are open like a subscribed one, without paying (Tristan:
+  // « débloque labo sur mon profil »): her Reels, the Sunday report, her pages; still within her credits.
+  const subscription = studio && ourStudio(studio as { team?: boolean | null; website_url?: string | null }) ? "active" : (studio?.subscription_status as string | null);
+  return accessOf({ subscription, credits, analyses: analyses ?? 0 });
 }
 
 /** Throws AccessError (its message tells Edith what to say) when nothing costly may start. */
