@@ -1,5 +1,5 @@
 import "server-only";
-import { FileState, GoogleGenAI, MediaResolution, type File as GeminiFile, type Part } from "@google/genai";
+import { FileState, GoogleGenAI, PartMediaResolutionLevel, type File as GeminiFile, type Part } from "@google/genai";
 import { clampLook, measuresLine, STEAL_PROMPT, stealFps, stolenLookReadingSchema, type ReelMeasures, type StolenLook, type StolenLookReading } from "@fauve/agent";
 import { readAnswer } from "@fauve/agent/answer";
 import { env } from "@/lib/env";
@@ -61,11 +61,12 @@ async function ready(ai: GoogleGenAI, uploaded: GeminiFile): Promise<GeminiFile 
 }
 
 const at = (s: number) => String(Math.round(s * 10) / 10).replace(".", ",");
+const HIGH = PartMediaResolutionLevel.MEDIA_RESOLUTION_HIGH;
 
 /**
  * Gemini's reading of a Reel's style (« Steal »): its form, hook, texts and how they are set,
  * effect, light, movement and music, from its small copy, with what the sandbox measured as
- * facts. Watched fast enough for a short Reel's every shot (stealFps), in medium resolution, with
+ * facts. Watched fast enough for a short Reel's every shot (stealFps), in high resolution, with
  * an image from the middle of each shot: at 2 frames a second Tristan's model, cut every 0.3 to
  * 0.6 s, lost its cut-outs. Its words are taken as written, then kept within their lengths; null when unreadable.
  */
@@ -82,16 +83,17 @@ export async function readStolenLook(studioId: string, video: Buffer, measures: 
         {
           role: "user",
           parts: [
-            { fileData: { fileUri: file.uri!, mimeType: "video/mp4" }, videoMetadata: { fps: stealFps(measures.duration) } },
+            // The resolution is set on the part: in the request's config, Gemini 3 kept the video at 66 tokens a frame.
+            { fileData: { fileUri: file.uri!, mimeType: "video/mp4" }, videoMetadata: { fps: stealFps(measures.duration) }, mediaResolution: { level: HIGH } },
             ...shots.flatMap((s, i): Part[] => [
               { text: `Plan ${i + 1}, de ${at(s.from)} à ${at(s.to)} s (image du milieu) :` },
-              { inlineData: { mimeType: "image/jpeg", data: s.jpeg.toString("base64") } },
+              { inlineData: { mimeType: "image/jpeg", data: s.jpeg.toString("base64") }, mediaResolution: { level: HIGH } },
             ]),
             { text: `${STEAL_PROMPT}\n\nMesuré sur la vidéo (des faits, ne les recompte pas) : ${measuresLine(measures)}.` },
           ],
         },
       ],
-      config: { responseMimeType: "application/json", responseJsonSchema: LOOK_SCHEMA, mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM },
+      config: { responseMimeType: "application/json", responseJsonSchema: LOOK_SCHEMA },
     });
     await logGeminiCost({ studioId, kind: "video_analysis", model, usage: response.usageMetadata as GeminiUsage, meta: { purpose: "steal", shots: shots.length, fps: stealFps(measures.duration) } });
     let reading: StolenLookReading;

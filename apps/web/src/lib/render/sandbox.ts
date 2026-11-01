@@ -1242,11 +1242,13 @@ async function shotImages(sandbox: Sandbox, dir: string, shots: { from: number; 
   try {
     await bash(
       sandbox,
-      'cd "$1" && shift && i=0 && for t in "$@"; do ffmpeg -v error -ss "$t" -i reel.mp4 -frames:v 1 -vf scale=540:-2 -q:v 4 -y "shot_$i.jpg" || true; i=$((i+1)); done',
+      `cd "$1" && shift && i=0 && for t in "$@"; do ${ROOT}/ffmpeg -v error -ss "$t" -i reel.mp4 -frames:v 1 -vf scale=540:-2 -q:v 4 -y "shot_$i.jpg" || true; i=$((i+1)); done`,
       [dir, ...shots.map((s) => String(s.at))],
     );
     const images = await Promise.all(shots.map((_, i) => sandbox.readFileToBuffer({ path: `${dir}/shot_${i}.jpg` }).catch(() => null)));
-    return shots.flatMap((s, i) => (images[i]?.length ? [{ from: s.from, to: s.to, jpeg: images[i]! }] : []));
+    const taken = shots.flatMap((s, i) => (images[i]?.length ? [{ from: s.from, to: s.to, jpeg: images[i]! }] : []));
+    if (taken.length < shots.length) console.warn("steal: shot images", taken.length, "of", shots.length);
+    return taken;
   } catch (error) {
     console.warn("steal: shot images not taken", error instanceof Error ? error.message.slice(0, 200) : error);
     return [];
