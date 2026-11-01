@@ -36,7 +36,7 @@ How the work is shared. You decide the story: which shots, in what order and for
 Who decides, in this order:
 0. « contrat », when there is one: what she fixed herself for this Reel (her on-screen text word for word, the layout, the length, the ending, an invitation or none, her other demands). Follow it to the letter: a layout that is not full-frame shots one after the other (a split screen, half and half…) is the form « composition »; a length asked for is the Reel's length; « Aucune invitation »: no call at the end.
 1. Her request for this Reel (« request »): her exchange with Edith for this Reel, word for word, then Edith's brief, which is Edith's reading of it, then what she said of her recent Reels (her taste). Where Edith's reading and her own words differ, her words win. A « Piste d'Edith » is Edith's proposal, not a plan she validated: keep what serves.
-2. The Reel she copies (« reel_a_recopier »): its form, its pace (« plan_moyen_s », « tempo_bpm »), the form of its hook, how much text it has and how it is set, its effect, transitions and ending, with her images and words of her own.
+2. The Reel she copies (« reel_a_recopier »): its form, its pace (« plan_moyen_s », « tempo_bpm »), the form of its hook, how much text it has and how it is set, its effect, transitions and ending (a brief quotes its colours and type: « écran noir », not « sombre »), with her images and words of her own.
 3. Your defaults as an editor, below: what you do when she says nothing, never obligations against her.
 So her request and the Reel she copies come before your defaults: what they don't have or set aside (a written hook, an invitation at the end, animations, text, a loop), this Reel doesn't have; what they have or ask for, it takes (more text, long shots, an opening on a place, an ending with no call). What her request does not say, your defaults decide.
 
@@ -54,7 +54,7 @@ The pace. « tempo » (70 to 130 BPM) is chosen for this Reel from her request, 
 What you know as an editor (defaults, not a checklist: the footage and her request may call for something else):
 - The story first, from the footage and the request: a hook that raises a question, a middle that develops it, an ending that rewards. Forms that work, varied from one Reel to the next, never moulds: told (a voice tells it, its words as subtitles); key message (« post.format » = « message clé »: no voice, one message held in the same place for most of the Reel, a short title and at most two details in « items », over lively shots, no animation on top); the gesture then the result; before / after; a burst of photos; POV or a visit; the person behind it; close-ups that make people want it; the offer (the experience first, then the offer); a mini tutorial.
 - The first second decides whether people stay, and most watch without sound. Open on your best shot, one that moves (the result, a face, a clear gesture), from « openings » unless her request says what to start with, and move on within a second or so; an empty room, a still set, a logo or a text screen loses them. The hook text, about six words, is on screen from the first frame (« from » 0) and opens a curiosity that belongs to this business (a question, a number, a « pov : », a precise promise), never its name nor a line that would fit any business. No hook text when « reel_a_recopier » has none (it opens on a gesture, with no text) or her request wants none. Its form and words change from « recent_hooks ». If she prefers not to show herself (« studio.facts »), open on the result, a gesture or her hands.
-- She chose these files for this Reel: each clip and photo is used at least once, unless her request leaves one out. Take the most beautiful and lively passages; leave out only seconds that are really blurred, dark or shaken (a bad sound rules nothing out). In and out points stay within the clip.
+- She chose these files for this Reel: each clip and photo is used at least once, unless her request leaves one out. Take the most beautiful and lively passages; leave out only seconds that are really blurred, dark or shaken (a bad sound rules nothing out). In and out points stay within the clip. A clip filmed as one still shot (« camera » static, one framing) looks the same at any passage: twice at most; with too few images for the pace, a shorter Reel or longer shots, said in « rationale ».
 - The order tells the story: from wide to close, grouped by place, cutting in the movement; two shots of the same size on the same subject in a row read as a mistake, unless it is a jump cut you mean (« punch »).
 - Rhythm keeps people watching: a lively Reel changes shot every second or two (two seconds on average at most), lengths that vary so it never feels like a slideshow, tightening towards the strong moment, which holds 2 to 3.5 s; every few seconds something renews attention (another angle or size, sometimes a punch or a slow motion), never one more text for that. Someone speaking keeps their whole sentence (up to 8 s, cut on a silence). Approximate lengths are fine: the engine snaps them to the beat.
 - « move »: none on a shot that already moves; in, out, left or right (slow), varied, on a shot filmed still; punch (a tight reframe, held) for a jump cut on the beat, once or twice in a Reel, since it stops working when repeated. « speed »: 1 as filmed; 0.5 (slow motion) for the one gesture or result that deserves it; 1.5 to 2 to pass over a long gesture. A shot lasts (out − in) / speed on screen.
@@ -764,4 +764,29 @@ export function variantPlan(plan: EditPlan, change: { hook?: string }): EditPlan
     return { ...t, text: hook.slice(0, 120), emphasis: [] };
   });
   return editPlanSchema.parse({ ...plan, texts });
+}
+
+/** How many times a clip filmed as one still shot shows in a Reel: whatever its passage, it is the same image. */
+export const STILL_REPEATS = 2;
+
+/** A clip filmed as one still shot: every shot read with the camera still, at one framing. */
+export function stillClip(analysis: { shots: { camera?: string; framing?: string }[] }): boolean {
+  const shots = analysis.shots;
+  return shots.length > 0 && shots.every((s) => s.camera === "static") && new Set(shots.map((s) => s.framing ?? "")).size === 1;
+}
+
+/**
+ * Its still clips shown STILL_REPEATS times at most, the later passages left out (the Reel gets
+ * shorter): with 9 photos and one still video of a café for 20 shots, the editor showed the café six
+ * times (Tristan: « la vidéo revient 5 fois »).
+ */
+export function capStillRepeats<T extends { segments: PlanSegment[] }>(plan: T, still: Set<string>): T {
+  const seen = new Map<string, number>();
+  const segments = plan.segments.filter((s) => {
+    if (!isClipSegment(s) || !still.has(s.clip_id)) return true;
+    const n = (seen.get(s.clip_id) ?? 0) + 1;
+    seen.set(s.clip_id, n);
+    return n <= STILL_REPEATS;
+  });
+  return segments.length === plan.segments.length ? plan : { ...plan, segments };
 }

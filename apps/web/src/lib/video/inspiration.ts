@@ -1,6 +1,6 @@
 import "server-only";
-import { FileState, GoogleGenAI, type File as GeminiFile } from "@google/genai";
-import { clampLook, measuresLine, STEAL_PROMPT, stolenLookReadingSchema, type ReelMeasures, type StolenLook, type StolenLookReading } from "@fauve/agent";
+import { FileState, GoogleGenAI, MediaResolution, type File as GeminiFile, type Part } from "@google/genai";
+import { clampLook, measuresLine, STEAL_PROMPT, stealFps, stolenLookReadingSchema, type ReelMeasures, type StolenLook, type StolenLookReading } from "@fauve/agent";
 import { readAnswer } from "@fauve/agent/answer";
 import { env } from "@/lib/env";
 import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
@@ -12,8 +12,6 @@ import { geminiSchema } from "./gemini-schema";
 
 const MAX_BYTES = 60 * 1024 * 1024;
 const PROCESSING_TIMEOUT_MS = 90_000;
-/** Frames a second Gemini watches a stolen Reel at: its texts appear and leave within a second. */
-const STEAL_FPS = 2;
 const LOOK_SCHEMA = geminiSchema(stolenLookReadingSchema);
 
 const PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (gym, hair or beauty salon, restaurant, shop…).
@@ -62,12 +60,16 @@ async function ready(ai: GoogleGenAI, uploaded: GeminiFile): Promise<GeminiFile 
   return file.state === FileState.ACTIVE && file.uri ? file : null;
 }
 
+const at = (s: number) => String(Math.round(s * 10) / 10).replace(".", ",");
+
 /**
  * Gemini's reading of a Reel's style (« Steal »): its form, hook, texts and how they are set,
  * effect, light, movement and music, from its small copy, with what the sandbox measured as
- * facts. Its words are taken as written, then kept within their lengths; null when unreadable.
+ * facts. Watched fast enough for a short Reel's every shot (stealFps), in medium resolution, with
+ * an image from the middle of each shot: at 2 frames a second Tristan's model, cut every 0.3 to
+ * 0.6 s, lost its cut-outs. Its words are taken as written, then kept within their lengths; null when unreadable.
  */
-export async function readStolenLook(studioId: string, video: Buffer, measures: ReelMeasures): Promise<StolenLook | null> {
+export async function readStolenLook(studioId: string, video: Buffer, measures: ReelMeasures, shots: { from: number; to: number; jpeg: Buffer }[] = []): Promise<StolenLook | null> {
   const ai = gemini();
   const uploaded = await ai.files.upload({ file: new Blob([new Uint8Array(video)], { type: "video/mp4" }), config: { mimeType: "video/mp4", displayName: "steal" } });
   try {
@@ -80,14 +82,18 @@ export async function readStolenLook(studioId: string, video: Buffer, measures: 
         {
           role: "user",
           parts: [
-            { fileData: { fileUri: file.uri!, mimeType: "video/mp4" }, videoMetadata: { fps: STEAL_FPS } },
+            { fileData: { fileUri: file.uri!, mimeType: "video/mp4" }, videoMetadata: { fps: stealFps(measures.duration) } },
+            ...shots.flatMap((s, i): Part[] => [
+              { text: `Plan ${i + 1}, de ${at(s.from)} à ${at(s.to)} s (image du milieu) :` },
+              { inlineData: { mimeType: "image/jpeg", data: s.jpeg.toString("base64") } },
+            ]),
             { text: `${STEAL_PROMPT}\n\nMesuré sur la vidéo (des faits, ne les recompte pas) : ${measuresLine(measures)}.` },
           ],
         },
       ],
-      config: { responseMimeType: "application/json", responseJsonSchema: LOOK_SCHEMA },
+      config: { responseMimeType: "application/json", responseJsonSchema: LOOK_SCHEMA, mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM },
     });
-    await logGeminiCost({ studioId, kind: "video_analysis", model, usage: response.usageMetadata as GeminiUsage, meta: { purpose: "steal" } });
+    await logGeminiCost({ studioId, kind: "video_analysis", model, usage: response.usageMetadata as GeminiUsage, meta: { purpose: "steal", shots: shots.length, fps: stealFps(measures.duration) } });
     let reading: StolenLookReading;
     try {
       reading = readAnswer(stolenLookReadingSchema, JSON.parse(response.text ?? "null"));

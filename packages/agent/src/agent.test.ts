@@ -5120,3 +5120,45 @@ test("whatsapp: the Sunday report from her @, against the week before, warm", ()
   // Template parameters: no line break (Meta refuses them).
   for (const p of weeklyPublicParams({ videos: 3, views: 4300, net: 12, followers: 1240 }, { videos: 2, views: 3100, net: 5, followers: 1228 })) assert.ok(!/\n/.test(p));
 });
+
+test("a copied Reel is read shot by shot, its cut-outs laid over its shots make a composition", async () => {
+  const { composedLayout, shotMiddles, stealFps } = await import("./steal.ts");
+  // Tristan's model: 13 s cut every 0.3 to 0.6 s; at 2 frames a second its cut-outs fell between two frames.
+  assert.equal(stealFps(13.2), 6);
+  assert.equal(stealFps(45), 4);
+  assert.equal(stealFps(90), 2);
+  assert.deepEqual(shotMiddles([1.5, 1.9, 3], 4), [
+    { from: 0, to: 1.5, at: 0.75 },
+    { from: 1.5, to: 1.9, at: 1.7 },
+    { from: 1.9, to: 3, at: 2.45 },
+    { from: 3, to: 4, at: 3.5 },
+  ]);
+  const many = shotMiddles(Array.from({ length: 99 }, (_, i) => (i + 1) * 0.3), 30, 10);
+  assert.equal(many.length, 10);
+  assert.equal(many[0]!.from, 0);
+  assert.equal(many.at(-1)!.to, 30);
+  // « plein cadre » alone is a montage; with cut-outs laid over its shots, a composition.
+  assert.equal(composedLayout({ layout: "plein cadre" }), null);
+  assert.equal(composedLayout({ layout: "Plein cadre." }), null);
+  assert.equal(composedLayout({ layout: "Plein cadre, plans serrés" }), null);
+  assert.equal(
+    composedLayout({ layout: "plein cadre, avec un objet détouré d'une autre image posé en grand au centre de certains plans" }),
+    "plein cadre, avec un objet détouré d'une autre image posé en grand au centre de certains plans",
+  );
+});
+
+test("a clip filmed as one still shot shows twice at most in a Reel", async () => {
+  const { capStillRepeats, stillClip } = await import("./editor.ts");
+  assert.equal(stillClip({ shots: [{ camera: "static", framing: "wide" }] }), true);
+  assert.equal(stillClip({ shots: [{ camera: "static", framing: "wide" }, { camera: "static", framing: "close" }] }), false);
+  assert.equal(stillClip({ shots: [{ camera: "handheld", framing: "wide" }] }), false);
+  const shot = (clip_id: string, at: number) => ({ clip_id, in: at, out: at + 0.57, zoom: "none" as const });
+  // The café's still video six times among the photos: twice kept, the later passages left out.
+  const plan = { segments: [shot("cafe", 0), shot("p1", 0), shot("cafe", 5), shot("p2", 0), shot("cafe", 10.5), shot("cafe", 1.5), shot("p1", 0)] };
+  const capped = capStillRepeats(plan, new Set(["cafe"]));
+  assert.deepEqual(
+    capped.segments.map((s) => ("clip_id" in s ? `${s.clip_id}@${s.in}` : "?")),
+    ["cafe@0", "p1@0", "cafe@5", "p2@0", "p1@0"],
+  );
+  assert.equal(capStillRepeats(plan, new Set()), plan);
+});

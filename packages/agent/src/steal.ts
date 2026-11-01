@@ -45,7 +45,7 @@ export const stolenLookReadingSchema = z.object({
   format: z
     .enum(FORMATS)
     .describe(
-      "raconte : une voix raconte ; message : un seul message clé posé à l'écran presque tout le Reel, sans voix ; pov : une visite ou un point de vue avec une petite ligne au début ; collage : du motion design fait main (papiers, découpes) ; autre",
+      "raconte : une voix raconte ; message : un seul message clé posé à l'écran presque tout le Reel, sans voix ; pov : une visite ou un point de vue avec une petite ligne au début ; collage : des images superposées (un objet ou une personne détourés posés sur une autre image, des tirages, du papier, des découpes) ; autre. Un message tenu sur des plans où des détourages se posent reste « message », et sa mise en page dit les détourages",
     ),
   voice: z.enum(["voix off", "quelqu'un parle", "aucune"]).describe("Qui parle : une voix off, quelqu'un à l'écran, ou personne"),
   hook: z.object({
@@ -69,7 +69,7 @@ export const stolenLookReadingSchema = z.object({
     font: z
       .string()
       .describe(
-        "Seulement si la police de ses titres fait son style (on ne reconnaîtrait pas ce Reel avec une autre : très condensée, manuscrite, de bande dessinée, rétro, à forts empattements…) : la famille Google Fonts qui lui ressemble le plus à l'œil, au nom exact (ex. « Anton », « Bangers »). Sinon une chaîne vide : un sans-serif ordinaire ne fait pas un style",
+        "Seulement si la police de ses titres fait son style (on ne reconnaîtrait pas ce Reel avec une autre : très condensée, manuscrite, de bande dessinée, rétro, à forts empattements…) : la famille Google Fonts qui lui ressemble le plus à l'œil, épaisseur du trait comprise (une écriture fine au stylo n'est pas une écriture au feutre), au nom exact (ex. « Anton », « Bangers »). Sinon une chaîne vide : un sans-serif ordinaire ne fait pas un style",
       ),
   }),
   colors: z
@@ -85,7 +85,7 @@ export const stolenLookReadingSchema = z.object({
         what: z
           .string()
           .describe(
-            "Ce qui se passe à l'écran, en une phrase précise : l'élément (une carte d'appli, des photos, un graphique, un mot en très grand, une page de texte, un écran coupé en deux…), où il est posé (autour de sa main, à côté de sa tête, derrière la personne, sur tout le fond), devant ou derrière elle, comment il arrive et bouge ; sans recopier ses mots ni les marques",
+            "Ce qui se passe à l'écran, en une phrase précise : l'élément (une carte d'appli, des photos, un objet ou une personne détourés d'une autre image et posés par-dessus le plan, un graphique, un mot en très grand, une page de texte, un écran coupé en deux…), où il est posé (autour de sa main, à côté de sa tête, derrière la personne, au centre en grand, sur tout le fond), sa taille, avec ou sans bord, devant ou derrière elle, comment il arrive et bouge ; sans recopier ses mots ni les marques",
           ),
       }),
     )
@@ -101,7 +101,7 @@ export const stolenLookReadingSchema = z.object({
   layout: z
     .string()
     .describe(
-      "Comment ses images occupent le cadre : « plein cadre » quand ses plans passent l'un après l'autre en plein écran ; sinon sa mise en page en une phrase (ex. un écran partagé avec la personne qui parle dans une moitié et ce qu'elle raconte dans l'autre ; un plan dans une fenêtre sur un fond ; plusieurs plans à la fois), sans recopier ses mots",
+      "Comment ses images occupent le cadre : « plein cadre » seulement quand ses plans passent l'un après l'autre en plein écran sans rien d'autre posé dessus que le texte ; sinon sa mise en page en une phrase (ex. plein cadre, avec un objet détouré d'une autre image posé en grand au centre de certains plans, sans bord ; un écran partagé avec la personne qui parle dans une moitié et ce qu'elle raconte dans l'autre ; un plan dans une fenêtre sur un fond ; plusieurs plans à la fois), sans recopier ses mots",
     ),
   camera: z.enum(["fixe", "à la main", "stabilisée", "mixte"]).describe("Comment c'est filmé"),
   transitions: z.enum(["coupes nettes", "fondus", "effets"]).describe("Comment les plans s'enchaînent"),
@@ -179,7 +179,8 @@ export const stolenStyleSchema = z.object({ look: stolenLookSchema, measures: re
 export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
 export const STEAL_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (studio, salon, restaurant, shop…). The person who runs the business wants to take this Reel's style for theirs: read it as a pro editor who wants to remake its style, not its content.
-Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, letter spacing, key word, background under the sentence, place, alignment; its font and its colours only when they make its style), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
+Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once, an object or a person cut out of another image and laid over some shots), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, letter spacing, key word, background under the sentence, place, alignment; its font and its colours only when they make its style), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
+You also get a sharp image from the middle of each of its shots, with its time: look at every one, since a shot of a third of a second counts and the video's frames can fall between two. A cut-out laid over a shot (a drink, a phone booth, a bag, a person, without or with a white border) is part of its style, even when it stays a few tenths of a second: say it in the layout and in its moments (when, what, where, how big, border or not).
 Copy neither its words, nor its images, nor the name of its music: describe a form another business can reuse. In your French, make no feminine or masculine agreement for the person who runs the business. In French, except « music » in English.`;
 
 /** The style one Reel copies (from its inspiration's stolen style): its look and its pace. */
@@ -362,8 +363,12 @@ export const followedTempo = (bpm: number) => Math.round(bpm > 140 ? bpm / 2 : b
  */
 export function composedLayout(look: Pick<StolenLook, "layout">): string | null {
   const layout = look.layout?.trim();
-  return layout && !/^plein (cadre|écran)\b/i.test(layout) ? layout : null;
+  // « plein cadre, plans serrés » is a montage; « plein cadre, avec un objet détouré posé par-dessus… » a composition.
+  return layout && (!/^plein (cadre|écran)\b/i.test(layout) || LAID_OVER.test(layout)) ? layout : null;
 }
+
+/** Something laid over full-frame shots: a cut-out, a print, another image in a window. */
+const LAID_OVER = /détour|par-dessus|superpos|collée?s?\b|autocollant|incrust|fenêtre|écran partagé|plusieurs (plans|images)|posée?s? (sur|en grand|au centre)/i;
 
 export function followedForEditor(followed: FollowedStyle) {
   const { look } = followed;
@@ -557,4 +562,24 @@ export function tempoOf(levels: number[]): number | null {
     if (top > tempo.top) tempo = { bpm, top };
   }
   return Math.round(tempo.bpm);
+}
+
+/**
+ * Frames a second Gemini watches a copied Reel at: a short one fast enough that no shot falls between
+ * two frames (Tristan's model cut every 0.3 to 0.6 s, its cut-outs lasting a few tenths of a second, and
+ * 2 a second missed them: « plein cadre, aucun effet »). Gemini takes up to 24.
+ */
+export function stealFps(duration: number): number {
+  return duration <= 30 ? 6 : duration <= 60 ? 4 : 2;
+}
+
+/** Images from the middle of a copied Reel's shots that Gemini gets besides its video, at most. */
+export const SHOT_IMAGES = 40;
+
+/** Its shots between its cuts, each with the middle where its image is taken (evenly picked beyond `max`). */
+export function shotMiddles(cuts: number[], duration: number, max = SHOT_IMAGES): { from: number; to: number; at: number }[] {
+  const edges = [0, ...cuts.filter((c) => c > 0 && c < duration), duration];
+  const shots = edges.slice(1).map((to, i) => ({ from: edges[i]!, to, at: Math.round(((edges[i]! + to) / 2) * 100) / 100 })).filter((s) => s.to - s.from > 0.04);
+  if (shots.length <= max) return shots;
+  return Array.from({ length: max }, (_, i) => shots[Math.round((i * (shots.length - 1)) / (max - 1))]!);
 }

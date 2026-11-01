@@ -187,7 +187,7 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     return missed(reel.miss);
   }
   const measures = reelMeasuresSchema.parse({ duration: reel.duration, cuts: reel.cuts, bpm: tempoOf(reel.levels), lufs: reel.lufs });
-  const look = await readStolenLook(studioId, reel.video, measures).catch((error: unknown) => {
+  const look = await readStolenLook(studioId, reel.video, measures, reel.shots).catch((error: unknown) => {
     console.warn("steal: reading failed", error instanceof Error ? error.message.slice(0, 300) : error);
     return null;
   });

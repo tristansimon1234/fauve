@@ -34,6 +34,8 @@ import {
   MAX_FREE_SCENES,
   motionTemplateSchema,
   normalizeEditPlan,
+  capStillRepeats,
+  stillClip,
   PHOTO_MAX_SECONDS,
   memoryLines,
   resolveReelBrand,
@@ -396,6 +398,7 @@ export async function designEdit(params: {
   // Retouch and blur stay on their clips from one version to the next.
   // A correction also keeps the texts' styles and places (the editor names looks, it does not copy them).
   const base = previousPlan.success ? previousPlan.data : null;
+  const still = new Set(clips.filter((c) => stillClip(c.analysis)).map((c) => c.media_id));
   // Its animations whose brief did not change keep their code before the new ones are counted;
   // one rewritten (its shots changed, or the request touched it) takes the place of the one it replaces.
   const toPlan = (answer: EditorOutput | EditorOutputLegacy) => {
@@ -403,7 +406,9 @@ export async function designEdit(params: {
     // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
     const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;
     const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
-    return carryRetouch(carryTextStyle(normalizeEditPlan(drafted, durations, allowed), params.fresh ? null : base), base);
+    // A clip filmed as one still shot shows twice at most, whatever its passages.
+    const capped = capStillRepeats(drafted, still);
+    return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed), params.fresh ? null : base), base);
   };
   let plan = toPlan(output);
   // The length she asked for is measured on the plan, never taken from the editor's words: missed, it

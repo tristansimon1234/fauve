@@ -57,7 +57,7 @@ Checked automatically
 - Readable on a phone, on any image: 48 px at least, and whole on screen long enough to read — 0.8 s plus 0.3 s per word once all its words are in (1.2 s at least).
 - Native, never an ad: nothing that looks like a promo flyer (starburst, explosion, speed lines, sale badge). An effect she asked for herself (a cartoon energy beam, a joke explosion) is not an ad: make it for real.
 - Fonts: brand.displayFont and brand.bodyFont. Another only when the request, the brief, a universe or the copied Reel needs it: an exact Google Fonts family listed in "fonts" (2 at most), always followed by one of hers as a fallback (fontFamily: \`"Family", "\${brand.displayFont}"\`). A font not listed is not loaded.
-- Colours: her charter's (brand.accent, brand.palette.secondary, .light and .dark, white, and their rgba shades) and the footage's; others only when the request, the brief, a universe or the copied Reel asks.
+- Colours: her charter's (brand.accent, brand.palette.secondary, .light and .dark, white, and their rgba shades) and the footage's; others only when the request, the brief, a universe or the copied Reel asks. A copied Reel's ending keeps its look: a black screen stays black (#000, never brand.palette.dark), its type and size, no marker, underline or glow it does not have.
 - On-screen text is in French, exactly the brief's words. Nothing invented: a number, price, counter, rating or client count appears only if the brief, the Reel's texts or her words give it (a copied Reel's metrics or app screens keep their form, with her real words).
 
 Code contract (strict)

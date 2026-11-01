@@ -8,6 +8,7 @@ import {
   mixFilter,
   mixGains,
   parseSceneCuts,
+  shotMiddles,
   pauseFilter,
   quietPauses,
   REEL_FPS,
@@ -1224,7 +1225,33 @@ const STEAL_JOB = [
 export type StealMiss = "unreachable" | "too_long" | "not_video";
 
 /** A Reel taken and measured: its small copy (for Gemini, never kept), its length, cuts, loudness and bass. */
-export type StolenReel = { video: Buffer; duration: number; cuts: number[]; lufs: number | null; levels: number[]; seconds: number };
+export type StolenReel = {
+  video: Buffer;
+  duration: number;
+  cuts: number[];
+  lufs: number | null;
+  levels: number[];
+  seconds: number;
+  /** An image from the middle of each shot, for its reading: a shot of a third of a second can fall between the video's frames. */
+  shots: { from: number; to: number; jpeg: Buffer }[];
+};
+
+/** Its shots' middle images (540 px wide), from its small copy; none when they could not be taken. */
+async function shotImages(sandbox: Sandbox, dir: string, shots: { from: number; to: number; at: number }[]): Promise<StolenReel["shots"]> {
+  if (!shots.length) return [];
+  try {
+    await bash(
+      sandbox,
+      'cd "$1" && shift && i=0 && for t in "$@"; do ffmpeg -v error -ss "$t" -i reel.mp4 -frames:v 1 -vf scale=540:-2 -q:v 4 -y "shot_$i.jpg" || true; i=$((i+1)); done',
+      [dir, ...shots.map((s) => String(s.at))],
+    );
+    const images = await Promise.all(shots.map((_, i) => sandbox.readFileToBuffer({ path: `${dir}/shot_${i}.jpg` }).catch(() => null)));
+    return shots.flatMap((s, i) => (images[i]?.length ? [{ from: s.from, to: s.to, jpeg: images[i]! }] : []));
+  } catch (error) {
+    console.warn("steal: shot images not taken", error instanceof Error ? error.message.slice(0, 200) : error);
+    return [];
+  }
+}
 
 /**
  * Takes a Reel from its link (a public Reel, TikTok or Short) or from a file (a signed URL)
@@ -1256,10 +1283,12 @@ export async function stealReelInSandbox(id: string, source: { link: string } | 
       sandbox.readFileToBuffer({ path: `${dir}/bass.txt` }).catch(() => null),
     ]);
     if (!video?.length) return { miss: "not_video", detail: "no copy" };
+    const sceneCuts = parseSceneCuts(cuts?.toString("utf8") ?? "", duration);
     return {
       video,
       duration,
-      cuts: parseSceneCuts(cuts?.toString("utf8") ?? "", duration),
+      cuts: sceneCuts,
+      shots: await shotImages(sandbox, dir, shotMiddles(sceneCuts, duration)),
       lufs: printed(out, "lufs"),
       // Silence prints -inf.
       levels: (bass?.toString("utf8") ?? "")
