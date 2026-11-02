@@ -7,6 +7,7 @@ import {
   stealMissMessage,
   stolenStyleLines,
   motionOnly,
+  openingOf,
   stolenStyleSchema,
   currentReading,
   STEAL_READER,
@@ -432,6 +433,13 @@ export async function pendingSteal(studioId: string): Promise<{ id: string; name
       // For Edith only: its music as read (she can say it in her words), and a Reel in pure motion design takes no file.
       ...(style.data.look.music ? [`Sa musique, lue sur le modèle (pour le compositeur) : ${style.data.look.music}`] : []),
       ...(motionOnly(style.data.look) ? ["Pur motion design, sans aucune image filmée ni photo : ne demande aucun fichier et n'en mets aucun dans le montage, sauf si elle en veut un"] : []),
+      // What her plan must describe as the model does it (Edith had planned « the power of Paris » on black, while
+      // the model types its title word by word over a filmed shot held 4 s: she had only the three lines above).
+      `Son accroche : ${style.data.look.hook.what}`,
+      ...(openingOf(followedFrom(data.id as string, style.data)) ? [`Son ouverture : ${openingOf(followedFrom(data.id as string, style.data))}`] : []),
+      `Sa voix : ${style.data.look.voice === "aucune" ? "personne ne parle (mesuré sur son son)" : style.data.look.voice}`,
+      ...(style.data.look.moments?.length ? [`Ses moments : ${style.data.look.moments.slice(0, 6).map((m) => `à ${m.at} s, ${m.what}`).join(" ; ")}`] : []),
+      "Ton plan décrit l'ouverture, les textes et la fin comme le modèle les fait, sauf ce que sa demande change ; n'invente pas une forme qu'il n'a pas",
     ],
   };
 }
