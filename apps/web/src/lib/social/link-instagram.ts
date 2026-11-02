@@ -6,7 +6,7 @@ import { sendText } from "@/lib/whatsapp/client";
 // Edith (Instagram Login): the account, its token, the end
 // of getting started, and a word on WhatsApp.
 
-export type LinkedAccount = { userId: string; username: string; accessToken: string; expiresAt: Date; scopes: string[] };
+export type LinkedAccount = { userId: string; username: string; accessToken: string; expiresAt: Date; scopes: string[]; accountType?: string | null };
 
 /** null when linked; else the error code shown on /connect. */
 export async function linkInstagramAccount(
@@ -35,6 +35,8 @@ export async function linkInstagramAccount(
         provider_ref: account.userId,
         status: "connected",
         connected_at: new Date().toISOString(),
+        // Business or creator: Instagram offers fewer sounds on a Business account (« Garder le son du modèle »).
+        ...(account.accountType ? { account_type: account.accountType.slice(0, 40) } : {}),
       },
       { onConflict: "studio_id,platform" },
     )

@@ -10,6 +10,7 @@ import { removeVoice } from "@/lib/voice-over";
 import { z } from "zod";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { keepModelSound } from "@/lib/model-sound";
 
 /** Sets a Reel's cover (a frame of its video or one of the studio's photos); null leaves it to Edith. */
 export async function setCover(postId: string, cover: PostCover | null): Promise<{ ok: boolean }> {
@@ -81,7 +82,10 @@ export async function setMusic(postId: string, mode: "on" | "off" | "another"): 
   const studioId = member.studio.id;
   const { data: post } = await db.from("posts").select("music, edit_plan_id").eq("id", postId).eq("studio_id", studioId).eq("kind", "reel").maybeSingle();
   if (!post?.edit_plan_id) return { ok: false };
-  const music = readPostMusic(post.music);
+  // Back from the sound of the Reel it copies: her own publishing set for it is given back first.
+  if (readPostMusic(post.music).mode === "model") await keepModelSound(studioId, postId, false);
+  const { data: now } = await supabaseAdmin().from("posts").select("music").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  const music = readPostMusic(now?.music);
   const { error } = await supabaseAdmin()
     .from("posts")
     .update({ music: { ...music, mode: mode === "off" ? "off" : "on" } })

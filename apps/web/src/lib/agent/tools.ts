@@ -62,6 +62,7 @@ import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { bakedReel } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { fewSubjects } from "@/lib/agent/copy-design";
+import { keepModelSound } from "@/lib/model-sound";
 import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus } from "@/lib/montage-status";
 import { publicHistory, publicStatsFor, weekForModel } from "@/lib/social/public-stats";
@@ -613,13 +614,15 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id }) {
+    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, son }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
       if (inspiration_id) {
         const known = await db.from("inspirations").select("id").eq("id", inspiration_id).eq("studio_id", studioId).maybeSingle();
         if (!known.data) return "Inspiration introuvable : reprends un inspiration_id de list_inspirations.";
         check(await db.from("posts").update({ inspiration_id }).eq("id", post_id).eq("studio_id", studioId));
       }
+      // Her answer to « garder son son ? » for a Reel copied from Instagram: no music of Edith's, she posts it herself.
+      const sound = son ? await keepModelSound(studioId, post_id, son === "modele").catch(() => null) : null;
       if ((correction || variant) && !post.edit_plan_id) return "Pas encore de montage pour cette publication : lance d'abord un montage (correction: false).";
       // A variant of a Reel the effects agent drew: the agent makes another version of its effect (a correction).
       if (variant && (await bakedReel(studioId, post_id))) {
@@ -666,6 +669,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         publication: post.title,
         ...(route === "agent" ? { atelier: "effet dessiné image par image, sur ce qui bouge dans sa vidéo", duree: `${minutes} min` } : level ? { niveau: level.label, duree: `${minutes} min` } : {}),
         ...(job.effort && job.effort !== wanted && route !== "agent" ? { attention: `Le solde ne permettait pas le niveau ${EFFORTS[wanted].label} : lancé en ${level?.label}.` } : {}),
+        ...(son === "modele" && !sound ? { son: "Ce Reel ne recopie pas un Reel d'Instagram : il n'y a pas de son à garder, il part avec ta musique. Dis-le en une phrase." } : {}),
+        ...(son === "modele" && sound?.business ? { son: "Sans ta musique, pour son son. Son compte Instagram est un compte Entreprise, où Instagram ne propose pas tous les sons : dis-lui que si « Utiliser l'audio » n'apparaît pas, elle te dit « mets ta musique »." } : {}),
         ...(subjects !== null
           ? {
               peu_de_sujets: `Le Reel qu'elle recopie pose un sujet détouré (un objet, une personne) sur presque chaque plan, et ses photos n'en montrent que ${subjects}. Dis-le en une phrase : ça part quand même, avec plus de plans sans détourage, et 4 ou 5 photos d'objets ou de personnes sur un fond simple le rendraient plus varié.`,
@@ -805,7 +810,21 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       const post = unwrap(await db.from("posts").select("id, kind, status, edit_plan_id, music").eq("id", post_id).eq("studio_id", studioId).single());
       if (post.kind !== "reel") return json({ error: "La musique se met sur un Reel." });
       if (["published", "measured"].includes(post.status as string)) return json({ error: "Ce Reel est déjà en ligne." });
-      check(await db.from("posts").update({ music: { ...readPostMusic(post.music), mode: mode === "off" ? "off" : "on" } }).eq("id", post_id));
+      // The sound of the Instagram Reel it copies: no music of hers, she posts it herself with « Utiliser l'audio »;
+      // from it back to her music, her own publishing set for it is given back too.
+      if (mode === "model") {
+        const sound = await keepModelSound(studioId, post_id, true);
+        if (!sound) return json({ error: "Ce Reel ne recopie pas un Reel d'Instagram : il n'y a pas de son à garder. Elle peut le publier sans musique (off) et choisir un son dans Instagram." });
+        if (post.edit_plan_id) ctx.afterReply.push(async () => void (await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId })));
+        return json({
+          status: post.edit_plan_id ? "started" : "ok",
+          note: `${post.edit_plan_id ? "La vidéo se refait sans ta musique (1 à 2 min) et le lien part tout seul." : "C'est noté pour son montage."} Elle la publiera elle-même en ajoutant le son (le message de livraison lui explique comment)${sound.business ? " ; son compte Instagram est un compte Entreprise, où Instagram ne propose pas tous les sons : si « Utiliser l'audio » n'apparaît pas, elle te dit « mets ta musique »" : ""}. Dis-le en une phrase.`,
+        });
+      }
+      // Back from the model's sound: her own publishing set for it is given back, then the mode asked.
+      if (readPostMusic(post.music).mode === "model") await keepModelSound(studioId, post_id, false);
+      const { data: now } = await db.from("posts").select("music").eq("id", post_id).single();
+      check(await db.from("posts").update({ music: { ...readPostMusic(now?.music), mode: mode === "off" ? "off" : "on" } }).eq("id", post_id));
       // Not montaged yet: the choice is kept for the montage.
       if (!post.edit_plan_id) return json({ ok: true, note: "C'est noté pour son montage. Continue sans le redire longuement." });
       ctx.afterReply.push(async () => {
@@ -1118,6 +1137,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         status: "started",
         inspiration_id: started.inspirationId,
         note: "Tu le regardes après ta réponse (environ une minute), puis tu lui envoies tout seul ce que son Reel en reprend. C'est le modèle d'un seul Reel, le prochain : si elle t'a déjà donné ses vidéos ou ses photos pour ce Reel (ou dit lesquelles prendre), crée la publication et lance montage tout de suite avec cet inspiration_id (le monteur attend la lecture) ; sinon ne les lui demande pas, ton message qui suit le fait. Annonce-le en une phrase, sans rien décrire de ce Reel avant de l'avoir vu.",
+        ...(link && /instagram\.com\//i.test(link)
+          ? {
+              son: "Un Reel d'Instagram : dans cette même réponse, demande-lui une fois si elle veut garder son son, avec deux boutons (reply_with) « Garder son son » et « Ta musique ». Garder son son : sa vidéo sortira sans musique, sur ses coupes, et elle ajoutera le son dans Instagram avec « Utiliser l'audio » en la publiant elle-même. Sa réponse va à montage (son) ; si le montage est déjà lancé, à set_music (model, ou on).",
+            }
+          : {}),
       });
     },
 

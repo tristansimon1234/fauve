@@ -5,6 +5,8 @@ import { createLoginLink } from "@/lib/auth/login-link";
 import { socialConnect } from "@/lib/social/connect";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { modelSound, modelSoundLine } from "@/lib/model-sound";
+import { readPostMusic } from "@/lib/render/music";
 import { isFirstReel } from "@/lib/onboarding";
 import { ownerWhatsApp } from "@/lib/owner-message";
 import { instagramAccount } from "@/lib/social/publish";
@@ -170,10 +172,14 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const intro = `Ton montage « ${r.title} » est prêt 🎬${seconds ? ` (${seconds} s)` : ""}.`;
   // Short (Tristan: « un user aura la flemme de tout lire »): what she must know, the video shows the rest.
   const voiceLine = target.voice ? `Voix off : ${target.voice}.` : target.spokenKept ? "J’ai gardé les paroles de ta vidéo plutôt qu’une voix off." : "";
+  // Without music for the sound of the Reel she copies: how to add it in Instagram, and the Business caveat.
+  const { data: sounded } = await supabaseAdmin().from("posts").select("music").eq("id", target.postId).eq("studio_id", target.studioId).maybeSingle();
+  const sound = readPostMusic(sounded?.music).mode === "model" ? await modelSound(target.studioId, target.postId).catch(() => null) : null;
+  const soundLine = sound ? modelSoundLine(sound) : "";
   // No quote before: what it used is said once it is there.
   const costLine = unlocked && target.cost?.credits ? `${target.cost.credits} crédit${target.cost.credits > 1 ? "s" : ""} utilisé${target.cost.credits > 1 ? "s" : ""}, il t’en reste ${target.cost.left}.` : "";
   // The editor's and the critic's words are the model's: no stray markup (« </br> ») reaches her; of the editor's, only a limit.
-  const notes = [plainText(deliveryWords(target.rationale)), plainText(target.care), voiceLine, offer ? "" : costLine].filter(Boolean).join("\n\n");
+  const notes = [plainText(deliveryWords(target.rationale)), plainText(target.care), voiceLine, soundLine, offer ? "" : costLine].filter(Boolean).join("\n\n");
   // One question at the end: publish it, or (first Reel) does it look like her.
   const after = offer
     ? [offer.question, costLine].filter(Boolean).join("\n")

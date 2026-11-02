@@ -37,8 +37,13 @@ import { withSlot } from "@/lib/work-slots";
 // a new one. Without ELEVENLABS_API_KEY, or turned off, the Reel stays silent.
 
 export const postMusicSchema = z.object({
-  /** On by default; off = a silent Reel (she adds a sound in Instagram, or none). */
-  mode: z.enum(["on", "off"]).default("on"),
+  /**
+   * On by default; off = a silent Reel (she adds a sound in Instagram, or none); model = silent too, for the sound of the
+   * Instagram Reel it copies, added by her with « Utiliser l'audio » (lib/model-sound.ts).
+   */
+  mode: z.enum(["on", "off", "model"]).default("on"),
+  /** Her own publishing was set for the model's sound (given back with Edith's music). */
+  hand: z.boolean().optional(),
   /** The piece made for this post, and the cut it was made for. */
   track: z
     .object({
@@ -201,7 +206,7 @@ export async function withMusic(params: {
   const db = supabaseAdmin();
   const { data: post } = await db.from("posts").select("music").eq("id", params.postId).single();
   const music = readPostMusic(post?.music);
-  if (music.mode === "off") return { mp4: params.mp4, music: "none" };
+  if (music.mode !== "on") return { mp4: params.mp4, music: "none" };
 
   const signature = cutSignature(params.plan);
   let mp3: Uint8Array | null = null;
