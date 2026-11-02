@@ -43,3 +43,17 @@ export function stableWindow<T extends { id: string }>(chronological: T[], limit
   // No checkpoint in reach: the newest ones, a step's worth beyond the limit.
   return chronological.slice(-(limit + step));
 }
+
+/**
+ * The window, widened so her latest burst is whole: every message since Edith last spoke, with the exchange just
+ * before it (`window` is a suffix of `chronological`). A link and its request sent before 24 files and a voice note
+ * fell out of a window of the last 20 messages: Edith planned without the Reel to copy and launched on 16 files of 24.
+ */
+export function withLatestBurst<T extends { direction: string }>(chronological: T[], window: T[]): T[] {
+  let lastOut = -1;
+  chronological.forEach((r, i) => {
+    if (r.direction === "outbound") lastOut = i;
+  });
+  const from = Math.max(0, lastOut - 1);
+  return from < chronological.length - window.length ? chronological.slice(from) : window;
+}

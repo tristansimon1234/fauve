@@ -5251,6 +5251,25 @@ test("a copied Reel's words keep their drawing, and its font is checked among cl
   assert.ok(stolenLookSchema.safeParse({ ...look, text: older }).success);
 });
 
+test("her latest burst is always whole in Edith's history, however long", async () => {
+  const { stableWindow, withLatestBurst } = await import("./history.ts");
+  const row = (i: number, direction: "inbound" | "outbound") => ({ id: `${String(i).padStart(8, "0")}-0000`, direction });
+  // Edith's last answer, then a link with its request, 24 files and a voice note: 26 messages.
+  const before = Array.from({ length: 30 }, (_, i) => row(i + 1, i % 2 ? "outbound" : "inbound"));
+  const burst = Array.from({ length: 26 }, (_, i) => row(100 + i, "inbound"));
+  const all = [...before, ...burst];
+  const window = stableWindow(all, 20, 10);
+  assert.ok(window.length < burst.length + 1, "the plain window cuts the burst");
+  const seen = withLatestBurst(all, window);
+  assert.ok(burst.every((m) => seen.includes(m)));
+  // With Edith's last message and the one before it.
+  assert.equal(seen[0], before.at(-2));
+  // A short burst: the window as it is (the prompt cache keeps its start).
+  const calm = [...before, ...burst.slice(0, 2)];
+  const plain = stableWindow(calm, 20, 10);
+  assert.equal(withLatestBurst(calm, plain), plain);
+});
+
 test("a clip whose passages look alike shows twice, its later passages given to the files that show least", async () => {
   const { spreadRepeats, alikeClip } = await import("./editor.ts");
   // One shot, nobody speaking: alike, whatever the camera. A face to camera says something else in each passage.

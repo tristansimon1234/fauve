@@ -1,7 +1,7 @@
 import "server-only";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readOwnVoice, readVoiceSetting, stableWindow, type ExchangeRow } from "@fauve/agent";
+import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readOwnVoice, readVoiceSetting, stableWindow, withLatestBurst, type ExchangeRow } from "@fauve/agent";
 import { dayOfTurns } from "@/lib/reply-cap";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
@@ -69,7 +69,14 @@ export function toModelHistory(rows: StoredMessage[]): Anthropic.Beta.BetaMessag
     const label = row.direction === "inbound" ? mediaLabels[row.type] : undefined;
     // A voice note whose words could not be read: Edith says so instead of guessing.
     const unheard = row.direction === "inbound" && row.type === "audio" && !row.body ? " · tu n'as pas pu l'écouter : dis-le-lui et demande-lui de l'écrire" : "";
-    const text = [label && `[${label}${row.media_id ? ` · media_id ${row.media_id}` : ""}${unheard}]`, row.body]
+    // A message WhatsApp did not pass on (a share from Instagram, a poll, a view-once): said, never silently skipped.
+    const unpassed =
+      row.direction === "inbound" && row.type === "unsupported"
+        ? i >= answering
+          ? "[Message que WhatsApp ne t'a pas transmis (un partage depuis Instagram, un sondage, un message éphémère…) : dis-lui en une phrase que tu ne l'as pas vu et demande le lien ou le fichier, sauf si un autre de ses messages le donne déjà]"
+          : "[Message que WhatsApp ne t'a pas transmis]"
+        : null;
+    const text = [label && `[${label}${row.media_id ? ` · media_id ${row.media_id}` : ""}${unheard}]`, unpassed, row.body]
       .filter(Boolean)
       .join(" ");
     if (!text) continue;
@@ -177,7 +184,9 @@ export async function replyInConversation(params: {
     kept = kept.filter((r) => !skip.has(r.conversation_id as string)).slice(0, HISTORY_READ);
   }
   // A copy: `kept` stays newest first (her latest message, the words this turn answers).
-  const stored = stableWindow([...kept].reverse(), HISTORY_LIMIT, HISTORY_STEP).map((r) => ({
+  // Her latest burst is always whole, however long (a link and its request before 24 files had fallen out of view).
+  const chronological = [...kept].reverse();
+  const stored = withLatestBurst(chronological, stableWindow(chronological, HISTORY_LIMIT, HISTORY_STEP)).map((r) => ({
     ...(r as StoredMessage & { wa_message_id: string | null }),
     reply_to: (r.payload as { reply_to?: string } | null)?.reply_to ?? null,
     notes: (r.payload as { notes?: string[] } | null)?.notes,
