@@ -5746,3 +5746,38 @@ test("what a copied Reel lays over its shots is told the same way to her and to 
   // Not read shot by shot: its layout alone.
   assert.equal(laidOver({ layout: "plein cadre, avec un objet détouré posé par-dessus" })?.short, "ses détourages posés par-dessus");
 });
+
+test("an end card's title is never cut: what does not fit goes on to the line below", async () => {
+  const { fitEndCard } = await import("./editor.ts");
+  assert.deepEqual(fitEndCard("Edith le fait, envoie-lui un message sur WhatsApp.", "Pas besoin d'app."), {
+    title: "Edith le fait",
+    subtitle: "envoie-lui un message sur WhatsApp. Pas besoin d'app.",
+  });
+  // A sentence ends within the room: the break is there.
+  assert.deepEqual(fitEndCard("Réserve ton cours. Lien dans la bio, à tout vite !"), { title: "Réserve ton cours.", subtitle: "Lien dans la bio, à tout vite !" });
+  // Short enough: as written.
+  assert.deepEqual(fitEndCard("Lien en bio", "Studio Lune"), { title: "Lien en bio", subtitle: "Studio Lune" });
+  // Every word kept whenever the room allows it.
+  const long = fitEndCard("Viens goûter notre nouveau brunch du dimanche matin");
+  assert.equal(`${long.title} ${long.subtitle}`.replace(/,/g, ""), "Viens goûter notre nouveau brunch du dimanche matin");
+  assert.ok(long.title.length <= 40);
+});
+
+test("a copy draws its title in a font she asks for, else in the model's", async () => {
+  const { copyPlan, COPY_WORDS_PROMPT, copyWordsSchema } = await import("./copy.ts");
+  assert.ok("font" in copyWordsSchema.shape);
+  assert.match(COPY_WORDS_PROMPT, /The music .* never a reason for "fits" false/);
+  const look = {
+    format: "message",
+    voice: "aucune",
+    layout: "plein cadre",
+    ending: "Un écran noir avec un appel à l'action",
+    text: { amount: "un message tenu", composition: "au centre", case: "normal", lines: "aligned", font: "Shadows Into Light", weight: "regular", subtitles: false },
+  } as never;
+  const files = [{ id: "a", photo: true, seconds: 5, moments: [] }, { id: "b", photo: true, seconds: 5, moments: [] }];
+  const base = { cuts: [1, 2, 3], duration: 4, bpm: null, files, look };
+  const mine = copyPlan({ ...base, words: { title: ["Tu veux le même REEL ?"], end: [], font: "Instrument Serif" } } as never);
+  const model = copyPlan({ ...base, words: { title: ["Tu veux le même REEL ?"], end: [] } } as never);
+  assert.equal(mine.copy?.title?.font, "Instrument Serif");
+  assert.equal(model.copy?.title?.font, "Shadows Into Light");
+});

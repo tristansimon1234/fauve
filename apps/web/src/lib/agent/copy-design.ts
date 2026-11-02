@@ -1,4 +1,5 @@
 import "server-only";
+import { googleFont } from "@/lib/fonts";
 import {
   BRIEF_MAX,
   CHAT_MODEL,
@@ -76,7 +77,7 @@ export async function designCopy(params: {
   contract?: ReelContract;
   /** The version corrected, when it is a copy: its words are kept but what her request changes. */
   previous?: EditPlan | null;
-  studio: { name?: string | null; business?: string | null; memory?: unknown; booking?: boolean; tone?: string };
+  studio: { name?: string | null; business?: string | null; memory?: unknown; booking?: boolean; tone?: string; fonts?: string[] };
 }): Promise<CopyDesign | null> {
   const { followed } = params;
   const look = followed.look;
@@ -188,6 +189,7 @@ async function copyWords(
     },
     demande: params.brief?.slice(0, BRIEF_MAX) || "Refaire le Reel envoyé, avec ses fichiers.",
     ...(contractLines(params.contract).length ? { contrat: contractLines(params.contract) } : {}),
+    ...(params.studio.fonts?.length ? { charte: { polices: params.studio.fonts.slice(0, 2) } } : {}),
     reel_modele: {
       texte: look.text.amount,
       composition_du_titre: look.text.composition,
@@ -210,7 +212,10 @@ async function copyWords(
     if (!response.parsed_output) return null;
     const answer = readAnswer(copyWordsSchema, response.parsed_output);
     const line = (l: string) => l.trim().slice(0, 48);
+    // A font she asked for, as Google Fonts serves it (else the model's stays).
+    const font = answer.font.trim() ? await googleFont(answer.font).catch(() => null) : null;
     return {
+      ...(font ? { font } : {}),
       fits: answer.fits,
       missing: answer.missing.trim().slice(0, 200),
       title: answer.title.map(line).filter(Boolean).slice(0, 4),

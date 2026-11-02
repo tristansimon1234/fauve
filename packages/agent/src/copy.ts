@@ -25,7 +25,8 @@ export type CopyFile = {
 };
 
 /** The words of the copy: its title's lines (none: no title), and its ending's cards, each a few lines. */
-export type CopyWords = { title: string[] | null; end: string[][] };
+/** font: a font she asked for the title instead of the model's (a Google Fonts family, checked). */
+export type CopyWords = { title: string[] | null; end: string[][]; font?: string };
 
 export type CopyInput = {
   /** The model's measures: its hard cuts and its length (s), its tempo when it has one. */
@@ -250,7 +251,7 @@ export function copyPlan(input: CopyInput): EditPlan {
           lines,
           from: 0,
           to: text.amount === "une ligne" ? (cuts.find((t) => t >= 2) ?? until) : until,
-          ...(text.font ? { font: text.font } : {}),
+          ...((input.words.font ?? text.font) ? { font: input.words.font ?? text.font } : {}),
           stroke: text.stroke ?? (text.weight === "black" ? "thick" : text.weight === "bold" ? "regular" : "thin"),
           staggered: text.lines === "staggered",
           tilt: text.tilt ?? 0,
@@ -302,6 +303,7 @@ export const copyWordsSchema = z.object({
   missing: z.string().describe("When fits is false: what her request needs that the remake cannot do, in a few words; empty otherwise"),
   title: z.array(z.string()).describe("The title's lines (1 to 4, 24 characters at most each), in French; empty when the model has no text"),
   end: z.array(z.array(z.string())).describe("The ending's cards, 0 to 3, each 1 to 3 short lines in French; empty when the model has no ending card"),
+  font: z.string().describe("The Google Fonts family she asks for the title instead of the model's; empty to keep the model's font"),
   shots: z
     .array(
       z.object({
@@ -317,9 +319,10 @@ export type CopyWordsAnswer = z.infer<typeof copyWordsSchema>;
 export const COPY_WORDS_PROMPT = `You write the on-screen words of a Reel that remakes, with a business's own photos and videos, a Reel the manager sent as a model. The remake is done by code, and the code can do exactly this:
 - her shots, cut on the model's own cut times, in the order she gave her files;
 - the subjects of her photos cut out and laid big over her other shots, when the model lays some;
-- ONE title held on screen, 1 to 4 short lines, drawn in the model's font and way;
+- ONE title held on screen, 1 to 4 short lines, drawn in the model's way and font, or in a font she asks for (« font »);
 - an ending card: 1 to 3 cards one after the other, each a few short lines, on a plain ground, when the model ends on one.
 It cannot do anything else: no voice-over, no subtitles, no animation, no split screen, no second text at another moment, no chosen order of shots, no effect, no other length.
+The music (the model's sound, Edith's music, a genre or a mood she asks for) and the caption are made elsewhere: never a reason for "fits" false.
 
 First decide "fits": true when this remake gives her everything she asked for. Her request may simply ask to copy the model, give her words, or ask for small things the remake does anyway (her photos, her style): that fits. When she asks for something the code cannot do and that matters to her (a voice, an animation, a shot first, a text at a precise moment, a different ending, a length), "fits" is false and "missing" says what, in a few words. When in doubt about something she clearly wants, false.
 
@@ -328,6 +331,7 @@ Then write the words, in French, what she and her customers read:
 - The ending's cards: her call to action in her words when she gave one, else what to do in a few words (where to find her, a link in the bio when she has a booking link, her name), as the model ends; never a fact that is not given.
 - Words she gives word for word (« contrat ») are kept, only split into lines, and always spelled right (accents, apostrophes, hyphens, « WhatsApp »): never one of her typos. Never invent a price, an hour, a place, an offer or a review.
 - A correction (« version_actuelle »): keep the current words except what her request changes.
+- "font": empty to keep the model's font. Only when she asks for another one for the title: its Google Fonts family, one of her charter's (« charte ») when she says her font or her charter's.
 
 Then cast her files on the shots of the remake, as an editor would, never in turn. « plans » gives each shot in order: its length, and when the model was read shot by shot, what the model's shot showed (« fond_du_modele ») and what it laid over it (« pose_du_modele »: nothing, a person, an object, two objects; « sujet_du_modele »). For each shot, in order:
 - ground: one of her grounds (« fonds », f1…), the one that looks most like the model's ground for that shot and makes sense at that point of the Reel: the strongest image first, a calm one before the ending. A video needs at least as many seconds as the shot. Every ground once before one comes back when there are enough of them, never the same on two shots in a row.

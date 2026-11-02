@@ -348,6 +348,31 @@ export function signatureShot(plan: { segments: object[]; texts: { style: string
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
 const HEX_COLOR = /^#[0-9a-f]{6}$/;
 
+/** The most characters of an end card's title, and of its line below. */
+const END_TITLE_MAX = 40;
+const END_SUBTITLE_MAX = 60;
+
+/**
+ * An end card's title over its 40 characters is never cut: what does not fit goes on to the line below, cut where a
+ * sentence ends, else after a comma, else between two words. « Edith le fait, envoie-lui un message sur WhatsApp. »
+ * had come out as « …un message sur », WhatsApp lost.
+ */
+export function fitEndCard(title: string, subtitle?: string): { title: string; subtitle?: string } {
+  const head = title.replace(/\s+/g, " ").trim();
+  const below = subtitle?.replace(/\s+/g, " ").trim() ?? "";
+  const words = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max).replace(/\s+\S*$/, "").replace(/[,;:\s]+$/, "")}…`);
+  if (head.length <= END_TITLE_MAX) return { title: head, ...(below ? { subtitle: words(below, END_SUBTITLE_MAX) } : {}) };
+  // Every space within the title's room, the best break first: after a sentence, after a comma, then the last one.
+  const breaks = [...head.slice(0, END_TITLE_MAX + 1).matchAll(/\s/g)]
+    .map((m) => m.index!)
+    .filter((i) => i > 0)
+    .map((i) => ({ i, rank: /[.!?…]$/.test(head.slice(0, i)) ? 2 : /[,;:]$/.test(head.slice(0, i)) ? 1 : 0 }));
+  const rest = (i: number) => [head.slice(i + 1), below].filter(Boolean).join(" ");
+  const best = breaks.filter((b) => rest(b.i).length <= END_SUBTITLE_MAX).sort((a, b) => b.rank - a.rank || b.i - a.i)[0] ?? [...breaks].sort((a, b) => b.i - a.i)[0];
+  if (!best) return { title: words(head, END_TITLE_MAX), ...(below ? { subtitle: words(below, END_SUBTITLE_MAX) } : {}) };
+  return { title: head.slice(0, best.i).replace(/[,;:]$/, ""), subtitle: words(rest(best.i), END_SUBTITLE_MAX) };
+}
+
 /** The editor's plan: its rhythm (tempo, collage), or a template (a plan written before a Reel had its own tempo). */
 type Written<P> = Omit<P, "tempo" | "form"> & { template: MotionTemplate; tempo?: number };
 type EditorPlanIn = EditorOutput["plan"] | EditorOutputLegacy["plan"] | Written<EditorOutput["plan"]> | Written<EditorOutputLegacy["plan"]>;
@@ -367,7 +392,7 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
         ...(plan.fonts.body && FONT_NAME.test(plan.fonts.body) ? { body: plan.fonts.body } : {}),
       }
     : undefined;
-  const endCard = plan.end_card?.title?.trim() ? { title: plan.end_card.title.trim().slice(0, 40), ...(plan.end_card.subtitle?.trim() ? { subtitle: plan.end_card.subtitle.trim().slice(0, 60) } : {}) } : undefined;
+  const endCard = plan.end_card?.title?.trim() ? fitEndCard(plan.end_card.title, plan.end_card.subtitle) : undefined;
   // Its own colours as the render takes them: a malformed one is dropped, her charter's are used.
   const ownColors = (plan as { colors?: unknown }).colors;
   const colors = Array.isArray(ownColors) ? [...new Set(ownColors.flatMap((c) => (typeof c === "string" && HEX_COLOR.test(c.trim().toLowerCase()) ? [c.trim().toLowerCase()] : [])))].slice(0, 3) : [];

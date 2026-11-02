@@ -637,7 +637,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           return json({
             possible: false,
             fichiers_d_avant: foreign.length,
-            note: `${foreign.length} de ces fichiers n'ont été ni envoyés ni choisis pour ce Reel. Demande-lui quelles images prendre (ou d'en envoyer), sans en prendre d'office ; si elle t'a dit de prendre ceux d'avant, relance avec anciens_fichiers true. Un Reel en pur motion design n'en prend aucun.`,
+            note: `${foreign.length} de ces fichiers n'ont été ni envoyés ni choisis pour ce Reel. Demande-lui quelles images prendre (ou d'en envoyer), sans en prendre d'office ; si elle t'a dit de prendre ceux d'avant, relance aussitôt avec anciens_fichiers true, sans rien en écrire (elle lit chaque mot de ta réponse). Un Reel en pur motion design n'en prend aucun.`,
           });
         }
       }

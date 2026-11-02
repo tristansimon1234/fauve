@@ -291,7 +291,7 @@ export async function designEdit(params: {
       brief: params.brief,
       contract: params.contract,
       previous: correction ? previousCopy : null,
-      studio: { name: studio.data?.name, business: studio.data?.business_type, memory: studio.data?.memory, booking: Boolean(studio.data?.booking_url), tone: profile.tone },
+      studio: { name: studio.data?.name, business: studio.data?.business_type, memory: studio.data?.memory, booking: Boolean(studio.data?.booking_url), tone: profile.tone, fonts: profile.fonts },
     });
     if (copied) return { editPlanId: copied.editPlanId, version: copied.version, plan: copied.plan, rationale: copied.rationale, newScenes: 0, reusedScenes: 0 };
   }
