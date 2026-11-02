@@ -378,7 +378,12 @@ function EdgesOf(hooks: KitHooks, Reveal: ReturnType<typeof RevealOf>, TypeOn: R
             left: area.x,
             width: area.w,
             textAlign: h === "left" ? "left" : h === "right" ? "right" : "center",
-            ...(v === "top" ? { top: area.y } : v === "bottom" ? { bottom: video.height - (area.y + area.h) } : { top: area.y + area.h / 2, transform: "translateY(-50%)" }),
+            // A margin in em: at a large size, the letters themselves rise above (or drop below) their line.
+            ...(v === "top"
+              ? { top: `calc(${area.y}px + 0.22em)` }
+              : v === "bottom"
+                ? { bottom: `calc(${video.height - (area.y + area.h)}px + 0.22em)` }
+                : { top: area.y + area.h / 2, transform: "translateY(-50%)" }),
             color: "#ffffff",
             fontSize: 64,
             lineHeight: 1.05,

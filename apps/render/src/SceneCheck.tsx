@@ -38,6 +38,14 @@ const FACE_MARGIN = 10; // px around the eyes, nose and mouth
 const STEP = 2; // frames between two samples
 /** The size a text to read is drawn at, at the least, in px of the 1080 × 1920 frame (its instructions say so too). */
 const MIN_TYPE = 48;
+/**
+ * An accent (data-fauve-accent): a short label set small beside a title that reads, the scale contrast of an
+ * editorial layout (« A · Summer · In » over « THE CANADIAN ROCKIES »; Tristan: « oui » to small labels next to a
+ * readable title). Held to this smaller minimum, 4 words at most, and only when another text of the scene reads.
+ */
+const ACCENT_MIN = 20;
+const ACCENT_WORDS = 4;
+const inAccent = (node: Node) => Boolean(node.parentElement?.closest("[data-fauve-accent]"));
 /** At most this many copies laid out at once: a collage's composition runs the whole Reel. */
 const MAX_COPIES = 120;
 /** A word may be lost on the picture this long (a shot that passes under it), not longer. */
@@ -259,7 +267,7 @@ function tooQuick(frames: number[], step: number, last: number): { text: string;
  * its largest over the scene (an entrance that grows it does not count): its font size times the scale of the
  * transforms above it, in px of the frame. An SVG text, sized in its drawing's units, is read on its boxes.
  */
-function sizes(copy: HTMLElement, largest: Map<string, number>) {
+function sizes(copy: HTMLElement, largest: Map<string, number>, accents: Set<string>) {
   const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
   const range = document.createRange();
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -284,6 +292,7 @@ function sizes(copy: HTMLElement, largest: Map<string, number>) {
       size = Math.max(0, ...Array.from(range.getClientRects()).map((r) => r.height)) / 1.2;
     }
     if (size > 0) largest.set(text, Math.max(largest.get(text) ?? 0, size));
+    if (inAccent(node)) accents.add(text);
   }
 }
 
@@ -533,12 +542,13 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
       const out = new Map<string, Out>();
       const onFace = new Map<string, OnFace>();
       const largest = new Map<string, number>();
+      const accents = new Set<string>();
       const lost = new Map<string, Ink>();
       const grids = new Map<string, Uint8Array>();
       document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
         const frame = Number(copy.dataset.checkFrame);
         measure(copy, frame, width, height, out, track(frame), onFace);
-        sizes(copy, largest);
+        sizes(copy, largest, accents);
         if (backdrop) {
           inks(copy, frame, backdrop, grids, lost);
           marks(copy, frame, backdrop, grids, lost);
@@ -577,7 +587,10 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
           const message = `texte trop rapide pour être lu : ${detail}. Une phrase reste entière à l'écran au moins 0,8 s plus 0,3 s par mot avant de partir (le temps de la lire sur un téléphone) : fais-la arriver plus tôt ou partir plus tard, ou garde moins de phrases, sans changer l'idée.`;
           console.log(`FAUVE_READ ${JSON.stringify(message)}`);
         }
-        const small = [...largest.entries()].filter(([, size]) => size < MIN_TYPE - 0.5).sort((a, b) => a[1] - b[1]);
+        // An accent is held to its own minimum when a text of the scene reads at the full one.
+        const titled = [...largest.entries()].some(([text, size]) => !accents.has(text) && size >= MIN_TYPE - 0.5);
+        const floor = (text: string) => (titled && accents.has(text) && text.split(" ").length <= ACCENT_WORDS ? ACCENT_MIN : MIN_TYPE);
+        const small = [...largest.entries()].filter(([text, size]) => size < floor(text) - 0.5).sort((a, b) => a[1] - b[1]);
         if (small.length) {
           const detail = small
             .slice(0, 3)
