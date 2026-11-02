@@ -5727,3 +5727,22 @@ test("a new Reel starts on her go and with the files of this exchange only", asy
   assert.equal(saysGo([...rows, her("Le plan validé (« Lancement ») :\n- Accroche : …")]), true);
   assert.equal(saysGo([]), false);
 });
+
+test("what a copied Reel lays over its shots is told the same way to her and to Edith, counted on its shots", async () => {
+  const { laidOver } = await import("./steal.ts");
+  const ground = (at: number) => ({ at, ground: "une rue", laid: "aucun" as const, subject: "" });
+  // One moment in 22 shots: never « ses détourages posés par-dessus », and Edith's line says where.
+  const once = laidOver({
+    layout: "plein cadre, avec deux objets détourés d'une autre image posés en grand sur un des plans",
+    shots: [...Array.from({ length: 20 }, (_, i) => ground(i * 0.5)), { at: 10.1, ground: "un bus", laid: "deux objets", subject: "deux gobelets de smoothie" }, ground(10.6)],
+  });
+  assert.equal(once?.short, "son détourage posé sur un plan");
+  assert.match(once?.detail ?? "", /un seul plan .*deux gobelets de smoothie.*10,1 s/);
+  // On most shots: its cut-outs laid over.
+  assert.equal(laidOver({ layout: "", shots: [{ ...ground(0), laid: "personne", subject: "une femme" }, { ...ground(1), laid: "objet", subject: "un sac" }, ground(2)] })?.short, "ses détourages posés par-dessus");
+  // None read on its shots: no cut-out, but a split screen is still its layout.
+  assert.equal(laidOver({ layout: "plein cadre, avec un objet détouré posé par-dessus", shots: [ground(0), ground(1)] }), null);
+  assert.equal(laidOver({ layout: "écran partagé en deux", shots: [ground(0), ground(1)] })?.short, "sa mise en page");
+  // Not read shot by shot: its layout alone.
+  assert.equal(laidOver({ layout: "plein cadre, avec un objet détouré posé par-dessus" })?.short, "ses détourages posés par-dessus");
+});

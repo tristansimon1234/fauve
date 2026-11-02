@@ -346,7 +346,7 @@ export function stolenStyleLines(style: StolenStyle): string[] {
   const { look, measures } = style;
   const effect = EFFECT_WORDS[look.effect];
   return [
-    `La forme : ${FORMAT_WORDS[look.format]}, ${paceWords(secondsPerShot(measures), measures.bpm, measures.cuts.length)}${look.moments?.length ? `, ${look.moments.length} effets ou temps enchaînés, que je refais avec tes images` : ""}.`,
+    `La forme : ${FORMAT_WORDS[look.format]}, ${paceWords(secondsPerShot(measures), measures.bpm, measures.cuts.length)}${laidOver(look) ? `, avec ${laidOver(look)!.detail}` : ""}${look.moments?.length ? `, ${look.moments.length} effets ou temps enchaînés, que je refais avec tes images` : ""}.`,
     `Le texte : ${look.text.composition.replace(/[.\s]+$/, "")}${look.text.subtitles ? ", avec des sous-titres" : ""}.`,
     // Its music is an English brief for the composer (« dreamy indie pop, soft female vocals »): never shown to her.
     [`L'ambiance : une musique dans son genre, composée pour ton Reel`, effect, look.why.replace(/[.\s]+$/, "")].filter(Boolean).join(" ; ") + ".",
@@ -403,11 +403,10 @@ const FORMAT_SHORT: Record<StolenLook["format"], string> = {
 export function stolenStyleShort(style: StolenStyle): string[] {
   const { look, measures } = style;
   const perShot = secondsPerShot(measures);
-  const laid = composedLayout(look);
   return [
     FORMAT_SHORT[look.format],
     measures.cuts.length ? (perShot <= 0.8 ? "ses plans très rapides" : perShot <= 1.6 ? "ses plans rapides" : "ses plans posés") : "",
-    laid ? (/détour/i.test(laid) ? "ses détourages posés par-dessus" : "sa mise en page") : "",
+    laidOver(look)?.short ?? "",
     look.text.font ? "sa police" : "",
     look.effect === "dust" ? "sa poussière de pellicule" : look.effect === "grain" ? "son grain" : "",
     /\bnoir/i.test(look.ending) ? "sa fin sur fond noir" : "",
@@ -499,6 +498,30 @@ export function composedLayout(look: Pick<StolenLook, "layout">): string | null 
   const layout = look.layout?.trim();
   // « plein cadre, plans serrés » is a montage; « plein cadre, avec un objet détouré posé par-dessus… » a composition.
   return layout && (!/^plein (cadre|écran)\b/i.test(layout) || LAID_OVER.test(layout)) ? layout : null;
+}
+
+/**
+ * What the model lays over its shots, counted on its shots read one by one (else its layout): the few words of the
+ * message she gets, and the line Edith reads. Both from here: the message told her « ses détourages posés
+ * par-dessus » for one moment in 22 shots, Edith's context said nothing of it, and she answered « je n'en vois pas ».
+ */
+export function laidOver(look: Pick<StolenLook, "shots" | "layout">): { short: string; detail: string } | null {
+  const shots = look.shots ?? [];
+  const layout = composedLayout(look);
+  if (shots.length < 2) return layout ? { short: /détour/i.test(layout) ? "ses détourages posés par-dessus" : "sa mise en page", detail: layout } : null;
+  const laid = shots.filter((s) => s.laid !== "aucun");
+  // No cut-out on any shot read: only a layout of another kind (a split screen, a frame) is left to tell.
+  if (!laid.length) return layout && !/détour|autocollant/i.test(layout) ? { short: "sa mise en page", detail: layout } : null;
+  const what = [...new Set(laid.map((s) => s.subject.trim()).filter(Boolean))].slice(0, 3).join(", ");
+  const of = what ? ` (${what})` : "";
+  if (laid.length * 2 >= shots.length) return { short: "ses détourages posés par-dessus", detail: `des détourages posés sur ${laid.length} de ses ${shots.length} plans${of}` };
+  const at = laid
+    .slice(0, 3)
+    .map((s) => `${seconds(s.at)} s`)
+    .join(", ");
+  return laid.length === 1
+    ? { short: "son détourage posé sur un plan", detail: `un seul plan avec un détourage posé par-dessus${of}, vers ${at}, tous les autres en plein cadre` }
+    : { short: `ses ${laid.length} détourages posés sur quelques plans`, detail: `${laid.length} de ses ${shots.length} plans avec un détourage posé par-dessus${of}, vers ${at}, les autres en plein cadre` };
 }
 
 /** Something laid over full-frame shots: a cut-out, a print, another image in a window. */
