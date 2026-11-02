@@ -7,6 +7,8 @@ import {
   stealMissMessage,
   stolenStyleLines,
   stolenStyleSchema,
+  currentReading,
+  STEAL_READER,
   tempoOf,
   usdToEur,
   type FollowedStyle,
@@ -76,14 +78,15 @@ export async function startSteal(studioId: string, source: StealSource): Promise
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const kept = stolenStyleSchema.safeParse(known?.style);
+    // A reading made before the current reader (it missed what it now sees) is read again.
+    const kept = currentReading(known?.style);
     if (known) {
       const { count } = await db.from("posts").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("inspiration_id", known.id);
       // Sent again before a Reel copied it: the same one, now the latest she sent (one that could not be read is read again).
       if (!count) {
         await db
           .from("inspirations")
-          .update({ created_at: new Date().toISOString(), ...(kept.success ? {} : { style: null }) })
+          .update({ created_at: new Date().toISOString(), ...(kept ? {} : { style: null }) })
           .eq("id", known.id);
         return { inspirationId: known.id as string };
       }
@@ -91,7 +94,7 @@ export async function startSteal(studioId: string, source: StealSource): Promise
     // A new Reel to copy; one a Reel of hers already copied is a new Reel to make, its reading reused.
     const { data: row, error } = await db
       .from("inspirations")
-      .insert({ studio_id: studioId, source: "link", kind: "reel", url: found.url, ...(known && kept.success ? { style: known.style, analysis: known.analysis, title: known.title } : {}) })
+      .insert({ studio_id: studioId, source: "link", kind: "reel", url: found.url, ...(known && kept ? { style: known.style, analysis: known.analysis, title: known.title } : {}) })
       .select("id")
       .single();
     if (error || !row) throw new Error(`inspirations insert: ${error?.message ?? "no row"}`);
@@ -195,7 +198,7 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   // A font that makes its style, by the name Google Fonts serves it under (the render loads it from there); else hers stay.
   const { font: named, ...text } = look.text;
   const font = named ? await googleFont(named).catch(() => null) : null;
-  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, ...outline };
+  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, reader: STEAL_READER, ...outline };
   // Its three lines also stand as its reading (the inspirations list, the editor's chosen inspiration).
   const analysis = stolenStyleLines(style).join(" ");
   await db

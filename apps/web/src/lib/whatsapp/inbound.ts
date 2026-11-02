@@ -17,6 +17,7 @@ import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { photoRegions } from "@/lib/video/regions";
 import { setReaction } from "@/lib/reactions";
 import { env } from "@/lib/env";
+import { withSlot } from "@/lib/work-slots";
 import { downloadMedia, markReadAndTyping, sendLinkButton, sendReaction, sendReply, sendText, sendVideo } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 
@@ -338,7 +339,34 @@ function deliveryError(error: unknown): { code: number | null; message: string; 
  * Edith's turn on WhatsApp: her answer, with its buttons and links, sent and stored, then
  * what runs after it (a render…). Also after files dropped through her upload link (lib/upload-link.ts).
  */
-export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo }: { studioId: string; memberId: string; waId: string; phone: string; replyTo?: string }): Promise<void> {
+export async function replyOnWhatsApp(turn: WhatsAppTurn): Promise<void> {
+  const { studioId, replyTo } = turn;
+  // A burst of messages (an album of photos, then « Alors ? »): the latest one's turn answers them all.
+  if (replyTo) {
+    await new Promise((resolve) => setTimeout(resolve, BURST_SETTLE_MS));
+    if (await newerMessage(studioId, replyTo).catch(() => false)) return;
+  }
+  // One turn at a time for a business: two at once each launched a Reel from the same message
+  // (Tristan's link and files, then « Alors ? », then « ? »: two montages, the same message sent twice).
+  // A turn that waited answers only if no newer message came meanwhile (that one's turn reads all).
+  const afterReply = await withSlot(turnSlot(studioId), async () => {
+    if (replyTo && (await newerMessage(studioId, replyTo).catch(() => false))) return [];
+    return answerOnWhatsApp(turn);
+  });
+  // E.g. a render: the video follows the "je monte ta vidéo" reply (the next turn need not wait for it).
+  for (const job of afterReply) await job().catch((e) => console.error("after-reply job failed", e));
+}
+
+type WhatsAppTurn = { studioId: string; memberId: string; waId: string; phone: string; replyTo?: string };
+
+/** How long a message waits for the next one of a burst (an album comes as one message a file, within seconds). */
+const BURST_SETTLE_MS = 3_000;
+
+/** A business's turn: one at a time, a lease long enough for a turn, a wait beyond which it runs anyway. */
+const turnSlot = (studioId: string) => ({ kind: `turn:${studioId}`, slots: 1, perSlot: 1, leaseMs: 4 * 60_000, waitMs: 2 * 60_000 });
+
+/** The turn itself: her answer sent and stored; what runs after it is returned, to run once the turn's place is free. */
+async function answerOnWhatsApp({ studioId, memberId, waId, phone, replyTo }: WhatsAppTurn): Promise<(() => Promise<unknown>)[]> {
   const db = supabaseAdmin();
   let result: Awaited<ReturnType<typeof replyInConversation>>;
   try {
@@ -348,7 +376,7 @@ export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo
     // the conversation history stays clean for the next attempt.
     console.error("agent failed, sending fallback reply", error);
     await sendText(waId, TECHNICAL_ISSUE_REPLY).catch((e) => console.error("fallback reply failed", e));
-    return;
+    return [];
   }
 
   // She wrote again while this turn ran (a video, then « c'est envoyé ! » a few seconds later):
@@ -417,6 +445,5 @@ export async function replyOnWhatsApp({ studioId, memberId, waId, phone, replyTo
     // Her Sunday report that waited for her (outside the window): right after her answer, « Au fait, … ».
     if (waMessageId) await deliverWaitingReport(studioId, waId).catch((e) => console.warn("waiting weekly report not sent", e));
   }
-  // E.g. a render: the video follows the "je monte ta vidéo" reply.
-  for (const job of result.afterReply) await job().catch((e) => console.error("after-reply job failed", e));
+  return result.afterReply;
 }

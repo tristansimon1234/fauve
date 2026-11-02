@@ -175,12 +175,30 @@ export function clampLook(reading: StolenLookReading): StolenLook {
  * A stolen style as it is kept on its inspiration (inspirations.style): the reading and the
  * measures; for one of her own Reels kept as a model (reel-model.ts), its plan's structure too.
  */
-export const stolenStyleSchema = z.object({ look: stolenLookSchema, measures: reelMeasuresSchema, outline: z.string().max(OUTLINE_CHARS).optional() });
+export const stolenStyleSchema = z.object({
+  look: stolenLookSchema,
+  measures: reelMeasuresSchema,
+  outline: z.string().max(OUTLINE_CHARS).optional(),
+  /** The reading's version (STEAL_READER): an older one is read again when its link comes back. */
+  reader: z.number().int().optional(),
+});
+
+/**
+ * The version of the reading: 2 watches every shot (stealFps, an image per shot) and names the cut-outs
+ * laid over shots. Tristan's link sent again reused the reading made before, « plein cadre » without them.
+ */
+export const STEAL_READER = 2;
+
+/** A kept reading as good as a new one: made by the current reader. */
+export const currentReading = (style: unknown): boolean => {
+  const parsed = stolenStyleSchema.safeParse(style);
+  return parsed.success && parsed.data.reader === STEAL_READER;
+};
 export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
 export const STEAL_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (studio, salon, restaurant, shop…). The person who runs the business wants to take this Reel's style for theirs: read it as a pro editor who wants to remake its style, not its content.
 Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once, an object or a person cut out of another image and laid over some shots), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, letter spacing, key word, background under the sentence, place, alignment; its font and its colours only when they make its style), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
-You also get a sharp image from the middle of each of its shots, with its time: look at every one, since a shot of a third of a second counts and the video's frames can fall between two. A cut-out laid over a shot (a drink, a phone booth, a bag, a person, without or with a white border) is part of its style, even when it stays a few tenths of a second: say it in the layout and in its moments (when, what, where, how big, border or not).
+You also get a sharp image from the middle of each of its shots, with its time: look at every one, since a shot of a third of a second counts and the video's frames can fall between two. A cut-out laid over a shot (a drink, a phone booth, a bag, a person, without or with a white border) is part of its style, even when it stays a few tenths of a second: say it in the layout, and make each one its own moment, every one of them and not only the first (when, what, where, how big, border or not).
 Copy neither its words, nor its images, nor the name of its music: describe a form another business can reuse. In your French, make no feminine or masculine agreement for the person who runs the business. In French, except « music » in English.`;
 
 /** The style one Reel copies (from its inspiration's stolen style): its look and its pace. */

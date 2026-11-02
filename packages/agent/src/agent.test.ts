@@ -5162,3 +5162,28 @@ test("a clip filmed as one still shot shows twice at most in a Reel", async () =
   );
   assert.equal(capStillRepeats(plan, new Set()), plan);
 });
+
+test("a copied Reel read before the current reader is read again when its link comes back", async () => {
+  const { currentReading, STEAL_READER } = await import("./steal.ts");
+  const look = {
+    name: "message manuscrit",
+    format: "message",
+    voice: "aucune",
+    hook: { kind: "promesse", what: "une phrase manuscrite" },
+    text: { amount: "un message tenu", composition: "au centre", case: "normal", weight: "regular", tracking: "normal", align: "center", stress: "none", band: "none", subtitles: false },
+    effect: "none",
+    grade: "bright",
+    motion: "epure",
+    layout: "plein cadre",
+    camera: "mixte",
+    transitions: "coupes nettes",
+    music: "indie pop",
+    ending: "écran noir",
+    why: "le texte tenu",
+  };
+  const measures = { duration: 13.2, cuts: [1.5], bpm: 106, lufs: -14 };
+  assert.equal(currentReading({ look, measures }), false);
+  assert.equal(currentReading({ look, measures, reader: STEAL_READER - 1 }), false);
+  assert.equal(currentReading({ look, measures, reader: STEAL_READER }), true);
+  assert.equal(currentReading({ miss: "unreadable" }), false);
+});
