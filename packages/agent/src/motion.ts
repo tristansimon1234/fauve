@@ -446,6 +446,27 @@ export function planTimeline(plan: Pick<EditPlan, "segments" | "transitions">): 
   return { segments, duration: (cursor + fadeFrames) / REEL_FPS };
 }
 
+/**
+ * One text per shot (« un mot à chaque transition, la scène et le mot en même temps »): when the texts after its opening
+ * go one with each shot (as many as its shots after the first, or one fewer, the last going without; each short; in
+ * order), each starts and ends with its shot, so the word and the scene appear together, and a sound on it too. The
+ * structure of the plan decides, never its words. Otherwise the plan is left as it is.
+ */
+export function textsOnShots<P extends Pick<EditPlan, "segments" | "transitions" | "texts">>(plan: P): P {
+  const { segments } = planTimeline(plan);
+  const later = plan.segments.flatMap((s, i) => (isClipSegment(s) && i > 0 && segments[i] ? [segments[i]!] : []));
+  const texts = plan.texts.flatMap((t, i) => (t.from > 0.05 ? [{ t, i }] : []));
+  if (texts.length < 3 || !(texts.length === later.length || texts.length === later.length - 1)) return plan;
+  if (texts.some(({ t }) => t.to - t.from > 3) || texts.some(({ t }, k) => k > 0 && t.from < texts[k - 1]!.t.from)) return plan;
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const next = plan.texts.slice();
+  texts.forEach(({ t, i }, k) => {
+    const span = later[k]!;
+    next[i] = { ...t, from: round(span.start), to: round(span.start + span.length) };
+  });
+  return { ...plan, texts: next };
+}
+
 /** The photos a free scene composes with, in its order: each one's link, shape and clean cut-out (a missing photo is left out). */
 export function scenePhotos(ids: string[], inputs: Pick<ReelInputs, "clipUrls" | "cutouts" | "photoAspects" | "sceneCutouts">): ScenePhoto[] {
   return ids.flatMap((id) => {
@@ -705,6 +726,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         ...(l.compose ? { compose: true, shots: composeShots(from, length) } : {}),
         // A composition that draws the whole picture gets the Reel's texts and its end to draw; one written without an
         // end card (draws_end false, or no word of it in its code) leaves the card to the engine and stops before it.
+        // The animation that draws the Reel's texts as the copied Reel does (the engine's texts step aside for it).
+        ...(l.words && !l.compose && l.motion.js ? { drawsTexts: true, reelTexts: composeTexts(texts, from) } : {}),
         ...(l.compose && l.motion.draws_texts
           ? (() => {
               // (Never an end card that starts after it: one she added plays after its last image, the engine's to draw.)

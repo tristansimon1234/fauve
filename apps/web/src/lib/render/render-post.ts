@@ -247,6 +247,8 @@ export async function checkReelAnimations(props: ReelProps): Promise<SceneChecks
         ...(l.shots ? { shots: l.shots } : {}),
         ...(l.track || l.shots?.some((x) => x.track) ? { look, ...(l.track ? { track: l.track } : {}) } : {}),
         ...(l.fonts ? { fonts: l.fonts } : {}),
+        // The animation that draws the Reel's texts: one it misses leaves it out, and the engine draws them.
+        ...(!l.compose && l.drawsTexts && l.reelTexts ? { reelTexts: l.reelTexts } : {}),
       })),
     ],
     props.brand,
@@ -447,7 +449,8 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         // engine cannot render them; anything else falls back to it only after that second try.
         const composed = Boolean(props.layers?.some((l) => l.compose));
         console.error("remotion render failed, trying again", renderId, composed ? "without its composition" : "", error);
-        const layers = props.layers?.filter((l) => !l.compose);
+        // The animation that draws the texts of a copied Reel goes with it: the engine draws them again.
+        const layers = props.layers?.filter((l) => !l.compose && !l.drawsTexts);
         const again = await renderReelInSandbox({ id: `${renderId}-again`, props: { ...props, layers: layers?.length ? layers : undefined }, patient: true }).catch(
           (second: unknown) => {
             if (composed || needsBlur || photoIds.length || plan.voice) throw second;

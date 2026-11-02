@@ -3505,6 +3505,26 @@ test("collage: one free composition lays the Reel's shots, never a paid animatio
   assert.equal(whole.drawsTexts, true);
   assert.deepEqual(whole.reelTexts?.[0], { text: "back to culte", role: "hook", from: 0, to: 45, emphasis: [] });
   assert.equal(whole.end, null);
+  // An animation over the whole Reel that draws its texts like the copied Reel: the shots stay the engine's.
+  const plain = editPlanSchema.parse({
+    format: "9:16",
+    duration: 4,
+    template: "libre",
+    segments: [{ clip_id: "a", in: 0, out: 4, zoom: "none" }],
+    texts: [{ text: "the power of paris", from: 0, to: 4, style: "hook" }],
+    images: [],
+    transitions: "cut",
+    subtitles: false,
+    music: null,
+    layers: [{ from: 0, to: 4, words: true, motion: { brief: "words", js: scene } }],
+  });
+  const words = buildReelProps(plain, { template: "libre", clipUrls: { a: "https://x/a.mp4" }, brand: { name: "Paris" } }).layers![0]!;
+  assert.equal(words.compose, undefined);
+  assert.equal(words.drawsTexts, true);
+  assert.equal(words.reelTexts?.[0]?.text, "the power of paris");
+  // Not written yet (no code): the engine draws the texts.
+  const unwritten = buildReelProps({ ...plain, layers: [{ ...plain.layers![0]!, motion: { brief: "words" } }] }, { template: "libre", clipUrls: { a: "https://x/a.mp4" }, brand: { name: "Paris" } }).layers ?? [];
+  assert.equal(unwritten.some((l) => l.drawsTexts), false);
 });
 
 test("what moves: the tracks under each animation, placed as the Reel draws the footage", async () => {
@@ -5891,6 +5911,25 @@ test("sound effects: placed by who wrote them, spaced, never under speech when l
     [[0.5, true], [1.2, true], [1.9, true], [2.6, true], [3.3, true]],
   );
   assert.deepEqual(pickCues(words, { level: "off", duration: 8, speech: [] }), []);
+  // One text per shot: each starts and ends with its shot (the word and the scene together); else left alone.
+  const { textsOnShots, planTimeline } = await import("./motion.ts");
+  const shot = (id: string, len: number) => ({ clip_id: id, in: 0, out: len, zoom: "none" as const });
+  const perShot = {
+    transitions: "cut" as const,
+    segments: [shot("a", 4.2), shot("b", 1.4), shot("c", 1.4), shot("d", 1.4), shot("e", 2)],
+    texts: [
+      { text: "The power of Paris", from: 0, to: 4.2, style: "hook" as const },
+      { text: "Historic", from: 4.2, to: 6.3, style: "caption" as const },
+      { text: "Elegant", from: 6.3, to: 7.7, style: "caption" as const },
+      { text: "Vibrant", from: 7.7, to: 9.1, style: "caption" as const },
+    ],
+  };
+  const starts = planTimeline(perShot).segments;
+  const aligned = textsOnShots(perShot as never) as typeof perShot;
+  assert.deepEqual(aligned.texts.map((t) => t.from), [0, ...starts.slice(1, 4).map((s) => Math.round(s.start * 100) / 100)]);
+  assert.equal(aligned.texts[1]!.to, Math.round((starts[1]!.start + starts[1]!.length) * 100) / 100);
+  const twoTexts = { ...perShot, texts: perShot.texts.slice(0, 3) };
+  assert.equal(textsOnShots(twoTexts as never), twoTexts);
   // The sounds her contract asked for on what appears: one on each text, or on each cut (never at 0).
   const { askedSounds } = await import("./sfx.ts");
   const asked = askedSounds({ texts: [{ from: 0 }, { from: 4.2 }, { from: 5.6 }] } as never, [{ start: 0 }, { start: 4.2 }, { start: 5.6 }], [{ on: "texts", sound: "light click" }]);

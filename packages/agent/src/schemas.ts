@@ -289,6 +289,11 @@ export const editPlanLayerSchema = z.object({
   to: z.number().min(0),
   /** A collage's composition: over the whole Reel, it lays the shots on the paper itself (nothing plays under it). Set by the engine. */
   compose: z.boolean().optional(),
+  /**
+   * Over the whole Reel, it draws the Reel's texts as the Reel she copies draws them (their place, size and how they
+   * appear: a title typed word by word, words that slam), the engine laying her shots under it. Set by the engine.
+   */
+  words: z.boolean().optional(),
 });
 export type PlanLayer = z.infer<typeof editPlanLayerSchema>;
 

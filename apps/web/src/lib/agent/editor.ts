@@ -46,6 +46,7 @@ import {
   planHook,
   planTimeline,
   askedSounds,
+  textsOnShots,
   voiceAt,
   voiceForEditor,
   buildReelProps,
@@ -88,6 +89,10 @@ import { isFirstReel } from "@/lib/onboarding";
 import { LAYER_ROLE, markTemplatesUsed, OVERLAY_ROLE, PHOTO_ROLE, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { timeLeft } from "@/lib/step-clock";
 import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
+
+/** The brief of the animation that draws a copied Reel's texts as its model does (constant: a correction keeps its code). */
+const WORDS_BRIEF =
+  "Draw the Reel's texts (reel_texts) exactly as the Reel she copies draws its texts (model_frames): where they sit on the image, their size, font and weight, how each one appears and leaves (typed word by word, slammed, faded), at its pace. Her shots play under you; draw nothing else.";
 
 /** The hooks of the studio's latest other Reels: the next one takes another form and other words. */
 async function recentHooks(studioId: string, postId: string): Promise<string[]> {
@@ -466,12 +471,21 @@ export async function designEdit(params: {
       ? [...new Map((base?.sounds ?? []).filter((c) => c.asked).map((c) => [c.sound, { on: "texts" as const, sound: c.sound }])).values()]
       : [];
   const framed = (p: EditPlan): EditPlan => {
-    const next: EditPlan = { ...p };
+    // A text per shot: each one with its shot (its click with it).
+    const next: EditPlan = { ...textsOnShots(p) };
     if (letterbox) next.frame = "letterbox";
     else delete next.frame;
     const sounds = asking.length ? askedSounds(next, planTimeline(next).segments, asking) : [];
     if (sounds.length) next.sounds = sounds;
     else delete next.sounds;
+    // A copied Reel's texts drawn as the model draws them, by an animation over the whole montage (the engine's rows
+    // put a title typed word by word on the image as a static line above it). Never over a composition, which draws
+    // its own, nor for a model without text.
+    const layers = (next.layers ?? []).filter((l) => !l.words);
+    const copiesText = followed && followed.look.text.amount !== "aucun" && next.texts.length && !next.copy && !layers.some((l) => l.compose) && layers.length < 3;
+    if (copiesText) next.layers = [...layers, { motion: { brief: WORDS_BRIEF }, from: 0, to: next.duration, words: true }];
+    else if (layers.length) next.layers = layers;
+    else delete next.layers;
     return next;
   };
   plan = framed(plan);
@@ -642,6 +656,8 @@ export async function designEdit(params: {
     const segment = found && isMotionSegment(found) ? found : null;
     const durationInFrames = Math.round((layer ? layer.to - layer.from : (segment?.duration ?? 2)) * 30);
     const compose = layer?.compose ? composition() : undefined;
+    // The animation that draws a copied Reel's texts: they are its to draw, at their moments.
+    const words = layer?.words ? compositionTexts(plan).texts : undefined;
     // What moves under it: the footage of its passage (a scene), the shots under it (an animation over the montage),
     // or, in a composition, each shot it lays (its code places them in the box it gives the shot).
     const track = !reel || compose
@@ -666,6 +682,7 @@ export async function designEdit(params: {
       ...(segment?.over?.busy?.length ? { busy: segment.over.busy } : {}),
       ...(layer ? { cuts: cutsUnder(layer.from, layer.to) } : {}),
       ...(compose ? { compose } : {}),
+      ...(words ? { words } : {}),
       ...(photos.length ? { photos } : {}),
       ...(track.length ? { track } : {}),
       ...(Array.isArray(moves) ? (moves.length ? { moves: { by_shot: moves } } : {}) : moves ? { moves } : {}),
@@ -936,8 +953,9 @@ export async function designEdit(params: {
       : compositionMissed
         ? "Je n'ai pas réussi à composer la mise en page demandée : cette version passe tes plans en plein cadre. Dis-moi « réessaie la mise en page » et je la refais."
         : honestLength(output.rationale, plan.duration, params.contract?.duration),
-    // A collage's composition is the ambiance itself, never a paid animation.
-    newScenes: requests.filter((r) => !r.compose).length,
+    // A collage's composition is the ambiance itself, and the one that draws a copied Reel's texts is the copy itself:
+    // never a paid animation, never counted in her new animations.
+    newScenes: requests.filter((r) => !r.compose && !r.words).length,
     reusedScenes: reused.size,
   };
 }

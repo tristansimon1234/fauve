@@ -105,7 +105,9 @@ const HDR_TAGS = "-color_primaries bt709 -color_trc bt709 -colorspace bt709";
 const NORMALIZE = [
   "set -euo pipefail",
   `${FETCH.replace('"$1"', '"$1.src"')}`,
-  `tail="fps=${REEL_FPS},tpad=stop_mode=clone:stop_duration=2,format=yuv420p"`,
+  // Its long side 2560 px at most: enough to frame a 1080 x 1920 Reel, and Remotion's frame extractor no longer runs
+  // out of memory on ten phone videos at full size (killed by the system, the Paris Reel came out broken at 11 s).
+  `tail="scale='if(gt(iw,ih),min(iw,2560),-2)':'if(gt(iw,ih),-2,min(ih,2560))':flags=lanczos,fps=${REEL_FPS},tpad=stop_mode=clone:stop_duration=2,format=yuv420p"`,
   'enc="-c:v libx264 -preset veryfast -crf 16 -c:a aac -b:a 192k -movflags +faststart"',
   `plain() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "$tail" $enc "$1"; }`,
   `hdr() { ${ROOT}/ffmpeg -v error -y -i "$1.src" -map 0:v:0 -map "0:a:0?" -vf "${HDR_TO_SDR},$tail" $enc ${HDR_TAGS} "$1"; }`,
@@ -384,9 +386,16 @@ export async function renderReelInSandbox(job: { id: string; props: ReelProps; p
       await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(props) }]);
       await bash(
         sandbox,
-        `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=${job.patient ? 2 : 4} --timeout=${job.patient ? 120000 : 60000} --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --enforce-audio-track --log=error`,
+        `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=${job.patient ? 2 : 4} --timeout=${job.patient ? 120000 : 60000} --offthreadvideo-cache-size-in-bytes=${job.patient ? 1000000000 : 1500000000} --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --enforce-audio-track --log=error`,
         [dir],
       );
+      // Whole, or not sent: every frame decodes (a Reel was delivered cut at 11 s of 20, its file broken after).
+      const check = await bash(sandbox, `${ROOT}/ffmpeg -hide_banner -v error -stats -i "$1/out.mp4" -map 0:v:0 -f null - 2>&1 | tr '\\r' '\\n' | grep -E "frame=|Invalid|rror" | tail -4 || true`, [dir]);
+      const report = await check.stdout();
+      const frames = Number(/frame=\s*(\d+)/.exec(report.split("\n").filter((l) => l.includes("frame=")).at(-1) ?? "")?.[1] ?? Number.NaN);
+      if (/Invalid|rror/.test(report) || (Number.isFinite(frames) && frames < job.props.durationInFrames - 2)) {
+        throw new Error(`render produced a broken file (${Number.isFinite(frames) ? `${frames} of ${job.props.durationInFrames} frames` : "unreadable"})`);
+      }
       const mp4 = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
       if (!mp4?.length) throw new Error("render produced no file");
       return mp4;

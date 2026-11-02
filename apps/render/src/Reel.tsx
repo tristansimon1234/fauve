@@ -79,6 +79,8 @@ export function Reel(props: ReelProps) {
   // One that draws the whole picture (Tristan: « tout ça n'est pas assez libre ») has its own ground, texts and end:
   // the engine's paper, texts and end card only play in its fallback. Another composition always does.
   const whole = Boolean(compose?.drawsTexts) || Boolean(compose && !collage);
+  // An animation over the montage that draws the Reel's texts as the Reel she copies does: the engine's step aside.
+  const wordsLayer = props.layers?.some((l) => !l.compose && l.drawsTexts);
   // A composition written without an end card (one added later, by her or Edith): it stops where the card starts, and the
   // engine draws the card. Drawn by no one, her calendar Reel's end card never showed.
   const engineEnd = Boolean(props.endCard) && (!whole || compose?.drawsEnd === false);
@@ -242,6 +244,7 @@ export function Reel(props: ReelProps) {
               photos={layer.photos}
               cuts={layer.cuts}
               track={layer.track}
+              {...(layer.drawsTexts ? { reelTexts: layer.reelTexts } : {})}
             />
           </Sequence>
         ),
@@ -250,7 +253,7 @@ export function Reel(props: ReelProps) {
       {/* A copied Reel remade by code: its laid subjects, its held title, its ending card. */}
       {props.copy ? <CopyLayer props={props} k={k} /> : null}
 
-      {whole ? null : engineTexts}
+      {whole || wordsLayer ? null : engineTexts}
 
       {props.words.length > 0 && <Subtitles props={props} theme={theme} k={k} />}
       {props.layer ? <TextLayer props={props} /> : null}

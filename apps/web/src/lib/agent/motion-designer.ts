@@ -72,6 +72,8 @@ export type SceneRequest = {
   model?: SceneFrame[];
   /** The sound effects already made (the library's), reused by name when one fits. */
   readySounds?: string[];
+  /** It draws the Reel's texts as the copied Reel does (its texts, frames from its start), over the montage. */
+  words?: CompositionTexts["texts"];
   /** The row where a voice's subtitles show during the scene (shares of the height): its words keep off it. */
   subtitles?: { y: number; h: number };
   /** The colours of the picture under it, read once from `canvas` for the scene check (null: none to read). */
@@ -246,6 +248,7 @@ async function writeScene(
     cuts: Boolean(request.cuts && !request.compose),
     moves: Boolean(request.moves || request.track?.length || request.compose?.shots.some((x) => x.track)),
     composition: Boolean(request.compose),
+    words: Boolean(request.words),
     correction: Boolean(seen),
   };
   const text = fix
@@ -298,6 +301,7 @@ async function writeScene(
         ...(seen ? { previous_version: { frames: `${seen.frames.length} images attached, above`, code: seen.code } } : {}),
         ...(canvas ? { reel_frames: `${canvas.length} images attached, above` } : {}),
         ...(request.readySounds?.length ? { ready_sounds: request.readySounds } : {}),
+        ...(request.words ? { reel_texts: request.words } : {}),
         ...(copied ? { model_frames: `${copied.length} sheets of the Reel she copies attached, first: remake how its elements appear, change, move and leave, at its pace, with her images and her words, never its images nor its words` } : {}),
       });
   const shown: string | Block[] = seen
@@ -415,6 +419,8 @@ function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneReq
         ...(r.fonts?.length ? { fonts: r.fonts } : {}),
         ...(request.cuts ? { cuts: request.cuts } : {}),
         ...(request.compose ? { shots: request.compose.shots, reelTexts: request.compose.texts, end: request.compose.end } : {}),
+        // The animation that draws the Reel's texts: checked that each one is there, whole, in its moment.
+        ...(request.words ? { reelTexts: request.words } : {}),
         // A scene that follows what moves is checked where it goes, with the Reel's camera moves.
         ...(request.track?.length || request.compose?.shots.some((x) => x.track) ? { ...(request.track?.length ? { track: request.track } : {}), look: context.look } : {}),
         // The colours of the picture under it: a word lost on it goes back to the motion designer.

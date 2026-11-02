@@ -598,7 +598,8 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
       return isClipSegment(s) ? [] : [{ from: at.start, to: at.start + at.length, words: animationWords(s) }];
     }),
     ...layers.flatMap((l) => {
-      const words = l.compose ? "" : motionWords(l.motion);
+      // A composition, or the animation that draws the Reel's own texts: never a reason to clear them.
+      const words = l.compose || l.words ? "" : motionWords(l.motion);
       return words ? [{ from: l.from, to: l.to, words }] : [];
     }),
   ];
