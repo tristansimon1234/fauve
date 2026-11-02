@@ -8,10 +8,10 @@ import { z } from "zod";
 import type { DeleteResult } from "@/components/delete-button";
 import { removePost } from "@/lib/delete-post";
 import { NOT_SCHEDULED, scheduleValidated } from "@/lib/posts";
-import { renderPost } from "@/lib/render/render-post";
 import { knownLayerCode, renderSlides, saveSlides } from "@/lib/render/slides";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { queueRerender } from "@/lib/rerender";
 
 export type PostFormState = { status: "idle" } | { status: "ok" | "error"; message: string };
 
@@ -195,13 +195,8 @@ export async function saveEditPlan(postId: string, input: unknown): Promise<Save
   }
   const version = row.version;
   await db.from("posts").update({ edit_plan_id: row.id }).eq("id", postId);
-  // The final video follows in about a minute; the editor already shows it live.
-  after(() =>
-    renderPost(studioId, postId).then(
-      () => revalidatePath(`/publications/${postId}`),
-      (e) => console.error("saveEditPlan: render failed", postId, e),
-    ),
-  );
+  // The final video follows in its own job (a long composition outlasts this request); the editor already shows it live.
+  after(() => queueRerender({ studioId, postId, silent: true }));
   revalidatePath(`/publications/${postId}`);
   return { ok: true, version };
 }

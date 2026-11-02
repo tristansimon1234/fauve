@@ -3,7 +3,7 @@
 
 import { DEFAULT_EFFORT, EFFORTS, type Effort } from "./effort.ts";
 
-export type JobKind = "montage" | "text_layer" | "elements" | "carousel" | "effect_words";
+export type JobKind = "montage" | "text_layer" | "elements" | "carousel" | "effect_words" | "rerender";
 
 export const JOB_STEPS: Record<JobKind, { stage: string; label: string }[]> = {
   montage: [
@@ -34,6 +34,8 @@ export const JOB_STEPS: Record<JobKind, { stage: string; label: string }[]> = {
   ],
   // Her words on an effect: its own script draws it again, then the music goes on it.
   effect_words: [{ stage: "render", label: "Tes mots sur l’effet" }],
+  // A video made again from the chat (its music, its voice, its text styles): only its render.
+  rerender: [{ stage: "render", label: "Nouvelle version" }],
 };
 
 /**
@@ -57,6 +59,7 @@ export const JOB_KIND_LABELS: Record<JobKind, string> = {
   elements: "Composants",
   carousel: "Carrousel",
   effect_words: "Texte de l’effet",
+  rerender: "Vidéo refaite",
 };
 
 /** No news for this long: the work most likely died (a step never takes this long). */

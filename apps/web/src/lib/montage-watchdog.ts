@@ -64,3 +64,25 @@ export async function reviveStalledMontages(): Promise<{ revived: string[]; fail
   }
   return { revived, failed };
 }
+
+/** A render older than this and still « rendering » died with its function (no render takes this long). */
+const RENDER_DEAD_MINUTES = 30;
+
+/**
+ * Renders whose function was stopped before they were kept: marked failed, so the page stops waiting for them
+ * (a re-render inside the chat's 300 s had stayed « rendering » for ever), and their silent rerender jobs ended.
+ */
+export async function failDeadRenders(): Promise<{ renders: number; jobs: number }> {
+  const db = supabaseAdmin();
+  const before = new Date(Date.now() - RENDER_DEAD_MINUTES * 60_000).toISOString();
+  const { data: renders } = await db.from("renders").update({ status: "failed" }).eq("status", "rendering").lt("created_at", before).select("id");
+  // A rerender job silent for 4 pulses: its function was stopped.
+  const { data: jobs } = await db
+    .from("studio_jobs")
+    .update({ finished_at: new Date().toISOString(), failed: true })
+    .eq("kind", "rerender")
+    .is("finished_at", null)
+    .lt("updated_at", new Date(Date.now() - SILENT_MS).toISOString())
+    .select("id");
+  return { renders: renders?.length ?? 0, jobs: jobs?.length ?? 0 };
+}

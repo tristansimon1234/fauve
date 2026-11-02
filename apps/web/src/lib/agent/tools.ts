@@ -63,6 +63,7 @@ import { bakedReel } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { fewSubjects } from "@/lib/agent/copy-design";
 import { keepModelSound } from "@/lib/model-sound";
+import { queueRerender } from "@/lib/rerender";
 import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus } from "@/lib/montage-status";
 import { publicHistory, publicStatsFor, weekForModel } from "@/lib/social/public-stats";
@@ -71,7 +72,7 @@ import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
 import { AiImageError, canAffordImages, improvePhoto, makeAmbiance, placeOnPost } from "@/lib/ai-images";
-import { deliverImages, notifyFailure, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
+import { deliverImages, notifyFailure, renderSlidesAndDeliver } from "@/lib/render/deliver";
 import { queueJob } from "@/lib/jobs";
 import { missMessage, startSteal } from "@/lib/steal";
 import { readPostMusic, setMusicWish } from "@/lib/render/music";
@@ -797,9 +798,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       );
       if (!post.edit_plan_id) return json({ error: "Cette publication n'a pas encore de montage : lance montage." });
       // A re-render of an unchanged plan: free (no AI work).
-      ctx.afterReply.push(async () => {
-        await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
-      });
+      ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
       return json({
         status: "started",
         note: "Le montage démarre après ta réponse et la vidéo sera envoyée automatiquement (environ une minute). Annonce-le en une phrase, sans décrire la vidéo comme si elle était déjà prête.",
@@ -815,7 +814,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (mode === "model") {
         const sound = await keepModelSound(studioId, post_id, true);
         if (!sound) return json({ error: "Ce Reel ne recopie pas un Reel d'Instagram : il n'y a pas de son à garder. Elle peut le publier sans musique (off) et choisir un son dans Instagram." });
-        if (post.edit_plan_id) ctx.afterReply.push(async () => void (await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId })));
+        if (post.edit_plan_id) ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
         return json({
           status: post.edit_plan_id ? "started" : "ok",
           note: `${post.edit_plan_id ? "La vidéo se refait sans ta musique (1 à 2 min) et le lien part tout seul." : "C'est noté pour son montage."} Elle la publiera elle-même en ajoutant le son (le message de livraison lui explique comment)${sound.business ? " ; son compte Instagram est un compte Entreprise, où Instagram ne propose pas tous les sons : si « Utiliser l'audio » n'apparaît pas, elle te dit « mets ta musique »" : ""}. Dis-le en une phrase.`,
@@ -832,9 +831,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       check(await db.from("posts").update({ music: { ...readPostMusic(now?.music), mode: mode === "off" ? "off" : "on" } }).eq("id", post_id));
       // Not montaged yet: the choice is kept for the montage.
       if (!post.edit_plan_id) return json({ ok: true, note: "C'est noté pour son montage. Continue sans le redire longuement." });
-      ctx.afterReply.push(async () => {
-        await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, freshMusic: mode === "another", conversationId: ctx.conversationId });
-      });
+      ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, freshMusic: mode === "another", conversationId: ctx.conversationId }));
       return json({ status: "started", note: "La vidéo se refait (1 à 2 min) et le lien part tout seul. Dis-le en une phrase." });
     },
 
@@ -866,9 +863,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         if (!rerender) return json({ ok: true, note: "C'est noté : pas de voix sur ce Reel." });
         // The voice is mixed into the video the effects agent drew: it makes the effect again without it.
         if (rerender === "agent") return effectCorrection(post_id, EFFECT_VOICE_OUT, "Edith refait l'effet sans la voix");
-        ctx.afterReply.push(async () => {
-          await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
-        });
+        ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
         return json({ status: "started", note: "La vidéo se refait sans voix (1 à 2 min) et le lien part tout seul. Dis-le en une phrase." });
       }
       const onReel = post.voice_media_id
@@ -1065,7 +1060,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.afterReply.push(async () => {
         try {
           await blurMontage(studioId, post_id, what);
-          await renderAndDeliver({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
+          await queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId });
         } catch (error) {
           await notifyFailure({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId }, "Je n’ai pas réussi à flouter la vidéo cette fois. Tu veux que je réessaie ?", error);
         }
@@ -1213,7 +1208,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           });
           ctx.afterReply.push(async () => {
             const target = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId };
-            await (result.kind === "slides" ? renderSlidesAndDeliver(target) : renderAndDeliver(target));
+            await (result.kind === "slides" ? renderSlidesAndDeliver(target) : queueRerender(target));
           });
           applied = { post_id, texts: result.changed, on: result.kind === "slides" ? "photos" : "montage" };
         } catch (error) {
@@ -1346,7 +1341,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           rendering.add(post_id);
           ctx.afterReply.push(async () => {
             const to = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId };
-            await (result.kind === "slides" ? renderSlidesAndDeliver(to) : renderAndDeliver(to));
+            await (result.kind === "slides" ? renderSlidesAndDeliver(to) : queueRerender(to));
           });
         }
         return json({

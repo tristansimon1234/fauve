@@ -5,11 +5,11 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { readPostMusic } from "@/lib/render/music";
-import { renderPost } from "@/lib/render/render-post";
 import { removeVoice } from "@/lib/voice-over";
 import { z } from "zod";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { queueRerender } from "@/lib/rerender";
 import { keepModelSound } from "@/lib/model-sound";
 
 /** Sets a Reel's cover (a frame of its video or one of the studio's photos); null leaves it to Edith. */
@@ -93,12 +93,8 @@ export async function setMusic(postId: string, mode: "on" | "off" | "another"): 
     .eq("studio_id", studioId)
     .not("status", "in", "(published,measured)");
   if (error) return { ok: false };
-  after(() =>
-    renderPost(studioId, postId, { freshMusic: mode === "another" }).then(
-      () => revalidatePath(`/publications/${postId}`),
-      (e: unknown) => console.error("setMusic: render failed", postId, e),
-    ),
-  );
+  // In its own job: a render and a new piece outlast this request (a piano was composed, then cut off before it was kept).
+  after(() => queueRerender({ studioId, postId, freshMusic: mode === "another", silent: true }));
   revalidatePath(`/publications/${postId}`);
   return { ok: true };
 }
@@ -125,12 +121,7 @@ export async function setVoiceOff(postId: string): Promise<{ ok: boolean }> {
     if ("error" in accepted) return { ok: false };
     after(() => startMontage(studioId, accepted, { request: { via: "page", lines: [{ who: "elle", text: "« Sans voix »" }] } }));
   } else if (again) {
-    after(() =>
-      renderPost(studioId, postId).then(
-        () => revalidatePath(`/publications/${postId}`),
-        (e: unknown) => console.error("setVoiceOff: render failed", postId, e),
-      ),
-    );
+    after(() => queueRerender({ studioId, postId, silent: true }));
   }
   revalidatePath(`/publications/${postId}`);
   return { ok: true };
