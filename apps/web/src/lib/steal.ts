@@ -217,8 +217,8 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
 
 /**
  * The font a copied Reel's title is written in, checked: the candidates Gemini named (by the names Google Fonts serves),
- * its words written in each by the workshop's Chrome, and Gemini picks the row drawn most like the title, or none when
- * none is as fine (her charter's fonts then stay: never a cheap stand-in). Its first name when the check cannot run.
+ * its words written in each by the workshop's Chrome, and Gemini picks the row drawn most like the title, always (a
+ * check that could refuse them all sent a handwritten model back to her charter). Its first name when the check cannot run.
  */
 async function checkedFont(studioId: string, check: { names: string[]; sample: string; seenAt: number }, shots: { from: number; to: number; jpeg: Buffer }[]): Promise<string | null> {
   const served = [...new Set((await Promise.all(check.names.map((n) => googleFont(n).catch(() => null)))).filter((n): n is string => Boolean(n)))];
@@ -232,10 +232,9 @@ async function checkedFont(studioId: string, check: { names: string[]; sample: s
     console.warn("steal: font pick failed", error instanceof Error ? error.message.slice(0, 200) : error);
     return null;
   });
-  if (choice === null) return loaded[0] ?? null;
-  if (choice === 0) return null;
+  if (choice === null) return loaded[0] ?? served[0]!;
   // A row drawn in a fallback font (its family did not load) is no answer.
-  return sheet.loaded[choice - 1] ? served[choice - 1]! : (loaded[0] ?? null);
+  return sheet.loaded[choice - 1] ? served[choice - 1]! : (loaded[0] ?? served[0]!);
 }
 
 /** A Reel's style read at once (the lab, a share on Instagram): its inspiration made, read, and the example dropped. */

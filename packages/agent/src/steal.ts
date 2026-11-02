@@ -69,11 +69,11 @@ export const stolenLookReadingSchema = z.object({
     font: z
       .string()
       .describe(
-        "Seulement si la police de ses titres fait son style (on ne reconnaîtrait pas ce Reel avec une autre : très condensée, manuscrite, de bande dessinée, rétro, à forts empattements…) : la famille Google Fonts qui lui ressemble le plus à l'œil, épaisseur du trait comprise (une écriture fine au stylo n'est pas une écriture au feutre), aussi soignée que l'originale (jamais une écriture enfantine ou bon marché pour une écriture fine), au nom exact (ex. « Anton », « Bangers »). Sinon une chaîne vide : un sans-serif ordinaire ne fait pas un style",
+        "Seulement si la police de ses titres fait son style (on ne reconnaîtrait pas ce Reel avec une autre : très condensée, manuscrite, de bande dessinée, rétro, à forts empattements…) : la famille Google Fonts qui lui ressemble le plus à l'œil, épaisseur du trait comprise (une écriture fine au stylo n'est pas une écriture au feutre), au nom exact (ex. « Anton », « Bangers »). Sinon une chaîne vide : un sans-serif ordinaire ne fait pas un style",
       ),
     font_alternatives: z
       .array(z.string())
-      .describe("Si font n'est pas vide : 2 autres familles Google Fonts proches, au même trait et aussi soignées, de la plus proche à la moins proche, au nom exact. Sinon une liste vide"),
+      .describe("Si font n'est pas vide : 4 autres familles Google Fonts proches, au même trait, de la plus proche à la moins proche, au nom exact. Sinon une liste vide"),
     stroke: z
       .enum(["thin", "regular", "thick"])
       .describe("L'épaisseur du trait des lettres de ses titres : thin (fin, comme au stylo ou une ligne fine), regular, thick (épais, comme au feutre ou très gras)"),
@@ -212,23 +212,22 @@ export function clampLook(reading: StolenLookReading): StolenLook {
 
 /**
  * The read font checked against what the Reel shows: its title's frame, then its words written in each candidate,
- * one row each. The closest row, or none (0) when none is as fine and refined: the Reel then keeps her charter's
- * fonts rather than a cheap stand-in (Tristan: « faut surtout pas que ça fasse cheap »).
+ * one row each; the closest row is kept, always (a check that could refuse them all sent a handwritten model back to
+ * her charter's fonts; Tristan: « enlève le contrôle cheap, il ferme trop de portes »).
  */
 export const FONT_PICK_PROMPT = `The first image is a frame of an Instagram Reel with its title written on it. The second image writes the same words in candidate Google Fonts, one row each, numbered in yellow.
-Which row is drawn most like the Reel's title: the shape of its letters, the thickness of its strokes (a fine pen is not a felt pen), its slant, its spacing, how refined it looks? Judge the lettering only, not its size or colour.
-Answer 0 when no row is as fine and refined as the Reel's lettering: a cheap, childish or clip-art lettering never stands for a fine one, and the Reel keeps the business's own fonts instead.`;
+Which row is drawn most like the Reel's title: the shape of its letters, the thickness of its strokes (a fine pen is not a felt pen), its slant, its spacing? Judge the lettering only, not its size or colour. Always name the closest row, even when none is exact.`;
 
 export const fontPickSchema = z.object({
-  choice: z.number().int().describe("The number of the closest row, or 0 when none is as fine and refined as the Reel's title"),
+  choice: z.number().int().describe("The number of the closest row"),
   why: z.string().describe("In a few words, why"),
 });
 
-/** What checks a read font: its name and alternatives (at most 3 families), its words as written and when they show. */
+/** What checks a read font: its name and alternatives (at most 5 families), its words as written and when they show. */
 export function fontCheckOf(reading: StolenLookReading): { names: string[]; sample: string; seenAt: number } {
   const names = [reading.text.font, ...reading.text.font_alternatives].map((n) => n.trim()).filter((n) => FONT_FAMILY.test(n));
   return {
-    names: [...new Set(names)].slice(0, 3),
+    names: [...new Set(names)].slice(0, 5),
     sample: clip(reading.text.sample.replace(/\s+/g, " "), 60),
     seenAt: Number.isFinite(reading.text.seen_at) ? Math.max(0, reading.text.seen_at) : 0,
   };
@@ -250,9 +249,10 @@ export const stolenStyleSchema = z.object({
  * The version of the reading: 2 watches every shot (stealFps, an image per shot) and names the cut-outs
  * laid over shots. Tristan's link sent again reused the reading made before, « plein cadre » without them.
  * 3 reads how its words are drawn (their strokes, lines, tilt and shadow) and checks its font against
- * candidates written out (Tristan: « la police un peu naze… pas fine comme sur le Reel envoyé »).
+ * candidates written out (Tristan: « la police un peu naze… pas fine comme sur le Reel envoyé »). 4 keeps the closest
+ * of five, always: 3 could refuse them all, and the Reel fell back on her charter's fonts.
  */
-export const STEAL_READER = 3;
+export const STEAL_READER = 4;
 
 /** A kept reading as good as a new one: made by the current reader. */
 export const currentReading = (style: unknown): boolean => {
@@ -262,7 +262,7 @@ export const currentReading = (style: unknown): boolean => {
 export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
 export const STEAL_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (studio, salon, restaurant, shop…). The person who runs the business wants to take this Reel's style for theirs: read it as a pro editor who wants to remake its style, not its content.
-Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once, an object or a person cut out of another image and laid over some shots), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, the thickness of its strokes (a fine pen is not a felt pen), letter spacing, key word, background under the sentence, place, alignment, its lines aligned or staggered, its tilt, its shadow; its font and its colours only when they make its style, the font named with two alternatives as refined as it: a cheap, childish or clip-art lettering never stands for a fine one), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
+Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once, an object or a person cut out of another image and laid over some shots), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, the thickness of its strokes (a fine pen is not a felt pen), letter spacing, key word, background under the sentence, place, alignment, its lines aligned or staggered, its tilt, its shadow; its font and its colours only when they make its style, the font named with four close alternatives), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
 You also get a sharp image from the middle of each of its shots, with its time: look at every one, since a shot of a third of a second counts and the video's frames can fall between two. A cut-out laid over a shot (a drink, a phone booth, a bag, a person, without or with a white border) is part of its style, even when it stays a few tenths of a second: say it in the layout, and make each one its own moment, every one of them and not only the first (when, what, where, how big, border or not).
 Copy neither its words, nor its images, nor the name of its music: describe a form another business can reuse. In your French, make no feminine or masculine agreement for the person who runs the business. In French, except « music » in English.`;
 

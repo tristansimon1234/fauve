@@ -5197,7 +5197,7 @@ test("a word lost on the picture under it is found, and one with its own edge is
 
 test("a copied Reel's words keep their drawing, and its font is checked among close candidates", async () => {
   const { clampLook, fontCheckOf, stolenLookSchema, textDrawingWords, STEAL_READER } = await import("./steal.ts");
-  assert.equal(STEAL_READER, 3);
+  assert.equal(STEAL_READER, 4);
   const reading = {
     name: "message manuscrit",
     format: "message" as const,

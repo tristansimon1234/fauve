@@ -118,7 +118,7 @@ const PICK_SCHEMA = geminiSchema(fontPickSchema);
 
 /**
  * Which candidate font writes the Reel's title most like it does (`frame`: the Reel with its title; `sheet`: the same
- * words in each candidate, rows numbered from 1): its number, 0 when none is as fine, null when the answer is unusable.
+ * words in each candidate, rows numbered from 1): its number, null when the answer is unusable.
  */
 export async function pickStolenFont(studioId: string, frame: Buffer, sheet: Buffer, count: number): Promise<number | null> {
   const model = env("GEMINI_MODEL");
@@ -138,5 +138,5 @@ export async function pickStolenFont(studioId: string, frame: Buffer, sheet: Buf
   });
   await logGeminiCost({ studioId, kind: "video_analysis", model, usage: response.usageMetadata as GeminiUsage, meta: { purpose: "steal_font", candidates: count } });
   const answer = readAnswer(fontPickSchema, JSON.parse(response.text ?? "null"));
-  return answer.choice >= 0 && answer.choice <= count ? answer.choice : null;
+  return answer.choice >= 1 && answer.choice <= count ? answer.choice : null;
 }
