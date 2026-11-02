@@ -171,6 +171,22 @@ export function placeSounds(
   });
 }
 
+/**
+ * The sounds she asked for on what appears (her contract's asked_sounds), on the plan's clock: one on each text as it
+ * appears, or on each cut, kept whatever the level (`asked`). Placed again on every version, so they follow its texts.
+ */
+export function askedSounds(plan: Pick<EditPlan, "texts">, starts: { start: number }[], asked: { on: "texts" | "cuts"; sound: string }[]): SfxCue[] {
+  const cues = asked.flatMap((a) =>
+    (a.on === "texts" ? plan.texts.map((t) => t.from) : starts.map((s) => s.start).filter((t) => t > 0.05)).map((at) => ({
+      at: Math.round(at * 1000) / 1000,
+      sound: a.sound.trim().slice(0, 60),
+      seconds: 0.5,
+      asked: true,
+    })),
+  );
+  return cues.filter((c) => c.sound.length >= 2).slice(0, 40);
+}
+
 /** The ffmpeg filter that prints a sound's level (RMS, dB) every `step` seconds. */
 export const soundLevelsFilter = (step: number) =>
   `aresample=16000,asetnsamples=n=${Math.round(16000 * step)}:p=0,astats=metadata=1:reset=1,ametadata=mode=print:key=lavfi.astats.Overall.RMS_level`;

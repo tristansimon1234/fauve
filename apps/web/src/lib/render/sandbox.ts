@@ -370,7 +370,11 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps): Promi
 }
 
 /** Renders the Reel composition with the given props and returns the MP4 bytes. */
-export async function renderReelInSandbox(job: { id: string; props: ReelProps }): Promise<Buffer> {
+/**
+ * A Reel rendered by Remotion. A frame of her video waits 60 s at most (the default 28 s gave up on a workshop busy
+ * with another render, and the Reel fell back to the plain ffmpeg engine); `patient`, a second try: 2 minutes, two tabs.
+ */
+export async function renderReelInSandbox(job: { id: string; props: ReelProps; patient?: boolean }): Promise<Buffer> {
   return withRemotion(RENDER_WAIT_MS, async (sandbox) => {
     const dir = `${ROOT}/jobs/${job.id}`;
     const media = `${REMOTION}/build/public/jobs/${job.id}`;
@@ -380,7 +384,7 @@ export async function renderReelInSandbox(job: { id: string; props: ReelProps })
       await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(props) }]);
       await bash(
         sandbox,
-        `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=4 --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --enforce-audio-track --log=error`,
+        `cd ${REMOTION} && npx remotion render build Reel "$1/out.mp4" --props="$1/props.json" --concurrency=${job.patient ? 2 : 4} --timeout=${job.patient ? 120000 : 60000} --codec=h264 --crf=18 --jpeg-quality=95 --pixel-format=yuv420p --enforce-audio-track --log=error`,
         [dir],
       );
       const mp4 = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });

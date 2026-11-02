@@ -5891,6 +5891,11 @@ test("sound effects: placed by who wrote them, spaced, never under speech when l
     [[0.5, true], [1.2, true], [1.9, true], [2.6, true], [3.3, true]],
   );
   assert.deepEqual(pickCues(words, { level: "off", duration: 8, speech: [] }), []);
+  // The sounds her contract asked for on what appears: one on each text, or on each cut (never at 0).
+  const { askedSounds } = await import("./sfx.ts");
+  const asked = askedSounds({ texts: [{ from: 0 }, { from: 4.2 }, { from: 5.6 }] } as never, [{ start: 0 }, { start: 4.2 }, { start: 5.6 }], [{ on: "texts", sound: "light click" }]);
+  assert.deepEqual(asked.map((c) => [c.at, c.sound, c.asked]), [[0, "light click", true], [4.2, "light click", true], [5.6, "light click", true]]);
+  assert.deepEqual(askedSounds({ texts: [] } as never, [{ start: 0 }, { start: 3 }], [{ on: "cuts", sound: "soft whoosh" }]).map((c) => c.at), [3]);
   // Lower under the voice than the level's own, never left out.
   assert.equal(sfxGain({ lufs: -20, peak: -12 }, "voice_over", "light", true), SFX_RULES.light.target.voice_over - 8 + 20);
   // Its loudest 400 ms on the target, its peak under -4 dBFS.

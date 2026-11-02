@@ -45,6 +45,7 @@ import {
   openingCandidates,
   planHook,
   planTimeline,
+  askedSounds,
   voiceAt,
   voiceForEditor,
   buildReelProps,
@@ -457,10 +458,20 @@ export async function designEdit(params: {
   // Her videos whole and horizontal on black (her contract): the engine draws it on every version.
   // A correction keeps it (its request is about something else).
   const letterbox = params.contract?.frame === "letterbox" || (correction && base?.frame === "letterbox");
+  // The sounds she asked for on what appears (her contract), placed on each version's texts or cuts; a correction
+  // keeps those of the version it corrects.
+  const asking = params.contract?.asked_sounds?.length
+    ? params.contract.asked_sounds
+    : correction
+      ? [...new Map((base?.sounds ?? []).filter((c) => c.asked).map((c) => [c.sound, { on: "texts" as const, sound: c.sound }])).values()]
+      : [];
   const framed = (p: EditPlan): EditPlan => {
     const next: EditPlan = { ...p };
     if (letterbox) next.frame = "letterbox";
     else delete next.frame;
+    const sounds = asking.length ? askedSounds(next, planTimeline(next).segments, asking) : [];
+    if (sounds.length) next.sounds = sounds;
+    else delete next.sounds;
     return next;
   };
   plan = framed(plan);

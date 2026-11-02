@@ -428,8 +428,8 @@ export const editPlanObjectSchema = z.object({
   overlays: z.array(planOverlaySchema).max(MAX_OVERLAYS).optional(),
   /** Her videos kept whole and horizontal, on black above and below (her request, read by her contract): the engine draws it. */
   frame: z.enum(["letterbox"]).optional(),
-  /** The editor's sound effects on its cuts and texts, on the Reel's clock (each animation brings its own). */
-  sounds: z.array(sfxCueSchema).max(8).optional(),
+  /** Sound effects on the Reel's clock: those she asked for on each text or cut (her contract), placed by the engine. */
+  sounds: z.array(sfxCueSchema).max(40).optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {

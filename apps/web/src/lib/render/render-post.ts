@@ -441,19 +441,25 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         engine = "remotion";
         durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
       } catch (error) {
-        // A collage's composition that broke the render gives way to the printed collage; photos, blurred
-        // zones or her voice: the ffmpeg engine cannot render them, Remotion gets a second try.
+        // Remotion always gets a second, more patient try (a frame of her video waited on a busy workshop: the Reel
+        // fell back to ffmpeg, which draws neither her black bars nor the hook's animation). A collage's composition
+        // that broke the render gives way to the printed collage. Photos, blurred zones or her voice: the ffmpeg
+        // engine cannot render them; anything else falls back to it only after that second try.
         const composed = Boolean(props.layers?.some((l) => l.compose));
-        if (composed || needsBlur || photoIds.length || plan.voice) {
-          console.error("remotion render failed, trying again", renderId, composed ? "without its composition" : "", error);
-          const layers = props.layers?.filter((l) => !l.compose);
-          mp4 = await renderReelInSandbox({ id: `${renderId}-again`, props: { ...props, layers: layers?.length ? layers : undefined } });
+        console.error("remotion render failed, trying again", renderId, composed ? "without its composition" : "", error);
+        const layers = props.layers?.filter((l) => !l.compose);
+        const again = await renderReelInSandbox({ id: `${renderId}-again`, props: { ...props, layers: layers?.length ? layers : undefined }, patient: true }).catch(
+          (second: unknown) => {
+            if (composed || needsBlur || photoIds.length || plan.voice) throw second;
+            console.error("remotion failed twice, falling back to ffmpeg", renderId, second);
+            return null;
+          },
+        );
+        if (again) {
+          mp4 = again;
           engine = "remotion";
           durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
-        } else {
-          console.error("remotion render failed, falling back to ffmpeg", renderId, error);
-          mp4 = await ffmpegRender();
-        }
+        } else mp4 = await ffmpegRender();
       }
     } else {
       mp4 = await ffmpegRender();

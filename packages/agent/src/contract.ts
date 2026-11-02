@@ -54,6 +54,15 @@ export const reelContractSchema = z.object({
    * et en dessous »): the engine draws it, never a composition (a 17 s Reel took 12 min to render that way).
    */
   frame: z.enum(["vertical", "letterbox"]).default("vertical"),
+  /**
+   * Sounds she asks to hear on what appears (« un petit clic léger à chaque mot qui apparaît »): on each text, or on
+   * each cut, the sound in a few generic English words. The engine places them, whoever draws the texts (a Reel with
+   * no animation had no one to place her clicks).
+   */
+  asked_sounds: z
+    .array(z.object({ on: z.enum(["texts", "cuts"]), sound: z.string().max(60) }))
+    .max(3)
+    .default([]),
 });
 export type ReelContract = z.infer<typeof reelContractSchema>;
 
@@ -70,6 +79,7 @@ export const CONTRACT_PROMPT = `You read a person's request for a Reel and note,
 - musts: everything else they explicitly ask for this Reel (a mood, a background, a universe, a rhythm, things to show), in their words, one thing per line.
 - A correction of a Reel that already has its voice-over also gets « Texte actuel de la voix ». When the request changes only part of this text (a word, a pronunciation, a sentence, the ending) or quotes only a piece of it, voice_text is the current text IN FULL with only that change made, nothing else cut or rewritten (verbatim): a quoted piece is never the whole text. Only a request that gives a whole new text, or asks for it to be rewritten, replaces it. When they say the voice stops too early, doesn't go to the end or must say more, voice_text is the current text in full and voice_text_rest what it must still say (what their original request describes and is missing). With no change to the voice asked for, voice_text stays null.
 - music: what they ask for the music of this Reel (instruments, genre, mood, pace, what they leave out), written in English for a composer, faithful to their words, nothing added; null when they say nothing about the music.
+- asked_sounds: sound effects they ask to hear each time something appears: on « texts » (each word or text that appears) or on « cuts » (each change of shot), the sound in a few generic English words (« light click », « soft whoosh »); empty when they ask for none.
 - frame: « letterbox » when they want their videos to stay whole and horizontal, with black (or bands) above and below, instead of filling the vertical frame; otherwise « vertical ».
 - redraw: for a correction, true only when they ask to change what the layout or its animations draw (the arrangement, the split screen, the interface, an effect, a graphic element, the background, their motion or their style); false when they only touch the voice, the subtitles, the words of a text, the music, the length, the caption, the order or the choice of shots. For a new Reel: true.`;
 
@@ -90,6 +100,7 @@ export const EMPTY_CONTRACT: ReelContract = {
   music: null,
   redraw: true,
   frame: "vertical",
+  asked_sounds: [],
 };
 
 /** Nothing fixed: the defaults decide everything. */
@@ -106,7 +117,8 @@ export const contractIsEmpty = (c: ReelContract | null | undefined): boolean =>
     c.call_to_action === "libre" &&
     !c.musts.length &&
     !c.music &&
-    c.frame !== "letterbox");
+    c.frame !== "letterbox" &&
+    !c.asked_sounds?.length);
 
 /** The contract in plain lines, for the editor, the voice-over writer and the critic (only what she fixed). */
 export function contractLines(c: ReelContract | null | undefined): string[] {
@@ -123,6 +135,7 @@ export function contractLines(c: ReelContract | null | undefined): string[] {
       ? "Cadre : ses vidéos entières et horizontales, sur du noir au-dessus et en dessous ; le moteur les pose ainsi (form montage, jamais une composition pour ça), les textes restent les tiens"
       : null,
     c.layout ? `Mise en page : ${c.layout}` : null,
+    ...(c.asked_sounds ?? []).map((s) => `Bruitage demandé : « ${s.sound} » à ${s.on === "texts" ? "chaque texte qui apparaît" : "chaque coupe"} (posé par le moteur)`),
     c.screen_text ? `Texte à l'écran, mot pour mot (orthographe corrigée) : « ${c.screen_text} »` : null,
     c.ending ? `Fin : ${c.ending}` : null,
     c.call_to_action === "aucune" ? "Aucune invitation à la fin" : c.call_to_action === "la_sienne" && c.call_to_action_text ? `Invitation à la fin, la sienne : « ${c.call_to_action_text} »` : null,
