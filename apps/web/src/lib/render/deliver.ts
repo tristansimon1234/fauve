@@ -1,5 +1,5 @@
 import "server-only";
-import { CREDIT_PRICES, PUBLISH_OFFER_OPTIONS, publishQuestion, publishWhen, shortSentence, STYLE_CHECK_OPTIONS, offersLine } from "@fauve/agent";
+import { PUBLISH_OFFER_OPTIONS, publishQuestion, publishWhen, shortSentence, STYLE_CHECK_OPTIONS, offersLine, deliveryWords } from "@fauve/agent";
 import { studioAccess } from "@/lib/billing/access";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { socialConnect } from "@/lib/social/connect";
@@ -168,28 +168,22 @@ export async function deliverMontage(target: DeliveryTarget, r: { title: string;
   const offer = unlocked && !styleCheck ? await publishOffer(target).catch(() => null) : null;
   // Short paragraphs, the link right under the first line: it is the one action.
   const intro = `Ton montage « ${r.title} » est prêt 🎬${seconds ? ` (${seconds} s)` : ""}.`;
-  const voiceLine = target.voice
-    ? `J’ai posé une voix off dessus (${target.voice}) : si tu le préfères sans, ou avec une autre voix, dis-le-moi.`
-    : target.spokenKept
-      ? "Quelqu’un parle dans ta vidéo : j’ai gardé ses paroles plutôt que de poser une voix off par-dessus. Tu veux quand même une voix off ? Dis-moi ce qu’elle doit raconter."
-      : "";
+  // Short (Tristan: « un user aura la flemme de tout lire »): what she must know, the video shows the rest.
+  const voiceLine = target.voice ? `Voix off : ${target.voice}.` : target.spokenKept ? "J’ai gardé les paroles de ta vidéo plutôt qu’une voix off." : "";
   // No quote before: what it used is said once it is there.
-  const costLine = unlocked && target.cost?.credits ? `Ça a utilisé ${target.cost.credits} crédit${target.cost.credits > 1 ? "s" : ""}, il t’en reste ${target.cost.left}.` : "";
-  // The editor's and the critic's words are the model's: no stray markup (« </br> ») reaches her.
-  const notes = [plainText(target.rationale), plainText(target.care), voiceLine, offer ? "" : costLine].filter(Boolean).join("\n\n");
+  const costLine = unlocked && target.cost?.credits ? `${target.cost.credits} crédit${target.cost.credits > 1 ? "s" : ""} utilisé${target.cost.credits > 1 ? "s" : ""}, il t’en reste ${target.cost.left}.` : "";
+  // The editor's and the critic's words are the model's: no stray markup (« </br> ») reaches her; of the editor's, only a limit.
+  const notes = [plainText(deliveryWords(target.rationale)), plainText(target.care), voiceLine, offer ? "" : costLine].filter(Boolean).join("\n\n");
   // One question at the end: publish it, or (first Reel) does it look like her.
   const after = offer
     ? [offer.question, costLine].filter(Boolean).join("\n")
-    : [
-        !unlocked
-          ? `Pour le voir en entier et le publier, abonne-toi : ${offersLine()}, sans engagement.`
-          : styleCheck ? "Ça te ressemble ? Dis-moi si tu le veux plus rapide, avec moins de texte, plus chaleureux ou autrement : je retiens ton style pour tous les prochains." : socialConnect() ? "Valide-le sur sa page, ou dis-moi ce que tu veux changer." : "Pour le poster, touche « Partager » sur sa page depuis ton téléphone : Instagram s’ouvre avec, sa légende déjà copiée. Ou dis-moi ce que tu veux changer.",
-        target.offerVariant === false || styleCheck || !unlocked
-          ? ""
-          : `Je peux aussi te faire une variante avec une autre accroche pour ${CREDIT_PRICES.variant} crédit${CREDIT_PRICES.variant > 1 ? "s" : ""}.`,
-      ]
-        .filter(Boolean)
-        .join(" ");
+    : !unlocked
+      ? `Pour le voir en entier et le publier, abonne-toi : ${offersLine()}, sans engagement.`
+      : styleCheck
+        ? "Ça te ressemble ?"
+        : socialConnect()
+          ? "Valide-le sur sa page, ou dis-moi quoi changer."
+          : "";
   const options = offer ? PUBLISH_OFFER_OPTIONS : styleCheck ? STYLE_CHECK_OPTIONS : undefined;
   const payload = { posts: [target.postId], open_post: target.postId, ...(options ? { options } : {}), ...(offer ? { publish_offer: target.postId } : {}) };
   if (target.note) {

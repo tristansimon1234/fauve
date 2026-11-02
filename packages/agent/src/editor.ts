@@ -790,3 +790,33 @@ export function capStillRepeats<T extends { segments: PlanSegment[] }>(plan: T, 
   });
   return segments.length === plan.segments.length ? plan : { ...plan, segments };
 }
+
+/** Its sentences, never cut inside a quote (« Pas d'app à télécharger. Pas de montage. »). */
+function sentencesOf(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
+    if (c === "«" || c === "“") depth++;
+    else if ((c === "»" || c === "”") && depth > 0) depth--;
+    else if (depth === 0 && /[.!?…]/.test(c) && (i + 1 === text.length || /\s/.test(text[i + 1]!))) {
+      out.push(text.slice(start, i + 1).trim());
+      start = i + 1;
+    }
+  }
+  const rest = text.slice(start).trim();
+  return rest ? [...out, rest] : out;
+}
+
+/**
+ * What a delivery says of the editor's words: what she must know (a limit, what to film, a length it
+ * could not keep), never its first sentence on its main choice, which the video shows (Tristan: « un user
+ * aura la flemme de tout lire »). The engine's own notes (« Je n'ai pas réussi… ») are said whole.
+ */
+export function deliveryWords(rationale: string | null | undefined): string {
+  const sentences = sentencesOf((rationale ?? "").trim());
+  if (!sentences.length) return "";
+  if (/^je n['’]ai pas (réussi|pu)/i.test(sentences[0]!)) return sentences.join(" ");
+  return sentences.slice(1).join(" ");
+}

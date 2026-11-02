@@ -93,7 +93,7 @@ export function weeklyReportText(report: { figures: string[]; summary: string; l
   return [
     `Ton bilan de la semaine : ${a}, ${b} et ${c}.`,
     sentence(report.summary),
-    ...(report.lesson ? [`Ce que je retiens : ${sentence(report.lesson)}`] : []),
+    // Short (Tristan: « un user aura la flemme de tout lire »): the figures, one sentence, the idea.
     ...(report.idea ? [`Mon idée pour cette semaine : ${sentence(report.idea)} Je te la prépare ?`] : []),
   ].join("\n\n");
 }

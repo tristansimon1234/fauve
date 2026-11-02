@@ -74,3 +74,33 @@ export function upsetLevel(text: string | null | undefined): "sad" | "angry" | "
 export function isSweet(text: string | null | undefined): boolean {
   return /😘|🥰|😍|\b(?:t['’]es (?:géniale|top|la meilleure|un amour|trop forte|parfaite)|tu es (?:géniale|la meilleure|un amour|parfaite|top|trop forte)|je t['’]adore|je t['’]aime|qu['’]est-ce que je ferais sans toi)\b/iu.test(text ?? "");
 }
+
+/** Lower case, the typographic apostrophe and the end's punctuation and emojis set aside. */
+const plainAsk = (text: string | null | undefined) =>
+  (text ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/’/g, "'")
+    .replace(/[\s!.…?\p{Extended_Pictographic}\u{FE0F}]+$/u, (end) => (end.includes("?") ? "?" : ""))
+    .trim();
+
+/**
+ * « Alors ? », « ? », « c'est bon ? »: she is waiting for what is under way. While Edith answers
+ * or a montage runs, a ⏳ says it without a turn (two turns at once had launched two Reels).
+ */
+export function isChaser(text: string | null | undefined): boolean {
+  const t = plainAsk(text);
+  return /^(\?|(et )?alors ?\??|c'est bon ?\?|ça (avance|vient|donne quoi) ?\?|ca (avance|vient) ?\?|(tu es|t'es) là ?\?|des nouvelles ?\?|toujours (rien|pas) ?\?|c'est prêt ?\?|c'est pret ?\?|et maintenant ?\?|allô ?\?|allo ?\?|hello ?\?)$/u.test(t);
+}
+
+/**
+ * A thank-you or an okay that needs nothing more (« merci », « top », « ok »), when Edith asked
+ * nothing: a reaction, ❤️ for thanks and 👍 for the rest, without a turn. Null for anything else.
+ */
+export function ackFor(text: string | null | undefined): Reaction | null {
+  const t = plainAsk(text);
+  if (t.endsWith("?")) return null;
+  if (/^(merci+|merci (beaucoup|bcp|edith|à toi|a toi)|thanks|thx|top merci|super merci|parfait merci|génial merci)$/u.test(t)) return "❤️";
+  if (/^(top|parfait|super|génial|genial|cool|nickel|trop bien|ok|okay|oki|okk|d'accord|dac|ça marche|ca marche|yes|vu|noté|note|bien reçu|reçu|recu|parfait top|top top|super top)$/u.test(t)) return "👍";
+  return null;
+}

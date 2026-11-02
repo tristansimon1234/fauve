@@ -271,31 +271,39 @@ export function measuresLine(measures: ReelMeasures): string {
   ].join(" ; ");
 }
 
-/**
- * What her Reel keeps of hers: her images always, her font unless the copied Reel's makes its style; its
- * colours only if they suit her Reel (the editor decides, with her charter and her request in front of it).
- */
-function keptWords(look: StolenLook): string {
-  const font = Boolean(look.text.font);
-  const colors = Boolean(look.colors?.length);
-  if (font && colors) return "Avec tes images, une police comme la sienne (elle fait son style), et ses couleurs si elles vont à ton Reel";
-  if (font) return "Avec tes couleurs et tes images, et une police comme la sienne (elle fait son style)";
-  if (colors) return "Avec tes polices et tes images, et ses couleurs si elles vont à ton Reel";
-  return "Avec tes couleurs, tes polices et tes images";
-}
 
 /**
  * What Edith sends once she has read the Reel: what she takes from it for hers. `making`: her
  * Reel is already on its way in this style; else she is asked for her videos or photos.
  */
 export function stolenStyleMessage(style: StolenStyle, making: boolean): string {
+  // Short (Tristan: « un user aura la flemme de tout lire »): what her Reel takes, in a few words each.
+  const taken = stolenStyleShort(style);
+  const list = taken.length > 1 ? `${taken.slice(0, -1).join(", ")} et ${taken.at(-1)}` : (taken[0] ?? "sa façon de faire");
+  return `J’ai regardé ton modèle 👀 Je reprends ${list}${making ? ". Ton Reel arrive dans quelques minutes." : ". Envoie-moi tes photos et vidéos."}`;
+}
+
+const FORMAT_SHORT: Record<StolenLook["format"], string> = {
+  message: "sa phrase tenue à l'écran",
+  raconte: "sa voix qui raconte",
+  pov: "sa visite en point de vue",
+  collage: "son collage",
+  autre: "",
+};
+
+/** What her Reel takes from the copied one, a few words each: its form, its pace, what is laid over, its font, its effect, its ending. */
+export function stolenStyleShort(style: StolenStyle): string[] {
+  const { look, measures } = style;
+  const perShot = secondsPerShot(measures);
+  const laid = composedLayout(look);
   return [
-    `J’ai regardé ce Reel 👀 Voilà ce que je reprends pour ${making ? "le tien" : "ton prochain Reel"} :`,
-    stolenStyleLines(style).join("\n"),
-    `${keptWords(style.look)} : sa façon de faire, jamais ses images ni ses mots. ${
-      making ? "Ton Reel arrive dans quelques minutes." : "Envoie-moi tes vidéos ou tes photos (ou dis-moi lesquelles prendre) et je te fais le tien comme ça."
-    }`,
-  ].join("\n\n");
+    FORMAT_SHORT[look.format],
+    measures.cuts.length ? (perShot <= 0.8 ? "ses plans très rapides" : perShot <= 1.6 ? "ses plans rapides" : "ses plans posés") : "",
+    laid ? (/détour/i.test(laid) ? "ses détourages posés par-dessus" : "sa mise en page") : "",
+    look.text.font ? "sa police" : "",
+    look.effect === "dust" ? "sa poussière de pellicule" : look.effect === "grain" ? "son grain" : "",
+    /\bnoir/i.test(look.ending) ? "sa fin sur fond noir" : "",
+  ].filter(Boolean);
 }
 
 /** Why it could not be read, and what she can do instead. */

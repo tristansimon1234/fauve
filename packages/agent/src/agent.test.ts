@@ -3757,15 +3757,13 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   assert.match(measuresLine(style.measures), /durée 12 s ; 7 coupes franches \(un plan toutes les 1,5 s\) ; un rythme régulier à 118 BPM ; volume -14 LUFS/);
   assert.match(measuresLine({ duration: 9, cuts: [], bpm: null, lufs: null }), /aucune coupe franche.*pas de rythme régulier.*pas de son/);
   // For her next Reel (her files asked for), or for the one on its way.
+  // Short (« un user aura la flemme de tout lire »): what her Reel takes, a few words each, in one sentence.
   const next = stolenStyleMessage(style, false);
-  assert.match(next, /^J’ai regardé ce Reel/);
-  assert.match(next, /pour ton prochain Reel/);
-  assert.equal(next.split("\n").filter((l) => /^(La forme|Le texte|L'ambiance) : /.test(l)).length, 3);
-  assert.doesNotMatch(next, /• /);
-  assert.match(next, /jamais ses images ni ses mots/);
-  assert.match(next, /Envoie-moi tes vidéos ou tes photos/);
+  assert.match(next, /^J’ai regardé ton modèle 👀 Je reprends sa phrase tenue à l'écran, ses plans rapides/);
+  assert.match(next, /Envoie-moi tes photos et vidéos\.$/);
+  assert.doesNotMatch(next, /\n/);
+  assert.ok(next.split(/\s+/).length <= 40);
   const making = stolenStyleMessage(style, true);
-  assert.match(making, /pour le tien/);
   assert.match(making, /arrive dans quelques minutes/);
   assert.doesNotMatch(making, /Envoie-moi/);
   // A link that does not open: the other ways in, with Edith's account when there is one.
@@ -3974,11 +3972,10 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
   assert.match(followedForEditor(split).mise_en_page ?? "", /écran partagé.*composition/);
   assert.match(followedLine(split), /mise en page : écran partagé/);
   assert.match(followedLine(followed), /sa police \(Anton\).*ses couleurs \(#ffdd00.*seulement si elles servent ce Reel.*jamais un défaut/);
-  // She is told what her Reel takes from it: its colours only if they suit hers.
-  assert.match(stolenStyleMessage(style, true), /une police comme la sienne \(elle fait son style\), et ses couleurs si elles vont à ton Reel/);
-  assert.match(stolenStyleMessage({ ...style, look: { ...look, colors: undefined } }, true), /Avec tes couleurs et tes images, et une police comme la sienne/);
+  // She is told in a few words what her Reel takes from it: its font when it makes its style.
+  assert.match(stolenStyleMessage(style, true), /sa police/);
   const plain = { ...look, text: { ...oldText }, colors: undefined };
-  assert.match(stolenStyleMessage({ ...style, look: plain }, false), /Avec tes couleurs, tes polices et tes images : sa façon de faire/);
+  assert.doesNotMatch(stolenStyleMessage({ ...style, look: plain }, false), /sa police/);
 
   // The Reel's own colours go over her charter's: the accent first, her colours after them in the palette.
   const brand = resolveReelBrand({ fonts: { display: "Anton" }, colors: ["#ffdd00"] }, "libre", { name: "Lou", accent: "#5b3fd9", colors: ["#5b3fd9", "#fbf7f4"], fonts: ["Fraunces", "Inter"] });
@@ -4628,10 +4625,10 @@ test("Edith's plan: 3 to 6 short points, a title and why, kept for the montage; 
   assert.match(planMessage(advised), /Conseil : ouvrir sur la coupe finie/);
   assert.doesNotMatch(validatedPlanBrief(advised), /Conseil/);
   assert.match(validatedPlanBrief(advised), /- Accroche : ton logo\n[\s\S]*\nPourquoi : On voit tout le travail\.$/);
-  // In the chat, the code writes it under Edith's words: title, points, why; buttons a WhatsApp button holds.
+  // In the chat, the code writes it under Edith's words: title and points (short), her advice only; buttons a WhatsApp button holds.
   assert.equal(
     planMessage({ title: "Pauline ouvre son studio", points: ["Ouverture : Pauline dans son studio", "Fin : « Essaie Edith »", "Le son : la voix d'Antonin"], why: "On suit quelqu'un, pas une pub." }),
-    "Pauline ouvre son studio\n\n• Ouverture : Pauline dans son studio\n• Fin : « Essaie Edith »\n• Le son : la voix d'Antonin\n\nOn suit quelqu'un, pas une pub.",
+    "Pauline ouvre son studio\n\n• Ouverture : Pauline dans son studio\n• Fin : « Essaie Edith »\n• Le son : la voix d'Antonin",
   );
   assert.ok(PLAN_BUTTONS.every((label) => label.length <= 20));
 });
@@ -5115,7 +5112,7 @@ test("whatsapp: the Sunday report from her @, against the week before, warm", ()
   });
   assert.equal(
     text,
-    "Ton bilan de la semaine : 3 vidéos publiées, 4 300 vues et 12 nouveaux abonnés.\n\nTes Reels face caméra vont deux fois plus loin que les autres.\n\nCe que je retiens : Montre-toi dès la première seconde.\n\nMon idée pour cette semaine : Un Reel où tu réponds à la question qu'on te pose le plus. Je te la prépare ?",
+    "Ton bilan de la semaine : 3 vidéos publiées, 4 300 vues et 12 nouveaux abonnés.\n\nTes Reels face caméra vont deux fois plus loin que les autres.\n\nMon idée pour cette semaine : Un Reel où tu réponds à la question qu'on te pose le plus. Je te la prépare ?",
   );
   // Template parameters: no line break (Meta refuses them).
   for (const p of weeklyPublicParams({ videos: 3, views: 4300, net: 12, followers: 1240 }, { videos: 2, views: 3100, net: 5, followers: 1228 })) assert.ok(!/\n/.test(p));
@@ -5186,4 +5183,33 @@ test("a copied Reel read before the current reader is read again when its link c
   assert.equal(currentReading({ look, measures, reader: STEAL_READER - 1 }), false);
   assert.equal(currentReading({ look, measures, reader: STEAL_READER }), true);
   assert.equal(currentReading({ miss: "unreadable" }), false);
+});
+
+test("WhatsApp: a chaser waits with ⏳, a thank-you or an okay gets its reaction, the rest gets a turn", async () => {
+  const { ackFor, isChaser } = await import("./emoji.ts");
+  for (const t of ["?", "??", "Alors ?", "alors", "Et alors ?", "c’est bon ?", "Ça avance ?", "t'es là ?", "Toujours rien ?"]) assert.equal(isChaser(t), true, t);
+  for (const t of ["Alors on fait quoi demain ?", "c'est bon pour 18 h", "Tu peux enlever la 2e photo ?", "ok"]) assert.equal(isChaser(t), false, t);
+  assert.equal(ackFor("Merci !"), "❤️");
+  assert.equal(ackFor("merci beaucoup 🙏"), "❤️");
+  assert.equal(ackFor("Top"), "👍");
+  assert.equal(ackFor("ok"), "👍");
+  assert.equal(ackFor("Parfait."), "👍");
+  // A thank-you that asks something, or says more, gets a real answer.
+  assert.equal(ackFor("merci, et pour demain ?"), null);
+  assert.equal(ackFor("ok ?"), null);
+  assert.equal(ackFor("top, tu peux le refaire plus court"), null);
+});
+
+test("a delivery says of the editor's words only what she must know", async () => {
+  const { deliveryWords } = await import("./editor.ts");
+  // Its main choice, quotes and all, is what the video shows: left out.
+  assert.equal(deliveryWords("Comme le modèle, ta phrase manuscrite « Pas d'app à télécharger. Pas de montage. » reste au centre pendant 12 s."), "");
+  // A limit after it is said.
+  assert.equal(
+    deliveryWords("J'ouvre sur la pizza qui sort du four. Le geste du pincement n'est dans aucune de tes vidéos : filme-le 3 secondes, la main dans le cadre."),
+    "Le geste du pincement n'est dans aucune de tes vidéos : filme-le 3 secondes, la main dans le cadre.",
+  );
+  // The engine's own notes are said whole.
+  assert.match(deliveryWords("Je n'ai pas réussi à composer la mise en page demandée : cette version passe tes plans en plein cadre. Dis-moi « réessaie la mise en page »."), /^Je n'ai pas réussi.*réessaie la mise en page/);
+  assert.equal(deliveryWords(""), "");
 });

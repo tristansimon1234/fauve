@@ -261,7 +261,9 @@ export const PLAN_BUTTONS = ["C'est parti", "Changer le plan"] as const;
  * (« Voilà le plan : dis-moi si je lance », and nothing above).
  */
 export function planMessage(plan: PostPlan): string {
-  return [plan.title, plan.points.map((point) => `• ${point}`).join("\n"), plan.why].filter(Boolean).join("\n\n");
+  // Short on WhatsApp: the points, and of the why only Edith's advice (never imposed, always shown).
+  const advice = plan.why.match(/Conseil\s*:.*$/su)?.[0]?.trim() ?? "";
+  return [plan.title, plan.points.map((point) => `• ${point}`).join("\n"), advice].filter(Boolean).join("\n\n");
 }
 
 /** The validated plan, as the montage (or Edith in the chat) reads it. */

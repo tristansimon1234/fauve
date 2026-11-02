@@ -1,5 +1,5 @@
 import "server-only";
-import { awaitsAnswer, echoFor, emojiOnly, INTRO_VIDEO, justHello, onboardingStepOf, replyExtrasSchema, WHATSAPP_WELCOME } from "@fauve/agent";
+import { ackFor, awaitsAnswer, echoFor, emojiOnly, INTRO_VIDEO, isChaser, justHello, onboardingStepOf, replyExtrasSchema, WHATSAPP_WELCOME, type Reaction } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { answerPairing, claimPairing, PAIRING_YES, PAIRING_NO } from "@/lib/auth/pairing";
 import { TERMS_LINE } from "@/lib/legal";
@@ -18,6 +18,7 @@ import { photoRegions } from "@/lib/video/regions";
 import { setReaction } from "@/lib/reactions";
 import { env } from "@/lib/env";
 import { withSlot } from "@/lib/work-slots";
+import { runningJobs } from "@/lib/studio-jobs";
 import { downloadMedia, markReadAndTyping, sendLinkButton, sendReaction, sendReply, sendText, sendVideo } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 
@@ -170,13 +171,7 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     if (transcript?.text) await db.from("whatsapp_messages").update({ body: transcript.text }).eq("wa_message_id", message.id);
   }
 
-  // Watching a clip takes up to a minute: acknowledge it now (👍 = reçu), then start
-  // the analysis right away so whoever answers finds it ready.
-  if (media?.isVideo) {
-    await sendReaction(message.from, message.id, "👍")
-      .then(() => setReaction({ waMessageId: message.id }, "fauve", "👍"))
-      .catch((e) => console.warn("reaction failed", e));
-  }
+  // Start the analysis right away so whoever answers finds it ready (the 👍 comes on the burst's last file).
   const analysis = media?.isVideo
     ? ensureClipAnalysis(member.studio_id, media.id).catch((e) => console.error("clip analysis failed", e))
     : media?.isImage
@@ -199,6 +194,8 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     await analysis;
     return;
   }
+  // The last file of a burst (an album, a video): 👍 = reçu, at once; the turn follows.
+  if (media?.isVideo || media?.isImage) await react(message, "👍");
   // Her first message ever: the welcome first (what Edith does, how to start); a plain « Bonjour » needs nothing more.
   const welcomed = await welcomeIfNew(member.studio_id, phone, message).catch((e: unknown) => {
     console.warn("welcome failed", e);
@@ -224,6 +221,26 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
       await sendReaction(message.from, message.id, echo)
         .then(() => setReaction({ waMessageId: message.id }, "fauve", echo))
         .catch((e) => console.warn("reaction failed", e));
+      return;
+    }
+  }
+
+  // A thank-you or an okay that needs nothing more (Edith asked nothing): ❤️ or 👍. « Alors ? », « ? »
+  // while she answers or a montage runs: ⏳. No turn for either (two turns at once had launched two Reels).
+  if (message.type === "text" && text) {
+    const { data: last } = await db
+      .from("whatsapp_messages")
+      .select("body, payload")
+      .eq("studio_id", member.studio_id)
+      .eq("direction", "outbound")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const extras = replyExtrasSchema.catch({}).parse(last?.payload ?? {});
+    const asked = awaitsAnswer(last ? { body: last.body as string | null, options: extras.options, quote: Boolean(extras.quote) } : null);
+    const reaction = (!asked && ackFor(text)) || (isChaser(text) && (await busyNow(member.studio_id)) ? "⏳" : null);
+    if (reaction) {
+      await react(message, reaction);
       return;
     }
   }
@@ -341,11 +358,7 @@ function deliveryError(error: unknown): { code: number | null; message: string; 
  */
 export async function replyOnWhatsApp(turn: WhatsAppTurn): Promise<void> {
   const { studioId, replyTo } = turn;
-  // A burst of messages (an album of photos, then « Alors ? »): the latest one's turn answers them all.
-  if (replyTo) {
-    await new Promise((resolve) => setTimeout(resolve, BURST_SETTLE_MS));
-    if (await newerMessage(studioId, replyTo).catch(() => false)) return;
-  }
+  // (A burst of messages, an album of photos, is already left to its latest one: BURST_DEBOUNCE_MS.)
   // One turn at a time for a business: two at once each launched a Reel from the same message
   // (Tristan's link and files, then « Alors ? », then « ? »: two montages, the same message sent twice).
   // A turn that waited answers only if no newer message came meanwhile (that one's turn reads all).
@@ -357,10 +370,23 @@ export async function replyOnWhatsApp(turn: WhatsAppTurn): Promise<void> {
   for (const job of afterReply) await job().catch((e) => console.error("after-reply job failed", e));
 }
 
-type WhatsAppTurn = { studioId: string; memberId: string; waId: string; phone: string; replyTo?: string };
+/** Edith's reaction to one of her messages, on WhatsApp and in the app's copy of it. */
+async function react(message: InboundMessage, emoji: Reaction): Promise<void> {
+  await sendReaction(message.from, message.id, emoji)
+    .then(() => setReaction({ waMessageId: message.id }, "fauve", emoji))
+    .catch((e) => console.warn("reaction failed", e));
+}
 
-/** How long a message waits for the next one of a burst (an album comes as one message a file, within seconds). */
-const BURST_SETTLE_MS = 3_000;
+/** Edith is answering this business, or one of its montages runs: a chaser waits for it. */
+async function busyNow(studioId: string): Promise<boolean> {
+  const [turn, jobs] = await Promise.all([
+    supabaseAdmin().from("work_slots").select("seat").eq("kind", `turn:${studioId}`).not("holder", "is", null).gt("expires_at", new Date().toISOString()).limit(1),
+    runningJobs(studioId).catch(() => []),
+  ]);
+  return Boolean(turn.data?.length) || jobs.length > 0;
+}
+
+type WhatsAppTurn = { studioId: string; memberId: string; waId: string; phone: string; replyTo?: string };
 
 /** A business's turn: one at a time, a lease long enough for a turn, a wait beyond which it runs anyway. */
 const turnSlot = (studioId: string) => ({ kind: `turn:${studioId}`, slots: 1, perSlot: 1, leaseMs: 4 * 60_000, waitMs: 2 * 60_000 });
