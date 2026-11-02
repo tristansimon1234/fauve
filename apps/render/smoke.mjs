@@ -66,6 +66,22 @@ const scope = {
   WordSearch: ({ words = [] }) => React.createElement("div", null, ...words.map((w, i) => React.createElement("div", { key: i }, String(w)))),
   Kinetic: ({ text }) => React.createElement("div", null, Array.isArray(text) ? text.join(" ") : String(text ?? "")),
   Burst: ({ children }) => React.createElement("div", null, children),
+  // The interface, graphics and transitions kit (Graphic.tsx): its words are written, what it shows is drawn.
+  Cursor: () => React.createElement("div", null),
+  Toggle: () => React.createElement("div", null),
+  Button: ({ text }) => React.createElement("div", null, String(text ?? "")),
+  ProfileCard: ({ name, handle, bio, avatar }) =>
+    React.createElement("div", null, drawn(avatar, { width: 150, height: 150 }), String(name ?? ""), String(handle ?? ""), String(bio ?? ""), "Follow", "Message"),
+  WordList: ({ items = [] }) => React.createElement("div", null, ...items.map((w, i) => React.createElement("div", { key: i }, String(w)))),
+  Timeline: () => React.createElement("div", null),
+  Grid: ({ children }) => React.createElement("div", null, children),
+  Fan: ({ items = [], middle }) => React.createElement("div", null, ...items.map((d, i) => React.createElement("div", { key: i }, drawn(d, { width: 1500, height: 220 }))), middle ?? null),
+  Turn: ({ draw }) => React.createElement("div", null, drawn(draw, { width: config.height, height: config.width })),
+  Whip: ({ from, to }) => React.createElement("div", null, drawn(from, config), drawn(to, config)),
+  ZoomThrough: ({ from, to }) => React.createElement("div", null, drawn(from, config), drawn(to, config)),
+  Through: ({ text, from, to }) => React.createElement("div", null, drawn(from, config), drawn(to, config), String(text ?? "")),
+  Flash: () => null,
+  Tint: () => React.createElement("div", null),
 };
 
 const defaultBrand = {

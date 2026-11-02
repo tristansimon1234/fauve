@@ -15,6 +15,7 @@ import {
 import { Fit } from "./Fit";
 import { makeKit } from "./Kit";
 import { makeType } from "./Type";
+import { makeGraphic } from "./Graphic";
 import { Marker } from "./Marker";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
 import { SceneView } from "./Scene";
@@ -70,7 +71,7 @@ const px = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0
  * retouched, framed on its subject in the box; a video plays in time while its shot is on
  * and holds its nearest image before and after it.
  */
-function Footage({ shot, style }: { shot: number; style?: CSSProperties }) {
+function Footage({ shot, style, hold }: { shot: number; style?: CSSProperties; hold?: number }) {
   const source = useContext(FootageContext);
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
@@ -81,7 +82,10 @@ function Footage({ shot, style }: { shot: number; style?: CSSProperties }) {
   const local = frame - info.from;
   return (
     <div style={box}>
-      {local >= 0 && local < info.durationInFrames ? (
+      {local >= 0 && local < info.durationInFrames && hold && hold > 1 ? (
+        // Each image held `hold` frames: the jerky, frame-sampled slow motion of the « Nike » edit, or stop motion.
+        <Freeze frame={Math.floor(local / Math.round(hold)) * Math.round(hold)}>{media}</Freeze>
+      ) : local >= 0 && local < info.durationInFrames ? (
         <Sequence from={info.from} durationInFrames={info.durationInFrames} layout="none">
           {media}
         </Sequence>
@@ -102,6 +106,9 @@ function Footage({ shot, style }: { shot: number; style?: CSSProperties }) {
 // materials kit (Type.tsx), with the timings of the reference Reels.
 const kit = makeKit({ useCurrentFrame, useVideoConfig });
 const type = makeType({ useCurrentFrame, useVideoConfig });
+// Cursor, Toggle, Button, ProfileCard, WordList, Timeline, Grid, Fan, Turn, Whip, ZoomThrough, Through, Flash, Tint: the
+// interface, graphics and transitions kit (Graphic.tsx).
+const graphic = makeGraphic({ useCurrentFrame, useVideoConfig });
 export const SCOPE = {
   AbsoluteFill,
   Sequence,
@@ -134,6 +141,20 @@ export const SCOPE = {
   Kinetic: type.Kinetic,
   WordArt: type.WordArt,
   Burst: type.Burst,
+  Cursor: graphic.Cursor,
+  Toggle: graphic.Toggle,
+  Button: graphic.Button,
+  ProfileCard: graphic.ProfileCard,
+  WordList: graphic.WordList,
+  Timeline: graphic.Timeline,
+  Grid: graphic.Grid,
+  Fan: graphic.Fan,
+  Turn: graphic.Turn,
+  Whip: graphic.Whip,
+  ZoomThrough: graphic.ZoomThrough,
+  Through: graphic.Through,
+  Flash: graphic.Flash,
+  Tint: graphic.Tint,
 };
 
 export type SceneComponent = (props: {
