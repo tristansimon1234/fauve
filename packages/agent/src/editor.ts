@@ -766,7 +766,7 @@ export function variantPlan(plan: EditPlan, change: { hook?: string }): EditPlan
   return editPlanSchema.parse({ ...plan, texts });
 }
 
-/** How many times a clip filmed as one still shot shows in a Reel: whatever its passage, it is the same image. */
+/** How many times a clip whose passages all look alike shows in a Reel: whatever its passage, it is the same image. */
 export const STILL_REPEATS = 2;
 
 /** A clip filmed as one still shot: every shot read with the camera still, at one framing. */
@@ -776,19 +776,88 @@ export function stillClip(analysis: { shots: { camera?: string; framing?: string
 }
 
 /**
- * Its still clips shown STILL_REPEATS times at most, the later passages left out (the Reel gets
- * shorter): with 9 photos and one still video of a café for 20 shots, the editor showed the café six
- * times (Tristan: « la vidéo revient 5 fois »).
+ * A clip whose passages all look alike: one shot (a café's terrace filmed a while, a woman seen from behind
+ * the whole way down a street) or one still framing, with nobody speaking (a face to camera says something
+ * else in each passage) and one gesture at most (a chef filmed in one shot from the dough to the oven shows
+ * something else in each passage). Shown a third time, it reads as the same image again.
  */
-export function capStillRepeats<T extends { segments: PlanSegment[] }>(plan: T, still: Set<string>): T {
+export function alikeClip(analysis: { shots: { camera?: string; framing?: string }[]; transcript?: string; words?: unknown[]; actions?: unknown[] }): boolean {
+  if (analysis.transcript?.trim() || analysis.words?.length || (analysis.actions?.length ?? 0) > 1) return false;
+  return analysis.shots.length === 1 || stillClip(analysis);
+}
+
+/**
+ * Its clips whose passages look alike shown STILL_REPEATS times at most, their later passages given to the files she
+ * sent that show the least (a passage not shown yet of the same length, never next to itself); with no file left, a
+ * still clip's passage is left out (the Reel gets shorter) and a moving one's stays. With 11 files for 18 shots, the editor showed a café's terrace and a woman walking 4 times each and
+ * other photos once (Tristan: « la vidéo revient 5 fois »). `files`: what she sent, with each one's length (a photo's is
+ * free).
+ */
+export function spreadRepeats<T extends { segments: PlanSegment[] }>(
+  plan: T,
+  alike: Set<string>,
+  files: { id: string; seconds: number; photo: boolean }[] = [],
+  still: Set<string> = alike,
+): T {
+  const shown = new Map<string, [number, number][]>();
+  for (const s of plan.segments) if (isClipSegment(s)) shown.set(s.clip_id, [...(shown.get(s.clip_id) ?? []), [s.in, s.out]]);
+  const uses = (id: string) => shown.get(id)?.length ?? 0;
+  // A passage of `length` seconds of a video not shown yet: from its start, else after one of its shown passages.
+  const passage = (file: { id: string; seconds: number }, length: number): number | null => {
+    const taken = shown.get(file.id) ?? [];
+    const starts = [0, ...taken.map(([, to]) => to)].sort((a, b) => a - b);
+    return starts.find((at) => at + length <= file.seconds + 0.01 && taken.every(([a, b]) => at + length <= a + 0.01 || at >= b - 0.01)) ?? null;
+  };
   const seen = new Map<string, number>();
-  const segments = plan.segments.filter((s) => {
-    if (!isClipSegment(s) || !still.has(s.clip_id)) return true;
+  const out: PlanSegment[] = [];
+  let changed = false;
+  plan.segments.forEach((s, i) => {
+    if (!isClipSegment(s) || !alike.has(s.clip_id)) return void out.push(s);
     const n = (seen.get(s.clip_id) ?? 0) + 1;
     seen.set(s.clip_id, n);
-    return n <= STILL_REPEATS;
+    if (n <= STILL_REPEATS) return void out.push(s);
+    changed = true;
+    // This passage no longer shows: the clip counts one use less.
+    const passages = shown.get(s.clip_id) ?? [];
+    const k = passages.findIndex(([a, b]) => a === s.in && b === s.out);
+    if (k >= 0) shown.set(s.clip_id, passages.filter((_, j) => j !== k));
+    const screen = (s.out - s.in) / (s.speed ?? 1);
+    const before = out.at(-1);
+    const after = plan.segments[i + 1];
+    const neighbours = new Set([before, after].flatMap((x) => (x && isClipSegment(x) ? [x.clip_id] : [])));
+    const pick = files
+      .filter((f) => f.id !== s.clip_id && !neighbours.has(f.id) && uses(f.id) < STILL_REPEATS)
+      .map((f) => ({ f, at: f.photo ? 0 : passage(f, screen * (s.speed ?? 1)) }))
+      .filter((c): c is { f: (typeof files)[number]; at: number } => c.at !== null)
+      .sort((a, b) => uses(a.f.id) - uses(b.f.id))[0];
+    // No file left to give it to: a still clip's passage is left out (the same image again); another one stays (it moves).
+    if (!pick) {
+      if (!still.has(s.clip_id)) {
+        shown.set(s.clip_id, [...(shown.get(s.clip_id) ?? []), [s.in, s.out]]);
+        out.push(s);
+      }
+      return;
+    }
+    const length = pick.f.photo ? Math.min(screen, PHOTO_MAX_SECONDS) : screen * (s.speed ?? 1);
+    const at = Math.round(pick.at * 100) / 100;
+    shown.set(pick.f.id, [...(shown.get(pick.f.id) ?? []), [at, at + length]]);
+    // Only what does not belong to its clip goes with it (its retouch, its blur, its framing are the other file's to get).
+    out.push({
+      clip_id: pick.f.id,
+      in: at,
+      out: Math.round((at + length) * 100) / 100,
+      zoom: s.zoom,
+      ...(s.move ? { move: s.move } : {}),
+      ...(s.speed && !pick.f.photo ? { speed: s.speed } : {}),
+      ...(s.accent ? { accent: s.accent } : {}),
+    } as PlanSegment);
   });
-  return segments.length === plan.segments.length ? plan : { ...plan, segments };
+  return changed ? { ...plan, segments: out } : plan;
+}
+
+/** Its still clips shown STILL_REPEATS times at most, the later passages left out (see spreadRepeats, which gives them to other files). */
+export function capStillRepeats<T extends { segments: PlanSegment[] }>(plan: T, still: Set<string>): T {
+  return spreadRepeats(plan, still);
 }
 
 /** Its sentences, never cut inside a quote (« Pas d'app à télécharger. Pas de montage. »). */

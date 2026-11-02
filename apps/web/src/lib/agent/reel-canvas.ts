@@ -58,7 +58,7 @@ export async function showReel(studioId: string, postId: string, plan: EditPlan,
   for (const request of writing) {
     const shown = (moments.get(request.id) ?? []).flatMap((m) => {
       const image = images[Math.round(m.t * 30)];
-      return image instanceof Buffer ? [{ label: m.label, jpeg: image }] : [];
+      return image instanceof Buffer ? [{ label: m.label, jpeg: image, ...(m.shot !== undefined ? { shot: m.shot } : {}), ...(m.frame !== undefined ? { frame: m.frame } : {}) }] : [];
     });
     if (shown.length) request.canvas = shown;
   }

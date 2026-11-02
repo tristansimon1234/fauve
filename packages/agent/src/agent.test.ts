@@ -5160,6 +5160,79 @@ test("a clip filmed as one still shot shows twice at most in a Reel", async () =
   assert.equal(capStillRepeats(plan, new Set()), plan);
 });
 
+test("a word lost on the picture under it is found, and one with its own edge is not", async () => {
+  const { blends, cellsUnder, contrast, decodeGrid, gridOf, GRID, lostOn, outlined, parseColor, parseShadows } = await import("../../../apps/render/src/contrast.ts");
+  const coral: [number, number, number] = [0xf2, 0x69, 0x4e];
+  const white: [number, number, number] = [255, 255, 255];
+  // Coral on a red awning, white on a bright sky: lost. White on red, coral on a dark street: read.
+  assert.equal(blends(coral, [200, 40, 45]), true);
+  assert.equal(blends(white, [245, 245, 240]), true);
+  assert.equal(blends(white, [200, 40, 45]), false);
+  assert.equal(blends(coral, [40, 38, 42]), false);
+  assert.ok(Math.abs(contrast(white, [0, 0, 0]) - 21) < 0.01);
+  assert.deepEqual(parseColor("rgba(0, 0, 0, 0.6)"), { rgb: [0, 0, 0], alpha: 0.6 });
+  assert.deepEqual(parseShadows("rgba(0, 0, 0, 0.6) 0px 3px 18px, rgba(0, 0, 0, 0.45) 0px 1px 3px").map((x) => x.blur), [18, 3]);
+  // A soft glow is no edge; dense tight shadows or a stroke are.
+  assert.equal(outlined(white, "rgba(0, 0, 0, 0.6) 0px 3px 18px, rgba(0, 0, 0, 0.45) 0px 1px 3px", 0, "rgba(0, 0, 0, 0)"), false);
+  assert.equal(outlined(white, "rgb(0, 0, 0) 0px 0px 3px", 0, "rgba(0, 0, 0, 0)"), true);
+  assert.equal(outlined(white, "none", 3, "rgb(20, 20, 20)"), true);
+  // A picture: red in its top half, a dark street below; a cell's median ignores a thin white stroke written on it.
+  const [w, h] = [GRID.cols * 4, GRID.rows * 4];
+  const pixels = new Uint8Array(w * h * 3);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 3;
+      const top = y < h / 2;
+      const stroke = x % 4 === 0;
+      pixels.set(stroke ? [255, 255, 255] : top ? [200, 40, 45] : [40, 38, 42], i);
+    }
+  const grid = decodeGrid(Buffer.from(gridOf(pixels, w, h)).toString("base64"));
+  const frame: [number, number, number, number] = [0, 0, 1080, 1920];
+  assert.equal(lostOn(coral, 1, cellsUnder(grid, [300, 600, 560, 720], frame))!.lost, true);
+  assert.equal(lostOn(coral, 1, cellsUnder(grid, [300, 1200, 560, 1320], frame))!.lost, false);
+  // A shot laid in half the frame (a split screen): its picture covers that box.
+  assert.equal(cellsUnder(grid, [0, 0, 540, 100], [0, 0, 540, 960]).every(([r]) => r === 200), true);
+  assert.equal(lostOn(coral, 1, []), null);
+});
+
+test("a clip whose passages look alike shows twice, its later passages given to the files that show least", async () => {
+  const { spreadRepeats, alikeClip } = await import("./editor.ts");
+  // One shot, nobody speaking: alike, whatever the camera. A face to camera says something else in each passage.
+  assert.equal(alikeClip({ shots: [{ camera: "handheld", framing: "wide" }], transcript: "" }), true);
+  assert.equal(alikeClip({ shots: [{ camera: "moving", framing: "medium" }] }), true);
+  assert.equal(alikeClip({ shots: [{ camera: "static", framing: "close" }], transcript: "Bonjour, aujourd'hui je vous montre…" }), false);
+  assert.equal(alikeClip({ shots: [{ camera: "handheld", framing: "wide" }, { camera: "moving", framing: "close" }], transcript: "" }), false);
+  // A chef in one shot from the dough to the oven: something else in each passage.
+  assert.equal(alikeClip({ shots: [{ camera: "static", framing: "medium" }], transcript: "", actions: [{}, {}, {}] }), false);
+  const shot = (clip_id: string, at: number, length = 0.57) => ({ clip_id, in: at, out: Math.round((at + length) * 100) / 100, zoom: "none" as const });
+  // The terrace four times among photos and a video shown once: twice kept, the other two given to the files seen once.
+  const plan = { segments: [shot("terrace", 0), shot("p1", 0), shot("terrace", 2.4), shot("p2", 0), shot("terrace", 4.6), shot("street", 0), shot("terrace", 11.2), shot("p3", 0)] };
+  const files = [
+    { id: "terrace", seconds: 16, photo: false },
+    { id: "street", seconds: 5.8, photo: false },
+    { id: "p1", seconds: 5, photo: true },
+    { id: "p2", seconds: 5, photo: true },
+    { id: "p3", seconds: 5, photo: true },
+  ];
+  const spread = spreadRepeats(plan, new Set(["terrace"]), files);
+  const names = spread.segments.map((s) => ("clip_id" in s ? `${s.clip_id}@${s.in}` : "?"));
+  assert.equal(spread.segments.length, plan.segments.length);
+  assert.equal(names.filter((n) => n.startsWith("terrace")).length, 2);
+  // Never a file more than twice, never next to itself, and a video's passage not shown yet.
+  const counts = new Map<string, number>();
+  for (const n of names) counts.set(n.split("@")[0]!, (counts.get(n.split("@")[0]!) ?? 0) + 1);
+  assert.ok([...counts.values()].every((c) => c <= 2), names.join(" "));
+  assert.ok(names.every((n, i) => i === 0 || n.split("@")[0] !== names[i - 1]!.split("@")[0]), names.join(" "));
+  // A video given a passage: one it has not shown yet.
+  const again = spreadRepeats({ segments: [shot("street", 0), shot("terrace", 0), shot("p1", 0), shot("terrace", 3), shot("p2", 0), shot("terrace", 6)] }, new Set(["terrace"]), files.slice(0, 4));
+  assert.equal(again.segments.map((s) => ("clip_id" in s ? `${s.clip_id}@${s.in}` : "?")).at(-1), "street@0.57");
+  // Nothing left to give it to: a still clip's passage left out, as before; a moving one's kept (it is all she sent).
+  const alone = { segments: [shot("terrace", 0), shot("terrace", 3), shot("terrace", 6)] };
+  assert.equal(spreadRepeats(alone, new Set(["terrace"]), files.slice(0, 1)).segments.length, 2);
+  assert.equal(spreadRepeats(alone, new Set(["terrace"]), files.slice(0, 1), new Set()).segments.length, 3);
+  assert.equal(spreadRepeats(plan, new Set(), files), plan);
+});
+
 test("a copied Reel read before the current reader is read again when its link comes back", async () => {
   const { currentReading, STEAL_READER } = await import("./steal.ts");
   const look = {

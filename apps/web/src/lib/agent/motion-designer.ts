@@ -28,6 +28,8 @@ import { toGeminiSchema } from "@/lib/gemini-schema";
 import { askKimiJson, strictShape } from "@/lib/kimi";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { smokeTestScenes, type SceneChecks, type SmokeScene } from "@/lib/render/sandbox";
+import type { SceneBackdrop } from "@render/contrast";
+import { sceneBackdrop } from "./backdrop";
 import { timeLeft } from "@/lib/step-clock";
 import { anthropic, CACHE_AN_HOUR, logClaudeCost } from "./run";
 
@@ -67,10 +69,12 @@ export type SceneRequest = {
   canvas?: SceneFrame[];
   /** The row where a voice's subtitles show during the scene (shares of the height): its words keep off it. */
   subtitles?: { y: number; h: number };
+  /** The colours of the picture under it, read once from `canvas` for the scene check (null: none to read). */
+  backdrop?: SceneBackdrop | null;
 };
 
-/** One image of the Reel as it renders, with the instant it shows. */
-export type SceneFrame = { label: string; jpeg: Buffer };
+/** One image of the Reel as it renders, with the instant it shows (and, before writing, which shot or which frame of the animation). */
+export type SceneFrame = { label: string; jpeg: Buffer; shot?: number; frame?: number };
 
 export type SceneResult = {
   id: string;
@@ -371,6 +375,8 @@ function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneReq
         ...(request.compose ? { shots: request.compose.shots, reelTexts: request.compose.texts, end: request.compose.end } : {}),
         // A scene that follows what moves is checked where it goes, with the Reel's camera moves.
         ...(request.track?.length || request.compose?.shots.some((x) => x.track) ? { ...(request.track?.length ? { track: request.track } : {}), look: context.look } : {}),
+        // The colours of the picture under it: a word lost on it goes back to the motion designer.
+        ...(request.backdrop ? { backdrop: request.backdrop } : {}),
       };
     });
 }
@@ -450,6 +456,8 @@ async function checkScenes(
 ): Promise<SceneResult[]> {
   let results = written;
   const working = new Map<string, SceneResult>();
+  // The colours under each first draft's words, read once on the images it saw before being written.
+  await Promise.all(written.map((r) => sceneBackdrop(requestOf(r.id))));
   for (let round = 0; round < 2; round++) {
     const checks = await smokeTestScenes(smokeScenes(results, requestOf, context), brand).catch(
       (e: unknown): SceneChecks => ({ errors: Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])), faces: {}, cover: {} }),

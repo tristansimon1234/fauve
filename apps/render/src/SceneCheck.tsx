@@ -1,5 +1,6 @@
 import { Component, createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { AbsoluteFill, cancelRender, continueRender, delayRender } from "remotion";
+import { cellsUnder, decodeGrid, lostOn, outlined, parseColor, type Rgb, type SceneBackdrop } from "./contrast";
 import { fitsPending } from "./Fit";
 import { fontsLoaded, loadFonts } from "./fonts";
 import { compileScene, SCOPE, type SceneComponent } from "./MotionScene";
@@ -20,7 +21,9 @@ import type { MotionTemplate, ReelProps } from "./types";
 // whole on screen long enough to be read (FAUVE_READ: Tristan, « parfois c'est trop rapide
 // donc on peut même pas lire »), and a text drawn under MIN_TYPE, its instructions' minimum
 // (FAUVE_SIZE: the WhatsApp of a florist's Reel was written at 40 px, Tristan: « il y a une raison
-// pour laquelle il fait un truc si p'tit ? »). And what it draws, row by row (FAUVE_COVER), for the engine
+// pour laquelle il fait un truc si p'tit ? »). So is a word lost on the picture under it (FAUVE_INK: a coral « Edith »
+// on a café's red awning), measured on the colours of her shots given with the scene (`backdrop`). And what it draws,
+// row by row (FAUVE_COVER), for the engine
 // to set a voice's subtitles where the animations leave room (Tristan: « il faut pas masquer
 // mais bien les placer là où ça ne gêne pas les anim et les visages »).
 
@@ -34,6 +37,11 @@ const STEP = 2; // frames between two samples
 const MIN_TYPE = 48;
 /** At most this many copies laid out at once: a collage's composition runs the whole Reel. */
 const MAX_COPIES = 120;
+/** A word may be lost on the picture this long (a shot that passes under it), not longer. */
+const INK_FRAMES = 12;
+/** The footage under an animation at one of its frames stands for the frames this close to it. */
+const INK_REACH = 15;
+
 
 export type SceneCheckProps = {
   js: string;
@@ -53,6 +61,8 @@ export type SceneCheckProps = {
   /** A collage's composition that draws the whole picture: the Reel's texts (each must be written, whole, at its moment) and its end. */
   reelTexts?: Parameters<SceneComponent>[0]["reelTexts"];
   end?: Parameters<SceneComponent>[0]["end"];
+  /** The colours of the picture under it, for the words lost on it. */
+  backdrop?: SceneBackdrop;
 };
 
 const FrameContext = createContext(0);
@@ -75,12 +85,17 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
   // A cut-out as a plain image: only the texts are measured, and a rim drawn in a canvas in every copy is slow.
   const Cutout = ({ photo, x, y, height: h, style }: Parameters<typeof SCOPE.Cutout>[0]) =>
     photo?.cutout && photo.subject ? <img src={photo.cutout} style={{ position: "absolute", left: x, top: y, height: h, ...style }} /> : null;
+  // One of her shots: a grey card, marked with its index (the colours under a word are read from its grid).
+  const Footage = ({ shot, style }: { shot: number; style?: CSSProperties }) => (
+    <div data-fauve-shot={shot} style={{ position: "absolute", overflow: "hidden", background: "linear-gradient(160deg, #9a9490, #5f5a57)", ...style }} />
+  );
   return {
     ...SCOPE,
     useCurrentFrame,
     useVideoConfig: () => ({ ...SCOPE.useVideoConfig(), width, height, durationInFrames }),
     Sequence: Sequence as unknown as typeof SCOPE.Sequence,
     Cutout: Cutout as typeof SCOPE.Cutout,
+    Footage: Footage as typeof SCOPE.Footage,
   };
 }
 
@@ -264,6 +279,96 @@ function sizes(copy: HTMLElement, largest: Map<string, number>) {
   }
 }
 
+/** A word lost on the picture under it: the frames it is lost, and its contrast there at the worst. */
+type Ink = { text: string; frames: number[]; ratio: number };
+
+/** An element's opacity as seen, up to the copy it is drawn in. */
+function seenOpacity(el: Element, copy: HTMLElement): number {
+  let opacity = 1;
+  for (let up: Element | null = el; up && up !== copy; up = up.parentElement) {
+    const style = getComputedStyle(up);
+    if (style.visibility === "hidden") return 0;
+    opacity *= Number(style.opacity);
+  }
+  return opacity;
+}
+
+/** Elements drawn as pictures: what is under a word there is not known. */
+const PICTURES = new Set(["img", "canvas", "video", "image"]);
+
+/**
+ * The words of a copy that are lost on what is under them (see contrast.ts): one of her shots (a composition's
+ * Footage, read from its grid), a flat colour the scene paints, or, with nothing painted under it, the footage
+ * under the animation at the nearest frame given. A word with its own edge (a stroke, dense tight shadows) reads
+ * anywhere; one over a picture of the scene (a cut-out, a photo) or a gradient is left alone.
+ */
+function inks(copy: HTMLElement, frame: number, backdrop: SceneBackdrop, grids: Map<string, Uint8Array>, found: Map<string, Ink>) {
+  const origin = copy.getBoundingClientRect();
+  const gridOf = (b64: string) => grids.get(b64) ?? grids.set(b64, decodeGrid(b64)).get(b64)!;
+  const footage = (backdrop.frames ?? []).filter((f) => Math.abs(f.frame - frame) <= INK_REACH).sort((a, b) => Math.abs(a.frame - frame) - Math.abs(b.frame - frame))[0];
+  const range = document.createRange();
+  const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.textContent?.replace(/\s+/g, " ").trim();
+    const el = node.parentElement;
+    if (!text || !el || (text.match(/\p{L}/gu)?.length ?? 0) < 2 || inDecor(node)) continue;
+    const opacity = seenOpacity(el, copy);
+    if (opacity < 0.5) continue;
+    const style = getComputedStyle(el);
+    const fill = parseColor(style.webkitTextFillColor || style.color);
+    if (!fill || fill.alpha < 0.3) continue;
+    if (outlined(fill.rgb, style.textShadow, parseFloat(style.webkitTextStrokeWidth) || 0, style.webkitTextStrokeColor)) continue;
+    range.selectNodeContents(node);
+    const rects = Array.from(range.getClientRects()).filter((r) => r.width >= 1 && r.height >= 1);
+    if (!rects.length) continue;
+    const box: [number, number, number, number] = [
+      Math.min(...rects.map((r) => r.left)) - origin.left,
+      Math.min(...rects.map((r) => r.top)) - origin.top,
+      Math.max(...rects.map((r) => r.right)) - origin.left,
+      Math.max(...rects.map((r) => r.bottom)) - origin.top,
+    ];
+    // What is under its middle, top down, in this copy only.
+    const under = document.elementsFromPoint(origin.left + (box[0] + box[2]) / 2, origin.top + (box[1] + box[3]) / 2).filter((e) => e !== copy && copy.contains(e));
+    let cells: Rgb[] | null = null;
+    let unknown = false;
+    for (const e of under) {
+      if (seenOpacity(e, copy) < 0.5) continue;
+      const shot = e.getAttribute("data-fauve-shot");
+      if (shot !== null) {
+        const grid = backdrop.shots?.[shot];
+        if (!grid) unknown = true;
+        else {
+          const r = e.getBoundingClientRect();
+          cells = cellsUnder(gridOf(grid), box, [r.left - origin.left, r.top - origin.top, r.right - origin.left, r.bottom - origin.top]);
+        }
+        break;
+      }
+      if (PICTURES.has(e.tagName.toLowerCase()) && !e.contains(node)) {
+        unknown = true;
+        break;
+      }
+      const painted = getComputedStyle(e);
+      const flat = parseColor(painted.backgroundColor);
+      if (flat && flat.alpha >= 0.6) {
+        cells = [flat.rgb];
+        break;
+      }
+      if (painted.backgroundImage !== "none") {
+        unknown = true;
+        break;
+      }
+    }
+    if (unknown) continue;
+    if (!cells && footage) cells = cellsUnder(gridOf(footage.grid), box, [0, 0, 1080, 1920]);
+    const seen = cells ? lostOn(fill.rgb, fill.alpha * opacity, cells) : null;
+    if (!seen?.lost) continue;
+    const entry = found.get(text) ?? { text, frames: [], ratio: seen.ratio };
+    if (entry.frames.at(-1) !== frame) entry.frames.push(frame);
+    entry.ratio = Math.min(entry.ratio, seen.ratio);
+    found.set(text, entry);
+  }
+}
+
 /** Rows of the frame the drawing is measured in (20 px each). */
 const COVER_ROWS = 96;
 /** Elements drawn as shapes (an image, a canvas, a vector shape), whatever their style. */
@@ -343,7 +448,7 @@ function missingTexts(reelTexts: NonNullable<SceneCheckProps["reelTexts"]>, fram
   });
 }
 
-export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null }: SceneCheckProps) {
+export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null, backdrop }: SceneCheckProps) {
   const width = 1080;
   const height = 1920;
   const [track] = useState(() => footageTrack(pieces, themeFor(look?.template ?? "libre", look?.signature, look?.tempo), { width, height }, { shots }));
@@ -367,10 +472,13 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
       const out = new Map<string, Out>();
       const onFace = new Map<string, OnFace>();
       const largest = new Map<string, number>();
+      const lost = new Map<string, Ink>();
+      const grids = new Map<string, Uint8Array>();
       document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
         const frame = Number(copy.dataset.checkFrame);
         measure(copy, frame, width, height, out, track(frame), onFace);
         sizes(copy, largest);
+        if (backdrop) inks(copy, frame, backdrop, grids, lost);
       });
       const failures = [...out.values()].filter((o) => o.frames.length * step > OUT_FRAMES);
       const r = (n: number) => Math.round(n);
@@ -413,6 +521,16 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
             .join(" ; ");
           const message = `texte trop petit pour un téléphone : ${detail}. Un texte se lit d'un coup d'œil à ${MIN_TYPE} px au moins, sa taille dans l'image de 1080 × 1920 : grossis-le, et s'il n'a pas la place, garde moins de mots ou de lignes, ou prends plus de place dans l'image, sans changer l'idée.`;
           console.log(`FAUVE_SIZE ${JSON.stringify(message)}`);
+        }
+        const blended = [...lost.values()].filter((o) => o.frames.length * step > INK_FRAMES);
+        if (blended.length) {
+          const c = (n: number) => n.toFixed(1).replace(".", ",");
+          const detail = blended
+            .slice(0, 3)
+            .map((o) => `« ${o.text.slice(0, 40)} » (images ${o.frames[0]} à ${o.frames.at(-1)}, contraste ${c(o.ratio)} avec l'image dessous)`)
+            .join(" ; ");
+          const message = `texte qui se perd dans l'image dessous : ${detail}. Un mot se lit sur chaque image qu'il croise : donne-lui un bord à lui (une ombre serrée et dense, un contour), une autre couleur là où il disparaît, ou pose-le là où l'image le laisse lire, sans changer l'idée ni le style.`;
+          console.log(`FAUVE_INK ${JSON.stringify(message)}`);
         }
         // What it draws, row by row, over its length (each row: the share of the subtitles' width it covers, on average).
         const copies = Array.from(document.querySelectorAll<HTMLElement>("[data-check-frame]")).map((copy) => drawn(copy, width, height));

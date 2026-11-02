@@ -27,6 +27,7 @@ import {
   type MotionTemplate,
   type TrackPiece,
 } from "@fauve/agent";
+import type { SceneBackdrop } from "@render/contrast";
 import { env } from "@/lib/env";
 import { REMOTION_SOURCE_FILES, REMOTION_SOURCE_HASH } from "./remotion-source.generated";
 import { withSlot } from "@/lib/work-slots";
@@ -405,6 +406,8 @@ export type SmokeScene = {
   /** A collage's composition that draws the whole picture: the Reel's texts (each one checked, written whole at its moment) and its end. */
   reelTexts?: ComposeText[];
   end?: ComposeEnd | null;
+  /** The colours of the picture under it (each shot's, the footage's at some of its frames): a word lost on it is reported. */
+  backdrop?: SceneBackdrop;
 };
 
 /**

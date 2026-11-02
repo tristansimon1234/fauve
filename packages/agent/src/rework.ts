@@ -72,13 +72,20 @@ export function earlierLooks(
 }
 
 /**
+ * An image of the Reel before an animation is written: its instant and what it is told; for a composition, which of
+ * its shots shows (`shot`); during the animation's moment, the frame of the animation (`frame`). The scene check reads
+ * the colours under its words there.
+ */
+export type CanvasMoment = { t: number; label: string; shot?: number; frame?: number };
+
+/**
  * What the motion designer sees of its Reel before writing each animation (`ids`), the Reel drawn without the animations
  * being written (Tristan: « il devrait voir la vidéo complètement »; written blind, a florist's chat card hid her smile):
  * an image a second across the whole Reel (spread when it is longer), then, closer together, across the animation's own
  * moment, told on its own frames; the moment of another animation being written says so. A composition of the whole
  * Reel sees the Reel only, each image saying which of its shots shows (numbered as it knows them).
  */
-export function canvasMoments(plan: EditPlan, ids: string[]): Map<string, { t: number; label: string }[]> {
+export function canvasMoments(plan: EditPlan, ids: string[]): Map<string, CanvasMoment[]> {
   const spans = animationSpans(plan);
   const timeline = planTimeline(plan);
   const round = (t: number) => Math.round(t * 100) / 100;
@@ -95,7 +102,7 @@ export function canvasMoments(plan: EditPlan, ids: string[]): Map<string, { t: n
     }
     return null;
   };
-  const looks = new Map<string, { t: number; label: string }[]>();
+  const looks = new Map<string, CanvasMoment[]>();
   for (const id of ids) {
     const span = spans.get(id);
     if (!span || span.to - span.from < 0.3) continue;
@@ -104,7 +111,7 @@ export function canvasMoments(plan: EditPlan, ids: string[]): Map<string, { t: n
         id,
         across.map((t) => {
           const shot = shotAt(t);
-          return { t, label: shot === null ? at(t) : `${at(t)} · shot ${shot}` };
+          return shot === null ? { t, label: at(t) } : { t, label: `${at(t)} · shot ${shot}`, shot };
         }),
       );
       continue;
@@ -119,7 +126,10 @@ export function canvasMoments(plan: EditPlan, ids: string[]): Map<string, { t: n
       id,
       [
         ...across.filter((t) => t < from || t >= to).map((t) => ({ t, label: another(t) ? `${at(t)} · another animation of the Reel will play here` : at(t) })),
-        ...mine.map((t) => ({ t, label: `${at(t)} · frame ${Math.max(0, Math.round((t - from) * 30))} of your animation` })),
+        ...mine.map((t) => {
+          const frame = Math.max(0, Math.round((t - from) * 30));
+          return { t, label: `${at(t)} · frame ${frame} of your animation`, frame };
+        }),
       ].sort((a, b) => a.t - b.t),
     );
   }

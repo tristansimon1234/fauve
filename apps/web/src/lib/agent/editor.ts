@@ -34,7 +34,8 @@ import {
   MAX_FREE_SCENES,
   motionTemplateSchema,
   normalizeEditPlan,
-  capStillRepeats,
+  spreadRepeats,
+  alikeClip,
   stillClip,
   PHOTO_MAX_SECONDS,
   memoryLines,
@@ -256,6 +257,10 @@ export async function designEdit(params: {
   // she sent to copy: its form and pace, its look over her charter, for this Reel only.
   const inspirationId = post.data.inspiration_id as string | null;
   const followed = await copying;
+  // A Reel she copies has its animations written for it, in the copied Reel's look (a black ending stays black): no scene
+  // of the library but this Reel's own (a reused closing card from an earlier try had painted the copied black ending violet).
+  const copiedOnly = Boolean(followed && !followed.own);
+  const offered = copiedOnly ? library.filter((t) => own.has(t.id)) : library;
   const chosenInspiration = inspirationId ? await ensureInspirationRead(params.studioId, inspirationId).catch(() => null) : null;
   const chosenTemplate = motionTemplateSchema.safeParse(post.data.template);
   // A collage composes with her photos' cut-outs: for one she chose for this post or asks for now (« en collage »), they are
@@ -329,7 +334,7 @@ export async function designEdit(params: {
     // Her photos: each one a still shot with a slow zoom (clip_id = media_id, in 0, out = how long it shows).
     photos: photos.length ? photos : undefined,
     // Scenes already made: reusing one costs nothing.
-    templates: library,
+    templates: offered,
     // The hooks of her latest Reels: this one takes another form and other words.
     recent_hooks: hooks.length ? hooks : undefined,
     // Motion code stays out of the editor's context: it only needs the briefs.
@@ -398,7 +403,10 @@ export async function designEdit(params: {
   // Retouch and blur stay on their clips from one version to the next.
   // A correction also keeps the texts' styles and places (the editor names looks, it does not copy them).
   const base = previousPlan.success ? previousPlan.data : null;
-  const still = new Set(clips.filter((c) => stillClip(c.analysis)).map((c) => c.media_id));
+  // Clips whose passages all look alike, shown twice at most: their later passages go to the files she sent that show the least.
+  const alike = new Set(clips.filter((c) => alikeClip(c.analysis)).map((c) => c.media_id));
+  const still = new Set(clips.filter((c) => alikeClip(c.analysis) && stillClip(c.analysis)).map((c) => c.media_id));
+  const files = [...clips.map((c) => ({ id: c.media_id, seconds: c.analysis.duration, photo: false })), ...photoIds.map((id) => ({ id, seconds: PHOTO_MAX_SECONDS, photo: true }))];
   // Its animations whose brief did not change keep their code before the new ones are counted;
   // one rewritten (its shots changed, or the request touched it) takes the place of the one it replaces.
   const toPlan = (answer: EditorOutput | EditorOutputLegacy) => {
@@ -406,8 +414,8 @@ export async function designEdit(params: {
     // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
     const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;
     const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
-    // A clip filmed as one still shot shows twice at most, whatever its passages.
-    const capped = capStillRepeats(drafted, still);
+    // A clip whose passages look alike shows twice at most, whatever its passages.
+    const capped = spreadRepeats(drafted, alike, files, still);
     return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed), params.fresh ? null : base), base);
   };
   let plan = toPlan(output);
@@ -492,7 +500,7 @@ export async function designEdit(params: {
   // Library scenes: their saved code, with the new texts. An unknown id becomes a new scene.
   const reused = await templateCode(
     params.studioId,
-    plan.segments.filter(isMotionSegment).flatMap((s) => (s.motion.template_id ? [s.motion.template_id] : [])),
+    plan.segments.filter(isMotionSegment).flatMap((s) => (s.motion.template_id && (!copiedOnly || own.has(s.motion.template_id)) ? [s.motion.template_id] : [])),
   );
   plan.segments = plan.segments.map((s) => {
     if (!isMotionSegment(s) || !s.motion.template_id) return s;
