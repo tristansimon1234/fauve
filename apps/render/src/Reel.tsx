@@ -258,6 +258,12 @@ export function Reel(props: ReelProps) {
       {props.overlays?.length ? <Overlays props={props} k={k} /> : null}
       {collage && !whole ? <Grain props={props} /> : null}
       {props.soundtrack?.src ? <Audio src={props.soundtrack.src} volume={(f) => musicVolume(props.soundtrack!, f)} /> : null}
+      {/* Its sound effects, as the mix sets them: from its attack, at its gain (the preview cannot go over the file's own level). */}
+      {(props.sfx ?? []).map((s, i) => (
+        <Sequence key={`sfx${i}`} from={s.from} durationInFrames={Math.max(2, Math.ceil((s.end - s.onset) * props.fps))} layout="none">
+          <Audio src={s.src} trimBefore={Math.round(s.onset * props.fps)} volume={Math.min(1, 10 ** (s.gain / 20))} />
+        </Sequence>
+      ))}
       {props.voice?.src ? (
         // A voice that starts before the Reel (negative from): its silence before the first word is cut.
         <Sequence from={Math.max(0, props.voice.from)} layout="none">

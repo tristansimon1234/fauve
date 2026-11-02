@@ -11,9 +11,12 @@ import {
   musicTail,
   planBeat,
   planBpm,
+  sfxLevelSchema,
   usdToEur,
   type EditPlan,
   type PostKind,
+  type SfxLevel,
+  type SoundInMix,
 } from "@fauve/agent";
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -46,6 +49,8 @@ export const postMusicSchema = z.object({
   hand: z.boolean().optional(),
   /** What she asked for the music of this Reel (her contract's, in English): the composer's brief, over every default. */
   wish: z.string().max(300).optional(),
+  /** How present this Reel's sound effects are (light, more, off); absent: her default, else light (sfx.ts). */
+  sfx: sfxLevelSchema.optional(),
   /** The piece made for this post, and the cut it was made for. */
   track: z
     .object({
@@ -62,6 +67,24 @@ export const postMusicSchema = z.object({
 export type PostMusic = z.infer<typeof postMusicSchema>;
 
 export const readPostMusic = (value: unknown): PostMusic => postMusicSchema.catch({ mode: "on" }).parse(value ?? {});
+
+/**
+ * How present a Reel's sound effects are: this Reel's choice, else her default (for all her Reels),
+ * else light. None on a Reel that keeps the sound of the Reel it copies: Instagram puts that sound
+ * in place of the video's own (« Utiliser l'audio »), effects included.
+ */
+export async function soundLevel(studioId: string, postId: string): Promise<SfxLevel> {
+  const db = supabaseAdmin();
+  const [{ data: post }, { data: profile }] = await Promise.all([
+    db.from("posts").select("music").eq("id", postId).eq("studio_id", studioId).maybeSingle(),
+    db.from("brand_profiles").select("profile").eq("studio_id", studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const music = readPostMusic(post?.music);
+  if (music.mode === "model") return "off";
+  if (music.sfx) return music.sfx;
+  const own = sfxLevelSchema.safeParse((profile?.profile as { sfx?: unknown } | null)?.sfx);
+  return own.success ? own.data : "light";
+}
 
 /** The cut of a montage: what the music follows (the clips, scenes and their lengths), not the texts. */
 export function cutSignature(plan: Pick<EditPlan, "segments" | "template" | "transitions"> & { voice?: EditPlan["voice"]; tempo?: number; baked?: EditPlan["baked"] }): string {
@@ -217,12 +240,19 @@ export async function withMusic(params: {
   mp4: Buffer;
   renderId: string;
   fresh?: boolean;
+  /** Its sound effects, placed and levelled (sfx.ts) with their files: mixed with the music, or alone over its own sound. */
+  sounds?: (SoundInMix & { mp3: Uint8Array })[];
 }): Promise<{ mp4: Buffer; music: "kept" | "new" | "none" }> {
   if (!env("ELEVENLABS_API_KEY") || (params.kind !== "reel" && params.kind !== "story")) return { mp4: params.mp4, music: "none" };
   const db = supabaseAdmin();
   const { data: post } = await db.from("posts").select("music").eq("id", params.postId).single();
   const music = readPostMusic(post?.music);
-  if (music.mode !== "on") return { mp4: params.mp4, music: "none" };
+  const sounds = music.mode === "model" ? [] : (params.sounds ?? []);
+  if (music.mode !== "on") {
+    // No music of hers: the effects alone over its own sound (none on a Reel that takes the copied Reel's sound).
+    if (!sounds.length) return { mp4: params.mp4, music: "none" };
+    return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, null, { sounds }), music: "none" };
+  }
 
   const signature = cutSignature(params.plan);
   let mp3: Uint8Array | null = null;
@@ -306,7 +336,7 @@ export async function withMusic(params: {
       .update({ music: { mode: "on", ...(music.wish ? { wish: music.wish } : {}), track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString(), ...(music.wish ? { wish: music.wish } : {}) } } })
       .eq("id", params.postId);
   }
-  return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice) }), music: made };
+  return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice), sounds }), music: made };
 }
 
 /** Keeps what she asked for this Reel's music (her contract's): the composer's brief from now on, and a new piece. */

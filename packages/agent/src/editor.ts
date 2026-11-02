@@ -187,6 +187,12 @@ export const editorOutputSchema = z.object({
     end_card: z.object({ title: z.string(), subtitle: z.string().optional() }).optional(),
     effect: z.enum(["none", "dust"]).optional(),
     layers: z.array(z.object({ brief: z.string(), from: z.number(), to: z.number() })).optional(),
+    sounds: z
+      .array(z.object({ at: z.number(), sound: z.string(), seconds: z.number().optional() }))
+      .optional()
+      .describe(
+        "Light sound effects on your cuts and texts, each at seconds on the Reel's clock, sound a few generic English words (« soft whoosh », « light pop », « camera shutter »), seconds 0.5 to 2: 0 to 3, only where the viewer sees something happen and would expect to hear it; none under someone speaking, none during an animation (it brings its own), none for a calm Reel. The Reel she copies plays its own (« reel_a_recopier.bruitages »): the same kinds at the same moments. Reuse a name from « ready_sounds » when one fits",
+      ),
   }),
   rationale: z.string(),
 });
@@ -397,7 +403,19 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
   const ownColors = (plan as { colors?: unknown }).colors;
   const colors = Array.isArray(ownColors) ? [...new Set(ownColors.flatMap((c) => (typeof c === "string" && HEX_COLOR.test(c.trim().toLowerCase()) ? [c.trim().toLowerCase()] : [])))].slice(0, 3) : [];
   const { end_card: _endCard, fonts: _fonts, colors: _colors, ...rest } = plan as typeof plan & { colors?: unknown };
-  const { effect: _effect, layers: asked, ...kept } = rest as typeof rest & { effect?: string; layers?: { brief: string; from: number; to: number }[] };
+  const { effect: _effect, layers: asked, sounds: heard, ...kept } = rest as typeof rest & {
+    effect?: string;
+    layers?: { brief: string; from: number; to: number }[];
+    sounds?: { at?: unknown; sound?: unknown; seconds?: unknown }[];
+  };
+  // Its sound effects on its cuts and texts, within the Reel (the engine spaces and levels them).
+  const sounds = (Array.isArray(heard) ? heard : [])
+    .flatMap((c) =>
+      typeof c?.at === "number" && Number.isFinite(c.at) && c.at >= 0 && c.at < (Number(plan.duration) || 0) && typeof c.sound === "string" && c.sound.trim().length >= 2
+        ? [{ at: Math.round(c.at * 100) / 100, sound: c.sound.trim().slice(0, 60), ...(typeof c.seconds === "number" && Number.isFinite(c.seconds) ? { seconds: Math.min(3, Math.max(0.5, c.seconds)) } : {}) }]
+        : [],
+    )
+    .slice(0, 8);
   // Animations over several shots: a brief and a span, the code comes later (like a scene's).
   const layers = (asked ?? []).filter((l) => l.brief?.trim() && Number.isFinite(l.from) && Number.isFinite(l.to)).slice(0, 3);
   // A composition: the animation over the whole Reel lays its shots (one is added when the editor wrote none).
@@ -419,6 +437,7 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
     ...(fonts && Object.keys(fonts).length ? { fonts } : {}),
     ...(colors.length ? { colors } : {}),
     ...(endCard ? { end_card: endCard } : {}),
+    ...(sounds.length ? { sounds } : {}),
     // A named look brings its style back (and, for a list, its details and bullets).
     texts: plan.texts.map(({ look_name, ...t }) => {
       const saved = look_name ? byName.get(look_name.trim().toLowerCase()) : undefined;

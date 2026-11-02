@@ -122,6 +122,22 @@ export const editPlanSceneSegmentSchema = z.object({
 /** Name of a text slot in a motion template, e.g. "title" or "price". */
 export const SLOT_NAME = /^[a-z][a-z0-9_]{0,23}$/;
 
+/**
+ * A light sound effect on something seen (sfx.ts): `at` seconds (from its animation's start on an animation, on the
+ * Reel's clock on the plan), `sound` a short generic description in English (« soft pop », « paper whoosh »), the key
+ * of the shared library with `seconds`, its length. Written by the motion designer and the editor, never the browser.
+ */
+export const sfxCueSchema = z.object({
+  at: z.number().min(0).max(120),
+  sound: z.string().min(2).max(60),
+  seconds: z.number().min(0.5).max(3).optional(),
+});
+export type SfxCue = z.infer<typeof sfxCueSchema>;
+
+/** How present the sound effects are: light (the default), more, or none. */
+export const sfxLevelSchema = z.enum(["light", "more", "off"]);
+export type SfxLevel = z.infer<typeof sfxLevelSchema>;
+
 /** Free motion-design scene: the editor writes the brief, the motion designer (Opus) writes the code. */
 export const editPlanMotionSegmentSchema = z.object({
   motion: z.object({
@@ -159,6 +175,8 @@ export const editPlanMotionSegmentSchema = z.object({
     draws_end: z.boolean().optional(),
     /** A composition's choice of where the engine sets a voice's subtitles (share of the height): where none of its faces nor texts go. */
     subtitle_y: z.number().min(0.1).max(0.8).optional(),
+    /** Its sound effects, from its own start (the motion designer's answer): they follow its code, never the browser. */
+    sounds: z.array(sfxCueSchema).max(6).optional(),
   }),
   duration: z.number().min(1).max(8),
   /**
@@ -406,6 +424,8 @@ export const editPlanObjectSchema = z.object({
   copy: copyLayerSchema.optional(),
   /** What she added on it (planOverlaySchema), over everything. */
   overlays: z.array(planOverlaySchema).max(MAX_OVERLAYS).optional(),
+  /** The editor's sound effects on its cuts and texts, on the Reel's clock (each animation brings its own). */
+  sounds: z.array(sfxCueSchema).max(8).optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {
@@ -591,6 +611,8 @@ export const brandProfileSchema = z.object({
   text_looks: z.array(savedLookSchema).max(12).optional(),
   /** Edith's voice over the Reels: when, and which voice (absent: auto, the first voice). */
   voice: voiceSettingSchema.optional(),
+  /** Her sound effects on all her next Reels (light, more, off): absent, light (sfx.ts). */
+  sfx: sfxLevelSchema.optional(),
   dos: z.array(z.string()),
   donts: z.array(z.string()),
 });

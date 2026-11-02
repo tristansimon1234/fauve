@@ -938,8 +938,25 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async set_music({ post_id, mode, wish }) {
+    async set_music({ post_id, mode, wish, bruitages }) {
+      // Her sound effects for all her next Reels.
+      if (!post_id) {
+        if (!bruitages) return json({ error: "Donne post_id (ce Reel), ou bruitages seul pour tous ses prochains Reels." });
+        await insertProfileVersion(studioId, (profile) => ({ ...profile, sfx: bruitages }));
+        return json({ ok: true, note: "Gardé pour ses prochains Reels. Dis-le en une phrase." });
+      }
       const post = unwrap(await db.from("posts").select("id, kind, status, edit_plan_id, music").eq("id", post_id).eq("studio_id", studioId).single());
+      if (bruitages) {
+        if (post.kind !== "reel" && post.kind !== "story") return json({ error: "Les bruitages se mettent sur un Reel ou une story." });
+        if (["published", "measured"].includes(post.status as string)) return json({ error: "Ce Reel est déjà en ligne." });
+        check(await db.from("posts").update({ music: { ...readPostMusic(post.music), sfx: bruitages } }).eq("id", post_id));
+        if (!mode && !wish?.trim()) {
+          if (!post.edit_plan_id) return json({ ok: true, note: "C'est noté pour son montage." });
+          ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
+          return json({ status: "started", note: "La vidéo se refait avec ses bruitages réglés (1 à 2 min), sans toucher au montage ni à la musique, et le lien part tout seul. Dis-le en une phrase." });
+        }
+      }
+      if (!mode) mode = "on";
       if (post.kind !== "reel") return json({ error: "La musique se met sur un Reel." });
       if (["published", "measured"].includes(post.status as string)) return json({ error: "Ce Reel est déjà en ligne." });
       // The sound of the Instagram Reel it copies: no music of hers, she posts it herself with « Utiliser l'audio »;

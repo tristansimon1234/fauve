@@ -13,6 +13,7 @@ import {
   type DesignerMoves,
   type MotionPromptParts,
   type MotionSlot,
+  type SfxCue,
   type ReelProps,
   type ScenePhoto,
   type TrackPiece,
@@ -69,6 +70,8 @@ export type SceneRequest = {
   canvas?: SceneFrame[];
   /** The Reel she copies, at the moment this animation remakes: sheets of its frames (ten each), seen before writing. */
   model?: SceneFrame[];
+  /** The sound effects already made (the library's), reused by name when one fits. */
+  readySounds?: string[];
   /** The row where a voice's subtitles show during the scene (shares of the height): its words keep off it. */
   subtitles?: { y: number; h: number };
   /** The colours of the picture under it, read once from `canvas` for the scene check (null: none to read). */
@@ -94,6 +97,8 @@ export type SceneResult = {
   fonts?: string[];
   /** A composition: where it wants a voice's subtitles (share of the height). */
   subtitleY?: number;
+  /** Its sound effects, from its start (seconds), within its length. */
+  sounds?: SfxCue[];
 };
 
 /** What already exists, so that a new scene takes another idea. */
@@ -292,6 +297,7 @@ async function writeScene(
             : {}),
         ...(seen ? { previous_version: { frames: `${seen.frames.length} images attached, above`, code: seen.code } } : {}),
         ...(canvas ? { reel_frames: `${canvas.length} images attached, above` } : {}),
+        ...(request.readySounds?.length ? { ready_sounds: request.readySounds } : {}),
         ...(copied ? { model_frames: `${copied.length} sheets of the Reel she copies attached, first: remake how its elements appear, change, move and leave, at its pace, with her images and her words, never its images nor its words` } : {}),
       });
   const shown: string | Block[] = seen
@@ -334,6 +340,15 @@ async function writeScene(
   const fonts = (await Promise.all(named.map((f) => googleFont(f).catch(() => null)))).filter((f): f is string => Boolean(f));
   // A composition's choice of row for a voice's subtitles, kept within the frame's safe rows.
   const subtitleY = request.compose && typeof output?.subtitle_y === "number" ? Math.min(0.8, Math.max(0.1, output.subtitle_y)) : undefined;
+  // Its sounds within its length, a few at most (the engine spaces and levels them).
+  const seconds = request.durationInFrames / 30;
+  const sounds: SfxCue[] = (output?.sounds ?? [])
+    .flatMap((c) =>
+      c && typeof c.at === "number" && Number.isFinite(c.at) && c.at >= 0 && c.at < seconds && typeof c.sound === "string" && c.sound.trim().length >= 2
+        ? [{ at: Math.round(c.at * 100) / 100, sound: c.sound.trim().slice(0, 60), ...(typeof c.seconds === "number" && Number.isFinite(c.seconds) ? { seconds: Math.min(3, Math.max(0.5, c.seconds)) } : {}) }]
+        : [],
+    )
+    .slice(0, 4);
   const meta = {
     name: output?.name ?? "",
     slots: output?.slots ?? [],
@@ -341,6 +356,7 @@ async function writeScene(
     photos,
     fonts,
     ...(subtitleY !== undefined ? { subtitleY } : {}),
+    ...(sounds.length ? { sounds } : {}),
   };
   const problems = checkMotionCode(code);
   if (problems.length) return { code, js: null, error: `code refusé : ${problems.join(", ")}`, ...meta };

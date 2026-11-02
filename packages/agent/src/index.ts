@@ -79,3 +79,4 @@ export * from "./rework.ts";
 export * from "./trends.ts";
 export * from "./feedback.ts";
 export * from "./video-quality.ts";
+export * from "./sfx.ts";

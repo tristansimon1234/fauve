@@ -67,18 +67,51 @@ export function mixGains(loudness: { speech: number | null; music: number | null
  * The ffmpeg filter graph of a mix: [0:a] the video's own sound, [1:a] the music,
  * out as [a], faded out over 0.8 s from `fadeAt` (s; null when the length is unknown: no fade).
  */
-export function mixFilter(gains: ReturnType<typeof mixGains>, fadeAt: number | null): string {
-  const stereo = "aformat=sample_rates=44100:channel_layouts=stereo";
+export function mixFilter(gains: ReturnType<typeof mixGains>, fadeAt: number | null, sounds: SoundInMix[] = []): string {
   const fade = fadeAt === null ? "" : `,afade=t=out:st=${Math.max(0, fadeAt).toFixed(2)}:d=0.8`;
   const limit = `alimiter=limit=${MIX_CEILING}:level=false`;
-  const music = `[1:a]${stereo},volume=${gains.musicGain}dB`;
-  if (!gains.duck) return `${music},${limit}${fade}[a]`;
+  const music = `[1:a]${STEREO},volume=${gains.musicGain}dB`;
+  // The sound effects (inputs 2…), added to the mix before its limiter and its fade.
+  const end = sounds.length ? `[pre];${soundChains(sounds, 2)};[pre]${sounds.map((_, i) => `[x${i}]`).join("")}amix=inputs=${sounds.length + 1}:duration=first:normalize=0,` : ",";
+  if (!gains.duck) return `${music}${end}${limit}${fade}[a]`;
   const d = gains.duck;
   return (
-    `[0:a]${stereo},volume=${gains.speechGain}dB,asplit=2[key][own];${music}[m];` +
+    `[0:a]${STEREO},volume=${gains.speechGain}dB,asplit=2[key][own];${music}[m];` +
     `[m][key]sidechaincompress=threshold=${d.threshold}:ratio=${d.ratio}:attack=${d.attack}:release=${d.release}[ducked];` +
-    `[ducked][own]amix=inputs=2:duration=first:normalize=0,${limit}${fade}[a]`
+    `[ducked][own]amix=inputs=2:duration=first:normalize=0${end}${limit}${fade}[a]`
   );
+}
+
+const STEREO = "aformat=sample_rates=44100:channel_layouts=stereo";
+
+/** A sound effect as the mix takes it (sfx.ts placeSounds): its attack at `at` (s), its gain (dB), the part of its file played (s). */
+export type SoundInMix = { at: number; gain: number; onset: number; end: number };
+
+/**
+ * Each sound effect's chain, its file the input `first + i`, out as [x0], [x1]…: trimmed to its
+ * attack and its fade, at its gain, faded in 5 ms and out 40 ms (no click), delayed to its moment.
+ */
+export function soundChains(sounds: SoundInMix[], first: number): string {
+  return sounds
+    .map((s, i) => {
+      const length = Math.max(0.05, s.end - s.onset);
+      const out = Math.max(0, length - 0.04);
+      const delay = Math.max(0, Math.round(s.at * 1000));
+      return (
+        `[${first + i}:a]atrim=start=${s.onset.toFixed(3)}:end=${s.end.toFixed(3)},asetpts=PTS-STARTPTS,${STEREO},volume=${s.gain}dB,` +
+        `afade=t=in:d=0.005,afade=t=out:st=${out.toFixed(3)}:d=0.04,adelay=${delay}:all=1[x${i}]`
+      );
+    })
+    .join(";");
+}
+
+/**
+ * The sound effects over a Reel without Edith's music: over its own sound as it is (`hasAudio`),
+ * else over silence of its `duration`; the effects are the inputs 1…, out as [a], peaks under -1 dBFS.
+ */
+export function soundsOnlyFilter(hasAudio: boolean, duration: number, sounds: SoundInMix[]): string {
+  const base = hasAudio ? `[0:a]${STEREO}[pre]` : `anullsrc=r=44100:cl=stereo,atrim=duration=${duration.toFixed(2)}[pre]`;
+  return `${base};${soundChains(sounds, 1)};[pre]${sounds.map((_, i) => `[x${i}]`).join("")}amix=inputs=${sounds.length + 1}:duration=first:normalize=0,alimiter=limit=${MIX_CEILING}:level=false[a]`;
 }
 
 /** The ffmpeg filter that prints a voice's level (RMS, dB) every `step` seconds (its rumble left out). */

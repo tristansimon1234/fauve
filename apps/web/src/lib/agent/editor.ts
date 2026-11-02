@@ -82,6 +82,7 @@ import { designMotionScenes, type SceneRequest } from "./motion-designer";
 import { showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS, modelSheets } from "@/lib/steal";
+import { readySounds } from "@/lib/render/sfx";
 import { isFirstReel } from "@/lib/onboarding";
 import { LAYER_ROLE, markTemplatesUsed, OVERLAY_ROLE, PHOTO_ROLE, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { timeLeft } from "@/lib/step-clock";
@@ -201,7 +202,7 @@ export async function designEdit(params: {
   contract?: ReelContract;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
-  const [post, studio, brand, previous, recent, report, inspirations, hooks] = await Promise.all([
+  const [post, studio, brand, previous, recent, report, inspirations, hooks, readyForEditor] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id, voice_media_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
     db.from("studios").select("name, business_type, booking_url, memory").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
@@ -210,6 +211,7 @@ export async function designEdit(params: {
     latestReport(params.studioId).catch(() => null),
     db.from("inspirations").select("analysis, source, copied:style->look").eq("studio_id", params.studioId).not("analysis", "is", null).order("created_at", { ascending: false }).limit(12),
     recentHooks(params.studioId, params.postId).catch(() => []),
+    readySounds().catch(() => []),
   ]);
   if (post.error) throw new Error("Publication introuvable");
   // The Reel she sent to copy (« Steal »): its style, read after her message, is waited for while the rest is read.
@@ -370,6 +372,8 @@ export async function designEdit(params: {
     templates: offered,
     // The hooks of her latest Reels: this one takes another form and other words.
     recent_hooks: hooks.length ? hooks : undefined,
+    // The sound effects already made: reused by name when one fits.
+    ready_sounds: readyForEditor.length ? readyForEditor : undefined,
     // Motion code stays out of the editor's context: it only needs the briefs.
     previous_plan:
       correction && previousPlan.success
@@ -650,6 +654,8 @@ export async function designEdit(params: {
     };
   };
   const requests = toWrite.map(requestFor);
+  // The sound effects already made: an animation reuses a name when one fits (a new one costs about a cent).
+  if (readyForEditor.length) for (const request of requests) request.readySounds = readyForEditor;
   // The Reel she copies, seen by each animation that remakes part of it: the sheets of its frames at the same point
   // of the Reel (all of them for an animation over the whole Reel), never a sentence alone.
   if (post.data.inspiration_id && requests.length) {
@@ -783,7 +789,11 @@ export async function designEdit(params: {
   plan.segments = plan.segments.map((s, i) => {
     if (!isMotionSegment(s) || s.motion.js) return s;
     const kept = reusable.get(s.motion.brief);
-    if (kept) return { ...s, motion: { ...s.motion, code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}), ...(kept.fonts ? { fonts: kept.fonts } : {}) } };
+    if (kept)
+      return {
+        ...s,
+        motion: { ...s.motion, code: kept.code, js: kept.js, ...(kept.photos ? { photos: kept.photos } : {}), ...(kept.fonts ? { fonts: kept.fonts } : {}), ...(kept.sounds ? { sounds: kept.sounds } : {}) },
+      };
     const result = resultOf(`s${i}`);
     if (result?.error) console.warn("motion scene falls back to its fixed scene", s.motion.brief.slice(0, 80), result.error);
     return {
@@ -794,6 +804,7 @@ export async function designEdit(params: {
         js: result?.js ?? undefined,
         ...(result?.js && result.photos?.length ? { photos: result.photos } : {}),
         ...(result?.js && result.fonts?.length ? { fonts: result.fonts } : {}),
+        ...(result?.js && result.sounds?.length ? { sounds: result.sounds } : {}),
       },
     };
   });
@@ -811,6 +822,7 @@ export async function designEdit(params: {
         ...(kept.photos ? { photos: kept.photos } : {}),
         ...(kept.fonts ? { fonts: kept.fonts } : {}),
         ...(kept.template_id ? { template_id: kept.template_id } : {}),
+        ...(kept.sounds ? { sounds: kept.sounds } : {}),
         // A composition kept as it was draws what it drew (its texts, or only its shots), and keeps its subtitles' row.
         ...(kept.draws_texts ? { draws_texts: true } : {}),
         ...(kept.subtitle_y !== undefined ? { subtitle_y: kept.subtitle_y } : {}),
@@ -836,6 +848,7 @@ export async function designEdit(params: {
       js: result.js,
       ...(result.photos?.length ? { photos: result.photos } : {}),
       ...(result.fonts?.length ? { fonts: result.fonts } : {}),
+      ...(result.sounds?.length ? { sounds: result.sounds } : {}),
       // A collage's composition written now draws the whole picture: its ground, the Reel's texts and its end;
       // it knows where its faces are, so it sets the row of a voice's subtitles (they had landed on Tristan's eyes).
       ...(l.compose ? { draws_texts: true, draws_end: Boolean(plan.end_card) } : {}),

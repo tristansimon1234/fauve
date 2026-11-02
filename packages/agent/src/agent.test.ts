@@ -5837,3 +5837,65 @@ test("she adds to a Reel without anything redone: an end card after its last ima
   assert.equal(props.layers?.[0]?.drawsEnd, false);
   assert.equal(props.layers?.[0]?.end, null);
 });
+
+test("sound effects: placed by who wrote them, spaced, never under speech when light, levelled from measures", async () => {
+  const { soundKey, planCues, pickCues, placeSounds, sfxGain, soundSpan, soundLoudness, SFX_RULES } = await import("./sfx.ts");
+  const { mixFilter, soundsOnlyFilter, mixGains } = await import("./mix.ts");
+  // One key per sound and length, whatever its writer's spelling.
+  assert.equal(soundKey("Soft  Pop!"), "soft pop@1");
+  assert.equal(soundKey("soft pop", 1.3), "soft pop@1.5");
+  // The editor's sounds pulled onto the cut they were meant for; an animation's from its own start.
+  const plan = {
+    duration: 8,
+    texts: [{ text: "pov", from: 0, to: 2, style: "hook" }],
+    segments: [
+      { clip_id: "a", in: 0, out: 3 },
+      { motion: { brief: "x", sounds: [{ at: 0.4, sound: "paper whoosh" }, { at: 9, sound: "too late" }] }, duration: 2 },
+      { clip_id: "b", in: 0, out: 3 },
+    ],
+    sounds: [{ at: 4.8, sound: "light pop" }],
+  } as never;
+  const cues = planCues(plan, [
+    { start: 0, length: 3 },
+    { start: 3, length: 2 },
+    { start: 5, length: 3 },
+  ]);
+  assert.deepEqual(
+    cues.map((c) => [c.at, c.key, c.from]),
+    [
+      [3.4, "paper whoosh@1", "animation"],
+      [5, "light pop@1", "editor"],
+    ],
+  );
+  // Light: far apart and never while someone speaks; more: closer, under speech marked.
+  const many = [0.5, 1, 1.4, 3, 3.2, 6].map((at) => ({ at }));
+  assert.deepEqual(pickCues(many, { level: "light", duration: 8, speech: [[2.9, 3.5]] }).map((c) => c.at), [0.5, 6]);
+  assert.deepEqual(pickCues(many, { level: "more", duration: 8, speech: [[2.9, 3.5]] }).map((c) => [c.at, c.under]), [[0.5, false], [1, false], [1.4, false], [3, true], [6, false]]);
+  assert.deepEqual(pickCues(many, { level: "off", duration: 8, speech: [] }), []);
+  // Its loudest 400 ms on the target, its peak under -4 dBFS.
+  assert.equal(sfxGain({ lufs: -30, peak: -20 }, "music", "light"), SFX_RULES.light.target.music + 30);
+  assert.equal(sfxGain({ lufs: -10, peak: -1 }, "music", "more"), -6);
+  // Where it starts, is loudest and fades, from its levels every 10 ms.
+  const levels = [-120, -80, -50, -30, -20, -12, -25, -40, -60, -90, -120];
+  assert.deepEqual(soundSpan(levels, 0.01), { onset: 0.025, end: 0.11, hit: 0.05 });
+  assert.deepEqual(soundLoudness("t: 0.1 M: -40.2 S:-120\nt: 0.2 M: -18.5 S: -20\n  Sample peak:\n    Peak:       -3.4 dBFS"), { lufs: -18.5, peak: -3.4 });
+  // Placed with its loudest moment on its event: a whoosh that builds starts before the cut.
+  const library = { "paper whoosh@1": { lufs: -20, peak: -10, onset: 0.02, end: 0.9, hit: 0.42 }, "light pop@1": { lufs: -25, peak: -12, onset: 0.1, end: 0.4 } };
+  const placed = placeSounds(cues, { level: "light", mix: "music", duration: 8, speech: [], library });
+  assert.deepEqual(placed, [
+    { key: "paper whoosh@1", at: 3, gain: 0, onset: 0.02, end: 0.9 },
+    { key: "light pop@1", at: 5, gain: 5, onset: 0.1, end: 0.4 },
+  ]);
+  // A sound the library does not have is left out.
+  assert.equal(placeSounds(cues, { level: "light", mix: "music", duration: 8, speech: [], library: {} }).length, 0);
+  // Mixed before the limiter: each trimmed, faded, at its gain, delayed to its moment; without them, the mix as before.
+  const gains = mixGains({ speech: null, music: -15 }, false);
+  const graph = mixFilter(gains, 7.2, placed);
+  assert.match(graph, /\[2:a\]atrim=start=0\.020:end=0\.900,.*volume=0dB,afade=t=in:d=0\.005,afade=t=out:st=0\.840:d=0\.04,adelay=3000:all=1\[x0\]/);
+  assert.match(graph, /\[pre\]\[x0\]\[x1\]amix=inputs=3:duration=first:normalize=0,alimiter/);
+  assert.equal(mixFilter(gains, 7.2), mixFilter(gains, 7.2, []));
+  assert.doesNotMatch(mixFilter(gains, 7.2), /amix/);
+  // Without music: over the video's own sound, or over silence.
+  assert.match(soundsOnlyFilter(true, 8, placed), /^\[0:a\]aformat/);
+  assert.match(soundsOnlyFilter(false, 8, placed), /^anullsrc=r=44100:cl=stereo,atrim=duration=8\.00\[pre\];\[1:a\]/);
+});

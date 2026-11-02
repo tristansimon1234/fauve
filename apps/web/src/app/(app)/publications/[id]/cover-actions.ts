@@ -100,6 +100,30 @@ export async function setMusic(postId: string, mode: "on" | "off" | "another"): 
 }
 
 /**
+ * Its sound effects (light, more, none): kept on the post, the video made again after the answer
+ * (about a minute, free, the montage and the music unchanged). `again` false: another change
+ * remakes it already.
+ */
+export async function setSoundEffects(postId: string, level: "light" | "more" | "off", again = true): Promise<{ ok: boolean }> {
+  if (!z.uuid().safeParse(postId).success || !["light", "more", "off"].includes(level)) return { ok: false };
+  const { db, member } = await getStudioContext();
+  if (!member) return { ok: false };
+  const studioId = member.studio.id;
+  const { data: post } = await db.from("posts").select("music, edit_plan_id").eq("id", postId).eq("studio_id", studioId).in("kind", ["reel", "story"]).maybeSingle();
+  if (!post) return { ok: false };
+  const { error } = await supabaseAdmin()
+    .from("posts")
+    .update({ music: { ...readPostMusic(post.music), sfx: level } })
+    .eq("id", postId)
+    .eq("studio_id", studioId)
+    .not("status", "in", "(published,measured)");
+  if (error) return { ok: false };
+  if (again && post.edit_plan_id) after(() => queueRerender({ studioId, postId, silent: true }));
+  revalidatePath(`/publications/${postId}`);
+  return { ok: true };
+}
+
+/**
  * A Reel without its voice over (Edith's or her own voice note): the montage keeps
  * its cut, the video is made again after the answer (about a minute, free).
  */

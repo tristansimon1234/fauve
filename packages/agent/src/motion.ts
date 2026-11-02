@@ -5,6 +5,8 @@ import type { LogoOnDark } from "./logo.ts";
 import type { VoiceWord } from "./voice.ts";
 import type { BrandSignature } from "./signature.ts";
 import { previewMusic, speechWindows, type MixCase } from "./mix.ts";
+import { placeSounds, planCues, type SoundFacts, type SoundPlacement } from "./sfx.ts";
+import type { SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
@@ -233,6 +235,11 @@ export type ReelProps = {
    * its volume (0–1), and the lower one while someone speaks, in `duck.windows` (frames).
    */
   soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
+  /**
+   * The sound effects (sfx.ts): each placed as the mix places it (`at`, `gain` in dB, the part of its file
+   * played), and `from` its frame. Played by the live preview only: the render strips them and mixes them afterwards.
+   */
+  sfx?: (SoundPlacement & { src: string; from: number })[];
   /** Her voice note over the Reel, from `from` (frames), in the render and the preview. */
   voice?: { src: string; from: number } | null;
   /** An overlay over the whole video, under the texts: film dust. */
@@ -336,6 +343,8 @@ export type ReelInputs = {
   };
   /** Signed link of the music kept for the post: the editors play it with the preview. */
   soundtrack?: string;
+  /** Its sound effects' level and the library's sounds it asks for (signed links and measures): placed by buildReelProps. */
+  sfx?: { level: SfxLevel; sounds: Record<string, SoundFacts & { src: string }> };
   /** Her voice note (plan.voice): its signed link and her words (for the subtitles). */
   voice?: { src: string; words: VoiceWord[] };
   /** In a collage, the photos whose subject makes a sticker: the cut-out's signed link and the subject's box (shares of the photo). */
@@ -619,7 +628,19 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           .map((w) => ({ from: segment.startAt + toFrames(w.start - s.in), to: segment.startAt + toFrames(w.end - s.in) }));
       });
   const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : "music";
-  const music = previewMusic(mix, speechWindows(spoken.filter((w) => w.from < durationInFrames), toFrames(0.5)));
+  const speech = speechWindows(spoken.filter((w) => w.from < durationInFrames), toFrames(0.5));
+  const music = previewMusic(mix, speech);
+  // Its sound effects, placed once for the preview and the mix alike: at its level, never on top of what is said.
+  const sfx =
+    inputs.sfx && inputs.sfx.level !== "off"
+      ? placeSounds(planCues(plan, planTimeline(plan).segments), {
+          level: inputs.sfx.level,
+          mix,
+          duration: durationInFrames / fps,
+          speech: speech.map(([from, to]) => [from / fps, to / fps]),
+          library: inputs.sfx.sounds,
+        }).map((p) => ({ ...p, src: inputs.sfx!.sounds[p.key]!.src, from: toFrames(p.at) }))
+      : [];
 
   const endCardFrames = toFrames(END_CARD_SECONDS);
 
@@ -710,6 +731,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     brand,
     endCard,
     ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack, ...music } } : {}),
+    ...(sfx.length ? { sfx } : {}),
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
     ...(plan.effect ? { effect: plan.effect } : {}),
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),

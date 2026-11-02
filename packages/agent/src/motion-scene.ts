@@ -70,7 +70,9 @@ Code contract (strict)
 - Inline styles and inline SVG; TypeScript or JavaScript.
 - brand = { name, accent (her main colour), accentInk (text readable on accent), palette: { secondary, light, dark } (her charter's other colours), displayFont, bodyFont (both loaded: fontFamily: \`"\${brand.displayFont}"\`), logoUrl, logoOnDark }. logoOnDark "white": a dark one-colour logo, filter: "brightness(0) invert(1)" on a dark background; "plate": a dark multicolour logo, on a light rounded plate; absent: as it is.
 
-Answer with the code in "code", one sentence on your idea in "notes", a short telling name in French in "name" (she sees it, e.g. « Titre serif qui se dessine »), the slots in "slots" (their role in French), the ids of the photos your code reads in "photos" (empty without photos) and the Google Fonts families you add in "fonts" (usually empty).`;
+Answer with the code in "code", one sentence on your idea in "notes", a short telling name in French in "name" (she sees it, e.g. « Titre serif qui se dessine »), the slots in "slots" (their role in French), the ids of the photos your code reads in "photos" (empty without photos) and the Google Fonts families you add in "fonts" (usually empty).
+
+Sound: you may answer "sounds", light sound effects on what your animation does, each { at: seconds from your animation's first frame (its frame / 30), sound: a short generic description of one sound in English (« soft pop », « paper whoosh », « light click », « camera shutter », « marker squeak », « bubble pop »), seconds: its length, 0.5 to 2 }. Only where the viewer sees something happen and would expect to hear it (an element landing, a card flipping, a word slamming, a fast swipe), never one per element nor a bed of sound under everything, never under her voice; 0 to 3, fewer is better, none for a quiet animation. Reuse a name from ready_sounds when one fits (it is already made). The engine levels them under the music and the voice.`;
 
 /** The parts of the prompt a call needs besides its base, in this order. */
 const MOTION_PARTS = {
@@ -118,6 +120,8 @@ export const motionSceneOutputSchema = z.object({
   fonts: z.array(z.string()),
   // A composition: where the engine sets a voice's subtitles (share of the height, 0.1 to 0.8), null to leave them where they are.
   subtitle_y: z.number().nullable().optional(),
+  // Its light sound effects (sfx.ts): seconds from its start, a short generic English description, its length.
+  sounds: z.array(z.object({ at: z.number(), sound: z.string(), seconds: z.number().nullable() })).nullable().optional(),
 });
 
 /** Patterns generated code may not contain (shared with the text layers). */

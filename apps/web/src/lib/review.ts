@@ -18,7 +18,7 @@ import { localInstant, parseIsoDate } from "@/lib/dates";
 import { env } from "@/lib/env";
 import { montageStatus } from "@/lib/montage-status";
 import { modelState, type ModelState } from "@/lib/reel-models";
-import { readPostMusic } from "@/lib/render/music";
+import { readPostMusic, soundLevel } from "@/lib/render/music";
 import { ensureSceneSprite } from "@/lib/render/scene-sprite";
 import { freeSlots } from "@/lib/slots";
 import { instagramAccount } from "@/lib/social/publish";
@@ -79,8 +79,8 @@ export type ReviewData = {
   /** Connecting Instagram offered (lib/social/connect.ts). */
   connect: boolean;
   publishByHand: boolean;
-  /** Edith's music (null: the music service is not set up). */
-  music: { on: boolean; made: boolean } | null;
+  /** Edith's music (null: the music service is not set up), and how present its sound effects are. */
+  music: { on: boolean; made: boolean; sfx: "light" | "more" | "off" } | null;
   /** The voice on the Reel: Edith's (which one) or her own voice note. */
   voice: { who: "simone" | "hers"; name: string | null; /** Edith's voice (or her clone) it was read with. */ id?: string | null } | null;
   /** Her own voice (a clone made in Style), to pick for this Reel. */
@@ -172,7 +172,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
   const previous = versions.filter((v) => v < (current.version as number)).at(-1);
   const next = versions.find((v) => v > (current.version as number));
   const music = readPostMusic(post.music);
-  const handle = await instagramHandle(studioId);
+  const [handle, sfx] = await Promise.all([instagramHandle(studioId), soundLevel(studioId, post.id).catch(() => "light" as const)]);
 
   return {
     postId: post.id,
@@ -202,7 +202,7 @@ export async function loadReview(db: Db, studioId: string, post: ReviewPost, tim
     instagram: Boolean(account),
     connect: socialConnect(),
     publishByHand: post.publish_by_hand,
-    music: env("ELEVENLABS_API_KEY") ? { on: music.mode === "on", made: Boolean(music.track) } : null,
+    music: env("ELEVENLABS_API_KEY") ? { on: music.mode === "on", made: Boolean(music.track), sfx } : null,
     voice,
     ownVoice: ownVoice ? { id: ownVoice.id, sampleUrl: ownSample?.data?.signedUrl ?? null } : null,
     slots,

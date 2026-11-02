@@ -2,7 +2,7 @@
 
 import { DEFAULT_COVER_SECONDS, EFFECT_MINUTES, EFFECT_WORDS_MINUTES, REDO_MINUTES, RERENDER_MINUTES, SIMONE_VOICES, voiceSamplePath, type PostCover } from "@fauve/agent";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { setMusic, setPublishByHand, setVoiceOff } from "@/app/(app)/publications/[id]/cover-actions";
+import { setMusic, setPublishByHand, setSoundEffects, setVoiceOff } from "@/app/(app)/publications/[id]/cover-actions";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { putVoice, redoReel, reschedule, saveEffectWords } from "@/app/(app)/publications/[id]/review-actions";
 import { CoverPicker } from "@/components/montage/cover-picker";
@@ -528,14 +528,24 @@ function MusicView({ data, onDone }: Props) {
       : []),
   ];
   const picked = options.find((o) => o.id === choice);
-  const changed = choice !== current;
+  // Its sound effects, with the music (a pop, a whoosh where something happens).
+  const sfxNow = data.music?.sfx ?? "light";
+  const [sfx, setSfx] = useState(sfxNow);
+  const musicChanged = choice !== current;
+  const sfxChanged = Boolean(data.music) && sfx !== sfxNow;
+  const changed = musicChanged || sfxChanged;
   const apply = () =>
     start(async () => {
-      if (!picked || !changed) return onDone("");
+      if (!changed) return onDone("");
       setError(null);
-      const result = await picked.apply();
-      if (!result.ok) return setError("Ça n’a pas marché. Réessaie dans un instant.");
-      onDone(picked.message);
+      // The music's change remakes the video already: the effects are set first, without a second remake.
+      if (sfxChanged && !(await setSoundEffects(data.postId, sfx, !musicChanged)).ok) return setError("Ça n’a pas marché. Réessaie dans un instant.");
+      if (musicChanged && picked) {
+        const result = await picked.apply();
+        if (!result.ok) return setError("Ça n’a pas marché. Réessaie dans un instant.");
+        return onDone(picked.message);
+      }
+      onDone(sfx === "off" ? "Sans bruitages : la vidéo se refait, une minute environ." : "Les bruitages sont réglés : la vidéo se refait, une minute environ.");
     });
   return (
     <div className="flex flex-col gap-2.5">
@@ -566,13 +576,40 @@ function MusicView({ data, onDone }: Props) {
           );
         })}
       </div>
+      {data.music && (
+        <div className="mt-1 flex flex-col gap-1.5">
+          <span className="text-[13px] font-bold text-muted">Les bruitages</span>
+          <span className="text-[12.5px] leading-snug text-muted">Un petit son là où quelque chose se passe, sous la musique et la voix.</span>
+          <div role="radiogroup" aria-label="Les bruitages" className="flex gap-2">
+            {(
+              [
+                ["light", "Légers"],
+                ["more", "Plus présents"],
+                ["off", "Aucun"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={sfx === id}
+                disabled={pending}
+                onClick={() => setSfx(id)}
+                className={`h-9 rounded-full border-[1.5px] px-3.5 text-[13.5px] font-bold disabled:opacity-60 ${sfx === id ? "border-violet bg-violet-tint text-violet" : "border-line bg-white text-ink hover:border-lilac"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {error && (
         <p role="alert" className="text-[13.5px] font-semibold text-danger">
           {error}
         </p>
       )}
       <Done onClick={apply} pending={pending}>
-        {changed && picked ? picked.button : "C’est bon"}
+        {musicChanged && picked ? picked.button : sfxChanged ? "Régler les bruitages" : "C’est bon"}
       </Done>
     </div>
   );

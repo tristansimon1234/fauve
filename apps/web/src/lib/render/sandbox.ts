@@ -7,6 +7,11 @@ import {
   MIX_CEILING,
   mixFilter,
   mixGains,
+  soundLevelsFilter,
+  soundLoudness,
+  soundsOnlyFilter,
+  soundSpan,
+  type SoundInMix,
   parseSceneCuts,
   shotMiddles,
   pauseFilter,
@@ -682,33 +687,85 @@ function printed(stdout: string, name: string): number | null {
  * someone in a clip) is brought to the level of a voice, the music lies under it
  * and ducks while it speaks (mixGains: well under a voice over the whole Reel,
  * at its level around a few spoken shots). A video without sound just gets the music.
+ * Its sound effects (`sounds`, placed and levelled by sfx.ts) join the mix before its
+ * limiter; without music (`audio` null) they go over the video's own sound as it is.
  */
-export async function muxAudioInSandbox(id: string, mp4: Buffer, audio: Uint8Array, options: { voiceOver?: boolean } = {}): Promise<Buffer> {
+export async function muxAudioInSandbox(
+  id: string,
+  mp4: Buffer,
+  audio: Uint8Array | null,
+  options: { voiceOver?: boolean; sounds?: (SoundInMix & { mp3: Uint8Array })[] } = {},
+): Promise<Buffer> {
+  const sounds = options.sounds ?? [];
+  if (!audio && !sounds.length) return mp4;
   const sandbox = await jobSandbox();
   const dir = `${ROOT}/jobs/${id}-mux`;
   try {
     await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    const files = sounds.map((_, i) => `sfx_${String(i).padStart(2, "0")}.mp3`);
     await sandbox.writeFiles([
       { path: `${dir}/in.mp4`, content: mp4 },
-      { path: `${dir}/music.mp3`, content: audio },
+      ...(audio ? [{ path: `${dir}/music.mp3`, content: audio }] : []),
+      ...sounds.map((s, i) => ({ path: `${dir}/${files[i]}`, content: Buffer.from(s.mp3) })),
     ]);
     const probe = await bash(
       sandbox,
       // The music is measured over the Reel only: the composer's ending after it is cut off.
-      `cd "$1" && ${LOUD} && d=$(${ROOT}/ffmpeg -i in.mp4 2>&1 | sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' | awk -F: '{print $1*3600+$2*60+$3}'); echo "duration=$d speech=$(loud in.mp4) music=$(loud music.mp3 "$d")"`,
+      `cd "$1" && ${LOUD} && d=$(${ROOT}/ffmpeg -i in.mp4 2>&1 | sed -n 's/.*Duration: \\([0-9:.]*\\).*/\\1/p' | awk -F: '{print $1*3600+$2*60+$3}'); ` +
+        `a=$(${ROOT}/ffmpeg -i in.mp4 2>&1 | grep -c 'Audio:' || true); echo "duration=$d audio=$a speech=$(loud in.mp4)${audio ? ' music=$(loud music.mp3 "$d")' : ""}"`,
       [dir],
     );
     const measured = await probe.stdout();
-    const gains = mixGains({ speech: printed(measured, "speech"), music: printed(measured, "music") }, Boolean(options.voiceOver));
-    console.info("mix", id, measured.trim(), gains);
-    await bash(
-      sandbox,
-      `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 -filter_complex "$2" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4`,
-      [dir, mixFilter(gains, printed(measured, "duration") ? printed(measured, "duration")! - 0.8 : null)],
-    );
+    const duration = printed(measured, "duration");
+    const placed: SoundInMix[] = sounds.map((s) => ({ at: s.at, gain: s.gain, onset: s.onset, end: s.end }));
+    const inputs = files.flatMap((f) => ["-i", f]);
+    if (!audio) {
+      // No music of hers: the effects over the video's own sound (or silence), the picture copied.
+      const filter = soundsOnlyFilter((printed(measured, "audio") ?? 0) > 0, duration ?? 60, placed);
+      console.info("mix", id, measured.trim(), { sounds: placed.length });
+      await bash(
+        sandbox,
+        `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 ${inputs.map((_, i) => `"\${${i + 3}}"`).join(" ")} -filter_complex "$2" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4`,
+        [dir, filter, ...inputs],
+      );
+    } else {
+      const gains = mixGains({ speech: printed(measured, "speech"), music: printed(measured, "music") }, Boolean(options.voiceOver));
+      console.info("mix", id, measured.trim(), gains, { sounds: placed.length });
+      await bash(
+        sandbox,
+        `cd "$1" && ${ROOT}/ffmpeg -loglevel error -y -i in.mp4 -i music.mp3 ${inputs.map((_, i) => `"\${${i + 3}}"`).join(" ")} -filter_complex "$2" -map 0:v:0 -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4`,
+        [dir, mixFilter(gains, duration ? duration - 0.8 : null, placed), ...inputs],
+      );
+    }
     const out = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
     if (!out?.length) throw new Error("mux produced no file");
     return out;
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
+/**
+ * A sound effect measured once for the library: its loudest 400 ms (EBU R128 momentary) and its
+ * peak, then its level every 10 ms, where its attack starts and where it has faded out.
+ */
+export async function measureSoundInSandbox(id: string, mp3: Uint8Array): Promise<{ lufs: number | null; peak: number | null; onset: number; end: number; hit: number }> {
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}-sfx`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await sandbox.writeFiles([{ path: `${dir}/in.mp3`, content: Buffer.from(mp3) }]);
+    const loud = await bash(sandbox, `cd "$1" && ${ROOT}/ffmpeg -hide_banner -nostats -i in.mp3 -vn -af ebur128=peak=sample -f null - 2>&1 | tail -n 400`, [dir]);
+    const { lufs, peak } = soundLoudness(await loud.stdout());
+    const run = await bash(sandbox, `cd "$1" && ${ROOT}/ffmpeg -hide_banner -nostats -i in.mp3 -vn -af "$2" -f null - 2>&1 | grep -o 'RMS_level=[^ ]*' | cut -d= -f2`, [
+      dir,
+      soundLevelsFilter(0.01),
+    ]);
+    const levels = (await run.stdout())
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((v) => (Number.isFinite(Number(v)) ? Number(v) : -120));
+    return { lufs, peak, ...soundSpan(levels, 0.01) };
   } finally {
     await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
   }

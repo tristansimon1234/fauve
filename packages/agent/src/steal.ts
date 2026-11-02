@@ -107,6 +107,17 @@ export const stolenLookReadingSchema = z.object({
     .describe(
       "Quand le Reel enchaîne des effets, des animations ou des temps bien distincts (une liste d'effets montrés l'un après l'autre, des étapes, un avant/après), chacun dans l'ordre, jusqu'à 12 : c'est ce qui fait ce Reel, la personne qui le recopie doit pouvoir les refaire sans le revoir. Une liste vide pour un Reel sans moments distincts",
     ),
+  sounds: z
+    .array(
+      z.object({
+        at: z.number().describe("Quand on l'entend, en secondes"),
+        what: z.string().describe("Le son en anglais, en quelques mots génériques (« soft whoosh », « pop », « camera shutter », « typewriter click »), puis sur quoi il tombe"),
+      }),
+    )
+    .describe(
+      "Les bruitages qu'on entend par-dessus la musique (un whoosh sur une transition, un pop quand un élément arrive, un clic, un déclencheur photo, une sonnette…), chacun à son temps, jusqu'à 12. Ni la musique ni les paroles. Une liste vide quand il n'y en a pas",
+    )
+    .optional(),
   shots: z
     .array(
       z.object({
@@ -139,7 +150,7 @@ export const stolenLookReadingSchema = z.object({
 export type StolenLookReading = z.infer<typeof stolenLookReadingSchema>;
 
 /** The longest words of a stolen look, as it is kept. */
-const LOOK_CHARS = { name: 40, what: 200, composition: 240, layout: 200, music: 80, ending: 160, why: 300, moment: 320, ground: 100, subject: 80 } as const;
+const LOOK_CHARS = { name: 40, what: 200, composition: 240, layout: 200, music: 80, ending: 160, why: 300, moment: 320, ground: 100, subject: 80, sound: 120 } as const;
 /** The most shots a look keeps, one by one (what each shows, what is laid over it). */
 export const MAX_SHOTS = 40;
 /** The most moments a look keeps (a Reel of 9 effects, its ending). */
@@ -169,6 +180,11 @@ export const stolenLookSchema = stolenLookReadingSchema.extend({
     .array(z.object({ at: z.number().min(0).max(600), what: z.string().min(1).max(LOOK_CHARS.moment) }))
     .max(MAX_MOMENTS)
     .optional(),
+  // Its sound effects over the music, heard: a look read before them has none.
+  sounds: z
+    .array(z.object({ at: z.number().min(0).max(600), what: z.string().min(1).max(LOOK_CHARS.sound) }))
+    .max(MAX_MOMENTS)
+    .optional(),
   // A look read before its shots were read (reader 5) has none.
   shots: z
     .array(z.object({ at: z.number().min(0).max(600), ground: z.string().max(LOOK_CHARS.ground), laid: z.enum(["aucun", "personne", "objet", "deux objets"]), subject: z.string().max(LOOK_CHARS.subject) }))
@@ -190,12 +206,17 @@ function hexColor(written: string): string | null {
 
 /** Structured outputs do not enforce lengths: the reading is taken as written, then clamped. */
 export function clampLook(reading: StolenLookReading): StolenLook {
-  const { colors: written, text: t, moments: read, shots: seen, ...rest } = reading;
+  const { colors: written, text: t, moments: read, shots: seen, sounds: heard, ...rest } = reading;
   const font = t.font.trim();
   const colors = [...new Set(written.flatMap((c) => hexColor(c) ?? []))].slice(0, 3);
   const moments = read
     .filter((m) => Number.isFinite(m.at) && m.what.trim())
     .map((m) => ({ at: Math.round(Math.min(600, Math.max(0, m.at)) * 10) / 10, what: clip(m.what, LOOK_CHARS.moment) }))
+    .sort((a, b) => a.at - b.at)
+    .slice(0, MAX_MOMENTS);
+  const sounds = (heard ?? [])
+    .filter((x) => Number.isFinite(x.at) && x.what?.trim())
+    .map((x) => ({ at: Math.round(Math.min(600, Math.max(0, x.at)) * 10) / 10, what: clip(x.what, LOOK_CHARS.sound) }))
     .sort((a, b) => a.at - b.at)
     .slice(0, MAX_MOMENTS);
   const shots = (seen ?? [])
@@ -229,6 +250,7 @@ export function clampLook(reading: StolenLookReading): StolenLook {
     // One moment is not a sequence: a Reel built on one effect says it in its hook and its layout.
     ...(moments.length > 1 ? { moments } : {}),
     ...(shots.length ? { shots } : {}),
+    ...(sounds.length ? { sounds } : {}),
     music: clip(reading.music, LOOK_CHARS.music),
     ending: clip(reading.ending, LOOK_CHARS.ending),
     why: clip(reading.why, LOOK_CHARS.why),
@@ -550,6 +572,7 @@ export function followedForEditor(followed: FollowedStyle) {
     // What makes it: each effect or animation in turn, redone with her images (as many, each at its moment).
     // No filmed image in it: all made in motion design, her files left aside unless her request asks for one.
     ...(motionOnly(look) ? { sans_images: "pur motion design : des mots et des fonds dessinés, aucune image filmée ni photo ; refais-le tout en motion design, sans ses fichiers sauf si sa demande en veut un" } : {}),
+    ...(look.sounds?.length ? { bruitages: look.sounds.map((x) => ({ a_s: x.at, son: x.what })) } : {}),
     ...(look.moments?.length
       ? { moments: look.moments.map((m) => ({ a_s: m.at, quoi: m.what })), moments_consigne: "refais chacun de ces moments, dans cet ordre et à peu près à ces temps, avec ses images et ses mots : c'est ce qui fait ce Reel" }
       : {}),

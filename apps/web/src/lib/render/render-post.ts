@@ -13,6 +13,8 @@ import {
   motionTemplateSchema,
   isComposed,
   planMediaIds,
+  planCues,
+  planTimeline,
   PHOTO_MAX_SECONDS,
   scenePhotoIds,
   withoutScenes,
@@ -40,7 +42,8 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { meterWaits } from "@/lib/work-slots";
 import { logoTone } from "./logo-tone";
-import { withMusic } from "./music";
+import { soundLevel, withMusic } from "./music";
+import { ensureSounds, soundFiles, type LibrarySound } from "./sfx";
 import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
 import { copyCutoutInputs, ensureCutouts, overlayPhotoInputs, sceneCutoutInputs, stickerInputs } from "./cutout";
@@ -362,6 +365,9 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     };
     let engine: "remotion" | "ffmpeg" | "baked" = "ffmpeg";
     let mp4: Buffer;
+    // Its sound effects (sfx.ts): the library's sounds it asks for, made when missing, placed by buildReelProps
+    // (as the live preview places them) and mixed after the render, never by Remotion.
+    const sounds: { library: Record<string, LibrarySound>; placed: NonNullable<ReelProps["sfx"]> } = { library: {}, placed: [] };
     let durationMs = Math.round(renderDuration(withoutScenes(plan)) * 1000);
     if (plan.baked) {
       // A Reel the effects agent made: its video plays as it is (its texts and its effect are in the image), the music goes on it.
@@ -369,6 +375,14 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       engine = "baked";
       durationMs = Math.round(plan.duration * 1000);
     } else if (motion.success) {
+      const sfxLevel = post.kind === "reel" || post.kind === "story" ? await soundLevel(studioId, postId).catch(() => "off" as const) : "off";
+      const cues = sfxLevel === "off" ? [] : planCues(plan, planTimeline(plan).segments);
+      if (cues.length) {
+        sounds.library = await ensureSounds({ studioId, postId, cues }).catch((error: unknown) => {
+          console.warn("sound effects unavailable, none on this Reel", renderId, error);
+          return {};
+        });
+      }
       // Motion templates (Remotion); the ffmpeg engine is the safety net.
       const props = buildReelProps(plan, {
         template: motion.data,
@@ -384,7 +398,13 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         ...(overlayPhotos ? { overlayPhotos } : {}),
         photoAspects,
         ...(Object.keys(tracks).length ? { tracks } : {}),
+        ...(Object.keys(sounds.library).length
+          ? { sfx: { level: sfxLevel, sounds: Object.fromEntries(Object.entries(sounds.library).map(([key, s]) => [key, { ...s, src: s.path }])) } }
+          : {}),
       });
+      // The render stays silent of them: they are mixed afterwards, measured.
+      sounds.placed = props.sfx ?? [];
+      delete props.sfx;
       // Every animation is checked before the render: one whose text leaves the frame plays its fixed scene (an
       // animation over several shots, which has none, is left out). If the check is unavailable, the scenes stay.
       const checks = await checkReelAnimations(props);
@@ -439,7 +459,13 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       mp4 = await ffmpegRender();
     }
     // Edith's music, composed for this cut (or the one kept for it), on the video.
-    const voiced = await withMusic({ studioId, postId, kind: post.kind as PostKind, plan, mp4, renderId, fresh: options.freshMusic }).catch((error: unknown) => {
+    const effects = sounds.placed.length
+      ? await soundFiles(
+          sounds.placed.map(({ key, at, gain, onset, end }) => ({ key, at, gain, onset, end })),
+          sounds.library,
+        ).catch(() => [])
+      : [];
+    const voiced = await withMusic({ studioId, postId, kind: post.kind as PostKind, plan, mp4, renderId, fresh: options.freshMusic, sounds: effects }).catch((error: unknown) => {
       console.warn("music unavailable, silent Reel", renderId, error);
       return { mp4, music: "none" as const };
     });

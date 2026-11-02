@@ -1,6 +1,7 @@
 import "server-only";
-import { readPostMusic } from "@/lib/render/music";
-import { editPlanSchema, isClipSegment, motionTemplateSchema, type ReelInputs } from "@fauve/agent";
+import { readPostMusic, soundLevel } from "@/lib/render/music";
+import { playableSounds, soundsKnown } from "@/lib/render/sfx";
+import { editPlanSchema, isClipSegment, motionTemplateSchema, planCues, planTimeline, type ReelInputs } from "@fauve/agent";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { overlayPhotoInputs } from "@/lib/render/cutout";
@@ -38,6 +39,10 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
   const music = readPostMusic(post?.music);
   const soundtrack =
     music.mode === "on" && music.track ? ((await db.storage.from("media").createSignedUrl(music.track.path, 3600)).data?.signedUrl ?? undefined) : undefined;
+  // Its sound effects as the video has them (the library's, never made here): placed by buildReelProps like the render's.
+  const level = data?.post_id ? await soundLevel(studioId, data.post_id as string).catch(() => "off" as const) : "off";
+  const cues = level === "off" ? [] : planCues(plan.data, planTimeline(plan.data).segments);
+  const sounds = cues.length ? await playableSounds(await soundsKnown(cues.map((c) => c.key))).catch(() => ({})) : {};
   return {
     plan: plan.data,
     clipDurations: inputs.clipDurations,
@@ -49,6 +54,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       aspects: inputs.aspects,
       brand: { name: inputs.studioName, accent: inputs.accent, logoUrl: inputs.logoUrl, logoOnDark: inputs.logoOnDark, fonts: inputs.fonts, colors: inputs.colors, customFonts: inputs.customFonts, signature: inputs.reelSignature },
       ...(soundtrack ? { soundtrack } : {}),
+      ...(Object.keys(sounds).length ? { sfx: { level, sounds } } : {}),
       ...(inputs.voice ? { voice: inputs.voice } : {}),
       // A collage's stickers and the cut-outs its animations compose with, so the preview shows them as the video does.
       ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),

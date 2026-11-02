@@ -155,6 +155,14 @@ export function musicCostUsd(seconds: number): number {
   return (Math.max(0, seconds) / 60) * ELEVENLABS_MUSIC_USD_PER_MINUTE;
 }
 
+/** Sound effects, $0.12 a minute of sound (elevenlabs.io/pricing/api, November 2026; its FAQ says « billed per generation »: to check on the invoice). */
+export const ELEVENLABS_SFX_USD_PER_MINUTE = 0.12;
+
+/** A sound effect made for the library, by its length (half a second at least). */
+export function sfxCostUsd(seconds: number): number {
+  return (Math.max(0.5, seconds) / 60) * ELEVENLABS_SFX_USD_PER_MINUTE;
+}
+
 /** A transcribed voice note (Scribe), by its length. */
 export function transcriptionCostUsd(seconds: number): number {
   return (Math.max(0, seconds) / 3600) * ELEVENLABS_STT_USD_PER_HOUR;

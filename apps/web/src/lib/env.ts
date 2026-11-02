@@ -37,6 +37,8 @@ const schema = {
   ELEVENLABS_TTS_MODEL: z.string().default("eleven_v4"),
   ELEVENLABS_VOICE_ID: z.string().default("D6VK2PsbVdaFL5aALfRc"),
   ELEVENLABS_TTS_USD_PER_KCHAR: z.coerce.number().nonnegative().default(0.08),
+  /** Sound effects for the shared library (lib/render/sfx.ts). */
+  ELEVENLABS_SFX_MODEL: z.string().default("eleven_text_to_sound_v2"),
   // Instagram API with Instagram Login (Meta app → Instagram product).
   // Connecting Instagram / TikTok and publishing through their APIs (lib/social/connect.ts): « on » to offer them again.
   SOCIAL_CONNECT: z.enum(["on", "off"]).default("off"),
