@@ -8,6 +8,9 @@ import {
   CHAT_MODEL,
   CLAUDE_MODEL,
   clipAnalysisSchema,
+  COPY_SYSTEM,
+  copyRubric,
+  cutoutSchema,
   EFFECT_ROUTER_PROMPT,
   effectRouteSchema,
   effectsBudgetCents,
@@ -28,6 +31,9 @@ import {
   readEffectWords,
   memoryLines,
   signatureLines,
+  reelLink,
+  stolenStyleSchema,
+  textDrawingWords,
   usdToEur,
   voiceTranscriptSchema,
   type EditPlan,
@@ -39,7 +45,8 @@ import {
 import { outputFormat } from "@fauve/agent/answer";
 import { anthropic, logClaudeCost } from "@/lib/agent/run";
 import { env } from "@/lib/env";
-import { TRACK_MODELS } from "@/lib/render/sandbox";
+import { ensureCutouts } from "@/lib/render/cutout";
+import { stealReelInSandbox, TRACK_MODELS } from "@/lib/render/sandbox";
 import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -50,6 +57,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // is kept. The environment and the agent are made once and found again by their name.
 
 const NAME = "simone-effects";
+/** The director that remakes a Reel she sent, with her files (the workshop's copy mode), in the same environment. */
+const COPY_NAME = "simone-copy";
+/** The longest the copy waits for her photos' cut-outs before its session starts (its step has 800 s in all). */
+const CUTOUTS_WAIT_MS = 4 * 60_000;
 /** The agent that draws an effect again with her words: its own script, run by a lighter model in the same environment. */
 const REPLAY_NAME = "simone-effects-replay";
 const MANAGED_AGENTS = "managed-agents-2026-04-01";
@@ -119,6 +130,12 @@ export async function effectRoute(studioId: string, input: { postId: string; cor
   const videos = (media ?? []).filter((m) => m.kind === "video").length;
   // The Reel she copies is part of her request: its moments (an effect after another) say what it takes.
   const followed = await postStyle(studioId, input.postId).catch(() => undefined);
+  // A Reel she sent to remake (not one of hers kept as a model) is made by one director, in the workshop: the chain's
+  // relays (a reading in words, an editor, a motion designer coding blind) had lost its cuts, its cut-outs and its lettering.
+  if (followed && !followed.own && (media ?? []).length) {
+    console.log("montage: a copied Reel, made by the workshop's director", input.postId);
+    return "agent";
+  }
   const copied = followed ? momentsLine(followed.look) : null;
   const route = await routeEffect(studioId, input.brief ?? undefined, { videos, photos: (media ?? []).length - videos }, copied);
   if (route.agent) console.log("montage: effects agent", input.postId, route.effect, "—", route.why);
@@ -226,7 +243,7 @@ export async function startEffectsSession(input: {
   if (cents < 100) throw new Error("effects: budget too small for an effect");
   const db = supabaseAdmin();
   const client = anthropic();
-  const [{ environment, agent }, studio, brand, post, assets] = await Promise.all([
+  const [{ environment, agent: effectsAgent }, studio, brand, post, assets] = await Promise.all([
     effectsSetup(),
     db.from("studios").select("name, business_type, memory").eq("id", input.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", input.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
@@ -236,7 +253,10 @@ export async function startEffectsSession(input: {
       : Promise.resolve({ data: [] as { id: string; kind: string; storage_path: string; mime_type: string | null; duration: number | null }[] }),
   ]);
   const media = input.mediaIds.flatMap((id) => (assets.data ?? []).filter((a) => a.id === id && (a.kind === "video" || a.kind === "image")));
-  if (!media.some((m) => m.kind === "video")) throw new Error("effects: no video to work on");
+  const followed = await postStyle(input.studioId, input.postId).catch(() => undefined);
+  // A Reel she sent to remake (its style, then the model itself below): photos are enough for it.
+  const copying = Boolean(followed && !followed.own);
+  if (!media.length || (!copying && !media.some((m) => m.kind === "video"))) throw new Error("effects: no video to work on");
   const { data: analyses } = await db.from("clip_analyses").select("media_id, analysis").in("media_id", media.map((m) => m.id as string));
   const about = new Map(
     (analyses ?? []).flatMap((a) => {
@@ -245,7 +265,6 @@ export async function startEffectsSession(input: {
     }),
   );
   const profile = brandProfileSchema.pick({ colors: true, fonts: true, tone: true, signature: true }).partial().catch({}).parse(brand.data?.profile ?? {});
-  const followed = await postStyle(input.studioId, input.postId).catch(() => undefined);
   // A correction reworks the version she saw: its kit (its script, its measures) when it left one, her files under the same names.
   const seen = input.previousRender && post.data?.edit_plan_id ? (await db.from("edit_plans").select("plan").eq("id", post.data.edit_plan_id as string).maybeSingle()).data : null;
   const before = editPlanSchema.safeParse(seen?.plan).data?.baked;
@@ -281,6 +300,7 @@ export async function startEffectsSession(input: {
     uploads.push({ name: WORDS_FILE, mount: `/${WORDS_FILE}`, bytes: async () => Buffer.from(JSON.stringify(before?.words ?? [])) });
   }
   for (const m of TRACK_MODELS) uploads.push({ name: m.file, mount: `/models/${m.file}`, bytes: () => model(m) });
+  const copy = copying && followed ? await copyMaterial(input.studioId, followed.inspiration_id, files, media, uploads) : null;
 
   const task = effectsTask({
     request: input.request,
@@ -294,11 +314,15 @@ export async function startEffectsSession(input: {
     files,
     voice,
     copied: followed ? followedLine(followed) : null,
+    copy,
     previous: input.previousRender ? { name: "avant.mp4", kit: Boolean(kit) } : null,
     models: TRACK_MODELS.map((m) => m.file),
     budgetUsd: cents / 100,
   });
 
+  // The copy director, or the effects agent: the same environment, each with its own system prompt.
+  const agent = copy ? await workshopAgent(COPY_NAME, { id: CLAUDE_MODEL, effort: "high" }, COPY_SYSTEM) : effectsAgent;
+  const rubric = copy ? copyRubric({ voice: Boolean(voice), model: Boolean(copy.model) }) : effectsRubric({ voice: Boolean(voice) });
   const uploaded: string[] = [];
   try {
     const resources = [];
@@ -314,7 +338,7 @@ export async function startEffectsSession(input: {
       resources,
       budget: { type: "limit", max_list_cost: { amount: String(cents), currency: "USD" } },
       initial_events: [
-        { type: "user.define_outcome", description: task, rubric: { type: "text", content: effectsRubric({ voice: Boolean(voice) }) }, max_iterations: EFFECTS_MAX_ITERATIONS },
+        { type: "user.define_outcome", description: task, rubric: { type: "text", content: rubric }, max_iterations: EFFECTS_MAX_ITERATIONS },
       ],
       metadata: { studio: input.studioId, post: input.postId },
     });
@@ -324,6 +348,63 @@ export async function startEffectsSession(input: {
     await Promise.all(uploaded.map((id) => client.files.delete(id).catch(() => undefined)));
     throw error;
   }
+}
+
+/**
+ * What the copy director gets besides her files: the model itself, taken again from its link (a small copy to watch and
+ * measure, never kept), its cuts measured on it (else the ones measured when it was read), its lettering, and her photos'
+ * subjects cut out (made now when they are not yet), each added to the uploads.
+ */
+async function copyMaterial(
+  studioId: string,
+  inspirationId: string,
+  files: EffectsTaskInput["files"],
+  media: { id: unknown; kind: unknown }[],
+  uploads: { name: string; mount: string; bytes: () => Promise<Buffer> }[],
+): Promise<NonNullable<EffectsTaskInput["copy"]>> {
+  const db = supabaseAdmin();
+  const { data: row } = await db.from("inspirations").select("url, style").eq("id", inspirationId).eq("studio_id", studioId).maybeSingle();
+  const style = stolenStyleSchema.safeParse(row?.style);
+  let cuts = style.success ? style.data.measures.cuts : [];
+  let duration = style.success ? style.data.measures.duration : 0;
+  let model: string | null = null;
+  const link = typeof row?.url === "string" ? reelLink(row.url) : null;
+  if (link) {
+    const id = `copy-${createHash("sha1").update(`${inspirationId}${Date.now()}`).digest("hex").slice(0, 12)}`;
+    const taken = await stealReelInSandbox(id, { link: link.url }).catch(() => null);
+    if (taken && !("miss" in taken)) {
+      model = "modele.mp4";
+      const video = taken.video;
+      uploads.push({ name: model, mount: `/${model}`, bytes: async () => video });
+      cuts = taken.cuts;
+      duration = taken.duration;
+    } else console.warn("copy: the model could not be taken again, its reading and cuts stand", inspirationId);
+  }
+  // Her photos' subjects, cut out once (the cut-out sandbox), named after the photo they come from.
+  const photos = media.filter((m) => m.kind === "image").map((m) => m.id as string);
+  // Waited for a few minutes at most (one photo at a time in their sandbox): the ones made by then are given, the step goes on.
+  await Promise.race([
+    ensureCutouts(studioId, photos).catch((error: unknown) => console.warn("copy: cut-outs not made", error)),
+    new Promise((resolve) => setTimeout(resolve, CUTOUTS_WAIT_MS)),
+  ]);
+  const { data: cut } = photos.length ? await db.from("media_assets").select("id, cutout").in("id", photos) : { data: [] };
+  const cutouts: NonNullable<EffectsTaskInput["copy"]>["cutouts"] = [];
+  for (const c of cut ?? []) {
+    const read = cutoutSchema.safeParse(c.cutout);
+    const of = files[media.findIndex((m) => m.id === c.id)]?.name;
+    if (!read.success || !of) continue;
+    const name = `${of.replace(/\.[a-z0-9]+$/i, "")}_detoure.webp`;
+    uploads.push({ name, mount: `/${name}`, bytes: () => stored(read.data.path) });
+    cutouts.push({ name, of });
+  }
+  return {
+    model,
+    cuts,
+    duration,
+    font: style.success ? (style.data.look.text.font ?? null) : null,
+    drawing: style.success ? textDrawingWords(style.data.look.text) : null,
+    cutouts,
+  };
 }
 
 export type EffectsState = {

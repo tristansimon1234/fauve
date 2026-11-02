@@ -100,6 +100,19 @@ export type EffectsTaskInput = {
   voice?: { name: string; words: string; seconds: number; text: string } | null;
   /** The Reel she copies (« Steal »): its style, in lines; never its words nor its images. */
   copied?: string | null;
+  /**
+   * A Reel she sent to remake with her files (the workshop's copy mode): its video when it could be taken again, its
+   * cuts measured on it, its lettering (the font checked against its title, how its words are drawn), and her photos'
+   * subjects already cut out.
+   */
+  copy?: {
+    model: string | null;
+    cuts: number[];
+    duration: number;
+    font: string | null;
+    drawing: string | null;
+    cutouts: { name: string; of: string }[];
+  } | null;
   /** A correction: the version she saw, to rework rather than redo, and its kit when it left one. */
   previous?: { name: string; kit?: boolean } | null;
   /** The MediaPipe models, as mounted. */
@@ -126,6 +139,22 @@ How you work, the way a good motion designer does:
 
 What counts: the effect she asks for, true to her idea and to what moves in her video, in a Reel that hooks from the first frame, with a native look, like a creator who edits their own Reels, never an ad nor a flyer. Everything she will read (the texts on screen, your message to her) is in French.`;
 
+/**
+ * The copy mode: one director remakes a Reel she sent, with her files, alone in its container, the way a good editor
+ * remakes a model by hand (Tristan, comparing a copy made by hand to the chain's: « ça a l'air bcp mieux », then « moins
+ * il y a de parties prenantes, plus la qualité est bonne »): it watches the model, keeps its exact cuts, lays her cut-outs
+ * as it does, sets her words in its lettering, renders, looks, corrects.
+ */
+export const COPY_SYSTEM = `You are the editor and motion designer of Edith, the assistant that runs the social media of neighbourhood businesses. A manager sent you an Instagram Reel she loves and her own photos and videos: you remake that Reel with her images and her words, alone, in a Linux container. You have bash, Python 3, ffmpeg, MediaPipe, OpenCV, Pillow and numpy; Google Fonts fonts can be downloaded (fonts.googleapis.com, fonts.gstatic.com), nothing else on the network. Nobody answers while you work: ask no question, decide.
+
+How you work, the way a good editor remakes a model by hand:
+- watch the model first, shot by shot: contact sheets of its frames at every cut, then closer where something is laid over the picture (a person or an object cut out, a text, a frame);
+- keep its exact cut times and its length, so that its sound, added in Instagram from its start, lands on the same cuts; one of her images per shot of the model, the strongest first, none shown twice in a row;
+- remake each of its moments with her images: a cut-out laid as it lays one (her subjects already cut out are provided; a person stands on the bottom edge, an object sits big where it sits), its text set as it sets it (same place, size, lines, tilt, lettering, no shadow it does not have), its ending as it ends;
+- render, look at the result next to the model on the same instants, and correct until it reads like the same Reel with her images.
+
+What counts: someone who saw the model recognises it at once, and nothing in it looks cheaper than the model: the same lettering, the same restraint, her images at their best (cropped on what matters, never stretched, never a soft upscale). Everything she will read (the texts on screen, your message to her) is in French.`;
+
 /** The task of one session: her request, her business, her files, the Reel's rules and what to write out. */
 export function effectsTask(input: EffectsTaskInput): string {
   const files = input.files.map((f) => {
@@ -139,6 +168,23 @@ export function effectsTask(input: EffectsTaskInput): string {
     `The business: ${input.studio.name}${input.studio.business ? ` (${input.studio.business})` : ""}.${input.studio.facts.length ? ` What is true: ${input.studio.facts.join(" ; ")}.` : ""}${input.studio.tone ? ` Its tone: ${input.studio.tone}.` : ""}`,
     `Her charter, a starting point, not a cage: colours ${input.brand.colors.join(", ") || "to choose"}; fonts ${input.brand.fonts.join(" (titles), ") || "to choose"}${input.brand.fonts.length > 1 ? " (text)" : ""}.${input.brand.signature ? ` Her signature: ${input.brand.signature}` : ""} When her request or the Reel she copies calls for another universe (a cartoon, a manga, a film, other lettering, other colours), take it with its codes.`,
     ...(input.copied ? [`The Reel she copies (its style only, never its words nor its images): ${input.copied}`] : []),
+    ...(input.copy
+      ? [
+          "",
+          input.copy.model
+            ? `The Reel to remake: ${UPLOADS}/${input.copy.model} (a small copy, to watch and measure only: none of its images, its words or its sound goes into her Reel).`
+            : "The Reel to remake could not be taken again: work from its reading above and its measured cuts.",
+          `Its cuts, measured on it, in seconds: ${input.copy.cuts.map((c) => Math.round(c * 100) / 100).join(", ") || "none"}; it lasts ${Math.round(input.copy.duration * 100) / 100} s. Keep these cut times exactly and its length: she may add its own sound in Instagram, from its start, and each cut must land where it did.`,
+          ...(input.copy.font || input.copy.drawing
+            ? [`Its lettering: ${[input.copy.font ? `the Google Fonts family ${input.copy.font}, checked against its title` : "", input.copy.drawing ?? ""].filter(Boolean).join("; ")}. Her words take the place of its words, set the same way.`]
+            : []),
+          ...(input.copy.cutouts.length
+            ? [
+                `Her photos' subjects, already cut out (transparent background; look at each one before using it, and leave out one whose edge is not clean): ${input.copy.cutouts.map((c) => `${UPLOADS}/${c.name} (from ${c.of})`).join(", ")}.`,
+              ]
+            : []),
+        ]
+      : []),
     "",
     `Her files (read only; if one is missing, look for it with find ${UPLOADS}):`,
     ...files,
@@ -164,7 +210,9 @@ export function effectsTask(input: EffectsTaskInput): string {
       : []),
     "",
     "The Reel:",
-    `- 1080×1920, cropped on what matters, no bars; 30 fps; H.264 yuv420p (CRF 18) with an AAC sound track; 7 to ${MAX_REEL_SECONDS} s (7 to 15 s for an effect or an announcement, more when a voice tells a story);`,
+    input.copy
+      ? "- 1080×1920, cropped on what matters, no bars; 30 fps; H.264 yuv420p (CRF 18) with an AAC sound track (silent is fine); the model's length;"
+      : `- 1080×1920, cropped on what matters, no bars; 30 fps; H.264 yuv420p (CRF 18) with an AAC sound track; 7 to ${MAX_REEL_SECONDS} s (7 to 15 s for an effect or an announcement, more when a voice tells a story);`,
     "- it hooks from the first frame: the effect, or what intrigues, starts at once; cut the seconds of waiting before the gesture and what does not serve;",
     "- the texts read on a phone and stay in Instagram's safe zone: nothing important in the bottom quarter (480 px), within 140 px of the sides or in the top 80 px, like the rest of our Reels. Little text, short creator sentences, in French, with the non-breaking spaces before : ; ! ? %; never an ad nor a flyer;",
     "- a face stays clear, except when the effect asks for it (a text born between her fingers in front of her face, an effect laid on her);",
@@ -196,6 +244,23 @@ export function effectsRubric({ voice }: { voice: boolean }): string {
     ...(voice ? ["Her voice-over is whole and untouched, its first word around 0.2 s, and its words are subtitled, readable, out of the bottom quarter (480 px)."] : []),
     `${WORDS_FILE} lists each text written on screen (apart from subtitles) with a label for her, its text and its maximum length; ${KIT_FILE} holds render.py, which remakes reel.mp4 from ${WORDS_FILE} and her files, downloading nothing.`,
     "notes.md says what was measured, how the effect follows the video and what was corrected after looking; message.txt talks to her in two sentences, in French.",
+  ];
+  return ["# Criteria, each graded on its own", ...points.map((p, i) => `${i + 1}. ${p}`)].join("\n");
+}
+
+/** The grader's rubric for a copy: the model's structure kept with her images, each point checked on its own. */
+export function copyRubric({ voice, model }: { voice: boolean; model: boolean }): string {
+  const points = [
+    `${OUTPUTS}/reel.mp4 exists and plays: 1080×1920, 30 fps, H.264, an AAC sound track, the model's length (within 0.2 s).`,
+    "Its cuts fall at the model's measured cut times, within one frame, shot for shot.",
+    "Every image comes from her files (her photos, her videos, their cut-outs): nothing of the model's images, nothing generated.",
+    ...(model ? ["Seen next to the model on the same instants, it reads as the same Reel: the same layout (full frame, cut-outs laid over, frames…), the text in the same place, size, lines and tilt, the same ending."] : []),
+    "The text is set in the model's lettering (its checked font, its stroke, no shadow it does not have), her words in French, whole in the frame and readable on a phone.",
+    "Each cut-out used has a clean edge and sits as the model's do (a person on the bottom edge, an object big); none looks pasted on carelessly.",
+    ...(voice ? ["Her voice-over is whole and untouched, its first word around 0.2 s, and its words are subtitled, readable, out of the bottom quarter (480 px)."] : []),
+    "6 to 10 images frame-<time>.jpg of the final Reel, covering its moments.",
+    `${WORDS_FILE} lists each text written on screen with a label for her, its text and its maximum length; ${KIT_FILE} holds render.py, which remakes reel.mp4 from ${WORDS_FILE} and her files, downloading nothing.`,
+    "notes.md says how the model was measured and what was corrected after looking; message.txt talks to her in two sentences, in French.",
   ];
   return ["# Criteria, each graded on its own", ...points.map((p, i) => `${i + 1}. ${p}`)].join("\n");
 }

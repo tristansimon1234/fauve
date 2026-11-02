@@ -5270,6 +5270,37 @@ test("her latest burst is always whole in Edith's history, however long", async 
   assert.equal(withLatestBurst(calm, plain), plain);
 });
 
+test("a copied Reel goes to one director, with the model, its exact cuts, its lettering and her cut-outs", async () => {
+  const { effectsTask, copyRubric, COPY_SYSTEM } = await import("./effects.ts");
+  const task = effectsTask({
+    request: "Refais ce Reel avec mes photos : « Tu veux les mêmes Reels ? »",
+    studio: { name: "Edith", business: "assistant IA", facts: [], tone: null },
+    brand: { colors: ["#5B3FD9"], fonts: ["Plus Jakarta Sans"] },
+    files: [{ name: "photo1.jpg", kind: "photo" }],
+    copied: "un message tenu",
+    copy: {
+      model: "modele.mp4",
+      cuts: [1.53, 1.87, 2.2],
+      duration: 13.21,
+      font: "Indie Flower",
+      drawing: "trait fin, comme au stylo",
+      cutouts: [{ name: "photo1_detoure.webp", of: "photo1.jpg" }],
+    },
+    models: [],
+    budgetUsd: 3,
+  });
+  assert.match(task, /Reel to remake: \/mnt\/session\/uploads\/modele\.mp4/);
+  assert.match(task, /1\.53, 1\.87, 2\.2; it lasts 13\.21 s\. Keep these cut times exactly/);
+  assert.match(task, /Google Fonts family Indie Flower, checked against its title; trait fin/);
+  assert.match(task, /photo1_detoure\.webp \(from photo1\.jpg\)/);
+  assert.match(task, /the model's length/);
+  assert.match(copyRubric({ voice: false, model: true }), /cuts fall at the model's measured cut times/);
+  assert.doesNotMatch(copyRubric({ voice: false, model: false }), /Seen next to the model/);
+  assert.match(COPY_SYSTEM, /keep its exact cut times/);
+  // An effect, without a copy, keeps its own length rules.
+  assert.match(effectsTask({ request: "un effet", studio: { name: "x", business: null, facts: [], tone: null }, brand: { colors: [], fonts: [] }, files: [], models: [], budgetUsd: 3 }), /7 to 45 s/);
+});
+
 test("a clip whose passages look alike shows twice, its later passages given to the files that show least", async () => {
   const { spreadRepeats, alikeClip } = await import("./editor.ts");
   // One shot, nobody speaking: alike, whatever the camera. A face to camera says something else in each passage.
