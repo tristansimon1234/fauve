@@ -23,6 +23,10 @@ export const MOTION_SCOPE = [
   "Cutout",
   "Footage",
   "Marker",
+  "Tiles",
+  "Window",
+  "Stack",
+  "Split",
 ] as const;
 
 // The motion designer's prompt: a base every animation gets (cached), then only the parts its call needs
@@ -66,6 +70,7 @@ Code contract (strict)
 - No import or export. Only these identifiers exist: ${MOTION_SCOPE.join(", ")} (standard Remotion API: useCurrentFrame() is the scene's frame, from 0; interpolate(frame, [a, b], [x, y], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing }); spring({ frame, fps, config }); random("seed") for deterministic randomness).
 - FitText, when you need it: a box whose text shrinks until it fits, never breaking a word — <FitText style={{ position: "absolute", left, top, width, height }} innerStyle={{ fontFamily, fontSize, lineHeight, color }}>{title}</FitText> (style places the box; innerStyle sets its content's type and layout, centred in a flex column by default). Text you set by hand (a bubble, an interface line, a label) does not need it.
 - Marker, when you circle or underline a word by hand: <Marker color={…} from={frame it starts drawing} shape="circle" | "underline" strokeWidth={px, optional}>{word}</Marker> wraps the word where it sits (in a line, in FitText) and draws its stroke around the word as laid out, whatever its final size.
+- The layout kit, tested pieces to use when the form calls for them (never imposed): each takes « draw », a node or (size) => node drawn at that size (in a composition, a shot of hers fills it: Footage at left 0, top 0, size.width × size.height). <Tiles cols={6} rows={…} steps={[{ at, show: draw, wave: "center" | "edges" | "random" | "top" | "bottom" | "left" | "right" | "diagonal" | "checker" | "groups" | "all", spread: frames, reveal: "cut" | "fade" | "pop" | "flip" | "slide" }]} gap={px} lines={{ color, from, to }} />: a picture cut into tiles (strips with cols={1} or rows={1}) that change to the next picture along a wave, each tile showing its own piece in place. <Window box={{ x, y, w, h }} at={frame} open={frames} reveal="grow" | "iris" | "wipe-up" | "wipe-down" | "wipe-left" | "wipe-right" | "fade" | "cut" moves={[{ at, frames, box }]} close={{ at }} radius shadow border={{ width, color }} fit="cover" | "cut">{draw}</Window>: a window that opens in the picture, moves, shrinks into a card and closes (fit "cut": the piece of a full-frame picture, in place). <Stack items={[draw or { draw, aspect }]} at every={frames} layout="pile" | "table" | "dump" | "row" | "grid" size={px} center={{ x, y }} tilt enter="drop" | "slide" | "pop" | "fade" | "cut" border={px} radius exit={{ at, to }} />: prints laid one by one, taken away one by one. <Split parts={[draw, draw]} direction="row" | "column" weights gap radius enter="slide" | "grow" | "wipe" | "fade" | "cut" stagger labels={[…]} labelStyle={…} />: two to four panes.
 - Forbidden: network access, Math.random, Date, setTimeout, eval, window, document, localStorage, <script>, external images (only brand.logoUrl, when there is one, and the given photos).
 - Inline styles and inline SVG; TypeScript or JavaScript.
 - brand = { name, accent (her main colour), accentInk (text readable on accent), palette: { secondary, light, dark } (her charter's other colours), displayFont, bodyFont (both loaded: fontFamily: \`"\${brand.displayFont}"\`), logoUrl, logoOnDark }. logoOnDark "white": a dark one-colour logo, filter: "brightness(0) invert(1)" on a dark background; "plate": a dark multicolour logo, on a light rounded plate; absent: as it is.

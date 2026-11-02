@@ -26,6 +26,9 @@ import { Easing, interpolate, interpolateColors, random, spring } from "remotion
 
 let frame = 0;
 let config = { fps: 30, width: 1080, height: 1920, durationInFrames: 60 };
+/** What a kit piece shows: a node, or a function of the size it is drawn at. */
+const drawn = (d, size) => (typeof d === "function" ? d(size) : (d ?? null));
+
 const scope = {
   AbsoluteFill: ({ style, children }) => React.createElement("div", { style }, children),
   Sequence: ({ children }) => React.createElement(React.Fragment, null, children),
@@ -44,6 +47,13 @@ const scope = {
   Footage: ({ style }) => React.createElement("div", { style: { position: "absolute", background: "#777", ...style } }),
   // A word circled by hand: the word itself is what the check reads.
   Marker: ({ children }) => React.createElement("span", null, children),
+  // The layout kit (Kit.tsx): what each piece shows is drawn, so its words and its code run here too.
+  Tiles: ({ steps = [] }) => React.createElement("div", null, ...steps.map((s, i) => React.createElement("div", { key: i }, drawn(s?.show, { width: config.width, height: config.height })))),
+  Window: ({ box, children }) => React.createElement("div", null, drawn(children, { width: box?.w ?? config.width, height: box?.h ?? config.height })),
+  Stack: ({ items = [], size }) =>
+    React.createElement("div", null, ...items.map((item, i) => React.createElement("div", { key: i }, drawn(item && typeof item === "object" && "draw" in item ? item.draw : item, { width: size ?? 540, height: size ?? 540 })))),
+  Split: ({ parts = [], labels = [] }) =>
+    React.createElement("div", null, ...parts.map((part, i) => React.createElement("div", { key: i }, drawn(part, { width: config.width / Math.max(1, parts.length), height: config.height }), labels[i] ?? null))),
 };
 
 const defaultBrand = {

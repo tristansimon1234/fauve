@@ -13,6 +13,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { Fit } from "./Fit";
+import { makeKit } from "./Kit";
 import { Marker } from "./Marker";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
 import { SceneView } from "./Scene";
@@ -94,7 +95,10 @@ function Footage({ shot, style }: { shot: number; style?: CSSProperties }) {
 // Cutout: a photo's subject cut out, with its scissor rim (collages, her photos in an animation).
 // Footage: one of her shots, where a collage's composition lays it.
 // Marker: a word circled or underlined by hand, the stroke following the word as it is laid out.
-export const SCOPE = { AbsoluteFill, Sequence, Img, useCurrentFrame, useVideoConfig, interpolate, interpolateColors, spring, Easing, random, FitText: Fit, Cutout, Footage, Marker };
+// Tiles, Window, Stack, Split: the layout kit (Kit.tsx), tested once, so an animation lays its pictures in tiles,
+// windows, stacks and split screens without coding their geometry.
+const kit = makeKit({ useCurrentFrame, useVideoConfig });
+export const SCOPE = { AbsoluteFill, Sequence, Img, useCurrentFrame, useVideoConfig, interpolate, interpolateColors, spring, Easing, random, FitText: Fit, Cutout, Footage, Marker, Tiles: kit.Tiles, Window: kit.Window, Stack: kit.Stack, Split: kit.Split };
 
 export type SceneComponent = (props: {
   width: number;

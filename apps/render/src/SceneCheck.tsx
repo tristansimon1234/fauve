@@ -3,6 +3,7 @@ import { AbsoluteFill, cancelRender, continueRender, delayRender } from "remotio
 import { cellsUnder, decodeGrid, lostOn, outlined, parseColor, type Rgb, type SceneBackdrop } from "./contrast";
 import { fitsPending } from "./Fit";
 import { fontsLoaded, loadFonts } from "./fonts";
+import { makeKit } from "./Kit";
 import { compileScene, SCOPE, type SceneComponent } from "./MotionScene";
 import { themeFor } from "./theme";
 import { footageTrack, type Seen, type TrackPiece } from "./track";
@@ -89,10 +90,13 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
   const Footage = ({ shot, style }: { shot: number; style?: CSSProperties }) => (
     <div data-fauve-shot={shot} style={{ position: "absolute", overflow: "hidden", background: "linear-gradient(160deg, #9a9490, #5f5a57)", ...style }} />
   );
+  const useVideoConfig = () => ({ ...SCOPE.useVideoConfig(), width, height, durationInFrames });
   return {
     ...SCOPE,
     useCurrentFrame,
-    useVideoConfig: () => ({ ...SCOPE.useVideoConfig(), width, height, durationInFrames }),
+    useVideoConfig,
+    // The layout kit on this copy's clock: it moves in the check as it will in the render.
+    ...makeKit({ useCurrentFrame, useVideoConfig }),
     Sequence: Sequence as unknown as typeof SCOPE.Sequence,
     Cutout: Cutout as typeof SCOPE.Cutout,
     Footage: Footage as typeof SCOPE.Footage,
