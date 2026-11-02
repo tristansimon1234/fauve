@@ -23,6 +23,54 @@ export type MontageStatus = {
 
 const RECENT_MS = 3 * 3600_000;
 
+/** Montages stopped these 3 hours (replaced by a newer request, or at her word): nothing delivered nor charged. */
+export async function stoppedMontages(studioId: string, postId?: string): Promise<{ postId: string; title: string; minutes: number }[]> {
+  let query = supabaseAdmin()
+    .from("credit_quotes")
+    .select("post_id, stage_at, posts(title)")
+    .eq("studio_id", studioId)
+    .eq("stage", "superseded")
+    .gt("used_at", new Date(Date.now() - RECENT_MS).toISOString())
+    .order("stage_at", { ascending: false })
+    .limit(5);
+  if (postId) query = query.eq("post_id", postId);
+  const { data } = await query;
+  return (data ?? []).map((q) => {
+    const post = q.posts as { title?: string | null } | { title?: string | null }[] | null;
+    return {
+      postId: q.post_id as string,
+      title: (Array.isArray(post) ? post[0]?.title : post?.title) ?? "Publication",
+      minutes: q.stage_at ? Math.round((Date.now() - Date.parse(q.stage_at as string)) / 60_000) : 0,
+    };
+  });
+}
+
+/**
+ * A Reel she has not seen yet: no video of it delivered and no montage of it under way. Its next montage is a new
+ * Reel, which waits for her go and takes only the files given for it, even when a stopped montage left a plan
+ * (Edith's launch Reel was started again on its own, with twenty old photos, on a post whose montage had been stopped).
+ */
+export async function unseenReel(studioId: string, postId: string): Promise<boolean> {
+  const db = supabaseAdmin();
+  const [plans, running] = await Promise.all([
+    db.from("edit_plans").select("id").eq("post_id", postId),
+    db
+      .from("credit_quotes")
+      .select("id", { count: "exact", head: true })
+      .eq("studio_id", studioId)
+      .eq("post_id", postId)
+      .not("used_at", "is", null)
+      .is("charged_at", null)
+      .gt("used_at", new Date(Date.now() - RECENT_MS).toISOString())
+      .or("stage.is.null,stage.not.in.(delivered,superseded)"),
+  ]);
+  if (running.count) return false;
+  const ids = (plans.data ?? []).map((p) => p.id as string);
+  if (!ids.length) return true;
+  const { count } = await db.from("renders").select("id", { count: "exact", head: true }).in("edit_plan_id", ids).eq("status", "done");
+  return !count;
+}
+
 export async function montageStatus(studioId: string, postId?: string): Promise<MontageStatus[]> {
   const db = supabaseAdmin();
   let query = db

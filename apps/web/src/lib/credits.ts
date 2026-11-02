@@ -404,6 +404,25 @@ async function supersedeRunning(postId: string, keepId: string): Promise<void> {
   for (const row of data ?? []) await finishJob(row.id as string);
 }
 
+/**
+ * Stopped at her word (« annule », « arrête ») with stop_montage: the montages under way on this post stop at their
+ * next step, nothing delivered nor charged. Edith used to say it could not be stopped.
+ */
+export async function stopMontages(studioId: string, postId: string): Promise<number> {
+  const { data, error } = await supabaseAdmin()
+    .from("credit_quotes")
+    .update({ stage: "superseded", stage_at: new Date().toISOString() })
+    .eq("studio_id", studioId)
+    .eq("post_id", postId)
+    .not("used_at", "is", null)
+    .is("charged_at", null)
+    .or("stage.is.null,stage.not.in.(delivered,superseded)")
+    .select("id");
+  if (error) throw new Error(error.message);
+  for (const row of data ?? []) await finishJob(row.id as string);
+  return data?.length ?? 0;
+}
+
 /** Replaced by a newer request on the same Reel: its job stops, nothing delivered nor charged. */
 export async function quoteSuperseded(quoteId: string | undefined): Promise<boolean> {
   if (!quoteId) return false;

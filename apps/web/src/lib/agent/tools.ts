@@ -59,7 +59,7 @@ import {
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { acceptQuote, createMontageQuote } from "@/lib/credits";
+import { acceptQuote, createMontageQuote, stopMontages } from "@/lib/credits";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { bakedReel } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
@@ -67,7 +67,7 @@ import { fewSubjects } from "@/lib/agent/copy-design";
 import { keepModelSound } from "@/lib/model-sound";
 import { queueRerender } from "@/lib/rerender";
 import { startEffectWords } from "@/lib/effect-words";
-import { montageStatus } from "@/lib/montage-status";
+import { montageStatus, stoppedMontages, unseenReel } from "@/lib/montage-status";
 import { publicHistory, publicStatsFor, weekForModel } from "@/lib/social/public-stats";
 import { keepFeedback } from "@/lib/feedback";
 import { analyzePerformance, latestReport } from "@/lib/performance";
@@ -619,8 +619,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
 
     async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, son, anciens_fichiers }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
-      // A new Reel, checked before anything is spent: her go, and only the files of this exchange (or the post's own).
-      if (!correction && !variant && !post.edit_plan_id && ctx.exchange?.length) {
+      // A Reel she has not seen yet, checked before anything is spent: her go, and only the files of this exchange (or
+      // the post's own). A stopped montage's plan does not make it a correction; one under way, or a delivered video, does.
+      if (!variant && ctx.exchange?.length && (await unseenReel(studioId, post_id))) {
         if (!saysGo(ctx.exchange)) {
           return json({
             possible: false,
@@ -717,12 +718,27 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
     },
 
     async montage_status({ post_id }) {
-      const montages = await montageStatus(studioId, post_id);
-      if (!montages.length) return json({ montages: [], note: "Aucun montage lancé récemment." });
+      const [montages, stopped] = await Promise.all([montageStatus(studioId, post_id), stoppedMontages(studioId, post_id)]);
+      // A stopped montage is never a failure: replaced by a newer request or stopped at her word, nothing was charged.
+      const arretes = stopped.length
+        ? { arretes: stopped.map((s) => ({ post_id: s.postId, publication: s.title, arrete_il_y_a_minutes: s.minutes })), sur_les_arretes: "Arrêtés exprès (remplacés par une nouvelle demande, ou annulés) : rien de livré ni débité. Jamais « il n'a pas abouti », et ne les relance pas d'office : un Reel jamais livré attend son feu vert sur ton plan." }
+        : {};
+      if (!montages.length) return json({ montages: [], ...arretes, note: "Aucun montage en cours ni livré récemment." });
       return json({
         montages: montages.map((m) => ({ post_id: m.postId, publication: m.title, etape: m.step, depuis_minutes: m.minutes, late: m.late })),
+        ...arretes,
         note: "En file : beaucoup de commerces en même temps, il attend son tour et partira tout seul ; dis-lui qu'il arrive, sans proposer de le relancer. En montage, en rendu, en relecture ou en correction : tout va bien, il tourne et la vidéo arrive toute seule, même après 15 ou 20 minutes ; ne propose jamais de le relancer. late (seulement) : il s'est arrêté ; dis-le-lui simplement et propose de le refaire (montage).",
       });
+    },
+
+    async stop_montage({ post_id }) {
+      unwrap(await db.from("posts").select("id").eq("id", post_id).eq("studio_id", studioId).single());
+      const stopped = await stopMontages(studioId, post_id);
+      return json(
+        stopped
+          ? { arretes: stopped, note: "Arrêté : rien ne sera livré ni débité. Dis-le en une phrase, sans rien relancer." }
+          : { arretes: 0, note: "Aucun montage en cours sur cette publication : rien à arrêter. Dis-le simplement (montage_status montre ce qui a été livré)." },
+      );
     },
 
     async choose_version({ post_id, version }) {

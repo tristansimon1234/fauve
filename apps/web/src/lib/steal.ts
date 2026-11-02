@@ -329,8 +329,14 @@ export async function pendingSteal(studioId: string): Promise<{ id: string; name
   // Read, or being read: not one that could not be read, nor the words about a photo she shared.
   const reading = !data.style && !data.analysis && Date.now() - Date.parse(data.created_at as string) < READING_MS;
   if (!style.success && !reading) return null;
-  const { count } = await db.from("posts").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("inspiration_id", data.id);
-  if (count) return null;
+  // Copied once a Reel that follows it has been delivered; a post whose montage was stopped has not copied it yet.
+  const { data: copies } = await db.from("posts").select("id").eq("studio_id", studioId).eq("inspiration_id", data.id);
+  if (copies?.length) {
+    const { data: plans } = await db.from("edit_plans").select("id").in("post_id", copies.map((p) => p.id as string));
+    const ids = (plans ?? []).map((p) => p.id as string);
+    const { count } = ids.length ? await db.from("renders").select("id", { count: "exact", head: true }).in("edit_plan_id", ids).eq("status", "done") : { count: 0 };
+    if (count) return null;
+  }
   if (!style.success) return { id: data.id as string, name: null, lines: [] };
   return {
     id: data.id as string,
