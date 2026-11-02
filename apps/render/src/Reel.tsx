@@ -50,7 +50,7 @@ export function Reel(props: ReelProps) {
   loadCustomFonts(props.brand.customFonts);
   if (props.carousel) {
     // A designed carousel draws the whole slide itself, in every weight of its fonts.
-    loadFonts([props.brand.displayFont, props.brand.bodyFont, ...props.carousel.fonts], { wide: true });
+    loadFonts([props.brand.displayFont, props.brand.bodyFont, ...props.carousel.fonts]);
     return (
       <AbsoluteFill style={{ backgroundColor: "#FFFFFF" }}>
         <ExposureFilters />
