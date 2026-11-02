@@ -176,7 +176,7 @@ export const toolSpecs = {
   },
   montage: {
     description:
-      "Lance un montage ou une correction, tout de suite, dès qu'elle le demande en disant ce qu'elle imagine (ou avec une ref), ou qu'elle a répondu à ta question (pas de devis : les crédits sont débités à la livraison pour ce qui a vraiment été fait, et le message de livraison dit combien). Jamais pour changer seulement la musique d'un Reel monté : c'est set_music, avec sa demande dans wish (gratuit, une minute). Un nouveau Reel part sur son accord (« C'est parti », « vas-y », « ok ») : une modification de ton plan (« à la fin lien en bio ») te fait redire le plan avec, et une question encore ouverte (le son du modèle) se règle avant de lancer. En tâche de fond : ton monteur regarde les clips, choisit le rythme et la forme, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Edith la regarde et la fait corriger avant de l'envoyer (Rapide 5 à 20 min, Soigné 10 à 30, Max 15 à 40 ; le haut de la fourchette pour un Reel en motion design ou en écran partagé). Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus calme », « plus rythmé », « en collage », « enlève le texte », « change la police ») part du montage précédent. « Refais-le depuis le début », « repars de zéro », « fais-le vraiment comme le modèle » : correction false, un nouveau montage qui recopie de nouveau le Reel modèle, avec tous ses fichiers. Si le solde ne suffit pas, rien ne part : la réponse le dit. Avant un nouveau Reel : la publication (create_post) et sa légende (update_post), puis montage avec tous les fichiers donnés pour lui (le monteur choisit les passages, jamais toi). Une fois lancé, dis en une phrase quand la vidéo arrive ; jamais « je lance ? ». Le soin : celui du studio (contexte), Rapide si elle est pressée, Max seulement si elle le demande. Où ça en est : montage_status ; un montage en cours repart tout seul, ne le relance jamais ; elle veut l'arrêter : stop_montage. Un montage arrêté ou qui n'a jamais livré de vidéo est un nouveau Reel : son feu vert d'abord, et seulement les fichiers donnés pour lui. Le style, l'inspiration et la musique d'un nouveau Reel sont à toi, sauf si elle en parle. Ce que le montage sait faire, sans rien promettre d'autre ni l'envoyer vers une autre appli : chaque Reel à son rythme, dans sa charte (qui cède quand sa demande ou un Reel recopié en veut une autre), un collage, du motion design sur mesure, des Reels tout en motion design ou de photos, des écrans partagés, des effets dessinés sur ce qui bouge dans sa vidéo, toute police Google, des sous-titres quand quelqu'un parle, une fin avec son nom et son logo, une musique composée pour lui. Pas encore : les sons tendance d'Instagram (« Je publie moi-même »), les stickers, la 3D. Après la livraison : une petite retouche de texte se fait sur sa page (get_post_link) ; une variante (autre accroche) : montage avec variant.",
+      "Lance un montage ou une correction, tout de suite, dès qu'elle le demande en disant ce qu'elle imagine (ou avec une ref), ou qu'elle a répondu à ta question (pas de devis : les crédits sont débités à la livraison pour ce qui a vraiment été fait, et le message de livraison dit combien). Jamais pour changer seulement la musique d'un Reel monté : c'est set_music, avec sa demande dans wish (gratuit, une minute). Un nouveau Reel part sur son accord (« C'est parti », « vas-y », « ok ») : une modification de ton plan (« à la fin lien en bio ») te fait redire le plan avec, et une question encore ouverte (le son du modèle) se règle avant de lancer. En tâche de fond : ton monteur regarde les clips, choisit le rythme et la forme, écrit les textes, réutilise ou crée des scènes animées, puis la vidéo est rendue ; en Soigné et en Max, Edith la regarde et la fait corriger avant de l'envoyer (Rapide 5 à 20 min, Soigné 10 à 30, Max 15 à 40 ; le haut de la fourchette pour un Reel en motion design ou en écran partagé). Une vidéo sans media_ids est entièrement en motion design ; une correction (« plus calme », « plus rythmé », « en collage », « enlève le texte », « change la police ») part du montage précédent. Un simple ajout à un Reel monté (un écran de fin, un texte ou une photo sur une scène, une scène de plus) : add_to_reel, gratuit, sans rien refaire. « Refais-le depuis le début », « repars de zéro », « fais-le vraiment comme le modèle » : correction false, un nouveau montage qui recopie de nouveau le Reel modèle, avec tous ses fichiers. Si le solde ne suffit pas, rien ne part : la réponse le dit. Avant un nouveau Reel : la publication (create_post) et sa légende (update_post), puis montage avec tous les fichiers donnés pour lui (le monteur choisit les passages, jamais toi). Une fois lancé, dis en une phrase quand la vidéo arrive ; jamais « je lance ? ». Le soin : celui du studio (contexte), Rapide si elle est pressée, Max seulement si elle le demande. Où ça en est : montage_status ; un montage en cours repart tout seul, ne le relance jamais ; elle veut l'arrêter : stop_montage. Un montage arrêté ou qui n'a jamais livré de vidéo est un nouveau Reel : son feu vert d'abord, et seulement les fichiers donnés pour lui. Le style, l'inspiration et la musique d'un nouveau Reel sont à toi, sauf si elle en parle. Ce que le montage sait faire, sans rien promettre d'autre ni l'envoyer vers une autre appli : chaque Reel à son rythme, dans sa charte (qui cède quand sa demande ou un Reel recopié en veut une autre), un collage, du motion design sur mesure, des Reels tout en motion design ou de photos, des écrans partagés, des effets dessinés sur ce qui bouge dans sa vidéo, toute police Google, des sous-titres quand quelqu'un parle, une fin avec son nom et son logo, une musique composée pour lui. Pas encore : les sons tendance d'Instagram (« Je publie moi-même »), les stickers, la 3D. Après la livraison : une petite retouche de texte se fait sur sa page (get_post_link) ; une variante (autre accroche) : montage avec variant.",
     input: z.object({
       post_id: z.string().uuid(),
       media_ids: z
@@ -227,6 +227,38 @@ export const toolSpecs = {
     description:
       "Où en sont les montages lancés ces 3 dernières heures (ou celui d'une publication) : en montage (le monteur écrit le plan), 2e version (Max), en rendu, en relecture (tu regardes la vidéo), en correction, ou livré, et depuis combien de minutes. Un montage prend 5 à 25 minutes selon son niveau et ce qu'il demande ; tant qu'il n'est pas « late », il tourne. « late » : il s'est arrêté.",
     input: z.object({ post_id: z.string().uuid().optional() }),
+  },
+  add_to_reel: {
+    description:
+      "Ajoute quelque chose à un Reel déjà monté sans rien refaire : tout ce qui y est reste tel quel, même une grande animation (gratuit, la vidéo se refait en une à deux minutes, puis elle est livrée). Un écran de fin (après sa dernière image, sur fond noir quand une animation occupe tout le Reel), un texte ou une de ses photos posés sur une scène ou sur tout le Reel (une photo détourée quand son sujet s'y prête), une scène de plus (une de ses photos ou vidéos, ou un écran de texte ; dans un Reel fait d'une seule animation, seulement après elle). Pour changer l'histoire du Reel (couper, réordonner, changer le rythme ou l'ambiance), c'est montage (correction). Elle peut aussi le faire elle-même dans « Modifier ».",
+    input: z.object({
+      post_id: z.string().uuid(),
+      ecran_de_fin: z
+        .object({ titre: z.string().trim().min(1).max(90), sous_titre: z.string().trim().max(60).optional() })
+        .optional()
+        .describe("Ses mots, bien orthographiés ; remplace celui du Reel s'il en a un"),
+      elements: z
+        .array(
+          z.object({
+            texte: z.string().trim().min(1).max(90).optional().describe("Un texte (ou media_id pour une photo)"),
+            media_id: z.string().uuid().optional().describe("Une de ses photos (list_media)"),
+            detoure: z.boolean().optional().describe("false pour la photo entière ; par défaut son sujet détouré quand il s'y prête"),
+            scene: z.number().int().min(1).optional().describe("La scène où le poser (1 = la première) ; sans, tout le Reel"),
+            place: z.enum(["haut", "milieu", "bas", "haut_gauche", "haut_droite", "bas_gauche", "bas_droite"]).optional(),
+            taille: z.enum(["petit", "moyen", "grand"]).optional(),
+          }),
+        )
+        .max(4)
+        .optional(),
+      scene: z
+        .object({
+          media_id: z.string().uuid().optional().describe("Une de ses photos ou vidéos"),
+          texte: z.string().trim().min(1).max(60).optional().describe("Un écran de texte, à la place d'une photo ou vidéo"),
+          apres: z.number().int().min(0).optional().describe("Après quelle scène (0 = au début) ; sans, à la fin"),
+          secondes: z.number().min(1).max(6).optional(),
+        })
+        .optional(),
+    }),
   },
   stop_montage: {
     description:

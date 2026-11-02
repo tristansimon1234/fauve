@@ -1,13 +1,19 @@
 "use client";
 
 import {
+  addOverlay,
   buildReelProps,
   editPlanSchema,
+  insertableFrom,
+  insertSegment,
   moveSegment,
+  removeOverlay,
   removeSegment,
   segmentKind,
   timeline,
+  updateOverlay,
   updateSegment,
+  withEndCard,
   type EditPlan,
   type ReelInputs,
   type SavedLook,
@@ -16,13 +22,14 @@ import {
 import type { PlayerRef } from "@remotion/player";
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { saveEditPlan } from "@/app/(app)/publications/[id]/actions";
-import { liveMontage } from "@/app/(app)/publications/[id]/review-actions";
+import { editorMedia, liveMontage } from "@/app/(app)/publications/[id]/review-actions";
 import { ArrowLeftIcon, ChevronRightIcon, TrashIcon } from "@/components/icons";
 import { Mascot } from "@/components/mascot";
 import { ListItems } from "@/components/montage/list-items";
 import { StylePicker } from "@/components/montage/style-picker";
 import { TextBoxes } from "@/components/montage/text-boxes";
 import { ReelPlayer } from "@/components/reel-player";
+import { LibrarySheet, OverlayBoxes, OverlayPanel } from "./additions";
 import { openingParts, type EditorParts } from "./editor-parts";
 import { SceneStrip, type SceneSprite } from "./scene-strip";
 
@@ -40,7 +47,9 @@ import { SceneStrip, type SceneSprite } from "./scene-strip";
 export type EditStart = { text?: number; scene?: number };
 type Live = { plan: EditPlan; inputs: ReelInputs; looks: SavedLook[] };
 type Text = EditPlan["texts"][number];
-type Selection = { kind: "text" | "scene"; index: number } | null;
+type Selection = { kind: "text" | "scene" | "overlay"; index: number } | null;
+/** What she adds: picked from her library for an element on a scene, or for a scene after one. */
+type Picking = { for: "overlay" | "scene"; scene: number } | null;
 
 const KIND_LABEL = { clip: "Vidéo", scene: "Écran de texte", motion: "Animation" } as const;
 const round = (n: number) => Math.round(n * 10) / 10;
@@ -156,7 +165,19 @@ function Editor({
   const previewRef = useRef<HTMLDivElement>(null);
 
   const { plan, origin } = draft;
-  const props = useMemo(() => buildReelProps(plan, live.inputs), [plan, live.inputs]);
+  // The files she adds here, signed for the live preview (a scene, a photo over a scene).
+  const [added, setAdded] = useState<{ clipUrls: Record<string, string>; photoIds: string[]; overlayPhotos: NonNullable<ReelInputs["overlayPhotos"]> }>({ clipUrls: {}, photoIds: [], overlayPhotos: {} });
+  const inputs = useMemo<ReelInputs>(
+    () => ({
+      ...live.inputs,
+      clipUrls: { ...live.inputs.clipUrls, ...added.clipUrls },
+      photoIds: [...(live.inputs.photoIds ?? []), ...added.photoIds],
+      overlayPhotos: { ...(live.inputs.overlayPhotos ?? {}), ...added.overlayPhotos },
+    }),
+    [live.inputs, added],
+  );
+  const [picking, setPicking] = useState<Picking>(null);
+  const props = useMemo(() => buildReelProps(plan, inputs), [plan, inputs]);
   const spans = useMemo(() => timeline(plan), [plan]);
   const valid = useMemo(() => editPlanSchema.safeParse(plan).success, [plan]);
   // A Reel cut on a voice keeps its order: the voice would no longer match the pictures.
@@ -205,6 +226,60 @@ function Editor({
   };
   const setSegment = (index: number, segment: Segment) => edit({ plan: updateSegment(plan, index, segment) });
 
+  // What she adds, drawn by the engine over what is there: nothing redone, free.
+  const selectOverlay = (index: number, at?: number) => {
+    setSelection({ kind: "overlay", index });
+    if (at !== undefined) seek(at);
+  };
+  const addTextOn = (scene: number) => {
+    const span = spans[scene];
+    if (!span) return;
+    const next = addOverlay(plan, { kind: "text", text: "Ton texte", from: span.start, to: span.end, x: 0.5, y: 0.3, w: 0.08 });
+    edit({ plan: next });
+    selectOverlay((next.overlays?.length ?? 1) - 1, span.start + Math.min(0.5, (span.end - span.start) / 2));
+  };
+  const addEndCard = () => {
+    edit({ plan: withEndCard(plan, { title: props.brand.name || "Ton commerce" }) });
+    setSelection({ kind: "scene", index: plan.segments.length - 1 });
+  };
+  const addTextScene = (after: number) => {
+    const at = Math.max(insertableFrom(plan), after + 1);
+    const order = origin.slice();
+    order.splice(at, 0, null);
+    edit({ plan: insertSegment(plan, at, { scene: { kind: "title", title: "Ton texte", background: "ink" }, duration: 2.5 }), origin: order });
+    setSelection({ kind: "scene", index: at });
+  };
+  const [fetching, startFetching] = useTransition();
+  const picked = (id: string) => {
+    const target = picking;
+    setPicking(null);
+    if (!target) return;
+    startFetching(async () => {
+      const m = await editorMedia(postId, id).catch(() => ({ ok: false as const, error: "Ce fichier ne s’ouvre pas. Réessaie dans un instant." }));
+      if (!m.ok) return setMessage(m.error);
+      setAdded((a) => ({
+        clipUrls: { ...a.clipUrls, [m.id]: m.url },
+        photoIds: m.photo && !a.photoIds.includes(m.id) ? [...a.photoIds, m.id] : a.photoIds,
+        overlayPhotos: m.overlay ? { ...a.overlayPhotos, [m.id]: m.overlay } : a.overlayPhotos,
+      }));
+      if (target.for === "overlay") {
+        if (!m.photo) return setMessage("Sur une scène, on pose une photo : une vidéo s’ajoute en scène.");
+        const span = spans[target.scene];
+        if (!span) return;
+        const next = addOverlay(plan, { kind: "photo", media_id: m.id, from: span.start, to: span.end, x: 0.5, y: 0.45, w: 0.45 });
+        edit({ plan: next });
+        selectOverlay((next.overlays?.length ?? 1) - 1, span.start + Math.min(0.5, (span.end - span.start) / 2));
+        return;
+      }
+      const at = Math.max(insertableFrom(plan), target.scene + 1);
+      const order = origin.slice();
+      order.splice(at, 0, null);
+      const segment: Segment = { clip_id: m.id, in: 0, out: m.photo ? 2.5 : Math.max(1, Math.min(m.seconds ?? 3, 3)), zoom: "none" };
+      edit({ plan: insertSegment(plan, at, segment), origin: order });
+      setSelection({ kind: "scene", index: at });
+    });
+  };
+
   const save = () =>
     startSaving(async () => {
       if (!valid) return setMessage("Un texte est vide : écris quelque chose, ou retire-le.");
@@ -226,6 +301,7 @@ function Editor({
   }, [changed, onClose]);
 
   const text = selection?.kind === "text" ? plan.texts[selection.index] : undefined;
+  const overlay = selection?.kind === "overlay" ? plan.overlays?.[selection.index] : undefined;
   const sceneIndex = selection?.kind === "scene" && selection.index < plan.segments.length ? selection.index : null;
   const scene = sceneIndex !== null ? plan.segments[sceneIndex] : undefined;
   // The scene shown now, for the strip when a text is chosen.
@@ -277,6 +353,14 @@ function Editor({
         onPick={(i) => selectText(i, false)}
         onEdit={(i, words) => setText(i, { text: words })}
       />
+      <OverlayBoxes
+        container={previewRef}
+        player={playerRef}
+        overlays={plan.overlays ?? []}
+        active={overlay ? (selection?.index ?? null) : null}
+        onMove={(i, place) => edit({ plan: updateOverlay(plan, i, place) })}
+        onPick={(i) => selectOverlay(i)}
+      />
     </div>
   );
   const strip = (
@@ -284,7 +368,7 @@ function Editor({
       segments={plan.segments}
       sprite={scenes}
       origin={origin}
-      photos={live.inputs.photoIds}
+      photos={inputs.photoIds}
       selected={sceneIndex}
       playing={text && textScene >= 0 ? textScene : null}
       dark={!inPage}
@@ -298,7 +382,26 @@ function Editor({
           {message}
         </p>
       )}
-      {text && selection ? (
+      {picking && (
+        <div className="mb-3">
+          <LibrarySheet kind={picking.for === "overlay" ? "photo" : "any"} title={picking.for === "overlay" ? "Une de tes photos" : "Une photo ou une vidéo"} onPick={picked} onClose={() => setPicking(null)} />
+        </div>
+      )}
+      {fetching && <p className="mb-3 text-[13.5px] font-semibold text-muted">J’ajoute ton fichier…</p>}
+      {overlay && selection ? (
+        <OverlayPanel
+          key={`o${selection.index}`}
+          overlay={overlay}
+          sceneSpan={spans[spans.findIndex((s) => overlay.from >= s.start - 0.01 && overlay.from < s.end)] ?? null}
+          duration={plan.duration}
+          cutoutPossible={Boolean(overlay.media_id && inputs.overlayPhotos?.[overlay.media_id]?.cutout)}
+          onChange={(patch) => edit({ plan: updateOverlay(plan, selection.index, patch) })}
+          onRemove={() => {
+            edit({ plan: removeOverlay(plan, selection.index) });
+            setSelection(null);
+          }}
+        />
+      ) : text && selection ? (
         <TextPanel
           key={selection.index}
           text={text}
@@ -326,6 +429,13 @@ function Editor({
           onEndCard={(endCard) => edit({ plan: { ...plan, end_card: endCard } })}
           onText={(i) => selectText(i)}
           onAsk={() => onAsk(sceneIndex, `Scène ${sceneIndex + 1}`)}
+          canAddAfter={sceneIndex + 1 >= insertableFrom(plan)}
+          onAddText={() => addTextOn(sceneIndex)}
+          onAddPhoto={() => setPicking({ for: "overlay", scene: sceneIndex })}
+          onAddScene={(kind) => (kind === "text" ? addTextScene(sceneIndex) : setPicking({ for: "scene", scene: sceneIndex }))}
+          onAddEnd={sceneIndex === plan.segments.length - 1 && !plan.end_card ? addEndCard : undefined}
+          overlays={(plan.overlays ?? []).map((o, i) => ({ o, i })).filter(({ o }) => spans[sceneIndex] && o.from >= spans[sceneIndex].start - 0.01 && o.from < spans[sceneIndex].end)}
+          onOverlay={(i) => selectOverlay(i)}
         />
       ) : (
         <p className="text-[14.5px] leading-relaxed text-muted">Touche un texte sur la vidéo pour le changer, ou une scène en dessous.</p>
@@ -474,6 +584,13 @@ function ScenePanel({
   onEndCard,
   onText,
   onAsk,
+  canAddAfter,
+  onAddText,
+  onAddPhoto,
+  onAddScene,
+  onAddEnd,
+  overlays,
+  onOverlay,
 }: {
   index: number;
   count: number;
@@ -490,6 +607,15 @@ function ScenePanel({
   onEndCard: (endCard: EditPlan["end_card"]) => void;
   onText: (index: number) => void;
   onAsk: () => void;
+  /** A scene can be added after this one (in a Reel drawn by one animation, only after it). */
+  canAddAfter: boolean;
+  onAddText: () => void;
+  onAddPhoto: () => void;
+  onAddScene: (kind: "media" | "text") => void;
+  /** On the last scene of a Reel without one. */
+  onAddEnd?: () => void;
+  overlays: { o: NonNullable<EditPlan["overlays"]>[number]; i: number }[];
+  onOverlay: (index: number) => void;
 }) {
   const kind = segmentKind(segment);
   const button = "flex h-11 items-center justify-center gap-1 rounded-full border-[1.5px] border-line bg-white px-2 text-[13.5px] font-bold disabled:opacity-35";
@@ -544,6 +670,49 @@ function ScenePanel({
           ))}
         </div>
       )}
+
+      {overlays.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-bold text-muted">Ajouté sur cette scène</span>
+          {overlays.map(({ o, i }) => (
+            <button key={i} type="button" onClick={() => onOverlay(i)} className="flex items-center gap-2 rounded-[14px] border-[1.5px] border-line bg-white px-3 py-2.5 text-left hover:border-lilac">
+              <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{o.kind === "text" ? o.text : "Une photo"}</span>
+              <ChevronRightIcon size={15} className="shrink-0 text-muted" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Added without anything redone: drawn over what is there, free. */}
+      <div className="flex flex-col gap-2 rounded-[16px] border-[1.5px] border-dashed border-line p-3">
+        <span className="text-[13px] font-bold">Ajouter sur cette scène</span>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={onAddText} className={button}>
+            Un texte
+          </button>
+          <button type="button" onClick={onAddPhoto} className={button}>
+            Une photo
+          </button>
+        </div>
+        <span className="mt-1 text-[13px] font-bold">Ajouter une scène après</span>
+        {canAddAfter ? (
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => onAddScene("media")} className={button}>
+              Photo ou vidéo
+            </button>
+            <button type="button" onClick={() => onAddScene("text")} className={button}>
+              Écran de texte
+            </button>
+          </div>
+        ) : (
+          <p className="text-[12.5px] leading-snug text-muted">Ce Reel est une seule animation : une scène s’ajoute après elle, depuis sa dernière scène.</p>
+        )}
+        {onAddEnd && (
+          <button type="button" onClick={onAddEnd} className={`${button} mt-1`}>
+            Ajouter un écran de fin
+          </button>
+        )}
+      </div>
 
       <button
         type="button"

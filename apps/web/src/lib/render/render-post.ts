@@ -331,7 +331,12 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   const plan = editPlanSchema.parse(planRow.plan);
   // Photos have their subject cut out once (an open model in its own sandbox): a collage's, laid as stickers, a
   // composed Reel's, and those an animation composes with (the design step has usually made them already).
-  const toCut = [...(plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : scenePhotoIds(plan)), ...copyPhotos(plan)];
+  const toCut = [
+    ...(plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : scenePhotoIds(plan)),
+    ...copyPhotos(plan),
+    // The photos she added cut out (unless she wants them whole).
+    ...(plan.overlays ?? []).flatMap((o) => (o.kind === "photo" && o.media_id && o.cutout !== false ? [o.media_id] : [])),
+  ];
   if (toCut.length) await ensureCutouts(studioId, toCut);
   const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, copyCutouts, overlayPhotos, photoAspects, tracks, facts } =
     await loadMontageInputs(studioId, plan, { postId });

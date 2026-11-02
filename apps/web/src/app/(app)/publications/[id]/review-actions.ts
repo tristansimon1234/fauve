@@ -7,6 +7,7 @@ import { z } from "zod";
 import { studioAccess } from "@/lib/billing/access";
 import { startEffectWords } from "@/lib/effect-words";
 import { loadEditorData } from "@/lib/montage-editor-data";
+import { overlayPhotoInputs } from "@/lib/render/cutout";
 import { postImages, type PostImages } from "@/lib/post-images";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { forgetModel, keepAsModel, type ModelState } from "@/lib/reel-models";
@@ -144,6 +145,25 @@ export type LiveMontage = { ok: true; plan: EditPlan; inputs: ReelInputs; looks:
  * montage as saved, its files signed, and the studio's text styles. Loaded when she opens
  * it, so the page itself stays light.
  */
+/** One of her photos or videos picked in « Modifier » (a scene or an element she adds), signed for the live preview. */
+export async function editorMedia(
+  postId: string,
+  mediaId: string,
+): Promise<{ ok: true; id: string; photo: boolean; url: string; seconds: number | null; overlay?: NonNullable<ReelInputs["overlayPhotos"]>[string] } | { ok: false; error: string }> {
+  if (!z.uuid().safeParse(mediaId).success) return { ok: false, error: "Ce fichier est introuvable." };
+  const found = await reel(postId);
+  if (!found) return UNKNOWN;
+  const db = supabaseAdmin();
+  const { data } = await db.from("media_assets").select("id, kind, storage_path, duration").eq("id", mediaId).eq("studio_id", found.studioId).maybeSingle();
+  if (!data || (data.kind !== "image" && data.kind !== "video")) return { ok: false, error: "Ce fichier n’est plus dans ta médiathèque." };
+  const url = (await db.storage.from("media").createSignedUrl(data.storage_path as string, 7200)).data?.signedUrl;
+  if (!url) return { ok: false, error: "Ce fichier ne s’ouvre pas. Réessaie dans un instant." };
+  const photo = data.kind === "image";
+  const signed: NonNullable<ReelInputs["overlayPhotos"]> = photo ? await overlayPhotoInputs(found.studioId, [mediaId]).catch(() => ({})) : {};
+  const overlay = signed[mediaId];
+  return { ok: true, id: mediaId, photo, url, seconds: Number(data.duration) || null, ...(overlay ? { overlay } : {}) };
+}
+
 export async function liveMontage(postId: string): Promise<LiveMontage> {
   const found = await reel(postId);
   if (!found) return UNKNOWN;

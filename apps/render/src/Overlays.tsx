@@ -12,7 +12,7 @@ export function Overlays({ props, k }: { props: ReelProps; k: number }) {
       {(props.overlays ?? []).map((o, i) => (
         <Sequence key={`o${i}`} from={o.from} durationInFrames={o.durationInFrames} layout="none">
           <AbsoluteFill style={{ pointerEvents: "none" }}>
-            <Pop durationInFrames={o.durationInFrames} x={o.x * props.width} y={o.y * props.height}>
+            <Pop index={i} durationInFrames={o.durationInFrames} x={o.x * props.width} y={o.y * props.height}>
               {o.kind === "text" ? <OverlayText text={o.text ?? ""} size={o.w * props.width} props={props} k={k} /> : <OverlayPhoto o={o} width={o.w * props.width} k={k} />}
             </Pop>
           </AbsoluteFill>
@@ -23,13 +23,13 @@ export function Overlays({ props, k }: { props: ReelProps; k: number }) {
 }
 
 /** Centred on its point, it lands with a short spring and leaves in a few frames. */
-function Pop({ durationInFrames, x, y, children }: { durationInFrames: number; x: number; y: number; children: React.ReactNode }) {
+function Pop({ index, durationInFrames, x, y, children }: { index: number; durationInFrames: number; x: number; y: number; children: React.ReactNode }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const land = spring({ frame, fps, config: { damping: 18, stiffness: 220, mass: 0.6 } });
   const leave = interpolate(frame, [durationInFrames - 5, durationInFrames], [1, 0], clamp);
   return (
-    <div style={{ position: "absolute", left: x, top: y, transform: `translate(-50%, -50%) scale(${0.86 + 0.14 * land})`, opacity: Math.min(land, leave) }}>
+    <div data-fauve-overlay={index} style={{ position: "absolute", left: x, top: y, transform: `translate(-50%, -50%) scale(${0.86 + 0.14 * land})`, opacity: Math.min(land, leave) }}>
       {children}
     </div>
   );
@@ -38,7 +38,6 @@ function Pop({ durationInFrames, x, y, children }: { durationInFrames: number; x
 function OverlayText({ text, size, props, k }: { text: string; size: number; props: ReelProps; k: number }) {
   return (
     <div
-      data-fauve-text
       style={{
         maxWidth: props.width - 160 * k,
         fontFamily: `"${props.brand.displayFont}", sans-serif`,

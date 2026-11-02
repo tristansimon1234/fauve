@@ -58,12 +58,18 @@ import {
   isClipSegment,
   MAX_MONTAGE_FILES,
   type ExchangeRow,
+  withEndCard,
+  addOverlay,
+  insertSegment,
+  insertableFrom,
+  timeline,
+  fitEndCard,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { acceptQuote, createMontageQuote, stopMontages } from "@/lib/credits";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
-import { bakedReel } from "@/lib/edit-plans";
+import { bakedReel, insertPlanVersion } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
 import { fewSubjects } from "@/lib/agent/copy-design";
 import { keepModelSound } from "@/lib/model-sound";
@@ -751,6 +757,74 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         montages: montages.map((m) => ({ post_id: m.postId, publication: m.title, etape: m.step, depuis_minutes: m.minutes, late: m.late })),
         ...arretes,
         note: "En file : beaucoup de commerces en même temps, il attend son tour et partira tout seul ; dis-lui qu'il arrive, sans proposer de le relancer. En montage, en rendu, en relecture ou en correction : tout va bien, il tourne et la vidéo arrive toute seule, même après 15 ou 20 minutes ; ne propose jamais de le relancer. late (seulement) : il s'est arrêté ; dis-le-lui simplement et propose de le refaire (montage).",
+      });
+    },
+
+    async add_to_reel({ post_id, ecran_de_fin, elements, scene }) {
+      if (!ecran_de_fin && !elements?.length && !scene) return json({ error: "Dis ce qu'il faut ajouter : ecran_de_fin, elements ou scene." });
+      const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
+      if (!post.edit_plan_id) return json({ error: "Ce Reel n'est pas encore monté : lance d'abord montage." });
+      if (await bakedReel(studioId, post_id)) return json({ error: "Ce Reel a un effet dessiné image par image : un ajout passe par une correction de l'effet (montage, correction)." });
+      const current = editPlanSchema.safeParse((await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).single()).data?.plan);
+      if (!current.success) return json({ error: "Je n'arrive pas à relire ce montage : passe par montage (correction)." });
+      // Her own photos and videos only.
+      const ids = [...new Set([...(elements ?? []).flatMap((e) => (e.media_id ? [e.media_id] : [])), ...(scene?.media_id ? [scene.media_id] : [])])];
+      const media = ids.length ? ((await db.from("media_assets").select("id, kind, duration").eq("studio_id", studioId).in("id", ids)).data ?? []) : [];
+      const kindOf = new Map(media.map((m) => [m.id as string, { kind: m.kind as string, seconds: Number(m.duration) || null }]));
+      if (ids.some((id) => !kindOf.has(id))) return json({ error: "Un de ces fichiers n'est pas dans sa médiathèque : reprends un media_id de list_media." });
+
+      let plan = current.data;
+      const done: string[] = [];
+      // A scene first (the elements are placed on the scenes as numbered after it).
+      if (scene && (scene.media_id || scene.texte)) {
+        const seconds = scene.secondes ?? 2.5;
+        const file = scene.media_id ? kindOf.get(scene.media_id) : undefined;
+        const segment = scene.media_id
+          ? file?.kind === "image"
+            ? { clip_id: scene.media_id, in: 0, out: Math.min(5, seconds), zoom: "none" as const }
+            : { clip_id: scene.media_id, in: 0, out: Math.max(1, Math.min(file?.seconds ?? seconds, seconds)), zoom: "none" as const }
+          : { scene: { kind: "title" as const, title: scene.texte!.slice(0, 60), background: "ink" as const }, duration: Math.min(6, seconds) };
+        const at = Math.max(insertableFrom(plan), Math.min(plan.segments.length, scene.apres ?? plan.segments.length));
+        plan = insertSegment(plan, at, segment);
+        done.push(`une scène ajoutée en ${at + 1}e position`);
+      }
+      const spans = timeline(plan);
+      const PLACES = { haut: [0.5, 0.2], milieu: [0.5, 0.45], bas: [0.5, 0.64], haut_gauche: [0.32, 0.2], haut_droite: [0.68, 0.2], bas_gauche: [0.32, 0.64], bas_droite: [0.68, 0.64] } as const;
+      const SIZES = { text: { petit: 0.06, moyen: 0.08, grand: 0.11 }, photo: { petit: 0.3, moyen: 0.45, grand: 0.6 } } as const;
+      for (const e of elements ?? []) {
+        if (!e.texte && !e.media_id) continue;
+        if (e.media_id && kindOf.get(e.media_id)?.kind !== "image") return json({ error: "Seule une photo se pose sur une scène : pour une vidéo, ajoute-la en scène (scene)." });
+        const span = e.scene ? spans[e.scene - 1] : { start: 0, end: plan.duration };
+        if (!span) return json({ error: `Ce Reel a ${spans.length} scènes : la scène ${e.scene} n'existe pas.` });
+        const [x, y] = PLACES[e.place ?? (e.texte ? "haut" : "milieu")];
+        const kind = e.media_id ? ("photo" as const) : ("text" as const);
+        plan = addOverlay(plan, {
+          kind,
+          ...(e.texte && !e.media_id ? { text: e.texte } : {}),
+          ...(e.media_id ? { media_id: e.media_id, ...(e.detoure === false ? { cutout: false } : {}) } : {}),
+          from: span.start,
+          to: span.end,
+          x,
+          y,
+          w: SIZES[kind][e.taille ?? "moyen"],
+        });
+        done.push(e.media_id ? `une photo${e.scene ? ` sur la scène ${e.scene}` : ""}` : `le texte « ${e.texte} »${e.scene ? ` sur la scène ${e.scene}` : ""}`);
+      }
+      if (ecran_de_fin) {
+        const card = fitEndCard(ecran_de_fin.titre, ecran_de_fin.sous_titre);
+        plan = withEndCard(plan, { title: card.title, ...(card.subtitle ? { subtitle: card.subtitle } : {}) });
+        done.push("un écran de fin");
+      }
+      const checked = editPlanSchema.safeParse(plan);
+      if (!checked.success) return json({ error: "Cet ajout ne tient pas dans le Reel (durée, place) : passe par montage (correction)." });
+      const row = await insertPlanVersion(studioId, post_id, checked.data);
+      check(await db.from("posts").update({ edit_plan_id: row.id }).eq("id", post_id).eq("studio_id", studioId));
+      ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
+      ctx.notes.push(`ajout à « ${post.title as string} » post_id=${post_id} : ${done.join(", ")}`);
+      return json({
+        status: "started",
+        ajoute: done,
+        note: "Ajouté sans rien refaire du reste, gratuit. Dis-le en une phrase : la vidéo se refait en une à deux minutes et arrive toute seule.",
       });
     },
 
