@@ -69,8 +69,23 @@ export const stolenLookReadingSchema = z.object({
     font: z
       .string()
       .describe(
-        "Seulement si la police de ses titres fait son style (on ne reconnaîtrait pas ce Reel avec une autre : très condensée, manuscrite, de bande dessinée, rétro, à forts empattements…) : la famille Google Fonts qui lui ressemble le plus à l'œil, épaisseur du trait comprise (une écriture fine au stylo n'est pas une écriture au feutre), au nom exact (ex. « Anton », « Bangers »). Sinon une chaîne vide : un sans-serif ordinaire ne fait pas un style",
+        "Seulement si la police de ses titres fait son style (on ne reconnaîtrait pas ce Reel avec une autre : très condensée, manuscrite, de bande dessinée, rétro, à forts empattements…) : la famille Google Fonts qui lui ressemble le plus à l'œil, épaisseur du trait comprise (une écriture fine au stylo n'est pas une écriture au feutre), aussi soignée que l'originale (jamais une écriture enfantine ou bon marché pour une écriture fine), au nom exact (ex. « Anton », « Bangers »). Sinon une chaîne vide : un sans-serif ordinaire ne fait pas un style",
       ),
+    font_alternatives: z
+      .array(z.string())
+      .describe("Si font n'est pas vide : 2 autres familles Google Fonts proches, au même trait et aussi soignées, de la plus proche à la moins proche, au nom exact. Sinon une liste vide"),
+    stroke: z
+      .enum(["thin", "regular", "thick"])
+      .describe("L'épaisseur du trait des lettres de ses titres : thin (fin, comme au stylo ou une ligne fine), regular, thick (épais, comme au feutre ou très gras)"),
+    lines: z
+      .enum(["aligned", "staggered"])
+      .describe("Les lignes d'un titre sur plusieurs lignes : aligned (sur un même axe), staggered (décalées les unes des autres, en escalier ou en quinconce)"),
+    tilt: z.number().describe("La pente de ses titres en degrés, négative quand ils montent vers la droite ; 0 s'ils sont droits"),
+    shadow: z.enum(["none", "soft", "strong"]).describe("L'ombre sous les lettres : none (aucune qu'on voie), soft (légère), strong (marquée)"),
+    sample: z
+      .string()
+      .describe("Les mots de son titre principal tels qu'ils sont écrits à l'écran, 60 caractères au plus : seulement pour comparer des polices, jamais repris ; vide sans texte"),
+    seen_at: z.number().describe("Un instant, en secondes, où son titre principal se voit en entier ; 0 sans texte"),
   }),
   colors: z
     .array(z.string())
@@ -123,7 +138,15 @@ export const MAX_MOMENTS = 12;
 export const stolenLookSchema = stolenLookReadingSchema.extend({
   name: z.string().max(LOOK_CHARS.name),
   hook: stolenLookReadingSchema.shape.hook.extend({ what: z.string().max(LOOK_CHARS.what) }),
-  text: stolenLookReadingSchema.shape.text.extend({ composition: z.string().max(LOOK_CHARS.composition), font: z.string().regex(FONT_FAMILY).optional() }),
+  text: stolenLookReadingSchema.shape.text.omit({ font_alternatives: true, sample: true, seen_at: true }).extend({
+    composition: z.string().max(LOOK_CHARS.composition),
+    font: z.string().regex(FONT_FAMILY).optional(),
+    // Read since November 2026 (reader 3): a look read before has none of them.
+    stroke: z.enum(["thin", "regular", "thick"]).optional(),
+    lines: z.enum(["aligned", "staggered"]).optional(),
+    tilt: z.number().min(-45).max(45).optional(),
+    shadow: z.enum(["none", "soft", "strong"]).optional(),
+  }),
   colors: z.array(z.string().regex(HEX)).min(1).max(3).optional(),
   // A look read before its layout was read has none (its shots taken as full frame).
   layout: z.string().max(LOOK_CHARS.layout).optional(),
@@ -148,8 +171,8 @@ function hexColor(written: string): string | null {
 
 /** Structured outputs do not enforce lengths: the reading is taken as written, then clamped. */
 export function clampLook(reading: StolenLookReading): StolenLook {
-  const { colors: written, text: { font: named, ...text }, moments: read, ...rest } = reading;
-  const font = named.trim();
+  const { colors: written, text: t, moments: read, ...rest } = reading;
+  const font = t.font.trim();
   const colors = [...new Set(written.flatMap((c) => hexColor(c) ?? []))].slice(0, 3);
   const moments = read
     .filter((m) => Number.isFinite(m.at) && m.what.trim())
@@ -160,7 +183,23 @@ export function clampLook(reading: StolenLookReading): StolenLook {
     ...rest,
     name: clip(reading.name, LOOK_CHARS.name) || "son style",
     hook: { ...reading.hook, what: clip(reading.hook.what, LOOK_CHARS.what) },
-    text: { ...text, composition: clip(reading.text.composition, LOOK_CHARS.composition), ...(FONT_FAMILY.test(font) ? { font } : {}) },
+    // What compares its font (its alternatives, its words, when they show) is not kept.
+    text: {
+      amount: t.amount,
+      composition: clip(t.composition, LOOK_CHARS.composition),
+      case: t.case,
+      weight: t.weight,
+      tracking: t.tracking,
+      align: t.align,
+      stress: t.stress,
+      band: t.band,
+      subtitles: t.subtitles,
+      stroke: t.stroke,
+      lines: t.lines,
+      tilt: Number.isFinite(t.tilt) ? Math.round(Math.min(45, Math.max(-45, t.tilt))) : 0,
+      shadow: t.shadow,
+      ...(FONT_FAMILY.test(font) ? { font } : {}),
+    },
     ...(colors.length ? { colors } : {}),
     layout: clip(reading.layout, LOOK_CHARS.layout) || "plein cadre",
     // One moment is not a sequence: a Reel built on one effect says it in its hook and its layout.
@@ -168,6 +207,30 @@ export function clampLook(reading: StolenLookReading): StolenLook {
     music: clip(reading.music, LOOK_CHARS.music),
     ending: clip(reading.ending, LOOK_CHARS.ending),
     why: clip(reading.why, LOOK_CHARS.why),
+  };
+}
+
+/**
+ * The read font checked against what the Reel shows: its title's frame, then its words written in each candidate,
+ * one row each. The closest row, or none (0) when none is as fine and refined: the Reel then keeps her charter's
+ * fonts rather than a cheap stand-in (Tristan: « faut surtout pas que ça fasse cheap »).
+ */
+export const FONT_PICK_PROMPT = `The first image is a frame of an Instagram Reel with its title written on it. The second image writes the same words in candidate Google Fonts, one row each, numbered in yellow.
+Which row is drawn most like the Reel's title: the shape of its letters, the thickness of its strokes (a fine pen is not a felt pen), its slant, its spacing, how refined it looks? Judge the lettering only, not its size or colour.
+Answer 0 when no row is as fine and refined as the Reel's lettering: a cheap, childish or clip-art lettering never stands for a fine one, and the Reel keeps the business's own fonts instead.`;
+
+export const fontPickSchema = z.object({
+  choice: z.number().int().describe("The number of the closest row, or 0 when none is as fine and refined as the Reel's title"),
+  why: z.string().describe("In a few words, why"),
+});
+
+/** What checks a read font: its name and alternatives (at most 3 families), its words as written and when they show. */
+export function fontCheckOf(reading: StolenLookReading): { names: string[]; sample: string; seenAt: number } {
+  const names = [reading.text.font, ...reading.text.font_alternatives].map((n) => n.trim()).filter((n) => FONT_FAMILY.test(n));
+  return {
+    names: [...new Set(names)].slice(0, 3),
+    sample: clip(reading.text.sample.replace(/\s+/g, " "), 60),
+    seenAt: Number.isFinite(reading.text.seen_at) ? Math.max(0, reading.text.seen_at) : 0,
   };
 }
 
@@ -186,8 +249,10 @@ export const stolenStyleSchema = z.object({
 /**
  * The version of the reading: 2 watches every shot (stealFps, an image per shot) and names the cut-outs
  * laid over shots. Tristan's link sent again reused the reading made before, « plein cadre » without them.
+ * 3 reads how its words are drawn (their strokes, lines, tilt and shadow) and checks its font against
+ * candidates written out (Tristan: « la police un peu naze… pas fine comme sur le Reel envoyé »).
  */
-export const STEAL_READER = 2;
+export const STEAL_READER = 3;
 
 /** A kept reading as good as a new one: made by the current reader. */
 export const currentReading = (style: unknown): boolean => {
@@ -197,7 +262,7 @@ export const currentReading = (style: unknown): boolean => {
 export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
 export const STEAL_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (studio, salon, restaurant, shop…). The person who runs the business wants to take this Reel's style for theirs: read it as a pro editor who wants to remake its style, not its content.
-Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once, an object or a person cut out of another image and laid over some shots), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, letter spacing, key word, background under the sentence, place, alignment; its font and its colours only when they make its style), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
+Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once, an object or a person cut out of another image and laid over some shots), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, the thickness of its strokes (a fine pen is not a felt pen), letter spacing, key word, background under the sentence, place, alignment, its lines aligned or staggered, its tilt, its shadow; its font and its colours only when they make its style, the font named with two alternatives as refined as it: a cheap, childish or clip-art lettering never stands for a fine one), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
 You also get a sharp image from the middle of each of its shots, with its time: look at every one, since a shot of a third of a second counts and the video's frames can fall between two. A cut-out laid over a shot (a drink, a phone booth, a bag, a person, without or with a white border) is part of its style, even when it stays a few tenths of a second: say it in the layout, and make each one its own moment, every one of them and not only the first (when, what, where, how big, border or not).
 Copy neither its words, nor its images, nor the name of its music: describe a form another business can reuse. In your French, make no feminine or masculine agreement for the person who runs the business. In French, except « music » in English.`;
 
@@ -416,6 +481,7 @@ export function followedForEditor(followed: FollowedStyle) {
       ? { moments: look.moments.map((m) => ({ a_s: m.at, quoi: m.what })), moments_consigne: "refais chacun de ces moments, dans cet ordre et à peu près à ces temps, avec ses images et ses mots : c'est ce qui fait ce Reel" }
       : {}),
     texte: `${look.text.amount} ; ${look.text.composition}${look.text.subtitles ? " ; des sous-titres" : ""}`,
+    ...(textDrawingWords(look.text) ? { dessin_des_mots: textDrawingWords(look.text)! } : {}),
     // Its font is already set on the plan by the engine (followedLook): the editor and the animations follow it.
     ...(takenFont(look) ? { police: takenFont(look)! } : {}),
     // Its colours are the editor's call: it has her charter and her request in front of it.
@@ -426,6 +492,20 @@ export function followedForEditor(followed: FollowedStyle) {
     fin: look.ending,
     pourquoi: look.why,
   };
+}
+
+/**
+ * How its words are drawn, in words (« trait fin, comme au stylo ; lignes décalées ; penché de 8° ; sans ombre »), or
+ * null for a look read before: kept by the Reel that copies it, never in a heavier, cheaper version.
+ */
+export function textDrawingWords(text: StolenLook["text"]): string | null {
+  const words = [
+    text.stroke === "thin" ? "trait fin, comme au stylo (la graisse la plus légère de la police)" : text.stroke === "thick" ? "trait épais, comme au feutre" : "",
+    text.lines === "staggered" ? "lignes décalées les unes des autres" : "",
+    text.tilt ? `penché de ${Math.abs(text.tilt)}° vers le ${text.tilt < 0 ? "haut" : "bas"}` : "",
+    text.shadow === "none" ? "sans ombre (une ombre fine et serrée au plus, seulement si un mot se perdrait)" : text.shadow === "strong" ? "une ombre marquée" : "",
+  ].filter(Boolean);
+  return words.length ? words.join(" ; ") : null;
 }
 
 /** Its moments in one line (« 1,2 s : … ; 3,4 s : … »), or null. */
@@ -441,7 +521,7 @@ export function followedLine(followed: FollowedStyle): string {
     ...(composedLayout(look) ? [`mise en page : ${composedLayout(look)}`] : []),
     `accroche ${look.hook.kind}`,
     ...(momentsLine(look) ? [`ses moments, chacun à refaire avec ses images : ${momentsLine(look)}`] : []),
-    `texte : ${look.text.amount}`,
+    `texte : ${look.text.amount}${textDrawingWords(look.text) ? ` (${textDrawingWords(look.text)})` : ""}`,
     // With a voice, whether its words are written on screen: a copy may speak without subtitles.
     look.voice === "aucune" ? "voix : aucune" : `voix : ${look.voice}, ${look.text.subtitles ? "avec" : "sans"} sous-titres`,
     ...(takenFont(look) ? [takenFont(look)!] : []),

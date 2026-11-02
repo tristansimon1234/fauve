@@ -1,6 +1,6 @@
 import "server-only";
 import { FileState, GoogleGenAI, PartMediaResolutionLevel, type File as GeminiFile, type Part } from "@google/genai";
-import { clampLook, measuresLine, STEAL_PROMPT, stealFps, stolenLookReadingSchema, type ReelMeasures, type StolenLook, type StolenLookReading } from "@fauve/agent";
+import { clampLook, FONT_PICK_PROMPT, fontCheckOf, fontPickSchema, measuresLine, STEAL_PROMPT, stealFps, stolenLookReadingSchema, type ReelMeasures, type StolenLook, type StolenLookReading } from "@fauve/agent";
 import { readAnswer } from "@fauve/agent/answer";
 import { env } from "@/lib/env";
 import { logGeminiCost, type GeminiUsage } from "@/lib/gemini-cost";
@@ -70,7 +70,12 @@ const HIGH = PartMediaResolutionLevel.MEDIA_RESOLUTION_HIGH;
  * an image from the middle of each shot: at 2 frames a second Tristan's model, cut every 0.3 to
  * 0.6 s, lost its cut-outs. Its words are taken as written, then kept within their lengths; null when unreadable.
  */
-export async function readStolenLook(studioId: string, video: Buffer, measures: ReelMeasures, shots: { from: number; to: number; jpeg: Buffer }[] = []): Promise<StolenLook | null> {
+export async function readStolenLook(
+  studioId: string,
+  video: Buffer,
+  measures: ReelMeasures,
+  shots: { from: number; to: number; jpeg: Buffer }[] = [],
+): Promise<{ look: StolenLook; fonts: ReturnType<typeof fontCheckOf> } | null> {
   const ai = gemini();
   const uploaded = await ai.files.upload({ file: new Blob([new Uint8Array(video)], { type: "video/mp4" }), config: { mimeType: "video/mp4", displayName: "steal" } });
   try {
@@ -103,8 +108,35 @@ export async function readStolenLook(studioId: string, video: Buffer, measures: 
       console.warn("steal: reading refused", (error instanceof Error ? error.message : String(error)).slice(0, 300));
       return null;
     }
-    return clampLook(reading);
+    return { look: clampLook(reading), fonts: fontCheckOf(reading) };
   } finally {
     await ai.files.delete({ name: uploaded.name! }).catch(() => {});
   }
+}
+
+const PICK_SCHEMA = geminiSchema(fontPickSchema);
+
+/**
+ * Which candidate font writes the Reel's title most like it does (`frame`: the Reel with its title; `sheet`: the same
+ * words in each candidate, rows numbered from 1): its number, 0 when none is as fine, null when the answer is unusable.
+ */
+export async function pickStolenFont(studioId: string, frame: Buffer, sheet: Buffer, count: number): Promise<number | null> {
+  const model = env("GEMINI_MODEL");
+  const response = await gemini().models.generateContent({
+    model,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { inlineData: { mimeType: "image/jpeg", data: frame.toString("base64") }, mediaResolution: { level: HIGH } },
+          { inlineData: { mimeType: "image/png", data: sheet.toString("base64") }, mediaResolution: { level: HIGH } },
+          { text: `${FONT_PICK_PROMPT}\nRows: 1 to ${count}.` },
+        ],
+      },
+    ],
+    config: { responseMimeType: "application/json", responseJsonSchema: PICK_SCHEMA },
+  });
+  await logGeminiCost({ studioId, kind: "video_analysis", model, usage: response.usageMetadata as GeminiUsage, meta: { purpose: "steal_font", candidates: count } });
+  const answer = readAnswer(fontPickSchema, JSON.parse(response.text ?? "null"));
+  return answer.choice >= 0 && answer.choice <= count ? answer.choice : null;
 }

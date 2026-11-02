@@ -2036,7 +2036,7 @@ test("copy first: what the Reel she copies (or her request) does not have is nev
     format: "autre",
     voice: "aucune",
     hook: { kind: "geste", what: "une main qui pose une tasse" },
-    text: { amount: "aucun", composition: "aucun texte", case: "normal", weight: "regular", tracking: "normal", align: "center", stress: "none", band: "none", subtitles: false, font: "" },
+    text: { amount: "aucun", composition: "aucun texte", case: "normal", weight: "regular", tracking: "normal", align: "center", stress: "none", band: "none", subtitles: false, font_alternatives: [], stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const, sample: "", seen_at: 0, font: "" },
     colors: [],
     effect: "none",
     moments: [],
@@ -3657,7 +3657,7 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
     format: "message",
     voice: "aucune",
     hook: { kind: "chiffre", what: "un grand chiffre posé dès la première image" },
-    text: { amount: "un message tenu", composition: "un titre très grand en capitales, un sous-titre en petit dessous, centré au tiers haut. ".repeat(5), case: "upper", weight: "black", tracking: "tight", align: "center", stress: "block", band: "none", subtitles: false, font: "" },
+    text: { amount: "un message tenu", composition: "un titre très grand en capitales, un sous-titre en petit dessous, centré au tiers haut. ".repeat(5), case: "upper", weight: "black", tracking: "tight", align: "center", stress: "block", band: "none", subtitles: false, font_alternatives: [], stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const, sample: "", seen_at: 0, font: "" },
     colors: [],
     effect: "dust",
     moments: [],
@@ -3678,7 +3678,7 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   const effects = clampLook({
     ...look,
     layout: "plein cadre",
-    text: { ...look.text, font: "" },
+    text: { ...look.text, font: "", font_alternatives: [], sample: "", seen_at: 0, stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const },
     colors: [],
     moments: [
       { at: 4.2, what: "une fenêtre d'appli surgit à côté de sa tête" },
@@ -3690,7 +3690,7 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   assert.deepEqual(effects.moments?.map((m) => m.at), [2, 4.2, 7.5]);
   assert.ok(effects.moments!.every((m) => m.what.length <= 220));
   assert.ok(stolenLookSchema.safeParse(effects).success);
-  assert.equal("moments" in clampLook({ ...look, layout: "plein cadre", text: { ...look.text, font: "" }, colors: [], moments: [{ at: 1, what: "un seul effet" }] }), false);
+  assert.equal("moments" in clampLook({ ...look, layout: "plein cadre", text: { ...look.text, font: "", font_alternatives: [], sample: "", seen_at: 0, stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const }, colors: [], moments: [{ at: 1, what: "un seul effet" }] }), false);
   const sequence = followedFrom("11111111-2222-4333-8444-555555555555", { look: effects, measures: { duration: 19, cuts: [], bpm: null, lufs: -14 } });
   assert.equal(followedForEditor(sequence).moments?.length, 3);
   assert.match(followedLine(sequence), /ses moments, chacun à refaire avec ses images : 2 s : des icônes .* ; 4,2 s : une fenêtre d'appli surgit à côté de sa tête ; 7,5 s : une page de texte/);
@@ -3924,7 +3924,7 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
     format: "raconte" as const,
     voice: "quelqu'un parle" as const,
     hook: { kind: "promesse" as const, what: "une phrase en très gros dès la première image" },
-    text: { amount: "plusieurs" as const, composition: "des mots en capitales très grasses, un mot jaune", case: "upper" as const, weight: "black" as const, tracking: "tight" as const, align: "center" as const, stress: "color" as const, band: "none" as const, subtitles: true, font: " Anton " },
+    text: { amount: "plusieurs" as const, composition: "des mots en capitales très grasses, un mot jaune", case: "upper" as const, weight: "black" as const, tracking: "tight" as const, align: "center" as const, stress: "color" as const, band: "none" as const, subtitles: true, font_alternatives: [], stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const, sample: "", seen_at: 0, font: " Anton " },
     colors: ["#FD0", "jaune", "#FFFFFF", "#ffdd00", "#000000", "#ff3b30"],
     effect: "none" as const,
     moments: [],
@@ -4567,7 +4567,7 @@ test("her own Reel as a model: its structure for the editor, its origin for the 
     format: "autre",
     voice: "aucune",
     hook: { kind: "promesse", what: "un gros plan qui promet un secret" },
-    text: { amount: "une ligne", composition: "une phrase au tiers haut", case: "normal", weight: "bold", tracking: "normal", align: "center", stress: "color", band: "none", subtitles: false, font: "" },
+    text: { amount: "une ligne", composition: "une phrase au tiers haut", case: "normal", weight: "bold", tracking: "normal", align: "center", stress: "color", band: "none", subtitles: false, font_alternatives: [], stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const, sample: "", seen_at: 0, font: "" },
     colors: [],
     effect: "dust",
     moments: [],
@@ -5193,6 +5193,62 @@ test("a word lost on the picture under it is found, and one with its own edge is
   // A shot laid in half the frame (a split screen): its picture covers that box.
   assert.equal(cellsUnder(grid, [0, 0, 540, 100], [0, 0, 540, 960]).every(([r]) => r === 200), true);
   assert.equal(lostOn(coral, 1, []), null);
+});
+
+test("a copied Reel's words keep their drawing, and its font is checked among close candidates", async () => {
+  const { clampLook, fontCheckOf, stolenLookSchema, textDrawingWords, STEAL_READER } = await import("./steal.ts");
+  assert.equal(STEAL_READER, 3);
+  const reading = {
+    name: "message manuscrit",
+    format: "message" as const,
+    voice: "aucune" as const,
+    hook: { kind: "promesse" as const, what: "une phrase manuscrite tenue au centre" },
+    text: {
+      amount: "un message tenu" as const,
+      composition: "quatre lignes au centre",
+      case: "normal" as const,
+      weight: "regular" as const,
+      tracking: "normal" as const,
+      align: "center" as const,
+      stress: "none" as const,
+      band: "none" as const,
+      subtitles: false,
+      font: "Reenie Beanie",
+      font_alternatives: ["Nothing You Could Do", "Reenie Beanie", "Caveat", "Not a font!"],
+      stroke: "thin" as const,
+      lines: "staggered" as const,
+      tilt: -8.4,
+      shadow: "none" as const,
+      sample: "Cette App   Crée Des REELS Pour Vous",
+      seen_at: 1.2,
+    },
+    colors: [],
+    effect: "none" as const,
+    moments: [],
+    grade: "natural" as const,
+    motion: "energique" as const,
+    layout: "plein cadre",
+    camera: "à la main" as const,
+    transitions: "coupes nettes" as const,
+    music: "indie pop",
+    ending: "un écran noir",
+    why: "Le message reste, les images défilent.",
+  };
+  const look = clampLook(reading);
+  // What compares its font is not kept; how its words are drawn is.
+  assert.equal("sample" in look.text, false);
+  assert.equal(look.text.tilt, -8);
+  assert.ok(stolenLookSchema.safeParse(look).success);
+  assert.deepEqual(fontCheckOf(reading), { names: ["Reenie Beanie", "Nothing You Could Do", "Caveat"], sample: "Cette App Crée Des REELS Pour Vous", seenAt: 1.2 });
+  assert.match(textDrawingWords(look.text)!, /trait fin, comme au stylo.*lignes décalées.*penché de 8° vers le haut.*sans ombre/);
+  // A look read before has none of it, and still reads.
+  const older = { ...look.text };
+  delete older.stroke;
+  delete older.lines;
+  delete older.tilt;
+  delete older.shadow;
+  assert.equal(textDrawingWords(older), null);
+  assert.ok(stolenLookSchema.safeParse({ ...look, text: older }).success);
 });
 
 test("a clip whose passages look alike shows twice, its later passages given to the files that show least", async () => {

@@ -6,6 +6,7 @@ import {
   editorClip,
   signatureLines,
   followedForEditor,
+  textDrawingWords,
   followedLook,
   signatureOf,
   editorOutputSchemaLegacy,
@@ -664,7 +665,14 @@ export async function designEdit(params: {
       profile.art_direction,
       charter && `Sa charte en réglages (ses titres, son mouvement, sa lumière) :\n${charter}`,
       followed &&
-        `Le Reel qu'elle t'a envoyé à recopier, pour ses mots : ${followed.look.text.composition}${bare ? " Ses mots y sont nus, sans boîte ni aplat (une ombre légère les fait lire) : fais de même." : ""}`,
+        [
+          `Le Reel qu'elle t'a envoyé à recopier, pour ses mots : ${followed.look.text.composition}`,
+          bare ? "Ses mots y sont nus, sans boîte ni aplat : fais de même." : "",
+          // How its letters are drawn: a fine pen stays fine, never a heavier and cheaper version of it.
+          textDrawingWords(followed.look.text) ? `Le dessin de ses mots, à garder : ${textDrawingWords(followed.look.text)}. Jamais une version plus grasse ou plus cheap.` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
       profile.moodboard?.reading && `Lecture du moodboard de la gérante : ${profile.moodboard.reading}`,
     ]
       .filter(Boolean)

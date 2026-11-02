@@ -829,6 +829,50 @@ export async function pageInSandbox(id: string, url: string): Promise<{ capture:
 }
 
 /**
+ * Candidate fonts writing the same words, one row each (white on grey, numbered from 1), for the reading of a Reel she
+ * copies, with which families really loaded from Google Fonts (apps/render/fontsheet.mjs); null when Chrome fails.
+ */
+export async function fontSheetInSandbox(id: string, words: string, fonts: string[]): Promise<{ png: Buffer; loaded: boolean[] } | null> {
+  return withRemotion(CHECK_WAIT_MS, async (sandbox) => {
+    const dir = `${ROOT}/jobs/${id}`;
+    try {
+      await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+      await sandbox.writeFiles([{ path: `${dir}/in.json`, content: JSON.stringify({ words, fonts }) }]);
+      const result = await sandbox.runCommand({
+        cmd: "bash",
+        args: [
+          "-c",
+          `chrome=$(find ${REMOTION}/node_modules/.remotion -type f -name chrome-headless-shell 2>/dev/null | head -1)
+  [ -n "$chrome" ] || { echo "no chrome"; exit 3; }
+  cd ${REMOTION} && BROWSER_EXECUTABLE="$chrome" timeout 45 node fontsheet.mjs "$1/in.json" "$1/sheet.png"`,
+          "bash",
+          dir,
+        ],
+      });
+      if (result.exitCode !== 0) {
+        console.warn("font sheet failed", result.exitCode, (await result.output("both").catch(() => "")).slice(-400));
+        return null;
+      }
+      const png = await sandbox.readFileToBuffer({ path: `${dir}/sheet.png` });
+      if (!png?.length) return null;
+      let loaded = fonts.map(() => true);
+      try {
+        const parsed = JSON.parse((await result.stdout()).trim().split("\n").at(-1) ?? "") as { loaded?: unknown };
+        if (Array.isArray(parsed.loaded) && parsed.loaded.length === fonts.length) loaded = parsed.loaded.map(Boolean);
+      } catch {
+        // Its rows are there; which fonts loaded is unknown: they all count.
+      }
+      return { png, loaded };
+    } catch (error) {
+      console.warn("font sheet failed", error instanceof Error ? error.message.slice(0, 300) : error);
+      return null;
+    } finally {
+      await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+    }
+  });
+}
+
+/**
  * A capture of a public web page as a visitor sees it (1280 × 1600, the top of
  * the page), with the headless Chrome the Remotion templates already installed.
  * The URL was checked to be public before; null when the capture fails.

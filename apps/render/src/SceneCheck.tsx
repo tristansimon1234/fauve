@@ -529,7 +529,7 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
             .slice(0, 3)
             .map((o) => `« ${o.text.slice(0, 40)} » (images ${o.frames[0]} à ${o.frames.at(-1)}, contraste ${c(o.ratio)} avec l'image dessous)`)
             .join(" ; ");
-          const message = `texte qui se perd dans l'image dessous : ${detail}. Un mot se lit sur chaque image qu'il croise : donne-lui un bord à lui (une ombre serrée et dense, un contour), une autre couleur là où il disparaît, ou pose-le là où l'image le laisse lire, sans changer l'idée ni le style.`;
+          const message = `texte qui se perd dans l'image dessous : ${detail}. Un mot se lit sur chaque image qu'il croise : donne-lui d'abord un bord fin à lui (une ombre serrée et dense de 1 à 3 px, ou un contour fin ; jamais une grosse ombre floue, qui fait cheap), sinon une autre couleur là où il disparaît, ou pose-le là où l'image le laisse lire, sans changer l'idée ni le style (un trait fin reste fin).`;
           console.log(`FAUVE_INK ${JSON.stringify(message)}`);
         }
         // What it draws, row by row, over its length (each row: the share of the subtitles' width it covers, on average).

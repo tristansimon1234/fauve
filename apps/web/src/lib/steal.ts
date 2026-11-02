@@ -17,11 +17,11 @@ import {
 import { env } from "@/lib/env";
 import { googleFont } from "@/lib/fonts";
 import { cutoutPath } from "@/lib/render/cutout";
-import { sandboxCostEur, stealReelInSandbox, type StealMiss } from "@/lib/render/sandbox";
+import { fontSheetInSandbox, sandboxCostEur, stealReelInSandbox, type StealMiss } from "@/lib/render/sandbox";
 import { tracksPath } from "@/lib/render/tracks";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { instagramVideo } from "@/lib/treg";
-import { readStolenLook } from "@/lib/video/inspiration";
+import { pickStolenFont, readStolenLook } from "@/lib/video/inspiration";
 import { costMeta } from "@/lib/cost-scope";
 import { queueJob } from "@/lib/jobs";
 
@@ -191,14 +191,17 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     return missed(reel.miss);
   }
   const measures = reelMeasuresSchema.parse({ duration: reel.duration, cuts: reel.cuts, bpm: tempoOf(reel.levels), lufs: reel.lufs });
-  const look = await readStolenLook(studioId, reel.video, measures, reel.shots).catch((error: unknown) => {
+  const reading = await readStolenLook(studioId, reel.video, measures, reel.shots).catch((error: unknown) => {
     console.warn("steal: reading failed", error instanceof Error ? error.message.slice(0, 300) : error);
     return null;
   });
-  if (!look) return missed("unreadable");
-  // A font that makes its style, by the name Google Fonts serves it under (the render loads it from there); else hers stay.
-  const { font: named, ...text } = look.text;
-  const font = named ? await googleFont(named).catch(() => null) : null;
+  if (!reading) return missed("unreadable");
+  const { look } = reading;
+  // A font that makes its style, checked against its title and by the name Google Fonts serves it under (the render
+  // loads it from there); else hers stay.
+  const text = { ...look.text };
+  delete text.font;
+  const font = await checkedFont(studioId, reading.fonts, reel.shots);
   const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, reader: STEAL_READER, ...outline };
   // Its three lines also stand as its reading (the inspirations list, the editor's chosen inspiration).
   const analysis = stolenStyleLines(style).join(" ");
@@ -210,6 +213,29 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   // The file was only for this reading (someone else's content, or a copy of her own Reel's video).
   if (row.storage_path) await db.storage.from("media").remove([row.storage_path as string]).catch(() => {});
   return read(inspirationId, style, false);
+}
+
+/**
+ * The font a copied Reel's title is written in, checked: the candidates Gemini named (by the names Google Fonts serves),
+ * its words written in each by the workshop's Chrome, and Gemini picks the row drawn most like the title, or none when
+ * none is as fine (her charter's fonts then stay: never a cheap stand-in). Its first name when the check cannot run.
+ */
+async function checkedFont(studioId: string, check: { names: string[]; sample: string; seenAt: number }, shots: { from: number; to: number; jpeg: Buffer }[]): Promise<string | null> {
+  const served = [...new Set((await Promise.all(check.names.map((n) => googleFont(n).catch(() => null)))).filter((n): n is string => Boolean(n)))];
+  if (!served.length) return null;
+  const frame = (shots.find((s) => check.seenAt >= s.from && check.seenAt < s.to) ?? shots[0])?.jpeg;
+  if (!frame || !check.sample) return served[0]!;
+  const sheet = await fontSheetInSandbox(`font-${randomUUID()}`, check.sample, served).catch(() => null);
+  if (!sheet) return served[0]!;
+  const loaded = served.filter((_, i) => sheet.loaded[i]);
+  const choice = await pickStolenFont(studioId, frame, sheet.png, served.length).catch((error: unknown) => {
+    console.warn("steal: font pick failed", error instanceof Error ? error.message.slice(0, 200) : error);
+    return null;
+  });
+  if (choice === null) return loaded[0] ?? null;
+  if (choice === 0) return null;
+  // A row drawn in a fallback font (its family did not load) is no answer.
+  return sheet.loaded[choice - 1] ? served[choice - 1]! : (loaded[0] ?? null);
 }
 
 /** A Reel's style read at once (the lab, a share on Instagram): its inspiration made, read, and the example dropped. */
