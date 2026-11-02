@@ -201,7 +201,10 @@ export async function designEdit(params: {
   ]);
   if (post.error) throw new Error("Publication introuvable");
   // The Reel she sent to copy (« Steal »): its style, read after her message, is waited for while the rest is read.
-  const copying = post.data.inspiration_id ? postStyle(params.studioId, params.postId, { waitMs: STEAL_WAIT_MS }).catch(() => undefined) : Promise.resolve(undefined);
+  // A new montage follows the latest reading of the Reel it copies; a correction, the one its Reel was made with.
+  const copying = post.data.inspiration_id
+    ? postStyle(params.studioId, params.postId, { waitMs: STEAL_WAIT_MS, latest: Boolean(params.fresh) }).catch(() => undefined)
+    : Promise.resolve(undefined);
 
   // The version to correct: the one asked for, else the post's current one (a reviewed
   // montage keeps the version the critic chose, often not the highest number), else the latest.

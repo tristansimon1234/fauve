@@ -181,7 +181,10 @@ export const toolSpecs = {
       post_id: z.string().uuid(),
       media_ids: z.array(z.string().uuid()).max(MAX_MONTAGE_FILES).optional().describe("Clips et photos à monter (media_id), 20 au plus. Facultatif pour une correction ou une vidéo 100 % motion design."),
       brief: z.string().max(1500).optional().describe("Intention ou correction, avec tout ce qu'elle a fixé, dans ses mots : son texte exact entre « » (pour la voix ou l'écran, sans le réécrire ; seulement les mots qu'elle a écrits : quand elle n'en écrit que le début et décrit la suite, son début entre « » puis « et la voix continue : … » ; jamais un texte de ta main entre « », décris plutôt ce que la voix doit dire), la personne (« je »), la mise en page, la durée, la voix, la fin, l'invitation ou son absence. Pour une correction, redis aussi ce qu'elle avait fixé avant et qui tient toujours. Ex. « ouverture en motion design avec RENTRÉE en grand », « police Montserrat », « visages OK »"),
-      correction: z.boolean().default(false).describe("true pour modifier le montage existant de cette publication"),
+      correction: z
+        .boolean()
+        .default(false)
+        .describe("true pour modifier le montage existant de cette publication ; false pour un nouveau montage, qui ne reprend rien de la version d'avant (« repars de zéro », « refais-le avec tout ça », d'autres fichiers)"),
       plan: montagePlanSchema
         .optional()
         .describe("Facultatif : ta piste pour ce Reel (durée, forme, scènes) ; le monteur la lit comme ta proposition, jamais comme un plan qu'elle a validé. Ce qu'elle a fixé elle-même va dans brief, dans ses mots ; sinon le monteur décide"),

@@ -340,8 +340,12 @@ async function runStep(job: Job) {
 const next = (job: Job, patch: Partial<Job>) => queueJob("montage", { ...job, ...patch });
 
 /** What the editor is asked for: the clips, the request with the validated plan, the scenes allowed. */
+/**
+ * What the editor gets for this job. A new montage (not a correction) starts from her files, never from the version
+ * the post already has: « repars de zéro » on a Reel made earlier came back as a correction of that version.
+ */
 function designInput(job: Job) {
-  return { studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, maxNewScenes: job.maxNewScenes, format: job.format, contract: job.contract };
+  return { studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, maxNewScenes: job.maxNewScenes, format: job.format, contract: job.contract, fresh: !job.correction };
 }
 
 /** What she fixed for this Reel, read once (it travels with the job to every step). */
@@ -702,6 +706,8 @@ async function fix(job: Job) {
       ...designInput(job),
       brief: fixBrief({ score: job.score ?? 5, issues: job.issues ?? [] }, job.brief),
       fromPlanId: best.planId,
+      // The critic's fix corrects the version kept, whatever the job (a new montage included).
+      fresh: false,
       maxNewScenes: scenesLeft(job),
       effort: job.editorEffort ?? EFFORTS[job.effort!].editorEffort,
     });

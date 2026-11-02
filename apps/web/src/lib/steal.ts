@@ -23,6 +23,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { instagramVideo } from "@/lib/treg";
 import { readStolenLook } from "@/lib/video/inspiration";
 import { costMeta } from "@/lib/cost-scope";
+import { queueJob } from "@/lib/jobs";
 
 // « Steal » (Tristan : « tu envoies le lien d'un Reel et il recopie la DA », « c'est one shot ») :
 // a Reel she likes, from its link, a video she sent or a share to Edith on Instagram, is the
@@ -225,11 +226,22 @@ export async function stealNow(studioId: string, source: StealSource): Promise<S
  * last minutes) is waited for, `waitMs` at most; one that failed, or an older one read as
  * words only, gives none.
  */
-export async function postStyle(studioId: string, postId: string, { waitMs = 0 }: { waitMs?: number } = {}): Promise<FollowedStyle | undefined> {
+export async function postStyle(
+  studioId: string,
+  postId: string,
+  { waitMs = 0, latest = false }: { waitMs?: number; latest?: boolean } = {},
+): Promise<FollowedStyle | undefined> {
   const db = supabaseAdmin();
   const { data: post } = await db.from("posts").select("inspiration_id").eq("id", postId).eq("studio_id", studioId).maybeSingle();
-  const id = (post?.inspiration_id as string | null) ?? null;
-  if (!id) return undefined;
+  const kept = (post?.inspiration_id as string | null) ?? null;
+  if (!kept) return undefined;
+  // A new montage takes the latest reading of its link (`latest`); a correction or a render keeps the one its Reel was made with.
+  const id = latest
+    ? await currentReadingOf(studioId, postId, kept).catch((error: unknown) => {
+        console.warn("steal: the latest reading not found", error);
+        return kept;
+      })
+    : kept;
   const deadline = Date.now() + waitMs;
   for (;;) {
     const { data: row } = await db.from("inspirations").select("source, style, analysis, created_at").eq("id", id).maybeSingle();
@@ -242,6 +254,36 @@ export async function postStyle(studioId: string, postId: string, { waitMs = 0 }
     if (!reading || Date.now() >= deadline) return undefined;
     await new Promise((resolve) => setTimeout(resolve, 5000));
   }
+}
+
+/**
+ * The reading a post follows, current: a Reel sent by its link and read before the current reader takes the latest
+ * reading of the same link, and with none, the link is read again (quietly: her Reel is on its way). Tristan's « repars
+ * de zéro » went to a Reel that kept the morning's reading, without the cut-outs read at 08:31 from the same link.
+ */
+async function currentReadingOf(studioId: string, postId: string, id: string): Promise<string> {
+  const db = supabaseAdmin();
+  const { data: row } = await db.from("inspirations").select("source, url, style").eq("id", id).eq("studio_id", studioId).maybeSingle();
+  const missed = Boolean((row?.style as { miss?: unknown } | null)?.miss);
+  // Not read yet, read now, one that could not be read, or not a link: as it is.
+  if (!row?.url || row.source !== "link" || !row.style || missed || currentReading(row.style)) return id;
+  const { data: others } = await db
+    .from("inspirations")
+    .select("id, style")
+    .eq("studio_id", studioId)
+    .eq("url", row.url as string)
+    .order("created_at", { ascending: false })
+    .limit(6);
+  let next = (others ?? []).find((o) => currentReading(o.style))?.id as string | undefined;
+  if (!next) {
+    const started = await startSteal(studioId, { link: row.url as string });
+    if (!("inspirationId" in started)) return id;
+    await queueJob("steal", { studioId, inspirationId: started.inspirationId, quiet: true });
+    next = started.inspirationId;
+  }
+  await db.from("posts").update({ inspiration_id: next }).eq("id", postId).eq("studio_id", studioId);
+  console.log("steal: a post follows the latest reading of its link", postId, next);
+  return next;
 }
 
 /** The Reel she sent to copy that no Reel of hers has used yet (sent in the last 48 h): for her next one. */
