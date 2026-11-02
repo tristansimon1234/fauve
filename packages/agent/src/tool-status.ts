@@ -16,6 +16,7 @@ export const TOOL_STATUS: Record<ToolName, string | null> = {
   list_inspirations: "Je regarde tes inspirations…",
   steal_style: "Je prépare de regarder ce Reel…",
   remember: "Je note…",
+  log_feedback: null,
   suggest_dates: "Je regarde tes jours libres…",
   get_calendar: "Je regarde ton calendrier…",
   create_post: "J’ajoute la publication…",

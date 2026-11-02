@@ -5213,3 +5213,18 @@ test("a delivery says of the editor's words only what she must know", async () =
   assert.match(deliveryWords("Je n'ai pas réussi à composer la mise en page demandée : cette version passe tes plans en plein cadre. Dis-moi « réessaie la mise en page »."), /^Je n'ai pas réussi.*réessaie la mise en page/);
   assert.equal(deliveryWords(""), "");
 });
+
+test("feedback: the team's morning message, short, by kind, in their words", async () => {
+  const { feedbackDigest } = await import("./feedback.ts");
+  assert.equal(feedbackDigest([]), null);
+  const text = feedbackDigest([
+    { kind: "bug", words: "ça marche pas, le lien s'ouvre pas", studio: "Café Lune" },
+    { kind: "bug", words: "rien reçu", studio: "Studio Mia" },
+    { kind: "idee", words: "ce serait bien de pouvoir choisir la musique", studio: "Café Lune" },
+    { kind: "compliment", words: "trop bien ce Reel", studio: "Chez Lino" },
+  ])!;
+  assert.match(text, /^4 retours hier : 2 bugs, 1 idée et 1 compliment\.\n/);
+  assert.match(text, /• Café Lune : « ça marche pas, le lien s'ouvre pas »/);
+  assert.equal(text.split("\n").filter((l) => l.startsWith("• ")).length, 3);
+  assert.match(text, /Le reste dans Admin, sur ordinateur\.$/);
+});

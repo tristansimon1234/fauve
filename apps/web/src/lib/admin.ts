@@ -1,5 +1,5 @@
 import "server-only";
-import { JOB_STALE_MINUTES } from "@fauve/agent";
+import { JOB_STALE_MINUTES, type FeedbackKind } from "@fauve/agent";
 import { brakeSettings, type BrakeSettings } from "@/lib/brake-settings";
 import { providerBudgets, type ProviderBudget } from "@/lib/provider-budgets";
 import { teamToday } from "@/lib/reply-cap";
@@ -26,6 +26,8 @@ export type AdminView = {
   waitlistTotal: number;
   montages: { id: string; studio: string; stage: string; since: string }[];
   signups: { studio: string; firstName: string | null; phone: string; at: string; step: string; subscription: string | null }[];
+  /** What people said of Edith and the app, the newest first: those not done yet. */
+  feedback: { id: string; studio: string; kind: FeedbackKind; words: string; at: string; status: "new" | "seen"; source: string; byEdith: boolean }[];
 };
 
 const name = (studio: unknown) => {
@@ -37,7 +39,7 @@ export async function adminView(): Promise<AdminView> {
   const db = supabaseAdmin();
   const since = await teamToday();
   const fresh = new Date(Date.now() - JOB_STALE_MINUTES * 60_000).toISOString();
-  const [settings, providers, signups, spent, montages, waitlist, recent] = await Promise.all([
+  const [settings, providers, signups, spent, montages, waitlist, recent, feedback] = await Promise.all([
     brakeSettings(),
     providerBudgets(),
     db.from("members").select("id", { count: "exact", head: true }).gte("created_at", since),
@@ -52,6 +54,12 @@ export async function adminView(): Promise<AdminView> {
       .limit(50),
     db.from("waitlist").select("phone_e164, first_name, first_text, created_at, last_message_at", { count: "exact" }).is("admitted_at", null).order("created_at").limit(100),
     db.from("members").select("first_name, phone_e164, created_at, studios(name, onboarding_step, subscription_status)").order("created_at", { ascending: false }).limit(20),
+    db
+      .from("feedback")
+      .select("id, kind, words, created_at, status, source, by_edith, studios(name)")
+      .neq("status", "done")
+      .order("created_at", { ascending: false })
+      .limit(60),
   ]);
   const jobs = montages.data ?? [];
   return {
@@ -72,6 +80,16 @@ export async function adminView(): Promise<AdminView> {
     })),
     waitlistTotal: waitlist.count ?? 0,
     montages: jobs.map((j) => ({ id: j.id as string, studio: name(j.studios), stage: j.stage as string, since: j.started_at as string })),
+    feedback: (feedback.data ?? []).map((f) => ({
+      id: f.id as string,
+      studio: name(f.studios),
+      kind: f.kind as FeedbackKind,
+      words: f.words as string,
+      at: f.created_at as string,
+      status: f.status as "new" | "seen",
+      source: f.source as string,
+      byEdith: Boolean(f.by_edith),
+    })),
     signups: (recent.data ?? []).map((m) => {
       const s = (Array.isArray(m.studios) ? m.studios[0] : m.studios) as { name?: string | null; onboarding_step?: string; subscription_status?: string | null } | null;
       return {

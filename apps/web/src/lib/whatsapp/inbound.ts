@@ -19,6 +19,7 @@ import { setReaction } from "@/lib/reactions";
 import { env } from "@/lib/env";
 import { withSlot } from "@/lib/work-slots";
 import { runningJobs } from "@/lib/studio-jobs";
+import { feedbackFromMessage } from "@/lib/feedback";
 import { downloadMedia, markReadAndTyping, sendLinkButton, sendReaction, sendReply, sendText, sendVideo } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 
@@ -224,6 +225,9 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
       return;
     }
   }
+
+  // Upset, or « Changer le plan »: kept for the team (lib/feedback.ts), whatever answers it.
+  if (text) await feedbackFromMessage(member.studio_id, text, "whatsapp", message.id).catch((e: unknown) => console.warn("feedback not kept", e));
 
   // A thank-you or an okay that needs nothing more (Edith asked nothing): ❤️ or 👍. « Alors ? », « ? »
   // while she answers or a montage runs: ⏳. No turn for either (two turns at once had launched two Reels).

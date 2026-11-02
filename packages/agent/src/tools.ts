@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EDITH_FEEDBACK_KINDS } from "./feedback.ts";
 import { APP_GUIDE_TOPICS, type AppGuideTopic } from "./app-guide.ts";
 import { RESTYLES } from "./restyle.ts";
 import {
@@ -424,6 +425,15 @@ export const toolSpecs = {
     description:
       "Ajoute à ta réponse des boutons et des cartes, affichés sous ton message (dans l'app ; sur WhatsApp, les boutons deviennent des boutons WhatsApp). options : les réponses possibles quand tu poses une question fermée (« Oui, lance » / « Non », un choix d'horaire, de format…), 2 à 6, courtes. posts : les publications dont tu parles, montrées en carte avec leur aperçu (vidéo, photo), format, date et statut. grid : true pour montrer la grille Instagram avec les publications à venir. upload : une zone de dépôt (video, photo ou any) quand tu lui demandes des fichiers ; sur WhatsApp, elle devient son lien de dépôt en pleine qualité, ajouté sous ton message. pick_media (video, photo ou any) : sa médiathèque en vignettes à cocher, avec aussi l'ajout de nouveaux fichiers ; sa réponse revient avec les media_id choisis. step_card (onboarding, dans l'app) : la carte de l'étape en cours (website : champ pour son site ; style : sa charte trouvée et son moodboard ; rhythm : son rythme ; connect : le bouton Instagram ; first_post : créer sa première publication). Ni pick_media ni step_card n'apparaissent sur WhatsApp. plan : ton plan avant de produire (« Avant de produire ») : title, points (4 à 6, dans l'ordre, chacun « Rubrique : ce qu'on fait »), why (pourquoi ça marche, une phrase) ; il est écrit sous ta phrase tel quel, avec les boutons « C'est parti » et « Changer le plan » : ne l'écris jamais dans ton texte, une courte phrase avant suffit. Appelle-le au plus une fois par réponse, avec ton message.",
     input: replyExtrasSchema.omit({ quote: true, link: true, kind: true }).extend({ plan: proposalSchema.optional() }),
+  },
+  log_feedback: {
+    description:
+      "Range pour l'équipe un retour sur Edith ou l'app dès qu'elle en dit un, en passant : un bug (« ça marche pas »), une déception sur un résultat, une idée (« ce serait bien que… »), un compliment. Ses mots tels qu'elle les a écrits, et la publication s'il s'agit d'une. Puis réponds-lui normalement ; une demande de changement sur un Reel se fait, ce n'est pas un retour.",
+    input: z.object({
+      kind: z.enum(EDITH_FEEDBACK_KINDS),
+      words: z.string().min(2).max(800),
+      post_id: z.uuid().optional(),
+    }),
   },
   react_to_message: {
     description:

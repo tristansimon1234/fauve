@@ -4,12 +4,13 @@ import { PageSuspense } from "@/components/page-suspense";
 import { adminView, teamMember, type AdminView } from "@/lib/admin";
 import { formatPhone, formatShortDateTime } from "@/lib/format";
 import type { ProviderBudget } from "@/lib/provider-budgets";
-import { dropWaiting, letIn, saveBrakes, setBudget } from "./actions";
+import { FEEDBACK_LABELS } from "@fauve/agent";
+import { dropWaiting, letIn, markFeedback, saveBrakes, setBudget } from "./actions";
 
 export const metadata: Metadata = { title: "Admin" };
 
-// The team's page (Tristan : « il va me falloir une interface admin pour gérer ») : the brakes of a
-// rush (brakes.ts) and their numbers, the waitlist (let someone in, or off), the montages running
+// The team's page (Tristan : « il va me falloir une interface admin pour gérer ») : what people said of
+// Edith and the app (Retours, lib/feedback.ts), the brakes of a rush (brakes.ts) and their numbers, the waitlist (let someone in, or off), the montages running
 // or waiting, the last signups. Only the team's studio opens it (lib/admin.ts).
 
 const ZONE = "Europe/Paris";
@@ -40,6 +41,7 @@ async function Admin() {
     <>
       <h1 className="text-[28px] leading-tight font-extrabold tracking-[-0.02em]">Admin</h1>
       <Today view={view} />
+      <Feedback view={view} />
       <Providers providers={view.providers} />
       <Brakes view={view} />
       <Waitlist view={view} />
@@ -169,6 +171,51 @@ function Waitlist({ view }: { view: AdminView }) {
         </ul>
       ) : (
         <p className="text-sm text-muted">Personne n’attend.</p>
+      )}
+    </Section>
+  );
+}
+
+/** What people said of Edith and the app (lib/feedback.ts): the new ones first, « Vu » or « Réglé ». */
+function Feedback({ view }: { view: AdminView }) {
+  const fresh = view.feedback.filter((f) => f.status === "new").length;
+  return (
+    <Section title="Retours" hint={view.feedback.length ? `${fresh} nouveau${fresh > 1 ? "x" : ""}, rangés par Edith ou repérés dans les messages.` : undefined}>
+      {view.feedback.length ? (
+        <ul className="flex flex-col divide-y divide-line text-sm">
+          {view.feedback.map((f) => (
+            <li key={f.id} className="flex flex-col gap-1.5 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-[13px] text-muted">
+                  <span className={`font-semibold ${f.status === "new" ? "text-violet" : ""}`}>{FEEDBACK_LABELS[f.kind].one}</span> · {f.studio} ·{" "}
+                  {f.source === "whatsapp" ? "WhatsApp" : "app"}
+                  {f.byEdith ? "" : " · repéré"} · {formatShortDateTime(f.at, ZONE)}
+                </span>
+                <span className="leading-snug break-words whitespace-pre-line">« {f.words} »</span>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                {f.status === "new" && (
+                  <form action={markFeedback}>
+                    <input type="hidden" name="id" value={f.id} />
+                    <input type="hidden" name="status" value="seen" />
+                    <button type="submit" className="btn btn-secondary h-9 px-3 text-[13px]">
+                      Vu
+                    </button>
+                  </form>
+                )}
+                <form action={markFeedback}>
+                  <input type="hidden" name="id" value={f.id} />
+                  <input type="hidden" name="status" value="done" />
+                  <button type="submit" className="btn btn-primary h-9 px-3 text-[13px]">
+                    Réglé
+                  </button>
+                </form>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted">Aucun retour pour l’instant.</p>
       )}
     </Section>
   );

@@ -1,4 +1,5 @@
 import "server-only";
+import { feedbackFromMessage } from "@/lib/feedback";
 import { awaitsAnswer, echoFor, emojiOnly, segmentKind, editPlanSchema, MAX_MONTAGE_FILES } from "@fauve/agent";
 import { after } from "next/server";
 import { replyInConversation } from "@/lib/agent/conversation";
@@ -206,6 +207,8 @@ export async function chatTurn(
   const body = text.trim().slice(0, 4000);
   const files = attachments.slice(0, MAX_ATTACHMENTS);
   if (!body && !files.length) return { ok: false, error: "Message vide.", conversationId };
+  // Upset, or « Changer le plan »: kept for the team (lib/feedback.ts).
+  if (body) await feedbackFromMessage(ctx.studioId, body, "web").catch((e: unknown) => console.warn("feedback not kept", e));
   // Her face (and an emoji) as early as possible: Jev reads the message while it is being stored
   // and while Claude starts, and the page gets it the moment it is known. Only emojis: no reading.
   const reading = body && !emojiOnly(body) ? readReaction(ctx.studioId, conversationId, body, onEvent) : null;

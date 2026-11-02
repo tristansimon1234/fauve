@@ -64,6 +64,7 @@ import { effectRoute } from "@/lib/agent/effects-agent";
 import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus } from "@/lib/montage-status";
 import { publicHistory, publicStatsFor, weekForModel } from "@/lib/social/public-stats";
+import { keepFeedback } from "@/lib/feedback";
 import { analyzePerformance, latestReport } from "@/lib/performance";
 import { setReaction } from "@/lib/reactions";
 import { sendReaction } from "@/lib/whatsapp/client";
@@ -1486,6 +1487,13 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         note:
           "videos_de_son_compte : ses vidéos publiées sur la période, d'après son @ (les siennes et celles d'Edith, publication_edith), avec leurs vues à ce jour ; engagement = (j'aime + commentaires + enregistrements) / vues. Une vidéo se juge contre sa moyenne (par_reseau.vues_par_video) et contre ses abonnés, pas en absolu ; semaines compare chaque semaine à la précédente (vues_gagnees : les vues prises par ses vidéos cette semaine-là, null tant que l'historique ne remonte pas assez). Dis-le avec chaleur : d'abord ce qui marche, une baisse simplement avec quoi essayer, jamais un reproche.",
       });
+    },
+
+    async log_feedback({ kind, words, post_id }) {
+      // Only a publication of hers: an id from elsewhere is left out, the words are kept.
+      const own = post_id ? (await db.from("posts").select("id").eq("id", post_id).eq("studio_id", studioId).maybeSingle()).data : null;
+      await keepFeedback({ studioId, kind, words, source: ctx.waId ? "whatsapp" : "web", byEdith: true, postId: own ? post_id : null, waMessageId: ctx.replyToMessageId ?? null });
+      return "Rangé pour l'équipe. Réponds-lui normalement ; pour un bug ou une idée, tu peux dire en quelques mots que tu le fais remonter.";
     },
 
     async react_to_message({ emoji }) {

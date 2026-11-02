@@ -8,6 +8,7 @@ import { startWaitingMontages } from "@/lib/montage-queue";
 import { PROVIDERS, type ProviderKey } from "@fauve/agent";
 import { forgetBudget, saveBudget } from "@/lib/provider-budgets";
 import { admitNow, dropFromWaitlist } from "@/lib/waitlist";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // The admin page's actions: the team's studio only (lib/admin.ts), checked again on each one.
 
@@ -63,5 +64,17 @@ export async function setBudget(form: FormData): Promise<void> {
     if (!balance.success) return;
     await saveBudget(provider.data, balance.data, days);
   }
+  revalidatePath("/admin");
+}
+
+const feedbackStatus = z.object({ id: z.uuid(), status: z.enum(["seen", "done"]) });
+
+/** A feedback read (« Vu ») or dealt with (« Réglé »: it leaves the list). */
+export async function markFeedback(form: FormData): Promise<void> {
+  await guard();
+  const parsed = feedbackStatus.safeParse({ id: form.get("id"), status: form.get("status") });
+  if (!parsed.success) return;
+  const { error } = await supabaseAdmin().from("feedback").update({ status: parsed.data.status }).eq("id", parsed.data.id);
+  if (error) console.warn("feedback not marked", error.message);
   revalidatePath("/admin");
 }
