@@ -1276,23 +1276,26 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if ("miss" in started) {
         return json({ error: started.miss === "not_found" ? "Cette vidéo ou cette inspiration est introuvable : demande-lui le lien du Reel, ou la vidéo elle-même." : await missMessage(started.miss) });
       }
-      const job = { studioId, inspirationId: started.inspirationId, example: started.example, waId: ctx.waId, replyTo: ctx.replyToMessageId };
+      // Sent again: its reading is kept (she is sent what her Reel takes from it again, at once), never « je le regarde de nouveau ».
+      const known = await db.from("inspirations").select("style").eq("id", started.inspirationId).maybeSingle();
+      const alreadyRead = Boolean((known.data?.style as { look?: unknown } | null)?.look);
+      // Read now: Edith gets a turn with its reading to write her plan (already read, she writes it in this turn).
+      const job = { studioId, inspirationId: started.inspirationId, example: started.example, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId, turn: !alreadyRead };
       ctx.afterReply.push(() =>
         queueJob("steal", job).catch((error: unknown) =>
           notifyFailure({ studioId, postId: "", waId: ctx.waId, replyTo: ctx.replyToMessageId }, "Je n’ai pas réussi à regarder ce Reel cette fois. Tu veux que je réessaie ?", error),
         ),
       );
       ctx.notes.push(`Reel à recopier pour son prochain Reel : inspiration_id=${started.inspirationId}`);
-      // Sent again: its reading is kept (she is sent what her Reel takes from it again, at once), never « je le regarde de nouveau ».
-      const known = await db.from("inspirations").select("style").eq("id", started.inspirationId).maybeSingle();
-      const alreadyRead = Boolean((known.data?.style as { look?: unknown } | null)?.look);
       // Her answer about its sound, given since the last launch, is never asked again (she was asked twice for the same Reel).
       const soundAnswer = [...(ctx.exchange ?? [])].reverse().find((r) => r.direction === "inbound" && SOUND_ANSWER.test(r.body?.trim() ?? ""))?.body?.trim();
       return json({
         status: alreadyRead ? "deja_lu" : "started",
         inspiration_id: started.inspirationId,
         ...(alreadyRead ? { deja_lu: "Ce Reel est déjà regardé : ce que son Reel en reprend lui est renvoyé tout de suite, et ta ligne « Reel à recopier » le dit. Ne dis pas que tu le regardes de nouveau." } : {}),
-        note: "Tu le regardes après ta réponse (environ une minute), puis tu lui envoies tout seul ce que son Reel en reprend. C'est le modèle d'un seul Reel, le prochain : si elle t'a déjà donné ses vidéos ou ses photos pour ce Reel (ou dit lesquelles prendre), propose ton plan (reply_with plan) et lance montage avec cet inspiration_id sur son accord (le monteur attend la lecture) ; sinon ne les lui demande pas, ton message qui suit le fait (et un Reel en pur motion design n'en prend aucun). Annonce-le en une phrase, sans rien décrire de ce Reel avant de l'avoir vu.",
+        note: alreadyRead
+          ? "C'est le modèle d'un seul Reel, le prochain : si elle t'a déjà donné ses vidéos ou ses photos pour ce Reel (ou dit lesquelles prendre), propose ton plan (reply_with plan), construit sur ce modèle (ta ligne « Reel à recopier ») et sur sa demande, et lance montage avec cet inspiration_id sur son accord ; sinon ne les lui demande pas, le message qui suit le fait."
+          : "Tu le regardes après ta réponse (une à deux minutes). Pas encore de plan : ton plan doit être construit sur ce modèle, que tu n'as pas vu. Dis-lui seulement, en une phrase, que tu regardes son modèle et que tu reviens avec ton plan ; sans rien décrire de ce Reel. Une fois lu, tu reçois un tour avec sa lecture : tu y écris le plan (ou tu demandes ses fichiers s'il en manque). C'est le modèle d'un seul Reel, le prochain ; un Reel en pur motion design ne prend aucun fichier.",
         ...(soundAnswer ? { son_deja_choisi: `Elle a déjà répondu pour le son : « ${soundAnswer} ». Ne le redemande pas.` } : {}),
         ...(link && /instagram\.com\//i.test(link) && !soundAnswer
           ? {

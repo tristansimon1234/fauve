@@ -352,6 +352,30 @@ export async function chatTurn(
   return { ok: true, conversationId: id, messages, conversations };
 }
 
+/**
+ * A turn the app hands Edith in one of her app conversations (the Reel she sent to copy, now read):
+ * `note` says what happened, her answer is kept there and what it starts runs after it. False when
+ * she had nothing to say.
+ */
+export async function answerInApp(params: { studioId: string; memberId: string; conversationId: string; note: string }): Promise<boolean> {
+  const result = await replyInConversation({ studioId: params.studioId, memberId: params.memberId, conversationId: params.conversationId, channel: "web", note: params.note });
+  if (!result.reply) return false;
+  const { error } = await supabaseAdmin()
+    .from("whatsapp_messages")
+    .insert({
+      studio_id: params.studioId,
+      conversation_id: params.conversationId,
+      channel: "web",
+      direction: "outbound",
+      type: "text",
+      body: result.reply,
+      payload: { ...result.extras, notes: result.notes },
+    });
+  if (error) throw new Error(error.message);
+  for (const job of result.afterReply) await job().catch((e) => console.error("chat: after-reply job failed", e));
+  return true;
+}
+
 /** Edith's reaction to the manager's message, sent to the page the moment Jev answers. */
 async function readReaction(studioId: string, conversationId: string | null, body: string, onEvent?: (event: ChatEvent) => void) {
   const started = Date.now();

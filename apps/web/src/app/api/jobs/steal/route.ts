@@ -6,6 +6,7 @@ import { env } from "@/lib/env";
 import { messageStudio, notifyFailure, notifyStudio } from "@/lib/render/deliver";
 import { dropExample, missMessage, stealStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { planAfterReading } from "@/lib/steal-turn";
 
 // « Steal », in its own invocation: the Reel she sent to copy is taken, measured and read (a
 // minute or two), then she is told what her Reel takes from it. A montage launched from the
@@ -20,6 +21,10 @@ const bodySchema = z.object({
   example: z.object({ id: z.uuid(), path: z.string().max(400) }).optional(),
   waId: z.string().regex(/^\d{6,16}$/).optional(),
   replyTo: z.string().max(200).optional(),
+  /** The app conversation she sent it in (none on WhatsApp): Edith's plan, once it is read, goes there. */
+  conversationId: z.uuid().optional(),
+  /** Read now, from the chat: Edith gets a turn with its reading to write her plan (already read, she wrote it). */
+  turn: z.boolean().optional(),
   /** Given on the Créer screen, which shows its reading: told in the chat only when her Reel is already on its way. */
   fromCreate: z.boolean().optional(),
   /** One of her Reels kept as a model: its page shows its reading, nothing is said in the chat. */
@@ -44,6 +49,14 @@ async function run(job: Job) {
     const { count } = await supabaseAdmin().from("posts").select("id", { count: "exact", head: true }).eq("studio_id", job.studioId).eq("inspiration_id", job.inspirationId);
     const making = Boolean(count);
     if (!making && job.fromCreate) return;
+    // Sent in the chat: Edith now writes her plan with its reading (or asks for her files), where she was sent it.
+    if (!making && job.turn) {
+      const answered = await planAfterReading(job).catch((error: unknown) => {
+        console.warn("steal: Edith's turn after the reading failed, the fixed message instead", error);
+        return false;
+      });
+      if (answered) return;
+    }
     // Not yet: her files are asked for (in the app, her library under the message).
     await messageStudio(target, stolenStyleMessage(outcome.style, making), making || job.waId ? {} : { pick_media: "any" });
   } catch (error) {

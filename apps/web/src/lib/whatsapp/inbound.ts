@@ -404,17 +404,25 @@ async function busyNow(studioId: string): Promise<boolean> {
   return Boolean(turn.data?.length) || jobs.length > 0;
 }
 
-type WhatsAppTurn = { studioId: string; memberId: string; waId: string; phone: string; replyTo?: string };
+type WhatsAppTurn = {
+  studioId: string;
+  memberId: string;
+  waId: string;
+  phone: string;
+  replyTo?: string;
+  /** A turn the app hands her (the Reel she sent to copy, now read): what happened, last in her history. */
+  note?: string;
+};
 
 /** A business's turn: one at a time, a lease long enough for a turn, a wait beyond which it runs anyway. */
 const turnSlot = (studioId: string) => ({ kind: `turn:${studioId}`, slots: 1, perSlot: 1, leaseMs: 4 * 60_000, waitMs: 2 * 60_000 });
 
 /** The turn itself: her answer sent and stored; what runs after it is returned, to run once the turn's place is free. */
-async function answerOnWhatsApp({ studioId, memberId, waId, phone, replyTo }: WhatsAppTurn): Promise<(() => Promise<unknown>)[]> {
+async function answerOnWhatsApp({ studioId, memberId, waId, phone, replyTo, note }: WhatsAppTurn): Promise<(() => Promise<unknown>)[]> {
   const db = supabaseAdmin();
   let result: Awaited<ReturnType<typeof replyInConversation>>;
   try {
-    result = await replyInConversation({ studioId, memberId, waId, replyToMessageId: replyTo });
+    result = await replyInConversation({ studioId, memberId, waId, replyToMessageId: replyTo, note });
   } catch (error) {
     // Never leave the manager on a "typing…" that leads nowhere. Not stored, so
     // the conversation history stays clean for the next attempt.

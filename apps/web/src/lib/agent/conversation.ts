@@ -113,6 +113,8 @@ export async function replyInConversation(params: {
   channel?: "whatsapp" | "web";
   /** Live events of the turn (the app's chat). */
   onEvent?: RunFauveInput["onEvent"];
+  /** A turn the app hands her (the Reel she sent to copy, now read): what happened, last in her history. */
+  note?: string;
 }): Promise<RunFauveResult> {
   const db = supabaseAdmin();
   // A chat the manager started fresh in the web app is its own context (and
@@ -197,6 +199,12 @@ export async function replyInConversation(params: {
     undelivered: Boolean((r.payload as { undelivered?: unknown } | null)?.undelivered),
   }));
   const history = toModelHistory(orderReplies(stored));
+  // What the app tells her now, after everything said (her own last message may already be answered).
+  if (params.note) {
+    const last = history.at(-1);
+    if (last?.role === "user" && typeof last.content === "string") last.content = `${last.content}\n${params.note}`;
+    else history.push({ role: "user", content: params.note });
+  }
   const silent: RunFauveResult = { reply: null, reactions: [], extras: {}, notes: [], usage: { input_tokens: 0, output_tokens: 0 }, afterReply: [] };
   // Every message has already been answered (e.g. a retried delivery): nothing to say.
   if (history.at(-1)?.role !== "user") return silent;
