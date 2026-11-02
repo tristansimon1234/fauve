@@ -5666,3 +5666,25 @@ test("her request for the music is in her contract, for the composer", async () 
   assert.ok(contractLines(piano).includes("Musique demandée : just a classical piano, no other instrument"));
   assert.equal(EMPTY_CONTRACT.music, null);
 });
+
+test("a tool on trial is promoted on five good uses, retired on corrections or a failure", async () => {
+  const { proofVariants, settledOutcome, toolVerdict, PROOF_CHARTERS } = await import("./toolkit.ts");
+  const none = { kept: 0, published: 0, corrected: 0, failed: 0 };
+  assert.equal(toolVerdict("trial", { ...none, kept: 3, published: 1 }), "stay");
+  assert.equal(toolVerdict("trial", { ...none, kept: 3, published: 2 }), "promote");
+  assert.equal(toolVerdict("trial", { ...none, kept: 4, published: 1, corrected: 2 }), "stay");
+  assert.equal(toolVerdict("trial", { ...none, kept: 1, corrected: 2 }), "retire");
+  assert.equal(toolVerdict("trial", { ...none, kept: 6, failed: 1 }), "retire");
+  assert.equal(toolVerdict("active", { ...none, kept: 5, corrected: 5 }), "retire");
+  assert.equal(toolVerdict("active", { ...none, kept: 9, failed: 1 }), "stay");
+  // A use waits two days, unless its Reel is out.
+  assert.equal(settledOutcome({ ageHours: 2, published: true, stillUsed: true }), "published");
+  assert.equal(settledOutcome({ ageHours: 2, published: false, stillUsed: true }), null);
+  assert.equal(settledOutcome({ ageHours: 50, published: false, stillUsed: true }), "kept");
+  assert.equal(settledOutcome({ ageHours: 50, published: false, stillUsed: false }), "corrected");
+  // Proven on three charters, the short texts on the first, the long ones on the others.
+  const variants = proofVariants([{ slot: "title", short: "Brunch", long: "Le brunch du dimanche revient" }]);
+  assert.equal(variants.length, PROOF_CHARTERS.length);
+  assert.deepEqual(variants.map((v) => v.texts.title), ["Brunch", "Le brunch du dimanche revient", "Le brunch du dimanche revient"]);
+  assert.equal(new Set(variants.map((v) => v.charter.displayFont)).size, 3);
+});

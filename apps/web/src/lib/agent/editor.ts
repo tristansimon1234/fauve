@@ -77,6 +77,7 @@ import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
 import { copyCandidate, designCopy } from "./copy-design";
+import { recordToolUses } from "@/lib/tool-maker";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
 import { showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
@@ -842,6 +843,8 @@ export async function designEdit(params: {
   const row = await insertPlanVersion(params.studioId, params.postId, plan);
   const version = row.version;
   await db.from("posts").update({ edit_plan_id: row.id }).eq("id", params.postId);
+  // A tool of the shared library reused here: its use is noted, settled in two days (lib/tool-maker.ts).
+  await recordToolUses(params.studioId, params.postId, row.id, [...reused.keys()]);
 
   return {
     editPlanId: row.id,

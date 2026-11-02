@@ -50,7 +50,7 @@ export async function toolsWeek() {
   const since = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
   const [gaps, tools, versions, settings, spent] = await Promise.all([
     db.from("capability_gaps").select("label, source, studios(name, team, website_url)").gte("created_at", since).order("created_at", { ascending: false }).limit(500),
-    db.from("tools").select("status, created_at, retired_at"),
+    db.from("tools").select("status, created_at, retired_at, origin"),
     db.from("tool_versions").select("version, status, created_at").gte("created_at", since),
     toolSettings(),
     toolSpendEur(since),
@@ -59,7 +59,8 @@ export async function toolsWeek() {
     const s = (Array.isArray(g.studios) ? g.studios[0] : g.studios) as { team?: boolean | null; website_url?: string | null; name?: string | null } | null;
     return !s || !ourStudio(s);
   });
-  const all = tools.data ?? [];
+  // An animation tried and refused before its trial is not a tool made nor retired.
+  const all = (tools.data ?? []).filter((t) => !(t.origin as { rejected?: boolean } | null)?.rejected);
   const fresh = (at: unknown) => typeof at === "string" && at >= since;
   return {
     gaps: real.map((g) => ({ label: g.label as string, source: g.source as GapSource })),

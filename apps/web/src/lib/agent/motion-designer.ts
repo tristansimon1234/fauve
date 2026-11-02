@@ -196,7 +196,8 @@ async function designerModel(studioId: string): Promise<string> {
   return trial && asked && (GEMINI_MODEL_ID.test(asked) || isKimiModel(asked)) ? asked : CLAUDE_MODEL;
 }
 
-function transpile(code: string): string {
+/** A scene's TSX as plain JS for the render (never executed here); also the tools' (lib/tool-maker.ts). */
+export function transpile(code: string): string {
   return transform(code, { transforms: ["typescript", "jsx"], jsxRuntime: "classic", production: true }).code;
 }
 

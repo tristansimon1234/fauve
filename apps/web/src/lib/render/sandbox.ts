@@ -408,6 +408,8 @@ export type SmokeScene = {
   end?: ComposeEnd | null;
   /** The colours of the picture under it (each shot's, the footage's at some of its frames): a word lost on it is reported. */
   backdrop?: SceneBackdrop;
+  /** Its own brand, when the scenes are checked on several (a tool proven on three charters); else the call's. */
+  brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl">;
 };
 
 /**
@@ -432,7 +434,7 @@ export async function smokeTestScenes(
   return withRemotion(CHECK_WAIT_MS, async (sandbox) => {
     const file = `${ROOT}/jobs/smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
     try {
-      await sandbox.writeFiles([{ path: file, content: JSON.stringify(scenes.map((s) => ({ ...s, brand }))) }]);
+      await sandbox.writeFiles([{ path: file, content: JSON.stringify(scenes.map((s) => ({ ...s, brand: brand ?? s.brand }))) }]);
       const result = await sandbox.runCommand({ cmd: "bash", args: ["-c", `cd ${REMOTION} && timeout 150 node smoke.mjs "$1"`, "bash", file] });
       const lastLine = (await result.stdout()).trim().split("\n").at(-1) ?? "";
       try {
