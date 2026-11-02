@@ -1245,6 +1245,9 @@ function stealSandbox(): Promise<Sandbox> {
  * 720 px or more, once more as a browser if refused) or the file at `$2` when `$3` is « file ».
  * Exits 10 when it cannot be opened, 11 when it runs over STEAL_MAX_SECONDS, 12 when it is no video.
  */
+/** The most sheets of a copied Reel's frames kept for its animations (ten frames each). */
+const MODEL_SHEETS = 12;
+
 const STEAL_JOB = [
   "set -uo pipefail",
   'cd "$1"',
@@ -1265,6 +1268,10 @@ const STEAL_JOB = [
   `${ROOT}/ffmpeg -loglevel error -y -i in.src -map 0:v:0 -map "0:a:0?" -vf "scale='min(720,iw)':-2,fps=30,format=yuv420p" -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k -movflags +faststart reel.mp4 || exit 12`,
   "rm -f in.src",
   `${ROOT}/ffmpeg -hide_banner -nostats -i reel.mp4 -an -vf "scale=320:-2,scdet=threshold=12" -f null - 2> cuts.log || true`,
+  // Sheets of its frames, ten each (five by two, left to right then top to bottom), for the animations that remake it.
+  `sheet=$(awk -v d="$d" 'BEGIN { s = d / ${MODEL_SHEETS}; if (s < 2) s = 2; printf "%.3f", s }')`,
+  `${ROOT}/ffmpeg -v error -i reel.mp4 -an -vf "fps=10/$sheet,scale=192:-2,tile=5x2" -q:v 5 -y sheet_%02d.jpg || true`,
+  'echo "sheet=$sheet"',
   `${ROOT}/ffmpeg -hide_banner -nostats -i reel.mp4 -vn -af "$4" -f null - 2>&1 | grep -o 'RMS_level=[^ ]*' | cut -d= -f2 > bass.txt || true`,
   LOUD,
   'echo "duration=$d lufs=$(loud reel.mp4)"',
@@ -1283,6 +1290,8 @@ export type StolenReel = {
   seconds: number;
   /** An image from the middle of each shot, for its reading: a shot of a third of a second can fall between the video's frames. */
   shots: { from: number; to: number; jpeg: Buffer }[];
+  /** Sheets of its frames (ten each, 192 px wide), each over its span: shown to the animations that remake it. */
+  sheets: { from: number; to: number; jpeg: Buffer }[];
 };
 
 /** Its shots' middle images (540 px wide), from its small copy; none when they could not be taken. */
@@ -1335,7 +1344,19 @@ export async function stealReelInSandbox(id: string, source: { link: string } | 
     ]);
     if (!video?.length) return { miss: "not_video", detail: "no copy" };
     const sceneCuts = parseSceneCuts(cuts?.toString("utf8") ?? "", duration);
+    const span = printed(out, "sheet") ?? 2;
+    const sheets = (
+      await Promise.all(
+        Array.from({ length: MODEL_SHEETS }, (_, i) =>
+          sandbox.readFileToBuffer({ path: `${dir}/sheet_${String(i + 1).padStart(2, "0")}.jpg` }).then(
+            (jpeg) => (jpeg?.length ? { from: Math.round(i * span * 100) / 100, to: Math.round(Math.min(duration, (i + 1) * span) * 100) / 100, jpeg } : null),
+            () => null,
+          ),
+        ),
+      )
+    ).filter((s): s is { from: number; to: number; jpeg: Buffer } => Boolean(s) && s!.from < duration);
     return {
+      sheets,
       video,
       duration,
       cuts: sceneCuts,

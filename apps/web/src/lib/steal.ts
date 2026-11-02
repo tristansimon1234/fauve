@@ -203,7 +203,10 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   const text = { ...look.text };
   delete text.font;
   const font = await checkedFont(studioId, reading.fonts, reel.shots);
-  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, reader: STEAL_READER, ...outline };
+  // Sheets of its frames, for the animations that remake it (never its video): deleted with the inspiration.
+  await dropSheets(studioId, inspirationId).catch(() => {});
+  const sheets = await keepSheets(studioId, inspirationId, reel.sheets);
+  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, reader: STEAL_READER, ...outline, ...(sheets.length ? { sheets } : {}) };
   // Its three lines also stand as its reading (the inspirations list, the editor's chosen inspiration).
   const analysis = stolenStyleLines(style).join(" ");
   await db
@@ -214,6 +217,43 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   // The file was only for this reading (someone else's content, or a copy of her own Reel's video).
   if (row.storage_path) await db.storage.from("media").remove([row.storage_path as string]).catch(() => {});
   return read(inspirationId, style, false);
+}
+
+/** Where a copied Reel's sheets are kept: with her inspirations, removed with it. */
+export const sheetsFolder = (studioId: string, inspirationId: string) => `${studioId}/inspirations/${inspirationId}/sheets`;
+
+async function keepSheets(studioId: string, inspirationId: string, sheets: { from: number; to: number; jpeg: Buffer }[]): Promise<NonNullable<StolenStyle["sheets"]>> {
+  const db = supabaseAdmin();
+  const kept = await Promise.all(
+    sheets.slice(0, 16).map(async (s, i) => {
+      const path = `${sheetsFolder(studioId, inspirationId)}/${String(i).padStart(2, "0")}.jpg`;
+      const { error } = await db.storage.from("media").upload(path, s.jpeg, { contentType: "image/jpeg", upsert: true });
+      return error ? null : { from: s.from, to: s.to, path };
+    }),
+  );
+  return kept.filter((s): s is { from: number; to: number; path: string } => Boolean(s));
+}
+
+/** The sheets of the Reel a post copies (none for a reading made before them), each with its span. */
+export async function modelSheets(studioId: string, inspirationId: string): Promise<{ from: number; to: number; jpeg: Buffer }[]> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("inspirations").select("style").eq("id", inspirationId).eq("studio_id", studioId).maybeSingle();
+  const style = stolenStyleSchema.safeParse(data?.style);
+  const sheets = style.success ? (style.data.sheets ?? []) : [];
+  const read = await Promise.all(
+    sheets.map(async (s): Promise<{ from: number; to: number; jpeg: Buffer }[]> => {
+      const file = await db.storage.from("media").download(s.path).catch(() => null);
+      return file?.data ? [{ from: s.from, to: s.to, jpeg: Buffer.from(await file.data.arrayBuffer()) }] : [];
+    }),
+  );
+  return read.flat();
+}
+
+/** Its sheets removed (the inspiration deleted, or read again). */
+export async function dropSheets(studioId: string, inspirationId: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { data } = await db.storage.from("media").list(sheetsFolder(studioId, inspirationId));
+  if (data?.length) await db.storage.from("media").remove(data.map((f) => `${sheetsFolder(studioId, inspirationId)}/${f.name}`)).catch(() => {});
 }
 
 /**

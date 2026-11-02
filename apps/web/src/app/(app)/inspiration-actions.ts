@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ensureInspirationRead, listInspirations, type InspirationItem } from "@/lib/inspirations";
 import { getStudioContext } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { dropSheets } from "@/lib/steal";
 
 // The manager's inspirations, from anywhere in the app (new post sheet, Style).
 
@@ -52,5 +53,7 @@ export async function removeInspiration(id: string): Promise<boolean> {
   const db = supabaseAdmin();
   const { data } = await db.from("inspirations").delete().eq("id", id).eq("studio_id", studioId).select("storage_path").maybeSingle();
   if (data?.storage_path) await db.storage.from("media").remove([data.storage_path as string]);
+  // The sheets of its frames kept for its animations go with it.
+  if (data) await dropSheets(studioId, id).catch(() => {});
   return Boolean(data);
 }

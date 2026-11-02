@@ -81,7 +81,7 @@ import { recordToolUses } from "@/lib/tool-maker";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
 import { showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
-import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS } from "@/lib/steal";
+import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS, modelSheets } from "@/lib/steal";
 import { isFirstReel } from "@/lib/onboarding";
 import { LAYER_ROLE, markTemplatesUsed, OVERLAY_ROLE, PHOTO_ROLE, recentlyShownTemplates, saveTemplates, templateCode, templatesForEditor } from "./motion-templates";
 import { timeLeft } from "@/lib/step-clock";
@@ -650,6 +650,26 @@ export async function designEdit(params: {
     };
   };
   const requests = toWrite.map(requestFor);
+  // The Reel she copies, seen by each animation that remakes part of it: the sheets of its frames at the same point
+  // of the Reel (all of them for an animation over the whole Reel), never a sentence alone.
+  if (post.data.inspiration_id && requests.length) {
+    const sheets = await modelSheets(params.studioId, post.data.inspiration_id as string).catch(() => []);
+    if (sheets.length) {
+      const modelLength = sheets.at(-1)!.to || 1;
+      const spans = planTimeline(plan).segments;
+      const label = (s: { from: number; to: number }) => `Le Reel qu'elle recopie, de ${s.from.toFixed(1).replace(".", ",")} s à ${s.to.toFixed(1).replace(".", ",")} s :`;
+      for (const request of requests) {
+        const layer = request.id.startsWith("l") ? layers[Number(request.id.slice(1))] : null;
+        const at = layer ? { start: layer.from, end: layer.to } : spans[Number(request.id.slice(1))] ? { start: spans[Number(request.id.slice(1))]!.start, end: spans[Number(request.id.slice(1))]!.start + spans[Number(request.id.slice(1))]!.length } : null;
+        if (!at) continue;
+        const whole = at.end - at.start >= plan.duration * 0.7;
+        const from = (at.start / plan.duration) * modelLength - 0.5;
+        const to = (at.end / plan.duration) * modelLength + 0.5;
+        const chosen = whole ? sheets.filter((_, i) => sheets.length <= 8 || i % Math.ceil(sheets.length / 8) === 0).slice(0, 8) : sheets.filter((s) => s.to > from && s.from < to).slice(0, 3);
+        if (chosen.length) request.model = chosen.map((s) => ({ label: label(s), jpeg: s.jpeg }));
+      }
+    }
+  }
   // A correction: each animation rewritten first looks at how its earlier version came out on her images.
   if (correction && previousPlan.success && baseId && requests.length) {
     await lookAtEarlierRender(params.studioId, params.postId, baseId, previousPlan.data, plan, requests, {

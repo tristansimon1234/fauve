@@ -67,6 +67,8 @@ export type SceneRequest = {
   seen?: { code: string; frames: SceneFrame[] };
   /** A first draft: the Reel as it will come out without the animations being written (frames with their instant), seen before writing. */
   canvas?: SceneFrame[];
+  /** The Reel she copies, at the moment this animation remakes: sheets of its frames (ten each), seen before writing. */
+  model?: SceneFrame[];
   /** The row where a voice's subtitles show during the scene (shares of the height): its words keep off it. */
   subtitles?: { y: number; h: number };
   /** The colours of the picture under it, read once from `canvas` for the scene check (null: none to read). */
@@ -231,6 +233,8 @@ async function writeScene(
   const seen = !fix && request.seen?.frames.length ? request.seen : undefined;
   // A first draft sees the Reel it is written for, as it will come out without its animations.
   const canvas = !fix && !seen && request.canvas?.length ? request.canvas : undefined;
+  // The Reel she copies, for a first draft and a correction alike (never a code fix).
+  const copied = !fix && request.model?.length ? request.model : undefined;
   // Its prompt: the base, and only the parts this animation needs (a fix keeps those of its request).
   const parts: MotionPromptParts = {
     photos: Boolean(request.photos?.length || request.compose?.plans.some((p) => p.cut_out)),
@@ -288,8 +292,9 @@ async function writeScene(
             : {}),
         ...(seen ? { previous_version: { frames: `${seen.frames.length} images attached, above`, code: seen.code } } : {}),
         ...(canvas ? { reel_frames: `${canvas.length} images attached, above` } : {}),
+        ...(copied ? { model_frames: `${copied.length} sheets of the Reel she copies attached, first: remake how its elements appear, change, move and leave, at its pace, with her images and her words, never its images nor its words` } : {}),
       });
-  const content: string | Block[] = seen
+  const shown: string | Block[] = seen
     ? withFrames("Your earlier animation, rendered on her images:", seen.frames, text)
     : canvas
       ? withFrames(
@@ -300,6 +305,17 @@ async function writeScene(
           text,
         )
       : text;
+  // The Reel she copies, first: what this animation remakes, seen frame after frame rather than read in a sentence.
+  const content: string | Block[] = copied
+    ? [
+        ...withFrames(
+          "The Reel she copies, at the moment you remake (each image a sheet of ten frames in order, left to right then top to bottom):",
+          copied,
+          "",
+        ).slice(0, -1),
+        ...(typeof shown === "string" ? [{ type: "text" as const, text: shown }] : shown),
+      ]
+    : shown;
   const prompt = motionDesignerPrompt(parts);
   const output =
     model === CLAUDE_MODEL

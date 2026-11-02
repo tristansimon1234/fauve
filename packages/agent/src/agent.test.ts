@@ -3699,7 +3699,7 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
     { at: 0, ground: "une terrasse de café", laid: "aucun", subject: "" },
     { at: 3.1, ground: "une rue pavée", laid: "objet", subject: "une boisson glacée" },
   ]);
-  assert.ok(effects.moments!.every((m) => m.what.length <= 220));
+  assert.ok(effects.moments!.every((m) => m.what.length <= 320));
   assert.ok(stolenLookSchema.safeParse(effects).success);
   assert.equal("moments" in clampLook({ ...look, layout: "plein cadre", text: { ...look.text, font: "", font_alternatives: [], sample: "", seen_at: 0, stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const }, colors: [], shots: [], moments: [{ at: 1, what: "un seul effet" }] }), false);
   const sequence = followedFrom("11111111-2222-4333-8444-555555555555", { look: effects, measures: { duration: 19, cuts: [], bpm: null, lufs: -14 } });
@@ -5135,8 +5135,10 @@ test("whatsapp: the Sunday report from her @, against the week before, warm", ()
 test("a copied Reel is read shot by shot, its cut-outs laid over its shots make a composition", async () => {
   const { composedLayout, shotMiddles, stealFps } = await import("./steal.ts");
   // Tristan's model: 13 s cut every 0.3 to 0.6 s; at 2 frames a second its cut-outs fell between two frames.
-  assert.equal(stealFps(13.2), 6);
-  assert.equal(stealFps(45), 4);
+  // A short Reel at 15 a second: its effects are seen as they happen (a grid's squares turning one by one).
+  assert.equal(stealFps(13.2), 15);
+  assert.equal(stealFps(30), 10);
+  assert.equal(stealFps(45), 6);
   assert.equal(stealFps(90), 2);
   assert.deepEqual(shotMiddles([1.5, 1.9, 3], 4), [
     { from: 0, to: 1.5, at: 0.75 },
@@ -5211,7 +5213,7 @@ test("a word lost on the picture under it is found, and one with its own edge is
 
 test("a copied Reel's words keep their drawing, and its font is checked among close candidates", async () => {
   const { clampLook, fontCheckOf, stolenLookSchema, textDrawingWords, STEAL_READER } = await import("./steal.ts");
-  assert.equal(STEAL_READER, 5);
+  assert.equal(STEAL_READER, 6);
   const reading = {
     name: "message manuscrit",
     format: "message" as const,

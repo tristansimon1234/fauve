@@ -100,7 +100,7 @@ export const stolenLookReadingSchema = z.object({
         what: z
           .string()
           .describe(
-            "Ce qui se passe à l'écran, en une phrase précise : l'élément (une carte d'appli, des photos, un objet ou une personne détourés d'une autre image et posés par-dessus le plan, un graphique, un mot en très grand, une page de texte, un écran coupé en deux…), où il est posé (autour de sa main, à côté de sa tête, derrière la personne, au centre en grand, sur tout le fond), sa taille, avec ou sans bord, devant ou derrière elle, comment il arrive et bouge ; sans recopier ses mots ni les marques",
+            "Ce qui se passe à l'écran, en une phrase précise et mesurable : l'élément (une carte d'appli, des photos, un objet ou une personne détourés d'une autre image et posés par-dessus le plan, un graphique, un mot en très grand, une grille, un écran coupé en deux…), combien (7 cases par ligne, 3 photos), où il est posé (autour de sa main, derrière la personne, au centre en grand, sur tout le fond), sa taille, avec ou sans bord, comment il arrive, change et part : d'un coup ou en fondu, dans quel ordre (une à une en tache qui s'étend depuis un point, de gauche à droite, au hasard), en combien de temps ; sans recopier ses mots ni les marques",
           ),
       }),
     )
@@ -139,7 +139,7 @@ export const stolenLookReadingSchema = z.object({
 export type StolenLookReading = z.infer<typeof stolenLookReadingSchema>;
 
 /** The longest words of a stolen look, as it is kept. */
-const LOOK_CHARS = { name: 40, what: 200, composition: 240, layout: 200, music: 80, ending: 160, why: 300, moment: 220, ground: 100, subject: 80 } as const;
+const LOOK_CHARS = { name: 40, what: 200, composition: 240, layout: 200, music: 80, ending: 160, why: 300, moment: 320, ground: 100, subject: 80 } as const;
 /** The most shots a look keeps, one by one (what each shows, what is laid over it). */
 export const MAX_SHOTS = 40;
 /** The most moments a look keeps (a Reel of 9 effects, its ending). */
@@ -268,6 +268,8 @@ export const stolenStyleSchema = z.object({
   outline: z.string().max(OUTLINE_CHARS).optional(),
   /** The reading's version (STEAL_READER): an older one is read again when its link comes back. */
   reader: z.number().int().optional(),
+  /** Sheets of its frames (ten each) in Storage, each over its span: shown to the animations that remake it, deleted with the inspiration. */
+  sheets: z.array(z.object({ from: z.number().min(0), to: z.number().min(0), path: z.string().min(1).max(300) })).max(16).optional(),
 });
 
 /**
@@ -275,9 +277,11 @@ export const stolenStyleSchema = z.object({
  * laid over shots. Tristan's link sent again reused the reading made before, « plein cadre » without them.
  * 3 reads how its words are drawn (their strokes, lines, tilt and shadow) and checks its font against
  * candidates written out (Tristan: « la police un peu naze… pas fine comme sur le Reel envoyé »). 4 keeps the closest
- * of five, always: 3 could refuse them all, and the Reel fell back on her charter's fonts.
+ * of five, always: 3 could refuse them all, and the Reel fell back on her charter's fonts. 5 reads each shot
+ * (shots). 6 reads a short Reel at 15 frames a second, its effects measurably, and keeps sheets of its frames for
+ * the animations that remake it.
  */
-export const STEAL_READER = 5;
+export const STEAL_READER = 6;
 
 /** A kept reading as good as a new one: made by the current reader. */
 export const currentReading = (style: unknown): boolean => {
@@ -288,6 +292,7 @@ export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
 export const STEAL_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (studio, salon, restaurant, shop…). The person who runs the business wants to take this Reel's style for theirs: read it as a pro editor who wants to remake its style, not its content.
 Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once, an object or a person cut out of another image and laid over some shots), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, the thickness of its strokes (a fine pen is not a felt pen), letter spacing, key word, background under the sentence, place, alignment, its lines aligned or staggered, its tilt, its shadow; its font and its colours only when they make its style, the font named with four close alternatives), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
+A short Reel comes at 15 frames a second: read its effects and transitions at that pace, as a motion designer would, measurably (how many elements, in which order, how fast, cut or faded), since the person who remakes it never sees it. A Reel with no hard cut that changes its picture piece by piece is made of transitions: each one is a moment.
 You also get a sharp image from the middle of each of its shots, with its time: look at every one, since a shot of a third of a second counts and the video's frames can fall between two. List them in shots, one per image, in order: what the shot itself shows under what is laid on it, and what is laid on it. A cut-out laid over a shot (a drink, a phone booth, a bag, a person, without or with a white border) is part of its style, even when it stays a few tenths of a second: say it in the layout, and make each one its own moment, every one of them and not only the first (when, what, where, how big, border or not).
 Copy neither its words, nor its images, nor the name of its music: describe a form another business can reuse. In your French, make no feminine or masculine agreement for the person who runs the business. In French, except « music » in English.`;
 
@@ -744,7 +749,9 @@ export function tempoOf(levels: number[]): number | null {
  * 2 a second missed them: « plein cadre, aucun effet »). Gemini takes up to 24.
  */
 export function stealFps(duration: number): number {
-  return duration <= 30 ? 6 : duration <= 60 ? 4 : 2;
+  // At 6 a second, a grid whose squares turn one by one was seen as squares already turned, never how (Tristan: « il
+  // ne voit pas toute l'animation »). A short Reel is read at 15, for about a cent or two more.
+  return duration <= 20 ? 15 : duration <= 40 ? 10 : duration <= 60 ? 6 : 2;
 }
 
 /** Images from the middle of a copied Reel's shots that Gemini gets besides its video, at most. */

@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { editPlanSchema, planOutline, stolenStyleLines, stolenStyleSchema } from "@fauve/agent";
 import { queueJob } from "@/lib/jobs";
-import { MODEL_SOURCE, READING_MS } from "@/lib/steal";
+import { dropSheets, MODEL_SOURCE, READING_MS } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Her own Reels as models (Tristan : « ça serait bien de pouvoir enregistrer des modèles pour
@@ -58,6 +58,7 @@ export async function keepAsModel(studioId: string, postId: string): Promise<Mod
     if (state.state !== "missed") return state;
     await db.from("inspirations").delete().eq("id", known.id).eq("studio_id", studioId);
     if (known.storage_path) await db.storage.from("media").remove([known.storage_path as string]).catch(() => {});
+    await dropSheets(studioId, known.id as string).catch(() => {});
   }
   const { data: post } = await db.from("posts").select("kind, title, render_id, edit_plan_id").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   if (!post || post.kind !== "reel" || !post.render_id) return { error: "Ce Reel n’a pas encore sa vidéo." };
@@ -101,9 +102,10 @@ export async function keepAsModel(studioId: string, postId: string): Promise<Mod
 /** No longer a model: the Reels already made like it keep what they took. */
 export async function forgetModel(studioId: string, postId: string): Promise<void> {
   const db = supabaseAdmin();
-  const { data } = await db.from("inspirations").delete().eq("studio_id", studioId).eq("source", MODEL_SOURCE).eq("external_id", postId).select("storage_path");
+  const { data } = await db.from("inspirations").delete().eq("studio_id", studioId).eq("source", MODEL_SOURCE).eq("external_id", postId).select("id, storage_path");
   const paths = (data ?? []).flatMap((r) => (r.storage_path ? [r.storage_path as string] : []));
   if (paths.length) await db.storage.from("media").remove(paths).catch(() => {});
+  for (const r of data ?? []) await dropSheets(studioId, r.id as string).catch(() => {});
 }
 
 /** Her Reels kept as models and read, the latest first: what a new Reel can be made like. */
