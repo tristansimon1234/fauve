@@ -161,6 +161,8 @@ export type StudioContextForPrompt = {
   connect?: boolean;
   /** Where the manager is writing from: the advice on sending files depends on it. */
   channel?: "whatsapp" | "web";
+  /** How her latest WhatsApp video arrived (measured): in full quality (HD) or compressed. */
+  whatsappVideos?: "full" | "compressed" | null;
   /** The studio's default level of care for montages (Réglages). */
   montageEffort?: Effort;
   /** What Fauve already knows about the business: never asked again. */
@@ -248,6 +250,13 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
       ? [`Son @ TikTok : @${ctx.publicHandles.tiktok} (pas connecté) : tu suis ses abonnés, ses j'aime et les vues de ses vidéos sur son compte public, une fois par jour.`]
       : []),
     ...(ctx.channel ? [channelLines[ctx.channel]] : []),
+    ...(ctx.channel === "whatsapp" && ctx.whatsappVideos
+      ? [
+          ctx.whatsappVideos === "full"
+            ? "Ses vidéos arrivent ici en pleine qualité (WhatsApp en HD, mesuré) : demande-les simplement ici, sans lien de dépôt ni « en tant que document », et ne parle pas de compression."
+            : "Ses vidéos arrivent ici compressées par WhatsApp (mesuré) : quand tu lui demandes des vidéos, reply_with upload (son lien de dépôt, en pleine qualité) ; le réglage HD de WhatsApp lui est expliqué une fois par le code.",
+        ]
+      : []),
     ...(ctx.montageEffort ? [`Niveau de soin des montages par défaut : ${EFFORTS[ctx.montageEffort].label} (${ctx.montageEffort}).`] : []),
     ...(ctx.voice
       ? [`Voix off de ses Reels : ${VOICE_USE_LINES[ctx.voice.use]}, avec la voix de ${ctx.voice.name} (posée avant le montage ; son propre vocal passe toujours en premier ; set_voice pour changer).`]

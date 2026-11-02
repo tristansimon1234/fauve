@@ -1,5 +1,5 @@
 import "server-only";
-import { ackFor, awaitsAnswer, echoFor, emojiOnly, INTRO_VIDEO, isChaser, justHello, onboardingStepOf, replyExtrasSchema, WHATSAPP_WELCOME, type Reaction } from "@fauve/agent";
+import { ackFor, awaitsAnswer, echoFor, emojiOnly, HD_TIP, INTRO_VIDEO, isChaser, justHello, mp4Video, onboardingStepOf, replyExtrasSchema, WHATSAPP_WELCOME, type Reaction } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { answerPairing, claimPairing, PAIRING_YES, PAIRING_NO } from "@/lib/auth/pairing";
 import { TERMS_LINE } from "@/lib/legal";
@@ -12,6 +12,7 @@ import { quoteButtons } from "@/lib/credits";
 import { memberOrRoom, waitlist } from "@/lib/waitlist";
 import { answerDeletion } from "@/lib/account-deletion";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { markHdTip, whatsappVideos } from "@/lib/video-quality";
 import { ensureTranscript } from "@/lib/voice";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { photoRegions } from "@/lib/video/regions";
@@ -45,6 +46,15 @@ const extensionByMime: Record<string, string> = {
   "application/pdf": "pdf",
 };
 
+/** A video's header read, or nothing when it is not an MP4 that can be read. */
+function readVideo(bytes: ArrayBuffer) {
+  try {
+    return mp4Video(new Uint8Array(bytes));
+  } catch {
+    return null;
+  }
+}
+
 async function storeMedia(studioId: string, message: InboundMessage): Promise<{ id: string; isVideo: boolean; isImage: boolean } | null> {
   const ref = mediaOf(message);
   if (!ref) return null;
@@ -55,6 +65,8 @@ async function storeMedia(studioId: string, message: InboundMessage): Promise<{ 
   const path = `${studioId}/whatsapp/${message.id}.${ext}`;
   const upload = await db.storage.from("media").upload(path, file.bytes, { contentType: file.mimeType, upsert: true });
   if (upload.error) throw new Error(upload.error.message);
+  // A video's picture and length, read in its header: the quality it arrived in (compressed by WhatsApp, or HD).
+  const video = ref.kind === "video" ? readVideo(file.bytes) : null;
   const asset = await db
     .from("media_assets")
     .insert({
@@ -64,6 +76,8 @@ async function storeMedia(studioId: string, message: InboundMessage): Promise<{ 
       source: "whatsapp",
       mime_type: file.mimeType,
       size_bytes: file.size,
+      ...(video?.width && video.height ? { width: video.width, height: video.height } : {}),
+      ...(video?.duration ? { duration: video.duration } : {}),
     })
     .select("id")
     .single();
@@ -417,6 +431,12 @@ async function answerOnWhatsApp({ studioId, memberId, waId, phone, replyTo }: Wh
   if (result.reply && !superseded) {
     // Someone new, or terms that changed: Edith's message says that going on accepts them.
     const terms = await termsToShow(studioId).catch(() => false);
+    // Her videos: compressed by WhatsApp, she is told once how to send them in HD; in HD, no upload link.
+    const videos = await whatsappVideos(studioId).catch(() => ({ quality: null, tipNow: false }));
+    if (videos.tipNow) {
+      result.reply = `${result.reply}\n\n${HD_TIP}`;
+      await markHdTip(studioId).catch(() => undefined);
+    }
     if (terms) result.reply = `${result.reply}\n\n${TERMS_LINE}`;
     // The grid is the app's: never a link from WhatsApp, only the pages made for her phone.
     const { posts, quote } = result.extras;
@@ -429,7 +449,7 @@ async function answerOnWhatsApp({ studioId, memberId, waId, phone, replyTo }: Wh
     // Files asked for (a drop zone or the library in the app): her own upload link, in full quality (WhatsApp compresses videos).
     const button =
       result.extras.link ??
-      (result.extras.upload || result.extras.pick_media
+      ((result.extras.upload && videos.quality !== "full") || result.extras.pick_media
         ? { path: "/depot", label: "Envoyer mes fichiers", purpose: "upload" as const }
         : posts?.length === 1
           ? { path: `/v/${posts[0]}`, label: "Voir la publication", purpose: "open_post" as const }

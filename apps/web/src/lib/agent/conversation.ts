@@ -4,6 +4,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readOwnVoice, readVoiceSetting, stableWindow, withLatestBurst, type ExchangeRow } from "@fauve/agent";
 import { dayOfTurns } from "@/lib/reply-cap";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { whatsappVideos } from "@/lib/video-quality";
 import { runFauve, type RunFauveInput, type RunFauveResult } from "./run";
 import { describeJobs, runningJobs } from "@/lib/studio-jobs";
 import { presenceLines } from "@/lib/nudge";
@@ -136,7 +137,8 @@ export async function replyInConversation(params: {
     .limit(ownThread ? HISTORY_READ : HISTORY_READ * 2);
   if (ownThread) messages = messages.eq("conversation_id", conversation.id);
 
-  const [studio, member, rows, instagram, brand, jobs, tiktok, copying, models, report] = await Promise.all([
+  const onWhatsApp = (params.channel ?? (params.waId ? "whatsapp" : "web")) === "whatsapp";
+  const [studio, member, rows, instagram, brand, jobs, tiktok, copying, models, report, videos] = await Promise.all([
     db.from("studios").select("name, business_type, timezone, onboarding_step, montage_effort, website_url, booking_url, memory, team, subscription_status, instagram_handle, tiktok_handle").eq("id", params.studioId).single(),
     db.from("members").select("first_name").eq("id", params.memberId).single(),
     messages,
@@ -152,6 +154,8 @@ export async function replyInConversation(params: {
     studioModels(params.studioId, 5).catch(() => []),
     // Her latest « Ce qui marche »: Edith's ideas and advice lean on it.
     latestReport(params.studioId).catch(() => null),
+    // How her WhatsApp videos arrive (HD or compressed), measured on the latest.
+    onWhatsApp ? whatsappVideos(params.studioId).then((v) => v.quality).catch(() => null) : Promise.resolve(null),
   ]);
   const jobTitles = jobs.length
     ? new Map(
@@ -252,6 +256,7 @@ export async function replyInConversation(params: {
           }
         : { state: "off", handle: null, direct: false },
       channel: params.channel ?? (params.waId ? "whatsapp" : "web"),
+      whatsappVideos: videos,
       montageEffort: effortSchema.catch(DEFAULT_EFFORT).parse(studio.data.montage_effort),
       known: {
         website: (studio.data.website_url as string | null) ?? null,

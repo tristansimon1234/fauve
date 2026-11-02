@@ -5781,3 +5781,39 @@ test("a copy draws its title in a font she asks for, else in the model's", async
   assert.equal(mine.copy?.title?.font, "Instrument Serif");
   assert.equal(model.copy?.title?.font, "Shadows Into Light");
 });
+
+test("a WhatsApp video's quality is measured: its picture read in its MP4 header, compressed under 3 Mb/s or 480p", async () => {
+  const { mp4Video, compressedVideo } = await import("./video-quality.ts");
+  const box = (kind: string, body: Uint8Array) => {
+    const out = new Uint8Array(8 + body.length);
+    new DataView(out.buffer).setUint32(0, out.length);
+    out.set([...kind].map((c) => c.charCodeAt(0)), 4);
+    out.set(body, 8);
+    return out;
+  };
+  const join = (...parts: Uint8Array[]) => {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let at = 0;
+    for (const p of parts) (out.set(p, at), (at += p.length));
+    return out;
+  };
+  // mvhd v0: timescale 1000, duration 12 500.
+  const mvhd = new Uint8Array(100);
+  new DataView(mvhd.buffer).setUint32(12, 1000);
+  new DataView(mvhd.buffer).setUint32(16, 12_500);
+  // tkhd v0 of a phone video filmed upright: stored 1920 × 1080, turned a quarter by its matrix.
+  const tkhd = new Uint8Array(84);
+  const t = new DataView(tkhd.buffer);
+  t.setInt32(40, 0);
+  t.setInt32(44, 0x10000);
+  t.setInt32(52, -0x10000);
+  t.setUint32(76, 1920 * 65536);
+  t.setUint32(80, 1080 * 65536);
+  const file = join(box("ftyp", new Uint8Array(8)), box("moov", join(box("mvhd", mvhd), box("trak", box("tkhd", tkhd)))));
+  assert.deepEqual(mp4Video(file), { duration: 12.5, width: 1080, height: 1920 });
+  // Tristan's: WhatsApp's standard quality (1.7 Mb/s) is compressed, its HD (6.7 Mb/s) is not.
+  assert.equal(compressedVideo({ bytes: 3.3e6, duration: 16, width: null, height: null }), true);
+  assert.equal(compressedVideo({ bytes: 10.4e6, duration: 12.5, width: 1080, height: 1920 }), false);
+  assert.equal(compressedVideo({ bytes: 10e6, duration: 10, width: 480, height: 848 }), true);
+  assert.equal(compressedVideo({ bytes: null, duration: null, width: null, height: null }), null);
+});

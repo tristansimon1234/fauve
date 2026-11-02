@@ -100,6 +100,7 @@ export type RunFauveInput = ToolContext & {
     tiktok?: TikTokContext;
     publicHandles?: StudioContextForPrompt["publicHandles"];
     channel?: "whatsapp" | "web";
+    whatsappVideos?: "full" | "compressed" | null;
     /** Default level of care for montages (Réglages). */
     montageEffort?: Effort;
     /** What Fauve knows about the business (site, tone, memory). */
@@ -188,6 +189,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
           publicHandles: input.studio.publicHandles,
           connect: socialConnect(),
           channel: input.studio.channel,
+          whatsappVideos: input.studio.whatsappVideos,
           montageEffort: input.studio.montageEffort,
           known: input.studio.known,
           work: input.studio.work,
