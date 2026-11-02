@@ -79,8 +79,12 @@ export type ReelSegment =
       subtitleY?: number;
       cutout?: { src: string; box: { x: number; y: number; w: number; h: number } };
     }
-  /** Animations play over her footage when there is some (`under`), else on the studio's colours. */
-  | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
+  /**
+   * Animations play over her footage when there is some (`under`), else on the studio's colours. composed: an engine
+   * screen (a title card) inside a composition that draws the whole picture: its words are the composition's to draw,
+   * and the engine draws it only in the composition's fallback.
+   */
+  | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder; composed?: true }
   /** shift: how far the scene is moved down (share of the height, up when negative), off the faces of the footage under it. */
   | {
       type: "motion";
@@ -141,6 +145,15 @@ export function composeTexts(texts: ReelText[], from = 0): ComposeText[] {
     emphasis: t.emphasis,
     ...(t.items?.length ? { items: t.items } : {}),
   }));
+}
+
+/** The words of an engine screen (a title card, a list, a quote, a number), as a composition draws them: its title, its small line, its lines. */
+export function sceneWords(scene: Scene): { text: string; role: ComposeText["role"] }[] {
+  return [
+    ...(scene.kicker ? [{ text: scene.kicker, role: "caption" as const }] : []),
+    { text: scene.title, role: "hook" as const },
+    ...(scene.items ?? []).map((text) => ({ text, role: "caption" as const })),
+  ].filter((w) => w.text.trim().length > 0);
 }
 
 export type ScenePhoto = {
@@ -740,6 +753,25 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       },
     ];
   });
+  // An engine screen (a title card) under a composition that draws the whole picture is the composition's: its words are
+  // given to it at their moment, and the engine draws the screen only if the composition cannot run. Drawn on top, the
+  // title card on « ink » hid the black end her correction asked for and the composition had drawn.
+  const whole = layers.find((l) => l.compose && l.drawsTexts);
+  if (whole) {
+    segments.forEach((segment, i) => {
+      const s = plan.segments[i];
+      if (segment.type !== "scene" || !s || !("scene" in s)) return;
+      if (segment.startAt < whole.from || segment.startAt >= whole.from + whole.durationInFrames) return;
+      segment.composed = true;
+      const name = inputs.brand.name;
+      const from = segment.startAt - whole.from;
+      const to = Math.min(whole.durationInFrames, from + segment.durationInFrames);
+      whole.reelTexts = [
+        ...(whole.reelTexts ?? []),
+        ...sceneWords(segment.scene).map((w) => ({ text: frenchSpaces(keepName(w.text, name)), role: w.role, from, to, emphasis: [] })),
+      ].sort((a, b) => a.from - b.from);
+    });
+  }
 
   const copy = plan.copy ? copyProps(plan.copy, segments, inputs, durationInFrames) : null;
   const overlays = overlayProps(plan.overlays ?? [], inputs, durationInFrames);

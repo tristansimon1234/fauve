@@ -3522,6 +3522,34 @@ test("collage: one free composition lays the Reel's shots, never a paid animatio
   assert.equal(words.compose, undefined);
   assert.equal(words.drawsTexts, true);
   assert.equal(words.reelTexts?.[0]?.text, "the power of paris");
+  // An engine screen (a title card) under a composition that draws the whole picture is its: its words given at their
+  // moment, the screen drawn only in its fallback (on « ink », it hid the black end her correction asked for).
+  const screened = editPlanSchema.parse({
+    ...plain,
+    duration: 8,
+    segments: [plain.segments[0], { scene: { kind: "title", title: "Edith a fait le Reel.", kicker: "Elles travaillaient.", background: "ink" }, duration: 4 }],
+    texts: [],
+    layers: [{ from: 0, to: 8, compose: true, motion: { brief: "mosaic", js: scene, draws_texts: true } }],
+  });
+  const composedProps = buildReelProps(screened, { template: "libre", clipUrls: { a: "https://x/a.mp4" }, brand: { name: "Edith" } });
+  assert.equal(composedProps.segments[1]!.type === "scene" && composedProps.segments[1]!.composed, true);
+  assert.deepEqual(
+    composedProps.layers![0]!.reelTexts?.map((t) => [t.text, t.role, t.from, t.to]),
+    [
+      ["Elles travaillaient.", "caption", 120, 240],
+      ["Edith a fait le Reel.", "hook", 120, 240],
+    ],
+  );
+  assert.deepEqual(
+    compositionTexts(screened).texts.map((t) => [t.text, t.from, t.to]),
+    [
+      ["Elles travaillaient.", 120, 240],
+      ["Edith a fait le Reel.", 120, 240],
+    ],
+  );
+  // Without a composition drawing the whole picture, the engine draws its screen as before.
+  const bare = buildReelProps({ ...screened, layers: [] }, { template: "libre", clipUrls: { a: "https://x/a.mp4" }, brand: { name: "Edith" } });
+  assert.equal(bare.segments[1]!.type === "scene" && bare.segments[1]!.composed, undefined);
   // Not written yet (no code): the engine draws the texts.
   const unwritten = buildReelProps({ ...plain, layers: [{ ...plain.layers![0]!, motion: { brief: "words" } }] }, { template: "libre", clipUrls: { a: "https://x/a.mp4" }, brand: { name: "Paris" } }).layers ?? [];
   assert.equal(unwritten.some((l) => l.drawsTexts), false);

@@ -88,6 +88,9 @@ export function Reel(props: ReelProps) {
   // A shot she added after the composition ends is the engine's to play.
   const laidByComposition = (segment: ReelProps["segments"][number]) => Boolean(compose) && segment.startAt < compose!.from + compose!.durationInFrames;
   const isShot = (segment: ReelProps["segments"][number]) => segment.type === "clip" || segment.type === "image";
+  // An engine screen (a title card) a composition drawing the whole picture covers: its words are the composition's,
+  // and the engine draws it only in the composition's fallback, never on top of it.
+  const composedScreen = (segment: ReelProps["segments"][number]) => segment.type === "scene" && Boolean(segment.composed);
   // A collage's print of a shot: a card that stays a little under the next one sliding over it.
   const print = (segment: ReelProps["segments"][number], i: number, from = 0) =>
     segment.type === "clip" || segment.type === "image" ? (
@@ -203,9 +206,9 @@ export function Reel(props: ReelProps) {
             end={compose.end}
             fallbackNode={
               !collage ? (
-                // The plain montage: her shots full frame, the Reel's texts and end card.
+                // The plain montage: her shots full frame, the engine's screens it covered, the Reel's texts and end card.
                 <>
-                  {props.segments.map((segment, i) => (isShot(segment) ? montaged(segment, i) : null))}
+                  {props.segments.map((segment, i) => (isShot(segment) || composedScreen(segment) ? montaged(segment, i) : null))}
                   {engineTexts}
                   {endCard}
                 </>
@@ -213,7 +216,7 @@ export function Reel(props: ReelProps) {
                 // The fixed collage in full: its paper, its prints, the Reel's texts and end card on paper.
                 <>
                   <CollageBackdrop props={props} />
-                  {props.segments.map((segment, i) => print(segment, i, compose.from))}
+                  {props.segments.map((segment, i) => (composedScreen(segment) ? montaged(segment, i) : print(segment, i, compose.from)))}
                   {engineTexts}
                   {endCard}
                   <Grain props={props} />
@@ -227,7 +230,7 @@ export function Reel(props: ReelProps) {
       ) : null}
       {props.segments.map((segment, i) =>
         // A composed Reel's shots are laid by its composition; a collage's, else each one a print.
-        isShot(segment) && laidByComposition(segment) ? null : collage && isShot(segment) ? print(segment, i) : montaged(segment, i),
+        (isShot(segment) && laidByComposition(segment)) || (whole && composedScreen(segment)) ? null : collage && isShot(segment) ? print(segment, i) : montaged(segment, i),
       )}
       {/* Animations over several shots (a character on every shot, a counter that runs…), above the montage, under its texts. */}
       {(props.layers ?? []).map((layer, i) =>

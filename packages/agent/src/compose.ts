@@ -1,6 +1,6 @@
 import { shotAt, subjectPlace, type MediaFacts } from "./finish.ts";
 import { END_CARD_SECONDS } from "./editor.ts";
-import { planTimeline, REEL_FPS, type ComposeEnd, type ComposeText } from "./motion.ts";
+import { planTimeline, REEL_FPS, sceneWords, type ComposeEnd, type ComposeText } from "./motion.ts";
 import { SUBTITLE_ROW } from "./retouch.ts";
 import { isClipSegment, type EditPlan, type PlanLayer } from "./schemas.ts";
 
@@ -111,15 +111,25 @@ export function compositionTexts(plan: EditPlan): CompositionTexts {
   const frames = (s: number) => Math.round(s * REEL_FPS);
   const px = (share: number) => Math.round(share * 1920);
   const y = plan.subtitle_y ?? SUBTITLE_ROW.y;
+  // The engine's screens (a title card) are the composition's to draw too, at their moment (buildReelProps does the same).
+  const timeline = planTimeline(plan).segments;
+  const screens = plan.segments.flatMap((s, i) => {
+    const at = timeline[i];
+    if (!("scene" in s) || !at) return [];
+    return sceneWords(s.scene).map((w) => ({ text: w.text, role: w.role, from: frames(at.start), to: frames(at.start + at.length), emphasis: [] as string[] }));
+  });
   return {
-    texts: plan.texts.map((t) => ({
-      text: t.text,
-      role: t.style,
-      from: frames(t.from),
-      to: frames(t.to),
-      emphasis: t.emphasis ?? [],
-      ...(t.items?.length ? { items: t.items } : {}),
-    })),
+    texts: [
+      ...plan.texts.map((t) => ({
+        text: t.text,
+        role: t.style,
+        from: frames(t.from),
+        to: frames(t.to),
+        emphasis: t.emphasis ?? [],
+        ...(t.items?.length ? { items: t.items } : {}),
+      })),
+      ...screens,
+    ].sort((a, b) => a.from - b.from),
     end: plan.end_card ? { title: plan.end_card.title, subtitle: plan.end_card.subtitle ?? null, from: Math.max(0, frames(plan.duration - END_CARD_SECONDS)) } : null,
     subtitles: plan.subtitles ? { y_top: px(y - 0.01), y_bottom: px(y + SUBTITLE_ROW.h * 1.6) } : null,
   };

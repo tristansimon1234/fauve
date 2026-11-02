@@ -131,7 +131,8 @@ export type ReelProps = {
         /** In a collage, its subject cut out (an image with transparency; its box in shares of the photo), laid as a sticker. */
         cutout?: { src: string; box: Box };
       }
-    | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder }
+    /** composed: an engine screen inside a composition that draws the whole picture, drawn only in its fallback. */
+    | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder; composed?: true }
     /** shift: how far the scene is moved down (share of the height, up when negative), off the faces of the footage under it. */
     | {
         type: "motion";
