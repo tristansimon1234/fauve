@@ -372,8 +372,6 @@ export async function designEdit(params: {
     templates: offered,
     // The hooks of her latest Reels: this one takes another form and other words.
     recent_hooks: hooks.length ? hooks : undefined,
-    // The sound effects already made: reused by name when one fits.
-    ready_sounds: readyForEditor.length ? readyForEditor : undefined,
     // Motion code stays out of the editor's context: it only needs the briefs.
     previous_plan:
       correction && previousPlan.success

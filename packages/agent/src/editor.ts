@@ -130,7 +130,9 @@ const editorRhythm = {
  * refuses the current schema (structured-output grammars have limits of their own).
  */
 export const editorOutputSchemaLegacy = z.object({
-  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true, copy: true }).extend({
+  // No sound effects either: the grammar is at the API's limit (400 « compiled grammar is too large » on 2 November);
+  // the animations bring theirs (the motion designer's answer).
+  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true, copy: true, sounds: true }).extend({
     ...editorRhythm,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
@@ -187,12 +189,6 @@ export const editorOutputSchema = z.object({
     end_card: z.object({ title: z.string(), subtitle: z.string().optional() }).optional(),
     effect: z.enum(["none", "dust"]).optional(),
     layers: z.array(z.object({ brief: z.string(), from: z.number(), to: z.number() })).optional(),
-    sounds: z
-      .array(z.object({ at: z.number(), sound: z.string(), seconds: z.number().optional() }))
-      .optional()
-      .describe(
-        "Light sound effects on your cuts and texts, each at seconds on the Reel's clock, sound a few generic English words (« soft whoosh », « light pop », « camera shutter »), seconds 0.5 to 2: 0 to 3, only where the viewer sees something happen and would expect to hear it; none under someone speaking, none during an animation (it brings its own), none for a calm Reel. The Reel she copies plays its own (« reel_a_recopier.bruitages »): the same kinds at the same moments. Reuse a name from « ready_sounds » when one fits",
-      ),
   }),
   rationale: z.string(),
 });
