@@ -1,7 +1,7 @@
 import "server-only";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readOwnVoice, readVoiceSetting, stableWindow, withLatestBurst, type ExchangeRow } from "@fauve/agent";
+import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readOwnVoice, readVoiceSetting, stableWindow, withLatestBurst, type ExchangeRow, PLAN_BUTTONS } from "@fauve/agent";
 import { dayOfTurns } from "@/lib/reply-cap";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { whatsappVideos } from "@/lib/video-quality";
@@ -306,9 +306,11 @@ const UNPROMPTED = new Set(["reminder", "nudge", "daily_cap", "new_numbers_alert
  * a message she sent on her own (a delivery, a reminder) says which post it is about.
  */
 function toExchange(row: { direction: string; type: string; body: string | null; media_id?: string | null; created_at: string; payload: unknown }): ExchangeRow {
-  const payload = row.payload as { quote?: unknown; notes?: string[]; open_post?: unknown; kind?: unknown } | null;
+  const payload = row.payload as { quote?: unknown; notes?: string[]; open_post?: unknown; kind?: unknown; plan?: unknown; options?: unknown } | null;
   const outbound = row.direction === "outbound";
   const launched = outbound && Boolean(payload?.quote || payload?.notes?.some((n) => LAUNCHED.test(n)));
+  // A plan put to her: marked by reply_with plan, or (before the mark) its own two buttons.
+  const plan = outbound && (payload?.plan === true || (Array.isArray(payload?.options) && payload.options.join("|") === PLAN_BUTTONS.join("|")));
   const unprompted = outbound && Boolean(payload?.open_post || (typeof payload?.kind === "string" && UNPROMPTED.has(payload.kind)));
   return {
     direction: outbound ? "outbound" : "inbound",
@@ -317,6 +319,7 @@ function toExchange(row: { direction: string; type: string; body: string | null;
     created_at: row.created_at,
     ...(row.media_id ? { media_id: row.media_id } : {}),
     ...(launched ? { launched } : {}),
+    ...(plan ? { plan } : {}),
     ...(unprompted ? { unprompted: typeof payload?.open_post === "string" ? { post: payload.open_post } : {} } : {}),
   };
 }

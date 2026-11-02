@@ -27,7 +27,7 @@ import {
 } from "@fauve/agent";
 import { reviewMontage } from "@/lib/agent/critic";
 import { readContract } from "@/lib/agent/contract";
-import { designEdit } from "@/lib/agent/editor";
+import { MissedCorrection, designEdit } from "@/lib/agent/editor";
 import {
   collectEffects,
   effectRoute,
@@ -317,7 +317,7 @@ async function runStep(job: Job) {
     } catch (error) {
       console.error("montage design failed", job.postId, error);
       await reopenQuote(job.quoteId);
-      await notifyFailure(target, FAILED, error);
+      await notifyFailure(target, error instanceof MissedCorrection ? error.message : FAILED, error);
     }
     return;
   }
@@ -336,7 +336,7 @@ async function runStep(job: Job) {
     const outcome: Care | null = job.reviewed ? { reviewed: true, left: job.issues?.[0]?.problem } : null;
     if (kept.length && (await deliver(job, kept[kept.length - 1]!, outcome).catch(() => false))) return;
     await reopenQuote(job.quoteId);
-    await notifyFailure(target, FAILED, error);
+    await notifyFailure(target, error instanceof MissedCorrection ? error.message : FAILED, error);
   }
 }
 

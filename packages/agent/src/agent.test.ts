@@ -5700,32 +5700,23 @@ test("a copied Reel in pure motion design asks for no image", async () => {
   assert.equal(motionOnly({}), false);
 });
 
-test("a new Reel starts on her go and with the files of this exchange only", async () => {
-  const { exchangeFiles, saysGo } = await import("./request-log.ts");
+test("a new Reel starts once a plan was put to her, with the files of this exchange only", async () => {
+  const { exchangeFiles, planShown } = await import("./request-log.ts");
   const at = "2026-11-02T13:00:00Z";
   const her = (body: string, media_id?: string) => ({ direction: "inbound" as const, type: media_id ? "video" : "text", body, created_at: at, ...(media_id ? { media_id } : {}) });
-  const edith = (body: string, launched = false) => ({ direction: "outbound" as const, type: "text", body, created_at: at, ...(launched ? { launched } : {}) });
+  const edith = (body: string, extra: { launched?: boolean; plan?: boolean } = {}) => ({ direction: "outbound" as const, type: "text", body, created_at: at, ...extra });
   const old = "11111111-1111-4111-8111-111111111111";
   const sent = "22222222-2222-4222-8222-222222222222";
   const picked = "33333333-3333-4333-8333-333333333333";
-  const rows = [
-    her("", old),
-    edith("C'est lancé", true),
-    her("", sent),
-    her(`Je prends celle-ci dans la médiathèque, dans cet ordre (media_id : ${picked}).`),
-    edith("Le plan…"),
-    her("à la fin lien en bio"),
-  ];
+  const rows = [her("", old), edith("Le plan…", { plan: true }), her("go"), edith("C'est lancé", { launched: true }), her("", sent), her(`Je prends celle-ci dans la médiathèque, dans cet ordre (media_id : ${picked}).`)];
   // Only what was sent or picked since the last launch.
   assert.deepEqual([...exchangeFiles(rows)].sort(), [sent, picked].sort());
-  // A change to the plan is not a go; a short yes is; a yes with a change is not.
-  assert.equal(saysGo(rows), false);
-  assert.equal(saysGo([...rows, edith("Le plan…"), her("C'est parti")]), true);
-  assert.equal(saysGo([...rows, her("ok go 👍")]), true);
-  assert.equal(saysGo([...rows, her("ok mais mets du piano")]), false);
-  assert.equal(saysGo([...rows, her("oui, à la fin le logo")]), false);
-  assert.equal(saysGo([...rows, her("Le plan validé (« Lancement ») :\n- Accroche : …")]), true);
-  assert.equal(saysGo([]), false);
+  // The plan of the Reel before does not count: none was put to her since the last launch.
+  assert.equal(planShown(rows), false);
+  assert.equal(planShown([...rows, edith("Le plan…", { plan: true }), her("à la fin lien en bio")]), true);
+  // From « Créer »: its plan validated there.
+  assert.equal(planShown([...rows, her("Le plan validé (« Lancement ») :\n- Accroche : …")]), true);
+  assert.equal(planShown([]), false);
 });
 
 test("what a copied Reel lays over its shots is told the same way to her and to Edith, counted on its shots", async () => {

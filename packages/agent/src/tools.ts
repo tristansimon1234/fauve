@@ -201,6 +201,10 @@ export const toolSpecs = {
         .boolean()
         .optional()
         .describe("true seulement quand elle t'a dit de prendre des fichiers envoyés avant ce Reel (et lesquels) : sinon un nouveau Reel ne prend que ceux de cet échange"),
+      remplacer_fichiers: z
+        .boolean()
+        .optional()
+        .describe("Pour une correction avec media_ids : true seulement quand elle veut repartir de ces fichiers-là seuls, à ta lecture de sa demande ; sinon ils s'ajoutent à ceux du Reel, qui restent"),
       son: z
         .enum(["modele", "edith"])
         .optional()

@@ -54,7 +54,9 @@ import {
   PLAN_BUTTONS,
   exchangeLines,
   exchangeFiles,
-  saysGo,
+  planShown,
+  isClipSegment,
+  MAX_MONTAGE_FILES,
   type ExchangeRow,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
@@ -628,15 +630,25 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, son, anciens_fichiers }) {
+    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, son, anciens_fichiers, remplacer_fichiers }) {
       const post = unwrap(await db.from("posts").select("id, title, edit_plan_id, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
+      // A correction's new files join the Reel's own, unless Edith read that she wants to start again from them alone:
+      // given alone, Promo Edith 2's five new photos replaced its twenty files and it came back as 3 s.
+      if (correction && media_ids?.length && !remplacer_fichiers && post.edit_plan_id) {
+        const current = editPlanSchema.safeParse((await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).maybeSingle()).data?.plan);
+        if (current.success) {
+          const before = [...new Set([...current.data.segments.filter(isClipSegment).map((s) => s.clip_id), ...(current.data.copy?.cutouts.map((c) => c.photo) ?? [])])];
+          const added = media_ids.filter((id) => !before.includes(id));
+          media_ids = [...before.slice(0, Math.max(0, MAX_MONTAGE_FILES - added.length)), ...added];
+        }
+      }
       // A Reel she has not seen yet, checked before anything is spent: her go, and only the files of this exchange (or
       // the post's own). A stopped montage's plan does not make it a correction; one under way, or a delivered video, does.
       if (!variant && ctx.exchange?.length && (await unseenReel(studioId, post_id))) {
-        if (!saysGo(ctx.exchange)) {
+        if (!planShown(ctx.exchange)) {
           return json({
             possible: false,
-            note: "Pas encore son feu vert : son dernier message n'est pas un « C'est parti ». Redis-lui ton plan avec ce qu'elle vient de demander (reply_with plan), règle une question encore ouverte, et lance sur son accord.",
+            note: "Pas encore de plan pour ce Reel : propose-le-lui (reply_with plan), et lance sur son accord.",
           });
         }
         const allowed = new Set([...exchangeFiles(ctx.exchange), ...((post.media_ids as string[] | null) ?? []).map((id) => id.toLowerCase())]);
@@ -1620,6 +1632,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       ctx.extras.step_card = card;
       ctx.extras.options = answers;
       ctx.plan = kept ? planMessage(kept) : undefined;
+      ctx.extras.plan = kept ? true : undefined;
       ctx.extras.posts = own.length ? own : undefined;
       ctx.extras.grid = grid || undefined;
       // The drop zone is the app's; on WhatsApp, files asked for become her upload link under the message (full quality).

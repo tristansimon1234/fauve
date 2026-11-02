@@ -37,6 +37,8 @@ export type ExchangeRow = {
   /** A file she sent with this message. */
   media_id?: string | null;
   launched?: boolean;
+  /** Edith's message that put a post's plan to her (reply_with plan: its « C'est parti » / « Changer le plan » buttons). */
+  plan?: boolean;
   unprompted?: { post?: string };
 };
 
@@ -167,20 +169,12 @@ export function exchangeFiles(rows: ExchangeRow[]): Set<string> {
   return ids;
 }
 
-/** A go: a short yes with nothing to change in it (« C'est parti », « vas-y », « ok », 👍). */
-const GO = /(c'?est parti|vas[- ]?y|\bgo\b|\bok\b|\bokay\b|\boui\b|\byes\b|\bouais\b|\blance|parfait|\btop\b|nickel|d'?accord|(ça|ca) me va|c'?est bon|\bvalid|on y va|let'?s go|banco|carr[ée]ment|fonce|👍|✅|🚀|🔥)/i;
-/** What turns a yes into a change (« ok mais à la fin lien en bio »). */
-const CHANGE = /\b(mais|change|changer|plut[ôo]t|sauf|remplace|enl[èe]ve|ajoute|mets?|retire|par contre|juste|a la fin)\b|à la fin/i;
-
 /**
- * Whether her latest message since the last launch is a go for a new post: a short yes with no change, a click on
- * « C'est parti », or a message of the « Nouvelle publication » screen (its plan already validated). Edith had
- * launched a Reel on « à la fin lien en bio », a change to her plan, before her answer on the sound.
+ * A plan put to her since the last launch: Edith's plan with its buttons (reply_with plan), or a message of the
+ * « Nouvelle publication » screen, whose plan she validated there. A fact the code knows, never her words read with a
+ * list of keywords (Tristan: « les règles déterministes de ce type j'y crois pas »): whether her answer is a yes stays
+ * Edith's call. Edith had launched a Reel without any plan, with twenty photos sent for other Reels.
  */
-export function saysGo(rows: ExchangeRow[]): boolean {
-  const last = sinceLaunch(rows).filter((r) => r.direction === "inbound" && r.body?.trim()).at(-1);
-  const text = last?.body?.trim() ?? "";
-  if (!text) return false;
-  if (/^Le plan validé|^Nouvelle publication/m.test(text)) return true;
-  return text.length <= 80 && GO.test(text) && !CHANGE.test(text);
+export function planShown(rows: ExchangeRow[]): boolean {
+  return sinceLaunch(rows).some((r) => (r.direction === "outbound" && r.plan) || (r.direction === "inbound" && /^(Le plan validé|Nouvelle publication)/m.test(r.body ?? "")));
 }

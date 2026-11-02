@@ -168,6 +168,15 @@ const COMPOSE_RETRY_NEEDS_MS = 420_000;
 /** How long the montage waits for what moves in her videos (its faces, its hands) before the editor cuts. */
 const TRACKS_WAIT_MS = 180_000;
 
+/** A correction that would have made her Reel worse: not kept, its words are what she is told. */
+export class MissedCorrection extends Error {}
+const MISSED_LAYOUT =
+  "Je n'ai pas réussi à faire la mise en page que tu demandes : ta version d'avant reste en place, et rien n'est débité. Tu veux que je réessaie, ou que je le fasse autrement ?";
+const missedLength = (after: number, before: number) => {
+  const s = (n: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(n);
+  return `Cette retouche donnait un Reel de ${s(after)} s au lieu de ${s(before)} s : je ne l'ai pas gardée. Ta version d'avant reste en place, et rien n'est débité. Dis-moi ce que je change, ou quels fichiers ajouter.`;
+};
+
 /**
  * Fauve's editor: watches the analyses, picks a motion template and writes the
  * edit plan (new version) for a post. With a previous plan and a brief, it
@@ -839,6 +848,18 @@ export async function designEdit(params: {
     });
   }
   await markTemplatesUsed([...reused.keys()]).catch((e: unknown) => console.warn("motion_templates: usage count failed", e));
+
+  // A correction that came out worse than the Reel she has never replaces it: the layout she asked for not made, or a
+  // Reel half as long without her asking (Promo Edith 2, 13 s with its handwritten title, came back as 3 s of five
+  // photos and was delivered over it). Her version stays, nothing is charged (the job reopens its quote), she is told.
+  if (correction && previousPlan.success && baseId && !compositionKept) {
+    const before = previousPlan.data.duration;
+    const shrunk = !params.contract?.duration && plan.duration < before * 0.5;
+    if (compositionMissed || shrunk) {
+      const { count } = await db.from("renders").select("id", { count: "exact", head: true }).eq("edit_plan_id", baseId).eq("status", "done");
+      if (count) throw new MissedCorrection(compositionMissed ? MISSED_LAYOUT : missedLength(plan.duration, before));
+    }
+  }
 
   const row = await insertPlanVersion(params.studioId, params.postId, plan);
   const version = row.version;
