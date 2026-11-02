@@ -1,6 +1,7 @@
 import React, { useId, useMemo, type CSSProperties, type ReactNode } from "react";
 import { Easing, interpolate, interpolateColors, random } from "remotion";
 import type { Box, Draw, KitHooks, Size } from "./Kit";
+import type { TrackFn } from "./track";
 
 // The interface, graphics and transitions kit of the animations (lot 3), measured on the reference Reels:
 // a cursor that moves and clicks, a switch, a button that changes when clicked, a profile card, a list of
@@ -657,6 +658,111 @@ function Tint({ color = "#e10600", mode = "multiply", opacity = 1, style }: Tint
   return <div style={{ position: "absolute", inset: 0, background: color, mixBlendMode: mode, opacity, pointerEvents: "none", ...style }} />;
 }
 
+// ——— Detect and Sketch: how a machine « sees » her footage ——————————————————————————————
+
+type DetectProps = {
+  /** The scene's own track (what is seen in the footage under it, frame by frame). */
+  track: TrackFn;
+  /** In a composition: the shot and the box it is laid in (the same as its Footage). */
+  shot?: number;
+  box?: Box;
+  /** What gets a box: the people (bodies), their faces, their hands. */
+  kinds?: ("bodies" | "faces" | "hands")[];
+  color?: string;
+  /** The label on each box's tab (« person »); a score after it, made up but steady per person. */
+  label?: string;
+  score?: boolean;
+  /** Thin curves from each box to the next, like a graph of who is seen. */
+  links?: boolean;
+  width?: number;
+  at?: number;
+  out?: number;
+};
+
+type Rect = { id: number; x: number; y: number; w: number; h: number };
+
+/** The boxes around what is seen at a frame (a body from its visible points, its head included). */
+function rectsOf(seen: ReturnType<TrackFn>, kinds: NonNullable<DetectProps["kinds"]>): Rect[] {
+  const out: Rect[] = [];
+  if (kinds.includes("bodies"))
+    for (const b of seen.bodies) {
+      const pts = Object.values(b.points).filter((p) => p.visible);
+      if (pts.length < 4) continue;
+      const xs = pts.map((p) => p.x);
+      const ys = pts.map((p) => p.y);
+      const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+      const h = y1 - y0;
+      out.push({ id: b.id, x: x0 - (x1 - x0) * 0.18, y: y0 - h * 0.12, w: (x1 - x0) * 1.36, h: h * 1.16 });
+    }
+  if (kinds.includes("faces")) for (const f of seen.faces) out.push({ id: 1000 + f.id, x: f.x - f.width / 2, y: f.y - f.height / 2, w: f.width, h: f.height });
+  if (kinds.includes("hands")) for (const k of seen.hands) out.push({ id: 2000 + k.id, x: k.x - k.size / 2, y: k.y - k.size / 2, w: k.size, h: k.size });
+  return out;
+}
+
+/**
+ * Boxes drawn around the people her footage shows (from the tracker), with a label tab and, if asked, the thin curves
+ * that link them: a computer-vision look. They follow the people frame by frame; nobody seen, nothing drawn.
+ */
+function DetectOf(hooks: KitHooks) {
+  return function Detect({ track, shot, box, kinds = ["bodies"], color = "#111111", label = "person", score = true, links = false, width = 3, at = 0, out }: DetectProps) {
+    const frame = hooks.useCurrentFrame();
+    const video = hooks.useVideoConfig();
+    if (frame < at || (out !== undefined && frame >= out) || typeof track !== "function") return null;
+    // In a composition, the shot where it is laid (the whole frame by default).
+    const laid = box ?? { x: 0, y: 0, w: video.width, h: video.height };
+    const seen = track(frame, shot !== undefined ? { shot, left: laid.x, top: laid.y, width: laid.w, height: laid.h } : undefined);
+    const rects = rectsOf(seen, kinds).sort((a, b) => a.x - b.x);
+    if (!rects.length) return null;
+    const centre = (r: Rect) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+    return (
+      <div data-fauve-decor="" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        {links ? (
+          <svg width={video.width} height={video.height} style={{ position: "absolute", left: 0, top: 0 }} aria-hidden="true">
+            {rects.slice(1).map((r, i) => {
+              const a = centre(rects[i]!);
+              const b = centre(r);
+              const bend = (random(`detect-${rects[i]!.id}-${r.id}`) - 0.5) * 220;
+              return <path key={i} d={`M ${a.x} ${a.y} Q ${(a.x + b.x) / 2 + bend} ${(a.y + b.y) / 2 - bend * 0.5} ${b.x} ${b.y}`} fill="none" stroke={color} strokeWidth={Math.max(1, width * 0.5)} opacity={0.7} />;
+            })}
+          </svg>
+        ) : null}
+        {rects.map((r) => (
+          <div key={r.id} style={{ position: "absolute", left: r.x, top: r.y, width: r.w, height: r.h, border: `${width}px solid ${color}` }}>
+            <div style={{ position: "absolute", left: -width, bottom: "100%", background: color, color: "#ffffff", fontFamily: "monospace", fontSize: 18, lineHeight: 1, padding: "3px 6px", whiteSpace: "nowrap" }}>
+              {score ? `${label} ${(0.82 + random(`score-${r.id}`) * 0.17).toFixed(2)}` : label}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+}
+
+type SketchProps = { children?: ReactNode; /** Dark lines on white (true) or light lines on black. */ invert?: boolean; /** How strong the lines are (1). */ strength?: number; style?: CSSProperties };
+
+/** What it wraps redrawn as lines (its edges found by a convolution, in grey): a line drawing of her shot. */
+function Sketch({ children, invert = true, strength = 1, style }: SketchProps) {
+  const id = safeId(useId());
+  const k = 3.5 * Math.max(0.2, strength);
+  return (
+    <div style={{ position: "absolute", inset: 0, ...style }}>
+      <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true">
+        <filter id={`k${id}`} colorInterpolationFilters="sRGB">
+          <feColorMatrix type="saturate" values="0" />
+          <feConvolveMatrix order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1" preserveAlpha="true" />
+          <feComponentTransfer>
+            <feFuncR type="linear" slope={k} />
+            <feFuncG type="linear" slope={k} />
+            <feFuncB type="linear" slope={k} />
+          </feComponentTransfer>
+          {invert ? <feColorMatrix values="-1 0 0 0 1  0 -1 0 0 1  0 0 -1 0 1  0 0 0 1 0" /> : null}
+        </filter>
+      </svg>
+      <div style={{ position: "absolute", inset: 0, filter: `url(#k${id})` }}>{children}</div>
+    </div>
+  );
+}
+
 /** The interface, graphics and transitions kit, bound to a clock (the render's, or the scene check's own for each copy). */
 export function makeGraphic(hooks: KitHooks) {
   const Button = ButtonOf(hooks);
@@ -675,5 +781,7 @@ export function makeGraphic(hooks: KitHooks) {
     Through: ThroughOf(hooks),
     Flash: FlashOf(hooks),
     Tint,
+    Detect: DetectOf(hooks),
+    Sketch,
   };
 }

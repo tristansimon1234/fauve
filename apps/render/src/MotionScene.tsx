@@ -105,7 +105,27 @@ function Footage({ shot, style, hold }: { shot: number; style?: CSSProperties; h
  * drawn by one SVG filter (shadows stacked in CSS cost 40 to 100 s an image). Nothing when the shot has no cut-out:
  * the text then simply stays in front.
  */
-function Subject({ shot, style, rim = 0, rimColor = "#ffffff", shadow = false, hold }: { shot: number; style?: CSSProperties; rim?: number; rimColor?: string; shadow?: boolean; hold?: number }) {
+function Subject({
+  shot,
+  style,
+  rim = 0,
+  rimColor = "#ffffff",
+  shadow = false,
+  fill,
+  tint,
+  hold,
+}: {
+  shot: number;
+  style?: CSSProperties;
+  rim?: number;
+  rimColor?: string;
+  shadow?: boolean;
+  /** Her silhouette, all of one colour (black on a pale background, « I'm » written over it). */
+  fill?: string;
+  /** A colour over her only, multiplied (people tinted blue by a machine that « sees » them). */
+  tint?: string;
+  hold?: number;
+}) {
   const source = useContext(FootageContext);
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
@@ -116,13 +136,26 @@ function Subject({ shot, style, rim = 0, rimColor = "#ffffff", shadow = false, h
   if (!media) return null;
   const local = frame - info.from;
   const r = Math.max(0, rim);
-  const filtered = r > 0 || shadow;
+  const filtered = r > 0 || shadow || Boolean(fill) || Boolean(tint);
+  const body = fill ? "sil" : tint ? "tinted" : "SourceGraphic";
   const step = hold && hold > 1 ? Math.round(hold) : 0;
   return (
     <div style={{ position: "absolute", overflow: "hidden", ...style }}>
       {filtered ? (
         <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true">
           <filter id={`s${id}`} x="-10%" y="-10%" width="120%" height="120%">
+            {fill ? (
+              <>
+                <feFlood floodColor={fill} />
+                <feComposite in2="SourceAlpha" operator="in" result="sil" />
+              </>
+            ) : tint ? (
+              <>
+                <feFlood floodColor={tint} />
+                <feBlend in2="SourceGraphic" mode="multiply" />
+                <feComposite in2="SourceAlpha" operator="in" result="tinted" />
+              </>
+            ) : null}
             <feMorphology in="SourceAlpha" operator="dilate" radius={r} result="grown" />
             <feFlood floodColor={rimColor} />
             <feComposite in2="grown" operator="in" result="edge" />
@@ -137,7 +170,7 @@ function Subject({ shot, style, rim = 0, rimColor = "#ffffff", shadow = false, h
             <feMerge>
               {shadow ? <feMergeNode in="shade" /> : null}
               {r > 0 ? <feMergeNode in="edge" /> : null}
-              <feMergeNode in="SourceGraphic" />
+              <feMergeNode in={body} />
             </feMerge>
           </filter>
         </svg>
@@ -217,6 +250,8 @@ export const SCOPE = {
   Through: graphic.Through,
   Flash: graphic.Flash,
   Tint: graphic.Tint,
+  Detect: graphic.Detect,
+  Sketch: graphic.Sketch,
 };
 
 export type SceneComponent = (props: {

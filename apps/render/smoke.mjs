@@ -84,6 +84,9 @@ const scope = {
   Through: ({ text, from, to }) => React.createElement("div", null, drawn(from, config), drawn(to, config), String(text ?? "")),
   Flash: () => null,
   Tint: () => React.createElement("div", null),
+  // Nobody is seen here: no box; a sketch draws what it wraps.
+  Detect: () => null,
+  Sketch: ({ children }) => React.createElement("div", null, children),
 };
 
 const defaultBrand = {
