@@ -24,13 +24,15 @@ export function ToneSection({ value, onChange }: { value: ToneFields; onChange: 
         <label htmlFor="style-tone-input" className="text-[13px] font-bold">
           Ton
         </label>
-        <input
+        {/* On several lines: a tone read from her site runs longer than a line, and its end was out of sight. */}
+        <textarea
           id="style-tone-input"
           value={value.tone}
           maxLength={TONE_MAX}
+          rows={3}
           onChange={(e) => onChange({ tone: e.target.value })}
           placeholder="Doux, phrases courtes, un peu d’humour"
-          className={inputClass}
+          className={`${inputClass.replace("h-11", "min-h-[88px]")} resize-y py-2.5 leading-snug`}
         />
       </div>
       <div className="flex flex-wrap gap-x-8 gap-y-4">

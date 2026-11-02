@@ -228,7 +228,9 @@ export function studioContextPrompt(ctx: StudioContextForPrompt): string {
     }.`,
     ...(ctx.known?.website ? [`Site : ${ctx.known.website}.`] : []),
     ...(ctx.known?.booking ? [`Réservation : ${ctx.known.booking}.`] : []),
-    ...(ctx.known?.tone ? [`Ton du commerce : ${ctx.known.tone}`] : []),
+    // Her posts' voice, never Edith's own in the chat: read as « Ton du commerce », Edith spoke with the words of
+    // Tristan's landing (« j'm'en occupe ») to Tristan himself.
+    ...(ctx.known?.tone ? [`Ton de ses publications (ses légendes, les textes de ses Reels) : ${ctx.known.tone} Ce n'est pas ta façon de lui parler : avec elle, tu restes toi, sans reprendre ses formules.`] : []),
     ...(ctx.known?.fonts ? [`Polices de sa charte : ${ctx.known.fonts}`] : []),
     ctx.known?.memory.length
       ? `Mémoire (ce que tu sais déjà du commerce, valable dans toutes les conversations ; ne le redemande jamais) :\n${ctx.known.memory.map((f, i) => `${i + 1}. ${f}`).join("\n")}`

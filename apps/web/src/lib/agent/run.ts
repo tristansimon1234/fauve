@@ -290,7 +290,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
   // Never silent: a turn that only reacted keeps its reaction; one that did nothing at all says so.
   const silent = !reply && !input.reactions.length;
   return {
-    reply: silent ? (input.afterReply.length ? "C'est parti, je m'en occupe 👍" : SILENT_REPLY) : reply || null,
+    reply: silent ? (input.afterReply.length ? "C'est parti 👍" : SILENT_REPLY) : reply || null,
     reactions: input.reactions,
     extras: reply ? input.extras : {},
     notes: input.notes,
