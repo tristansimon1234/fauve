@@ -74,7 +74,7 @@ import { AiImageError, canAffordImages, improvePhoto, makeAmbiance, placeOnPost 
 import { deliverImages, notifyFailure, renderAndDeliver, renderSlidesAndDeliver } from "@/lib/render/deliver";
 import { queueJob } from "@/lib/jobs";
 import { missMessage, startSteal } from "@/lib/steal";
-import { readPostMusic } from "@/lib/render/music";
+import { readPostMusic, setMusicWish } from "@/lib/render/music";
 import { removeVoice } from "@/lib/voice-over";
 import { ownVoiceOf } from "@/lib/voice-clone";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
@@ -806,7 +806,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async set_music({ post_id, mode }) {
+    async set_music({ post_id, mode, wish }) {
       const post = unwrap(await db.from("posts").select("id, kind, status, edit_plan_id, music").eq("id", post_id).eq("studio_id", studioId).single());
       if (post.kind !== "reel") return json({ error: "La musique se met sur un Reel." });
       if (["published", "measured"].includes(post.status as string)) return json({ error: "Ce Reel est déjà en ligne." });
@@ -820,6 +820,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
           status: post.edit_plan_id ? "started" : "ok",
           note: `${post.edit_plan_id ? "La vidéo se refait sans ta musique (1 à 2 min) et le lien part tout seul." : "C'est noté pour son montage."} Elle la publiera elle-même en ajoutant le son (le message de livraison lui explique comment)${sound.business ? " ; son compte Instagram est un compte Entreprise, où Instagram ne propose pas tous les sons : si « Utiliser l'audio » n'apparaît pas, elle te dit « mets ta musique »" : ""}. Dis-le en une phrase.`,
         });
+      }
+      // What she asks for the music: the composer's brief for this Reel, and a new piece.
+      if (wish?.trim()) {
+        await setMusicWish(studioId, post_id, wish.trim());
+        mode = "another";
       }
       // Back from the model's sound: her own publishing set for it is given back, then the mode asked.
       if (readPostMusic(post.music).mode === "model") await keepModelSound(studioId, post_id, false);

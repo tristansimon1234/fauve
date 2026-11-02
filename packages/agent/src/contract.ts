@@ -37,6 +37,12 @@ export const reelContractSchema = z.object({
   /** Everything else she asked for explicitly (« fond papier », « bulles WhatsApp », « coupes rapides »), in her words. */
   musts: z.array(z.string().max(200)).max(10),
   /**
+   * What she asked for the music of this Reel (« juste un piano classique, sans autre instrument »), in English for the
+   * composer, faithful to her words; null when she said nothing of it. It is the composer's brief (Tristan: « il faut
+   * juste qu'on écoute ma demande », after a « piano only » came out as lounge with drums and bass).
+   */
+  music: z.string().max(300).nullable().default(null),
+  /**
    * A correction: whether it asks to redraw what the Reel's composition draws (its layout, its animations, its
    * interface, its effects, its background, how they move). False when it only touches the voice, the subtitles,
    * a text's words, the music, the length or the shots: the composition's code is kept, never written again
@@ -58,6 +64,7 @@ export const CONTRACT_PROMPT = `You read a person's request for a Reel and note,
 - call_to_action: « la_sienne » with its text if they give the invitation; « aucune » if they don't want one; otherwise « libre ».
 - musts: everything else they explicitly ask for this Reel (a mood, a background, a universe, a rhythm, things to show), in their words, one thing per line.
 - A correction of a Reel that already has its voice-over also gets « Texte actuel de la voix ». When the request changes only part of this text (a word, a pronunciation, a sentence, the ending) or quotes only a piece of it, voice_text is the current text IN FULL with only that change made, nothing else cut or rewritten (verbatim): a quoted piece is never the whole text. Only a request that gives a whole new text, or asks for it to be rewritten, replaces it. When they say the voice stops too early, doesn't go to the end or must say more, voice_text is the current text in full and voice_text_rest what it must still say (what their original request describes and is missing). With no change to the voice asked for, voice_text stays null.
+- music: what they ask for the music of this Reel (instruments, genre, mood, pace, what they leave out), written in English for a composer, faithful to their words, nothing added; null when they say nothing about the music.
 - redraw: for a correction, true only when they ask to change what the layout or its animations draw (the arrangement, the split screen, the interface, an effect, a graphic element, the background, their motion or their style); false when they only touch the voice, the subtitles, the words of a text, the music, the length, the caption, the order or the choice of shots. For a new Reel: true.`;
 
 export const EMPTY_CONTRACT: ReelContract = {
@@ -74,6 +81,7 @@ export const EMPTY_CONTRACT: ReelContract = {
   call_to_action: "libre",
   call_to_action_text: null,
   musts: [],
+  music: null,
   redraw: true,
 };
 
@@ -89,7 +97,8 @@ export const contractIsEmpty = (c: ReelContract | null | undefined): boolean =>
     !c.screen_text &&
     !c.ending &&
     c.call_to_action === "libre" &&
-    !c.musts.length);
+    !c.musts.length &&
+    !c.music);
 
 /** The contract in plain lines, for the editor, the voice-over writer and the critic (only what she fixed). */
 export function contractLines(c: ReelContract | null | undefined): string[] {
@@ -107,6 +116,7 @@ export function contractLines(c: ReelContract | null | undefined): string[] {
     c.ending ? `Fin : ${c.ending}` : null,
     c.call_to_action === "aucune" ? "Aucune invitation à la fin" : c.call_to_action === "la_sienne" && c.call_to_action_text ? `Invitation à la fin, la sienne : « ${c.call_to_action_text} »` : null,
     ...c.musts.map((m) => `Demandé : ${m}`),
+    c.music ? `Musique demandée : ${c.music}` : null,
     c.redraw === false ? "La mise en page et ses animations restent telles quelles (leur code est gardé) : ne change ni la forme du Reel ni le brief de sa composition" : null,
   ].filter((l): l is string => Boolean(l));
 }

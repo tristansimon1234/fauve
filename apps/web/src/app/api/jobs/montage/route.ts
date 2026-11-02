@@ -46,6 +46,7 @@ import { queueJob } from "@/lib/jobs";
 import { ensureCaption } from "@/lib/agent/caption-writer";
 import { deliverMontage, notifyFailure, renderAndDeliver } from "@/lib/render/deliver";
 import { renderPost } from "@/lib/render/render-post";
+import { setMusicWish } from "@/lib/render/music";
 import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { startWaitingMontages } from "@/lib/montage-queue";
@@ -354,6 +355,8 @@ function designInput(job: Job) {
 async function withContract(job: Job): Promise<void> {
   if (job.contract || !job.brief?.trim()) return;
   job.contract = await readContract(job.studioId, job.brief, job.correction ? await currentVoiceText(job) : null);
+  // What she asked for the music: the composer's brief for this Reel, kept on it (a correction that says nothing of it keeps hers).
+  if (job.contract.music) await setMusicWish(job.studioId, job.postId, job.contract.music).catch((e: unknown) => console.warn("music wish", e));
 }
 
 /** The words of the voice on the Reel now (hers or Edith's), for a correction's contract. */

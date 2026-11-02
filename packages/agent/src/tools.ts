@@ -357,7 +357,15 @@ export const toolSpecs = {
   set_music: {
     description:
       "Musique d'un Reel, composée par Edith pour ce montage (ElevenLabs, calée sur les images, libre de droits, sans voix) : on (par défaut, aussi quand elle dit « mets ta musique »), off (Reel muet), another (une nouvelle musique), model (un Reel qui en recopie un d'Instagram : garder son son, la vidéo sans musique sur ses coupes, qu'elle publie elle-même en ajoutant le son avec « Utiliser l'audio »). Refait la vidéo, gratuit.",
-    input: z.object({ post_id: z.string().uuid(), mode: z.enum(["on", "off", "another", "model"]) }),
+    input: z.object({
+      post_id: z.string().uuid(),
+      mode: z.enum(["on", "off", "another", "model"]),
+      wish: z
+        .string()
+        .max(300)
+        .optional()
+        .describe("Ce qu'elle demande pour la musique de ce Reel (« juste du piano »), en anglais pour le compositeur, fidèle à ses mots, rien d'ajouté : la nouvelle musique suit sa demande (mode another)"),
+    }),
   },
   set_voice: {
     description:

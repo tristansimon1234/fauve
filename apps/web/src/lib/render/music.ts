@@ -44,6 +44,8 @@ export const postMusicSchema = z.object({
   mode: z.enum(["on", "off", "model"]).default("on"),
   /** Her own publishing was set for the model's sound (given back with Edith's music). */
   hand: z.boolean().optional(),
+  /** What she asked for the music of this Reel (her contract's, in English): the composer's brief, over every default. */
+  wish: z.string().max(300).optional(),
   /** The piece made for this post, and the cut it was made for. */
   track: z
     .object({
@@ -51,6 +53,8 @@ export const postMusicSchema = z.object({
       signature: z.string(),
       song_id: z.string().nullable().optional(),
       created_at: z.string(),
+      /** The request it was composed for: another one composes again. */
+      wish: z.string().max(300).optional(),
     })
     .nullable()
     .optional(),
@@ -97,8 +101,20 @@ function moodOf(plan: EditPlan): { words: string; tags: string[] } {
 const underVoice = (sound: string) =>
   `${sound}, arranged to sit under a spoken voice-over: the drums, the bass and the groove carry the track with the same energy, the lead melody steps back (sparse, no solo, nothing competing with the voice)`;
 
-/** What the composer is asked for: the business, its own sound (else a groove for the Reel's energy), and the art direction adjustments. */
-function brief(plan: EditPlan, business: string | null, adjustments: string[], sound?: string): { description: string; tags: string[] } {
+/**
+ * What the composer is asked for: what she asked for this Reel's music, as she asked it (Tristan: « il faut juste
+ * qu'on écoute ma demande »: a « piano only » had come out as lounge with drums and bass, under our defaults); else
+ * the business, its own sound (else a groove for the Reel's energy), and the art direction adjustments.
+ */
+function brief(plan: EditPlan, business: string | null, adjustments: string[], sound?: string, wish?: string): { description: string; tags: string[] } {
+  if (wish) {
+    // Only what makes it hold on the video: one piece from the first second to the end.
+    const bpm = planBpm(plan);
+    return {
+      description: `Music for an Instagram Reel of ${business ? `a ${business}` : "a neighbourhood business"}: ${wish}.${bpm && !plan.voice ? ` Around ${bpm} BPM.` : ""} One piece from the very first second to the end, without a silence.`.slice(0, 2000),
+      tags: [wish.slice(0, 40)],
+    };
+  }
   const ambiance = moodOf(plan);
   // The sound read in its art direction (« deep house légère », « funk de quartier ») wins over the energy's genre.
   const mood = sound ? { words: `${sound}: the sound of this business, played like a track a creator would pick, with one simple hook`, tags: [sound.slice(0, 40)] } : ambiance;
@@ -211,7 +227,8 @@ export async function withMusic(params: {
   const signature = cutSignature(params.plan);
   let mp3: Uint8Array | null = null;
   let made: "kept" | "new" = "kept";
-  if (!params.fresh && music.track?.signature === signature) {
+  // The same cut and the same request: the piece made for them serves again.
+  if (!params.fresh && music.track?.signature === signature && (music.track.wish ?? "") === (music.wish ?? "")) {
     const { data } = await db.storage.from("media").download(music.track.path);
     if (data) mp3 = new Uint8Array(await data.arrayBuffer());
   }
@@ -225,7 +242,7 @@ export async function withMusic(params: {
     // The music of the Reel this one copies (« Steal »), else her charter's.
     const followed = (await postStyle(params.studioId, params.postId).catch(() => undefined))?.look.music.trim();
     const sound = followed || (typeof stored?.signature?.music === "string" ? stored.signature.music.trim().slice(0, 80) : undefined);
-    const ask = brief(params.plan, (studio.data?.business_type as string | null) ?? null, direction, sound || undefined);
+    const ask = brief(params.plan, (studio.data?.business_type as string | null) ?? null, direction, sound || undefined, music.wish);
     const duration = params.plan.duration;
     // A piece is written with its ending (the beat stops over its last seconds): it is composed longer
     // than the Reel, so that ending falls after it and the mix cuts it off.
@@ -286,8 +303,18 @@ export async function withMusic(params: {
     if (music.track?.path) await db.storage.from("media").remove([music.track.path]).catch(() => {});
     await db
       .from("posts")
-      .update({ music: { mode: "on", track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString() } } })
+      .update({ music: { mode: "on", ...(music.wish ? { wish: music.wish } : {}), track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString(), ...(music.wish ? { wish: music.wish } : {}) } } })
       .eq("id", params.postId);
   }
   return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice) }), music: made };
+}
+
+/** Keeps what she asked for this Reel's music (her contract's): the composer's brief from now on, and a new piece. */
+export async function setMusicWish(studioId: string, postId: string, wish: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("music").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  const music = readPostMusic(post?.music);
+  if (music.wish === wish) return;
+  const { error } = await db.from("posts").update({ music: { ...music, wish: wish.slice(0, 300) } }).eq("id", postId).eq("studio_id", studioId);
+  if (error) console.warn("music wish not kept", postId, error.message);
 }

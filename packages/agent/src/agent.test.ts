@@ -5658,3 +5658,11 @@ test("a copy follows the casting of its shots where it keeps the rules", async (
   const strict = copyPlan({ cuts: [1, 2, 3], duration: 4, files, look, words: { title: null, end: [] }, assignment: [{ ground: "terrasse", subjects: ["matcha"] }, { ground: "rue", subjects: ["zenit"] }, { ground: "terrasse", subjects: ["matcha"] }, { ground: "rue", subjects: ["matcha"] }] });
   assert.deepEqual(strict.copy!.cutouts.map((c) => c.photo), ["matcha", "zenit", "matcha"]);
 });
+
+test("her request for the music is in her contract, for the composer", async () => {
+  const { contractIsEmpty, contractLines, EMPTY_CONTRACT } = await import("./contract.ts");
+  const piano = { ...EMPTY_CONTRACT, music: "just a classical piano, no other instrument" };
+  assert.equal(contractIsEmpty(piano), false);
+  assert.ok(contractLines(piano).includes("Musique demandée : just a classical piano, no other instrument"));
+  assert.equal(EMPTY_CONTRACT.music, null);
+});
