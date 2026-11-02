@@ -203,6 +203,12 @@ function composedLines(design: CarouselDesign) {
 }
 
 /** Tools that spend (models, renders, images): refused without a subscription or credits. */
+/** What a photo shows, as its reading wrote it (detection.notes; at the top in older readings). */
+function photoNotes(regions: unknown): string | undefined {
+  const read = regions as { notes?: string; detection?: { notes?: string } } | null;
+  return read?.detection?.notes?.trim() || read?.notes?.trim() || undefined;
+}
+
 /** Her answer to « garder son son ? » (its buttons, or her words). */
 const SOUND_ANSWER = /^(garder son son|ta musique|ma musique|son du mod[eè]le|garde (son|le) son|mets ta musique)\b/i;
 
@@ -517,7 +523,9 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
             ...(w && h ? { format: w > h ? "paysage" : w < h ? "portrait" : "carré" } : {}),
             ...(r.duration ? { duree_s: Number(r.duration) } : {}),
             ...(summaries.get(r.id as string) ? { contenu: summaries.get(r.id as string) } : {}),
-            ...((r.regions as { notes?: string } | null)?.notes ? { contenu: (r.regions as { notes: string }).notes } : {}),
+            // A photo's reading keeps what it shows in detection.notes (older ones at the top): read at the top only,
+            // Edith saw no photo's content and told Tristan « je ne vois pas ce que montrent tes photos ».
+            ...(photoNotes(r.regions) ? { contenu: photoNotes(r.regions) } : {}),
             ...(r.bank ? { banque: true } : {}),
             ...(r.sorted_post_id ? { rangee_dans_post_id: r.sorted_post_id } : {}),
             ...(ai ? { ia: ai.mode === "improve" ? `photo améliorée (${ai.instruction.slice(0, 80)})` : `image d'ambiance : ${ai.instruction.slice(0, 80)}` } : {}),
