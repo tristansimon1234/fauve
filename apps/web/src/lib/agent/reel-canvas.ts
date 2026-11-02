@@ -1,5 +1,5 @@
 import "server-only";
-import { buildReelProps, canvasMoments, isMotionSegment, motionTemplateSchema, propsAt, type EditPlan } from "@fauve/agent";
+import { buildReelProps, canvasMoments, dayIn, isMotionSegment, motionTemplateSchema, propsAt, type EditPlan } from "@fauve/agent";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { reelFramesInSandbox } from "@/lib/render/sandbox";
 import type { SceneRequest } from "./motion-designer";
@@ -22,6 +22,8 @@ async function reelProps(studioId: string, postId: string, plan: EditPlan, templ
     ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
     ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
     ...(inputs.copyCutouts ? { copyCutouts: inputs.copyCutouts } : {}),
+    ...(inputs.depth ? { depth: inputs.depth } : {}),
+    today: dayIn(),
     photoAspects: inputs.photoAspects,
     ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),
   });

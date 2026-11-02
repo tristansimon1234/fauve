@@ -134,7 +134,10 @@ export async function effectRoute(studioId: string, input: { postId: string; cor
   // A Reel she sent to remake goes to the workshop's director only when it holds a real effect (routeEffect, below,
   // reads its moments): a simple one (a held message, cuts, cut-outs laid over) is remade by code, in the chain
   // (copyPlan), for the chain's price (Tristan: « réduire le nombre d'agents, améliorer la qualité mais garder les marges »).
-  const copied = followed ? momentsLine(followed.look) : null;
+  // What it makes with generative AI is never made: said, so that it does not send the Reel to the workshop.
+  const copied = followed
+    ? [momentsLine(followed.look), followed.look.generative ? `fait par IA générative, que personne ne refait : ${followed.look.generative}` : null].filter(Boolean).join(" ; ") || null
+    : null;
   const route = await routeEffect(studioId, input.brief ?? undefined, { videos, photos: (media ?? []).length - videos }, copied);
   if (route.agent) {
     console.log("montage: effects agent", input.postId, route.effect, "—", route.why);

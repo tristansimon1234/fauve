@@ -23,9 +23,11 @@ import { googleFont } from "@/lib/fonts";
 import { cutoutPath } from "@/lib/render/cutout";
 import { fontSheetInSandbox, sandboxCostEur, stealReelInSandbox, type StealMiss } from "@/lib/render/sandbox";
 import { tracksPath } from "@/lib/render/tracks";
+import { cleanedPaths } from "@/lib/video/speech";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { instagramVideo } from "@/lib/treg";
 import { pickStolenFont, readStolenLook } from "@/lib/video/inspiration";
+import { designLook } from "@/lib/agent/look-designer";
 import { costMeta } from "@/lib/cost-scope";
 import { queueJob } from "@/lib/jobs";
 
@@ -158,7 +160,7 @@ export async function dropExample(studioId: string, example: { id: string; path:
   if (files.length) {
     await db.storage
       .from("media")
-      .remove([...new Set(files), tracksPath(studioId, example.id), cutoutPath(studioId, example.id, "webp"), cutoutPath(studioId, example.id, "png")])
+      .remove([...new Set(files), tracksPath(studioId, example.id), cutoutPath(studioId, example.id, "webp"), cutoutPath(studioId, example.id, "png"), ...cleanedPaths(studioId, example.id)])
       .catch(() => {});
   }
 }
@@ -229,10 +231,12 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   const text = { ...look.text };
   delete text.font;
   const font = await checkedFont(studioId, reading.fonts, reel.shots);
+  // Its filter as a look's settings, designed once from what Gemini saw (its Reel wears it, unless she asks for another).
+  const filterLook = look.filter ? (await designLook(studioId, look.filter, { copied: true }))?.look : undefined;
   // Sheets of its frames, for the animations that remake it (never its video): deleted with the inspiration.
   await dropSheets(studioId, inspirationId).catch(() => {});
   const sheets = await keepSheets(studioId, inspirationId, reel.sheets);
-  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, reader: STEAL_READER, ...outline, ...(sheets.length ? { sheets } : {}) };
+  const style: StolenStyle = { look: { ...look, text: { ...text, ...(font ? { font } : {}) } }, measures, reader: STEAL_READER, ...outline, ...(sheets.length ? { sheets } : {}), ...(filterLook ? { filter_look: filterLook } : {}) };
   // Its three lines also stand as its reading (the inspirations list, the editor's chosen inspiration).
   const analysis = stolenStyleLines(style).join(" ");
   await db

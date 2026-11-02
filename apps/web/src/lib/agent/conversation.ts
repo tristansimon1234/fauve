@@ -1,7 +1,24 @@
 import "server-only";
 import { tiktokDirectPost, tiktokEnabled } from "@/lib/social/tiktok";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DAILY_CAP_REPLY, DEFAULT_EFFORT, DEFAULT_VOICE_ID, effortSchema, findVoice, orderReplies, memoryLines, readOwnVoice, readVoiceSetting, stableWindow, withLatestBurst, type ExchangeRow, PLAN_BUTTONS } from "@fauve/agent";
+import {
+  DAILY_CAP_REPLY,
+  DEFAULT_EFFORT,
+  DEFAULT_VOICE_ID,
+  effortSchema,
+  findVoice,
+  finishDefaultWords,
+  orderReplies,
+  memoryLines,
+  readOwnVoice,
+  readVoiceSetting,
+  reelFinishSchema,
+  reelLookSchema,
+  stableWindow,
+  withLatestBurst,
+  type ExchangeRow,
+  PLAN_BUTTONS,
+} from "@fauve/agent";
 import { dayOfTurns } from "@/lib/reply-cap";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { whatsappVideos } from "@/lib/video-quality";
@@ -147,7 +164,7 @@ export async function replyInConversation(params: {
     socialConnect()
       ? db.from("social_accounts").select("handle").eq("studio_id", params.studioId).eq("platform", "instagram").eq("status", "connected").maybeSingle()
       : Promise.resolve({ data: null }),
-    db.from("brand_profiles").select("profile->>tone, profile->voice, profile->own_voice, profile->fonts, profile->font_twins, profile->custom_fonts").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
+    db.from("brand_profiles").select("profile->>tone, profile->voice, profile->own_voice, profile->fonts, profile->font_twins, profile->custom_fonts, profile->look, profile->finish").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1).maybeSingle(),
     runningJobs(params.studioId).catch(() => []),
     db.from("social_accounts").select("handle, status").eq("studio_id", params.studioId).eq("platform", "tiktok").maybeSingle(),
     // The Reel she sent to copy (« Steal »), for her next Reel only.
@@ -292,6 +309,13 @@ export async function replyInConversation(params: {
               ideas: report.ideas,
             }
           : undefined,
+      defaults: (() => {
+        // Her look and finishing touches for all her Reels, when she set some (set_look, set_finish without a Reel).
+        const profile = brand.data as { look?: unknown; finish?: unknown } | null;
+        const look = reelLookSchema.safeParse(profile?.look);
+        const finish = reelFinishSchema.safeParse(profile?.finish ?? {});
+        return [...(look.success ? [`look « ${look.data.name} »`] : []), ...finishDefaultWords(finish.success ? finish.data : undefined)];
+      })(),
       routine: await Promise.all([
         accessLine(params.studioId).catch(() => null),
         presenceLines(params.studioId).catch((error) => {

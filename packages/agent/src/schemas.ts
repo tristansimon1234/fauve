@@ -4,6 +4,7 @@ import { listFields, LOOK_FONT, savedLookSchema, textLookSchema } from "./text-l
 import { brandSignatureSchema } from "./signature.ts";
 import { styleSampleSchema } from "./moodboard.ts";
 import { voiceSettingSchema } from "./voice-over.ts";
+import { REEL_EFFECTS, reelLookSchema } from "./looks.ts";
 
 // Mirrors the Postgres enums in supabase/migrations.
 export const postStatusSchema = z.enum([
@@ -102,7 +103,39 @@ export const editPlanSegmentSchema = z.object({
   accent: z.enum(["punch", "wipe"]).optional(),
   /** Older plans: where the subtitles sat while this shot played (now one row for the whole Reel, the plan's `subtitle_y`). */
   subtitle_y: z.number().min(0.1).max(0.8).optional(),
+  /**
+   * A speed ramp on a shot in slow motion, set by the engine (finish.ts, `speedRamp`): the shot plays
+   * as filmed, eases into slow motion around its gesture (`at`, a time of the clip, for `hold` seconds
+   * of the clip) and back out, in the same time on screen as the slow motion the editor asked for over
+   * `asked` (its in and out, shown to it again for a correction).
+   */
+  ramp: z
+    .object({ at: z.number().min(0), hold: z.number().positive().max(5), asked: z.tuple([z.number().min(0), z.number().positive()]) })
+    .optional(),
+  /**
+   * A piece of a passage where someone speaks, cut by the engine (speech.ts: its « euh » and long pauses
+   * out): the passage as the editor wrote it, its in, out and move, so the cuts can be undone
+   * (`finish.cuts` off, and what a correction shows the editor).
+   */
+  jump: z.object({ in: z.number().min(0), out: z.number().positive(), move: cameraMoveSchema.optional() }).optional(),
 });
+
+/**
+ * The finishing touches the engine adds to a Reel by itself, each one hers to change (Edith's
+ * set_finish; her defaults for every Reel in her profile): the sound of what is said (cleaned when
+ * noisy, always, or as recorded), the sound of her videos (only where someone speaks, all along, or
+ * none), the « euh » and silences cut, the speed ramps, the photos in relief, the steadied videos.
+ * Absent: « auto » (and « speech » for the sound of her videos).
+ */
+export const reelFinishSchema = z.object({
+  sound: z.enum(["auto", "clean", "original"]).optional(),
+  video_sound: z.enum(["speech", "all", "none"]).optional(),
+  cuts: z.enum(["auto", "off"]).optional(),
+  ramp: z.enum(["auto", "off"]).optional(),
+  relief: z.enum(["auto", "off"]).optional(),
+  steady: z.enum(["auto", "off"]).optional(),
+});
+export type ReelFinish = z.infer<typeof reelFinishSchema>;
 
 /** Full motion-design screen (animated typography in the studio's colours, no video). */
 export const sceneSchema = z.object({
@@ -405,10 +438,17 @@ export const editPlanObjectSchema = z.object({
   /** Her own voice over the Reel: a voice note (media_assets, with its transcript), from `at` seconds. Set from the post, never written by the editor. */
   // `at`: where the recording starts on the Reel's clock; negative, the silence before its first word is cut.
   voice: z.object({ media_id: z.string().min(1), at: z.number().min(-30).max(10) }).optional(),
-  /** An overlay over the whole video, under the texts: dust, film dust and a rare scratch (a key message, a vintage or night mood). */
-  effect: z.enum(["dust"]).optional(),
+  /**
+   * A look over the whole video, under the texts (looks.ts: its grade and its texture, as settings written from her
+   * words, the Reel she copies, or a preset), on her request, the Reel she copies, or her default for all her Reels.
+   */
+  look: reelLookSchema.optional(),
+  /** The preset a plan made before named for its look (film dust, a disposable camera, a VHS tape…): planLook reads it. */
+  effect: z.enum(REEL_EFFECTS).optional(),
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height), set by the engine off the faces: they never move from shot to shot. */
   subtitle_y: z.number().min(0.1).max(0.8).optional(),
+  /** Her finishing touches for this Reel (reelFinishSchema): carried from one version to the next, never written by the editor. */
+  finish: reelFinishSchema.optional(),
   /** Animations over several shots (see editPlanLayerSchema). */
   layers: z.array(editPlanLayerSchema).max(3).optional(),
   /** A Reel made by the effects agent (effects.ts): its one shot is the finished video, played as it is. Set by the engine. */
@@ -458,8 +498,35 @@ export type PlanSegment = EditPlan["segments"][number];
 export const isClipSegment = (s: PlanSegment): s is ClipSegment => "clip_id" in s;
 export type MotionSegment = z.infer<typeof editPlanMotionSegmentSchema>;
 export const isMotionSegment = (s: PlanSegment): s is MotionSegment => "motion" in s;
-/** How long a segment lasts in the video (a shot at another speed lasts its clip time divided by the speed). */
-export const segmentSeconds = (s: PlanSegment) => (isClipSegment(s) ? (s.out - s.in) / (s.speed ?? 1) : s.duration);
+/** The ease of a speed ramp: this much of the clip on each side of the slow passage plays halfway between (seconds of the clip). */
+export const RAMP_EASE = 0.12;
+
+/**
+ * A shot's passages at each speed, in times of the clip: one at its speed; with a ramp, as filmed,
+ * halfway, slow around the gesture, halfway, as filmed (empty passages left out).
+ */
+export function speedPieces(s: Pick<ClipSegment, "in" | "out" | "speed" | "ramp">): { from: number; to: number; speed: number }[] {
+  const speed = s.speed ?? 1;
+  if (!s.ramp || speed >= 1) return [{ from: s.in, to: s.out, speed }];
+  const mid = (1 + speed) / 2;
+  const a = s.ramp.at - s.ramp.hold / 2;
+  const b = s.ramp.at + s.ramp.hold / 2;
+  const edges = [s.in, a - RAMP_EASE, a, b, b + RAMP_EASE, s.out].map((t) => Math.min(s.out, Math.max(s.in, t)));
+  return [1, mid, speed, mid, 1].flatMap((v, k) => (edges[k + 1]! - edges[k]! > 1e-6 ? [{ from: edges[k]!, to: edges[k + 1]!, speed: v }] : []));
+}
+
+/** How long a segment lasts in the video (a shot at another speed lasts its clip time divided by the speed; a ramp, each passage at its own). */
+export const segmentSeconds = (s: PlanSegment) => (isClipSegment(s) ? speedPieces(s).reduce((sum, p) => sum + (p.to - p.from) / p.speed, 0) : s.duration);
+
+/** When a moment of the clip (`clip`, seconds) shows in a shot, in seconds from the shot's start (its speed and its ramp counted). */
+export function screenTime(s: Pick<ClipSegment, "in" | "out" | "speed" | "ramp">, clip: number): number {
+  let seconds = 0;
+  for (const p of speedPieces(s)) {
+    if (clip <= p.from) break;
+    seconds += (Math.min(clip, p.to) - p.from) / p.speed;
+  }
+  return seconds;
+}
 
 /** Every clip or photo a plan plays: its shots and the footage under its animations. */
 export function planMediaIds(plan: Pick<EditPlan, "segments"> & { layers?: EditPlan["layers"] }): string[] {
@@ -528,6 +595,26 @@ const clipShotBase = z.object({
   faces_visible: z.boolean(),
 });
 
+const timedSpan = z.object({ start: z.number().min(0), end: z.number().min(0) });
+
+/**
+ * Her speech in a video, read precisely once after the analysis (speech.ts): its sound cleaned
+ * (a neural denoiser, only when it was noisy), its hesitations (« euh », « hum ») and its pauses
+ * measured, so the engine cuts them out where someone speaks to the camera. `source`: where the
+ * words' times come from, Scribe (exact) or Gemini's reading (approximate: only the pauses are cut then).
+ */
+export const clipSpeechSchema = z.object({
+  source: z.enum(["scribe", "gemini"]),
+  cleaned: z.boolean(),
+  /** The noise floor it had (dBFS), measured before cleaning. */
+  floor: z.number().nullable(),
+  fillers: z.array(z.object({ w: z.string(), start: z.number().min(0), end: z.number().min(0) })).max(200),
+  pauses: z.array(timedSpan).max(300),
+  /** The copy with its sound cleaned, in Storage beside the video (the video keeps its sound as recorded). */
+  path: z.string().max(300).optional(),
+});
+export type ClipSpeech = z.infer<typeof clipSpeechSchema>;
+
 export const clipAnalysisSchema = z.object({
   duration: z.number().positive().describe("Durée totale du clip en secondes"),
   orientation: z.enum(["portrait", "landscape", "square"]),
@@ -550,11 +637,13 @@ export const clipAnalysisSchema = z.object({
   // Came later: older analyses do not have them.
   actions: clipActionsSchema.optional(),
   correction: clipCorrectionSchema.optional().describe("La retouche légère qui rendrait le clip plus beau et naturel sur Instagram, comme un bon étalonneur : ±0,1 à ±0,3 en général, 0 pour ne rien changer"),
+  /** Set by the engine after the analysis (never asked of Gemini): her speech read precisely. */
+  speech: clipSpeechSchema.optional(),
 });
 export type ClipAnalysis = z.infer<typeof clipAnalysisSchema>;
 
 /** What Gemini is asked for: the same, with the look of every shot and the clip's correction required. */
-export const clipAnalysisRequestSchema = clipAnalysisSchema.extend({
+export const clipAnalysisRequestSchema = clipAnalysisSchema.omit({ speech: true }).extend({
   shots: z.array(clipShotBase.extend(shotLookSchema.shape)).describe("Plans successifs, sans trou ni chevauchement"),
   actions: clipActionsSchema,
   correction: clipCorrectionSchema.describe("La retouche légère qui rendrait le clip plus beau et naturel sur Instagram, comme un bon étalonneur : ±0,1 à ±0,3 en général, 0 pour ne rien changer"),
@@ -622,6 +711,10 @@ export const brandProfileSchema = z.object({
   voice: voiceSettingSchema.optional(),
   /** Her sound effects on all her next Reels (light, more, off): absent, light (sfx.ts). */
   sfx: sfxLevelSchema.optional(),
+  /** Her finishing touches for all her Reels (each Reel can change them): set by Edith's set_finish without a Reel. */
+  finish: reelFinishSchema.optional(),
+  /** A look on all her Reels, when she asked for one (Edith's set_look without a Reel): each Reel can change it. */
+  look: reelLookSchema.optional(),
   dos: z.array(z.string()),
   donts: z.array(z.string()),
 });

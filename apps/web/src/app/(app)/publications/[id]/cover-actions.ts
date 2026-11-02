@@ -1,6 +1,8 @@
 "use server";
 
-import { EFFECT_VOICE_OUT, postCoverSchema, type PostCover } from "@fauve/agent";
+import { EFFECT_VOICE_OUT, editPlanSchema, isBaked, planLook, postCoverSchema, sameLook, withLook, type PostCover } from "@fauve/agent";
+import { resolveLook } from "@/lib/agent/look-designer";
+import { insertPlanVersion } from "@/lib/edit-plans";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
@@ -69,6 +71,42 @@ export async function setPublishByHand(postId: string, byHand: boolean): Promise
   if (error || !data.length) return { ok: false };
   revalidatePath(`/publications/${postId}`);
   return { ok: true };
+}
+
+/**
+ * A look over the whole video (looks.ts): « none », a preset (« vhs »), or her words, designed into its settings
+ * (« pellicule Kodak des années 70 »); a new version of the same cut, the video made again after the answer
+ * (about a minute, free; the music stays). Answers its name, and what it does instead of what a look cannot do.
+ */
+export async function setLook(postId: string, words: string): Promise<{ ok: boolean; name?: string; note?: string }> {
+  if (!z.uuid().safeParse(postId).success || !words.trim() || words.length > 300) return { ok: false };
+  const { db, member } = await getStudioContext();
+  if (!member) return { ok: false };
+  const studioId = member.studio.id;
+  const { data: post } = await db
+    .from("posts")
+    .select("edit_plan_id")
+    .eq("id", postId)
+    .eq("studio_id", studioId)
+    .in("kind", ["reel", "story"])
+    .not("status", "in", "(published,measured)")
+    .maybeSingle();
+  if (!post?.edit_plan_id) return { ok: false };
+  const { data: current } = await supabaseAdmin().from("edit_plans").select("plan").eq("id", post.edit_plan_id as string).eq("studio_id", studioId).maybeSingle();
+  const plan = editPlanSchema.safeParse(current?.plan);
+  // A video drawn image by image by the effects workshop: its look is a correction of the effect.
+  if (!plan.success || isBaked(plan.data)) return { ok: false };
+  const chosen = await resolveLook(studioId, words);
+  if ("missed" in chosen) return { ok: false };
+  const named = { ...(chosen.look ? { name: chosen.look.name } : {}), ...(chosen.note ? { note: chosen.note } : {}) };
+  if (sameLook(planLook(plan.data), chosen.look)) return { ok: true, ...named };
+  const cut = withLook(plan.data, chosen.look);
+  const { id } = await insertPlanVersion(studioId, postId, cut);
+  const { error } = await supabaseAdmin().from("posts").update({ edit_plan_id: id }).eq("id", postId).eq("studio_id", studioId);
+  if (error) return { ok: false };
+  after(() => queueRerender({ studioId, postId, silent: true }));
+  revalidatePath(`/publications/${postId}`);
+  return { ok: true, ...named };
 }
 
 /**

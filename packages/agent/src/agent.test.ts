@@ -1890,11 +1890,11 @@ test("formats: a key message held all along, film dust when the editor asks, Fre
   };
   assert.equal(editorOutputSchema.safeParse({ plan: output, rationale: "message clé" }).success, true);
   const plan = fromEditorPlan(output as never);
-  assert.equal(plan.effect, "dust");
-  assert.equal(fromEditorPlan({ ...output, effect: "none" } as never).effect, undefined);
+  assert.equal(plan.look?.preset, "dust");
+  assert.equal(fromEditorPlan({ ...output, effect: "none" } as never).look, undefined);
   const parsed = editPlanSchema.parse(plan);
   const props = buildReelProps(parsed, { template: "dynamique", clipUrls: { a: "https://x/a.mp4", b: "https://x/b.mp4" }, brand: { name: "Culte" } });
-  assert.equal(props.effect, "dust");
+  assert.equal(props.look?.preset, "dust");
   // « : » never starts a line.
   assert.equal(props.texts[0]!.text, "offre de rentrée\u202f: -15\u202f% sur les cours");
   assert.equal(frenchSpaces("Prête ? « Viens » !"), "Prête\u202f? «\u202fViens\u202f»\u202f!");
@@ -5315,6 +5315,8 @@ test("a copied Reel's words keep their drawing, and its font is checked among cl
     music: "indie pop",
     ending: "un écran noir",
     why: "Le message reste, les images défilent.",
+    filter: "",
+    generative: "",
   };
   const look = clampLook(reading);
   // What compares its font is not kept; how its words are drawn is.

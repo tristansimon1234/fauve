@@ -242,6 +242,8 @@ export async function withMusic(params: {
   fresh?: boolean;
   /** Its sound effects, placed and levelled (sfx.ts) with their files: mixed with the music, or alone over its own sound. */
   sounds?: (SoundInMix & { mp3: Uint8Array })[];
+  /** The sound of her videos kept all along, nobody speaking: mixed as an ambience under the music. */
+  ambient?: boolean;
 }): Promise<{ mp4: Buffer; music: "kept" | "new" | "none" }> {
   if (!env("ELEVENLABS_API_KEY") || (params.kind !== "reel" && params.kind !== "story")) return { mp4: params.mp4, music: "none" };
   const db = supabaseAdmin();
@@ -336,7 +338,7 @@ export async function withMusic(params: {
       .update({ music: { mode: "on", ...(music.wish ? { wish: music.wish } : {}), track: { path, signature, song_id: best!.songId, created_at: new Date().toISOString(), ...(music.wish ? { wish: music.wish } : {}) } } })
       .eq("id", params.postId);
   }
-  return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice), sounds }), music: made };
+  return { mp4: await muxAudioInSandbox(params.renderId, params.mp4, mp3, { voiceOver: Boolean(params.plan.voice), sounds, ambient: params.ambient }), music: made };
 }
 
 /** Keeps what she asked for this Reel's music (her contract's): the composer's brief from now on, and a new piece. */

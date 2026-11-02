@@ -4,6 +4,8 @@ import { planTimeline } from "./motion.ts";
 import { renderDuration } from "./render.ts";
 import { hookAtStart } from "./hook.ts";
 import { snapToTempo, TEMPLATE_BPM } from "./tempo.ts";
+import { lookChoice, type ReelLook } from "./looks.ts";
+import { applySpeechCuts, spokenShot, type SpeechFacts } from "./speech.ts";
 import {
   cameraMoveSchema,
   MAX_SPEED,
@@ -56,12 +58,12 @@ What you know as an editor (defaults, not a checklist: the footage and her reque
 - The first second decides whether people stay, and most watch without sound. Open on your best shot, one that moves (the result, a face, a clear gesture), from « openings » unless her request says what to start with, and move on within a second or so; an empty room, a still set, a logo or a text screen loses them. The hook text, about six words, is on screen from the first frame (« from » 0) and opens a curiosity that belongs to this business (a question, a number, a « pov : », a precise promise), never its name nor a line that would fit any business. No hook text when « reel_a_recopier » has none (it opens on a gesture, with no text) or her request wants none. Its form and words change from « recent_hooks ». If she prefers not to show herself (« studio.facts »), open on the result, a gesture or her hands.
 - She chose these files for this Reel: each clip and photo is used at least once, unless her request leaves one out. Take the most beautiful and lively passages; leave out only seconds that are really blurred, dark or shaken (a bad sound rules nothing out). In and out points stay within the clip. A clip filmed as one still shot (« camera » static, one framing) looks the same at any passage: twice at most; with too few images for the pace, a shorter Reel or longer shots, said in « rationale ».
 - The order tells the story: from wide to close, grouped by place, cutting in the movement; two shots of the same size on the same subject in a row read as a mistake, unless it is a jump cut you mean (« punch »).
-- Rhythm keeps people watching: a lively Reel changes shot every second or two (two seconds on average at most), lengths that vary so it never feels like a slideshow, tightening towards the strong moment, which holds 2 to 3.5 s; every few seconds something renews attention (another angle or size, sometimes a punch or a slow motion), never one more text for that. Someone speaking keeps their whole sentence (up to 8 s, cut on a silence). Approximate lengths are fine: the engine snaps them to the beat.
-- « move »: none on a shot that already moves; in, out, left or right (slow), varied, on a shot filmed still; punch (a tight reframe, held) for a jump cut on the beat, once or twice in a Reel, since it stops working when repeated. « speed »: 1 as filmed; 0.5 (slow motion) for the one gesture or result that deserves it; 1.5 to 2 to pass over a long gesture. A shot lasts (out − in) / speed on screen.
+- Rhythm keeps people watching: a lively Reel changes shot every second or two (two seconds on average at most), lengths that vary so it never feels like a slideshow, tightening towards the strong moment, which holds 2 to 3.5 s; every few seconds something renews attention (another angle or size, a punch, a slow motion), never one more text. Someone speaking keeps their whole sentence (up to 8 s, cut on a silence); the engine cuts its « euh » and pauses. Approximate lengths are fine: the engine snaps them to the beat.
+- « move »: none on a shot that already moves; in, out, left or right (slow), varied, on a shot filmed still; punch (a tight reframe, held) for a jump cut on the beat, once or twice (it wears out). « speed »: 1 as filmed; 0.5 (slow motion, smoothed and ramped by the engine) for the one gesture or result that deserves it; 1.5 to 2 to pass over a long gesture. A shot lasts (out − in) / speed on screen.
 - The ending rewards: the most beautiful shot, held 2 to 3 s, with a short invitation (a precise act drawn from her offer: come, book, try) or a reason to send it to someone; the last image echoes the first when the footage allows. « end_card » only for an offer or an announcement, or when she asks: a final card looks like an ad.
 - The examples in quotes in these instructions show a form, never words to reuse.
 
-Texts on screen, few and strong: Reels that work let the images speak, and each text competes with the image and the subtitles. The hook (« hook »), then two other texts at most (the copied Reel's amount when it has more or none; a typography animation counts as a text): « band » for the offer or what makes the business unique (five words or so), « caption » for a short phrase. « emphasis »: words written exactly as in the text; a strong number there shows very large. Write like a creator talking: short phrases with a verb, in lowercase, never a slogan without a verb nor an ad formula. The words come from the business (« studio.facts », her request, her offer): never a fact it doesn't have (a price, an offer, hours, an address, a number). Word-by-word « subtitles » only when someone speaks and it helps. The engine places the texts and moves those that would fall during an animation that writes words.
+Texts on screen, few and strong: each text competes with the image and the subtitles. The hook (« hook »), then two other texts at most (the copied Reel's amount when it has more or none; a typography animation counts as a text): « band » for the offer or what makes the business unique (five words or so), « caption » for a short phrase. « emphasis »: words written exactly as in the text; a strong number there shows very large. Write like a creator talking: short phrases with a verb, in lowercase, never a slogan without a verb nor an ad formula. The words come from the business (« studio.facts », her request, her offer): never a fact it doesn't have (a price, an offer, hours, an address, a number). Word-by-word « subtitles » only when someone speaks and it helps. The engine places the texts and moves those that would fall during an animation that writes words.
 
 Animations (motion design), over her video, never instead of it:
 - Where they serve: the moment where words matter (the promise, the offer, a number, a short list), 1.5 to 3 s each; usually 0 to 2 per Reel, and a Reel can have none. Her request decides first, within « max_new_scenes » (otherwise say so in « rationale »).
@@ -78,11 +80,11 @@ Her voice (« voice »): the Reel is cut on it and lasts at least « ends_at » 
 
 Her first Reel (« first_reel ») is how she discovers what Edith can do: it should make her say « waouh » within a second: her most beautiful shot with the promise in an animation over it, her best shots in a real story, little text, a lively pace, an ending on the most beautiful shot, the animations allowed (usually 2) over her images. Her request and « reel_a_recopier » still come first.
 
-Transitions and effects stay invisible: « transitions » « cut » almost always, « fade » only for a calm Reel with long shots; no strong zoom on every shot. The engine puts one signature transition on the shot where your « band » appears. « effect »: « dust » (a discreet film dust) for a key message or a retro, night or handmade mood; « none » most of the time.
+Transitions stay invisible: « cut » almost always, « fade » only for a calm Reel with long shots; no strong zoom on every shot. The engine puts one signature transition on the shot where your « band » appears. « look »: « none » most of the time; « dust » (discreet film dust) for a key message or a retro, night or handmade mood; another only when her request or « reel_a_recopier » has one: « disposable », « vhs », « y2k », « cine », « bw », or her words in French.
 
 « duration »: the sum of the shots' lengths on screen. 7 to 15 s for an announcement or a mood, 20 to 30 s for a story; up to 45 s only when someone speaks or a voice tells it all along, or when the Reel she copies is that long; never over 45 s.
 
-A correction starts from « previous_plan » and applies exactly what is asked, without changing the rest. « Améliore-la » changes everything that makes it average, not only the flaw she named; a request about style changes mostly the form (pace, camera, texts, animations) and keeps the messages. An animation that stays keeps its brief word for word: the engine recognises it by its brief and keeps its code, while a changed brief is written again from scratch. One her request touches, or whose shots change, is rewritten with her words in its brief (it replaces the old one and does not count in « max_new_scenes »). An animation she asked for never disappears. The « form » and the composition (« composition_du_reel ») keep the same brief unless her request touches them: then add what must change, in her words (what must stay readable or visible), never a form of yours.
+A correction starts from « previous_plan » and applies exactly what is asked, without changing the rest. « Améliore-la » changes everything that makes it average, not only the flaw she named; a request about style changes mostly the form (pace, camera, texts, animations) and keeps the messages. An animation that stays keeps its brief word for word (the engine keeps its code by its brief; a changed brief is written again). One her request touches, or whose shots change, is rewritten with her words in its brief (it replaces the old one and does not count in « max_new_scenes »). An animation she asked for never disappears. The « form » and the composition (« composition_du_reel ») keep the same brief unless her request touches them: then add what must change, in her words (what must stay readable or visible), never a form of yours.
 
 Language: what she reads is in French (the texts on screen, « items », « template_texts », the fallback, « end_card », « rationale »). Briefs are in English, with her words and the words on screen quoted in French, exactly.
 
@@ -132,13 +134,13 @@ const editorRhythm = {
 export const editorOutputSchemaLegacy = z.object({
   // No sound effects either: the grammar is at the API's limit (400 « compiled grammar is too large » on 2 November);
   // the animations bring theirs (the motion designer's answer).
-  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true, copy: true, sounds: true }).extend({
+  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true, copy: true, sounds: true, finish: true, look: true }).extend({
     ...editorRhythm,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
     // No signature transition field here: the structured-output grammar is at the API's
     // limit (400 « compiled grammar is too large »); the engine places it (signatureShot).
-    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
+    segments: z.array(z.union([editPlanSegmentSchema.omit({ adjust: true, blur: true, photo: true, accent: true, ramp: true, jump: true }), editPlanSceneSegmentSchema, editorMotionSegmentSchema])).min(1),
   }),
   rationale: z.string(),
 });
@@ -187,11 +189,21 @@ export const editorOutputSchema = z.object({
         "This Reel's own colours (hex, the main one first, 3 at most), only when it needs others than her charter's: the Reel she copies has its own (« reel_a_recopier.couleurs ») and they serve this Reel and her request, or her request asks for a world of its own. Otherwise leave it out. A correction keeps the previous version's unless you write others (her charter's to go back to them)",
       ),
     end_card: z.object({ title: z.string(), subtitle: z.string().optional() }).optional(),
-    effect: z.enum(["none", "dust"]).optional(),
+    look: z.string().optional(),
     layers: z.array(z.object({ brief: z.string(), from: z.number(), to: z.number() })).optional(),
   }),
   rationale: z.string(),
 });
+
+/**
+ * The look the editor asks for: none, a preset (its key), or her words for another, which the look
+ * designer turns into settings (lookChoice). An editor output of the older form names a preset in `effect`.
+ */
+export function editorLook(plan: unknown): { look: ReelLook | null } | { design: string } | null {
+  const written = plan as { look?: unknown; effect?: unknown };
+  const words = typeof written.look === "string" ? written.look : typeof written.effect === "string" ? written.effect : undefined;
+  return lookChoice(words);
+}
 
 /**
  * The Reel's signature transition: a short zoom for a lively Reel (and a collage), a
@@ -399,8 +411,9 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
   const ownColors = (plan as { colors?: unknown }).colors;
   const colors = Array.isArray(ownColors) ? [...new Set(ownColors.flatMap((c) => (typeof c === "string" && HEX_COLOR.test(c.trim().toLowerCase()) ? [c.trim().toLowerCase()] : [])))].slice(0, 3) : [];
   const { end_card: _endCard, fonts: _fonts, colors: _colors, ...rest } = plan as typeof plan & { colors?: unknown };
-  const { effect: _effect, layers: asked, sounds: heard, ...kept } = rest as typeof rest & {
+  const { effect: _effect, look: _look, layers: asked, sounds: heard, ...kept } = rest as typeof rest & {
     effect?: string;
+    look?: unknown;
     layers?: { brief: string; from: number; to: number }[];
     sounds?: { at?: unknown; sound?: unknown; seconds?: unknown }[];
   };
@@ -412,6 +425,7 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
         : [],
     )
     .slice(0, 8);
+  const askedLook = editorLook(plan);
   // Animations over several shots: a brief and a span, the code comes later (like a scene's).
   const layers = (asked ?? []).filter((l) => l.brief?.trim() && Number.isFinite(l.from) && Number.isFinite(l.to)).slice(0, 3);
   // A composition: the animation over the whole Reel lays its shots (one is added when the editor wrote none).
@@ -428,8 +442,8 @@ export function fromEditorPlan(input: EditorPlanIn, looks: SavedLook[] = []): Ed
     format: "9:16",
     images: [],
     music: null,
-    // Film dust over the whole video, when the editor asks for it.
-    ...("effect" in plan && plan.effect === "dust" ? { effect: "dust" as const } : {}),
+    // A preset look over the whole video, when the editor asks for one (a look in her words is designed after: editorLook).
+    ...(askedLook && "look" in askedLook && askedLook.look ? { look: askedLook.look } : {}),
     ...(fonts && Object.keys(fonts).length ? { fonts } : {}),
     ...(colors.length ? { colors } : {}),
     ...(endCard ? { end_card: endCard } : {}),
@@ -516,7 +530,11 @@ const FADE_MIN_AVERAGE = 2.4;
 export const END_CARD_SECONDS = 1.6;
 const END_CARD_HOLD = 2.2;
 
-export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>, maxFreeScenes = MAX_FREE_SCENES): EditPlan {
+/**
+ * `speech`: what was measured of the speech in her videos (speech.ts): the hesitations and long
+ * pauses are cut out of the passages where someone speaks, and those cuts never move onto the beat.
+ */
+export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, number>, maxFreeScenes = MAX_FREE_SCENES, speech?: Record<string, SpeechFacts>): EditPlan {
   let freeScenes = 0;
   const shownTemplates = new Set<string>();
   const segments = plan.segments.flatMap((s): PlanSegment[] => {
@@ -569,18 +587,20 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
   // A crossfade between short shots reads as a double exposure: cuts, unless the shots breathe.
   const average = segments.reduce((sum, x) => sum + segmentSeconds(x), 0) / segments.length;
   const transitions = plan.transitions === "fade" && average < FADE_MIN_AVERAGE ? "cut" : plan.transitions;
-  // The cuts on the ambiance's beats (not over her voice), then at most one signature transition.
-  const tempo = snapToTempo({ ...plan, transitions, segments }, clipDurations);
+  // Someone speaking: the « euh » and long silences cut out (jump cuts), the texts moved with their picture.
+  const spoken = applySpeechCuts({ ...plan, transitions, segments }, speech, clipDurations);
+  // The cuts on the ambiance's beats (not over her voice, nor between two of someone's words), then at most one signature transition.
+  const tempo = snapToTempo(spoken, clipDurations, speech ? (s) => spokenShot(s, speech) : undefined);
   segments.splice(0, segments.length, ...oneAccent(tempo.segments));
   // Too long to render in time: the plans before the last one go, the last (the end) stays.
-  while (segments.length > 2 && renderDuration({ ...plan, transitions, segments }) > MAX_REEL_SECONDS) segments.splice(segments.length - 2, 1);
+  while (segments.length > 2 && renderDuration({ ...plan, transitions: spoken.transitions, segments }) > MAX_REEL_SECONDS) segments.splice(segments.length - 2, 1);
 
-  const draft = { ...plan, transitions, segments, images: [], music: null };
+  const draft = { ...plan, transitions: spoken.transitions, segments, images: [], music: null };
   const duration = Math.max(3, renderDuration(draft));
 
   // Animations over several shots: inside the Reel, a second at least, each a new animation within the budget;
   // a collage's composition is the ambiance itself, over the whole Reel, never counted.
-  const layers = composedLayers(plan, duration).flatMap((l) => {
+  const layers = composedLayers({ ...plan, layers: spoken.layers }, duration).flatMap((l) => {
     if (l.compose) return [l];
     const from = round(Math.max(0, l.from));
     const to = round(Math.min(duration, l.to));

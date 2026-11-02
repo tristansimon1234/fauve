@@ -1,8 +1,8 @@
 "use client";
 
-import { DEFAULT_COVER_SECONDS, EFFECT_MINUTES, EFFECT_WORDS_MINUTES, REDO_MINUTES, RERENDER_MINUTES, SIMONE_VOICES, voiceSamplePath, type PostCover } from "@fauve/agent";
+import { DEFAULT_COVER_SECONDS, EFFECT_MINUTES, LOOK_PRESETS, EFFECT_WORDS_MINUTES, REDO_MINUTES, REEL_EFFECTS, RERENDER_MINUTES, SIMONE_VOICES, voiceSamplePath, type PostCover, type ReelEffect } from "@fauve/agent";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { setMusic, setPublishByHand, setSoundEffects, setVoiceOff } from "@/app/(app)/publications/[id]/cover-actions";
+import { setLook, setMusic, setPublishByHand, setSoundEffects, setVoiceOff } from "@/app/(app)/publications/[id]/cover-actions";
 import { updatePost } from "@/app/(app)/publications/[id]/actions";
 import { putVoice, redoReel, reschedule, saveEffectWords } from "@/app/(app)/publications/[id]/review-actions";
 import { CoverPicker } from "@/components/montage/cover-picker";
@@ -15,6 +15,7 @@ import {
   ImageIcon,
   MicIcon,
   MusicIcon,
+  PaletteIcon,
   PauseIcon,
   PlayIcon,
   ScissorsIcon,
@@ -31,7 +32,7 @@ import type { EditStart } from "./reel-editor";
 // Edith remakes starts on a tap: each view says what will happen, takes a précision
 // if she wants, and asks to confirm.
 
-export type ChangeView = "menu" | "caption" | "cover" | "date" | "shorter" | "punchier" | "music" | "voice" | "words";
+export type ChangeView = "menu" | "caption" | "cover" | "date" | "shorter" | "punchier" | "music" | "voice" | "words" | "look";
 
 const SAMPLES = `${publicEnv.supabaseUrl}/storage/v1/object/public/landing`;
 
@@ -72,6 +73,7 @@ export function ChangePanel(props: Props) {
       {view === "music" && <MusicView {...props} />}
       {view === "voice" && <VoiceView {...props} />}
       {view === "words" && <WordsView {...props} />}
+      {view === "look" && <LookView {...props} />}
     </div>
   );
 }
@@ -85,6 +87,7 @@ const TITLES: Record<Exclude<ChangeView, "menu">, string> = {
   music: "La musique",
   voice: "Une voix off",
   words: "Le texte à l’écran",
+  look: "Le look",
 };
 
 function Tile({ icon, label, onClick, tone, disabled }: { icon: React.ReactNode; label: string; onClick: () => void; tone: "violet" | "peach"; disabled?: boolean }) {
@@ -134,6 +137,8 @@ function Menu({ data, onView, onEdit, ask }: Props) {
         <Tile tone="peach" icon={<ZapIcon size={18} />} label="Plus rythmé" onClick={() => onView("punchier")} disabled={busy} />
         <Tile tone="peach" icon={<MusicIcon size={18} />} label="La musique" onClick={() => onView("music")} disabled={busy} />
         <Tile tone="peach" icon={<MicIcon size={18} />} label="Une voix off" onClick={() => onView("voice")} disabled={busy} />
+        {/* A look over the whole video, like a filter (an effect drawn image by image is asked of Edith). */}
+        {!data.baked && <Tile tone="peach" icon={<PaletteIcon size={18} />} label="Le look" onClick={() => onView("look")} disabled={busy} />}
       </div>
       <form
         className="mt-1 flex items-center gap-2"
@@ -177,11 +182,23 @@ function Done({ children, disabled, onClick, pending }: { children: React.ReactN
 }
 
 /** What she adds in her words, sent with the request (optional). */
-function NoteField({ label, placeholder, value, onChange }: { label: string; placeholder: string; value: string; onChange: (value: string) => void }) {
+function NoteField({
+  label,
+  placeholder,
+  value,
+  onChange,
+  required = false,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[13.5px] font-bold">
-        {label} <span className="font-semibold text-muted">facultatif</span>
+        {label} {required ? null : <span className="font-semibold text-muted">facultatif</span>}
       </span>
       <textarea
         value={value}
@@ -610,6 +627,87 @@ function MusicView({ data, onDone }: Props) {
       )}
       <Done onClick={apply} pending={pending}>
         {musicChanged && picked ? picked.button : sfxChanged ? "Régler les bruitages" : "C’est bon"}
+      </Done>
+    </div>
+  );
+}
+
+/**
+ * A look over the whole video, like a filter: a ready one (a disposable camera, a VHS tape…) or her own in her
+ * words (« pellicule Kodak des années 70 »), then she confirms (the video is made again, free).
+ */
+function LookView({ data, onDone }: Props) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  type Choice = ReelEffect | "none" | "own";
+  const current: Choice = data.look ? (data.look.preset ?? "own") : "none";
+  const [choice, setChoice] = useState<Choice>(current);
+  const [words, setWords] = useState("");
+  const options: { id: Choice; title: string; hint: string }[] = [
+    { id: "none", title: "Sans look", hint: "Ta vidéo telle quelle, avec la lumière de ta charte." },
+    ...REEL_EFFECTS.map((id) => ({ id, title: LOOK_PRESETS[id].name, hint: LOOK_PRESETS[id].hint })),
+    {
+      id: "own",
+      title: current === "own" && data.look ? data.look.name : "Un autre look",
+      hint: current === "own" && data.look ? data.look.hint : "Décris-le avec tes mots : une pellicule, un appareil, une époque, un film.",
+    },
+  ];
+  const changed = choice === "own" ? Boolean(words.trim()) : choice !== current;
+  const apply = () =>
+    start(async () => {
+      if (!changed) return onDone("");
+      setError(null);
+      const result = await setLook(data.postId, choice === "own" ? words.trim() : choice);
+      if (!result.ok) return setError(choice === "own" ? "Je n’ai pas réussi à faire ce look. Redis-le avec d’autres mots." : "Ça n’a pas marché. Réessaie dans un instant.");
+      const done = choice === "none" ? "Sans look" : `Look « ${result.name ?? ""} »`;
+      onDone(`${result.note ? `${result.note} ` : ""}${done} : la vidéo se refait, ${RERENDER_MINUTES} minutes environ.`);
+    });
+  return (
+    <div className="flex flex-col gap-2.5">
+      <p className="text-[13.5px] leading-snug text-muted">Sur toute la vidéo, sous tes textes, comme un filtre : ses couleurs et sa texture, jamais tes images redessinées. Gratuit.</p>
+      <div role="radiogroup" aria-label="Le look" className="flex flex-col gap-2">
+        {options.map((o) => {
+          const on = choice === o.id;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={pending}
+              onClick={() => setChoice(o.id)}
+              className={`flex items-center gap-3 rounded-[16px] border-[1.5px] px-3.5 py-3 text-left disabled:opacity-60 ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
+            >
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex items-center gap-2 text-[15px] font-extrabold">
+                  {o.title}
+                  {o.id === current && <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-bold text-muted">Actuel</span>}
+                </span>
+                <span className="text-[13px] leading-snug text-muted">{o.hint}</span>
+              </span>
+              <span className={`flex size-5.5 shrink-0 items-center justify-center rounded-full border-2 ${on ? "border-violet" : "border-lilac"}`}>
+                {on && <span className="size-2.5 rounded-full bg-violet" />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {choice === "own" && (
+        <NoteField
+          label={current === "own" ? "Un autre look ?" : "Ton look"}
+          placeholder="Ex. pellicule Kodak des années 70, Polaroid délavé, comme un film de Wes Anderson"
+          value={words}
+          onChange={setWords}
+          required
+        />
+      )}
+      {error && (
+        <p role="alert" className="text-[13.5px] font-semibold text-danger">
+          {error}
+        </p>
+      )}
+      <Done onClick={apply} pending={pending}>
+        {changed ? (choice === "none" ? "Retirer le look" : choice === "own" ? "Mettre ce look" : `Mettre le look « ${LOOK_PRESETS[choice].name} »`) : "C’est bon"}
       </Done>
     </div>
   );

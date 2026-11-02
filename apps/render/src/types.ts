@@ -2,6 +2,9 @@
 // This package is shipped alone to the render sandbox, so it cannot import it.
 import type { FaceZone, TrackPiece } from "./track";
 
+/** A passage of a shot at one speed (a speed ramp is several). Mirrors SpeedPiece in packages/agent/src/motion.ts. */
+export type SpeedPiece = { at: number; length: number; startFrom: number; speed: number };
+
 export type MotionTemplate = "doux" | "dynamique" | "chic" | "collage" | "libre";
 
 /** Mirror of the retouch types in packages/agent/src/retouch.ts. */
@@ -109,6 +112,10 @@ export type ReelProps = {
         zoom: boolean;
         move?: CameraMove;
         speed?: number;
+        /** A speed ramp: the shot's passages at each speed, from `at` (frames from its start), the clip's image `startFrom` played at `speed`. */
+        ramp?: SpeedPiece[];
+        /** The file plays the clip from this frame of it (a slow motion's own smooth file); `startFrom` stays a frame of the clip. */
+        srcFrom?: number;
         /** The clip's width / height, to frame its subject in the vertical crop. */
         aspect?: number;
         adjust?: Adjust;
@@ -130,6 +137,8 @@ export type ReelProps = {
         subtitleY?: number;
         /** In a collage, its subject cut out (an image with transparency; its box in shares of the photo), laid as a sticker. */
         cutout?: { src: string; box: Box };
+        /** A moving photo in relief: its subject cut out (framed like the photo), moving a little more than the room behind it. */
+        depth?: { src: string; box: Box };
       }
     /** composed: an engine screen inside a composition that draws the whole picture, drawn only in its fallback. */
     | { type: "scene"; scene: Scene; startAt: number; durationInFrames: number; under?: ReelUnder; composed?: true }
@@ -196,8 +205,10 @@ export type ReelProps = {
   frame?: "letterbox";
   /** Her voice note over the Reel, from `from` (frames). */
   voice?: { src: string; from: number } | null;
-  /** An overlay over the whole video, under the texts: film dust. */
-  effect?: "dust" | null;
+  /** A look over the whole video (Looks.tsx): its grade over the footage, its texture under the texts. */
+  look?: ReelLookDraw | null;
+  /** The date a look prints, in its camera's format (« '26 10 29 », « 29 OCT. 2026 »). */
+  stamp?: string;
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
   subtitleY?: number;
@@ -315,4 +326,44 @@ export type ReelSignature = {
   band: "white" | "accent" | "dark" | "light" | "outline";
   grade: "natural" | "warm" | "bright" | "flash" | "film" | "moody" | "cool";
   base: "light" | "dark";
+};
+
+/** A look as the engine draws it (looks.ts in @fauve/agent): its settings, 0 leaving the image as it is, and its grade as one colour matrix. */
+export type ReelLookDraw = {
+  name: string;
+  exposure: number;
+  contrast: number;
+  saturation: number;
+  warmth: number;
+  tint: number;
+  fade: number;
+  shadows: string | null;
+  highlights: string | null;
+  split: number;
+  hue: number;
+  soft: number;
+  bleed: number;
+  glow: number;
+  glow_color: string;
+  grain: number;
+  grain_size: "fine" | "medium" | "coarse";
+  vignette: number;
+  flash: number;
+  leak: number;
+  leak_color: string;
+  lines: number;
+  tracking: boolean;
+  dust: number;
+  flicker: number;
+  frame: "none" | "bars" | "border";
+  stamp: {
+    style: "digital" | "camcorder" | "typed";
+    format: "yy_mm_dd" | "d_mon_yyyy" | "dd_mm_yyyy";
+    color: string;
+    corner: "bottom_right" | "bottom_left" | "top_left" | "top_right";
+    label: string;
+    clock: boolean;
+  } | null;
+  /** The 20 values of an SVG feColorMatrix: the whole grade at once. */
+  matrix: number[];
 };

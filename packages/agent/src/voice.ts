@@ -14,6 +14,11 @@ export const voiceTranscriptSchema = z.object({
   duration: z.number(),
   words: z.array(voiceWordSchema),
   language: z.string().nullable().optional(),
+  /**
+   * Her voice note's copy with its sound cleaned (speech.ts), beside it: its path (null: it was clean,
+   * nothing to do) and the noise floor it had. The note itself stays as recorded.
+   */
+  clean: z.object({ path: z.string().max(300).nullable(), floor: z.number().nullable() }).optional(),
 });
 export type VoiceTranscript = z.infer<typeof voiceTranscriptSchema>;
 

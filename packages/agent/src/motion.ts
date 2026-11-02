@@ -1,4 +1,4 @@
-import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type CopyLayer, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
+import { isClipSegment, isMotionSegment, screenTime, segmentSeconds, speedPieces, type CameraMove, type ClipAnalysis, type ClipSegment, type CopyLayer, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
 import type { Adjust, ClipBlur, PhotoEdit } from "./retouch.ts";
 import { brandPalette, resolveBrandLook, type BrandPalette, type Bullet, type ListItem, type TextLook } from "./text-look.ts";
 import type { LogoOnDark } from "./logo.ts";
@@ -8,6 +8,8 @@ import { previewMusic, speechWindows, type MixCase } from "./mix.ts";
 import { placeSounds, planCues, type SoundFacts, type SoundPlacement } from "./sfx.ts";
 import type { SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
+import { DEPTH_MOVES } from "./depth.ts";
+import { lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
 // is converted to frames on the output timeline here, so the templates only
@@ -35,6 +37,30 @@ const TEMPLATE_FONTS: Record<MotionTemplate, { display: string; body: string }> 
 /** The fonts an ambiance uses when the studio has none (or one a Reel cannot load). */
 export const templateFonts = (template: MotionTemplate) => TEMPLATE_FONTS[template];
 
+/** A passage of a shot at one speed (a ramp is several, one after the other). Mirrors apps/render/src/types.ts. */
+export type SpeedPiece = { at: number; length: number; startFrom: number; speed: number };
+
+/**
+ * A ramped shot's passages in frames (`durationInFrames` in all): each starts where the clip's time puts
+ * it on screen, and on the clip's image right after the last one the passage before showed (each rounded
+ * on its own, two passages showed the same image at their seam).
+ */
+export function rampFrames(s: Pick<ClipSegment, "in" | "out" | "speed" | "ramp">, durationInFrames: number): SpeedPiece[] | undefined {
+  if (!s.ramp) return undefined;
+  const pieces = speedPieces(s);
+  if (pieces.length < 2) return undefined;
+  const starts = pieces.map((p) => Math.min(durationInFrames, Math.round(screenTime(s, p.from) * REEL_FPS)));
+  let image = Math.round(s.in * REEL_FPS);
+  return pieces.flatMap((p, k) => {
+    const at = starts[k]!;
+    const length = (k === pieces.length - 1 ? durationInFrames : starts[k + 1]!) - at;
+    if (length <= 0) return [];
+    const startFrom = image;
+    image = Math.round(startFrom + length * p.speed);
+    return [{ at, length, startFrom, speed: p.speed }];
+  });
+}
+
 /** Footage that keeps playing under an animation: a passage of a clip, or a photo. */
 export type ReelUnder =
   | { type: "clip"; src: string; startFrom: number; adjust?: Adjust; aspect?: number }
@@ -54,6 +80,13 @@ export type ReelSegment =
       zoom: boolean;
       move?: CameraMove;
       speed?: number;
+      /**
+       * A speed ramp (speedRamp): the shot's passages at each speed, one after the other: from `at` (frames
+       * from the shot's start) for `length` frames, the clip's image `startFrom` played at `speed`.
+       */
+      ramp?: SpeedPiece[];
+      /** The file plays the clip from this frame of it (a slow motion's own file, made smooth): `startFrom` stays a frame of the clip. */
+      srcFrom?: number;
       /** The clip's width / height, to frame its subject in the vertical crop. */
       aspect?: number;
       adjust?: Adjust;
@@ -78,6 +111,8 @@ export type ReelSegment =
       accent?: "punch" | "wipe";
       subtitleY?: number;
       cutout?: { src: string; box: { x: number; y: number; w: number; h: number } };
+      /** A moving photo in relief (depth.ts): its subject cut out (framed like the photo), moving a little more than the room. */
+      depth?: { src: string; box: { x: number; y: number; w: number; h: number } };
     }
   /**
    * Animations play over her footage when there is some (`under`), else on the studio's colours. composed: an engine
@@ -257,8 +292,10 @@ export type ReelProps = {
   frame?: "letterbox";
   /** Her voice note over the Reel, from `from` (frames), in the render and the preview. */
   voice?: { src: string; from: number } | null;
-  /** An overlay over the whole video, under the texts: film dust. */
-  effect?: "dust" | null;
+  /** A look over the whole video (looks.ts): its settings, and its grade as one colour matrix over the footage; its texture under the texts. */
+  look?: (ReelLook & { matrix: number[] }) | null;
+  /** The date a look prints, in its camera's format (« '26 10 29 », « 29 OCT. 2026 »). */
+  stamp?: string;
   /** The studio's logo over the whole video or still (carousel slides). */
   logo?: "top" | "bottom" | null;
   /** Where a voice's subtitles sit for the whole Reel (top, share of the height): off the faces, never moving. */
@@ -374,6 +411,10 @@ export type ReelInputs = {
   copyCutouts?: Record<string, { src: string; box: CopyBox; aspect: number }>;
   /** The photos she added on her Reel (plan.overlays): each signed, its cut-out's when she wants it and it has one, with its shape. */
   overlayPhotos?: Record<string, { src: string; aspect: number; cutout?: { src: string; box: { x: number; y: number; w: number; h: number } } }>;
+  /** The day of the render in her time zone (YYYY-MM-DD): the date a look prints. */
+  today?: string;
+  /** The moving photos whose subject cuts out cleanly (depthPhotoIds): signed cut-out and the subject's box, played in relief. */
+  depth?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
 };
 
 /** A clip's width / height as the Reel frames it, from its analysis (phones film 16:9 or 9:16). */
@@ -519,6 +560,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const fps = REEL_FPS;
   const brand = resolveReelBrand(plan, inputs.template, inputs.brand);
   const { lengths, fadeFrames } = frameLengths(plan);
+  const look = planLook(plan);
 
   // The footage under an animation: the passage of her clip (or the photo) the plan names.
   const underOf = (over: { clip_id: string; in?: number } | undefined): ReelUnder | undefined => {
@@ -558,8 +600,11 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     const src = inputs.clipUrls[s.clip_id];
     if (!src) throw new Error(`No URL for clip ${s.clip_id}`);
     const speed = s.speed && Math.abs(s.speed - 1) > 0.01 ? s.speed : undefined;
-    // Someone speaks in this passage: its sound stays (unless her voice is over the Reel, or the shot plays at another speed).
-    const speech = !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out);
+    // Someone speaks in this passage: its sound stays (unless her voice is over the Reel, or the shot plays at another speed);
+    // or she wants the sound of her videos all along (never slowed down), or none of it.
+    const heard = plan.finish?.video_sound ?? "speech";
+    const speech =
+      heard === "all" ? !speed : heard === "speech" && !plan.voice && !speed && (inputs.words?.[s.clip_id] ?? []).some((w) => w.start >= s.in && w.end <= s.out);
     const zoom = s.zoom === "light" || plan.transitions === "light_zoom";
     const move: CameraMove = s.move ?? (zoom ? "in" : "none");
     // A photo in a Reel: the move the engine chose (photoMoves: most held still); a plan from before those moves keeps its slow zoom.
@@ -576,8 +621,13 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         ...(s.subtitle_y !== undefined ? { subtitleY: s.subtitle_y } : {}),
         // A collage lays its subject over its print as a sticker (placed by the photo's framing, so only with it).
         ...(inputs.template === "collage" && s.photo && inputs.cutouts?.[s.clip_id] ? { cutout: inputs.cutouts[s.clip_id] } : {}),
+        // Anywhere else, a moving photo whose subject cuts out cleanly plays in relief.
+        ...(inputs.template !== "collage" && plan.finish?.relief !== "off" && s.photo && !s.photo.blur?.length && s.move && DEPTH_MOVES.includes(s.move) && inputs.depth?.[s.clip_id]
+          ? { depth: inputs.depth[s.clip_id] }
+          : {}),
       };
     }
+    const ramp = rampFrames(s, lengths[i]!);
     return {
       type: "clip",
       src,
@@ -587,6 +637,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       zoom,
       ...(move !== "none" ? { move } : {}),
       ...(speed ? { speed } : {}),
+      ...(ramp ? { ramp } : {}),
       ...(inputs.aspects?.[s.clip_id] ? { aspect: inputs.aspects[s.clip_id] } : {}),
       ...(s.adjust ? { adjust: s.adjust } : {}),
       ...(s.blur ? { blur: s.blur } : {}),
@@ -641,11 +692,10 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   } else if (plan.subtitles) {
     plan.segments.forEach((s, i) => {
       if (!isClipSegment(s)) return;
-      const speed = s.speed ?? 1;
       for (const word of inputs.words?.[s.clip_id] ?? []) {
         if (word.start < s.in || word.end > s.out) continue;
-        const from = segments[i]!.startAt + toFrames((word.start - s.in) / speed);
-        const to = segments[i]!.startAt + toFrames((word.end - s.in) / speed);
+        const from = segments[i]!.startAt + toFrames(screenTime(s, word.start));
+        const to = segments[i]!.startAt + toFrames(screenTime(s, word.end));
         if (from < durationInFrames) words.push({ w: word.w, from, to: Math.max(to, from + 3) });
       }
     });
@@ -663,7 +713,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
           .filter((w) => w.start >= s.in && w.end <= s.out)
           .map((w) => ({ from: segment.startAt + toFrames(w.start - s.in), to: segment.startAt + toFrames(w.end - s.in) }));
       });
-  const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : "music";
+  const ambient = plan.finish?.video_sound === "all" && segments.some((s) => s.type === "clip" && s.speech);
+  const mix: MixCase = voice ? "voice_over" : spoken.length ? "speech_in_clips" : ambient ? "ambient" : "music";
   const speech = speechWindows(spoken.filter((w) => w.from < durationInFrames), toFrames(0.5));
   const music = previewMusic(mix, speech);
   // Its sound effects, placed once for the preview and the mix alike: at its level, never on top of what is said.
@@ -791,7 +842,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(sfx.length ? { sfx } : {}),
     ...(plan.frame === "letterbox" ? { frame: "letterbox" as const } : {}),
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
-    ...(plan.effect ? { effect: plan.effect } : {}),
+    ...(look ? { look: { ...look, matrix: lookMatrix(look) } } : {}),
+    ...(lookStamp(look, inputs.today) ? { stamp: lookStamp(look, inputs.today)! } : {}),
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),
     ...(layers.length ? { layers } : {}),
     ...(copy ? { copy } : {}),

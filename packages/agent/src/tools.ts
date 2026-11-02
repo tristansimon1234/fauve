@@ -417,6 +417,36 @@ export const toolSpecs = {
         .describe("Ce qu'elle demande pour la musique de ce Reel (« juste du piano »), en anglais pour le compositeur, fidèle à ses mots, rien d'ajouté : la nouvelle musique suit sa demande (mode another)"),
     }),
   },
+  story_express: {
+    description:
+      "Une story animée en un geste, gratuite : une de ses photos ou un passage de sa vidéo, sa phrase dessus dès la première image (« 2 places ce soir », « Le plat du jour : … ») et un détail dessous si elle en donne un (une heure, un prix), dans sa charte, avec un mouvement lent (en relief quand le sujet se détoure), sa musique, et un look si elle en demande un. Sans montage : prête en une ou deux minutes, livrée comme un montage (son lien, sa carte). Pour les stories du quotidien qui donnent envie de venir ; ses mots, jamais un fait inventé (prix, horaire). Sur une story existante (post_id), sinon une nouvelle story (scheduled_at : quand lui faire signe, par défaut maintenant).",
+    input: z.object({
+      media_id: z.string().uuid().describe("La photo ou la vidéo (list_media)"),
+      text: z.string().min(1).max(60).describe("La phrase sur la story, courte, avec ses mots"),
+      detail: z.string().max(40).optional().describe("Un détail sous la phrase : une heure, un prix, « 2 places »"),
+      look: z.string().max(300).optional().describe("Seulement si elle demande un look : un de set_look (disposable, vhs…) ou ses mots"),
+      post_id: z.string().uuid().optional().describe("Une story déjà prévue ; sinon une nouvelle est créée"),
+      scheduled_at: isoDateTime.optional(),
+    }),
+  },
+  set_finish: {
+    description:
+      "Les finitions que le moteur ajoute tout seul à un Reel, chacune à régler à sa demande. sound : auto (nettoyé quand c'est bruyant), clean (toujours nettoyé : « enlève le bruit de fond »), original (le son tel qu'enregistré). video_sound : speech (le son de ses vidéos seulement quand quelqu'un parle, par défaut), all (le son de ses vidéos tout du long sous la musique : « garde le son d'ambiance »), none (jamais : juste la musique ou la voix). cuts : auto (les « euh », faux départs et blancs coupés quand quelqu'un parle), off (ses mots tels qu'elle les a dits, hésitations comprises). ramp : auto (un ralenti part en rampe sur le geste), off (ralenti simple). relief : auto (une photo qui bouge passe en relief), off (à plat). steady : auto (une vidéo qui tremble est stabilisée), off (telle que filmée). Avec post_id : ce Reel seulement, la vidéo se refait sans nouveau montage, gratuit. Sans post_id : ses prochains Reels (réglage gardé). Seulement ce qu'elle demande.",
+    input: z.object({
+      post_id: z.string().uuid().optional(),
+      sound: z.enum(["auto", "clean", "original"]).optional(),
+      video_sound: z.enum(["speech", "all", "none"]).optional(),
+      cuts: z.enum(["auto", "off"]).optional(),
+      ramp: z.enum(["auto", "off"]).optional(),
+      relief: z.enum(["auto", "off"]).optional(),
+      steady: z.enum(["auto", "off"]).optional(),
+    }),
+  },
+  set_look: {
+    description:
+      "Le look d'une vidéo montée (Reel ou story), sur toute l'image, sous ses textes, comme les filtres de Prequel : n'importe quel look qui change les couleurs et la texture de ses vraies images (une pellicule, un appareil, une époque, un film, un réalisateur). look : un tout prêt, disposable (appareil photo jetable : flash chaud, grain, date orange), vhs (cassette VHS : couleurs qui bavent, lignes, « PLAY ▶ » et la date), y2k (flash direct des années 2000), cine (couleurs de cinéma), bw (noir et blanc contrasté), dust (poussière de pellicule) ; sinon ses mots, précis (« pellicule Kodak Portra des années 70 », « Polaroid délavé », « comme un film de Wes Anderson ») ; none pour l'enlever. Un look ne redessine jamais ses images (dessin animé, peinture, visage ou lieu changés) : la réponse dit ce qu'il fait à la place. Avec post_id : cette vidéo, refaite sans nouveau montage. Sans post_id : tous ses prochains Reels (réglage gardé, none l'enlève). Seulement quand elle le demande, jamais de toi-même. Gratuit.",
+    input: z.object({ post_id: z.string().uuid().optional(), look: z.string().min(1).max(300) }),
+  },
   set_voice: {
     description:
       "Voix off d'Edith sur les Reels (une vraie voix française qui raconte les images, texte écrit par toi, posée avant le montage, la musique passe dessous) : voix Eva, Victoria, Lucie, Koraly (chuchotée, ASMR) pour les femmes, Neto, Antonin, Jules, Mister K (chuchotée, ASMR) pour les hommes ; « sa voix » quand elle a cloné sa propre voix dans Style › Voix off (sa ligne « Voix off » le dit) ; une voix chuchotée seulement si elle la veut (spa, massage, soin, un moment très calme). Avec post_id, pour ce Reel : mode on (en mettre une), off (sans voix, ni la sienne), redo (refaire le texte, avec wish : ce qu'elle veut qu'on dise) ; voice pour changer de voix. Sans post_id : le réglage du commerce pour ses prochains Reels (use : auto = quand ça raconte quelque chose et que personne ne parle déjà dans ses vidéos, always, never ; voice). Gratuit. off sur un Reel monté refait la vidéo tout de suite ; on, redo et voice valent pour le prochain montage du Reel : sur un Reel déjà monté, propose de le refaire (montage avec correction).",

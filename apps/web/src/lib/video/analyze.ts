@@ -9,6 +9,7 @@ import { toGeminiSchema } from "@/lib/gemini-schema";
 import { studioAccess } from "@/lib/billing/access";
 import { sortClip } from "@/lib/clip-sort";
 import { stabilizeIfShaky } from "@/lib/video/stabilize";
+import { polishSpeech } from "@/lib/video/speech";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Clip analysis with Gemini: the clip goes from Storage to the Gemini Files API,
@@ -18,8 +19,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const FPS = 3; // short studio clips: more frames give sharper shot boundaries
 const PROCESSING_TIMEOUT_MS = 120_000;
-// Gemini, then a shaky video steadied (up to two 150 s passes) before the analysis is stored.
-const STALE_CLAIM_MS = 7 * 60_000;
+// Gemini, then a shaky video steadied (up to two 150 s passes) and its speech read before the analysis is stored.
+const STALE_CLAIM_MS = 8 * 60_000;
 
 let client: GoogleGenAI | undefined;
 const gemini = () => (client ??= new GoogleGenAI({ apiKey: env("GEMINI_API_KEY") }));
@@ -31,7 +32,7 @@ const wordsSchema = z.array(z.object({ w: z.string(), start: z.number(), end: z.
 const RESPONSE_SCHEMAS = [
   toGeminiSchema(z.toJSONSchema(clipAnalysisRequestSchema.extend({ words: wordsSchema.optional() }))),
   toGeminiSchema(z.toJSONSchema(clipAnalysisRequestSchema.omit({ words: true }))),
-  toGeminiSchema(z.toJSONSchema(clipAnalysisSchema.omit({ words: true, correction: true }))),
+  toGeminiSchema(z.toJSONSchema(clipAnalysisSchema.omit({ words: true, correction: true, speech: true }))),
 ];
 
 export type StoredAnalysis = { media_id: string; analysis: ClipAnalysis };
@@ -107,9 +108,11 @@ async function runAnalysis(asset: { id: string; studio_id: string; storage_path:
     const raw = JSON.parse(response.text ?? "") as { words?: unknown };
     // Words are a bonus for subtitles: keep only a clean, bounded list.
     const words = wordsSchema.safeParse(raw.words);
-    const analysis = readAnswer(clipAnalysisSchema, { ...raw, words: words.success ? words.data.slice(0, 400) : undefined });
+    const read = readAnswer(clipAnalysisSchema, { ...raw, words: words.success ? words.data.slice(0, 400) : undefined });
     // Steadied before the analysis is stored: whoever waits for it (a montage) tracks and cuts the steady file.
-    await stabilizeIfShaky(asset, analysis);
+    await stabilizeIfShaky(asset, read);
+    // Someone speaks: its sound cleaned when noisy, its words timed exactly, its « euh » and pauses measured.
+    const analysis = await polishSpeech(asset, read);
     const insert = await db
       .from("clip_analyses")
       .insert({ studio_id: asset.studio_id, media_id: asset.id, analysis, model });

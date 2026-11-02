@@ -22,9 +22,9 @@ export const SFX_MAX_NEW = 8;
 export const SFX_RULES: Record<Exclude<SfxLevel, "off">, { gap: number; perSecond: number; max: number; underSpeech: number | null; target: Record<MixCase, number> }> = {
   // About 8 LU under the music, 10 under a voice: heard, never on top.
   // Measured on a test mix (music at -14 LUFS): the Reel's loudness moves 0.1 LU, its peaks stay far under -1 dBFS.
-  light: { gap: 1.5, perSecond: 1 / 2.5, max: 6, underSpeech: null, target: { music: -20, voice_over: -23, speech_in_clips: -20 } },
+  light: { gap: 1.5, perSecond: 1 / 2.5, max: 6, underSpeech: null, target: { music: -20, voice_over: -23, speech_in_clips: -20, ambient: -20 } },
   // Present like a creator who punctuates everything, still under the voice.
-  more: { gap: 0.35, perSecond: 1 / 1.2, max: 14, underSpeech: -8, target: { music: -16, voice_over: -20, speech_in_clips: -17 } },
+  more: { gap: 0.35, perSecond: 1 / 1.2, max: 14, underSpeech: -8, target: { music: -16, voice_over: -20, speech_in_clips: -17, ambient: -16 } },
 };
 
 /** A sound's peak after its gain (dBFS): the mix's limiter (-1 dBFS) never has to squash it. */

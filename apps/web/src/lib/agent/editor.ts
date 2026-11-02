@@ -1,5 +1,6 @@
 import "server-only";
 import { insertPlanVersion } from "@/lib/edit-plans";
+import { designLook } from "./look-designer";
 import {
   contractLines,
   type ReelContract,
@@ -8,6 +9,10 @@ import {
   followedForEditor,
   textDrawingWords,
   followedLook,
+  followedFilter,
+  editorLook,
+  lookChoice,
+  planLook,
   signatureOf,
   editorOutputSchemaLegacy,
   finishPlan,
@@ -60,6 +65,9 @@ import {
   gestureMoments,
   handMoves,
   SUBTITLE_ROW,
+  speechFacts,
+  asAsked,
+  undoSpeechCuts,
   type ReelProps,
   type TracksByClip,
   honestLength,
@@ -75,6 +83,7 @@ import { usableFonts } from "@/lib/fonts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { ensureTranscript } from "@/lib/voice";
+import { ensureCleanVoice, ensureSpeech } from "@/lib/video/speech";
 import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
@@ -174,6 +183,8 @@ const COMPOSE_RETRY_NEEDS_MS = 420_000;
 
 /** How long the montage waits for what moves in her videos (its faces, its hands) before the editor cuts. */
 const TRACKS_WAIT_MS = 180_000;
+/** …and for the speech of a video analysed before it was read (its sound cleaned, its words timed). */
+const SPEECH_WAIT_MS = 90_000;
 
 /** A correction that would have made her Reel worse: not kept, its words are what she is told. */
 export class MissedCorrection extends Error {}
@@ -250,12 +261,19 @@ export async function designEdit(params: {
     Promise.all(videoIds.map((id) => ensureClipAnalysis(params.studioId, id))),
     Promise.all(photoIds.map((id) => photoRegions(params.studioId, id).catch(() => null))),
   ]);
-  const clips = analyses.flatMap((a) => ("analysis" in a ? [{ media_id: a.media_id, analysis: a.analysis }] : []));
+  let clips = analyses.flatMap((a) => ("analysis" in a ? [{ media_id: a.media_id, analysis: a.analysis }] : []));
   if (videoIds.length && !clips.length && !photoIds.length) throw new Error("Les vidéos ne sont pas encore analysées, réessaie dans une minute");
   // What moves in her videos (hands, faces, bodies), followed once per clip with someone in it (the cut-out sandbox),
   // started now so it runs while the rest is read: an animation can then start from a gesture, hold on to it or follow it.
   const earlyTracks = clips.length
     ? ensureTracks(params.studioId, clips.map((c) => c.media_id)).catch((e: unknown) => console.warn("tracks: not ready", e))
+    : null;
+  // Someone speaking in a video analysed before its speech was read: read now (its sound cleaned, its « euh » timed).
+  const earlySpeech = clips.length
+    ? ensureSpeech(params.studioId, clips).catch((e: unknown) => {
+        console.warn("speech: not read", e);
+        return null;
+      })
     : null;
   const photos = photoIds.map((id, i) => {
     const read = photoReads[i];
@@ -269,6 +287,8 @@ export async function designEdit(params: {
   // Its first word is heard at once: the silence a voice note opens on is cut.
   const voiceId = post.data.voice_media_id as string | null;
   const voice = voiceId ? await ensureTranscript(params.studioId, voiceId) : null;
+  // Her own voice note recorded in a noisy place: a cleaned copy beside it, its words keep their timing.
+  if (voiceId && voice) await ensureCleanVoice(params.studioId, voiceId);
   const voiceStart = voice ? voiceAt(voice) : 0;
   const spoken = voice ? voiceForEditor(voice, voiceStart) : null;
   // The strongest moments to open on, best first (a voice over was written for the first one).
@@ -317,7 +337,14 @@ export async function designEdit(params: {
   // (the texts keep off them) and what the animations follow. Never more than a few minutes of waiting (a sandbox
   // installing the tracker for the first time): without them, the faces are Gemini's and the animations follow nothing.
   if (earlyTracks) await Promise.race([earlyTracks, new Promise((resolve) => setTimeout(resolve, TRACKS_WAIT_MS))]);
+  // Her speech read (the hesitations and pauses the engine cuts): a minute and a half at most, else cut as it is.
+  if (earlySpeech) {
+    const read = await Promise.race([earlySpeech, new Promise<null>((resolve) => setTimeout(() => resolve(null), SPEECH_WAIT_MS))]);
+    if (read) clips = read;
+  }
   const tracks: TracksByClip = clips.length ? await loadTracks(params.studioId, clips.map((c) => c.media_id)).catch(() => ({})) : {};
+  // The version to correct as the editor wrote it: its ramps and its cuts of the « euh » undone (the engine makes them again).
+  const asWritten = previousPlan.success ? undoSpeechCuts({ ...previousPlan.data, segments: previousPlan.data.segments.map(asAsked) }) : null;
   const input = {
     studio: {
       name: studio.data?.name,
@@ -380,10 +407,13 @@ export async function designEdit(params: {
     recent_hooks: hooks.length ? hooks : undefined,
     // Motion code stays out of the editor's context: it only needs the briefs.
     previous_plan:
-      correction && previousPlan.success
+      correction && asWritten
         ? {
-            ...previousPlan.data,
-            segments: previousPlan.data.segments.map((s) =>
+            ...asWritten,
+            // Its look by its name (« look » of the answer: the same name keeps it as it is).
+            look: planLook(asWritten)?.preset ?? planLook(asWritten)?.name,
+            effect: undefined,
+            segments: asWritten.segments.map((s) =>
               isMotionSegment(s)
                 ? {
                     motion: {
@@ -397,7 +427,7 @@ export async function designEdit(params: {
                 : s,
             ),
             // Its animations over several shots, by their brief and span (a collage's composition named as such).
-            layers: previousPlan.data.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, ...(l.compose ? { composition_du_reel: true } : {}) })),
+            layers: asWritten.layers?.map((l) => ({ brief: l.motion.brief, from: l.from, to: l.to, ...(l.compose ? { composition_du_reel: true } : {}) })),
           }
         : undefined,
     request: params.brief ?? "Premier montage de cette publication.",
@@ -441,6 +471,8 @@ export async function designEdit(params: {
   let output = response.parsed_output;
 
   const durations = { ...Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.duration])), ...Object.fromEntries(photoIds.map((id) => [id, PHOTO_MAX_SECONDS])) };
+  // Where someone speaks: the hesitations and long pauses the engine cuts out.
+  const speech = speechFacts(clips);
   // Retouch and blur stay on their clips from one version to the next.
   // A correction also keeps the texts' styles and places (the editor names looks, it does not copy them).
   const base = previousPlan.success ? previousPlan.data : null;
@@ -448,16 +480,20 @@ export async function designEdit(params: {
   const alike = new Set(clips.filter((c) => alikeClip(c.analysis)).map((c) => c.media_id));
   const still = new Set(clips.filter((c) => alikeClip(c.analysis) && stillClip(c.analysis)).map((c) => c.media_id));
   const files = [...clips.map((c) => ({ id: c.media_id, seconds: c.analysis.duration, photo: false })), ...photoIds.map((id) => ({ id, seconds: PHOTO_MAX_SECONDS, photo: true }))];
+  // Her finishing touches (the sound, the « euh » cut or not, the ramps, the relief, the steadying): her defaults
+  // for all her Reels, then this Reel's own, carried from version to version (never written by the editor).
+  const finish = { ...profile.finish, ...base?.finish };
   // Its animations whose brief did not change keep their code before the new ones are counted;
   // one rewritten (its shots changed, or the request touched it) takes the place of the one it replaces.
   const toPlan = (answer: EditorOutput | EditorOutputLegacy) => {
-    const withWritten = keepWrittenAnimations(fromEditorPlan(answer.plan, profile.text_looks ?? []), params.fresh ? null : base);
+    const written = fromEditorPlan(answer.plan, profile.text_looks ?? []);
+    const withWritten = keepWrittenAnimations(Object.keys(finish).length ? { ...written, finish } : written, params.fresh ? null : base);
     // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
     const drafted = correction && !params.fresh && params.contract?.redraw === false ? keepComposition(withWritten, base) : withWritten;
     const allowed = Math.min(MAX_FREE_SCENES, (params.maxNewScenes ?? MAX_FREE_SCENES) + replacedAnimations(drafted, params.fresh ? null : base));
     // A clip whose passages look alike shows twice at most, whatever its passages.
     const capped = spreadRepeats(drafted, alike, files, still);
-    return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed), params.fresh ? null : base), base);
+    return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed, speech), params.fresh ? null : base), base);
   };
   let plan = toPlan(output);
   // Her videos whole and horizontal on black (her contract): the engine draws it on every version.
@@ -509,6 +545,27 @@ export async function designEdit(params: {
   if (!plan.colors && base?.colors && !params.fresh) plan.colors = base.colors;
   // The Reel she copies takes its own font over her charter's when it makes its style (the animations get it too); its colours were offered to the editor.
   Object.assign(plan, followedLook(plan, followed));
+  // Its look: a preset is already on the plan; one in her words is designed now (named again in a correction, it is
+  // kept as it was). A correction keeps its look unless the editor changed it (« none » takes it off); a new Reel
+  // takes the look of the Reel she copies, else her default for all her Reels, when she asked for one.
+  const baseLook = base && !params.fresh ? planLook(base) : null;
+  const askedLook = editorLook(output.plan);
+  let lookNote = "";
+  if (askedLook && "design" in askedLook) {
+    const named = lookChoice(baseLook?.name);
+    if (baseLook && named && "design" in named && named.design.toLowerCase() === askedLook.design.toLowerCase()) plan.look = baseLook;
+    else {
+      const designed = await designLook(params.studioId, askedLook.design);
+      if (designed) {
+        plan.look = designed.look;
+        lookNote = designed.note;
+      } else if (baseLook) plan.look = baseLook;
+    }
+  } else if (!askedLook && correction && baseLook) plan.look = baseLook;
+  if (!correction || params.fresh) {
+    Object.assign(plan, followedFilter(plan, followed));
+    if (!planLook(plan) && profile.look) plan.look = profile.look;
+  }
 
   // The hook's words decide whether anyone stays: a new Reel's written hook is weighed against
   // other forms by the hook judge, who keeps the strongest (an opening animation is its own hook).
@@ -952,7 +1009,7 @@ export async function designEdit(params: {
       ? "Je n'ai pas réussi à refaire l'animation du haut avec tes changements : je garde celle de la version d'avant, avec tes nouveaux textes et ta nouvelle voix. Dis-moi « refais l'animation » et je la reprends."
       : compositionMissed
         ? "Je n'ai pas réussi à composer la mise en page demandée : cette version passe tes plans en plein cadre. Dis-moi « réessaie la mise en page » et je la refais."
-        : honestLength(output.rationale, plan.duration, params.contract?.duration),
+        : [honestLength(output.rationale, plan.duration, params.contract?.duration), lookNote].filter(Boolean).join(" "),
     // A collage's composition is the ambiance itself, and the one that draws a copied Reel's texts is the copy itself:
     // never a paid animation, never counted in her new animations.
     newScenes: requests.filter((r) => !r.compose && !r.words).length,

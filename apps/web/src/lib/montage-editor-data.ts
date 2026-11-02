@@ -1,7 +1,7 @@
 import "server-only";
 import { readPostMusic, soundLevel } from "@/lib/render/music";
 import { playableSounds, soundsKnown } from "@/lib/render/sfx";
-import { editPlanSchema, isClipSegment, motionTemplateSchema, planCues, planTimeline, type ReelInputs } from "@fauve/agent";
+import { dayIn, editPlanSchema, isClipSegment, motionTemplateSchema, planCues, planTimeline, type ReelInputs } from "@fauve/agent";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { overlayPhotoInputs } from "@/lib/render/cutout";
@@ -30,6 +30,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
     template: plan.data.template,
     layers: plan.data.layers,
     overlays: plan.data.overlays,
+    finish: plan.data.finish,
   }, { postId: data?.post_id as string | undefined });
   // Her added photos, and any photo she may add by hand from her library, signed for the live preview.
   const overlayIds = [...(plan.data.overlays ?? []).flatMap((o) => (o.media_id ? [o.media_id] : [])), ...wanted];
@@ -61,6 +62,9 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
       ...(inputs.copyCutouts ? { copyCutouts: inputs.copyCutouts } : {}),
       ...(Object.keys(overlayPhotos).length ? { overlayPhotos } : {}),
+      // A moving photo in relief, as in the video.
+      ...(inputs.depth ? { depth: inputs.depth } : {}),
+      today: dayIn(),
       photoAspects: inputs.photoAspects,
       // What moves under its animations, so an animation that follows a hand follows it in the preview too.
       ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),

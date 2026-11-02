@@ -64,6 +64,12 @@ import {
   insertableFrom,
   timeline,
   fitEndCard,
+  planLook,
+  sameLook,
+  withLook,
+  isBaked,
+  reelFinishSchema,
+  type ReelFinish,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -86,6 +92,9 @@ import { deliverImages, notifyFailure, renderSlidesAndDeliver } from "@/lib/rend
 import { queueJob } from "@/lib/jobs";
 import { missMessage, startSteal } from "@/lib/steal";
 import { readPostMusic, setMusicWish } from "@/lib/render/music";
+import { deliverStoryExpress, prepareStoryExpress, StoryExpressError } from "@/lib/story-express";
+import { refinishPost } from "@/lib/finish-options";
+import { resolveLook } from "./look-designer";
 import { removeVoice } from "@/lib/voice-over";
 import { ownVoiceOf } from "@/lib/voice-clone";
 import { renderSlides, saveSlides } from "@/lib/render/slides";
@@ -236,6 +245,7 @@ const COSTLY_TOOLS = [
   "style_texts",
   "analyze_performance",
   "steal_style",
+  "story_express",
 ] as const satisfies readonly ToolName[];
 
 /** Reels she likes read before she subscribes: what she shows during her getting started (Tristan: « logos / images / reels ? »). */
@@ -983,6 +993,107 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (!post.edit_plan_id) return json({ ok: true, note: "C'est noté pour son montage. Continue sans le redire longuement." });
       ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, freshMusic: mode === "another", conversationId: ctx.conversationId }));
       return json({ status: "started", note: "La vidéo se refait (1 à 2 min) et le lien part tout seul. Dis-le en une phrase." });
+    },
+
+    async story_express({ media_id, text, detail, look, post_id, scheduled_at }) {
+      // Quick checks now (what to tell her); the story is made after the answer and delivered like a montage.
+      const { data: media } = await db.from("media_assets").select("kind").eq("id", media_id).eq("studio_id", studioId).maybeSingle();
+      if (!media || (media.kind !== "image" && media.kind !== "video")) return json({ error: "Ce media_id n'est ni une photo ni une vidéo de ce commerce (list_media)." });
+      if (post_id) {
+        const { data: post } = await db.from("posts").select("kind, status").eq("id", post_id).eq("studio_id", studioId).maybeSingle();
+        if (post?.kind !== "story") return json({ error: "Cette publication n'est pas une story : sans post_id, une nouvelle story est créée." });
+        if (["published", "measured"].includes(post.status as string)) return json({ error: "Cette story est déjà en ligne." });
+      }
+      // A look in her words is designed now: what it does instead of what it cannot (redraw her image) is said with the answer.
+      const chosen = look ? await resolveLook(studioId, look) : null;
+      const storyLook = chosen && "look" in chosen ? chosen.look : null;
+      ctx.afterReply.push(async () => {
+        const target = { studioId, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId };
+        try {
+          const story = await prepareStoryExpress({ studioId, mediaId: media_id, text, detail, look: storyLook, postId: post_id, scheduledAt: scheduled_at });
+          await deliverStoryExpress({ ...target, postId: story.postId });
+        } catch (error) {
+          const said = error instanceof StoryExpressError ? error.message : "La story n’a pas abouti cette fois, je regarde ce qui coince. Tu veux que je réessaie ?";
+          await notifyFailure({ ...target, postId: post_id ?? "" }, said, error);
+        }
+      });
+      return json({
+        status: "started",
+        note: `La story se prépare (une à deux minutes) et part toute seule dans la conversation. Dis-le en une phrase.${
+          chosen && "missed" in chosen ? " Le look demandé n'a pas pu être fait : elle part sans look, dis-le." : chosen && "note" in chosen && chosen.note ? ` Dis-lui aussi : « ${chosen.note} »` : ""
+        }`,
+      });
+    },
+
+    async set_finish({ post_id, ...asked }) {
+      const change = Object.fromEntries(Object.entries(asked).filter(([, v]) => v !== undefined)) as ReelFinish;
+      if (!Object.keys(change).length) return json({ error: "Dis ce qui change : sound, video_sound, cuts, ramp, relief ou steady." });
+      // Her defaults, for all her next Reels.
+      if (!post_id) {
+        await insertProfileVersion(studioId, (profile) => ({ ...profile, finish: { ...reelFinishSchema.catch({}).parse(profile.finish ?? {}), ...change } }));
+        return json({ ok: true, note: "Gardé pour ses prochains Reels. Dis-le en une phrase ; pour un Reel déjà fait, propose de le refaire ainsi (set_finish avec son post_id)." });
+      }
+      const post = unwrap(await db.from("posts").select("id, kind, status, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
+      if (post.kind !== "reel" && post.kind !== "story") return json({ error: "Les finitions se règlent sur une vidéo montée (un Reel ou une story)." });
+      if (["published", "measured"].includes(post.status as string)) return json({ error: "Cette vidéo est déjà en ligne." });
+      if (!post.edit_plan_id) {
+        return json({ error: "Pas encore de montage : règle-le pour ses prochains Reels (set_finish sans post_id), il s'appliquera à celui-ci." });
+      }
+      const current = unwrap(await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).eq("studio_id", studioId).single());
+      const plan = editPlanSchema.safeParse(current.plan);
+      if (!plan.success) return json({ error: "Montage illisible : relance montage." });
+      if (isBaked(plan.data)) return json({ error: "Cette vidéo est un effet dessiné image par image : demande ce changement en correction (montage)." });
+      // The blurred zones follow the steadied picture: the shaky original would show what they hide.
+      if (change.steady === "off" && plan.data.segments.some((s) => "clip_id" in s && s.blur?.tracks.length)) {
+        return json({ error: "Ce Reel floute des zones qui suivent l'image stabilisée : sans stabilisation, elles ne seraient plus au bon endroit. Retire d'abord le floutage (blur_video) si elle le veut." });
+      }
+      ctx.afterReply.push(async () => {
+        const target = { studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId };
+        try {
+          await refinishPost(studioId, post_id, change);
+          // Made again in its own background job (800 s), followed, never announced delivered by mistake.
+          await queueRerender(target);
+        } catch (error) {
+          await notifyFailure(target, "Les finitions n’ont pas pu être appliquées cette fois. Tu veux que je réessaie ?", error);
+        }
+      });
+      return json({ status: "started", note: "La vidéo se refait avec ces finitions, sans nouveau montage (1 à 3 min, gratuit), et part toute seule. Dis-le en une phrase." });
+    },
+
+    async set_look({ post_id, look: words }) {
+      const chosen = await resolveLook(studioId, words);
+      if ("missed" in chosen) return json({ error: "Je n'ai pas réussi à faire ce look : redis-le avec d'autres mots, ou propose un look tout prêt." });
+      const said = chosen.note ? ` Dis-lui aussi : « ${chosen.note} »` : "";
+      // Her default, for all her next Reels.
+      if (!post_id) {
+        await insertProfileVersion(studioId, (profile) => {
+          const next = { ...profile, look: chosen.look ?? undefined };
+          if (!chosen.look) delete next.look;
+          return next;
+        });
+        return json({
+          ok: true,
+          note: `${chosen.look ? `Gardé pour tous ses prochains Reels : look « ${chosen.look.name} »` : "Plus de look sur ses prochains Reels"}. Dis-le en une phrase ; pour un Reel déjà fait, propose de le refaire ainsi (set_look avec son post_id).${said}`,
+        });
+      }
+      const post = unwrap(await db.from("posts").select("id, kind, status, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
+      if (post.kind !== "reel" && post.kind !== "story") return json({ error: "Un look se pose sur une vidéo montée (un Reel ou une story)." });
+      if (["published", "measured"].includes(post.status as string)) return json({ error: "Cette vidéo est déjà en ligne." });
+      if (!post.edit_plan_id) return json({ error: "Pas encore de montage : dis le look dans la demande du montage (montage), il le posera." });
+      const current = unwrap(await db.from("edit_plans").select("plan").eq("id", post.edit_plan_id).eq("studio_id", studioId).single());
+      const plan = editPlanSchema.safeParse(current.plan);
+      if (!plan.success) return json({ error: "Montage illisible : relance montage." });
+      // Drawn image by image by the effects workshop: a look is a correction of its effect.
+      if (isBaked(plan.data)) return json({ error: "Cette vidéo est un effet dessiné image par image : demande ce look en correction (montage), l'atelier le redessinera." });
+      if (sameLook(planLook(plan.data), chosen.look)) return json({ ok: true, note: "C'est déjà son look. Dis-le en une phrase." });
+      // A new version of the same cut with its look: the music stays, the video is made again for free.
+      const { id } = await insertPlanVersion(studioId, post_id, withLook(plan.data, chosen.look));
+      check(await db.from("posts").update({ edit_plan_id: id }).eq("id", post_id).eq("studio_id", studioId));
+      ctx.afterReply.push(() => queueRerender({ studioId, postId: post_id, waId: ctx.waId, replyTo: ctx.replyToMessageId, conversationId: ctx.conversationId }));
+      return json({
+        status: "started",
+        note: `La vidéo se refait ${chosen.look ? `en look « ${chosen.look.name} » (${chosen.look.hint})` : "sans look"} (1 à 2 min) et le lien part tout seul. Dis-le en une phrase.${said}`,
+      });
     },
 
     async set_voice({ post_id, mode, wish, voice, use }) {

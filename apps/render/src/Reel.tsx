@@ -15,7 +15,8 @@ import { CarouselDesign } from "./Carousel";
 import { CopyLayer } from "./Copy";
 import { Overlays } from "./Overlays";
 import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, CollageMessage, Grain, printSize, stickerTop, type Sticker } from "./Collage";
-import { FilmDust } from "./FilmDust";
+import { DEPTH_MOVES, DepthPhoto } from "./Depth";
+import { gradesFootage, LookDefs, LookOverlay, lookFilter } from "./Looks";
 import { Fit } from "./Fit";
 import { loadCustomFonts, loadFonts } from "./fonts";
 import { Marker } from "./Marker";
@@ -26,7 +27,7 @@ import { Elements } from "./Elements";
 import { TextLayer } from "./TextLayer";
 import { TEXT_Y, themeFor, type Theme } from "./theme";
 import { cameraMotion, faceFocus, framingPercent, punchScale, straightening, type FaceZone } from "./track";
-import type { CameraMove, ReelProps, ReelUnder, TextLook } from "./types";
+import type { CameraMove, ReelProps, ReelUnder, SpeedPiece, TextLook } from "./types";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -73,6 +74,10 @@ export function Reel(props: ReelProps) {
     ...(props.copy?.title?.font ? [props.copy.title.font] : []),
   ]);
   const k = props.width / 1080;
+  // A look on the whole Reel (on her request): a grade over her footage and its animations, its texture under the texts.
+  const look = props.look ?? null;
+  if (look?.stamp?.style === "camcorder") loadFonts(["VT323"]);
+  if (look?.stamp?.style === "typed") loadFonts(["Courier Prime"]);
   // A free collage, or another composed Reel (a split screen…): its composition lays the shots (the fixed prints,
   // or the plain montage, only if its code cannot run).
   const compose = props.layers?.find((l) => l.compose);
@@ -141,6 +146,9 @@ export function Reel(props: ReelProps) {
               ) : (
                 <Shot segment={segment} theme={theme} />
               )
+            ) : segment.depth && segment.edit && !segment.edit.blur?.length && segment.move && DEPTH_MOVES.includes(segment.move) ? (
+              // A moving photo whose subject cuts out cleanly: in relief, the subject ahead of the room.
+              <DepthPhoto src={segment.src} cutout={segment.depth} edit={segment.edit} grade={theme.grade} move={segment.move} durationInFrames={segment.durationInFrames} theme={theme} />
             ) : (
               <KenBurns on={Boolean(segment.zoom)} move={segment.move} index={i} durationInFrames={segment.durationInFrames} theme={theme}>
                 <Photo src={segment.src} edit={segment.edit} grade={theme.grade} />
@@ -185,9 +193,8 @@ export function Reel(props: ReelProps) {
     </Sequence>
   ) : null;
 
-  return (
-    <AbsoluteFill style={{ backgroundColor: "#000" }}>
-      <ExposureFilters />
+  const footage = (
+    <>
       {collage && !whole ? <CollageBackdrop props={props} /> : null}
       {compose ? (
         <Sequence from={compose.from} durationInFrames={composeLength} layout="none">
@@ -252,7 +259,15 @@ export function Reel(props: ReelProps) {
           </Sequence>
         ),
       )}
-      {props.effect === "dust" ? <FilmDust k={k} /> : null}
+    </>
+  );
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: "#000" }}>
+      <ExposureFilters />
+      {look && gradesFootage(look) ? <LookDefs look={look} k={k} /> : null}
+      {look && gradesFootage(look) ? <AbsoluteFill style={{ filter: lookFilter(look, k) }}>{footage}</AbsoluteFill> : footage}
+      {look ? <LookOverlay look={look} stamp={props.stamp} k={k} /> : null}
       {/* A copied Reel remade by code: its laid subjects, its held title, its ending card. */}
       {props.copy ? <CopyLayer props={props} k={k} /> : null}
 
@@ -470,26 +485,39 @@ function Shot({ segment, theme, frame: box, face }: { segment: ClipSegment; them
   const move = segment.move ?? (segment.zoom ? "in" : "none");
   const frameAspect = width / height;
   const focus = faceFocus(segment.adjust?.focus, face, segment.aspect, frameAspect);
+  // A passage of the clip at one speed: the file may start later in the clip (a slow motion's own smooth file).
+  const passage = (p: SpeedPiece) => (
+    <>
+      <OffthreadVideo
+        src={segment.src}
+        trimBefore={Math.max(0, p.startFrom - (segment.srcFrom ?? 0))}
+        playbackRate={p.speed}
+        // Only the passages where someone speaks keep their sound; the rest is under the music.
+        muted={!segment.speech}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: framing(focus, segment.aspect, frameAspect),
+          filter: [theme.grade, cssFilter(segment.adjust)].filter(Boolean).join(" ") || undefined,
+        }}
+      />
+      {segment.blur?.tracks.length ? <ClipBlurLayer blur={segment.blur} startFrom={p.startFrom} focus={focus} speed={p.speed} size={box} /> : null}
+    </>
+  );
   return (
     <AbsoluteFill style={{ transform: cameraTransform(move, frame, segment.durationInFrames, theme) }}>
       <AbsoluteFill style={{ transform: straighten(segment.adjust?.straighten, frameAspect) }}>
-        <OffthreadVideo
-          src={segment.src}
-          trimBefore={segment.startFrom}
-          playbackRate={segment.speed ?? 1}
-          // Only the passages where someone speaks keep their sound; the rest is under the music.
-          muted={!segment.speech}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            objectPosition: framing(focus, segment.aspect, frameAspect),
-            filter: [theme.grade, cssFilter(segment.adjust)].filter(Boolean).join(" ") || undefined,
-          }}
-        />
-        {segment.blur?.tracks.length ? (
-          <ClipBlurLayer blur={segment.blur} startFrom={segment.startFrom} focus={focus} speed={segment.speed} size={box} />
-        ) : null}
+        {segment.ramp?.length ? (
+          // A speed ramp: each passage at its speed, one after the other, under one camera move.
+          segment.ramp.map((p, k) => (
+            <Sequence key={k} from={p.at} durationInFrames={p.length} premountFor={10}>
+              {passage(p)}
+            </Sequence>
+          ))
+        ) : (
+          passage({ at: 0, length: segment.durationInFrames, startFrom: segment.startFrom, speed: segment.speed ?? 1 })
+        )}
       </AbsoluteFill>
     </AbsoluteFill>
   );
