@@ -48,6 +48,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       // A collage's stickers and the cut-outs its animations compose with, so the preview shows them as the video does.
       ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
       ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
+      ...(inputs.copyCutouts ? { copyCutouts: inputs.copyCutouts } : {}),
       photoAspects: inputs.photoAspects,
       // What moves under its animations, so an animation that follows a hand follows it in the preview too.
       ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),

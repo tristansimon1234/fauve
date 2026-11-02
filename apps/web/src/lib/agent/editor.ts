@@ -76,6 +76,7 @@ import { ensureTranscript } from "@/lib/voice";
 import { photoRegions } from "@/lib/video/regions";
 import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
+import { copyCandidate, designCopy } from "./copy-design";
 import { designMotionScenes, type SceneRequest } from "./motion-designer";
 import { showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
@@ -275,6 +276,24 @@ export async function designEdit(params: {
       ? ensureCutouts(params.studioId, photoIds.slice(0, MAX_OFFERED_PHOTOS)).catch((e: unknown) => console.warn("cut-outs: not ready", e))
       : null;
   const profile = brandProfileSchema.partial().catch({}).parse(brand.data?.[0]?.profile ?? {});
+  // A simple Reel she copies is remade by code (copy.ts: the model's own cuts, her photos' subjects laid over, its title, its
+  // ending): no editor nor motion designer, one small call writes its words. Its correction too; anything it cannot do, the editor.
+  const previousCopy = previousPlan.success && previousPlan.data.copy ? previousPlan.data : null;
+  if ((!correction || previousCopy) && copyCandidate(followed, params.contract, Boolean(voice))) {
+    const copied = await designCopy({
+      studioId: params.studioId,
+      postId: params.postId,
+      followed,
+      mediaIds,
+      clips,
+      photos: Object.fromEntries(photoIds.flatMap((id, i) => (photoReads[i] ? [[id, photoReads[i]!] as const] : []))),
+      brief: params.brief,
+      contract: params.contract,
+      previous: correction ? previousCopy : null,
+      studio: { name: studio.data?.name, business: studio.data?.business_type, memory: studio.data?.memory, booking: Boolean(studio.data?.booking_url), tone: profile.tone },
+    });
+    if (copied) return { editPlanId: copied.editPlanId, version: copied.version, plan: copied.plan, rationale: copied.rationale, newScenes: 0, reusedScenes: 0 };
+  }
   // What moves in her videos, followed before the editor cuts: which gestures show their hands in the vertical
   // frame (the editor puts an animation that hangs on a gesture where it can be seen), where the faces really are
   // (the texts keep off them) and what the animations follow. Never more than a few minutes of waiting (a sandbox

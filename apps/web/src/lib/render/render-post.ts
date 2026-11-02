@@ -8,6 +8,7 @@ import {
   clipAnalysisSchema,
   clipAspect,
   clipsUnderAnimations,
+  copyPhotos,
   isClipSegment,
   motionTemplateSchema,
   isComposed,
@@ -42,7 +43,7 @@ import { logoTone } from "./logo-tone";
 import { withMusic } from "./music";
 import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
-import { ensureCutouts, sceneCutoutInputs, stickerInputs } from "./cutout";
+import { copyCutoutInputs, ensureCutouts, sceneCutoutInputs, stickerInputs } from "./cutout";
 import { loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
@@ -82,7 +83,7 @@ export function towardsDraft(status: PostStatus): PostStatus[] {
  */
 export async function loadMontageInputs(
   studioId: string,
-  plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"]; layers?: EditPlan["layers"] },
+  plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"]; layers?: EditPlan["layers"]; copy?: EditPlan["copy"] },
   options: { postId?: string } = {},
 ) {
   const db = supabaseAdmin();
@@ -141,6 +142,8 @@ export async function loadMontageInputs(
   // animation composes with the photos it names, and their clean cut-outs.
   const withPhotos = scenePhotoIds(plan);
   const cutouts = (template === "collage" && plan.template === "collage") || isComposed(plan) ? await stickerInputs(studioId, photoIds).catch(() => ({})) : undefined;
+  // A copied Reel remade by code lays the subjects of her photos over its shots.
+  const copyCutouts = plan.copy?.cutouts.length ? await copyCutoutInputs(studioId, copyPhotos(plan)).catch(() => ({})) : undefined;
   // The animations' cut-outs: a clean edge is enough, even cut by the photo's frame (the animation brings the subject in from there).
   const sceneCutouts = withPhotos.length ? await sceneCutoutInputs(studioId, withPhotos).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
@@ -192,6 +195,7 @@ export async function loadMontageInputs(
     voice,
     cutouts,
     sceneCutouts,
+    copyCutouts,
     photoAspects,
     tracks,
     facts,
@@ -323,9 +327,9 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   const plan = editPlanSchema.parse(planRow.plan);
   // Photos have their subject cut out once (an open model in its own sandbox): a collage's, laid as stickers, a
   // composed Reel's, and those an animation composes with (the design step has usually made them already).
-  const toCut = plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : scenePhotoIds(plan);
+  const toCut = [...(plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : scenePhotoIds(plan)), ...copyPhotos(plan)];
   if (toCut.length) await ensureCutouts(studioId, toCut);
-  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, photoAspects, tracks, facts } =
+  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, copyCutouts, photoAspects, tracks, facts } =
     await loadMontageInputs(studioId, plan, { postId });
   const motion = motionTemplateSchema.safeParse(plan.template);
 
@@ -342,6 +346,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       if (needsBlur) throw new Error("Ce montage floute des zones : le moteur de secours ne sait pas le faire, réessaie dans un instant");
       if (photoIds.length) throw new Error("Ce montage anime des photos : le moteur de secours ne sait pas le faire, réessaie dans un instant");
       if (plan.voice) throw new Error("Ce montage porte ta voix : le moteur de secours ne sait pas la poser, réessaie dans un instant");
+      if (plan.copy) throw new Error("Ce Reel recopié pose ses détourages et son titre : le moteur de secours ne sait pas le faire, réessaie dans un instant");
       const clipsOnly = withoutScenes(plan);
       if (!clipsOnly.segments.length) throw new Error("Montage sans vidéo : le moteur de motion design est indisponible");
       return renderInSandbox({ id: renderId, clips, ass: buildAss(clipsOnly, accent), ffmpegArgs: buildFfmpegArgs(clipsOnly, { clipFiles }) });
@@ -366,6 +371,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         ...(voice ? { voice } : {}),
         ...(cutouts ? { cutouts } : {}),
         ...(sceneCutouts ? { sceneCutouts } : {}),
+        ...(copyCutouts ? { copyCutouts } : {}),
         photoAspects,
         ...(Object.keys(tracks).length ? { tracks } : {}),
       });

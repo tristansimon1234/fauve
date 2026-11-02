@@ -5407,3 +5407,128 @@ test("feedback: the team's morning message, short, by kind, in their words", asy
   assert.equal(text.split("\n").filter((l) => l.startsWith("• ")).length, 3);
   assert.match(text, /Le reste dans Admin, sur ordinateur\.$/);
 });
+
+test("a simple copied Reel is remade by code on the model's own cuts", async () => {
+  const { copyable, copyPlan, endingCard, laysCutouts } = await import("./copy.ts");
+  const look = {
+    format: "message" as const,
+    voice: "aucune" as const,
+    layout: "plein cadre, avec un objet ou une personne détourés d'une autre image posés en grand par-dessus certains plans",
+    ending: "un écran noir avec deux lignes de texte blanc, puis « Lien en bio »",
+    text: {
+      amount: "un message tenu" as const,
+      composition: "une question écrite à la main en haut, sur trois lignes décalées",
+      case: "normal" as const,
+      weight: "regular" as const,
+      tracking: "normal" as const,
+      align: "center" as const,
+      stress: "none" as const,
+      band: "none" as const,
+      subtitles: false,
+      font: "Indie Flower",
+      stroke: "thin" as const,
+      lines: "staggered" as const,
+      tilt: -8,
+      shadow: "soft" as const,
+    },
+  };
+  const cuts = [1.53, 1.87, 2.2, 2.7, 3.03, 3.37, 4.37, 5.3, 6, 6.9, 7.23, 7.57, 7.9, 8.23, 8.57, 8.9, 9.4, 9.73, 10.07, 10.57, 11.13];
+  assert.equal(copyable(look, { cuts, duration: 13.21 }), true);
+  assert.equal(laysCutouts(look), true);
+  assert.deepEqual(endingCard(look.ending), { dark: true });
+  // A voice, a split screen, several texts or an animated moment go to the editor.
+  assert.equal(copyable({ ...look, voice: "voix off" }, { cuts, duration: 13.21 }), false);
+  assert.equal(copyable({ ...look, layout: "un écran partagé, la personne en haut et le produit en bas" }, { cuts, duration: 13.21 }), false);
+  assert.equal(copyable({ ...look, text: { ...look.text, amount: "plusieurs" } }, { cuts, duration: 13.21 }), false);
+  assert.equal(copyable({ ...look, moments: [{ at: 1, what: "une carte d'appli posée au centre" }, { at: 3, what: "une photo détourée" }] }, { cuts, duration: 13.21 }), false);
+  assert.equal(copyable(look, { cuts: [4], duration: 13 }), false);
+
+  const files = [
+    { id: "street1", photo: true, seconds: 0 },
+    { id: "cafe", photo: false, seconds: 9, moments: [{ start: 2, end: 4 }] },
+    { id: "street2", photo: true, seconds: 0 },
+    { id: "street3", photo: true, seconds: 0 },
+    { id: "street4", photo: true, seconds: 0 },
+    { id: "street5", photo: true, seconds: 0 },
+    { id: "night", photo: false, seconds: 6 },
+    { id: "camera", photo: true, seconds: 0, cutout: { tall: 0.7, person: false } },
+    { id: "matcha", photo: true, seconds: 0, cutout: { tall: 1.6, person: false } },
+    { id: "woman", photo: true, seconds: 0, cutout: { tall: 2.4, person: true } },
+  ];
+  const plan = copyPlan({
+    cuts,
+    duration: 13.21,
+    bpm: 128,
+    files,
+    look,
+    words: { title: ["Tu veux", "les mêmes", "Reels ?"], end: [["Edith s'en occupe", "sur WhatsApp."], ["Lien en bio"]] },
+  });
+  editPlanSchema.parse(plan);
+  // Its shots on the model's cuts: the last one plays under the ending card, which starts on the model's last cut.
+  const shots = plan.segments.map((s) => ("clip_id" in s ? s : null)).filter((s) => s !== null);
+  assert.equal(shots.length, cuts.length);
+  let at = 0;
+  for (const [i, s] of shots.entries()) {
+    if (i) assert.ok(Math.abs(at - cuts[i - 1]!) < 0.02, `shot ${i} starts on its cut`);
+    at += segmentSeconds(s);
+  }
+  assert.ok(Math.abs(at - 13.21) < 0.02);
+  assert.equal(plan.copy?.end?.from, 11.13);
+  assert.deepEqual(plan.copy?.end?.cards.map((c) => c.lines), [["Edith s'en occupe", "sur WhatsApp."], ["Lien en bio"]]);
+  assert.equal(plan.copy?.end?.ground, "#000000");
+  // Grounds are her photos and videos without a clean subject (enough for a shot in three); the subjects are laid over them.
+  assert.ok(shots.every((s) => !["camera", "matcha", "woman"].includes(s.clip_id)));
+  const few = copyPlan({ cuts, duration: 13.21, files: [files[0]!, ...files.slice(-3)], look, words: { title: ["x"], end: [] } });
+  assert.ok(few.segments.some((s) => "clip_id" in s && s.clip_id === "camera"));
+  assert.ok(few.copy!.cutouts.every((c) => { const s = few.segments[c.segment]!; return !("clip_id" in s) || s.clip_id !== c.photo; }));
+  const laid = plan.copy!.cutouts;
+  assert.ok(laid.length >= 10);
+  assert.ok(laid.every((c) => shots[c.segment]!.clip_id !== c.photo));
+  // One shot in four stays bare; a person stands on the bottom edge; once a pair side by side.
+  assert.ok(!laid.some((c) => c.segment % 4 === 3));
+  assert.ok(laid.filter((c) => c.photo === "woman").every((c) => c.place === "stand"));
+  assert.equal(laid.filter((c) => c.place === "left").length, 1);
+  // Never the same subject on two shots in a row.
+  const bySegment = new Map(laid.map((c) => [c.segment, c.photo]));
+  for (const [segment, photo] of bySegment) if (bySegment.has(segment + 1) && laid.filter((c) => c.segment === segment + 1).length === 1) assert.notEqual(bySegment.get(segment + 1), photo);
+  // A video never shows the same passage twice while another is free; its best moment first.
+  const cafe = shots.filter((s) => s.clip_id === "cafe");
+  assert.equal(cafe[0]!.in, 2);
+  for (let i = 0; i < cafe.length; i++)
+    for (let j = i + 1; j < cafe.length; j++) assert.ok(cafe[i]!.out <= cafe[j]!.in + 0.01 || cafe[j]!.out <= cafe[i]!.in + 0.01, "passages apart");
+  // Its title held until the ending, in the model's way; its tempo; no engine text nor subtitles.
+  assert.deepEqual(plan.copy?.title && { lines: plan.copy.title.lines, from: plan.copy.title.from, to: plan.copy.title.to, font: plan.copy.title.font, staggered: plan.copy.title.staggered, stroke: plan.copy.title.stroke, tilt: plan.copy.title.tilt }, {
+    lines: ["Tu veux", "les mêmes", "Reels ?"],
+    from: 0,
+    to: 11.13,
+    font: "Indie Flower",
+    staggered: true,
+    stroke: "thin",
+    tilt: -8,
+  });
+  assert.equal(plan.tempo, 128);
+  assert.deepEqual(plan.texts, []);
+  assert.equal(plan.subtitles, false);
+});
+
+test("a copy plan keeps the model's cuts through the engine", async () => {
+  const { copyPlan } = await import("./copy.ts");
+  const { normalizeEditPlan } = await import("./editor.ts");
+  const look = {
+    format: "pov" as const,
+    voice: "aucune" as const,
+    layout: "plein cadre",
+    ending: "le dernier plan tenu",
+    text: { amount: "aucun" as const, composition: "", case: "normal" as const, weight: "bold" as const, tracking: "normal" as const, align: "center" as const, stress: "none" as const, band: "none" as const, subtitles: false },
+  };
+  const plan = copyPlan({ cuts: [0.33, 0.66, 1.7, 2.1], duration: 4, bpm: 100, files: [{ id: "a", photo: false, seconds: 20 }, { id: "b", photo: false, seconds: 20 }], look, words: { title: ["ignoré"], end: [] } });
+  // No text in the model, no title; no ending card for a model that ends on a shot.
+  assert.equal(plan.copy?.title, null);
+  assert.equal(plan.copy?.end, null);
+  assert.equal(plan.segments.length, 5);
+  const normalized = normalizeEditPlan(plan, { a: 20, b: 20 });
+  assert.deepEqual(
+    normalized.segments.map((s) => segmentSeconds(s)),
+    plan.segments.map((s) => segmentSeconds(s)),
+  );
+});

@@ -220,6 +220,28 @@ export type ReelProps = {
     reelTexts?: ComposeText[];
     end?: ComposeEnd | null;
   }[];
+  /**
+   * A simple copied Reel remade by code (copy.ts): her photos' subjects laid over its shots (`box` in shares of the
+   * photo, `aspect` its width over height), its held title drawn as the model draws it, its ending card. In frames.
+   */
+  copy?: {
+    cutouts: { src: string; box: Box; aspect: number; place: "stand" | "center" | "left" | "right"; from: number; durationInFrames: number; segment: number }[];
+    title: {
+      lines: string[];
+      from: number;
+      durationInFrames: number;
+      font?: string;
+      stroke: "thin" | "regular" | "thick";
+      staggered: boolean;
+      tilt: number;
+      shadow: "none" | "soft" | "strong";
+      color: string;
+      upper: boolean;
+      y: number;
+    } | null;
+    /** Its cards' `from` counts from the ending's. */
+    end: { from: number; ground: string; ink: string; cards: { from: number; lines: string[] }[] } | null;
+  };
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   elements?: {
     js: string;

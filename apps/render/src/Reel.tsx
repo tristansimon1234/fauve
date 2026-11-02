@@ -12,6 +12,7 @@ import {
   useVideoConfig,
 } from "remotion";
 import { CarouselDesign } from "./Carousel";
+import { CopyLayer } from "./Copy";
 import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, CollageMessage, Grain, printSize, stickerTop, type Sticker } from "./Collage";
 import { FilmDust } from "./FilmDust";
 import { Fit } from "./Fit";
@@ -67,6 +68,8 @@ export function Reel(props: ReelProps) {
     // The fonts an animation brings for itself (a universe she names, the Reel she copies).
     ...props.segments.flatMap((s) => (s.type === "motion" ? (s.fonts ?? []) : [])),
     ...(props.layers ?? []).flatMap((l) => l.fonts ?? []),
+    // A copied Reel's title, in the model's font.
+    ...(props.copy?.title?.font ? [props.copy.title.font] : []),
   ]);
   const k = props.width / 1080;
   // A free collage, or another composed Reel (a split screen…): its composition lays the shots (the fixed prints,
@@ -233,6 +236,8 @@ export function Reel(props: ReelProps) {
         ),
       )}
       {props.effect === "dust" ? <FilmDust k={k} /> : null}
+      {/* A copied Reel remade by code: its laid subjects, its held title, its ending card. */}
+      {props.copy ? <CopyLayer props={props} k={k} /> : null}
 
       {whole ? null : engineTexts}
 

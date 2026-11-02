@@ -276,6 +276,8 @@ export const followedStyleSchema = z.object({
   /** One of her own Reels, kept as a model: redone with her new images, its structure known. */
   own: z.boolean().optional(),
   outline: z.string().max(OUTLINE_CHARS).optional(),
+  /** Its measured cuts and length (s): a simple copy is remade on the model's own cut times (copy.ts). */
+  measured: reelMeasuresSchema.pick({ duration: true, cuts: true }).optional(),
 });
 export type FollowedStyle = z.infer<typeof followedStyleSchema>;
 
@@ -288,6 +290,7 @@ export function followedFrom(inspirationId: string, style: StolenStyle, own = fa
     bpm: style.measures.bpm === null ? null : Math.round(style.measures.bpm),
     ...(own ? { own: true } : {}),
     ...(style.outline ? { outline: style.outline } : {}),
+    ...(style.measures.duration > 0 ? { measured: { duration: style.measures.duration, cuts: style.measures.cuts } } : {}),
   };
 }
 

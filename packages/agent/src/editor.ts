@@ -130,7 +130,7 @@ const editorRhythm = {
  * refuses the current schema (structured-output grammars have limits of their own).
  */
 export const editorOutputSchemaLegacy = z.object({
-  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true }).extend({
+  plan: editPlanObjectSchema.omit({ voice: true, layers: true, template: true, tempo: true, copy: true }).extend({
     ...editorRhythm,
     texts: z.array(editorTextSchema),
     // Retouch and blur are set by their own tools and carried over (carryRetouch), never written by the editor.
@@ -509,7 +509,8 @@ export function normalizeEditPlan(plan: EditPlan, clipDurations: Record<string, 
     const speed = s.speed === undefined ? undefined : Math.min(MAX_SPEED, Math.max(MIN_SPEED, s.speed));
     const clip = { ...s, in: round(Math.max(0, s.in)), out, ...(speed === undefined || Math.abs(speed - 1) < 0.01 ? { speed: undefined } : { speed }) };
     // A burst of photos goes down to a beat (0.4 s); a video shot holds at least half a second.
-    const shortest = photoLike(s.clip_id, clipDurations) ? 0.35 : 0.5;
+    // A copied Reel remade by code keeps the model's own short shots.
+    const shortest = plan.copy ? 0.2 : photoLike(s.clip_id, clipDurations) ? 0.35 : 0.5;
     return s.clip_id in clipDurations && segmentSeconds(clip) >= shortest ? [clip] : [];
   });
   if (!segments.length) throw new Error("Le plan de montage ne garde aucun plan utilisable");

@@ -72,6 +72,7 @@ export * from "./request-log.ts";
 export * from "./site-page.ts";
 export * from "./cutout.ts";
 export * from "./compose.ts";
+export * from "./copy.ts";
 export * from "./tracking.ts";
 export * from "./rework.ts";
 export * from "./trends.ts";

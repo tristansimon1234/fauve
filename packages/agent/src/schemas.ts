@@ -280,6 +280,50 @@ export const effectWordSchema = z.object({
 });
 export type EffectWord = z.infer<typeof effectWordSchema>;
 
+/** Where a cut-out of one of her photos is laid over a shot of a copied Reel (copy.ts): standing on the bottom edge (a person), big in the middle (an object), or one of a pair. */
+export const COPY_PLACES = ["stand", "center", "left", "right"] as const;
+const COPY_LINE = z.string().min(1).max(48);
+const COPY_HEX = z.string().regex(/^#[0-9a-f]{6}$/i);
+
+/**
+ * A simple copied Reel remade by code (copy.ts, no editor nor motion designer): her shots on the model's own cut
+ * times, the subjects of her photos cut out and laid over them, its held title drawn as the model draws it, and its
+ * ending card. Drawn by `CopyLayer` (apps/render/src/Copy.tsx), above the shots and under the logo. Set by the engine.
+ */
+export const copyLayerSchema = z.object({
+  /** `segment`: the shot it is laid on; `at`: seconds into that shot when it lands. */
+  cutouts: z
+    .array(z.object({ segment: z.number().int().min(0).max(200), photo: z.string().min(1).max(80), place: z.enum(COPY_PLACES), at: z.number().min(0).max(10) }))
+    .max(120),
+  /** Its title, held from `from` to `to` (s): its lines, drawn in the model's way (its font, its stroke, its lines staggered or not, its tilt, its shadow). */
+  title: z
+    .object({
+      lines: z.array(COPY_LINE).min(1).max(4),
+      from: z.number().min(0),
+      to: z.number().min(0),
+      font: z.string().regex(/^[A-Za-z0-9 ]{2,40}$/).optional(),
+      stroke: z.enum(["thin", "regular", "thick"]),
+      staggered: z.boolean(),
+      tilt: z.number().min(-45).max(45),
+      shadow: z.enum(["none", "soft", "strong"]),
+      color: COPY_HEX,
+      upper: z.boolean(),
+      /** Its top, as a share of the height. */
+      y: z.number().min(0.04).max(0.7),
+    })
+    .nullable(),
+  /** Its ending: a plain ground over the last shot from `from` (s), its cards of a few small lines one after the other. */
+  end: z
+    .object({
+      from: z.number().min(0),
+      ground: COPY_HEX,
+      ink: COPY_HEX,
+      cards: z.array(z.object({ at: z.number().min(0), lines: z.array(COPY_LINE).min(1).max(4) })).min(1).max(3),
+    })
+    .nullable(),
+});
+export type CopyLayer = z.infer<typeof copyLayerSchema>;
+
 export const editPlanObjectSchema = z.object({
   format: z.enum(["9:16", "1:1", "4:5"]),
   duration: z.number().min(3).max(90),
@@ -329,6 +373,8 @@ export const editPlanObjectSchema = z.object({
         .optional(),
     })
     .optional(),
+  /** A simple copied Reel remade by code (copyLayerSchema): its cut-outs, its title and its ending, drawn over the shots. */
+  copy: copyLayerSchema.optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {

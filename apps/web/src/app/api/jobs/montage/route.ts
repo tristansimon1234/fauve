@@ -128,6 +128,8 @@ const bodySchema = z.object({
   spokenKept: z.boolean().optional(),
   /** The voice step is done: the design goes on (in its own invocation when a voice was recorded). */
   voiced: z.boolean().optional(),
+  /** A simple copied Reel remade by code (copy.ts): rendered and delivered as it is, no second take nor critic. */
+  copied: z.boolean().optional(),
   /** Edith chose a key message with the music over a voice for this Reel (her setting is « auto »). */
   format: reelFormatSchema.optional(),
   /** What she fixed for this Reel, read once from her request at its design (the editor and the voice obey it). */
@@ -575,9 +577,11 @@ async function design(job: Job) {
   if (await voiceFirst(job)) return;
   const edit = await designEdit({ ...designInput(job), effort: job.editorEffort ?? EFFORTS[job.effort!].editorEffort });
   const versions: Version[] = [{ planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) }];
-  const two = effortVersions(job.effort!, Boolean(job.correction)) > 1;
+  // A copy remade by code is the model's own cuts: a second take or a critic's correction would only undo them.
+  const copied = Boolean(edit.plan.copy);
+  const two = !copied && effortVersions(job.effort!, Boolean(job.correction)) > 1;
   const then = two ? "alternative" : "render";
-  await next(job, { step: then, versions, newScenes: edit.newScenes, round: 0, fixes: 0 });
+  await next(job, { step: then, versions, newScenes: edit.newScenes, round: 0, fixes: 0, ...(copied ? { copied } : {}) });
 }
 
 /** What a design saved for the look at its animations, before it was cut. */
@@ -649,6 +653,11 @@ async function review(job: Job) {
   await setQuoteStage(job.quoteId, "review");
   const rendered = (job.versions ?? []).filter((v): v is Version & { renderId: string } => Boolean(v.renderId));
   if (!rendered.length) throw new Error("Rien à relire");
+  // A copy remade by code goes out as rendered: its cuts and its words are the model's and hers.
+  if (job.copied) {
+    await deliver(job, rendered[0]!, null);
+    return;
+  }
   const round = job.round ?? 0;
   const verdict = await reviewMontage({
     studioId: job.studioId,

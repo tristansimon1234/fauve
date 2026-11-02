@@ -44,7 +44,8 @@ const MOTION_MAX = 8;
  */
 export function snapToTempo(plan: EditPlan, clipDurations: Record<string, number>): EditPlan {
   const beat = planBeat(plan);
-  if (!beat || plan.voice || !plan.segments.length) return plan;
+  // A copied Reel remade by code keeps the model's own cut times (its sound lands on them).
+  if (!beat || plan.voice || plan.copy || !plan.segments.length) return plan;
   // Worked in frames, as the composition plays it (a crossfade overlaps whole frames).
   const frames = (t: number) => Math.round(t * REEL_FPS);
   const fade = usesFades(plan) ? frames(FADE) : 0;

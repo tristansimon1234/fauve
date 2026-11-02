@@ -136,3 +136,22 @@ export async function stickerInputs(studioId: string, photoIds: string[]): Promi
   const signed = await db.storage.from("media").createSignedUrls(stickers.map((s) => s.cutout.path), 7200);
   return Object.fromEntries(stickers.flatMap((s, i) => (signed.data?.[i]?.signedUrl ? [[s.id, { src: signed.data[i]!.signedUrl, box: s.cutout.box }]] : [])));
 }
+
+/**
+ * A copied Reel's laid subjects (copy.ts): each photo's cut-out signed, its subject's box and the photo's shape.
+ * Any cut-out the copy chose (it took only clean ones), even one the collage's stricter rule would not make a sticker.
+ */
+export async function copyCutoutInputs(studioId: string, photoIds: string[]): Promise<NonNullable<ReelInputs["copyCutouts"]>> {
+  if (!photoIds.length) return {};
+  const db = supabaseAdmin();
+  const { data: assets } = await db.from("media_assets").select("id, cutout").eq("studio_id", studioId).in("id", photoIds);
+  const cuts = (assets ?? []).flatMap((a) => {
+    const cutout = cutoutSchema.safeParse(a.cutout);
+    return cutout.success && cutout.data.path.startsWith(`${studioId}/`) ? [{ id: a.id as string, cutout: cutout.data }] : [];
+  });
+  if (!cuts.length) return {};
+  const signed = await db.storage.from("media").createSignedUrls(cuts.map((c) => c.cutout.path), 7200);
+  return Object.fromEntries(
+    cuts.flatMap((c, i) => (signed.data?.[i]?.signedUrl ? [[c.id, { src: signed.data[i]!.signedUrl, box: c.cutout.box, aspect: c.cutout.w / c.cutout.h }]] : [])),
+  );
+}

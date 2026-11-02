@@ -1,4 +1,4 @@
-import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
+import { isClipSegment, isMotionSegment, segmentSeconds, type CameraMove, type ClipAnalysis, type CopyLayer, type EditPlan, type MotionTemplate, type Scene } from "./schemas.ts";
 import type { Adjust, ClipBlur, PhotoEdit } from "./retouch.ts";
 import { brandPalette, resolveBrandLook, type BrandPalette, type Bullet, type ListItem, type TextLook } from "./text-look.ts";
 import type { LogoOnDark } from "./logo.ts";
@@ -173,6 +173,15 @@ export type ReelText = {
 };
 export type ReelWord = { w: string; from: number; to: number };
 
+type CopyBox = { x: number; y: number; w: number; h: number };
+/** A copied Reel's layer as the render draws it: its cut-outs, its title and its ending, in frames. */
+export type ReelCopy = {
+  cutouts: { src: string; box: CopyBox; aspect: number; place: CopyLayer["cutouts"][number]["place"]; from: number; durationInFrames: number; segment: number }[];
+  title: (Omit<NonNullable<CopyLayer["title"]>, "from" | "to"> & { from: number; durationInFrames: number }) | null;
+  /** Its cards' `from` counts from the ending's. */
+  end: { from: number; ground: string; ink: string; cards: { from: number; lines: string[] }[] } | null;
+};
+
 export type ReelProps = {
   template: MotionTemplate;
   /** The Reel's own tempo (beats per minute): how lively its texts and camera move (a « libre » Reel). */
@@ -241,6 +250,8 @@ export type ReelProps = {
     end?: ComposeEnd | null;
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
+  /** A simple copied Reel remade by code (copy.ts), in frames (mirror of the render's). */
+  copy?: ReelCopy;
   elements?: {
     js: string;
     texts: Record<string, string>;
@@ -315,6 +326,8 @@ export type ReelInputs = {
   sceneCutouts?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number }; edges?: ("top" | "bottom" | "left" | "right")[] }>;
   /** What was tracked in her clips (hands, faces, bodies), by clip_id: the animations over them can follow it. */
   tracks?: TracksByClip;
+  /** A copied Reel's laid subjects, by photo: the cut-out's signed link, the subject's box (shares of the photo), the photo's width over height. */
+  copyCutouts?: Record<string, { src: string; box: CopyBox; aspect: number }>;
 };
 
 /** A clip's width / height as the Reel frames it, from its analysis (phones film 16:9 or 9:16). */
@@ -653,6 +666,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ];
   });
 
+  const copy = plan.copy ? copyProps(plan.copy, segments, inputs, durationInFrames) : null;
   return {
     template: inputs.template,
     ...(plan.tempo ? { tempo: plan.tempo } : {}),
@@ -670,7 +684,36 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(plan.effect ? { effect: plan.effect } : {}),
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),
     ...(layers.length ? { layers } : {}),
+    ...(copy ? { copy } : {}),
   };
+}
+
+/** A copied Reel's layer in frames: each subject over its shot from its landing, the title held, the ending's cards. */
+function copyProps(copy: CopyLayer, segments: ReelSegment[], inputs: ReelInputs, total: number): ReelCopy {
+  const cutouts = copy.cutouts.flatMap((c) => {
+    const segment = segments[c.segment];
+    const cut = inputs.copyCutouts?.[c.photo];
+    if (!segment || !cut) return [];
+    const from = Math.min(segment.startAt + segment.durationInFrames - 1, segment.startAt + toFrames(c.at));
+    const length = Math.min(total, segment.startAt + segment.durationInFrames) - from;
+    return length > 0 ? [{ src: cut.src, box: cut.box, aspect: cut.aspect, place: c.place, from, durationInFrames: length, segment: c.segment }] : [];
+  });
+  const title = (() => {
+    if (!copy.title) return null;
+    const { from: start, to, ...look } = copy.title;
+    const from = toFrames(start);
+    const length = Math.min(total, toFrames(to)) - from;
+    return length > 0 ? { ...look, lines: look.lines.map(frenchSpaces), from, durationInFrames: length } : null;
+  })();
+  const end = copy.end
+    ? {
+        from: Math.min(total - 1, toFrames(copy.end.from)),
+        ground: copy.end.ground,
+        ink: copy.end.ink,
+        cards: copy.end.cards.map((c) => ({ from: Math.max(0, toFrames(c.at) - toFrames(copy.end!.from)), lines: c.lines.map(frenchSpaces) })),
+      }
+    : null;
+  return { cutouts, title, end };
 }
 
 /**

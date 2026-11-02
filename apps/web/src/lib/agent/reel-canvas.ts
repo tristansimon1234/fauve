@@ -21,6 +21,7 @@ async function reelProps(studioId: string, postId: string, plan: EditPlan, templ
     ...(inputs.voice ? { voice: inputs.voice } : {}),
     ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
     ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
+    ...(inputs.copyCutouts ? { copyCutouts: inputs.copyCutouts } : {}),
     photoAspects: inputs.photoAspects,
     ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),
   });

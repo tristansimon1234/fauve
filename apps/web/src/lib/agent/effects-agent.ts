@@ -130,12 +130,9 @@ export async function effectRoute(studioId: string, input: { postId: string; cor
   const videos = (media ?? []).filter((m) => m.kind === "video").length;
   // The Reel she copies is part of her request: its moments (an effect after another) say what it takes.
   const followed = await postStyle(studioId, input.postId).catch(() => undefined);
-  // A Reel she sent to remake (not one of hers kept as a model) is made by one director, in the workshop: the chain's
-  // relays (a reading in words, an editor, a motion designer coding blind) had lost its cuts, its cut-outs and its lettering.
-  if (followed && !followed.own && (media ?? []).length) {
-    console.log("montage: a copied Reel, made by the workshop's director", input.postId);
-    return "agent";
-  }
+  // A Reel she sent to remake goes to the workshop's director only when it holds a real effect (routeEffect, below,
+  // reads its moments): a simple one (a held message, cuts, cut-outs laid over) is remade by code, in the chain
+  // (copyPlan), for the chain's price (Tristan: « réduire le nombre d'agents, améliorer la qualité mais garder les marges »).
   const copied = followed ? momentsLine(followed.look) : null;
   const route = await routeEffect(studioId, input.brief ?? undefined, { videos, photos: (media ?? []).length - videos }, copied);
   if (route.agent) console.log("montage: effects agent", input.postId, route.effect, "—", route.why);

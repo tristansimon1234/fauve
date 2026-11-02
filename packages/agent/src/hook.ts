@@ -29,7 +29,7 @@ type Shot = ClipAnalysis["shots"][number];
  * its beauty and energy; a close shot reads at a glance, a still wide shot is a décor;
  * a blurry, dark or shaky shot never opens. In one of the clip's best moments, it counts more.
  */
-function shotScore(shot: Shot, analysis: ClipAnalysis): number {
+export function shotScore(shot: Shot, analysis: ClipAnalysis): number {
   let score = shot.hook_score * 2 + (shot.beauty ?? 3) + shot.energy * 0.5;
   if (shot.framing === "close" || shot.framing === "detail") score += 0.5;
   if (shot.framing === "wide" && shot.camera === "static") score -= 1;
