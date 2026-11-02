@@ -1185,7 +1185,7 @@ test("the first Reel's buttons and the ambiances speak plain words", async () =>
   }
   // No ambiance to choose any more: each Reel its own rhythm, in the look of her charter.
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
-  assert.ok(FAUVE_SYSTEM_PROMPT.includes("each Reel at its own pace") && !FAUVE_SYSTEM_PROMPT.includes("« Coupes rapides »"));
+  assert.ok(!FAUVE_SYSTEM_PROMPT.includes("« Coupes rapides »"));
 });
 
 test("the site's photos: share image first, big images, no logos or icons", async () => {
@@ -4513,16 +4513,17 @@ test("Edith makes sure she knows what she wants, and her plan fixes only what sh
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
   // The team works from what Edith passes on: a request left open where it changes the result gets one short question.
   // Tristan: « question essentielles toujours »: every one that changes the result, one per message, and only those.
-  assert.match(FAUVE_SYSTEM_PROMPT, /Always ask the essential questions: whatever her request leaves open that changes the result .* one question per message, the most important first, two at most for one request/);
-  assert.match(FAUVE_SYSTEM_PROMPT, /Only those: when the answer would change little, decide yourself/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /ask the essential questions: what her request leaves open and that changes the result .* one per message, the most important first, two at most/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /Only those: what would change little, decide yourself/);
   // « textes animés en bas » was Edith's own idea in the florist's plan, validated with « C'est parti ».
-  assert.match(FAUVE_SYSTEM_PROMPT, /not where things go on screen nor what an animation looks like, unless she said it/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /never where things go on screen unless she said it/);
   // A preference said of her Reels in general is kept; a wish for one Reel goes in its brief.
-  assert.match(FAUVE_SYSTEM_PROMPT, /A preference she states about her Reels in general .* is lasting too/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /a preference about all her Reels/);
   // « ça c'est Ines, truc et truc… un truc comme ça » became the voice's first words, word for word, then « trouve les bons messages » changed nothing.
-  assert.match(FAUVE_SYSTEM_PROMPT, /The words it quotes .* are the ones the Reel will say, and writing them well is your craft/);
-  assert.match(FAUVE_SYSTEM_PROMPT, /Her own words stay as they are only when she gives them as final/);
-  assert.ok(FAUVE_SYSTEM_PROMPT.length < 46_000);
+  assert.match(FAUVE_SYSTEM_PROMPT, /the words it quotes are the ones the post will say, written as a good creator would when she gave only their idea/);
+
+  // Short on purpose: principles here, the steps of each job in its tool, what must never happen in the code.
+  assert.ok(FAUVE_SYSTEM_PROMPT.length < 12_000);
 });
 
 test("each agent in its role: the editor writes what an animation says, the motion designer its form", async () => {
@@ -4536,9 +4537,9 @@ test("each agent in its role: the editor writes what an animation says, the moti
 
 test("the imagine question stands alone: no dates, formats or filming in its buttons", async () => {
   const { FAUVE_SYSTEM_PROMPT } = await import("./prompts.ts");
-  assert.match(FAUVE_SYSTEM_PROMPT, /asked once and alone in its message: no date, format, advice or other choice beside it/);
-  assert.match(FAUVE_SYSTEM_PROMPT, /never in the message where you ask what she imagines/);
-  assert.match(FAUVE_SYSTEM_PROMPT, /asked you to start from her site's photos: don't propose filming/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /one question, alone in its message: what she imagines, or a ref/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /Launch only on her go/);
+  assert.match(FAUVE_SYSTEM_PROMPT, /Never take files she sent for something else unless she says which/);
   assert.doesNotMatch(FAUVE_SYSTEM_PROMPT, /un autre format ou un autre jour, elle le dit dans sa réponse/);
 });
 
@@ -5697,4 +5698,32 @@ test("a copied Reel in pure motion design asks for no image", async () => {
   assert.equal(motionOnly({ shots: [...drawn, { at: 3, ground: "une rue pavée", laid: "aucun", subject: "" }] }), false);
   assert.equal(motionOnly({ shots: [drawn[0]!, { ...drawn[1]!, laid: "objet", subject: "une tasse" }] }), false);
   assert.equal(motionOnly({}), false);
+});
+
+test("a new Reel starts on her go and with the files of this exchange only", async () => {
+  const { exchangeFiles, saysGo } = await import("./request-log.ts");
+  const at = "2026-11-02T13:00:00Z";
+  const her = (body: string, media_id?: string) => ({ direction: "inbound" as const, type: media_id ? "video" : "text", body, created_at: at, ...(media_id ? { media_id } : {}) });
+  const edith = (body: string, launched = false) => ({ direction: "outbound" as const, type: "text", body, created_at: at, ...(launched ? { launched } : {}) });
+  const old = "11111111-1111-4111-8111-111111111111";
+  const sent = "22222222-2222-4222-8222-222222222222";
+  const picked = "33333333-3333-4333-8333-333333333333";
+  const rows = [
+    her("", old),
+    edith("C'est lancé", true),
+    her("", sent),
+    her(`Je prends celle-ci dans la médiathèque, dans cet ordre (media_id : ${picked}).`),
+    edith("Le plan…"),
+    her("à la fin lien en bio"),
+  ];
+  // Only what was sent or picked since the last launch.
+  assert.deepEqual([...exchangeFiles(rows)].sort(), [sent, picked].sort());
+  // A change to the plan is not a go; a short yes is; a yes with a change is not.
+  assert.equal(saysGo(rows), false);
+  assert.equal(saysGo([...rows, edith("Le plan…"), her("C'est parti")]), true);
+  assert.equal(saysGo([...rows, her("ok go 👍")]), true);
+  assert.equal(saysGo([...rows, her("ok mais mets du piano")]), false);
+  assert.equal(saysGo([...rows, her("oui, à la fin le logo")]), false);
+  assert.equal(saysGo([...rows, her("Le plan validé (« Lancement ») :\n- Accroche : …")]), true);
+  assert.equal(saysGo([]), false);
 });

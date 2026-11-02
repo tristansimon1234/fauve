@@ -10,6 +10,7 @@ import {
   CLAUDE_MODEL,
   claudeCostUsd,
   FAUVE_SYSTEM_PROMPT,
+  FAUVE_SYSTEM_PROMPT_V1,
   studioContextPrompt,
   type StudioContextForPrompt,
   toolSpecs,
@@ -166,7 +167,7 @@ export async function runFauve(input: RunFauveInput): Promise<RunFauveResult> {
     // Stable prefix first (tools, system prompt, history), cached; the volatile
     // studio context (date, step) goes last as a system message so it never
     // invalidates the cached history.
-    system: [{ type: "text", text: FAUVE_SYSTEM_PROMPT, cache_control: CACHE_AN_HOUR }],
+    system: [{ type: "text", text: env("EDITH_PROMPT") === "v1" ? FAUVE_SYSTEM_PROMPT_V1 : FAUVE_SYSTEM_PROMPT, cache_control: CACHE_AN_HOUR }],
     // Each step of the tool loop re-reads everything before it from the cache.
     cache_control: CACHE_THIS_TURN,
     tools: buildTools(createToolHandlers(input)),

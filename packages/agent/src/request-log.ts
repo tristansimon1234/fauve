@@ -34,6 +34,8 @@ export type ExchangeRow = {
   type: string;
   body: string | null;
   created_at: string;
+  /** A file she sent with this message. */
+  media_id?: string | null;
   launched?: boolean;
   unprompted?: { post?: string };
 };
@@ -140,4 +142,45 @@ function recentWords(recent: { title: string; log: RequestEntry[] }[]): string {
     length += part.length;
   }
   return parts.length ? `Ce qu'elle a dit de ses Reels récents (ses goûts ; la demande de ce Reel passe avant) :\n${parts.join("\n")}` : "";
+}
+
+/** Her messages since the last montage launched in this exchange. */
+function sinceLaunch(rows: ExchangeRow[]): ExchangeRow[] {
+  const start = rows.reduce((at, row, i) => (row.launched ? i + 1 : at), 0);
+  return rows.slice(start);
+}
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+/**
+ * The files of this exchange: the ones she sent, or picked in her media library (their ids in her message), since the
+ * last launch. A new Reel takes only these (or the post's own): Edith's launch Reel had been started with twenty photos
+ * sent for other Reels.
+ */
+export function exchangeFiles(rows: ExchangeRow[]): Set<string> {
+  const ids = new Set<string>();
+  for (const row of sinceLaunch(rows)) {
+    if (row.direction !== "inbound") continue;
+    if (row.media_id) ids.add(row.media_id.toLowerCase());
+    for (const m of (row.body ?? "").matchAll(UUID)) ids.add(m[0].toLowerCase());
+  }
+  return ids;
+}
+
+/** A go: a short yes with nothing to change in it (« C'est parti », « vas-y », « ok », 👍). */
+const GO = /(c'?est parti|vas[- ]?y|\bgo\b|\bok\b|\bokay\b|\boui\b|\byes\b|\bouais\b|\blance|parfait|\btop\b|nickel|d'?accord|(ça|ca) me va|c'?est bon|\bvalid|on y va|let'?s go|banco|carr[ée]ment|fonce|👍|✅|🚀|🔥)/i;
+/** What turns a yes into a change (« ok mais à la fin lien en bio »). */
+const CHANGE = /\b(mais|change|changer|plut[ôo]t|sauf|remplace|enl[èe]ve|ajoute|mets?|retire|par contre|juste|a la fin)\b|à la fin/i;
+
+/**
+ * Whether her latest message since the last launch is a go for a new post: a short yes with no change, a click on
+ * « C'est parti », or a message of the « Nouvelle publication » screen (its plan already validated). Edith had
+ * launched a Reel on « à la fin lien en bio », a change to her plan, before her answer on the sound.
+ */
+export function saysGo(rows: ExchangeRow[]): boolean {
+  const last = sinceLaunch(rows).filter((r) => r.direction === "inbound" && r.body?.trim()).at(-1);
+  const text = last?.body?.trim() ?? "";
+  if (!text) return false;
+  if (/^Le plan validé|^Nouvelle publication/m.test(text)) return true;
+  return text.length <= 80 && GO.test(text) && !CHANGE.test(text);
 }

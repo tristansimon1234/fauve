@@ -66,6 +66,8 @@ const schema = {
   // A new Reel whose effect holds to what moves in her video goes to the effects agent (Managed Agents); false: the chain
   // (a correction of a Reel the agent made still goes back to it).
   EFFECTS_AGENT: z.stringbool().default(true),
+  /** Edith's instructions: v2 (the short ones, by default) or v1 (the former 46 000 characters), to go back in one setting. */
+  EDITH_PROMPT: z.enum(["v1", "v2"]).default("v2"),
   // The brakes for a rush (packages/agent/src/brakes.ts): their defaults, changed without a release.
   DAILY_SIGNUPS: z.coerce.number().int().nonnegative().optional(),
   MONTAGES_AT_ONCE: z.coerce.number().int().positive().optional(),

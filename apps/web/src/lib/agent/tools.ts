@@ -53,6 +53,8 @@ import {
   planMessage,
   PLAN_BUTTONS,
   exchangeLines,
+  exchangeFiles,
+  saysGo,
   type ExchangeRow,
 } from "@fauve/agent";
 import { createLoginLink } from "@/lib/auth/login-link";
@@ -615,8 +617,26 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       });
     },
 
-    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, son }) {
-      const post = unwrap(await db.from("posts").select("id, title, edit_plan_id").eq("id", post_id).eq("studio_id", studioId).single());
+    async montage({ post_id, media_ids, brief, correction, max_new_scenes, variant, plan, effort, inspiration_id, son, anciens_fichiers }) {
+      const post = unwrap(await db.from("posts").select("id, title, edit_plan_id, media_ids").eq("id", post_id).eq("studio_id", studioId).single());
+      // A new Reel, checked before anything is spent: her go, and only the files of this exchange (or the post's own).
+      if (!correction && !variant && !post.edit_plan_id && ctx.exchange?.length) {
+        if (!saysGo(ctx.exchange)) {
+          return json({
+            possible: false,
+            note: "Pas encore son feu vert : son dernier message n'est pas un « C'est parti ». Redis-lui ton plan avec ce qu'elle vient de demander (reply_with plan), règle une question encore ouverte, et lance sur son accord.",
+          });
+        }
+        const allowed = new Set([...exchangeFiles(ctx.exchange), ...((post.media_ids as string[] | null) ?? []).map((id) => id.toLowerCase())]);
+        const foreign = (media_ids ?? []).filter((id) => !allowed.has(id.toLowerCase()));
+        if (foreign.length && !anciens_fichiers) {
+          return json({
+            possible: false,
+            fichiers_d_avant: foreign.length,
+            note: `${foreign.length} de ces fichiers n'ont été ni envoyés ni choisis pour ce Reel. Demande-lui quelles images prendre (ou d'en envoyer), sans en prendre d'office ; si elle t'a dit de prendre ceux d'avant, relance avec anciens_fichiers true. Un Reel en pur motion design n'en prend aucun.`,
+          });
+        }
+      }
       if (inspiration_id) {
         const known = await db.from("inspirations").select("id").eq("id", inspiration_id).eq("studio_id", studioId).maybeSingle();
         if (!known.data) return "Inspiration introuvable : reprends un inspiration_id de list_inspirations.";
@@ -1136,7 +1156,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       return json({
         status: "started",
         inspiration_id: started.inspirationId,
-        note: "Tu le regardes après ta réponse (environ une minute), puis tu lui envoies tout seul ce que son Reel en reprend. C'est le modèle d'un seul Reel, le prochain : si elle t'a déjà donné ses vidéos ou ses photos pour ce Reel (ou dit lesquelles prendre), crée la publication et lance montage tout de suite avec cet inspiration_id (le monteur attend la lecture) ; sinon ne les lui demande pas, ton message qui suit le fait. Annonce-le en une phrase, sans rien décrire de ce Reel avant de l'avoir vu.",
+        note: "Tu le regardes après ta réponse (environ une minute), puis tu lui envoies tout seul ce que son Reel en reprend. C'est le modèle d'un seul Reel, le prochain : si elle t'a déjà donné ses vidéos ou ses photos pour ce Reel (ou dit lesquelles prendre), propose ton plan (reply_with plan) et lance montage avec cet inspiration_id sur son accord (le monteur attend la lecture) ; sinon ne les lui demande pas, ton message qui suit le fait (et un Reel en pur motion design n'en prend aucun). Annonce-le en une phrase, sans rien décrire de ce Reel avant de l'avoir vu.",
         ...(link && /instagram\.com\//i.test(link)
           ? {
               son: "Un Reel d'Instagram : dans cette même réponse, demande-lui une fois si elle veut garder son son, avec deux boutons (reply_with) « Garder son son » et « Ta musique ». Garder son son : sa vidéo sortira sans musique, sur ses coupes, et elle ajoutera le son dans Instagram avec « Utiliser l'audio » en la publiant elle-même. Sa réponse va à montage (son) ; si le montage est déjà lancé, à set_music (model, ou on).",

@@ -300,7 +300,7 @@ const UNPROMPTED = new Set(["reminder", "nudge", "daily_cap", "new_numbers_alert
  * A stored message as a launch's exchange reads it: Edith's reply of a turn that started work marks where it begins;
  * a message she sent on her own (a delivery, a reminder) says which post it is about.
  */
-function toExchange(row: { direction: string; type: string; body: string | null; created_at: string; payload: unknown }): ExchangeRow {
+function toExchange(row: { direction: string; type: string; body: string | null; media_id?: string | null; created_at: string; payload: unknown }): ExchangeRow {
   const payload = row.payload as { quote?: unknown; notes?: string[]; open_post?: unknown; kind?: unknown } | null;
   const outbound = row.direction === "outbound";
   const launched = outbound && Boolean(payload?.quote || payload?.notes?.some((n) => LAUNCHED.test(n)));
@@ -310,6 +310,7 @@ function toExchange(row: { direction: string; type: string; body: string | null;
     type: row.type,
     body: row.body,
     created_at: row.created_at,
+    ...(row.media_id ? { media_id: row.media_id } : {}),
     ...(launched ? { launched } : {}),
     ...(unprompted ? { unprompted: typeof payload?.open_post === "string" ? { post: payload.open_post } : {} } : {}),
   };
