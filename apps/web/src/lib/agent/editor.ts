@@ -555,7 +555,13 @@ export async function designEdit(params: {
   // those its brief names (by media_id). Each is cut out first (their own sandbox); one without a clean cut-out comes whole.
   const collage = plan.template === "collage" || isComposed(plan);
   const named = (brief: string) => photoIds.filter((id) => brief.includes(id));
-  const wanted = [...new Set(toWrite.flatMap((w) => (collage ? photoIds : named(w.brief))))].slice(0, MAX_OFFERED_PHOTOS);
+  // At most MAX_OFFERED_PHOTOS: the ones a brief names first, then a correction's new photos, then (for a composition)
+  // the others in the Reel's order. In the Reel's order alone, Promo Edith 2's five new photos came last, were left
+  // out, and the détourages she asked for of them were never drawn.
+  const earlierFiles = correction && previousPlan.success ? new Set(planMediaIds(previousPlan.data)) : null;
+  const wanted = [
+    ...new Set([...toWrite.flatMap((w) => named(w.brief)), ...(earlierFiles ? photoIds.filter((id) => !earlierFiles.has(id)) : []), ...(collage ? photoIds : [])]),
+  ].slice(0, MAX_OFFERED_PHOTOS);
   await earlyCutouts;
   if (wanted.length) await ensureCutouts(params.studioId, wanted);
   const offers = wanted.length ? await photoOffers(params.studioId, wanted).catch(() => []) : [];

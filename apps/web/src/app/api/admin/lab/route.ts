@@ -24,7 +24,7 @@ import { startEffectWords } from "@/lib/effect-words";
 import { usableFonts } from "@/lib/fonts";
 import { queueJob } from "@/lib/jobs";
 import { readSiteLook } from "@/lib/site-look";
-import { missMessage, stealNow, stealStyle } from "@/lib/steal";
+import { missMessage, modelVideo, stealNow, stealStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { speak, writeVoiceScript } from "@/lib/voice-over";
@@ -735,6 +735,12 @@ async function newMusic(key: string) {
 export async function POST(request: Request) {
   if (!cronAuthorized(request)) return new Response("unauthorized", { status: 401 });
   const params = new URL(request.url).searchParams;
+  // A Reel to copy, as its reading gets it: its video for an hour, to look at it frame by frame (no studio needed).
+  if (params.get("step") === "model") {
+    const link = params.get("steal") ?? "";
+    if (!/^https:\/\/\S{8,500}$/.test(link)) return Response.json({ error: "steal=<https url>" }, { status: 400 });
+    return Response.json(await modelVideo(link));
+  }
   // A real business, from its website.
   const site = params.get("site");
   if (site) {

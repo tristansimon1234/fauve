@@ -349,3 +349,27 @@ export async function pendingSteal(studioId: string): Promise<{ id: string; name
     ],
   };
 }
+
+/**
+ * A Reel's video as the reading gets it (the sandbox's small copy, 720 px, 30 i/s), kept an hour for the team to look
+ * at it frame by frame next to its reading (Tristan: « elle analyse pas assez d'images par seconde ? »). The lab only.
+ */
+export async function modelVideo(url: string): Promise<{ url: string; duration: number; cuts: number[] } | { miss: string }> {
+  const link = reelLink(url);
+  const take: { link: string } | { file: string } = link ? { link: link.url } : { file: url };
+  let reel = await stealReelInSandbox(`model-${randomUUID()}`, take);
+  if ("miss" in reel && reel.miss === "unreachable" && link?.platform === "instagram") {
+    const fetched = await instagramVideo(link.url).catch(() => null);
+    if (fetched?.video) reel = await stealReelInSandbox(`model-${randomUUID()}`, { file: fetched.video });
+  }
+  if ("miss" in reel) return { miss: reel.miss };
+  const db = supabaseAdmin();
+  await db.from("cost_events").insert({ studio_id: null, kind: "steal", provider: "vercel_sandbox", units: Math.round(reel.seconds), cost_eur: sandboxCostEur(reel.seconds), meta: { purpose: "model_frames" } });
+  const path = `lab/models/${randomUUID()}.mp4`;
+  const upload = await db.storage.from("media").upload(path, reel.video, { contentType: "video/mp4" });
+  if (upload.error) throw new Error(upload.error.message);
+  const signed = await db.storage.from("media").createSignedUrl(path, 3600);
+  if (!signed.data) throw new Error("model video: no link");
+  return { url: signed.data.signedUrl, duration: reel.duration, cuts: reel.cuts };
+}
+
