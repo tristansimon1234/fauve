@@ -5187,8 +5187,8 @@ test("a copied Reel read before the current reader is read again when its link c
 
 test("WhatsApp: a chaser waits with ⏳, a thank-you or an okay gets its reaction, the rest gets a turn", async () => {
   const { ackFor, isChaser } = await import("./emoji.ts");
-  for (const t of ["?", "??", "Alors ?", "alors", "Et alors ?", "c’est bon ?", "Ça avance ?", "t'es là ?", "Toujours rien ?"]) assert.equal(isChaser(t), true, t);
-  for (const t of ["Alors on fait quoi demain ?", "c'est bon pour 18 h", "Tu peux enlever la 2e photo ?", "ok"]) assert.equal(isChaser(t), false, t);
+  for (const t of ["?", "??", "Alors ?", "alors", "Et alors ?", "c’est bon ?", "Ça avance ?", "t'es là ?", "Toujours rien ?", "Ok ?", "ok?", "On en est où ?"]) assert.equal(isChaser(t), true, t);
+  for (const t of ["Alors on fait quoi demain ?", "c'est bon pour 18 h", "Tu peux enlever la 2e photo ?", "ok", "Ok !", "Ok pour samedi ?"]) assert.equal(isChaser(t), false, t);
   assert.equal(ackFor("Merci !"), "❤️");
   assert.equal(ackFor("merci beaucoup 🙏"), "❤️");
   assert.equal(ackFor("Top"), "👍");

@@ -85,12 +85,12 @@ const plainAsk = (text: string | null | undefined) =>
     .trim();
 
 /**
- * « Alors ? », « ? », « c'est bon ? »: she is waiting for what is under way. While Edith answers
+ * « Alors ? », « ? », « Ok ? », « c'est bon ? »: she is waiting for what is under way. While Edith answers
  * or a montage runs, a ⏳ says it without a turn (two turns at once had launched two Reels).
  */
 export function isChaser(text: string | null | undefined): boolean {
   const t = plainAsk(text);
-  return /^(\?|(et )?alors ?\??|c'est bon ?\?|ça (avance|vient|donne quoi) ?\?|ca (avance|vient) ?\?|(tu es|t'es) là ?\?|des nouvelles ?\?|toujours (rien|pas) ?\?|c'est prêt ?\?|c'est pret ?\?|et maintenant ?\?|allô ?\?|allo ?\?|hello ?\?)$/u.test(t);
+  return /^(\?|(et )?alors ?\??|c'est bon ?\?|ça (avance|vient|donne quoi) ?\?|ca (avance|vient) ?\?|(tu es|t'es) là ?\?|des nouvelles ?\?|toujours (rien|pas) ?\?|c'est prêt ?\?|c'est pret ?\?|et maintenant ?\?|allô ?\?|allo ?\?|hello ?\?|ok ?\?|okay ?\?|on en est où ?\?|on en est ou ?\?|tu en es où ?\?|t'en es où ?\?|ça en est où ?\?|c'est fini ?\?|c'est parti ?\?|ça part ?\?|ça marche ?\?|ca marche ?\?)$/u.test(t);
 }
 
 /**
