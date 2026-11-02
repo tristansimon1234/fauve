@@ -818,7 +818,7 @@ export async function designEdit(params: {
       ...(result.fonts?.length ? { fonts: result.fonts } : {}),
       // A collage's composition written now draws the whole picture: its ground, the Reel's texts and its end;
       // it knows where its faces are, so it sets the row of a voice's subtitles (they had landed on Tristan's eyes).
-      ...(l.compose ? { draws_texts: true } : {}),
+      ...(l.compose ? { draws_texts: true, draws_end: Boolean(plan.end_card) } : {}),
       ...(l.compose && result.subtitleY !== undefined ? { subtitle_y: result.subtitleY } : {}),
     };
     return [{ ...l, motion }];

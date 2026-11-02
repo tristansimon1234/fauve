@@ -217,8 +217,27 @@ export type ReelProps = {
     fonts?: string[];
     /** A collage's composition that draws the whole picture: the Reel's texts and its end are its own (no paper nor texts of the engine). */
     drawsTexts?: boolean;
+    /** False: written without an end card; it stops before the card, which the engine draws. */
+    drawsEnd?: boolean;
     reelTexts?: ComposeText[];
     end?: ComposeEnd | null;
+  }[];
+  /** What she added on her Reel (a text, one of her photos or its cut-out), drawn over everything, in frames. */
+  overlays?: {
+    kind: "text" | "photo";
+    text?: string;
+    src?: string;
+    /** The photo's width over its height. */
+    aspect?: number;
+    /** A cut-out subject: the image is the photo's size, its subject in `box` (shares). */
+    cutout?: boolean;
+    box?: Box;
+    from: number;
+    durationInFrames: number;
+    /** Its centre (shares of the frame); w: a photo's width, or a text's type size, share of the width. */
+    x: number;
+    y: number;
+    w: number;
   }[];
   /**
    * A simple copied Reel remade by code (copy.ts): her photos' subjects laid over its shots (`box` in shares of the

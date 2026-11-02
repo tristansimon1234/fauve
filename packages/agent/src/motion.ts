@@ -182,6 +182,22 @@ export type ReelCopy = {
   end: { from: number; ground: string; ink: string; cards: { from: number; lines: string[] }[] } | null;
 };
 
+/** An element she added, as the render draws it (mirror of plan.overlays). */
+export type ReelOverlay = {
+  kind: "text" | "photo";
+  text?: string;
+  src?: string;
+  aspect?: number;
+  /** The photo is a cut-out subject (a sticker's shadow, no frame): its image the photo's size, its subject in `box` (shares). */
+  cutout?: boolean;
+  box?: { x: number; y: number; w: number; h: number };
+  from: number;
+  durationInFrames: number;
+  x: number;
+  y: number;
+  w: number;
+};
+
 export type ReelProps = {
   template: MotionTemplate;
   /** The Reel's own tempo (beats per minute): how lively its texts and camera move (a « libre » Reel). */
@@ -246,12 +262,16 @@ export type ReelProps = {
     fonts?: string[];
     /** A collage's composition that draws the whole picture: the Reel's texts and its end are its own (no paper nor texts of the engine). */
     drawsTexts?: boolean;
+    /** False: one written without an end card, which stops before it while the engine draws the card. */
+    drawsEnd?: boolean;
     reelTexts?: ComposeText[];
     end?: ComposeEnd | null;
   }[];
   /** Components of the studio's bank placed on a still: drawn at their design width (base), then scaled into their box (shares of the frame). */
   /** A simple copied Reel remade by code (copy.ts), in frames (mirror of the render's). */
   copy?: ReelCopy;
+  /** What she added on her Reel (plan.overlays), in frames and px shares, drawn over everything. */
+  overlays?: ReelOverlay[];
   elements?: {
     js: string;
     texts: Record<string, string>;
@@ -328,6 +348,8 @@ export type ReelInputs = {
   tracks?: TracksByClip;
   /** A copied Reel's laid subjects, by photo: the cut-out's signed link, the subject's box (shares of the photo), the photo's width over height. */
   copyCutouts?: Record<string, { src: string; box: CopyBox; aspect: number }>;
+  /** The photos she added on her Reel (plan.overlays): each signed, its cut-out's when she wants it and it has one, with its shape. */
+  overlayPhotos?: Record<string, { src: string; aspect: number; cutout?: { src: string; box: { x: number; y: number; w: number; h: number } } }>;
 };
 
 /** A clip's width / height as the Reel frames it, from its analysis (phones film 16:9 or 9:16). */
@@ -602,10 +624,12 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   const endCardFrames = toFrames(END_CARD_SECONDS);
 
   // A collage's composition lays her shots itself: each one's segment, span, shape and subject (a photo's cut-out too).
-  const composeShots = (from: number): ComposeShot[] =>
+  const composeShots = (from: number, length: number): ComposeShot[] =>
     plan.segments.flatMap((s, i): ComposeShot[] => {
       const segment = segments[i];
       if (!isClipSegment(s) || !segment || (segment.type !== "clip" && segment.type !== "image")) return [];
+      // A shot added after the composition ends is the engine's to play, not one it lays.
+      if (segment.startAt >= from + length) return [];
       const span = { segment: i, from: segment.startAt - from, durationInFrames: segment.durationInFrames };
       if (segment.type === "image") {
         const photo = scenePhotos([s.clip_id], inputs)[0];
@@ -655,10 +679,15 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         durationInFrames: length,
         cuts: starts.filter((f) => f > from && f < from + length).map((f) => f - from),
         ...(l.motion.photos?.length ? { photos: scenePhotos(l.motion.photos, inputs) } : {}),
-        ...(l.compose ? { compose: true, shots: composeShots(from) } : {}),
-        // A composition that draws the whole picture gets the Reel's texts and its end to draw.
+        ...(l.compose ? { compose: true, shots: composeShots(from, length) } : {}),
+        // A composition that draws the whole picture gets the Reel's texts and its end to draw; one written without an
+        // end card (draws_end false, or no word of it in its code) leaves the card to the engine and stops before it.
         ...(l.compose && l.motion.draws_texts
-          ? { drawsTexts: true, reelTexts: composeTexts(texts, from), end: endCard ? { ...endCard, from: endCard.from - from } : null }
+          ? (() => {
+              // (Never an end card that starts after it: one she added plays after its last image, the engine's to draw.)
+              const drawsEnd = (l.motion.draws_end ?? /\bend\b/.test(l.motion.code ?? l.motion.js ?? "")) && (!endCard || endCard.from < from + length);
+              return { drawsTexts: true, drawsEnd, reelTexts: composeTexts(texts, from), end: endCard && drawsEnd ? { ...endCard, from: endCard.from - from } : null };
+            })()
           : {}),
         ...(track.length ? { track } : {}),
         ...(l.motion.fonts?.length ? { fonts: l.motion.fonts } : {}),
@@ -667,6 +696,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
   });
 
   const copy = plan.copy ? copyProps(plan.copy, segments, inputs, durationInFrames) : null;
+  const overlays = overlayProps(plan.overlays ?? [], inputs, durationInFrames);
   return {
     template: inputs.template,
     ...(plan.tempo ? { tempo: plan.tempo } : {}),
@@ -685,7 +715,23 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),
     ...(layers.length ? { layers } : {}),
     ...(copy ? { copy } : {}),
+    ...(overlays.length ? { overlays } : {}),
   };
+}
+
+/** What she added, in frames: a text as written, a photo by its signed link (its cut-out when she wants it and it has one). */
+function overlayProps(overlays: NonNullable<EditPlan["overlays"]>, inputs: ReelInputs, total: number): ReelOverlay[] {
+  return overlays.flatMap((o): ReelOverlay[] => {
+    const from = Math.min(total - 1, toFrames(o.from));
+    const length = Math.min(total, toFrames(o.to)) - from;
+    if (length <= 0) return [];
+    const place = { from, durationInFrames: length, x: o.x, y: o.y, w: o.w };
+    if (o.kind === "text") return o.text ? [{ kind: "text", text: frenchSpaces(o.text), ...place }] : [];
+    const photo = o.media_id ? inputs.overlayPhotos?.[o.media_id] : undefined;
+    if (!photo) return [];
+    const cut = o.cutout !== false ? photo.cutout : undefined;
+    return [{ kind: "photo", src: cut ? cut.src : photo.src, aspect: photo.aspect, ...(cut ? { cutout: true, box: cut.box } : {}), ...place }];
+  });
 }
 
 /** A copied Reel's layer in frames: each subject over its shot from its landing, the title held, the ending's cards. */

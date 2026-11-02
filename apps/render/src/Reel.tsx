@@ -13,6 +13,7 @@ import {
 } from "remotion";
 import { CarouselDesign } from "./Carousel";
 import { CopyLayer } from "./Copy";
+import { Overlays } from "./Overlays";
 import { COLLAGE_OVERLAP, COLLAGE_SERIF, CollageBackdrop, CollageBand, CollageCaption, CollageCard, CollageEndCard, CollageHook, CollageMessage, Grain, printSize, stickerTop, type Sticker } from "./Collage";
 import { FilmDust } from "./FilmDust";
 import { Fit } from "./Fit";
@@ -78,6 +79,12 @@ export function Reel(props: ReelProps) {
   // One that draws the whole picture (Tristan: « tout ça n'est pas assez libre ») has its own ground, texts and end:
   // the engine's paper, texts and end card only play in its fallback. Another composition always does.
   const whole = Boolean(compose?.drawsTexts) || Boolean(compose && !collage);
+  // A composition written without an end card (one added later, by her or Edith): it stops where the card starts, and the
+  // engine draws the card. Drawn by no one, her calendar Reel's end card never showed.
+  const engineEnd = Boolean(props.endCard) && (!whole || compose?.drawsEnd === false);
+  const composeLength = compose && whole && engineEnd && props.endCard ? Math.max(1, Math.min(compose.durationInFrames, props.endCard.from - compose.from)) : compose?.durationInFrames;
+  // A shot she added after the composition ends is the engine's to play.
+  const laidByComposition = (segment: ReelProps["segments"][number]) => Boolean(compose) && segment.startAt < compose!.from + compose!.durationInFrames;
   const isShot = (segment: ReelProps["segments"][number]) => segment.type === "clip" || segment.type === "image";
   // A collage's print of a shot: a card that stays a little under the next one sliding over it.
   const print = (segment: ReelProps["segments"][number], i: number, from = 0) =>
@@ -174,7 +181,7 @@ export function Reel(props: ReelProps) {
       <ExposureFilters />
       {collage && !whole ? <CollageBackdrop props={props} /> : null}
       {compose ? (
-        <Sequence from={compose.from} durationInFrames={compose.durationInFrames} layout="none">
+        <Sequence from={compose.from} durationInFrames={composeLength} layout="none">
           <MotionScene
             js={compose.js}
             texts={compose.texts}
@@ -214,7 +221,7 @@ export function Reel(props: ReelProps) {
       ) : null}
       {props.segments.map((segment, i) =>
         // A composed Reel's shots are laid by its composition; a collage's, else each one a print.
-        isShot(segment) && compose ? null : collage && isShot(segment) ? print(segment, i) : montaged(segment, i),
+        isShot(segment) && laidByComposition(segment) ? null : collage && isShot(segment) ? print(segment, i) : montaged(segment, i),
       )}
       {/* Animations over several shots (a character on every shot, a counter that runs…), above the montage, under its texts. */}
       {(props.layers ?? []).map((layer, i) =>
@@ -246,7 +253,9 @@ export function Reel(props: ReelProps) {
       {props.elements?.length ? <Elements props={props} /> : null}
       <Logo props={props} k={k} />
 
-      {whole ? null : endCard}
+      {engineEnd ? endCard : null}
+      {/* What she added (a text, a photo, a cut-out): over everything, the end card too. */}
+      {props.overlays?.length ? <Overlays props={props} k={k} /> : null}
       {collage && !whole ? <Grain props={props} /> : null}
       {props.soundtrack?.src ? <Audio src={props.soundtrack.src} volume={(f) => musicVolume(props.soundtrack!, f)} /> : null}
       {props.voice?.src ? (

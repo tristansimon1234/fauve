@@ -151,6 +151,12 @@ export const editPlanMotionSegmentSchema = z.object({
      * the paper and the texts stay the engine's.
      */
     draws_texts: z.boolean().optional(),
+    /**
+     * A composition written for a Reel with an end card: it draws that card itself (set by the engine when written).
+     * One written without it stops before the card, and the engine draws the card (her calendar Reel's end card,
+     * added later, was drawn by no one three times).
+     */
+    draws_end: z.boolean().optional(),
     /** A composition's choice of where the engine sets a voice's subtitles (share of the height): where none of its faces nor texts go. */
     subtitle_y: z.number().min(0.1).max(0.8).optional(),
   }),
@@ -326,6 +332,27 @@ export const copyLayerSchema = z.object({
 });
 export type CopyLayer = z.infer<typeof copyLayerSchema>;
 
+/**
+ * Something she adds on her Reel, drawn by the engine over whatever is there, a composition too, free (Tristan: « si je
+ * veux ajouter qq chose à un reel je comprends pas pq je peux pas »): a text, or one of her photos (its subject cut out
+ * when it has a clean one), from `from` to `to` s. x, y: its centre, shares of the frame; w: a photo's width, or a
+ * text's type size, share of the width.
+ */
+export const planOverlaySchema = z.object({
+  kind: z.enum(["text", "photo"]),
+  text: z.string().trim().min(1).max(90).optional(),
+  media_id: z.string().min(1).max(80).optional(),
+  cutout: z.boolean().optional(),
+  from: z.number().min(0),
+  to: z.number().min(0),
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  w: z.number().min(0.03).max(1),
+});
+export type PlanOverlay = z.infer<typeof planOverlaySchema>;
+/** The most elements she adds on one Reel. */
+export const MAX_OVERLAYS = 8;
+
 export const editPlanObjectSchema = z.object({
   format: z.enum(["9:16", "1:1", "4:5"]),
   duration: z.number().min(3).max(90),
@@ -377,6 +404,8 @@ export const editPlanObjectSchema = z.object({
     .optional(),
   /** A simple copied Reel remade by code (copyLayerSchema): its cut-outs, its title and its ending, drawn over the shots. */
   copy: copyLayerSchema.optional(),
+  /** What she added on it (planOverlaySchema), over everything. */
+  overlays: z.array(planOverlaySchema).max(MAX_OVERLAYS).optional(),
 });
 
 export const editPlanSchema = editPlanObjectSchema.superRefine((plan, ctx) => {

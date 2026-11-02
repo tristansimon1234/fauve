@@ -3,6 +3,7 @@ import { readPostMusic } from "@/lib/render/music";
 import { editPlanSchema, isClipSegment, motionTemplateSchema, type ReelInputs } from "@fauve/agent";
 import { loadMontageInputs } from "@/lib/render/render-post";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { overlayPhotoInputs } from "@/lib/render/cutout";
 
 /**
  * What the live montage (scene editor, mobile page) needs: the full plan and
@@ -27,7 +28,11 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
     voice: plan.data.voice,
     template: plan.data.template,
     layers: plan.data.layers,
+    overlays: plan.data.overlays,
   }, { postId: data?.post_id as string | undefined });
+  // Her added photos, and any photo she may add by hand from her library, signed for the live preview.
+  const overlayIds = [...(plan.data.overlays ?? []).flatMap((o) => (o.media_id ? [o.media_id] : [])), ...wanted];
+  const overlayPhotos = overlayIds.length ? await overlayPhotoInputs(studioId, overlayIds).catch(() => ({})) : {};
   // Edith's music plays in the live preview too (the piece kept for this post).
   const { data: post } = data?.post_id ? await db.from("posts").select("music").eq("id", data.post_id).maybeSingle() : { data: null };
   const music = readPostMusic(post?.music);
@@ -49,6 +54,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
       ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
       ...(inputs.copyCutouts ? { copyCutouts: inputs.copyCutouts } : {}),
+      ...(Object.keys(overlayPhotos).length ? { overlayPhotos } : {}),
       photoAspects: inputs.photoAspects,
       // What moves under its animations, so an animation that follows a hand follows it in the preview too.
       ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),

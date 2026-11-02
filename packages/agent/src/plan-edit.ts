@@ -1,4 +1,4 @@
-import { isClipSegment, segmentSeconds, type EditPlan } from "./schemas.ts";
+import { isClipSegment, MAX_OVERLAYS, segmentSeconds, type EditPlan, type PlanOverlay } from "./schemas.ts";
 
 // Manual edits of a montage (the scene editor): every change keeps the plan
 // valid and the overlay texts attached to the scene they were on, since texts
@@ -55,8 +55,20 @@ function withSegments(plan: EditPlan, segments: Segment[], origin: (number | nul
     const end = round(Math.min(after[at]!.end, text.to + offset));
     return end - start >= 0.3 ? [{ ...text, from: start, to: end }] : [];
   });
+  // What she added on a scene moves with it, like a text (one over the whole Reel keeps its span, clipped to the new end).
   const duration = round(after.at(-1)?.end ?? 0);
-  return { ...plan, segments, texts, duration: Math.max(3, duration) };
+  const overlays = plan.overlays?.flatMap((o): PlanOverlay[] => {
+    const whole = o.from <= 0.05 && o.to >= (before.at(-1)?.end ?? 0) - 0.05;
+    if (whole) return [{ ...o, to: round(Math.max(o.from + 0.3, duration)) }];
+    const from = segmentAt(plan, o.from);
+    const at = origin.indexOf(from);
+    if (at === -1) return [];
+    const offset = after[at]!.start - before[from]!.start;
+    const start = round(Math.max(0, o.from + offset));
+    const end = round(Math.min(duration, o.to + offset));
+    return end - start >= 0.3 ? [{ ...o, from: start, to: end }] : [];
+  });
+  return { ...plan, segments, texts, duration: Math.max(3, duration), ...(plan.overlays ? { overlays } : {}) };
 }
 
 /** Moves the segment at `from` to position `to`. */
@@ -102,3 +114,59 @@ export function insertSegment(plan: EditPlan, index: number, segment: Segment): 
   segments.splice(at, 0, segment);
   return withSegments(plan, segments, origin);
 }
+
+/** How long an end card she adds plays, after the Reel's last image (its last shot held under the card). */
+export const ADDED_END_SECONDS = 1.6;
+
+/**
+ * Her end card: its words changed when the Reel has one; else added, the Reel going on by ADDED_END_SECONDS after its
+ * last image (the last shot held, a photo still, a video on its last frame), the card playing there. Over a Reel drawn
+ * by one composition, the composition stops where the card starts and the engine draws the card on black.
+ */
+export function withEndCard(plan: EditPlan, card: { title: string; subtitle?: string }): EditPlan {
+  const end = { title: card.title.trim().slice(0, 40), ...(card.subtitle?.trim() ? { subtitle: card.subtitle.trim().slice(0, 60) } : {}) };
+  if (!end.title) return plan;
+  if (plan.end_card) return { ...plan, end_card: { ...plan.end_card, ...end, ...(end.subtitle ? {} : { subtitle: undefined }) } };
+  const index = plan.segments.length - 1;
+  const last = plan.segments[index]!;
+  const longer: Segment = isClipSegment(last)
+    ? { ...last, out: round(last.out + ADDED_END_SECONDS * (last.speed ?? 1)) }
+    : { ...last, duration: Math.min("scene" in last ? 6 : 8, round(last.duration + ADDED_END_SECONDS)) };
+  return { ...updateSegment(plan, index, longer), end_card: end };
+}
+
+/** Her end card taken out: the time added for it goes with it. */
+export function withoutEndCard(plan: EditPlan): EditPlan {
+  if (!plan.end_card) return plan;
+  const { end_card: _gone, ...rest } = plan;
+  return rest as EditPlan;
+}
+
+/** An element she adds (a text, a photo), clipped to the Reel; at most MAX_OVERLAYS. */
+export function addOverlay(plan: EditPlan, overlay: PlanOverlay): EditPlan {
+  const from = round(Math.max(0, Math.min(plan.duration - 0.3, overlay.from)));
+  const to = round(Math.max(from + 0.3, Math.min(plan.duration, overlay.to)));
+  return { ...plan, overlays: [...(plan.overlays ?? []), { ...overlay, from, to }].slice(-MAX_OVERLAYS) };
+}
+
+export function updateOverlay(plan: EditPlan, index: number, patch: Partial<PlanOverlay>): EditPlan {
+  return { ...plan, overlays: (plan.overlays ?? []).map((o, i) => (i === index ? { ...o, ...patch } : o)) };
+}
+
+export function removeOverlay(plan: EditPlan, index: number): EditPlan {
+  const overlays = (plan.overlays ?? []).filter((_, i) => i !== index);
+  return { ...plan, overlays };
+}
+
+/**
+ * Where a scene she adds can go: anywhere in a montage; after the composition in a Reel drawn by one (its shots are
+ * laid by its code: one put in the middle would not be seen).
+ */
+export function insertableFrom(plan: EditPlan): number {
+  const compose = plan.layers?.find((l) => l.compose);
+  if (!compose) return 0;
+  const spans = timeline(plan);
+  const first = spans.findIndex((s) => s.start >= compose.to - 0.05);
+  return first === -1 ? plan.segments.length : first;
+}
+

@@ -155,3 +155,35 @@ export async function copyCutoutInputs(studioId: string, photoIds: string[]): Pr
     cuts.flatMap((c, i) => (signed.data?.[i]?.signedUrl ? [[c.id, { src: signed.data[i]!.signedUrl, box: c.cutout.box, aspect: c.cutout.w / c.cutout.h }]] : [])),
   );
 }
+
+/**
+ * The photos she added on her Reel (plan.overlays): each one signed, with its shape, and its subject cut out when the
+ * cut-out is clean enough to stand alone (sceneWorthy): drawn by the engine over her Reel, and in the live preview.
+ */
+export async function overlayPhotoInputs(studioId: string, ids: string[]): Promise<NonNullable<ReelInputs["overlayPhotos"]>> {
+  const unique = [...new Set(ids)].slice(0, 16);
+  if (!unique.length) return {};
+  const db = supabaseAdmin();
+  const { data: assets } = await db.from("media_assets").select("id, kind, storage_path, regions, cutout").eq("studio_id", studioId).eq("kind", "image").in("id", unique);
+  const rows = (assets ?? []).filter((a) => typeof a.storage_path === "string" && (a.storage_path as string).startsWith(`${studioId}/`));
+  if (!rows.length) return {};
+  const cuts = rows.map((a) => {
+    const cutout = cutoutSchema.safeParse(a.cutout);
+    return cutout.success && cutout.data.path.startsWith(`${studioId}/`) && sceneWorthy(cutout.data) ? cutout.data : null;
+  });
+  const paths = [...rows.map((a) => a.storage_path as string), ...cuts.flatMap((c) => (c ? [c.path] : []))];
+  const signed = (await db.storage.from("media").createSignedUrls(paths, 7200)).data ?? [];
+  const url = (path: string) => signed.find((s) => s.path === path)?.signedUrl;
+  return Object.fromEntries(
+    rows.flatMap((a, i) => {
+      const src = url(a.storage_path as string);
+      if (!src) return [];
+      const read = (a.regions ?? {}) as { width?: number; height?: number };
+      const cut = cuts[i];
+      const aspect = read.width && read.height ? read.width / read.height : cut ? cut.w / cut.h : 3 / 4;
+      const cutSrc = cut ? url(cut.path) : undefined;
+      return [[a.id as string, { src, aspect, ...(cut && cutSrc ? { cutout: { src: cutSrc, box: cut.box } } : {}) }]];
+    }),
+  );
+}
+

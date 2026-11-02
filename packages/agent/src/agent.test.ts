@@ -5808,3 +5808,30 @@ test("a WhatsApp video's quality is measured: its picture read in its MP4 header
   assert.equal(compressedVideo({ bytes: 10e6, duration: 10, width: 480, height: 848 }), true);
   assert.equal(compressedVideo({ bytes: null, duration: null, width: null, height: null }), null);
 });
+
+test("she adds to a Reel without anything redone: an end card after its last image, an element on a scene", async () => {
+  const { withEndCard, addOverlay, insertableFrom, moveSegment, ADDED_END_SECONDS } = await import("./plan-edit.ts");
+  const { buildReelProps } = await import("./motion.ts");
+  const clip = (id: string, out: number) => ({ clip_id: id, in: 0, out, zoom: "none" as const });
+  const base = { format: "9:16", duration: 9, template: "libre", segments: [clip("a", 3), clip("b", 3), clip("c", 3)], texts: [], images: [], transitions: "cut", subtitles: false, music: null } as never;
+  // An end card: the Reel goes on after its last image, and the card plays there.
+  const ended = withEndCard(base, { title: "Demande à Edith", subtitle: "sur WhatsApp" }) as { duration: number; end_card?: { title: string }; segments: { out: number }[] };
+  assert.equal(ended.end_card?.title, "Demande à Edith");
+  assert.equal(ended.duration, 9 + ADDED_END_SECONDS);
+  // An element on the second scene moves with it.
+  const withText = addOverlay(base, { kind: "text", text: "Nouveau", from: 3.2, to: 5.8, x: 0.5, y: 0.4, w: 0.08 }) as never;
+  const moved = moveSegment(withText, 1, 0) as { overlays?: { from: number }[] };
+  assert.equal(moved.overlays?.[0]?.from, 0.2);
+  // A Reel drawn by one composition takes an added scene only after it.
+  const composed = { ...(base as object), layers: [{ from: 0, to: 6, compose: true, motion: { brief: "grid", js: "x" } }] } as never;
+  assert.equal(insertableFrom(composed), 2);
+  assert.equal(insertableFrom(base), 0);
+  // The render draws the element, and the end card added after a composition written without one is the engine's.
+  const props = buildReelProps(
+    { ...(ended as object), layers: [{ from: 0, to: 9, compose: true, motion: { brief: "grid", js: "function Scene(){return null}", code: "function Scene({ reelTexts }) {}", draws_texts: true } }], overlays: [{ kind: "text", text: "Hello", from: 1, to: 2, x: 0.5, y: 0.5, w: 0.08 }] } as never,
+    { template: "libre", clipUrls: { a: "x", b: "x", c: "x" }, brand: { name: "Edith" } } as never,
+  );
+  assert.equal(props.overlays?.length, 1);
+  assert.equal(props.layers?.[0]?.drawsEnd, false);
+  assert.equal(props.layers?.[0]?.end, null);
+});

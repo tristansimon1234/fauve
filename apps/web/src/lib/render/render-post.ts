@@ -43,7 +43,7 @@ import { logoTone } from "./logo-tone";
 import { withMusic } from "./music";
 import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
-import { copyCutoutInputs, ensureCutouts, sceneCutoutInputs, stickerInputs } from "./cutout";
+import { copyCutoutInputs, ensureCutouts, overlayPhotoInputs, sceneCutoutInputs, stickerInputs } from "./cutout";
 import { loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
 import { renderInSandbox, renderReelInSandbox, sandboxCostEur, smokeTestScenes, type SceneChecks } from "./sandbox";
@@ -83,7 +83,7 @@ export function towardsDraft(status: PostStatus): PostStatus[] {
  */
 export async function loadMontageInputs(
   studioId: string,
-  plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"]; layers?: EditPlan["layers"]; copy?: EditPlan["copy"] },
+  plan: Pick<EditPlan, "segments"> & { voice?: EditPlan["voice"]; template?: EditPlan["template"]; layers?: EditPlan["layers"]; copy?: EditPlan["copy"]; overlays?: EditPlan["overlays"] },
   options: { postId?: string } = {},
 ) {
   const db = supabaseAdmin();
@@ -144,6 +144,9 @@ export async function loadMontageInputs(
   const cutouts = (template === "collage" && plan.template === "collage") || isComposed(plan) ? await stickerInputs(studioId, photoIds).catch(() => ({})) : undefined;
   // A copied Reel remade by code lays the subjects of her photos over its shots.
   const copyCutouts = plan.copy?.cutouts.length ? await copyCutoutInputs(studioId, copyPhotos(plan)).catch(() => ({})) : undefined;
+  // The photos she added on it, over everything.
+  const overlayIds = (plan.overlays ?? []).flatMap((o) => (o.kind === "photo" && o.media_id ? [o.media_id] : []));
+  const overlayPhotos = overlayIds.length ? await overlayPhotoInputs(studioId, overlayIds).catch(() => ({})) : undefined;
   // The animations' cut-outs: a clean edge is enough, even cut by the photo's frame (the animation brings the subject in from there).
   const sceneCutouts = withPhotos.length ? await sceneCutoutInputs(studioId, withPhotos).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
@@ -196,6 +199,7 @@ export async function loadMontageInputs(
     cutouts,
     sceneCutouts,
     copyCutouts,
+    overlayPhotos,
     photoAspects,
     tracks,
     facts,
@@ -329,7 +333,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
   // composed Reel's, and those an animation composes with (the design step has usually made them already).
   const toCut = [...(plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : scenePhotoIds(plan)), ...copyPhotos(plan)];
   if (toCut.length) await ensureCutouts(studioId, toCut);
-  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, copyCutouts, photoAspects, tracks, facts } =
+  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, copyCutouts, overlayPhotos, photoAspects, tracks, facts } =
     await loadMontageInputs(studioId, plan, { postId });
   const motion = motionTemplateSchema.safeParse(plan.template);
 
@@ -372,6 +376,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         ...(cutouts ? { cutouts } : {}),
         ...(sceneCutouts ? { sceneCutouts } : {}),
         ...(copyCutouts ? { copyCutouts } : {}),
+        ...(overlayPhotos ? { overlayPhotos } : {}),
         photoAspects,
         ...(Object.keys(tracks).length ? { tracks } : {}),
       });
