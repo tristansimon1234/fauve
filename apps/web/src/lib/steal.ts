@@ -6,6 +6,7 @@ import {
   reelMeasuresSchema,
   stealMissMessage,
   stolenStyleLines,
+  motionOnly,
   stolenStyleSchema,
   currentReading,
   STEAL_READER,
@@ -330,5 +331,15 @@ export async function pendingSteal(studioId: string): Promise<{ id: string; name
   if (!style.success && !reading) return null;
   const { count } = await db.from("posts").select("id", { count: "exact", head: true }).eq("studio_id", studioId).eq("inspiration_id", data.id);
   if (count) return null;
-  return { id: data.id as string, name: style.success ? style.data.look.name : null, lines: style.success ? stolenStyleLines(style.data) : [] };
+  if (!style.success) return { id: data.id as string, name: null, lines: [] };
+  return {
+    id: data.id as string,
+    name: style.data.look.name,
+    lines: [
+      ...stolenStyleLines(style.data),
+      // For Edith only: its music as read (she can say it in her words), and a Reel in pure motion design takes no file.
+      ...(style.data.look.music ? [`Sa musique, lue sur le modèle (pour le compositeur) : ${style.data.look.music}`] : []),
+      ...(motionOnly(style.data.look) ? ["Pur motion design, sans aucune image filmée ni photo : ne demande aucun fichier et n'en mets aucun dans le montage, sauf si elle en veut un"] : []),
+    ],
+  };
 }

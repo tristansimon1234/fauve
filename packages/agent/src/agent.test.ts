@@ -5688,3 +5688,13 @@ test("a tool on trial is promoted on five good uses, retired on corrections or a
   assert.deepEqual(variants.map((v) => v.texts.title), ["Brunch", "Le brunch du dimanche revient", "Le brunch du dimanche revient"]);
   assert.equal(new Set(variants.map((v) => v.charter.displayFont)).size, 3);
 });
+
+test("a copied Reel in pure motion design asks for no image", async () => {
+  const { motionOnly } = await import("./steal.ts");
+  const drawn = Array.from({ length: 6 }, (_, i) => ({ at: i * 0.4, ground: i % 2 ? "fond dégradé bleu nuit profond" : "fond dégradé crème lumineux", laid: "aucun" as const, subject: "" }));
+  assert.equal(motionOnly({ shots: drawn }), true);
+  // A filmed shot among them, a cut-out laid on a ground, or no shots read: not pure motion design.
+  assert.equal(motionOnly({ shots: [...drawn, { at: 3, ground: "une rue pavée", laid: "aucun", subject: "" }] }), false);
+  assert.equal(motionOnly({ shots: [drawn[0]!, { ...drawn[1]!, laid: "objet", subject: "une tasse" }] }), false);
+  assert.equal(motionOnly({}), false);
+});

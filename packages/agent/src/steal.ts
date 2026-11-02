@@ -365,6 +365,19 @@ export function measuresLine(measures: ReelMeasures): string {
 }
 
 
+/** A shot of the Reel that shows no filmed image: a plain ground, a gradient, a colour, a pattern. */
+const DRAWN_GROUND = /^(un |une |le |la |des )?(fond|aplat|d[ée]grad[ée]|[ée]cran (noir|blanc|uni)|couleur|motif|texture)/i;
+
+/**
+ * A Reel in pure motion design (words, shapes and grounds, no filmed image nor photo): every shot read is a drawn ground
+ * with nothing cut out laid on it. Its copy takes none of her files (a launch Reel copied from one had been made with
+ * twenty photos of Paris streets sent for other Reels, and she had been asked for photos it did not need).
+ */
+export function motionOnly(look: Pick<StolenLook, "shots">): boolean {
+  const shots = look.shots ?? [];
+  return shots.length >= 2 && shots.every((s) => s.laid === "aucun" && DRAWN_GROUND.test(s.ground.trim()));
+}
+
 /**
  * What Edith sends once she has read the Reel: what she takes from it for hers. `making`: her
  * Reel is already on its way in this style; else she is asked for her videos or photos.
@@ -373,7 +386,9 @@ export function stolenStyleMessage(style: StolenStyle, making: boolean): string 
   // Short (Tristan: « un user aura la flemme de tout lire »): what her Reel takes, in a few words each.
   const taken = stolenStyleShort(style);
   const list = taken.length > 1 ? `${taken.slice(0, -1).join(", ")} et ${taken.at(-1)}` : (taken[0] ?? "sa façon de faire");
-  return `J’ai regardé ton modèle 👀 Je reprends ${list}${making ? ". Ton Reel arrive dans quelques minutes." : ". Envoie-moi tes photos et vidéos."}`;
+  // Pure motion design needs none of her images: only her words.
+  const ask = motionOnly(style.look) ? ". C'est du pur motion design : pas besoin d'images, dis-moi juste tes mots." : ". Envoie-moi tes photos et vidéos.";
+  return `J’ai regardé ton modèle 👀 Je reprends ${list}${making ? ". Ton Reel arrive dans quelques minutes." : ask}`;
 }
 
 const FORMAT_SHORT: Record<StolenLook["format"], string> = {
@@ -505,6 +520,8 @@ export function followedForEditor(followed: FollowedStyle) {
     ...(followed.bpm !== null ? { tempo_bpm: followedTempo(followed.bpm) } : {}),
     accroche: `${look.hook.kind} : ${look.hook.what}`,
     // What makes it: each effect or animation in turn, redone with her images (as many, each at its moment).
+    // No filmed image in it: all made in motion design, her files left aside unless her request asks for one.
+    ...(motionOnly(look) ? { sans_images: "pur motion design : des mots et des fonds dessinés, aucune image filmée ni photo ; refais-le tout en motion design, sans ses fichiers sauf si sa demande en veut un" } : {}),
     ...(look.moments?.length
       ? { moments: look.moments.map((m) => ({ a_s: m.at, quoi: m.what })), moments_consigne: "refais chacun de ces moments, dans cet ordre et à peu près à ces temps, avec ses images et ses mots : c'est ce qui fait ce Reel" }
       : {}),
