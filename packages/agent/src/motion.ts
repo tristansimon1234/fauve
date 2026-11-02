@@ -240,6 +240,8 @@ export type ReelProps = {
    * played), and `from` its frame. Played by the live preview only: the render strips them and mixes them afterwards.
    */
   sfx?: (SoundPlacement & { src: string; from: number })[];
+  /** Her videos kept whole and horizontal, on black above and below (plan.frame). */
+  frame?: "letterbox";
   /** Her voice note over the Reel, from `from` (frames), in the render and the preview. */
   voice?: { src: string; from: number } | null;
   /** An overlay over the whole video, under the texts: film dust. */
@@ -732,6 +734,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     endCard,
     ...(inputs.soundtrack ? { soundtrack: { src: inputs.soundtrack, ...music } } : {}),
     ...(sfx.length ? { sfx } : {}),
+    ...(plan.frame === "letterbox" ? { frame: "letterbox" as const } : {}),
     ...(voice ? { voice: { src: voice.src, from: voice.from } } : {}),
     ...(plan.effect ? { effect: plan.effect } : {}),
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),

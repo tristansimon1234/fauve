@@ -131,6 +131,8 @@ export const sfxCueSchema = z.object({
   at: z.number().min(0).max(120),
   sound: z.string().min(2).max(60),
   seconds: z.number().min(0.5).max(3).optional(),
+  /** One she asked for (« un petit clic à chaque mot »): kept whatever the level's spacing, under a voice too. */
+  asked: z.boolean().optional(),
 });
 export type SfxCue = z.infer<typeof sfxCueSchema>;
 
@@ -176,7 +178,7 @@ export const editPlanMotionSegmentSchema = z.object({
     /** A composition's choice of where the engine sets a voice's subtitles (share of the height): where none of its faces nor texts go. */
     subtitle_y: z.number().min(0.1).max(0.8).optional(),
     /** Its sound effects, from its own start (the motion designer's answer): they follow its code, never the browser. */
-    sounds: z.array(sfxCueSchema).max(6).optional(),
+    sounds: z.array(sfxCueSchema).max(16).optional(),
   }),
   duration: z.number().min(1).max(8),
   /**
@@ -424,6 +426,8 @@ export const editPlanObjectSchema = z.object({
   copy: copyLayerSchema.optional(),
   /** What she added on it (planOverlaySchema), over everything. */
   overlays: z.array(planOverlaySchema).max(MAX_OVERLAYS).optional(),
+  /** Her videos kept whole and horizontal, on black above and below (her request, read by her contract): the engine draws it. */
+  frame: z.enum(["letterbox"]).optional(),
   /** The editor's sound effects on its cuts and texts, on the Reel's clock (each animation brings its own). */
   sounds: z.array(sfxCueSchema).max(8).optional(),
 });

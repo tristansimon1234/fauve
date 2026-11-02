@@ -49,6 +49,11 @@ export const reelContractSchema = z.object({
    * (Tristan: « pourquoi la correction refait tout, c'est une hérésie »). A job read before it had none: true.
    */
   redraw: z.boolean().default(true),
+  /**
+   * letterbox: her videos kept whole and horizontal, on black above and below (« la vidéo reste horizontale, noir au-dessus
+   * et en dessous »): the engine draws it, never a composition (a 17 s Reel took 12 min to render that way).
+   */
+  frame: z.enum(["vertical", "letterbox"]).default("vertical"),
 });
 export type ReelContract = z.infer<typeof reelContractSchema>;
 
@@ -65,6 +70,7 @@ export const CONTRACT_PROMPT = `You read a person's request for a Reel and note,
 - musts: everything else they explicitly ask for this Reel (a mood, a background, a universe, a rhythm, things to show), in their words, one thing per line.
 - A correction of a Reel that already has its voice-over also gets « Texte actuel de la voix ». When the request changes only part of this text (a word, a pronunciation, a sentence, the ending) or quotes only a piece of it, voice_text is the current text IN FULL with only that change made, nothing else cut or rewritten (verbatim): a quoted piece is never the whole text. Only a request that gives a whole new text, or asks for it to be rewritten, replaces it. When they say the voice stops too early, doesn't go to the end or must say more, voice_text is the current text in full and voice_text_rest what it must still say (what their original request describes and is missing). With no change to the voice asked for, voice_text stays null.
 - music: what they ask for the music of this Reel (instruments, genre, mood, pace, what they leave out), written in English for a composer, faithful to their words, nothing added; null when they say nothing about the music.
+- frame: « letterbox » when they want their videos to stay whole and horizontal, with black (or bands) above and below, instead of filling the vertical frame; otherwise « vertical ».
 - redraw: for a correction, true only when they ask to change what the layout or its animations draw (the arrangement, the split screen, the interface, an effect, a graphic element, the background, their motion or their style); false when they only touch the voice, the subtitles, the words of a text, the music, the length, the caption, the order or the choice of shots. For a new Reel: true.`;
 
 export const EMPTY_CONTRACT: ReelContract = {
@@ -83,6 +89,7 @@ export const EMPTY_CONTRACT: ReelContract = {
   musts: [],
   music: null,
   redraw: true,
+  frame: "vertical",
 };
 
 /** Nothing fixed: the defaults decide everything. */
@@ -98,7 +105,8 @@ export const contractIsEmpty = (c: ReelContract | null | undefined): boolean =>
     !c.ending &&
     c.call_to_action === "libre" &&
     !c.musts.length &&
-    !c.music);
+    !c.music &&
+    c.frame !== "letterbox");
 
 /** The contract in plain lines, for the editor, the voice-over writer and the critic (only what she fixed). */
 export function contractLines(c: ReelContract | null | undefined): string[] {
@@ -111,6 +119,9 @@ export function contractLines(c: ReelContract | null | undefined): string[] {
     c.voice_pace !== "normale" ? `Voix ${c.voice_pace === "rapide" ? "plus rapide" : "plus lente"}` : null,
     c.voice_gender !== "libre" ? `Voix d'${c.voice_gender === "homme" ? "homme" : "femme"}` : null,
     c.duration ? `Durée : ${c.duration} s environ` : null,
+    c.frame === "letterbox"
+      ? "Cadre : ses vidéos entières et horizontales, sur du noir au-dessus et en dessous ; le moteur les pose ainsi (form montage, jamais une composition pour ça), les textes restent les tiens"
+      : null,
     c.layout ? `Mise en page : ${c.layout}` : null,
     c.screen_text ? `Texte à l'écran, mot pour mot (orthographe corrigée) : « ${c.screen_text} »` : null,
     c.ending ? `Fin : ${c.ending}` : null,

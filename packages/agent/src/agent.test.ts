@@ -5872,6 +5872,15 @@ test("sound effects: placed by who wrote them, spaced, never under speech when l
   assert.deepEqual(pickCues(many, { level: "light", duration: 8, speech: [[2.9, 3.5]] }).map((c) => c.at), [0.5, 6]);
   assert.deepEqual(pickCues(many, { level: "more", duration: 8, speech: [[2.9, 3.5]] }).map((c) => [c.at, c.under]), [[0.5, false], [1, false], [1.4, false], [3, true], [6, false]]);
   assert.deepEqual(pickCues(many, { level: "off", duration: 8, speech: [] }), []);
+  // The ones she asked for (a click on each word) are all kept, under a voice too, a quarter second apart at least.
+  const words = [0.5, 1.2, 1.9, 2.0, 2.6, 3.3].map((at) => ({ at, asked: true }));
+  assert.deepEqual(
+    pickCues(words, { level: "light", duration: 8, speech: [[0, 8]] }).map((c) => [c.at, c.under]),
+    [[0.5, true], [1.2, true], [1.9, true], [2.6, true], [3.3, true]],
+  );
+  assert.deepEqual(pickCues(words, { level: "off", duration: 8, speech: [] }), []);
+  // Lower under the voice than the level's own, never left out.
+  assert.equal(sfxGain({ lufs: -20, peak: -12 }, "voice_over", "light", true), SFX_RULES.light.target.voice_over - 8 + 20);
   // Its loudest 400 ms on the target, its peak under -4 dBFS.
   assert.equal(sfxGain({ lufs: -30, peak: -20 }, "music", "light"), SFX_RULES.light.target.music + 30);
   assert.equal(sfxGain({ lufs: -10, peak: -1 }, "music", "more"), -6);

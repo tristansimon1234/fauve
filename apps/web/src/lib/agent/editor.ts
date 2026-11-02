@@ -454,6 +454,11 @@ export async function designEdit(params: {
     return carryRetouch(carryTextStyle(normalizeEditPlan(capped, durations, allowed), params.fresh ? null : base), base);
   };
   let plan = toPlan(output);
+  // Her videos whole and horizontal on black (her contract): the engine draws it on every version.
+  // A correction keeps it (its request is about something else).
+  const letterbox = params.contract?.frame === "letterbox" || (correction && base?.frame === "letterbox");
+  const framed = (p: EditPlan): EditPlan => (letterbox ? { ...p, frame: "letterbox" } : (({ frame: _frame, ...rest }) => rest)(p));
+  plan = framed(plan);
   // The length she asked for is measured on the plan, never taken from the editor's words: missed, it
   // reads the measure and answers once more, and the closer of its two plans is kept.
   const asked = params.contract?.duration;
@@ -466,7 +471,7 @@ export async function designEdit(params: {
       const retried = toPlan(again.parsed_output);
       if (Math.abs(retried.duration - asked) < Math.abs(plan.duration - asked)) {
         output = again.parsed_output;
-        plan = retried;
+        plan = framed(retried);
       }
     }
   }

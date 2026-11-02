@@ -345,10 +345,19 @@ async function writeScene(
   const sounds: SfxCue[] = (output?.sounds ?? [])
     .flatMap((c) =>
       c && typeof c.at === "number" && Number.isFinite(c.at) && c.at >= 0 && c.at < seconds && typeof c.sound === "string" && c.sound.trim().length >= 2
-        ? [{ at: Math.round(c.at * 100) / 100, sound: c.sound.trim().slice(0, 60), ...(typeof c.seconds === "number" && Number.isFinite(c.seconds) ? { seconds: Math.min(3, Math.max(0.5, c.seconds)) } : {}) }]
+        ? [
+            {
+              at: Math.round(c.at * 100) / 100,
+              sound: c.sound.trim().slice(0, 60),
+              ...(typeof c.seconds === "number" && Number.isFinite(c.seconds) ? { seconds: Math.min(3, Math.max(0.5, c.seconds)) } : {}),
+              ...(c.asked === true ? { asked: true } : {}),
+            },
+          ]
         : [],
     )
-    .slice(0, 4);
+    // Hers all kept (a click on each word of a long Reel), a few of its own otherwise.
+    .filter((c, i, all) => c.asked || all.slice(0, i).filter((x) => !x.asked).length < 4)
+    .slice(0, 16);
   const meta = {
     name: output?.name ?? "",
     slots: output?.slots ?? [],

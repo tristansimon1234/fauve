@@ -191,6 +191,8 @@ export type ReelProps = {
   soundtrack?: { src: string; volume?: number; duck?: { volume: number; windows: [number, number][] } } | null;
   /** Its sound effects in the live preview (the render strips them and mixes them afterwards): from its frame, its gain in dB, the part of its file played (s). */
   sfx?: { src: string; key: string; from: number; at: number; gain: number; onset: number; end: number }[];
+  /** Her videos kept whole and horizontal, on black above and below. */
+  frame?: "letterbox";
   /** Her voice note over the Reel, from `from` (frames). */
   voice?: { src: string; from: number } | null;
   /** An overlay over the whole video, under the texts: film dust. */

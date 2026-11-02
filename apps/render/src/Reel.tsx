@@ -131,7 +131,11 @@ export function Reel(props: ReelProps) {
         {segment.type === "clip" || segment.type === "image" ? (
           <Accent kind={segment.accent} color={props.brand.accent}>
             {segment.type === "clip" ? (
-              <Shot segment={segment} theme={theme} />
+              props.frame === "letterbox" ? (
+                <Letterbox aspect={segment.aspect}>{(box) => <Shot segment={segment} theme={theme} frame={box} />}</Letterbox>
+              ) : (
+                <Shot segment={segment} theme={theme} />
+              )
             ) : (
               <KenBurns on={Boolean(segment.zoom)} move={segment.move} index={i} durationInFrames={segment.durationInFrames} theme={theme}>
                 <Photo src={segment.src} edit={segment.edit} grade={theme.grade} />
@@ -433,6 +437,23 @@ function framing(focus: { x: number; y: number } | undefined, aspect: number | u
 function straighten(degrees: number | undefined, frameAspect: number): string | undefined {
   const straight = straightening(degrees, frameAspect);
   return straight ? `rotate(${straight.degrees}deg) scale(${straight.scale.toFixed(4)})` : undefined;
+}
+
+/**
+ * A horizontal video kept whole, on black above and below (her request, plan.frame): the box keeps its shape, centred;
+ * a vertical one still fills the frame.
+ */
+function Letterbox({ aspect, children }: { aspect: number | undefined; children: (box: { width: number; height: number }) => ReactNode }) {
+  const { width, height } = useVideoConfig();
+  if (!aspect || aspect <= width / height) return <>{children({ width, height })}</>;
+  const boxHeight = Math.round(width / aspect);
+  return (
+    <AbsoluteFill style={{ background: "#000" }}>
+      <div style={{ position: "absolute", left: 0, top: Math.round((height - boxHeight) / 2), width, height: boxHeight, overflow: "hidden" }}>
+        {children({ width, height: boxHeight })}
+      </div>
+    </AbsoluteFill>
+  );
 }
 
 /** A clip as filmed and retouched, covering the frame, or the box it is drawn in (`frame`: a collage's composition). */
