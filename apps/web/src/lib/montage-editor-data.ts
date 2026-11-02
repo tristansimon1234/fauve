@@ -64,6 +64,7 @@ export async function loadEditorData(studioId: string, planId: string, extraMedi
       ...(Object.keys(overlayPhotos).length ? { overlayPhotos } : {}),
       // A moving photo in relief, as in the video.
       ...(inputs.depth ? { depth: inputs.depth } : {}),
+      ...(inputs.subjects && Object.keys(inputs.subjects).length ? { subjects: inputs.subjects } : {}),
       today: dayIn(),
       photoAspects: inputs.photoAspects,
       // What moves under its animations, so an animation that follows a hand follows it in the preview too.

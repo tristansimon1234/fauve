@@ -187,7 +187,7 @@ function TypeOnOf(hooks: KitHooks) {
 
 // ——— Reveal ——————————————————————————————————————————————————————————————————————————
 
-type RevealFrom = "rise" | "fall" | "blur" | "fade" | "scale" | "left" | "right";
+type RevealFrom = "rise" | "fall" | "blur" | "fade" | "scale" | "left" | "right" | "flicker";
 type RevealProps = {
   text: string;
   at?: number;
@@ -197,8 +197,12 @@ type RevealProps = {
   stagger?: number;
   /** Frames each unit takes (12). */
   frames?: number;
-  /** rise / fall: out of a mask, like an editorial title; blur: out of focus; scale: from small. */
+  /**
+   * rise / fall: out of a mask, like an editorial title; blur: out of focus; scale: from small; flicker: the units light
+   * up in a random order, blinking a few times before they hold (a title of a travel film: 7 letters in 1.1 s).
+   */
   from?: RevealFrom;
+  seed?: string;
   /** Goes the way it came, unit by unit, from this frame. */
   exit?: { at: number; frames?: number };
   style?: CSSProperties;
@@ -225,7 +229,7 @@ function unitStyle(from: RevealFrom, p: number): CSSProperties {
 }
 
 function RevealOf(hooks: KitHooks) {
-  return function Reveal({ text, at = 0, by = "word", stagger, frames = 12, from = "rise", exit, style }: RevealProps) {
+  return function Reveal({ text, at = 0, by = "word", stagger, frames = 12, from = "rise", exit, style, seed = "reveal" }: RevealProps) {
     const frame = hooks.useCurrentFrame();
     const gap = num(stagger, by === "letter" ? 2 : by === "word" ? 4 : 6);
     const lines = text.split("\n");
@@ -238,14 +242,20 @@ function RevealOf(hooks: KitHooks) {
     // Settled: the plain text, laid out the same (no kerning across the letters' boxes).
     if (frame >= doneAt && !leaving)
       return <span style={{ whiteSpace: "pre-line", ...(by === "letter" ? { fontKerning: "none", fontVariantLigatures: "none" } : {}), ...style }}>{text}</span>;
+    // In a flicker, each unit's turn comes in a random order.
+    const order = from === "flicker" ? Array.from({ length: count }, (_, i) => i).sort((a, b) => random(`${seed}-o-${a}`) - random(`${seed}-o-${b}`)) : null;
     const progress = (i: number) => {
-      const p = settle(interpolate(frame, [at + i * gap, at + i * gap + frames], [0, 1], clamp));
+      const turn = order ? order.indexOf(i) : i;
+      const p = settle(interpolate(frame, [at + turn * gap, at + turn * gap + frames], [0, 1], clamp));
       if (!leaving) return p;
       return Math.min(p, 1 - settle(interpolate(frame, [exit.at + i * gap, exit.at + i * gap + (exit.frames ?? frames)], [0, 1], clamp)));
     };
     const masked = from === "rise" || from === "fall";
     const unit = (content: ReactNode, i: number, key: string) => {
-      const inner = <span style={{ display: "inline-block", whiteSpace: "pre", ...unitStyle(from, progress(i)) }}>{content}</span>;
+      const p = progress(i);
+      // A flicker: on or off every two frames, more often on as it goes, then held.
+      const look = from === "flicker" ? { opacity: p >= 1 || (p > 0 && random(`${seed}-f-${i}-${Math.floor(frame / 2)}`) < 0.25 + 0.75 * p) ? 1 : 0 } : unitStyle(from, p);
+      const inner = <span style={{ display: "inline-block", whiteSpace: "pre", ...look }}>{content}</span>;
       return masked ? (
         <span key={key} style={{ display: "inline-block", overflow: "hidden", verticalAlign: "top", paddingBottom: "0.14em", marginBottom: "-0.14em" }}>
           {inner}

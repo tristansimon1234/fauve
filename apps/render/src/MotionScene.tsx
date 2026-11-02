@@ -1,4 +1,4 @@
-import React, { Component, createContext, useContext, useMemo, type CSSProperties, type ReactNode } from "react";
+import React, { Component, createContext, useContext, useId, useMemo, type CSSProperties, type ReactNode } from "react";
 import {
   AbsoluteFill,
   Easing,
@@ -59,6 +59,8 @@ function Cutout({ photo, x, y, height, rim = 10, shadow = true, style }: { photo
 export type FootageSource = {
   shots: ComposeShot[];
   draw: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
+  /** Its subject cut out at every image (matte.py), drawn exactly like the shot; nothing when it has none. */
+  subject?: (shot: ComposeShot, size: { width: number; height: number }) => ReactNode;
 };
 
 /** Given by the Reel to a collage's composition only; none in the scene check (a grey card stands in for each shot). */
@@ -96,6 +98,65 @@ function Footage({ shot, style, hold }: { shot: number; style?: CSSProperties; h
   );
 }
 
+/**
+ * The subject of one of her shots cut out at every image (a person walking, a hill under a title), drawn exactly
+ * where and how Footage draws the shot in the same box: a text laid between the two passes behind her; laid alone
+ * on a colour or on paper, she is a moving cut-out. `rim`: a white scissor edge (px), `shadow`: a warm shadow, both
+ * drawn by one SVG filter (shadows stacked in CSS cost 40 to 100 s an image). Nothing when the shot has no cut-out:
+ * the text then simply stays in front.
+ */
+function Subject({ shot, style, rim = 0, rimColor = "#ffffff", shadow = false, hold }: { shot: number; style?: CSSProperties; rim?: number; rimColor?: string; shadow?: boolean; hold?: number }) {
+  const source = useContext(FootageContext);
+  const frame = useCurrentFrame();
+  const { width, height } = useVideoConfig();
+  const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const info = source?.shots[shot];
+  if (!source?.subject || !info) return null;
+  const media = source.subject(info, { width: px(style?.width) ?? width, height: px(style?.height) ?? height });
+  if (!media) return null;
+  const local = frame - info.from;
+  const r = Math.max(0, rim);
+  const filtered = r > 0 || shadow;
+  const step = hold && hold > 1 ? Math.round(hold) : 0;
+  return (
+    <div style={{ position: "absolute", overflow: "hidden", ...style }}>
+      {filtered ? (
+        <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true">
+          <filter id={`s${id}`} x="-10%" y="-10%" width="120%" height="120%">
+            <feMorphology in="SourceAlpha" operator="dilate" radius={r} result="grown" />
+            <feFlood floodColor={rimColor} />
+            <feComposite in2="grown" operator="in" result="edge" />
+            {shadow ? (
+              <>
+                <feGaussianBlur in="grown" stdDeviation={r * 1.2 + 6} />
+                <feOffset dy={r + 8} result="drop" />
+                <feFlood floodColor="rgba(40,26,10,0.34)" />
+                <feComposite in2="drop" operator="in" result="shade" />
+              </>
+            ) : null}
+            <feMerge>
+              {shadow ? <feMergeNode in="shade" /> : null}
+              {r > 0 ? <feMergeNode in="edge" /> : null}
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </svg>
+      ) : null}
+      <div style={{ position: "absolute", inset: 0, filter: filtered ? `url(#s${id})` : undefined }}>
+        {local >= 0 && local < info.durationInFrames && step ? (
+          <Freeze frame={Math.floor(local / step) * step}>{media}</Freeze>
+        ) : local >= 0 && local < info.durationInFrames ? (
+          <Sequence from={info.from} durationInFrames={info.durationInFrames} layout="none">
+            {media}
+          </Sequence>
+        ) : (
+          <Freeze frame={Math.max(0, Math.min(info.durationInFrames - 1, local))}>{media}</Freeze>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // FitText: a box whose text shrinks until it fits (see Fit.tsx), so a long text never leaves the frame.
 // Cutout: a photo's subject cut out, with its scissor rim (collages, her photos in an animation).
 // Footage: one of her shots, where a collage's composition lays it.
@@ -123,6 +184,7 @@ export const SCOPE = {
   FitText: Fit,
   Cutout,
   Footage,
+  Subject,
   Marker,
   Tiles: kit.Tiles,
   Window: kit.Window,

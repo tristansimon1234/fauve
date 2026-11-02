@@ -1,0 +1,237 @@
+# The subject of a passage of her video, cut out at every image, run in the cut-out sandbox (never in the web
+# app): so an animation can lay a text behind her as she walks, or lay her alone on a colour or on paper. The
+# photo model (BiRefNet lite, MIT, rembg's ONNX export, the cut-outs' own) reads the images where the picture has
+# moved since the last one it read, a key image; between two, the cut-out follows the moves measured by the optical
+# flow (OpenCV's DIS), from the nearest key image, so a limb is never drawn twice. When the tracker followed a body
+# there (track.py), only what stands on a person is kept: the model cuts out "what is in front", chairs included,
+# one key image yes and the next no. A passage where nothing moves is read once: one image, its cut-out for the
+# whole passage (a hill under a title, a shop front). Measured on a 720p street video: about 7 s per key image on 4
+# CPUs (8.6 GB of memory at most), a key every 2 to 12 images by the moves, so a fast walk costs about 2 min of work
+# a second of video there (about half on the sandbox's 8), a still shot one image.
+# Usage: python matte.py jobs.json → prints {"<id>": { file, still, frames, keys, seconds } | { error }}.
+# jobs.json: [{ id, src (a local video), from, to (seconds of the clip), out (a path without its extension),
+# track? (the clip's tracks JSON, its frames from the clip's start at 30 i/s) }]. MATTE_MODEL: the ONNX model;
+# FFMPEG: ffmpeg; HDR_FILTER: NORMALIZE's tone mapping, so her cut-out has the colours of the shot it lies on.
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+
+FPS = 30
+# The long side of the cut-out (the shot is framed in a 1080 × 1920 Reel) and of the picture the moves are read on.
+OUT_LONG = 1920
+WORK_WIDE = 540
+# A key image again once the picture has moved this much since the last one (px at 540 wide), and at least every 12 images.
+MOVE = 18.0
+MAX_GAP = 12
+# A passage whose whole move stays under this is still: one key image for all of it.
+STILL_MOVE = 24.0
+# The longest passage cut out (a Reel shows a few seconds of a shot).
+MAX_SECONDS = 8.0
+# The person: a body's bones, drawn thick around its skeleton (MediaPipe's 33 points).
+BONES = [(11, 13), (13, 15), (12, 14), (14, 16), (15, 17), (15, 19), (16, 18), (16, 20), (23, 25), (25, 27), (27, 29), (27, 31), (24, 26), (26, 28), (28, 30), (28, 32), (11, 23), (12, 24)]
+
+MODEL = os.environ.get("MATTE_MODEL", "model.onnx")
+FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
+HDR_FILTER = os.environ.get("HDR_FILTER", "")
+
+
+def probe(src):
+    info = subprocess.run([FFMPEG, "-hide_banner", "-i", src], capture_output=True, text=True).stderr
+    m = re.search(r"Video:.*?, (\d{2,5})x(\d{2,5})", info)
+    if not m:
+        raise RuntimeError("vidéo illisible")
+    w, h = int(m.group(1)), int(m.group(2))
+    rot = re.search(r"rotation of (-?\d+(?:\.\d+)?) degrees|rotate\s*:\s*(-?\d+)", info)
+    if rot and 45 < abs(float(rot.group(1) or rot.group(2))) % 180 < 135:
+        w, h = h, w
+    return w, h, bool(re.search(r"arib-std-b67|smpte2084", info))
+
+
+def decode(src, start, seconds, w, h, hdr):
+    """The passage's images at the Reel's rate, as NORMALIZE makes them (its tone mapping), at w × h, RGB."""
+    import numpy as np
+
+    chain = ",".join(filter(None, [HDR_FILTER if hdr else "", f"fps={FPS}", f"scale={w}:{h}:flags=lanczos", "format=rgb24"]))
+    # Seeking after the input: exact to the image, the same images as the Reel plays.
+    raw = subprocess.run([FFMPEG, "-v", "error", "-i", src, "-ss", f"{start:.3f}", "-t", f"{seconds:.3f}", "-vf", chain, "-f", "rawvideo", "-"], capture_output=True, check=True).stdout
+    n = len(raw) // (w * h * 3)
+    if not n:
+        raise RuntimeError("aucune image lue")
+    return np.frombuffer(raw[: n * w * h * 3], np.uint8).reshape(n, h, w, 3)
+
+
+def bodies_at(track, frame):
+    """The bodies the tracker saw at an image of the clip: their 33 points (x, y in thousandths, visibility in hundredths)."""
+    if not track or frame < 0 or frame >= len(track["frames"]):
+        return []
+    return [b[1:] for b in track["frames"][frame].get("b", [])]
+
+
+def person_gate(bodies, w, h):
+    """Where the people are: their skeletons drawn thick, then grown and softened; None when no body is seen."""
+    import cv2
+    import numpy as np
+
+    if not bodies:
+        return None
+    gate = np.zeros((h, w), np.uint8)
+    for b in bodies:
+        pts = [(b[k * 3] / 1000 * w, b[k * 3 + 1] / 1000 * h, b[k * 3 + 2] / 100) for k in range(33)]
+        if min(pts[11][2], pts[12][2]) < 0.3:
+            continue
+        shoulders = max(8.0, ((pts[11][0] - pts[12][0]) ** 2 + (pts[11][1] - pts[12][1]) ** 2) ** 0.5)
+        torso = np.array([pts[11][:2], pts[12][:2], pts[24][:2], pts[23][:2]], np.int32)
+        cv2.fillConvexPoly(gate, torso, 255)
+        for a, c in BONES:
+            if min(pts[a][2], pts[c][2]) < 0.2:
+                continue
+            thick = shoulders * (0.5 if a >= 23 else 0.38)
+            cv2.line(gate, (int(pts[a][0]), int(pts[a][1])), (int(pts[c][0]), int(pts[c][1])), 255, max(2, int(thick)))
+        head = pts[0]
+        cv2.circle(gate, (int(head[0]), int(head[1] - shoulders * 0.15)), int(shoulders * 0.75), 255, -1)
+    if not gate.any():
+        return None
+    grow = max(9, int(h * 0.05) | 1)
+    gate = cv2.dilate(gate, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (grow, grow)))
+    return cv2.GaussianBlur(gate, (grow, grow), 0).astype(np.float32) / 255.0
+
+
+def cut(job, session):
+    import cv2
+    import numpy as np
+
+    started = time.time()
+    src_w, src_h, hdr = probe(job["src"])
+    start = max(0.0, float(job["from"]))
+    seconds = min(MAX_SECONDS, max(1.0 / FPS, float(job["to"]) - start))
+    scale = min(1.0, OUT_LONG / max(src_w, src_h))
+    ow, oh = max(2, int(round(src_w * scale / 2)) * 2), max(2, int(round(src_h * scale / 2)) * 2)
+    frames = decode(job["src"], start, seconds, ow, oh, hdr)
+    n = len(frames)
+    ww, wh = WORK_WIDE, max(2, int(round(oh * WORK_WIDE / ow / 2)) * 2)
+    work = [cv2.resize(f, (ww, wh), interpolation=cv2.INTER_AREA) for f in frames]
+    gray = [cv2.cvtColor(f, cv2.COLOR_RGB2GRAY) for f in work]
+
+    # Where the picture moves: key images where it moves, few where it is still.
+    fast = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_ULTRAFAST)
+    small = [cv2.resize(g, (ww // 3, wh // 3)) for g in gray]
+    keys, moved, total = [0], 0.0, 0.0
+    for i in range(1, n):
+        step = float(np.percentile(np.linalg.norm(fast.calc(small[i - 1], small[i], None), axis=2) * 3, 95))
+        moved += step
+        total += step
+        if moved >= MOVE or i - keys[-1] >= MAX_GAP:
+            keys.append(i)
+            moved = 0.0
+    still = total < STILL_MOVE
+    if still:
+        keys = [n // 2]
+    elif keys[-1] != n - 1:
+        keys.append(n - 1)
+
+    track = None
+    if job.get("track"):
+        try:
+            track = json.load(open(job["track"]))
+        except Exception:  # noqa: BLE001 — no tracks: the photo model alone
+            track = None
+    first = int(round(start * FPS))
+    people = sum(1 for k in keys if bodies_at(track, first + k)) * 2 >= len(keys) if track else False
+
+    inp = session.get_inputs()[0].name
+    mean = np.array([0.485, 0.456, 0.406], np.float32)
+    std = np.array([0.229, 0.224, 0.225], np.float32)
+
+    def read(img):
+        x = cv2.resize(img, (1024, 1024), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
+        m = session.run(None, {inp: ((x - mean) / std).transpose(2, 0, 1)[None]})[0][0, 0]
+        return cv2.resize(1 / (1 + np.exp(-m)), (ww, wh), interpolation=cv2.INTER_LINEAR)
+
+    km = {}
+    last_gate = None
+    for k in keys:
+        m = read(frames[k])
+        if people:
+            g = person_gate(bodies_at(track, first + k), ww, wh)
+            # A body the tracker lost for a moment: the last place it was seen, a little wider.
+            g = g if g is not None else (cv2.dilate(last_gate, np.ones((15, 15), np.uint8)) if last_gate is not None else None)
+            if g is not None:
+                m = m * g
+                last_gate = g
+        km[k] = m
+
+    dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+    grid = np.dstack(np.meshgrid(np.arange(ww), np.arange(wh))).astype(np.float32)
+
+    def carry(mask, a, b):
+        """The cut-out of image a, moved to image b along the flow from b to a (each flow used once, not kept)."""
+        return cv2.remap(mask, grid + dis.calc(gray[b], gray[a], None), None, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+
+    masks = []
+    if still:
+        masks = [km[keys[0]]]
+    else:
+        # Each image from the nearest key image, step by step along the moves (a long jump loses a fast limb);
+        # a short cross-fade at the middle only, so the change of key image does not jump.
+        forward = {}
+        for k0, k1 in zip(keys, keys[1:]):
+            a = km[k0]
+            for t in range(k0 + 1, k1):
+                a = carry(a, t - 1, t)
+                forward[t] = a
+            b = km[k1]
+            for t in range(k1 - 1, k0, -1):
+                b = carry(b, t + 1, t)
+                w = min(1.0, max(0.0, ((t - k0) / (k1 - k0) - 0.4) / 0.2))
+                forward[t] = forward[t] * (1 - w) + b * w
+        masks = [km[t] if t in km else forward[t] for t in range(n)]
+        # A light smoothing over time, against a shimmer of the edges.
+        masks = [masks[0]] + [0.5 * masks[i] + 0.25 * masks[i - 1] + 0.25 * masks[min(n - 1, i + 1)] for i in range(1, n)]
+
+    def alpha(m):
+        # Solid where the model is fairly sure (a body blurred by its own move read at 0.5 stays solid), soft at the edge.
+        a = np.clip((cv2.resize(m, (ow, oh), interpolation=cv2.INTER_LINEAR) - 0.15) / 0.4, 0, 1)
+        return (a * a * (3 - 2 * a) * 255).astype(np.uint8)
+
+    if still:
+        out = f"{job['out']}.png"
+        cv2.imwrite(out, cv2.cvtColor(np.dstack([frames[keys[0]], alpha(masks[0])]), cv2.COLOR_RGBA2BGRA))
+    else:
+        out = f"{job['out']}.webm"
+        enc = subprocess.Popen(
+            [FFMPEG, "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{ow}x{oh}", "-r", str(FPS), "-i", "-",
+             "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "32", "-deadline", "realtime", "-cpu-used", "8",
+             "-row-mt", "1", "-auto-alt-ref", "0", out],
+            stdin=subprocess.PIPE,
+        )
+        for f, m in zip(frames, masks):
+            enc.stdin.write(np.dstack([f, alpha(m)]).tobytes())
+        enc.stdin.close()
+        if enc.wait() != 0:
+            raise RuntimeError("encodage du détourage impossible")
+    return {"file": out, "still": still, "frames": n, "keys": len(keys), "people": people, "seconds": round(time.time() - started, 1)}
+
+
+if __name__ == "__main__":
+    import onnxruntime as ort
+
+    jobs = json.load(open(sys.argv[1]))
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = os.cpu_count() or 4
+    # No memory plan (the pool stays, for speed): with both, the model held 13 GB of the sandbox's 16 over a passage
+    # of 2 s; without the plan, 8.6 GB at the same speed (without the pool too, 7.4 GB but twice as slow).
+    options.enable_mem_pattern = False
+    session = ort.InferenceSession(MODEL, options, providers=["CPUExecutionProvider"])
+    results = {}
+    # One passage after the other: the model already uses every CPU.
+    for job in jobs:
+        try:
+            results[job["id"]] = cut(job, session)
+        except Exception as error:  # noqa: BLE001 — one passage that fails never stops the others
+            results[job["id"]] = {"error": str(error)[:300]}
+    print(json.dumps(results))
+    sys.stdout.flush()
+    os._exit(0)

@@ -124,6 +124,8 @@ export type ReelProps = {
         accent?: "punch" | "wipe";
         /** Where the subtitles sit over this shot (top, share of the frame), off its faces. */
         subtitleY?: number;
+        /** Its subject cut out at every image of the passage (a transparent video, or one image when nothing moves), for a composition's Subject. */
+        subject?: { src: string; still?: boolean };
       }
     | {
         type: "image";

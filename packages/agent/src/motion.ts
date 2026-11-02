@@ -9,6 +9,7 @@ import { placeSounds, planCues, type SoundFacts, type SoundPlacement } from "./s
 import type { SfxLevel } from "./schemas.ts";
 import { faceZone, layerTrack, sceneTrack, shotTrack, type FaceZone, type ShotTrack, type TrackPiece, type TracksByClip } from "./tracking.ts";
 import { DEPTH_MOVES } from "./depth.ts";
+import { subjectKey } from "./subject.ts";
 import { lookMatrix, lookStamp, planLook, type ReelLook } from "./looks.ts";
 
 // Edit plan → props of the Remotion "Reel" composition (apps/render). Everything
@@ -95,6 +96,11 @@ export type ReelSegment =
       accent?: "punch" | "wipe";
       /** Where the subtitles sit over this shot (top, share of the frame), off its faces. */
       subtitleY?: number;
+      /**
+       * Its subject cut out at every image of the passage (matte.py: a transparent video, or one image when nothing moves),
+       * drawn exactly over the shot by a composition's Subject, so a text can pass between the shot and her.
+       */
+      subject?: { src: string; still?: boolean };
     }
   /**
    * A photo: a carousel slide (with its retouch and blurred zones), or a photo in a Reel (zoom: a slow Ken Burns move).
@@ -415,6 +421,8 @@ export type ReelInputs = {
   today?: string;
   /** The moving photos whose subject cuts out cleanly (depthPhotoIds): signed cut-out and the subject's box, played in relief. */
   depth?: Record<string, { src: string; box: { x: number; y: number; w: number; h: number } }>;
+  /** The passages of her clips cut out at every image (subjectKey: clip, in, out), signed: what a composition's Subject draws. */
+  subjects?: Record<string, { src: string; still?: boolean }>;
 };
 
 /** A clip's width / height as the Reel frames it, from its analysis (phones film 16:9 or 9:16). */
@@ -644,6 +652,8 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
       ...(speech ? { speech: true } : {}),
       ...(s.accent ? { accent: s.accent } : {}),
       ...(s.subtitle_y !== undefined ? { subtitleY: s.subtitle_y } : {}),
+      // Its subject cut out, image for image: only at its own pace (a cut-out follows the clip's images one by one).
+      ...(!ramp && !speed && inputs.subjects?.[subjectKey(s.clip_id, s.in, s.out)] ? { subject: inputs.subjects[subjectKey(s.clip_id, s.in, s.out)] } : {}),
     };
   });
   const durationInFrames = cursor + fadeFrames;

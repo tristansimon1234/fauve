@@ -208,7 +208,11 @@ export function Reel(props: ReelProps) {
             overlay
             photos={compose.photos}
             cuts={compose.cuts}
-            footage={{ shots: compose.shots ?? [], draw: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face) }}
+            footage={{
+              shots: compose.shots ?? [],
+              draw: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face),
+              subject: (shot, size) => drawShot(props.segments[shot.segment], theme, size, shot.face, "subject"),
+            }}
             reelTexts={compose.reelTexts}
             end={compose.end}
             fallbackNode={
@@ -300,7 +304,8 @@ export function Reel(props: ReelProps) {
 }
 
 /** One of her shots in a box of that size, as the Reel draws it (its retouch, its camera move, its light), its faces whole: for a composition. */
-function drawShot(segment: ReelProps["segments"][number] | undefined, theme: Theme, size: { width: number; height: number }, face?: FaceZone): ReactNode {
+function drawShot(segment: ReelProps["segments"][number] | undefined, theme: Theme, size: { width: number; height: number }, face?: FaceZone, layer?: "subject"): ReactNode {
+  if (layer === "subject") return segment?.type === "clip" && segment.subject ? <Shot segment={segment} theme={theme} frame={size} face={face} layer="subject" /> : null;
   if (segment?.type === "clip") return <Shot segment={segment} theme={theme} frame={size} face={face} />;
   if (segment?.type === "image") return <Photo src={segment.src} edit={segment.edit} grade={theme.grade} frame={size} />;
   return null;
@@ -478,30 +483,46 @@ function Letterbox({ aspect, children }: { aspect: number | undefined; children:
 }
 
 /** A clip as filmed and retouched, covering the frame, or the box it is drawn in (`frame`: a collage's composition). */
-function Shot({ segment, theme, frame: box, face }: { segment: ClipSegment; theme: Theme; frame?: { width: number; height: number }; face?: FaceZone }) {
+/**
+ * A clip as the Reel frames it; with layer « subject », its subject cut out (matte.py) drawn the same way (the same
+ * framing, straightening, camera move, light and blurred faces), so it falls exactly on the shot.
+ */
+function Shot({ segment, theme, frame: box, face, layer }: { segment: ClipSegment; theme: Theme; frame?: { width: number; height: number }; face?: FaceZone; layer?: "subject" }) {
   const frame = useCurrentFrame();
   const video = useVideoConfig();
   const { width, height } = box ?? video;
   const move = segment.move ?? (segment.zoom ? "in" : "none");
   const frameAspect = width / height;
   const focus = faceFocus(segment.adjust?.focus, face, segment.aspect, frameAspect);
+  const look: CSSProperties = {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    objectPosition: framing(focus, segment.aspect, frameAspect),
+    filter: [theme.grade, cssFilter(segment.adjust)].filter(Boolean).join(" ") || undefined,
+  };
+  const subject = layer === "subject" ? segment.subject : undefined;
+  if (layer === "subject" && !subject) return null;
   // A passage of the clip at one speed: the file may start later in the clip (a slow motion's own smooth file).
   const passage = (p: SpeedPiece) => (
     <>
+      {subject ? (
+        subject.still ? (
+          <Img src={subject.src} style={look} />
+        ) : (
+          // Its cut-out starts at the shot's first image of the clip, image for image.
+          <OffthreadVideo src={subject.src} transparent muted trimBefore={Math.max(0, p.startFrom - segment.startFrom)} playbackRate={p.speed} style={look} />
+        )
+      ) : (
       <OffthreadVideo
         src={segment.src}
         trimBefore={Math.max(0, p.startFrom - (segment.srcFrom ?? 0))}
         playbackRate={p.speed}
         // Only the passages where someone speaks keep their sound; the rest is under the music.
         muted={!segment.speech}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          objectPosition: framing(focus, segment.aspect, frameAspect),
-          filter: [theme.grade, cssFilter(segment.adjust)].filter(Boolean).join(" ") || undefined,
-        }}
+        style={look}
       />
+      )}
       {segment.blur?.tracks.length ? <ClipBlurLayer blur={segment.blur} startFrom={p.startFrom} focus={focus} speed={p.speed} size={box} /> : null}
     </>
   );

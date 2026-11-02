@@ -39,6 +39,7 @@ import {
   type ReelProps,
   type TracksByClip,
   voiceTranscriptSchema,
+  drawsSubject,
 } from "@fauve/agent";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -49,6 +50,7 @@ import { ensureSounds, soundFiles, type LibrarySound } from "./sfx";
 import { usableFonts } from "@/lib/fonts";
 import { makeSceneSprite } from "./scene-sprite";
 import { copyCutoutInputs, ensureCutouts, overlayPhotoInputs, sceneCutoutInputs, stickerInputs } from "./cutout";
+import { ensureSubjects, subjectInputs } from "./subjects";
 import { ensureCleanCopies } from "@/lib/video/speech";
 import { loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
@@ -173,6 +175,8 @@ export async function loadMontageInputs(
   // A moving photo whose subject cuts out cleanly plays in relief (the same clean cut-out).
   const moving = depthPhotoIds(plan);
   const depth = moving.length ? await sceneCutoutInputs(studioId, moving).catch(() => ({})) : undefined;
+  // Her subject cut out at every image, for the compositions that draw it (Subject).
+  const subjects = (plan.layers ?? []).some((l) => l.compose && drawsSubject(l.motion.js)) ? await subjectInputs(studioId, plan).catch(() => ({})) : undefined;
   // Each photo's shape, from its reading.
   const photoAspects = Object.fromEntries(
     assets.flatMap((a) => {
@@ -225,6 +229,7 @@ export async function loadMontageInputs(
     copyCutouts,
     overlayPhotos,
     depth,
+    subjects,
     photoAspects,
     tracks,
     facts,
@@ -367,9 +372,12 @@ export async function renderPost(studioId: string, postId: string, options: { ed
     ...(plan.overlays ?? []).flatMap((o) => (o.kind === "photo" && o.media_id && o.cutout !== false ? [o.media_id] : [])),
   ];
   if (toCut.length) await ensureCutouts(studioId, toCut);
+  // A composition that draws her subject over her shots (Subject): its passages cut out at every image, as many as
+  // the step has time for before its render.
+  if ((plan.layers ?? []).some((l) => l.compose && drawsSubject(l.motion.js))) await ensureSubjects(studioId, postId, plan);
   // She wants the sound cleaned, even where it was not noisy: the cleaned copies are made first.
   if (plan.finish?.sound === "clean") await ensureCleanCopies(studioId, planMediaIds(plan), plan.voice?.media_id);
-  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, copyCutouts, overlayPhotos, depth, photoAspects, tracks, facts } =
+  const { clipIds, clipFiles, clips, clipUrls, photoIds, words, aspects, accent, logoUrl, logoOnDark, studioName, fonts, colors, customFonts, reelSignature: signature, voice, cutouts, sceneCutouts, copyCutouts, overlayPhotos, depth, subjects, photoAspects, tracks, facts } =
     await loadMontageInputs(studioId, plan, { postId });
   const motion = motionTemplateSchema.safeParse(plan.template);
 
@@ -425,6 +433,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         ...(copyCutouts ? { copyCutouts } : {}),
         ...(overlayPhotos ? { overlayPhotos } : {}),
         ...(depth ? { depth } : {}),
+        ...(subjects && Object.keys(subjects).length ? { subjects } : {}),
         today: dayIn(),
         photoAspects,
         ...(Object.keys(tracks).length ? { tracks } : {}),

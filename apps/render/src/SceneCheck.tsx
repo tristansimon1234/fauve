@@ -589,7 +589,9 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         }
         // An accent is held to its own minimum when a text of the scene reads at the full one.
         const titled = [...largest.entries()].some(([text, size]) => !accents.has(text) && size >= MIN_TYPE - 0.5);
-        const floor = (text: string) => (titled && accents.has(text) && text.split(" ").length <= ACCENT_WORDS ? ACCENT_MIN : MIN_TYPE);
+        // Its words only: a separator (« · », « / », « — ») is not one.
+        const words = (text: string) => text.split(" ").filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+        const floor = (text: string) => (titled && accents.has(text) && words(text) <= ACCENT_WORDS ? ACCENT_MIN : MIN_TYPE);
         const small = [...largest.entries()].filter(([text, size]) => size < floor(text) - 0.5).sort((a, b) => a[1] - b[1]);
         if (small.length) {
           const detail = small

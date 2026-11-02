@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { subjectFiles } from "@fauve/agent";
 import { deleteExpiredAccounts } from "@/lib/account-deletion";
 import { env } from "@/lib/env";
 import { kitPath } from "@/lib/effect-words";
@@ -36,6 +37,8 @@ async function handle(request: Request) {
     const batch = expired.slice(i, i + BATCH);
     // A steadied video keeps its shaky original beside it (lib/video/stabilize.ts).
     const { data: originals } = await db.from("media_assets").select("original_path").in("id", batch.map((m) => m.id)).not("original_path", "is", null);
+    // Its subject cut out at every image, for the compositions that drew it (lib/render/subjects.ts).
+    const { data: withSubjects } = await db.from("media_assets").select("subjects").in("id", batch.map((m) => m.id));
     // Files first: a row is only removed once its file is gone (a failed batch is retried next hour).
     // A photo's cut-out (collages), what was tracked in a video, an effect's kit and a recording's ref frames go with it; a path with nothing there is simply skipped.
     const removed = await db.storage
@@ -52,6 +55,7 @@ async function handle(request: Request) {
           ...cleanedPaths(m.studio_id, m.id),
         ]),
         ...(originals ?? []).map((o) => o.original_path as string),
+        ...(withSubjects ?? []).flatMap((row) => subjectFiles(row.subjects)),
       ]);
     if (removed.error) {
       console.error("retention: files not removed", removed.error.message);

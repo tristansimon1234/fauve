@@ -45,6 +45,8 @@ const scope = {
     photo?.cutout && photo.subject ? React.createElement("img", { src: photo.cutout, style: { position: "absolute", left: x, top: y, height, ...style } }) : null,
   // One of her shots in a collage's composition: a grey card stands in.
   Footage: ({ style }) => React.createElement("div", { style: { position: "absolute", background: "#777", ...style } }),
+  // Her subject cut out: none here (cut out before the render), the scene must stand without it.
+  Subject: () => null,
   // A word circled by hand: the word itself is what the check reads.
   Marker: ({ children }) => React.createElement("span", null, children),
   // The layout kit (Kit.tsx): what each piece shows is drawn, so its words and its code run here too.

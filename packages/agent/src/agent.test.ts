@@ -5999,3 +5999,31 @@ test("sound effects: placed by who wrote them, spaced, never under speech when l
   assert.match(soundsOnlyFilter(true, 8, placed), /^\[0:a\]aformat/);
   assert.match(soundsOnlyFilter(false, 8, placed), /^anullsrc=r=44100:cl=stereo,atrim=duration=8\.00\[pre\];\[1:a\]/);
 });
+
+test("subject cut-outs: only for a composition that draws Subject, at the clip's own pace, within the budget", async () => {
+  const { subjectPassages, subjectKey, subjectFiles, SUBJECT_MAX_SECONDS } = await import("./subject.ts");
+  const video = (id: string) => id !== "photo";
+  const layer = (js: string) => [{ from: 0, to: 6, compose: true, motion: { brief: "b", js } }];
+  const segments = [
+    { clip_id: "a", in: 1, out: 3, zoom: "none" },
+    { clip_id: "photo", in: 0, out: 2, zoom: "none" },
+    { clip_id: "b", in: 0, out: 2, zoom: "none", speed: 0.5 },
+    { clip_id: "c", in: 4, out: 6.5, zoom: "none" },
+  ];
+  // No Subject in the code: nothing is cut out.
+  assert.deepEqual(subjectPassages({ segments, layers: layer("function Scene(){ return Footage }") } as never, video), []);
+  const passages = subjectPassages({ segments, layers: layer("function Scene(){ return h(Subject, { shot: 0 }) }") } as never, video);
+  // The photo (its cut-out is the photo's) and the slow motion (other images show) are left out.
+  assert.deepEqual(
+    passages.map((p) => p.key),
+    [subjectKey("a", 1, 3), subjectKey("c", 4, 6.5)],
+  );
+  assert.equal(subjectKey("a", 1, 3), "a@1.00-3.00");
+  // Past the budget, the next passages wait.
+  const long = Array.from({ length: 8 }, (_, i) => ({ clip_id: `v${i}`, in: 0, out: 4, zoom: "none" }));
+  const kept = subjectPassages({ segments: long, layers: layer("Subject") } as never, () => true);
+  assert.ok(kept.reduce((n, p) => n + p.to - p.from, 0) <= SUBJECT_MAX_SECONDS);
+  // The files the retention removes with the clip.
+  assert.deepEqual(subjectFiles({ k: { path: "s/subjects/a.webm", still: false, at: "x" }, j: { failed_at: "x", error: "e" } }), ["s/subjects/a.webm"]);
+  assert.deepEqual(subjectFiles(null), []);
+});

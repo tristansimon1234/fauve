@@ -388,7 +388,8 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
     if (!/^https?:/.test(src)) return src;
     const known = files.get(src);
     if (known) return known;
-    const ext = video ? "mp4" : (/\.(png|webp|jpe?g)(?:\?|$)/i.exec(src)?.[1]?.toLowerCase() ?? "jpg");
+    // A subject's cut-out (a transparent WebM, matte.py) is fetched as is: normalizing it would drop its transparency.
+    const ext = video ? "mp4" : (/\.(png|webp|jpe?g|webm)(?:\?|$)/i.exec(src)?.[1]?.toLowerCase() ?? "jpg");
     const file = `jobs/${id}/m${files.size}.${ext}`;
     files.set(src, `/public/${file}`);
     jobs.set(src, bash(sandbox, video ? NORMALIZE : FETCH, [`${REMOTION}/build/public/${file}`, src]));
@@ -409,6 +410,7 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
       slow.push({ index, src: segment.src, srcFrom, seconds: (end - srcFrom) / REEL_FPS + 0.5 });
       return segment;
     }
+    if (segment.type === "clip" && segment.subject) return { ...segment, src: local(segment.src, true), subject: { ...segment.subject, src: local(segment.subject.src, false) } };
     if (segment.type === "clip" || segment.type === "image") return { ...segment, src: local(segment.src, segment.type === "clip") };
     const moved = segment.under ? { ...segment, under: under(segment.under) } : segment;
     return moved.type === "motion" && moved.photos ? { ...moved, photos: photos(moved.photos) } : moved;
@@ -1299,6 +1301,8 @@ const TRACK_PACKAGES = [
   "mediapipe==1.1.1", "numpy==2.5.4", "absl-py==2.5.1", "flatbuffers==25.12.19", "certifi==2026.7.22",
   "opencv-python-headless==5.0.0.93", "matplotlib==3.11.2", "contourpy==1.4.0", "cycler==0.12.1", "fonttools==4.67.0",
   "kiwisolver==1.5.1", "packaging==26.3", "pillow==13.0.0", "pyparsing==3.3.3", "python-dateutil==2.9.0.post0", "six==1.17.0",
+  // The subject cut out at every image (matte.py): the photo model read from Python (it imports without protobuf).
+  "onnxruntime==1.31.1",
 ];
 const TRACK_SETUP = [
   "set -euo pipefail",
@@ -1308,7 +1312,7 @@ const TRACK_SETUP = [
   'if [[ "$libs" != *"libEGL.so.1 "* || "$libs" != *"libGLESv2.so.2 "* ]]; then if command -v apt-get >/dev/null; then sudo apt-get update -qq && sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends libegl1 libgles2 >/dev/null; else sudo dnf install -y -q libglvnd-egl libglvnd-gles; fi; fi',
   UV_INSTALL,
   `export UV_PYTHON_INSTALL_DIR=${TRACK_ROOT}/python UV_PYTHON_PREFERENCE=only-managed UV_NO_CACHE=1`,
-  `py/bin/python -c "import mediapipe, cv2, matplotlib" 2>/dev/null || { rm -rf py && bin/uv venv -q --python 3.13 py && bin/uv pip install -q --python py/bin/python --no-deps ${TRACK_PACKAGES.join(" ")}; }`,
+  `py/bin/python -c "import mediapipe, cv2, matplotlib, onnxruntime" 2>/dev/null || { rm -rf py && bin/uv venv -q --python 3.13 py && bin/uv pip install -q --python py/bin/python --no-deps ${TRACK_PACKAGES.join(" ")}; }`,
   ...TRACK_MODELS.map(
     (m) =>
       `echo "${m.sha256}  models/${m.file}" | sha256sum -c --status 2>/dev/null || { curl -fsSL --retry 3 -o models/${m.file}.tmp '${m.url}' && mv models/${m.file}.tmp models/${m.file} && echo "${m.sha256}  models/${m.file}" | sha256sum -c --status; }`,
@@ -1324,8 +1328,12 @@ export function trackSandbox(): Promise<Sandbox> {
     await bash(sandbox, TRACK_SETUP);
     // The script ships with the render source (apps/render/track.py), written as this deploy has it.
     const script = REMOTION_SOURCE_FILES["track.py"];
-    if (!script) throw new Error("track.py is missing from the render source");
-    await sandbox.writeFiles([{ path: `${TRACK_ROOT}/track.py`, content: script }]);
+    const matte = REMOTION_SOURCE_FILES["matte.py"];
+    if (!script || !matte) throw new Error("track.py or matte.py is missing from the render source");
+    await sandbox.writeFiles([
+      { path: `${TRACK_ROOT}/track.py`, content: script },
+      { path: `${TRACK_ROOT}/matte.py`, content: matte },
+    ]);
     return sandbox;
   })().catch((error: unknown) => {
     trackReady = undefined;
@@ -1372,6 +1380,76 @@ export async function stabilizeInSandbox(id: string, url: string): Promise<{ vid
       const video = await sandbox.readFileToBuffer({ path: `${dir}/out.mp4` });
       if (!video?.length) throw new Error("no stabilized video");
       return { video, seconds: (Date.now() - started) / 1000 };
+    } finally {
+      await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+    }
+  });
+}
+
+/** A passage of a clip cut out: its file (a transparent WebM, or a PNG when nothing moved) and how it was made. */
+export type SubjectCut = { file: Buffer; still: boolean; frames: number; keys: number; people: boolean };
+
+/**
+ * Cuts out the subject of each passage at every image (apps/render/matte.py: the photo model on key images where
+ * the picture moves, the optical flow in between, only the people when the tracker saw a body), one passage after
+ * the other on the cut-out sandbox, in the photos' cut-out place (the model takes most of its memory: never two at
+ * once). The colours go through NORMALIZE's tone mapping, so the cut-out lies on its shot without a seam.
+ */
+export async function subjectsInSandbox(
+  id: string,
+  passages: { key: string; url: string; from: number; to: number; trackUrl?: string }[],
+): Promise<{ results: Record<string, SubjectCut | Error>; seconds: number }> {
+  if (!passages.length) return { results: {}, seconds: 0 };
+  return withSlot(CUTOUT_SLOT, async () => {
+    // The time it worked, not the time it waited for its place.
+    const started = Date.now();
+    await cutoutSandbox().then(withTimeLeft);
+    const sandbox = await withTimeLeft(await trackSandbox());
+    const dir = `${TRACK_ROOT}/jobs/${id}`;
+    try {
+      await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+      await withTimeLeft(sandbox);
+      const clips = [...new Set(passages.map((p) => p.url))];
+      await Promise.all(clips.map((url, i) => bash(sandbox, FETCH, [`${dir}/in${i}`, url])));
+      const tracks = [...new Set(passages.flatMap((p) => (p.trackUrl ? [p.trackUrl] : [])))];
+      await Promise.all(tracks.map((url, i) => bash(sandbox, FETCH, [`${dir}/track${i}.json`, url]).catch(() => undefined)));
+      const jobs = passages.map((p, i) => ({
+        id: p.key,
+        src: `${dir}/in${clips.indexOf(p.url)}`,
+        from: p.from,
+        to: p.to,
+        out: `${dir}/out${i}`,
+        ...(p.trackUrl ? { track: `${dir}/track${tracks.indexOf(p.trackUrl)}.json` } : {}),
+      }));
+      await sandbox.writeFiles([{ path: `${dir}/jobs.json`, content: JSON.stringify(jobs) }]);
+      const run = await sandbox.runCommand({
+        cmd: "bash",
+        args: [
+          "-c",
+          `cd ${TRACK_ROOT} && MATTE_MODEL=${CUTOUT_ROOT}/model.onnx FFMPEG=${CUTOUT_ROOT}/ffmpeg HDR_FILTER='${HDR_TO_SDR}' timeout 600 py/bin/python -I matte.py "$1/jobs.json"`,
+          "bash",
+          dir,
+        ],
+      });
+      const lastLine = (await run.stdout()).trim().split("\n").at(-1) ?? "";
+      let readings: Record<string, { file: string; still: boolean; frames: number; keys: number; people: boolean } | { error: string }>;
+      try {
+        readings = JSON.parse(lastLine);
+      } catch {
+        const output = (await run.output("both").catch(() => "")).slice(-400);
+        throw new Error(`cut-out failed (${run.exitCode}): ${output}`);
+      }
+      const results: Record<string, SubjectCut | Error> = {};
+      for (const p of passages) {
+        const r = readings[p.key];
+        if (!r || "error" in r) {
+          results[p.key] = new Error(r && "error" in r ? r.error : "nothing cut out");
+          continue;
+        }
+        const file = await sandbox.readFileToBuffer({ path: r.file }).catch(() => null);
+        results[p.key] = file?.length ? { file, still: r.still, frames: r.frames, keys: r.keys, people: r.people } : new Error("cut-out file missing");
+      }
+      return { results, seconds: (Date.now() - started) / 1000 };
     } finally {
       await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
     }
