@@ -11,6 +11,7 @@ import { setReaction, type Reactions } from "@/lib/reactions";
 import { getStudioContext, signMediaUrls } from "@/lib/studio";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureTranscript } from "@/lib/voice";
+import { refreshOutdatedReading } from "@/lib/steal";
 import { ensureClipAnalysis } from "@/lib/video/analyze";
 import { photoRegions } from "@/lib/video/regions";
 
@@ -320,6 +321,8 @@ export async function chatTurn(
     }
   }
 
+  // A Reel link whose reading is outdated: read again before Edith answers, whatever she decides.
+  if (body) await refreshOutdatedReading(ctx.studioId, body).catch((e: unknown) => console.warn("steal: reading not refreshed", e));
   try {
     const result = await replyInConversation({
       studioId: ctx.studioId,

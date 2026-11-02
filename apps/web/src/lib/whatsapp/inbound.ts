@@ -21,6 +21,7 @@ import { env } from "@/lib/env";
 import { withSlot } from "@/lib/work-slots";
 import { runningJobs } from "@/lib/studio-jobs";
 import { feedbackFromMessage } from "@/lib/feedback";
+import { refreshOutdatedReading } from "@/lib/steal";
 import { downloadMedia, markReadAndTyping, sendLinkButton, sendReaction, sendReply, sendText, sendVideo } from "./client";
 import { mediaOf, textOf, toE164, type InboundMessage } from "./schema";
 
@@ -293,6 +294,8 @@ export async function handleInboundMessage(message: InboundMessage, profileName?
     }
   }
 
+  // A Reel link whose reading is outdated: read again before Edith answers, whatever she decides.
+  if (text) await refreshOutdatedReading(member.studio_id, text).catch((e: unknown) => console.warn("steal: reading not refreshed", e));
   await replyOnWhatsApp({ studioId: member.studio_id, memberId: member.id, waId: message.from, phone, replyTo: message.id });
 }
 

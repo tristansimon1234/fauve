@@ -76,12 +76,14 @@ export async function startSteal(studioId: string, source: StealSource): Promise
     if (!found) return { miss: "unreachable" };
     const { data: known } = await db
       .from("inspirations")
-      .select("id, style, analysis, title")
+      .select("id, style, analysis, title, created_at")
       .eq("studio_id", studioId)
       .eq("url", found.url)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    // Being read again right now (refreshOutdatedReading): the same one, never a second reading.
+    if (known && known.style === null && Date.now() - new Date(known.created_at as string).getTime() < 5 * 60_000) return { inspirationId: known.id as string };
     // A reading made before the current reader (it missed what it now sees) is read again.
     const kept = currentReading(known?.style);
     if (known) {
@@ -113,6 +115,25 @@ export async function startSteal(studioId: string, source: StealSource): Promise
   const { data: row, error } = await db.from("inspirations").insert({ studio_id: studioId, source: "chat", kind: "video", storage_path: path }).select("id").single();
   if (error || !row) throw new Error(`inspirations insert: ${error?.message ?? "no row"}`);
   return { inspirationId: row.id as string, example: { id: asset.id as string, path: from } };
+}
+
+/**
+ * A Reel link in her message whose reading is older than the current reader is read again now, in place, whoever
+ * answers her: Tristan sent his model's link again after the reader was fixed, and Edith, taking it for the same
+ * Reel, kept its old reading (a voice over that was not there, its title unreadable). A link never read, being
+ * read, or read by the current reader is left to Edith (steal_style). Quiet: what her Reel takes from it is told
+ * by the turn that answers her.
+ */
+export async function refreshOutdatedReading(studioId: string, text: string | null | undefined): Promise<void> {
+  const found = text ? reelLink(text) : null;
+  if (!found) return;
+  const db = supabaseAdmin();
+  const { data: known } = await db.from("inspirations").select("id, style").eq("studio_id", studioId).eq("url", found.url).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const style = known?.style as { look?: unknown } | null | undefined;
+  if (!known || !style?.look || currentReading(style)) return;
+  await db.from("inspirations").update({ style: null, created_at: new Date().toISOString() }).eq("id", known.id);
+  await queueJob("steal", { studioId, inspirationId: known.id, quiet: true });
+  console.info("steal: an outdated reading read again", known.id);
 }
 
 /**
