@@ -5012,6 +5012,11 @@ test("her Instagram profile at her getting started: its link, the providers' ans
     { image: "https://cdn.example/b.jpg", caption: "Avant / après", video: false },
     { image: "https://cdn.example/c.jpg", caption: "", video: true },
   ]);
+  // With a real code, each post keeps its address (a Reel's under /reel/).
+  assert.deepEqual(
+    readInstagramPosts({ items: [{ code: "DfK3yekMwTd", image: "https://cdn.example/d.jpg", is_video: true }, { shortcode: "DZzPvO6CXt-", image: "https://cdn.example/e.jpg" }] }).map((p) => p.link),
+    ["https://www.instagram.com/reel/DfK3yekMwTd/", "https://www.instagram.com/p/DZzPvO6CXt-/"],
+  );
 
   // Her first « Bonjour » gets the welcome alone; anything more gets its own answer after it.
   assert.equal(justHello("Bonjour !"), true);

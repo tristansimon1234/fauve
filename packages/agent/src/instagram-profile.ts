@@ -39,7 +39,8 @@ export type InstagramProfile = {
   posts: number | null;
 };
 
-export type InstagramPost = { image: string; caption: string; video: boolean };
+/** link: the post's own address, when the provider gives its code or permalink. */
+export type InstagramPost = { image: string; caption: string; video: boolean; link?: string };
 
 type Obj = Record<string, unknown>;
 
@@ -105,7 +106,10 @@ function postOf(o: Obj): InstagramPost | null {
   const caption = first(text(o.caption), text(at(o, "caption", "text")), text(at(o, "edge_media_to_caption", "edges", 0, "node", "text")), text(o.captionText), text(o.description)) ?? "";
   const kind = String(o.kind ?? o.type ?? o.product_type ?? o.productType ?? "").toLowerCase();
   const video = o.is_video === true || o.isVideo === true || o.media_type === 2 || Boolean(link(o.video_url) ?? link(o.videoUrl)) || /video|reel|clips/.test(kind);
-  return { image, caption, video };
+  const code = first(text(o.code), text(o.shortcode), text(o.shortCode));
+  const permalink = first(link(o.permalink), link(o.url), link(o.post_url), link(o.postUrl));
+  const own = code && /^[\w-]{5,20}$/.test(code) ? `https://www.instagram.com/${video ? "reel" : "p"}/${code}/` : permalink && /instagram\.com\/(p|reel|reels)\//.test(permalink) ? permalink : null;
+  return { image, caption, video, ...(own ? { link: own } : {}) };
 }
 
 /** Her latest posts in a provider's answer, in its order, each image once. */
