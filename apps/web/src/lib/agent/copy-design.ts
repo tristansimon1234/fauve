@@ -4,8 +4,11 @@ import {
   CHAT_MODEL,
   contractLines,
   COPY_WORDS_PROMPT,
+  castInput,
   copyable,
+  copyCast,
   copyPlan,
+  copyShots,
   faceInSubject,
   FEW_SUBJECTS,
   subjectLikely,
@@ -124,7 +127,14 @@ export async function designCopy(params: {
   });
   if (!files.length) return null;
 
-  const words = await copyWords(params);
+  // One small call writes its words and casts her files on its shots, as an editor would: for each shot, her ground most
+  // like the model's and the subject that makes sense on it (« il n'y a pas de logique concrète sur ces choix »).
+  const shots = copyShots({ cuts: followed.measured.cuts, duration: followed.measured.duration, look });
+  const cast = castInput(shots.spans, look.shots, copyCast(files, look, shots.spans.length), {
+    ...Object.fromEntries(Object.entries(params.photos).map(([id, read]) => [id, read.detection.notes])),
+    ...Object.fromEntries(params.clips.map((c) => [c.media_id, c.analysis.summary])),
+  });
+  const words = await copyWords(params, cast.input);
   if (!words) return null;
   if (!words.fits) {
     console.log("copy: her request needs the editor", params.postId, words.missing);
@@ -132,7 +142,7 @@ export async function designCopy(params: {
     await noteGap({ studioId: params.studioId, postId: params.postId, source: "copy", label: words.missing || "une demande hors de la recopie", request: params.brief });
     return null;
   }
-  const plan = copyPlan({ cuts: followed.measured.cuts, duration: followed.measured.duration, bpm: followed.bpm, files, look, words });
+  const plan = copyPlan({ cuts: followed.measured.cuts, duration: followed.measured.duration, bpm: followed.bpm, files, look, words, assignment: cast.read(words.shots) });
   Object.assign(plan, followedLook(plan, followed));
   // Each shot framed on its subject and its light corrected, as any montage.
   const durations = Object.fromEntries(files.map((f) => [f.id, f.photo ? plan.duration : f.seconds]));
@@ -151,6 +161,7 @@ export async function designCopy(params: {
     version: row.version,
     rationale: [
       `Je l'ai refait sur les coupes exactes du Reel que tu m'as envoyé${laid ? ", avec les sujets de tes photos détourés par-dessus" : ""}${plan.copy?.title ? ", et son titre dans sa police" : ""}.`,
+      words.why,
       few
         ? `Je n'ai trouvé ${subjects ? `que ${subjects} sujet${subjects > 1 ? "s" : ""} net${subjects > 1 ? "s" : ""}` : "aucun sujet net"} à détourer dans tes photos, alors plus de plans restent sans détourage que dans le modèle : envoie-moi 4 ou 5 photos d'objets ou de personnes sur un fond simple et je le refais plus varié.`
         : "",
@@ -161,7 +172,10 @@ export async function designCopy(params: {
 }
 
 /** Its words and whether her request fits, in one small call (Sonnet). Null when it fails: the editor makes the Reel. */
-async function copyWords(params: Parameters<typeof designCopy>[0]): Promise<(CopyWords & { fits: boolean; missing: string }) | null> {
+async function copyWords(
+  params: Parameters<typeof designCopy>[0],
+  casting: ReturnType<typeof castInput>["input"],
+): Promise<(CopyWords & { fits: boolean; missing: string; shots: { ground: string; subjects: string[] }[]; why: string }) | null> {
   const look = params.followed.look;
   const current = params.previous?.copy;
   const input = {
@@ -182,12 +196,13 @@ async function copyWords(params: Parameters<typeof designCopy>[0]): Promise<(Cop
       fin: look.ending,
     },
     ...(current ? { version_actuelle: { titre: current.title?.lines ?? [], fin: current.end?.cards.map((c) => c.lines) ?? [] } } : {}),
+    ...casting,
   };
   try {
     const response = await anthropic().beta.messages.parse({
       model: CHAT_MODEL,
-      max_tokens: 2000,
-      output_config: { effort: "low", format: outputFormat(copyWordsSchema) },
+      max_tokens: 6000,
+      output_config: { effort: "medium", format: outputFormat(copyWordsSchema) },
       system: COPY_WORDS_PROMPT,
       messages: [{ role: "user", content: JSON.stringify(input) }],
     });
@@ -200,6 +215,8 @@ async function copyWords(params: Parameters<typeof designCopy>[0]): Promise<(Cop
       missing: answer.missing.trim().slice(0, 200),
       title: answer.title.map(line).filter(Boolean).slice(0, 4),
       end: answer.end.map((card) => card.map(line).filter(Boolean).slice(0, 3)).filter((card) => card.length).slice(0, 3),
+      shots: answer.shots.slice(0, 80),
+      why: answer.why.trim().slice(0, 300),
     };
   } catch (error) {
     console.warn("copy: its words could not be written, the editor makes it", error);

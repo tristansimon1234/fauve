@@ -107,6 +107,18 @@ export const stolenLookReadingSchema = z.object({
     .describe(
       "Quand le Reel enchaîne des effets, des animations ou des temps bien distincts (une liste d'effets montrés l'un après l'autre, des étapes, un avant/après), chacun dans l'ordre, jusqu'à 12 : c'est ce qui fait ce Reel, la personne qui le recopie doit pouvoir les refaire sans le revoir. Une liste vide pour un Reel sans moments distincts",
     ),
+  shots: z
+    .array(
+      z.object({
+        at: z.number().describe("Le début du plan, en secondes (l'instant donné avec son image)"),
+        ground: z
+          .string()
+          .describe("Ce que montre le plan lui-même, sous ce qui est posé dessus, en quelques mots (une rue pavée, une terrasse de café, un intérieur, la vitrine d'une boutique, un gros plan sur une main…), sans marque"),
+        laid: z.enum(["aucun", "personne", "objet", "deux objets"]).describe("Ce qui est détouré d'une autre image et posé par-dessus ce plan : rien, une personne, un objet, deux objets côte à côte"),
+        subject: z.string().describe("Ce qui est posé dessus, en quelques mots (une boisson glacée, un appareil photo, une femme en manteau) ; vide si rien"),
+      }),
+    )
+    .describe("Chaque plan, dans l'ordre, un par image donnée avec son instant (jusqu'à 40) : ce qu'il montre et ce qui est posé dessus. Une liste vide sans images de plans"),
   grade: z
     .enum(SIGNATURE_GRADES)
     .describe("La lumière et les couleurs de ses images : natural, warm (chaude), bright (claire et aérée), flash (flash direct), film (argentique), moody (sombre et contrastée), cool (froide)"),
@@ -127,7 +139,9 @@ export const stolenLookReadingSchema = z.object({
 export type StolenLookReading = z.infer<typeof stolenLookReadingSchema>;
 
 /** The longest words of a stolen look, as it is kept. */
-const LOOK_CHARS = { name: 40, what: 200, composition: 240, layout: 200, music: 80, ending: 160, why: 300, moment: 220 } as const;
+const LOOK_CHARS = { name: 40, what: 200, composition: 240, layout: 200, music: 80, ending: 160, why: 300, moment: 220, ground: 100, subject: 80 } as const;
+/** The most shots a look keeps, one by one (what each shows, what is laid over it). */
+export const MAX_SHOTS = 40;
 /** The most moments a look keeps (a Reel of 9 effects, its ending). */
 export const MAX_MOMENTS = 12;
 
@@ -155,6 +169,11 @@ export const stolenLookSchema = stolenLookReadingSchema.extend({
     .array(z.object({ at: z.number().min(0).max(600), what: z.string().min(1).max(LOOK_CHARS.moment) }))
     .max(MAX_MOMENTS)
     .optional(),
+  // A look read before its shots were read (reader 5) has none.
+  shots: z
+    .array(z.object({ at: z.number().min(0).max(600), ground: z.string().max(LOOK_CHARS.ground), laid: z.enum(["aucun", "personne", "objet", "deux objets"]), subject: z.string().max(LOOK_CHARS.subject) }))
+    .max(MAX_SHOTS)
+    .optional(),
   music: z.string().max(LOOK_CHARS.music),
   ending: z.string().max(LOOK_CHARS.ending),
   why: z.string().max(LOOK_CHARS.why),
@@ -171,7 +190,7 @@ function hexColor(written: string): string | null {
 
 /** Structured outputs do not enforce lengths: the reading is taken as written, then clamped. */
 export function clampLook(reading: StolenLookReading): StolenLook {
-  const { colors: written, text: t, moments: read, ...rest } = reading;
+  const { colors: written, text: t, moments: read, shots: seen, ...rest } = reading;
   const font = t.font.trim();
   const colors = [...new Set(written.flatMap((c) => hexColor(c) ?? []))].slice(0, 3);
   const moments = read
@@ -179,6 +198,11 @@ export function clampLook(reading: StolenLookReading): StolenLook {
     .map((m) => ({ at: Math.round(Math.min(600, Math.max(0, m.at)) * 10) / 10, what: clip(m.what, LOOK_CHARS.moment) }))
     .sort((a, b) => a.at - b.at)
     .slice(0, MAX_MOMENTS);
+  const shots = (seen ?? [])
+    .filter((x) => Number.isFinite(x.at))
+    .map((x) => ({ at: Math.round(Math.min(600, Math.max(0, x.at)) * 100) / 100, ground: clip(x.ground, LOOK_CHARS.ground), laid: x.laid, subject: x.laid === "aucun" ? "" : clip(x.subject, LOOK_CHARS.subject) }))
+    .sort((a, b) => a.at - b.at)
+    .slice(0, MAX_SHOTS);
   return {
     ...rest,
     name: clip(reading.name, LOOK_CHARS.name) || "son style",
@@ -204,6 +228,7 @@ export function clampLook(reading: StolenLookReading): StolenLook {
     layout: clip(reading.layout, LOOK_CHARS.layout) || "plein cadre",
     // One moment is not a sequence: a Reel built on one effect says it in its hook and its layout.
     ...(moments.length > 1 ? { moments } : {}),
+    ...(shots.length ? { shots } : {}),
     music: clip(reading.music, LOOK_CHARS.music),
     ending: clip(reading.ending, LOOK_CHARS.ending),
     why: clip(reading.why, LOOK_CHARS.why),
@@ -252,7 +277,7 @@ export const stolenStyleSchema = z.object({
  * candidates written out (Tristan: « la police un peu naze… pas fine comme sur le Reel envoyé »). 4 keeps the closest
  * of five, always: 3 could refuse them all, and the Reel fell back on her charter's fonts.
  */
-export const STEAL_READER = 4;
+export const STEAL_READER = 5;
 
 /** A kept reading as good as a new one: made by the current reader. */
 export const currentReading = (style: unknown): boolean => {
@@ -263,7 +288,7 @@ export type StolenStyle = z.infer<typeof stolenStyleSchema>;
 
 export const STEAL_PROMPT = `You are Edith's art director; Edith edits the Instagram Reels of a neighbourhood business (studio, salon, restaurant, shop…). The person who runs the business wants to take this Reel's style for theirs: read it as a pro editor who wants to remake its style, not its content.
 Watch the whole Reel, frame by frame, with the sound: its form (told by a voice, a key message held on screen, a visit, collage), its layout (its shots full frame, or a split screen, a shot in a window, several at once, an object or a person cut out of another image and laid over some shots), the hook of the first 2 seconds, the text laid on the video (how much, how it is composed: levels, sizes, case, weight, the thickness of its strokes (a fine pen is not a felt pen), letter spacing, key word, background under the sentence, place, alignment, its lines aligned or staggered, its tilt, its shadow; its font and its colours only when they make its style, the font named with four close alternatives), the subtitles, the effect on the video (film dust, grain), its moments when it chains clearly distinct effects or animations (each one: when, which element, where, in front of or behind the person, how it moves), the light, the motion of the texts, the camera, the transitions, the music (genre and energy, for a composer), the ending.
-You also get a sharp image from the middle of each of its shots, with its time: look at every one, since a shot of a third of a second counts and the video's frames can fall between two. A cut-out laid over a shot (a drink, a phone booth, a bag, a person, without or with a white border) is part of its style, even when it stays a few tenths of a second: say it in the layout, and make each one its own moment, every one of them and not only the first (when, what, where, how big, border or not).
+You also get a sharp image from the middle of each of its shots, with its time: look at every one, since a shot of a third of a second counts and the video's frames can fall between two. List them in shots, one per image, in order: what the shot itself shows under what is laid on it, and what is laid on it. A cut-out laid over a shot (a drink, a phone booth, a bag, a person, without or with a white border) is part of its style, even when it stays a few tenths of a second: say it in the layout, and make each one its own moment, every one of them and not only the first (when, what, where, how big, border or not).
 Copy neither its words, nor its images, nor the name of its music: describe a form another business can reuse. In your French, make no feminine or masculine agreement for the person who runs the business. In French, except « music » in English.`;
 
 /** The style one Reel copies (from its inspiration's stolen style): its look and its pace. */

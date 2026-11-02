@@ -2040,6 +2040,7 @@ test("copy first: what the Reel she copies (or her request) does not have is nev
     colors: [],
     effect: "none",
     moments: [],
+    shots: [],
     grade: "natural",
     motion: "epure",
     layout: "plein cadre",
@@ -3661,6 +3662,7 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
     colors: [],
     effect: "dust",
     moments: [],
+    shots: [],
     grade: "film",
     motion: "energique",
     layout: "plein cadre",
@@ -3680,6 +3682,10 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
     layout: "plein cadre",
     text: { ...look.text, font: "", font_alternatives: [], sample: "", seen_at: 0, stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const },
     colors: [],
+    shots: [
+      { at: 3.1, ground: "une rue pavée", laid: "objet" as const, subject: "une boisson glacée" },
+      { at: 0, ground: "  une terrasse de café  ", laid: "aucun" as const, subject: "ne compte pas" },
+    ],
     moments: [
       { at: 4.2, what: "une fenêtre d'appli surgit à côté de sa tête" },
       { at: 2.04, what: "des icônes tournent autour de sa main. ".repeat(10) },
@@ -3688,9 +3694,14 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
     ],
   });
   assert.deepEqual(effects.moments?.map((m) => m.at), [2, 4.2, 7.5]);
+  // Its shots in order, a bare shot without a subject.
+  assert.deepEqual(effects.shots, [
+    { at: 0, ground: "une terrasse de café", laid: "aucun", subject: "" },
+    { at: 3.1, ground: "une rue pavée", laid: "objet", subject: "une boisson glacée" },
+  ]);
   assert.ok(effects.moments!.every((m) => m.what.length <= 220));
   assert.ok(stolenLookSchema.safeParse(effects).success);
-  assert.equal("moments" in clampLook({ ...look, layout: "plein cadre", text: { ...look.text, font: "", font_alternatives: [], sample: "", seen_at: 0, stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const }, colors: [], moments: [{ at: 1, what: "un seul effet" }] }), false);
+  assert.equal("moments" in clampLook({ ...look, layout: "plein cadre", text: { ...look.text, font: "", font_alternatives: [], sample: "", seen_at: 0, stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const }, colors: [], shots: [], moments: [{ at: 1, what: "un seul effet" }] }), false);
   const sequence = followedFrom("11111111-2222-4333-8444-555555555555", { look: effects, measures: { duration: 19, cuts: [], bpm: null, lufs: -14 } });
   assert.equal(followedForEditor(sequence).moments?.length, 3);
   assert.match(followedLine(sequence), /ses moments, chacun à refaire avec ses images : 2 s : des icônes .* ; 4,2 s : une fenêtre d'appli surgit à côté de sa tête ; 7,5 s : une page de texte/);
@@ -3928,6 +3939,7 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
     colors: ["#FD0", "jaune", "#FFFFFF", "#ffdd00", "#000000", "#ff3b30"],
     effect: "none" as const,
     moments: [],
+    shots: [],
     grade: "natural" as const,
     motion: "energique" as const,
     layout: "plein cadre",
@@ -4571,6 +4583,7 @@ test("her own Reel as a model: its structure for the editor, its origin for the 
     colors: [],
     effect: "dust",
     moments: [],
+    shots: [],
     grade: "warm",
     motion: "chaleureux",
     layout: "plein cadre",
@@ -5197,7 +5210,7 @@ test("a word lost on the picture under it is found, and one with its own edge is
 
 test("a copied Reel's words keep their drawing, and its font is checked among close candidates", async () => {
   const { clampLook, fontCheckOf, stolenLookSchema, textDrawingWords, STEAL_READER } = await import("./steal.ts");
-  assert.equal(STEAL_READER, 4);
+  assert.equal(STEAL_READER, 5);
   const reading = {
     name: "message manuscrit",
     format: "message" as const,
@@ -5225,6 +5238,7 @@ test("a copied Reel's words keep their drawing, and its font is checked among cl
     colors: [],
     effect: "none" as const,
     moments: [],
+    shots: [],
     grade: "natural" as const,
     motion: "energique" as const,
     layout: "plein cadre",
@@ -5585,4 +5599,62 @@ test("a copy cuts out the photos most likely to hold a subject first, and someon
   assert.equal(faceInSubject([face], { x: 0.1, y: 0.4, w: 0.5, h: 0.5 }), false);
   assert.equal(faceInSubject([face], { x: 0.7, y: 0.05, w: 0.3, h: 0.9 }), true);
   assert.equal(faceInSubject([{ kind: "plate", box_2d: [100, 800, 160, 860] }], { x: 0.7, y: 0.05, w: 0.3, h: 0.9 }), false);
+});
+
+test("a copy follows the casting of its shots where it keeps the rules", async () => {
+  const { castInput, copyCast, copyPlan, copyShots } = await import("./copy.ts");
+  const look = {
+    format: "message" as const,
+    voice: "aucune" as const,
+    layout: "plein cadre, avec un objet ou une personne détourés posés en grand par-dessus certains plans",
+    ending: "le dernier plan tenu",
+    text: { amount: "aucun" as const, composition: "", case: "normal" as const, weight: "regular" as const, tracking: "normal" as const, align: "center" as const, stress: "none" as const, band: "none" as const, subtitles: false },
+    shots: [
+      { at: 0, ground: "une terrasse de café", laid: "objet" as const, subject: "une boisson" },
+      { at: 1, ground: "une rue pavée", laid: "aucun" as const, subject: "" },
+      { at: 2, ground: "une rue", laid: "personne" as const, subject: "une femme en manteau" },
+      { at: 3, ground: "une vitrine", laid: "deux objets" as const, subject: "deux appareils" },
+    ],
+  };
+  const files = [
+    { id: "terrasse", photo: true, seconds: 0 },
+    { id: "rue", photo: true, seconds: 0 },
+    { id: "vitrine", photo: false, seconds: 0.5 },
+    { id: "matcha", photo: true, seconds: 0, cutout: { tall: 1, person: false } },
+    { id: "zenit", photo: true, seconds: 0, cutout: { tall: 0.7, person: false } },
+    { id: "femme", photo: true, seconds: 0, cutout: { tall: 2.5, person: true } },
+  ];
+  const shots = copyShots({ cuts: [1, 2, 3], duration: 4, look });
+  const cast = castInput(shots.spans, look.shots, copyCast(files, look, shots.spans.length), { terrasse: "une terrasse", matcha: "un matcha" });
+  // The call reads the model's shot under each one, her grounds and subjects under short ids.
+  assert.deepEqual(cast.input.plans[2], { n: 3, secondes: 1, fond_du_modele: "une rue", pose_du_modele: "une personne", sujet_du_modele: "une femme en manteau" });
+  assert.deepEqual(cast.input.fonds.map((f) => f.id), ["f1", "f2", "f3"]);
+  assert.deepEqual(cast.input.sujets.map((s) => [s.id, s.personne]), [["s1", false], ["s2", false], ["s3", true]]);
+  const assignment = cast.read([
+    { ground: "f1", subjects: ["s1"] },
+    { ground: "f2", subjects: [] },
+    { ground: "f2", subjects: ["s3"] },
+    // A video too short for its shot (0.5 s for 1 s), and the same subject as the last laid shot but one: kept.
+    { ground: "f3", subjects: ["s1", "s2"] },
+  ]);
+  const plan = copyPlan({ cuts: [1, 2, 3], duration: 4, files, look, words: { title: null, end: [] }, assignment });
+  const grounds = plan.segments.map((s) => ("clip_id" in s ? s.clip_id : ""));
+  // The same ground twice in a row (rue, rue) is not kept: another one takes the third shot.
+  assert.deepEqual(grounds.slice(0, 2), ["terrasse", "rue"]);
+  assert.notEqual(grounds[2], "rue");
+  // The short video cannot hold its shot: another ground takes it.
+  assert.notEqual(grounds[3], "vitrine");
+  for (let i = 1; i < grounds.length; i++) assert.notEqual(grounds[i], grounds[i - 1]);
+  assert.deepEqual(
+    plan.copy!.cutouts.map((c) => [c.segment, c.photo, c.place]),
+    [
+      [0, "matcha", "center"],
+      [2, "femme", "stand"],
+      [3, "matcha", "left"],
+      [3, "zenit", "right"],
+    ],
+  );
+  // A subject on its own photo, or past two uses, is dropped.
+  const strict = copyPlan({ cuts: [1, 2, 3], duration: 4, files, look, words: { title: null, end: [] }, assignment: [{ ground: "terrasse", subjects: ["matcha"] }, { ground: "rue", subjects: ["zenit"] }, { ground: "terrasse", subjects: ["matcha"] }, { ground: "rue", subjects: ["matcha"] }] });
+  assert.deepEqual(strict.copy!.cutouts.map((c) => c.photo), ["matcha", "zenit", "matcha"]);
 });
