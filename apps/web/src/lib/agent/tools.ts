@@ -61,6 +61,7 @@ import { acceptQuote, createMontageQuote } from "@/lib/credits";
 import { correctionQuote, startMontage } from "@/lib/montage-start";
 import { bakedReel } from "@/lib/edit-plans";
 import { effectRoute } from "@/lib/agent/effects-agent";
+import { fewSubjects } from "@/lib/agent/copy-design";
 import { startEffectWords } from "@/lib/effect-words";
 import { montageStatus } from "@/lib/montage-status";
 import { publicHistory, publicStatsFor, weekForModel } from "@/lib/social/public-stats";
@@ -655,6 +656,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       // In the app, the card follows the montage step by step; on WhatsApp, cards become links, so the post's link stays.
       ctx.extras.quote = job.id;
       if (ctx.waId) ctx.extras.posts = [post_id];
+      // A copy that lays a subject on most shots, and few subjects in her photos: they would come back often, she is told.
+      const subjects = accepted.kind === "montage" && route === "chain" ? await fewSubjects(studioId, post_id, accepted.mediaIds).catch(() => null) : null;
       const level = job.effort ? EFFORTS[job.effort] : null;
       const minutes = route === "agent" ? EFFECT_MINUTES : (level?.minutes ?? EFFORTS.rapide.minutes);
       ctx.notes.push(`montage lancé job=${job.id} pour « ${post.title as string} » post_id=${post_id}${route === "agent" ? " (effet image par image)" : level ? ` (${level.label})` : ""}`);
@@ -663,6 +666,11 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         publication: post.title,
         ...(route === "agent" ? { atelier: "effet dessiné image par image, sur ce qui bouge dans sa vidéo", duree: `${minutes} min` } : level ? { niveau: level.label, duree: `${minutes} min` } : {}),
         ...(job.effort && job.effort !== wanted && route !== "agent" ? { attention: `Le solde ne permettait pas le niveau ${EFFORTS[wanted].label} : lancé en ${level?.label}.` } : {}),
+        ...(subjects !== null
+          ? {
+              peu_de_sujets: `Le Reel qu'elle recopie pose un sujet détouré (un objet, une personne) sur presque chaque plan, et ses photos n'en montrent que ${subjects}. Dis-le en une phrase : ça part quand même, avec plus de plans sans détourage, et 4 ou 5 photos d'objets ou de personnes sur un fond simple le rendraient plus varié.`,
+            }
+          : {}),
         note: `C'est lancé. Dis en une ou deux phrases ce que tu vas faire et quand la vidéo arrive (${minutes} min). Ne parle pas de prix ni de devis : le message de livraison dira combien de crédits ont servi. Ne demande pas « je lance ? ».`,
       });
     },

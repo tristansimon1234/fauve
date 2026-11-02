@@ -6,6 +6,9 @@ import {
   COPY_WORDS_PROMPT,
   copyable,
   copyPlan,
+  faceInSubject,
+  FEW_SUBJECTS,
+  subjectLikely,
   copyWordsSchema,
   cutoutSchema,
   finishPlan,
@@ -26,6 +29,7 @@ import { insertPlanVersion } from "@/lib/edit-plans";
 import { ensureCutouts } from "@/lib/render/cutout";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { noteGap } from "@/lib/toolkit";
+import { postStyle } from "@/lib/steal";
 import { anthropic, logClaudeCost } from "./run";
 
 // A simple copied Reel remade by code (packages/agent/src/copy.ts): one small call writes its words and says whether
@@ -33,8 +37,9 @@ import { anthropic, logClaudeCost } from "./run";
 
 /** How long the cut-outs of her photos are waited for (their own sandbox, 10 to 30 s a photo). */
 const CUTOUTS_WAIT_MS = 4 * 60_000;
-/** The most photos cut out for a copy. */
-const MAX_CUT = 10;
+/** The most photos cut out for a copy, the likeliest subjects first, a few at a time (what is ready in time is laid). */
+const MAX_CUT = 20;
+const CUT_BATCH = 4;
 
 export type CopyDesign = { plan: EditPlan; editPlanId: string; version: number; rationale: string };
 
@@ -73,9 +78,24 @@ export async function designCopy(params: {
   const { followed } = params;
   const look = followed.look;
   const photoIds = params.mediaIds.filter((id) => params.photos[id]);
-  // Her photos' subjects, cut out once (laid over the other shots when the model lays some).
+  // Her photos' subjects, cut out once (laid over the other shots when the model lays some): the photos whose reading
+  // says an object, someone or a close-up first, a few at a time, so what is ready in time is laid. In her order, the
+  // first ten (streets and façades) had been cut and the woman with her dog, the barista and the shoes never tried.
   if (laysCutouts(look) && photoIds.length) {
-    await Promise.race([ensureCutouts(params.studioId, photoIds.slice(0, MAX_CUT)).catch((e: unknown) => console.warn("copy: cut-outs not ready", e)), new Promise((resolve) => setTimeout(resolve, CUTOUTS_WAIT_MS))]);
+    const ranked = photoIds
+      .map((id, i) => ({ id, i, score: subjectLikely(params.photos[id]!.detection.notes) }))
+      .sort((a, b) => b.score - a.score || a.i - b.i)
+      .slice(0, MAX_CUT)
+      .map((p) => p.id);
+    const began = Date.now();
+    for (let k = 0; k < ranked.length; k += CUT_BATCH) {
+      const left = CUTOUTS_WAIT_MS - (Date.now() - began);
+      if (left <= 0) break;
+      await Promise.race([
+        ensureCutouts(params.studioId, ranked.slice(k, k + CUT_BATCH)).catch((e: unknown) => console.warn("copy: cut-outs not ready", e)),
+        new Promise((resolve) => setTimeout(resolve, left)),
+      ]);
+    }
   }
   const cutouts = photoIds.length
     ? new Map(
@@ -90,8 +110,9 @@ export async function designCopy(params: {
   const files: CopyFile[] = params.mediaIds.flatMap((id): CopyFile[] => {
     if (params.photos[id]) {
       const cut = cutouts.get(id);
-      // Someone stands on the bottom edge (a face was read on the photo); an object sits big in the middle.
-      const person = params.photos[id]!.detection.regions.some((r) => r.kind === "face");
+      // Someone stands on the bottom edge (a face read inside the subject cut out); an object sits big in the middle.
+      // A face anywhere on the photo had stood a row of terrace chairs up like a person.
+      const person = cut ? faceInSubject(params.photos[id]!.detection.regions, cut.box) : false;
       return [{ id, photo: true, seconds: 0, ...(cut ? { cutout: { tall: (cut.box.h * cut.h) / Math.max(1, cut.box.w * cut.w), person } } : {}) }];
     }
     const clip = params.clips.find((c) => c.media_id === id);
@@ -121,11 +142,21 @@ export async function designCopy(params: {
   const row = await insertPlanVersion(params.studioId, params.postId, plan);
   await supabaseAdmin().from("posts").update({ edit_plan_id: row.id }).eq("id", params.postId);
   const laid = plan.copy?.cutouts.length ?? 0;
+  // Too few clean subjects for a model that lays one on most shots: more shots stay bare, and she is told what to send.
+  const subjects = files.filter((f) => f.cutout).length;
+  const few = laysCutouts(look) && subjects < FEW_SUBJECTS;
   return {
     plan,
     editPlanId: row.id,
     version: row.version,
-    rationale: `Je l'ai refait sur les coupes exactes du Reel que tu m'as envoyé${laid ? ", avec les sujets de tes photos détourés par-dessus" : ""}${plan.copy?.title ? ", et son titre dans sa police" : ""}.`,
+    rationale: [
+      `Je l'ai refait sur les coupes exactes du Reel que tu m'as envoyé${laid ? ", avec les sujets de tes photos détourés par-dessus" : ""}${plan.copy?.title ? ", et son titre dans sa police" : ""}.`,
+      few
+        ? `Je n'ai trouvé ${subjects ? `que ${subjects} sujet${subjects > 1 ? "s" : ""} net${subjects > 1 ? "s" : ""}` : "aucun sujet net"} à détourer dans tes photos, alors plus de plans restent sans détourage que dans le modèle : envoie-moi 4 ou 5 photos d'objets ou de personnes sur un fond simple et je le refais plus varié.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
   };
 }
 
@@ -174,4 +205,16 @@ async function copyWords(params: Parameters<typeof designCopy>[0]): Promise<(Cop
     console.warn("copy: its words could not be written, the editor makes it", error);
     return null;
   }
+}
+
+/**
+ * At launch: the Reel she copies lays a subject on most shots, and her photos hold fewer than FEW_SUBJECTS likely ones
+ * (from their readings, before anything is cut out). Their count, else null: Edith says it in a sentence, the Reel goes.
+ */
+export async function fewSubjects(studioId: string, postId: string, mediaIds: string[]): Promise<number | null> {
+  const followed = await postStyle(studioId, postId).catch(() => undefined);
+  if (!copyCandidate(followed, undefined, false) || !laysCutouts(followed.look) || !mediaIds.length) return null;
+  const { data } = await supabaseAdmin().from("media_assets").select("kind, regions").eq("studio_id", studioId).in("id", mediaIds);
+  const likely = (data ?? []).filter((m) => m.kind === "image" && subjectLikely(((m.regions as { detection?: { notes?: string } } | null)?.detection?.notes) ?? "") > 0).length;
+  return likely < FEW_SUBJECTS ? likely : null;
 }

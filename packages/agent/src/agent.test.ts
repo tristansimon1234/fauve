@@ -5481,13 +5481,23 @@ test("a simple copied Reel is remade by code on the model's own cuts", async () 
   const few = copyPlan({ cuts, duration: 13.21, files: [files[0]!, ...files.slice(-3)], look, words: { title: ["x"], end: [] } });
   assert.ok(few.segments.some((s) => "clip_id" in s && s.clip_id === "camera"));
   assert.ok(few.copy!.cutouts.every((c) => { const s = few.segments[c.segment]!; return !("clip_id" in s) || s.clip_id !== c.photo; }));
+
+  // Many subjects: they fill the open shots, still twice at most each.
+  const many = Array.from({ length: 9 }, (_, k) => ({ id: `s${k}`, photo: true, seconds: 0, cutout: { tall: 1, person: false } }));
+  const full = copyPlan({ cuts, duration: 13.21, files: [...files.slice(0, 8), ...many], look, words: { title: ["x"], end: [] } });
+  const open = full.segments.filter((_, i) => i % 4 !== 3).length;
+  assert.ok(full.copy!.cutouts.length >= open);
+  assert.ok(many.every((m) => full.copy!.cutouts.filter((c) => c.photo === m.id).length <= 2));
   const laid = plan.copy!.cutouts;
-  assert.ok(laid.length >= 10);
+  // Three subjects: each laid twice at most, the rest of the shots bare, spread over the Reel (not all at the start).
+  assert.ok(laid.length >= 5 && laid.length <= 6);
+  for (const id of ["camera", "matcha", "woman"]) assert.ok(laid.filter((c) => c.photo === id).length <= 2, id);
+  assert.ok(Math.max(...laid.map((c) => c.segment)) >= 14);
   assert.ok(laid.every((c) => shots[c.segment]!.clip_id !== c.photo));
-  // One shot in four stays bare; a person stands on the bottom edge; once a pair side by side.
+  // One shot in four stays bare; a person stands on the bottom edge; a pair side by side once at most.
   assert.ok(!laid.some((c) => c.segment % 4 === 3));
   assert.ok(laid.filter((c) => c.photo === "woman").every((c) => c.place === "stand"));
-  assert.equal(laid.filter((c) => c.place === "left").length, 1);
+  assert.ok(laid.filter((c) => c.place === "left").length <= 1);
   // Never the same subject on two shots in a row.
   const bySegment = new Map(laid.map((c) => [c.segment, c.photo]));
   for (const [segment, photo] of bySegment) if (bySegment.has(segment + 1) && laid.filter((c) => c.segment === segment + 1).length === 1) assert.notEqual(bySegment.get(segment + 1), photo);
@@ -5557,4 +5567,22 @@ test("the tools' week: gaps grouped in other words, the message only when there 
   const moved = toolsDigest({ gaps: [], tools: { ...none, active: 2, trial: 1, made: 1, updated: 1 }, autonomy: false, budgetEur: 10, spentEur: 1.5 })!;
   assert.match(moved, /Outils : 2 actifs, 1 à l'essai\. Cette semaine : 1 fabriqué, 0 promu, 1 mis à jour, 0 retiré\./);
   assert.match(moved, /Fabrication automatique : coupée\./);
+});
+
+test("a copy cuts out the photos most likely to hold a subject first, and someone stands only when the face is in the subject", async () => {
+  const { faceInSubject, subjectLikely } = await import("./copy.ts");
+  const notes = [
+    "Charmante rue pavée parisienne bordée de terrasses de cafés ensoleillées.",
+    "Un appareil photo argentique Zenit posé sur un rocher, sublimé par une douce lumière.",
+    "Une personne vue de dos vêtue d'un manteau moucheté promène son chien.",
+    "Façade emblématique et rotonde du BHV Marais à Paris.",
+  ];
+  const ranked = notes.map((n, i) => ({ i, score: subjectLikely(n) })).sort((a, b) => b.score - a.score || a.i - b.i).map((r) => r.i);
+  assert.deepEqual(ranked.slice(0, 2), [1, 2]);
+  assert.ok(subjectLikely(notes[0]!) < 0 && subjectLikely(notes[3]!) < 0);
+  // A face on the terrace, away from the chairs cut out: not a person.
+  const face = { kind: "face", box_2d: [100, 800, 160, 860] };
+  assert.equal(faceInSubject([face], { x: 0.1, y: 0.4, w: 0.5, h: 0.5 }), false);
+  assert.equal(faceInSubject([face], { x: 0.7, y: 0.05, w: 0.3, h: 0.9 }), true);
+  assert.equal(faceInSubject([{ kind: "plate", box_2d: [100, 800, 160, 860] }], { x: 0.7, y: 0.05, w: 0.3, h: 0.9 }), false);
 });

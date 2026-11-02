@@ -38,6 +38,10 @@ export type CopyInput = {
   words: CopyWords;
 };
 
+/** How many shots one of her subjects is laid on, at most. */
+export const MAX_SUBJECT_USES = 2;
+/** Fewer clean subjects than this, and a model that lays one on most shots: she is told hers will be few. */
+export const FEW_SUBJECTS = 4;
 /** The shortest shot kept between two of the model's cuts (scene detection sees a flash as two cuts). */
 const SHORTEST_SHOT = 0.2;
 /** An ending card lasts this long when the model's last shot is too long to be it. */
@@ -144,23 +148,33 @@ export function copyPlan(input: CopyInput): EditPlan {
     return { clip_id: longest.id, in: 0, out: round(Math.min(longest.seconds, length * speed)), zoom: "none", speed: round(speed) };
   });
 
+  // Each subject twice at most, never on its own photo nor on two laid shots in a row: with few subjects, more shots stay
+  // bare, spread over the Reel (three subjects had come back on 17 shots of a copy Tristan made, « 15 fois le même détourage »).
   const cutouts: CopyLayer["cutouts"] = [];
   if (stickers.length) {
+    const uses = new Map<string, number>();
+    const free = (f: CopyFile) => (uses.get(f.id) ?? 0) < MAX_SUBJECT_USES;
+    const take = (f: CopyFile) => uses.set(f.id, (uses.get(f.id) ?? 0) + 1);
+    // The shots that may carry one (one in four stays bare), as many as her subjects allow, spread evenly.
+    const open = segments.map((_, i) => i).filter((i) => i % 4 !== 3);
+    const room = Math.min(open.length, stickers.length * MAX_SUBJECT_USES);
+    const chosen = [...new Set(Array.from({ length: room }, (_, k) => open[Math.floor((k * open.length) / room)]!))];
     let next = 0;
-    let last = "";
+    let last: string[] = [];
     let paired = false;
-    segments.forEach((s, i) => {
-      // A breath: one shot in four stays bare.
-      if (i % 4 === 3) return;
+    for (const i of chosen) {
+      const s = segments[i]!;
       const length = spans[i]!.end - spans[i]!.start;
-      const fits = (f: CopyFile) => f.id !== s.clip_id && f.id !== last;
+      const fits = (f: CopyFile) => f.id !== s.clip_id && !last.includes(f.id) && free(f);
       const objects = stickers.filter((f) => fits(f) && !f.cutout!.person);
       // Once, past the first third, two objects side by side.
       if (!paired && i >= spans.length / 3 && objects.length >= 2 && length >= 0.45) {
         paired = true;
-        cutouts.push({ segment: i, photo: objects[0]!.id, place: "left", at: 0 }, { segment: i, photo: objects[1]!.id, place: "right", at: 0 });
-        last = objects[1]!.id;
-        return;
+        const pair = objects.slice(0, 2);
+        cutouts.push({ segment: i, photo: pair[0]!.id, place: "left", at: 0 }, { segment: i, photo: pair[1]!.id, place: "right", at: 0 });
+        pair.forEach(take);
+        last = pair.map((f) => f.id);
+        continue;
       }
       for (let k = 0; k < stickers.length; k++) {
         const file = stickers[(next + k) % stickers.length]!;
@@ -168,10 +182,11 @@ export function copyPlan(input: CopyInput): EditPlan {
         next += k + 1;
         // Over the opening shot, it lands once the title has been read alone.
         cutouts.push({ segment: i, photo: file.id, place: file.cutout!.person ? "stand" : "center", at: i === 0 ? round(Math.min(1, length / 2)) : 0 });
-        last = file.id;
-        return;
+        take(file);
+        last = [file.id];
+        break;
       }
-    });
+    }
   }
 
   // Its title, held as the model holds it: all along (a held message), or its first seconds (a line).
@@ -253,3 +268,27 @@ Then write the words, in French, what she and her customers read:
 - The ending's cards: her call to action in her words when she gave one, else what to do in a few words (where to find her, a link in the bio when she has a booking link, her name), as the model ends; never a fact that is not given.
 - Words she gives word for word (« contrat ») are kept exactly, only split into lines. Never invent a price, an hour, a place, an offer or a review.
 - A correction (« version_actuelle »): keep the current words except what her request changes.`;
+
+/**
+ * How likely a photo is to hold a subject that cuts out (an object, someone, a close-up) rather than a whole scene (a
+ * street, a façade, a square), from what its reading says of it: the likeliest are cut out first.
+ */
+export function subjectLikely(notes: string): number {
+  const text = notes.toLowerCase();
+  let score = 0;
+  if (/gros plan|plan serré|posée?s? (sur|devant)|nature morte|en détail|isolée?|sur fond (uni|blanc|simple)/.test(text)) score += 2;
+  if (/appareil|verre|tasse|bouteille|\bsac\b|chaussure|bonnet|manteau|chapeau|bijou|produit|\bplat\b|assiette|bouquet|gâteau|pâtisserie|vase|lampe|objet/.test(text)) score += 2;
+  if (/personne|femme|homme|\bfille\b|garçon|enfant|vue de dos|silhouette|portrait|barista|serveur|serveuse/.test(text)) score += 1;
+  if (/\brue\b|façade|\bplace\b|perspective|paysage|édifice|immeuble|bâtiment|panorama|vue d'ensemble|\bdôme\b|fontaine|ciel|quartier/.test(text)) score -= 2;
+  return score;
+}
+
+/** Whether someone is the subject cut out: a face read on the photo inside the subject's box (box_2d [ymin, xmin, ymax, xmax] on 0 to 1000). */
+export function faceInSubject(regions: { kind: string; box_2d: number[] }[], box: { x: number; y: number; w: number; h: number }): boolean {
+  return regions.some((r) => {
+    if (r.kind !== "face" || r.box_2d.length < 4) return false;
+    const [ymin, xmin, ymax, xmax] = r.box_2d as [number, number, number, number];
+    const [cx, cy] = [(xmin + xmax) / 2000, (ymin + ymax) / 2000];
+    return cx >= box.x && cx <= box.x + box.w && cy >= box.y && cy <= box.y + box.h;
+  });
+}
