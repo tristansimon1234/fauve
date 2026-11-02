@@ -14,6 +14,7 @@ import {
 } from "remotion";
 import { Fit } from "./Fit";
 import { makeKit } from "./Kit";
+import { makeType } from "./Type";
 import { Marker } from "./Marker";
 import { PaperCutout, type RimSpec } from "./PaperCutout";
 import { SceneView } from "./Scene";
@@ -97,8 +98,43 @@ function Footage({ shot, style }: { shot: number; style?: CSSProperties }) {
 // Marker: a word circled or underlined by hand, the stroke following the word as it is laid out.
 // Tiles, Window, Stack, Split: the layout kit (Kit.tsx), tested once, so an animation lays its pictures in tiles,
 // windows, stacks and split screens without coding their geometry.
+// Decode, TypeOn, Reveal, Count, Edges, Paper, Emboss, Card, Scribble, WordSearch, Kinetic, WordArt, Burst: the text and
+// materials kit (Type.tsx), with the timings of the reference Reels.
 const kit = makeKit({ useCurrentFrame, useVideoConfig });
-export const SCOPE = { AbsoluteFill, Sequence, Img, useCurrentFrame, useVideoConfig, interpolate, interpolateColors, spring, Easing, random, FitText: Fit, Cutout, Footage, Marker, Tiles: kit.Tiles, Window: kit.Window, Stack: kit.Stack, Split: kit.Split };
+const type = makeType({ useCurrentFrame, useVideoConfig });
+export const SCOPE = {
+  AbsoluteFill,
+  Sequence,
+  Img,
+  useCurrentFrame,
+  useVideoConfig,
+  interpolate,
+  interpolateColors,
+  spring,
+  Easing,
+  random,
+  FitText: Fit,
+  Cutout,
+  Footage,
+  Marker,
+  Tiles: kit.Tiles,
+  Window: kit.Window,
+  Stack: kit.Stack,
+  Split: kit.Split,
+  Decode: type.Decode,
+  TypeOn: type.TypeOn,
+  Reveal: type.Reveal,
+  Count: type.Count,
+  Edges: type.Edges,
+  Paper: type.Paper,
+  Emboss: type.Emboss,
+  Card: type.Card,
+  Scribble: type.Scribble,
+  WordSearch: type.WordSearch,
+  Kinetic: type.Kinetic,
+  WordArt: type.WordArt,
+  Burst: type.Burst,
+};
 
 export type SceneComponent = (props: {
   width: number;
@@ -121,13 +157,17 @@ export type SceneComponent = (props: {
   end: ComposeEnd | null;
 }) => ReactNode;
 
-/** The component a generated code defines (`Scene` for a motion scene, `Layer` for a text layer, `Carousel` for a whole carousel…), or null. */
+/**
+ * The component a generated code defines (`Scene` for a motion scene, `Layer` for a text layer, `Carousel` for a whole carousel…), or null.
+ * The code runs in its own block under the scope, so a name it declares itself (its own `Card`) comes before the scope's
+ * instead of failing to compile.
+ */
 export function compileComponent<C>(js: string, name: "Scene" | "Layer" | "Element" | "Carousel", scope: Record<string, unknown> = SCOPE): C | null {
   try {
     const factory = new Function(
       "React",
       "scope",
-      `"use strict";\nconst { ${Object.keys(scope).join(", ")} } = scope;\n${js}\nreturn typeof ${name} === "function" ? ${name} : null;`,
+      `"use strict";\nconst { ${Object.keys(scope).join(", ")} } = scope;\n{\n${js}\nreturn typeof ${name} === "function" ? ${name} : null;\n}`,
     );
     return factory(React, scope) as C | null;
   } catch {

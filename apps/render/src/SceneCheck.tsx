@@ -4,6 +4,7 @@ import { cellsUnder, decodeGrid, lostOn, outlined, parseColor, type Rgb, type Sc
 import { fitsPending } from "./Fit";
 import { fontsLoaded, loadFonts } from "./fonts";
 import { makeKit } from "./Kit";
+import { makeType } from "./Type";
 import { compileScene, SCOPE, type SceneComponent } from "./MotionScene";
 import { themeFor } from "./theme";
 import { footageTrack, type Seen, type TrackPiece } from "./track";
@@ -97,6 +98,7 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
     useVideoConfig,
     // The layout kit on this copy's clock: it moves in the check as it will in the render.
     ...makeKit({ useCurrentFrame, useVideoConfig }),
+    ...makeType({ useCurrentFrame, useVideoConfig }),
     Sequence: Sequence as unknown as typeof SCOPE.Sequence,
     Cutout: Cutout as typeof SCOPE.Cutout,
     Footage: Footage as typeof SCOPE.Footage,

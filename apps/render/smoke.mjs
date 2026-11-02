@@ -54,6 +54,18 @@ const scope = {
     React.createElement("div", null, ...items.map((item, i) => React.createElement("div", { key: i }, drawn(item && typeof item === "object" && "draw" in item ? item.draw : item, { width: size ?? 540, height: size ?? 540 })))),
   Split: ({ parts = [], labels = [] }) =>
     React.createElement("div", null, ...parts.map((part, i) => React.createElement("div", { key: i }, drawn(part, { width: config.width / Math.max(1, parts.length), height: config.height }), labels[i] ?? null))),
+  // The text and materials kit (Type.tsx): its words are written whole here, what it carries drawn.
+  ...Object.fromEntries(
+    ["Decode", "TypeOn", "Reveal", "Emboss", "WordArt"].map((name) => [name, ({ text, style }) => React.createElement("span", { style }, String(text ?? ""))]),
+  ),
+  Count: ({ to, prefix = "", suffix = "", style }) => React.createElement("span", { style }, `${prefix}${Number(to)}${suffix}`),
+  Edges: ({ items = [] }) => React.createElement("div", null, ...items.map((item, i) => React.createElement("div", { key: i }, String(item?.text ?? "")))),
+  Paper: ({ style, children }) => React.createElement("div", { style }, children),
+  Card: ({ text, steps }) => React.createElement("div", null, String(steps?.at?.(-1)?.text ?? text ?? "")),
+  Scribble: () => React.createElement("svg", null),
+  WordSearch: ({ words = [] }) => React.createElement("div", null, ...words.map((w, i) => React.createElement("div", { key: i }, String(w)))),
+  Kinetic: ({ text }) => React.createElement("div", null, Array.isArray(text) ? text.join(" ") : String(text ?? "")),
+  Burst: ({ children }) => React.createElement("div", null, children),
 };
 
 const defaultBrand = {
@@ -77,7 +89,7 @@ for (const scene of scenes) {
     const factory = new Function(
       "React",
       "scope",
-      `"use strict";\nconst { ${Object.keys(scope).join(", ")} } = scope;\n${scene.js}\nreturn typeof Scene === "function" ? Scene : null;`,
+      `"use strict";\nconst { ${Object.keys(scope).join(", ")} } = scope;\n{\n${scene.js}\nreturn typeof Scene === "function" ? Scene : null;\n}`,
     );
     const Scene = factory(React, scope);
     if (!Scene) throw new Error("Scene is not defined");
