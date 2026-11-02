@@ -49,6 +49,7 @@ import { ensureCutouts } from "@/lib/render/cutout";
 import { stealReelInSandbox, TRACK_MODELS } from "@/lib/render/sandbox";
 import { postStyle } from "@/lib/steal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { noteGap } from "@/lib/toolkit";
 
 // The effects agent (packages/agent/src/effects.ts): one Opus agent with a Linux container
 // of its own (Managed Agents) makes a Reel whose effect holds to what moves in her video.
@@ -135,7 +136,11 @@ export async function effectRoute(studioId: string, input: { postId: string; cor
   // (copyPlan), for the chain's price (Tristan: « réduire le nombre d'agents, améliorer la qualité mais garder les marges »).
   const copied = followed ? momentsLine(followed.look) : null;
   const route = await routeEffect(studioId, input.brief ?? undefined, { videos, photos: (media ?? []).length - videos }, copied);
-  if (route.agent) console.log("montage: effects agent", input.postId, route.effect, "—", route.why);
+  if (route.agent) {
+    console.log("montage: effects agent", input.postId, route.effect, "—", route.why);
+    // An effect the chain cannot make: noted, a gap that comes back becomes a tool (toolkit).
+    await noteGap({ studioId, postId: input.postId, source: "effects", label: route.effect || "un effet sur sa vidéo", request: input.brief, detail: route.why });
+  }
   return route.agent ? "agent" : "chain";
 }
 

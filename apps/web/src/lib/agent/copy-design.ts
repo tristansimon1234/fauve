@@ -25,6 +25,7 @@ import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { insertPlanVersion } from "@/lib/edit-plans";
 import { ensureCutouts } from "@/lib/render/cutout";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { noteGap } from "@/lib/toolkit";
 import { anthropic, logClaudeCost } from "./run";
 
 // A simple copied Reel remade by code (packages/agent/src/copy.ts): one small call writes its words and says whether
@@ -106,6 +107,8 @@ export async function designCopy(params: {
   if (!words) return null;
   if (!words.fits) {
     console.log("copy: her request needs the editor", params.postId, words.missing);
+    // What the code could not do, noted: a gap that comes back becomes a tool (toolkit).
+    await noteGap({ studioId: params.studioId, postId: params.postId, source: "copy", label: words.missing || "une demande hors de la recopie", request: params.brief });
     return null;
   }
   const plan = copyPlan({ cuts: followed.measured.cuts, duration: followed.measured.duration, bpm: followed.bpm, files, look, words });

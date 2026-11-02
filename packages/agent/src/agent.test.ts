@@ -5532,3 +5532,29 @@ test("a copy plan keeps the model's cuts through the engine", async () => {
     plan.segments.map((s) => segmentSeconds(s)),
   );
 });
+
+test("the tools' week: gaps grouped in other words, the message only when there is something to say", async () => {
+  const { gapKey, gapLabel, groupGaps, toolsDigest } = await import("./toolkit.ts");
+  assert.equal(gapKey("Une voix off !"), gapKey("une  Voix-off"));
+  assert.equal(gapLabel("  un texte   entre les doigts. "), "un texte entre les doigts");
+  assert.ok(gapLabel("x".repeat(300)).length <= 120);
+  const gaps = [
+    { label: "Une voix off", source: "copy" as const },
+    { label: "une voix-off", source: "copy" as const },
+    { label: "un texte entre ses doigts", source: "effects" as const },
+    { label: "Une voix off.", source: "editor" as const },
+  ];
+  assert.deepEqual(groupGaps(gaps), [
+    { label: "Une voix off", count: 3, sources: ["copy", "editor"] },
+    { label: "un texte entre ses doigts", count: 1, sources: ["effects"] },
+  ]);
+  const none = { trial: 0, active: 0, made: 0, promoted: 0, updated: 0, retired: 0 };
+  assert.equal(toolsDigest({ gaps: [], tools: none, autonomy: true, budgetEur: 10, spentEur: 0 }), null);
+  const text = toolsDigest({ gaps, tools: none, autonomy: true, budgetEur: 10, spentEur: 0 })!;
+  assert.match(text, /Ce que le code ne savait pas faire \(4 demandes\) :\n• Une voix off ×3 \(recopie, monteur\)\n• un texte entre ses doigts \(atelier\)/);
+  assert.match(text, /Aucun outil encore/);
+  assert.match(text, /Fabrication automatique : en marche, 0 € dépensés sur 10 € par semaine\./);
+  const moved = toolsDigest({ gaps: [], tools: { ...none, active: 2, trial: 1, made: 1, updated: 1 }, autonomy: false, budgetEur: 10, spentEur: 1.5 })!;
+  assert.match(moved, /Outils : 2 actifs, 1 à l'essai\. Cette semaine : 1 fabriqué, 0 promu, 1 mis à jour, 0 retiré\./);
+  assert.match(moved, /Fabrication automatique : coupée\./);
+});
