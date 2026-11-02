@@ -1327,7 +1327,8 @@ const STEAL_JOB = [
   `${ROOT}/ffmpeg -hide_banner -nostats -i reel.mp4 -an -vf "scale=320:-2,scdet=threshold=12" -f null - 2> cuts.log || true`,
   // Sheets of its frames, ten each (five by two, left to right then top to bottom), for the animations that remake it.
   `sheet=$(awk -v d="$d" 'BEGIN { s = d / ${MODEL_SHEETS}; if (s < 2) s = 2; printf "%.3f", s }')`,
-  `${ROOT}/ffmpeg -v error -i reel.mp4 -an -vf "fps=10/$sheet,scale=192:-2,tile=5x2" -q:v 5 -y sheet_%02d.jpg || true`,
+  // Readable: 320 px on the long side (192 px wide, a horizontal Reel's title was a few pixels high).
+  `${ROOT}/ffmpeg -v error -i reel.mp4 -an -vf "fps=10/$sheet,scale='if(gt(iw,ih),320,-2)':'if(gt(iw,ih),-2,320)',tile=5x2" -q:v 5 -y sheet_%02d.jpg || true`,
   'echo "sheet=$sheet"',
   `${ROOT}/ffmpeg -hide_banner -nostats -i reel.mp4 -vn -af "$4" -f null - 2>&1 | grep -o 'RMS_level=[^ ]*' | cut -d= -f2 > bass.txt || true`,
   LOUD,

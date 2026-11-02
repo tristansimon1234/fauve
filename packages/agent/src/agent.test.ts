@@ -3701,7 +3701,19 @@ test("steal: a Reel's style read, measured, summed up and copied over her charte
   ]);
   assert.ok(effects.moments!.every((m) => m.what.length <= 320));
   assert.ok(stolenLookSchema.safeParse(effects).success);
-  assert.equal("moments" in clampLook({ ...look, layout: "plein cadre", text: { ...look.text, font: "", font_alternatives: [], sample: "", seen_at: 0, stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const }, colors: [], shots: [], moments: [{ at: 1, what: "un seul effet" }] }), false);
+  // One moment is kept (its title typed word by word was its only effect).
+  assert.equal(clampLook({ ...look, layout: "plein cadre", text: { ...look.text, font: "", font_alternatives: [], sample: "", seen_at: 0, stroke: "regular" as const, lines: "aligned" as const, tilt: 0, shadow: "soft" as const }, colors: [], shots: [], moments: [{ at: 1, what: "un seul effet" }] }).moments?.length, 1);
+  // Its voice as measured: no words heard, nobody speaks, whatever the reading says; words heard leave its reading.
+  const { measuredVoice, measuresLine: line, openingOf } = await import("./steal.ts");
+  assert.equal(measuredVoice("voix off", { spoken: 0 }), "aucune");
+  assert.equal(measuredVoice("voix off", { spoken: 12 }), "voix off");
+  assert.equal(measuredVoice("voix off", {}), "voix off");
+  assert.match(line({ duration: 12, cuts: [4], bpm: null, lufs: -14, spoken: 0 }), /personne ne parle/);
+  // Its opening, measured on its cuts, with its hook as it appears.
+  const opened = followedFrom("11111111-2222-4333-8444-555555555555", { look: { ...effects, hook: { kind: "promesse", what: "affichée mot à mot au centre" } }, measures: { duration: 12.5, cuts: [4.17, 5.2], bpm: null, lufs: -14 } });
+  assert.match(openingOf(opened)!, /premier plan dure 4,2 s, avec son accroche \(affichée mot à mot au centre\)/);
+  assert.equal(followedForEditor(opened).ouverture, openingOf(opened));
+  assert.equal(openingOf(followedFrom("11111111-2222-4333-8444-555555555555", { look: effects, measures: { duration: 12, cuts: [0.8], bpm: null, lufs: -14 } })), null);
   const sequence = followedFrom("11111111-2222-4333-8444-555555555555", { look: effects, measures: { duration: 19, cuts: [], bpm: null, lufs: -14 } });
   assert.equal(followedForEditor(sequence).moments?.length, 3);
   assert.match(followedLine(sequence), /ses moments, chacun à refaire avec ses images : 2 s : des icônes .* ; 4,2 s : une fenêtre d'appli surgit à côté de sa tête ; 7,5 s : une page de texte/);
@@ -5213,7 +5225,7 @@ test("a word lost on the picture under it is found, and one with its own edge is
 
 test("a copied Reel's words keep their drawing, and its font is checked among close candidates", async () => {
   const { clampLook, fontCheckOf, stolenLookSchema, textDrawingWords, STEAL_READER } = await import("./steal.ts");
-  assert.equal(STEAL_READER, 6);
+  assert.equal(STEAL_READER, 7);
   const reading = {
     name: "message manuscrit",
     format: "message" as const,

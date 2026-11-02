@@ -27,6 +27,11 @@ export const reelMeasuresSchema = z.object({
   bpm: z.number().min(50).max(200).nullable(),
   /** Its loudness (LUFS), null when silent. */
   lufs: z.number().nullable(),
+  /**
+   * The words heard in it (a transcription of its sound), absent when not measured. Under 3, nobody speaks: its
+   * voice is « aucune » whatever its reading says (Gemini heard a voice over in an ambient piece, and her copy got one).
+   */
+  spoken: z.number().int().min(0).optional(),
 });
 export type ReelMeasures = z.infer<typeof reelMeasuresSchema>;
 
@@ -248,7 +253,8 @@ export function clampLook(reading: StolenLookReading): StolenLook {
     ...(colors.length ? { colors } : {}),
     layout: clip(reading.layout, LOOK_CHARS.layout) || "plein cadre",
     // One moment is not a sequence: a Reel built on one effect says it in its hook and its layout.
-    ...(moments.length > 1 ? { moments } : {}),
+    // One is enough: a Reel whose one effect is its title typed word by word keeps it (its only moment was dropped).
+    ...(moments.length ? { moments } : {}),
     ...(shots.length ? { shots } : {}),
     ...(sounds.length ? { sounds } : {}),
     music: clip(reading.music, LOOK_CHARS.music),
@@ -301,9 +307,10 @@ export const stolenStyleSchema = z.object({
  * candidates written out (Tristan: « la police un peu naze… pas fine comme sur le Reel envoyé »). 4 keeps the closest
  * of five, always: 3 could refuse them all, and the Reel fell back on her charter's fonts. 5 reads each shot
  * (shots). 6 reads a short Reel at 15 frames a second, its effects measurably, and keeps sheets of its frames for
- * the animations that remake it.
+ * the animations that remake it. 7 measures its voice (a transcription: no words, no voice over in the copy), keeps
+ * a single moment (its title typed word by word), and its sheets are readable (320 px on the long side).
  */
-export const STEAL_READER = 6;
+export const STEAL_READER = 7;
 
 /** A kept reading as good as a new one: made by the current reader. */
 export const currentReading = (style: unknown): boolean => {
@@ -388,9 +395,18 @@ export function measuresLine(measures: ReelMeasures): string {
     cuts ? `${cuts} coupe${cuts > 1 ? "s" : ""} franche${cuts > 1 ? "s" : ""} (un plan toutes les ${seconds(secondsPerShot(measures))} s)` : "aucune coupe franche (un seul plan, ou des fondus)",
     measures.bpm ? `un rythme régulier à ${Math.round(measures.bpm)} BPM` : "pas de rythme régulier dans le son (une voix, une ambiance)",
     ...(measures.lufs !== null ? [`volume ${Math.round(measures.lufs)} LUFS`] : ["pas de son"]),
+    ...(measures.spoken === undefined ? [] : [measures.spoken < SPOKEN_MIN ? "personne ne parle (aucune parole dans le son)" : `des paroles dans le son (${measures.spoken} mots)`]),
   ].join(" ; ");
 }
 
+
+/** Under this many words heard, nobody speaks in the Reel (a word or two of a song, a shout). */
+export const SPOKEN_MIN = 3;
+
+/** Its voice as measured: nobody speaks when its sound holds no words, whatever the reading says. */
+export function measuredVoice(voice: StolenLook["voice"], measures: Pick<ReelMeasures, "spoken">): StolenLook["voice"] {
+  return measures.spoken !== undefined && measures.spoken < SPOKEN_MIN ? "aucune" : voice;
+}
 
 /** A shot of the Reel that shows no filmed image: a plain ground, a gradient, a colour, a pattern. */
 const DRAWN_GROUND = /^(un |une |le |la |des )?(fond|aplat|d[ée]grad[ée]|[ée]cran (noir|blanc|uni)|couleur|motif|texture)/i;
@@ -569,6 +585,9 @@ export function followedForEditor(followed: FollowedStyle) {
     ...(followed.average_shot !== null ? { plan_moyen_s: followed.average_shot } : {}),
     ...(followed.bpm !== null ? { tempo_bpm: followedTempo(followed.bpm) } : {}),
     accroche: `${look.hook.kind} : ${look.hook.what}`,
+    // Its opening as measured: its first shot's length, with its hook as it appears (a title typed word by word over a
+    // shot held 4 s was cut to 2 s and shown at once).
+    ...(openingOf(followed) ? { ouverture: openingOf(followed)! } : {}),
     // What makes it: each effect or animation in turn, redone with her images (as many, each at its moment).
     // No filmed image in it: all made in motion design, her files left aside unless her request asks for one.
     ...(motionOnly(look) ? { sans_images: "pur motion design : des mots et des fonds dessinés, aucune image filmée ni photo ; refais-le tout en motion design, sans ses fichiers sauf si sa demande en veut un" } : {}),
@@ -588,6 +607,15 @@ export function followedForEditor(followed: FollowedStyle) {
     fin: look.ending,
     pourquoi: look.why,
   };
+}
+
+/** Its opening: its first shot's length (measured on its cuts) and how its hook appears, kept unless her request says otherwise. */
+export function openingOf(followed: FollowedStyle): string | null {
+  const m = followed.measured;
+  if (!m || m.duration <= 0) return null;
+  const first = Math.round((m.cuts.find((c) => c > 0.2) ?? m.duration) * 10) / 10;
+  if (first < 1.5) return null;
+  return `son premier plan dure ${String(first).replace(".", ",")} s, avec son accroche (${followed.look.hook.what}) : ton premier plan tient aussi longtemps et l'accroche y apparaît de la même façon, sauf si sa demande dit autre chose`;
 }
 
 /**

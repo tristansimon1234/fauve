@@ -10,7 +10,9 @@ import {
   stolenStyleSchema,
   currentReading,
   STEAL_READER,
+  measuredVoice,
   tempoOf,
+  transcriptionCostUsd,
   usdToEur,
   type FollowedStyle,
   type StolenStyle,
@@ -191,13 +193,15 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
     console.warn("steal: not taken", reel.miss, reel.detail.slice(-500));
     return missed(reel.miss);
   }
-  const measures = reelMeasuresSchema.parse({ duration: reel.duration, cuts: reel.cuts, bpm: tempoOf(reel.levels), lufs: reel.lufs });
+  const spoken = reel.lufs === null ? 0 : await spokenWords(studioId, reel.video, reel.duration).catch((error: unknown) => (console.warn("steal: words not counted", error), null));
+  const measures = reelMeasuresSchema.parse({ duration: reel.duration, cuts: reel.cuts, bpm: tempoOf(reel.levels), lufs: reel.lufs, ...(spoken === null ? {} : { spoken }) });
   const reading = await readStolenLook(studioId, reel.video, measures, reel.shots).catch((error: unknown) => {
     console.warn("steal: reading failed", error instanceof Error ? error.message.slice(0, 300) : error);
     return null;
   });
   if (!reading) return missed("unreadable");
-  const { look } = reading;
+  // Its voice as measured: nobody speaks when its sound holds no words (an ambient piece was read as a voice over).
+  const look = { ...reading.look, voice: measuredVoice(reading.look.voice, measures) };
   // A font that makes its style, checked against its title and by the name Google Fonts serves it under (the render
   // loads it from there); else hers stay.
   const text = { ...look.text };
@@ -217,6 +221,27 @@ export async function stealStyle(studioId: string, inspirationId: string): Promi
   // The file was only for this reading (someone else's content, or a copy of her own Reel's video).
   if (row.storage_path) await db.storage.from("media").remove([row.storage_path as string]).catch(() => {});
   return read(inspirationId, style, false);
+}
+
+/**
+ * How many words are said in the Reel she sends to copy: its sound transcribed (ElevenLabs Scribe, a tenth of a cent
+ * for a Reel), audio events (music, applause) left out. Null without a key: its reading's voice stays.
+ */
+async function spokenWords(studioId: string, mp4: Buffer, seconds: number): Promise<number | null> {
+  const key = env("ELEVENLABS_API_KEY");
+  if (!key) return null;
+  const form = new FormData();
+  form.append("model_id", env("ELEVENLABS_STT_MODEL"));
+  form.append("file", new Blob([new Uint8Array(mp4)], { type: "video/mp4" }), "reel.mp4");
+  form.append("tag_audio_events", "true");
+  const res = await fetch("https://api.elevenlabs.io/v1/speech-to-text", { method: "POST", headers: { "xi-api-key": key }, body: form });
+  if (!res.ok) throw new Error(`speech to text ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  const body = (await res.json()) as { words?: { type?: string; text?: string }[] };
+  const words = (body.words ?? []).filter((w) => (w.type ?? "word") === "word" && /\p{L}/u.test(w.text ?? "")).length;
+  await supabaseAdmin()
+    .from("cost_events")
+    .insert({ studio_id: studioId, kind: "transcription", provider: "elevenlabs", units: Math.round(seconds), cost_eur: usdToEur(transcriptionCostUsd(seconds), env("USD_TO_EUR")), meta: costMeta({ purpose: "steal_voice", words }) });
+  return words;
 }
 
 /** Where a copied Reel's sheets are kept: with her inspirations, removed with it. */
