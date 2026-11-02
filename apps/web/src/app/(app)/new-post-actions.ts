@@ -271,7 +271,9 @@ export async function proposePlan(input: z.input<typeof proposalInput>): Promise
       const a = byId.get(f.media);
       if (!a) return;
       const video = a.kind === "video";
-      const known = video ? summaries.get(f.media) : (a.regions as { notes?: string } | null)?.notes;
+      // A photo's reading keeps what it shows in detection.notes (at the top in older readings).
+      const read = a.regions as { notes?: string; detection?: { notes?: string } } | null;
+      const known = video ? summaries.get(f.media) : read?.detection?.notes || read?.notes;
       if (known) lines.push(`${n}. ${video ? `vidéo${a.duration ? ` de ${Math.round(Number(a.duration))} s` : ""}` : "photo"} : ${known.slice(0, video ? 1200 : 300)}`);
       else if (!video && READABLE.has(String(a.mime_type)) && looks.length < MAX_LOOKS) {
         looks.push({ n, path: a.storage_path as string });
