@@ -54,6 +54,7 @@ export const CONTRACT_PROMPT = `You read a person's request for a Reel and note,
 - voice_pace: « rapide » or « lente » if they ask for it; otherwise « normale ». voice_gender: if they say a man's or a woman's voice.
 - duration: the length in seconds if they give it. layout: the layout they describe (split screen, half and half, a shot in a frame…), in their words.
 - screen_text: an on-screen text they give word for word. ending: the ending they describe.
+- Words they give for the screen (screen_text, call_to_action_text) keep their words and order but are always written right: spelling, accents, apostrophes and hyphens, capitals of names (WhatsApp, Instagram), French punctuation (« Parles en a Edith, ton IA sur whatapps » → « Parles-en à Edith, ton IA sur WhatsApp. »). Never one of their typos on screen.
 - call_to_action: « la_sienne » with its text if they give the invitation; « aucune » if they don't want one; otherwise « libre ».
 - musts: everything else they explicitly ask for this Reel (a mood, a background, a universe, a rhythm, things to show), in their words, one thing per line.
 - A correction of a Reel that already has its voice-over also gets « Texte actuel de la voix ». When the request changes only part of this text (a word, a pronunciation, a sentence, the ending) or quotes only a piece of it, voice_text is the current text IN FULL with only that change made, nothing else cut or rewritten (verbatim): a quoted piece is never the whole text. Only a request that gives a whole new text, or asks for it to be rewritten, replaces it. When they say the voice stops too early, doesn't go to the end or must say more, voice_text is the current text in full and voice_text_rest what it must still say (what their original request describes and is missing). With no change to the voice asked for, voice_text stays null.
@@ -102,7 +103,7 @@ export function contractLines(c: ReelContract | null | undefined): string[] {
     c.voice_gender !== "libre" ? `Voix d'${c.voice_gender === "homme" ? "homme" : "femme"}` : null,
     c.duration ? `Durée : ${c.duration} s environ` : null,
     c.layout ? `Mise en page : ${c.layout}` : null,
-    c.screen_text ? `Texte à l'écran, mot pour mot : « ${c.screen_text} »` : null,
+    c.screen_text ? `Texte à l'écran, mot pour mot (orthographe corrigée) : « ${c.screen_text} »` : null,
     c.ending ? `Fin : ${c.ending}` : null,
     c.call_to_action === "aucune" ? "Aucune invitation à la fin" : c.call_to_action === "la_sienne" && c.call_to_action_text ? `Invitation à la fin, la sienne : « ${c.call_to_action_text} »` : null,
     ...c.musts.map((m) => `Demandé : ${m}`),

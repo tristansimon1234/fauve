@@ -327,41 +327,94 @@ function inks(copy: HTMLElement, frame: number, backdrop: SceneBackdrop, grids: 
       Math.max(...rects.map((r) => r.right)) - origin.left,
       Math.max(...rects.map((r) => r.bottom)) - origin.top,
     ];
-    // What is under its middle, top down, in this copy only.
-    const under = document.elementsFromPoint(origin.left + (box[0] + box[2]) / 2, origin.top + (box[1] + box[3]) / 2).filter((e) => e !== copy && copy.contains(e));
-    let cells: Rgb[] | null = null;
-    let unknown = false;
-    for (const e of under) {
-      if (seenOpacity(e, copy) < 0.5) continue;
-      const shot = e.getAttribute("data-fauve-shot");
-      if (shot !== null) {
-        const grid = backdrop.shots?.[shot];
-        if (!grid) unknown = true;
-        else {
-          const r = e.getBoundingClientRect();
-          cells = cellsUnder(gridOf(grid), box, [r.left - origin.left, r.top - origin.top, r.right - origin.left, r.bottom - origin.top]);
-        }
-        break;
-      }
-      if (PICTURES.has(e.tagName.toLowerCase()) && !e.contains(node)) {
-        unknown = true;
-        break;
-      }
-      const painted = getComputedStyle(e);
-      const flat = parseColor(painted.backgroundColor);
-      if (flat && flat.alpha >= 0.6) {
-        cells = [flat.rgb];
-        break;
-      }
-      if (painted.backgroundImage !== "none") {
-        unknown = true;
-        break;
-      }
-    }
+    const { cells, unknown } = cellsAt(box, origin, copy, node, backdrop, footage, gridOf);
     if (unknown) continue;
-    if (!cells && footage) cells = cellsUnder(gridOf(footage.grid), box, [0, 0, 1080, 1920]);
     const seen = cells ? lostOn(fill.rgb, fill.alpha * opacity, cells) : null;
     if (!seen?.lost) continue;
+    const entry = found.get(text) ?? { text, frames: [], ratio: seen.ratio };
+    if (entry.frames.at(-1) !== frame) entry.frames.push(frame);
+    entry.ratio = Math.min(entry.ratio, seen.ratio);
+    found.set(text, entry);
+  }
+}
+
+/**
+ * The colours under a box of a copy (px from the copy's corner): one of her shots (a composition's Footage, from its
+ * grid), a flat colour the scene paints, or with nothing painted, the footage under the animation; `unknown` over a
+ * picture of the scene or a gradient (left alone). `skip`: what is measured, never taken for what is under it.
+ */
+function cellsAt(
+  box: [number, number, number, number],
+  origin: DOMRect,
+  copy: HTMLElement,
+  skip: Node,
+  backdrop: SceneBackdrop,
+  footage: { frame: number; grid: string } | undefined,
+  gridOf: (b64: string) => Uint8Array,
+): { cells: Rgb[] | null; unknown: boolean } {
+  // What is under its middle, top down, in this copy only.
+  const under = document.elementsFromPoint(origin.left + (box[0] + box[2]) / 2, origin.top + (box[1] + box[3]) / 2).filter((e) => e !== copy && copy.contains(e));
+  for (const e of under) {
+    if (e === skip || seenOpacity(e, copy) < 0.5) continue;
+    const shot = e.getAttribute("data-fauve-shot");
+    if (shot !== null) {
+      const grid = backdrop.shots?.[shot];
+      if (!grid) return { cells: null, unknown: true };
+      const r = e.getBoundingClientRect();
+      return { cells: cellsUnder(gridOf(grid), box, [r.left - origin.left, r.top - origin.top, r.right - origin.left, r.bottom - origin.top]), unknown: false };
+    }
+    // A picture of the scene under it (not one that holds what is measured): left alone.
+    if (PICTURES.has(e.tagName.toLowerCase()) && !e.contains(skip)) return { cells: null, unknown: true };
+    const painted = getComputedStyle(e);
+    const flat = parseColor(painted.backgroundColor);
+    if (flat && flat.alpha >= 0.6) return { cells: [flat.rgb], unknown: false };
+    if (painted.backgroundImage !== "none") return { cells: null, unknown: true };
+  }
+  return { cells: footage ? cellsUnder(gridOf(footage.grid), box, [0, 0, 1080, 1920]) : null, unknown: false };
+}
+
+/** The vector shapes a scene draws with a stroke: a circle around a word, an underline, a frame, an arrow. */
+const MARKS = "path, ellipse, circle, line, polyline, polygon, rect";
+
+/**
+ * The marks of a copy lost on what is under them, like its words (a white circle around « EFFETS » on a pale sky
+ * could hardly be seen on Tristan's grid of hidden words): a stroke of 1 px or more, without a fill, named by the
+ * word it surrounds. One with its own shadow (a drop-shadow filter) reads anywhere.
+ */
+function marks(copy: HTMLElement, frame: number, backdrop: SceneBackdrop, grids: Map<string, Uint8Array>, found: Map<string, Ink>) {
+  const origin = copy.getBoundingClientRect();
+  const gridOf = (b64: string) => grids.get(b64) ?? grids.set(b64, decodeGrid(b64)).get(b64)!;
+  const footage = (backdrop.frames ?? []).filter((f) => Math.abs(f.frame - frame) <= INK_REACH).sort((a, b) => Math.abs(a.frame - frame) - Math.abs(b.frame - frame))[0];
+  for (const el of Array.from(copy.querySelectorAll<SVGGraphicsElement>(MARKS))) {
+    if (inDecor(el)) continue;
+    const style = getComputedStyle(el);
+    const stroke = parseColor(style.stroke);
+    if (!stroke || (parseFloat(style.strokeWidth) || 0) < 1) continue;
+    const fill = parseColor(style.fill);
+    if (fill && fill.alpha >= 0.3) continue;
+    const alpha = stroke.alpha * seenOpacity(el, copy) * (Number(style.strokeOpacity) || 1);
+    if (alpha < 0.3) continue;
+    let shadowed = false;
+    for (let up: Element | null = el; up && up !== copy && !shadowed; up = up.parentElement) shadowed = /drop-shadow/.test(getComputedStyle(up).filter);
+    if (shadowed) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 6 && r.height < 6) continue;
+    const box: [number, number, number, number] = [r.left - origin.left, r.top - origin.top, r.right - origin.left, r.bottom - origin.top];
+    const { cells, unknown } = cellsAt(box, origin, copy, el, backdrop, footage, gridOf);
+    if (unknown || !cells) continue;
+    const seen = lostOn(stroke.rgb, alpha, cells);
+    if (!seen?.lost) continue;
+    // Named by the word it surrounds or marks, when there is one.
+    const word = Array.from(copy.querySelectorAll<HTMLElement>("*"))
+      .filter((e) => e.childElementCount === 0 && /\p{L}{2}/u.test(e.textContent ?? "") && !inDecor(e))
+      .find((e) => {
+        const t = e.getBoundingClientRect();
+        const [cx, cy] = [(t.left + t.right) / 2, (t.top + t.bottom) / 2];
+        return cx >= r.left && cx <= r.right && cy >= r.top - 20 && cy <= r.bottom + 20;
+      })
+      ?.textContent?.replace(/\s+/g, " ")
+      .trim();
+    const text = word ? `le tracé autour de « ${word.slice(0, 30)} »` : "un tracé";
     const entry = found.get(text) ?? { text, frames: [], ratio: seen.ratio };
     if (entry.frames.at(-1) !== frame) entry.frames.push(frame);
     entry.ratio = Math.min(entry.ratio, seen.ratio);
@@ -478,7 +531,10 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         const frame = Number(copy.dataset.checkFrame);
         measure(copy, frame, width, height, out, track(frame), onFace);
         sizes(copy, largest);
-        if (backdrop) inks(copy, frame, backdrop, grids, lost);
+        if (backdrop) {
+          inks(copy, frame, backdrop, grids, lost);
+          marks(copy, frame, backdrop, grids, lost);
+        }
       });
       const failures = [...out.values()].filter((o) => o.frames.length * step > OUT_FRAMES);
       const r = (n: number) => Math.round(n);
@@ -527,9 +583,9 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
           const c = (n: number) => n.toFixed(1).replace(".", ",");
           const detail = blended
             .slice(0, 3)
-            .map((o) => `« ${o.text.slice(0, 40)} » (images ${o.frames[0]} à ${o.frames.at(-1)}, contraste ${c(o.ratio)} avec l'image dessous)`)
+            .map((o) => `${/^(le |un )tracé/.test(o.text) ? o.text : `« ${o.text.slice(0, 40)} »`} (images ${o.frames[0]} à ${o.frames.at(-1)}, contraste ${c(o.ratio)} avec l'image dessous)`)
             .join(" ; ");
-          const message = `texte qui se perd dans l'image dessous : ${detail}. Un mot se lit sur chaque image qu'il croise : donne-lui d'abord un bord fin à lui (une ombre serrée et dense de 1 à 3 px, ou un contour fin ; jamais une grosse ombre floue, qui fait cheap), sinon une autre couleur là où il disparaît, ou pose-le là où l'image le laisse lire, sans changer l'idée ni le style (un trait fin reste fin).`;
+          const message = `texte ou tracé qui se perd dans l'image dessous : ${detail}. Un mot ou un tracé (un cercle, un souligné) se voit sur chaque image qu'il croise : donne-lui d'abord un bord fin à lui (une ombre serrée et dense de 1 à 3 px, ou un contour fin ; jamais une grosse ombre floue, qui fait cheap ; pour un tracé SVG, un filtre drop-shadow serré ou un second trait sombre dessous), sinon une autre couleur là où il disparaît, ou pose-le là où l'image le laisse voir, sans changer l'idée ni le style (un trait fin reste fin).`;
           console.log(`FAUVE_INK ${JSON.stringify(message)}`);
         }
         // What it draws, row by row, over its length (each row: the share of the subtitles' width it covers, on average).

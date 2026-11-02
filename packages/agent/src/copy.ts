@@ -326,7 +326,7 @@ First decide "fits": true when this remake gives her everything she asked for. H
 Then write the words, in French, what she and her customers read:
 - The title takes the model's place and job (its composition and amount of text are given), about this business, for her customers: a line a creator would write, concrete, never a slogan, a promise of an ad or a formula. Short lines (24 characters at most), cut where one would breathe; staggered lines read well as 2 or 3 lines of a few words. Upper or lower case as the model.
 - The ending's cards: her call to action in her words when she gave one, else what to do in a few words (where to find her, a link in the bio when she has a booking link, her name), as the model ends; never a fact that is not given.
-- Words she gives word for word (« contrat ») are kept exactly, only split into lines. Never invent a price, an hour, a place, an offer or a review.
+- Words she gives word for word (« contrat ») are kept, only split into lines, and always spelled right (accents, apostrophes, hyphens, « WhatsApp »): never one of her typos. Never invent a price, an hour, a place, an offer or a review.
 - A correction (« version_actuelle »): keep the current words except what her request changes.
 
 Then cast her files on the shots of the remake, as an editor would, never in turn. « plans » gives each shot in order: its length, and when the model was read shot by shot, what the model's shot showed (« fond_du_modele ») and what it laid over it (« pose_du_modele »: nothing, a person, an object, two objects; « sujet_du_modele »). For each shot, in order:
