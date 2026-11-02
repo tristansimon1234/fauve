@@ -457,7 +457,12 @@ export async function designEdit(params: {
   // Her videos whole and horizontal on black (her contract): the engine draws it on every version.
   // A correction keeps it (its request is about something else).
   const letterbox = params.contract?.frame === "letterbox" || (correction && base?.frame === "letterbox");
-  const framed = (p: EditPlan): EditPlan => (letterbox ? { ...p, frame: "letterbox" } : (({ frame: _frame, ...rest }) => rest)(p));
+  const framed = (p: EditPlan): EditPlan => {
+    const next: EditPlan = { ...p };
+    if (letterbox) next.frame = "letterbox";
+    else delete next.frame;
+    return next;
+  };
   plan = framed(plan);
   // The length she asked for is measured on the plan, never taken from the editor's words: missed, it
   // reads the measure and answers once more, and the closer of its two plans is kept.
