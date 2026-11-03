@@ -8,9 +8,18 @@
 2. **Les 31 modèles d'Edith voient leur original.** Chaque Reel de référence est gardé (`house/originals/<clé>.mp4`, jamais montré) avec ses planches de dix images (`house/sheets/<clé>/`, `houseSheets`, `/api/admin/house-sheets`) ; la vidéo des « ingénieurs IA » n'est plus gardée.
 3. **Un seul réalisateur pour un Reel qui suit un modèle** (`lib/agent/director.ts`, `packages/agent/src/director.ts`) : il voit l'original et ses fichiers en planches, écrit le plan et le code de la composition en une réponse, puis regarde son Reel à côté de l'original au même instant dans sa propre étape (`look`) et corrige tout ou garde. Repli sur le monteur et le motion designer s'il échoue. Le format de sa réponse est plat (une composition imbriquée faisait refuser la grammaire par l'API) ; `step=grammar` du banc le vérifie pour quelques jetons.
 
-## En cours
+## Banc du réalisateur (3 novembre, soir)
 
-- **Banc d'essai du réalisateur** : café et Procope (`/api/admin/lab?case=cafe|procope&reset=1&route=chain`, résultat par `&step=result`), comparés à la version faite par le monteur et le motion designer (le premier essai de ce soir, retombé sur eux à cause de la grammaire). À mesurer : qualité (planche de 8 images par Reel), coût, temps.
+Mêmes rushes, modèle choisi par Edith, comparé à la chaîne monteur + motion designer (qui voit déjà l'original) :
+
+| | Chaîne (référence) | Réalisateur unique |
+|---|---|---|
+| Café (« Titre qui se décode ») | 0,59 €, 12,8 s, ouverture pleine | 0,76 €, 15,7 s, fidèle à la mise en page du modèle (bande cinéma sur noir), mais beaucoup de noir et une 1re image faible |
+| Procope (« Une journée chez toi ») | 0,82 €, 13,7 s, grand « AU PROCOPE » derrière les passants | 0,77 €, 11,7 s, titre minuscule et vertical, accroche absente |
+
+Verdict : pas encore meilleur. Il ne tourne plus que sur le banc et le studio de l'équipe (`directorTrial` dans `lib/agent/editor.ts`) ; les commerces gardent la chaîne. Défaut trouvé et corrigé en route : le code réécrit par son regard était remplacé par l'ancien quand la description de la composition ne changeait pas.
+
+Pistes : il écrit plan et code en un appel, en effort medium, avec un très long prompt (consigne du monteur + kit), et ses compositions font 3 000 à 4 000 caractères ; essayer l'effort high, ou garder deux agents et donner au monteur les planches (rushes et original) et au regard du motion designer l'original au même instant (le gain de fidélité vient de là). Pour comparer à la chaîne, garder ses compositions avant `reset=1` (la remise à zéro du banc les efface).
 
 ## Prochains chantiers proposés (dans l'ordre)
 

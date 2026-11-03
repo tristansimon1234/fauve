@@ -302,7 +302,7 @@ export async function designEdit(params: {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, recent, report, inspirations, hooks, readyForEditor] = await Promise.all([
     db.from("posts").select("id, title, kind, caption, platforms, edit_plan_id, template, inspiration_id, voice_media_id").eq("id", params.postId).eq("studio_id", params.studioId).single(),
-    db.from("studios").select("name, business_type, booking_url, memory").eq("id", params.studioId).single(),
+    db.from("studios").select("name, business_type, booking_url, memory, website_url, team").eq("id", params.studioId).single(),
     db.from("brand_profiles").select("profile").eq("studio_id", params.studioId).order("version", { ascending: false }).limit(1),
     db.from("edit_plans").select("plan, version").eq("post_id", params.postId).order("version", { ascending: false }).limit(1),
     recentlyShownTemplates(params.studioId, params.postId),
@@ -548,7 +548,10 @@ export async function designEdit(params: {
   const example = house?.example ? HOUSE_EXAMPLES[house.example] : undefined;
   const sheets = inspirationId ? await modelSheets(params.studioId, inspirationId).catch(() => []) : [];
   const originalLength = sheets.at(-1)?.to ?? followed?.measured?.duration ?? 0;
-  const directing = Boolean(followed && sheets.length && !correction && !(voice && voiceId && spoken) && (params.director || timeLeft() >= DIRECTOR_NEEDS_MS));
+  // On the bench and the team's studio only, until it beats the editor and the motion designer (first bench: more
+  // faithful to the model on the café but emptier, worse on the Procope: a tiny vertical title, no hook).
+  const directorTrial = Boolean(studio.data?.team) || String(studio.data?.website_url ?? "").startsWith("lab://");
+  const directing = Boolean(directorTrial && followed && sheets.length && !correction && !(voice && voiceId && spoken) && (params.director || timeLeft() >= DIRECTOR_NEEDS_MS));
   let directed: { first: DirectorBlock[]; parts: DirectorParts; answer: DirectorOutput } | null = null;
   // What the engine measured on the director's plan (a length missed, a floor not held): told at its look.
   const directorNotes: string[] = [];
