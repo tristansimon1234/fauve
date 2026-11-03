@@ -816,9 +816,13 @@ export async function designEdit(params: {
   // Free scenes and animations over several shots: reuse the code of unchanged briefs, have the motion designer write the others.
   const reusable = new Map(previousMotions.filter((m) => m.js).map((m) => [m.brief, m] as const));
   const layers = plan.layers ?? [];
+  // The director wrote the composition with its plan: its code is the one checked and kept, never the earlier version's
+  // with the same brief (its look at the Procope had rewritten the code, and the earlier one went out).
+  const directorWrites = Boolean(directed?.answer.composition_code.trim());
+  const reusedLayer = (l: (typeof layers)[number]) => reusable.has(l.motion.brief) && !(l.compose && directorWrites);
   const toWrite = [
     ...plan.segments.flatMap((s, i) => (isMotionSegment(s) && !s.motion.js && !reusable.has(s.motion.brief) ? [{ id: `s${i}`, brief: s.motion.brief }] : [])),
-    ...layers.flatMap((l, i) => (!l.motion.js && !reusable.has(l.motion.brief) ? [{ id: `l${i}`, brief: l.motion.brief }] : [])),
+    ...layers.flatMap((l, i) => (!l.motion.js && !reusedLayer(l) ? [{ id: `l${i}`, brief: l.motion.brief }] : [])),
   ];
   // Her photos an animation may compose with: in a collage or another composition, every photo of the Reel; elsewhere,
   // those its brief names (by media_id). Each is cut out first (their own sandbox); one without a clean cut-out comes whole.
@@ -968,10 +972,10 @@ export async function designEdit(params: {
   // remakes it (the composition over the whole Reel first of all), never pasted as it is.
   if (house && example) for (const request of requests) request.example = { name: house.name, ...example };
   // The director wrote the composition with its plan: checked like any animation, never written again.
-  if (directed?.answer.composition_code.trim()) {
+  if (directed && directorWrites) {
     const target = requests.find((r) => r.compose);
     if (target) target.draft = { code: directed.answer.composition_code, name: directed.answer.composition_name };
-    else console.warn("director: a composition for a plan that is not composed, left out", params.postId);
+    else console.warn("director: a composition for a plan that is not composed, left out", params.postId, plan.layers?.length ?? 0);
   }
   // A correction: each animation rewritten first looks at how its earlier version came out on her images.
   if (correction && previousPlan.success && baseId && requests.length) {
@@ -1123,7 +1127,7 @@ export async function designEdit(params: {
   let compositionKept = false;
   const written = layers.flatMap((l, i) => {
     if (l.motion.js) return [l];
-    const kept = reusable.get(l.motion.brief);
+    const kept = reusedLayer(l) ? reusable.get(l.motion.brief) : undefined;
     if (kept?.js) {
       const motion = {
         ...l.motion,
