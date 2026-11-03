@@ -1250,3 +1250,22 @@ test("the director's look at its own Reel: its first image, each text coming in 
   assert.equal(long[0], 0.2);
   assert.equal(long.at(-1), 39.7);
 });
+
+test("a model Edith picked holds her floor: words on screen, an ambiance 15 s at most when nobody speaks", async () => {
+  const { dressedFloorNote, AMBIANCE_MAX_SECONDS } = await import("./editor.ts");
+  const base = { duration: 12, texts: [{ text: "le premier café", from: 0, to: 2 }], end_card: undefined } as unknown as Parameters<typeof dressedFloorNote>[0];
+  const quiet = { voice: false, speech: false };
+  assert.equal(dressedFloorNote(base, quiet), null);
+  // Café Tolbiac's mosaic: 30 s, not one word.
+  const mosaic = { ...base, duration: 30, texts: [] } as unknown as Parameters<typeof dressedFloorNote>[0];
+  const note = dressedFloorNote(mosaic, quiet)!;
+  assert.match(note, /aucun texte/);
+  assert.match(note, new RegExp(`${AMBIANCE_MAX_SECONDS} s au plus`));
+  // Someone speaks, a voice tells it, or she asked for a length: the length is theirs.
+  assert.doesNotMatch(dressedFloorNote(mosaic, { voice: false, speech: true })!, /au plus/);
+  assert.equal(dressedFloorNote({ ...mosaic, texts: base.texts } as typeof mosaic, { ...quiet, duration: 30 }), null);
+  // Her request wants no words: none is asked.
+  assert.equal(dressedFloorNote({ ...base, texts: [] } as typeof base, { ...quiet, request: "Juste les images, sans texte." }), null);
+  // An end card is a word on screen.
+  assert.equal(dressedFloorNote({ ...base, texts: [], end_card: { title: "Café Tolbiac" } } as unknown as typeof base, quiet), null);
+});

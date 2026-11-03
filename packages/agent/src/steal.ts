@@ -698,7 +698,7 @@ export function followedForEditor(followed: FollowedStyle) {
     ...(followed.house
       ? {
           origine: followed.dressed
-            ? "un modèle d'Edith, choisi par Edith comme forme de ce Reel (sa direction artistique par défaut) : sa forme, son rythme, ses moments et sa finition sont à refaire avec ses images et ses mots à elle, habillés de sa charte (ses polices, ses couleurs) ; sa demande passe avant le modèle"
+            ? "un modèle d'Edith, choisi par Edith comme forme de ce Reel (sa direction artistique par défaut) : sa forme, son rythme, ses moments et sa finition sont à refaire avec ses images et ses mots à elle, habillés de sa charte (ses polices, ses couleurs) ; sa demande passe avant le modèle. Le modèle ne donne ni la longueur ni le silence : 7 à 15 s pour une ambiance ou une annonce quand personne ne parle, une accroche écrite lisible dès la première seconde et une fin (son nom ou une invitation), même si le modèle n'en a pas"
             : "un modèle d'Edith qu'elle a choisi : sa forme, son rythme, ses moments et sa finition sont à refaire avec ses images et ses mots à elle ; le motion designer reçoit la composition de référence de ce modèle",
         }
       : {}),
@@ -810,7 +810,8 @@ export function followedChecks(followed: FollowedStyle | undefined): QualityOpti
   const { text, hook } = followed.look;
   return {
     paceCeiling: paceCeiling(MAX_AVERAGE_SHOT, followed),
-    wordlessHook: text.amount === "aucun" || hook.kind === "geste" || hook.kind === "aucun",
+    // A model Edith picked keeps her floor: its hook is written whatever the model does.
+    wordlessHook: !followed.dressed && (text.amount === "aucun" || hook.kind === "geste" || hook.kind === "aucun"),
     manyTexts: text.amount === "plusieurs",
   };
 }

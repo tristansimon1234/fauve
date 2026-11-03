@@ -77,6 +77,8 @@ import {
   honestLength,
   lengthNote,
   missesLength,
+  AMBIANCE_MAX_SECONDS,
+  dressedFloorNote,
   houseModel,
   FONT_PAIRS,
   SPOKEN_WRITTEN,
@@ -617,6 +619,25 @@ export async function designEdit(params: {
         output = again.parsed_output;
         plan = framed(retried);
       }
+    }
+  }
+  // A model Edith picked holds her floor (dressedFloorNote): a plan without one word, or too long for an ambiance,
+  // reads what was measured and answers once more; the retry is kept when it holds (or holds better).
+  const floorContext = { voice: Boolean(voice), speech: clips.some((c) => Boolean(c.analysis.words?.length)), request: params.brief, duration: params.contract?.duration };
+  const floor = followed?.dressed && !correction ? dressedFloorNote(plan, floorContext) : null;
+  if (floor) {
+    const again = await ask(legacy, { answer: output, note: floor }).catch((error: unknown) => {
+      console.warn("editor: floor retry failed", error);
+      return null;
+    });
+    if (again?.parsed_output) {
+      const retried = framed(toPlan(again.parsed_output));
+      const fails = (p: typeof plan) => (p.texts.length ? 0 : 2) + (p.duration > AMBIANCE_MAX_SECONDS + 0.5 ? 1 : 0);
+      if (!dressedFloorNote(retried, floorContext) || fails(retried) < fails(plan)) {
+        output = again.parsed_output;
+        plan = retried;
+      }
+      console.log("editor: floor retry", params.postId, `${plan.duration} s, ${plan.texts.length} texts`);
     }
   }
   // A correction keeps this Reel's own colours when the editor wrote none: only what she asked changes.

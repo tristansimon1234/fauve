@@ -798,6 +798,35 @@ export function lengthNote(actual: number, asked: number): string {
   return `[Contrôle du moteur, pas de la gérante] Ton plan dure ${seconds(actual)} une fois monté (somme des plans, moins les fondus) ; elle a demandé environ ${seconds(Math.min(asked, MAX_REEL_SECONDS))}. Rends le plan entier avec cette durée : une animation dure 8 s au plus, un plan filmé ne dépasse pas sa vidéo, une photo 5 s ; une voix plus courte ne s'étire pas, ce sont les images qui tiennent (une fin ou un écran de fin tenus après elle). « rationale » dit la vraie durée.`;
 }
 
+/** The longest a Reel made in a model Edith picked runs when nobody speaks and she asked for no length (an ambiance, an announcement). */
+export const AMBIANCE_MAX_SECONDS = 15;
+/** Her request asks for no words on screen. */
+const NO_WORDS = /sans (aucun )?(texte|mots?)|pas de (texte|mots?)|aucun (texte|mot)|z[ée]ro (texte|mot)|no text/i;
+
+/**
+ * Edith's art direction holds her own floor when the model is one Edith picked (Café Tolbiac's mosaic came back 30 s
+ * long without one word, the model lasting 6 s): the model gives the form, never the length nor the silence. A plan
+ * with no word on screen (no voice, her request not asking for none), or longer than an ambiance with nobody speaking
+ * and no length asked, is sent back once to the editor with what was measured; null when it holds.
+ */
+export function dressedFloorNote(plan: Pick<EditPlan, "duration" | "texts" | "end_card">, context: { voice: boolean; speech: boolean; request?: string; duration?: number | null }): string | null {
+  const wordless = !plan.texts.length && !plan.end_card && !context.voice && !NO_WORDS.test(context.request ?? "");
+  const long = !context.voice && !context.speech && !context.duration && plan.duration > AMBIANCE_MAX_SECONDS + 0.5;
+  if (!wordless && !long) return null;
+  return [
+    "[Contrôle du moteur, pas de la gérante] Ce Reel est fait dans un modèle d'Edith qu'elle n'a pas choisi elle-même : le modèle donne la forme et les moments, jamais la longueur ni le silence.",
+    wordless
+      ? "Ton plan n'a aucun texte à l'écran : écris son accroche, lisible dès la première seconde (ses mots, son nom ou ce qu'elle annonce, une phrase courte de créateur), et ce qui le termine (son nom ou une invitation) ; la composition les dessine dans le style du modèle."
+      : "",
+    long
+      ? `Ton plan dure ${seconds(plan.duration)} alors que personne n'y parle et qu'elle n'a pas demandé de durée : une ambiance ou une annonce tient en 7 à ${AMBIANCE_MAX_SECONDS} s, coupe à ${AMBIANCE_MAX_SECONDS} s au plus (moins de plans, ou des plans plus courts, sur le temps).`
+      : "",
+    "Rends le plan entier.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 /** Her message never announces a length the video does not have: the true one is said when it is still off. */
 export function honestLength(rationale: string, actual: number, asked: number | null | undefined): string {
   if (!asked || !missesLength(actual, asked)) return rationale;

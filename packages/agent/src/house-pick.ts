@@ -17,6 +17,7 @@ How to choose
 - Her files first: a model can only be made with the footage it needs (il_faut, and its number of files). One that needs someone walking in front of the place, someone talking to the camera, a hand raised to a wall, a fixed shot of the shop front or photos on a plain background is out unless her files have it.
 - Then her request (demande): what people must feel or do; when she names a form (a split screen, a collage, a word in big, black and white, a mosaic…), the model that is that form.
 - Then her trade and what her footage shows: the model whose idea makes this business look its best (a mosaic for dishes or creations, fixed cinema shots for a calm place, whip pans for a lively street, a typed name for a place in the sun…).
+- When she asks to surprise, for an effect or to say something (an offer, a name, a moment), a model whose idea is in its words or its effect (a title that decodes, a word you pass through, a title behind the passers-by, words that slam on each cut), never one made of images alone (a mosaic, a photo dump, fixed shots) unless she asks for that.
 - Never one of derniers_modeles (the models of her last Reels): each Reel must look new.
 - When none can be made with her files, answer "none".
 
