@@ -9,7 +9,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 // with the recipe of a Reel she sends, kept in house/sheets/<key>/: POST with CRON_SECRET (Authorization: Bearer …),
 // from the database by net.http_post. A body { "originals": { "<key>": "lab/models/<uuid>.mp4" } } first copies the
 // bench's copy of an original (modelVideo) to its place. ?key=<key> makes one model's sheets, otherwise every model's
-// whose original is kept.
+// whose original is kept. ?drop=lab/models/<uuid>.mp4 removes a bench copy no model is made from (the two « ingénieurs
+// IA », which Tristan did not want kept).
 
 export const maxDuration = 800;
 
@@ -25,6 +26,12 @@ type Made = { key: string; sheets: number; named: number; seconds: number } | { 
 
 export async function POST(request: Request) {
   if (!authorized(request)) return new Response("unauthorized", { status: 401 });
+  const drop = new URL(request.url).searchParams.get("drop");
+  if (drop) {
+    if (!/^lab\/models\/[0-9a-f-]{36}\.mp4$/.test(drop)) return Response.json({ error: "drop=lab/models/<uuid>.mp4" }, { status: 400 });
+    const { data, error } = await supabaseAdmin().storage.from("media").remove([drop]);
+    return Response.json({ dropped: error ? null : (data ?? []).map((f) => f.name), error: error?.message ?? null });
+  }
   const only = new URL(request.url).searchParams.get("key");
   if (only && !HOUSE_MODELS.some((m) => m.key === only)) return Response.json({ error: `modèle inconnu : ${only}` }, { status: 400 });
   const body = bodySchema.safeParse(await request.json().catch(() => ({})));
