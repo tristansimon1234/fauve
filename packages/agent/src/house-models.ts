@@ -1,7 +1,7 @@
 import { fontPair, pairFonts, type FontPair } from "./font-pairs.ts";
 import { HOUSE_MEASURES } from "./house-measures.ts";
 import { reelLookSchema, type ReelLook } from "./looks.ts";
-import { STEAL_READER, stolenStyleLines, type StolenLook, type StolenStyle } from "./steal.ts";
+import { filmWords, STEAL_READER, stolenStyleLines, type StolenLook, type StolenStyle } from "./steal.ts";
 import type { z } from "zod";
 
 // Edith's own models (lot 5; Tristan: « chaque référence deviendra un modèle soigné qu'Edith sait refaire quand on
@@ -17,7 +17,7 @@ import type { z } from "zod";
 /** The source of the inspiration row a house model is kept on, per studio (one per model, made when first used). */
 export const HOUSE_SOURCE = "house";
 /** The catalogue's version: a studio's row written by an older one is rewritten when the model is used again. */
-export const HOUSE_VERSION = 1;
+export const HOUSE_VERSION = 2;
 
 export type HouseModel = {
   key: string;
@@ -212,6 +212,9 @@ export const HOUSE_MODELS: HouseModel[] = [
       music: "upbeat funk soul, punchy drums and slap bass",
       ending: "la carte avec la phrase entière sur un dernier plan, tenue une seconde",
       why: "Le rythme en stop motion accroche et la phrase se lit en se construisant : on attend le mot suivant, et l'invitation finit écrite à la main.",
+      // In the model the card is real, held by a hand in front of each shot.
+      to_film: "ta main qui tient une carte blanche devant tes plans, comme dans le modèle",
+      to_film_else: "je dessine la carte par-dessus tes images",
     },
   }),
   model({
@@ -722,6 +725,9 @@ export const HOUSE_MODELS: HouseModel[] = [
       music: "hard-hitting trap beat, heavy 808 and claps",
       ending: "un geste figé sur le dernier temps, puis le noir",
       why: "Le noir et blanc et les ralentis saccadés donnent du poids à chaque geste : c'est l'énergie d'une marque de sport, sans rien inventer.",
+      // The rays of light of the reference are filmed (smoke and a backlight): nothing in an edit makes them.
+      to_film: "un ou deux plans en contre-jour avec un peu de vapeur ou de fumée (une tasse qui fume, une machine à café), pour que la lumière fasse des rayons",
+      to_film_else: "le montage est là, sans les rayons de lumière",
     },
   }),
   model({
@@ -1088,7 +1094,10 @@ export function houseStyle(model: HouseModel): StolenStyle {
 /** What her Reel takes from a house model, in three lines (as for a Reel she sends). */
 export const houseLines = (model: HouseModel): string[] => stolenStyleLines(houseStyle(model));
 
-/** The models for Edith: their key, name, what they do and what they want. */
-export function houseModelsForEdith(): { key: string; nom: string; ce_que_ca_fait: string; il_faut: string }[] {
-  return HOUSE_MODELS.map((m) => ({ key: m.key, nom: m.name, ce_que_ca_fait: m.pitch, il_faut: m.needs }));
+/** The models for Edith: their key, name, what they do, what they want, and what only she can film for one. */
+export function houseModelsForEdith(): { key: string; nom: string; ce_que_ca_fait: string; il_faut: string; a_lui_dire?: string }[] {
+  return HOUSE_MODELS.map((m) => {
+    const film = filmWords(m.look);
+    return { key: m.key, nom: m.name, ce_que_ca_fait: m.pitch, il_faut: m.needs, ...(film ? { a_lui_dire: film } : {}) };
+  });
 }

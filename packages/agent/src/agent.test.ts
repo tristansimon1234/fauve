@@ -5317,6 +5317,7 @@ test("a copied Reel's words keep their drawing, and its font is checked among cl
     why: "Le message reste, les images défilent.",
     filter: "",
     generative: "",
+    to_film: "",
   };
   const look = clampLook(reading);
   // What compares its font is not kept; how its words are drawn is.

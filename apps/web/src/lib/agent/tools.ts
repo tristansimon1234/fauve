@@ -1383,7 +1383,7 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
         inspirations: items.map((i) => ({ inspiration_id: i.id, titre: i.title, a_reprendre: i.summary ?? (i.reading ? "en cours de lecture" : undefined), source: i.source })),
         // Edith's own models: a Reel made like one of them (montage modele_edith), shown with their preview in Créer.
         modeles_edith: houseModelsForEdith(),
-        note: `${items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration à elle : elle peut envoyer le lien d'un Reel qu'elle aime."} Les modèles d'Edith : propose-en 2 ou 3 qui vont avec ses fichiers et son idée (par leur nom, en une phrase chacun), jamais toute la liste ; elle les voit en vidéo dans Créer › « Un modèle d'Edith ».`,
+        note: `${items.length ? "Propose-en 2 au plus, par leur titre." : "Aucune inspiration à elle : elle peut envoyer le lien d'un Reel qu'elle aime."} Les modèles d'Edith : propose-en 2 ou 3 qui vont avec ses fichiers et son idée (par leur nom, en une phrase chacun), jamais toute la liste ; elle les voit en vidéo dans Créer › « Un modèle d'Edith ». Quand elle en choisit un qui a a_lui_dire (ce qu'elle seule peut filmer), dis-le-lui avec ses fichiers à envoyer, tel quel, avant de lancer.`,
       });
     },
 

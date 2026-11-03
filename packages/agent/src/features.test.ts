@@ -27,7 +27,8 @@ import { mixFilter, mixGains } from "./mix.ts";
 import { fromEditorPlan, normalizeEditPlan } from "./editor.ts";
 import { depthPhotoIds, reliefFiles, reliefJobs, reliefOf, RELIEF_VERSION } from "./depth.ts";
 import { dayIn, LOOK_PRESETS, lookChoice, lookFromDesign, lookMatrix, lookStamp, planLook, reelLookSchema, withLook, type LookDesign } from "./looks.ts";
-import { clampLook, followedFilter, followedForEditor, followedFrom, followedLine, stolenStyleLines, type StolenLookReading } from "./steal.ts";
+import { clampLook, filmWords, followedFilter, followedForEditor, followedFrom, followedLine, stolenStyleLines, stolenStyleMessage, type StolenLookReading } from "./steal.ts";
+import { houseLines, houseModel, houseModelsForEdith } from "./house-models.ts";
 import { editorLook } from "./editor.ts";
 import { snapToTempo } from "./tempo.ts";
 
@@ -577,6 +578,7 @@ test("steal: its filter in words, and what it makes with generative AI, said and
     effect: "none",
     filter: "couleurs délavées et chaudes, grain fort, coins sombres.",
     generative: "la personne est redessinée en personnage de manga image par image.",
+    to_film: "",
     moments: [],
     shots: [],
     grade: "warm",
@@ -602,6 +604,51 @@ test("steal: its filter in words, and what it makes with generative AI, said and
   assert.equal("generative" in plain, false);
   assert.equal(stolenStyleLines({ ...style, look: plain }).length, 3);
   assert.equal(followedForEditor(followedFrom("11111111-2222-4333-8444-555555555555", { ...style, look: plain })).ia_generative, undefined);
+});
+
+test("steal: what only she can film for her copy, said as soon as a model is chosen, known to the editor and the critic", () => {
+  const reading: StolenLookReading = {
+    name: "carte au feutre",
+    format: "message",
+    voice: "aucune",
+    hook: { kind: "mystère", what: "une carte blanche tenue devant le premier plan" },
+    text: { amount: "un message tenu", composition: "une phrase au feutre rouge sur une carte", case: "upper", weight: "bold", tracking: "normal", align: "center", stress: "none", band: "none", subtitles: false, font: "", font_alternatives: [], stroke: "thick", lines: "aligned", tilt: 0, shadow: "none", sample: "", seen_at: 0 },
+    colors: [],
+    effect: "none",
+    filter: "",
+    generative: "",
+    to_film: "ta main qui tient une carte blanche devant tes plans.",
+    moments: [],
+    shots: [],
+    grade: "flash",
+    motion: "fait_main",
+    layout: "plein cadre, avec une carte tenue au centre",
+    camera: "à la main",
+    transitions: "coupes nettes",
+    music: "upbeat funk soul",
+    ending: "la carte avec la phrase entière.",
+    why: "La phrase se lit en se construisant.",
+  };
+  const look = clampLook(reading);
+  assert.equal(look.to_film, "ta main qui tient une carte blanche devant tes plans.");
+  const style = { look, measures: { duration: 9, cuts: [0.3, 0.6, 0.9], bpm: 92, lufs: -14 } };
+  // Said in her lines (Créer shows them), in the message after the reading, to the editor and to the critic.
+  assert.ok(stolenStyleLines(style).includes("Il faut que tu me filmes ta main qui tient une carte blanche devant tes plans ; sans ça, je fais au plus proche avec tes images."));
+  assert.match(stolenStyleMessage(style, false), /Envoie-moi tes photos et vidéos\. Et il faut que tu me filmes ta main qui tient une carte blanche devant tes plans\.$/);
+  assert.match(stolenStyleMessage(style, true), /Ton Reel arrive dans quelques minutes\. Pour qu’il ressemble encore plus au modèle, filme-moi ta main/);
+  const followed = followedFrom("11111111-2222-4333-8444-555555555555", style);
+  assert.match(followedForEditor(followed).a_filmer ?? "", /^ta main qui tient une carte blanche.*sers-t'en à sa place.*rationale/);
+  assert.match(followedLine(followed), /à filmer par elle, son absence n'est jamais un défaut du montage/);
+  // Nothing to film: nothing said.
+  const plain = clampLook({ ...reading, to_film: "" });
+  assert.equal("to_film" in plain, false);
+  assert.equal(filmWords(plain), null);
+  assert.doesNotMatch(stolenStyleMessage({ ...style, look: plain }, false), /filmes/);
+  // Two of Edith's models need something filmed, with what they do without it.
+  const card = houseModel("carte-feutre")!;
+  assert.ok(houseLines(card).includes("Il faut que tu me filmes ta main qui tient une carte blanche devant tes plans, comme dans le modèle ; sans ça, je dessine la carte par-dessus tes images."));
+  const told = houseModelsForEdith().filter((m) => m.a_lui_dire).map((m) => m.key);
+  assert.deepEqual(told.sort(), ["carte-feutre", "nike"]);
 });
 
 const validPlanBase = {
