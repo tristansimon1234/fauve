@@ -31,7 +31,12 @@ import type { MotionTemplate, ReelProps } from "./types";
 // to set a voice's subtitles where the animations leave room (Tristan: « il faut pas masquer
 // mais bien les placer là où ça ne gêne pas les anim et les visages »).
 
-export const SAFE_ZONE = { side: 140, top: 80, bottom: 0.75 };
+/**
+ * Where a text may go: 40 px from the sides, 80 from the top, above the bottom quarter (the apps' caption), and 140 px
+ * from the right below the middle, where the apps' buttons are (lot 7: a giant word behind her, across the frame, was
+ * refused at 140 px on both sides, on Tristan's creator references nothing holds the left nor the top right).
+ */
+export const SAFE_ZONE = { side: 140, edge: 40, top: 80, bottom: 0.75, buttons: 0.5 };
 const TOLERANCE = 12; // px: glyph boxes are a little wider than the ink
 const OUT_FRAMES = 12; // 0.4 s at 30 fps
 const FACE_FRAMES = 12; // a text may cross a face, not stay on it
@@ -158,11 +163,13 @@ type OnFace = { text: string; frames: number[]; face: [number, number, number, n
 function measure(copy: HTMLElement, frame: number, width: number, height: number, out: Map<string, Out>, seen: Seen, onFace: Map<string, OnFace>) {
   const origin = copy.getBoundingClientRect();
   const zone = {
-    left: SAFE_ZONE.side - TOLERANCE,
-    right: width - SAFE_ZONE.side + TOLERANCE,
+    left: SAFE_ZONE.edge - TOLERANCE,
+    right: width - SAFE_ZONE.edge + TOLERANCE,
     top: SAFE_ZONE.top - TOLERANCE,
     bottom: height * SAFE_ZONE.bottom + TOLERANCE,
   };
+  // The apps' buttons: the right side, below the middle.
+  const buttons = { left: width - SAFE_ZONE.side + TOLERANCE, top: height * SAFE_ZONE.buttons - TOLERANCE };
   const range = document.createRange();
   const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -191,7 +198,8 @@ function measure(copy: HTMLElement, frame: number, width: number, height: number
         onFace.set(text, entry);
       }
       const limit = isMark(text) ? { left: -TOLERANCE, right: width + TOLERANCE, top: -TOLERANCE, bottom: height + TOLERANCE } : zone;
-      if (box[0] >= limit.left && box[2] <= limit.right && box[1] >= limit.top && box[3] <= limit.bottom) continue;
+      const onButtons = !isMark(text) && box[2] > buttons.left && box[3] > buttons.top;
+      if (box[0] >= limit.left && box[2] <= limit.right && box[1] >= limit.top && box[3] <= limit.bottom && !onButtons) continue;
       const entry = out.get(text) ?? { text, frames: [], box };
       if (entry.frames.at(-1) !== frame) entry.frames.push(frame);
       entry.box = [Math.min(entry.box[0], box[0]), Math.min(entry.box[1], box[1]), Math.max(entry.box[2], box[2]), Math.max(entry.box[3], box[3])];
@@ -625,7 +633,7 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         .join(" ; ");
       cancelRender(
         new Error(
-          `texte hors du cadre ou de la zone de sécurité : ${detail}. Chaque texte doit rester entier entre x = ${SAFE_ZONE.side} et x = ${width - SAFE_ZONE.side}, et entre y = ${SAFE_ZONE.top} et y = ${height * SAFE_ZONE.bottom}, zooms, rebonds et rotations compris (une entrée depuis le bord doit finir en moins de ${(OUT_FRAMES / 30).toFixed(1).replace(".", ",")} s) : mets les textes dans FitText et n'agrandis pas un texte au-delà de sa boîte.`,
+          `texte hors du cadre ou de la zone de sécurité : ${detail}. Chaque texte doit rester entier entre x = ${SAFE_ZONE.edge} et x = ${width - SAFE_ZONE.edge}, entre y = ${SAFE_ZONE.top} et y = ${height * SAFE_ZONE.bottom}, et à gauche de x = ${width - SAFE_ZONE.side} sous y = ${height * SAFE_ZONE.buttons} (les boutons de l'appli), zooms, rebonds et rotations compris (une entrée depuis le bord doit finir en moins de ${(OUT_FRAMES / 30).toFixed(1).replace(".", ",")} s) : mets les textes dans FitText et n'agrandis pas un texte au-delà de sa boîte.`,
         ),
       );
     })().catch((error: unknown) => cancelRender(error instanceof Error ? error : new Error(String(error))));
