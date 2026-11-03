@@ -87,6 +87,13 @@ const scope = {
   // Nobody is seen here: no box; a sketch draws what it wraps.
   Detect: () => null,
   Sketch: ({ children }) => React.createElement("div", null, children),
+  // The effects kit (Effects.tsx): what it wraps is drawn, its labels written.
+  Letterbox: () => null,
+  ColorPop: ({ children }) => React.createElement("div", null, children),
+  MaskReveal: ({ children }) => React.createElement("div", null, children),
+  Glitch: ({ children }) => React.createElement("div", null, children),
+  Callout: ({ label }) => React.createElement("div", null, String(label ?? "")),
+  Brackets: ({ label }) => React.createElement("div", null, String(label ?? "")),
   // What is said, written: the words themselves are what the check reads.
   Captions: ({ words = [] }) => React.createElement("div", null, (Array.isArray(words) ? words : []).map((w) => String(w?.w ?? "")).join(" ")),
 };

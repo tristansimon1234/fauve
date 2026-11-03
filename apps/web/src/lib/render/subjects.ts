@@ -26,12 +26,12 @@ export const subjectPath = (studioId: string, mediaId: string, key: string, stil
   `${studioId}/subjects/${mediaId}-${createHash("sha1").update(key).digest("hex").slice(0, 12)}.${still ? "png" : "webm"}`;
 
 /** The passages to cut out for this plan, with their clips' rows (her own steadied video plays: an unsteadied original is left out). */
-async function planned(studioId: string, plan: Plan) {
+async function planned(studioId: string, plan: Plan, anticipate = false) {
   const ids = [...new Set(plan.segments.flatMap((s) => (isClipSegment(s) ? [s.clip_id] : [])))];
   if (!ids.length || plan.finish?.steady === "off") return { passages: [] as SubjectPassage[], rows: new Map<string, Row>() };
   const { data } = await supabaseAdmin().from("media_assets").select("id, kind, storage_path, subjects, tracks").eq("studio_id", studioId).in("id", ids);
   const rows = new Map(((data ?? []) as Row[]).map((r) => [r.id, r]));
-  return { passages: subjectPassages(plan, (id) => rows.get(id)?.kind === "video"), rows };
+  return { passages: subjectPassages(plan, (id) => rows.get(id)?.kind === "video", anticipate), rows };
 }
 
 type Row = { id: string; kind: string; storage_path: string | null; subjects: unknown; tracks: unknown };
@@ -42,8 +42,8 @@ const kept = (row: Row | undefined): MediaSubjects => mediaSubjectsSchema.safePa
  * Cuts out the passages this plan's compositions draw her on and that have no cut-out yet, as many as the step has
  * time for before its render (the rest render without: the text in front of her, and are made for the next version).
  */
-export async function ensureSubjects(studioId: string, postId: string, plan: Plan): Promise<void> {
-  const { passages, rows } = await planned(studioId, plan);
+export async function ensureSubjects(studioId: string, postId: string, plan: Plan, options: { anticipate?: boolean } = {}): Promise<void> {
+  const { passages, rows } = await planned(studioId, plan, options.anticipate);
   const missing = passages.filter((p) => {
     const k = kept(rows.get(p.clip_id))[p.key];
     return !k || ("failed_at" in k && Date.now() - Date.parse(k.failed_at) > RETRY_MS);

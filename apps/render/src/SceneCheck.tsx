@@ -6,6 +6,7 @@ import { fontsLoaded, loadFonts } from "./fonts";
 import { makeKit } from "./Kit";
 import { makeType } from "./Type";
 import { makeGraphic } from "./Graphic";
+import { makeEffects } from "./Effects";
 import { compileScene, SCOPE, type SceneComponent } from "./MotionScene";
 import { themeFor } from "./theme";
 import { footageTrack, type Seen, type TrackPiece } from "./track";
@@ -109,6 +110,7 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
     ...makeKit({ useCurrentFrame, useVideoConfig }),
     ...makeType({ useCurrentFrame, useVideoConfig }),
     ...makeGraphic({ useCurrentFrame, useVideoConfig }),
+    ...makeEffects({ useCurrentFrame, useVideoConfig }),
     Sequence: Sequence as unknown as typeof SCOPE.Sequence,
     Cutout: Cutout as typeof SCOPE.Cutout,
     Footage: Footage as typeof SCOPE.Footage,

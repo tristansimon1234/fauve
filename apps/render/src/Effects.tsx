@@ -1,0 +1,342 @@
+import { useId, type CSSProperties, type ReactNode } from "react";
+import { Easing, interpolate, random } from "remotion";
+import type { Box, KitHooks } from "./Kit";
+
+// The effects kit of the animations (lot 7), from Tristan's reference Reels: cinema bars that open and close (and what
+// steps out of them in front: Subject laid after), black and white turning to colour, a grade revealed inside a mask
+// with its outline and handles as in a grading tool, a glitch on a cut, and annotations (a line or an arrow drawn to
+// a label, corner brackets around what matters). Tools, never imposed; drawn from the frame number only, the same in
+// the render, the live preview and the scene check.
+
+const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+const settle = Easing.bezier(0.22, 1, 0.36, 1);
+const safeId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "");
+
+type Point = { x: number; y: number };
+/** A point fixed, or followed frame by frame (a hand, a face read with track). */
+type Anchor = Point | ((frame: number) => Point);
+const pointAt = (a: Anchor, frame: number): Point => (typeof a === "function" ? a(frame) : a);
+
+// ——— Letterbox ————————————————————————————————————————————————————————————————————————
+
+type LetterboxProps = {
+  /** Frame the bars start closing in, and (optionally) the frame they start opening again. */
+  at?: number;
+  out?: number;
+  /** Each bar's height, share of the frame (0.12; 0.5 closes the frame to a line). */
+  size?: number;
+  /** Frames to come in and to leave (12). */
+  frames?: number;
+  color?: string;
+};
+
+/** Cinema bars that slide in from the top and the bottom, and leave; laid before Subject, she steps out of them in front. */
+function LetterboxOf(hooks: KitHooks) {
+  return function Letterbox({ at = 0, out, size = 0.12, frames = 12, color = "#000000" }: LetterboxProps) {
+    const frame = hooks.useCurrentFrame();
+    const { height } = hooks.useVideoConfig();
+    const come = interpolate(frame, [at, at + frames], [0, 1], { ...clamp, easing: settle });
+    const go = out === undefined ? 0 : interpolate(frame, [out, out + frames], [0, 1], { ...clamp, easing: settle });
+    const h = Math.round(height * Math.min(0.5, size) * come * (1 - go));
+    if (h <= 0) return null;
+    return (
+      <div data-fauve-decor="" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: h, background: color }} />
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: h, background: color }} />
+      </div>
+    );
+  };
+}
+
+// ——— ColorPop ————————————————————————————————————————————————————————————————————————
+
+type ColorPopProps = {
+  /** Frame the colour starts coming back; before it, black and white. */
+  at: number;
+  /** Frames it takes (14). */
+  frames?: number;
+  /** How the colour comes: all at once fading in, a wipe from the left, or a circle growing from `origin`. */
+  mode?: "fade" | "wipe" | "circle";
+  /** Where the circle grows from (px of the frame; the centre by default). */
+  origin?: Point;
+  /** Back to black and white from this frame (optional). */
+  out?: number;
+  children: ReactNode;
+};
+
+/** What it wraps (her footage) in black and white, then in colour: faded in, wiped, or opening in a circle. */
+function ColorPopOf(hooks: KitHooks) {
+  return function ColorPop({ at, frames = 14, mode = "fade", origin, out, children }: ColorPopProps) {
+    const frame = hooks.useCurrentFrame();
+    const { width, height } = hooks.useVideoConfig();
+    const come = interpolate(frame, [at, at + frames], [0, 1], { ...clamp, easing: settle });
+    const p = out === undefined ? come : come * (1 - interpolate(frame, [out, out + frames], [0, 1], { ...clamp, easing: settle }));
+    // One copy only when it is all one or the other, or when the colour simply fades in.
+    if (mode === "fade" || p <= 0 || p >= 1) {
+      return <div style={{ position: "absolute", inset: 0, filter: p >= 1 ? undefined : `grayscale(${(1 - p).toFixed(3)})` }}>{children}</div>;
+    }
+    const o = origin ?? { x: width / 2, y: height / 2 };
+    const reach = Math.hypot(Math.max(o.x, width - o.x), Math.max(o.y, height - o.y));
+    const clip = mode === "circle" ? `circle(${Math.round(reach * p)}px at ${Math.round(o.x)}px ${Math.round(o.y)}px)` : `inset(0 ${((1 - p) * 100).toFixed(2)}% 0 0)`;
+    return (
+      <div style={{ position: "absolute", inset: 0 }}>
+        <div style={{ position: "absolute", inset: 0, filter: "grayscale(1)" }}>{children}</div>
+        <div style={{ position: "absolute", inset: 0, clipPath: clip }}>{children}</div>
+      </div>
+    );
+  };
+}
+
+// ——— MaskReveal ——————————————————————————————————————————————————————————————————————
+
+type MaskStep = { at: number; box: Box };
+
+type MaskRevealProps = {
+  /** The mask: its box (px of the frame), or boxes at frames it moves to (it glides from one to the next). */
+  box?: Box;
+  moves?: MaskStep[];
+  shape?: "ellipse" | "rect";
+  /** Frame it opens (it grows from its centre), frames to open (12). */
+  at?: number;
+  frames?: number;
+  /** The grade inside and outside, as CSS filters (inside « saturate(1.4) brightness(1.08) », outside « grayscale(1) brightness(0.7) »). */
+  inside?: string;
+  outside?: string;
+  /** Its outline and handles, as a grading tool draws them (true), from this frame until `out`. */
+  outline?: boolean;
+  color?: string;
+  out?: number;
+  children: ReactNode;
+};
+
+/** Her footage graded one way inside a shape and another outside it, the shape's outline and handles drawn like a colourist's mask. */
+function MaskRevealOf(hooks: KitHooks) {
+  return function MaskReveal({ box, moves, shape = "ellipse", at = 0, frames = 12, inside = "saturate(1.35) brightness(1.06) contrast(1.05)", outside = "grayscale(1) brightness(0.72)", outline = true, color = "#ffffff", out, children }: MaskRevealProps) {
+    const frame = hooks.useCurrentFrame();
+    const { width, height } = hooks.useVideoConfig();
+    const id = safeId(useId());
+    const steps = moves?.length ? [...moves].sort((a, b) => a.at - b.at) : [{ at, box: box ?? { x: width * 0.2, y: height * 0.3, w: width * 0.6, h: height * 0.3 } }];
+    // Where it is now: between the two steps around this frame.
+    const next = steps.findIndex((s) => s.at > frame);
+    const a = steps[Math.max(0, (next < 0 ? steps.length : next) - 1)]!;
+    const b = next < 0 ? a : steps[next]!;
+    const t = b === a ? 1 : interpolate(frame, [a.at, b.at], [0, 1], { ...clamp, easing: Easing.bezier(0.65, 0, 0.35, 1) });
+    const lerp = (k: keyof Box) => a.box[k] + (b.box[k] - a.box[k]) * t;
+    const grow = interpolate(frame, [at, at + frames], [0, 1], { ...clamp, easing: settle });
+    const leave = out === undefined ? 0 : interpolate(frame, [out, out + frames], [0, 1], clamp);
+    const open = grow * (1 - leave);
+    const cx = lerp("x") + lerp("w") / 2;
+    const cy = lerp("y") + lerp("h") / 2;
+    const w = lerp("w") * open;
+    const h = lerp("h") * open;
+    const clip = shape === "ellipse" ? `ellipse(${Math.round(w / 2)}px ${Math.round(h / 2)}px at ${Math.round(cx)}px ${Math.round(cy)}px)` : `inset(${Math.round(cy - h / 2)}px ${Math.round(width - cx - w / 2)}px ${Math.round(height - cy - h / 2)}px ${Math.round(cx - w / 2)}px)`;
+    const handles = shape === "ellipse" ? [[cx, cy - h / 2], [cx + w / 2, cy], [cx, cy + h / 2], [cx - w / 2, cy]] : [[cx - w / 2, cy - h / 2], [cx + w / 2, cy - h / 2], [cx + w / 2, cy + h / 2], [cx - w / 2, cy + h / 2]];
+    return (
+      <div style={{ position: "absolute", inset: 0 }}>
+        <div style={{ position: "absolute", inset: 0, filter: frame >= at && open > 0 ? outside : undefined }}>{children}</div>
+        {open > 0 ? (
+          <div style={{ position: "absolute", inset: 0, clipPath: clip, filter: inside }}>{children}</div>
+        ) : null}
+        {outline && open > 0.02 ? (
+          <svg data-fauve-decor="" width={width} height={height} style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }} aria-hidden="true">
+            <defs>
+              <filter id={`s${id}`}>
+                <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#000" floodOpacity="0.45" />
+              </filter>
+            </defs>
+            <g filter={`url(#s${id})`} stroke={color} fill="none" strokeWidth={3}>
+              {shape === "ellipse" ? <ellipse cx={cx} cy={cy} rx={w / 2} ry={h / 2} /> : <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} />}
+              <circle cx={cx} cy={cy} r={7} fill={color} />
+              {handles.map(([x, y], i) => (
+                <rect key={i} x={x! - 8} y={y! - 8} width={16} height={16} fill="#00000055" />
+              ))}
+            </g>
+          </svg>
+        ) : null}
+      </div>
+    );
+  };
+}
+
+// ——— Glitch ——————————————————————————————————————————————————————————————————————————
+
+type GlitchProps = {
+  /** Frame(s) it glitches (a cut), and for how many frames (6). */
+  at: number | number[];
+  frames?: number;
+  /** How far it tears (1). */
+  strength?: number;
+  children: ReactNode;
+};
+
+/** A glitch on a cut: the colours split apart and bands of the picture slide sideways, for a few frames. Only when asked for or copied. */
+function GlitchOf(hooks: KitHooks) {
+  return function Glitch({ at, frames = 6, strength = 1, children }: GlitchProps) {
+    const frame = hooks.useCurrentFrame();
+    const { width, height } = hooks.useVideoConfig();
+    const id = safeId(useId());
+    const hit = (Array.isArray(at) ? at : [at]).find((a) => frame >= a && frame < a + frames);
+    if (hit === undefined) return <div style={{ position: "absolute", inset: 0 }}>{children}</div>;
+    // Strongest in the middle of its frames, its tears drawn anew each frame (seeded: the same on every render).
+    const k = Math.sin(((frame - hit + 0.5) / frames) * Math.PI) * strength;
+    const split = Math.round(18 * k);
+    const bands = Array.from({ length: 5 }, (_, i) => {
+      const y = random(`glitch-y-${hit}-${frame}-${i}`) * height;
+      const h = 20 + random(`glitch-h-${hit}-${frame}-${i}`) * 120;
+      const dx = (random(`glitch-x-${hit}-${frame}-${i}`) - 0.5) * 160 * k;
+      return { y, h, dx };
+    });
+    return (
+      <div style={{ position: "absolute", inset: 0 }}>
+        <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true">
+          <filter id={`g${id}`} x="-5%" y="0" width="110%" height="100%" colorInterpolationFilters="sRGB">
+            <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r" />
+            <feOffset in="r" dx={split} result="ro" />
+            <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" result="gb" />
+            <feOffset in="gb" dx={-split} result="gbo" />
+            <feBlend in="ro" in2="gbo" mode="screen" />
+          </filter>
+        </svg>
+        <div style={{ position: "absolute", inset: 0, filter: `url(#g${id})` }}>{children}</div>
+        {bands.map((b, i) => (
+          <div key={i} style={{ position: "absolute", inset: 0, clipPath: `inset(${Math.round(b.y)}px 0 ${Math.max(0, Math.round(height - b.y - b.h))}px 0)`, transform: `translateX(${Math.round(b.dx)}px)` }}>
+            <div style={{ position: "absolute", inset: 0, width, height }}>{children}</div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+}
+
+// ——— Annotations: Callout and Brackets ———————————————————————————————————————————————————
+
+type CalloutProps = {
+  /** What it points at (px of the frame, or followed frame by frame), and where its label sits. */
+  from: Anchor;
+  to: Point;
+  label?: string;
+  /** Frame it starts drawing, frames to draw (14), frame it goes (optional). */
+  at?: number;
+  frames?: number;
+  out?: number;
+  /** An arrow at what it points at, a dot, or a plain line. */
+  kind?: "arrow" | "dot" | "line";
+  /** How much the line bends (0 straight, 0.25 a gentle curve). */
+  curve?: number;
+  color?: string;
+  width?: number;
+  /** The label's type (a mono label by default). */
+  labelStyle?: CSSProperties;
+};
+
+/** A line (or an arrow) drawn from what matters to its label, like a hand annotating a picture; it can follow a hand or a face. */
+function CalloutOf(hooks: KitHooks) {
+  return function Callout({ from, to, label, at = 0, frames = 14, out, kind = "arrow", curve = 0.18, color = "#ffffff", width = 4, labelStyle }: CalloutProps) {
+    const frame = hooks.useCurrentFrame();
+    const video = hooks.useVideoConfig();
+    if (frame < at || (out !== undefined && frame >= out + 8)) return null;
+    const fade = out === undefined ? 1 : 1 - interpolate(frame, [out, out + 8], [0, 1], clamp);
+    const p = interpolate(frame, [at, at + frames], [0, 1], { ...clamp, easing: settle });
+    const a = pointAt(from, frame);
+    const dx = to.x - a.x;
+    const dy = to.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // The control point, off to one side of the middle.
+    const c = { x: (a.x + to.x) / 2 - dy * curve, y: (a.y + to.y) / 2 + dx * curve };
+    const path = `M ${to.x} ${to.y} Q ${c.x} ${c.y} ${a.x} ${a.y}`;
+    const total = len * (1 + curve * curve * 1.4);
+    // The head at what it points at, along the last bit of the curve.
+    const ang = Math.atan2(a.y - c.y, a.x - c.x);
+    const head = 22 + width * 2;
+    const tip = (s: number) => `${a.x - Math.cos(ang + s) * head},${a.y - Math.sin(ang + s) * head}`;
+    const labelIn = interpolate(frame, [at + frames * 0.6, at + frames], [0, 1], clamp);
+    return (
+      <div data-fauve-decor="" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: fade }}>
+        <svg width={video.width} height={video.height} style={{ position: "absolute", left: 0, top: 0 }} aria-hidden="true">
+          <path d={path} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeDasharray={total} strokeDashoffset={total * (1 - p)} />
+          {p >= 0.98 && kind === "arrow" ? <polyline points={`${tip(0.45)} ${a.x},${a.y} ${tip(-0.45)}`} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" /> : null}
+          {p >= 0.98 && kind === "dot" ? <circle cx={a.x} cy={a.y} r={width * 2.5} fill={color} /> : null}
+        </svg>
+        {label ? (
+          <div
+            style={{
+              position: "absolute",
+              left: to.x,
+              top: to.y,
+              transform: `translate(${dx > 0 ? "-100%" : "0"}, -50%) translateY(${((1 - labelIn) * 12).toFixed(1)}px)`,
+              padding: dx > 0 ? "0 14px 0 0" : "0 0 0 14px",
+              opacity: labelIn,
+              whiteSpace: "nowrap",
+              color,
+              fontFamily: "'IBM Plex Mono', 'Space Mono', monospace",
+              fontSize: 30,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+              ...labelStyle,
+            }}
+          >
+            {label}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+}
+
+type BracketsProps = {
+  /** What it frames (px of the frame, or followed frame by frame: a box around a hand, a face, her). */
+  box: Box | ((frame: number) => Box);
+  at?: number;
+  frames?: number;
+  out?: number;
+  /** Each corner's arm (share of the box's smaller side, 0.22). */
+  arm?: number;
+  color?: string;
+  width?: number;
+  /** A small label on the top left corner. */
+  label?: string;
+};
+
+/** Corner brackets drawn around what matters (a product, a face), closing in from a little wider; they can follow it. */
+function BracketsOf(hooks: KitHooks) {
+  return function Brackets({ box, at = 0, frames = 10, out, arm = 0.22, color = "#ffffff", width = 4, label }: BracketsProps) {
+    const frame = hooks.useCurrentFrame();
+    if (frame < at || (out !== undefined && frame >= out)) return null;
+    const b = typeof box === "function" ? box(frame) : box;
+    const p = interpolate(frame, [at, at + frames], [0, 1], { ...clamp, easing: settle });
+    const pad = (1 - p) * 40;
+    const [x0, y0, x1, y1] = [b.x - pad, b.y - pad, b.x + b.w + pad, b.y + b.h + pad];
+    const l = Math.min(b.w, b.h) * arm;
+    const corners = [
+      `M ${x0} ${y0 + l} L ${x0} ${y0} L ${x0 + l} ${y0}`,
+      `M ${x1 - l} ${y0} L ${x1} ${y0} L ${x1} ${y0 + l}`,
+      `M ${x1} ${y1 - l} L ${x1} ${y1} L ${x1 - l} ${y1}`,
+      `M ${x0 + l} ${y1} L ${x0} ${y1} L ${x0} ${y1 - l}`,
+    ];
+    return (
+      <div data-fauve-decor="" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: p }}>
+        <svg width="100%" height="100%" style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }} aria-hidden="true">
+          {corners.map((d, i) => (
+            <path key={i} d={d} fill="none" stroke={color} strokeWidth={width} strokeLinecap="square" />
+          ))}
+        </svg>
+        {label ? (
+          <div style={{ position: "absolute", left: x0, top: y0 - 44, color, fontFamily: "'IBM Plex Mono', 'Space Mono', monospace", fontSize: 26, letterSpacing: "0.08em", textTransform: "uppercase", textShadow: "0 1px 3px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>{label}</div>
+        ) : null}
+      </div>
+    );
+  };
+}
+
+/** The effects kit, bound to a clock (the render's, or the scene check's own for each copy). */
+export function makeEffects(hooks: KitHooks) {
+  return {
+    Letterbox: LetterboxOf(hooks),
+    ColorPop: ColorPopOf(hooks),
+    MaskReveal: MaskRevealOf(hooks),
+    Glitch: GlitchOf(hooks),
+    Callout: CalloutOf(hooks),
+    Brackets: BracketsOf(hooks),
+  };
+}

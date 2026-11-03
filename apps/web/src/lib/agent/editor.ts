@@ -17,6 +17,7 @@ import {
   editorOutputSchemaLegacy,
   finishPlan,
   captionStyle,
+  CUT_OUT_WORDS,
   type EditorOutput,
   type EditorOutputLegacy,
   type MediaFacts,
@@ -80,6 +81,7 @@ import {
 import { outputFormat } from "@fauve/agent/answer";
 import { HOUSE_EXAMPLES } from "@fauve/agent/house-examples";
 import { ensureCutouts, photoOffers } from "@/lib/render/cutout";
+import { ensureSubjects } from "@/lib/render/subjects";
 import { logoNamed } from "@/lib/render/logo-tone";
 import { videoFramesInSandbox } from "@/lib/render/sandbox";
 import { ensureTracks, loadTracks } from "@/lib/render/tracks";
@@ -877,6 +879,13 @@ export async function designEdit(params: {
     segments: plan.segments.map((s) => (isMotionSegment(s) ? { ...s, motion: withKept(s.motion) } : s)),
     ...(plan.layers ? { layers: plan.layers.map((l) => ({ ...l, motion: withKept(l.motion) })) } : {}),
   };
+  // Her cut out at every image, when the composition will want it (her background replaced, a word behind her): made
+  // in the cut-out sandbox while the animations are written, instead of after them, so a whole Reel on another ground
+  // has the time it needs (the render step finishes what is left).
+  const cutOutAsked = (plan.layers ?? []).some((l) => l.compose && CUT_OUT_WORDS.test(l.motion.brief)) || CUT_OUT_WORDS.test(params.brief ?? "");
+  const earlySubjects = cutOutAsked
+    ? ensureSubjects(params.studioId, params.postId, plan, { anticipate: true }).catch((e: unknown) => console.warn("subjects: not ready", e))
+    : null;
   const designed = await designMotionScenes(params.studioId, requests, direction, sceneBrand, kit, {
     ...sceneContext,
     show: (written) => showReel(params.studioId, params.postId, shown, written),
@@ -894,6 +903,8 @@ export async function designEdit(params: {
       compositionMissed = false;
     }
   }
+  // Her cut-outs, started with the animations, kept before the step ends (the render finishes what is left).
+  await earlySubjects;
   const resultOf = (id: string) => designed.find((d) => d.id === id);
   plan.segments = plan.segments.map((s, i) => {
     if (!isMotionSegment(s) || s.motion.js) return s;

@@ -7,7 +7,12 @@
 # one key image yes and the next no. A passage where nothing moves is read once: one image, its cut-out for the
 # whole passage (a hill under a title, a shop front). Measured on a 720p street video: about 7 s per key image on 4
 # CPUs (8.6 GB of memory at most), a key every 2 to 12 images by the moves, so a fast walk costs about 2 min of work
-# a second of video there (about half on the sandbox's 8), a still shot one image.
+# a second of video there (about half on the sandbox's 8), a still shot one image. Its edge is then made at full size
+# (lot 7, Tristan: « il faudra améliorer le détourage »): snapped to the edges of the picture itself by a guided filter
+# on its light (the model reads at 1024 and the moves at 540: upscaled, its edge was soft and slightly off), and the
+# colours of the edge freed of the background behind it, the subject's own colour carried out to its border (on a new
+# ground, the half-transparent edge kept a grey halo of the old one). Without a tracked body, only the main subject and
+# what is nearly as big stay (a chair or a lamp cut out on its own goes).
 # Usage: python matte.py jobs.json → prints {"<id>": { file, still, frames, keys, seconds } | { error }}.
 # jobs.json: [{ id, src (a local video), from, to (seconds of the clip), out (a path without its extension),
 # track? (the clip's tracks JSON, its frames from the clip's start at 30 i/s) }]. MATTE_MODEL: the ONNX model;
@@ -24,8 +29,8 @@ FPS = 30
 OUT_LONG = 1920
 WORK_WIDE = 540
 # A key image again once the picture has moved this much since the last one (px at 540 wide), and at least every 12 images.
-MOVE = 18.0
-MAX_GAP = 12
+MOVE = 24.0
+MAX_GAP = 15
 # A passage whose whole move stays under this is still: one key image for all of it.
 STILL_MOVE = 24.0
 # The longest passage cut out (a Reel shows a few seconds of a shot).
@@ -99,6 +104,35 @@ def person_gate(bodies, w, h):
     return cv2.GaussianBlur(gate, (grow, grow), 0).astype(np.float32) / 255.0
 
 
+def main_subject(m):
+    """The main subject of a cut-out and what is nearly as big (a second person); a small thing apart goes."""
+    import cv2
+    import numpy as np
+
+    count, labels, stats, _ = cv2.connectedComponentsWithStats((m > 0.5).astype(np.uint8), 8)
+    if count <= 2:
+        return m
+    areas = stats[1:, cv2.CC_STAT_AREA]
+    keep = np.isin(labels, 1 + np.nonzero(areas >= 0.25 * areas.max())[0]).astype(np.uint8)
+    keep = cv2.dilate(keep, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15)))
+    return m * cv2.GaussianBlur(keep.astype(np.float32), (15, 15), 0)
+
+
+def box(x, r):
+    import cv2
+
+    return cv2.boxFilter(x, -1, (2 * r + 1, 2 * r + 1), borderType=cv2.BORDER_REFLECT)
+
+
+def guided(guide, p, r, eps):
+    """He's guided filter: p reshaped to follow the edges of guide (both float32, one channel)."""
+    mean_i, mean_p = box(guide, r), box(p, r)
+    var_i = box(guide * guide, r) - mean_i * mean_i
+    a = (box(guide * p, r) - mean_i * mean_p) / (var_i + eps)
+    b = mean_p - a * mean_i
+    return box(a, r) * guide + box(b, r)
+
+
 def cut(job, session):
     import cv2
     import numpy as np
@@ -161,7 +195,7 @@ def cut(job, session):
             if g is not None:
                 m = m * g
                 last_gate = g
-        km[k] = m
+        km[k] = m if people else main_subject(m)
 
     dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
     grid = np.dstack(np.meshgrid(np.arange(ww), np.arange(wh))).astype(np.float32)
@@ -200,14 +234,30 @@ def cut(job, session):
     # behind her is placed where her head covers only its bottom.
     top = round(float(np.percentile([head_top(m) for m in masks], 20)), 3)
 
-    def alpha(m):
-        # Solid where the model is fairly sure (a body blurred by its own move read at 0.5 stays solid), soft at the edge.
-        a = np.clip((cv2.resize(m, (ow, oh), interpolation=cv2.INTER_LINEAR) - 0.15) / 0.4, 0, 1)
-        return (a * a * (3 - 2 * a) * 255).astype(np.uint8)
+    # The edge at full size: the guided filter's reach and the band where the edge's colours are carried out.
+    reach = max(4, ow // 135)
+    soft = (2 * reach + 1) | 1
+
+    def rgba(f, m):
+        # Its edge on the picture's own edges, then solid where the model is fairly sure (a body blurred by its own move
+        # read at 0.5 stays solid), soft at the edge.
+        light = cv2.cvtColor(f, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
+        up = cv2.resize(m, (ow, oh), interpolation=cv2.INTER_LINEAR).astype(np.float32)
+        snapped = np.clip(guided(light, up, reach, 1e-3), 0, 1)
+        a = np.clip((snapped - 0.22) / 0.38, 0, 1)
+        a = a * a * (3 - 2 * a)
+        # Its edge's colours: the subject's own, just inside, carried out to its border where it is half transparent.
+        solid = (a >= 0.95).astype(np.float32)
+        weight = cv2.blur(solid, (soft, soft))
+        img = f.astype(np.float32)
+        inside = cv2.blur(img * solid[..., None], (soft, soft)) / np.maximum(weight, 1e-3)[..., None]
+        t = (np.clip((0.98 - a) / 0.3, 0, 1) * (weight > 0.04))[..., None]
+        color = img * (1 - t) + inside * t
+        return np.dstack([np.clip(color, 0, 255).astype(np.uint8), (a * 255).astype(np.uint8)])
 
     if still:
         out = f"{job['out']}.png"
-        cv2.imwrite(out, cv2.cvtColor(np.dstack([frames[keys[0]], alpha(masks[0])]), cv2.COLOR_RGBA2BGRA))
+        cv2.imwrite(out, cv2.cvtColor(rgba(frames[keys[0]], masks[0]), cv2.COLOR_RGBA2BGRA))
     else:
         out = f"{job['out']}.webm"
         enc = subprocess.Popen(
@@ -217,7 +267,7 @@ def cut(job, session):
             stdin=subprocess.PIPE,
         )
         for f, m in zip(frames, masks):
-            enc.stdin.write(np.dstack([f, alpha(m)]).tobytes())
+            enc.stdin.write(rgba(f, m).tobytes())
         enc.stdin.close()
         if enc.wait() != 0:
             raise RuntimeError("encodage du détourage impossible")

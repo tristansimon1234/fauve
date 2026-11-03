@@ -125,7 +125,7 @@ const editorRhythm = {
   form: z
     .enum(["montage", "collage", "composition"])
     .describe(
-      "montage: her shots one after the other, full frame; collage: the collage form; composition: her shots laid otherwise than full frame (a split screen, a shot in a frame, several at once); collage and composition: the motion designer composes the whole Reel, written in layers from 0 to the end",
+      "montage: her shots one after the other, full frame; collage: the collage form; composition: her shots laid otherwise than full frame (a split screen, a shot in a frame, several at once, her cut out on another ground: a colour, a photo, another shot); collage and composition: the motion designer composes the whole Reel, written in layers from 0 to the end",
     ),
 };
 
