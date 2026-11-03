@@ -2,7 +2,9 @@ import { after } from "next/server";
 import { z } from "zod";
 import {
   CHAT_MODEL,
+  CLAUDE_MODEL,
   DEFAULT_EFFORT,
+  directorOutputSchema,
   editPlanSchema,
   GEMINI_MODEL_ID,
   isKimiModel,
@@ -840,9 +842,28 @@ async function newMusic(key: string) {
   console.log("lab: new music", key, rendered.renderId);
 }
 
+/**
+ * Whether the API compiles the director's answer into a grammar (a nested composition had been refused, 400 « compiled
+ * grammar is too large »): a few tokens of a call, before a bench makes Reels with it.
+ */
+async function directorGrammar(): Promise<{ ok: boolean; detail: string }> {
+  try {
+    const response = await anthropic().beta.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 16,
+      output_config: { format: outputFormat(directorOutputSchema) },
+      messages: [{ role: "user", content: "Réponds par un plan vide." }],
+    });
+    return { ok: true, detail: String(response.stop_reason) };
+  } catch (error) {
+    return { ok: false, detail: error instanceof Error ? error.message.slice(0, 300) : String(error) };
+  }
+}
+
 export async function POST(request: Request) {
   if (!cronAuthorized(request)) return new Response("unauthorized", { status: 401 });
   const params = new URL(request.url).searchParams;
+  if (params.get("step") === "grammar") return Response.json(await directorGrammar());
   // A Reel to copy, as its reading gets it: its video for an hour, to look at it frame by frame (no studio needed).
   if (params.get("step") === "model") {
     const link = params.get("steal") ?? "";

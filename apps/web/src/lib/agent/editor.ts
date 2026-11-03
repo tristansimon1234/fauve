@@ -968,10 +968,9 @@ export async function designEdit(params: {
   // remakes it (the composition over the whole Reel first of all), never pasted as it is.
   if (house && example) for (const request of requests) request.example = { name: house.name, ...example };
   // The director wrote the composition with its plan: checked like any animation, never written again.
-  const drafted = directed?.answer.composition;
-  if (drafted?.code?.trim()) {
+  if (directed?.answer.composition_code.trim()) {
     const target = requests.find((r) => r.compose);
-    if (target) target.draft = { ...drafted };
+    if (target) target.draft = { code: directed.answer.composition_code, name: directed.answer.composition_name };
     else console.warn("director: a composition for a plan that is not composed, left out", params.postId);
   }
   // A correction: each animation rewritten first looks at how its earlier version came out on her images.

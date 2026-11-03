@@ -1270,9 +1270,10 @@ test("one director for a Reel that follows a model: its answer, the original at 
   const { houseSheets } = await import("./house-sheets.ts");
   // Its answer is the editor's, with a composition and, after a look, keep.
   const shape = Object.keys(directorOutputSchema.shape).sort();
-  assert.deepEqual(shape, ["composition", "keep", "plan", "rationale"]);
-  assert.ok(directorOutputSchema.shape.composition.safeParse(null).success);
-  assert.ok(directorOutputSchema.shape.composition.safeParse({ code: "function Scene() {}", notes: "", name: "Titre", photos: [], fonts: [] }).success);
+  assert.deepEqual(shape, ["composition_code", "composition_name", "keep", "plan", "rationale"]);
+  // Flat and required (a nested composition made the grammar too large), without what the engine sets itself.
+  for (const key of ["captions", "look", "colors", "fonts"]) assert.equal(key in directorOutputSchema.shape.plan.shape, false, key);
+  assert.ok(!directorOutputSchema.shape.keep.isOptional() && !directorOutputSchema.shape.composition_code.isOptional());
   assert.match(DIRECTOR_PROMPT, /never seconds you wrote/);
   assert.match(DIRECTOR_LOOK_NOTE, /keep true/);
   // The same second when the two lengths are close, the same point of it otherwise; never past its end.

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { editorOutputSchema } from "./editor.ts";
-import { motionSceneOutputSchema } from "./motion-scene.ts";
 import { sheetSpan } from "./house-sheets.ts";
 
 // One director for a composed Reel (Tristan: « on a vraiment besoin d'un réalisateur et d'un monteur ? », « il voit
@@ -20,22 +19,27 @@ What you see, before the JSON
 
 Faithful as reel_a_recopier.origine says: the same moments in the same order, the same layout, the same type (its size, weight, case and place), the same pace and about the same length, unless her request changes it; a model dressed in her charter takes her fonts and colours and keeps the rest of the model.
 
-The composition (composition, only for form composition; null otherwise)
+The composition (composition_code, only for form composition; empty otherwise)
 - One component, as the kit says, that lays the shots of YOUR plan in your order (shots[i], each with from and durationInFrames in frames: the engine settles each cut on the beat and around words, and may split a shot where someone pauses, so always read the timing and the number of shots from shots, never seconds you wrote), draws each text of your plan during its moment (reelTexts) and the end, and everything else on screen: the ground, the frames, the type.
-- Write it for the plan of this same answer. composition.name: its name in a few French words (she sees it); composition.notes: its idea in one sentence; photos and fonts as the kit says.
+- Write it for the plan of this same answer. Of the kit's answer you give only the code (composition_code) and its name in a few French words (composition_name, she sees it): no slots, no sounds, no photos besides her shots (a photo of hers is a shot of your plan) and no fonts besides brand.displayFont and brand.bodyFont (the engine sets the model's own on the Reel when it keeps them).
 - It is checked before the Reel is made (each text whole, readable, long enough, off faces, inside the safe zone); one that fails goes to a motion designer with the reason, so write it to pass.`;
 
 /** The turn where the director looks at its Reel as it renders, next to the original. */
 export const DIRECTOR_LOOK_NOTE = `Your Reel as it renders now: each image shows your version on the left and the original at the same point on the right, with the instant. Look at it the way a director looks at a cut before delivering it, as the person who scrolls, on a phone, then as the person who made the original. Does the first image stop the thumb as the original's does? Is each moment of the original there, in its order, with the same layout and the same weight of type? Is every word readable at a glance (its size, its contrast with what is under it), whole, where the original puts it? Does the idea carry every second, or is there a stretch where nothing of it happens? Is a passage of hers wrong for its moment (a shot that does not play the part, too long, too short, off the beat)? Is anything cut, crowded, too small or too slow?
 Fix everything that is wrong, the cuts and the passages included: answer the whole plan and the whole composition again, with keep false. When nothing needs fixing, answer keep true (your plan and code are then kept as they are). These are stills: a word half drawn just after it starts is coming in, not a fault; a title meant to pass behind her that shows in front of her had its cut-out not ready yet.`;
 
-/** The composition the director writes with its plan: the motion designer's answer for it, without slots or sounds. */
-export const directorCompositionSchema = motionSceneOutputSchema.pick({ code: true, notes: true, name: true, photos: true, fonts: true, subtitle_y: true });
-
-/** The director's answer: the editor's plan and rationale, its composition when the Reel is composed, and after a look whether it keeps its Reel. */
-export const directorOutputSchema = editorOutputSchema.extend({
-  composition: directorCompositionSchema.nullable().optional(),
-  keep: z.boolean().optional().describe("After a look at your Reel only: true when nothing needs fixing (plan and composition are then kept as they were)"),
+/**
+ * The director's answer: the editor's plan and rationale, its composition's code and name (empty for a Reel that is not
+ * composed), and after a look whether it keeps its Reel. Flat and required: the editor's schema with a nested composition
+ * was refused (400 « compiled grammar is too large »), and what the engine sets itself on a Reel that follows a model
+ * (its fonts and colours, its look, how what is said is written) is left out of it.
+ */
+export const directorOutputSchema = z.object({
+  plan: editorOutputSchema.shape.plan.omit({ captions: true, look: true, colors: true, fonts: true }),
+  rationale: z.string(),
+  composition_code: z.string().describe("The composition's code when the plan's form is composition, else empty"),
+  composition_name: z.string().describe("Its name in a few French words (she sees it), else empty"),
+  keep: z.boolean().describe("After a look at your Reel only: true when nothing needs fixing (plan and code are then kept as they were); false otherwise"),
 });
 export type DirectorOutput = z.infer<typeof directorOutputSchema>;
 
