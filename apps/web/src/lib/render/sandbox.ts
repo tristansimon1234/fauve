@@ -495,6 +495,8 @@ export type SmokeScene = {
   end?: ComposeEnd | null;
   /** The colours of the picture under it (each shot's, the footage's at some of its frames): a word lost on it is reported. */
   backdrop?: SceneBackdrop;
+  /** Its code reads what is said (`spoken`): the check gives it words said under it and measures whether it writes them. */
+  probeSpoken?: boolean;
   /** Its own brand, when the scenes are checked on several (a tool proven on three charters); else the call's. */
   brand?: Pick<ReelProps["brand"], "name" | "accent" | "accentInk" | "displayFont" | "bodyFont" | "logoUrl">;
 };
@@ -505,7 +507,13 @@ export type SmokeScene = {
  * (what to change, for the motion designer), and what it draws, row by row (`cover`: the rows of
  * the frame, each the share of the subtitles' width it covers on average), for a voice's subtitles.
  */
-export type SceneChecks = { errors: Record<string, string | null>; faces: Record<string, string>; cover: Record<string, number[]> };
+export type SceneChecks = {
+  errors: Record<string, string | null>;
+  faces: Record<string, string>;
+  cover: Record<string, number[]>;
+  /** For a scene whose code reads what is said: the share of the words said it was seen writing at their moment. */
+  spoken?: Record<string, number>;
+};
 
 /**
  * Runs generated motion scenes outside the video: a server render (first, middle,
@@ -529,9 +537,11 @@ export async function smokeTestScenes(
           results?: Record<string, string | null>;
           faces?: Record<string, string>;
           cover?: Record<string, number[]>;
+          spoken?: Record<string, number>;
         } & Record<string, unknown>;
         // A workshop still on the previous checker prints the errors alone.
-        if (parsed.results && typeof parsed.results === "object") return { errors: parsed.results, faces: parsed.faces ?? {}, cover: parsed.cover ?? {} };
+        if (parsed.results && typeof parsed.results === "object")
+          return { errors: parsed.results, faces: parsed.faces ?? {}, cover: parsed.cover ?? {}, ...(parsed.spoken ? { spoken: parsed.spoken } : {}) };
         return { errors: parsed as Record<string, string | null>, faces: {}, cover: {} };
       } catch {
         const output = (await result.output("both").catch(() => "")).slice(-400);

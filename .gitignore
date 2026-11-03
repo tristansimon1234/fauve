@@ -8,3 +8,4 @@ node_modules/
 supabase/.temp/
 supabase/.branches/
 .claude/worktrees/
+__pycache__/

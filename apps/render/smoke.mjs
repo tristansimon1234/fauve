@@ -7,7 +7,8 @@
 // read by its `track`, with look, the Reel's rhythm and look for the camera moves; fonts: the Google Fonts
 // families its code brings besides the brand's two, laid out with them; reelTexts, end: for a composition that
 // draws the whole picture, the Reel's texts it must write at their moment, and its end; backdrop: the colours of the
-// picture under it, each shot's and the footage's at some of its frames, for the words lost on it).
+// picture under it, each shot's and the footage's at some of its frames, for the words lost on it; probeSpoken: its
+// code reads what is said, so it is given words said under it, and how many of them it writes is measured).
 // 1. Each scene is rendered at its first, middle and last frame with React's server
 //    renderer and minimal Remotion shims, which catches crashes and bad output early. Its `track` sees
 //    nothing there: a scene must stand without anyone in the picture (reused over other footage).
@@ -16,7 +17,8 @@
 //    leaves the frame or the safe zone fails the scene. A scene that passes says which
 //    of its texts stay on a face it follows (faces: not a failure, a reason for one more
 //    round of the motion designer), its sentences that do not stay long enough to be
-//    read, its texts drawn too small for a phone and its words lost on the picture under them (in faces too).
+//    read, its texts drawn too small for a phone, its words lost on the picture under them and its words laid behind
+//    a person who hides them (in faces too), and, when its code reads what is said, how much of it it writes (spoken).
 // BROWSER_EXECUTABLE overrides Remotion's own Chrome (local runs).
 import { existsSync, readFileSync } from "node:fs";
 import React from "react";
@@ -116,6 +118,8 @@ const results = {};
 const faces = {};
 // What each scene draws, row by row: where a voice's subtitles leave it room.
 const cover = {};
+// For a scene whose code reads what is said (probeSpoken): the share of the words said it writes at their moment.
+const spoken = {};
 for (const scene of scenes) {
   try {
     const factory = new Function(
@@ -184,6 +188,7 @@ if (browser) {
         ...(scene.reelTexts?.length ? { reelTexts: scene.reelTexts } : {}),
         ...(scene.end ? { end: scene.end } : {}),
         ...(scene.backdrop ? { backdrop: scene.backdrop } : {}),
+        ...(scene.probeSpoken ? { probeSpoken: true } : {}),
       };
       try {
         const composition = await selectComposition({ serveUrl: bundle, id: "SceneCheck", inputProps, puppeteerInstance: browser, browserExecutable, logLevel: "error" });
@@ -200,10 +205,13 @@ if (browser) {
           timeoutInMilliseconds: 60000,
           onBrowserLog: (log) => {
             // Not failures, reasons for one more round: a text on a face, a sentence too quick to read, a text too small, a word lost on the picture.
-            const note = /^FAUVE_(?:FACE|READ|SIZE|INK) (".*")$/.exec(log.text)?.[1];
+            const note = /^FAUVE_(?:FACE|READ|SIZE|INK|HIDDEN) (".*")$/.exec(log.text)?.[1];
             if (note) faces[scene.id] = [faces[scene.id], JSON.parse(note)].filter(Boolean).join("\n");
             const drawn = /^FAUVE_COVER (\[.*\])$/.exec(log.text)?.[1];
             if (drawn) cover[scene.id] = JSON.parse(drawn);
+            // Its code reads what is said: the share of the words said it writes at their moment.
+            const written = /^FAUVE_SPOKEN ([0-9.]+)$/.exec(log.text)?.[1];
+            if (written) spoken[scene.id] = Number(written);
           },
         });
       } catch (error) {
@@ -218,4 +226,4 @@ if (browser) {
     await browser.close({ silent: true });
   }
 }
-console.log(JSON.stringify({ results, faces, cover }));
+console.log(JSON.stringify({ results, faces, cover, spoken }));

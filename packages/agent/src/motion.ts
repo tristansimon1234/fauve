@@ -231,8 +231,27 @@ export type ReelText = {
 };
 export type ReelWord = { w: string; from: number; to: number };
 
-/** An animation's code that writes what is said itself (the words under it, `spoken`). */
-export const writesSpoken = (js: string | undefined) => Boolean(js && /\bspoken\b/.test(js));
+/**
+ * An animation's code that reads what is said (the words under it, `spoken`): its use in the code, never its mere
+ * name in the list of its inputs (the first background replaced in production listed it, used it nowhere, and the
+ * engine's subtitles stepped aside for words nobody wrote). Whether it really writes them is measured by the scene
+ * check (`writes_spoken` of its motion).
+ */
+export function readsSpoken(js: string | undefined): boolean {
+  if (!js) return false;
+  const body = js
+    // The Scene's own inputs: function Scene({ …, spoken }) / const Scene = ({ …, spoken }) =>
+    .replace(/(function\s+Scene\s*|\bScene\s*=\s*(?:function\s*)?)\(\s*\{[^{}]*\}\s*\)/g, "$1()")
+    // and a plain unpacking of its props: const { …, spoken } = props;
+    .replace(/(?:const|let|var)\s*\{[^{}]*\}\s*=\s*props\b\s*;?/g, "");
+  return /\bspoken\b/.test(body);
+}
+
+/** The share of the words said that the scene check must find written at their moment to let the engine's subtitles step aside. */
+export const SPOKEN_WRITTEN = 0.6;
+
+/** An animation that writes what is said itself: it reads `spoken`, and the scene check did not find it leaving words out. */
+export const writesSpoken = (motion: { js?: string; writes_spoken?: boolean } | undefined) => Boolean(motion && readsSpoken(motion.js) && motion.writes_spoken !== false);
 
 type CopyBox = { x: number; y: number; w: number; h: number };
 /** A copied Reel's layer as the render draws it: its cut-outs, its title and its ending, in frames. */
@@ -822,7 +841,7 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
         ...(track.length ? { track } : {}),
         ...(l.motion.fonts?.length ? { fonts: l.motion.fonts } : {}),
         // An animation that writes what is said itself (Captions, around her or behind her): the words under it.
-        ...(writesSpoken(l.motion.js) && words.some((w) => w.from >= from && w.from < from + length)
+        ...(writesSpoken(l.motion) && words.some((w) => w.from >= from && w.from < from + length)
           ? { spoken: words.filter((w) => w.from >= from && w.from < from + length).map((w) => ({ w: w.w, from: w.from - from, to: w.to - from })) }
           : {}),
       },
@@ -869,7 +888,11 @@ export function buildReelProps(plan: EditPlan, inputs: ReelInputs): ReelProps {
     ...(look ? { look: { ...look, matrix: lookMatrix(look) } } : {}),
     ...(lookStamp(look, inputs.today) ? { stamp: lookStamp(look, inputs.today)! } : {}),
     ...(subtitleRow(plan) !== undefined ? { subtitleY: subtitleRow(plan) } : {}),
-    ...(words.length && captionStyle(plan) ? { captions: captionStyle(plan)! } : {}),
+    // An animation that times its own words on what is said without writing it all (a big word per phrase behind her):
+    // the engine writes the rest as the apps' plain subtitles, never a second set of big words over its own.
+    ...(words.length && captionStyle(plan) && !(plan.layers ?? []).some((l) => readsSpoken(l.motion.js) && l.motion.writes_spoken === false)
+      ? { captions: captionStyle(plan)! }
+      : {}),
     ...(layers.length ? { layers } : {}),
     ...(copy ? { copy } : {}),
     ...(overlays.length ? { overlays } : {}),

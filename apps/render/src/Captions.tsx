@@ -80,7 +80,7 @@ const MARGIN = { left: 80, right: 150 };
 const SMALL = 54;
 const STRONG_MAX = { display: 300, serif: 250 };
 
-export function Captions(p: {
+type CaptionsProps = {
   words: SpokenWord[];
   style?: CaptionStyle;
   look?: Partial<CaptionLook>;
@@ -89,9 +89,26 @@ export function Captions(p: {
    * with the top of her head (share of the height): the word sits above it, her head covering only its bottom.
    */
   subjectFor?: (card: CaptionCard) => { node: ReactNode; top: number } | null;
-}) {
-  const frame = useCurrentFrame();
-  const { width, height, fps, durationInFrames } = useVideoConfig();
+};
+
+/** The clock Captions reads: Remotion's in the render, each copy's own in the scene check (one copy per frame). */
+type CaptionHooks = {
+  useCurrentFrame: () => number;
+  useVideoConfig: () => { width: number; height: number; fps: number; durationInFrames: number };
+};
+
+/** Captions bound to a clock (the render's, or the scene check's for each of its copies: else every copy drew frame 0, and nothing). */
+export function makeCaptions(hooks: CaptionHooks) {
+  return function Captions(p: CaptionsProps) {
+    return <CaptionsAt {...p} frame={hooks.useCurrentFrame()} video={hooks.useVideoConfig()} />;
+  };
+}
+
+export const Captions = makeCaptions({ useCurrentFrame, useVideoConfig });
+
+function CaptionsAt(p: CaptionsProps & { frame: number; video: { width: number; height: number; fps: number; durationInFrames: number } }) {
+  const { frame } = p;
+  const { width, height, fps, durationInFrames } = p.video;
   const inherited = useContext(CaptionLookContext);
   const look: CaptionLook = {
     fonts: { display: "Inter", body: "Inter", serif: "Instrument Serif", ...inherited?.fonts, ...p.look?.fonts },
@@ -131,8 +148,10 @@ function Kinetic({ card, frame, look, k, width, height, subject }: { card: Capti
   // Else it fills its side of the band.
   const size = over ? over.size : strong ? fitSize(text, card.face, look, room, STRONG_MAX[card.face] * k, display ? -0.02 : 0) : 0;
   const small = SMALL * k;
-  const lines = (ws: { w: string }[]) => (ws.length ? Math.ceil((ws.map((w) => w.w).join(" ").length * small * 0.56) / room) : 0);
-  const block = behind ? (lines(after) * small * 1.2) / height : ((lines(before) + lines(after)) * small * 1.2 + size * 0.95) / height;
+  const lines = (ws: { w: string }[]) => (ws.length ? Math.ceil((ws.map((w) => w.w).join(" ").length * small * 0.6) / room) : 0);
+  // The big word's letters reach past its tight line (its font's ascent and descent): counted at 1.3 times its size, so
+  // the phrase never runs under the apps' caption (the scene check measured a big word 50 px into it).
+  const block = behind ? (lines(after) * small * 1.2) / height : ((lines(before) + lines(after)) * small * 1.2 + size * 1.3) / height;
   const top = cardTop(look.row, block) * height;
   const align = behind ? "center" : card.align;
   const box: CSSProperties = {

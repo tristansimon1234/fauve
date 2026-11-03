@@ -694,3 +694,70 @@ test("captions: what is said written like a creator, phrase by phrase, its stron
   assert.equal(props.captions, "kinetic");
   assert.equal(buildReelProps({ ...plan, subtitles: false }, { template: "libre", clipUrls: { c1: "https://x/c1.mp4", c2: "https://x/c2.mp4" }, brand: { name: "Studio" } }).captions, undefined);
 });
+
+test("what is said: an animation that only lists `spoken` in its inputs, or times its own words on it, leaves the subtitles to the engine", async () => {
+  const { readsSpoken, writesSpoken, SPOKEN_WRITTEN } = await import("./motion.ts");
+  // Only named among its inputs (the first background replaced in production): it does not read it.
+  assert.equal(readsSpoken("function Scene({ width, height, fps, durationInFrames, brand, texts, photos, cuts, shots, track, spoken }) { return null; }"), false);
+  assert.equal(readsSpoken("const Scene = ({ track, spoken }) => null;"), false);
+  assert.equal(readsSpoken("function Scene(props) { const { width, spoken } = props; return null; }"), false);
+  // Used: it reads it.
+  assert.equal(readsSpoken("function Scene({ spoken }) { return React.createElement(Captions, { words: spoken }); }"), true);
+  assert.equal(readsSpoken("function Scene(props) { return props.spoken.map((w) => w.w); }"), true);
+  // Read, and the check saw it writing the words said: the engine's captions step aside; seen leaving them out, they stay.
+  const js = "function Scene({ spoken }) { return spoken.map((w) => w.w); }";
+  assert.equal(writesSpoken({ js }), true);
+  assert.equal(writesSpoken({ js, writes_spoken: true }), true);
+  assert.equal(writesSpoken({ js, writes_spoken: false }), false);
+  assert.ok(SPOKEN_WRITTEN > 0.5 && SPOKEN_WRITTEN < 1);
+  // A composition that reads it without writing it all keeps the apps' plain subtitles, never a second set of big words.
+  const base = { format: "9:16", duration: 6, template: "libre", segments: [{ clip_id: "c1", in: 0, out: 6, zoom: "none" }], texts: [], images: [], music: null, transitions: "cut", subtitles: true, captions: "kinetic" };
+  const inputs = { template: "libre" as const, clipUrls: { c1: "https://x/c1.mp4" }, brand: { name: "Studio" }, words: { c1: [{ w: "bonjour", start: 0.2, end: 0.6 }, { w: "Lille", start: 0.8, end: 1.2 }] } };
+  const layer = (writes: boolean) => ({ from: 0, to: 6, compose: true, motion: { brief: "her on orange, a big word per phrase behind her", js: "function Scene({ spoken, shots }) { const big = spoken.find((w) => w.w.length > 4); return big ? big.w : null; }", writes_spoken: writes } });
+  const partly = buildReelProps(editPlanSchema.parse({ ...base, layers: [layer(false)] }), inputs);
+  assert.equal(partly.captions, undefined);
+  assert.equal(partly.layers?.[0]?.spoken, undefined);
+  assert.ok(partly.words.length > 0);
+  const whole = buildReelProps(editPlanSchema.parse({ ...base, layers: [layer(true)] }), inputs);
+  assert.equal(whole.captions, "kinetic");
+  assert.ok((whole.layers?.[0]?.spoken?.length ?? 0) > 0);
+});
+
+test("a word behind her: her silhouette from what was tracked hides it on a close-up, not above her head; the probe's words", async () => {
+  const { silhouette, coveredShare, probeSpoken, onlyProbe } = await import("../../../apps/render/src/silhouette.ts");
+  const names = [
+    "nose", "left_eye_inner", "left_eye", "left_eye_outer", "right_eye_inner", "right_eye", "right_eye_outer", "left_ear", "right_ear",
+    "mouth_left", "mouth_right", "left_shoulder", "right_shoulder", "left_elbow", "right_elbow", "left_wrist", "right_wrist", "left_pinky",
+    "right_pinky", "left_index", "right_index", "left_thumb", "right_thumb", "left_hip", "right_hip", "left_knee", "right_knee", "left_ankle",
+    "right_ankle", "left_heel", "right_heel", "left_foot_index", "right_foot_index",
+  ];
+  const body = (at: Record<string, [number, number]>) => ({
+    id: 1,
+    x: 540,
+    y: 900,
+    points: Object.fromEntries(names.map((n) => [n, at[n] ? { x: at[n]![0], y: at[n]![1], visible: true } : { x: 0, y: 0, visible: false }])),
+  });
+  const frame = { left: 0, top: 0, width: 1080, height: 1920 };
+  // A close-up: her face fills the top, her shoulders the width, her hips out of the picture.
+  const close = { hands: [], faces: [], bodies: [body({ nose: [540, 700], left_ear: [700, 650], right_ear: [380, 650], left_shoulder: [960, 1250], right_shoulder: [120, 1250] })] };
+  const shapes = silhouette(close as never, frame);
+  // A big word across her body is hidden; one at the top of the picture, above her hair, reads.
+  assert.ok(coveredShare({ left: 150, top: 1350, right: 930, bottom: 1600 }, shapes, frame) > 0.8);
+  assert.ok(coveredShare({ left: 150, top: 90, right: 930, bottom: 180 }, shapes, frame) < 0.2);
+  // Standing in the middle, small in the picture: a word beside her reads, one across her waist is partly hidden.
+  const standing = { hands: [], faces: [], bodies: [body({ nose: [540, 500], left_shoulder: [610, 620], right_shoulder: [470, 620], left_hip: [590, 950], right_hip: [490, 950], left_knee: [585, 1250], right_knee: [495, 1250], left_ankle: [585, 1550], right_ankle: [495, 1550] })] };
+  const her = silhouette(standing as never, frame);
+  assert.ok(coveredShare({ left: 60, top: 700, right: 400, bottom: 900 }, her, frame) < 0.05);
+  const across = coveredShare({ left: 200, top: 800, right: 880, bottom: 950 }, her, frame);
+  assert.ok(across > 0.1 && across < 0.4);
+  // Nothing tracked: nothing hidden. Outside the box she is drawn in, nothing either.
+  assert.deepEqual(silhouette({ hands: [], faces: [], bodies: [] } as never, frame), []);
+  assert.equal(coveredShare({ left: 150, top: 1350, right: 930, bottom: 1600 }, shapes, { left: 0, top: 0, width: 1080, height: 960 }), 0);
+  // The probe: all different words over the scene, phrases ending on a full stop; a text made of them is left out of the reading checks.
+  const said = probeSpoken(300);
+  assert.equal(new Set(said.map((w) => w.w.replace(".", ""))).size, said.length);
+  assert.ok(said.at(-1)!.to <= 300 && said.length >= 20);
+  assert.ok(said[3]!.w.endsWith("."));
+  assert.equal(onlyProbe("lumière matin boutique"), true);
+  assert.equal(onlyProbe("-20 % sur tout"), false);
+});

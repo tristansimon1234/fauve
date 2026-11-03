@@ -77,6 +77,7 @@ import {
   missesLength,
   houseModel,
   FONT_PAIRS,
+  SPOKEN_WRITTEN,
 } from "@fauve/agent";
 import { outputFormat } from "@fauve/agent/answer";
 import { HOUSE_EXAMPLES } from "@fauve/agent/house-examples";
@@ -946,6 +947,7 @@ export async function designEdit(params: {
         // A composition kept as it was draws what it drew (its texts, or only its shots), and keeps its subtitles' row.
         ...(kept.draws_texts ? { draws_texts: true } : {}),
         ...(kept.subtitle_y !== undefined ? { subtitle_y: kept.subtitle_y } : {}),
+        ...(kept.writes_spoken !== undefined ? { writes_spoken: kept.writes_spoken } : {}),
       };
       return [{ ...l, motion }];
     }
@@ -973,6 +975,8 @@ export async function designEdit(params: {
       // it knows where its faces are, so it sets the row of a voice's subtitles (they had landed on Tristan's eyes).
       ...(l.compose ? { draws_texts: true, draws_end: Boolean(plan.end_card) } : {}),
       ...(l.compose && result.subtitleY !== undefined ? { subtitle_y: result.subtitleY } : {}),
+      // Its code reads what is said: whether the check saw it written (else the engine's subtitles stay).
+      ...(result.spokenShare !== undefined ? { writes_spoken: result.spokenShare >= SPOKEN_WRITTEN } : {}),
     };
     return [{ ...l, motion }];
   });

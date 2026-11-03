@@ -226,6 +226,11 @@ export const editPlanMotionSegmentSchema = z.object({
     draws_end: z.boolean().optional(),
     /** A composition's choice of where the engine sets a voice's subtitles (share of the height): where none of its faces nor texts go. */
     subtitle_y: z.number().min(0.1).max(0.8).optional(),
+    /**
+     * Its code reads what is said (`spoken`): whether the scene check found it writing those words at their moment
+     * (set by the engine; false: it only times its own words on them, and the engine's subtitles stay). It follows its code.
+     */
+    writes_spoken: z.boolean().optional(),
     /** Its sound effects, from its own start (the motion designer's answer): they follow its code, never the browser. */
     sounds: z.array(sfxCueSchema).max(16).optional(),
   }),

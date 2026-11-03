@@ -17,6 +17,7 @@ import {
   type ReelProps,
   type ScenePhoto,
   type TrackPiece,
+  readsSpoken,
 } from "@fauve/agent";
 import { outputFormat, readAnswer } from "@fauve/agent/answer";
 import { GoogleGenAI } from "@google/genai";
@@ -103,6 +104,8 @@ export type SceneResult = {
   subtitleY?: number;
   /** Its sound effects, from its start (seconds), within its length. */
   sounds?: SfxCue[];
+  /** Its code reads what is said: the share of the words said the scene check found written at their moment. */
+  spokenShare?: number;
 };
 
 /** What already exists, so that a new scene takes another idea. */
@@ -437,6 +440,8 @@ function smokeScenes(results: SceneResult[], requestOf: (id: string) => SceneReq
         ...(request.track?.length || request.compose?.shots.some((x) => x.track) ? { ...(request.track?.length ? { track: request.track } : {}), look: context.look } : {}),
         // The colours of the picture under it: a word lost on it goes back to the motion designer.
         ...(request.backdrop ? { backdrop: request.backdrop } : {}),
+        // Its code reads what is said: checked with words said under it, to see whether it writes them.
+        ...(readsSpoken(r.js!) ? { probeSpoken: true } : {}),
       };
     });
 }
@@ -523,7 +528,7 @@ async function checkScenes(
       (e: unknown): SceneChecks => ({ errors: Object.fromEntries(results.map((r) => [r.id, `smoke indisponible : ${String(e)}`])), faces: {}, cover: {} }),
     );
     results = results.map((r) => {
-      if (!r.js || !checks.errors[r.id]) return r;
+      if (!r.js || !checks.errors[r.id]) return checks.spoken?.[r.id] !== undefined && r.js ? { ...r, spokenShare: checks.spoken[r.id] } : r;
       return working.get(r.id) ?? { ...r, js: null, error: checks.errors[r.id]! };
     });
     if (round === 1) break;

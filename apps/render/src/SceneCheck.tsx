@@ -7,9 +7,11 @@ import { makeKit } from "./Kit";
 import { makeType } from "./Type";
 import { makeGraphic } from "./Graphic";
 import { makeEffects } from "./Effects";
+import { makeCaptions } from "./Captions";
 import { compileScene, SCOPE, type SceneComponent } from "./MotionScene";
 import { themeFor } from "./theme";
-import { footageTrack, type Seen, type TrackPiece } from "./track";
+import { inBox, inShape, onlyProbe, probeSpoken as probeWords, silhouette, type Box as PersonBox, type Shape } from "./silhouette";
+import { footageTrack, NOTHING_SEEN, type Seen, type TrackFn, type TrackPiece } from "./track";
 import type { MotionTemplate, ReelProps } from "./types";
 
 // Layout check of a generated motion scene, run by smoke.mjs before the scene
@@ -29,7 +31,12 @@ import type { MotionTemplate, ReelProps } from "./types";
 // on a café's red awning), measured on the colours of her shots given with the scene (`backdrop`). And what it draws,
 // row by row (FAUVE_COVER), for the engine
 // to set a voice's subtitles where the animations leave room (Tristan: « il faut pas masquer
-// mais bien les placer là où ça ne gêne pas les anim et les visages »).
+// mais bien les placer là où ça ne gêne pas les anim et les visages »). A word laid behind
+// her (before Subject) that her silhouette hides is reported too (FAUVE_HIDDEN: the first
+// background replaced in production hid its big words behind her on every close-up). And a
+// scene whose code reads what is said is given words said (probeSpoken) and says how many of
+// them it writes at their moment (FAUVE_SPOKEN): the engine's subtitles step aside only for one
+// that writes them.
 
 /**
  * Where a text may go: 40 px from the sides, 80 from the top, above the bottom quarter (the apps' caption), and 140 px
@@ -58,6 +65,12 @@ const MAX_COPIES = 120;
 const INK_FRAMES = 12;
 /** The footage under an animation at one of its frames stands for the frames this close to it. */
 const INK_REACH = 15;
+/** A word behind her may be hidden while she passes it, not stay hidden: 0.4 s. */
+const HIDDEN_FRAMES = 12;
+/** The share of a word her silhouette may cover before it no longer reads. */
+const HIDDEN_SHARE = 0.4;
+/** How long after its last frame a word said may still be on screen and count as written (its phrase held). */
+const SPOKEN_HOLD = 18;
 
 
 export type SceneCheckProps = {
@@ -80,6 +93,8 @@ export type SceneCheckProps = {
   end?: Parameters<SceneComponent>[0]["end"];
   /** The colours of the picture under it, for the words lost on it. */
   backdrop?: SceneBackdrop;
+  /** Its code reads what is said: it is given words said, and how many of them it writes is measured. */
+  probeSpoken?: boolean;
 };
 
 const FrameContext = createContext(0);
@@ -106,6 +121,11 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
   const Footage = ({ shot, style }: { shot: number; style?: CSSProperties }) => (
     <div data-fauve-shot={shot} style={{ position: "absolute", overflow: "hidden", background: "linear-gradient(160deg, #9a9490, #5f5a57)", ...style }} />
   );
+  // Her cut out: an empty box where it is drawn, marked with its shot (a word laid before it is behind her, and her
+  // silhouette there is read from what was tracked in that shot).
+  const Subject = ({ shot, style }: { shot: number; style?: CSSProperties }) => (
+    <div data-fauve-subject={shot} style={{ position: "absolute", left: 0, top: 0, width, height, ...style }} />
+  );
   const useVideoConfig = () => ({ ...SCOPE.useVideoConfig(), width, height, durationInFrames });
   return {
     ...SCOPE,
@@ -116,9 +136,12 @@ function checkScope(width: number, height: number, durationInFrames: number): ty
     ...makeType({ useCurrentFrame, useVideoConfig }),
     ...makeGraphic({ useCurrentFrame, useVideoConfig }),
     ...makeEffects({ useCurrentFrame, useVideoConfig }),
+    // What is said, on this copy's clock too (its words are measured: does the scene write them?).
+    Captions: makeCaptions({ useCurrentFrame, useVideoConfig }),
     Sequence: Sequence as unknown as typeof SCOPE.Sequence,
     Cutout: Cutout as typeof SCOPE.Cutout,
     Footage: Footage as typeof SCOPE.Footage,
+    Subject: Subject as unknown as typeof SCOPE.Subject,
   };
 }
 
@@ -230,7 +253,7 @@ function blockOf(node: Node, copy: HTMLElement): HTMLElement | null {
  * long they stay and how long they need. A sentence still on screen when the scene ends is left
  * to the montage; one that only grows into a longer one is read as the longer one.
  */
-function tooQuick(frames: number[], step: number, last: number): { text: string; seconds: number; needs: number; from: number }[] {
+function tooQuick(frames: number[], step: number, last: number, skip: (text: string) => boolean): { text: string; seconds: number; needs: number; from: number }[] {
   const seen = new Map<string, number[]>();
   document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
     const frame = Number(copy.dataset.checkFrame);
@@ -249,7 +272,7 @@ function tooQuick(frames: number[], step: number, last: number): { text: string;
     }
     for (const block of blocks) {
       const text = (block.textContent ?? "").replace(/\s+/g, " ").trim();
-      if (text.split(" ").length < 3) continue;
+      if (text.split(" ").length < 3 || skip(text)) continue;
       const at = seen.get(text) ?? [];
       if (at.at(-1) !== frame) at.push(frame);
       seen.set(text, at);
@@ -277,13 +300,13 @@ function tooQuick(frames: number[], step: number, last: number): { text: string;
  * its largest over the scene (an entrance that grows it does not count): its font size times the scale of the
  * transforms above it, in px of the frame. An SVG text, sized in its drawing's units, is read on its boxes.
  */
-function sizes(copy: HTMLElement, largest: Map<string, number>, accents: Set<string>) {
+function sizes(copy: HTMLElement, largest: Map<string, number>, accents: Set<string>, skip: (text: string) => boolean) {
   const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
   const range = document.createRange();
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node.textContent?.replace(/\s+/g, " ").trim();
     const el = node.parentElement;
-    if (!text || !el || (text.match(/\p{L}/gu)?.length ?? 0) < 3 || inDecor(node)) continue;
+    if (!text || !el || (text.match(/\p{L}/gu)?.length ?? 0) < 3 || inDecor(node) || skip(text)) continue;
     let opacity = 1;
     let scale = 1;
     for (let up: HTMLElement | null = el; up && up !== copy; up = up.parentElement) {
@@ -513,6 +536,99 @@ const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => res
 /** Words compared as written: spaces of any kind and case aside. */
 const plain = (s: string) => s.replace(/[\s\u00a0\u202f]+/g, "").toLowerCase();
 
+/** A word hidden behind her: the frames it is, and how much of it at the worst. */
+type Hidden = { text: string; frames: number[]; share: number };
+
+/** Whether `a` is painted under `b` (z-index of their branches under their common ancestor, else their order). */
+function paintedUnder(a: Element, b: Element): boolean {
+  let common: Element | null = b.parentElement;
+  while (common && !common.contains(a)) common = common.parentElement;
+  if (!common || a === common) return false;
+  const branch = (el: Element) => {
+    let x = el;
+    while (x.parentElement && x.parentElement !== common) x = x.parentElement;
+    return x;
+  };
+  const ba = branch(a);
+  const bb = branch(b);
+  const z = (el: Element) => {
+    const style = getComputedStyle(el);
+    return style.position !== "static" && style.zIndex !== "auto" ? Number(style.zIndex) || 0 : 0;
+  };
+  if (z(ba) !== z(bb)) return z(ba) < z(bb);
+  return Boolean(ba.compareDocumentPosition(bb) & Node.DOCUMENT_POSITION_FOLLOWING);
+}
+
+/**
+ * The words of a copy laid behind her (painted before a Subject) that her silhouette hides, read from what was
+ * tracked in her shot placed in the box she is drawn in: more than HIDDEN_SHARE of a word covered.
+ */
+function hiddenBehind(copy: HTMLElement, frame: number, track: TrackFn, found: Map<string, Hidden>) {
+  const markers = Array.from(copy.querySelectorAll<HTMLElement>("[data-fauve-subject]"));
+  if (!markers.length) return;
+  const origin = copy.getBoundingClientRect();
+  const people = markers.flatMap((marker) => {
+    // Her shadow (a faint copy of her, offset): it hides nothing.
+    if (seenOpacity(marker, copy) < 0.5) return [];
+    const r = marker.getBoundingClientRect();
+    const box: PersonBox = { left: r.left - origin.left, top: r.top - origin.top, width: r.width, height: r.height };
+    const shot = Number(marker.dataset.fauveSubject);
+    const seen = box.width > 0 && box.height > 0 && Number.isFinite(shot) ? track(frame, { shot, ...box }) : NOTHING_SEEN;
+    const shapes: Shape[] = silhouette(seen, box);
+    return shapes.length ? [{ marker, box, shapes }] : [];
+  });
+  if (!people.length) return;
+  const range = document.createRange();
+  const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.textContent?.trim();
+    const el = node.parentElement;
+    if (!text || !el || isMark(text) || inDecor(node) || seenOpacity(el, copy) < 0.15) continue;
+    const behind = people.filter((p) => paintedUnder(el, p.marker));
+    if (!behind.length) continue;
+    range.selectNodeContents(node);
+    let points = 0;
+    let covered = 0;
+    for (const r of Array.from(range.getClientRects())) {
+      if (r.width < 1 || r.height < 1) continue;
+      const rect = { left: r.left - origin.left, top: r.top - origin.top, right: r.right - origin.left, bottom: r.bottom - origin.top };
+      // Each point counted once, covered when any of the people it is behind covers it.
+      const step = 10;
+      for (let y = rect.top + step / 2; y < rect.bottom; y += step) {
+        for (let x = rect.left + step / 2; x < rect.right; x += step) {
+          points++;
+          if (behind.some((p) => inBox(p.box, x, y) && p.shapes.some((shape) => inShape(shape, x, y)))) covered++;
+        }
+      }
+    }
+    const share = points ? covered / points : 0;
+    if (share <= HIDDEN_SHARE) continue;
+    const entry = found.get(text) ?? { text, frames: [], share: 0 };
+    if (entry.frames.at(-1) !== frame) entry.frames.push(frame);
+    entry.share = Math.max(entry.share, share);
+    found.set(text, entry);
+  }
+}
+
+/**
+ * The share of the words said (the probe's) a scene writes at their moment: each one looked for in the copies of the
+ * frames it is said, and a little after (its phrase held on screen).
+ */
+function spokenWritten(words: { w: string; from: number; to: number }[], frames: number[], step: number): number {
+  const copies = new Map<number, string>();
+  document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => copies.set(Number(copy.dataset.checkFrame), (copy.textContent ?? "").toLowerCase()));
+  let asked = 0;
+  let written = 0;
+  for (const word of words) {
+    const at = frames.filter((f) => f >= word.from - step && f <= word.to + SPOKEN_HOLD);
+    if (!at.length) continue;
+    asked++;
+    const bare = word.w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+    if (at.some((f) => copies.get(f)?.includes(bare))) written++;
+  }
+  return asked ? written / asked : 1;
+}
+
 /**
  * The Reel's texts a composition does not write: each one is looked for, whole, in the copies of
  * the frames it holds (its words may come one by one, so the fullest copy counts).
@@ -528,13 +644,17 @@ function missingTexts(reelTexts: NonNullable<SceneCheckProps["reelTexts"]>, fram
   });
 }
 
-export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null, backdrop }: SceneCheckProps) {
+export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cuts = [], shots = [], track: pieces, look, fonts = [], reelTexts = [], end = null, backdrop, probeSpoken = false }: SceneCheckProps) {
   const width = 1080;
   const height = 1920;
   const [track] = useState(() => footageTrack(pieces, themeFor(look?.template ?? "libre", look?.signature, look?.tempo), { width, height }, { shots }));
   loadFonts([brand.displayFont, brand.bodyFont, ...fonts]);
   const [handle] = useState(() => delayRender("scene check", { timeoutInMilliseconds: 60000 }));
   const [Scene] = useState(() => compileScene(js, checkScope(width, height, durationInFrames)));
+  // Words said under it, when its code reads them: written by it or not, they are what it is given.
+  const [spoken] = useState(() => (probeSpoken ? probeWords(durationInFrames) : []));
+  // The probe's words are said in time with a voice: never held to a sentence's reading time nor to a title's size.
+  const skip = (text: string) => probeSpoken && onlyProbe(text);
   const step = Math.max(STEP, Math.ceil(durationInFrames / MAX_COPIES));
   const frames: number[] = [];
   for (let f = 0; f < durationInFrames; f += step) frames.push(f);
@@ -555,10 +675,12 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
       const accents = new Set<string>();
       const lost = new Map<string, Ink>();
       const grids = new Map<string, Uint8Array>();
+      const hidden = new Map<string, Hidden>();
       document.querySelectorAll<HTMLElement>("[data-check-frame]").forEach((copy) => {
         const frame = Number(copy.dataset.checkFrame);
         measure(copy, frame, width, height, out, track(frame), onFace);
-        sizes(copy, largest, accents);
+        sizes(copy, largest, accents, skip);
+        hiddenBehind(copy, frame, track, hidden);
         if (backdrop) {
           inks(copy, frame, backdrop, grids, lost);
           marks(copy, frame, backdrop, grids, lost);
@@ -587,7 +709,17 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
           const message = `texte sur un visage de la vidéo : ${detail}. Un texte ne se pose pas sur les yeux, le nez ou la bouche de quelqu'un qu'on voit : lis track(frame).faces et pose-le du côté libre (de l'autre côté de la main, au-dessus de la tête ou plus bas), sans changer l'idée. Sauf si ce que tu poses cache la vidéo à cet endroit (un aplat, une carte : le visage ne se voit plus), ou si l'effet qu'elle a demandé a besoin d'être devant un visage (un mot tenu entre ses doigts, un message posé sur elle comme dans le Reel qu'elle recopie) : alors garde-le.`;
           console.log(`FAUVE_FACE ${JSON.stringify(message)}`);
         }
-        const quick = tooQuick(frames, step, frames.at(-1) ?? 0);
+        const behind = [...hidden.values()].filter((o) => o.frames.length * step > HIDDEN_FRAMES);
+        if (behind.length) {
+          const detail = behind
+            .slice(0, 3)
+            .map((o) => `« ${o.text.slice(0, 40)} » (images ${o.frames[0]} à ${o.frames.at(-1)}, caché à ${Math.round(o.share * 100)} %)`)
+            .join(" ; ");
+          const message = `mot caché derrière la personne : ${detail}. Un mot posé derrière elle (avant Subject) se lit : ${Math.round((1 - HIDDEN_SHARE) * 100)} % de ses lettres au moins se voient à chaque image. Pose-le là où sa silhouette le laisse voir (au-dessus de sa tête, du côté libre : track(frame, box).bodies et .faces, ou SubjectBox, disent où elle est), plus petit ou sur deux lignes s'il le faut ; quand elle remplit l'image (un gros plan), pose-le devant elle (après Subject), loin de son visage. Garde l'idée.`;
+          console.log(`FAUVE_HIDDEN ${JSON.stringify(message)}`);
+        }
+        if (probeSpoken) console.log(`FAUVE_SPOKEN ${spokenWritten(spoken, frames, step).toFixed(2)}`);
+        const quick = tooQuick(frames, step, frames.at(-1) ?? 0, skip);
         if (quick.length) {
           const s = (n: number) => n.toFixed(1).replace(".", ",");
           const detail = quick
@@ -648,7 +780,7 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
         <div key={f} data-check-frame={f} style={{ position: "absolute", left: 0, top: 0, width, height }}>
           <Catch onError={(error) => cancelRender(new Error(`erreur à l'image ${f} : ${error instanceof Error ? error.message : String(error)}`))}>
             <FrameContext.Provider value={f}>
-              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} shots={shots} track={track} reelTexts={reelTexts} end={end} spoken={[]} />
+              <Scene width={width} height={height} fps={30} durationInFrames={durationInFrames} brand={brand} texts={texts} photos={photos} cuts={cuts} shots={shots} track={track} reelTexts={reelTexts} end={end} spoken={spoken} />
             </FrameContext.Provider>
           </Catch>
         </div>

@@ -110,7 +110,11 @@ def person_gate(bodies, w, h):
 
 
 def main_subject(m):
-    """The main subject of a cut-out and what is nearly as big (a second person); a small thing apart goes."""
+    """
+    The main subject of a cut-out and what is nearly as big (a second person); a small thing apart goes, and so does a
+    piece cut by a side of the picture and under half the main one: someone passing at the edge (the arm of one of her
+    « clones » stayed at the right edge of the first background replaced in production).
+    """
     import cv2
     import numpy as np
 
@@ -118,7 +122,14 @@ def main_subject(m):
     if count <= 2:
         return m
     areas = stats[1:, cv2.CC_STAT_AREA]
-    keep = np.isin(labels, 1 + np.nonzero(areas >= 0.25 * areas.max())[0]).astype(np.uint8)
+    main = int(np.argmax(areas))
+    width = m.shape[1]
+    left = stats[1:, cv2.CC_STAT_LEFT]
+    right = left + stats[1:, cv2.CC_STAT_WIDTH]
+    at_side = (left <= 1) | (right >= width - 1)
+    kept = (areas >= 0.25 * areas.max()) & ~(at_side & (areas < 0.5 * areas.max()))
+    kept[main] = True
+    keep = np.isin(labels, 1 + np.nonzero(kept)[0]).astype(np.uint8)
     keep = cv2.dilate(keep, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15)))
     return m * cv2.GaussianBlur(keep.astype(np.float32), (15, 15), 0)
 
