@@ -1,7 +1,7 @@
 import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
-import { gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
+import { gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, smoothOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
 import { reliefOf } from "@fauve/agent";
 import { renderPost } from "@/lib/render/render-post";
 import { dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
@@ -21,7 +21,8 @@ import { adminKeyAuthorized } from "@/lib/test-studio";
 // lib/render/gpu.ts), in the background, its file in {studio}/lab-gpu/ and a 24 h link, its timing and cost in the logs
 // (« gpu subject »), to try the card without a whole Reel. And POST ?action=gpu-objects&…&name=<object>: the same for
 // an object followed by its name (« gpu object »). And POST ?action=gpu-relief&media=<photo>&move=in|out|left|right
-// &seconds=<s>: a photo drawn in relief by its depth (« gpu relief »).
+// &seconds=<s>: a photo drawn in relief by its depth (« gpu relief »). And POST ?action=gpu-slowmo&media=<video>&from=<s>
+// &seconds=<s>: a passage made at 60 i/s by RIFE (« gpu slowmo »).
 
 export const maxDuration = 800;
 
@@ -153,6 +154,33 @@ export async function POST(request: NextRequest) {
       if (card > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "relief", provider: "modal", units: Math.round(card), cost_eur: cost, meta: { lab: true, media, move, frames, gpu: used } });
       const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(path, 86_400)).data?.signedUrl : null;
       console.log("gpu relief", JSON.stringify({ link, media, move, frames, origin: shot.origin, shift: shot.shift, seconds: Math.round(card), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result }));
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
+  }
+  // ?action=gpu-slowmo&media=<video id>&from=<s>&seconds=<s>: a passage made at 60 images a second on the card (RIFE,
+  // rife.py), its file in {studio}/lab-gpu/ (« gpu slowmo »); its first call adds RIFE to the card's PyTorch machine.
+  if (action === "gpu-slowmo") {
+    const media = request.nextUrl.searchParams.get("media") ?? "";
+    const from = Math.max(0, Number(request.nextUrl.searchParams.get("from") ?? "0") || 0);
+    const seconds = Math.min(8, Math.max(0.5, Number(request.nextUrl.searchParams.get("seconds") ?? "2") || 2));
+    if (!/^[0-9a-f-]{36}$/.test(media)) return Response.json({ error: "media=<uuid>&from=<s>&seconds=<s>" }, { status: 400 });
+    if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: row } = await db.from("media_assets").select("studio_id, storage_path, kind").eq("id", media).maybeSingle();
+      if (!row?.storage_path || row.kind !== "video") return console.error("gpu slowmo: no such video", media);
+      const path = `${row.studio_id}/lab-gpu/slowmo-${media}-${from}-${seconds}.mp4`;
+      const [clip, upload] = await Promise.all([
+        db.storage.from("media").createSignedUrl(row.storage_path, 3600),
+        db.storage.from("media").createSignedUploadUrl(path, { upsert: true }),
+      ]);
+      if (!clip.data?.signedUrl || !upload.data?.signedUrl) return console.error("gpu slowmo: links refused");
+      const { results, seconds: card, gpu: used } = await smoothOnGpu([{ key: "lab", url: clip.data.signedUrl, from, seconds, upload: { mp4: upload.data.signedUrl } }], 700_000, { startMs: 600_000 });
+      const result = results.lab;
+      const cost = gpuCostEur(card, used);
+      if (card > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "slowmo", provider: "modal", units: Math.round(card), cost_eur: cost, meta: { lab: true, media, from, seconds, gpu: used } });
+      const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(path, 86_400)).data?.signedUrl : null;
+      console.log("gpu slowmo", JSON.stringify({ link, media, from, seconds, gpu: used, card_seconds: Math.round(card), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result }));
     });
     return Response.json({ ok: true, started: true }, { status: 202 });
   }
