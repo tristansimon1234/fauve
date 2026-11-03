@@ -10,7 +10,7 @@ import { graph, WhatsAppError } from "@/lib/whatsapp/client";
 //   ?action=subscribe           subscribe this app to the WABA's webhooks
 //   ?action=templates           list message templates and their review status
 //   ?action=create_templates    submit Fauve's templates (see whatsappTemplates) for review (&only=a,b: just these)
-// POST with CRON_SECRET (select public.call_app('/api/admin/whatsapp?action=…')): templates and create_templates only.
+// POST with CRON_SECRET (select public.call_app('/api/admin/whatsapp?action=…')): status, templates and create_templates only.
 
 // Must match whatsappTemplates (packages/agent) and the senders in lib/whatsapp/client.ts.
 const TEMPLATE_DEFINITIONS = [
@@ -194,11 +194,11 @@ export async function GET(request: NextRequest) {
   return run(params);
 }
 
-/** The same with CRON_SECRET (pg_net, call_app): to list or submit the templates from the database. */
+/** The same with CRON_SECRET (pg_net, call_app): to read the number's status (its display name review), list or submit the templates from the database. */
 export async function POST(request: NextRequest) {
   if (!cronAuthorized(request)) return new Response("Forbidden", { status: 403 });
   const params = request.nextUrl.searchParams;
-  if (!["templates", "create_templates"].includes(params.get("action") ?? "")) return Response.json({ error: "templates or create_templates only" }, { status: 400 });
+  if (!["status", "templates", "create_templates"].includes(params.get("action") ?? "")) return Response.json({ error: "status, templates or create_templates only" }, { status: 400 });
   return run(params);
 }
 
@@ -249,7 +249,7 @@ async function run(params: URLSearchParams) {
   const [phone, subscriptions] = await Promise.all([
     attempt(() =>
       graph(
-        `${env("WHATSAPP_PHONE_ID")}?fields=display_phone_number,verified_name,name_status,status,quality_rating,code_verification_status,platform_type,messaging_limit_tier`,
+        `${env("WHATSAPP_PHONE_ID")}?fields=display_phone_number,verified_name,name_status,new_name_status,new_display_name,status,quality_rating,code_verification_status,platform_type,messaging_limit_tier`,
       ),
     ),
     attempt(() => graph(`${env("WHATSAPP_WABA_ID")}/subscribed_apps`)),
