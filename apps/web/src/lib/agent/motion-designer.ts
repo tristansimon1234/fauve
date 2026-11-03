@@ -69,6 +69,8 @@ export type SceneRequest = {
   moves?: DesignerMoves | { by_shot: ({ shot: number } & DesignerMoves)[] };
   /** A correction: the animation it reworks as it was rendered on her images (frames with their instant) and its code (what is asked is its request). */
   seen?: { code: string; frames: SceneFrame[] };
+  /** With `seen`: no correction asked, the director's own look at the composition it has just written, before it goes out. */
+  look?: boolean;
   /** A first draft: the Reel as it will come out without the animations being written (frames with their instant), seen before writing. */
   canvas?: SceneFrame[];
   /** The Reel she copies, at the moment this animation remakes: sheets of its frames (ten each), seen before writing. */
@@ -257,7 +259,8 @@ async function writeScene(
     moves: Boolean(request.moves || request.track?.length || request.compose?.shots.some((x) => x.track)),
     composition: Boolean(request.compose),
     words: Boolean(request.words),
-    correction: Boolean(seen),
+    correction: Boolean(seen) && !request.look,
+    look: Boolean(seen) && Boolean(request.look),
     example: Boolean(!fix && request.example),
   };
   const text = fix
@@ -323,7 +326,7 @@ async function writeScene(
         ...(copied ? { model_frames: `${copied.length} sheets of the Reel she copies attached, first: remake how its elements appear, change, move and leave, at its pace, with her images and her words, never its images nor its words` } : {}),
       });
   const shown: string | Block[] = seen
-    ? withFrames("Your earlier animation, rendered on her images:", seen.frames, text)
+    ? withFrames(request.look ? "Your Reel as it renders now, before it goes to her:" : "Your earlier animation, rendered on her images:", seen.frames, text)
     : canvas
       ? withFrames(
           request.compose

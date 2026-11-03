@@ -208,8 +208,8 @@ if (browser) {
           logLevel: "error",
           timeoutInMilliseconds: 60000,
           onBrowserLog: (log) => {
-            // Not failures, reasons for one more round: a text on a face, a sentence too quick to read, a text too small, a word lost on the picture.
-            const note = /^FAUVE_(?:FACE|READ|SIZE|INK|HIDDEN) (".*")$/.exec(log.text)?.[1];
+            // Not failures, reasons for one more round: a text on a face, a sentence too quick to read, a text too small, a word lost on the picture, a text of the Reel not written.
+            const note = /^FAUVE_(?:FACE|READ|SIZE|INK|HIDDEN|MISSING) (".*")$/.exec(log.text)?.[1];
             if (note) faces[scene.id] = [faces[scene.id], JSON.parse(note)].filter(Boolean).join("\n");
             const drawn = /^FAUVE_COVER (\[.*\])$/.exec(log.text)?.[1];
             if (drawn) cover[scene.id] = JSON.parse(drawn);

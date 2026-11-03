@@ -1192,3 +1192,61 @@ test("an object named on a shot written as a variable is looked for on every sho
     ["v1"],
   );
 });
+
+test("Edith's art direction by default: a model her files can make, never one of her last Reels, dressed in her charter", async () => {
+  const { readHousePick, housePickInput, HOUSE_PICK_AVOID } = await import("./house-pick.ts");
+  const { HOUSE_MODELS, houseModel, houseStyle } = await import("./house-models.ts");
+  const { followedLook, followedSignature, stolenStyleSchema } = await import("./steal.ts");
+  // The picker reads every model, her files and the models of her last Reels.
+  const input = JSON.parse(housePickInput({ request: "Six heures du matin, ça grouille.", business: "boulangerie", files: [{ kind: "video", seconds: 8, shows: "pain qui sort du four" }], voice: false, avoid: ["mosaique"] }));
+  assert.equal(input.modeles.length, HOUSE_MODELS.length);
+  assert.deepEqual(input.derniers_modeles, ["mosaique"]);
+  assert.equal(HOUSE_PICK_AVOID, 3);
+  // A model of the catalogue, not one of her last Reels', that her files can fill.
+  assert.equal(readHousePick({ key: "decode", why: "" }, 5, []), "decode");
+  assert.equal(readHousePick({ key: " Decode ", why: "" }, 5, []), "decode");
+  assert.equal(readHousePick({ key: "decode", why: "" }, 5, ["decode"]), null);
+  assert.equal(readHousePick({ key: "none", why: "" }, 5, []), null);
+  assert.equal(readHousePick({ key: "inconnu", why: "" }, 5, []), null);
+  // The card wants 10 files: three are too few.
+  assert.equal(houseModel("carte-feutre")!.files[0], 10);
+  assert.equal(readHousePick({ key: "carte-feutre", why: "" }, 3, []), null);
+  assert.equal(readHousePick({ key: "carte-feutre", why: "" }, 8, []), "carte-feutre");
+  // Picked by Edith, the model wears her charter: her fonts set the Reel, its pairing only offered.
+  const style = stolenStyleSchema.parse(houseStyle(houseModel("decode")!));
+  const chosen = followedFrom("00000000-0000-4000-8000-000000000000", style);
+  const dressed = followedFrom("00000000-0000-4000-8000-000000000000", style, false, true);
+  assert.ok(chosen.fonts && !chosen.dressed);
+  assert.equal(dressed.dressed, true);
+  assert.equal(dressed.fonts, undefined);
+  assert.deepEqual(dressed.pairing, chosen.fonts);
+  assert.ok(Object.keys(followedLook({}, chosen)).length > 0);
+  assert.deepEqual(followedLook({}, dressed), {});
+  assert.match(String(followedForEditor(dressed).police), /polices de sa charte/);
+  assert.match(String(followedForEditor(dressed).origine), /choisi par Edith/);
+  assert.match(followedLine(dressed), /habillé de sa charte/);
+  // Her charter's music stays when she has one; the model's otherwise.
+  const charter = { titles: { font: "display", case: "normal", weight: "bold", align: "center", tracking: "normal" }, stress: "color", band: "white", grade: "natural", base: "light", motion: "chaleureux", music: "warm acoustic guitar", voice: "" } as const;
+  assert.equal(followedSignature(charter, dressed.look, true).music, "warm acoustic guitar");
+  assert.notEqual(followedSignature(charter, chosen.look).music, "warm acoustic guitar");
+});
+
+test("the director's look at its own Reel: its first image, each text coming in and read, each shot, its end, sixteen at most", async () => {
+  const { lookMoments, LOOK_FRAMES } = await import("./rework.ts");
+  const plan = { duration: 10, texts: [{ from: 0, to: 2 }, { from: 4, to: 6 }] } as unknown as Pick<EditPlan, "duration" | "texts">;
+  const moments = lookMoments(plan, [
+    { start: 0, length: 2 },
+    { start: 2, length: 3 },
+    { start: 5, length: 5 },
+  ]);
+  assert.equal(moments[0], 0.2);
+  assert.equal(moments.at(-1), 9.7);
+  // Each text as it comes in and while it reads (60 % of its span), each shot's middle; none closer than 0.35 s to the one before.
+  for (const t of [1.2, 4.2, 5.2, 3.5, 7.5]) assert.ok(moments.some((m) => Math.abs(m - t) < 0.36), `${t} looked at`);
+  for (let i = 1; i < moments.length; i++) assert.ok(moments[i]! - moments[i - 1]! >= 0.35);
+  // A long Reel: sixteen at most, its first and last kept.
+  const long = lookMoments({ duration: 40, texts: [] } as unknown as Pick<EditPlan, "duration" | "texts">, Array.from({ length: 30 }, (_, i) => ({ start: i * 1.3, length: 1.3 })));
+  assert.equal(long.length, LOOK_FRAMES);
+  assert.equal(long[0], 0.2);
+  assert.equal(long.at(-1), 39.7);
+});

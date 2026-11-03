@@ -27,6 +27,8 @@ export type EffortLevel = {
   minutes: string;
   /** The editor's reasoning effort. */
   editorEffort: "medium" | "high";
+  /** How many times the director looks at its own composition (the Reel drawn as it will come out) and fixes it before it goes out. */
+  looks: number;
 };
 
 export const EFFORTS: Record<Effort, EffortLevel> = {
@@ -39,6 +41,7 @@ export const EFFORTS: Record<Effort, EffortLevel> = {
     minutes: "5 à 20",
     // High like the others: Rapide is the default now, only the review is left out.
     editorEffort: "high",
+    looks: 1,
   },
   soigne: {
     label: "Soigné",
@@ -48,6 +51,7 @@ export const EFFORTS: Record<Effort, EffortLevel> = {
     fixRounds: 1,
     minutes: "10 à 30",
     editorEffort: "high",
+    looks: 2,
   },
   max: {
     label: "Max",
@@ -57,6 +61,7 @@ export const EFFORTS: Record<Effort, EffortLevel> = {
     fixRounds: 2,
     minutes: "15 à 40",
     editorEffort: "high",
+    looks: 3,
   },
 };
 

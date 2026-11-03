@@ -349,6 +349,35 @@ async function voiceInput(studioId: string, mediaId: string, cleaned = true): Pr
 }
 
 /**
+ * What a render of this plan needs computed first (the design's look at its own Reel too, so its images show what the
+ * render will): its photos' cut-outs and their outlines, her subject and the objects its compositions follow, the
+ * depth of its shots and its photos in relief. Each is kept on its media, made once, reused by the render.
+ */
+export async function prepareRenderAssets(studioId: string, postId: string, plan: EditPlan): Promise<void> {
+  // Photos have their subject cut out once (an open model in its own sandbox): a collage's, laid as stickers, a
+  // composed Reel's, and those an animation composes with (the design step has usually made them already).
+  const toCut = [
+    ...(plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : [...new Set([...scenePhotoIds(plan), ...depthPhotoIds(plan), ...subjectPhotoIds(plan)])]),
+    ...copyPhotos(plan),
+    // The photos she added cut out (unless she wants them whole).
+    ...(plan.overlays ?? []).flatMap((o) => (o.kind === "photo" && o.media_id && o.cutout !== false ? [o.media_id] : [])),
+  ];
+  if (toCut.length) await ensureCutouts(studioId, toCut);
+  // The photos whose subject an animation draws: their cut-out's outline, read once (a word runs along it).
+  if (subjectPhotoIds(plan).length) await ensureCutoutContours(studioId, subjectPhotoIds(plan));
+  // A composition that draws her subject over her shots (Subject): its passages cut out at every image, as many as
+  // the step has time for before its render.
+  // The objects its compositions follow by name (a cup she lifts), on the rented card, at the same time, the shots
+  // they show in depth (Depth), and its moving photos drawn in relief by their depth.
+  await Promise.all([
+    wantsSubjects(plan) ? ensureSubjects(studioId, postId, plan) : null,
+    wantsObjects(plan) ? ensureObjects(studioId, postId, plan) : null,
+    wantsDepth(plan) ? ensureDepths(studioId, postId, plan) : null,
+    depthPhotoIds(plan).length ? ensureReliefs(studioId, postId, plan).catch((e: unknown) => console.warn("reliefs unavailable", e instanceof Error ? e.message : e)) : null,
+  ]);
+}
+
+/**
  * Renders the post's current edit plan (or the version given, which becomes the
  * current one) to MP4, stores it and links it to the post.
  */
@@ -371,27 +400,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
       .single(),
   ).data!;
   const plan = editPlanSchema.parse(planRow.plan);
-  // Photos have their subject cut out once (an open model in its own sandbox): a collage's, laid as stickers, a
-  // composed Reel's, and those an animation composes with (the design step has usually made them already).
-  const toCut = [
-    ...(plan.template === "collage" || isComposed(plan) ? planMediaIds(plan) : [...new Set([...scenePhotoIds(plan), ...depthPhotoIds(plan), ...subjectPhotoIds(plan)])]),
-    ...copyPhotos(plan),
-    // The photos she added cut out (unless she wants them whole).
-    ...(plan.overlays ?? []).flatMap((o) => (o.kind === "photo" && o.media_id && o.cutout !== false ? [o.media_id] : [])),
-  ];
-  if (toCut.length) await ensureCutouts(studioId, toCut);
-  // The photos whose subject an animation draws: their cut-out's outline, read once (a word runs along it).
-  if (subjectPhotoIds(plan).length) await ensureCutoutContours(studioId, subjectPhotoIds(plan));
-  // A composition that draws her subject over her shots (Subject): its passages cut out at every image, as many as
-  // the step has time for before its render.
-  // The objects its compositions follow by name (a cup she lifts), on the rented card, at the same time, the shots
-  // they show in depth (Depth), and its moving photos drawn in relief by their depth.
-  await Promise.all([
-    wantsSubjects(plan) ? ensureSubjects(studioId, postId, plan) : null,
-    wantsObjects(plan) ? ensureObjects(studioId, postId, plan) : null,
-    wantsDepth(plan) ? ensureDepths(studioId, postId, plan) : null,
-    depthPhotoIds(plan).length ? ensureReliefs(studioId, postId, plan).catch((e: unknown) => console.warn("reliefs unavailable", e instanceof Error ? e.message : e)) : null,
-  ]);
+  await prepareRenderAssets(studioId, postId, plan);
   // She wants the sound cleaned, even where it was not noisy: the cleaned copies are made first.
   if (plan.finish?.sound === "clean" || plan.finish?.sound === "voice")
     await ensureCleanCopies(studioId, planMediaIds(plan), plan.voice?.media_id, { isolate: plan.finish.sound === "voice" });

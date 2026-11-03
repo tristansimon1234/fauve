@@ -349,9 +349,11 @@ export async function postStyle(
   { waitMs = 0, latest = false }: { waitMs?: number; latest?: boolean } = {},
 ): Promise<FollowedStyle | undefined> {
   const db = supabaseAdmin();
-  const { data: post } = await db.from("posts").select("inspiration_id").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  const { data: post } = await db.from("posts").select("inspiration_id, edith_pick").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   const kept = (post?.inspiration_id as string | null) ?? null;
   if (!kept) return undefined;
+  // One of Edith's models she picked as this Reel's form (house-pick.ts): dressed in her charter.
+  const dressed = kept === ((post?.edith_pick as string | null) ?? null);
   // A new montage takes the latest reading of its link (`latest`); a correction or a render keeps the one its Reel was made with.
   const id = latest
     ? await currentReadingOf(studioId, postId, kept).catch((error: unknown) => {
@@ -364,7 +366,7 @@ export async function postStyle(
     const { data: row } = await db.from("inspirations").select("source, style, analysis, created_at").eq("id", id).maybeSingle();
     if (!row) return undefined;
     const style = stolenStyleSchema.safeParse(row.style);
-    if (style.success) return followedFrom(id, style.data, row.source === MODEL_SOURCE);
+    if (style.success) return followedFrom(id, style.data, row.source === MODEL_SOURCE, dressed);
     // Not read yet: no style, or only a model's structure waiting for its reading (never one that missed).
     const kept = row.style as { miss?: unknown } | null;
     const reading = (!kept || !kept.miss) && !row.analysis && Date.now() - Date.parse(row.created_at as string) < READING_MS;

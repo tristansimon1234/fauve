@@ -9,6 +9,7 @@ import {
   EFFECTS_TIMEOUT_MINUTES,
   effectPlan,
   effectWords,
+  DEFAULT_EFFORT,
   EFFORTS,
   effortSchema,
   effortVersions,
@@ -27,6 +28,7 @@ import {
 } from "@fauve/agent";
 import { reviewMontage } from "@/lib/agent/critic";
 import { readContract } from "@/lib/agent/contract";
+import { ensureEdithModel } from "@/lib/agent/house-pick";
 import { MissedCorrection, designEdit } from "@/lib/agent/editor";
 import {
   collectEffects,
@@ -302,6 +304,7 @@ async function runStep(job: Job) {
     }
     try {
       await setQuoteStage(job.quoteId, "design");
+      await edithModelFirst(job);
       if (await voiceFirst(job)) return;
       const edit = await designEdit({ ...designInput(job), effort: job.editorEffort ?? level?.editorEffort });
       await queueJob("montage", {
@@ -348,7 +351,29 @@ const next = (job: Job, patch: Partial<Job>) => queueJob("montage", { ...job, ..
  * the post already has: « repars de zéro » on a Reel made earlier came back as a correction of that version.
  */
 function designInput(job: Job) {
-  return { studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief, maxNewScenes: job.maxNewScenes, format: job.format, contract: job.contract, fresh: !job.correction };
+  return {
+    studioId: job.studioId,
+    postId: job.postId,
+    mediaIds: job.mediaIds,
+    brief: job.brief,
+    maxNewScenes: job.maxNewScenes,
+    format: job.format,
+    contract: job.contract,
+    fresh: !job.correction,
+    // Its level of care: how many times its director looks at the composition before it goes out.
+    looks: EFFORTS[job.effort ?? DEFAULT_EFFORT].looks,
+  };
+}
+
+/**
+ * Edith's art direction by default: a new Reel with no model, no Reel to copy and no form of hers is made in one of
+ * Edith's models, picked once before the voice and the editor (both follow it), dressed in her charter (house-pick.ts).
+ */
+async function edithModelFirst(job: Job): Promise<void> {
+  if (job.correction) return;
+  await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief }).catch((error: unknown) =>
+    console.warn("house pick failed, the Reel is made freely", job.postId, error),
+  );
 }
 
 /** What she fixed for this Reel, read once (it travels with the job to every step). */
@@ -577,6 +602,7 @@ async function backToChain(job: Job, error: unknown) {
 
 async function design(job: Job) {
   await setQuoteStage(job.quoteId, "design");
+  await edithModelFirst(job);
   if (await voiceFirst(job)) return;
   const edit = await designEdit({ ...designInput(job), effort: job.editorEffort ?? EFFORTS[job.effort!].editorEffort });
   const versions: Version[] = [{ planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) }];

@@ -694,12 +694,11 @@ export function SceneCheck({ js, texts, durationInFrames, brand, photos = [], cu
       // A composition that draws the whole picture writes every text of the Reel.
       const missing = missingTexts(reelTexts, frames);
       if (!failures.length && missing.length) {
-        cancelRender(
-          new Error(
-            `texte du Reel absent : ${missing.slice(0, 3).join(" ; ")}. Ta composition écrit chaque texte de reelTexts pendant son moment (from à to), en entier et tel quel, détails d'un message compris (items).`,
-          ),
+        // Read by smoke.mjs: a text of the Reel the composition does not write, for one more round of its author (it
+        // cancelled the check before, a failure smoke.mjs never read: the composition went out without the text).
+        console.log(
+          `FAUVE_MISSING ${JSON.stringify(`texte du Reel absent : ${missing.slice(0, 3).join(" ; ")}. Ta composition écrit chaque texte de reelTexts pendant son moment (from à to), en entier et tel quel, détails d'un message compris (items).`)}`,
         );
-        return;
       }
       if (!failures.length) {
         // Read by smoke.mjs: the texts that stay on a face of the footage, for one more round of the motion designer.

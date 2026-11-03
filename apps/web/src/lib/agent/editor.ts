@@ -52,6 +52,7 @@ import {
   type EditPlan,
   openingCandidates,
   planHook,
+  lookMoments,
   planTimeline,
   askedSounds,
   textsOnShots,
@@ -97,8 +98,8 @@ import { latestReport } from "@/lib/performance";
 import { judgeHooks } from "./hook-judge";
 import { copyCandidate, designCopy } from "./copy-design";
 import { recordToolUses } from "@/lib/tool-maker";
-import { designMotionScenes, type SceneRequest } from "./motion-designer";
-import { showReel } from "./reel-canvas";
+import { designMotionScenes, type SceneRequest, type SceneResult } from "./motion-designer";
+import { reelStills, showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS, modelSheets } from "@/lib/steal";
 import { readySounds } from "@/lib/render/sfx";
@@ -188,6 +189,63 @@ export type DesignedEdit = {
 
 /** A failed composition is tried once more only with this much left in the design step (its limit is 800 s): a call, its check, the rest of the step. */
 const COMPOSE_RETRY_NEEDS_MS = 420_000;
+/** What the director's look at its Reel needs of the step: its images (a minute or two), a call and its check. */
+const LOOK_NEEDS_MS = 420_000;
+/** How long the look's images may take, her cut-outs computed first (a title behind her is judged behind her). */
+const LOOK_IMAGES_MS = 150_000;
+
+/**
+ * The director's look at the composition it has just written (the whole Reel): the Reel drawn at its first image, each
+ * text, each shot and its end, shown to the motion designer with its code (`look`), which answers it fixed or the same.
+ * A new version that passes its check replaces the first one, here and in what the library keeps (`result`).
+ */
+async function lookAtOwnReel(
+  studioId: string,
+  postId: string,
+  plan: EditPlan,
+  request: SceneRequest | undefined,
+  result: SceneResult | undefined,
+  write: (requests: SceneRequest[]) => Promise<SceneResult[]>,
+): Promise<boolean> {
+  const index = (plan.layers ?? []).findIndex((l) => l.compose && l.motion.js);
+  const layer = index >= 0 ? plan.layers![index]! : undefined;
+  if (!layer?.motion.code || !request || !result?.js) return false;
+  if (timeLeft() < LOOK_NEEDS_MS) {
+    console.log("look: no time left in the step, the Reel goes as written", postId, Math.round(timeLeft() / 1000));
+    return false;
+  }
+  const started = Date.now();
+  const timeline = planTimeline(plan).segments;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const frames = await Promise.race([
+    reelStills(studioId, postId, plan, lookMoments(plan, timeline)),
+    new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error("look: images too slow")), LOOK_IMAGES_MS))),
+  ]).finally(() => clearTimeout(timer));
+  if (!frames.length) return false;
+  const again = (await write([{ ...request, canvas: undefined, seen: { code: layer.motion.code, frames }, look: true }]))[0];
+  const seconds = Math.round((Date.now() - started) / 1000);
+  if (!again?.js || !again.code || again.code.trim() === layer.motion.code.trim()) {
+    console.log("look: the director kept its Reel as written", postId, `${seconds} s`, again?.error ?? "");
+    return false;
+  }
+  plan.layers![index] = {
+    ...layer,
+    motion: {
+      ...layer.motion,
+      code: again.code,
+      js: again.js,
+      ...(again.photos?.length ? { photos: again.photos } : {}),
+      ...(again.fonts?.length ? { fonts: again.fonts } : {}),
+      ...(again.sounds?.length ? { sounds: again.sounds } : {}),
+      ...(again.subtitleY !== undefined ? { subtitle_y: again.subtitleY } : {}),
+      ...(again.spokenShare !== undefined ? { writes_spoken: again.spokenShare >= SPOKEN_WRITTEN } : {}),
+    },
+  };
+  // The library keeps the version that went out.
+  Object.assign(result, { code: again.code, js: again.js, ...(again.name ? { name: again.name } : {}), ...(again.slots ? { slots: again.slots } : {}), ...(again.fonts ? { fonts: again.fonts } : {}) });
+  console.log("look: the director fixed its Reel", postId, `${seconds} s`, again.notes ?? "");
+  return true;
+}
 
 /** How long the montage waits for what moves in her videos (its faces, its hands) before the editor cuts. */
 const TRACKS_WAIT_MS = 180_000;
@@ -225,6 +283,8 @@ export async function designEdit(params: {
   format?: ReelFormat;
   /** What she fixed for this Reel: over every default of the editor. */
   contract?: ReelContract;
+  /** How many times the director looks at its new composition before it goes out (its level of care; 1 by default). */
+  looks?: number;
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, recent, report, inspirations, hooks, readyForEditor] = await Promise.all([
@@ -502,7 +562,8 @@ export async function designEdit(params: {
   // What is said written like a creator, her choice for all her Reels or this one: written whenever someone speaks.
   const writeSpoken = captionStyle({ finish }) && (Boolean(spoken) || clips.some((c) => c.analysis.words?.length));
   const toPlan = (answer: EditorOutput | EditorOutputLegacy) => {
-    const read = fromEditorPlan(answer.plan, profile.text_looks ?? []);
+    // A model Edith picked as this Reel's form is always composed: its director draws the whole Reel, then looks at it.
+    const read = fromEditorPlan(followed?.dressed && !correction ? ({ ...answer.plan, form: "composition" } as typeof answer.plan) : answer.plan, profile.text_looks ?? []);
     const written = writeSpoken ? { ...read, subtitles: true } : read;
     const withWritten = keepWrittenAnimations(Object.keys(finish).length ? { ...written, finish } : written, params.fresh ? null : base);
     // A correction that redraws nothing keeps the composition's code as it is: never written again for a voice or a subtitle.
@@ -905,7 +966,11 @@ export async function designEdit(params: {
   // Her cut out at every image, when the composition will want it (her background replaced, a word behind her): made
   // in the cut-out sandbox while the animations are written, instead of after them, so a whole Reel on another ground
   // has the time it needs (the render step finishes what is left).
-  const cutOutAsked = (plan.layers ?? []).some((l) => l.compose && CUT_OUT_WORDS.test(l.motion.brief)) || CUT_OUT_WORDS.test(params.brief ?? "");
+  const cutOutAsked =
+    (plan.layers ?? []).some((l) => l.compose && CUT_OUT_WORDS.test(l.motion.brief)) ||
+    CUT_OUT_WORDS.test(params.brief ?? "") ||
+    // A model of Edith's whose reference composition draws her cut out (a title behind her): the director looks at it with her cut-out.
+    Boolean(example && /\bSubject\b/.test(example.code));
   const earlySubjects = cutOutAsked
     ? ensureSubjects(params.studioId, params.postId, plan, { anticipate: true }).catch((e: unknown) => console.warn("subjects: not ready", e))
     : null;
@@ -1004,6 +1069,21 @@ export async function designEdit(params: {
   });
   if (written.length) plan.layers = written;
   else delete plan.layers;
+
+  // The director looks at its own Reel before it goes out (Tristan: « fait un rendu rapide, regarde les images, corrige
+  // une ou deux fois, puis livre »): a composition written now, drawn as it will come out (her cut-outs computed first,
+  // as the render does), seen by the one who wrote it, which fixes what is off or keeps it. Only while the step has the
+  // time for its images and a call; a look that fails keeps the composition as written.
+  for (let look = 0; composeId && !correction && look < (params.looks ?? 1); look++) {
+    const fixed = await lookAtOwnReel(params.studioId, params.postId, plan, requests.find((r) => r.id === composeId), designed.find((d) => d.id === composeId), (requests) =>
+      designMotionScenes(params.studioId, requests, direction, sceneBrand, kit, sceneContext),
+    ).catch((error: unknown) => {
+      console.warn("look: the director could not look at its Reel, kept as written", params.postId, error);
+      return false;
+    });
+    // Kept as it was: another look would see the same Reel.
+    if (!fixed) break;
+  }
 
   // Every new scene that works joins the studio's library: an animation over her footage can be reused by the
   // next Reels; one made with her photos or over several shots belongs to its Reel (kept for its kit and its name).

@@ -135,3 +135,21 @@ export function canvasMoments(plan: EditPlan, ids: string[]): Map<string, Canvas
   }
   return looks;
 }
+
+/** The most images a look shows (the first image, each text coming in and read, each shot, the end). */
+export const LOOK_FRAMES = 16;
+
+/**
+ * The instants a look at the whole Reel sees: its first image, each text as it comes in (a fifth of a second after it
+ * starts: how it appears) and while it reads, each shot's middle, its end.
+ */
+export function lookMoments(plan: Pick<EditPlan, "duration" | "texts">, timeline: { start: number; length: number }[]): number[] {
+  const end = Math.max(0.3, plan.duration - 0.3);
+  const all = [0.2, ...plan.texts.flatMap((t) => [t.from + 0.2, t.from + (t.to - t.from) * 0.6]), ...timeline.map((s) => s.start + s.length / 2), end]
+    .map((t) => Math.min(end, Math.max(0.2, t)))
+    .sort((a, b) => a - b)
+    .filter((t, i, list) => i === 0 || t - list[i - 1]! >= 0.35);
+  if (all.length <= LOOK_FRAMES) return all;
+  // Evenly among them, the first and the last kept.
+  return Array.from({ length: LOOK_FRAMES }, (_, i) => all[Math.round((i * (all.length - 1)) / (LOOK_FRAMES - 1))]!);
+}

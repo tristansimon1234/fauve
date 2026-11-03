@@ -1,8 +1,8 @@
 import "server-only";
 import { buildReelProps, canvasMoments, dayIn, isMotionSegment, motionTemplateSchema, propsAt, type EditPlan } from "@fauve/agent";
-import { loadMontageInputs } from "@/lib/render/render-post";
+import { loadMontageInputs, prepareRenderAssets } from "@/lib/render/render-post";
 import { reelFramesInSandbox } from "@/lib/render/sandbox";
-import type { SceneRequest } from "./motion-designer";
+import type { SceneFrame, SceneRequest } from "./motion-designer";
 
 // The motion designer sees the Reel before it writes an animation for it (Tristan: « il devrait voir la vidéo
 // complètement »): her shots, the footage under each animation, the Reel's texts and a voice's subtitles, as the Reel
@@ -22,7 +22,10 @@ async function reelProps(studioId: string, postId: string, plan: EditPlan, templ
     ...(inputs.cutouts ? { cutouts: inputs.cutouts } : {}),
     ...(inputs.sceneCutouts ? { sceneCutouts: inputs.sceneCutouts } : {}),
     ...(inputs.copyCutouts ? { copyCutouts: inputs.copyCutouts } : {}),
+    ...(inputs.overlayPhotos ? { overlayPhotos: inputs.overlayPhotos } : {}),
     ...(inputs.depth ? { depth: inputs.depth } : {}),
+    ...(inputs.reliefs && Object.keys(inputs.reliefs).length ? { reliefs: inputs.reliefs } : {}),
+    ...(inputs.subjects && Object.keys(inputs.subjects).length ? { subjects: inputs.subjects } : {}),
     today: dayIn(),
     photoAspects: inputs.photoAspects,
     ...(Object.keys(inputs.tracks).length ? { tracks: inputs.tracks } : {}),
@@ -66,4 +69,26 @@ export async function showReel(studioId: string, postId: string, plan: EditPlan,
     if (shown.length) request.canvas = shown;
   }
   console.log("motion: the Reel shown before writing", postId, `${frames.length} images in ${Math.round((Date.now() - started) / 1000)} s`);
+}
+
+/** The images of a look at the Reel as written: at a phone's half size, the cut-outs drawn (about 450 tokens each, as before writing). */
+const LOOK_SCALE = 0.4;
+/**
+ * The Reel as it will come out, its animations and its composition drawn, at the instants given (seconds): what its
+ * director looks at before it goes to her. What its compositions cut out or follow is computed first, as the render
+ * does (and reused by it), so a title behind her is seen behind her.
+ */
+export async function reelStills(studioId: string, postId: string, plan: EditPlan, times: number[]): Promise<SceneFrame[]> {
+  const started = Date.now();
+  await prepareRenderAssets(studioId, postId, plan).catch((error: unknown) => console.warn("look: cut-outs not ready, the images show without them", error));
+  const props = await reelProps(studioId, postId, plan);
+  const frames = [...new Set(times.map((t) => Math.min(props.durationInFrames - 1, Math.max(0, Math.round(t * 30)))))].sort((a, b) => a - b);
+  if (!frames.length) return [];
+  const images = await reelFramesInSandbox(`look-${postId.slice(0, 8)}-${Date.now()}`, propsAt(props, frames), frames, LOOK_SCALE);
+  const shown = frames.flatMap((f) => {
+    const image = images[f];
+    return image instanceof Buffer ? [{ label: `À ${(f / 30).toFixed(1).replace(".", ",")} s :`, jpeg: image, frame: f }] : [];
+  });
+  console.log("look: the Reel shown to its director", postId, `${shown.length} images in ${Math.round((Date.now() - started) / 1000)} s`);
+  return shown;
 }

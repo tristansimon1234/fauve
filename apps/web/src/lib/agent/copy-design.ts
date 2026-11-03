@@ -52,6 +52,8 @@ export function copyCandidate(followed: FollowedStyle | undefined, contract: Ree
   return Boolean(
     followed &&
       !followed.own &&
+      // A model Edith picked as this Reel's form is directed (its composition written, then looked at), never copied by code.
+      !followed.dressed &&
       followed.measured &&
       copyable(followed.look, followed.measured) &&
       !voice &&
