@@ -4,7 +4,7 @@ import { modalCostUsd, usdToEur } from "@fauve/agent";
 import { ModalClient, type Sandbox } from "modal";
 import { env } from "@/lib/env";
 import { REMOTION_SOURCE_FILES } from "./remotion-source.generated";
-import { HDR_TO_SDR } from "./sandbox";
+import { HDR_TO_SDR, type CutoutReading } from "./sandbox";
 
 // Her video cut out at every image on a graphics card rented by the second (Modal, Tristan: « rétro-engineer ça pour
 // avoir un truc bien », on poof.bg): a Modal sandbox with an A10G is created for the job and ended after it, its image
@@ -17,10 +17,15 @@ import { HDR_TO_SDR } from "./sandbox";
 // up within GPU_START_MS and done by the deadline it is given, or it is ended and the run reports why; a card allotted
 // after we gave up ends itself after a minute without work (idleTimeoutMs). Each step is written to the logs with its
 // time (« gpu … »), the script's own progress lines included, so a slow run shows where its time goes.
+//
+// Two jobs run there, each in its own machine: her video cut out at every image (portrait.py, the portrait model)
+// and the subject of her photos (photo_cut.py, the general model: a person, a dish, a product), one model per job.
 
-/** The model (rembg's ONNX export of BiRefNet-portrait, MIT) and its digest: the image refuses any other file. */
+/** The models (rembg's ONNX exports of BiRefNet, MIT) and their digests: the image refuses any other file. */
 const MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-portrait-epoch_150.onnx";
 const MODEL_SHA256 = "1ba1c8ff5a7bbfadc8d8d13fb11d7be793f91f23d9d466549e37a854f6668f99";
+const GENERAL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-epoch_244.onnx";
+const GENERAL_SHA256 = "58f621f00f5d756097615970a88a791584600dcf7c45b18a0a6267535a1ebd3c";
 
 /** The card's machine: Debian with Python 3.12, its packages pinned (onnxruntime-gpu 1.26 is the last one for CUDA 12). */
 const BASE_IMAGE = "python:3.12-slim-bookworm";
@@ -29,15 +34,19 @@ const IMAGE_COMMANDS = [
   "RUN pip install --no-cache-dir 'onnxruntime-gpu[cuda,cudnn]==1.26.0' 'numpy==1.26.4' 'opencv-python-headless==4.10.0.84'",
   `RUN mkdir -p /models && curl -fsSL -o /models/portrait.onnx ${MODEL_URL} && echo '${MODEL_SHA256}  /models/portrait.onnx' | sha256sum -c -`,
 ];
+/** A model made half precision by onnxruntime's own converter (its input and output kept in 32 bits). */
+const half = (from: string, to: string) =>
+  `python -c "import onnx; from onnxruntime.transformers.float16 import convert_float_to_float16 as half; onnx.save(half(onnx.load('${from}'), keep_io_types=True), '${to}')"`;
 /**
- * The model used: the same in half precision (its weights and its sums in 16 bits, its input and output kept in 32),
- * made once on Modal from the file checked above by onnxruntime's own converter (22 s, a layer of its own on top of
- * the image). On 3 s of the fashion shoot, against the full precision: 0.41 s an image instead of 0.52, 54 s of card
- * instead of 73 (0.020 € instead of 0.028), and the same cut-out (0.03 % apart on average, 0.003 % of its pixels off
- * by more than a tenth).
+ * The models used, in half precision (their weights and their sums in 16 bits), made once on Modal from the files
+ * checked by their digests (a layer each on top of the image, 22 s for the portrait). On 3 s of the fashion shoot,
+ * against the full precision: 0.41 s an image instead of 0.52, 54 s of card instead of 73 (0.020 € instead of 0.028),
+ * and the same cut-out (0.03 % apart on average, 0.003 % of its pixels off by more than a tenth).
  */
-const FP16_COMMANDS = [
-  `RUN pip install --no-cache-dir 'onnx==1.17.0' && python -c "import onnx; from onnxruntime.transformers.float16 import convert_float_to_float16 as half; onnx.save(half(onnx.load('/models/portrait.onnx'), keep_io_types=True), '/models/portrait-fp16.onnx')"`,
+const FP16_COMMANDS = [`RUN pip install --no-cache-dir 'onnx==1.17.0' && ${half("/models/portrait.onnx", "/models/portrait-fp16.onnx")}`];
+/** The general model for her photos: fetched, checked, made half precision, its full-precision file dropped in the same step. */
+const PHOTO_COMMANDS = [
+  `RUN curl -fsSL -o /models/general.onnx ${GENERAL_URL} && echo '${GENERAL_SHA256}  /models/general.onnx' | sha256sum -c - && ${half("/models/general.onnx", "/models/general-fp16.onnx")} && rm /models/general.onnx`,
 ];
 const APP = "fauve";
 /**
@@ -66,6 +75,10 @@ export const gpuReady = () => Boolean(env("MODAL_TOKEN_ID") && env("MODAL_TOKEN_
 export type GpuPassage = { key: string; url: string; from: number; to: number; upload: { webm: string; png: string } };
 /** A passage cut out on the card (its file already sent to its upload link). */
 export type GpuCut = { still: boolean; frames: number; keys: number; people: boolean; top?: number; boxes?: (number[] | null)[] };
+/** A photo to cut out: its media id, the photo (signed), and where its cut-out is sent (signed upload links, WebP and PNG). */
+export type GpuPhoto = { key: string; url: string; upload: { webp: string; png: string } };
+/** A photo cut out on the card (its file already sent), with what it is like, as the cut-out sandbox reads it. */
+export type GpuPhotoCut = { reading: CutoutReading; ext: "webp" | "png" };
 
 /** What `seconds` of the card's sandbox cost, in euros (logged in cost_events); `gpu`: another card tried, or none. */
 export const gpuCostEur = (seconds: number, gpu: string | null = GPU) => usdToEur(modalCostUsd(seconds, CORES, MEMORY_GIB, gpu), env("USD_TO_EUR"));
@@ -101,29 +114,30 @@ async function echo(stream: ReadableStream<string>, say: (line: string) => void)
   return tail;
 }
 
+/** For a test from the admin route: another card (« T4 »…) or none (a machine without a card: it shows whether Modal
+ * starts a machine at all when no card comes), the model in full precision (fp16 false), a longer start. */
+type CardOptions = { gpu?: string | null; fp16?: boolean; startMs?: number };
+
 /**
- * Cuts out each passage at every image on the card (one sandbox for all of them, the model loaded once).
- * `deadlineMs`: the time it may take in all, its start included. Never throws: a passage that was not cut out has
- * its reason as an Error. `seconds`: the time the card ran (what Modal bills), 0 when none was allotted.
+ * Runs one of the card's scripts on its jobs in a machine of its own, created for them and ended after. `envFor` is given
+ * the seconds left when the script starts (it stops on its own when its pace would not finish in time). Never throws:
+ * its readings by job id, or why there are none. `seconds`: the time the card ran (what Modal bills), 0 when none came.
  */
-export async function subjectsOnGpu(
-  passages: GpuPassage[],
+async function onCard(
+  script: "portrait.py" | "photo_cut.py",
+  jobs: { id: string }[],
+  envFor: (secondsLeft: number) => Record<string, string>,
   deadlineMs: number,
-  // For a test from the admin route: another card (« T4 »…) or none (a machine without a card: it shows whether Modal
-  // starts a machine at all when no card comes), the model in full precision (fp16 false), a longer start.
-  options: { gpu?: string | null; fp16?: boolean; startMs?: number } = {},
-): Promise<{ results: Record<string, GpuCut | Error>; seconds: number }> {
+  options: CardOptions,
+): Promise<{ readings: Record<string, Record<string, unknown>> | Error; seconds: number }> {
   const gpu = options.gpu === undefined ? GPU : options.gpu;
   const startMs = options.startMs ?? GPU_START_MS;
-  const fp16 = options.fp16 ?? true;
-  if (!passages.length) return { results: {}, seconds: 0 };
   const started = Date.now();
   const at = () => `${((Date.now() - started) / 1000).toFixed(1)} s`;
   const say = (what: string) => console.log(`gpu ${at()}: ${what}`);
-  const failAll = (error: Error) => Object.fromEntries(passages.map((p) => [p.key, error]));
-  const portrait = REMOTION_SOURCE_FILES["portrait.py"];
-  const matte = REMOTION_SOURCE_FILES["matte.py"];
-  if (!portrait || !matte) return { results: failAll(new Error("portrait.py or matte.py is missing from the render source")), seconds: 0 };
+  const files = ["portrait.py", "matte.py", "photo_cut.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
+  const missing = files.find((f) => !f.text);
+  if (missing) return { readings: new Error(`${missing.name} is missing from the render source`), seconds: 0 };
 
   const client = new ModalClient({ tokenId: env("MODAL_TOKEN_ID"), tokenSecret: env("MODAL_TOKEN_SECRET") });
   const deadline = started + deadlineMs;
@@ -134,10 +148,11 @@ export async function subjectsOnGpu(
   let upAt = 0;
   let over = false;
 
-  const work = async (): Promise<Record<string, GpuCut | Error>> => {
+  const work = async (): Promise<Record<string, Record<string, unknown>>> => {
     const app = await before(upBy, client.apps.fromName(APP, { createIfMissing: true }), "Modal did not answer");
-    const base = client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(IMAGE_COMMANDS);
-    const image = await before(upBy, (fp16 ? base.dockerfileCommands(FP16_COMMANDS) : base).build(app), `its image was not ready after ${startMs / 1000} s`);
+    // One image for both jobs: the portrait model (full and half precision) and the general one (half).
+    const base = client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(IMAGE_COMMANDS).dockerfileCommands(FP16_COMMANDS).dockerfileCommands(PHOTO_COMMANDS);
+    const image = await before(upBy, base.build(app), `its image was not ready after ${startMs / 1000} s`);
     say(`image ready (${image.imageId})`);
     const created = await before(
       upBy,
@@ -159,46 +174,27 @@ export async function subjectsOnGpu(
     upAt = Date.now();
     say(`${gpu ?? "machine without a card"} up (${created.sandboxId})`);
     await created.filesystem.makeDirectory("/work", { createParents: true }).catch(() => undefined);
-    await created.filesystem.writeText(portrait, "/work/portrait.py");
-    await created.filesystem.writeText(matte, "/work/matte.py");
-    const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, upload: p.upload }));
+    for (const f of files) await created.filesystem.writeText(f.text!, `/work/${f.name}`);
     await created.filesystem.writeText(JSON.stringify(jobs), "/work/jobs.json");
     const left = deadline - Date.now();
     if (left < 30_000) throw new Error("no time left to cut out");
-    const run = await created.exec(["python", "-I", "/work/portrait.py", "/work/jobs.json"], {
-      workdir: "/work",
-      timeoutMs: wholeSeconds(left),
-      // PORTRAIT_SECONDS: the script stops on its own (and says why) when its pace would not finish in time.
-      env: { PORTRAIT_MODEL: fp16 ? "/models/portrait-fp16.onnx" : "/models/portrait.onnx", PORTRAIT_WORK: "/work", PORTRAIT_SECONDS: String(Math.floor(left / 1000) - 10), HDR_FILTER: HDR_TO_SDR },
-    });
+    const run = await created.exec(["python", "-I", `/work/${script}`, "/work/jobs.json"], { workdir: "/work", timeoutMs: wholeSeconds(left), env: envFor(Math.floor(left / 1000) - 10) });
     const [stdout, stderr, code] = await Promise.all([run.stdout.readText(), echo(run.stderr, (line) => say(line)), run.wait()]);
     say(`script ended (${code})`);
     const lastLine = stdout.trim().split("\n").at(-1) ?? "";
-    let readings: Record<string, (GpuCut & { uploaded?: boolean }) | { error: string }>;
     try {
-      readings = JSON.parse(lastLine);
+      return JSON.parse(lastLine) as Record<string, Record<string, unknown>>;
     } catch {
-      throw new Error(`cut-out on the card failed (${code}): ${stderr.slice(-400)}`);
+      throw new Error(`the card's script failed (${code}): ${stderr.slice(-400)}`);
     }
-    const results: Record<string, GpuCut | Error> = {};
-    for (const p of passages) {
-      const r = readings[p.key];
-      results[p.key] =
-        !r || "error" in r
-          ? new Error(r && "error" in r ? r.error : "nothing cut out")
-          : !r.uploaded
-            ? new Error("cut-out not sent")
-            : { still: r.still, frames: r.frames, keys: r.keys, people: r.people, ...(typeof r.top === "number" ? { top: r.top } : {}), ...(Array.isArray(r.boxes) ? { boxes: r.boxes } : {}) };
-    }
-    return results;
   };
 
   try {
-    return { results: await before(deadline, work(), `the card was not done after ${Math.round(deadlineMs / 1000)} s`), seconds: upAt ? (Date.now() - upAt) / 1000 : 0 };
+    return { readings: await before(deadline, work(), `the card was not done after ${Math.round(deadlineMs / 1000)} s`), seconds: upAt ? (Date.now() - upAt) / 1000 : 0 };
   } catch (error) {
     const reason = error instanceof Error ? error : new Error(String(error));
     say(`stopped: ${reason.message.slice(0, 300)}`);
-    return { results: failAll(reason), seconds: upAt ? (Date.now() - upAt) / 1000 : 0 };
+    return { readings: reason, seconds: upAt ? (Date.now() - upAt) / 1000 : 0 };
   } finally {
     over = true;
     if (sandbox) await sandbox.terminate().catch(() => undefined);
@@ -206,4 +202,68 @@ export async function subjectsOnGpu(
     else await client.sandboxes.fromName(APP, name).then((s) => s.terminate()).catch(() => undefined);
     client.close();
   }
+}
+
+/** A job's reading as given, or why it has none (its error, or nothing sent). */
+function readingOf(readings: Record<string, Record<string, unknown>> | Error, key: string): Record<string, unknown> | Error {
+  if (readings instanceof Error) return readings;
+  const r = readings[key];
+  if (!r) return new Error("nothing cut out");
+  if (typeof r.error === "string") return new Error(r.error);
+  return r.uploaded ? r : new Error("cut-out not sent");
+}
+
+/**
+ * Cuts out each passage at every image on the card (one machine for all of them, the model loaded once).
+ * `deadlineMs`: the time it may take in all, its start included. Never throws: a passage that was not cut out has
+ * its reason as an Error. `seconds`: the time the card ran (what Modal bills), 0 when none was allotted.
+ */
+export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuCut | Error>; seconds: number }> {
+  if (!passages.length) return { results: {}, seconds: 0 };
+  const fp16 = options.fp16 ?? true;
+  const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, upload: p.upload }));
+  const { readings, seconds } = await onCard(
+    "portrait.py",
+    jobs,
+    (secondsLeft) => ({ PORTRAIT_MODEL: fp16 ? "/models/portrait-fp16.onnx" : "/models/portrait.onnx", PORTRAIT_WORK: "/work", PORTRAIT_SECONDS: String(secondsLeft), HDR_FILTER: HDR_TO_SDR }),
+    deadlineMs,
+    options,
+  );
+  const results: Record<string, GpuCut | Error> = {};
+  for (const p of passages) {
+    const r = readingOf(readings, p.key);
+    results[p.key] =
+      r instanceof Error
+        ? r
+        : {
+            still: Boolean(r.still),
+            frames: Number(r.frames),
+            keys: Number(r.keys),
+            people: Boolean(r.people),
+            ...(typeof r.top === "number" ? { top: r.top } : {}),
+            ...(Array.isArray(r.boxes) ? { boxes: r.boxes as (number[] | null)[] } : {}),
+          };
+  }
+  return { results, seconds };
+}
+
+/**
+ * Cuts out the subject of each photo on the card (the general model, half precision, loaded once): about a second a
+ * photo once the card is up. Never throws, like subjectsOnGpu.
+ */
+export async function photosOnGpu(photos: GpuPhoto[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuPhotoCut | Error>; seconds: number }> {
+  if (!photos.length) return { results: {}, seconds: 0 };
+  const jobs = photos.map((p) => ({ id: p.key, url: p.url, upload: p.upload }));
+  const { readings, seconds } = await onCard("photo_cut.py", jobs, () => ({ PHOTO_MODEL: "/models/general-fp16.onnx", PHOTO_WORK: "/work" }), deadlineMs, options);
+  const results: Record<string, GpuPhotoCut | Error> = {};
+  for (const p of photos) {
+    const r = readingOf(readings, p.key);
+    if (r instanceof Error) {
+      results[p.key] = r;
+      continue;
+    }
+    const reading = Object.fromEntries(Object.entries(r).filter(([k]) => k !== "ext" && k !== "uploaded"));
+    results[p.key] = { reading: reading as CutoutReading, ext: r.ext === "png" ? "png" : "webp" };
+  }
+  return { results, seconds };
 }

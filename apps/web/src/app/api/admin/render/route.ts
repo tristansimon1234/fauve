@@ -1,7 +1,7 @@
 import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
-import { GPU, gpuCostEur, gpuReady, subjectsOnGpu } from "@/lib/render/gpu";
+import { GPU, gpuCostEur, gpuReady, photosOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
 import { renderPost } from "@/lib/render/render-post";
 import { dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -40,6 +40,48 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       return Response.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
+  }
+  // ?action=gpu-photos&media=<id>,<id>…: her photos cut out on the card (the general model), in the background, each
+  // file in {studio}/lab-gpu/photo-<id> (its kept cut-out untouched), one log line each (« gpu photo ») with its link
+  // and the link of the cut-out it already has, to compare; the time and cost in « gpu photos ».
+  if (action === "gpu-photos") {
+    const ids = (request.nextUrl.searchParams.get("media") ?? "").split(",").filter((id) => /^[0-9a-f-]{36}$/.test(id)).slice(0, 10);
+    if (!ids.length) return Response.json({ error: "media=<uuid>,<uuid>… (10 at most)" }, { status: 400 });
+    if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: rows } = await db.from("media_assets").select("id, studio_id, storage_path, kind, cutout").in("id", ids);
+      const photos = (rows ?? []).filter((r) => r.kind === "image" && r.storage_path);
+      if (!photos.length) return console.error("gpu photos: no such photos", ids);
+      const lab = (r: (typeof photos)[number], ext: string) => `${r.studio_id}/lab-gpu/photo-${r.id}.${ext}`;
+      const jobs = (
+        await Promise.all(
+          photos.map(async (r) => {
+            const [src, webp, png] = await Promise.all([
+              db.storage.from("media").createSignedUrl(r.storage_path as string, 3600),
+              db.storage.from("media").createSignedUploadUrl(lab(r, "webp"), { upsert: true }),
+              db.storage.from("media").createSignedUploadUrl(lab(r, "png"), { upsert: true }),
+            ]);
+            return src.data?.signedUrl && webp.data?.signedUrl && png.data?.signedUrl ? [{ key: r.id as string, url: src.data.signedUrl, upload: { webp: webp.data.signedUrl, png: png.data.signedUrl } }] : [];
+          }),
+        )
+      ).flat();
+      const { results, seconds } = await photosOnGpu(jobs, 700_000, { startMs: 600_000 });
+      for (const r of photos) {
+        const result = results[r.id as string];
+        const kept = (r.cutout ?? null) as { path?: string; model?: string } | null;
+        const [link, before] = await Promise.all([
+          result && !(result instanceof Error) ? db.storage.from("media").createSignedUrl(lab(r, result.ext), 86_400).then((x) => x.data?.signedUrl ?? null) : null,
+          kept?.path ? db.storage.from("media").createSignedUrl(kept.path, 86_400).then((x) => x.data?.signedUrl ?? null) : null,
+        ]);
+        console.log("gpu photo", JSON.stringify({ link, before, before_model: kept?.model ?? null, media: r.id, result: result instanceof Error || !result ? (result?.message ?? "nothing") : result.reading }));
+      }
+      const cost = gpuCostEur(seconds);
+      const studio = photos[0]!.studio_id as string;
+      if (seconds > 0) await db.from("cost_events").insert({ studio_id: studio, kind: "cutout", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, photos: jobs.length, gpu: GPU } });
+      console.log("gpu photos", JSON.stringify({ photos: jobs.length, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000 }));
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
   }
   if (action === "gpu-subject") {
     const media = request.nextUrl.searchParams.get("media") ?? "";

@@ -5,8 +5,16 @@ import { z } from "zod";
 // sticker with a white scissor edge. A cut-out is kept on its photo
 // (media_assets.cutout); only a clean one makes a sticker, the others stay prints.
 
-/** The model the cut-outs come from: a new one cuts every photo again. */
+/** The model of the cut-out sandbox (BiRefNet lite, on its CPUs): what a photo gets when the rented card cannot. */
 export const CUTOUT_MODEL = "birefnet-lite";
+/** The model of the rented card (the full BiRefNet, general use, half precision): every new photo's first choice. */
+export const CARD_CUTOUT_MODEL = "birefnet-general";
+
+/**
+ * Whether a photo's cut-out is one of today's (from the card or the sandbox): one from an older model is cut again,
+ * a fine one is never cut again just because the card is now there (no cost for nothing, no wait in a render).
+ */
+export const currentCutout = (model: string | undefined) => model === CARD_CUTOUT_MODEL || model === CUTOUT_MODEL;
 
 const share = z.number().min(0).max(1);
 

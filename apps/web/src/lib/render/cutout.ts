@@ -1,36 +1,48 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { CUTOUT_MODEL, cutEdges, cutoutSchema, sceneWorthy, stickerWorthy, type Cutout, type ReelInputs, type ScenePhoto } from "@fauve/agent";
+import { CARD_CUTOUT_MODEL, CUTOUT_MODEL, currentCutout, cutEdges, cutoutSchema, sceneWorthy, stickerWorthy, type Cutout, type ReelInputs, type ScenePhoto } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cutoutCostEur, cutoutsInSandbox } from "./sandbox";
+import { GPU, GPU_START_MS, gpuCostEur, gpuReady, photosOnGpu } from "./gpu";
 import { costMeta } from "@/lib/cost-scope";
+import { timeLeft } from "@/lib/step-clock";
 
-// Cut-outs: the subject of a photo cut out once in its own sandbox (an open model,
-// never redrawn), kept on the photo (media_assets.cutout) with its image in Storage.
+// Cut-outs: the subject of a photo cut out once (an open model, never redrawn): on the rented card with the full
+// model when it is set up (lib/render/gpu.ts, about a second a photo), else in the cut-out sandbox with the lite one
+// (10 to 30 s a photo), kept on the photo (media_assets.cutout) with its image in Storage.
 // In a collage, a clean one is laid on the Reel as a sticker, the others stay prints;
 // in any Reel, an animation can compose with her photos and their cut-outs.
 
-/** The most photos cut out in one go (each takes 10 to 30 s). */
+/** The most photos cut out in one go (each takes 10 to 30 s in the sandbox). */
 const MAX_PHOTOS = 10;
+/** On the card: its model loaded (5 s) and then a photo (fetched, read, its edge and its WebP made, sent), with room. */
+const CARD_LOAD_MS = 30_000;
+const CARD_PHOTO_MS = 6_000;
 
 /** Where a photo's cut-out is kept (the retention removes it with its photo). */
 export const cutoutPath = (studioId: string, mediaId: string, ext: "webp" | "png") => `${studioId}/cutouts/${mediaId}.${ext}`;
 
 /**
- * Cuts out the subject of the photos that have none yet (or one from an older model).
- * Never fails a render: a photo without its cut-out stays a print.
+ * Cuts out the subject of the photos that have none yet (or one from an older model): on the card first, the
+ * photos it could not do in the cut-out sandbox. Never fails a render: a photo without its cut-out stays a print.
  */
 export async function ensureCutouts(studioId: string, mediaIds: string[]): Promise<void> {
   if (!mediaIds.length) return;
   const db = supabaseAdmin();
   const { data: assets } = await db.from("media_assets").select("id, storage_path, kind, cutout").eq("studio_id", studioId).in("id", mediaIds);
-  const missing = (assets ?? [])
-    .filter((a) => a.kind === "image" && cutoutSchema.safeParse(a.cutout).data?.model !== CUTOUT_MODEL)
-    .slice(0, MAX_PHOTOS);
+  const missing = (assets ?? []).filter((a) => a.kind === "image" && !currentCutout(cutoutSchema.safeParse(a.cutout).data?.model)).slice(0, MAX_PHOTOS);
   if (!missing.length) return;
   const signed = await db.storage.from("media").createSignedUrls(missing.map((a) => a.storage_path as string), 3600);
-  const photos = missing.flatMap((a, i) => (signed.data?.[i]?.signedUrl ? [{ id: a.id as string, url: signed.data[i]!.signedUrl }] : []));
+  let photos = missing.flatMap((a, i) => (signed.data?.[i]?.signedUrl ? [{ id: a.id as string, url: signed.data[i]!.signedUrl }] : []));
   if (!photos.length) return;
+  if (gpuReady()) {
+    const done = await cutOnCard(studioId, photos).catch((error: unknown) => {
+      console.warn("photo cut-outs on the card unavailable, the sandbox takes them", error instanceof Error ? error.message.slice(0, 300) : error);
+      return new Set<string>();
+    });
+    photos = photos.filter((p) => !done.has(p.id));
+    if (!photos.length) return;
+  }
   try {
     const { results, seconds } = await cutoutsInSandbox(`cutout-${randomUUID()}`, photos);
     for (const p of photos) {
@@ -59,6 +71,50 @@ export async function ensureCutouts(studioId: string, mediaIds: string[]): Promi
   } catch (error) {
     console.warn("cut-outs unavailable, the photos stay prints", error instanceof Error ? error.message.slice(0, 300) : error);
   }
+}
+
+/**
+ * The photos cut out on the rented card, each sent straight to its place in Storage and kept on its photo; the ids it
+ * made. Its time is never the whole step's: the sandbox keeps time for the photos it did not do.
+ */
+async function cutOnCard(studioId: string, photos: { id: string; url: string }[]): Promise<Set<string>> {
+  const db = supabaseAdmin();
+  const jobs = (
+    await Promise.all(
+      photos.map(async (p) => {
+        const [webp, png] = await Promise.all((["webp", "png"] as const).map((ext) => db.storage.from("media").createSignedUploadUrl(cutoutPath(studioId, p.id, ext), { upsert: true })));
+        return webp?.data?.signedUrl && png?.data?.signedUrl ? [{ key: p.id, url: p.url, upload: { webp: webp.data.signedUrl, png: png.data.signedUrl } }] : [];
+      }),
+    )
+  ).flat();
+  if (!jobs.length) return new Set();
+  const left = timeLeft();
+  const need = GPU_START_MS + CARD_LOAD_MS + jobs.length * CARD_PHOTO_MS;
+  const { results, seconds } = await photosOnGpu(jobs, Number.isFinite(left) ? Math.max(60_000, Math.min(need, left / 2)) : need);
+  const at = new Date().toISOString();
+  const done = new Set<string>();
+  for (const j of jobs) {
+    const result = results[j.key];
+    if (!result || result instanceof Error) {
+      if (result) console.warn("photo cut-out on the card failed", j.key, result.message);
+      continue;
+    }
+    const cutout: Cutout = { path: cutoutPath(studioId, j.key, result.ext), ...result.reading, sticker: stickerWorthy(result.reading), model: CARD_CUTOUT_MODEL, at };
+    const saved = await db.from("media_assets").update({ cutout }).eq("id", j.key).eq("studio_id", studioId);
+    if (saved.error) console.warn("photo cut-out not kept", j.key, saved.error.message);
+    else done.add(j.key);
+  }
+  // The card's time, billed whether or not it cut out (none when no card was allotted).
+  if (seconds > 0)
+    await db.from("cost_events").insert({
+      studio_id: studioId,
+      kind: "cutout",
+      provider: "modal",
+      units: Math.round(seconds),
+      cost_eur: gpuCostEur(seconds),
+      meta: costMeta({ photos: jobs.length, done: done.size, model: CARD_CUTOUT_MODEL, gpu: GPU }),
+    });
+  return done;
 }
 
 /** A cut-out an animation can use (sceneWorthy: a clean edge, even cut by the photo's frame), kept for this studio. */

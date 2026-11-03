@@ -762,6 +762,14 @@ test("a word behind her: her silhouette from what was tracked hides it on a clos
   assert.equal(onlyProbe("-20 % sur tout"), false);
 });
 
+test("a photo's cut-out from the card or the sandbox is kept, an older one is cut again", async () => {
+  const { currentCutout, CARD_CUTOUT_MODEL, CUTOUT_MODEL } = await import("./cutout.ts");
+  assert.equal(currentCutout(CARD_CUTOUT_MODEL), true);
+  assert.equal(currentCutout(CUTOUT_MODEL), true);
+  assert.equal(currentCutout("u2net"), false);
+  assert.equal(currentCutout(undefined), false);
+});
+
 test("the rented card's price: its card and a sandbox's CPU and memory by the second", async () => {
   const { modalCostUsd } = await import("./pricing.ts");
   // 100 s with an A10G, 2 cores and 8 GiB: about 4.4 cents (the card, then the sandbox's CPU and memory at 3 times the functions' price).
