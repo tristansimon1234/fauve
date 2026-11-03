@@ -41,7 +41,10 @@ def load(path, gpu=True):
     if gpu:
         # The CUDA and cuDNN libraries installed by pip (onnxruntime-gpu[cuda,cudnn]), loaded before the session.
         ort.preload_dlls()
-        session = ort.InferenceSession(path, providers=[("CUDAExecutionProvider", {"cudnn_conv_algo_search": "HEURISTIC"}), "CPUExecutionProvider"])
+        # Errors only: its warnings about shape nodes it cannot fold filled the logs, a dozen lines each run.
+        options = ort.SessionOptions()
+        options.log_severity_level = 3
+        session = ort.InferenceSession(path, options, providers=[("CUDAExecutionProvider", {"cudnn_conv_algo_search": "HEURISTIC"}), "CPUExecutionProvider"])
         if "CUDAExecutionProvider" not in session.get_providers():
             # On a CPU it would take an hour: the app falls back to its own cut-out sandbox instead.
             raise RuntimeError("pas de carte graphique pour le modèle")
