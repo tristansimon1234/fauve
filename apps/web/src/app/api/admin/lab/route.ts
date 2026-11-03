@@ -130,6 +130,36 @@ type LabCase = {
 };
 
 const CASES: Record<string, LabCase> = {
+  // The site's Reels made again by the real chain (Tristan: « les reels qu'on a mis sur la landing on pourra tenter
+  // de les refaire avec le nouveau système ? »): the same clips and the same request as on the landing (work.ts).
+  cafe: {
+    name: "Café Tolbiac",
+    business: "café de spécialité",
+    facts: ["Café de spécialité, Paris 13e", "Espresso et café filtre, grains torréfiés à Paris"],
+    brand: { colors: ["#7A4B2A", "#F3EBDD", "#1F1A17"], fonts: ["Instrument Serif", "Inter Tight"], tone: "chaleureux, complice, tutoiement" },
+    title: "Le premier café",
+    idea: "Le premier café, avec un effet qui surprend.",
+    clips: [41859, 41865, 4992, 796, 810],
+  },
+  bar: {
+    name: "Le Comptoir",
+    business: "bar à cocktails",
+    facts: ["Bar à cocktails, Paris 11e", "Cocktails maison, ouvert le jeudi soir"],
+    brand: { colors: ["#C1121F", "#F5F2EC", "#111111"], fonts: ["Bodoni Moda", "Inter Tight"], tone: "nocturne, élégant, tutoiement" },
+    title: "Le jeudi soir",
+    idea: "Le jeudi soir, en noir et blanc, avec du rouge.",
+    clips: [4043, 4173, 4174, 4295, 4416, 5132, 5133],
+  },
+  procope: {
+    name: "Le Procope",
+    business: "café-restaurant",
+    facts: ["Café-restaurant historique, Paris 6e"],
+    brand: { colors: ["#B4232A", "#F4EDE2", "#1B1B1B"], fonts: ["Syne", "Inter Tight"], tone: "élégant, parisien, tutoiement" },
+    title: "Au Procope",
+    idea: "Le nom « Au Procope » en très grand dans le décor, les passants qui passent devant les lettres, puis une rafale de plans du quartier.",
+    // Tristan's own videos of the street, uploaded with step=upload (2-le-procope-serveur.mp4: people walking past its front).
+    own: ["2-le-procope-serveur.mp4", "1-terrasse-mariniere.mp4", "3-boulangerie-le-viennoise.mp4", "4-rue-passantes-graphic.mp4", "5-feu-pieton-affiches.mp4", "6-passage-pieton-rue.mp4"],
+  },
   pizzeria: {
     name: "Pizzeria Nonna",
     business: "pizzeria",
