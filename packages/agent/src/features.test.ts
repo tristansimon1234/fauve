@@ -22,7 +22,7 @@ import {
   wantsIsolation,
 } from "./speech.ts";
 import { isolationCostUsd } from "./pricing.ts";
-import { mp4Size, needsUpscale } from "./upscale.ts";
+import { mp4Size, needsUpscale, UPSCALE_MAX_WORK, upscaleWork } from "./upscale.ts";
 import { mixFilter, mixGains } from "./mix.ts";
 import { fromEditorPlan, normalizeEditPlan } from "./editor.ts";
 import { depthPhotoIds, reliefFiles, reliefJobs, reliefOf, RELIEF_VERSION } from "./depth.ts";
@@ -423,6 +423,11 @@ test("upscale: only what a Reel would show too large, and an MP4's size read fro
   assert.equal(needsUpscale(1080, 1920), false);
   assert.equal(needsUpscale(720, 1280), false);
   assert.equal(needsUpscale(120, 120), false);
+  // The card's time, by its picture's size: the production run (5 s of 1280 × 720 in 18.4 s) is under the estimate,
+  // a 30 s 480p video from WhatsApp fits, a minute of it does not (it would hold a montage waiting on its reading).
+  assert.ok(upscaleWork(1280, 720, 5.04) > 18.4);
+  assert.ok(upscaleWork(854, 480, 30) <= UPSCALE_MAX_WORK);
+  assert.ok(upscaleWork(854, 480, 60) > UPSCALE_MAX_WORK);
   /** A minimal MP4: ftyp, then moov › trak › tkhd (version 0) with its matrix and its size. */
   const mp4 = (width: number, height: number, turned: boolean) => {
     const box = (kind: string, body: Uint8Array) => {

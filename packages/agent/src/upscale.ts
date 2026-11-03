@@ -8,8 +8,24 @@ import { z } from "zod";
 export const UPSCALE_BELOW = 720;
 /** Nor a picture smaller than this (an icon, a thumbnail): there is nothing to rebuild. */
 export const UPSCALE_FROM = 200;
-/** Nor a video longer than this (seconds): a minute and a half of the card at most. */
+/** Nor a video longer than this (seconds). */
 export const UPSCALE_MAX_SECONDS = 90;
+/**
+ * The card's time for a second of video, per megapixel of its own picture (seconds). Measured in production on an
+ * A10G: 5 s of 1280 × 720 video at 24 images a second drawn in 18.4 s, 4 s per megapixel; at 30 images a second and
+ * with a margin, 5.5.
+ */
+export const UPSCALE_SECONDS_PER_MEGAPIXEL = 5.5;
+/**
+ * The card's time a video may take (seconds): it is enlarged while it is read, and a montage waits for that reading
+ * (4 min at most, editor.ts). A video that would take longer stays as sent: a 480p one up to 53 s, a 360p one up to 90.
+ */
+export const UPSCALE_MAX_WORK = 120;
+
+/** The card's time to enlarge a video of this size and length (seconds of drawing, the card's start apart). */
+export function upscaleWork(width: number, height: number, duration: number): number {
+  return (duration * UPSCALE_SECONDS_PER_MEGAPIXEL * width * height) / 1e6;
+}
 
 /** Whether a photo or a video of this size is enlarged. */
 export function needsUpscale(width: number, height: number): boolean {

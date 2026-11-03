@@ -264,8 +264,10 @@ export async function designEdit(params: {
     : new Map<string, string>();
   const photoIds = mediaIds.filter((id) => kinds.get(id) === "image");
   const videoIds = mediaIds.filter((id) => kinds.get(id) !== "image");
+  // A video still being read is waited for 4 min: its reading may include its enlargement on the card (a 480p one,
+  // up to 2 min of it) and its steadying; without its reading, the montage would leave it out.
   const [analyses, photoReads] = await Promise.all([
-    Promise.all(videoIds.map((id) => ensureClipAnalysis(params.studioId, id))),
+    Promise.all(videoIds.map((id) => ensureClipAnalysis(params.studioId, id, { waitMs: 240_000 }))),
     Promise.all(photoIds.map((id) => photoRegions(params.studioId, id).catch(() => null))),
   ]);
   let clips = analyses.flatMap((a) => ("analysis" in a ? [{ media_id: a.media_id, analysis: a.analysis }] : []));

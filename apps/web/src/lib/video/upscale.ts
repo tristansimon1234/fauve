@@ -1,5 +1,5 @@
 import "server-only";
-import { needsUpscale, UPSCALE_MAX_SECONDS } from "@fauve/agent";
+import { needsUpscale, UPSCALE_MAX_SECONDS, UPSCALE_MAX_WORK, upscaleWork } from "@fauve/agent";
 import { costMeta } from "@/lib/cost-scope";
 import { GPU_START_MS, gpuCostEur, gpuReady, upscaleOnGpu } from "@/lib/render/gpu";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -13,14 +13,14 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 /** Where a photo's or a video's larger copy is kept. */
 export const upscaledPath = (studioId: string, mediaId: string, ext: "mp4" | "jpg") => `${studioId}/upscaled/${mediaId}.${ext}`;
 
-/** On the card: Real-ESRGAN loaded (1 s) and the file fetched, then a photo (a second) or a second of video (about a second). */
+/** On the card: Real-ESRGAN loaded (1 s) and the file fetched, then a photo (6 s in production) or a video (upscaleWork). */
 const LOAD_MS = 30_000;
 const PHOTO_MS = 15_000;
-const VIDEO_MS_PER_SECOND = 3_000;
 
 /**
- * Enlarges the photo or the video when its short side is under 720 px (and over 200, a video of 90 s at most): its
- * larger copy then takes its place. The new storage path, or null when it is left as it is.
+ * Enlarges the photo or the video when its short side is under 720 px (and over 200; a video of 90 s at most, and
+ * of 2 min of the card at most): its larger copy then takes its place. The new storage path, or null when it is left
+ * as it is.
  */
 export async function upscaleIfSmall(
   asset: { id: string; studio_id: string; storage_path: string; original_path?: string | null },
@@ -29,7 +29,8 @@ export async function upscaleIfSmall(
   duration?: number,
 ): Promise<{ storage_path: string; original_path: string } | null> {
   if (!gpuReady() || !size || !needsUpscale(size.width, size.height)) return null;
-  if (kind === "video" && duration !== undefined && duration > UPSCALE_MAX_SECONDS) return null;
+  const work = kind === "video" ? upscaleWork(size.width, size.height, duration ?? 30) : 0;
+  if (kind === "video" && ((duration ?? 0) > UPSCALE_MAX_SECONDS || work > UPSCALE_MAX_WORK)) return null;
   const db = supabaseAdmin();
   const path = upscaledPath(asset.studio_id, asset.id, kind === "video" ? "mp4" : "jpg");
   try {
@@ -38,7 +39,7 @@ export async function upscaleIfSmall(
       db.storage.from("media").createSignedUploadUrl(path, { upsert: true }),
     ]);
     if (!source.data?.signedUrl || !upload.data?.signedUrl) throw new Error("links refused");
-    const deadline = GPU_START_MS + LOAD_MS + (kind === "video" ? Math.max(10, duration ?? 30) * VIDEO_MS_PER_SECOND : PHOTO_MS);
+    const deadline = GPU_START_MS + LOAD_MS + (kind === "video" ? Math.max(15_000, 1.5 * work * 1000) : PHOTO_MS);
     const { results, seconds, gpu } = await upscaleOnGpu(
       [{ key: asset.id, url: source.data.signedUrl, kind, upload: kind === "video" ? { mp4: upload.data.signedUrl } : { jpg: upload.data.signedUrl } }],
       deadline,
