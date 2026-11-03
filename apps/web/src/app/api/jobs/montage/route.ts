@@ -28,7 +28,7 @@ import {
 } from "@fauve/agent";
 import { reviewMontage } from "@/lib/agent/critic";
 import { readContract } from "@/lib/agent/contract";
-import { ensureEdithModel } from "@/lib/agent/house-pick";
+import { ensureCopyCharter, ensureEdithModel } from "@/lib/agent/house-pick";
 import { MissedCorrection, designEdit } from "@/lib/agent/editor";
 import {
   collectEffects,
@@ -374,6 +374,8 @@ async function edithModelFirst(job: Job): Promise<void> {
   await ensureEdithModel({ studioId: job.studioId, postId: job.postId, mediaIds: job.mediaIds, brief: job.brief }).catch((error: unknown) =>
     console.warn("house pick failed, the Reel is made freely", job.postId, error),
   );
+  // A Reel she copies stays faithful to it unless she asked for her own look on it.
+  await ensureCopyCharter({ studioId: job.studioId, postId: job.postId, brief: job.brief }).catch((error: unknown) => console.warn("copy charter not read", job.postId, error));
 }
 
 /** What she fixed for this Reel, read once (it travels with the job to every step). */

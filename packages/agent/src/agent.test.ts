@@ -4021,16 +4021,22 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
 
   const style = { look, measures: { duration: 10, cuts: [2, 4, 6, 8], bpm: null, lufs: -14 } };
   const followed = followedFrom("11111111-2222-4333-8444-555555555555", style);
-  // Its font is set on the plan for this Reel (its titles in that font); a font this request chose stays.
-  assert.deepEqual(followedLook({}, followed), { fonts: { display: "Anton" } });
-  assert.deepEqual(followedLook({ fonts: { display: "Bangers" } }, followed), {});
+  // A faithful copy (Tristan: « la DA s'applique s'il demande »): its font and its colours are set on the plan for
+  // this Reel; a font or colours this request chose stay.
+  assert.deepEqual(followedLook({}, followed), { fonts: { display: "Anton" }, colors: ["#ffdd00", "#ffffff", "#000000"] });
+  assert.deepEqual(followedLook({ fonts: { display: "Bangers" }, colors: ["#123456"] }, followed), {});
   assert.deepEqual(followedLook({ fonts: { body: "Inter" } }, followed).fonts, { body: "Inter", display: "Anton" });
   assert.deepEqual(followedLook({}, undefined), {});
   assert.deepEqual(followedLook({}, followedFrom(followed.inspiration_id, { ...style, look: clampLook({ ...reading, text: { ...reading.text, font: "" }, colors: [] }) })), {});
-  // Its colours are offered to the editor, never set by the engine: the blue of a tutorial's interface had gone onto a hook whose charter says « never a cold blue ».
+  // Her charter asked on the copy (« avec mes couleurs »): dressed, nothing of the model's look on the plan.
+  assert.deepEqual(followedLook({}, followedFrom(followed.inspiration_id, style, false, true)), {});
   assert.match(followedForEditor(followed).police ?? "", /Anton.*fait son style/);
-  assert.match(followedForEditor(followed).couleurs ?? "", /#ffdd00.*Prends-les dans « colors » si elles servent ce Reel/);
-  assert.match(EDITOR_SYSTEM_PROMPT, /its colours are yours to take or leave/);
+  assert.match(followedForEditor(followed).couleurs ?? "", /#ffdd00.*celles de ce Reel, fidèle au modèle/);
+  assert.match(EDITOR_SYSTEM_PROMPT, /a copy is faithful, in her charter only when she asks/);
+  assert.match(followedLine(followed), /le style du modèle décide/);
+  const { OWN_LOOK_WORDS } = await import("./house-pick.ts");
+  for (const asked of ["Fais-le avec mes couleurs", "à ma charte stp", "garde ma police", "aux couleurs de mon salon, à mon style"]) assert.ok(OWN_LOOK_WORDS.test(asked), asked);
+  for (const not of ["Refais ce Reel", "les couleurs du modèle", "une police plus grosse"]) assert.ok(!OWN_LOOK_WORDS.test(not), not);
   const { fromEditorPlan } = await import("./editor.ts");
   const written = { duration: 6, tempo: 100, form: "montage" as const, segments: [{ clip_id: "c1", in: 0, out: 6, move: "none", speed: 1 }], texts: [], transitions: "cut" as const, subtitles: false };
   assert.deepEqual(fromEditorPlan({ ...written, colors: ["#FFDD00", "jaune", "#ffdd00", "#000000"] }).colors, ["#ffdd00", "#000000"]);
@@ -4043,7 +4049,7 @@ test("DA liberties: the copied Reel's font and colours when they make its style,
   const split = { ...followed, look: { ...followed.look, layout: "écran partagé : la personne en bas, la démo en haut" } };
   assert.match(followedForEditor(split).mise_en_page ?? "", /écran partagé.*composition/);
   assert.match(followedLine(split), /mise en page : écran partagé/);
-  assert.match(followedLine(followed), /sa police \(Anton\).*ses couleurs \(#ffdd00.*seulement si elles servent ce Reel.*jamais un défaut/);
+  assert.match(followedLine(followed), /sa police \(Anton\).*ses couleurs \(#ffdd00.*celles de ce Reel, fidèle au modèle, jamais un défaut/);
   // She is told in a few words what her Reel takes from it: its font when it makes its style.
   assert.match(stolenStyleMessage(style, true), /sa police/);
   const plain = { ...look, text: { ...oldText }, colors: undefined };

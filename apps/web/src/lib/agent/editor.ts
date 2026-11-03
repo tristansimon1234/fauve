@@ -672,7 +672,9 @@ export async function designEdit(params: {
   // other forms by the hook judge, who keeps the strongest (an opening animation is its own hook).
   const hook = planHook(plan);
   const opener = plan.segments[0];
-  if (hook && !hook.text.items?.length && opener && isClipSegment(opener) && !correction && !params.contract?.screen_text) {
+  // Never on a Reel she copies: its hook is the model's form, made with her words (« plus de règles en cas de recopiage »).
+  const faithfulCopy = Boolean(followed && !followed.dressed);
+  if (hook && !hook.text.items?.length && opener && isClipSegment(opener) && !correction && !params.contract?.screen_text && !faithfulCopy) {
     const clip = clips.find((c) => c.media_id === opener.clip_id);
     const firstImage = clip
       ? (clip.analysis.shots.find((shot) => opener.in >= shot.start && opener.in < shot.end)?.description ?? clip.analysis.summary)

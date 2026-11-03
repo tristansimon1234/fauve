@@ -349,11 +349,12 @@ export async function postStyle(
   { waitMs = 0, latest = false }: { waitMs?: number; latest?: boolean } = {},
 ): Promise<FollowedStyle | undefined> {
   const db = supabaseAdmin();
-  const { data: post } = await db.from("posts").select("inspiration_id, edith_pick").eq("id", postId).eq("studio_id", studioId).maybeSingle();
+  const { data: post } = await db.from("posts").select("inspiration_id, edith_pick, copy_charter").eq("id", postId).eq("studio_id", studioId).maybeSingle();
   const kept = (post?.inspiration_id as string | null) ?? null;
   if (!kept) return undefined;
-  // One of Edith's models she picked as this Reel's form (house-pick.ts): dressed in her charter.
-  const dressed = kept === ((post?.edith_pick as string | null) ?? null);
+  // Dressed in her charter: one of Edith's models Edith picked as this Reel's form (house-pick.ts), or a Reel she copies
+  // when she asked for her own look on it (« avec mes couleurs »); otherwise the copy is faithful, its look its model's.
+  const dressed = kept === ((post?.edith_pick as string | null) ?? null) || post?.copy_charter === true;
   // A new montage takes the latest reading of its link (`latest`); a correction or a render keeps the one its Reel was made with.
   const id = latest
     ? await currentReadingOf(studioId, postId, kept).catch((error: unknown) => {

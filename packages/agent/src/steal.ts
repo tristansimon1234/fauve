@@ -620,9 +620,19 @@ export function signatureOf(profile: { signature?: BrandSignature; followed?: Fo
  * every copy, the blue of a tutorial's interface had gone onto the hook of a studio whose charter
  * says « never a cold blue », next to its orange animations.
  */
-export function followedLook(plan: { fonts?: { display?: string; body?: string } }, followed: FollowedStyle | undefined): { fonts?: { display?: string; body?: string } } {
-  // A model Edith dressed in her charter: her fonts set the Reel (its pairing is only offered to the animation).
+export function followedLook(
+  plan: { fonts?: { display?: string; body?: string }; colors?: string[] },
+  followed: FollowedStyle | undefined,
+): { fonts?: { display?: string; body?: string }; colors?: string[] } {
+  // Dressed in her charter (a model Edith picked, or her own look asked on a copy): her fonts and colours set the Reel.
   if (followed?.dressed) return {};
+  // A faithful copy (Tristan: « la DA s'applique s'il demande »): the copied Reel's colours too, unless the editor wrote this Reel's own.
+  const colors = !plan.colors?.length && followed?.look.colors?.length ? { colors: followed.look.colors.slice(0, 3) } : {};
+  return { ...followedFonts(plan, followed), ...colors };
+}
+
+/** The copied Reel's fonts on the plan: a model of Edith's in its pairing, a sent Reel in its title font (a font this request chose stays). */
+function followedFonts(plan: { fonts?: { display?: string; body?: string } }, followed: FollowedStyle | undefined): { fonts?: { display?: string; body?: string } } {
   // A model of Edith's is set in its pairing, both faces (a face this request chose stays).
   const pair = followed?.fonts;
   if (pair) {
@@ -643,8 +653,8 @@ function offeredColors(look: StolenLook, reader: "editor" | "critic"): string | 
   if (!look.colors?.length) return null;
   const colors = look.colors.join(", ");
   return reader === "editor"
-    ? `${colors} : celles de ses textes et de ses formes. Prends-les dans « colors » si elles servent ce Reel et sa demande, à côté de sa charte ; sinon sa charte garde les siennes`
-    : `ses couleurs (${colors}) : prises par le monteur seulement si elles servent ce Reel, sa charte sinon, jamais un défaut`;
+    ? `${colors} : celles de ses textes et de ses formes, et donc celles de ce Reel, fidèle au modèle (le moteur les pose quand tu n'en écris pas d'autres) ; sa charte seulement si sa demande la veut (« avec mes couleurs »)`
+    : `ses couleurs (${colors}) : celles de ce Reel, fidèle au modèle, jamais un défaut`;
 }
 
 /** A followed tempo as a plan holds it (60 to 140 BPM): a faster beat is cut at half time, on the same kicks. */
@@ -783,7 +793,11 @@ export function momentsLine(look: Pick<StolenLook, "moments">): string | null {
 export function followedLine(followed: FollowedStyle): string {
   const { look } = followed;
   return [
-    `Reel à recopier (${followed.own ? "un de ses Reels, gardé comme modèle" : followed.dressed ? "un modèle d'Edith qu'Edith a pris comme forme de ce Reel, habillé de sa charte : ses polices et ses couleurs à elle ne sont jamais un défaut" : followed.house ? "un modèle d'Edith qu'elle a choisi" : "un Reel qu'elle a envoyé"}, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
+    `Reel à recopier (${followed.own ? "un de ses Reels, gardé comme modèle" : followed.dressed ? "un modèle habillé de sa charte : ses polices et ses couleurs à elle ne sont jamais un défaut" : followed.house ? "un modèle d'Edith qu'elle a choisi" : "un Reel qu'elle a envoyé"}, « ${look.name} ») : ${FORMAT_WORDS[look.format]}, ${paceWords(followed.average_shot, followed.bpm)}`,
+    // A faithful copy: the model's style decides, never the usual habits (Tristan: « plus de règles en cas de recopiage »).
+    ...(followed.dressed
+      ? []
+      : ["le style du modèle décide : ses polices et leur nombre, sa mise en page, ses fonds (cartes, aplats, plein cadre ou non), ses couleurs, son nombre de textes, sa longueur, sa voix et sa fin ne sont jamais un défaut ; seuls le sont un écart au modèle, un texte illisible sur ses images, hors de la zone de sécurité ou sur un visage que le modèle ne couvre pas, et un fait inventé"]),
     ...(composedLayout(look) ? [`mise en page : ${composedLayout(look)}`] : []),
     `accroche ${look.hook.kind}`,
     ...(momentsLine(look) ? [`ses moments, chacun à refaire avec ses images : ${momentsLine(look)}`] : []),

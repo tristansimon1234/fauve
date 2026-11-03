@@ -2,6 +2,7 @@ import "server-only";
 import {
   CHAT_MODEL,
   HOUSE_PICK_AVOID,
+  OWN_LOOK_WORDS,
   HOUSE_PICK_PROMPT,
   HOUSE_SOURCE,
   housePickInput,
@@ -103,4 +104,16 @@ async function recentHouseKeys(studioId: string, postId: string): Promise<string
   const { data: rows } = await db.from("inspirations").select("id, external_id").in("id", ids).eq("source", HOUSE_SOURCE);
   const key = new Map((rows ?? []).map((r) => [r.id as string, r.external_id as string]));
   return [...new Set((posts ?? []).map((p) => key.get(p.inspiration_id as string)).filter((k): k is string => Boolean(k)))].slice(0, HOUSE_PICK_AVOID);
+}
+
+/**
+ * A Reel she copies is faithful to its model (Tristan: « la DA s'applique s'il demande »): her charter dresses it only
+ * when her request asks for it (« avec mes couleurs », « à ma charte »), read once when a new montage starts.
+ */
+export async function ensureCopyCharter(input: { studioId: string; postId: string; brief?: string }): Promise<void> {
+  const db = supabaseAdmin();
+  const { data: post } = await db.from("posts").select("inspiration_id, edith_pick, copy_charter").eq("id", input.postId).eq("studio_id", input.studioId).maybeSingle();
+  if (!post?.inspiration_id || post.inspiration_id === post.edith_pick) return;
+  const asked = OWN_LOOK_WORDS.test(input.brief ?? "");
+  if (asked !== post.copy_charter) await db.from("posts").update({ copy_charter: asked }).eq("id", input.postId).eq("studio_id", input.studioId);
 }

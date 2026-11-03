@@ -8,6 +8,10 @@ import { HOUSE_MODELS, houseModel } from "./house-models.ts";
 // once, when the montage starts its design, by a short call; "none" when no model can be made with her files, the
 // Reel then made freely in the same spirit.
 
+/** Her request asks for her own look on a Reel she copies: her colours, her fonts, her charter. */
+export const OWN_LOOK_WORDS =
+  /(?:^|[\s,;.!?«"'(])(?:(?:mes|nos) (?:couleurs|polices|typos?)|(?:ma|notre) (?:charte|police|typo|palette|identité|da)(?![a-zà-ÿ])|ma direction artistique|à (?:mon|notre) (?:style|image)|(?:à|aux) (?:mes|nos) couleurs|aux couleurs de (?:mon|ma|notre|chez)|avec mon style)/i;
+
 /** How many of her last Reels' models are not picked again. */
 export const HOUSE_PICK_AVOID = 3;
 
