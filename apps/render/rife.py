@@ -178,7 +178,6 @@ def encoder(file, w, h):
 
 
 def smooth(job, net, device):
-    import numpy as np
     import torch
     import torch.nn.functional as F
 
@@ -202,10 +201,13 @@ def smooth(job, net, device):
         if made.returncode != 0:
             raise RuntimeError(f"vidéo : {made.stderr.decode(errors='replace')[:200]}")
         return {"file": file, "frames": int(round(seconds * OUT_FPS)), "fps": round(fps, 2), "w": w, "h": h, "made": 0, "cuts": 0}
-    # Its images at 30 a second (a phone's varying pace evened out, as NORMALIZE does), one at a time.
+    # Its own images at its own pace (a phone's varying pace evened out at its rate), one at a time: each image of the
+    # 60 i/s file falls somewhere between two of them and is drawn at that very instant (RIFE takes any), so a video
+    # filmed at 24 or 25 i/s slows down as evenly as one at 30 (brought to 30 first, one image in five came twice).
+    pace = fps if 10 <= fps <= 120 else float(FPS)
     dec = subprocess.Popen(
         [FFMPEG, "-v", "error", "-ss", f"{start:.3f}", "-t", f"{seconds:.3f}", "-i", job["src"], "-map", "0:v:0",
-         "-vf", f"{hdr_part}fps={FPS},scale={w}:{h}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"],
+         "-vf", f"{hdr_part}fps={pace:.5f},scale={w}:{h}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"],
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
     )
@@ -214,46 +216,47 @@ def smooth(job, net, device):
     # RIFE reads sizes in multiples of 64: padded with black, cropped after.
     ph, pw = (h + 63) // 64 * 64, (w + 63) // 64 * 64
     dtype = torch.float16 if device == "cuda" else torch.float32
-    half = torch.full((1, 1, 1, 1), 0.5, device=device, dtype=dtype)
 
-    def tensor(raw):
+    def read():
+        raw = dec.stdout.read(size)
+        if len(raw) != size:
+            return None
         t = torch.frombuffer(bytearray(raw), dtype=torch.uint8).to(device).view(h, w, 3).permute(2, 0, 1)[None].to(dtype) / 255
-        return F.pad(t, (0, pw - w, 0, ph - h))
+        small = F.interpolate(t.float().mean(1, keepdim=True), size=(64, max(1, round(64 * w / h))), mode="area")
+        return raw, F.pad(t, (0, pw - w, 0, ph - h)), small
 
-    def small(t):
-        return F.interpolate(t[:, :, :h, :w].float().mean(1, keepdim=True), size=(64, max(1, round(64 * w / h))), mode="area")
-
-    prev_raw = dec.stdout.read(size)
-    if len(prev_raw) != size:
+    a = read()
+    if a is None:
         raise RuntimeError("aucune image dans ce passage")
-    prev = tensor(prev_raw)
-    prev_small = small(prev)
-    n, made, cuts = 1, 0, 0
+    b = read()
+    i, n, made, cuts, cut_at = 0, 2 if b else 1, 0, 0, -1
     with torch.inference_mode():
-        while True:
-            raw = dec.stdout.read(size)
-            enc.stdin.write(prev_raw)
-            if len(raw) != size:
-                break
-            cur = tensor(raw)
-            cur_small = small(cur)
-            if float((cur_small - prev_small).abs().mean()) > CUT:
-                # A cut in her clip: the image before is held, never blended into the next.
-                mid_raw = prev_raw
-                cuts += 1
+        for k in range(max(1, int(round(seconds * OUT_FPS)))):
+            u = k * pace / OUT_FPS
+            while b is not None and u >= i + 1:
+                a, b, i = b, read(), i + 1
+                n += 1 if b else 0
+            s = u - i
+            if b is None or s < 0.01:
+                out = a[0]
+            elif float((b[2] - a[2]).abs().mean()) > CUT:
+                # A cut in her clip: the nearer image is held, never blended into the other.
+                out = a[0] if s < 0.5 else b[0]
+                if cut_at != i:
+                    cuts, cut_at = cuts + 1, i
             else:
-                mid = net(prev, cur, half)[:, :, :h, :w].clamp(0, 1)
-                mid_raw = (mid[0].permute(1, 2, 0).float() * 255 + 0.5).byte().cpu().numpy().tobytes()
+                mid = net(a[1], b[1], torch.full((1, 1, 1, 1), s, device=device, dtype=dtype))[:, :, :h, :w].clamp(0, 1)
+                out = (mid[0].permute(1, 2, 0).float() * 255 + 0.5).byte().cpu().numpy().tobytes()
                 made += 1
-            enc.stdin.write(mid_raw)
-            prev, prev_raw, prev_small = cur, raw, cur_small
-            n += 1
+            enc.stdin.write(out)
+        frames = k + 1
+    dec.stdout.close()
     dec.wait()
     enc.stdin.close()
     if enc.wait() != 0:
         raise RuntimeError(f"vidéo : {enc.stderr.read().decode(errors='replace')[:200]}")
-    log(f"{n} images of {w}×{h} at {fps:.0f} i/s, {made} made in between, {cuts} cuts held, in {time.time() - started:.1f} s")
-    return {"file": file, "frames": 2 * n - 1, "fps": round(fps, 2), "w": w, "h": h, "made": made, "cuts": cuts}
+    log(f"{n} images of {w}×{h} at {pace:.2f} i/s, {frames} at 60 i/s of which {made} drawn in between, {cuts} cuts held, in {time.time() - started:.1f} s")
+    return {"file": file, "frames": frames, "fps": round(fps, 2), "w": w, "h": h, "made": made, "cuts": cuts}
 
 
 if __name__ == "__main__":
