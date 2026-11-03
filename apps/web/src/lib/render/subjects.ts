@@ -4,7 +4,7 @@ import { isClipSegment, mediaSubjectsSchema, mediaTracksSchema, objectPassages, 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
-import { GPU, GPU_START_MS, gpuCostEur, gpuReady, objectsOnGpu, subjectsOnGpu } from "./gpu";
+import { GPU_START_MS, gpuCostEur, gpuReady, objectsOnGpu, subjectsOnGpu } from "./gpu";
 import { cutoutCostEur, subjectsInSandbox } from "./sandbox";
 
 // Her subject cut out at every image of the passages a composition draws it on (Subject), made in the cut-out
@@ -131,7 +131,7 @@ async function cutOnGpu(studioId: string, postId: string, chosen: SubjectPassage
     )
   ).flat();
   if (!jobs.length) return new Set();
-  const { results, seconds } = await subjectsOnGpu(jobs, deadlineMs);
+  const { results, seconds, gpu } = await subjectsOnGpu(jobs, deadlineMs);
   const at = new Date().toISOString();
   const done = new Set<string>();
   for (const p of chosen) {
@@ -161,8 +161,8 @@ async function cutOnGpu(studioId: string, postId: string, chosen: SubjectPassage
       kind: "matting",
       provider: "modal",
       units: Math.round(seconds),
-      cost_eur: gpuCostEur(seconds),
-      meta: costMeta({ post_id: postId, passages: jobs.length, done: done.size, gpu: GPU, seconds_of_video: Math.round(chosen.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
+      cost_eur: gpuCostEur(seconds, gpu),
+      meta: costMeta({ post_id: postId, passages: jobs.length, done: done.size, gpu, seconds_of_video: Math.round(chosen.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
     });
   return done;
 }
@@ -335,7 +335,7 @@ export async function ensureObjects(studioId: string, postId: string, plan: Plan
     )
   ).flat();
   if (!jobs.length) return;
-  const { results, seconds } = await objectsOnGpu(jobs, deadline);
+  const { results, seconds, gpu } = await objectsOnGpu(jobs, deadline);
   const at = new Date().toISOString();
   const updates = new Map<string, MediaSubjects>();
   const record = (p: ObjectPassage, value: MediaSubjects[string]) => {
@@ -375,7 +375,7 @@ export async function ensureObjects(studioId: string, postId: string, plan: Plan
       kind: "matting",
       provider: "modal",
       units: Math.round(seconds),
-      cost_eur: gpuCostEur(seconds),
-      meta: costMeta({ post_id: postId, objects: jobs.length, done, gpu: GPU, seconds_of_video: Math.round(missing.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
+      cost_eur: gpuCostEur(seconds, gpu),
+      meta: costMeta({ post_id: postId, objects: jobs.length, done, gpu, seconds_of_video: Math.round(missing.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
     });
 }

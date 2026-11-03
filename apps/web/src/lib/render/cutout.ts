@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { CARD_CUTOUT_MODEL, CUTOUT_MODEL, currentCutout, cutEdges, cutoutSchema, sceneWorthy, stickerWorthy, type Cutout, type ReelInputs, type ScenePhoto } from "@fauve/agent";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cutoutCostEur, cutoutsInSandbox } from "./sandbox";
-import { GPU, GPU_START_MS, gpuCostEur, gpuReady, photosOnGpu } from "./gpu";
+import { GPU_START_MS, gpuCostEur, gpuReady, photosOnGpu } from "./gpu";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
 
@@ -90,7 +90,7 @@ async function cutOnCard(studioId: string, photos: { id: string; url: string }[]
   if (!jobs.length) return new Set();
   const left = timeLeft();
   const need = GPU_START_MS + CARD_LOAD_MS + jobs.length * CARD_PHOTO_MS;
-  const { results, seconds } = await photosOnGpu(jobs, Number.isFinite(left) ? Math.max(60_000, Math.min(need, left / 2)) : need);
+  const { results, seconds, gpu } = await photosOnGpu(jobs, Number.isFinite(left) ? Math.max(60_000, Math.min(need, left / 2)) : need);
   const at = new Date().toISOString();
   const done = new Set<string>();
   for (const j of jobs) {
@@ -111,8 +111,8 @@ async function cutOnCard(studioId: string, photos: { id: string; url: string }[]
       kind: "cutout",
       provider: "modal",
       units: Math.round(seconds),
-      cost_eur: gpuCostEur(seconds),
-      meta: costMeta({ photos: jobs.length, done: done.size, model: CARD_CUTOUT_MODEL, gpu: GPU }),
+      cost_eur: gpuCostEur(seconds, gpu),
+      meta: costMeta({ photos: jobs.length, done: done.size, model: CARD_CUTOUT_MODEL, gpu }),
     });
   return done;
 }

@@ -1,7 +1,7 @@
 import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
-import { GPU, gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
+import { gpuCostEur, gpuReady, objectsOnGpu, photosOnGpu, reliefsOnGpu, subjectsOnGpu } from "@/lib/render/gpu";
 import { reliefOf } from "@fauve/agent";
 import { renderPost } from "@/lib/render/render-post";
 import { dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
           }),
         )
       ).flat();
-      const { results, seconds } = await photosOnGpu(jobs, 700_000, { startMs: 600_000 });
+      const { results, seconds, gpu: used } = await photosOnGpu(jobs, 700_000, { startMs: 600_000 });
       for (const r of photos) {
         const result = results[r.id as string];
         const kept = (r.cutout ?? null) as { path?: string; model?: string } | null;
@@ -79,9 +79,9 @@ export async function POST(request: NextRequest) {
         ]);
         console.log("gpu photo", JSON.stringify({ link, before, before_model: kept?.model ?? null, media: r.id, result: result instanceof Error || !result ? (result?.message ?? "nothing") : result.reading }));
       }
-      const cost = gpuCostEur(seconds);
+      const cost = gpuCostEur(seconds, used);
       const studio = photos[0]!.studio_id as string;
-      if (seconds > 0) await db.from("cost_events").insert({ studio_id: studio, kind: "cutout", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, photos: jobs.length, gpu: GPU } });
+      if (seconds > 0) await db.from("cost_events").insert({ studio_id: studio, kind: "cutout", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, photos: jobs.length, gpu: used } });
       console.log("gpu photos", JSON.stringify({ photos: jobs.length, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000 }));
     });
     return Response.json({ ok: true, started: true }, { status: 202 });
@@ -107,10 +107,10 @@ export async function POST(request: NextRequest) {
         db.storage.from("media").createSignedUploadUrl(`${base}.png`, { upsert: true }),
       ]);
       if (!clip.data?.signedUrl || !webm.data?.signedUrl || !png.data?.signedUrl) return console.error("gpu object: links refused");
-      const { results, seconds } = await objectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, name, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000, { startMs: 600_000 });
+      const { results, seconds, gpu: used } = await objectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, name, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000, { startMs: 600_000 });
       const result = results.lab;
-      const cost = gpuCostEur(seconds);
-      if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "matting", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, object: name, gpu: GPU } });
+      const cost = gpuCostEur(seconds, used);
+      if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "matting", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, object: name, gpu: used } });
       const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(`${base}.${result.still ? "png" : "webm"}`, 86_400)).data?.signedUrl : null;
       const summary = result instanceof Error || !result ? (result?.message ?? "nothing") : { ...result, boxes: result.boxes?.length ?? 0, contours: result.contours?.length ?? 0 };
       console.log("gpu object", JSON.stringify({ link, media, from, to, name, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: summary }));
@@ -143,14 +143,14 @@ export async function POST(request: NextRequest) {
         db.storage.from("media").createSignedUploadUrl(path, { upsert: true }),
       ]);
       if (!photo.data?.signedUrl || !upload.data?.signedUrl) return console.error("gpu relief: links refused");
-      const { results, seconds: card } = await reliefsOnGpu(
+      const { results, seconds: card, gpu: used } = await reliefsOnGpu(
         [{ key: "lab", url: photo.data.signedUrl, move: shot.move, frames, origin: shot.origin, shift: shot.shift, upload: { mp4: upload.data.signedUrl } }],
         700_000,
         { startMs: 600_000 },
       );
       const result = results.lab;
-      const cost = gpuCostEur(card);
-      if (card > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "relief", provider: "modal", units: Math.round(card), cost_eur: cost, meta: { lab: true, media, move, frames, gpu: GPU } });
+      const cost = gpuCostEur(card, used);
+      if (card > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "relief", provider: "modal", units: Math.round(card), cost_eur: cost, meta: { lab: true, media, move, frames, gpu: used } });
       const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(path, 86_400)).data?.signedUrl : null;
       console.log("gpu relief", JSON.stringify({ link, media, move, frames, origin: shot.origin, shift: shot.shift, seconds: Math.round(card), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result }));
     });
@@ -179,9 +179,8 @@ export async function POST(request: NextRequest) {
       ]);
       if (!clip.data?.signedUrl || !webm.data?.signedUrl || !png.data?.signedUrl) return console.error("gpu subject: links refused");
       // Its steps are in the logs as they happen (« gpu … »), then its result (« gpu subject »).
-      const { results, seconds } = await subjectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000, { gpu, fp16, startMs: 600_000 });
+      const { results, seconds, gpu: card } = await subjectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000, { gpu, fp16, startMs: 600_000 });
       const result = results.lab;
-      const card = gpu === undefined ? GPU : gpu;
       const cost = gpuCostEur(seconds, card);
       if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "matting", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, gpu: card ?? "none" } });
       const still = result && !(result instanceof Error) && result.still;

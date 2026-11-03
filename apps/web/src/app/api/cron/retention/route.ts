@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { reliefFiles, subjectFiles } from "@fauve/agent";
+import { reliefFiles, smoothFiles, subjectFiles } from "@fauve/agent";
 import { deleteExpiredAccounts } from "@/lib/account-deletion";
 import { env } from "@/lib/env";
 import { kitPath } from "@/lib/effect-words";
@@ -39,7 +39,8 @@ async function handle(request: Request) {
     const { data: originals } = await db.from("media_assets").select("original_path").in("id", batch.map((m) => m.id)).not("original_path", "is", null);
     // Its subject cut out at every image, for the compositions that drew it (lib/render/subjects.ts).
     // A photo's shots drawn in relief by their depth (lib/render/relief.ts).
-    const { data: withSubjects } = await db.from("media_assets").select("subjects, reliefs").in("id", batch.map((m) => m.id));
+    // And a clip's slow passages made on the card (lib/render/smooth.ts).
+    const { data: withSubjects } = await db.from("media_assets").select("subjects, reliefs, smooth").in("id", batch.map((m) => m.id));
     // Files first: a row is only removed once its file is gone (a failed batch is retried next hour).
     // A photo's cut-out (collages), what was tracked in a video, an effect's kit and a recording's ref frames go with it; a path with nothing there is simply skipped.
     const removed = await db.storage
@@ -56,7 +57,7 @@ async function handle(request: Request) {
           ...cleanedPaths(m.studio_id, m.id),
         ]),
         ...(originals ?? []).map((o) => o.original_path as string),
-        ...(withSubjects ?? []).flatMap((row) => [...subjectFiles(row.subjects), ...reliefFiles(row.reliefs)]),
+        ...(withSubjects ?? []).flatMap((row) => [...subjectFiles(row.subjects), ...reliefFiles(row.reliefs), ...smoothFiles(row.smooth)]),
       ]);
     if (removed.error) {
       console.error("retention: files not removed", removed.error.message);

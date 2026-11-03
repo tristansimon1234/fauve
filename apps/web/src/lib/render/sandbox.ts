@@ -381,7 +381,24 @@ const CHECK_WAIT_MS = 2 * 60_000;
  * a slow or broken stream used to time the render out. Each file once, however many shots
  * use it; videos re-encoded so that every frame the plan asks for exists (NORMALIZE).
  */
-async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, options: { smooth?: boolean } = {}): Promise<ReelProps> {
+/** A shot of a Reel in slow motion: its index, its clip and the passage its own 60 i/s file holds (SLOW_LEAD frames before it). */
+export type SlowPassage = { index: number; src: string; srcFrom: number; seconds: number };
+
+/** The shots of a Reel in slow motion and the passage each one's own file holds: what the sandbox (SLOW_NORMALIZE) or the card (rife.py) makes. */
+export function slowPassages(props: ReelProps): SlowPassage[] {
+  return props.segments.flatMap((segment, index) => {
+    if (segment.type !== "clip" || !/^https?:/.test(segment.src) || !(segment.ramp ?? [{ speed: segment.speed ?? 1 }]).some((p) => p.speed < 0.99)) return [];
+    const passages = segment.ramp ?? [{ at: 0, length: segment.durationInFrames, startFrom: segment.startFrom, speed: segment.speed ?? 1 }];
+    const end = Math.max(...passages.map((p) => p.startFrom + Math.ceil(p.length * p.speed)));
+    const srcFrom = Math.max(0, segment.startFrom - SLOW_LEAD);
+    return [{ index, src: segment.src, srcFrom, seconds: (end - srcFrom) / REEL_FPS + 0.5 }];
+  });
+}
+
+/** The slow passages the card already made (lib/render/smooth.ts), by shot: its file (signed) and the frame it starts at. */
+export type SmoothFiles = Record<number, { src: string; srcFrom: number }>;
+
+async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, options: { smooth?: boolean; made?: SmoothFiles } = {}): Promise<ReelProps> {
   const files = new Map<string, string>();
   const jobs = new Map<string, Promise<unknown>>();
   const local = (src: string, video: boolean): string => {
@@ -396,8 +413,10 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
     jobs.set(src, bash(sandbox, video ? NORMALIZE : FETCH, [`${REMOTION}/build/public/${file}`, src]));
     return `/public/${file}`;
   };
-  // A shot in slow motion gets its own file at 60 frames a second (made smooth, SLOW_NORMALIZE), for a final render only.
-  const slow: { index: number; src: string; srcFrom: number; seconds: number }[] = [];
+  // A shot in slow motion gets its own file at 60 frames a second (made smooth: by the card when it could, rife.py, else
+  // SLOW_NORMALIZE), for a final render only.
+  const slow = options.smooth ? slowPassages(props) : [];
+  const slowShots = new Set(slow.map((s) => s.index));
   const under = (u: ReelUnder | undefined) => (u ? { ...u, src: local(u.src, u.type === "clip") } : u);
   // The photos an animation composes with, and their cut-outs.
   const photos = (list: ScenePhoto[]) => list.map((p) => ({ ...p, src: local(p.src, false), ...(p.cutout ? { cutout: local(p.cutout, false) } : {}) }));
@@ -410,13 +429,7 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
         ...(segment.depth ? { depth: { ...segment.depth, src: local(segment.depth.src, false) } } : {}),
         ...(segment.relief ? { relief: { ...segment.relief, src: local(segment.relief.src, false) } } : {}),
       };
-    if (segment.type === "clip" && options.smooth && /^https?:/.test(segment.src) && (segment.ramp ?? [{ speed: segment.speed ?? 1 }]).some((p) => p.speed < 0.99)) {
-      const passages = segment.ramp ?? [{ at: 0, length: segment.durationInFrames, startFrom: segment.startFrom, speed: segment.speed ?? 1 }];
-      const end = Math.max(...passages.map((p) => p.startFrom + Math.ceil(p.length * p.speed)));
-      const srcFrom = Math.max(0, segment.startFrom - SLOW_LEAD);
-      slow.push({ index, src: segment.src, srcFrom, seconds: (end - srcFrom) / REEL_FPS + 0.5 });
-      return segment;
-    }
+    if (slowShots.has(index)) return segment;
     if (segment.type === "clip" && segment.subject) return { ...segment, src: local(segment.src, true), subject: { ...segment.subject, src: local(segment.subject.src, false) } };
     if (segment.type === "clip" || segment.type === "image") return { ...segment, src: local(segment.src, segment.type === "clip") };
     const moved = segment.under ? { ...segment, under: under(segment.under) } : segment;
@@ -428,10 +441,21 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
   // The frames in between are made for a few seconds of clip in all (SMOOTH_BUDGET_SECONDS); past them, each frame is shown twice.
   let budget = SMOOTH_BUDGET_SECONDS;
   const smoothed = slow.map(async (job) => {
+    const segment = segments[job.index] as Extract<ReelProps["segments"][number], { type: "clip" }>;
+    const file = `jobs/${id}/s${job.index}.mp4`;
+    // Made on the card (RIFE): fetched as it is (on its own, so a failed fetch falls back below without failing the rest).
+    const made = options.made?.[job.index];
+    if (made && made.srcFrom === job.srcFrom) {
+      try {
+        await bash(sandbox, FETCH, [`${REMOTION}/build/public/${file}`, made.src]);
+        segments[job.index] = { ...segment, src: `/public/${file}`, srcFrom: made.srcFrom };
+        return;
+      } catch (error) {
+        console.warn("slow motion from the card not fetched", id, job.index, error instanceof Error ? error.message.slice(0, 300) : error);
+      }
+    }
     const interpolate = budget >= job.seconds;
     if (interpolate) budget -= job.seconds;
-    const file = `jobs/${id}/s${job.index}.mp4`;
-    const segment = segments[job.index] as Extract<ReelProps["segments"][number], { type: "clip" }>;
     try {
       await bash(sandbox, SLOW_NORMALIZE, [`${REMOTION}/build/public/${file}`, job.src, (job.srcFrom / REEL_FPS).toFixed(3), job.seconds.toFixed(3), interpolate ? "1" : "0"]);
       segments[job.index] = { ...segment, src: `/public/${file}`, srcFrom: job.srcFrom };
@@ -452,13 +476,13 @@ async function localMedia(sandbox: Sandbox, id: string, props: ReelProps, option
  * A Reel rendered by Remotion. A frame of her video waits 60 s at most (the default 28 s gave up on a workshop busy
  * with another render, and the Reel fell back to the plain ffmpeg engine); `patient`, a second try: 2 minutes, two tabs.
  */
-export async function renderReelInSandbox(job: { id: string; props: ReelProps; patient?: boolean }): Promise<Buffer> {
+export async function renderReelInSandbox(job: { id: string; props: ReelProps; patient?: boolean; slowmo?: SmoothFiles }): Promise<Buffer> {
   return withRemotion(RENDER_WAIT_MS, async (sandbox) => {
     const dir = `${ROOT}/jobs/${job.id}`;
     const media = `${REMOTION}/build/public/jobs/${job.id}`;
     try {
       await bash(sandbox, 'rm -rf "$1" "$2" && mkdir -p "$1"', [dir, media]);
-      const props = await localMedia(sandbox, job.id, job.props, { smooth: true });
+      const props = await localMedia(sandbox, job.id, job.props, { smooth: true, made: job.slowmo });
       await sandbox.writeFiles([{ path: `${dir}/props.json`, content: JSON.stringify(props) }]);
       await bash(
         sandbox,

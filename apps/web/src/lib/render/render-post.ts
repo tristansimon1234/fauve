@@ -53,6 +53,7 @@ import { makeSceneSprite } from "./scene-sprite";
 import { copyCutoutInputs, ensureCutouts, overlayPhotoInputs, sceneCutoutInputs, stickerInputs } from "./cutout";
 import { ensureObjects, ensureSubjects, subjectInputs } from "./subjects";
 import { ensureReliefs, reliefInputs } from "./relief";
+import { smoothSlowMotion } from "./smooth";
 import { ensureCleanCopies } from "@/lib/video/speech";
 import { loadTracks } from "./tracks";
 import { postStyle } from "@/lib/steal";
@@ -487,8 +488,13 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         const saved = await db.from("edit_plans").update({ plan: { ...(planRow.plan as Record<string, unknown>), subtitle_y: row } }).eq("id", planRow.id);
         if (saved.error) console.warn("subtitles' row not kept on the plan", planRow.id, saved.error.message);
       }
+      // Its slow-motion passages made smooth on the card (RIFE), when it is set up; else the sandbox makes them.
+      const slowmo = await smoothSlowMotion(studioId, postId, plan, props).catch((e: unknown) => {
+        console.warn("slow motion on the card unavailable", e instanceof Error ? e.message.slice(0, 300) : e);
+        return {};
+      });
       try {
-        mp4 = await renderReelInSandbox({ id: renderId, props });
+        mp4 = await renderReelInSandbox({ id: renderId, props, slowmo });
         engine = "remotion";
         durationMs = Math.round((props.durationInFrames / props.fps) * 1000);
       } catch (error) {
@@ -500,7 +506,7 @@ export async function renderPost(studioId: string, postId: string, options: { ed
         console.error("remotion render failed, trying again", renderId, composed ? "without its composition" : "", error);
         // The animation that draws the texts of a copied Reel goes with it: the engine draws them again.
         const layers = props.layers?.filter((l) => !l.compose && !l.drawsTexts);
-        const again = await renderReelInSandbox({ id: `${renderId}-again`, props: { ...props, layers: layers?.length ? layers : undefined }, patient: true }).catch(
+        const again = await renderReelInSandbox({ id: `${renderId}-again`, props: { ...props, layers: layers?.length ? layers : undefined }, patient: true, slowmo }).catch(
           (second: unknown) => {
             if (composed || needsBlur || photoIds.length || plan.voice) throw second;
             console.error("remotion failed twice, falling back to ffmpeg", renderId, second);

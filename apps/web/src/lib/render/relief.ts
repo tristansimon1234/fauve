@@ -4,7 +4,7 @@ import { mediaReliefsSchema, reliefJobs, type EditPlan, type MediaReliefs, type 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
-import { GPU, GPU_START_MS, gpuCostEur, gpuReady, reliefsOnGpu } from "./gpu";
+import { GPU_START_MS, gpuCostEur, gpuReady, reliefsOnGpu } from "./gpu";
 
 // A moving photo in relief, its depth read on the rented card (apps/render/relief.py): before the render, each photo
 // shot that moves gets the video of every pixel moved by its own depth, made for the shot as the plan has it and kept
@@ -75,7 +75,7 @@ export async function ensureReliefs(studioId: string, postId: string, plan: Plan
     )
   ).flat();
   if (!shots.length) return;
-  const { results, seconds } = await reliefsOnGpu(
+  const { results, seconds, gpu } = await reliefsOnGpu(
     shots.map((s) => s.shot),
     deadline,
   );
@@ -114,8 +114,8 @@ export async function ensureReliefs(studioId: string, postId: string, plan: Plan
       kind: "relief",
       provider: "modal",
       units: Math.round(seconds),
-      cost_eur: gpuCostEur(seconds),
-      meta: costMeta({ post_id: postId, shots: shots.length, done, gpu: GPU }),
+      cost_eur: gpuCostEur(seconds, gpu),
+      meta: costMeta({ post_id: postId, shots: shots.length, done, gpu }),
     });
 }
 

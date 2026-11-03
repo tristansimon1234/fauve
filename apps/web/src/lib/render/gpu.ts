@@ -82,6 +82,18 @@ const DEPTH_MODEL = {
   sha: "3152477ce0d8d6978d76b995120de97cb5b928701fd0f817769f59e249a16b70",
   configs: ["config.json", "preprocessor_config.json"],
 };
+/**
+ * RIFE v4.26 (slow motion made smooth, rife.py), a layer of its own on the PyTorch machine: Practical-RIFE's weights
+ * (MIT) from its author's own release on Hugging Face (hzwer/RIFE), pinned by revision, the archive and the
+ * flownet.pkl inside both checked by their digests.
+ */
+const RIFE_ZIP = { url: `${HF}/hzwer/RIFE/resolve/01fdc7e97404120c243c3ea7b427046e5dc7643e/RIFEv4.26_0921.zip`, sha: "1fa9b9cda3d9b8c3e301359e2595960902f97bf926c08598b0e9957a3f3f760e" };
+const RIFE_WEIGHTS_SHA = "45c7f74156704769dc9f85cfcaf8552e1e926f9399dcfa3a553dee88fac6f53f";
+const RIFE_COMMANDS = [
+  `RUN curl -fsSL -o /tmp/rife.zip ${RIFE_ZIP.url} && echo '${RIFE_ZIP.sha}  /tmp/rife.zip' | sha256sum -c - && mkdir -p /models/rife && ` +
+    `python -c "import zipfile; open('/models/rife/flownet.pkl', 'wb').write(zipfile.ZipFile('/tmp/rife.zip').read('RIFEv4.26_0921/flownet.pkl'))" && ` +
+    `echo '${RIFE_WEIGHTS_SHA}  /models/rife/flownet.pkl' | sha256sum -c - && rm /tmp/rife.zip`,
+];
 const DEPTH_COMMANDS = [
   `RUN mkdir -p /models/${DEPTH_MODEL.dir} && cd /models/${DEPTH_MODEL.dir} && ` +
     [...DEPTH_MODEL.configs, "model.safetensors"].map((f) => `curl -fsSL -o ${f} ${HF}/${DEPTH_MODEL.repo}/resolve/${DEPTH_MODEL.rev}/${f}`).join(" && ") +
@@ -94,6 +106,13 @@ const APP = "fauve";
  * A10G came in 1.7 s.
  */
 export const GPU = "A10G";
+/**
+ * Modal sometimes has no A10G for minutes (4 min 40 s for a photo's relief on November 3, against 2 s an hour before):
+ * past HEDGE_MS without it, an L40S is asked for too (the same family of card, faster, about 1.8 times the price a
+ * second), and whichever comes first runs the jobs, the other ended as soon as it comes.
+ */
+const SECOND_GPU = "L40S";
+const HEDGE_MS = 20_000;
 const CORES = 2;
 const MEMORY_GIB = 8;
 
@@ -169,27 +188,31 @@ type Machine = "cut" | "torch";
  * its readings by job id, or why there are none. `seconds`: the time the card ran (what Modal bills), 0 when none came.
  */
 async function onCard(
-  script: "portrait.py" | "photo_cut.py" | "track_objects.py" | "relief.py",
+  script: "portrait.py" | "photo_cut.py" | "track_objects.py" | "relief.py" | "rife.py",
   machine: Machine,
   jobs: { id: string }[],
   envFor: (secondsLeft: number) => Record<string, string>,
   deadlineMs: number,
   options: CardOptions,
-): Promise<{ readings: Record<string, Record<string, unknown>> | Error; seconds: number }> {
+): Promise<{ readings: Record<string, Record<string, unknown>> | Error; seconds: number; gpu: string | null }> {
   const gpu = options.gpu === undefined ? GPU : options.gpu;
+  // The card that ran the jobs (what Modal bills).
+  let used: string | null = gpu;
   const startMs = options.startMs ?? GPU_START_MS;
   const started = Date.now();
   const at = () => `${((Date.now() - started) / 1000).toFixed(1)} s`;
   const say = (what: string) => console.log(`gpu ${at()}: ${what}`);
-  const files = ["portrait.py", "matte.py", "photo_cut.py", "track_objects.py", "relief.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
+  const files = ["portrait.py", "matte.py", "photo_cut.py", "track_objects.py", "relief.py", "rife.py"].map((name) => ({ name, text: REMOTION_SOURCE_FILES[name] }));
   const missing = files.find((f) => !f.text);
-  if (missing) return { readings: new Error(`${missing.name} is missing from the render source`), seconds: 0 };
+  if (missing) return { readings: new Error(`${missing.name} is missing from the render source`), seconds: 0, gpu };
 
   const client = new ModalClient({ tokenId: env("MODAL_TOKEN_ID"), tokenSecret: env("MODAL_TOKEN_SECRET") });
   const deadline = started + deadlineMs;
   const upBy = Math.min(deadline, started + startMs);
-  // A name of its own, to end the card asked for when it is allotted after we stopped waiting for it.
+  // A name of its own for each card asked for, to end one allotted after we stopped waiting for it.
   const name = `cut-${randomUUID().slice(0, 13)}`;
+  const cards = gpu === GPU ? [GPU, SECOND_GPU] : [gpu];
+  const names = cards.map((_, i) => (i ? `${name}-${i}` : name));
   let sandbox: Sandbox | undefined;
   let upAt = 0;
   let over = false;
@@ -199,29 +222,55 @@ async function onCard(
     // One image for both jobs: the portrait model (full and half precision) and the general one (half).
     const base =
       machine === "torch"
-        ? client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(TORCH_COMMANDS).dockerfileCommands(DEPTH_COMMANDS)
+        ? client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(TORCH_COMMANDS).dockerfileCommands(DEPTH_COMMANDS).dockerfileCommands(RIFE_COMMANDS)
         : client.images.fromRegistry(BASE_IMAGE).dockerfileCommands(IMAGE_COMMANDS).dockerfileCommands(FP16_COMMANDS).dockerfileCommands(PHOTO_COMMANDS);
     const image = await before(upBy, base.build(app), `its image was not ready after ${startMs / 1000} s`);
     say(`image ready (${image.imageId})`);
-    const created = await before(
-      upBy,
-      client.sandboxes.create(app, image, {
-        ...(gpu ? { gpu } : {}),
-        cpu: CORES,
-        memoryMiB: MEMORY_GIB * 1024,
-        timeoutMs: wholeSeconds(Math.max(60_000, deadline - Date.now() + 30_000)),
-        idleTimeoutMs: IDLE_MS,
-        name,
-      }),
-      gpu ? `no ${gpu} card free after ${startMs / 1000} s` : `no machine started after ${startMs / 1000} s`,
+    const ask = (i: number) =>
+      client.sandboxes
+        .create(app, image, {
+          ...(cards[i] ? { gpu: cards[i]! } : {}),
+          cpu: CORES,
+          memoryMiB: MEMORY_GIB * 1024,
+          timeoutMs: wholeSeconds(Math.max(60_000, deadline - Date.now() + 30_000)),
+          idleTimeoutMs: IDLE_MS,
+          name: names[i],
+        })
+        .then((s) => ({ s, card: cards[i] ?? null }));
+    // The card asked for; past HEDGE_MS without it, the second kind too.
+    let won = false;
+    let hedge: ReturnType<typeof setTimeout> | undefined;
+    const asked = [ask(0)];
+    if (cards.length > 1)
+      asked.push(
+        new Promise((resolve, reject) => {
+          hedge = setTimeout(
+            () => {
+              if (won) return;
+              say(`no ${cards[0]} after ${HEDGE_MS / 1000} s: an ${cards[1]} asked for too`);
+              ask(1).then(resolve, reject);
+            },
+            Math.max(0, Math.min(HEDGE_MS, upBy - Date.now())),
+          );
+        }),
+      );
+    const first = await before(upBy, Promise.any(asked), gpu ? `no ${cards.join(" nor ")} card free after ${startMs / 1000} s` : `no machine started after ${startMs / 1000} s`).finally(
+      () => {
+        won = true;
+        clearTimeout(hedge);
+      },
     );
+    // The other card, if it comes after all: ended at once.
+    for (const other of asked) void other.then(({ s }) => (s === first.s ? undefined : s.terminate())).catch(() => undefined);
+    const created = first.s;
     if (over) {
       await created.terminate().catch(() => undefined);
       throw new Error("the card came after the deadline");
     }
     sandbox = created;
+    used = first.card;
     upAt = Date.now();
-    say(`${gpu ?? "machine without a card"} up (${created.sandboxId})`);
+    say(`${used ?? "machine without a card"} up (${created.sandboxId})`);
     await created.filesystem.makeDirectory("/work", { createParents: true }).catch(() => undefined);
     for (const f of files) await created.filesystem.writeText(f.text!, `/work/${f.name}`);
     await created.filesystem.writeText(JSON.stringify(jobs), "/work/jobs.json");
@@ -239,16 +288,17 @@ async function onCard(
   };
 
   try {
-    return { readings: await before(deadline, work(), `the card was not done after ${Math.round(deadlineMs / 1000)} s`), seconds: upAt ? (Date.now() - upAt) / 1000 : 0 };
+    const readings = await before(deadline, work(), `the card was not done after ${Math.round(deadlineMs / 1000)} s`);
+    return { readings, seconds: upAt ? (Date.now() - upAt) / 1000 : 0, gpu: used };
   } catch (error) {
     const reason = error instanceof Error ? error : new Error(String(error));
     say(`stopped: ${reason.message.slice(0, 300)}`);
-    return { readings: reason, seconds: upAt ? (Date.now() - upAt) / 1000 : 0 };
+    return { readings: reason, seconds: upAt ? (Date.now() - upAt) / 1000 : 0, gpu: used };
   } finally {
     over = true;
     if (sandbox) await sandbox.terminate().catch(() => undefined);
     // A card still being allotted when we gave up: ended by its name (or by itself after IDLE_MS without work).
-    else await client.sandboxes.fromName(APP, name).then((s) => s.terminate()).catch(() => undefined);
+    else await Promise.all(names.map((n) => client.sandboxes.fromName(APP, n).then((s) => s.terminate()).catch(() => undefined)));
     client.close();
   }
 }
@@ -267,11 +317,11 @@ function readingOf(readings: Record<string, Record<string, unknown>> | Error, ke
  * `deadlineMs`: the time it may take in all, its start included. Never throws: a passage that was not cut out has
  * its reason as an Error. `seconds`: the time the card ran (what Modal bills), 0 when none was allotted.
  */
-export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuCut | Error>; seconds: number }> {
-  if (!passages.length) return { results: {}, seconds: 0 };
+export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuCut | Error>; seconds: number; gpu: string | null }> {
+  if (!passages.length) return { results: {}, seconds: 0, gpu: null };
   const fp16 = options.fp16 ?? true;
   const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, upload: p.upload }));
-  const { readings, seconds } = await onCard(
+  const { readings, seconds, gpu } = await onCard(
     "portrait.py",
     "cut",
     jobs,
@@ -295,17 +345,17 @@ export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number, 
             ...(Array.isArray(r.contours) ? { contours: r.contours as (number[] | null)[] } : {}),
           };
   }
-  return { results, seconds };
+  return { results, seconds, gpu };
 }
 
 /**
  * Cuts out the subject of each photo on the card (the general model, half precision, loaded once): about a second a
  * photo once the card is up. Never throws, like subjectsOnGpu.
  */
-export async function photosOnGpu(photos: GpuPhoto[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuPhotoCut | Error>; seconds: number }> {
-  if (!photos.length) return { results: {}, seconds: 0 };
+export async function photosOnGpu(photos: GpuPhoto[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuPhotoCut | Error>; seconds: number; gpu: string | null }> {
+  if (!photos.length) return { results: {}, seconds: 0, gpu: null };
   const jobs = photos.map((p) => ({ id: p.key, url: p.url, upload: p.upload }));
-  const { readings, seconds } = await onCard("photo_cut.py", "cut", jobs, () => ({ PHOTO_MODEL: "/models/general-fp16.onnx", PHOTO_WORK: "/work" }), deadlineMs, options);
+  const { readings, seconds, gpu } = await onCard("photo_cut.py", "cut", jobs, () => ({ PHOTO_MODEL: "/models/general-fp16.onnx", PHOTO_WORK: "/work" }), deadlineMs, options);
   const results: Record<string, GpuPhotoCut | Error> = {};
   for (const p of photos) {
     const r = readingOf(readings, p.key);
@@ -316,7 +366,7 @@ export async function photosOnGpu(photos: GpuPhoto[], deadlineMs: number, option
     const reading = Object.fromEntries(Object.entries(r).filter(([k]) => k !== "ext" && k !== "uploaded"));
     results[p.key] = { reading: reading as CutoutReading, ext: r.ext === "png" ? "png" : "webp" };
   }
-  return { results, seconds };
+  return { results, seconds, gpu };
 }
 
 /** A passage where an object is followed: the passage's, and the object's name (as its animation gives it). */
@@ -326,10 +376,10 @@ export type GpuObjectPassage = GpuPassage & { name: string };
  * Follows each object through its passage on the card (the PyTorch machine: the detector finds it by its name, SAM 2
  * follows it both ways, matte.py's finish cuts it out with its boxes and outline). Never throws, like subjectsOnGpu.
  */
-export async function objectsOnGpu(passages: GpuObjectPassage[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuCut | Error>; seconds: number }> {
-  if (!passages.length) return { results: {}, seconds: 0 };
+export async function objectsOnGpu(passages: GpuObjectPassage[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuCut | Error>; seconds: number; gpu: string | null }> {
+  if (!passages.length) return { results: {}, seconds: 0, gpu: null };
   const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, to: p.to, name: p.name, upload: p.upload }));
-  const { readings, seconds } = await onCard(
+  const { readings, seconds, gpu } = await onCard(
     "track_objects.py",
     "torch",
     jobs,
@@ -353,7 +403,7 @@ export async function objectsOnGpu(passages: GpuObjectPassage[], deadlineMs: num
             ...(Array.isArray(r.contours) ? { contours: r.contours as (number[] | null)[] } : {}),
           };
   }
-  return { results, seconds };
+  return { results, seconds, gpu };
 }
 
 /** A photo shot to draw in relief (relief.py): the photo (signed), the shot as the plan has it, where its video is sent. */
@@ -365,10 +415,10 @@ export type GpuReliefDone = { frames: number; w: number; h: number; near?: numbe
  * Draws each photo shot in relief on the card (relief.py, the PyTorch machine: the depth read once, then every image
  * of the shot): a few seconds a shot once the card is up. Never throws, like subjectsOnGpu.
  */
-export async function reliefsOnGpu(shots: GpuRelief[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuReliefDone | Error>; seconds: number }> {
-  if (!shots.length) return { results: {}, seconds: 0 };
+export async function reliefsOnGpu(shots: GpuRelief[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuReliefDone | Error>; seconds: number; gpu: string | null }> {
+  if (!shots.length) return { results: {}, seconds: 0, gpu: null };
   const jobs = shots.map((s) => ({ id: s.key, url: s.url, move: s.move, frames: s.frames, origin: s.origin, shift: s.shift, upload: s.upload }));
-  const { readings, seconds } = await onCard("relief.py", "torch", jobs, () => ({ DEPTH_MODEL: `/models/${DEPTH_MODEL.dir}`, RELIEF_WORK: "/work" }), deadlineMs, options);
+  const { readings, seconds, gpu } = await onCard("relief.py", "torch", jobs, () => ({ DEPTH_MODEL: `/models/${DEPTH_MODEL.dir}`, RELIEF_WORK: "/work" }), deadlineMs, options);
   const results: Record<string, GpuReliefDone | Error> = {};
   for (const s of shots) {
     const r = readingOf(readings, s.key);
@@ -379,5 +429,31 @@ export async function reliefsOnGpu(shots: GpuRelief[], deadlineMs: number, optio
     const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
     results[s.key] = r.uploaded && n(r.frames) > 0 ? { frames: n(r.frames), w: n(r.w), h: n(r.h), ...(typeof r.near === "number" ? { near: r.near } : {}) } : new Error("relief not sent");
   }
-  return { results, seconds };
+  return { results, seconds, gpu };
+}
+
+/** A passage of her clip to play in slow motion (rife.py): the clip (signed), its seconds, where its 60 i/s file is sent. */
+export type GpuSlow = { key: string; url: string; from: number; seconds: number; upload: { mp4: string } };
+/** A passage made at 60 i/s on the card (its file already sent): its images, and how many were made in between. */
+export type GpuSlowDone = { frames: number; fps: number; made: number; cuts: number };
+
+/**
+ * Makes each passage played in slow motion at 60 images a second on the card (rife.py: RIFE draws the images in
+ * between, a video filmed fast keeps its own): about a second of the card a second of clip once it is up. Never throws.
+ */
+export async function smoothOnGpu(passages: GpuSlow[], deadlineMs: number, options: CardOptions = {}): Promise<{ results: Record<string, GpuSlowDone | Error>; seconds: number; gpu: string | null }> {
+  if (!passages.length) return { results: {}, seconds: 0, gpu: null };
+  const jobs = passages.map((p) => ({ id: p.key, url: p.url, from: p.from, seconds: p.seconds, upload: p.upload }));
+  const { readings, seconds, gpu } = await onCard("rife.py", "torch", jobs, () => ({ RIFE_MODEL: "/models/rife/flownet.pkl", RIFE_WORK: "/work", HDR_FILTER: HDR_TO_SDR }), deadlineMs, options);
+  const results: Record<string, GpuSlowDone | Error> = {};
+  for (const p of passages) {
+    const r = readingOf(readings, p.key);
+    if (r instanceof Error) {
+      results[p.key] = r;
+      continue;
+    }
+    const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    results[p.key] = r.uploaded && n(r.frames) > 0 ? { frames: n(r.frames), fps: n(r.fps), made: n(r.made), cuts: n(r.cuts) } : new Error("slow motion not sent");
+  }
+  return { results, seconds, gpu };
 }
