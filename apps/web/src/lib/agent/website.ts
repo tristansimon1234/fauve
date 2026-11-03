@@ -57,7 +57,7 @@ async function openPublic(input: string, accept: RegExp, signal: AbortSignal, ac
       redirect: "manual",
       signal,
       headers: {
-        "user-agent": "Mozilla/5.0 (compatible; FauveBot/1.0; +https://fauve-one.vercel.app)",
+        "user-agent": "Mozilla/5.0 (compatible; FauveBot/1.0; +https://edith-ai.app)",
         accept: acceptHeader,
         "accept-language": "fr-FR,fr;q=0.9",
       },
