@@ -92,7 +92,14 @@ async function echo(stream: ReadableStream<string>, say: (line: string) => void)
  * `deadlineMs`: the time it may take in all, its start included. Never throws: a passage that was not cut out has
  * its reason as an Error. `seconds`: the time the card ran (what Modal bills), 0 when none was allotted.
  */
-export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number): Promise<{ results: Record<string, GpuCut | Error>; seconds: number }> {
+export async function subjectsOnGpu(
+  passages: GpuPassage[],
+  deadlineMs: number,
+  // Another card for a test from the admin route (« A10G », « T4 »…), or none (a machine without a card: it shows
+  // whether Modal starts a machine at all when no card comes).
+  options: { gpu?: string | null } = {},
+): Promise<{ results: Record<string, GpuCut | Error>; seconds: number }> {
+  const gpu = options.gpu === undefined ? GPU : options.gpu;
   if (!passages.length) return { results: {}, seconds: 0 };
   const started = Date.now();
   const at = () => `${((Date.now() - started) / 1000).toFixed(1)} s`;
@@ -117,8 +124,15 @@ export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number):
     say(`image ready (${image.imageId})`);
     const created = await before(
       upBy,
-      client.sandboxes.create(app, image, { gpu: GPU, cpu: CORES, memoryMiB: MEMORY_GIB * 1024, timeoutMs: wholeSeconds(Math.max(60_000, deadline - Date.now() + 30_000)), idleTimeoutMs: IDLE_MS, name }),
-      `no ${GPU} card free after ${GPU_START_MS / 1000} s`,
+      client.sandboxes.create(app, image, {
+        ...(gpu ? { gpu } : {}),
+        cpu: CORES,
+        memoryMiB: MEMORY_GIB * 1024,
+        timeoutMs: wholeSeconds(Math.max(60_000, deadline - Date.now() + 30_000)),
+        idleTimeoutMs: IDLE_MS,
+        name,
+      }),
+      gpu ? `no ${gpu} card free after ${GPU_START_MS / 1000} s` : `no machine started after ${GPU_START_MS / 1000} s`,
     );
     if (over) {
       await created.terminate().catch(() => undefined);
@@ -126,7 +140,7 @@ export async function subjectsOnGpu(passages: GpuPassage[], deadlineMs: number):
     }
     sandbox = created;
     upAt = Date.now();
-    say(`card up (${created.sandboxId})`);
+    say(`${gpu ?? "machine without a card"} up (${created.sandboxId})`);
     await created.filesystem.makeDirectory("/work", { createParents: true }).catch(() => undefined);
     await created.filesystem.writeText(portrait, "/work/portrait.py");
     await created.filesystem.writeText(matte, "/work/matte.py");

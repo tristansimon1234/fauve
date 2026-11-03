@@ -45,6 +45,9 @@ export async function POST(request: NextRequest) {
     const media = request.nextUrl.searchParams.get("media") ?? "";
     const from = Number(request.nextUrl.searchParams.get("from") ?? "0");
     const to = Number(request.nextUrl.searchParams.get("to") ?? "0");
+    // &gpu=A10G|T4|L40S|A100…: another card; &gpu=none: a machine without one (to see whether Modal starts one at all).
+    const gpuParam = request.nextUrl.searchParams.get("gpu");
+    const gpu = gpuParam === "none" ? null : gpuParam && /^[A-Z0-9-]{2,12}$/i.test(gpuParam) ? gpuParam.toUpperCase() : undefined;
     if (!/^[0-9a-f-]{36}$/.test(media) || !(to > from) || to - from > 8) return Response.json({ error: "media=<uuid>&from=<s>&to=<s> (8 s at most)" }, { status: 400 });
     if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
     after(async () => {
@@ -59,13 +62,13 @@ export async function POST(request: NextRequest) {
       ]);
       if (!clip.data?.signedUrl || !webm.data?.signedUrl || !png.data?.signedUrl) return console.error("gpu subject: links refused");
       // Its steps are in the logs as they happen (« gpu … »), then its result (« gpu subject »).
-      const { results, seconds } = await subjectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000);
+      const { results, seconds } = await subjectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000, { gpu });
       const result = results.lab;
       const cost = gpuCostEur(seconds);
       if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "matting", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, gpu: "L4" } });
       const still = result && !(result instanceof Error) && result.still;
       const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(`${base}.${still ? "png" : "webm"}`, 86_400)).data?.signedUrl : null;
-      console.log("gpu subject", JSON.stringify({ media, from, to, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result, link }));
+      console.log("gpu subject", JSON.stringify({ media, from, to, gpu: gpu === undefined ? "L4" : (gpu ?? "none"), seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result, link }));
     });
     return Response.json({ ok: true, started: true }, { status: 202 });
   }
