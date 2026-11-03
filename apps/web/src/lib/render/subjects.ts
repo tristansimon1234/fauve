@@ -4,6 +4,7 @@ import { isClipSegment, mediaSubjectsSchema, mediaTracksSchema, subjectPassages,
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
+import { gpuCostEur, gpuReady, subjectsOnGpu } from "./gpu";
 import { cutoutCostEur, subjectsInSandbox } from "./sandbox";
 
 // Her subject cut out at every image of the passages a composition draws it on (Subject), made in the cut-out
@@ -40,9 +41,15 @@ type Row = { id: string; kind: string; storage_path: string | null; subjects: un
 
 const kept = (row: Row | undefined): MediaSubjects => mediaSubjectsSchema.safeParse(row?.subjects ?? {}).data ?? {};
 
+/** On the card: what its machine takes to start (its image built once by Modal, then seconds), and a second of video (its 30 images read and their edge made). */
+const GPU_START_MS = 90_000;
+const GPU_WORK_PER_SECOND = 12;
+
 /**
  * Cuts out the passages this plan's compositions draw her on and that have no cut-out yet, as many as the step has
  * time for before its render (the rest render without: the text in front of her, and are made for the next version).
+ * On the rented card first (the full portrait model at every image, lib/render/gpu.ts) when it is set up; what it
+ * could not do goes to the cut-out sandbox, as before.
  */
 export async function ensureSubjects(studioId: string, postId: string, plan: Plan, options: { anticipate?: boolean } = {}): Promise<void> {
   const { passages, rows } = await planned(studioId, plan, options.anticipate);
@@ -52,8 +59,92 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
   });
   if (!missing.length) return;
   // Outside a step (no deadline known), as if a step of Vercel's 800 s had just begun.
-  const left = timeLeft();
-  let budget = (Number.isFinite(left) ? left : 800_000) - RENDER_MARGIN_MS;
+  const budgetNow = () => {
+    const left = timeLeft();
+    return (Number.isFinite(left) ? left : 800_000) - RENDER_MARGIN_MS;
+  };
+  const updates = new Map<string, MediaSubjects>();
+  const record = (p: SubjectPassage, value: MediaSubjects[string]) => {
+    const next = updates.get(p.clip_id) ?? { ...kept(rows.get(p.clip_id)) };
+    next[p.key] = value;
+    updates.set(p.clip_id, next);
+  };
+  const db = supabaseAdmin();
+  let pending = missing;
+  if (gpuReady()) {
+    const budget = budgetNow() - GPU_START_MS;
+    let room = budget;
+    const chosen = missing.filter((p) => {
+      const need = (p.to - p.from) * GPU_WORK_PER_SECOND * 1000;
+      if (need > room) return false;
+      room -= need;
+      return true;
+    });
+    const done = chosen.length ? await cutOnGpu(studioId, postId, chosen, rows, record, budget + GPU_START_MS).catch((error: unknown) => {
+      console.warn("subject cut-outs on the card unavailable, the sandbox takes them", error instanceof Error ? error.message.slice(0, 300) : error);
+      return new Set<string>();
+    }) : new Set<string>();
+    pending = missing.filter((p) => !done.has(p.key));
+  }
+  if (pending.length) await cutInSandbox(studioId, postId, pending, rows, record, budgetNow());
+  await Promise.all([...updates].map(([id, subjects]) => db.from("media_assets").update({ subjects }).eq("id", id).eq("studio_id", studioId)));
+}
+
+type Record_ = (p: SubjectPassage, value: MediaSubjects[string]) => void;
+
+/** The passages cut out on the rented card, each sent straight to its place in Storage; the keys it made. */
+async function cutOnGpu(studioId: string, postId: string, chosen: SubjectPassage[], rows: Map<string, Row>, record: Record_, deadlineMs: number): Promise<Set<string>> {
+  const db = supabaseAdmin();
+  const clips = [...new Set(chosen.map((p) => p.clip_id))];
+  const clipPaths = clips.map((id) => rows.get(id)?.storage_path ?? "");
+  const signed = (await db.storage.from("media").createSignedUrls(clipPaths.filter(Boolean), 3600)).data ?? [];
+  const jobs = (
+    await Promise.all(
+      chosen.map(async (p) => {
+        const url = signed.find((s) => s.path === clipPaths[clips.indexOf(p.clip_id)])?.signedUrl;
+        const [webm, png] = await Promise.all(
+          [false, true].map((still) => db.storage.from("media").createSignedUploadUrl(subjectPath(studioId, p.clip_id, p.key, still), { upsert: true })),
+        );
+        return url && webm?.data?.signedUrl && png?.data?.signedUrl ? [{ key: p.key, url, from: p.from, to: p.to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }] : [];
+      }),
+    )
+  ).flat();
+  if (!jobs.length) return new Set();
+  const { results, seconds } = await subjectsOnGpu(jobs, deadlineMs);
+  const at = new Date().toISOString();
+  const done = new Set<string>();
+  for (const p of chosen) {
+    const result = results[p.key];
+    if (!result || result instanceof Error) {
+      if (result) console.warn("subject cut-out on the card failed", p.key, result.message);
+      continue;
+    }
+    done.add(p.key);
+    record(p, {
+      path: subjectPath(studioId, p.clip_id, p.key, result.still),
+      still: result.still,
+      at,
+      frames: result.frames,
+      keys: result.keys,
+      people: result.people,
+      ...(result.top !== undefined ? { top: result.top } : {}),
+      ...(result.boxes?.length ? { boxes: result.boxes } : {}),
+    });
+  }
+  await db.from("cost_events").insert({
+    studio_id: studioId,
+    kind: "matting",
+    provider: "modal",
+    units: Math.round(seconds),
+    cost_eur: gpuCostEur(seconds),
+    meta: costMeta({ post_id: postId, passages: jobs.length, gpu: "L4", seconds_of_video: Math.round(chosen.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
+  });
+  return done;
+}
+
+/** The passages cut out in the cut-out sandbox (the photo model on key images, or the person model at every image). */
+async function cutInSandbox(studioId: string, postId: string, missing: SubjectPassage[], rows: Map<string, Row>, record: Record_, startBudget: number): Promise<void> {
+  let budget = startBudget;
   // A clip where the tracker followed someone is cut out by the person's own model, much faster.
   const followed = (id: string) => {
     const t = mediaTracksSchema.safeParse(rows.get(id)?.tracks).data;
@@ -85,35 +176,31 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
   try {
     const { results, seconds } = await subjectsInSandbox(`subject-${randomUUID()}`, jobs);
     const at = new Date().toISOString();
-    const updates = new Map<string, MediaSubjects>();
     for (const p of chosen) {
       const result = results[p.key];
       if (!result) continue;
-      const next = updates.get(p.clip_id) ?? { ...kept(rows.get(p.clip_id)) };
       if (result instanceof Error) {
         console.warn("subject cut-out failed", p.key, result.message);
-        next[p.key] = { failed_at: at, error: result.message.slice(0, 200) };
-      } else {
-        const path = subjectPath(studioId, p.clip_id, p.key, result.still);
-        const uploaded = await db.storage.from("media").upload(path, result.file, { contentType: result.still ? "image/png" : "video/webm", upsert: true });
-        if (uploaded.error) {
-          console.warn("subject cut-out not kept", p.key, uploaded.error.message);
-          continue;
-        }
-        next[p.key] = {
-          path,
-          still: result.still,
-          at,
-          frames: result.frames,
-          keys: result.keys,
-          people: result.people,
-          ...(result.top !== undefined ? { top: result.top } : {}),
-          ...(result.boxes?.length ? { boxes: result.boxes } : {}),
-        };
+        record(p, { failed_at: at, error: result.message.slice(0, 200) });
+        continue;
       }
-      updates.set(p.clip_id, next);
+      const path = subjectPath(studioId, p.clip_id, p.key, result.still);
+      const uploaded = await db.storage.from("media").upload(path, result.file, { contentType: result.still ? "image/png" : "video/webm", upsert: true });
+      if (uploaded.error) {
+        console.warn("subject cut-out not kept", p.key, uploaded.error.message);
+        continue;
+      }
+      record(p, {
+        path,
+        still: result.still,
+        at,
+        frames: result.frames,
+        keys: result.keys,
+        people: result.people,
+        ...(result.top !== undefined ? { top: result.top } : {}),
+        ...(result.boxes?.length ? { boxes: result.boxes } : {}),
+      });
     }
-    await Promise.all([...updates].map(([id, subjects]) => db.from("media_assets").update({ subjects }).eq("id", id).eq("studio_id", studioId)));
     await db.from("cost_events").insert({
       studio_id: studioId,
       kind: "matting",

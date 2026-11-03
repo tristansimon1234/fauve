@@ -30,6 +30,10 @@ const schema = {
   ANTHROPIC_ADMIN_KEY: z.string().min(1).optional(),
   // ElevenLabs Music: each Reel's soundtrack, composed from the rendered video. Unset = silent Reels.
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
+  // Modal (a graphics card rented by the second, lib/render/gpu.ts): her video cut out at every image by the full
+  // portrait model. Unset = the cut-out sandbox does it, as before.
+  MODAL_TOKEN_ID: z.string().startsWith("ak-").optional(),
+  MODAL_TOKEN_SECRET: z.string().startsWith("as-").optional(),
   ELEVENLABS_MUSIC_MODEL: z.string().default("music_v2_5"),
   /** Speech to text for her voice notes (word timings for the Reels' subtitles). */
   ELEVENLABS_STT_MODEL: z.string().default("scribe_v2"),

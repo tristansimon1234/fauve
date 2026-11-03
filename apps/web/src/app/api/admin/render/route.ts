@@ -1,6 +1,7 @@
 import { after, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { designEdit } from "@/lib/agent/editor";
+import { gpuCostEur, gpuReady, subjectsOnGpu } from "@/lib/render/gpu";
 import { renderPost } from "@/lib/render/render-post";
 import { dropSandbox, pruneSnapshots, trackSandbox, warmRemotionPool } from "@/lib/render/sandbox";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -14,7 +15,10 @@ import { adminKeyAuthorized } from "@/lib/test-studio";
 // in the background (a new sandbox installs everything once, a few minutes, the collages'
 // cut-out model and the tracker included). And POST
 // ?action=drop&sandbox=<name>: deletes an old render sandbox (never the one in service). And POST
-// ?action=prune: deletes the snapshots the sandboxes in service no longer need (the last two stay).
+// ?action=prune: deletes the snapshots the sandboxes in service no longer need (the last two stay). And POST
+// ?action=gpu-subject&media=<media id>&from=<s>&to=<s>: one passage of a video cut out on the rented card (Modal,
+// lib/render/gpu.ts), in the background, its file in {studio}/lab-gpu/ and a 24 h link, its timing and cost in the logs
+// (« gpu subject »), to try the card without a whole Reel.
 
 export const maxDuration = 800;
 
@@ -36,6 +40,37 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       return Response.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
+  }
+  if (action === "gpu-subject") {
+    const media = request.nextUrl.searchParams.get("media") ?? "";
+    const from = Number(request.nextUrl.searchParams.get("from") ?? "0");
+    const to = Number(request.nextUrl.searchParams.get("to") ?? "0");
+    if (!/^[0-9a-f-]{36}$/.test(media) || !(to > from) || to - from > 8) return Response.json({ error: "media=<uuid>&from=<s>&to=<s> (8 s at most)" }, { status: 400 });
+    if (!gpuReady()) return Response.json({ error: "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET not set" }, { status: 400 });
+    after(async () => {
+      const db = supabaseAdmin();
+      const { data: row } = await db.from("media_assets").select("studio_id, storage_path").eq("id", media).maybeSingle();
+      if (!row?.storage_path) return console.error("gpu subject: no such media", media);
+      const base = `${row.studio_id}/lab-gpu/${media}-${from}-${to}`;
+      const [clip, webm, png] = await Promise.all([
+        db.storage.from("media").createSignedUrl(row.storage_path, 3600),
+        db.storage.from("media").createSignedUploadUrl(`${base}.webm`, { upsert: true }),
+        db.storage.from("media").createSignedUploadUrl(`${base}.png`, { upsert: true }),
+      ]);
+      if (!clip.data?.signedUrl || !webm.data?.signedUrl || !png.data?.signedUrl) return console.error("gpu subject: links refused");
+      try {
+        const { results, seconds } = await subjectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000);
+        const result = results.lab;
+        const cost = gpuCostEur(seconds);
+        await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "matting", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, gpu: "L4" } });
+        const still = result && !(result instanceof Error) && result.still;
+        const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(`${base}.${still ? "png" : "webm"}`, 86_400)).data?.signedUrl : null;
+        console.log("gpu subject", JSON.stringify({ media, from, to, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result, link }));
+      } catch (error) {
+        console.error("gpu subject failed", error instanceof Error ? error.message.slice(0, 600) : error);
+      }
+    });
+    return Response.json({ ok: true, started: true }, { status: 202 });
   }
   if (action !== "warm") return Response.json({ error: "unknown action" }, { status: 400 });
   after(async () => {

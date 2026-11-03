@@ -104,7 +104,7 @@ const FETCH = 'curl -fsSL --http1.1 --retry 4 --retry-all-errors --retry-delay 1
  * ffmpeg cannot read it, the file as it came.
  */
 /** An iPhone's HDR (HLG or PQ, 10 bits) tone-mapped to the SDR of a Reel, else its colours come out washed out. */
-const HDR_TO_SDR = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv";
+export const HDR_TO_SDR = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv";
 const HDR_TAGS = "-color_primaries bt709 -color_trc bt709 -colorspace bt709";
 
 const NORMALIZE = [

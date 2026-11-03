@@ -146,6 +146,17 @@ export function sandboxCostUsd(seconds: number, vcpus: number, region: string = 
   return (Math.max(0, seconds) / 3600) * vcpus * (rate.cpuHour + 2 * rate.memoryGbHour);
 }
 
+// Modal (modal.com/pricing, November 2026), USD a second: an L4 card, and a sandbox's CPU (per physical core) and
+// memory (per GiB), which sandboxes pay at three times the functions' list price.
+export const MODAL_L4_USD_PER_SECOND = 0.000222;
+export const MODAL_SANDBOX_CORE_USD_PER_SECOND = 0.00003942;
+export const MODAL_SANDBOX_GIB_USD_PER_SECOND = 0.00000667;
+
+/** What `seconds` of a Modal sandbox with an L4, `cores` and `gib` cost (its whole life: it is created for the job and ended after it). */
+export function modalCostUsd(seconds: number, cores: number, gib: number): number {
+  return Math.max(0, seconds) * (MODAL_L4_USD_PER_SECOND + cores * MODAL_SANDBOX_CORE_USD_PER_SECOND + gib * MODAL_SANDBOX_GIB_USD_PER_SECOND);
+}
+
 // ElevenLabs on the API (elevenlabs.io/pricing/api, October 2026), USD.
 export const ELEVENLABS_MUSIC_USD_PER_MINUTE = 0.15;
 export const ELEVENLABS_STT_USD_PER_HOUR = 0.22;
