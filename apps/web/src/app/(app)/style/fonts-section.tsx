@@ -94,7 +94,7 @@ function PairList({ display, body, onPick }: { display: string | null; body: str
             role="radio"
             aria-checked={on}
             onClick={() => onPick(pair)}
-            className={`fauve-press flex min-w-0 flex-col gap-1.5 rounded-[16px] border-[1.5px] px-4 py-3.5 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-violet/40"}`}
+            className={`fauve-press flex min-w-0 flex-col gap-1.5 border-[1.5px] px-4 py-3.5 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-violet/40"}`}
           >
             <span
               className="truncate text-[30px] leading-none"
@@ -163,7 +163,7 @@ function FontPicker({
     <fieldset className="flex min-w-0 flex-col gap-2.5">
       <legend className="mb-2 text-[13px] font-bold">{label}</legend>
       <details className="group flex flex-col gap-2.5">
-        <summary className="flex h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl border-[1.5px] border-line bg-white px-3.5 hover:border-lilac group-open:border-violet [&::-webkit-details-marker]:hidden">
+        <summary className="flex h-12 cursor-pointer list-none items-center justify-between gap-3 border-[1.5px] border-line bg-white px-3.5 hover:border-lilac group-open:border-violet [&::-webkit-details-marker]:hidden">
           <span className="truncate text-[17px]" style={{ fontFamily: fontStack(value ?? fallback) }}>
             {value ?? "Automatique"}
           </span>
@@ -186,7 +186,7 @@ function FontPicker({
             placeholder="Rechercher une police"
             className={inputClass}
           />
-          <div className="max-h-72 overflow-y-auto rounded-[14px] border border-line p-1.5">
+          <div className="max-h-72 overflow-y-auto border border-line p-1.5">
             <FontOption name={id} checked={value === null} onSelect={() => onChange(null)} family={fallback}>
               <span className="flex flex-col">
                 <span>Automatique</span>
@@ -270,7 +270,7 @@ function FontOption({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-[17px] hover:bg-soft has-checked:bg-violet-soft has-checked:text-violet has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-violet">
+    <label className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-[17px] hover:bg-soft has-checked:bg-violet-soft has-checked:text-violet has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-violet">
       <input type="radio" name={name} checked={checked} onChange={onSelect} className="sr-only" />
       <span style={{ fontFamily: fontStack(family) }}>{children}</span>
       {checked && <CheckIcon size={16} className="shrink-0" />}

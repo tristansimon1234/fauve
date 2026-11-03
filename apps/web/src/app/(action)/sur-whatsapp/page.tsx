@@ -18,7 +18,7 @@ export default function OnWhatsAppPage() {
       <p className="text-[15px] leading-snug text-white/80">
         Écris-moi là-bas comme à une vraie personne : tes photos, tes vidéos, tes idées. Quand il faut un écran, je t’envoie un bouton vers la bonne page.
       </p>
-      <a href={whatsappLink("")} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-[15px] font-extrabold text-ink">
+      <a href={whatsappLink("")} className="inline-flex items-center gap-2 bg-white px-5 py-3 text-[15px] font-extrabold text-ink">
         <WhatsAppIcon size={18} /> Ouvrir WhatsApp
       </a>
       <p className="text-[13px] leading-snug text-white/60">L’app complète s’ouvre sur ordinateur, sur {new URL(SITE_URL).host}.</p>

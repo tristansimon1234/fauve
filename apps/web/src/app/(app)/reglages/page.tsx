@@ -61,7 +61,7 @@ async function Settings() {
   if (!member) {
     return (
       <>
-        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Réglages</h1>
+        <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[60px]">Réglages</h1>
         <NoStudio />
         <SignOut />
       </>
@@ -90,7 +90,7 @@ async function Settings() {
   return (
     // The same gap as inside a tab: on a phone, all the tabs' sections follow one another evenly.
     <div className="mx-auto flex w-full max-w-[760px] flex-col gap-4">
-      <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Réglages</h1>
+      <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[60px]">Réglages</h1>
       <SettingsPanels
         panels={{
           commerce: (
@@ -148,7 +148,7 @@ async function Settings() {
                         : "Edith envoie tes Reels dans tes brouillons TikTok : tu ajoutes un son et tu publies.";
                   return (
                     <div key={platform} className="flex items-center gap-3">
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-violet-soft text-violet">
+                      <span className="flex size-9 shrink-0 items-center justify-center bg-violet-soft text-violet">
                         {platform === "tiktok" ? <TikTokIcon size={18} /> : <InstagramIcon size={18} />}
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col">

@@ -30,13 +30,13 @@ export async function ConnectActions({ searchParams }: { searchParams: Promise<R
   return (
     <>
       {error && (
-        <p role="alert" className="rounded-2xl bg-peach px-4 py-3 text-sm font-semibold text-peach-ink">
+        <p role="alert" className="bg-peach px-4 py-3 text-sm font-semibold text-peach-ink">
           {error}
         </p>
       )}
 
       {account && (
-        <div className="flex items-center gap-3 rounded-2xl border border-line px-4 py-3.5">
+        <div className="flex items-center gap-3 border border-line px-4 py-3.5">
           <span className="flex size-9 items-center justify-center rounded-full bg-violet-soft text-violet">
             <CheckIcon size={18} />
           </span>
@@ -47,7 +47,7 @@ export async function ConnectActions({ searchParams }: { searchParams: Promise<R
         </div>
       )}
 
-      <div className={`flex items-center gap-3 rounded-2xl border border-line px-4 py-3.5 ${tiktokOn ? "" : "opacity-70"}`}>
+      <div className={`flex items-center gap-3 border border-line px-4 py-3.5 ${tiktokOn ? "" : "opacity-70"}`}>
         <TikTokIcon className="shrink-0" />
         <span className="flex flex-1 flex-col gap-0.5">
           <span className="text-[15px] font-bold">TikTok</span>
@@ -86,14 +86,14 @@ export async function ConnectActions({ searchParams }: { searchParams: Promise<R
         {!member ? (
           <Link
             href="/connexion?next=/connect"
-            className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-ink text-base font-bold text-white"
+            className="flex h-[54px] items-center justify-center gap-2.5 bg-ink text-base font-bold text-white"
           >
             Se connecter pour continuer
           </Link>
         ) : account ? (
           <Link
             href="/pret"
-            className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-ink text-base font-bold text-white"
+            className="flex h-[54px] items-center justify-center gap-2.5 bg-ink text-base font-bold text-white"
           >
             Continuer
           </Link>
@@ -101,7 +101,7 @@ export async function ConnectActions({ searchParams }: { searchParams: Promise<R
           // Plain link: the OAuth start is a route handler, not a page.
           <a
             href="/api/instagram/connect"
-            className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-ink text-base font-bold text-white"
+            className="flex h-[54px] items-center justify-center gap-2.5 bg-ink text-base font-bold text-white"
           >
             <InstagramIcon />
             Connecter Instagram
@@ -131,7 +131,7 @@ export async function HandlesActions() {
       <div className="mt-auto -mx-6 border-t border-line px-6 pt-3.5 pb-7.5">
         <Link
           href={member ? "/pret" : "/connexion?next=/connect"}
-          className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-ink text-base font-bold text-white"
+          className="flex h-[54px] items-center justify-center gap-2.5 bg-ink text-base font-bold text-white"
         >
           {member ? "Continuer" : "Se connecter pour continuer"}
         </Link>
@@ -141,5 +141,5 @@ export async function HandlesActions() {
 }
 
 export function ConnectActionsFallback() {
-  return <div className="mt-auto h-[54px] animate-pulse rounded-full bg-soft motion-reduce:animate-none" aria-hidden="true" />;
+  return <div className="mt-auto h-[54px] animate-pulse bg-soft motion-reduce:animate-none" aria-hidden="true" />;
 }

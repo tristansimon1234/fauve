@@ -78,7 +78,7 @@ export default async function GuidePage({ params }: PageProps<"/guides/[slug]">)
           <span className="h-px w-8 bg-ink/30" />
           {fr(guide.kicker)}
         </span>
-        <h1 className="mt-5 text-[clamp(36px,5vw,60px)] leading-[1.02] font-extrabold tracking-[-0.045em]">
+        <h1 className="mt-5 text-[clamp(42px,6vw,88px)] leading-[0.92] font-semibold tracking-[-0.055em]">
           {fr(guide.h1)}
           {guide.accent && <span className="mt-1 block font-[family-name:var(--font-serif)] text-[1.05em] leading-[1] font-normal tracking-[-0.02em] text-violet italic">{fr(guide.accent)}</span>}
         </h1>
@@ -91,7 +91,7 @@ export default async function GuidePage({ params }: PageProps<"/guides/[slug]">)
         </div>
 
         {trade && (
-          <Link href={`/community-manager/${trade.slug}`} className="mt-14 flex flex-col gap-2 rounded-[22px] bg-white p-7 transition-shadow hover:shadow-[0_24px_50px_-28px_rgba(28,21,48,.35)]">
+          <Link href={`/community-manager/${trade.slug}`} className="mt-14 flex flex-col gap-2 border border-ink/20 p-7 transition-colors hover:border-ink">
             <span className="text-[12px] font-bold tracking-[0.16em] text-violet uppercase">{fr(trade.menu)}</span>
             <span className="text-[22px] leading-snug font-extrabold tracking-[-0.02em]">{fr(`${trade.h1} ${trade.accent}`)}</span>
             <span className="text-[15px] text-muted">{fr("Voir ce qu’Edith fait pour ton métier →")}</span>

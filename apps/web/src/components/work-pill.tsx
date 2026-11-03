@@ -74,7 +74,7 @@ export function WorkPill({ studioId }: { studioId: string }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="fauve-enter flex items-center gap-2 rounded-full whitespace-nowrap border border-line bg-white/95 py-1.5 pr-3.5 pl-1.5 text-[13px] font-semibold shadow-[0_8px_24px_rgba(28,21,48,0.14)] backdrop-blur"
+        className="fauve-enter flex items-center gap-2 whitespace-nowrap border border-line bg-white/95 py-1.5 pr-3.5 pl-1.5 text-[13px] font-semibold shadow-[0_8px_24px_rgba(18,17,16,0.14)] backdrop-blur"
       >
         {running.length ? (
           <Orb size={24} />
@@ -87,7 +87,7 @@ export function WorkPill({ studioId }: { studioId: string }) {
         <span className="text-muted">· {label}</span>
       </button>
       {open && (
-        <div className="fauve-pop absolute right-0 flex w-[min(340px,calc(100vw-32px))] flex-col gap-3 rounded-[18px] border border-line bg-white p-3.5 shadow-[0_16px_40px_rgba(28,21,48,0.18)] max-sm:bottom-full max-sm:left-1/2 max-sm:mb-2 max-sm:-translate-x-1/2 max-sm:[--fauve-origin:bottom_center] sm:top-full sm:mt-2 sm:[--fauve-origin:top_right]">
+        <div className="fauve-pop absolute right-0 flex w-[min(340px,calc(100vw-32px))] flex-col gap-3 border border-line bg-white p-3.5 shadow-[0_16px_40px_rgba(18,17,16,0.18)] max-sm:bottom-full max-sm:left-1/2 max-sm:mb-2 max-sm:-translate-x-1/2 max-sm:[--fauve-origin:bottom_center] sm:top-full sm:mt-2 sm:[--fauve-origin:top_right]">
           {visible.map((item) => (
             <div key={item.id} className="flex flex-col gap-2">
               <div className="flex items-start gap-2">
@@ -120,7 +120,7 @@ export function WorkPill({ studioId }: { studioId: string }) {
                   <ol className="flex gap-1" aria-label="Étapes">
                     {item.steps.map((s, i) => (
                       <li key={s} className="flex min-w-0 flex-1 flex-col gap-1">
-                        <span className={`h-1.5 rounded-full ${i < item.step ? "bg-violet" : i === item.step ? "fauve-pulse bg-violet/60" : "bg-line"}`} />
+                        <span className={`h-1.5 ${i < item.step ? "bg-violet" : i === item.step ? "fauve-pulse bg-violet/60" : "bg-line"}`} />
                         <span className={`truncate text-[11px] ${i === item.step ? "font-bold text-ink" : "text-muted"}`}>{s}</span>
                       </li>
                     ))}

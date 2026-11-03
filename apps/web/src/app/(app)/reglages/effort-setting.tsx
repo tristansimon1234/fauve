@@ -62,7 +62,7 @@ export function EffortSetting({ initial }: { initial: Effort }) {
           return (
             <label
               key={e}
-              className={`flex cursor-pointer items-start gap-3 rounded-[16px] border p-3.5 transition-[border-color,background-color,scale] duration-150 ease-fauve active:scale-[0.985] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-violet motion-reduce:transition-none motion-reduce:active:scale-100 sm:flex-col sm:gap-2 ${
+              className={`flex cursor-pointer items-start gap-3 border p-3.5 transition-[border-color,background-color,scale] duration-150 ease-fauve active:scale-[0.985] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-violet motion-reduce:transition-none motion-reduce:active:scale-100 sm:flex-col sm:gap-2 ${
                 on ? "border-violet bg-violet-soft" : "border-line bg-white hover:border-violet/40"
               }`}
             >
@@ -94,7 +94,7 @@ export function EffortSetting({ initial }: { initial: Effort }) {
                     {level.label}
                   </span>
                   {e === DEFAULT_EFFORT && (
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-violet ring-1 ring-violet/20">Conseillé</span>
+                    <span className="bg-white px-2 py-0.5 text-[11px] font-bold text-violet ring-1 ring-violet/20">Conseillé</span>
                   )}
                 </span>
                 {/* The time and cost line sits at the bottom, level across the three cards. */}

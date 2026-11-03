@@ -103,7 +103,7 @@ export function IdeaToPost() {
   return (
     <div ref={ref} className="grid items-center gap-8 lg:grid-cols-[1fr_1.05fr] lg:gap-14">
       {/* The conversation, in the app */}
-      <div className="flex h-[440px] flex-col overflow-hidden rounded-[28px] border border-white bg-chat shadow-[0_30px_70px_-30px_rgba(28,21,48,.3)] sm:h-[460px]">
+      <div className="flex h-[440px] flex-col overflow-hidden border border-ink/15 bg-chat sm:h-[460px]">
         <div className="flex items-center gap-3 border-b border-line/80 bg-white/70 px-5 py-3.5 backdrop-blur">
           <Mascot size={46} mood={MOODS[phase]} />
           <span className="flex flex-col">
@@ -141,7 +141,7 @@ export function IdeaToPost() {
                 <strong className="font-bold text-violet">Ta-da.</strong> Ton carrousel est prêt : tes photos retouchées, tes couleurs, ta police. Il est prêt à partager.
                 <span className="mt-2.5 flex flex-wrap gap-1.5">
                   {["Voir mon carrousel", "Change un texte"].map((label) => (
-                    <span key={label} className="rounded-full border border-line bg-white px-3 py-1.5 text-[12px] font-bold text-violet">
+                    <span key={label} className="border border-line bg-white px-3 py-1.5 text-[12px] font-bold text-violet">
                       {label}
                     </span>
                   ))}
@@ -152,7 +152,7 @@ export function IdeaToPost() {
         </div>
         {/* Her message box: she types her idea, and sends it. */}
         <div className="flex items-center gap-2 border-t border-line/70 bg-white/80 px-3 py-2.5">
-          <span className="flex h-11 min-w-0 flex-1 items-center rounded-full border border-line bg-white px-4 text-[14px]">
+          <span className="flex h-11 min-w-0 flex-1 items-center border border-line bg-white px-4 text-[14px]">
             {draft ? (
               <>
                 <span className="truncate">{draft}</span>
@@ -170,9 +170,9 @@ export function IdeaToPost() {
 
       {/* The result: the carousel develops, then becomes the post */}
       <div className="flex flex-col items-center gap-3">
-        <figure className="w-full max-w-[400px] overflow-hidden rounded-[22px] border border-line bg-white shadow-[0_30px_70px_-30px_rgba(28,21,48,.35)]">
+        <figure className="w-full max-w-[400px] overflow-hidden border border-ink/15 bg-white">
           <span className={`flex items-center gap-2 px-3.5 py-3 transition-opacity duration-700 ${phase === 4 ? "opacity-100" : "opacity-35"}`}>
-            <span className="size-8 shrink-0 rounded-full bg-[conic-gradient(from_180deg,#F2694E,#5B3FD9,#F2694E)] p-[2px]">
+            <span className="size-8 shrink-0 rounded-full bg-ink p-[2px]">
               <span className="block size-full rounded-full border-2 border-white bg-[#6D2E46]" />
             </span>
             <span className="flex flex-col leading-tight">
@@ -196,7 +196,7 @@ export function IdeaToPost() {
                   style={{
                     transform: phase === 4 ? strip : sheet,
                     borderRadius: phase === 4 ? 0 : 22,
-                    boxShadow: phase === 4 ? "none" : "0 18px 40px -16px rgba(28,21,48,.45)",
+                    boxShadow: phase === 4 ? "none" : "0 18px 40px -16px rgba(18,17,16,.45)",
                     // Gathering into the post: the first photo grows, the others follow it out.
                     transitionDelay: gathering ? `${i * 70}ms` : "0ms",
                   }}
@@ -206,7 +206,7 @@ export function IdeaToPost() {
             {/* A light passes over the photos at each step. */}
             {phase === 3 && done > 0 && <span key={`s${run}-${done}`} className="land-sweep pointer-events-none absolute inset-0" />}
             {phase === 4 && (
-              <span className="absolute top-3 right-3 rounded-full bg-black/55 px-2 py-0.5 text-[11.5px] font-semibold text-white tabular-nums">
+              <span className="absolute top-3 right-3 bg-black/55 px-2 py-0.5 text-[11.5px] font-semibold text-white tabular-nums">
                 {at + 1}/{SHOWCASE_SLIDES.length}
               </span>
             )}
@@ -250,9 +250,9 @@ function Row({ fresh, children }: { fresh: boolean; children: ReactNode }) {
 }
 
 function Her({ children }: { children: ReactNode }) {
-  return <div className="max-w-[90%] self-start rounded-[16px_16px_16px_4px] border border-line bg-white px-3.5 py-2.5 text-[14px] leading-[1.45]">{children}</div>;
+  return <div className="max-w-[90%] self-start border border-line bg-white px-3.5 py-2.5 text-[14px] leading-[1.45]">{children}</div>;
 }
 
 function Me({ children }: { children: ReactNode }) {
-  return <div className="max-w-[82%] self-end rounded-[16px_16px_4px_16px] bg-violet px-3.5 py-2.5 text-[14px] leading-[1.45] text-white">{children}</div>;
+  return <div className="max-w-[82%] self-end bg-violet px-3.5 py-2.5 text-[14px] leading-[1.45] text-white">{children}</div>;
 }

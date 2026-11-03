@@ -143,7 +143,7 @@ export function NewPostSheet({ date, copyLink, onClose }: { date?: string; copyL
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="fauve-enter relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:h-auto sm:max-h-[min(860px,92dvh)] sm:min-h-[min(520px,92dvh)] sm:max-w-[560px] sm:rounded-[22px] sm:shadow-[0_24px_60px_rgba(28,21,48,0.22)]"
+        className="fauve-enter relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:h-auto sm:max-h-[min(860px,92dvh)] sm:min-h-[min(520px,92dvh)] sm:max-w-[560px] sm:shadow-[0_24px_60px_rgba(18,17,16,0.22)]"
       >
         {work ? (
           <Working work={work} titleId={titleId} onClose={onClose} />
@@ -497,7 +497,7 @@ function Create({
               aria-current={i === at ? "step" : undefined}
               className="flex w-full flex-col gap-1.5 text-left disabled:cursor-default"
             >
-              <span className={`h-1 rounded-full ${i <= at ? "bg-violet" : "bg-line"}`} />
+              <span className={`h-1 ${i <= at ? "bg-violet" : "bg-line"}`} />
               <span className={`truncate text-[11.5px] font-bold ${i === at ? "text-violet" : i < at ? "text-ink" : "text-muted"}`}>{STEP_LABELS[s]}</span>
             </button>
           </li>
@@ -508,7 +508,7 @@ function Create({
         {step === "what" && (
           <div className="flex items-end gap-2.5">
             <Mascot size={46} still />
-            <p className="rounded-[20px_20px_20px_6px] bg-[#F3EEF8] px-[15px] py-3 text-[15.5px] leading-[1.4] font-medium">
+            <p className="bg-soft px-[15px] py-3 text-[15.5px] leading-[1.4] font-medium">
               Donne-moi tes photos ou vidéos, je m’occupe de tout le reste.
             </p>
           </div>
@@ -538,7 +538,7 @@ function Create({
                     // A Reel asks its style and its voice on the same screen; the others go on to the files.
                     if (f.kind !== "reel") setStepAt(1);
                   }}
-                  className={`fauve-press flex h-12 items-center gap-2 rounded-[14px] border-[1.5px] px-3 text-left text-[14.5px] font-extrabold disabled:opacity-40 ${
+                  className={`fauve-press flex h-12 items-center gap-2 border-[1.5px] px-3 text-left text-[14.5px] font-extrabold disabled:opacity-40 ${
                     on ? "border-violet bg-violet-tint text-violet" : "border-line bg-white hover:border-violet/40"
                   }`}
                 >
@@ -570,7 +570,7 @@ function Create({
                   role="radio"
                   aria-checked={c.on}
                   onClick={c.pick}
-                  className={`fauve-press flex min-h-12 items-center justify-center rounded-[14px] border-[1.5px] px-2 py-2 text-center text-[14px] leading-tight font-extrabold ${
+                  className={`fauve-press flex min-h-12 items-center justify-center border-[1.5px] px-2 py-2 text-center text-[14px] leading-tight font-extrabold ${
                     c.on ? "border-violet bg-violet-tint text-violet" : "border-line bg-white hover:border-violet/40"
                   }`}
                 >
@@ -589,7 +589,7 @@ function Create({
         {step === "files" && (
         <section
           aria-labelledby={`${titleId}-files`}
-          className={`flex flex-col gap-2.5 rounded-[18px] transition-colors ${dragging ? "bg-violet-soft outline-2 outline-offset-4 outline-violet outline-dashed" : ""}`}
+          className={`flex flex-col gap-2.5 transition-colors ${dragging ? "bg-violet-soft outline-2 outline-offset-4 outline-violet outline-dashed" : ""}`}
           onDragOver={(e) => {
             e.preventDefault();
             setDragging(true);
@@ -615,7 +615,7 @@ function Create({
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={!options}
-                className="fauve-press flex aspect-square w-full flex-col items-center justify-center gap-1.5 rounded-[16px] border-[1.5px] border-dashed border-[#CFC6F7] bg-[#F6F2FF] p-1.5 text-violet disabled:opacity-60"
+                className="fauve-press flex aspect-square w-full flex-col items-center justify-center gap-1.5 border-[1.5px] border-dashed border-ink bg-violet-tint p-1.5 text-violet disabled:opacity-60"
               >
                 <PlusIcon size={24} />
                 <span className="text-center text-[12.5px] leading-tight font-bold">
@@ -665,7 +665,7 @@ function Create({
               );
             })}
             {options === null
-              ? Array.from({ length: 5 }, (_, i) => <li key={i} className="aspect-square animate-pulse rounded-[16px] bg-soft" aria-hidden />)
+              ? Array.from({ length: 5 }, (_, i) => <li key={i} className="aspect-square animate-pulse bg-soft" aria-hidden />)
               : shownLibrary.map((m) => {
                   const at = picked.indexOf(`m:${m.id}`);
                   return (
@@ -715,7 +715,7 @@ function Create({
             rows={4}
             onChange={(e) => typeIdea(e.target.value)}
             placeholder={SCENARIO_EXAMPLE[kind]}
-            className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-3 text-[15.5px] leading-snug outline-none focus:border-violet"
+            className="w-full resize-none border-[1.5px] border-line bg-white px-3.5 py-3 text-[15.5px] leading-snug outline-none focus:border-violet"
           />
           {linkBusy && (
             <p className="flex items-center gap-2 text-[13.5px] text-muted">
@@ -777,7 +777,7 @@ function Create({
                 </div>
               )}
               {copying && reading?.state === "read" && reading.lines.length > 0 && (
-                <div className="flex flex-col gap-1.5 rounded-[16px] bg-soft px-3.5 py-3">
+                <div className="flex flex-col gap-1.5 bg-soft px-3.5 py-3">
                   <span className="text-[13px] font-bold">Ce que ton Reel en reprendra</span>
                   <ul className="flex flex-col gap-1 text-[13.5px] leading-snug text-muted">
                     {reading.lines.map((line) => (
@@ -806,7 +806,7 @@ function Create({
                 type="button"
                 onClick={() => refRef.current?.click()}
                 disabled={refs.files.length >= 4}
-                className={`fauve-press flex items-center gap-2.5 self-start rounded-full border-[1.5px] py-1.5 pr-3.5 pl-2 text-left text-[14px] font-bold disabled:opacity-60 ${
+                className={`fauve-press flex items-center gap-2.5 self-start border-[1.5px] py-1.5 pr-3.5 pl-2 text-left text-[14px] font-bold disabled:opacity-60 ${
                   refs.files.length ? "border-violet bg-violet-tint text-violet" : "border-dashed border-line bg-white text-violet hover:border-violet/40"
                 }`}
               >
@@ -845,7 +845,7 @@ function Create({
           {/* Edith says back what she will make: one plan, in points, with why (Tristan: « la demande bien reformulée, claire et précise, lisible »). */}
           <div className="flex items-end gap-2.5">
             <Mascot size={46} mood={proposing ? "thinking" : "happy"} still />
-            <p aria-live="polite" className="rounded-[20px_20px_20px_6px] bg-[#F3EEF8] px-[15px] py-3 text-[15.5px] leading-[1.4] font-medium">
+            <p aria-live="polite" className="bg-soft px-[15px] py-3 text-[15.5px] leading-[1.4] font-medium">
               {proposing
                 ? idea.trim()
                   ? "Je relis ta demande et je regarde tes fichiers…"
@@ -858,16 +858,16 @@ function Create({
             </p>
           </div>
           {proposing ? (
-            <div className="flex flex-col gap-2.5 rounded-[20px] border-[1.5px] border-line p-4" aria-hidden>
-              <div className="h-5 w-1/2 animate-pulse rounded-full bg-soft" />
+            <div className="flex flex-col gap-2.5 border-[1.5px] border-line p-4" aria-hidden>
+              <div className="h-5 w-1/2 animate-pulse bg-soft" />
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-4 animate-pulse rounded-full bg-soft" style={{ width: `${88 - i * 9}%` }} />
+                <div key={i} className="h-4 animate-pulse bg-soft" style={{ width: `${88 - i * 9}%` }} />
               ))}
             </div>
           ) : plan ? (
             <PlanCard plan={plan} />
           ) : idea.trim() ? (
-            <p className="rounded-[18px] bg-soft px-4 py-3 text-[14.5px] leading-snug">{idea.trim()}</p>
+            <p className="bg-soft px-4 py-3 text-[14.5px] leading-snug">{idea.trim()}</p>
           ) : null}
           {!proposing && (
             <button type="button" onClick={() => setStepAt(steps.indexOf("idea"))} className="self-start py-1 text-[14px] font-bold text-violet">
@@ -878,7 +878,7 @@ function Create({
         )}
 
         {error && (
-          <div role="alert" className="flex flex-col gap-2 rounded-[16px] bg-peach px-4 py-3 text-[14px] leading-snug text-peach-ink">
+          <div role="alert" className="flex flex-col gap-2 bg-peach px-4 py-3 text-[14px] leading-snug text-peach-ink">
             <p className="font-semibold">{error}</p>
             {locked && (
               <Link href="/abonnement" onClick={onClose} className="self-start font-bold underline underline-offset-2">
@@ -965,7 +965,7 @@ function Create({
 
       {sheet === "date" && options && (
         <Sheet label="La date" onClose={() => setSheet(null)}>
-          <SheetHead title="Quand te faire signe ?" hint="Rien ne part tout seul : à ce moment-là, je t’envoie un rappel et tu le publies d’un mot. Tes prochains jours libres, à ton heure habituelle." onClose={() => setSheet(null)} />
+          <SheetHead title="Quand te faire signe ?"hint="Rien ne part tout seul : à ce moment-là, je t’envoie un rappel et tu le publies d’un mot. Tes prochains jours libres, à ton heure habituelle." onClose={() => setSheet(null)} />
           {kind === "reel" && options.tiktok && (
             <div className="flex items-center gap-2">
               <span className="flex-1 text-[14px] font-bold">Où ?</span>
@@ -977,7 +977,7 @@ function Create({
                     type="button"
                     aria-pressed={on}
                     onClick={() => setPlatforms(on ? (where.length > 1 ? where.filter((x) => x !== p) : where) : [...where, p])}
-                    className={`h-9 rounded-full border-[1.5px] px-3.5 text-[13.5px] font-bold ${on ? "border-violet bg-violet-soft text-violet" : "border-line bg-white text-muted"}`}
+                    className={`h-9 border-[1.5px] px-3.5 text-[13.5px] font-bold ${on ? "border-violet bg-violet-soft text-violet" : "border-line bg-white text-muted"}`}
                   >
                     {p === "instagram" ? "Instagram" : "TikTok"}
                   </button>
@@ -998,14 +998,14 @@ function Create({
                 }}
               />
             ))}
-            <label className="flex flex-col gap-1.5 rounded-[18px] border-[1.5px] border-dashed border-line px-3.5 py-3">
+            <label className="flex flex-col gap-1.5 border-[1.5px] border-dashed border-line px-3.5 py-3">
               <span className="text-[15px] font-bold text-violet">Une autre date</span>
               <input
                 type="datetime-local"
                 value={other}
                 min={options.nowLocal}
                 onChange={(e) => setOther(e.target.value)}
-                className="h-11 rounded-[12px] border border-line bg-white px-3 text-[15px] outline-none focus:border-violet"
+                className="h-11 border border-line bg-white px-3 text-[15px] outline-none focus:border-violet"
               />
             </label>
             {other && (
@@ -1034,8 +1034,7 @@ function Create({
           }}
         >
           <SheetHead
-            title="Une voix off sur ce Reel ?"
-            hint="Une voix raconte ton Reel, la musique passe dessous. Ou juste la musique. Écoute et choisis."
+            title="Une voix off sur ce Reel ?"hint="Une voix raconte ton Reel, la musique passe dessous. Ou juste la musique. Écoute et choisis."
             onClose={() => {
               setLaunchOnVoice(false);
               setSheet(null);
@@ -1068,7 +1067,7 @@ function Create({
           </div>
           <ol className="flex flex-col gap-2">
             {(options?.film ?? []).map((f, i) => (
-              <li key={f.idea} className="flex gap-3 rounded-[18px] bg-soft px-3.5 py-3">
+              <li key={f.idea} className="flex gap-3 bg-soft px-3.5 py-3">
                 <span className="w-[18px] font-serif text-[26px] leading-none text-coral italic" aria-hidden>
                   {i + 1}
                 </span>
@@ -1170,7 +1169,7 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
                   : `Ton Reel sera prêt dans ${effect ? EFFECT_MINUTES : work.minutes} minutes environ.`}
           </p>
         </div>
-        <ol aria-label="Ce que fait Edith" className="flex w-full flex-col rounded-[22px] border border-line bg-white px-[18px] py-2 text-left">
+        <ol aria-label="Ce que fait Edith" className="flex w-full flex-col border border-line bg-white px-[18px] py-2 text-left">
           {steps.map((s, i) => {
             const state = done || i < reached ? "done" : i === reached && !failed ? "now" : "later";
             return (
@@ -1192,7 +1191,7 @@ function Working({ work, titleId, onClose }: { work: Work; titleId: string; onCl
           })}
         </ol>
         {!done && !failed && (
-          <div className="flex w-full items-start gap-3 rounded-[20px] bg-soft px-4 py-3.5 text-left">
+          <div className="flex w-full items-start gap-3 bg-soft px-4 py-3.5 text-left">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-success-soft text-success">
               <CheckIcon size={18} />
             </span>
@@ -1227,7 +1226,7 @@ function Field({ icon, label, value, sub, wide, onClick }: { icon: ReactNode; la
     <button
       type="button"
       onClick={onClick}
-      className={`fauve-press flex min-w-0 items-center gap-2.5 rounded-[16px] border-[1.5px] border-line bg-white py-2 pr-2.5 pl-2 text-left transition-colors hover:border-violet/40 ${wide ? "col-span-2" : "max-[419px]:pl-3.5"}`}
+      className={`fauve-press flex min-w-0 items-center gap-2.5 border-[1.5px] border-line bg-white py-2 pr-2.5 pl-2 text-left transition-colors hover:border-violet/40 ${wide ? "col-span-2" : "max-[419px]:pl-3.5"}`}
     >
       {/* Half a narrow phone: the words first. */}
       <span className={`flex size-9 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet ${wide ? "" : "max-[419px]:hidden"}`}>{icon}</span>
@@ -1247,7 +1246,7 @@ function Field({ icon, label, value, sub, wide, onClick }: { icon: ReactNode; la
 /** The plan Edith will follow: its title, its points in order (the rubric in bold), and why. */
 function PlanCard({ plan }: { plan: PostPlan }) {
   return (
-    <div className="fauve-enter flex flex-col gap-3 rounded-[20px] border-[1.5px] border-violet/30 bg-white p-4">
+    <div className="fauve-enter flex flex-col gap-3 border-[1.5px] border-violet/30 bg-white p-4">
       <h3 className="text-[17px] font-extrabold tracking-[-0.01em]">{plan.title}</h3>
       <ul className="flex flex-col gap-2">
         {plan.points.map((point) => {
@@ -1311,7 +1310,7 @@ function CopyGiver({ studioId, another, onGiven }: { studioId: string; another: 
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-[18px] border-[1.5px] border-dashed border-line px-3.5 py-3">
+    <div className="flex flex-col gap-2 border-[1.5px] border-dashed border-line px-3.5 py-3">
       <span className="text-[15px] font-bold text-violet">{another ? "Un autre Reel que tu aimes" : "Un Reel que tu aimes"}</span>
       <form
         className="flex gap-2"
@@ -1328,7 +1327,7 @@ function CopyGiver({ studioId, another, onGiven }: { studioId: string; another: 
           onChange={(e) => setLink(e.target.value)}
           placeholder="Colle son lien (Instagram, TikTok…)"
           aria-label="Le lien du Reel"
-          className="h-11 min-w-0 flex-1 rounded-[12px] border border-line bg-white px-3 text-[15px] outline-none focus:border-violet"
+          className="h-11 min-w-0 flex-1 border border-line bg-white px-3 text-[15px] outline-none focus:border-violet"
         />
         <button type="submit" disabled={busy || !link.trim()} className="btn btn-primary h-11 px-4 disabled:bg-line disabled:text-muted">
           {busy ? <Spinner /> : "OK"}
@@ -1383,7 +1382,7 @@ function VoicePicker({ own, value, onPick }: { own: NewPostOptions["ownVoice"]; 
         ].map((v) => {
           const on = value === v.id;
           return (
-            <div key={v.id} className={`flex items-center gap-1.5 rounded-[14px] border-[1.5px] py-1 pr-1 pl-3 ${on ? "border-violet bg-violet-tint" : "border-line bg-white"}`}>
+            <div key={v.id} className={`flex items-center gap-1.5 border-[1.5px] py-1 pr-1 pl-3 ${on ? "border-violet bg-violet-tint" : "border-line bg-white"}`}>
               <button type="button" role="radio" aria-checked={on} onClick={() => pick(v.id)} className="flex min-w-0 flex-1 flex-col py-1.5 text-left">
                 <span className="text-[14.5px] font-extrabold">{v.name}</span>
                 <span className="truncate text-[12.5px] text-muted">{`${v.hint.charAt(0).toUpperCase()}${v.hint.slice(1)}`}</span>
@@ -1409,12 +1408,12 @@ function VoicePicker({ own, value, onPick }: { own: NewPostOptions["ownVoice"]; 
 /** A photo or video to pick: its number in the order once picked. */
 function Tile({ on, order, label, onClick, media, badge, children }: { on: boolean; order: number; label: string; onClick: () => void; media: ReactNode; badge: ReactNode; children?: ReactNode }) {
   return (
-    <button type="button" aria-pressed={on} aria-label={label} onClick={onClick} className="relative block aspect-square w-full overflow-hidden rounded-[16px] bg-line">
+    <button type="button" aria-pressed={on} aria-label={label} onClick={onClick} className="relative block aspect-square w-full overflow-hidden bg-line">
       {media}
       {badge && (
-        <span className="absolute bottom-[7px] left-[7px] flex items-center gap-[3px] rounded-full bg-ink/60 py-[3px] pr-[7px] pl-[5px] text-[11.5px] font-bold text-white">{badge}</span>
+        <span className="absolute bottom-[7px] left-[7px] flex items-center gap-[3px] bg-ink/60 py-[3px] pr-[7px] pl-[5px] text-[11.5px] font-bold text-white">{badge}</span>
       )}
-      {on && <span aria-hidden className="pointer-events-none absolute inset-0 rounded-[16px] ring-3 ring-violet ring-inset" />}
+      {on && <span aria-hidden className="pointer-events-none absolute inset-0 ring-3 ring-violet ring-inset" />}
       <span
         aria-hidden
         className={`absolute top-[7px] right-[7px] flex size-[26px] items-center justify-center rounded-full border-2 border-white text-[13px] font-extrabold ${on ? "fauve-pop bg-violet text-white" : "bg-ink/20"}`}
@@ -1448,9 +1447,9 @@ function Sheet({ label, onClose, children }: { label: string; onClose: () => voi
       <div
         role="dialog"
         aria-label={label}
-        className="fauve-enter absolute inset-x-0 bottom-0 z-20 flex max-h-[88%] flex-col gap-3.5 overflow-y-auto rounded-t-[26px] bg-white px-5 pt-2.5 pb-[max(1.6rem,env(safe-area-inset-bottom))] shadow-[0_-10px_40px_rgba(28,21,48,0.14)] [--fauve-y:40px]"
+        className="fauve-enter absolute inset-x-0 bottom-0 z-20 flex max-h-[88%] flex-col gap-3.5 overflow-y-auto bg-white px-5 pt-2.5 pb-[max(1.6rem,env(safe-area-inset-bottom))] shadow-[0_-10px_40px_rgba(18,17,16,0.14)] [--fauve-y:40px]"
       >
-        <span aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-line" />
+        <span aria-hidden className="mx-auto h-1 w-10 shrink-0 bg-line" />
         {children}
       </div>
     </>
@@ -1504,9 +1503,9 @@ function HouseGallery({ cards, chosen, busy, onPick }: { cards: HouseCard[]; cho
             role="radio"
             aria-checked={on}
             onClick={() => onPick(card)}
-            className={`fauve-press flex w-[118px] shrink-0 snap-start flex-col gap-1.5 rounded-[16px] p-1 text-left ${on ? "bg-violet-tint ring-2 ring-violet" : "hover:bg-soft"}`}
+            className={`fauve-press flex w-[118px] shrink-0 snap-start flex-col gap-1.5 p-1 text-left ${on ? "bg-violet-tint ring-2 ring-violet" : "hover:bg-soft"}`}
           >
-            <span className="relative block aspect-[9/16] w-full overflow-hidden rounded-[12px] bg-ink">
+            <span className="relative block aspect-[9/16] w-full overflow-hidden bg-ink">
               <video src={card.video} poster={card.poster} muted loop playsInline preload="none" className="absolute inset-0 size-full object-cover" />
               {busy === card.key && (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-white">
@@ -1530,16 +1529,16 @@ function Choice({ on, disabled, title, hint, badge, onClick }: { on: boolean; di
       aria-checked={on}
       disabled={disabled}
       onClick={onClick}
-      className={`fauve-press flex items-center gap-3 rounded-[18px] border-[1.5px] px-3.5 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${on ? "border-violet bg-[#F6F2FF]" : "border-line bg-white hover:border-violet/40"}`}
+      className={`fauve-press flex items-center gap-3 border-[1.5px] px-3.5 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-violet/40"}`}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-center gap-2 text-[16px] font-extrabold">
           {title}
-          {badge && <span className="rounded-full bg-peach px-2 py-0.5 text-[11.5px] font-bold text-peach-ink">{badge}</span>}
+          {badge && <span className="bg-peach px-2 py-0.5 text-[11.5px] font-bold text-peach-ink">{badge}</span>}
         </span>
         {hint && <span className="text-[13.5px] text-muted">{hint}</span>}
       </span>
-      <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border-2 ${on ? "border-violet" : "border-[#CFC6F7]"}`}>
+      <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border-2 ${on ? "border-violet" : "border-ink"}`}>
         {on && <span className="size-3 rounded-full bg-violet" />}
       </span>
     </button>

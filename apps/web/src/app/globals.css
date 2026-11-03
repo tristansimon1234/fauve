@@ -1,34 +1,47 @@
 @import "tailwindcss";
 
-/* Fauve design tokens (see CLAUDE.md › Design). */
+/* Edith's design tokens (see CLAUDE.md › Design): paper and ink, thin lines, square corners, big type; the colour
+   comes from her photos and videos. The token names are the first identity's (violet, peach…): they now hold the
+   paper-and-ink values, so a class like bg-violet is the ink of an action. */
 @theme {
-  --color-white: #ffffff;
-  --color-soft: #fbf7f4;
-  --color-line: #ece6ef;
-  --color-ink: #1c1530;
-  --color-muted: #5e5670;
-  --color-violet: #5b3fd9;
-  --color-violet-hover: #4528b8;
-  --color-violet-soft: #efebff;
-  --color-violet-tint: #f6f2ff;
-  --color-lilac: #d9ccf5;
-  --color-lilac-ink: #cfc6f7;
-  --color-coral: #f2694e;
-  --color-coral-ink: #c2412a;
-  --color-danger: #b5321a;
-  --color-peach: #ffe9e1;
-  --color-peach-ink: #9a3412;
-  --color-success-soft: #e7f6ee;
-  --color-success: #146c3d;
-  --color-online: #1f9d55;
-  --color-track: #e7e1ec;
-  --color-chip: #f3f1f5;
-  --color-chat: #f3eef8;
+  /* Paper: the page, the cards, the light text on ink. */
+  --color-white: #f5f2ec;
+  /* A shade darker: wells, bubbles, hover. */
+  --color-soft: #ece8e0;
+  /* The hairline between things. */
+  --color-line: #d4cec3;
+  --color-ink: #121110;
+  --color-muted: #6b675f;
+  /* Actions are ink. */
+  --color-violet: #121110;
+  --color-violet-hover: #2e2c29;
+  /* What is chosen or pointed out: a tint of the paper. */
+  --color-violet-soft: #e4dfd5;
+  --color-violet-tint: #ece8e0;
+  --color-lilac: #9a958b;
+  --color-lilac-ink: #bdb8ae;
+  --color-coral: #121110;
+  --color-coral-ink: #121110;
+  --color-danger: #b42318;
+  /* A warning (credits running low, a refusal): warm paper, brown ink. */
+  --color-peach: #efe5d6;
+  --color-peach-ink: #7a4512;
+  --color-success-soft: #e2ebe0;
+  --color-success: #23613a;
+  --color-online: #1f8a4c;
+  --color-track: #ddd8ce;
+  --color-chip: #e9e5dd;
+  --color-chat: #ece8e0;
 
-  --font-sans: var(--font-jakarta), system-ui, sans-serif;
+  --font-sans: var(--font-grotesk), system-ui, sans-serif;
   --font-serif: var(--font-instrument), Georgia, serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
-  --radius-card: 20px;
+  /* Bold reads lighter in the tight grotesque: big type contrasts by size, not by black weight. */
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 700;
+
+  --radius-card: 0px;
 
   /* Motion: quick ease-out, for feedback and continuity (see « Motion » at the end). */
   --ease-fauve: cubic-bezier(0.22, 1, 0.36, 1);
@@ -52,8 +65,12 @@
     cursor: pointer;
   }
   :focus-visible {
-    outline: 2px solid var(--color-violet);
+    outline: 1.5px solid var(--color-ink);
     outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--color-ink);
+    color: var(--color-white);
   }
 }
 
@@ -61,7 +78,16 @@
   font-family: var(--font-serif);
   font-style: italic;
   font-weight: 400;
-  color: var(--color-violet);
+  letter-spacing: -0.01em;
+}
+
+/* A small label in mono capitals (« N° 01 », a status, a count): the thin voice next to the big type. */
+@utility mono-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 @utility btn {
@@ -71,15 +97,16 @@
   gap: 8px;
   height: 48px;
   padding: 0 22px;
-  border-radius: 999px;
+  border-radius: 0;
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   transition:
     background-color 0.15s,
     border-color 0.15s,
     scale 0.15s var(--ease-fauve);
-  /* A tap answers: the pill dips while pressed. */
+  /* A tap answers: the button dips while pressed. */
   &:active:not(:disabled) {
     scale: 0.97;
   }
@@ -94,12 +121,11 @@
 }
 
 @utility btn-secondary {
-  background: var(--color-white);
+  background: transparent;
   color: var(--color-ink);
-  border: 1.5px solid var(--color-line);
-  font-weight: 600;
+  border: 1px solid var(--color-ink);
   &:hover {
-    border-color: var(--color-lilac);
+    background: var(--color-soft);
   }
 }
 
@@ -110,9 +136,9 @@
 
 /* Long-form legal pages. */
 .legal h1 {
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
   line-height: 1.15;
 }
 .legal h2 {
@@ -128,99 +154,22 @@
   gap: 4px;
 }
 .legal a {
-  color: var(--color-violet);
   font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-/* Fauve's orb (components/orb.tsx): a breathing sphere with three 3D orbits. */
-.fauve-orb {
-  position: relative;
-  display: inline-block;
-  flex-shrink: 0;
-  width: var(--orb);
-  height: var(--orb);
-  perspective: calc(var(--orb) * 4);
-}
-.fauve-orb-sphere {
-  position: absolute;
-  inset: 14%;
-  background: radial-gradient(circle at 34% 30%, #ffe2d6 0%, #f8a48c 24%, #f2694e 52%, #8a4ad9 82%, #5b3fd9 100%);
-  border-radius: 50%;
-  box-shadow:
-    inset calc(var(--orb) * -0.06) calc(var(--orb) * -0.08) calc(var(--orb) * 0.14) rgba(40, 20, 90, 0.35),
-    0 calc(var(--orb) * 0.06) calc(var(--orb) * 0.18) rgba(91, 63, 217, 0.25);
-  animation: fauve-morph 9s ease-in-out infinite;
-}
-.fauve-orb-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: max(1px, calc(var(--orb) * 0.02)) solid rgba(91, 63, 217, 0.55);
-  transform-style: preserve-3d;
-}
-.fauve-orb-ring-a {
-  animation: fauve-orbit-a 7s linear infinite;
-}
-.fauve-orb-ring-b {
-  inset: 4%;
-  border-color: rgba(242, 105, 78, 0.6);
-  animation: fauve-orbit-b 11s linear infinite;
-}
-.fauve-orb-ring-c {
-  inset: 8% -6%;
-  border-color: rgba(91, 63, 217, 0.3);
-  animation: fauve-orbit-c 15s linear infinite;
-}
-.fauve-orb-moon {
-  position: absolute;
-  top: calc(var(--orb) * -0.035);
-  left: 50%;
-  width: max(3px, calc(var(--orb) * 0.07));
-  height: max(3px, calc(var(--orb) * 0.07));
-  margin-left: max(-1.5px, calc(var(--orb) * -0.035));
-  border-radius: 50%;
-  background: #5b3fd9;
-  box-shadow: 0 0 calc(var(--orb) * 0.08) rgba(91, 63, 217, 0.6);
-}
-.fauve-orb-ring-b .fauve-orb-moon {
-  background: #f2694e;
-  box-shadow: 0 0 calc(var(--orb) * 0.08) rgba(242, 105, 78, 0.6);
-}
-@keyframes fauve-morph {
-  0%, 100% { border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%; transform: rotate(0deg) scale(1); }
-  25% { border-radius: 58% 42% 55% 45% / 47% 56% 44% 53%; transform: rotate(12deg) scale(1.03); }
-  50% { border-radius: 44% 56% 46% 54% / 57% 45% 55% 43%; transform: rotate(-6deg) scale(0.98); }
-  75% { border-radius: 53% 47% 41% 59% / 44% 54% 46% 56%; transform: rotate(8deg) scale(1.02); }
-}
-@keyframes fauve-orbit-a {
-  from { transform: rotateX(72deg) rotateY(-12deg) rotateZ(0deg); }
-  to { transform: rotateX(72deg) rotateY(-12deg) rotateZ(360deg); }
-}
-@keyframes fauve-orbit-b {
-  from { transform: rotateX(64deg) rotateY(48deg) rotateZ(360deg); }
-  to { transform: rotateX(64deg) rotateY(48deg) rotateZ(0deg); }
-}
-@keyframes fauve-orbit-c {
-  from { transform: rotateX(78deg) rotateY(-58deg) rotateZ(0deg); }
-  to { transform: rotateX(78deg) rotateY(-58deg) rotateZ(360deg); }
-}
-.fauve-orb-still .fauve-orb-sphere,
-.fauve-orb-still .fauve-orb-ring {
-  animation-play-state: paused;
-}
-@media (prefers-reduced-motion: reduce) {
-  .fauve-orb-sphere,
-  .fauve-orb-ring {
-    animation-play-state: paused;
-  }
-}
-
-/* Edith's mascot (components/mascot.tsx): a clean head under a line of curls; it floats and blinks. */
+/* Edith's mascot (components/mascot.tsx): a head drawn in thin lines, the hair one curling line; it floats and blinks.
+   Its lines keep the same thin width on screen at every size (the stroke width is set in px by the component). */
 .fauve-cat {
   display: inline-block;
   flex-shrink: 0;
   width: var(--cat);
   height: var(--cat);
+}
+.fauve-cat path,
+.fauve-cat ellipse {
+  vector-effect: non-scaling-stroke;
 }
 .fauve-cat-float {
   transform-box: fill-box;
@@ -431,9 +380,8 @@
     gap: 4px;
   }
   .fauve-dots > span {
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
+    width: 5px;
+    height: 5px;
     background: currentColor;
     opacity: 0.35;
     animation: fauve-dot 1.2s ease-in-out infinite;
@@ -451,11 +399,10 @@
     height: 1em;
     margin-left: 2px;
     vertical-align: -0.15em;
-    border-radius: 1px;
-    background: var(--color-violet);
+    background: currentColor;
     animation: fauve-caret 1s steps(2, start) infinite;
   }
-  /* Segmented choice: a pill slides under the chosen option. Equal columns, no gap;
+  /* Segmented choice: a block slides under the chosen option. Equal columns, no gap;
      set --n (options) and --i (chosen index) on the group. */
   .fauve-pill {
     position: relative;
@@ -463,18 +410,16 @@
     display: grid;
     grid-auto-columns: minmax(0, 1fr);
     grid-auto-flow: column;
-    padding: 4px;
-    border-radius: 999px;
+    padding: 3px;
+    border: 1px solid var(--color-line);
   }
   .fauve-pill-indicator {
     position: absolute;
     z-index: -1;
-    inset-block: 4px;
-    left: 4px;
-    width: calc((100% - 8px) / var(--n, 3));
-    border-radius: 999px;
-    background: var(--color-violet);
-    box-shadow: 0 2px 8px rgba(91, 63, 217, 0.3);
+    inset-block: 3px;
+    left: 3px;
+    width: calc((100% - 6px) / var(--n, 3));
+    background: var(--color-ink);
     transform: translateX(calc(var(--i, 0) * 100%));
     transition: transform 220ms var(--ease-fauve);
   }
@@ -515,8 +460,8 @@
   to { transform: translateX(var(--fauve-from, 100%)); }
 }
 @keyframes fauve-spot-hint {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0), 0 0 0 4px rgba(91, 63, 217, 0); }
-  25%, 70% { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #5b3fd9; }
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0), 0 0 0 4px rgba(18, 17, 16, 0); }
+  25%, 70% { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #121110; }
 }
 @keyframes fauve-flash {
   0% { opacity: 0; transform: translateY(2px); }
@@ -691,29 +636,26 @@
   background: transparent;
 }
 .fauve-scrubber::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 999px;
+  height: 3px;
   background: linear-gradient(to right, #fff var(--fauve-progress, 0%), rgb(255 255 255 / 0.35) var(--fauve-progress, 0%));
 }
 .fauve-scrubber::-moz-range-track {
-  height: 4px;
-  border-radius: 999px;
+  height: 3px;
   background: linear-gradient(to right, #fff var(--fauve-progress, 0%), rgb(255 255 255 / 0.35) var(--fauve-progress, 0%));
 }
 .fauve-scrubber::-webkit-slider-thumb {
   appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -5px;
-  border-radius: 999px;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
   background: #fff;
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
 }
 .fauve-scrubber::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 0;
   background: #fff;
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
 }

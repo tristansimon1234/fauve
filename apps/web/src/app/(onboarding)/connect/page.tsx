@@ -62,7 +62,7 @@ export default function ConnectPage({ searchParams }: PageProps<"/connect">) {
         </ul>
         {connect ? (
           <>
-            <div className="rounded-2xl bg-soft px-4 py-3.5 text-sm leading-normal">
+            <div className="bg-soft px-4 py-3.5 text-sm leading-normal">
               <strong>Rien n’est publié sans ton accord.</strong> Tu peux déconnecter Edith à tout moment.
             </div>
             <Suspense fallback={<ConnectActionsFallback />}>

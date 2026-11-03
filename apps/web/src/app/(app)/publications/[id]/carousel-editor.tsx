@@ -136,14 +136,14 @@ export function CarouselEditor({
       } else setMessage({ ok: false, text: res.error });
     });
 
-  const chip = (on: boolean) => `h-8 rounded-full px-3 text-[12px] font-semibold ${on ? "bg-violet text-white" : "bg-white text-muted hover:text-ink"}`;
+  const chip = (on: boolean) => `h-8 px-3 text-[12px] font-semibold ${on ? "bg-violet text-white" : "bg-white text-muted hover:text-ink"}`;
   const swatch = (on: boolean) => `size-7 shrink-0 rounded-full border transition-transform hover:scale-110 motion-reduce:hover:scale-100 ${on ? "ring-2 ring-violet ring-offset-2" : "border-line"}`;
 
   return (
     <>
       <div className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-4">
         {/* The photo as it will be published, on a dark stage; arrows and ← → to move along the carousel. */}
-        <div className="relative flex items-center justify-center rounded-[24px] bg-[radial-gradient(ellipse_at_top,#2a2145_0%,#16112a_70%)] px-12 py-5">
+        <div className="relative flex items-center justify-center bg-ink px-12 py-5">
           <button
             type="button"
             aria-label="Photo précédente"
@@ -155,7 +155,7 @@ export function CarouselEditor({
           </button>
           <div
             ref={previewRef}
-            className="relative overflow-hidden rounded-[16px] bg-black shadow-[0_24px_60px_rgba(0,0,0,.45)]"
+            className="relative overflow-hidden bg-black shadow-[0_24px_60px_rgba(0,0,0,.45)]"
             style={{ width: "max(220px, min(100%, 420px, calc((100dvh - 330px) * 4 / 5)))" }}
           >
             {props ? (
@@ -209,7 +209,7 @@ export function CarouselEditor({
         </div>
 
         {/* The strip of photos, as published (with their texts): the carousel's timeline. */}
-        <section aria-label="Photos du carrousel" className="flex flex-col gap-2 rounded-[18px] border border-line bg-white p-3">
+        <section aria-label="Photos du carrousel" className="flex flex-col gap-2 border border-line bg-white p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-[13px] font-bold">
               {plan.slides.length} photo{plan.slides.length > 1 ? "s" : ""}
@@ -217,7 +217,7 @@ export function CarouselEditor({
             {dirty ? (
               <div className="flex items-center gap-2">
                 <span className="text-[12px] font-semibold text-peach-ink">Modifié · pas encore enregistré</span>
-                <button type="button" onClick={() => edit(saved)} disabled={saving} className="h-8 rounded-full px-3 text-[13px] font-semibold text-muted hover:bg-soft disabled:opacity-40">
+                <button type="button" onClick={() => edit(saved)} disabled={saving} className="h-8 px-3 text-[13px] font-semibold text-muted hover:bg-soft disabled:opacity-40">
                   Annuler
                 </button>
                 <button type="button" onClick={save} disabled={saving} className="btn btn-primary h-8 px-3.5 text-[13px] disabled:opacity-50">
@@ -244,14 +244,14 @@ export function CarouselEditor({
                   aria-selected={i === index}
                   aria-label={`Photo ${i + 1}`}
                   onClick={() => go(i)}
-                  className={`relative w-[92px] shrink-0 overflow-hidden rounded-[12px] bg-ink transition-shadow ${i === index ? "ring-2 ring-violet ring-offset-2" : "opacity-85 hover:opacity-100"}`}
+                  className={`relative w-[92px] shrink-0 overflow-hidden bg-ink transition-shadow ${i === index ? "ring-2 ring-violet ring-offset-2" : "opacity-85 hover:opacity-100"}`}
                 >
                   {thumb ? (
                     <SlidePreview props={thumb} />
                   ) : (
                     <span className="flex aspect-[4/5] items-center justify-center text-[11px] font-bold text-white/70">Vidéo</span>
                   )}
-                  <span className="absolute bottom-1 left-1 rounded-full bg-black/60 px-1.5 text-[10px] font-bold text-white">{i + 1}</span>
+                  <span className="absolute bottom-1 left-1 bg-black/60 px-1.5 text-[10px] font-bold text-white">{i + 1}</span>
                 </button>
               );
             })}
@@ -259,14 +259,14 @@ export function CarouselEditor({
         </section>
 
         {message && !message.ok && (
-          <p role="alert" className="rounded-xl bg-peach px-3 py-2 text-[13px] font-semibold text-danger">
+          <p role="alert" className="bg-peach px-3 py-2 text-[13px] font-semibold text-danger">
             {message.text}
           </p>
         )}
       </div>
 
       <aside aria-label="Photo sélectionnée" className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-6">
-        <section className="flex flex-col gap-4 rounded-[20px] border border-line bg-white p-5">
+        <section className="flex flex-col gap-4 border border-line bg-white p-5">
           <div className="flex items-center gap-2">
             <h2 className="min-w-0 flex-1 truncate text-[16px] font-bold">
               Photo {index + 1} <span className="font-semibold text-muted">sur {plan.slides.length}</span>
@@ -313,7 +313,7 @@ export function CarouselEditor({
 
           {props && slide.layer ? (
             <div className="flex flex-col gap-4">
-              <p className="rounded-[12px] bg-violet-tint px-3 py-2 text-[12px] leading-snug text-violet">
+              <p className="bg-violet-tint px-3 py-2 text-[12px] leading-snug text-violet">
                 Clique sur un texte de la photo pour l’écrire, glisse la mise en page pour la déplacer, tire le rond du coin pour l’agrandir.
               </p>
               <div className="flex flex-col gap-2">
@@ -349,7 +349,7 @@ export function CarouselEditor({
                       const scale = Math.round(Math.min(1.5, Math.max(0.5, p.scale + d)) * 100) / 100;
                       setSlide({ layer: { ...slide.layer!, place: { ...p, scale } } });
                     }}
-                    className="h-8 rounded-full bg-soft px-3 text-[13px] font-bold hover:bg-violet-soft hover:text-violet"
+                    className="h-8 bg-soft px-3 text-[13px] font-bold hover:bg-violet-soft hover:text-violet"
                   >
                     {label}
                   </button>
@@ -385,7 +385,7 @@ export function CarouselEditor({
                       key={i}
                       onFocusCapture={() => setActive(i)}
                       onPointerDownCapture={() => setActive(i)}
-                      className={`flex flex-col gap-2.5 rounded-[14px] p-3 transition-colors ${active === i ? "bg-violet-tint ring-1 ring-lilac" : "bg-soft"}`}
+                      className={`flex flex-col gap-2.5 p-3 transition-colors ${active === i ? "bg-violet-tint ring-1 ring-lilac" : "bg-soft"}`}
                     >
                       <div className="flex items-center gap-2">
                         <input
@@ -395,7 +395,7 @@ export function CarouselEditor({
                           hidden={Boolean(t.items)}
                           onChange={(e) => setText(i, { text: e.target.value })}
                           aria-label="Texte"
-                          className="h-10 min-w-0 flex-1 rounded-[10px] border border-line bg-white px-3 text-[14px] outline-none focus:border-lilac"
+                          className="h-10 min-w-0 flex-1 border border-line bg-white px-3 text-[14px] outline-none focus:border-lilac"
                         />
                         {t.items && <span className="min-w-0 flex-1 text-[13px] font-bold">Liste · {t.items.length} éléments</span>}
                         <button type="button" aria-label="Supprimer ce texte" onClick={() => setSlide({ texts: slide.texts.filter((_, j) => j !== i) })} className="text-muted hover:text-danger">

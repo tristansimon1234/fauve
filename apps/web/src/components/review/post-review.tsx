@@ -163,9 +163,9 @@ export function PostReview({
       router.refresh();
     });
 
-  const tile = "fauve-press flex h-[60px] min-w-0 flex-col items-center justify-center gap-1 rounded-[18px] px-1 text-[13.5px] font-extrabold disabled:opacity-60";
+  const tile = "fauve-press flex h-[60px] min-w-0 flex-col items-center justify-center gap-1 px-1 text-[13.5px] font-extrabold disabled:opacity-60";
   const action = data.locked ? null : data.status === "scheduled" ? (
-    <div className="flex items-start gap-3 rounded-[18px] bg-success-soft px-4 py-3.5 text-success">
+    <div className="flex items-start gap-3 bg-success-soft px-4 py-3.5 text-success">
       <CheckIcon size={20} className="mt-0.5 shrink-0" />
       <p className="text-[14.5px] leading-snug font-semibold">{`C’est parti : il part sur ${where}, Edith te dit quand il est en ligne.`}</p>
     </div>
@@ -234,7 +234,7 @@ export function PostReview({
       <div className="flex flex-col gap-5 pb-36 lg:pb-0">
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
           {/* The Reel as it will go out. */}
-          <section aria-label="Aperçu" className="flex flex-col items-center gap-3 rounded-[24px] bg-soft px-4 py-5 lg:py-8">
+          <section aria-label="Aperçu" className="flex flex-col items-center gap-3 bg-soft px-4 py-5 lg:py-8">
             {parts ? (
               <p className="text-[13.5px] font-bold text-violet">Tu modifies une scène de ton Reel</p>
             ) : data.locked ? (
@@ -242,7 +242,7 @@ export function PostReview({
             ) : (
               !data.making && <Versions data={data} pending={pending} onSwitch={switchTo} />
             )}
-            <div className="relative aspect-[9/16] w-[max(176px,min(280px,calc((100dvh-470px)*0.5625)))] overflow-hidden rounded-[22px] bg-ink shadow-[0_18px_44px_rgba(28,21,48,.18)] lg:w-[320px]">
+            <div className="relative aspect-[9/16] w-[max(176px,min(280px,calc((100dvh-470px)*0.5625)))] overflow-hidden bg-ink shadow-[0_18px_44px_rgba(18,17,16,.18)] lg:w-[320px]">
               {parts?.preview ??
                 (data.videoUrl && (
                   <>
@@ -324,7 +324,7 @@ export function PostReview({
 
           {parts ? (
             // « Modifier »: the panel beside the video becomes the scene chosen.
-            <aside aria-label="Modifier" className="flex flex-col gap-4 rounded-[24px] border border-line bg-white p-5">
+            <aside aria-label="Modifier" className="flex flex-col gap-4 border border-line bg-white p-5">
               <div className="hidden lg:block">{parts.actions}</div>
               {parts.settings}
             </aside>
@@ -381,7 +381,7 @@ export function PostReview({
         {toast && (
           <p
             role="status"
-            className={`fixed inset-x-4 z-40 mx-auto max-w-[420px] rounded-[18px] bg-ink px-4 py-3 text-center text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(28,21,48,.25)] lg:bottom-8 ${surface === "app" ? "bottom-[calc(14rem+env(safe-area-inset-bottom))]" : "bottom-[calc(9.5rem+env(safe-area-inset-bottom))]"}`}
+            className={`fixed inset-x-4 z-40 mx-auto max-w-[420px] bg-ink px-4 py-3 text-center text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(18,17,16,.25)] lg:bottom-8 ${surface === "app" ? "bottom-[calc(14rem+env(safe-area-inset-bottom))]" : "bottom-[calc(9.5rem+env(safe-area-inset-bottom))]"}`}
           >
             {toast}
           </p>
@@ -447,7 +447,7 @@ function Caption({ data, caption, onChange: setCaption, onSaved }: { data: Revie
       router.refresh();
     });
   return (
-    <section aria-label="Légende" className="flex flex-col gap-2 rounded-[20px] border border-line bg-white p-4">
+    <section aria-label="Légende" className="flex flex-col gap-2 border border-line bg-white p-4">
       <label htmlFor={`caption-${data.postId}`} className="text-[13px] font-bold text-muted">
         Légende
       </label>
@@ -461,7 +461,7 @@ function Caption({ data, caption, onChange: setCaption, onSaved }: { data: Revie
           maxLength={2200}
           rows={7}
           placeholder="Edith l’écrit avec la vidéo."
-          className="w-full resize-y rounded-[14px] border-[1.5px] border-line bg-white px-3 py-2.5 text-[14.5px] leading-relaxed outline-none focus:border-violet"
+          className="w-full resize-y border-[1.5px] border-line bg-white px-3 py-2.5 text-[14.5px] leading-relaxed outline-none focus:border-violet"
         />
       )}
       {error && (

@@ -61,7 +61,7 @@ export async function Paywall({ db, studioId, postId, next, upgradeFrom }: { db:
   const weekly = (PLANS.decouverte.priceEur * 12) / 52;
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-soft px-4 py-6 md:flex-row md:gap-14 md:py-10">
-      <div className="relative hidden aspect-[9/16] w-[280px] shrink-0 overflow-hidden rounded-[22px] bg-ink shadow-lg md:block">
+      <div className="relative hidden aspect-[9/16] w-[280px] shrink-0 overflow-hidden bg-ink shadow-lg md:block">
         {preview ? (
           preview.video ? (
             <video src={preview.url} autoPlay muted loop playsInline className="size-full scale-110 object-cover blur-xl" />

@@ -42,12 +42,12 @@ export function MediaPickCard({
   };
 
   return (
-    <div className={`flex w-full max-w-[420px] flex-col gap-2.5 rounded-[18px] border border-line bg-white p-3 ${className}`}>
+    <div className={`flex w-full max-w-[420px] flex-col gap-2.5 border border-line bg-white p-3 ${className}`}>
       <span className="text-[13px] font-bold">Tes {labels[kind]}</span>
       {items === null ? (
         <div className="grid grid-cols-4 gap-1.5">
           {Array.from({ length: 8 }, (_, i) => (
-            <span key={i} className="aspect-square animate-pulse rounded-lg bg-soft" aria-hidden />
+            <span key={i} className="aspect-square animate-pulse bg-soft" aria-hidden />
           ))}
         </div>
       ) : items.length ? (
@@ -61,7 +61,7 @@ export function MediaPickCard({
                   aria-pressed={at >= 0}
                   aria-label={`${m.video ? "Vidéo" : "Photo"} du ${new Date(m.at).toLocaleDateString("fr-FR")}`}
                   onClick={() => toggle(m.id)}
-                  className={`relative block aspect-square w-full overflow-hidden rounded-lg bg-ink ${at >= 0 ? "ring-2 ring-violet ring-offset-2" : "hover:opacity-90"}`}
+                  className={`relative block aspect-square w-full overflow-hidden bg-ink ${at >= 0 ? "ring-2 ring-violet ring-offset-2" : "hover:opacity-90"}`}
                 >
                   {m.video ? (
                     <video src={`${m.url}#t=0.5`} muted playsInline preload="metadata" className="size-full object-cover" />
@@ -88,7 +88,7 @@ export function MediaPickCard({
           <CheckIcon size={15} />
           {chosen.length ? `Utiliser ${chosen.length > 1 ? `ces ${chosen.length}` : "celle-ci"}` : "Choisis-en"}
         </button>
-        <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold text-violet hover:bg-violet-soft">
+        <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 px-3 text-[13px] font-bold text-violet hover:bg-violet-soft">
           <UploadIcon size={15} />
           Ajouter depuis ton appareil
         </button>

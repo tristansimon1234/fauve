@@ -50,7 +50,7 @@ export default async function TradePage({ params }: PageProps<"/community-manage
       <JsonLd data={{ "@context": "https://schema.org", "@graph": [breadcrumb([["Edith", "/"], [trade.menu, path]]), faqPage(faq)] }} />
 
       {/* The promise for this trade */}
-      <section className="mx-auto flex max-w-[1240px] flex-col gap-7 px-4 pt-8 pb-16 sm:px-8 sm:pt-12">
+      <section className="mx-auto flex max-w-[1360px] flex-col gap-7 px-4 pt-8 pb-16 sm:px-8 sm:pt-12">
         <nav aria-label="Fil d’Ariane" className="text-[13px] font-semibold text-muted">
           <Link href="/" className="hover:text-ink">
             Edith
@@ -62,27 +62,27 @@ export default async function TradePage({ params }: PageProps<"/community-manage
           <span className="h-px w-8 bg-ink/30" />
           Community manager IA · {trade.kicker}
         </span>
-        <h1 className="max-w-[900px] text-[clamp(38px,5.2vw,72px)] leading-[1] font-extrabold tracking-[-0.045em]">
+        <h1 className="max-w-[1200px] text-[clamp(48px,7.6vw,120px)] leading-[0.9] font-semibold tracking-[-0.06em]">
           {fr(trade.h1)}
           <span className="mt-1 block font-[family-name:var(--font-serif)] text-[1.1em] leading-[0.98] font-normal tracking-[-0.02em] text-violet italic">{fr(trade.accent)}</span>
         </h1>
         <p className="max-w-[620px] text-[18px] leading-[1.6] text-muted sm:text-[19px]">{fr(trade.intro)}</p>
         <div className="flex flex-wrap items-center gap-3">
           <Start waUrl={waUrl} size="lg" />
-          <Link href="/#tarif" className="btn h-14 border border-ink/15 bg-white px-7 text-base text-ink hover:border-ink/30">
+          <Link href="/#tarif" className="btn btn-secondary h-14 px-7 text-base">
             Voir les tarifs
           </Link>
         </div>
       </section>
 
       {/* The work */}
-      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-4 pb-24 sm:px-8">
         {trade.show.carousel ? <CarouselStrip /> : <ReelWall only={trade.show.reels} />}
         <p className="mt-5 text-[13px] text-muted">{fr(trade.show.note)}</p>
       </section>
 
       {/* Why it works for this trade */}
-      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-4 pb-24 sm:px-8">
         <SectionTitle n={1} kicker="Pourquoi ça marche">
           Fait pour ton métier, <span className="accent">pas pour tout le monde.</span>
         </SectionTitle>
@@ -98,7 +98,7 @@ export default async function TradePage({ params }: PageProps<"/community-manage
       </section>
 
       {/* What to ask: the very ideas the app offers this trade */}
-      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-4 pb-24 sm:px-8">
         <SectionTitle n={2} kicker="Ce que tu peux lui demander">
           Une phrase, <span className="accent">un Reel.</span>
         </SectionTitle>
@@ -125,13 +125,13 @@ export default async function TradePage({ params }: PageProps<"/community-manage
       </section>
 
       {/* Easy to film */}
-      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-4 pb-24 sm:px-8">
         <SectionTitle n={3} kicker="À filmer cette semaine">
           Pas d’idée ? <span className="accent">Commence par ça.</span>
         </SectionTitle>
         <div className="mt-10 grid gap-4 md:grid-cols-3">
           {film.map((f) => (
-            <div key={f.idea} className="flex flex-col gap-1.5 rounded-[22px] bg-white p-6">
+            <div key={f.idea} className="flex flex-col gap-1.5 border border-ink/20 p-6">
               <span className="text-[17px] font-bold">{fr(f.idea)}</span>
               <span className="text-[15px] text-muted">{fr(f.how)}</span>
             </div>
@@ -140,13 +140,13 @@ export default async function TradePage({ params }: PageProps<"/community-manage
       </section>
 
       {/* The offers, in one line each */}
-      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-4 pb-24 sm:px-8">
         <SectionTitle n={4} kicker="Tarif">
           Sans engagement, <span className="accent">sans surprise.</span>
         </SectionTitle>
         <div className="mt-10 grid gap-4 md:grid-cols-3">
           {PLAN_ORDER.map((id) => (
-            <Link key={id} href="/#tarif" className="flex flex-col gap-2 rounded-[22px] bg-white p-6 transition-shadow hover:shadow-[0_24px_50px_-28px_rgba(28,21,48,.35)]">
+            <Link key={id} href="/#tarif" className="flex flex-col gap-2 border border-ink/20 p-6 transition-colors hover:border-ink">
               <span className="text-[12px] font-bold tracking-[0.16em] text-violet uppercase">{PLANS[id].label}</span>
               <span className="text-[34px] leading-none font-extrabold tracking-[-0.03em]">
                 {PLANS[id].priceEur}&nbsp;€<span className="ml-1 text-[15px] font-semibold text-muted">{priceTax ? "TTC / mois" : "par mois"}</span>
@@ -161,7 +161,7 @@ export default async function TradePage({ params }: PageProps<"/community-manage
       </section>
 
       {/* Questions */}
-      <section className="mx-auto grid max-w-[1240px] gap-10 px-4 pb-24 sm:px-8 lg:grid-cols-[1fr_1.6fr]">
+      <section className="mx-auto grid max-w-[1360px] gap-10 px-4 pb-24 sm:px-8 lg:grid-cols-[1fr_1.6fr]">
         <SectionTitle n={5} kicker="Questions">
           Ce qu’on nous <span className="accent">demande.</span>
         </SectionTitle>
@@ -179,7 +179,7 @@ export default async function TradePage({ params }: PageProps<"/community-manage
       </section>
 
       {/* To read next */}
-      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-4 pb-24 sm:px-8">
         <span className="mb-4 block text-[12px] font-bold tracking-[0.16em] text-muted uppercase">À lire aussi</span>
         <div className="grid gap-4 md:grid-cols-3">
           {[
@@ -189,7 +189,7 @@ export default async function TradePage({ params }: PageProps<"/community-manage
             }),
             [`/comparatif/${COMPARISONS[0]!.slug}`, "Comparer", COMPARISONS[0]!.h1] as const,
           ].map(([href, kind, title]) => (
-            <Link key={href} href={href} className="flex flex-col gap-2 rounded-[22px] border border-ink/10 p-6 transition-colors hover:border-ink/30">
+            <Link key={href} href={href} className="flex flex-col gap-2 border border-ink/10 p-6 transition-colors hover:border-ink/30">
               <span className="text-[12px] font-bold tracking-[0.16em] text-violet uppercase">{kind}</span>
               <span className="text-[18px] leading-snug font-bold">{fr(title)}</span>
             </Link>

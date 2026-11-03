@@ -49,7 +49,7 @@ export function OnboardingStepper({ step }: { step: OnboardingStep }) {
         const on = i === at;
         return (
           <li key={s} className="flex min-w-0 flex-1 flex-col gap-1.5" aria-current={on ? "step" : undefined}>
-            <span className={`h-1.5 rounded-full ${done ? "bg-violet" : on ? "fauve-pulse bg-violet/60" : "bg-line"}`} />
+            <span className={`h-1.5 ${done ? "bg-violet" : on ? "fauve-pulse bg-violet/60" : "bg-line"}`} />
             <span className={`truncate text-[11px] sm:text-[12px] ${on ? "font-bold text-ink" : done ? "font-semibold text-violet" : "text-muted"}`}>
               {done && <CheckIcon size={10} className="mr-0.5 inline" />}
               {ONBOARDING_LABELS[s]}
@@ -105,7 +105,7 @@ export function OnboardingCard({
       onSend(message);
     });
 
-  const card = `flex w-full max-w-[560px] flex-col gap-4 rounded-[22px] border border-line bg-white p-5 text-left shadow-[0_8px_30px_rgba(28,21,48,0.06)] ${className}`;
+  const card = `flex w-full max-w-[560px] flex-col gap-4 border border-line bg-white p-5 text-left shadow-[0_8px_30px_rgba(18,17,16,0.06)] ${className}`;
   if (passed) {
     return (
       <div className={`${card} flex-row items-center gap-2 py-3.5`}>
@@ -181,7 +181,7 @@ function WebsiteStep({ onSend, pending }: { onSend: (text: string) => void; pend
         controls
         preload="metadata"
         aria-label="Tout ce qu’il faut savoir sur Edith, en 25 secondes"
-        className="aspect-[9/16] w-full max-w-[200px] shrink-0 self-center rounded-[18px] bg-soft object-cover sm:self-start"
+        className="aspect-[9/16] w-full max-w-[200px] shrink-0 self-center bg-soft object-cover sm:self-start"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <p className="text-[14px] leading-relaxed text-muted">Tout ce qu’il faut savoir sur moi est dans la vidéo. Pour commencer, ton site ou ton Instagram me disent qui tu es, ce que tu proposes et ton style : je les lis et je te résume ce que j’ai compris.</p>
@@ -199,7 +199,7 @@ function WebsiteStep({ onSend, pending }: { onSend: (text: string) => void; pend
             autoComplete="url"
             placeholder="monsite.fr ou @moninstagram"
             aria-label="Ton site ou ton Instagram"
-            className="h-12 min-w-0 flex-1 rounded-full border border-line bg-white px-4 text-[15px] outline-none focus:border-violet"
+            className="h-12 min-w-0 flex-1 border border-line bg-white px-4 text-[15px] outline-none focus:border-violet"
           />
           <button type="submit" disabled={!valid || pending} className="btn btn-primary h-12 px-5 disabled:opacity-40">
             {instagram ? "Lire mon Instagram" : "Lire mon site"}
@@ -280,10 +280,10 @@ function StyleStep({
   return (
     <>
       {(view.brand.colors.length > 0 || view.brand.fonts.length > 0 || view.brand.logoUrl) && (
-        <div className="flex flex-wrap items-center gap-4 rounded-[16px] bg-soft p-3.5">
+        <div className="flex flex-wrap items-center gap-4 bg-soft p-3.5">
           {view.brand.logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={view.brand.logoUrl} alt="Ton logo" className="h-10 max-w-[96px] object-contain [filter:drop-shadow(0_0_1px_rgba(28,21,48,0.55))_drop-shadow(0_1px_2px_rgba(28,21,48,0.25))]" />
+            <img src={view.brand.logoUrl} alt="Ton logo" className="h-10 max-w-[96px] object-contain [filter:drop-shadow(0_0_1px_rgba(18,17,16,0.55))_drop-shadow(0_1px_2px_rgba(18,17,16,0.25))]" />
           )}
           {view.brand.colors.length > 0 && (
             <div className="flex -space-x-1.5" aria-label="Tes couleurs">
@@ -299,8 +299,8 @@ function StyleStep({
         </div>
       )}
       {!view.preview && lookingAtSite && items.length > 0 && (
-        <div className="fauve-fade flex items-center gap-4 rounded-[16px] bg-soft p-3.5">
-          <span aria-hidden="true" className="aspect-[9/16] w-[118px] shrink-0 animate-pulse rounded-[12px] bg-line sm:w-[132px]" />
+        <div className="fauve-fade flex items-center gap-4 bg-soft p-3.5">
+          <span aria-hidden="true" className="aspect-[9/16] w-[118px] shrink-0 animate-pulse bg-line sm:w-[132px]" />
           <div className="flex min-w-0 flex-col gap-2">
             <span className="text-[14px] font-bold">Tes Reels auront ce style</span>
             <span className="flex items-center gap-2 text-[13px] font-semibold text-violet">
@@ -311,8 +311,8 @@ function StyleStep({
         </div>
       )}
       {view.preview && (
-        <div className="flex items-start gap-4 rounded-[16px] bg-soft p-3.5">
-          <div className="w-[118px] shrink-0 overflow-hidden rounded-[12px] shadow-sm sm:w-[132px]">
+        <div className="flex items-start gap-4 bg-soft p-3.5">
+          <div className="w-[118px] shrink-0 overflow-hidden shadow-sm sm:w-[132px]">
             <SlidePreview props={view.preview} frame={STYLE_PREVIEW_FRAME} />
           </div>
           <div className="flex min-w-0 flex-col gap-2">
@@ -338,7 +338,7 @@ function StyleStep({
             : "Des images de ce que tu aimes : des posts, des ambiances, des couleurs. Je m’en sers pour tous tes visuels."}
         </p>
         {lookingAtSite && !items.length && (
-          <p className="fauve-fade flex items-center gap-2 rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[13px] font-semibold text-violet">
+          <p className="fauve-fade flex items-center gap-2 bg-violet-tint px-3.5 py-2.5 text-[13px] font-semibold text-violet">
             <Mascot size={24} mood="thinking" />
             Je regarde les photos et le style de ton site…
           </p>
@@ -353,25 +353,25 @@ function StyleStep({
         >
           {items.map((i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={i.path} src={i.url} alt="" className="fauve-enter aspect-square w-full rounded-[12px] object-cover" />
+            <img key={i.path} src={i.url} alt="" className="fauve-enter aspect-square w-full object-cover" />
           ))}
           {/* The site's photos on their way: their places are already there. */}
           {lookingAtSite &&
             !items.length &&
-            [0, 1, 2, 3].map((n) => <span key={n} aria-hidden="true" className="aspect-square w-full animate-pulse rounded-[12px] bg-line" style={{ animationDelay: `${n * 150}ms` }} />)}
+            [0, 1, 2, 3].map((n) => <span key={n} aria-hidden="true" className="aspect-square w-full animate-pulse bg-line" style={{ animationDelay: `${n * 150}ms` }} />)}
           {room > 0 && !lookingAtSite && (
             <button
               type="button"
               disabled={busy !== null}
               onClick={() => fileRef.current?.click()}
-              className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-[12px] border-[1.5px] border-dashed border-lilac bg-violet-tint text-violet disabled:opacity-60"
+              className="flex aspect-square w-full flex-col items-center justify-center gap-1 border-[1.5px] border-dashed border-lilac bg-violet-tint text-violet disabled:opacity-60"
             >
               {busy ? <Orb size={22} /> : <PlusIcon size={20} />}
               <span className="text-[11px] font-bold">{busy === "reading" ? "Je regarde…" : busy ? "Envoi…" : "Ajouter"}</span>
             </button>
           )}
         </div>
-        {!view.preview && view.direction && <p className="rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[13px] leading-relaxed text-violet">{view.direction}</p>}
+        {!view.preview && view.direction && <p className="bg-violet-tint px-3.5 py-2.5 text-[13px] leading-relaxed text-violet">{view.direction}</p>}
         <input ref={fileRef} type="file" accept="image/*" multiple className="sr-only" onChange={(e) => (void add([...(e.target.files ?? [])]), (e.target.value = ""))} />
       </div>
       {/* No atmospheres to pick (Tristan: « je comprends pas trop l'utilité »): her style comes from what she has, or her words. */}
@@ -418,7 +418,7 @@ function CharterFontAsk({ studioId, font, twin, onSaved, setError }: { studioId:
     }
   };
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-[16px] border border-line bg-white px-3.5 py-3">
+    <div className="flex flex-wrap items-center gap-3 border border-line bg-white px-3.5 py-3">
       <span className="min-w-0 flex-1 text-[13px] leading-snug text-muted">
         <b className="text-ink">{font}</b> n’est pas une police libre : tes vidéos utilisent <b className="text-ink">{twin}</b>, qui lui ressemble. Tu as son fichier ? Ajoute-le pour avoir la vraie.
       </span>
@@ -457,7 +457,7 @@ function LogoAsk({ studioId, hasSite, onSaved, setError }: { studioId: string; h
     }
   };
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-[16px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-3.5 py-3">
+    <div className="flex flex-wrap items-center gap-3 border-[1.5px] border-dashed border-lilac bg-violet-tint px-3.5 py-3">
       <span className="min-w-0 flex-1 text-[13px] leading-snug text-violet">
         {hasSite ? (
           <>
@@ -480,7 +480,7 @@ function LogoAsk({ studioId, hasSite, onSaved, setError }: { studioId: string; h
 
 function Counter({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[16px] bg-soft px-4 py-3">
+    <div className="flex items-center justify-between gap-3 bg-soft px-4 py-3">
       <span className="text-[14px] font-semibold">{label}</span>
       <div className="flex items-center gap-2">
         <button type="button" aria-label={`${label} : moins`} disabled={value <= min} onClick={() => onChange(value - 1)} className="flex size-9 items-center justify-center rounded-full bg-white text-[18px] font-bold disabled:opacity-30">
@@ -526,11 +526,11 @@ function RhythmStep({
               type="button"
               aria-pressed={on}
               onClick={() => (setPosts(p.posts), setStories(p.stories))}
-              className={`flex flex-col items-start rounded-[14px] border-[1.5px] px-3.5 py-2 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
+              className={`flex flex-col items-start border-[1.5px] px-3.5 py-2 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
             >
               <span className="text-[13px] font-bold">
                 {p.label}
-                {p.advised && <span className="ml-1.5 rounded-full bg-violet px-1.5 py-0.5 text-[10px] font-extrabold text-white">conseillé</span>}
+                {p.advised && <span className="ml-1.5 bg-violet px-1.5 py-0.5 text-[10px] font-extrabold text-white">conseillé</span>}
               </span>
               <span className="text-[12px] text-muted">
                 {p.posts} posts · {p.stories} stories
@@ -543,7 +543,7 @@ function RhythmStep({
         <Counter label="Posts et Reels" value={posts} min={1} max={14} onChange={setPosts} />
         <Counter label="Stories" value={stories} min={0} max={21} onChange={setStories} />
       </div>
-      <div className="flex flex-col gap-1.5 rounded-[16px] bg-soft px-4 py-3">
+      <div className="flex flex-col gap-1.5 bg-soft px-4 py-3">
         <span className="text-xs font-extrabold tracking-[.06em] text-muted">UNE SEMAINE TYPE</span>
         <ul className="flex flex-col gap-1">
           {week.map((d) => (

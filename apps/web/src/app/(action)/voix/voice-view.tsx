@@ -63,7 +63,7 @@ export function VoiceView({ studioId, initial, own: initialOwn }: { studioId: st
         </p>
         <a
           href={whatsappLink(done.answered ? "" : use === "never" ? "C’est noté pour la voix : juste la musique." : `C’est noté pour la voix : ${mine ? "ma voix" : name} 🎙️`)}
-          className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-[15px] font-extrabold text-ink"
+          className="inline-flex items-center gap-2 bg-white px-5 py-3 text-[15px] font-extrabold text-ink"
         >
           <WhatsAppIcon size={18} /> Retourner sur WhatsApp
         </a>
@@ -99,7 +99,7 @@ export function VoiceView({ studioId, initial, own: initialOwn }: { studioId: st
               role="radio"
               aria-checked={use === u.value}
               onClick={() => setUse(u.value)}
-              className={`min-h-12 rounded-[14px] border-[1.5px] px-2 text-[13.5px] leading-tight font-extrabold ${use === u.value ? "border-violet bg-violet-tint text-violet" : "border-line bg-white"}`}
+              className={`min-h-12 border-[1.5px] px-2 text-[13.5px] leading-tight font-extrabold ${use === u.value ? "border-violet bg-violet-tint text-violet" : "border-line bg-white"}`}
             >
               {u.label}
             </button>
@@ -114,7 +114,7 @@ export function VoiceView({ studioId, initial, own: initialOwn }: { studioId: st
           {voices.map((v) => {
             const on = voiceId === v.id;
             return (
-              <div key={v.id} className={`flex items-center gap-2 rounded-[16px] border-[1.5px] py-1 pr-1.5 pl-4 ${on ? "border-violet bg-violet-tint" : "border-line bg-white"}`}>
+              <div key={v.id} className={`flex items-center gap-2 border-[1.5px] py-1 pr-1.5 pl-4 ${on ? "border-violet bg-violet-tint" : "border-line bg-white"}`}>
                 <button type="button" role="radio" aria-checked={on} disabled={use === "never"} onClick={() => setVoiceId(v.id)} className="flex min-w-0 flex-1 items-center gap-2 py-2.5 text-left">
                   <span className="flex min-w-0 flex-col">
                     <span className="text-[15.5px] font-extrabold">{v.name}</span>
@@ -171,7 +171,7 @@ export function VoiceView({ studioId, initial, own: initialOwn }: { studioId: st
           type="button"
           disabled={pending || cloning}
           onClick={() => save({ use, voiceId })}
-          className="mx-auto flex h-12 w-full max-w-[448px] items-center justify-center rounded-full bg-violet text-[16px] font-extrabold text-white disabled:opacity-50"
+          className="mx-auto flex h-12 w-full max-w-[448px] items-center justify-center bg-violet text-[16px] font-extrabold text-white disabled:opacity-50"
         >
           {pending ? "J’enregistre…" : use === "never" ? "Juste la musique" : "C’est cette voix"}
         </button>

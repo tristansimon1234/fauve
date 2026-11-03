@@ -24,7 +24,7 @@ export async function SidebarAccount() {
     return (
       <>
         <Credits studioId={member.studio.id} wide />
-        <div className="flex flex-col gap-2 rounded-[14px] bg-soft p-3.5">
+        <div className="flex flex-col gap-2 bg-soft p-3.5">
           <span className="text-xs font-bold tracking-[.06em] text-muted">TES COMPTES</span>
           {handles.map(([platform, handle]) => (
             <span key={platform} className="flex items-center gap-2 text-sm font-semibold">
@@ -49,7 +49,7 @@ export async function SidebarAccount() {
   return (
     <>
       <Credits studioId={member.studio.id} wide />
-      <div className="flex flex-col gap-2 rounded-[14px] bg-soft p-3.5">
+      <div className="flex flex-col gap-2 bg-soft p-3.5">
         <span className="text-xs font-bold tracking-[.06em] text-muted">COMPTES CONNECTÉS</span>
         {accounts.map((a) => (
           <span key={a.platform} className="flex items-center gap-2 text-sm font-semibold">
@@ -80,7 +80,7 @@ export async function SidebarAccount() {
 
 function StudioLink({ name, firstName, role }: { name: string; firstName: string | null; role: string }) {
   return (
-    <Link href="/reglages" className="flex items-center gap-3 rounded-xl px-1.5 py-1 hover:bg-soft">
+    <Link href="/reglages" className="flex items-center gap-3 px-1.5 py-1 hover:bg-soft">
       <Avatar name={name} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate text-[15px] font-bold">{name}</span>
@@ -114,12 +114,12 @@ async function Credits({ studioId, wide = false }: { studioId: string; wide?: bo
     <Link
       href="/reglages#credits"
       aria-label={`${balance} crédits disponibles`}
-      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold tabular-nums ${low ? "bg-peach text-peach-ink" : "bg-violet-tint text-violet"} ${wide ? "justify-between" : ""}`}
+      className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-bold tabular-nums ${low ? "bg-peach text-peach-ink" : "bg-violet-tint text-violet"} ${wide ? "justify-between" : ""}`}
     >
       {wide ? <span className="font-semibold">Crédits</span> : null}
       <span>
         {balance}
-        {wide ? "" : " crédits"}
+        {wide ? "" : "crédits"}
       </span>
     </Link>
   );
@@ -128,7 +128,7 @@ async function Credits({ studioId, wide = false }: { studioId: string; wide?: bo
 function Avatar({ name, small = false }: { name: string | null | undefined; small?: boolean }) {
   return (
     <span
-      className={`flex shrink-0 items-center justify-center rounded-full bg-peach font-extrabold text-peach-ink ${
+      className={`flex shrink-0 items-center justify-center bg-peach font-extrabold text-peach-ink ${
         small ? "size-9 text-xs" : "size-10 text-sm"
       }`}
     >

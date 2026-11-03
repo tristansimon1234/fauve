@@ -62,7 +62,7 @@ export function InlineEdit({
             onDone();
           }
         }}
-        className="block w-full resize-none overflow-hidden rounded-[10px] border-0 bg-white/95 px-3 py-2 text-[15px] leading-snug text-ink shadow-[0_8px_28px_rgba(0,0,0,.35)] outline-none ring-2 ring-violet"
+        className="block w-full resize-none overflow-hidden border-0 bg-white/95 px-3 py-2 text-[15px] leading-snug text-ink shadow-[0_8px_28px_rgba(0,0,0,.35)] outline-none ring-2 ring-violet"
       />
       <span className="mt-1 block text-center text-[11px] font-semibold text-white drop-shadow">
         {multiline ? "Une ligne par élément · ⌘ Entrée pour finir" : "Entrée pour finir · Échap pour annuler"}

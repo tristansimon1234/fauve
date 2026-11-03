@@ -13,11 +13,11 @@ function Switch({ label, on, busy, disabled, onToggle, dark }: { label: string; 
       aria-checked={on}
       disabled={busy || disabled}
       onClick={onToggle}
-      className={`fauve-press inline-flex h-9 items-center gap-2 rounded-full px-3 text-[13px] font-semibold disabled:opacity-50 ${
+      className={`fauve-press inline-flex h-9 items-center gap-2 px-3 text-[13px] font-semibold disabled:opacity-50 ${
         on ? "bg-violet text-white" : dark ? "bg-white/10 text-white/85" : "bg-soft text-ink"
       }`}
     >
-      <span className={`relative h-4 w-7 rounded-full ${on ? "bg-white/40" : dark ? "bg-white/25" : "bg-line"}`}>
+      <span className={`relative h-4 w-7 ${on ? "bg-white/40" : dark ? "bg-white/25" : "bg-line"}`}>
         <span
           className={`absolute top-0.5 left-0.5 size-3 rounded-full bg-white transition-transform duration-200 ease-fauve motion-reduce:transition-none ${on ? "translate-x-3" : ""}`}
         />

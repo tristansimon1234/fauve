@@ -44,7 +44,7 @@ export function DropCard({
           setOver(false);
           onFiles(e.dataTransfer.files);
         }}
-        className={`fauve-press flex w-full flex-col items-center gap-1.5 rounded-[18px] border-[1.5px] border-dashed px-4 py-5 text-center transition-colors ${
+        className={`fauve-press flex w-full flex-col items-center gap-1.5 border-[1.5px] border-dashed px-4 py-5 text-center transition-colors ${
           over ? "border-violet bg-violet-soft" : "border-lilac bg-white hover:border-violet hover:bg-violet-tint"
         }`}
       >

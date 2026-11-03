@@ -111,7 +111,7 @@ export function Bubble({
             const first = i === 0;
             const last = i === parts.length - 1;
             const bigEmoji = parts.length === 1 && !message.media && !message.videoUrl && emojiOnly(part) && [...part.matchAll(/\p{Extended_Pictographic}/gu)].length <= 3;
-            const corner = mine ? (last ? "rounded-[18px_18px_6px_18px]" : "rounded-[18px]") : last ? "rounded-[18px_18px_18px_6px]" : "rounded-[18px]";
+            const corner = mine ? (last ? "" : "") : last ? "" : "";
             return (
               <div
                 key={i}
@@ -124,13 +124,13 @@ export function Bubble({
               >
                 {first &&
                   (message.videoUrl ? (
-                    <video src={message.videoUrl} controls playsInline preload="metadata" className="aspect-[9/16] w-[240px] max-w-full rounded-xl bg-ink" />
+                    <video src={message.videoUrl} controls playsInline preload="metadata" className="aspect-[9/16] w-[240px] max-w-full bg-ink" />
                   ) : message.media ? (
                     message.media.video ? (
-                      <video src={message.media.url} controls playsInline preload="metadata" className="max-h-[320px] w-[220px] max-w-full rounded-xl bg-ink object-contain" />
+                      <video src={message.media.url} controls playsInline preload="metadata" className="max-h-[320px] w-[220px] max-w-full bg-ink object-contain" />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={message.media.url} alt="" className="max-h-[320px] w-[220px] max-w-full rounded-xl object-cover" />
+                      <img src={message.media.url} alt="" className="max-h-[320px] w-[220px] max-w-full object-cover" />
                     )
                   ) : (
                     media && (
@@ -144,7 +144,7 @@ export function Bubble({
                   // On the last bubble's bottom corner, like WhatsApp.
                   <span
                     key={reactions.join("")}
-                    className={`absolute -bottom-3.5 flex items-center gap-0.5 rounded-full border border-line bg-white px-1.5 py-0.5 text-[14px] leading-none text-ink shadow-sm ${
+                    className={`absolute -bottom-3.5 flex items-center gap-0.5 border border-line bg-white px-1.5 py-0.5 text-[14px] leading-none text-ink shadow-sm ${
                       mine ? "left-2.5 [--fauve-origin:top_left]" : "right-2.5 [--fauve-origin:top_right]"
                     } ${message.reactions.me !== firstReaction || message.reactions.fauve !== firstFauve ? "fauve-pop [--fauve-scale:0.6]" : ""}`}
                     aria-label={`Réactions : ${reactions.join(" ")}`}
@@ -170,7 +170,7 @@ export function Bubble({
           </button>
         )}
         {picking && (
-          <div className="fauve-pop absolute bottom-full left-0 z-10 mb-1.5 flex gap-0.5 rounded-full border border-line bg-white p-1 shadow-[0_8px_24px_rgba(28,21,48,0.12)] [--fauve-origin:bottom_left]">
+          <div className="fauve-pop absolute bottom-full left-0 z-10 mb-1.5 flex gap-0.5 border border-line bg-white p-1 shadow-[0_8px_24px_rgba(18,17,16,0.12)] [--fauve-origin:bottom_left]">
             {REACTIONS.map((emoji) => (
               <button
                 key={emoji}
@@ -216,7 +216,7 @@ export function Bubble({
               key={option}
               type="button"
               onClick={() => onChoose?.(option)}
-              className="fauve-press h-10 rounded-full border border-lilac bg-white px-4 text-[14px] font-semibold text-violet shadow-[0_2px_8px_rgba(28,21,48,0.05)] hover:bg-violet hover:text-white"
+              className="fauve-press h-10 border border-lilac bg-white px-4 text-[14px] font-semibold text-violet shadow-[0_2px_8px_rgba(18,17,16,0.05)] hover:bg-violet hover:text-white"
             >
               {option}
             </button>

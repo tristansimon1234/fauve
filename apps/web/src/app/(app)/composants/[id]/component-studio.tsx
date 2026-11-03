@@ -134,8 +134,8 @@ export function ComponentStudio({
       setExample(null);
     });
 
-  const card = "flex flex-col gap-3 rounded-[20px] border border-line bg-white p-5";
-  const field = "w-full rounded-[12px] border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-violet";
+  const card = "flex flex-col gap-3 border border-line bg-white p-5";
+  const field = "w-full border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-violet";
 
   return (
     <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -143,23 +143,23 @@ export function ComponentStudio({
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="line-clamp-2 min-w-0 flex-1 text-[26px] leading-tight font-extrabold tracking-[-0.02em] sm:text-[28px]">{element.name}</h1>
           {photoUrl && (
-            <div className="flex rounded-full bg-soft p-1" role="group" aria-label="Aperçu">
+            <div className="flex bg-soft p-1" role="group" aria-label="Aperçu">
               {(
                 [
                   ["photo", "Sur une photo"],
                   ["alone", "Seul"],
                 ] as const
               ).map(([v, label]) => (
-                <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={`rounded-full px-3.5 py-1.5 text-[13px] font-bold ${view === v ? "bg-white text-ink shadow-sm" : "text-muted"}`}>
+                <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={`px-3.5 py-1.5 text-[13px] font-bold ${view === v ? "bg-white text-ink shadow-sm" : "text-muted"}`}>
                   {label}
                 </button>
               ))}
             </div>
           )}
         </div>
-        <div className="flex items-center justify-center rounded-[24px] bg-[radial-gradient(ellipse_at_top,#2a2145_0%,#16112a_70%)] p-5">
+        <div className="flex items-center justify-center bg-ink p-5">
           {view === "photo" && slideProps ? (
-            <div ref={stage} className="relative w-full max-w-[440px] overflow-hidden rounded-[16px] shadow-[0_24px_60px_rgba(0,0,0,.45)]">
+            <div ref={stage} className="relative w-full max-w-[440px] overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,.45)]">
               <SlidePreview props={slideProps} />
               <ElementHandles
                 container={stage}
@@ -174,7 +174,7 @@ export function ComponentStudio({
               />
             </div>
           ) : (
-            <div className="w-full max-w-[520px] overflow-hidden rounded-[16px]">
+            <div className="w-full max-w-[520px] overflow-hidden">
               <ElementThumb element={{ js: element.js, texts: sample, fonts: element.fonts, base: element.base }} brand={brand} eager />
             </div>
           )}
@@ -190,9 +190,9 @@ export function ComponentStudio({
           </div>
         )}
         {exampleUrl && (
-          <div className="flex items-center gap-3 rounded-[16px] bg-soft p-3">
+          <div className="flex items-center gap-3 bg-soft p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={exampleUrl} alt="L’inspiration d’origine" className="h-20 w-16 rounded-[10px] object-cover" />
+            <img src={exampleUrl} alt="L’inspiration d’origine" className="h-20 w-16 object-cover" />
             <span className="text-[13px] leading-snug text-muted">
               Tiré de ton inspiration{element.kitName ? ` « ${element.kitName} »` : ""}.
             </span>
@@ -202,7 +202,7 @@ export function ComponentStudio({
 
       <aside className="flex min-w-0 flex-col gap-4">
         {message && (
-          <p role={message.ok ? "status" : "alert"} className={`rounded-[14px] px-4 py-3 text-[13px] font-semibold ${message.ok ? "bg-violet-tint text-violet" : "bg-peach text-danger"}`}>
+          <p role={message.ok ? "status" : "alert"} className={`px-4 py-3 text-[13px] font-semibold ${message.ok ? "bg-violet-tint text-violet" : "bg-peach text-danger"}`}>
             {message.text}
           </p>
         )}
@@ -230,7 +230,7 @@ export function ComponentStudio({
             Demander un changement à Edith
           </h2>
           {running ? (
-            <p className="flex items-center gap-2 rounded-[12px] bg-violet-tint px-3 py-2.5 text-[13px] font-semibold text-violet">
+            <p className="flex items-center gap-2 bg-violet-tint px-3 py-2.5 text-[13px] font-semibold text-violet">
               <Orb size={18} />
               Nouvelle version en cours · {running.stage.toLowerCase()}
             </p>
@@ -247,7 +247,7 @@ export function ComponentStudio({
               {!change && (
                 <div className="flex flex-wrap gap-1.5">
                   {CHANGES.map((c) => (
-                    <button key={c} type="button" onClick={() => setChange(c)} className="h-7 rounded-full bg-soft px-2.5 text-[12px] font-semibold hover:text-violet">
+                    <button key={c} type="button" onClick={() => setChange(c)} className="h-7 bg-soft px-2.5 text-[12px] font-semibold hover:text-violet">
                       {c}
                     </button>
                   ))}
@@ -257,7 +257,7 @@ export function ComponentStudio({
                 {example ? (
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={example.preview} alt="" className="size-9 rounded-lg object-cover" />
+                    <img src={example.preview} alt="" className="size-9 object-cover" />
                     <span className="truncate text-[12px] text-muted">Exemple joint</span>
                     <button
                       type="button"
@@ -313,7 +313,7 @@ export function ComponentStudio({
               <label key={slot.name} className="flex flex-col gap-1">
                 <span className="text-[12px] font-semibold text-muted first-letter:uppercase">
                   {slot.role}
-                  {slot.multiline ? " · une ligne par élément" : ""}
+                  {slot.multiline ? "· une ligne par élément" : ""}
                 </span>
                 {slot.multiline ? (
                   <textarea value={value} rows={Math.min(7, Math.max(2, value.split("\n").length + 1))} onChange={(e) => set(e.target.value)} className={field} />
@@ -349,7 +349,7 @@ export function ComponentStudio({
           <h2 className="text-[15px] font-bold">Versions</h2>
           <ul className="flex flex-col gap-2">
             <li className="flex items-center gap-3">
-              <div className="w-14 shrink-0 overflow-hidden rounded-[10px]">
+              <div className="w-14 shrink-0 overflow-hidden">
                 <ElementThumb element={{ js: element.js, texts: element.sample, fonts: element.fonts, base: element.base }} brand={brand} />
               </div>
               <span className="min-w-0 flex-1 text-[13px]">
@@ -359,7 +359,7 @@ export function ComponentStudio({
             </li>
             {history.map((v, i) => (
               <li key={`${v.at}-${i}`} className="flex items-center gap-3">
-                <div className="w-14 shrink-0 overflow-hidden rounded-[10px]">
+                <div className="w-14 shrink-0 overflow-hidden">
                   <ElementThumb element={{ js: v.js, texts: v.sample, fonts: v.fonts, base: v.base }} brand={brand} />
                 </div>
                 <span className="min-w-0 flex-1 text-[13px]">

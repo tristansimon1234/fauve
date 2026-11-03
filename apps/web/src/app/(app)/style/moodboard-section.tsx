@@ -78,7 +78,7 @@ export function MoodboardSection({
     setItems((current) => [...current, ...added].slice(0, MOODBOARD_MAX_ITEMS));
     setState(
       failed
-        ? { status: "error", message: `${failed} image${failed > 1 ? "s n’ont" : " n’a"} pas pu être ajoutée${failed > 1 ? "s" : ""} (format non lu ou connexion).` }
+        ? { status: "error", message: `${failed} image${failed > 1 ? "s n’ont" : "n’a"} pas pu être ajoutée${failed > 1 ? "s" : ""} (format non lu ou connexion).` }
         : { status: "idle" },
     );
   };
@@ -112,7 +112,7 @@ export function MoodboardSection({
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4" aria-busy={busy}>
         {items.map((item, i) => (
           <li key={item.path} className="flex flex-col gap-1.5">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-[14px] border border-line bg-soft">
+            <div className="relative aspect-[4/5] overflow-hidden border border-line bg-soft">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={item.url} alt={item.note || `Inspiration ${i + 1}`} className="size-full object-cover" />
               <button
@@ -138,7 +138,7 @@ export function MoodboardSection({
                 const note = e.target.value;
                 setItems((current) => current.map((x) => (x.path === item.path ? { ...x, note } : x)));
               }}
-              className="h-9 rounded-full border border-line bg-soft px-3 text-[13px] outline-none focus:border-violet"
+              className="h-9 border border-line bg-soft px-3 text-[13px] outline-none focus:border-violet"
             />
           </li>
         ))}
@@ -146,7 +146,7 @@ export function MoodboardSection({
           <li>
             <label
               htmlFor={id}
-              className={`flex aspect-[4/5] flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-line bg-soft px-3 text-center text-sm font-semibold text-muted transition-colors hover:border-violet hover:text-violet has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-violet ${busy ? "pointer-events-none opacity-60" : "cursor-pointer"}`}
+              className={`flex aspect-[4/5] flex-col items-center justify-center gap-2 border-2 border-dashed border-line bg-soft px-3 text-center text-sm font-semibold text-muted transition-colors hover:border-violet hover:text-violet has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-violet ${busy ? "pointer-events-none opacity-60" : "cursor-pointer"}`}
             >
               <PlusIcon size={22} />
               {state.status === "uploading" ? "Ajout…" : items.length ? "Ajouter" : "Ajouter des images"}
@@ -190,7 +190,7 @@ export function MoodboardSection({
       )}
 
       {reading && (
-        <div className="flex flex-col gap-3 rounded-[16px] bg-soft p-4 sm:p-5">
+        <div className="flex flex-col gap-3 bg-soft p-4 sm:p-5">
           <div className="flex items-center gap-2.5">
             <Orb size={28} still />
             <h3 className="text-[15px] font-bold">Ce qu’Edith en retient</h3>

@@ -26,7 +26,7 @@ export function ListItems({
   onChange: (patch: { items?: ListItem[]; bullet?: Bullet }) => void;
 }) {
   const set = (i: number, patch: Partial<ListItem>) => onChange({ items: items.map((item, j) => (j === i ? { ...item, ...patch } : item)) });
-  const input = "min-w-0 rounded-[10px] border border-line bg-white px-2.5 py-2 text-[14px] outline-none focus:border-violet";
+  const input = "min-w-0 border border-line bg-white px-2.5 py-2 text-[14px] outline-none focus:border-violet";
   return (
     <div className="flex flex-col gap-2">
       {items.map((item, i) => (
@@ -79,7 +79,7 @@ export function ListItems({
             aria-label="Couleur des puces"
             value={/^#/.test(bullet.color) ? bullet.color : "#ffffff"}
             onChange={(e) => onChange({ bullet: { ...bullet, color: e.target.value } })}
-            className="h-8 w-10 cursor-pointer rounded-[8px] border border-line bg-white"
+            className="h-8 w-10 cursor-pointer border border-line bg-white"
           />
         )}
       </div>

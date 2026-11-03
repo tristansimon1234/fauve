@@ -22,7 +22,7 @@ export function ArtDirectionSection({ value, onChange }: { value: string; onChan
         onChange={(e) => onChange(e.target.value)}
         placeholder="Minimaliste et lumineux, tons terracotta et crème, typographie éditoriale, mouvements lents, beaucoup d’espace, jamais de néon."
         aria-describedby="art-direction-count"
-        className="w-full resize-y rounded-[14px] border-[1.5px] border-line bg-white px-4 py-3.5 text-[15px] leading-relaxed placeholder:text-muted/70 focus:border-violet focus:outline-none"
+        className="w-full resize-y border-[1.5px] border-line bg-white px-4 py-3.5 text-[15px] leading-relaxed placeholder:text-muted/70 focus:border-violet focus:outline-none"
       />
       <p
         id="art-direction-count"

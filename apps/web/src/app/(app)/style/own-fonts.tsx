@@ -69,15 +69,15 @@ export function OwnFonts({
     save([...fonts.map(({ family, path }) => ({ family, path })), { family, path }]);
   };
 
-  const chip = (on: boolean) => `h-8 rounded-full px-3 text-[12px] font-semibold ${on ? "bg-violet text-white" : "bg-white text-ink hover:text-violet"}`;
+  const chip = (on: boolean) => `h-8 px-3 text-[12px] font-semibold ${on ? "bg-violet text-white" : "bg-white text-ink hover:text-violet"}`;
   return (
-    <div className="flex flex-col gap-3 rounded-[16px] bg-soft p-4">
+    <div className="flex flex-col gap-3 bg-soft p-4">
       <div className="flex flex-col gap-0.5">
         <span className="text-[14px] font-bold">Tes polices</span>
         <span className="text-[13px] text-muted">Ta police à toi (celle de ton logo ou de ton site), en fichier .ttf, .otf ou .woff. Edith l’utilise dans tes Reels et tes textes sur photo.</span>
       </div>
       {fonts.map((f) => (
-        <div key={f.path} className="flex flex-wrap items-center gap-2 rounded-[12px] bg-white p-3">
+        <div key={f.path} className="flex flex-wrap items-center gap-2 bg-white p-3">
           <span className="min-w-0 flex-1 truncate text-[22px] leading-tight" style={{ fontFamily: `"${f.family}", sans-serif` }}>
             {f.family}
           </span>
@@ -103,7 +103,7 @@ export function OwnFonts({
           type="button"
           disabled={busy}
           onClick={() => fileRef.current?.click()}
-          className="flex items-center justify-center gap-2 rounded-[12px] border-[1.5px] border-dashed border-line py-2.5 text-[14px] font-bold text-violet hover:border-violet/50 hover:bg-white disabled:opacity-50"
+          className="flex items-center justify-center gap-2 border-[1.5px] border-dashed border-line py-2.5 text-[14px] font-bold text-violet hover:border-violet/50 hover:bg-white disabled:opacity-50"
         >
           <PlusIcon size={16} />
           {busy ? "Envoi…" : "Ajouter une police"}

@@ -82,7 +82,7 @@ export function PublishByHand({
   };
 
   return (
-    <section aria-label="Musique" className="flex flex-col gap-3 rounded-[18px] border border-line bg-white p-3.5">
+    <section aria-label="Musique" className="flex flex-col gap-3 border border-line bg-white p-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-[16px] font-extrabold">Musique</h2>
         <span className="text-[12px] text-muted" aria-live="polite">
@@ -90,7 +90,7 @@ export function PublishByHand({
         </span>
       </div>
       {voice !== undefined && (
-        <div className="flex flex-col gap-1 rounded-[12px] bg-soft px-3 py-2.5">
+        <div className="flex flex-col gap-1 bg-soft px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[12px] font-bold">
               {voice && !voiceGone ? (voice.who === "simone" ? `Voix off : ${voice.name}` : "Voix off : ta voix") : "Sans voix off"}
@@ -112,7 +112,7 @@ export function PublishByHand({
       )}
       {music && (
         <div className="flex flex-col gap-2">
-          <div role="radiogroup" aria-label="Musique d’Edith" className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">
+          <div role="radiogroup" aria-label="Musique d’Edith" className="grid grid-cols-2 gap-1 bg-soft p-1">
             {[
               { on: true, label: "Musique d’Edith", hint: "composée pour ce Reel" },
               { on: false, label: "Sans musique", hint: "Reel muet" },
@@ -123,7 +123,7 @@ export function PublishByHand({
                 role="radio"
                 aria-checked={musicOn === o.on}
                 onClick={() => musicOn !== o.on && changeMusic(o.on ? "on" : "off")}
-                className={`flex flex-col rounded-[9px] px-2 py-2 leading-tight transition-colors ${musicOn === o.on ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+                className={`flex flex-col px-2 py-2 leading-tight transition-colors ${musicOn === o.on ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}
               >
                 <span className="text-[12px] font-bold">{o.label}</span>
                 <span className="text-[11px] font-semibold opacity-70">{o.hint}</span>
@@ -144,7 +144,7 @@ export function PublishByHand({
           )}
         </div>
       )}
-      <div role="radiogroup" aria-label="Qui publie ce Reel" className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">
+      <div role="radiogroup" aria-label="Qui publie ce Reel" className="grid grid-cols-2 gap-1 bg-soft p-1">
         {[
           { on: false, label: "Edith publie", hint: musicOn && music ? "avec sa musique" : "telle quelle" },
           { on: true, label: "Je publie moi-même", hint: "avec un son d’Instagram" },
@@ -155,7 +155,7 @@ export function PublishByHand({
             role="radio"
             aria-checked={byHand === o.on}
             onClick={() => choose(o.on)}
-            className={`flex flex-col rounded-[9px] px-2 py-2 leading-tight transition-colors ${byHand === o.on ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+            className={`flex flex-col px-2 py-2 leading-tight transition-colors ${byHand === o.on ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}
           >
             <span className="text-[12px] font-bold">{o.label}</span>
             <span className="text-[11px] font-semibold opacity-70">{o.hint}</span>
@@ -168,7 +168,7 @@ export function PublishByHand({
             {handedOffAt
               ? `Envoyé ${handedOffAt}. Publie-le depuis Instagram avec ta musique : je le retrouverai tout seul sur ton compte.`
               : "À l’heure prévue, je t’envoie la vidéo et la légende sur WhatsApp. Tu l’enregistres, tu ajoutes ta musique dans Instagram (+ › Reel) et tu publies. Je retrouve ensuite le Reel sur ton compte pour suivre ses résultats."}
-            {music && musicOn ? " Pour un son d’Instagram, choisis « Sans musique » plus haut." : ""}
+            {music && musicOn ? "Pour un son d’Instagram, choisis « Sans musique » plus haut." : ""}
           </p>
           <div className="flex flex-wrap gap-2">
             {downloadUrl && (
@@ -177,7 +177,7 @@ export function PublishByHand({
               </a>
             )}
             {caption && (
-              <button type="button" onClick={copy} className="h-9 rounded-full bg-soft px-4 text-[13px] font-bold">
+              <button type="button" onClick={copy} className="h-9 bg-soft px-4 text-[13px] font-bold">
                 {copied ? "Légende copiée" : "Copier la légende"}
               </button>
             )}

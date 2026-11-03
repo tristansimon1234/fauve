@@ -13,7 +13,7 @@ export function CarouselStrip() {
           src={`${BASE}/${file}`}
           alt={`Diapositive ${i + 1} d’un carrousel conseils pour un salon de coiffure`}
           loading="lazy"
-          className="aspect-[4/5] w-[62vw] max-w-[280px] shrink-0 snap-center rounded-[18px] object-cover shadow-[0_30px_60px_-34px_rgba(28,21,48,.5)] md:w-full md:max-w-none"
+          className="aspect-[4/5] w-[62vw] max-w-[280px] shrink-0 snap-center object-cover border border-ink/15 md:w-full md:max-w-none"
         />
       ))}
     </div>

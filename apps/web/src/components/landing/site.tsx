@@ -24,7 +24,7 @@ export function Start({ waUrl, size, light = false }: { waUrl: string; size: "sm
   if (!OPEN) {
     if (size === "sm") return null;
     return (
-      <span className={`inline-flex h-14 items-center rounded-full px-7 text-base font-bold ${light ? "bg-white/10 text-white" : "bg-violet-soft text-violet"}`}>
+      <span className={`inline-flex h-14 items-center border px-7 text-base font-semibold ${light ? "border-white/40 text-white" : "border-ink text-ink"}`}>
         Bientôt disponible
       </span>
     );
@@ -43,30 +43,30 @@ export function Start({ waUrl, size, light = false }: { waUrl: string; size: "sm
   );
 }
 
-/** A section's title, numbered like a magazine's pages: N° 01, a hairline, its name, then the line. */
+/** A section's title, numbered like a magazine's pages: a hairline across, « N° 01 — Le travail » in mono, then the line in big type. */
 export function SectionTitle({ n, kicker, children, as: Tag = "h2" }: { n?: number; kicker: string; children: ReactNode; as?: "h1" | "h2" }) {
   return (
-    <div className="flex flex-col gap-4">
-      <span className="flex items-center gap-3 text-[12px] font-bold tracking-[0.16em] text-muted uppercase">
-        {n !== undefined && <span className="font-[family-name:var(--font-serif)] text-[17px] font-normal tracking-normal text-ink normal-case italic">N° {String(n).padStart(2, "0")}</span>}
-        <span className="h-px w-8 bg-ink/25" />
-        {fr(kicker)}
+    <div className="flex flex-col gap-6 border-t border-ink pt-4">
+      <span className="mono-label flex items-center justify-between gap-3 text-ink">
+        <span>{fr(kicker)}</span>
+        {n !== undefined && <span className="tabular-nums">N° {String(n).padStart(2, "0")}</span>}
       </span>
-      <Tag className="max-w-[860px] text-[clamp(34px,4.4vw,58px)] leading-[1.02] font-extrabold tracking-[-0.04em]">{frNodes(children)}</Tag>
+      <Tag className="max-w-[1100px] text-[clamp(40px,6.4vw,96px)] leading-[0.95] font-semibold tracking-[-0.055em]">{frNodes(children)}</Tag>
     </div>
   );
 }
 
-/** The last call, on ink: one promise, one line, the button. */
+/** The last call: Edith's head in thin lines, one promise in the biggest type of the page, one line, the button. */
 export function LastCall({ waUrl, children, line }: { waUrl: string; children: ReactNode; line: string }) {
   return (
-    <section className="mx-auto max-w-[1240px] px-4 pb-16 sm:px-8">
-      <div className="land-reveal relative isolate flex flex-col items-center gap-6 overflow-hidden rounded-[32px] bg-ink px-6 py-16 text-center text-white sm:py-20">
-        <span className="pointer-events-none absolute -bottom-40 left-1/2 -z-10 size-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(91,63,217,.55),transparent_65%)]" aria-hidden="true" />
-        <Mascot size={92} mood="happy" />
-        <h2 className="max-w-[760px] text-[clamp(34px,5vw,64px)] leading-[1.02] font-extrabold tracking-[-0.04em]">{frNodes(children)}</h2>
-        <p className="max-w-[460px] text-[16px] text-white/70">{fr(line)}</p>
-        <Start waUrl={waUrl} size="lg" light />
+    <section className="mx-auto max-w-[1360px] px-4 pb-20 sm:px-8">
+      <div className="land-reveal flex flex-col items-start gap-8 border-t border-ink pt-10 sm:pt-14">
+        <Mascot size={120} mood="happy" />
+        <h2 className="max-w-[1200px] text-[clamp(48px,8.4vw,132px)] leading-[0.92] font-semibold tracking-[-0.06em]">{frNodes(children)}</h2>
+        <div className="flex w-full flex-wrap items-end justify-between gap-6">
+          <p className="max-w-[460px] text-[17px] leading-relaxed text-muted">{fr(line)}</p>
+          <Start waUrl={waUrl} size="lg" />
+        </div>
       </div>
     </section>
   );
@@ -76,7 +76,7 @@ export function LastCall({ waUrl, children, line }: { waUrl: string; children: R
 export function SiteHeader({ waUrl, home = false }: { waUrl: string; home?: boolean }) {
   const at = (hash: string) => (home ? hash : `/${hash}`);
   return (
-    <header className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-4 py-5 sm:px-8 sm:py-6">
+    <header className="mx-auto flex max-w-[1360px] items-center justify-between gap-4 border-b border-ink/15 px-4 py-4 sm:px-8">
       <Link href="/" aria-label="Edith, accueil">
         <Logo />
       </Link>
@@ -87,12 +87,12 @@ export function SiteHeader({ waUrl, home = false }: { waUrl: string; home?: bool
           [at("#comment"), "Comment ça marche"],
           [at("#tarif"), "Tarif"],
         ].map(([href, label]) => (
-          <a key={href} href={href} className="hidden text-[14.5px] font-semibold text-ink/80 transition-colors hover:text-ink lg:inline">
+          <a key={href} href={href} className="mono-label hidden text-ink/70 transition-colors hover:text-ink lg:inline">
             {label}
           </a>
         ))}
         {!home && (
-          <Link href="/guides" className="hidden text-[14.5px] font-semibold text-ink/80 transition-colors hover:text-ink lg:inline">
+          <Link href="/guides" className="mono-label hidden text-ink/70 transition-colors hover:text-ink lg:inline">
             Guides
           </Link>
         )}
@@ -111,7 +111,7 @@ export function SiteHeader({ waUrl, home = false }: { waUrl: string; home?: bool
 export function SiteFooter() {
   const column = (title: string, links: [string, string][]) => (
     <div className="flex min-w-0 flex-col gap-2.5">
-      <span className="text-[12px] font-bold tracking-[0.16em] text-ink uppercase">{title}</span>
+      <span className="mono-label text-ink">{title}</span>
       {links.map(([href, label]) => (
         <Link key={href} href={href} className="text-[14.5px] text-muted transition-colors hover:text-ink">
           {fr(label)}
@@ -120,8 +120,8 @@ export function SiteFooter() {
     </div>
   );
   return (
-    <footer className="mx-auto max-w-[1240px] px-4 pb-10 sm:px-8">
-      <div className="grid gap-10 border-t border-ink/12 pt-10 sm:grid-cols-3">
+    <footer className="mx-auto max-w-[1360px] px-4 pb-10 sm:px-8">
+      <div className="grid gap-10 border-t border-ink pt-8 sm:grid-cols-3">
         {column(
           "Par métier",
           TRADES.map((t) => [`/community-manager/${t.slug}`, t.menu]),
@@ -132,7 +132,7 @@ export function SiteFooter() {
           COMPARISONS.map((c) => [`/comparatif/${c.slug}`, c.menu]),
         )}
       </div>
-      <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-muted">
+      <div className="mt-12 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-ink/15 pt-5 text-[13px] font-medium text-muted">
         <span>© Edith</span>
         <Link href="/confidentialite">Confidentialité</Link>
         <Link href="/conditions">Conditions d’utilisation</Link>

@@ -25,7 +25,7 @@ async function Grid() {
     <GridView
       aside={
         <div className="flex flex-wrap items-center justify-between gap-3 lg:flex-col lg:items-start">
-          <h1 className="text-[30px] font-extrabold tracking-[-0.02em]">Grille</h1>
+          <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[60px]">Grille</h1>
           <CreatePostButton timezone={member.studio.timezone} />
         </div>
       }

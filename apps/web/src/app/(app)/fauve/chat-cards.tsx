@@ -65,7 +65,7 @@ function PlanList({ plan }: { plan: NonNullable<CardQuote["plan"]> }) {
       <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-soft text-[12px] font-bold text-muted">{i + 1}</span>
       <div className="flex min-w-0 flex-col gap-1">
         <span
-          className={`self-start rounded-full px-2 py-0.5 text-[11px] font-bold ${
+          className={`self-start px-2 py-0.5 text-[11px] font-bold ${
             s.kind === "animation" ? "bg-violet-soft text-violet" : s.kind === "end" ? "bg-chip text-muted" : "bg-peach text-peach-ink"
           }`}
         >
@@ -80,7 +80,7 @@ function PlanList({ plan }: { plan: NonNullable<CardQuote["plan"]> }) {
     <div className="flex flex-col gap-3">
       <span className="text-[13px] font-semibold text-muted">
         ~{Math.round(plan.duration)} s · {plan.scenes.length} scène{plan.scenes.length > 1 ? "s" : ""}
-        {plan.style === "collage" ? " · en collage" : plan.style && plan.style !== "libre" ? ` · ${AMBIANCES[plan.style].label.toLowerCase()}` : ""}
+        {plan.style === "collage" ? "· en collage" : plan.style && plan.style !== "libre" ? ` · ${AMBIANCES[plan.style].label.toLowerCase()}` : ""}
       </span>
       <ol className="flex flex-col gap-2.5">{plan.scenes.slice(0, FIRST_SCENES).map(scene)}</ol>
       {rest.length > 0 && (
@@ -99,7 +99,7 @@ function PlanList({ plan }: { plan: NonNullable<CardQuote["plan"]> }) {
             type="button"
             aria-expanded={all}
             onClick={() => setAll((a) => !a)}
-            className="fauve-press -mt-1 self-start rounded-full text-[13px] font-bold text-violet @xl:hidden"
+            className="fauve-press -mt-1 self-start text-[13px] font-bold text-violet @xl:hidden"
           >
             {all ? "Voir moins" : `Voir les ${plan.scenes.length} scènes`}
           </button>
@@ -209,7 +209,7 @@ function QuoteCard({
   return (
     <article
       data-quote={quote.id}
-      className={`@container flex ${quote.plan && open ? "w-[640px]" : "w-[360px]"} max-w-full flex-col overflow-hidden rounded-[20px] border border-line bg-white shadow-[0_4px_18px_rgba(28,21,48,0.07)]`}
+      className={`@container flex ${quote.plan && open ? "w-[640px]" : "w-[360px]"} max-w-full flex-col overflow-hidden border border-line bg-white shadow-[0_4px_18px_rgba(18,17,16,0.07)]`}
     >
       <div className="flex items-start justify-between gap-3 border-b border-line px-5 pt-4 pb-3">
         <div className="flex min-w-0 flex-col gap-0.5">
@@ -219,13 +219,13 @@ function QuoteCard({
           <span className="text-[17px] leading-snug font-bold">{quote.title}</span>
         </div>
         {level && !(open && levels.length > 1) && (
-          <span className="mt-0.5 shrink-0 rounded-full bg-violet-soft px-2.5 py-1 text-[12px] font-bold text-violet">{level.label}</span>
+          <span className="mt-0.5 shrink-0 bg-violet-soft px-2.5 py-1 text-[12px] font-bold text-violet">{level.label}</span>
         )}
       </div>
       {/* Montages start at once now: the plan and its prices only show on an older quote still waiting for its « Lancer ». */}
       <div className={`grid gap-5 p-5 ${quote.plan && open ? "@xl:grid-cols-[1fr_230px]" : ""}`}>
         {quote.plan && open && <PlanList plan={quote.plan} />}
-        <div className="flex min-w-0 flex-col @xl:rounded-[16px] @xl:bg-soft @xl:p-4">
+        <div className="flex min-w-0 flex-col @ @xl:bg-soft @xl:p-4">
           {/* The part that changes with the state rises in when it changes live. */}
           <div key={quote.state} className={`flex flex-col gap-3 ${quote.state !== first ? "fauve-enter" : ""}`}>
             {open ? (
@@ -244,7 +244,7 @@ function QuoteCard({
                         {levels.map((e) => (
                           <label
                             key={e}
-                            className={`flex h-10 cursor-pointer items-center justify-center rounded-full text-[13px] font-bold transition-colors duration-200 ease-fauve has-disabled:cursor-default has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-violet @xl:h-9 ${
+                            className={`flex h-10 cursor-pointer items-center justify-center text-[13px] font-bold transition-colors duration-200 ease-fauve has-disabled:cursor-default has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-violet @xl:h-9 ${
                               effort === e ? "text-white" : "text-muted hover:text-ink"
                             }`}
                           >
@@ -299,7 +299,7 @@ function QuoteCard({
                   </p>
                 </div>
                 {quote.failed && (
-                  <p className="rounded-[12px] bg-peach px-3 py-2 text-[13px] leading-snug text-peach-ink">
+                  <p className="bg-peach px-3 py-2 text-[13px] leading-snug text-peach-ink">
                     Le montage n’a pas abouti. Aucun crédit n’a été débité.
                   </p>
                 )}
@@ -311,7 +311,7 @@ function QuoteCard({
                       aria-disabled={busy || undefined}
                       aria-busy={launching || undefined}
                       onClick={launch}
-                      className={`fauve-press flex h-11 items-center justify-center gap-2 rounded-full bg-violet px-4 text-[15px] font-bold whitespace-nowrap text-white ${
+                      className={`fauve-press flex h-11 items-center justify-center gap-2 bg-violet px-4 text-[15px] font-bold whitespace-nowrap text-white ${
                         busy ? "cursor-default" : "hover:bg-violet-hover"
                       } ${busy && !launching ? "opacity-60" : ""}`}
                     >
@@ -343,7 +343,7 @@ function QuoteCard({
                         type="button"
                         disabled={busy}
                         onClick={() => onAnswer("Pas maintenant")}
-                        className="fauve-press h-10 rounded-full px-3 text-[14px] font-semibold text-muted hover:bg-soft hover:text-ink disabled:opacity-60 @xl:hover:bg-white"
+                        className="fauve-press h-10 px-3 text-[14px] font-semibold text-muted hover:bg-soft hover:text-ink disabled:opacity-60 @xl:hover:bg-white"
                       >
                         Pas maintenant
                       </button>
@@ -384,7 +384,7 @@ function QuoteCard({
                   <button
                     type="button"
                     onClick={() => onAsk(`Lance le montage de « ${quote.title} »`)}
-                    className="fauve-press h-10 rounded-full border border-lilac bg-white px-4 text-[14px] font-semibold text-violet hover:bg-violet-soft"
+                    className="fauve-press h-10 border border-lilac bg-white px-4 text-[14px] font-semibold text-violet hover:bg-violet-soft"
                   >
                     Le lancer maintenant
                   </button>
@@ -525,7 +525,7 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
           return (
             <li key={step.key} aria-current={current ? "step" : undefined} className="relative flex items-center gap-2.5 pb-3.5 last:pb-0">
               {i < steps.length - 1 && (
-                <span aria-hidden="true" className="absolute top-[22px] -bottom-0.5 left-[9px] w-0.5 overflow-hidden rounded-full bg-line">
+                <span aria-hidden="true" className="absolute top-[22px] -bottom-0.5 left-[9px] w-0.5 overflow-hidden bg-line">
                   <span
                     className={`block size-full origin-top bg-violet transition-transform duration-300 ease-fauve motion-reduce:transition-none ${
                       i < at ? "scale-y-100" : "scale-y-0"
@@ -562,7 +562,7 @@ function MontageProgress({ quote, live, focus, onAsk }: { quote: CardQuote; live
         </span>
       </p>
       {late ? (
-        <div className="fauve-enter flex flex-col items-start gap-1 rounded-[12px] bg-peach px-3 py-2 text-[13px] leading-snug text-peach-ink">
+        <div className="fauve-enter flex flex-col items-start gap-1 bg-peach px-3 py-2 text-[13px] leading-snug text-peach-ink">
           C’est plus long que prévu. Je te préviens dès que c’est prêt.
           {onAsk && (
             <button type="button" onClick={() => onAsk(`Où en est mon montage « ${quote.title} » ?`)} className="fauve-press font-bold underline underline-offset-2">
@@ -606,7 +606,7 @@ function Media({ post, controls }: { post: CardPost; controls: boolean }) {
 function PostCard({ post, timezone, making = false }: { post: CardPost; timezone: string; making?: boolean }) {
   const tall = post.kind === "reel" || post.kind === "story";
   return (
-    <article className="flex w-[240px] max-w-full flex-col overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_2px_10px_rgba(28,21,48,0.05)]">
+    <article className="flex w-[240px] max-w-full flex-col overflow-hidden border border-line bg-white shadow-[0_2px_10px_rgba(18,17,16,0.05)]">
       <div className={`relative ${tall ? "aspect-[9/16]" : "aspect-[4/5]"} bg-soft`}>
         <Media post={post} controls />
         {post.kind === "carousel" && <LayersIcon size={16} className="absolute top-2 right-2 text-white drop-shadow" />}
@@ -642,7 +642,7 @@ function PostCard({ post, timezone, making = false }: { post: CardPost; timezone
 
 function GridCard({ posts }: { posts: CardPost[] }) {
   return (
-    <article className="flex w-[300px] max-w-full flex-col overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_2px_10px_rgba(28,21,48,0.05)]">
+    <article className="flex w-[300px] max-w-full flex-col overflow-hidden border border-line bg-white shadow-[0_2px_10px_rgba(18,17,16,0.05)]">
       <span className="px-3 pt-3 pb-2 text-[13px] font-bold">Ta grille à venir</span>
       {posts.length ? (
         <ul className="grid grid-cols-3 gap-0.5 border-t border-line">

@@ -1,12 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Serif, Plus_Jakarta_Sans } from "next/font/google";
+import { IBM_Plex_Mono, Instrument_Serif, Inter_Tight } from "next/font/google";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
-const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
+// The interface and the big titles: a tight grotesque (Tristan: « ligne et très fin, contraste avec des grosses polices »).
+const grotesk = Inter_Tight({
+  variable: "--font-grotesk",
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700", "800"],
+});
+
+// Small labels in capitals (« N° 01 », a status, a count).
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500"],
 });
 
 const instrument = Instrument_Serif({
@@ -30,14 +37,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#5B3FD9",
+  themeColor: "#F5F2EC",
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="fr" className={`${jakarta.variable} ${instrument.variable} h-full`}>
+    <html lang="fr" className={`${grotesk.variable} ${instrument.variable} ${plexMono.variable} h-full`}>
       <body className="min-h-full">{children}</body>
     </html>
   );

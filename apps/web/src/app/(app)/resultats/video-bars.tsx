@@ -74,7 +74,7 @@ function Columns({
               >
                 {n !== null && (
                   <span
-                    className={`block w-full max-w-[24px] rounded-t-[4px] ${COLOR[v.platform]} transition-opacity ${hover !== null && hover !== i ? "opacity-40" : ""}`}
+                    className={`block w-full max-w-[24px] ${COLOR[v.platform]} transition-opacity ${hover !== null && hover !== i ? "opacity-40" : ""}`}
                     style={{ height: `${Math.max(2, (n / top) * 100)}%` }}
                   />
                 )}
@@ -83,7 +83,7 @@ function Columns({
           })}
           {hover !== null && hover < values.length && (
             <span
-              className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-[10px] bg-ink px-2.5 py-1.5 text-[12px] font-semibold whitespace-nowrap text-white shadow-sm"
+              className="pointer-events-none absolute z-10 -translate-x-1/2 bg-ink px-2.5 py-1.5 text-[12px] font-semibold whitespace-nowrap text-white shadow-sm"
               // Just above its column, inside the plot (above the plot it sat on the chart's title).
               style={{ left: `${((hover + 0.5) / videos.length) * 100}%`, bottom: `calc(${Math.min(84, Math.max(2, ((values[hover] ?? 0) / top) * 100))}% + 6px)` }}
             >
@@ -116,7 +116,7 @@ export function VideoBars({ videos, timeZone }: { videos: VideoRow[]; timeZone: 
           <ul className="flex gap-4 text-[12.5px] font-semibold text-muted" aria-label="Légende">
             {platforms.map((p) => (
               <li key={p} className="flex items-center gap-1.5">
-                <span className={`size-2.5 rounded-[3px] ${COLOR[p]}`} /> {NAME[p]}
+                <span className={`size-2.5 ${COLOR[p]}`} /> {NAME[p]}
               </li>
             ))}
           </ul>

@@ -34,7 +34,7 @@ export function TrendQuery({ query, lang, left }: { query: string | null; lang: 
         <span className="text-muted">Pour</span>
         <span className="font-serif text-[22px] italic leading-none">« {query} »</span>
         <span className="text-muted">{trendLangIn(lang)}</span>
-        <button type="button" onClick={() => setEditing(true)} className="rounded-full px-3 py-1.5 text-[14px] font-bold text-violet hover:bg-violet-soft">
+        <button type="button" onClick={() => setEditing(true)} className="px-3 py-1.5 text-[14px] font-bold text-violet hover:bg-violet-soft">
           Changer
         </button>
       </div>
@@ -58,13 +58,13 @@ export function TrendQuery({ query, lang, left }: { query: string | null; lang: 
           onChange={(e) => setWords(e.target.value)}
           maxLength={60}
           placeholder="salon de coiffure, café, studio de pilates…"
-          className="h-11 min-w-[200px] flex-1 rounded-full border border-line px-4 text-[16px] outline-none focus:border-violet"
+          className="h-11 min-w-[200px] flex-1 border border-line px-4 text-[16px] outline-none focus:border-violet"
         />
         <select
           aria-label="Langue des vidéos"
           value={language}
           onChange={(e) => setLanguage(e.target.value as TrendLang)}
-          className="h-11 rounded-full border border-line bg-white px-4 text-[16px] outline-none focus:border-violet"
+          className="h-11 border border-line bg-white px-4 text-[16px] outline-none focus:border-violet"
         >
           {TREND_LANGS.map((l) => (
             <option key={l} value={l}>
@@ -72,7 +72,7 @@ export function TrendQuery({ query, lang, left }: { query: string | null; lang: 
             </option>
           ))}
         </select>
-        <button type="submit" disabled={pending} className="h-11 rounded-full bg-violet px-5 text-[15px] font-bold text-white disabled:opacity-50">
+        <button type="submit" disabled={pending} className="h-11 bg-violet px-5 text-[15px] font-bold text-white disabled:opacity-50">
           {pending ? "…" : "Voir"}
         </button>
       </div>
@@ -104,14 +104,14 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
 
   if (searching) {
     return (
-      <div className="rounded-[22px] bg-soft px-6 py-10 text-center text-[15px] text-muted" aria-busy="true">
+      <div className="bg-soft px-6 py-10 text-center text-[15px] text-muted" aria-busy="true">
         Je cherche ce qui inspire en ce moment sur TikTok et Instagram… ça prend une ou deux minutes.
       </div>
     );
   }
   if (!lists.trend.length && !lists.local.length) {
     return (
-      <div className="rounded-[22px] bg-soft px-6 py-10 text-center text-[15px] text-muted">
+      <div className="bg-soft px-6 py-10 text-center text-[15px] text-muted">
         Rien de vraiment fort pour ces mots cette semaine. Essaie d’autres mots, plus simples (« coiffeur », « brunch », « pilates »).
       </div>
     );
@@ -125,7 +125,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         {platforms.size > 1 ? (
-          <div className="flex gap-1 rounded-full bg-soft p-1" role="tablist" aria-label="Réseau">
+          <div className="flex gap-1 bg-soft p-1" role="tablist" aria-label="Réseau">
             {(
               [
                 ["all", "Tout"],
@@ -139,7 +139,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
                 role="tab"
                 aria-selected={filter === key}
                 onClick={() => setFilter(key)}
-                className={`h-9 rounded-full px-4 text-[14px] font-bold ${filter === key ? "bg-white text-ink shadow-sm" : "text-muted"}`}
+                className={`h-9 px-4 text-[14px] font-bold ${filter === key ? "bg-white text-ink shadow-sm" : "text-muted"}`}
               >
                 {label}
               </button>
@@ -154,7 +154,7 @@ export function TrendsGrid({ lists, searching, timezone }: { lists: TrendLists; 
       {lists.hashtags.length > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label="Hashtags sur Instagram">
           {lists.hashtags.map((h) => (
-            <li key={h.hashtag} className="flex items-baseline gap-2 rounded-full border border-line px-4 py-2 text-[14px]">
+            <li key={h.hashtag} className="flex items-baseline gap-2 border border-line px-4 py-2 text-[14px]">
               <span className="font-bold">#{h.hashtag}</span>
               <span className="text-muted">{shortCount(h.posts)} publications</span>
               {h.gained !== null && h.gained > 0 && h.days !== null && (
@@ -188,13 +188,13 @@ function HookRow({ cards, onOpen }: { cards: TrendCard[]; onOpen: (card: TrendCa
       <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
         {cards.map((card) => (
           <li key={card.id} className="w-[260px] shrink-0 snap-start">
-            <button type="button" onClick={() => onOpen(card)} className="flex h-full w-full flex-col justify-between gap-4 rounded-[18px] border border-line p-4 text-left hover:border-violet">
+            <button type="button" onClick={() => onOpen(card)} className="flex h-full w-full flex-col justify-between gap-4 border border-line p-4 text-left hover:border-violet">
               <span className="flex flex-col gap-2">
                 <p className="font-serif text-[21px] italic leading-snug">« {card.hook} »</p>
                 {card.hookWhy && <p className="text-[13px] leading-snug text-muted">{card.hookWhy}</p>}
               </span>
               <span className="flex items-center justify-between gap-2 text-[12px] text-muted">
-                <span className="rounded-full bg-violet-soft px-2.5 py-1 font-bold text-violet">{HOOK_FORM_LABELS[card.hookForm ?? "autre"]}</span>
+                <span className="bg-violet-soft px-2.5 py-1 font-bold text-violet">{HOOK_FORM_LABELS[card.hookForm ?? "autre"]}</span>
                 <span className="flex items-center gap-1">
                   {card.platform === "tiktok" ? <TikTokIcon size={13} /> : <InstagramIcon size={13} />}
                   {card.views !== null ? `${shortCount(card.views)} vues` : card.author ? `@${card.author}` : null}
@@ -225,7 +225,7 @@ function TrendSection({ title, note, cards, filter, onOpen, onCopy }: { title: s
           ))}
         </ul>
       ) : (
-        <p className="rounded-[16px] bg-soft px-5 py-6 text-[14px] text-muted">Rien d’assez fort ici cette semaine.</p>
+        <p className="bg-soft px-5 py-6 text-[14px] text-muted">Rien d’assez fort ici cette semaine.</p>
       )}
     </section>
   );
@@ -234,7 +234,7 @@ function TrendSection({ title, note, cards, filter, onOpen, onCopy }: { title: s
 /** A cover that opens the video in the app, with its platform and its views. */
 function Cover({ card, onOpen }: { card: TrendCard; onOpen: (card: TrendCard) => void }) {
   return (
-    <button type="button" onClick={() => onOpen(card)} aria-label="Voir la vidéo" className="group relative block aspect-[9/16] w-full overflow-hidden rounded-[16px] bg-soft">
+    <button type="button" onClick={() => onOpen(card)} aria-label="Voir la vidéo" className="group relative block aspect-[9/16] w-full overflow-hidden bg-soft">
       {card.cover ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={card.cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
@@ -278,7 +278,7 @@ function TrendItem({ card, onOpen, onCopy }: { card: TrendCard; onOpen: (card: T
         {card.tags.length > 0 && (
           <ul className="flex flex-wrap gap-1">
             {card.tags.map((tag) => (
-              <li key={tag} className="rounded-full bg-soft px-2 py-0.5 text-[11px] font-bold text-muted">
+              <li key={tag} className="bg-soft px-2 py-0.5 text-[11px] font-bold text-muted">
                 {tag}
               </li>
             ))}
@@ -294,7 +294,7 @@ function TrendItem({ card, onOpen, onCopy }: { card: TrendCard; onOpen: (card: T
           {[card.postedAt ? since(card.postedAt) : null, card.likes !== null && card.views !== null ? `${shortCount(card.likes)} j’aime` : null].filter(Boolean).join(" · ")}
         </p>
       </div>
-      <button type="button" onClick={() => onCopy(card.url)} className="h-9 rounded-full border border-line text-[13px] font-bold text-violet hover:bg-violet-soft">
+      <button type="button" onClick={() => onCopy(card.url)} className="h-9 border border-line text-[13px] font-bold text-violet hover:bg-violet-soft">
         Fais-en un comme ça
       </button>
     </li>
@@ -322,15 +322,15 @@ function Player({ card, onClose, onCopy }: { card: TrendCard; onClose: () => voi
             <XIcon size={18} />
           </button>
         </div>
-        <div className={`overflow-hidden rounded-[18px] bg-black ${card.platform === "tiktok" ? "aspect-[9/16]" : "aspect-[9/14]"} max-h-[72vh] w-full`}>
+        <div className={`overflow-hidden bg-black ${card.platform === "tiktok" ? "aspect-[9/16]" : "aspect-[9/14]"} max-h-[72vh] w-full`}>
           <iframe src={playerUrl(card)} title="Vidéo" className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
         </div>
         {card.hook && <p className="font-serif text-[18px] italic leading-snug text-white">« {card.hook} »</p>}
         <div className="flex gap-2">
-          <button type="button" onClick={() => onCopy(card.url)} className="h-11 flex-1 rounded-full bg-violet text-[14px] font-bold text-white">
+          <button type="button" onClick={() => onCopy(card.url)} className="h-11 flex-1 bg-violet text-[14px] font-bold text-white">
             Fais-en un comme ça
           </button>
-          <a href={card.url} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center rounded-full bg-white/15 px-4 text-[14px] font-bold text-white hover:bg-white/25">
+          <a href={card.url} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center bg-white/15 px-4 text-[14px] font-bold text-white hover:bg-white/25">
             Ouvrir
           </a>
         </div>

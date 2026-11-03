@@ -5,7 +5,7 @@ export function FormatBadge({ format, small = false }: { format: "reel" | "carou
   if (format !== "reel" && format !== "carousel") return null;
   return (
     <span
-      className={`pointer-events-none absolute top-1.5 right-1.5 flex items-center gap-1 rounded-full bg-black/60 font-bold text-white backdrop-blur-sm ${
+      className={`pointer-events-none absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 font-bold text-white backdrop-blur-sm ${
         small ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"
       }`}
     >

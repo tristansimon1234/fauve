@@ -31,7 +31,7 @@ export function ReviewSheets({
 }) {
   if (sheet === "date") {
     return (
-      <Sheet title="Quand te faire signe ?" hint="Edith te rappelle de le poster à ce moment-là, sur WhatsApp et dans l’app." onClose={onClose}>
+      <Sheet title="Quand te faire signe ?"hint="Edith te rappelle de le poster à ce moment-là, sur WhatsApp et dans l’app." onClose={onClose}>
         <DateView data={data} onDone={onPlanned} />
       </Sheet>
     );
@@ -84,7 +84,7 @@ export function Sheet({ title, hint, onClose, children }: { title: string; hint:
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="fauve-enter relative flex max-h-[88dvh] w-full flex-col gap-3 overflow-y-auto rounded-t-[26px] bg-white px-5 pt-4 pb-[max(1.4rem,env(safe-area-inset-bottom))] shadow-[0_-10px_40px_rgba(28,21,48,0.14)] sm:max-w-[440px] sm:rounded-[22px] sm:pb-5"
+        className="fauve-enter relative flex max-h-[88dvh] w-full flex-col gap-3 overflow-y-auto bg-white px-5 pt-4 pb-[max(1.4rem,env(safe-area-inset-bottom))] shadow-[0_-10px_40px_rgba(18,17,16,0.14)] sm:max-w-[440px] sm:pb-5"
       >
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1">

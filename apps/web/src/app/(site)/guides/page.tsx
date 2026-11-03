@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function GuidesPage() {
   const guides = [...GUIDES].sort((a, b) => b.published.localeCompare(a.published));
   return (
-    <main className="mx-auto max-w-[1240px] px-4 pt-8 pb-24 sm:px-8 sm:pt-12">
+    <main className="mx-auto max-w-[1360px] px-4 pt-8 pb-24 sm:px-8 sm:pt-12">
       <JsonLd data={{ "@context": "https://schema.org", ...breadcrumb([["Edith", "/"], ["Guides", "/guides"]]) }} />
       <SectionTitle kicker="Guides" as="h1">
         Instagram et TikTok, <span className="accent">pour ceux qui ont un métier.</span>

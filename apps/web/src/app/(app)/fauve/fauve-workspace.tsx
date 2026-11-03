@@ -470,7 +470,7 @@ export function FauveWorkspace({
       )}
 
       <section
-        className="relative flex min-w-0 flex-1 flex-col bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%),radial-gradient(ellipse_at_bottom_left,#fff1ec_0%,rgba(255,241,236,0)_50%)]"
+        className="relative flex min-w-0 flex-1 flex-col bg-white"
         // Drop zone: photos and videos dropped anywhere on the conversation.
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes("Files")) return;
@@ -489,7 +489,7 @@ export function FauveWorkspace({
         }}
       >
         {dragging && (
-          <div className="fauve-fade pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/85 text-center">
+          <div className="fauve-fade pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-violet bg-violet-soft/85 text-center">
             <PaperclipIcon size={28} className="text-violet" />
             <p className="text-[17px] font-bold text-violet">Dépose tes photos et vidéos</p>
             <p className="text-[14px] text-violet/80">Edith en fait un Reel, un carrousel ou un post</p>
@@ -514,7 +514,7 @@ export function FauveWorkspace({
             </div>
           )}
           <div className="ml-auto flex items-center gap-1">
-            <button type="button" onClick={() => setShowList(true)} className="h-9 rounded-full px-3 text-[13px] font-bold hover:bg-white md:hidden">
+            <button type="button" onClick={() => setShowList(true)} className="h-9 px-3 text-[13px] font-bold hover:bg-white md:hidden">
               Conversations
             </button>
             <button type="button" aria-label="Nouvelle conversation" onClick={startNew} className="flex size-9 items-center justify-center rounded-full hover:bg-white md:hidden">
@@ -543,8 +543,8 @@ export function FauveWorkspace({
             <div className="mx-auto flex min-h-full w-full max-w-[640px] flex-col items-center justify-center gap-6 px-4 py-8 text-center">
               <Mascot size={88} />
               <div className="flex flex-col gap-2.5">
-                <h1 className="text-[32px] font-extrabold tracking-[-0.03em] sm:text-[42px]">
-                  Bienvenue{firstName ? " " : ""}
+                <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[64px]">
+                  Bienvenue{firstName ? "" : ""}
                   {firstName && <span className="accent">{firstName}</span>}
                 </h1>
                 <p className="mx-auto max-w-[520px] text-[15px] text-muted sm:text-[16px]">
@@ -558,15 +558,15 @@ export function FauveWorkspace({
             <div className="mx-auto flex min-h-full w-full max-w-[820px] flex-col items-center justify-center gap-6 px-4 py-8 text-center">
               <Mascot size={104} />
               <div className="flex flex-col gap-3">
-                <h1 className="text-[34px] font-extrabold tracking-[-0.03em] sm:text-[46px]">
-                  Bonjour{firstName ? " " : ""}
+                <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[64px]">
+                  Bonjour{firstName ? "" : ""}
                   {firstName && <span className="accent">{firstName}</span>}
                 </h1>
                 <p className="mx-auto max-w-[560px] text-[16px] text-muted sm:text-[17px]">{summary}</p>
               </div>
               <a
                 href={whatsappHref}
-                className="inline-flex h-12 items-center gap-2.5 rounded-full border border-line bg-white px-5 text-[15px] font-semibold text-violet shadow-[0_2px_10px_rgba(28,21,48,0.05)] hover:border-lilac"
+                className="inline-flex h-12 items-center gap-2.5 border border-line bg-white px-5 text-[15px] font-semibold text-violet shadow-[0_2px_10px_rgba(18,17,16,0.05)] hover:border-lilac"
               >
                 <WhatsAppIcon size={18} />
                 Continuer sur WhatsApp
@@ -580,7 +580,7 @@ export function FauveWorkspace({
                         type="button"
                         disabled={pending}
                         onClick={() => (s.action === "new-post" ? setCreating(true) : send(s.prompt))}
-                        className="fauve-press flex h-full w-full items-center gap-3.5 rounded-[18px] border border-line bg-white px-5 py-4 text-left shadow-[0_2px_10px_rgba(28,21,48,0.04)] transition-colors hover:border-lilac disabled:opacity-60 sm:flex-col sm:items-start sm:gap-3"
+                        className="fauve-press flex h-full w-full items-center gap-3.5 border border-line bg-white px-5 py-4 text-left shadow-[0_2px_10px_rgba(18,17,16,0.04)] transition-colors hover:border-lilac disabled:opacity-60 sm:flex-col sm:items-start sm:gap-3"
                       >
                         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet">
                           <Icon size={20} />
@@ -599,7 +599,7 @@ export function FauveWorkspace({
           ) : (
             <div className="mx-auto flex w-full max-w-[780px] flex-col gap-3 px-4 py-6">
               {onboarding && onboarding.step !== "done" && (
-                <div className="sticky top-0 z-10 -mx-1 rounded-[16px] bg-white/90 px-3 py-2.5 backdrop-blur">
+                <div className="sticky top-0 z-10 -mx-1 bg-white/90 px-3 py-2.5 backdrop-blur">
                   <OnboardingStepper step={onboarding.step} />
                 </div>
               )}
@@ -639,12 +639,12 @@ export function FauveWorkspace({
         >
           <div className="mx-auto flex w-full max-w-[820px] flex-col gap-2">
             {error && (
-              <p role="alert" className="fauve-enter self-center rounded-xl bg-peach px-3 py-2 text-sm font-semibold text-danger">
+              <p role="alert" className="fauve-enter self-center bg-peach px-3 py-2 text-sm font-semibold text-danger">
                 {error}
               </p>
             )}
             <FileStrip files={files} onRemove={removeFile} />
-            <div className="relative flex items-end gap-1 rounded-[30px] border border-line bg-white p-2 pl-2 shadow-[0_8px_30px_rgba(28,21,48,0.08)] focus-within:border-lilac">
+            <div className="relative flex items-end gap-1 border border-line bg-white p-2 pl-2 shadow-[0_8px_30px_rgba(18,17,16,0.08)] focus-within:border-lilac">
               <input
                 ref={fileRef}
                 type="file"
@@ -680,7 +680,7 @@ export function FauveWorkspace({
                   <div
                     role="listbox"
                     aria-label="Emojis"
-                    className="fauve-pop absolute bottom-full left-0 z-20 mb-2 grid w-[296px] grid-cols-8 gap-0.5 rounded-[18px] border border-line bg-white p-2 shadow-[0_12px_36px_rgba(28,21,48,0.14)] [--fauve-origin:bottom_left]"
+                    className="fauve-pop absolute bottom-full left-0 z-20 mb-2 grid w-[296px] grid-cols-8 gap-0.5 border border-line bg-white p-2 shadow-[0_12px_36px_rgba(18,17,16,0.14)] [--fauve-origin:bottom_left]"
                   >
                     {EMOJIS.map((emoji) => (
                       <button
@@ -690,7 +690,7 @@ export function FauveWorkspace({
                         aria-selected={false}
                         aria-label={emoji}
                         onClick={() => insertEmoji(emoji)}
-                        className="flex size-9 items-center justify-center rounded-lg text-[20px] hover:bg-soft"
+                        className="flex size-9 items-center justify-center text-[20px] hover:bg-soft"
                       >
                         {emoji}
                       </button>
@@ -765,7 +765,7 @@ function MontageReminder({ quote, scroller }: { quote: CardQuote; scroller: RefO
         <button
           type="button"
           onClick={() => scroller.current?.querySelector(`[data-quote="${quote.id}"] [data-progress]`)?.scrollIntoView({ block: "center", behavior: "auto" })}
-          className="fauve-enter fauve-press flex h-9 shrink-0 items-center gap-2 rounded-full border border-line bg-white/95 px-3.5 text-[13px] font-semibold shadow-[0_4px_14px_rgba(28,21,48,0.08)] backdrop-blur [--fauve-y:-6px]"
+          className="fauve-enter fauve-press flex h-9 shrink-0 items-center gap-2 border border-line bg-white/95 px-3.5 text-[13px] font-semibold shadow-[0_4px_14px_rgba(18,17,16,0.08)] backdrop-blur [--fauve-y:-6px]"
         >
           <Orb size={16} />
           {montageStep(quote)}
@@ -813,7 +813,7 @@ function ConversationList({
               type="button"
               onClick={() => onOpen(c.id)}
               aria-current={c.id === active ? "true" : undefined}
-              className={`block w-full truncate rounded-[12px] py-2.5 pr-10 pl-3 text-left text-[14px] ${
+              className={`block w-full truncate py-2.5 pr-10 pl-3 text-left text-[14px] ${
                 c.id === active ? "bg-violet-soft font-semibold text-ink" : "text-ink/85 hover:bg-soft"
               }`}
             >

@@ -28,7 +28,7 @@ export function ReelPlayer({
     () => false,
   );
   if (!mounted) {
-    return <div className={`rounded-[18px] bg-ink ${className ?? ""}`} style={{ width: "100%", aspectRatio: `${props.width} / ${props.height}` }} />;
+    return <div className={`bg-ink ${className ?? ""}`} style={{ width: "100%", aspectRatio: `${props.width} / ${props.height}` }} />;
   }
   return (
     <Player

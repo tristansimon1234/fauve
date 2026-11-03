@@ -38,7 +38,7 @@ async function Thanks() {
       </p>
       <a
         href={whatsappLink(ok ? "C’est bon, c’est payé ! On y va 🚀" : "J’ai une question sur les offres")}
-        className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-[15px] font-extrabold text-ink"
+        className="inline-flex items-center gap-2 bg-white px-5 py-3 text-[15px] font-extrabold text-ink"
       >
         <WhatsAppIcon size={18} /> Retourner sur WhatsApp
       </a>

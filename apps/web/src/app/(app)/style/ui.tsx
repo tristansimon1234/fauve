@@ -6,7 +6,7 @@ import { PlusIcon, XIcon } from "@/components/icons";
 // Small form pieces shared by the Style sections.
 
 export const inputClass =
-  "h-11 w-full rounded-xl border-[1.5px] border-line bg-white px-3.5 text-[15px] placeholder:text-muted/70 focus:border-violet focus:outline-none";
+  "h-11 w-full border-[1.5px] border-line bg-white px-3.5 text-[15px] placeholder:text-muted/70 focus:border-violet focus:outline-none";
 
 export function Section({
   id,
@@ -73,11 +73,11 @@ export function Segmented<T extends string>({
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="mb-2 text-[13px] font-bold">{legend}</legend>
-      <div className="inline-flex w-fit flex-wrap gap-1 rounded-full bg-chip p-1">
+      <div className="inline-flex w-fit flex-wrap gap-1 bg-chip p-1">
         {options.map((option) => (
           <label
             key={option.value}
-            className="relative cursor-pointer rounded-full px-4 py-2 text-sm font-semibold text-muted transition-[background-color,color,box-shadow] duration-200 ease-fauve has-checked:bg-white has-checked:text-ink has-checked:shadow-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-violet motion-reduce:transition-none"
+            className="relative cursor-pointer px-4 py-2 text-sm font-semibold text-muted transition-[background-color,color,box-shadow] duration-200 ease-fauve has-checked:bg-white has-checked:text-ink has-checked:shadow-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-violet motion-reduce:transition-none"
           >
             <input
               type="radio"
@@ -135,7 +135,7 @@ export function HashtagInput({
       {value.length > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label="Hashtags">
           {value.map((tag) => (
-            <li key={tag} className="flex items-center gap-1 rounded-full bg-violet-soft py-1 pr-1 pl-3 text-sm font-semibold text-violet">
+            <li key={tag} className="flex items-center gap-1 bg-violet-soft py-1 pr-1 pl-3 text-sm font-semibold text-violet">
               #{tag}
               <button
                 type="button"
@@ -217,7 +217,7 @@ export function RuleList({
               type="button"
               onClick={() => onChange(value.filter((_, j) => j !== i))}
               aria-label={`Retirer la règle ${i + 1}`}
-              className="flex size-11 shrink-0 items-center justify-center rounded-xl border-[1.5px] border-line text-muted hover:text-ink"
+              className="flex size-11 shrink-0 items-center justify-center border-[1.5px] border-line text-muted hover:text-ink"
             >
               <XIcon size={18} />
             </button>
@@ -228,7 +228,7 @@ export function RuleList({
         type="button"
         disabled={value.length >= max}
         onClick={() => onChange([...value, ""])}
-        className="flex w-fit items-center gap-1.5 rounded-full px-1 py-1 text-sm font-bold text-violet disabled:opacity-50"
+        className="flex w-fit items-center gap-1.5 px-1 py-1 text-sm font-bold text-violet disabled:opacity-50"
       >
         <PlusIcon size={18} />
         {addLabel}

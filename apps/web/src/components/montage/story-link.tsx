@@ -26,14 +26,14 @@ export function StoryLink({ postId, initial, handedOffAt, bookingUrl }: { postId
   };
 
   return (
-    <section aria-label="Lien de la story" className="flex flex-col gap-3 rounded-[18px] border border-line bg-white p-3.5">
+    <section aria-label="Lien de la story" className="flex flex-col gap-3 border border-line bg-white p-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-[16px] font-extrabold">Lien</h2>
         <span className="text-[12px] text-muted" aria-live="polite">
           {state === "saving" ? "Enregistrement…" : state === "error" ? "Pas enregistré, réessaie" : ""}
         </span>
       </div>
-      <div role="radiogroup" aria-label="Qui publie cette story" className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">
+      <div role="radiogroup" aria-label="Qui publie cette story" className="grid grid-cols-2 gap-1 bg-soft p-1">
         {[
           { on: false, label: "Edith publie", hint: "sans lien" },
           { on: true, label: "Avec un lien", hint: "tu la partages depuis WhatsApp" },
@@ -44,7 +44,7 @@ export function StoryLink({ postId, initial, handedOffAt, bookingUrl }: { postId
             role="radio"
             aria-checked={byHand === o.on}
             onClick={() => choose(o.on)}
-            className={`flex flex-col rounded-[9px] px-2 py-2 leading-tight transition-colors ${byHand === o.on ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+            className={`flex flex-col px-2 py-2 leading-tight transition-colors ${byHand === o.on ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}
           >
             <span className="text-[12px] font-bold">{o.label}</span>
             <span className="text-[11px] font-semibold opacity-70">{o.hint}</span>

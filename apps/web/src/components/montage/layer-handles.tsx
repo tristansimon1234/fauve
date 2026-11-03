@@ -117,7 +117,7 @@ export function LayerHandles({
           onPointerMove={move}
           onPointerUp={end}
           onPointerCancel={end}
-          className={`group absolute z-20 touch-none rounded-[10px] border-2 ${dragging ? "cursor-grabbing border-white" : "cursor-grab border-dashed border-white/50 hover:border-white"}`}
+          className={`group absolute z-20 touch-none border-2 ${dragging ? "cursor-grabbing border-white" : "cursor-grab border-dashed border-white/50 hover:border-white"}`}
           style={pct(frame)}
         >
           {layer.slots.map((slot) => {
@@ -133,7 +133,7 @@ export function LayerHandles({
                 onPointerMove={move}
                 onPointerUp={end}
                 onPointerCancel={end}
-                className="absolute cursor-text rounded-[6px] hover:bg-white/15 hover:ring-2 hover:ring-white/80"
+                className="absolute cursor-text hover:bg-white/15 hover:ring-2 hover:ring-white/80"
                 style={pct(inner)}
               />
             );

@@ -183,7 +183,7 @@ export function CalendarBoard({
             toggle(p.id);
           }
         }}
-        className={`group/card relative flex w-full flex-col overflow-hidden rounded-xl bg-white text-left transition-shadow hover:shadow-[0_6px_18px_rgba(28,21,48,0.08)] ${cardBorder(p.status)} ${
+        className={`group/card relative flex w-full flex-col overflow-hidden bg-white text-left transition-shadow hover:shadow-[0_6px_18px_rgba(18,17,16,0.08)] ${cardBorder(p.status)} ${
           locked ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
         } ${ticked ? "ring-2 ring-violet" : open === p.id ? "ring-2 ring-lilac" : ""} ${p.status === "skipped" ? "opacity-60" : ""}`}
       >
@@ -195,7 +195,7 @@ export function CalendarBoard({
               // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
               <img src={p.cover.url} alt="" loading="lazy" className="pointer-events-none size-full object-cover" />
             )}
-            <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 bg-black/55 px-1.5 py-0.5 text-[10px] font-bold text-white">
               {p.kind === "reel" || p.kind === "story" ? <PlayIcon size={10} /> : p.kind === "carousel" ? <LayersIcon size={10} /> : null}
               {kindLabels[p.kind]}
               {p.day !== null ? ` · ${p.time}` : ""}
@@ -220,7 +220,7 @@ export function CalendarBoard({
             e.stopPropagation();
             toggle(p.id);
           }}
-          className={`absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md border-[1.5px] transition-opacity ${
+          className={`absolute top-1.5 right-1.5 flex size-6 items-center justify-center border-[1.5px] transition-opacity ${
             ticked ? "border-violet bg-violet text-white opacity-100" : "border-line bg-white/95 text-transparent opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100"
           } ${selecting ? "opacity-100" : ""}`}
         >
@@ -242,7 +242,7 @@ export function CalendarBoard({
             <ArrowLeftIcon size={16} className="rotate-180" />
           </Link>
           {todayHref && (
-            <Link href={todayHref} transitionTypes={["week-today"]} className="ml-1 rounded-full px-3 py-1.5 text-[13px] font-bold text-violet hover:bg-violet-soft">
+            <Link href={todayHref} transitionTypes={["week-today"]} className="ml-1 px-3 py-1.5 text-[13px] font-bold text-violet hover:bg-violet-soft">
               Aujourd’hui
             </Link>
           )}
@@ -258,7 +258,7 @@ export function CalendarBoard({
                   type="button"
                   aria-pressed={on}
                   onClick={() => setFilter(f.key)}
-                  className={`h-9 rounded-full border-[1.5px] px-3.5 text-[13px] font-semibold ${on ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-lilac"}`}
+                  className={`h-9 border-[1.5px] px-3.5 text-[13px] font-semibold ${on ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-lilac"}`}
                 >
                   {f.label}
                   {f.key === "skipped" ? ` (${skippedCount})` : ""}
@@ -280,7 +280,7 @@ export function CalendarBoard({
         <p
           key={message.text}
           role="status"
-          className={`fauve-enter self-start rounded-xl px-3 py-2 text-sm font-semibold ${message.ok ? "bg-violet-tint text-ink" : "bg-peach text-danger"}`}
+          className={`fauve-enter self-start px-3 py-2 text-sm font-semibold ${message.ok ? "bg-violet-tint text-ink" : "bg-peach text-danger"}`}
         >
           {message.text}
         </p>
@@ -324,7 +324,7 @@ export function CalendarBoard({
                   setOver(null);
                   if (id) drop(id, day);
                 }}
-                className={`flex min-h-[420px] flex-col gap-2 rounded-2xl p-1.5 transition-colors ${
+                className={`flex min-h-[420px] flex-col gap-2 p-1.5 transition-colors ${
                   over === day ? "bg-violet-soft outline-2 outline-dashed outline-violet" : today ? "bg-violet-tint" : "bg-soft"
                 }`}
               >
@@ -333,7 +333,7 @@ export function CalendarBoard({
                   <button
                     type="button"
                     onClick={() => setAdding(day)}
-                    className="mt-auto flex h-9 items-center justify-center rounded-xl text-muted opacity-0 group-hover/day:opacity-100 hover:bg-white hover:text-violet"
+                    className="mt-auto flex h-9 items-center justify-center text-muted opacity-0 group-hover/day:opacity-100 hover:bg-white hover:text-violet"
                     aria-label={`Nouvelle publication le ${dayNames[day]} ${date}`}
                   >
                     <PlusIcon size={16} />
@@ -408,33 +408,33 @@ function SelectionBar({
       role="toolbar"
       aria-label="Actions groupées"
       // Rises in when a first post is checked (the keyframe animates `transform`, so it composes with -translate-x-1/2).
-      className="fauve-enter fixed bottom-24 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded-full bg-ink py-2 pr-2 pl-5 text-white shadow-[0_18px_40px_rgba(28,21,48,0.3)] [--fauve-y:12px] lg:bottom-6"
+      className="fauve-enter fixed bottom-24 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center gap-2 bg-ink py-2 pr-2 pl-5 text-white shadow-[0_18px_40px_rgba(18,17,16,0.3)] [--fauve-y:12px] lg:bottom-6"
     >
       <span className="text-[14px] font-bold">
         {count} sélectionnée{count > 1 ? "s" : ""}
       </span>
       <span className="mx-1 h-5 w-px bg-white/20" />
       {drafts > 0 && (
-        <button type="button" disabled={pending} onClick={onValidate} className="flex h-9 items-center gap-1.5 rounded-full bg-violet px-3.5 text-[13px] font-bold disabled:opacity-50">
+        <button type="button" disabled={pending} onClick={onValidate} className="flex h-9 items-center gap-1.5 bg-violet px-3.5 text-[13px] font-bold disabled:opacity-50">
           <CheckIcon size={15} /> Valider {drafts > 1 ? `les ${drafts}` : ""}
         </button>
       )}
-      <label className="flex h-9 items-center gap-2 rounded-full bg-white/10 pr-1 pl-3.5 text-[13px] font-bold">
+      <label className="flex h-9 items-center gap-2 bg-white/10 pr-1 pl-3.5 text-[13px] font-bold">
         Déplacer au
         <input
           type="date"
           disabled={pending}
           onChange={(e) => e.target.value && onMove(e.target.value)}
-          className="h-7 rounded-full bg-white px-2 text-[13px] text-ink"
+          className="h-7 bg-white px-2 text-[13px] text-ink"
           aria-label="Nouvelle date"
         />
       </label>
       {confirming ? (
         <span className="flex items-center gap-1">
-          <button type="button" disabled={pending} onClick={onDelete} className="h-9 rounded-full bg-danger px-3.5 text-[13px] font-bold">
+          <button type="button" disabled={pending} onClick={onDelete} className="h-9 bg-danger px-3.5 text-[13px] font-bold">
             Supprimer {count > 1 ? `les ${count}` : ""}
           </button>
-          <button type="button" onClick={() => setConfirming(false)} className="h-9 rounded-full px-3 text-[13px] font-semibold text-white/70">
+          <button type="button" onClick={() => setConfirming(false)} className="h-9 px-3 text-[13px] font-semibold text-white/70">
             Non
           </button>
         </span>

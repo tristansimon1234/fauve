@@ -140,7 +140,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
   const where = data.platforms.length ? data.platforms.map((p) => (p === "tiktok" ? "TikTok" : "Instagram")).join(" et ") : "Instagram";
   const sent = data.status === "scheduled";
   const change = whatsappLink(`Pour « ${data.title} » : `);
-  const tile = "flex h-[60px] min-w-0 flex-col items-center justify-center gap-1 rounded-[18px] px-1 text-[13px] font-extrabold disabled:opacity-50";
+  const tile = "flex h-[60px] min-w-0 flex-col items-center justify-center gap-1 px-1 text-[13px] font-extrabold disabled:opacity-50";
   const ready = Boolean(data.videoUrl) && !data.making && !data.failed;
   const tap = () => {
     if (!ready) return;
@@ -251,19 +251,19 @@ export function PhoneReview({ data }: { data: ReviewData }) {
         )}
 
         {error && (
-          <p role="alert" className="rounded-[14px] bg-danger px-3 py-2 text-[13.5px] font-semibold">
+          <p role="alert" className="bg-danger px-3 py-2 text-[13.5px] font-semibold">
             {error}
           </p>
         )}
 
         {data.locked ? (
           data.downloadUrl && (
-            <a href={data.downloadUrl} download className="flex h-[50px] items-center justify-center gap-2 rounded-full bg-white/15 text-[15px] font-extrabold backdrop-blur-sm">
+            <a href={data.downloadUrl} download className="flex h-[50px] items-center justify-center gap-2 bg-white/15 text-[15px] font-extrabold backdrop-blur-sm">
               <DownloadIcon size={19} /> Télécharger
             </a>
           )
         ) : sent ? (
-          <p className="flex items-start gap-2 rounded-[18px] bg-white/15 px-4 py-3 text-[14.5px] leading-snug font-semibold backdrop-blur-sm">
+          <p className="flex items-start gap-2 bg-white/15 px-4 py-3 text-[14.5px] leading-snug font-semibold backdrop-blur-sm">
             <CheckIcon size={19} className="mt-0.5 shrink-0" />
             {`C’est parti sur ${where}, je te dis quand il est en ligne.`}
           </p>
@@ -301,7 +301,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
         )}
 
         {!data.locked && (
-          <a href={change} className="flex h-[50px] items-center justify-center gap-2 rounded-full bg-white/15 text-[15.5px] font-extrabold backdrop-blur-sm">
+          <a href={change} className="flex h-[50px] items-center justify-center gap-2 bg-white/15 text-[15.5px] font-extrabold backdrop-blur-sm">
             <PenIcon size={18} /> Modifier avec Edith
           </a>
         )}
@@ -324,7 +324,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
             aria-label="Ta légende"
             placeholder="Edith l’écrit avec la vidéo."
             // 16 px: under it, the phone zooms into the page as soon as she touches it.
-            className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3 py-2.5 text-[16px] leading-relaxed outline-none focus:border-violet"
+            className="w-full resize-none border-[1.5px] border-line bg-white px-3 py-2.5 text-[16px] leading-relaxed outline-none focus:border-violet"
           />
           {error && (
             <p role="alert" className="text-[13px] font-semibold text-danger">
@@ -349,7 +349,7 @@ export function PhoneReview({ data }: { data: ReviewData }) {
       )}
 
       {toast && (
-        <p role="status" className="absolute inset-x-4 top-[calc(4.5rem+env(safe-area-inset-top))] z-20 rounded-[18px] bg-white px-4 py-3 text-center text-[14px] font-bold text-ink shadow-lg">
+        <p role="status" className="absolute inset-x-4 top-[calc(4.5rem+env(safe-area-inset-top))] z-20 bg-white px-4 py-3 text-center text-[14px] font-bold text-ink shadow-lg">
           {toast}
         </p>
       )}
@@ -381,7 +381,7 @@ function Making({ step, kind, minutes, again }: { step: string | null; kind: "re
       {/* The two steps she can picture: the montage, then the video. */}
       <span className="flex items-center gap-2 text-[12.5px] font-bold" aria-hidden="true">
         {["Montage", "Vidéo"].map((label, i) => (
-          <span key={label} className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${i < at ? "bg-white/25 text-white" : i === at ? "bg-violet text-white" : "bg-white/10 text-white/55"}`}>
+          <span key={label} className={`flex items-center gap-1.5 px-3 py-1 ${i < at ? "bg-white/25 text-white" : i === at ? "bg-violet text-white" : "bg-white/10 text-white/55"}`}>
             {i < at && <CheckIcon size={13} />}
             {label}
           </span>

@@ -141,7 +141,7 @@ export function ElementHandles({
             onPointerMove={move}
             onPointerUp={end}
             onPointerCancel={end}
-            className={`absolute z-20 touch-none rounded-[8px] border-2 ${
+            className={`absolute z-20 touch-none border-2 ${
               on ? (dragging ? "cursor-grabbing border-white" : "cursor-grab border-white shadow-[0_0_0_1px_rgba(91,63,217,.8)]") : "cursor-pointer border-transparent hover:border-dashed hover:border-white/70"
             }`}
             style={pct(box)}
@@ -150,7 +150,7 @@ export function ElementHandles({
               Object.entries(measured.slots).map(([name, b]) => (
                 <span
                   key={name}
-                  className="pointer-events-none absolute rounded-[4px] ring-1 ring-white/50"
+                  className="pointer-events-none absolute ring-1 ring-white/50"
                   style={pct({ left: (b.left - box.left) / box.width, top: (b.top - box.top) / box.height, width: b.width / box.width, height: b.height / box.height })}
                 />
               ))}

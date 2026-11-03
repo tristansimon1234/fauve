@@ -48,7 +48,7 @@ export function SceneStrip({
               onClick={() => onPick(i)}
               aria-label={`Scène ${i + 1}`}
               aria-current={on ? "true" : undefined}
-              className={`relative flex h-[71px] w-10 items-center justify-center overflow-hidden rounded-[9px] transition-shadow lg:h-[82px] lg:w-[46px] ${
+              className={`relative flex h-[71px] w-10 items-center justify-center overflow-hidden transition-shadow lg:h-[82px] lg:w-[46px] ${
                 on
                   ? dark
                     ? "ring-2 ring-white ring-offset-2 ring-offset-[#1d1630]"

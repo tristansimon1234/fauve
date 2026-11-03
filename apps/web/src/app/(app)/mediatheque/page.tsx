@@ -66,7 +66,7 @@ async function Library() {
   return (
     <>
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Médiathèque</h1>
+        <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[60px]">Médiathèque</h1>
         <p className="text-[15px] text-muted">
           {assets.length
             ? `Tes vidéos et photos, les plus récentes d’abord${assets.length === LIMIT ? ` (les ${LIMIT} dernières)` : ""}.`
@@ -87,7 +87,7 @@ async function Library() {
         </>
       ) : (
         <>
-          <div className="flex max-w-[860px] flex-wrap items-center gap-4 rounded-[20px] border-[1.5px] border-dashed border-lilac bg-violet-tint px-5 py-4">
+          <div className="flex max-w-[860px] flex-wrap items-center gap-4 border-[1.5px] border-dashed border-lilac bg-violet-tint px-5 py-4">
             <p className="min-w-0 flex-[1_1_320px] text-sm leading-relaxed">
               <strong>Ajoute des photos et des vidéos</strong> en les glissant dans la conversation avec Edith : elles
               arrivent en pleine qualité. Sur WhatsApp, envoie-les en tant que document.
@@ -113,7 +113,7 @@ async function Library() {
 
 function AssetCard({ asset, url }: { asset: Asset; url: string | undefined }) {
   return (
-    <article className="relative overflow-hidden rounded-[18px] border border-line bg-soft">
+    <article className="relative overflow-hidden border border-line bg-soft">
       {url && asset.kind === "video" ? (
         <video
           src={`${url}#t=0.1`}
@@ -139,12 +139,12 @@ function AssetCard({ asset, url }: { asset: Asset; url: string | undefined }) {
         />
       </div>
       {asset.duration !== null && asset.duration > 0 && (
-        <span className="pointer-events-none absolute top-2 right-2 rounded-md bg-ink/60 px-1.5 py-0.5 text-[11px] font-bold text-white">
+        <span className="pointer-events-none absolute top-2 right-2 bg-ink/60 px-1.5 py-0.5 text-[11px] font-bold text-white">
           {formatDuration(asset.duration)}
         </span>
       )}
       {asset.source === "ai" && (
-        <span className="pointer-events-none absolute right-2 bottom-2 rounded-md bg-ink/60 px-1.5 py-0.5 text-[11px] font-bold text-white">
+        <span className="pointer-events-none absolute right-2 bottom-2 bg-ink/60 px-1.5 py-0.5 text-[11px] font-bold text-white">
           IA
         </span>
       )}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { fr } from "./fr";
+import { WORK } from "./work";
 
 // The landing's work, side by side like a contact sheet (Tristan: « les reels présentés trop pub
 // oriented »): three Reels as accounts people follow for pleasure post them, never an offer nor a
@@ -11,29 +12,7 @@ import { fr } from "./fr";
 // is Edith's, and two of them are told by a voice of Edith's gallery (Victoria, Jules: ElevenLabs).
 // Files in public/landing. Each plays muted while on screen; a tap gives it the sound.
 
-export const WORK = [
-  {
-    id: "pilates",
-    trade: "Studio de Pilates Reformer",
-    brief: "Fais-moi vivre un premier cours. Rien qui fasse pub.",
-    sent: "7 vidéos brutes",
-    made: ["POV", "Voix off (Victoria)", "Coupes sur le temps"],
-  },
-  {
-    id: "cafe",
-    trade: "Café de spécialité",
-    brief: "Le premier café du matin, avec un peu d’humour.",
-    sent: "6 vidéos brutes",
-    made: ["Une chute", "Un plan par temps", "Boîte de texte native"],
-  },
-  {
-    id: "cave",
-    trade: "Cave à manger",
-    brief: "Donne envie de passer ce soir, sans « réservez maintenant ».",
-    sent: "8 vidéos brutes",
-    made: ["Voix off (Jules)", "Accroche dès la 1re image", "Grain pellicule"],
-  },
-] as const;
+
 
 /** The wall's columns on a computer, by how many Reels it shows. */
 const COLUMNS = ["", "md:grid-cols-1 md:max-w-[360px]", "md:grid-cols-2 md:max-w-[780px]", "md:grid-cols-3"];
@@ -94,7 +73,7 @@ export function ReelWall({ only }: { only?: readonly string[] } = {}) {
             onClick={() => toggle(i)}
             aria-label={sound === i ? `Couper le son du Reel « ${w.trade} »` : `Écouter le Reel « ${w.trade} »`}
             aria-pressed={sound === i}
-            className="group relative block aspect-[9/16] w-full overflow-hidden rounded-[22px] bg-ink text-left shadow-[0_40px_80px_-40px_rgba(28,21,48,.55)]"
+            className="group relative block aspect-[9/16] w-full overflow-hidden bg-ink text-left border border-ink/15"
           >
             <video
               ref={(el) => {
@@ -110,7 +89,7 @@ export function ReelWall({ only }: { only?: readonly string[] } = {}) {
             />
             <span className="absolute top-3.5 left-3.5 font-[family-name:var(--font-serif)] text-[19px] leading-none text-white/90 italic drop-shadow">N°{String(i + 1).padStart(2, "0")}</span>
             <span
-              className={`absolute right-3 bottom-3 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold text-white backdrop-blur-sm transition-colors ${sound === i ? "bg-black/45" : "bg-white/20 group-hover:bg-white/30"}`}
+              className={`absolute right-3 bottom-3 flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-bold text-white backdrop-blur-sm transition-colors ${sound === i ? "bg-black/45" : "bg-white/20 group-hover:bg-white/30"}`}
             >
               {sound === i ? <VolumeIcon size={14} /> : <VolumeOffIcon size={14} />}
               {sound === i ? "Son" : "Écouter"}
@@ -123,7 +102,7 @@ export function ReelWall({ only }: { only?: readonly string[] } = {}) {
               <span className="flex -space-x-2">
                 {[0, 1, 2].map((k) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={k} src={`/landing/raw-${w.id}-${k}.webp`} alt="" loading="lazy" className="h-[38px] w-[30px] rounded-[6px] border-2 border-soft object-cover" />
+                  <img key={k} src={`/landing/raw-${w.id}-${k}.webp`} alt="" loading="lazy" className="h-[38px] w-[30px] border-2 border-soft object-cover" />
                 ))}
               </span>
               <span className="text-[13px] leading-snug text-muted">
@@ -132,7 +111,7 @@ export function ReelWall({ only }: { only?: readonly string[] } = {}) {
             </div>
             <ul className="flex flex-wrap gap-1.5">
               {w.made.map((m) => (
-                <li key={m} className="rounded-full border border-ink/10 px-2.5 py-1 text-[12px] font-semibold text-ink/75">
+                <li key={m} className="border border-ink/10 px-2.5 py-1 text-[12px] font-semibold text-ink/75">
                   {m}
                 </li>
               ))}

@@ -121,7 +121,7 @@ export function TextBoxes({
             key={box.index}
             type="button"
             aria-label={`Déplacer « ${text.text} »`}
-            className={`absolute z-20 cursor-grab touch-none rounded-[8px] border-2 active:cursor-grabbing ${
+            className={`absolute z-20 cursor-grab touch-none border-2 active:cursor-grabbing ${
               active === box.index ? "border-white shadow-[0_0_0_2px_rgba(91,63,217,0.9)]" : "border-dashed border-white/70 hover:border-white"
             }`}
             style={{ left: `${box.left * 100}%`, top: `${box.top * 100}%`, width: `${box.width * 100}%`, height: `${box.height * 100}%` }}

@@ -237,7 +237,7 @@ export function HeroScene() {
 
 function Phone({ scene, still }: { scene: Scene; still: boolean }) {
   return (
-    <div className="land-float absolute top-0 left-0 z-10 h-[548px] w-[262px] rounded-[46px] bg-[#16131f] p-[8px] shadow-[0_50px_90px_-30px_rgba(28,21,48,.55),0_18px_36px_-18px_rgba(28,21,48,.35),inset_0_0_0_1.5px_rgba(255,255,255,.08)] sm:top-[52px]">
+    <div className="land-float absolute top-0 left-0 z-10 h-[548px] w-[262px] rounded-[46px] bg-[#16131f] p-[8px] shadow-[0_50px_90px_-30px_rgba(18,17,16,.55),0_18px_36px_-18px_rgba(18,17,16,.35),inset_0_0_0_1.5px_rgba(255,255,255,.08)] sm:top-[52px]">
       <div className="land-app-font relative flex h-full flex-col overflow-hidden rounded-[38px] bg-[#f6f6f6] text-[#111b21]">
         <StatusBar />
         {/* Edith's conversation header, as in WhatsApp. */}
@@ -245,7 +245,7 @@ function Phone({ scene, still }: { scene: Scene; still: boolean }) {
           <svg width="10" height="16" viewBox="0 0 10 16" fill="none" stroke="#1d7aef" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M8 2 2 8l6 6" />
           </svg>
-          <span className="flex size-[34px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#efebff]">
+          <span className="flex size-[34px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-soft">
             <Mascot size={30} mood={scene.mood} still={still} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
@@ -456,7 +456,7 @@ const GAP = 4;
 
 function AppWindow({ tiles }: { tiles: Tile[] }) {
   return (
-    <div className="land-float-slow absolute top-0 right-0 hidden h-[330px] w-[344px] flex-col overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_40px_80px_-34px_rgba(28,21,48,.35),0_10px_26px_-14px_rgba(28,21,48,.18)] sm:flex">
+    <div className="land-float-slow absolute top-0 right-0 hidden h-[330px] w-[344px] flex-col overflow-hidden rounded-[18px] border border-line bg-white border border-ink/15 sm:flex">
       {/* The browser around the app. */}
       <div className="flex h-[30px] shrink-0 items-center gap-1.5 border-b border-line bg-soft px-3">
         {["#ec6a5e", "#f4bf4f", "#61c554"].map((c) => (
@@ -516,10 +516,10 @@ function TileFace({ t }: { t: Tile }) {
   if (t.state === "making") {
     const step = t.step ?? 0;
     return (
-      <span className="flex size-full flex-col items-center justify-center gap-1.5 bg-[linear-gradient(160deg,#f6f2ff,#efebff)] px-1.5 text-center">
+      <span className="flex size-full flex-col items-center justify-center gap-1.5 bg-soft px-1.5 text-center">
         <svg width="30" height="30" viewBox="0 0 36 36" className="-rotate-90">
           <circle cx="18" cy="18" r="14" fill="none" stroke="#e2dbfb" strokeWidth="3" />
-          <circle cx="18" cy="18" r="14" fill="none" stroke="#5b3fd9" strokeWidth="3" strokeLinecap="round" strokeDasharray="88" strokeDashoffset={88 - 88 * ((step + 1) / 4)} className="land-progress" />
+          <circle cx="18" cy="18" r="14" fill="none" stroke="#121110" strokeWidth="3" strokeLinecap="round" strokeDasharray="88" strokeDashoffset={88 - 88 * ((step + 1) / 4)} className="land-progress" />
         </svg>
         <span key={step} className="land-enter text-[8.5px] leading-tight font-bold text-violet">
           {STEPS[step] ?? STEPS[2]}
@@ -555,7 +555,7 @@ function TileFace({ t }: { t: Tile }) {
 function VisitsCard({ on, visits }: { on: boolean; visits: number }) {
   return (
     <div
-      className={`land-card-in absolute right-[-6px] bottom-[64px] z-20 w-[176px] rounded-[18px] border border-line bg-white p-3.5 shadow-[0_24px_50px_-20px_rgba(28,21,48,.35)] sm:right-[10px] sm:bottom-[44px] sm:w-[206px] ${
+      className={`land-card-in absolute right-[-6px] bottom-[64px] z-20 w-[176px] rounded-[18px] border border-line bg-white p-3.5 border border-ink/15 sm:right-[10px] sm:bottom-[44px] sm:w-[206px] ${
         on ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
       }`}
     >
@@ -572,14 +572,14 @@ function VisitsCard({ on, visits }: { on: boolean; visits: number }) {
       <svg viewBox="0 0 180 40" className="mt-2 h-[34px] w-full" fill="none">
         <defs>
           <linearGradient id="land-visits" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="#5b3fd9" stopOpacity=".18" />
-            <stop offset="1" stopColor="#5b3fd9" stopOpacity="0" />
+            <stop offset="0" stopColor="#121110" stopOpacity=".18" />
+            <stop offset="1" stopColor="#121110" stopOpacity="0" />
           </linearGradient>
         </defs>
         {on && (
           <g key={visits}>
             <path d="M2 34 L30 30 L58 32 L86 24 L114 26 L142 14 L178 6 L178 40 L2 40 Z" fill="url(#land-visits)" className="land-fade" style={{ animationDuration: "1.2s" }} />
-            <path d="M2 34 L30 30 L58 32 L86 24 L114 26 L142 14 L178 6" stroke="#5b3fd9" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="land-spark-line" />
+            <path d="M2 34 L30 30 L58 32 L86 24 L114 26 L142 14 L178 6" stroke="#121110" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="land-spark-line" />
           </g>
         )}
       </svg>

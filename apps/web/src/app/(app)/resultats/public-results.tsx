@@ -34,7 +34,7 @@ export function PlatformCard({
 }) {
   if (!handle && followers === null && !summary.videos) {
     return (
-      <section className="flex min-w-0 flex-col gap-2 rounded-[22px] border border-dashed border-line p-5.5">
+      <section className="flex min-w-0 flex-col gap-2 border border-dashed border-line p-5.5">
         <span className="flex items-center gap-2 text-[15px] font-bold">
           <Icon platform={platform} /> {NAMES[platform]}
         </span>
@@ -51,7 +51,7 @@ export function PlatformCard({
     ["Engagement", percent(summary.engagement), summary.views ? "j’aime, commentaires et enregistrements par vue" : null],
   ];
   return (
-    <section className="flex min-w-0 flex-col gap-4 rounded-[22px] border border-line p-5.5">
+    <section className="flex min-w-0 flex-col gap-4 border border-line p-5.5">
       <div className="flex items-center justify-between gap-3">
         <span className="flex min-w-0 items-center gap-2 text-[15px] font-bold">
           <Icon platform={platform} /> <span className="truncate">{handle ? `@${handle}` : NAMES[platform]}</span>
@@ -64,7 +64,7 @@ export function PlatformCard({
       </div>
       <div className="grid grid-cols-3 gap-2">
         {stats.map(([label, value, detail]) => (
-          <div key={label} className="flex min-w-0 flex-col gap-0.5 rounded-[14px] bg-soft p-3">
+          <div key={label} className="flex min-w-0 flex-col gap-0.5 bg-soft p-3">
             <span className="text-[12px] font-semibold text-muted">{label}</span>
             <span className="text-[20px] font-extrabold tabular-nums">{value}</span>
             {detail && <span className="text-[11.5px] leading-snug text-muted">{detail}</span>}

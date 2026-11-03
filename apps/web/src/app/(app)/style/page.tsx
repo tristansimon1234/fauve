@@ -35,7 +35,7 @@ async function StyleLoader() {
   if (!member) {
     return (
       <>
-        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Ton style</h1>
+        <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[60px]">Ton style</h1>
         <NoStudio />
       </>
     );

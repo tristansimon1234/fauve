@@ -78,7 +78,7 @@ export function CreatedSections({ scenes, looks, brand }: { scenes: Creation[]; 
         <Section id="tes-animations" title="Tes animations" hint="Faites pour tes Reels. Edith les réutilise avec d’autres mots, sans crédit : retire celles que tu ne veux plus revoir.">
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
             {scenes.map((s) => (
-              <li key={s.id} className="flex flex-col overflow-hidden rounded-[16px] border border-line bg-white">
+              <li key={s.id} className="flex flex-col overflow-hidden border border-line bg-white">
                 <div className="relative aspect-[9/16] overflow-hidden bg-ink">
                   <LivePreview props={sceneProps(s.js, s.name, brand, s.fonts)} frame={Math.round(SCENE_FRAMES * 0.6)} />
                   <div className="absolute right-2 bottom-2 z-10">
@@ -98,7 +98,7 @@ export function CreatedSections({ scenes, looks, brand }: { scenes: Creation[]; 
         <Section id="tes-styles-texte" title="Tes styles de texte" hint="Repris des exemples que tu as envoyés à Edith. Elle s’en sert pour écrire sur tes Reels, et tu les retrouves quand tu changes un texte.">
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
             {looks.map((s) => (
-              <li key={s.name} className="group flex flex-col gap-1.5 rounded-[16px] border border-line bg-white p-2">
+              <li key={s.name} className="group flex flex-col gap-1.5 border border-line bg-white p-2">
                 <StyleTile look={resolveBrandLook(s.look, brand)} brand={brand} words="Ton texte ici" on={false} />
                 <span className="flex items-center gap-1">
                   <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{s.name}</span>

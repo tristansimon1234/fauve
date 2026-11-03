@@ -67,7 +67,7 @@ export function CoverPicker({
   };
 
   return (
-    <section aria-label="Vignette" className="flex flex-col gap-3 rounded-[18px] border-2 border-violet-soft bg-white p-3.5">
+    <section aria-label="Vignette" className="flex flex-col gap-3 border-2 border-violet-soft bg-white p-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-[16px] font-extrabold">Vignette</h2>
         <span className="text-[12px] text-muted" aria-live="polite">
@@ -76,7 +76,7 @@ export function CoverPicker({
       </div>
       <div className="flex gap-3">
         {/* As in the grid: a 3:4 crop of the Reel. */}
-        <span className="relative block aspect-[3/4] w-[112px] shrink-0 overflow-hidden rounded-[12px] bg-ink shadow-[0_6px_18px_rgba(28,21,48,.18)]">
+        <span className="relative block aspect-[3/4] w-[112px] shrink-0 overflow-hidden bg-ink shadow-[0_6px_18px_rgba(18,17,16,.18)]">
           {photo ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
             <img src={photo.url} alt="Vignette choisie" className="size-full object-cover" />
@@ -126,7 +126,7 @@ export function CoverPicker({
                         setLocal(next);
                         save(next);
                       }}
-                      className={`size-10 overflow-hidden rounded-[8px] ${on ? "ring-2 ring-violet ring-offset-1" : "hover:ring-1 hover:ring-lilac"}`}
+                      className={`size-10 overflow-hidden ${on ? "ring-2 ring-violet ring-offset-1" : "hover:ring-1 hover:ring-lilac"}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element -- signed Storage URL */}
                       <img src={p.url} alt="" className="size-full object-cover" />
@@ -153,7 +153,7 @@ export function CoverPicker({
       {/* Instagram puts a Reel in the profile grid and the Reels tab; she can keep it to the Reels tab. */}
       <div role="radiogroup" aria-label="Où apparaît le Reel sur ton profil" className="flex flex-col gap-1.5">
         <span className="text-[12px] font-semibold text-muted">Où il apparaît sur ton profil</span>
-        <div className="grid grid-cols-2 gap-1 rounded-[12px] bg-soft p-1">
+        <div className="grid grid-cols-2 gap-1 bg-soft p-1">
           {[
             { on: true, label: "Grille + onglet Reels" },
             { on: false, label: "Onglet Reels seulement" },
@@ -164,7 +164,7 @@ export function CoverPicker({
               role="radio"
               aria-checked={inGrid === o.on}
               onClick={() => inGrid !== o.on && toggleGrid()}
-              className={`rounded-[9px] px-2 py-2 text-[12px] font-bold leading-tight transition-colors ${inGrid === o.on ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+              className={`px-2 py-2 text-[12px] font-bold leading-tight transition-colors ${inGrid === o.on ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}
             >
               {o.label}
             </button>

@@ -68,7 +68,7 @@ export function LogoSection({
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div
-          className="flex h-28 w-full shrink-0 items-center justify-center rounded-[16px] border border-line bg-[repeating-conic-gradient(#f3f1f5_0_25%,#ffffff_0_50%)] bg-[length:16px_16px] p-3 sm:w-44"
+          className="flex h-28 w-full shrink-0 items-center justify-center border border-line bg-[repeating-conic-gradient(#f3f1f5_0_25%,#ffffff_0_50%)] bg-[length:16px_16px] p-3 sm:w-44"
           aria-busy={busy}
         >
           {logo ? (

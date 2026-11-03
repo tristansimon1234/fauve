@@ -22,7 +22,7 @@ export function Pairing({ signIn, expired }: { signIn: boolean; expired: boolean
     startPairing()
       .then(async ({ code, text }) => {
         const url = whatsappLink(text);
-        const qr = await QRCode.toString(url, { type: "svg", margin: 0, color: { dark: "#1C1530", light: "#FFFFFF" } });
+        const qr = await QRCode.toString(url, { type: "svg", margin: 0, color: { dark: "#121110", light: "#FFFFFF" } });
         setPair({ code, url, qr });
         setState("waiting");
       })
@@ -90,7 +90,7 @@ export function Pairing({ signIn, expired }: { signIn: boolean; expired: boolean
         </div>
       ) : (
         <>
-          <div className="flex size-[232px] items-center justify-center rounded-[24px] border border-line bg-white p-4 shadow-[0_12px_40px_rgba(28,21,48,.08)]">
+          <div className="flex size-[232px] items-center justify-center border border-line bg-white p-4 shadow-[0_12px_40px_rgba(18,17,16,.08)]">
             {pair ? <div className="size-full [&_svg]:size-full" aria-label="QR code pour écrire à Edith" role="img" dangerouslySetInnerHTML={{ __html: pair.qr }} /> : <Orb size={36} />}
           </div>
           {pair && (

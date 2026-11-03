@@ -76,7 +76,7 @@ export function LayoutPicker({
   const tile = (on: boolean) =>
     `group flex min-w-0 flex-col gap-1.5 text-left outline-none ${on ? "" : "opacity-90 hover:opacity-100"}`;
   const frame = (on: boolean) =>
-    `relative overflow-hidden rounded-[10px] bg-ink transition-shadow group-focus-visible:ring-2 group-focus-visible:ring-violet ${on ? "ring-2 ring-violet ring-offset-2" : "ring-1 ring-line"}`;
+    `relative overflow-hidden bg-ink transition-shadow group-focus-visible:ring-2 group-focus-visible:ring-violet ${on ? "ring-2 ring-violet ring-offset-2" : "ring-1 ring-line"}`;
 
   return (
     <section aria-label="Mise en page" className="flex flex-col gap-2.5">

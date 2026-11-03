@@ -18,7 +18,7 @@ export function PortalButton() {
             if (res?.error) setError(res.error);
           })
         }
-        className="h-11 rounded-full bg-white/12 px-5 text-[15px] font-bold disabled:opacity-50"
+        className="h-11 bg-white/12 px-5 text-[15px] font-bold disabled:opacity-50"
       >
         {pending ? "Un instant…" : "Gérer mon abonnement"}
       </button>

@@ -10,7 +10,7 @@ const tabs = [
 export function SettingsTabs({ current }: { current: (typeof tabs)[number]["href"] }) {
   return (
     // On a phone only: on a computer, Médiathèque and Ton style are in the side menu.
-    <nav aria-label="Réglages" className="-mb-2 flex max-w-full gap-1 self-start overflow-x-auto rounded-full bg-soft p-1 [scrollbar-width:none] lg:hidden">
+    <nav aria-label="Réglages" className="-mb-2 flex max-w-full gap-1 self-start overflow-x-auto bg-soft p-1 [scrollbar-width:none] lg:hidden">
       {tabs.map((tab) => {
         const on = tab.href === current;
         return (
@@ -18,7 +18,7 @@ export function SettingsTabs({ current }: { current: (typeof tabs)[number]["href
             key={tab.href}
             href={tab.href}
             aria-current={on ? "page" : undefined}
-            className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-bold ${on ? "bg-white text-ink shadow-[0_2px_8px_rgba(28,21,48,0.08)]" : "text-muted hover:text-ink"}`}
+            className={`shrink-0 px-3.5 py-2 text-sm font-bold ${on ? "bg-white text-ink shadow-[0_2px_8px_rgba(18,17,16,0.08)]" : "text-muted hover:text-ink"}`}
           >
             {tab.label}
           </Link>

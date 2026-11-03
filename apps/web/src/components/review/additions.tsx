@@ -23,7 +23,7 @@ export function LibrarySheet({ kind, title, onPick, onClose }: { kind: "photo" |
     };
   }, [kind]);
   return (
-    <div className="flex flex-col gap-2.5 rounded-[16px] border-[1.5px] border-line bg-white p-3">
+    <div className="flex flex-col gap-2.5 border-[1.5px] border-line bg-white p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[13.5px] font-bold">{title}</span>
         <button type="button" onClick={onClose} className="text-[13px] font-bold text-muted">
@@ -33,14 +33,14 @@ export function LibrarySheet({ kind, title, onPick, onClose }: { kind: "photo" |
       {items === null ? (
         <div className="grid grid-cols-4 gap-1.5">
           {Array.from({ length: 8 }, (_, i) => (
-            <span key={i} className="aspect-square animate-pulse rounded-lg bg-soft" aria-hidden />
+            <span key={i} className="aspect-square animate-pulse bg-soft" aria-hidden />
           ))}
         </div>
       ) : items.length ? (
         <ul className="grid max-h-[260px] grid-cols-4 gap-1.5 overflow-y-auto">
           {items.map((m) => (
             <li key={m.id}>
-              <button type="button" onClick={() => onPick(m.id)} className="relative block aspect-square w-full overflow-hidden rounded-lg bg-soft hover:ring-2 hover:ring-violet">
+              <button type="button" onClick={() => onPick(m.id)} className="relative block aspect-square w-full overflow-hidden bg-soft hover:ring-2 hover:ring-violet">
                 {m.video ? (
                   <>
                     <video src={`${m.url}#t=0.5`} muted playsInline preload="metadata" className="size-full object-cover" />
@@ -123,7 +123,7 @@ export function OverlayBoxes({
             key={box.index}
             type="button"
             aria-label={o.kind === "text" ? `Déplacer « ${o.text} »` : "Déplacer la photo"}
-            className={`absolute z-20 cursor-grab touch-none rounded-[8px] border-2 active:cursor-grabbing ${
+            className={`absolute z-20 cursor-grab touch-none border-2 active:cursor-grabbing ${
               active === box.index ? "border-white shadow-[0_0_0_2px_rgba(91,63,217,0.9)]" : "border-dashed border-white/70 hover:border-white"
             }`}
             style={{ left: `${box.left * 100}%`, top: `${box.top * 100}%`, width: `${box.width * 100}%`, height: `${box.height * 100}%` }}
@@ -171,7 +171,7 @@ export function OverlayPanel({
   const step = text ? 0.01 : 0.05;
   const [min, max] = text ? [0.04, 0.16] : [0.15, 0.95];
   const whole = overlay.from <= 0.05 && overlay.to >= duration - 0.05;
-  const chip = "h-10 rounded-full px-3.5 text-[13.5px] font-bold";
+  const chip = "h-10 px-3.5 text-[13.5px] font-bold";
   return (
     <div className="flex flex-col gap-3.5">
       <h3 className="text-[17px] font-extrabold tracking-[-0.01em]">{text ? "Le texte ajouté" : "La photo ajoutée"}</h3>
@@ -181,16 +181,16 @@ export function OverlayPanel({
           maxLength={90}
           onChange={(e) => onChange({ text: e.target.value })}
           aria-label="Les mots"
-          className="h-12 w-full rounded-[14px] border-[1.5px] border-line bg-white px-3.5 text-[16px] font-semibold outline-none focus:border-violet"
+          className="h-12 w-full border-[1.5px] border-line bg-white px-3.5 text-[16px] font-semibold outline-none focus:border-violet"
         />
       )}
       <p className="-mt-1.5 text-[12.5px] leading-snug text-muted">Pour le placer, fais-le glisser sur la vidéo.</p>
       <div className="flex items-center gap-2">
         <span className="flex-1 text-[14px] font-bold">Taille</span>
-        <button type="button" aria-label="Plus petit" disabled={overlay.w <= min} onClick={() => onChange({ w: Math.max(min, roundTo(overlay.w - step)) })} className="h-10 w-12 rounded-full bg-chip text-[14px] font-extrabold disabled:opacity-35">
+        <button type="button" aria-label="Plus petit" disabled={overlay.w <= min} onClick={() => onChange({ w: Math.max(min, roundTo(overlay.w - step)) })} className="h-10 w-12 bg-chip text-[14px] font-extrabold disabled:opacity-35">
           A−
         </button>
-        <button type="button" aria-label="Plus grand" disabled={overlay.w >= max} onClick={() => onChange({ w: Math.min(max, roundTo(overlay.w + step)) })} className="h-10 w-12 rounded-full bg-chip text-[17px] font-extrabold disabled:opacity-35">
+        <button type="button" aria-label="Plus grand" disabled={overlay.w >= max} onClick={() => onChange({ w: Math.min(max, roundTo(overlay.w + step)) })} className="h-10 w-12 bg-chip text-[17px] font-extrabold disabled:opacity-35">
           A+
         </button>
       </div>

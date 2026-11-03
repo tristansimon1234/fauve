@@ -75,7 +75,7 @@ export function SlidesEditor({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-center">
-        <div ref={previewRef} className="relative overflow-hidden rounded-[18px] bg-black" style={{ width: previewWidth }}>
+        <div ref={previewRef} className="relative overflow-hidden bg-black" style={{ width: previewWidth }}>
           {props ? (
             <>
               <SlidePreview props={props} />
@@ -109,7 +109,7 @@ export function SlidesEditor({
               aria-selected={i === index}
               aria-label={`Photo ${i + 1}`}
               onClick={() => pickSlide(i)}
-              className={`relative aspect-[4/5] w-14 shrink-0 overflow-hidden rounded-[10px] ${i === index ? "ring-2 ring-violet ring-offset-2" : "opacity-80"} ${dark ? "ring-offset-ink" : "ring-offset-white"}`}
+              className={`relative aspect-[4/5] w-14 shrink-0 overflow-hidden ${i === index ? "ring-2 ring-violet ring-offset-2" : "opacity-80"} ${dark ? "ring-offset-ink" : "ring-offset-white"}`}
             >
               {photos[s.media_id] ? (
                 // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
@@ -117,7 +117,7 @@ export function SlidesEditor({
               ) : (
                 <span className={`flex size-full items-center justify-center text-[10px] font-bold ${dark ? "bg-white/10" : "bg-soft"}`}>Vidéo</span>
               )}
-              <span className="absolute bottom-0.5 left-0.5 rounded-full bg-black/60 px-1.5 text-[10px] font-bold text-white">{i + 1}</span>
+              <span className="absolute bottom-0.5 left-0.5 bg-black/60 px-1.5 text-[10px] font-bold text-white">{i + 1}</span>
               {(s.texts.length > 0 || s.layer) && <span className="absolute top-1 right-1 size-2 rounded-full bg-violet" aria-label="Avec texte" />}
             </button>
           ))}
@@ -152,7 +152,7 @@ export function SlidesEditor({
                 key={i}
                 type="button"
                 onClick={() => setActive(i)}
-                className={`flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] ${dark ? "border-white/20" : "border-line bg-white"}`}
+                className={`flex max-w-full items-center gap-1.5 border px-3 py-1.5 text-[13px] ${dark ? "border-white/20" : "border-line bg-white"}`}
               >
                 <PenIcon size={13} className={`shrink-0 ${muted}`} />
                 <span className="truncate">{t.text}</span>
@@ -162,7 +162,7 @@ export function SlidesEditor({
               <button
                 type="button"
                 onClick={addText}
-                className={`flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1.5 text-[13px] ${dark ? "border-white/30 text-white/80" : "border-lilac text-violet"}`}
+                className={`flex items-center gap-1.5 border border-dashed px-3 py-1.5 text-[13px] ${dark ? "border-white/30 text-white/80" : "border-lilac text-violet"}`}
               >
                 <PlusIcon size={13} /> Ajouter un texte
               </button>
@@ -193,7 +193,7 @@ export function SlidesEditor({
               type="button"
               aria-pressed={(slide.logo ?? null) === p.value}
               onClick={() => onChange({ ...plan, slides: plan.slides.map((s, i) => (i === index ? { ...s, logo: p.value ?? undefined } : s)) })}
-              className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${chip((slide.logo ?? null) === p.value)}`}
+              className={`px-3 py-1.5 text-[13px] font-semibold ${chip((slide.logo ?? null) === p.value)}`}
             >
               {p.label}
             </button>

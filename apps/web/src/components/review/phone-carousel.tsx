@@ -206,7 +206,7 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
   // Composing it: its photos alone are not what she will see.
   if (data.making && !design) return <Making title={data.title} step={data.making.step} minutes={data.making.minutes} />;
 
-  const tile = "flex h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-[18px] px-1 text-[13px] font-extrabold disabled:opacity-45";
+  const tile = "flex h-[56px] min-w-0 flex-col items-center justify-center gap-1 px-1 text-[13px] font-extrabold disabled:opacity-45";
   const dirty = design ? wordsChanged : planChanged;
 
   return (
@@ -287,7 +287,7 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
             </ul>
             {/* Shown when the slide changes, then gone: it would hide the corner of the image. */}
             {many && (
-              <span key={index} className="fauve-counter pointer-events-none absolute top-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-[12px] font-bold">
+              <span key={index} className="fauve-counter pointer-events-none absolute top-3 right-3 bg-black/60 px-2.5 py-1 text-[12px] font-bold">
                 {index + 1}/{count}
               </span>
             )}
@@ -321,7 +321,7 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
                   setError(null);
                 }}
                 aria-label={changeLabel}
-                className="flex h-8 items-center gap-1.5 justify-self-end rounded-full bg-white/10 px-3 text-[13px] font-bold"
+                className="flex h-8 items-center gap-1.5 justify-self-end bg-white/10 px-3 text-[13px] font-bold"
               >
                 {/* Beside many dots, the icon alone. */}
                 <TypeIcon size={14} className="shrink-0" />
@@ -331,7 +331,7 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
           </div>
         </>
       ) : (
-        <div className="mx-4 mt-3 flex aspect-[4/5] flex-col items-center justify-center gap-3 rounded-[22px] bg-white/5 px-8 text-center">
+        <div className="mx-4 mt-3 flex aspect-[4/5] flex-col items-center justify-center gap-3 bg-white/5 px-8 text-center">
           <Orb size={48} />
           <p className="text-[14.5px] leading-snug text-white/75">J’attends encore tes photos pour {noun}. Envoie-les-moi sur WhatsApp.</p>
         </div>
@@ -362,7 +362,7 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
       )}
 
       {toast && (
-        <p role="status" className="fauve-enter fixed inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] z-30 mx-auto max-w-[440px] rounded-[18px] bg-white px-4 py-3 text-center text-[14px] font-bold text-ink shadow-lg">
+        <p role="status" className="fauve-enter fixed inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] z-30 mx-auto max-w-[440px] bg-white px-4 py-3 text-center text-[14px] font-bold text-ink shadow-lg">
           {toast}
         </p>
       )}
@@ -371,25 +371,25 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ink/95 backdrop-blur">
         <div className="mx-auto flex max-w-[480px] flex-col gap-2 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
           {error && (
-            <p role="alert" className="rounded-[14px] bg-danger px-3 py-2 text-[13.5px] font-semibold">
+            <p role="alert" className="bg-danger px-3 py-2 text-[13.5px] font-semibold">
               {error}
             </p>
           )}
           {editing ? (
             <div className="flex gap-2">
-              <button type="button" onClick={cancelWords} disabled={pending} className="flex-1 rounded-full border border-white/25 py-3.5 text-[15px] font-bold">
+              <button type="button" onClick={cancelWords} disabled={pending} className="flex-1 border border-white/25 py-3.5 text-[15px] font-bold">
                 Annuler
               </button>
-              <button type="button" onClick={saveWords} disabled={!dirty || pending} className="flex-[2] rounded-full bg-violet py-3.5 text-[15px] font-bold disabled:opacity-40">
+              <button type="button" onClick={saveWords} disabled={!dirty || pending} className="flex-[2] bg-violet py-3.5 text-[15px] font-bold disabled:opacity-40">
                 {pending ? "Enregistrement…" : "Enregistrer"}
               </button>
             </div>
           ) : (
             <>
               {data.locked ? (
-                <SaveButton data={data} className="flex h-[50px] items-center justify-center gap-2 rounded-full bg-white/15 text-[15px] font-extrabold disabled:opacity-45" onMany={() => setSheet("save")} />
+                <SaveButton data={data} className="flex h-[50px] items-center justify-center gap-2 bg-white/15 text-[15px] font-extrabold disabled:opacity-45" onMany={() => setSheet("save")} />
               ) : sent ? (
-                <p className="flex items-start gap-2 rounded-[18px] bg-white/10 px-4 py-3 text-[14.5px] leading-snug font-semibold">
+                <p className="flex items-start gap-2 bg-white/10 px-4 py-3 text-[14.5px] leading-snug font-semibold">
                   <CheckIcon size={19} className="mt-0.5 shrink-0" />
                   {`C’est parti sur ${where}, je te dis quand c’est en ligne.`}
                 </p>
@@ -411,7 +411,7 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
                 <p className="text-center text-[12.5px] font-semibold text-white/80">Je te fais signe {data.when.short} pour le poster.</p>
               )}
               {!data.locked && (
-                <a href={whatsappLink(`Pour « ${data.title} » : `)} className="flex h-[46px] items-center justify-center gap-2 rounded-full bg-white/12 text-[15px] font-extrabold">
+                <a href={whatsappLink(`Pour « ${data.title} » : `)} className="flex h-[46px] items-center justify-center gap-2 bg-white/12 text-[15px] font-extrabold">
                   <PenIcon size={17} /> Modifier avec Edith
                 </a>
               )}
@@ -431,7 +431,7 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
             placeholder="Edith l’écrit avec les images."
             readOnly={data.locked}
             // 16 px: under it, the phone zooms into the page as soon as she touches it.
-            className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3 py-2.5 text-[16px] leading-relaxed outline-none focus:border-violet"
+            className="w-full resize-none border-[1.5px] border-line bg-white px-3 py-2.5 text-[16px] leading-relaxed outline-none focus:border-violet"
           />
           {error && (
             <p role="alert" className="text-[13px] font-semibold text-danger">
@@ -455,7 +455,7 @@ export function PhoneCarousel({ data, looks = [] }: { data: CarouselReviewData; 
         </Sheet>
       )}
       {sheet === "date" && (
-        <Sheet title="Quand te faire signe ?" hint="Edith te rappelle de le poster à ce moment-là, sur WhatsApp et dans l’app." onClose={() => setSheet(null)}>
+        <Sheet title="Quand te faire signe ?"hint="Edith te rappelle de le poster à ce moment-là, sur WhatsApp et dans l’app." onClose={() => setSheet(null)}>
           <DateView
             data={data}
             onDone={(message) => {
@@ -554,7 +554,7 @@ function SaveSheet({ data, publish = false, caption, onClose }: { data: Carousel
       <ul className="grid grid-cols-5 gap-1.5">
         {data.downloads.map((d, i) => (
           <li key={d.url}>
-            <a href={d.url} download={d.name} aria-label={`Télécharger l’image ${i + 1}`} className="relative block aspect-[4/5] overflow-hidden rounded-[8px] bg-soft">
+            <a href={d.url} download={d.name} aria-label={`Télécharger l’image ${i + 1}`} className="relative block aspect-[4/5] overflow-hidden bg-soft">
               {d.name.endsWith(".mp4") ? (
                 <span className="flex size-full items-center justify-center text-[12px] font-bold text-muted">Vidéo</span>
               ) : (

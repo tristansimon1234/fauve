@@ -37,7 +37,7 @@ export function DropView({ studioId }: { studioId: string }) {
         {/* WhatsApp never lets a link send a message by itself: when Edith cannot write first, hers is ready to send. */}
         <a
           href={whatsappLink(sent.answered ? "" : `C’est envoyé ! ${sent.count > 1 ? `${sent.count} fichiers` : "1 fichier"} 📎`)}
-          className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-[15px] font-extrabold text-ink"
+          className="inline-flex items-center gap-2 bg-white px-5 py-3 text-[15px] font-extrabold text-ink"
         >
           <WhatsAppIcon size={18} /> {sent.answered ? "Retourner sur WhatsApp" : "Prévenir Edith sur WhatsApp"}
         </a>
@@ -74,14 +74,14 @@ export function DropView({ studioId }: { studioId: string }) {
         type="button"
         onClick={() => input.current?.click()}
         disabled={uploads.files.length >= MAX_FILES}
-        className="flex flex-col items-center gap-2 rounded-[22px] border-2 border-dashed border-white/30 bg-white/5 px-4 py-8 text-center hover:border-white/60 disabled:opacity-50"
+        className="flex flex-col items-center gap-2 border-2 border-dashed border-white/30 bg-white/5 px-4 py-8 text-center hover:border-white/60 disabled:opacity-50"
       >
         <ImageIcon size={28} />
         <span className="text-[16px] font-extrabold">{uploads.files.length ? "En ajouter" : "Choisir dans ma galerie"}</span>
         <span className="text-[12.5px] text-white/60">Jusqu’à {MAX_FILES} fichiers</span>
       </button>
 
-      <div className="rounded-[18px] bg-white p-2 empty:hidden">
+      <div className="bg-white p-2 empty:hidden">
         <FileStrip files={uploads.files} onRemove={uploads.removeFile} />
       </div>
 
@@ -92,7 +92,7 @@ export function DropView({ studioId }: { studioId: string }) {
         type="button"
         onClick={send}
         disabled={!uploads.ready.length || uploads.uploading || pending}
-        className="mt-auto rounded-full bg-violet px-5 py-3.5 text-[16px] font-extrabold text-white disabled:opacity-40"
+        className="mt-auto bg-violet px-5 py-3.5 text-[16px] font-extrabold text-white disabled:opacity-40"
       >
         {uploads.uploading ? "Envoi en cours…" : pending ? "J’envoie à Edith…" : uploads.ready.length ? `Envoyer à Edith (${uploads.ready.length})` : "Envoyer à Edith"}
       </button>

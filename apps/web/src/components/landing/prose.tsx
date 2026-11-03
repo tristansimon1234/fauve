@@ -36,12 +36,12 @@ export function Prose({ blocks }: { blocks: Block[] }) {
           );
         if ("tip" in block)
           return (
-            <p key={i} className="rounded-[18px] bg-violet-soft px-6 py-5 font-[family-name:var(--font-serif)] text-[22px] leading-[1.35] text-violet italic">
+            <p key={i} className="bg-violet-soft px-6 py-5 font-[family-name:var(--font-serif)] text-[22px] leading-[1.35] text-violet italic">
               {fr(block.tip)}
             </p>
           );
         return (
-          <figure key={i} className="rounded-[18px] border border-ink/10 bg-white px-6 py-5">
+          <figure key={i} className="border border-ink/10 bg-white px-6 py-5">
             <figcaption className="mb-2 text-[12px] font-bold tracking-[0.14em] text-muted uppercase">{fr(block.example.label)}</figcaption>
             <p className="text-[16px] leading-[1.6] whitespace-pre-line text-ink">{fr(block.example.text)}</p>
           </figure>

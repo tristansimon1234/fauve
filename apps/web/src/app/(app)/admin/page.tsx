@@ -95,7 +95,7 @@ function NumberField({ name, label, hint, value, step }: { name: string; label: 
         min={0}
         step={step ?? "1"}
         required
-        className="h-10 w-full rounded-[12px] border border-line bg-white px-3 text-[14px] tabular-nums outline-none focus:border-violet"
+        className="h-10 w-full border border-line bg-white px-3 text-[14px] tabular-nums outline-none focus:border-violet"
       />
       <span className="text-[13px] text-muted">{hint}</span>
     </label>
@@ -150,7 +150,7 @@ function Waitlist({ view }: { view: AdminView }) {
                   {w.firstText && <span className="truncate text-sm text-muted">« {w.firstText} »</span>}
                   <span className="text-[13px] text-muted">
                     Depuis le {formatShortDateTime(w.since, ZONE)}
-                    {reachable ? "" : " · plus de 24 h sans message : il entrera à son prochain message"}
+                    {reachable ? "" : "· plus de 24 h sans message : il entrera à son prochain message"}
                   </span>
                 </div>
                 <form action={letIn}>
@@ -189,7 +189,7 @@ function Feedback({ view }: { view: AdminView }) {
                 <span className="text-[13px] text-muted">
                   <span className={`font-semibold ${f.status === "new" ? "text-violet" : ""}`}>{FEEDBACK_LABELS[f.kind].one}</span> · {f.studio} ·{" "}
                   {f.source === "whatsapp" ? "WhatsApp" : "app"}
-                  {f.byEdith ? "" : " · repéré"} · {formatShortDateTime(f.at, ZONE)}
+                  {f.byEdith ? "" : "· repéré"} · {formatShortDateTime(f.at, ZONE)}
                 </span>
                 <span className="leading-snug break-words whitespace-pre-line">« {f.words} »</span>
               </div>
@@ -308,7 +308,7 @@ function ProviderRow({ p }: { p: ProviderBudget }) {
           <span className={`text-sm tabular-nums ${p.quota.limit && p.quota.used / p.quota.limit > 0.85 ? "font-bold text-peach-ink" : ""}`}>
             Crédits du mois : {p.quota.used.toLocaleString("fr-FR")} / {p.quota.limit.toLocaleString("fr-FR")}
             {p.quota.resetsAt ? ` · remis à zéro le ${formatShortDateTime(p.quota.resetsAt, ZONE)}` : ""}
-            {p.quota.overage ? " · dépassement autorisé" : ""}
+            {p.quota.overage ? "· dépassement autorisé" : ""}
           </span>
         )}
         {p.live === null && <span className="text-sm text-muted">Solde illisible pour l’instant</span>}
@@ -322,7 +322,7 @@ function ProviderRow({ p }: { p: ProviderBudget }) {
                 inputMode="decimal"
                 placeholder="en $"
                 defaultValue={p.budget ? String(Math.max(0, Math.round((state.remaining ?? 0) * 100) / 100)) : ""}
-                className="h-9 w-24 rounded-[12px] border border-line bg-white px-2.5 text-[14px] tabular-nums outline-none focus:border-violet"
+                className="h-9 w-24 border border-line bg-white px-2.5 text-[14px] tabular-nums outline-none focus:border-violet"
               />
             </label>
             <label className="flex items-center gap-1.5 text-sm">
@@ -333,7 +333,7 @@ function ProviderRow({ p }: { p: ProviderBudget }) {
                 min={1}
                 max={90}
                 defaultValue={p.budget?.alertDays ?? 7}
-                className="h-9 w-16 rounded-[12px] border border-line bg-white px-2.5 text-[14px] tabular-nums outline-none focus:border-violet"
+                className="h-9 w-16 border border-line bg-white px-2.5 text-[14px] tabular-nums outline-none focus:border-violet"
               />
               jours
             </label>

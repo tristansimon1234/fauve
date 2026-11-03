@@ -19,7 +19,7 @@ export function EmptyState({
 }) {
   return (
     <div
-      className={`flex flex-col items-center gap-3.5 rounded-[22px] bg-soft px-6 py-10 text-center ${className}`}
+      className={`flex flex-col items-center gap-3.5 bg-soft px-6 py-10 text-center ${className}`}
     >
       <Orb size={52} />
       <h2 className="text-lg font-bold">{title}</h2>
@@ -49,12 +49,12 @@ export function PageLoading({ title }: { title: string }) {
   return (
     <div className="flex flex-col gap-6" aria-busy="true">
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">{title}</h1>
+        <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[60px]">{title}</h1>
         <p className="text-[15px] text-muted">Chargement…</p>
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-4">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-40 animate-pulse rounded-[20px] bg-soft motion-reduce:animate-none" />
+          <div key={i} className="h-40 animate-pulse bg-soft motion-reduce:animate-none" />
         ))}
       </div>
     </div>

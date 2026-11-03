@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Ton community manager vit dans WhatsApp.",
     start_url: "/fauve",
     display: "standalone",
-    background_color: "#FFFFFF",
-    theme_color: "#5B3FD9",
+    background_color: "#F5F2EC",
+    theme_color: "#F5F2EC",
     lang: "fr",
     icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
   };

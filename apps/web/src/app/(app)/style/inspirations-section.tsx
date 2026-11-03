@@ -95,7 +95,7 @@ export function InspirationsSection({ items: initial, studioId }: { items: Inspi
           type="button"
           disabled={uploading}
           onClick={() => fileRef.current?.click()}
-          className="flex items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-line py-3 text-[14px] font-bold text-violet hover:border-violet/50 hover:bg-violet-soft disabled:opacity-50"
+          className="flex items-center justify-center gap-2 border-[1.5px] border-dashed border-line py-3 text-[14px] font-bold text-violet hover:border-violet/50 hover:bg-violet-soft disabled:opacity-50"
         >
           <PlusIcon size={17} />
           {uploading ? "Envoi…" : "Ajouter un Reel qui te plaît"}

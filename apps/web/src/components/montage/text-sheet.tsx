@@ -41,7 +41,7 @@ export function TextSheet<T extends SheetText>({
 }) {
   const scale = text.scale ?? 1;
   return (
-    <div className="flex flex-col gap-3 rounded-[18px] bg-white p-3.5 text-ink">
+    <div className="flex flex-col gap-3 bg-white p-3.5 text-ink">
       <div className="flex items-center gap-2">
         {text.items ? (
           <span className="min-w-0 flex-1 text-[14px] font-bold">Liste · {text.items.length} élément{text.items.length > 1 ? "s" : ""}</span>
@@ -51,7 +51,7 @@ export function TextSheet<T extends SheetText>({
           onChange={(e) => onChange({ text: e.target.value })}
           maxLength={120}
           aria-label="Texte"
-          className="min-w-0 flex-1 rounded-[12px] border border-line px-3 py-2.5 text-[16px] outline-none focus:border-violet"
+          className="min-w-0 flex-1 border border-line px-3 py-2.5 text-[16px] outline-none focus:border-violet"
         />
         )}
         <button type="button" aria-label="Fermer" onClick={onClose} className="flex size-10 shrink-0 items-center justify-center rounded-full bg-chip text-muted">

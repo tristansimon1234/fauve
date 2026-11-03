@@ -55,7 +55,7 @@ export function PhotoAsk({
   };
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-[16px] bg-violet-tint p-3">
+    <div className="flex flex-col gap-2.5 bg-violet-tint p-3">
       <span className="flex items-center gap-2 text-[13px] font-bold text-violet">
         <Orb size={18} still />
         {heading}
@@ -72,12 +72,12 @@ export function PhotoAsk({
         rows={2}
         maxLength={400}
         placeholder={placeholder}
-        className="resize-none rounded-[12px] border border-lilac bg-white px-3 py-2 text-[14px] leading-snug outline-none focus:border-violet"
+        className="resize-none border border-lilac bg-white px-3 py-2 text-[14px] leading-snug outline-none focus:border-violet"
       />
       {!text && (
         <div className="flex flex-wrap gap-1.5">
           {ideas.map((idea) => (
-            <button key={idea} type="button" onClick={() => setText(idea)} className="h-7 rounded-full bg-white px-2.5 text-[12px] font-semibold text-ink hover:text-violet">
+            <button key={idea} type="button" onClick={() => setText(idea)} className="h-7 bg-white px-2.5 text-[12px] font-semibold text-ink hover:text-violet">
               {idea}
             </button>
           ))}
@@ -87,7 +87,7 @@ export function PhotoAsk({
         {example ? (
           <span className="flex min-w-0 flex-1 items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={example.preview} alt="" className="size-9 rounded-lg object-cover" />
+            <img src={example.preview} alt="" className="size-9 object-cover" />
             <span className="truncate text-[12px] text-muted">Exemple joint</span>
             <button
               type="button"

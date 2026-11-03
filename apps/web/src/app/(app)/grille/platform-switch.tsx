@@ -18,7 +18,7 @@ export function GridLayout({ aside, views }: { aside: ReactNode; views: ProfileV
       <aside className="flex flex-col gap-5 lg:sticky lg:top-9 lg:w-[300px] lg:shrink-0">
         {aside}
         {views.length > 1 && (
-          <div role="tablist" aria-label="Réseau" className="flex gap-1.5 self-start rounded-full bg-soft p-1">
+          <div role="tablist" aria-label="Réseau" className="flex gap-1.5 self-start bg-soft p-1">
             {views.map(({ key }) => {
               const Icon = key === "tiktok" ? TikTokIcon : InstagramIcon;
               return (
@@ -28,7 +28,7 @@ export function GridLayout({ aside, views }: { aside: ReactNode; views: ProfileV
                   role="tab"
                   aria-selected={platform === key}
                   onClick={() => setPlatform(key)}
-                  className={`flex h-10 items-center gap-2 rounded-full px-4.5 text-sm font-bold transition-colors ${platform === key ? "bg-ink text-white" : "text-muted hover:text-ink"}`}
+                  className={`flex h-10 items-center gap-2 px-4.5 text-sm font-bold transition-colors ${platform === key ? "bg-ink text-white" : "text-muted hover:text-ink"}`}
                 >
                   <Icon size={16} />
                   {key === "tiktok" ? "TikTok" : "Instagram"}

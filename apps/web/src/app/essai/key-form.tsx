@@ -9,7 +9,7 @@ export function KeyForm() {
   return (
     <form action={action} className="flex flex-col items-center gap-3">
       <label htmlFor="key">Clé de test</label>
-      <input id="key" name="key" type="password" autoComplete="off" required className="h-11 w-64 rounded-full border border-line bg-white px-4 text-ink" />
+      <input id="key" name="key" type="password" autoComplete="off" required className="h-11 w-64 border border-line bg-white px-4 text-ink" />
       <button type="submit" disabled={pending} className="btn btn-primary h-11">
         Entrer
       </button>

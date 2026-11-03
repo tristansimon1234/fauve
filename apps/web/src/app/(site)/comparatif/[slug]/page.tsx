@@ -40,7 +40,7 @@ export default async function ComparisonPage({ params }: PageProps<"/comparatif/
     <main>
       <JsonLd data={{ "@context": "https://schema.org", "@graph": [breadcrumb([["Edith", "/"], [c.h1, path]]), faqPage(c.faq)] }} />
 
-      <section className="mx-auto flex max-w-[1240px] flex-col gap-7 px-4 pt-8 pb-16 sm:px-8 sm:pt-12">
+      <section className="mx-auto flex max-w-[1360px] flex-col gap-7 px-4 pt-8 pb-16 sm:px-8 sm:pt-12">
         <nav aria-label="Fil d’Ariane" className="text-[13px] font-semibold text-muted">
           <Link href="/" className="hover:text-ink">
             Edith
@@ -48,7 +48,7 @@ export default async function ComparisonPage({ params }: PageProps<"/comparatif/
           <span className="mx-2 text-ink/30">/</span>
           Comparatif
         </nav>
-        <h1 className="max-w-[900px] text-[clamp(38px,5.2vw,72px)] leading-[1] font-extrabold tracking-[-0.045em]">
+        <h1 className="max-w-[1200px] text-[clamp(48px,7.6vw,120px)] leading-[0.9] font-semibold tracking-[-0.06em]">
           {fr(c.h1)}
           <span className="mt-1 block font-[family-name:var(--font-serif)] text-[1.1em] leading-[0.98] font-normal tracking-[-0.02em] text-violet italic">{fr(c.accent)}</span>
         </h1>
@@ -56,8 +56,8 @@ export default async function ComparisonPage({ params }: PageProps<"/comparatif/
       </section>
 
       {/* Side by side */}
-      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-8">
-        <div className="overflow-x-auto rounded-[22px] bg-white">
+      <section className="mx-auto max-w-[1360px] px-4 pb-24 sm:px-8">
+        <div className="overflow-x-auto border border-ink/20">
           <table className="w-full min-w-[620px] border-collapse text-left text-[15.5px]">
             <thead>
               <tr className="border-b border-ink/10">
@@ -86,7 +86,7 @@ export default async function ComparisonPage({ params }: PageProps<"/comparatif/
       </section>
 
       {/* When to choose which */}
-      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-4 pb-24 sm:px-8">
         <SectionTitle n={1} kicker="Que choisir">
           Chacun son cas, <span className="accent">honnêtement.</span>
         </SectionTitle>
@@ -97,7 +97,7 @@ export default async function ComparisonPage({ params }: PageProps<"/comparatif/
               ["Choisis Edith si…", c.edithWins, true],
             ] as const
           ).map(([title, items, ours]) => (
-            <div key={title} className={`flex flex-col gap-4 rounded-[22px] p-7 ${ours ? "bg-ink text-white" : "bg-white"}`}>
+            <div key={title} className={`flex flex-col gap-4 p-7 ${ours ? "bg-ink text-white" : "border border-ink/20"}`}>
               <h3 className="text-[22px] font-extrabold tracking-[-0.02em]">{fr(title)}</h3>
               <ul className="flex flex-col gap-3">
                 {items.map((item) => (
@@ -116,7 +116,7 @@ export default async function ComparisonPage({ params }: PageProps<"/comparatif/
       </section>
 
       {/* Questions */}
-      <section className="mx-auto grid max-w-[1240px] gap-10 px-4 pb-24 sm:px-8 lg:grid-cols-[1fr_1.6fr]">
+      <section className="mx-auto grid max-w-[1360px] gap-10 px-4 pb-24 sm:px-8 lg:grid-cols-[1fr_1.6fr]">
         <SectionTitle n={2} kicker="Questions">
           Ce qu’on nous <span className="accent">demande.</span>
         </SectionTitle>
@@ -133,11 +133,11 @@ export default async function ComparisonPage({ params }: PageProps<"/comparatif/
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-4 pb-24 sm:px-8">
         <span className="mb-4 block text-[12px] font-bold tracking-[0.16em] text-muted uppercase">Autres comparatifs</span>
         <div className="grid gap-4 md:grid-cols-2">
           {others.map((o) => (
-            <Link key={o.slug} href={`/comparatif/${o.slug}`} className="rounded-[22px] border border-ink/10 p-6 text-[18px] font-bold transition-colors hover:border-ink/30">
+            <Link key={o.slug} href={`/comparatif/${o.slug}`} className="border border-ink/10 p-6 text-[18px] font-bold transition-colors hover:border-ink/30">
               {fr(o.h1)}
             </Link>
           ))}

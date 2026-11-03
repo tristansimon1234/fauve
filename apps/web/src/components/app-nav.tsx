@@ -46,8 +46,8 @@ export function NavList({ variant, pathname }: { variant: Variant; pathname: str
           key={href}
           href={href}
           aria-current={active ? "page" : undefined}
-          className={`flex h-11 items-center gap-3 rounded-xl px-3.5 text-[15px] ${gap} ${
-            active ? "bg-violet-soft font-bold text-violet" : "font-medium text-muted hover:text-ink"
+          className={`flex h-11 items-center gap-3 px-3.5 text-[15px] ${gap} ${
+            active ? "bg-ink font-semibold text-white" : "font-medium text-muted hover:text-ink"
           }`}
         >
           <Icon />
@@ -64,8 +64,8 @@ export function NavList({ variant, pathname }: { variant: Variant; pathname: str
         key={href}
         href={href}
         aria-current={active ? "page" : undefined}
-        className={`flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-bold ${
-          active ? "text-violet" : "text-muted"
+        className={`flex h-16 flex-col items-center justify-center gap-1 border-t-2 text-[11px] font-semibold ${
+          active ? "border-ink text-ink" : "border-transparent text-muted"
         }`}
       >
         <Icon size={22} />

@@ -43,7 +43,7 @@ async function Invoices() {
       {subscribed ? <PortalButton /> : null}
       <a
         href={whatsappLink("")}
-        className="mt-auto inline-flex items-center justify-center gap-2 self-center rounded-full bg-white px-5 py-3 text-[15px] font-extrabold text-ink"
+        className="mt-auto inline-flex items-center justify-center gap-2 self-center bg-white px-5 py-3 text-[15px] font-extrabold text-ink"
       >
         <WhatsAppIcon size={18} /> Retourner sur WhatsApp
       </a>

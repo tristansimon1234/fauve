@@ -182,7 +182,7 @@ export function ActionView({
         </span>
         <h1 className="font-serif text-[34px] italic leading-tight">C’est validé</h1>
         <p className="max-w-[320px] text-[16px] leading-relaxed text-white/75">{done}</p>
-        <a href={backHref} className="mt-2 flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-[15px] font-bold text-ink">
+        <a href={backHref} className="mt-2 flex items-center gap-2 bg-white px-6 py-3.5 text-[15px] font-bold text-ink">
           <WhatsAppIcon size={18} /> Retour à WhatsApp
         </a>
         <button type="button" onClick={() => setMode("view")} className="text-[14px] font-semibold text-white/60 underline-offset-4 hover:underline">
@@ -218,7 +218,7 @@ export function ActionView({
             {post.when ? ` · ${post.when}` : ""}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/80">{statusLabels[status].label}</span>
+        <span className="shrink-0 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/80">{statusLabels[status].label}</span>
       </header>
 
       {editing && (
@@ -228,7 +228,7 @@ export function ActionView({
       )}
 
       {grid && !editing && (
-        <div role="tablist" aria-label="Aperçu" className="mt-3 flex self-center rounded-full bg-white/10 p-1">
+        <div role="tablist" aria-label="Aperçu" className="mt-3 flex self-center bg-white/10 p-1">
           {[
             { on: !inGrid, label: "Publication", set: false },
             { on: inGrid, label: "Dans ta grille", set: true },
@@ -242,7 +242,7 @@ export function ActionView({
                 setInGrid(tab.set);
                 playerRef.current?.pause();
               }}
-              className={`rounded-full px-4 py-1.5 text-[13px] font-bold ${tab.on ? "bg-white text-ink" : "text-white/70"}`}
+              className={`px-4 py-1.5 text-[13px] font-bold ${tab.on ? "bg-white text-ink" : "text-white/70"}`}
             >
               {tab.label}
             </button>
@@ -253,7 +253,7 @@ export function ActionView({
       {showGrid && <GridPreview cover={coverPhoto ? { url: coverPhoto.url, video: false } : videoUrl ? { url: videoUrl, video: true, at: cover && "at" in cover ? cover.at : DEFAULT_COVER_SECONDS } : (media[0] ?? null)} kind={post.kind} tiles={grid} />}
 
       <div className={`mt-3 justify-center ${showGrid ? "hidden" : "flex"}`}>
-        <div ref={previewRef} className="relative overflow-hidden rounded-[22px] bg-black" style={{ width: mediaWidth }}>
+        <div ref={previewRef} className="relative overflow-hidden bg-black" style={{ width: mediaWidth }}>
           {props ? (
             <>
               {/* Opens a second in: at frame 0 the texts have not come in yet. */}
@@ -292,7 +292,7 @@ export function ActionView({
                   key={i}
                   type="button"
                   onClick={() => pickScene(i)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${
+                  className={`shrink-0 px-3 py-1.5 text-[13px] font-semibold ${
                     i === sceneIndex ? "bg-white text-ink" : "bg-white/10 text-white/80"
                   }`}
                 >
@@ -321,13 +321,13 @@ export function ActionView({
                     pick(i);
                     seek(t.from + 0.3);
                   }}
-                  className="flex max-w-full items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-[13px]"
+                  className="flex max-w-full items-center gap-1.5 border border-white/20 px-3 py-1.5 text-[13px]"
                 >
                   <PenIcon size={13} className="shrink-0 text-white/60" />
                   <span className="truncate">{t.text}</span>
                 </button>
               ))}
-              <button type="button" onClick={addText} className="flex items-center gap-1.5 rounded-full border border-dashed border-white/30 px-3 py-1.5 text-[13px] text-white/80">
+              <button type="button" onClick={addText} className="flex items-center gap-1.5 border border-dashed border-white/30 px-3 py-1.5 text-[13px] text-white/80">
                 <PlusIcon size={13} /> Ajouter un texte
               </button>
             </div>
@@ -336,7 +336,7 @@ export function ActionView({
       ) : (
         <>
         {post.kind === "reel" && videoUrl && editor && (
-          <div className="mt-4 rounded-[16px] bg-white text-ink">
+          <div className="mt-4 bg-white text-ink">
             <CoverPicker postId={post.id} videoUrl={videoUrl} initial={cover} defaultAt={DEFAULT_COVER_SECONDS} photos={coverPhotos} initialShareToFeed={shareToFeed} />
           </div>
         )}
@@ -348,14 +348,14 @@ export function ActionView({
               onChange={(e) => setCaption(e.target.value)}
               rows={6}
               maxLength={2200}
-              className="w-full rounded-[16px] bg-white p-3.5 text-[15px] leading-relaxed text-ink outline-none focus:ring-2 focus:ring-violet"
+              className="w-full bg-white p-3.5 text-[15px] leading-relaxed text-ink outline-none focus:ring-2 focus:ring-violet"
             />
           ) : (
             <button
               type="button"
               disabled={!editable && !canValidate}
               onClick={() => setEditingCaption(true)}
-              className="w-full rounded-[16px] bg-white/[0.07] p-3.5 text-left text-[14px] leading-relaxed text-white/85"
+              className="w-full bg-white/[0.07] p-3.5 text-left text-[14px] leading-relaxed text-white/85"
             >
               <span className="line-clamp-3 whitespace-pre-line">{caption || "Pas encore de légende."}</span>
               {post.hashtags.length > 0 && <span className="mt-1.5 block truncate text-violet-soft/80">{post.hashtags.map((h) => `#${h}`).join(" ")}</span>}
@@ -371,7 +371,7 @@ export function ActionView({
       )}
 
       {note && !editing && !showGrid && (
-        <div className="mt-3 flex items-start gap-2.5 rounded-[16px] border border-white/10 p-3">
+        <div className="mt-3 flex items-start gap-2.5 border border-white/10 p-3">
           <Orb size={20} className="mt-0.5" />
           <p className="text-[13px] leading-snug text-white/70">{note}</p>
         </div>
@@ -381,7 +381,7 @@ export function ActionView({
         <p
           key={toast.text}
           role="status"
-          className={`fauve-enter mt-3 rounded-[14px] px-3.5 py-2.5 text-[14px] ${toast.ok ? "bg-white/10 text-white" : "bg-peach text-peach-ink"}`}
+          className={`fauve-enter mt-3 px-3.5 py-2.5 text-[14px] ${toast.ok ? "bg-white/10 text-white" : "bg-peach text-peach-ink"}`}
         >
           {toast.text}
         </p>
@@ -391,14 +391,14 @@ export function ActionView({
         <div className="mx-auto flex max-w-[480px] flex-col gap-2 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
           {editing ? (
             <div className="flex gap-2">
-              <button type="button" onClick={cancelEdit} className="flex-1 rounded-full border border-white/25 py-3.5 text-[15px] font-bold">
+              <button type="button" onClick={cancelEdit} className="flex-1 border border-white/25 py-3.5 text-[15px] font-bold">
                 Annuler
               </button>
               <button
                 type="button"
                 disabled={!dirty || !valid || pending}
                 onClick={saveEdit}
-                className="flex-[2] rounded-full bg-violet py-3.5 text-[15px] font-bold disabled:opacity-40"
+                className="flex-[2] bg-violet py-3.5 text-[15px] font-bold disabled:opacity-40"
               >
                 {pending ? "Enregistrement…" : "Enregistrer"}
               </button>
@@ -415,7 +415,7 @@ export function ActionView({
                       setToast(null);
                       setEditingCaption(false);
                     }}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/25 py-3.5 text-[15px] font-bold"
+                    className="flex flex-1 items-center justify-center gap-2 border border-white/25 py-3.5 text-[15px] font-bold"
                   >
                     <PenIcon size={16} /> Modifier
                   </button>
@@ -425,7 +425,7 @@ export function ActionView({
                     type="button"
                     disabled={pending}
                     onClick={() => submit("validate")}
-                    className="flex flex-[2] items-center justify-center gap-2 rounded-full bg-violet py-3.5 text-[15px] font-bold disabled:opacity-50"
+                    className="flex flex-[2] items-center justify-center gap-2 bg-violet py-3.5 text-[15px] font-bold disabled:opacity-50"
                   >
                     <CheckIcon size={18} /> {pending ? "Validation…" : "Valider"}
                   </button>
@@ -434,12 +434,12 @@ export function ActionView({
                     type="button"
                     disabled={pending}
                     onClick={() => submit("save")}
-                    className="flex-[2] rounded-full bg-violet py-3.5 text-[15px] font-bold disabled:opacity-50"
+                    className="flex-[2] bg-violet py-3.5 text-[15px] font-bold disabled:opacity-50"
                   >
                     Enregistrer la légende
                   </button>
                 ) : (
-                  <p className="flex flex-[2] items-center justify-center rounded-full bg-white/10 px-3 py-3.5 text-center text-[14px] font-semibold text-white/80">
+                  <p className="flex flex-[2] items-center justify-center bg-white/10 px-3 py-3.5 text-center text-[14px] font-semibold text-white/80">
                     {status === "validated" || status === "scheduled" ? "Déjà validée" : statusLabels[status].label}
                   </p>
                 )}
@@ -482,7 +482,7 @@ function MediaSlides({ media, ratio }: { media: ActionMedia[]; ratio: string }) 
       </ul>
       {media.length > 1 && (
         <>
-          <span className="absolute top-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-[12px] font-bold">
+          <span className="absolute top-3 right-3 bg-black/60 px-2.5 py-1 text-[12px] font-bold">
             {index + 1}/{media.length}
           </span>
           <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
@@ -514,7 +514,7 @@ function GridPreview({
 }) {
   return (
     <section aria-label="Dans ta grille" className="mt-3 flex flex-col gap-2">
-      <ul className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-[18px] bg-white/5">
+      <ul className="grid grid-cols-3 gap-0.5 overflow-hidden bg-white/5">
         <li className="relative aspect-[3/4] overflow-hidden bg-white/10">
           {cover?.video ? (
             <video src={coverSrc(cover)} muted playsInline preload="metadata" className="size-full object-cover" />
@@ -523,7 +523,7 @@ function GridPreview({
             <img src={cover.url} alt="" className="size-full object-cover" />
           ) : null}
           <span className="pointer-events-none absolute inset-0 border-2 border-violet" />
-          <span className="absolute top-1.5 left-1.5 rounded-full bg-violet px-2 py-0.5 text-[10px] font-bold">Nouveau</span>
+          <span className="absolute top-1.5 left-1.5 bg-violet px-2 py-0.5 text-[10px] font-bold">Nouveau</span>
           <FormatBadge format={kind} small />
         </li>
         {tiles.map((t, i) => (

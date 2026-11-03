@@ -92,7 +92,7 @@ export function FollowersLine({ label, points, timeZone }: { label: string; poin
         </span>
         {shown && hover !== null && (
           <div
-            className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-[10px] bg-ink px-2.5 py-1.5 text-[12px] font-semibold whitespace-nowrap text-white shadow-sm"
+            className="pointer-events-none absolute top-0 -translate-x-1/2 bg-ink px-2.5 py-1.5 text-[12px] font-semibold whitespace-nowrap text-white shadow-sm"
             style={{ left: `${(x(hover) / W) * 100}%` }}
           >
             {at(shown.day)} · {number(shown.followers)} abonnés

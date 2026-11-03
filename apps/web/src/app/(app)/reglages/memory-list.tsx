@@ -40,7 +40,7 @@ export function MemoryList({ initial }: { initial: string[] }) {
       {facts.length ? (
         <ul className="flex flex-col gap-1.5">
           {facts.map((fact) => (
-            <li key={fact} className="flex items-start gap-2 rounded-[12px] bg-soft px-3 py-2">
+            <li key={fact} className="flex items-start gap-2 bg-soft px-3 py-2">
               <span className="min-w-0 flex-1 text-[14px] leading-snug">{fact}</span>
               <button
                 type="button"
@@ -69,7 +69,7 @@ export function MemoryList({ initial }: { initial: string[] }) {
           maxLength={MAX_FACT_CHARS}
           placeholder="Ex. Cours de Pilates Reformer, 12 personnes max"
           aria-label="Ajouter une info"
-          className="h-10 min-w-0 flex-1 rounded-[12px] border border-line bg-white px-3 text-[14px] outline-none focus:border-violet"
+          className="h-10 min-w-0 flex-1 border border-line bg-white px-3 text-[14px] outline-none focus:border-violet"
         />
         <button type="submit" disabled={pending || draft.trim().length < 3} className="btn btn-secondary h-10 px-3.5 text-[14px] disabled:opacity-40">
           <PlusIcon size={16} />

@@ -79,7 +79,7 @@ export function VoiceSection({
             return (
               <div
                 key={voice.id}
-                className={`flex items-center gap-2 rounded-[16px] border p-2.5 transition-colors ${chosen ? "border-violet bg-violet-soft" : "border-line bg-white"} ${value.voice_use === "never" ? "opacity-50" : ""}`}
+                className={`flex items-center gap-2 border p-2.5 transition-colors ${chosen ? "border-violet bg-violet-soft" : "border-line bg-white"} ${value.voice_use === "never" ? "opacity-50" : ""}`}
               >
                 <button
                   type="button"
@@ -154,12 +154,12 @@ function OwnVoiceLine({ onDeleted, onRedo }: { onDeleted: () => void; onRedo: ()
             else setError(res.message ?? "Ce n’est pas supprimé. Réessaie.");
           });
         }}
-        className="inline-flex items-center gap-1 font-semibold text-ink hover:text-[#9A3412] disabled:opacity-50"
+        className="inline-flex items-center gap-1 font-semibold text-ink hover:text-peach-ink disabled:opacity-50"
       >
         <TrashIcon size={13} />
         {busy ? "Suppression…" : "Supprimer ma voix"}
       </button>
-      {error ? <span role="alert" className="text-[#9A3412]">{error}</span> : null}
+      {error ? <span role="alert" className="text-peach-ink">{error}</span> : null}
     </div>
   );
 }
@@ -224,7 +224,7 @@ export function CloneVoice({
       <button
         type="button"
         onClick={onOpen}
-        className="flex items-center gap-3 rounded-[16px] border border-dashed border-line bg-soft p-4 text-left transition-colors hover:border-violet"
+        className="flex items-center gap-3 border border-dashed border-line bg-soft p-4 text-left transition-colors hover:border-violet"
       >
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-violet text-white">
           <MicIcon size={18} />
@@ -295,7 +295,7 @@ export function CloneVoice({
   const tooShort = take !== null && take.seconds < CLONE_MIN_SECONDS;
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   return (
-    <div className="flex flex-col gap-3 rounded-[16px] bg-soft p-4">
+    <div className="flex flex-col gap-3 bg-soft p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <span className="text-[14px] font-bold">Ta voix sur tes Reels</span>
@@ -307,15 +307,15 @@ export function CloneVoice({
           Fermer
         </button>
       </div>
-      <p className="rounded-[12px] bg-white p-4 text-[15px] leading-relaxed">{CLONE_SCRIPT}</p>
+      <p className="bg-white p-4 text-[15px] leading-relaxed">{CLONE_SCRIPT}</p>
       <div className="flex flex-wrap items-center gap-2">
         {recording ? (
-          <button type="button" onClick={() => recorder.current?.stop()} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#9A3412] px-4 text-[14px] font-semibold text-white">
+          <button type="button" onClick={() => recorder.current?.stop()} className="inline-flex h-10 items-center gap-2 bg-peach-ink px-4 text-[14px] font-semibold text-white">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" />
             Arrêter · {mmss(elapsed)}
           </button>
         ) : (
-          <button type="button" onClick={record} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-full bg-violet px-4 text-[14px] font-semibold text-white disabled:opacity-50">
+          <button type="button" onClick={record} disabled={busy} className="inline-flex h-10 items-center gap-2 bg-violet px-4 text-[14px] font-semibold text-white disabled:opacity-50">
             <MicIcon size={15} />
             {take ? "Recommencer" : "M’enregistrer"}
           </button>
@@ -324,7 +324,7 @@ export function CloneVoice({
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={recording || busy}
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[14px] font-semibold text-ink hover:text-violet disabled:opacity-50"
+          className="inline-flex h-10 items-center gap-2 bg-white px-4 text-[14px] font-semibold text-ink hover:text-violet disabled:opacity-50"
         >
           <UploadIcon size={15} />
           Envoyer un fichier audio
@@ -344,23 +344,23 @@ export function CloneVoice({
       {take && !recording ? (
         <div className="flex flex-col gap-3">
           <audio controls src={take.url} className="w-full" />
-          {tooShort ? <p className="text-[13px] text-[#9A3412]">C’est un peu court ({Math.round(take.seconds)} s) : lis tout le texte, sans te presser.</p> : null}
+          {tooShort ? <p className="text-[13px] text-peach-ink">C’est un peu court ({Math.round(take.seconds)} s) : lis tout le texte, sans te presser.</p> : null}
           <label className="flex items-start gap-2 text-[13px] leading-snug">
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#5B3FD9]" />
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 accent-ink" />
             <span>C’est ma voix, et j’accepte qu’Edith la clone pour raconter mes Reels. Je peux la supprimer quand je veux.</span>
           </label>
           <button
             type="button"
             onClick={send}
             disabled={!consent || tooShort || busy}
-            className="inline-flex h-10 w-fit items-center rounded-full bg-violet px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+            className="inline-flex h-10 w-fit items-center bg-violet px-5 text-[14px] font-semibold text-white disabled:opacity-50"
           >
             {busy ? "Edith clone ta voix… (une minute environ)" : "Cloner ma voix"}
           </button>
         </div>
       ) : null}
       {error ? (
-        <p role="alert" className="text-[13px] text-[#9A3412]">
+        <p role="alert" className="text-[13px] text-peach-ink">
           {error}
         </p>
       ) : null}

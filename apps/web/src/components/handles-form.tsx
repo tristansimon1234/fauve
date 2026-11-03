@@ -24,7 +24,7 @@ export function HandlesForm({
     return next;
   }, {});
   const field = (name: "instagram" | "tiktok", value: string | null) => (
-    <label className="flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-2.5">
+    <label className="flex items-center gap-3 border border-line bg-white px-4 py-2.5">
       {name === "instagram" ? <InstagramIcon size={18} className="shrink-0 text-violet" /> : <TikTokIcon size={18} className="shrink-0 text-violet" />}
       <span className="sr-only">{name === "instagram" ? "Ton @ Instagram" : "Ton @ TikTok"}</span>
       <input

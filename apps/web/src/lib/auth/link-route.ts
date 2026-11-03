@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { openSessionForPhone } from "@/lib/auth/server-login";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
+import { FACE_PATH, FRINGE_PATH, GLASSES_PATH, HAIR_PATH } from "@/components/mascot";
 
 // Opaque one-time links sent by Edith on WhatsApp (15 min, a day for a
 // publication; single use): opening one signs the manager in on that device.
@@ -35,19 +36,18 @@ export function linkPage(action: string): NextResponse {
 <meta property="og:title" content="Edith">
 <meta property="og:description" content="Ouvre le lien pour voir ta publication.">
 <style>
-  body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; background: #1c1530; color: #fff;
-    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif; }
+  body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; background: #f5f2ec; color: #121110;
+    font-family: "Inter Tight", "Helvetica Neue", system-ui, -apple-system, sans-serif; }
   main { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px; text-align: center; }
-  .orb { width: 56px; height: 56px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffd2c4, #f2694e 45%, #5b3fd9 100%);
-    animation: breathe 1.6s ease-in-out infinite; }
+  .orb { width: 56px; height: 56px; color: #121110; animation: breathe 1.6s ease-in-out infinite; }
   @keyframes breathe { 50% { transform: scale(1.08); } }
-  p { margin: 0; color: rgba(255,255,255,.75); font-size: 15px; }
-  button { border: 0; border-radius: 999px; background: #5b3fd9; color: #fff; font: inherit; font-weight: 700; font-size: 15px; padding: 14px 26px; }
+  p { margin: 0; color: #6b675f; font-size: 15px; }
+  button { border: 0; border-radius: 0; background: #121110; color: #f5f2ec; font: inherit; font-weight: 600; font-size: 15px; padding: 14px 26px; }
 </style>
 </head>
 <body>
 <main>
-  <div class="orb"></div>
+  <svg class="orb" viewBox="14 18 72 76" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${[HAIR_PATH, FACE_PATH, FRINGE_PATH, GLASSES_PATH, "M39.2 54 Q42.6 52.2 45.6 53.4 M54.4 52 Q57.8 49.9 61 51.6", "M46.4 76 Q50.5 78 54.4 75.4"].map((d) => `<path d="${d}" vector-effect="non-scaling-stroke"/>`).join("")}<ellipse cx="42.6" cy="59" rx="1.7" ry="2.2" fill="currentColor" stroke="none"/><ellipse cx="57.6" cy="58.4" rx="1.7" ry="2.2" fill="currentColor" stroke="none"/></svg>
   <p>J’ouvre ta page…</p>
   <form method="post" action="${escape(action)}"><button type="submit">Ouvrir</button></form>
 </main>

@@ -77,7 +77,7 @@ export function ElementsPanel({
           {placed.map((e, i) => {
             const on = i === selected;
             return (
-              <li key={`${i}-${e.element_id ?? e.name}`} className={`rounded-[14px] border ${on ? "border-violet bg-violet-tint/40" : "border-line"}`}>
+              <li key={`${i}-${e.element_id ?? e.name}`} className={`border ${on ? "border-violet bg-violet-tint/40" : "border-line"}`}>
                 <div className="flex items-center gap-1 pr-1.5">
                   <button type="button" onClick={() => onSelect(on ? null : i)} aria-expanded={on} className="flex min-w-0 flex-1 flex-col px-3 py-2 text-left">
                     <span className="truncate text-[13px] font-bold">{e.name}</span>
@@ -97,12 +97,12 @@ export function ElementsPanel({
                     {current.slots.map((slot) => {
                       const value = current.texts[slot.name] ?? "";
                       const set = (text: string) => patch(i, { texts: { ...current.texts, [slot.name]: text.slice(0, slot.max_chars) } });
-                      const field = "w-full rounded-[10px] border border-line bg-white px-2.5 py-2 text-[14px] outline-none focus:border-violet";
+                      const field = "w-full border border-line bg-white px-2.5 py-2 text-[14px] outline-none focus:border-violet";
                       return (
                         <label key={slot.name} className="flex flex-col gap-1">
                           <span className="text-[11px] font-semibold text-muted first-letter:uppercase">
                             {slot.role}
-                            {slot.multiline ? " · une ligne par élément" : ""}
+                            {slot.multiline ? "· une ligne par élément" : ""}
                           </span>
                           {slot.multiline ? (
                             <textarea value={value} rows={Math.min(7, Math.max(2, value.split("\n").length + 1))} onChange={(ev) => set(ev.target.value)} className={field} />
@@ -122,7 +122,7 @@ export function ElementsPanel({
                           key={label}
                           type="button"
                           onClick={() => patch(i, { box: { ...current.box, w: Math.round(Math.min(1.1, Math.max(0.08, current.box.w + d)) * 1000) / 1000 } })}
-                          className="h-8 rounded-full bg-soft px-3 text-[13px] font-bold hover:bg-violet-soft hover:text-violet"
+                          className="h-8 bg-soft px-3 text-[13px] font-bold hover:bg-violet-soft hover:text-violet"
                         >
                           {label}
                         </button>
@@ -180,7 +180,7 @@ export function ElementsPanel({
                     onClick={() => add([e])}
                     title={e.name}
                     aria-label={`Ajouter ${e.name}`}
-                    className="overflow-hidden rounded-[10px] ring-violet transition-shadow hover:ring-2"
+                    className="overflow-hidden ring-violet transition-shadow hover:ring-2"
                   >
                     <ElementThumb element={{ js: e.js, texts: e.sample, fonts: e.fonts, base: e.base }} brand={brand} />
                   </button>

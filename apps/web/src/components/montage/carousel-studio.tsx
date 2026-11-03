@@ -232,13 +232,13 @@ export function CarouselStudio({
   return (
     <div className={`flex flex-col items-center gap-2.5 ${className}`}>
       <div ref={stageRef} className="group relative w-full">
-        <div ref={canvas} className="overflow-hidden rounded-[18px] shadow-[0_18px_40px_rgba(28,21,48,.18)]">
+        <div ref={canvas} className="overflow-hidden shadow-[0_18px_40px_rgba(18,17,16,.18)]">
           <SlidePreview props={props} />
         </div>
 
         {/* Her texts, to touch; a swipe turns the slide. */}
         <div
-          className="absolute inset-0 isolate touch-pan-y overflow-hidden rounded-[18px]"
+          className="absolute inset-0 isolate touch-pan-y overflow-hidden"
           onPointerDown={(e) => {
             swipe.current = { x: e.clientX, y: e.clientY, moved: false };
           }}
@@ -290,7 +290,7 @@ export function CarouselStudio({
                     if (swipe.current?.moved || editing) return;
                     open(s.name, box);
                   }}
-                  className={`fauve-spot-hint absolute cursor-text rounded-[8px] outline-none hover:shadow-[0_0_0_2px_#fff,0_0_0_4px_#5b3fd9] focus-visible:shadow-[0_0_0_2px_#fff,0_0_0_4px_#5b3fd9] ${editing ? "invisible" : ""}`}
+                  className={`fauve-spot-hint absolute cursor-text outline-none hover:shadow-[0_0_0_2px_#fff,0_0_0_4px_#121110] focus-visible:shadow-[0_0_0_2px_#fff,0_0_0_4px_#121110] ${editing ? "invisible" : ""}`}
                   style={{ ...touchFrame(box), zIndex: layer.get(s.name) }}
                 />
               );
@@ -298,7 +298,7 @@ export function CarouselStudio({
           {editedBox && (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute rounded-[8px] shadow-[0_0_0_2px_#fff,0_0_0_4px_#5b3fd9,0_0_0_200vmax_rgba(15,10,30,.55)] transition-[left,top,width,height] duration-100"
+              className="pointer-events-none absolute shadow-[0_0_0_2px_#fff,0_0_0_4px_#121110,0_0_0_200vmax_rgba(18,17,16,.55)] transition-[left,top,width,height] duration-100"
               style={{ left: editedBox.left - PAD, top: editedBox.top - PAD, width: editedBox.right - editedBox.left + 2 * PAD, height: editedBox.bottom - editedBox.top + 2 * PAD }}
             />
           )}
@@ -309,7 +309,7 @@ export function CarouselStudio({
             key={editing.slot}
             role="dialog"
             aria-label={editedSlot?.role ?? "Changer le texte"}
-            className="absolute z-20 rounded-[14px] bg-white p-2.5 text-ink shadow-[0_14px_36px_rgba(0,0,0,.35)]"
+            className="absolute z-20 bg-white p-2.5 text-ink shadow-[0_14px_36px_rgba(0,0,0,.35)]"
             style={card}
           >
             <span className="mb-1.5 block truncate px-1 text-[12px] font-semibold text-muted">{editedSlot?.role ?? "Texte"}</span>
@@ -330,10 +330,10 @@ export function CarouselStudio({
                   close(true, true);
                 }
               }}
-              className="block w-full resize-none rounded-[10px] bg-soft px-3 py-2 text-[16px] leading-snug outline-none focus:ring-2 focus:ring-violet"
+              className="block w-full resize-none bg-soft px-3 py-2 text-[16px] leading-snug outline-none focus:ring-2 focus:ring-violet"
             />
             <div className="mt-2 flex items-center justify-end gap-1.5">
-              <button type="button" onClick={(e) => close(false, e.detail === 0)} className="h-8 rounded-full px-3 text-[13px] font-semibold text-muted hover:text-ink">
+              <button type="button" onClick={(e) => close(false, e.detail === 0)} className="h-8 px-3 text-[13px] font-semibold text-muted hover:text-ink">
                 Annuler
               </button>
               <button type="button" onClick={(e) => close(true, e.detail === 0)} className="btn btn-primary h-8 px-3.5 text-[13px]">
@@ -368,7 +368,7 @@ export function CarouselStudio({
               </button>
             )}
             {/* Shown when the slide changes, then gone: it would hide the corner of the image. */}
-            <span key={slide} className="fauve-counter pointer-events-none absolute top-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-[12px] font-bold text-white">
+            <span key={slide} className="fauve-counter pointer-events-none absolute top-3 right-3 bg-black/60 px-2.5 py-1 text-[12px] font-bold text-white">
               {slide + 1}/{design.count}
             </span>
           </>

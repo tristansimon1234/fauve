@@ -59,7 +59,7 @@ export function PhotoImprove({ postId, mediaId, url, disabled }: { postId: strin
                 type="button"
                 disabled={disabled}
                 onClick={() => run(k, PHOTO_IMPROVEMENTS[k].label)}
-                className="fauve-press h-8 rounded-full bg-soft px-3 text-[12px] font-semibold text-ink hover:text-violet disabled:opacity-40"
+                className="fauve-press h-8 bg-soft px-3 text-[12px] font-semibold text-ink hover:text-violet disabled:opacity-40"
               >
                 {PHOTO_IMPROVEMENTS[k].label}
               </button>
@@ -78,7 +78,7 @@ export function PhotoImprove({ postId, mediaId, url, disabled }: { postId: strin
               maxLength={400}
               disabled={disabled}
               placeholder="Ou dis-le : « enlève la poubelle à gauche »"
-              className="h-9 min-w-0 flex-1 rounded-full border border-line bg-white px-3.5 text-[13px] outline-none focus:border-violet disabled:opacity-40"
+              className="h-9 min-w-0 flex-1 border border-line bg-white px-3.5 text-[13px] outline-none focus:border-violet disabled:opacity-40"
             />
             <button type="submit" disabled={disabled || wish.trim().length < 3} className="btn btn-primary h-9 shrink-0 px-3.5 text-[13px] disabled:opacity-40">
               OK

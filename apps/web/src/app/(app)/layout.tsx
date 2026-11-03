@@ -10,7 +10,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShell
       account={
-        <Suspense fallback={<div className="h-[140px] rounded-[14px] bg-soft" />}>
+        <Suspense fallback={<div className="h-[140px] bg-soft" />}>
           <SidebarAccount />
         </Suspense>
       }

@@ -11,7 +11,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
         </Link>
       </header>
       <main className="mx-auto max-w-[760px] px-4 pb-20 sm:px-8">
-        <article className="legal flex flex-col gap-4 rounded-[22px] border border-line bg-white p-6 text-[15px] leading-relaxed sm:p-10">
+        <article className="legal flex flex-col gap-4 border border-line bg-white p-6 text-[15px] leading-relaxed sm:p-10">
           {children}
           <p className="mt-6 text-sm text-muted">Dernière mise à jour : {company.updatedAt}</p>
         </article>

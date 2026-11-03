@@ -547,14 +547,14 @@
 @keyframes land-lay-bg {
   0%,
   61% {
-    background-color: #1c1530;
+    background-color: #121110;
   }
   69%,
   94% {
     background-color: #f3ece2;
   }
   100% {
-    background-color: #1c1530;
+    background-color: #121110;
   }
 }
 /* Each name holds while its form shows, leaves upwards, and the next one comes up in its place. */

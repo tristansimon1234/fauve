@@ -24,7 +24,7 @@ export function ColorsSection({ value, onChange }: { value: string[]; onChange: 
       hint="Jusqu’à 6 couleurs. La première est la couleur principale : bandeaux, mots mis en avant, bouton de fin."
     >
       {value.length === 0 ? (
-        <p className="rounded-[14px] bg-soft px-4 py-3 text-sm text-muted">
+        <p className="bg-soft px-4 py-3 text-sm text-muted">
           Aucune couleur : Edith utilise son violet par défaut.
         </p>
       ) : (
@@ -46,7 +46,7 @@ export function ColorsSection({ value, onChange }: { value: string[]; onChange: 
         type="button"
         onClick={add}
         disabled={value.length >= MAX_COLORS}
-        className="flex w-fit items-center gap-1.5 rounded-full px-1 py-1 text-sm font-bold text-violet disabled:opacity-50"
+        className="flex w-fit items-center gap-1.5 px-1 py-1 text-sm font-bold text-violet disabled:opacity-50"
       >
         <PlusIcon size={18} />
         Ajouter une couleur
@@ -80,16 +80,16 @@ function ColorRow({
   const invalid = !HEX_COLOR.test(draft);
   const name = index === 0 ? "Couleur principale" : `Couleur ${index + 1}`;
   const iconButton =
-    "flex size-10 items-center justify-center rounded-xl border-[1.5px] border-line text-muted hover:text-ink disabled:opacity-40 disabled:hover:text-muted";
+    "flex size-10 items-center justify-center border-[1.5px] border-line text-muted hover:text-ink disabled:opacity-40 disabled:hover:text-muted";
 
   return (
-    <li className="flex flex-wrap items-center gap-2.5 rounded-[16px] border border-line p-2.5 sm:flex-nowrap">
+    <li className="flex flex-wrap items-center gap-2.5 border border-line p-2.5 sm:flex-nowrap">
       <input
         type="color"
         value={color}
         onChange={(e) => onChange(e.target.value.toLowerCase())}
         aria-label={`${name} : choisir la couleur`}
-        className="size-11 shrink-0 cursor-pointer rounded-xl border-[1.5px] border-line bg-white p-1"
+        className="size-11 shrink-0 cursor-pointer border-[1.5px] border-line bg-white p-1"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex flex-wrap items-baseline gap-x-2 text-[13px] font-bold">
@@ -113,7 +113,7 @@ function ColorRow({
           spellCheck={false}
           aria-label={`${name} : code hexadécimal`}
           aria-invalid={invalid}
-          className={`h-9 w-full max-w-[140px] rounded-lg border-[1.5px] bg-white px-2.5 font-mono text-sm uppercase focus:outline-none ${
+          className={`h-9 w-full max-w-[140px] border-[1.5px] bg-white px-2.5 font-mono text-sm uppercase focus:outline-none ${
             invalid ? "border-danger" : "border-line focus:border-violet"
           }`}
         />

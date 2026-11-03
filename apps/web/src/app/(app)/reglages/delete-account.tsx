@@ -20,7 +20,7 @@ export function DeleteAccount() {
     );
   }
   return (
-    <div className="flex flex-col gap-3 rounded-[16px] border border-line bg-soft p-4">
+    <div className="flex flex-col gap-3 border border-line bg-soft p-4">
       <p className="text-[14px] leading-snug">
         Ton compte, tes conversations, tes photos et vidéos, tes publications préparées, tes statistiques, tes connexions à Instagram et TikTok et ta voix clonée seront
         supprimés pour de bon, et ton abonnement arrêté. Les publications déjà en ligne restent sur Instagram et TikTok.
@@ -31,7 +31,7 @@ export function DeleteAccount() {
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           autoComplete="off"
-          className="h-10 rounded-[12px] border border-line bg-white px-3 text-[14px] outline-none focus:border-violet"
+          className="h-10 border border-line bg-white px-3 text-[14px] outline-none focus:border-violet"
         />
       </label>
       {error && <p className="text-[13px] text-danger">{error}</p>}

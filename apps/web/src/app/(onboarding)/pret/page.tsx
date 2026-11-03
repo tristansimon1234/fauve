@@ -26,13 +26,13 @@ export default function ReadyPage() {
         {/* On a computer the app goes on (the next step waits on the Fauve page); on a phone, WhatsApp only (no app there, proxy.ts). */}
         <Link
           href="/fauve"
-          className="hidden h-[54px] items-center justify-center rounded-full bg-violet text-base font-bold text-white md:flex"
+          className="hidden h-[54px] items-center justify-center bg-violet text-base font-bold text-white md:flex"
         >
           Continuer dans l’app
         </Link>
         <a
           href={whatsappLink()}
-          className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-violet text-base font-bold text-white md:h-12 md:border-[1.5px] md:border-line md:bg-transparent md:text-[15px] md:font-semibold md:text-ink"
+          className="flex h-[54px] items-center justify-center gap-2.5 bg-violet text-base font-bold text-white md:h-12 md:border-[1.5px] md:border-line md:bg-transparent md:text-[15px] md:font-semibold md:text-ink"
         >
           <WhatsAppIcon />
           <span className="md:hidden">Retourner sur WhatsApp</span>
@@ -115,7 +115,7 @@ function Ready({ firstName, items }: { firstName: string | null; items: Item[] |
               className={`flex items-center gap-3 py-3 ${i < items.length - 1 ? "border-b border-line" : ""}`}
             >
               <span
-                className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${
+                className={`flex size-9 shrink-0 items-center justify-center ${
                   warm ? "bg-peach text-peach-ink" : "bg-violet-soft text-violet"
                 }`}
               >

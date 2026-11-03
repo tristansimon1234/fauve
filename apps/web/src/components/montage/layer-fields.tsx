@@ -16,7 +16,7 @@ export function LayerFields({
   onRemove: () => void;
   dark?: boolean;
 }) {
-  const field = `w-full rounded-[12px] border px-3 py-2.5 text-[15px] outline-none ${dark ? "border-white/15 bg-white/5 text-white focus:border-white/50" : "border-line bg-white focus:border-violet"}`;
+  const field = `w-full border px-3 py-2.5 text-[15px] outline-none ${dark ? "border-white/15 bg-white/5 text-white focus:border-white/50" : "border-line bg-white focus:border-violet"}`;
   const muted = dark ? "text-white/60" : "text-muted";
   return (
     <div className="flex flex-col gap-3">
@@ -33,7 +33,7 @@ export function LayerFields({
           <label key={slot.name} className="flex flex-col gap-1">
             <span className={`text-[12px] font-semibold first-letter:uppercase ${muted}`}>
               {slot.role}
-              {slot.multiline ? " · une ligne par élément" : ""}
+              {slot.multiline ? "· une ligne par élément" : ""}
             </span>
             {slot.multiline ? (
               <textarea value={value} rows={Math.min(8, Math.max(3, value.split("\n").length + 1))} onChange={(e) => set(e.target.value)} className={field} />

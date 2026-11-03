@@ -13,17 +13,17 @@ const v = (vars: Record<string, string | number>) => vars as CSSProperties;
 export function CopyReelVisual() {
   return (
     <span className="mt-5 flex flex-col gap-2">
-      <span className="land-once land-rise self-end rounded-[14px_14px_4px_14px] bg-violet px-3 py-2 text-[12.5px] text-white" style={v({ "--d": "0.1s" })}>
+      <span className="land-once land-rise self-end bg-violet px-3 py-2 text-[12.5px] text-white" style={v({ "--d": "0.1s" })}>
         instagram.com/reel/… fais-moi le même
       </span>
-      <span className="land-once land-rise max-w-[94%] rounded-[14px_14px_14px_4px] border border-line bg-soft px-3 py-2.5 text-[12.5px] leading-snug text-ink" style={v({ "--d": "0.8s" })}>
+      <span className="land-once land-rise max-w-[94%] border border-line bg-soft px-3 py-2.5 text-[12.5px] leading-snug text-ink" style={v({ "--d": "0.8s" })}>
         Je reprends son écran partagé, ses coupes sur le temps et ses petits textes en minuscules. Avec ta vidéo en bas.
       </span>
       <span className="mt-4 flex items-end justify-center gap-3">
         <MiniPhone label="Le Reel que tu aimes" d="1.3s">
           <span className="flex h-1/2 flex-col items-center justify-center gap-1.5 bg-[#e9e7ec] px-2">
-            <span className="h-[7px] w-[70%] rounded-full bg-[#b9b4c2]" />
-            <span className="h-[7px] w-[52%] rounded-full bg-[#b9b4c2]" />
+            <span className="h-[7px] w-[70%] bg-[#b9b4c2]" />
+            <span className="h-[7px] w-[52%] bg-[#b9b4c2]" />
           </span>
           <span className="flex h-1/2 items-center justify-center bg-[#cfcbd6] text-white">
             <PlayIcon size={16} />
@@ -48,7 +48,7 @@ export function CopyReelVisual() {
 function MiniPhone({ label, d, wipe = false, children }: { label: string; d: string; wipe?: boolean; children: ReactNode }) {
   return (
     <span className="flex flex-col items-center gap-1.5">
-      <span className={`land-once ${wipe ? "land-wipe" : "land-rise"} flex h-[164px] w-[92px] flex-col overflow-hidden rounded-[16px] border-[3px] border-ink bg-ink`} style={v({ "--d": d })}>
+      <span className={`land-once ${wipe ? "land-wipe" : "land-rise"} flex h-[164px] w-[92px] flex-col overflow-hidden border-[3px] border-ink bg-ink`} style={v({ "--d": d })}>
         {children}
       </span>
       <span className="text-[11px] font-bold text-muted">{label}</span>
@@ -63,14 +63,14 @@ const SAID = ["Ton", "cours", "de 7 h,", "c’est", "le moment", "préféré", "
 
 export function VoiceVisual() {
   return (
-    <span className="mt-5 block rounded-[18px] bg-soft p-3.5">
+    <span className="mt-5 block bg-soft p-3.5">
       <span className="flex items-center gap-3">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-violet text-white">
           <PlayIcon size={14} />
         </span>
         <span className="flex h-9 min-w-0 flex-1 items-center gap-[3px]" aria-hidden="true">
           {WAVE.map((h, i) => (
-            <span key={i} className="land-loop land-wave w-[3px] shrink-0 rounded-full bg-violet/75" style={v({ height: `${h}%`, "--d": `${-(i % 7) * 0.16}s` })} />
+            <span key={i} className="land-loop land-wave w-[3px] shrink-0 bg-violet/75" style={v({ height: `${h}%`, "--d": `${-(i % 7) * 0.16}s` })} />
           ))}
         </span>
         <span className="shrink-0 text-[11.5px] font-bold text-muted">Eva</span>
@@ -78,7 +78,7 @@ export function VoiceVisual() {
       <span className="mt-3 block text-[13.5px] leading-[1.75] font-semibold text-ink">
         {SAID.map((w, i) => (
           <span key={w}>
-            <span className="land-loop land-said -mx-[2px] rounded-[6px] px-[3px] py-[1px]" style={v({ "--i": i, "--dur": "4.8s", "--step": "0.6s" })}>
+            <span className="land-loop land-said -mx-[2px] px-[3px] py-[1px]" style={v({ "--i": i, "--dur": "4.8s", "--step": "0.6s" })}>
               {w}
             </span>{" "}
           </span>
@@ -104,9 +104,9 @@ const BARS = Array.from({ length: 44 }, (_, i) => {
 
 export function MusicVisual() {
   return (
-    <span className="mt-5 block rounded-[18px] bg-ink p-3.5 text-white">
+    <span className="mt-5 block bg-ink p-3.5 text-white">
       <span className="relative block">
-        <span className="flex h-11 gap-[3px] overflow-hidden rounded-[8px]">
+        <span className="flex h-11 gap-[3px] overflow-hidden">
           {CLIPS.map((c) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img key={c.src} src={c.src} alt="" className="h-full min-w-0 object-cover opacity-90" style={{ width: `${c.w}%` }} />
@@ -114,11 +114,11 @@ export function MusicVisual() {
         </span>
         <span className="mt-2 flex h-8 items-end gap-[2px]" aria-hidden="true">
           {BARS.map((b, i) => (
-            <span key={i} className={`flex-1 rounded-full ${b.beat ? "bg-lilac" : "bg-white/25"}`} style={{ height: `${b.h}%` }} />
+            <span key={i} className={`flex-1 ${b.beat ? "bg-lilac" : "bg-white/25"}`} style={{ height: `${b.h}%` }} />
           ))}
         </span>
         {CUTS.map((x) => (
-          <span key={x} className="land-loop land-cut absolute -top-1 -bottom-1 w-[2px] rounded-full bg-coral/70" style={v({ left: `calc(${x * 100}% - 1px)`, "--x": x })} />
+          <span key={x} className="land-loop land-cut absolute -top-1 -bottom-1 w-[2px] bg-coral/70" style={v({ left: `calc(${x * 100}% - 1px)`, "--x": x })} />
         ))}
         <span className="land-loop land-playhead absolute -top-2 -bottom-2 w-[2px] bg-white shadow-[0_0_10px_rgba(255,255,255,.6)]" style={{ left: "38%" }}>
           <span className="absolute -top-1 left-1/2 size-2.5 -translate-x-1/2 rounded-full bg-white" />
@@ -126,7 +126,7 @@ export function MusicVisual() {
       </span>
       <span className="mt-3 flex items-center justify-between text-[11.5px] font-semibold text-white/70">
         <span>Composée pour ce Reel</span>
-        <span className="rounded-full bg-white/10 px-2 py-0.5 tabular-nums">98 BPM</span>
+        <span className="bg-white/10 px-2 py-0.5 tabular-nums">98 BPM</span>
       </span>
     </span>
   );
@@ -136,19 +136,19 @@ export function MusicVisual() {
 
 export function GestureVisual() {
   return (
-    <span className="relative mt-5 block h-[170px] overflow-hidden rounded-[18px] bg-[radial-gradient(circle_at_25%_15%,#ffe9e1,transparent_55%),linear-gradient(160deg,#efebff,#fbf7f4)]">
+    <span className="relative mt-5 block h-[170px] overflow-hidden bg-soft">
       <span className="absolute inset-0 bg-[linear-gradient(rgba(91,63,217,.06)_1px,transparent_1px),linear-gradient(90deg,rgba(91,63,217,.06)_1px,transparent_1px)] bg-[size:18px_18px]" aria-hidden="true" />
-      <span className="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-white/85 px-2 py-0.5 text-[10.5px] font-bold text-muted">
+      <span className="absolute top-3 left-3 flex items-center gap-1.5 bg-white/85 px-2 py-0.5 text-[10.5px] font-bold text-muted">
         <span className="size-1.5 rounded-full bg-coral" />
         Suivi image par image
       </span>
       <span className="absolute top-[56%] left-1/2" aria-hidden="true">
-        <span className="land-loop land-pinch-line absolute top-0 left-0 h-[2px] w-[100px] rounded-full bg-violet/35" style={{ transform: "translate(-50%, -50%) rotate(-37deg)" }} />
+        <span className="land-loop land-pinch-line absolute top-0 left-0 h-[2px] w-[100px] bg-violet/35" style={{ transform: "translate(-50%, -50%) rotate(-37deg)" }} />
         <span className="land-loop land-pinch-word absolute top-0 left-0 font-[family-name:var(--font-serif)] text-[46px] leading-none whitespace-nowrap text-ink italic" style={{ transform: "translate(-50%, -50%)" }}>
           nouveau
         </span>
-        <span className="land-loop land-thumb absolute -top-[7px] -left-[7px] size-3.5 rounded-full bg-coral shadow-[0_0_0_5px_rgba(242,105,78,.22)]" style={{ transform: "translate(-40px, 30px)" }} />
-        <span className="land-loop land-index absolute -top-[7px] -left-[7px] size-3.5 rounded-full bg-violet shadow-[0_0_0_5px_rgba(91,63,217,.2)]" style={{ transform: "translate(40px, -30px)" }} />
+        <span className="land-loop land-thumb absolute -top-[7px] -left-[7px] size-3.5 rounded-full bg-coral shadow-[0_0_0_5px_rgba(18,17,16,.12)]" style={{ transform: "translate(-40px, 30px)" }} />
+        <span className="land-loop land-index absolute -top-[7px] -left-[7px] size-3.5 rounded-full bg-violet shadow-[0_0_0_5px_rgba(18,17,16,.12)]" style={{ transform: "translate(40px, -30px)" }} />
       </span>
     </span>
   );
@@ -159,7 +159,7 @@ export function GestureVisual() {
 export function LayoutsVisual() {
   return (
     <span className="mt-5 flex items-center gap-5">
-      <span className="land-loop land-lay-bg relative h-[176px] w-[99px] shrink-0 overflow-hidden rounded-[16px] border-[3px] border-ink bg-ink" aria-hidden="true">
+      <span className="land-loop land-lay-bg relative h-[176px] w-[99px] shrink-0 overflow-hidden border-[3px] border-ink bg-ink" aria-hidden="true">
         {(
           [
             ["/landing/tile-4.webp", "land-lay-a", "0", ""],
@@ -198,7 +198,7 @@ const CAPTION = "Le cours de 7 h, c’est notre moment préféré. Lumière douc
 export function CaptionVisual() {
   const words = CAPTION.split(" ");
   return (
-    <span className="mt-4 block rounded-[14px] border border-line bg-soft p-3.5 text-[13.5px] leading-relaxed text-ink">
+    <span className="mt-4 block border border-line bg-soft p-3.5 text-[13.5px] leading-relaxed text-ink">
       {words.map((w, i) => (
         <span key={i} className="land-once land-fade" style={v({ "--d": `${0.15 + i * 0.045}s`, animationDuration: "0.35s" })}>
           {w}{" "}
@@ -219,10 +219,10 @@ export function CaptionVisual() {
 
 export function ReminderVisual() {
   return (
-    <span className="mt-4 block overflow-hidden rounded-[18px] bg-[linear-gradient(165deg,#2c2546,#1c1530_70%)] p-3">
-      <span className="land-once land-drop flex flex-col gap-1 rounded-[14px] bg-white/95 p-2.5 shadow-[0_10px_24px_rgba(0,0,0,.25)]" style={v({ "--d": "0.15s" })}>
+    <span className="mt-4 block overflow-hidden bg-ink p-3">
+      <span className="land-once land-drop flex flex-col gap-1 bg-white/95 p-2.5 shadow-[0_10px_24px_rgba(0,0,0,.25)]" style={v({ "--d": "0.15s" })}>
         <span className="flex items-center gap-2">
-          <span className="flex size-[22px] items-center justify-center overflow-hidden rounded-[6px] bg-violet-soft">
+          <span className="flex size-[22px] items-center justify-center overflow-hidden bg-violet-soft">
             <Mascot size={20} still />
           </span>
           <span className="text-[12px] font-bold text-ink">Edith</span>
@@ -231,12 +231,12 @@ export function ReminderVisual() {
         <span className="text-[12.5px] leading-snug text-ink">C’est le bon moment pour poster ton Reel : vendredi 18 h, tes clientes sont là. Sa légende est copiée.</span>
       </span>
       <span className="mt-2 flex gap-1.5">
-        <span className="land-once land-rise flex-1 overflow-hidden rounded-full" style={v({ "--d": "0.9s" })}>
-          <span className="land-once land-press block rounded-full bg-violet py-1.5 text-center text-[11.5px] font-bold text-white" style={v({ "--d": "1.7s" })}>
+        <span className="land-once land-rise flex-1 overflow-hidden" style={v({ "--d": "0.9s" })}>
+          <span className="land-once land-press block bg-violet py-1.5 text-center text-[11.5px] font-bold text-white" style={v({ "--d": "1.7s" })}>
             Partager
           </span>
         </span>
-        <span className="land-once land-rise flex-1 rounded-full bg-white/12 py-1.5 text-center text-[11.5px] font-bold text-white/80" style={v({ "--d": "1s" })}>
+        <span className="land-once land-rise flex-1 bg-white/12 py-1.5 text-center text-[11.5px] font-bold text-white/80" style={v({ "--d": "1s" })}>
           Plus tard
         </span>
       </span>
@@ -257,16 +257,16 @@ export function ReportVisual() {
     <span className="mt-4 flex flex-col gap-3">
       <span className="relative flex h-[96px] items-end gap-1.5 pt-5">
         {WEEK.map((h, i) => (
-          <span key={i} className={`land-once land-grow relative flex-1 rounded-t-[6px] ${i === 3 ? "bg-violet" : "bg-lilac"}`} style={v({ height: `${h}%`, "--d": `${0.1 + i * 0.07}s` })}>
+          <span key={i} className={`land-once land-grow relative flex-1 ${i === 3 ? "bg-violet" : "bg-lilac"}`} style={v({ height: `${h}%`, "--d": `${0.1 + i * 0.07}s` })}>
             {i === 3 && (
-              <span className="land-once land-pop absolute -top-6 left-1/2 -translate-x-1/2 rounded-full bg-ink px-1.5 py-0.5 text-[10px] font-bold whitespace-nowrap text-white" style={v({ "--d": "1.25s" })}>
+              <span className="land-once land-pop absolute -top-6 left-1/2 -translate-x-1/2 bg-ink px-1.5 py-0.5 text-[10px] font-bold whitespace-nowrap text-white" style={v({ "--d": "1.25s" })}>
                 +38 %
               </span>
             )}
           </span>
         ))}
       </span>
-      <span className="land-once land-rise rounded-[12px] bg-violet-tint px-3 py-2 text-[12.5px] leading-snug text-violet" style={v({ "--d": "1.2s" })}>
+      <span className="land-once land-rise bg-violet-tint px-3 py-2 text-[12.5px] leading-snug text-violet" style={v({ "--d": "1.2s" })}>
         Tes Reels du jeudi matin amènent le plus de visites sur ton profil : on garde ce moment.
       </span>
     </span>
@@ -279,7 +279,7 @@ export function RetouchVisual() {
   // Served from the app (an Unsplash photo, free licence): a visitor's browser never calls a third party.
   const photo = "/landing/retouch-cafe.jpg";
   return (
-    <span className="relative mt-4 block h-[132px] overflow-hidden rounded-[14px]">
+    <span className="relative mt-4 block h-[132px] overflow-hidden">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={photo} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" style={{ filter: "brightness(1.1) saturate(1.22) contrast(1.06)" }} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -291,8 +291,8 @@ export function RetouchVisual() {
           </svg>
         </span>
       </span>
-      <span className="absolute top-2 left-2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-bold text-white">Avant</span>
-      <span className="absolute top-2 right-2 rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-bold text-ink">Après</span>
+      <span className="absolute top-2 left-2 bg-black/45 px-2 py-0.5 text-[10px] font-bold text-white">Avant</span>
+      <span className="absolute top-2 right-2 bg-white/85 px-2 py-0.5 text-[10px] font-bold text-ink">Après</span>
     </span>
   );
 }

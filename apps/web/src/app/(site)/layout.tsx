@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="land-paper min-h-dvh overflow-x-clip bg-soft">
+    <div className="land-paper min-h-dvh overflow-x-clip bg-white">
       <SiteHeader waUrl={whatsappLink()} />
       {children}
       <SiteFooter />

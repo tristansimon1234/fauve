@@ -73,7 +73,7 @@ export function WhereToPost({ postId, initial, tiktok }: { postId: string; initi
   const tiktokUsable = Boolean(tiktok?.connected && tiktok.canTake);
 
   return (
-    <section aria-label="Où publier" className="flex flex-col gap-3 rounded-[18px] border border-line bg-white p-3.5">
+    <section aria-label="Où publier" className="flex flex-col gap-3 border border-line bg-white p-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-[16px] font-extrabold">Où publier</h2>
         <span className="text-[12px] text-muted" aria-live="polite">
@@ -112,7 +112,7 @@ export function WhereToPost({ postId, initial, tiktok }: { postId: string; initi
                 <select
                   value={settings.privacy_level ?? ""}
                   onChange={(e) => change({ privacy_level: e.target.value || null })}
-                  className="h-10 rounded-[12px] border border-line bg-white px-3 text-[14px]"
+                  className="h-10 border border-line bg-white px-3 text-[14px]"
                 >
                   <option value="">Choisir…</option>
                   {tiktok.options.privacy.map((p) => (
@@ -153,7 +153,7 @@ export function WhereToPost({ postId, initial, tiktok }: { postId: string; initi
             </p>
           )}
           {!tiktok.direct && tiktok.caption && (
-            <button type="button" onClick={copy} className="h-9 self-start rounded-full bg-soft px-4 text-[13px] font-bold">
+            <button type="button" onClick={copy} className="h-9 self-start bg-soft px-4 text-[13px] font-bold">
               {copied ? "Légende copiée" : "Copier la légende TikTok"}
             </button>
           )}
@@ -170,7 +170,7 @@ function Chip({ on, disabled, onClick, icon, label }: { on: boolean; disabled?: 
       aria-pressed={on}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-bold transition-colors disabled:opacity-50 ${
+      className={`inline-flex h-9 items-center gap-1.5 border px-3.5 text-[13px] font-bold transition-colors disabled:opacity-50 ${
         on ? "border-violet bg-violet-soft text-violet" : "border-line text-muted hover:text-ink"
       }`}
     >

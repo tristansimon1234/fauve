@@ -104,7 +104,7 @@ export function PostDrawer({
         aria-modal="true"
         aria-label="Publication"
         // Slides in and out (visibility waits for the slide to end); translate-x sets `translate`.
-        className={`absolute inset-y-0 right-0 flex w-full max-w-[420px] flex-col bg-white shadow-[-12px_0_40px_rgba(28,21,48,0.12)] transition-[translate,visibility] duration-240 ease-fauve motion-reduce:transition-none ${
+        className={`absolute inset-y-0 right-0 flex w-full max-w-[420px] flex-col bg-white shadow-[-12px_0_40px_rgba(18,17,16,0.12)] transition-[translate,visibility] duration-240 ease-fauve motion-reduce:transition-none ${
           postId ? "translate-x-0" : "invisible translate-x-full"
         }`}
       >
@@ -126,19 +126,19 @@ export function PostDrawer({
               </div>
 
               {shown.cover && (
-                <div className="flex justify-center rounded-[18px] bg-soft p-2">
+                <div className="flex justify-center bg-soft p-2">
                   {shown.cover.video ? (
-                    <video src={coverSrc(shown.cover)} muted playsInline controls preload="metadata" className="max-h-[260px] rounded-[12px]" />
+                    <video src={coverSrc(shown.cover)} muted playsInline controls preload="metadata" className="max-h-[260px]" />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
-                    <img src={shown.cover.url} alt="" className="max-h-[260px] rounded-[12px] object-contain" />
+                    <img src={shown.cover.url} alt="" className="max-h-[260px] object-contain" />
                   )}
                 </div>
               )}
 
               <section aria-label="Ce qu’il reste à faire" className="flex flex-col gap-3">
-                <p className="rounded-2xl bg-violet-tint px-4 py-3 text-[14px] leading-snug font-semibold">{shown.todo}</p>
-                {shown.publishError && <p className="rounded-xl bg-peach px-3 py-2 text-[13px] text-peach-ink">{shown.publishError}</p>}
+                <p className="bg-violet-tint px-4 py-3 text-[14px] leading-snug font-semibold">{shown.todo}</p>
+                {shown.publishError && <p className="bg-peach px-3 py-2 text-[13px] text-peach-ink">{shown.publishError}</p>}
                 <ol className="flex flex-col gap-2">
                   {shown.steps.map((step) => (
                     <li key={step.label} className={`flex items-center gap-2.5 text-[14px] ${step.done ? "text-ink" : "text-muted"}`}>
@@ -152,7 +152,7 @@ export function PostDrawer({
                   ))}
                 </ol>
                 {shown.shots.length > 0 && (
-                  <div className="flex flex-col gap-1.5 rounded-2xl border border-line p-3.5">
+                  <div className="flex flex-col gap-1.5 border border-line p-3.5">
                     <span className="text-[13px] font-bold">À filmer</span>
                     {shown.shots.map((shot) => (
                       <span key={shot.id} className={`text-[13px] ${shot.done ? "text-muted line-through" : ""}`}>
@@ -173,14 +173,14 @@ export function PostDrawer({
                       defaultValue={shown.date ?? ""}
                       key={`d-${shown.date}`}
                       onChange={(e) => e.target.value && reschedule(e.target.value, shown.time ?? "18:00")}
-                      className="h-11 flex-1 rounded-xl border border-line px-3 text-[16px] outline-none focus:border-violet sm:text-[14px]"
+                      className="h-11 flex-1 border border-line px-3 text-[16px] outline-none focus:border-violet sm:text-[14px]"
                     />
                     <input
                       type="time"
                       defaultValue={shown.time ?? "18:00"}
                       key={`t-${shown.time}`}
                       onBlur={(e) => shown.date && e.target.value && e.target.value !== shown.time && reschedule(shown.date, e.target.value)}
-                      className="h-11 w-[110px] rounded-xl border border-line px-3 text-[16px] outline-none focus:border-violet sm:text-[14px]"
+                      className="h-11 w-[110px] border border-line px-3 text-[16px] outline-none focus:border-violet sm:text-[14px]"
                     />
                   </div>
                 </section>

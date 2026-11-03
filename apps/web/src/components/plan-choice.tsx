@@ -28,7 +28,7 @@ export function PlanChoice({ next, upgradeFrom }: { next: string; upgradeFrom?: 
               role="radio"
               aria-checked={on}
               onClick={() => setPlan(id)}
-              className={`flex items-center gap-3 rounded-[16px] border-[1.5px] px-4 py-3 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
+              className={`flex items-center gap-3 border-[1.5px] px-4 py-3 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
             >
               <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border-[1.5px] ${on ? "border-violet bg-violet text-white" : "border-line"}`}>
                 {on ? <CheckIcon size={12} /> : null}
@@ -36,7 +36,7 @@ export function PlanChoice({ next, upgradeFrom }: { next: string; upgradeFrom?: 
               <span className="flex flex-1 flex-col">
                 <span className="text-[15px] font-bold">
                   {PLANS[id].label}
-                  {id === RECOMMENDED_PLAN && !upgradeFrom ? <span className="ml-2 rounded-full bg-violet px-2 py-0.5 text-[10px] font-extrabold text-white">recommandé</span> : null}
+                  {id === RECOMMENDED_PLAN && !upgradeFrom ? <span className="ml-2 bg-violet px-2 py-0.5 text-[10px] font-extrabold text-white">recommandé</span> : null}
                 </span>
                 <span className="text-[13px] text-muted">
                   {id === "decouverte" ? weeklyPosts(id) : `${weeklyPosts(id)}, environ ${reelsPerMonth(id)} Reels par mois`}

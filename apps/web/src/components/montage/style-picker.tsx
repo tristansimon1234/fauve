@@ -75,7 +75,7 @@ export function StylePicker({
               role="radio"
               aria-checked={on}
               onClick={() => onChange(c.look)}
-              className={`group flex min-w-0 flex-col items-center gap-1 rounded-[14px] p-1 transition-shadow ${on ? "ring-2 ring-violet" : "hover:ring-1 hover:ring-lilac"}`}
+              className={`group flex min-w-0 flex-col items-center gap-1 p-1 transition-shadow ${on ? "ring-2 ring-violet" : "hover:ring-1 hover:ring-lilac"}`}
             >
               <StyleTile look={resolveBrandLook(c.preview, brand)} brand={brand} words={words} on={on} />
               <span className={`w-full truncate text-center text-[11px] font-semibold ${on ? "text-violet" : "text-muted"}`}>{c.name}</span>
@@ -100,7 +100,7 @@ export function StyleTile({ look, brand, words, on }: { look: TextLook; brand: S
   const fill = look.fill;
   const shadow = { none: "none", soft: "0 1px 6px rgba(0,0,0,.45)", strong: "0 2px 4px rgba(0,0,0,.8)", hard: "2px 2px 0 rgba(0,0,0,.85)" }[look.shadow];
   return (
-    <span className="flex h-[58px] w-full items-center justify-center overflow-hidden rounded-[10px] bg-[linear-gradient(160deg,#6b5a7a_0%,#3a2f45_55%,#1d1726_100%)] px-1.5">
+    <span className="flex h-[58px] w-full items-center justify-center overflow-hidden bg-[linear-gradient(160deg,#6b5a7a_0%,#3a2f45_55%,#1d1726_100%)] px-1.5">
       <span className="inline-block max-w-full" style={{ transform: look.rotate ? `rotate(${look.rotate}deg)` : undefined }}>
         <span
           className={`fauve-tile-anim line-clamp-2 max-w-full text-center break-words ${on ? "is-on" : ""}`}

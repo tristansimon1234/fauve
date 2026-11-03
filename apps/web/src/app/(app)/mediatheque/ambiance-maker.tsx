@@ -44,7 +44,7 @@ export function AmbianceMaker() {
   }
   const price = count * CREDIT_PRICES.image;
   return (
-    <div className="flex w-full max-w-[860px] flex-col gap-3 rounded-[20px] border border-line bg-white p-5">
+    <div className="flex w-full max-w-[860px] flex-col gap-3 border border-line bg-white p-5">
       <div className="flex flex-col gap-1">
         <h2 className="text-[16px] font-bold">Une image d’ambiance</h2>
         <p className="text-[13px] leading-snug text-muted">
@@ -59,12 +59,12 @@ export function AmbianceMaker() {
         maxLength={400}
         disabled={busy}
         placeholder="Ce qu’on y voit, ex. « des serviettes roulées sur du bois clair, lumière douce »"
-        className="resize-none rounded-[12px] border border-line px-3 py-2 text-[14px] leading-snug outline-none focus:border-violet"
+        className="resize-none border border-line px-3 py-2 text-[14px] leading-snug outline-none focus:border-violet"
       />
       {!text && (
         <div className="flex flex-wrap gap-1.5">
           {IDEAS.map((idea) => (
-            <button key={idea} type="button" onClick={() => setText(idea)} className="h-7 rounded-full bg-soft px-2.5 text-[12px] font-semibold text-ink hover:text-violet">
+            <button key={idea} type="button" onClick={() => setText(idea)} className="h-7 bg-soft px-2.5 text-[12px] font-semibold text-ink hover:text-violet">
               {idea}
             </button>
           ))}
@@ -77,7 +77,7 @@ export function AmbianceMaker() {
             type="button"
             aria-pressed={format === f.value}
             onClick={() => setFormat(f.value)}
-            className={`h-8 rounded-full px-3 text-[12px] font-semibold ${format === f.value ? "bg-violet text-white" : "bg-soft text-ink"}`}
+            className={`h-8 px-3 text-[12px] font-semibold ${format === f.value ? "bg-violet text-white" : "bg-soft text-ink"}`}
           >
             {f.label}
           </button>

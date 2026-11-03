@@ -76,7 +76,7 @@ export function TestChat({ initial }: { initial: TestState }) {
         <header className="flex items-center justify-between gap-3 border-b border-line bg-white px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             <Logo size={30} />
-            <span className="rounded-full bg-peach px-2.5 py-1 text-xs font-bold text-peach-ink">Mode test</span>
+            <span className="bg-peach px-2.5 py-1 text-xs font-bold text-peach-ink">Mode test</span>
           </div>
           <button type="button" onClick={reset} disabled={pending} className="text-sm font-bold text-violet disabled:opacity-50">
             Recommencer à zéro
@@ -100,7 +100,7 @@ export function TestChat({ initial }: { initial: TestState }) {
             {pending && (
               <div
                 role="status"
-                className="fauve-enter flex items-center gap-2 self-start rounded-[16px_16px_16px_4px] border border-line bg-white px-4 py-3 text-sm text-muted [--fauve-delay:120ms]"
+                className="fauve-enter flex items-center gap-2 self-start border border-line bg-white px-4 py-3 text-sm text-muted [--fauve-delay:120ms]"
               >
                 <span className="fauve-dots" aria-hidden="true">
                   <span />
@@ -111,7 +111,7 @@ export function TestChat({ initial }: { initial: TestState }) {
               </div>
             )}
             {error && (
-              <p role="alert" className="self-center rounded-xl bg-peach px-3 py-2 text-sm font-semibold text-danger">
+              <p role="alert" className="self-center bg-peach px-3 py-2 text-sm font-semibold text-danger">
                 {error}
               </p>
             )}
@@ -142,7 +142,7 @@ export function TestChat({ initial }: { initial: TestState }) {
                 }
               }}
               placeholder="Écris à Edith…"
-              className="max-h-40 min-h-11 flex-1 resize-none rounded-[22px] border border-line bg-soft px-4 py-2.5 text-[15px] outline-none focus:border-violet"
+              className="max-h-40 min-h-11 flex-1 resize-none border border-line bg-soft px-4 py-2.5 text-[15px] outline-none focus:border-violet"
             />
             <button
               type="submit"
@@ -167,8 +167,8 @@ function Bubble({ message }: { message: ChatMessage }) {
     <div
       className={`max-w-[85%] px-3.5 py-2.5 text-[15px] leading-[1.45] whitespace-pre-wrap ${
         mine
-          ? "self-end rounded-[16px_16px_4px_16px] bg-violet text-white"
-          : "self-start rounded-[16px_16px_16px_4px] border border-line bg-white"
+          ? "self-end bg-violet text-white"
+          : "self-start border border-line bg-white"
       }`}
     >
       {message.body}
@@ -252,7 +252,7 @@ function Panel({ snapshot }: { snapshot: TestSnapshot }) {
 
 function Card({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-2.5 rounded-2xl border border-line p-4">
+    <section className="flex flex-col gap-2.5 border border-line p-4">
       <h3 className="flex items-center gap-2 text-sm font-bold">
         {icon && <span className="text-violet">{icon}</span>}
         {title}

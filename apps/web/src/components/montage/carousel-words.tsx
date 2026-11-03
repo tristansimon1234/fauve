@@ -21,7 +21,7 @@ export function CarouselWords({
 }) {
   const own = design.slots.filter((s) => s.slide === slide + 1);
   const everywhere = design.slots.filter((s) => s.slide === 0);
-  const field = `w-full rounded-[12px] px-3 py-2.5 text-[15px] leading-snug outline-none focus:ring-2 focus:ring-violet ${
+  const field = `w-full px-3 py-2.5 text-[15px] leading-snug outline-none focus:ring-2 focus:ring-violet ${
     dark ? "bg-white text-ink" : "border border-line bg-white"
   }`;
   const row = (s: CarouselDesign["slots"][number]) => {

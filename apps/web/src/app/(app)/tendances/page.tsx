@@ -58,7 +58,7 @@ async function Trends() {
 function Header() {
   return (
     <div className="flex flex-col gap-1.5">
-      <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Tendances</h1>
+      <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[60px]">Tendances</h1>
       <p className="text-[15px] text-muted">Les vidéos les plus vues de ton métier ce mois-ci, dans ta langue et près de chez toi, sur TikTok et Instagram, avec leurs accroches. Mis à jour chaque semaine.</p>
     </div>
   );

@@ -96,7 +96,7 @@ function Tile({ icon, label, onClick, tone, disabled }: { icon: React.ReactNode;
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex min-h-[56px] items-center gap-2.5 rounded-[16px] border border-line bg-white py-2 pr-3 pl-2 text-left transition-colors hover:border-lilac disabled:opacity-50"
+      className="flex min-h-[56px] items-center gap-2.5 border border-line bg-white py-2 pr-3 pl-2 text-left transition-colors hover:border-lilac disabled:opacity-50"
     >
       <span
         className={`flex size-9 shrink-0 items-center justify-center rounded-full ${tone === "violet" ? "bg-violet-tint text-violet" : "bg-peach text-peach-ink"}`}
@@ -155,7 +155,7 @@ function Menu({ data, onView, onEdit, ask }: Props) {
           value={wish}
           onChange={(e) => setWish(e.target.value)}
           placeholder="Autre chose ? Dis-le avec tes mots"
-          className="h-12 min-w-0 flex-1 rounded-full border-[1.5px] border-line bg-white px-4 text-[15px] outline-none focus:border-violet"
+          className="h-12 min-w-0 flex-1 border-[1.5px] border-line bg-white px-4 text-[15px] outline-none focus:border-violet"
         />
         <button
           type="submit"
@@ -206,7 +206,7 @@ function NoteField({
         maxLength={300}
         rows={2}
         placeholder={placeholder}
-        className="resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-2.5 text-[15px] leading-snug outline-none focus:border-violet"
+        className="resize-none border-[1.5px] border-line bg-white px-3.5 py-2.5 text-[15px] leading-snug outline-none focus:border-violet"
       />
     </label>
   );
@@ -293,7 +293,7 @@ function WordsView({ data, onDone }: Props) {
           "aria-invalid": over,
           onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setTexts((t) => ({ ...t, [w.id]: e.target.value })),
           className:
-            "w-full rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-2.5 text-[15px] leading-snug outline-none focus:border-violet",
+            "w-full border-[1.5px] border-line bg-white px-3.5 py-2.5 text-[15px] leading-snug outline-none focus:border-violet",
         };
         return (
           <div key={w.id} className="flex flex-col gap-1.5">
@@ -348,7 +348,7 @@ function CaptionView({ data, onDone }: Props) {
         onChange={(e) => setCaption(e.target.value)}
         maxLength={2200}
         rows={8}
-        className="w-full resize-y rounded-[16px] border-[1.5px] border-line bg-white px-3.5 py-3 text-[15px] leading-relaxed outline-none focus:border-violet"
+        className="w-full resize-y border-[1.5px] border-line bg-white px-3.5 py-3 text-[15px] leading-relaxed outline-none focus:border-violet"
       />
       <button
         type="button"
@@ -441,7 +441,7 @@ export function DateView({ data, onDone }: { data: DateData; onDone: Props["onDo
                 setChosen(o.iso);
                 setOther(localValue(o.iso, data.timezone));
               }}
-              className={`flex items-center gap-3 rounded-[16px] border-[1.5px] px-3.5 py-2.5 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
+              className={`flex items-center gap-3 border-[1.5px] px-3.5 py-2.5 text-left ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
             >
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-[15px] font-extrabold">{o.label}</span>
@@ -463,7 +463,7 @@ export function DateView({ data, onDone }: { data: DateData; onDone: Props["onDo
             setOther(e.target.value);
             setChosen(fromLocalValue(e.target.value, data.timezone));
           }}
-          className="h-11 rounded-[14px] border-[1.5px] border-line bg-white px-3 text-[15px] font-semibold text-ink outline-none focus:border-violet"
+          className="h-11 border-[1.5px] border-line bg-white px-3 text-[15px] font-semibold text-ink outline-none focus:border-violet"
         />
       </label>
       {/* Instagram, and TikTok once the app offers it (her choices for a direct post too). */}
@@ -577,12 +577,12 @@ function MusicView({ data, onDone }: Props) {
               aria-checked={on}
               disabled={pending}
               onClick={() => setChoice(o.id)}
-              className={`flex items-center gap-3 rounded-[16px] border-[1.5px] px-3.5 py-3 text-left disabled:opacity-60 ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
+              className={`flex items-center gap-3 border-[1.5px] px-3.5 py-3 text-left disabled:opacity-60 ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
             >
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex items-center gap-2 text-[15px] font-extrabold">
                   {o.title}
-                  {o.id === current && <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-bold text-muted">Actuelle</span>}
+                  {o.id === current && <span className="bg-chip px-2 py-0.5 text-[11px] font-bold text-muted">Actuelle</span>}
                 </span>
                 <span className="text-[13px] leading-snug text-muted">{o.hint}</span>
               </span>
@@ -612,7 +612,7 @@ function MusicView({ data, onDone }: Props) {
                 aria-checked={sfx === id}
                 disabled={pending}
                 onClick={() => setSfx(id)}
-                className={`h-9 rounded-full border-[1.5px] px-3.5 text-[13.5px] font-bold disabled:opacity-60 ${sfx === id ? "border-violet bg-violet-tint text-violet" : "border-line bg-white text-ink hover:border-lilac"}`}
+                className={`h-9 border-[1.5px] px-3.5 text-[13.5px] font-bold disabled:opacity-60 ${sfx === id ? "border-violet bg-violet-tint text-violet" : "border-line bg-white text-ink hover:border-lilac"}`}
               >
                 {label}
               </button>
@@ -676,12 +676,12 @@ function LookView({ data, onDone }: Props) {
               aria-checked={on}
               disabled={pending}
               onClick={() => setChoice(o.id)}
-              className={`flex items-center gap-3 rounded-[16px] border-[1.5px] px-3.5 py-3 text-left disabled:opacity-60 ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
+              className={`flex items-center gap-3 border-[1.5px] px-3.5 py-3 text-left disabled:opacity-60 ${on ? "border-violet bg-violet-tint" : "border-line bg-white hover:border-lilac"}`}
             >
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex items-center gap-2 text-[15px] font-extrabold">
                   {o.title}
-                  {o.id === current && <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-bold text-muted">Actuel</span>}
+                  {o.id === current && <span className="bg-chip px-2 py-0.5 text-[11px] font-bold text-muted">Actuel</span>}
                 </span>
                 <span className="text-[13px] leading-snug text-muted">{o.hint}</span>
               </span>
@@ -694,7 +694,7 @@ function LookView({ data, onDone }: Props) {
       </div>
       {choice === "own" && (
         <NoteField
-          label={current === "own" ? "Un autre look ?" : "Ton look"}
+          label={current === "own" ? "Un autre look ?": "Ton look"}
           placeholder="Ex. pellicule Kodak des années 70, Polaroid délavé, comme un film de Wes Anderson"
           value={words}
           onChange={setWords}
@@ -781,7 +781,7 @@ function VoiceView({ data, onDone }: Props) {
         ].map((v) => {
           const on = picked === v.id;
           return (
-            <div key={v.id ?? "none"} className={`flex items-center gap-1.5 rounded-[14px] border-[1.5px] py-1 pr-1 pl-3 ${on ? "border-violet bg-violet-tint" : "border-line bg-white"}`}>
+            <div key={v.id ?? "none"} className={`flex items-center gap-1.5 border-[1.5px] py-1 pr-1 pl-3 ${on ? "border-violet bg-violet-tint" : "border-line bg-white"}`}>
               <button type="button" role="radio" aria-checked={on} onClick={() => setPicked(v.id)} className="flex min-w-0 flex-1 flex-col py-1.5 text-left">
                 <span className="text-[14.5px] font-extrabold">{v.name}</span>
                 <span className="truncate text-[12.5px] text-muted">{v.hint}</span>
@@ -801,7 +801,7 @@ function VoiceView({ data, onDone }: Props) {
         })}
       </div>
       {picked !== null && (
-        <NoteField label="Ce que la voix doit dire ?" placeholder="Ex. parle du cours offert pour une première venue" value={note} onChange={setNote} />
+        <NoteField label="Ce que la voix doit dire ?"placeholder="Ex. parle du cours offert pour une première venue" value={note} onChange={setNote} />
       )}
       <p className="text-[13px] leading-snug text-muted">Ou ta propre voix : envoie un vocal à Edith sur WhatsApp, il le pose dessus.</p>
       {error && (

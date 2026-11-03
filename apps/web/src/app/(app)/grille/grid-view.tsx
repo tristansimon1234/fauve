@@ -105,7 +105,7 @@ function InstagramView({ handle, info, identity, tiles, tz }: { handle: string |
   const reelTiles = tiles.filter((t) => (t.kind === "upcoming" ? t.format === "reel" : t.kind === "instagram" && t.media.media_product_type === "REELS"));
   return (
     <>
-      <section aria-label="Aperçu du profil Instagram" className={`mx-auto w-full max-w-[430px] overflow-hidden rounded-[28px] border border-line bg-white text-[#000] ${APP_FONT}`}>
+      <section aria-label="Aperçu du profil Instagram" className={`mx-auto w-full max-w-[430px] overflow-hidden rounded-[28px] border border-line bg-[#fff] text-[#000] ${APP_FONT}`}>
         {/* The top bar: her username, then « create » and the menu. */}
         <div className="flex h-12 items-center justify-between px-4">
           <span className="flex min-w-0 items-center gap-1 text-[18px] font-bold">
@@ -161,7 +161,7 @@ function TikTokView({ grid, identity, tz }: { grid: TikTokGrid; identity: Profil
   const username = grid.handle ?? usernameOf(identity.name);
   return (
     <>
-      <section aria-label="Aperçu du profil TikTok" className={`mx-auto w-full max-w-[430px] overflow-hidden rounded-[28px] border border-line bg-white text-[#161823] ${APP_FONT}`}>
+      <section aria-label="Aperçu du profil TikTok" className={`mx-auto w-full max-w-[430px] overflow-hidden rounded-[28px] border border-line bg-[#fff] text-[#161823] ${APP_FONT}`}>
         <div className="relative flex h-12 items-center justify-center px-4">
           <span className="flex min-w-0 items-center gap-1 text-[17px] font-bold">
             <span className="truncate">{name}</span>
@@ -207,11 +207,11 @@ function TikTokView({ grid, identity, tz }: { grid: TikTokGrid; identity: Profil
 function Avatar({ src, name, size }: { src: string | null | undefined; name: string; size: number }) {
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element -- her picture or logo, any host
-    <img src={src} alt="" style={{ width: size, height: size }} className="shrink-0 rounded-full border border-[#dbdbdb] bg-white object-cover" />
+    <img src={src} alt="" style={{ width: size, height: size }} className="shrink-0 rounded-full border border-[#dbdbdb] bg-[#fff] object-cover" />
   ) : (
     <span
       style={{ width: size, height: size, fontSize: size * 0.4 }}
-      className="flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet to-coral font-bold text-white"
+      className="flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#5b3fd9] to-[#f2694e] font-bold text-white"
     >
       {name.trim().charAt(0).toUpperCase() || "?"}
     </span>
@@ -253,7 +253,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 /** The tiles, 3:4 as in the profile grid, or 9:16 in the Reels tab; views where the app shows them. */
 function TileGrid({ tiles, tz, tall = false, views = tall }: { tiles: Tile[]; tz: string; tall?: boolean; views?: boolean }) {
   return (
-    <ul className="grid grid-cols-3 gap-px bg-white">
+    <ul className="grid grid-cols-3 gap-px bg-[#fff]">
       {tiles.map((tile) => (
         <li key={tile.kind === "upcoming" ? `p-${tile.id}` : tile.kind === "instagram" ? `ig-${tile.media.id}` : `tt-${tile.video.id}`} className={`relative bg-[#efefef] ${tall ? "aspect-[9/16]" : "aspect-[3/4]"}`}>
           {tile.kind === "upcoming" ? (

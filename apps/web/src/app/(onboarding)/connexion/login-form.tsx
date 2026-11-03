@@ -7,7 +7,7 @@ import { WhatsAppIcon } from "@/components/icons";
 import { sendCode, verifyCode, type LoginState } from "./actions";
 
 const inputClass =
-  "h-14 w-full rounded-2xl border-[1.5px] border-line bg-white px-4 text-lg font-semibold outline-none focus:border-violet";
+  "h-14 w-full border-[1.5px] border-line bg-white px-4 text-lg font-semibold outline-none focus:border-violet";
 
 export function LoginForm() {
   const params = useSearchParams();
@@ -84,7 +84,7 @@ function Steps({ next, expiredLink, onRestart }: { next: string; expiredLink: bo
 }
 
 function Notice({ children }: { children: React.ReactNode }) {
-  return <p className="rounded-2xl bg-soft px-4 py-3 text-sm leading-normal">{children}</p>;
+  return <p className="bg-soft px-4 py-3 text-sm leading-normal">{children}</p>;
 }
 
 function ErrorText({ children }: { children: React.ReactNode }) {

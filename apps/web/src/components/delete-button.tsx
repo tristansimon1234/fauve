@@ -56,7 +56,7 @@ export function DeleteButton({
         className={
           compact
             ? "flex size-9 items-center justify-center rounded-full bg-white/90 text-danger shadow-sm hover:bg-white"
-            : "inline-flex h-11 items-center gap-2 rounded-full border border-line bg-white px-4 text-[14px] font-semibold text-danger hover:border-danger/40"
+            : "inline-flex h-11 items-center gap-2 border border-line bg-white px-4 text-[14px] font-semibold text-danger hover:border-danger/40"
         }
       >
         <TrashIcon size={compact ? 16 : 18} />
@@ -66,7 +66,7 @@ export function DeleteButton({
   }
 
   return (
-    <div role="alertdialog" aria-label={confirmText} className="flex flex-col gap-2 rounded-[16px] border border-line bg-white p-3 text-[13px] shadow-[0_8px_24px_rgba(28,21,48,0.12)]">
+    <div role="alertdialog" aria-label={confirmText} className="flex flex-col gap-2 border border-line bg-white p-3 text-[13px] shadow-[0_8px_24px_rgba(18,17,16,0.12)]">
       <p className="leading-snug">{confirmText}</p>
       {error && <p className="font-semibold text-danger">{error}</p>}
       <div className="flex gap-2">
@@ -74,11 +74,11 @@ export function DeleteButton({
           type="button"
           onClick={run}
           disabled={pending}
-          className="h-9 rounded-full bg-danger px-4 font-bold text-white disabled:opacity-60"
+          className="h-9 bg-danger px-4 font-bold text-white disabled:opacity-60"
         >
           {pending ? "Suppression…" : "Oui, supprimer"}
         </button>
-        <button type="button" onClick={() => setConfirming(false)} disabled={pending} className="h-9 rounded-full px-3 font-semibold text-muted hover:bg-soft">
+        <button type="button" onClick={() => setConfirming(false)} disabled={pending} className="h-9 px-3 font-semibold text-muted hover:bg-soft">
           Annuler
         </button>
       </div>

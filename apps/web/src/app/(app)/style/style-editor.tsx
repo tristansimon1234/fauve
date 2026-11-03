@@ -124,7 +124,7 @@ export function StyleEditor({
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col gap-5">
       <header className="flex flex-col gap-1.5">
-        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Ton style</h1>
+        <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[60px]">Ton style</h1>
         <p className="text-[15px] leading-normal text-muted">
           Ce qu’Edith suit pour tes Reels et tes carrousels : tes inspirations, ton logo, tes couleurs, tes polices, ta voix et tes mots. Et ce qu’elle a déjà créé pour toi.
         </p>
@@ -193,12 +193,12 @@ export function StyleEditor({
       <div role="tabpanel" className={panel("creations")}>
         {/* Nothing made yet: on a computer, a line says so (on a phone, the section is just absent). */}
         <div className="peer flex flex-col gap-5">{created}</div>
-        <p className="hidden rounded-[18px] border border-dashed border-line px-5 py-8 text-center text-[14.5px] text-muted lg:peer-empty:block">
+        <p className="hidden border border-dashed border-line px-5 py-8 text-center text-[14.5px] text-muted lg:peer-empty:block">
           Edith n’a encore rien créé pour toi : ses animations et tes styles de texte apparaîtront ici après tes premiers Reels.
         </p>
       </div>
 
-      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[18px] border border-line bg-white/95 px-4 py-3 shadow-[0_8px_30px_rgba(28,21,48,0.08)] backdrop-blur lg:bottom-4">
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border border-line bg-white/95 px-4 py-3 shadow-[0_8px_30px_rgba(18,17,16,0.08)] backdrop-blur lg:bottom-4">
         <p
           role={saveState.status === "error" ? "alert" : "status"}
           className={`min-w-0 flex-1 text-sm font-semibold ${

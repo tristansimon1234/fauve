@@ -14,11 +14,11 @@ export function LiveTyping({ live }: { live: LiveState | null }) {
   return (
     <div role="status" aria-live="polite" className="flex max-w-[85%] flex-col items-start gap-1 self-start">
       {done.map((part, i) => (
-        <div key={i} className="fauve-enter max-w-full rounded-[18px] border border-line bg-white px-4 py-2.5 text-[15px] leading-[1.5] whitespace-pre-wrap wrap-break-word">
+        <div key={i} className="fauve-enter max-w-full border border-line bg-white px-4 py-2.5 text-[15px] leading-[1.5] whitespace-pre-wrap wrap-break-word">
           <MessageText text={part} light={false} />
         </div>
       ))}
-      <div className="fauve-enter flex items-center gap-2 rounded-[18px_18px_18px_6px] border border-line bg-white py-2 pr-4 pl-2.5 text-sm text-muted [--fauve-delay:120ms]">
+      <div className="fauve-enter flex items-center gap-2 border border-line bg-white py-2 pr-4 pl-2.5 text-sm text-muted [--fauve-delay:120ms]">
         {/* Edith thinks in the header; here, what she is doing. */}
         <span className="fauve-dots" aria-hidden="true">
           <span />

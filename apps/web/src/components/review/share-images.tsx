@@ -112,7 +112,7 @@ export function ShareImages({ postId, tone = "light" }: { postId: string; tone?:
 
   const button =
     tone === "dark"
-      ? "flex w-full items-center justify-center gap-2 rounded-full border border-white/25 py-3.5 text-[15px] font-bold disabled:opacity-50"
+      ? "flex w-full items-center justify-center gap-2 border border-white/25 py-3.5 text-[15px] font-bold disabled:opacity-50"
       : "btn btn-secondary h-[50px] w-full text-[16px] font-extrabold disabled:opacity-50";
   const note = tone === "dark" ? "text-center text-[12.5px] leading-snug text-white/65" : "text-center text-[12.5px] leading-snug text-muted";
 

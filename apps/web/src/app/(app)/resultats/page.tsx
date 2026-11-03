@@ -208,7 +208,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   const header = (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-[34px] font-extrabold tracking-[-0.02em]">Résultats</h1>
+        <h1 className="text-[44px] leading-[0.95] font-semibold tracking-[-0.05em] sm:text-[60px]">Résultats</h1>
         <p className="text-[15px] text-muted">
           {connected
             ? "Instagram et TikTok"
@@ -216,13 +216,13 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
           · {period.days} derniers jours
         </p>
       </div>
-      <nav aria-label="Période" className="flex gap-1.5 rounded-full bg-soft p-1">
+      <nav aria-label="Période" className="flex gap-1.5 bg-soft p-1">
         {periods.map((p) => (
           <Link
             key={p.key}
             href={`/resultats?periode=${p.key}`}
             aria-current={period.key === p.key ? "page" : undefined}
-            className={`flex h-10 items-center rounded-full px-4.5 text-sm font-bold ${
+            className={`flex h-10 items-center px-4.5 text-sm font-bold ${
               period.key === p.key ? "bg-ink text-white" : "text-muted"
             }`}
           >
@@ -236,11 +236,11 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
   // No @ yet: the one thing to do, first.
   const handlesCard =
     !connected && !followed ? (
-      <section className="flex max-w-[640px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
+      <section className="flex max-w-[640px] flex-col gap-3 border border-line p-5.5">
         <h2 className="text-base font-bold">Ton @, et Edith suit tes chiffres</h2>
         <p className="text-sm leading-relaxed text-muted">
           Sans rien connecter : chaque jour, tes abonnés, et les vues, j’aime et commentaires de tes publications, lus sur ton profil public.
-          {readable ? "" : " C’est compris dans ton abonnement."}
+          {readable ? "" : "C’est compris dans ton abonnement."}
         </p>
         <HandlesForm instagram={null} tiktok={null} />
       </section>
@@ -348,7 +348,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
       {connected ? (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
           {kpis.map(([label, value, detail], i) => (
-            <div key={label} className={`flex flex-col gap-2 rounded-[20px] p-5 ${kpiStyles[i]}`}>
+            <div key={label} className={`flex flex-col gap-2 p-5 ${kpiStyles[i]}`}>
               <span className="text-sm font-semibold opacity-85">{label}</span>
               <span className="text-4xl font-extrabold tracking-[-0.02em]">{value}</span>
               <span className="text-[13px] font-semibold opacity-85">{detail}</span>
@@ -363,7 +363,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         </div>
       ) : null}
       {!connected && followed && (
-        <section className="flex flex-col gap-3 rounded-[22px] border border-line p-5 sm:p-6">
+        <section className="flex flex-col gap-3 border border-line p-5 sm:p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-lg font-bold">Tes Reels et vidéos</h2>
             <span className="text-[13px] font-semibold text-muted">publiés ces {period.days} derniers jours, du plus récent au plus ancien</span>
@@ -374,7 +374,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
               <VideoTable videos={periodVideos} followers={followers} timeZone={tz} />
             </>
           ) : (
-            <p className="text-sm text-muted">Aucune vidéo publiée sur la période.{videos.length ? " Choisis 90 jours pour voir les plus anciennes." : " Elles apparaissent ici dès le prochain relevé de ton profil."}</p>
+            <p className="text-sm text-muted">Aucune vidéo publiée sur la période.{videos.length ? "Choisis 90 jours pour voir les plus anciennes." : "Elles apparaissent ici dès le prochain relevé de ton profil."}</p>
           )}
           <p className="text-[12px] text-muted">
             Lus chaque jour sur ton profil public, faites avec Edith ou non. Engagement : j’aime, commentaires et enregistrements pour chaque vue. Vues / abonnés : au-dessus de 1×, la vidéo est allée au-delà de tes abonnés.
@@ -382,7 +382,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         </section>
       )}
 
-      <section className="flex flex-col gap-4 rounded-[22px] border border-line p-5 sm:p-6">
+      <section className="flex flex-col gap-4 border border-line p-5 sm:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-bold">Tes abonnés, semaine par semaine</h2>
           {ig.followers !== null && <span className="text-[13px] font-semibold text-muted">{formatNumber(ig.followers)} abonnés sur Instagram</span>}
@@ -429,7 +429,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
       {((connected && formats.length > 0) || shownMoments.days.length > 0) && (
         <div className="flex flex-wrap items-start gap-6">
           {connected && formats.length > 0 && (
-            <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
+            <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3 border border-line p-5.5">
               <h2 className="text-base font-bold">Ce que rapporte chaque format</h2>
               <FormatTable rows={formats} labels={kindLabels} publicOnly={!connected} />
               <p className="text-[12px] text-muted">
@@ -440,10 +440,10 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
             </section>
           )}
           {shownMoments.days.length > 0 && (
-            <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-3 rounded-[22px] border border-line p-5.5">
+            <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-3 border border-line p-5.5">
               <h2 className="text-base font-bold">Tes meilleurs moments</h2>
               {shownMoment && (
-                <p className="rounded-[14px] bg-violet-tint px-3.5 py-2.5 text-[14px] font-semibold text-violet">
+                <p className="bg-violet-tint px-3.5 py-2.5 text-[14px] font-semibold text-violet">
                   D’après tes posts, publie plutôt {shownMoment}.
                 </p>
               )}
@@ -463,7 +463,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
       )}
 
       {connected && Boolean(audience.city?.length || audience.age?.length) && (
-        <section className="flex flex-col gap-4 rounded-[22px] border border-line p-5.5">
+        <section className="flex flex-col gap-4 border border-line p-5.5">
           <h2 className="text-base font-bold">Qui te suit</h2>
           <div className="flex flex-wrap gap-6">
             {[
@@ -487,7 +487,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
       )}
 
       <div className="flex flex-wrap items-start gap-6">
-        <section className="flex min-w-0 flex-[1_1_380px] flex-col gap-3.5 rounded-[22px] bg-soft p-6">
+        <section className="flex min-w-0 flex-[1_1_380px] flex-col gap-3.5 bg-soft p-6">
           <div className="flex items-center gap-2.5">
             <Orb size={32} />
             <h2 className="text-lg font-bold">Ce qui marche chez toi</h2>
@@ -542,7 +542,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/resultats">
         </section>
 
         {connected && (
-        <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3.5 rounded-[22px] border border-line p-5.5">
+        <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-3.5 border border-line p-5.5">
           <h2 className="text-base font-bold">Ce qui a le plus donné envie</h2>
           {ranked.length ? (
             ranked.map(({ postId, totals: t }) => {

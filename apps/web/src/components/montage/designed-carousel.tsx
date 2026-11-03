@@ -68,7 +68,7 @@ export function DesignedCarousel({
           <ul className="flex max-w-full gap-2 overflow-x-auto p-1" aria-label="Toutes les images">
             {Array.from({ length: design.count }, (_, i) => (
               <li key={i} className="w-[64px] shrink-0">
-                <button type="button" onClick={() => setIndex(i)} aria-label={`Image ${i + 1}`} aria-pressed={i === index} className={`block w-full overflow-hidden rounded-[10px] ${i === index ? "ring-2 ring-violet ring-offset-2" : "opacity-75 hover:opacity-100"}`}>
+                <button type="button" onClick={() => setIndex(i)} aria-label={`Image ${i + 1}`} aria-pressed={i === index} className={`block w-full overflow-hidden ${i === index ? "ring-2 ring-violet ring-offset-2" : "opacity-75 hover:opacity-100"}`}>
                   <SlidePreview props={buildCarouselProps({ ...design, texts }, i, { template, brand, photos })} />
                 </button>
               </li>
@@ -77,7 +77,7 @@ export function DesignedCarousel({
         )}
       </div>
 
-      <aside className="flex min-w-0 flex-col gap-4 rounded-[18px] border border-line bg-white p-4">
+      <aside className="flex min-w-0 flex-col gap-4 border border-line bg-white p-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-[16px] font-extrabold">
             Image {index + 1} sur {design.count}
@@ -87,7 +87,7 @@ export function DesignedCarousel({
         {!canEdit ? (
           <p className="text-[14px] text-muted">Ce carrousel est en ligne.</p>
         ) : changed > 0 ? (
-          <div className="flex flex-col gap-3 rounded-[16px] bg-soft p-3">
+          <div className="flex flex-col gap-3 bg-soft p-3">
             <p className="text-[14px] font-semibold">{changed > 1 ? `${changed} textes changés` : "1 texte changé"}</p>
             <div className="flex flex-wrap gap-2">
               <button type="button" disabled={saving} onClick={save} className="btn btn-primary disabled:opacity-40">
@@ -120,7 +120,7 @@ export function DesignedCarousel({
             placeholder="Ex. le titre plus gros, ou une photo de la vitrine"
           />
         )}
-        {message && <p className={`rounded-[12px] px-3 py-2 text-[13px] ${message.ok ? "bg-soft" : "bg-peach text-peach-ink"}`}>{message.text}</p>}
+        {message && <p className={`px-3 py-2 text-[13px] ${message.ok ? "bg-soft" : "bg-peach text-peach-ink"}`}>{message.text}</p>}
       </aside>
     </>
   );

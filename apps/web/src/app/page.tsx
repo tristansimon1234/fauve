@@ -1,4 +1,4 @@
-import { PLAN_ORDER, PLANS, reelsPerMonth, weeklyPosts } from "@fauve/agent";
+import { HOUSE_MODELS, PLAN_ORDER, PLANS, reelsPerMonth, weeklyPosts } from "@fauve/agent";
 import { priceTax } from "@/lib/legal";
 import type { Metadata } from "next";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
@@ -6,7 +6,9 @@ import { ChartIcon, CheckIcon, ClockIcon, EyeIcon, LayersIcon, MicIcon, MusicIco
 import { HeroScene } from "@/components/landing/hero-scene";
 import { IdeaToPost } from "@/components/landing/idea-to-post";
 import { Play } from "@/components/landing/play";
+import { ModelWall, ReelStrip, type StripReel } from "@/components/landing/reel-strip";
 import { ReelWall } from "@/components/landing/reel-wall";
+import { WORK } from "@/components/landing/work";
 import { fr, frNodes } from "@/components/landing/fr";
 import { faqPage, JsonLd, LastCall, SectionTitle, SiteFooter, SiteHeader, Start } from "@/components/landing/site";
 import { CaptionVisual, CopyReelVisual, GestureVisual, LayoutsVisual, MusicVisual, ReminderVisual, ReportVisual, RetouchVisual, VoiceVisual } from "@/components/landing/visuals";
@@ -124,62 +126,86 @@ const structuredData = () => ({
 
 const vars = (values: Record<string, string | number>) => values as CSSProperties;
 
+/** A model of Edith's as the site shows it: its loop, its poster, its name and what it does. */
+const model = (key: string): StripReel => {
+  const m = HOUSE_MODELS.find((h) => h.key === key);
+  return { key, src: `/modeles/${key}.mp4`, poster: `/modeles/${key}.jpg`, label: m?.name ?? key, note: m?.pitch };
+};
+const work = (id: (typeof WORK)[number]["id"]): StripReel => {
+  const w = WORK.find((x) => x.id === id)!;
+  return { key: `work-${id}`, src: `/landing/work-${id}.mp4`, poster: `/landing/work-${id}.webp`, label: w.trade };
+};
+
+/** The hero's strip: the landing's three Reels between models of Edith's, the strongest pictures first. */
+const HERO_STRIP: StripReel[] = [model("aplat"), work("pilates"), model("titre-derriere"), work("cafe"), model("carte-feutre"), work("cave"), model("pile")].map((r) => ({ ...r, note: undefined }));
+
+/** Every model, the most striking first (the rest open on a tap). */
+const WALL_ORDER = [
+  "aplat", "titre-derriere", "mot-cle", "pile", "carte-feutre", "detourages", "journee", "mosaique", "quatre-coins", "coulisses", "cadre", "fenetres",
+  "frappe", "interrupteur", "mots-meles", "pixel", "nike", "eventail", "coups-de-fouet", "tourne", "plans-fixes", "table", "ecran-partage", "facade",
+  "gaufre", "photo-dump", "decode", "silhouette", "vision", "createur", "interface",
+];
+const WALL: StripReel[] = [...WALL_ORDER.filter((k) => HOUSE_MODELS.some((m) => m.key === k)), ...HOUSE_MODELS.map((m) => m.key).filter((k) => !WALL_ORDER.includes(k))].map(model);
+
 export default function LandingPage() {
   const waUrl = whatsappLink();
 
   return (
-    <div className="land-paper min-h-dvh overflow-x-clip bg-soft">
+    <div className="land-paper min-h-dvh overflow-x-clip bg-white">
       <JsonLd data={structuredData()} />
       <SiteHeader waUrl={waUrl} home />
 
       {/*
-        Hero: the promise first, in her words (Tristan: « des reels top quali et pas ai cringe »), what it is
-        right under it (« assistant IA sur WhatsApp et via une app web »), and the product alive beside it.
+        Hero (lot 6: paper and ink, thin lines, big type; « le site devra être ultra visuel »): the promise across the
+        whole width in the biggest type of the site, then what it is, then a strip of Reels playing: the colour comes
+        from them.
       */}
-      <section className="mx-auto grid max-w-[1240px] items-center gap-12 px-4 pt-8 pb-20 sm:px-8 sm:pt-12 lg:grid-cols-[1.08fr_1fr] lg:gap-12">
-        <div className="flex min-w-0 flex-col gap-7">
-          <span className="land-intro flex items-center gap-3 text-[12px] font-bold tracking-[0.16em] text-muted uppercase" style={vars({ "--i": 0 })}>
-            <span className="h-px w-8 bg-ink/30" />
-            Ton community manager IA, sur WhatsApp et dans l’app
-          </span>
-          <h1 className="land-intro text-[clamp(38px,4.6vw,66px)] leading-[1] font-extrabold tracking-[-0.045em]" style={vars({ "--i": 1 })}>
-            Edith est une IA.
-            <span className="mt-1 block font-[family-name:var(--font-serif)] text-[1.22em] leading-[0.95] font-normal tracking-[-0.02em] text-violet italic">Tes Reels n’en ont pas l’air.</span>
-          </h1>
-          <p className="land-intro max-w-[540px] text-[18px] leading-[1.6] text-muted sm:text-[19px]" style={vars({ "--i": 2 })}>
+      <section className="mx-auto flex max-w-[1360px] flex-col gap-10 px-4 pt-8 pb-16 sm:px-8 sm:pt-12 lg:pb-24">
+        <span className="land-intro mono-label flex items-center justify-between gap-4 text-ink" style={vars({ "--i": 0 })}>
+          <span>Community manager IA</span>
+          <span className="hidden sm:inline">Sur WhatsApp et dans l’app</span>
+        </span>
+        <h1 className="land-intro text-[clamp(52px,10.4vw,168px)] leading-[0.88] font-semibold tracking-[-0.065em]" style={vars({ "--i": 1 })}>
+          Edith est une IA.
+          <span className="block font-[family-name:var(--font-serif)] text-[1.04em] leading-[0.92] font-normal tracking-[-0.035em] italic">Tes Reels n’en ont pas l’air.</span>
+        </h1>
+        <div className="land-intro grid gap-6 border-t border-ink pt-6 lg:grid-cols-[1fr_auto] lg:items-end" style={vars({ "--i": 2 })}>
+          <p className="max-w-[620px] text-[19px] leading-[1.5] sm:text-[22px]">
             Envoie tes vidéos sur WhatsApp, telles quelles. Edith les monte comme un créateur, écrit la légende, et tu postes d’un toucher sur Instagram et TikTok.
           </p>
-          <div className="land-intro flex flex-wrap items-center gap-3" style={vars({ "--i": 3 })}>
-            <Start waUrl={waUrl} size="lg" />
-            <a href="#travail" className="btn btn-secondary h-14 px-6 text-base">
-              Voir ses Reels
-            </a>
+          <div className="flex flex-col gap-3 lg:items-end">
+            <div className="flex flex-wrap items-center gap-3">
+              <Start waUrl={waUrl} size="lg" />
+              <a href="#travail" className="btn btn-secondary h-14 px-6 text-base">
+                Voir ses Reels
+              </a>
+            </div>
+            <ul className="mono-label flex flex-wrap gap-x-5 gap-y-1.5 text-muted">
+              {["Rien ne part sans ton oui", "En place en 5 minutes", `Dès ${PLANS.decouverte.priceEur} € par mois`].map((t) => (
+                <li key={t} className="flex items-center gap-1.5">
+                  <CheckIcon size={13} className="text-ink" />
+                  {t}
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="land-intro -mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-[13.5px] font-semibold text-muted" style={vars({ "--i": 3 })}>
-            {["Rien ne part sans ton oui", "En place en 5 minutes", `Dès ${PLANS.decouverte.priceEur} € par mois, sans engagement`].map((t) => (
-              <li key={t} className="flex items-center gap-1.5">
-                <CheckIcon size={14} className="text-violet" />
-                {t}
-              </li>
-            ))}
-          </ul>
         </div>
-        <div className="land-intro min-w-0 lg:pl-2" style={vars({ "--i": 3 })}>
-          <HeroScene />
+        <div className="land-intro" style={vars({ "--i": 3 })}>
+          <ReelStrip reels={HERO_STRIP} />
         </div>
       </section>
 
-      {/* The manifesto, passing by. */}
-      <div className="land-ticker-band overflow-hidden bg-ink py-5 text-white" aria-label={NOT.join(", ")}>
+      {/* The manifesto, passing by between two hairlines. */}
+      <div className="land-ticker-band overflow-hidden border-y border-ink py-5" aria-label={NOT.join(", ")}>
         <div className="land-ticker-row flex w-max items-center" aria-hidden="true">
           {[0, 1].map((copy) => (
             <span key={copy} className="flex shrink-0 items-center">
               {NOT.map((t, i) => (
                 <span key={t} className="flex items-center">
-                  <span className={`px-7 text-[clamp(22px,2.6vw,34px)] leading-none whitespace-nowrap ${i === NOT.length - 1 ? "font-[family-name:var(--font-serif)] text-lilac italic" : "font-semibold tracking-[-0.02em] text-white/85"}`}>
+                  <span className={`px-8 text-[clamp(28px,3.6vw,52px)] leading-none whitespace-nowrap ${i === NOT.length - 1 ? "font-[family-name:var(--font-serif)] italic" : "font-semibold tracking-[-0.045em]"}`}>
                     {t}
                   </span>
-                  <span className="size-1.5 rounded-full bg-coral" />
+                  <span className="size-2 bg-ink" />
                 </span>
               ))}
             </span>
@@ -188,72 +214,79 @@ export default function LandingPage() {
       </div>
 
       {/* N° 01, the work: Reels people watch to the end, never ads. */}
-      <section id="travail" className="mx-auto flex max-w-[1240px] scroll-mt-6 flex-col gap-10 px-4 pt-24 pb-28 sm:px-8">
-        <div className="land-reveal grid items-end gap-6 lg:grid-cols-[1.2fr_1fr]">
+      <section id="travail" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pt-24 pb-28 sm:px-8">
+        <div className="land-reveal">
           <SectionTitle n={1} kicker="Le travail">
             Des Reels qu’on regarde <span className="accent">jusqu’au bout.</span>
           </SectionTitle>
-          <p className="max-w-[420px] text-[16px] leading-relaxed text-muted lg:justify-self-end">
-            Pas des pubs&nbsp;: des Reels comme ceux des comptes qu’on suit pour le plaisir.
-            <span className="mt-1 block text-[13px] text-muted/80">Commerces d’exemple, vidéos libres de droits.</span>
-          </p>
         </div>
+        <p className="land-reveal -mt-4 max-w-[520px] text-[17px] leading-relaxed text-muted">
+          Pas des pubs&nbsp;: des Reels comme ceux des comptes qu’on suit pour le plaisir.
+          <span className="mono-label mt-2 block text-muted/80">Commerces d’exemple · vidéos libres de droits</span>
+        </p>
         <div className="land-reveal">
           <ReelWall />
         </div>
       </section>
 
-      {/* N° 02, zero cringe: what gives AI content away, and what Edith does instead. */}
-      <section id="cringe" className="mx-auto max-w-[1240px] scroll-mt-6 px-4 pb-28 sm:px-8">
-        <div className="grid gap-12 lg:grid-cols-[1fr_1.3fr] lg:gap-16">
-          <div className="land-reveal flex flex-col gap-5 lg:sticky lg:top-10 lg:self-start">
-            <SectionTitle n={2} kicker="Zéro cringe">
-              Le «&nbsp;contenu IA&nbsp;», tout le monde le repère. <span className="accent">Edith fait l’inverse.</span>
-            </SectionTitle>
-          </div>
-          <Play threshold={0.2}>
-            <ol className="flex flex-col border-t border-ink/12">
-              {cringe.map(([bad, good], i) => (
-                <li key={bad} className="grid gap-2 border-b border-ink/12 py-5 sm:grid-cols-[1fr_1.15fr] sm:gap-8">
-                  <span className="flex items-baseline gap-4 text-[15.5px] leading-snug text-muted">
-                    <span className="w-6 shrink-0 font-[family-name:var(--font-serif)] text-[17px] text-ink/40 italic tabular-nums">{String(i + 1).padStart(2, "0")}</span>
-                    {/* Inline inside its flex item, so a wrapped tic is struck line by line. */}
-                    <span>
-                      <span className="land-once land-strike" style={vars({ "--d": `${0.15 + i * 0.12}s` })}>
-                        {fr(bad)}
-                      </span>
-                    </span>
-                  </span>
-                  <span className="flex items-baseline gap-2.5 pl-10 text-[15.5px] leading-snug font-semibold text-ink sm:pl-0">
-                    <CheckIcon size={15} className="shrink-0 translate-y-[2px] text-violet" />
-                    {fr(good)}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </Play>
+      {/* N° 02, Edith's models: every one plays, the colour of the page. */}
+      <section id="modeles" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pb-28 sm:px-8">
+        <div className="land-reveal">
+          <SectionTitle n={2} kicker="Ses modèles">
+            {HOUSE_MODELS.length} façons de raconter ton commerce. <span className="accent">Avec tes images.</span>
+          </SectionTitle>
         </div>
+        <p className="land-reveal -mt-4 max-w-[560px] text-[17px] leading-relaxed text-muted">
+          Choisis-en un dans l’app, ou montre-lui un Reel que tu aimes&nbsp;: Edith le refait avec tes photos, tes vidéos et ta charte.
+          <span className="mono-label mt-2 block text-muted/80">Aperçus · vidéos libres de droits</span>
+        </p>
+        <ModelWall reels={WALL} />
       </section>
 
-      {/* N° 03, ta-da: her ideas, Edith does the rest (the real carousel). */}
-      <section className="mx-auto flex max-w-[1240px] flex-col gap-10 px-4 pb-28 sm:px-8">
+      {/* N° 03, zero cringe: what gives AI content away, and what Edith does instead. */}
+      <section id="cringe" className="mx-auto max-w-[1360px] scroll-mt-6 px-4 pb-28 sm:px-8">
+        <div className="land-reveal mb-12">
+          <SectionTitle n={3} kicker="Zéro cringe">
+            Le «&nbsp;contenu IA&nbsp;», tout le monde le repère. <span className="accent">Edith fait l’inverse.</span>
+          </SectionTitle>
+        </div>
+        <Play threshold={0.2}>
+          <ol className="flex flex-col border-t border-ink">
+            {cringe.map(([bad, good], i) => (
+              <li key={bad} className="grid gap-2 border-b border-ink/20 py-6 sm:grid-cols-[64px_1fr_1.1fr] sm:items-baseline sm:gap-8">
+                <span className="font-mono text-[12px] text-muted tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+                {/* Inline inside its grid item, so a wrapped tic is struck line by line. */}
+                <span className="text-[clamp(18px,1.7vw,24px)] leading-snug tracking-[-0.02em] text-muted">
+                  <span className="land-once land-strike" style={vars({ "--d": `${0.15 + i * 0.12}s` })}>
+                    {fr(bad)}
+                  </span>
+                </span>
+                <span className="text-[clamp(18px,1.7vw,24px)] leading-snug font-semibold tracking-[-0.025em] text-ink">{fr(good)}</span>
+              </li>
+            ))}
+          </ol>
+        </Play>
+      </section>
+
+      {/* N° 04, ta-da: her ideas, Edith does the rest (the real carousel). */}
+      <section className="mx-auto flex max-w-[1360px] flex-col gap-12 px-4 pb-28 sm:px-8">
         <div className="land-reveal">
-          <SectionTitle n={3} kicker="Ta-da !">
+          <SectionTitle n={4} kicker="Ta-da !">
             Toi, tu as les idées. <span className="accent">Moi, j’exécute.</span>
           </SectionTitle>
         </div>
         <IdeaToPost />
-        <div className="land-reveal flex flex-col gap-2.5">
-          <span className="text-[12px] font-bold tracking-[0.14em] text-muted uppercase">Et toutes tes autres idées</span>
-          <div className="land-marquee-wrap overflow-hidden">
-            <div className="land-marquee flex w-max gap-2.5 pr-2.5" style={vars({ "--dur": "50s" })}>
+        <div className="land-reveal flex flex-col gap-3">
+          <span className="mono-label text-muted">Et toutes tes autres idées</span>
+          <div className="land-marquee-wrap overflow-hidden border-y border-ink/20 py-3">
+            <div className="land-marquee flex w-max gap-8 pr-8" style={vars({ "--dur": "50s" })}>
               {[...ideas, ...ideas].map(([idea, kind], i) => (
                 <span
                   key={i}
                   aria-hidden={i >= ideas.length || undefined}
-                  className={`flex shrink-0 items-center gap-2 rounded-full border border-ink/10 bg-white py-1.5 pr-1.5 pl-3.5 text-[14px] font-semibold whitespace-nowrap ${i >= ideas.length ? "land-marquee-dup" : ""}`}
+                  className={`flex shrink-0 items-baseline gap-3 text-[clamp(20px,2vw,28px)] font-medium tracking-[-0.03em] whitespace-nowrap ${i >= ideas.length ? "land-marquee-dup" : ""}`}
                 >
-                  {fr(`« ${idea} »`)}<span className="rounded-full bg-soft px-2.5 py-0.5 text-[12px] font-bold text-ink/70">{kind}</span>
+                  {fr(`« ${idea} »`)}<span className="mono-label text-muted">{kind}</span>
                 </span>
               ))}
             </div>
@@ -261,14 +294,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* N° 04, what she can ask */}
-      <section className="mx-auto flex max-w-[1240px] flex-col gap-10 px-4 pb-28 sm:px-8">
+      {/* N° 05, what she can ask */}
+      <section className="mx-auto flex max-w-[1360px] flex-col gap-12 px-4 pb-28 sm:px-8">
         <div className="land-reveal">
-          <SectionTitle n={4} kicker="Ce que tu peux lui demander">
+          <SectionTitle n={5} kicker="Ce que tu peux lui demander">
             Une idée, un lien, un vocal&nbsp;: <span className="accent">il s’en occupe.</span>
           </SectionTitle>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-px border border-ink/20 bg-ink/20 md:grid-cols-2 lg:grid-cols-3">
           <Card i={0} icon={RepeatIcon} title="« Refais-moi ce Reel »" className="lg:row-span-2" visual={<CopyReelVisual />} center>
             Colle le lien d’un Reel que tu aimes : il en reprend la forme, avec tes images.
           </Card>
@@ -287,14 +320,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* N° 05, what else she does */}
-      <section className="mx-auto flex max-w-[1240px] flex-col gap-10 px-4 pb-28 sm:px-8">
+      {/* N° 06, what else she does */}
+      <section className="mx-auto flex max-w-[1360px] flex-col gap-12 px-4 pb-28 sm:px-8">
         <div className="land-reveal">
-          <SectionTitle n={5} kicker="Ce qu’il fait aussi">
+          <SectionTitle n={6} kicker="Ce qu’il fait aussi">
             Tout ce qu’un community manager fait, <span className="accent">à ta façon.</span>
           </SectionTitle>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-px border border-ink/20 bg-ink/20 md:grid-cols-2 lg:grid-cols-4">
           <Card i={0} icon={PenIcon} title="Les légendes" visual={<CaptionVisual />}>
             Dans ton ton, avec ton lien de réservation.
           </Card>
@@ -310,54 +343,54 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* N° 06, how it works: on a computer, a line joins the steps as the page scrolls. */}
-      <section id="comment" className="mx-auto flex max-w-[1240px] scroll-mt-6 flex-col gap-10 px-4 pb-28 sm:px-8">
+      {/* N° 07, how it works: the product alive (WhatsApp and the app), and the five steps. */}
+      <section id="comment" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pb-28 sm:px-8">
         <div className="land-reveal">
-          <SectionTitle n={6} kicker="Comment ça marche">
+          <SectionTitle n={7} kicker="Comment ça marche">
             En place en <span className="accent">5 minutes</span>, sans rien installer.
           </SectionTitle>
         </div>
-        <ol className="land-steps relative grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:gap-6">
-          <span className="land-steps-line pointer-events-none absolute top-[17px] right-[calc(20%-37.2px)] left-[18px] hidden h-[2px] rounded-full bg-violet/30 lg:block" aria-hidden="true" />
-          {steps.map(([title, text], i) => (
-            <li key={title} className="land-reveal relative flex flex-col gap-2.5 rounded-[22px] bg-white p-5 lg:bg-transparent lg:p-0 lg:pr-2" style={vars({ "--i": i })}>
-              <span className="land-step-dot flex size-9 items-center justify-center rounded-full bg-violet-soft text-[15px] font-extrabold text-violet" style={vars({ "--i": i })}>
-                {i + 1}
-              </span>
-              <h3 className="text-[17px] font-bold">{title}</h3>
-              <p className="text-[14px] leading-[1.55] text-muted">{fr(text)}</p>
-            </li>
-          ))}
-        </ol>
+        <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
+          <ol className="flex flex-col border-t border-ink">
+            {steps.map(([title, text], i) => (
+              <li key={title} className="land-reveal grid grid-cols-[56px_1fr] items-baseline gap-x-4 border-b border-ink/20 py-5" style={vars({ "--i": i })}>
+                <span className="text-[clamp(32px,3.2vw,44px)] leading-none font-semibold tracking-[-0.05em] tabular-nums">{i + 1}</span>
+                <span className="flex flex-col gap-1">
+                  <h3 className="text-[22px] font-semibold tracking-[-0.03em]">{title}</h3>
+                  <p className="text-[15px] leading-[1.55] text-muted">{fr(text)}</p>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <div className="land-reveal min-w-0">
+            <HeroScene />
+          </div>
+        </div>
       </section>
 
-      {/* N° 07, price */}
-      <section id="tarif" className="mx-auto max-w-[1240px] scroll-mt-6 px-4 pb-28 sm:px-8">
-        <div className="land-reveal mb-10">
-          <SectionTitle n={7} kicker="Tarif">
+      {/* N° 08, price: three columns between hairlines, the price in the biggest type. */}
+      <section id="tarif" className="mx-auto max-w-[1360px] scroll-mt-6 px-4 pb-28 sm:px-8">
+        <div className="land-reveal mb-12">
+          <SectionTitle n={8} kicker="Tarif">
             Trois offres, <span className="accent">sans engagement.</span>
           </SectionTitle>
         </div>
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid gap-px border border-ink bg-ink lg:grid-cols-3">
           {offers.map((o, i) => (
-            <div
-              key={o.id}
-              className={`land-reveal relative isolate flex flex-col gap-4 overflow-hidden rounded-[28px] p-7 sm:p-10 ${o.dark ? "bg-ink text-white" : "bg-white text-ink"}`}
-              style={vars({ "--i": i })}
-            >
-              {o.dark && <span className="pointer-events-none absolute -top-28 -right-24 -z-10 size-80 rounded-full bg-[radial-gradient(circle,rgba(91,63,217,.5),transparent_68%)]" aria-hidden="true" />}
-              <div className="flex items-center justify-between gap-3">
-                <span className={`text-sm font-bold tracking-[0.12em] ${o.dark ? "text-lilac-ink" : "text-violet"}`}>{o.label.toUpperCase()}</span>
-                {o.dark && <span className="rounded-full bg-white/10 px-3 py-1 text-[12px] font-bold">Le plus complet</span>}
+            <div key={o.id} className={`land-reveal flex flex-col gap-5 p-7 sm:p-9 ${o.dark ? "bg-ink text-white" : "bg-white text-ink"}`} style={vars({ "--i": i })}>
+              <div className="mono-label flex items-center justify-between gap-3">
+                <span>{o.label}</span>
+                {o.dark && <span className="border border-white/40 px-2 py-1">Le plus complet</span>}
               </div>
-              <span className="text-[56px] leading-none font-extrabold tracking-[-0.04em]">
-                {o.price} € <span className={`text-xl font-semibold tracking-normal ${o.dark ? "text-lilac-ink" : "text-muted"}`}>{priceTax ? "TTC / mois" : "par mois"}</span>
+              <span className="text-[clamp(72px,7vw,104px)] leading-[0.85] font-semibold tracking-[-0.06em]">
+                {o.price}&nbsp;€
+                <span className={`mono-label mt-3 block tracking-[0.08em] ${o.dark ? "text-white/60" : "text-muted"}`}>{priceTax ? "TTC par mois" : "par mois"}</span>
               </span>
-              <p className={`text-[15px] ${o.dark ? "text-[#E4DFF2]" : "text-muted"}`}>{fr(o.pitch)}</p>
-              <ul className={`grid gap-2 text-[15px] ${o.dark ? "text-[#E4DFF2]" : "text-ink/85"}`}>
+              <p className={`text-[16px] leading-relaxed ${o.dark ? "text-white/75" : "text-muted"}`}>{fr(o.pitch)}</p>
+              <ul className={`flex flex-col border-t text-[15px] ${o.dark ? "border-white/25" : "border-ink/20"}`}>
                 {o.points.map((t) => (
-                  <li key={t} className="flex items-center gap-2">
-                    <CheckIcon size={16} className={`shrink-0 ${o.dark ? "text-lilac-ink" : "text-violet"}`} />
+                  <li key={t} className={`flex items-center gap-2 border-b py-2.5 ${o.dark ? "border-white/25" : "border-ink/20"}`}>
+                    <CheckIcon size={15} className="shrink-0" />
                     {t}
                   </li>
                 ))}
@@ -368,33 +401,31 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
-        <p className="mt-6 text-center text-[14px] text-muted">
-          Les trois font tout&nbsp;: seul le nombre de Reels change.
-        </p>
+        <p className="mono-label mt-5 text-muted">Les trois font tout&nbsp;: seul le nombre de Reels change.</p>
       </section>
 
       {/* FAQ */}
-      <section className="mx-auto grid max-w-[1240px] gap-10 px-4 pb-28 sm:px-8 lg:grid-cols-[1fr_1.6fr]">
+      <section className="mx-auto flex max-w-[1360px] flex-col gap-12 px-4 pb-28 sm:px-8">
         <div className="land-reveal">
-          <SectionTitle n={8} kicker="Questions">
+          <SectionTitle n={9} kicker="Questions">
             Ce qu’on nous <span className="accent">demande.</span>
           </SectionTitle>
         </div>
-        <div className="flex flex-col border-t border-ink/12">
+        <div className="flex flex-col border-t border-ink lg:ml-[33%]">
           {faq.map(([q, a], i) => (
-            <details key={q} className="land-reveal group border-b border-ink/12 py-5" style={vars({ "--i": i * 0.5 })}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[17px] font-bold [&::-webkit-details-marker]:hidden">
+            <details key={q} className="land-reveal group border-b border-ink/20 py-5" style={vars({ "--i": i * 0.5 })}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[clamp(19px,1.6vw,23px)] font-semibold tracking-[-0.025em] [&::-webkit-details-marker]:hidden">
                 {fr(q)}
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-ink/15 text-lg leading-none text-ink transition-transform duration-300 ease-[var(--ease-fauve)] group-open:rotate-45">+</span>
+                <span className="flex size-8 shrink-0 items-center justify-center border border-ink text-lg leading-none font-light text-ink transition-transform duration-300 ease-[var(--ease-fauve)] group-open:rotate-45">+</span>
               </summary>
-              <p className="mt-3 max-w-[640px] text-[15.5px] leading-relaxed text-muted">{fr(a)}</p>
+              <p className="mt-3 max-w-[680px] text-[16px] leading-relaxed text-muted">{fr(a)}</p>
             </details>
           ))}
         </div>
       </section>
 
       <LastCall waUrl={waUrl} line="Dis-lui ce que tu fais : dans cinq minutes, il te montre ce qu’il ferait pour toi.">
-        Tes vidéos sont déjà là. <span className="font-[family-name:var(--font-serif)] font-normal tracking-[-0.01em] text-lilac italic">Edith en fait des Reels.</span>
+        Tes vidéos sont déjà là. <span className="font-[family-name:var(--font-serif)] font-normal tracking-[-0.03em] italic">Edith en fait des Reels.</span>
       </LastCall>
 
       <SiteFooter />
@@ -402,7 +433,7 @@ export default function LandingPage() {
   );
 }
 
-/** A card: its icon, title and words, then the scene that shows it, played when it comes on screen. */
+/** A cell of the grid: its icon, title and words, then the scene that shows it, played when it comes on screen. */
 function Card({
   i,
   icon: Icon,
@@ -424,13 +455,13 @@ function Card({
   children: ReactNode;
 }) {
   return (
-    <div className={`land-reveal flex min-w-0 flex-col rounded-[22px] bg-white p-6 transition-shadow duration-500 hover:shadow-[0_24px_50px_-28px_rgba(28,21,48,.35)] ${className}`} style={vars({ "--i": i })}>
-      <span className="mb-4 flex items-center gap-2.5 text-violet">
+    <div className={`land-reveal flex min-w-0 flex-col bg-white p-6 sm:p-7 ${className}`} style={vars({ "--i": i })}>
+      <span className="mb-5 flex items-center justify-between gap-2.5 text-ink">
         <Icon size={20} />
-        <span className="h-px flex-1 bg-ink/10" />
+        <span className="font-mono text-[11px] text-muted tabular-nums">{String(i + 1).padStart(2, "0")}</span>
       </span>
-      <h3 className="text-[19px] font-bold tracking-[-0.01em]">{title}</h3>
-      <p className="mt-1.5 text-[15px] leading-[1.55] text-muted">{frNodes(children)}</p>
+      <h3 className="text-[22px] leading-[1.1] font-semibold tracking-[-0.035em]">{title}</h3>
+      <p className="mt-2 text-[15px] leading-[1.55] text-muted">{frNodes(children)}</p>
       <Play loop={loop} className={center ? "my-auto" : "mt-auto"}>
         {visual}
       </Play>

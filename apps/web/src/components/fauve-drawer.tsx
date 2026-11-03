@@ -329,7 +329,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         aria-modal="true"
         aria-label="Edith"
         data-closing={closing || undefined}
-        className="fauve-sheet absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-white bg-[radial-gradient(ellipse_at_top_right,#efebff_0%,rgba(239,235,255,0)_55%)] shadow-[-12px_0_40px_rgba(28,21,48,0.14)]"
+        className="fauve-sheet absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-white border-l border-ink"
         // Drop zone: photos and videos dropped anywhere on the panel.
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes("Files")) return;
@@ -347,7 +347,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
         }}
       >
         {dragging && (
-          <div className="fauve-fade pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-violet bg-violet-soft/90 text-center">
+          <div className="fauve-fade pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-violet bg-violet-soft/90 text-center">
             <PaperclipIcon size={28} className="text-violet" />
             <p className="text-[16px] font-bold text-violet">Dépose tes photos et vidéos</p>
           </div>
@@ -382,7 +382,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
             {!loading && messages.length === 0 && (
               <div className="flex flex-col gap-3 pt-6 text-center">
                 <p className="text-[15px] text-muted">
-                  {topic.scene !== undefined ? "Qu’est-ce que tu veux changer dans cette scène ?" : "Qu’est-ce que tu veux changer ?"}
+                  {topic.scene !== undefined ? "Qu’est-ce que tu veux changer dans cette scène ?": "Qu’est-ce que tu veux changer ?"}
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {suggestionsFor(topic).map((s) => (
@@ -390,7 +390,7 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
                       key={s}
                       type="button"
                       onClick={() => send(s)}
-                      className="fauve-press rounded-full border border-lilac bg-white px-3.5 py-2 text-[13px] font-semibold text-violet hover:bg-violet hover:text-white"
+                      className="fauve-press border border-lilac bg-white px-3.5 py-2 text-[13px] font-semibold text-violet hover:bg-violet hover:text-white"
                     >
                       {s}
                     </button>
@@ -426,12 +426,12 @@ function FauveDrawer({ topic, onClose }: { topic: DrawerTopic; onClose: () => vo
           }}
         >
           {error && (
-            <p role="alert" className="fauve-enter rounded-xl bg-peach px-3 py-2 text-sm font-semibold text-danger">
+            <p role="alert" className="fauve-enter bg-peach px-3 py-2 text-sm font-semibold text-danger">
               {error}
             </p>
           )}
           <FileStrip files={uploads.files} onRemove={uploads.removeFile} />
-          <div className="flex items-end gap-1 rounded-[26px] border border-line bg-white p-1.5 pl-1.5 focus-within:border-lilac">
+          <div className="flex items-end gap-1 border border-line bg-white p-1.5 pl-1.5 focus-within:border-lilac">
             <input
               ref={fileRef}
               type="file"

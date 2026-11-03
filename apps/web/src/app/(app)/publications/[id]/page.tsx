@@ -137,7 +137,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
             <Link href="/grille" aria-label="Retour à la grille" title="Grille" className="flex size-10 shrink-0 items-center justify-center rounded-full border border-line text-ink hover:bg-soft">
               <ArrowLeftIcon size={18} />
             </Link>
-            <h1 className="min-w-0 flex-1 truncate text-[24px] leading-tight font-extrabold tracking-[-0.02em]">{post.title}</h1>
+            <h1 className="min-w-0 flex-1 truncate text-[30px] leading-[1] font-semibold tracking-[-0.045em] sm:text-[38px]">{post.title}</h1>
             <DeleteButton
               action={deletePost.bind(null, post.id)}
               redirectTo="/grille"
@@ -262,7 +262,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
         {post.hashtags.length > 0 && (
           <span className="flex flex-wrap gap-1.5">
             {post.hashtags.map((h) => (
-              <span key={h} className="rounded-full bg-soft px-2.5 py-1.5 text-[13px] font-semibold">
+              <span key={h} className="bg-soft px-2.5 py-1.5 text-[13px] font-semibold">
                 #{h.replace(/^#/, "")}
               </span>
             ))}
@@ -275,7 +275,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
       )}
 
       {/* Where and when, in two quiet lines. */}
-      <dl className="flex flex-col gap-2 rounded-[16px] bg-soft px-4 py-3 text-[14px]">
+      <dl className="flex flex-col gap-2 bg-soft px-4 py-3 text-[14px]">
         <div className="flex items-center gap-2.5">
           <dt className="sr-only">Publier sur</dt>
           <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -301,7 +301,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
       </dl>
       {(post.status === "draft" || post.status === "validated") && (
         <p className="-mt-2 text-[12px] leading-snug text-muted">
-          {post.status === "validated" ? "Validée : " : "Une fois validée, "}Edith la publie sur {post.platforms.map((p) => platformLabels[p]).join(" et ") || "Instagram"} à l’horaire prévu, si ton compte est connecté.
+          {post.status === "validated" ? "Validée : ": "Une fois validée, "}Edith la publie sur {post.platforms.map((p) => platformLabels[p]).join(" et ") || "Instagram"} à l’horaire prévu, si ton compte est connecté.
         </p>
       )}
 
@@ -325,7 +325,7 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
           <ArrowLeftIcon size={18} />
         </Link>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h1 className="truncate text-[24px] leading-tight font-extrabold tracking-[-0.02em]">{post.title}</h1>
+          <h1 className="truncate text-[30px] leading-[1] font-semibold tracking-[-0.045em] sm:text-[38px]">{post.title}</h1>
           <p className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
             <StatusPill status={post.status} />
             {kindLabels[post.kind]} · {post.scheduled_at ? `prévu ${formatDateTime(post.scheduled_at, tz)}` : "date à définir"}
@@ -380,10 +380,10 @@ async function PostDetail({ params }: { params: PageProps<"/publications/[id]">[
               controls
               playsInline
               preload="metadata"
-              className="aspect-[9/16] w-full max-w-[320px] rounded-[22px] bg-ink object-contain shadow-[0_18px_40px_rgba(28,21,48,.18)]"
+              className="aspect-[9/16] w-full max-w-[320px] bg-ink object-contain shadow-[0_18px_40px_rgba(18,17,16,.18)]"
             />
           ) : (
-            <div className="flex aspect-[9/16] w-full max-w-[320px] flex-col items-center justify-center gap-4 rounded-[22px] bg-soft px-6 text-center">
+            <div className="flex aspect-[9/16] w-full max-w-[320px] flex-col items-center justify-center gap-4 bg-soft px-6 text-center">
               <Orb size={56} />
               <p className="text-sm leading-relaxed text-muted">{previewMessage(post.status, plan !== null, render)}</p>
             </div>
@@ -471,7 +471,7 @@ function MediaPreview({ media, kind }: { media: PostMedia[]; kind: PostKind }) {
   return (
     <div className="flex w-full max-w-[320px] flex-col gap-2">
       <ul
-        className={`flex snap-x snap-mandatory overflow-x-auto rounded-[22px] bg-ink shadow-[0_18px_40px_rgba(28,21,48,.18)] ${ratio}`}
+        className={`flex snap-x snap-mandatory overflow-x-auto bg-ink shadow-[0_18px_40px_rgba(18,17,16,.18)] ${ratio}`}
         aria-label={kind === "carousel" ? `Carrousel de ${shown.length} éléments` : "Aperçu"}
       >
         {shown.map((m) => (

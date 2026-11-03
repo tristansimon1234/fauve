@@ -119,7 +119,7 @@ export function ReelEditor({
       ) : (
         <>
           <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
-            <button type="button" onClick={() => onClose()} className="h-10 rounded-full px-3 text-[15px] font-bold text-muted hover:bg-soft">
+            <button type="button" onClick={() => onClose()} className="h-10 px-3 text-[15px] font-bold text-muted hover:bg-soft">
               Fermer
             </button>
             <h2 className="flex-1 pr-16 text-center text-[16px] font-extrabold">Modifier</h2>
@@ -309,7 +309,7 @@ function Editor({
 
   const header = (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-2">
-      <button type="button" onClick={cancel} className="h-10 rounded-full px-3 text-[15px] font-bold text-muted hover:bg-soft">
+      <button type="button" onClick={cancel} className="h-10 px-3 text-[15px] font-bold text-muted hover:bg-soft">
         Annuler
       </button>
       <h2 className="flex-1 text-center text-[16px] font-extrabold">Modifier</h2>
@@ -322,13 +322,13 @@ function Editor({
     <div
       role="alertdialog"
       aria-label="Quitter sans enregistrer"
-      className={`flex shrink-0 flex-wrap items-center gap-2 bg-peach px-4 py-2.5 text-peach-ink ${inPage ? "rounded-[16px]" : ""}`}
+      className={`flex shrink-0 flex-wrap items-center gap-2 bg-peach px-4 py-2.5 text-peach-ink ${inPage ? "" : ""}`}
     >
       <p className="min-w-0 flex-1 text-[14px] font-semibold">Tes changements ne seront pas gardés.</p>
-      <button type="button" onClick={() => setLeaving(false)} className="h-9 rounded-full bg-white px-3.5 text-[13.5px] font-bold text-ink">
+      <button type="button" onClick={() => setLeaving(false)} className="h-9 bg-white px-3.5 text-[13.5px] font-bold text-ink">
         Rester
       </button>
-      <button type="button" onClick={() => onClose()} className="h-9 rounded-full px-3 text-[13.5px] font-bold underline underline-offset-2">
+      <button type="button" onClick={() => onClose()} className="h-9 px-3 text-[13.5px] font-bold underline underline-offset-2">
         Quitter
       </button>
     </div>
@@ -339,7 +339,7 @@ function Editor({
       className={
         inPage
           ? "relative size-full"
-          : "relative w-[min(calc(40dvh*9/16),236px)] overflow-hidden rounded-[14px] shadow-[0_18px_44px_rgba(0,0,0,.45)] lg:w-[min(calc((100dvh-250px)*9/16),340px)]"
+          : "relative w-[min(calc(40dvh*9/16),236px)] overflow-hidden shadow-[0_18px_44px_rgba(0,0,0,.45)] lg:w-[min(calc((100dvh-250px)*9/16),340px)]"
       }
     >
       <ReelPlayer props={props} playerRef={playerRef} initialFrame={initialFrame} />
@@ -378,7 +378,7 @@ function Editor({
   const settings = (
     <>
       {message && (
-        <p role="alert" className="mb-3 rounded-[12px] bg-peach px-3 py-2 text-[13.5px] font-semibold text-danger">
+        <p role="alert" className="mb-3 bg-peach px-3 py-2 text-[13.5px] font-semibold text-danger">
           {message}
         </p>
       )}
@@ -467,7 +467,7 @@ function Editor({
       {leave}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* The Reel, live, and its scenes. */}
-        <section aria-label="Aperçu" className="flex shrink-0 flex-col items-center gap-2.5 bg-[radial-gradient(ellipse_at_top,#2a2145_0%,#16112a_70%)] px-4 pt-3.5 pb-2.5 lg:min-w-0 lg:flex-1 lg:justify-center lg:gap-4 lg:py-6">
+        <section aria-label="Aperçu" className="flex shrink-0 flex-col items-center gap-2.5 bg-ink px-4 pt-3.5 pb-2.5 lg:min-w-0 lg:flex-1 lg:justify-center lg:gap-4 lg:py-6">
           {preview}
           {strip}
         </section>
@@ -534,7 +534,7 @@ function TextPanel({
           maxLength={120}
           onChange={(e) => onChange({ text: e.target.value })}
           aria-label="Les mots du texte"
-          className="h-12 w-full rounded-[14px] border-[1.5px] border-line bg-white px-3.5 text-[16px] font-semibold outline-none focus:border-violet"
+          className="h-12 w-full border-[1.5px] border-line bg-white px-3.5 text-[16px] font-semibold outline-none focus:border-violet"
         />
       )}
       <p className="-mt-1.5 text-[12.5px] leading-snug text-muted">Pour le placer, fais-le glisser sur la vidéo.</p>
@@ -545,7 +545,7 @@ function TextPanel({
           aria-label="Plus petit"
           disabled={scale <= 0.6}
           onClick={() => onChange({ scale: Math.max(0.6, round(scale - 0.1)) })}
-          className="h-10 w-12 rounded-full bg-chip text-[14px] font-extrabold disabled:opacity-35"
+          className="h-10 w-12 bg-chip text-[14px] font-extrabold disabled:opacity-35"
         >
           A−
         </button>
@@ -554,7 +554,7 @@ function TextPanel({
           aria-label="Plus grand"
           disabled={scale >= 1.6}
           onClick={() => onChange({ scale: Math.min(1.6, round(scale + 0.1)) })}
-          className="h-10 w-12 rounded-full bg-chip text-[17px] font-extrabold disabled:opacity-35"
+          className="h-10 w-12 bg-chip text-[17px] font-extrabold disabled:opacity-35"
         >
           A+
         </button>
@@ -618,7 +618,7 @@ function ScenePanel({
   onOverlay: (index: number) => void;
 }) {
   const kind = segmentKind(segment);
-  const button = "flex h-11 items-center justify-center gap-1 rounded-full border-[1.5px] border-line bg-white px-2 text-[13.5px] font-bold disabled:opacity-35";
+  const button = "flex h-11 items-center justify-center gap-1 border-[1.5px] border-line bg-white px-2 text-[13.5px] font-bold disabled:opacity-35";
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex items-baseline justify-between gap-2">
@@ -646,7 +646,7 @@ function ScenePanel({
       <SceneWords segment={segment} onChange={onChange} />
 
       {endCard && (
-        <div className="flex flex-col gap-2 rounded-[16px] bg-soft p-3">
+        <div className="flex flex-col gap-2 bg-soft p-3">
           <span className="text-[13px] font-bold">L’écran de fin</span>
           <Field label="Titre" value={endCard.title} max={40} onChange={(title) => onEndCard({ ...endCard, title })} />
           <Field label="L’invitation" value={endCard.subtitle ?? ""} max={60} onChange={(subtitle) => onEndCard({ ...endCard, subtitle: subtitle || undefined })} />
@@ -661,7 +661,7 @@ function ScenePanel({
               key={i}
               type="button"
               onClick={() => onText(i)}
-              className="flex items-center gap-2 rounded-[14px] border-[1.5px] border-line bg-white px-3 py-2.5 text-left hover:border-lilac"
+              className="flex items-center gap-2 border-[1.5px] border-line bg-white px-3 py-2.5 text-left hover:border-lilac"
             >
               <span className="w-9 shrink-0 text-[12px] font-bold text-muted tabular-nums">{clock(t.from)}</span>
               <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{t.text}</span>
@@ -675,7 +675,7 @@ function ScenePanel({
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-bold text-muted">Ajouté sur cette scène</span>
           {overlays.map(({ o, i }) => (
-            <button key={i} type="button" onClick={() => onOverlay(i)} className="flex items-center gap-2 rounded-[14px] border-[1.5px] border-line bg-white px-3 py-2.5 text-left hover:border-lilac">
+            <button key={i} type="button" onClick={() => onOverlay(i)} className="flex items-center gap-2 border-[1.5px] border-line bg-white px-3 py-2.5 text-left hover:border-lilac">
               <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{o.kind === "text" ? o.text : "Une photo"}</span>
               <ChevronRightIcon size={15} className="shrink-0 text-muted" />
             </button>
@@ -684,7 +684,7 @@ function ScenePanel({
       )}
 
       {/* Added without anything redone: drawn over what is there, free. */}
-      <div className="flex flex-col gap-2 rounded-[16px] border-[1.5px] border-dashed border-line p-3">
+      <div className="flex flex-col gap-2 border-[1.5px] border-dashed border-line p-3">
         <span className="text-[13px] font-bold">Ajouter sur cette scène</span>
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={onAddText} className={button}>
@@ -718,7 +718,7 @@ function ScenePanel({
         type="button"
         onClick={onAsk}
         disabled={changed}
-        className="h-11 rounded-full bg-violet-tint px-4 text-[14px] font-bold text-violet hover:bg-violet hover:text-white disabled:opacity-50 disabled:hover:bg-violet-tint disabled:hover:text-violet"
+        className="h-11 bg-violet-tint px-4 text-[14px] font-bold text-violet hover:bg-violet hover:text-white disabled:opacity-50 disabled:hover:bg-violet-tint disabled:hover:text-violet"
       >
         Demander à Edith pour cette scène
       </button>
@@ -768,7 +768,7 @@ function Field({ label, value, max, onChange }: { label: string; value: string; 
         value={value}
         maxLength={max}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 rounded-[12px] border-[1.5px] border-line bg-white px-3 text-[15px] font-semibold outline-none focus:border-violet"
+        className="h-11 border-[1.5px] border-line bg-white px-3 text-[15px] font-semibold outline-none focus:border-violet"
       />
     </label>
   );
