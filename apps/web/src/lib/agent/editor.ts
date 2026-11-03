@@ -21,6 +21,7 @@ import {
   CUT_OUT_WORDS,
   type EditorOutput,
   type EditorOutputLegacy,
+  type DirectorOutput,
   type MediaFacts,
   type ReelFormat,
   carryRetouch,
@@ -101,6 +102,7 @@ import { judgeHooks } from "./hook-judge";
 import { copyCandidate, designCopy } from "./copy-design";
 import { recordToolUses } from "@/lib/tool-maker";
 import { designMotionScenes, type SceneRequest, type SceneResult } from "./motion-designer";
+import { askDirector, directorFirstTurn, directorLookTurn, type DirectorBlock, type DirectorParts, type SavedDirector } from "./director";
 import { reelStills, showReel } from "./reel-canvas";
 import { ensureInspirationRead } from "@/lib/inspirations";
 import { MODEL_SOURCE, postStyle, SENT_TO_COPY, STEAL_WAIT_MS, modelSheets } from "@/lib/steal";
@@ -187,7 +189,14 @@ export type DesignedEdit = {
   /** Scenes written by the motion designer for this plan (the costly part), and scenes reused from the library. */
   newScenes: number;
   reusedScenes: number;
+  /** Made by the director (director.ts): its turn and answer, for the look at its Reel that follows (its own step). */
+  director?: SavedDirector;
+  /** A director's look that found nothing to fix: the Reel stays as it was (no new version). */
+  kept?: boolean;
 };
+
+/** What the director needs of the design step before it is asked: its call (up to 64 000 tokens streamed) and its composition's check. */
+const DIRECTOR_NEEDS_MS = 420_000;
 
 /** A failed composition is tried once more only with this much left in the design step (its limit is 800 s): a call, its check, the rest of the step. */
 const COMPOSE_RETRY_NEEDS_MS = 420_000;
@@ -287,6 +296,8 @@ export async function designEdit(params: {
   contract?: ReelContract;
   /** How many times the director looks at its new composition before it goes out (its level of care; 1 by default). */
   looks?: number;
+  /** The director's look at the Reel it made (its own step): its first turn and answer, saved by the design. */
+  director?: { look: SavedDirector };
 }): Promise<DesignedEdit> {
   const db = supabaseAdmin();
   const [post, studio, brand, previous, recent, report, inspirations, hooks, readyForEditor] = await Promise.all([
@@ -530,21 +541,79 @@ export async function designEdit(params: {
     await logClaudeCost(params.studioId, response.usage, "editor");
     return response as { stop_reason: string | null; parsed_output: EditorOutput | EditorOutputLegacy | null };
   };
+  // One director for a new Reel that follows a model (director.ts: one of Edith's, a Reel she sends, one of hers kept):
+  // it sees the original frame by frame and her files, and cuts and composes the Reel in one answer; its look at the
+  // Reel, next to the original, is its own step. The editor cuts the others (a voice leads them, a correction, no model).
+  const house = houseModel(followed?.house);
+  const example = house?.example ? HOUSE_EXAMPLES[house.example] : undefined;
+  const sheets = inspirationId ? await modelSheets(params.studioId, inspirationId).catch(() => []) : [];
+  const originalLength = sheets.at(-1)?.to ?? followed?.measured?.duration ?? 0;
+  const directing = Boolean(followed && sheets.length && !correction && !(voice && voiceId && spoken) && (params.director || timeLeft() >= DIRECTOR_NEEDS_MS));
+  let directed: { first: DirectorBlock[]; parts: DirectorParts; answer: DirectorOutput } | null = null;
+  // What the engine measured on the director's plan (a length missed, a floor not held): told at its look.
+  const directorNotes: string[] = [];
+  if (directing) {
+    try {
+      const parts: DirectorParts = params.director?.look.parts ?? { photos: photoIds.length > 0, moves: Object.keys(tracks).length > 0, example: Boolean(example) };
+      const first =
+        params.director?.look.first ??
+        (await directorFirstTurn(
+          params.studioId,
+          sheets,
+          [...clips.map((c) => ({ id: c.media_id, seconds: c.analysis.duration, photo: false })), ...photoIds.map((id) => ({ id, seconds: 0, photo: true }))],
+          house && example ? { ...input, model_code: { model: house.name, reference: `${example.frames} frames, ${example.shots} shots of the bench; its words and shots are placeholders`, code: example.code } } : input,
+        ));
+      const looked = params.director && previousPlan.success ? previousPlan.data : null;
+      const measured = params.director?.look.notes ?? [];
+      const answer = await askDirector(
+        params.studioId,
+        parts,
+        looked
+          ? [
+              { role: "user", content: first },
+              { role: "assistant", content: JSON.stringify(params.director!.look.answer) },
+              {
+                role: "user",
+                content: [...(await directorLookTurn(params.studioId, params.postId, looked, sheets, originalLength)), ...(measured.length ? [{ type: "text" as const, text: `Measured on it by the engine: ${measured.join(" ")}` }] : [])],
+              },
+            ]
+          : [{ role: "user", content: first }],
+      );
+      // Its look found nothing to fix: the Reel stays as it was.
+      if (looked && answer?.keep && baseId) {
+        console.log("director: kept its Reel after looking at it", params.postId);
+        return { editPlanId: baseId, version: previous.data?.[0]?.version ?? 0, plan: looked, rationale: "", newScenes: 0, reusedScenes: 0, kept: true };
+      }
+      if (answer?.plan?.segments?.length) directed = { first, parts, answer };
+      else console.warn("director: no plan, the editor cuts", params.postId);
+    } catch (error) {
+      console.warn("director failed, the editor cuts", params.postId, error);
+    }
+    // A look that could not be made keeps the Reel as it was.
+    if (!directed && params.director && baseId && previousPlan.success) {
+      return { editPlanId: baseId, version: previous.data?.[0]?.version ?? 0, plan: previousPlan.data, rationale: "", newScenes: 0, reusedScenes: 0, kept: true };
+    }
+  }
+
   // The answer's schema is compiled into a grammar with limits of its own: if the API ever
   // refuses it, the editor answers in the previous, smaller schema rather than not at all.
   let legacy = false;
-  const response = await ask(false).catch((error: unknown) => {
-    const status = (error as { status?: number }).status;
-    const message = error instanceof Error ? error.message : String(error);
-    if (status !== 400 || !/grammar|schema|complex|compil/i.test(message)) throw error;
-    console.warn("editor: schema refused, answering in the legacy schema", message);
-    legacy = true;
-    return ask(true);
-  });
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    throw new Error(`Le montage n'a pas pu être préparé (${response.stop_reason})`);
+  let output: EditorOutput | EditorOutputLegacy;
+  if (directed) output = directed.answer;
+  else {
+    const response = await ask(false).catch((error: unknown) => {
+      const status = (error as { status?: number }).status;
+      const message = error instanceof Error ? error.message : String(error);
+      if (status !== 400 || !/grammar|schema|complex|compil/i.test(message)) throw error;
+      console.warn("editor: schema refused, answering in the legacy schema", message);
+      legacy = true;
+      return ask(true);
+    });
+    if (response.stop_reason === "refusal" || !response.parsed_output) {
+      throw new Error(`Le montage n'a pas pu être préparé (${response.stop_reason})`);
+    }
+    output = response.parsed_output;
   }
-  let output = response.parsed_output;
 
   const durations = { ...Object.fromEntries(clips.map((c) => [c.media_id, c.analysis.duration])), ...Object.fromEntries(photoIds.map((id) => [id, PHOTO_MAX_SECONDS])) };
   // Where someone speaks: the hesitations and long pauses the engine cuts out.
@@ -608,7 +677,9 @@ export async function designEdit(params: {
   // The length she asked for is measured on the plan, never taken from the editor's words: missed, it
   // reads the measure and answers once more, and the closer of its two plans is kept.
   const asked = params.contract?.duration;
-  if (asked && missesLength(plan.duration, asked)) {
+  // The director's plan: what was measured goes to its look, which re-cuts the whole Reel anyway (a retry here would take its step's time).
+  if (asked && missesLength(plan.duration, asked) && directed) directorNotes.push(lengthNote(plan.duration, asked));
+  else if (asked && missesLength(plan.duration, asked)) {
     const again = await ask(legacy, { answer: output, note: lengthNote(plan.duration, asked) }).catch((error: unknown) => {
       console.warn("editor: length retry failed", error);
       return null;
@@ -625,7 +696,8 @@ export async function designEdit(params: {
   // reads what was measured and answers once more; the retry is kept when it holds (or holds better).
   const floorContext = { voice: Boolean(voice), speech: clips.some((c) => Boolean(c.analysis.words?.length)), request: params.brief, duration: params.contract?.duration };
   const floor = followed?.dressed && !correction ? dressedFloorNote(plan, floorContext) : null;
-  if (floor) {
+  if (floor && directed) directorNotes.push(floor);
+  else if (floor) {
     const again = await ask(legacy, { answer: output, note: floor }).catch((error: unknown) => {
       console.warn("editor: floor retry failed", error);
       return null;
@@ -872,7 +944,6 @@ export async function designEdit(params: {
   // The Reel she copies, seen by each animation that remakes part of it: the sheets of its frames at the same point
   // of the Reel (all of them for an animation over the whole Reel), never a sentence alone.
   if (post.data.inspiration_id && requests.length) {
-    const sheets = await modelSheets(params.studioId, post.data.inspiration_id as string).catch(() => []);
     if (sheets.length) {
       const modelLength = sheets.at(-1)!.to || 1;
       const spans = planTimeline(plan).segments;
@@ -895,9 +966,14 @@ export async function designEdit(params: {
   }
   // One of Edith's models: its reference composition, timed on the model, a worked example for each animation that
   // remakes it (the composition over the whole Reel first of all), never pasted as it is.
-  const house = houseModel(followed?.house);
-  const example = house?.example ? HOUSE_EXAMPLES[house.example] : undefined;
   if (house && example) for (const request of requests) request.example = { name: house.name, ...example };
+  // The director wrote the composition with its plan: checked like any animation, never written again.
+  const drafted = directed?.answer.composition;
+  if (drafted?.code?.trim()) {
+    const target = requests.find((r) => r.compose);
+    if (target) target.draft = { ...drafted };
+    else console.warn("director: a composition for a plan that is not composed, left out", params.postId);
+  }
   // A correction: each animation rewritten first looks at how its earlier version came out on her images.
   if (correction && previousPlan.success && baseId && requests.length) {
     await lookAtEarlierRender(params.studioId, params.postId, baseId, previousPlan.data, plan, requests, {
@@ -1101,7 +1177,7 @@ export async function designEdit(params: {
   // une ou deux fois, puis livre »): a composition written now, drawn as it will come out (her cut-outs computed first,
   // as the render does), seen by the one who wrote it, which fixes what is off or keeps it. Only while the step has the
   // time for its images and a call; a look that fails keeps the composition as written.
-  for (let look = 0; composeId && !correction && look < (params.looks ?? 1); look++) {
+  for (let look = 0; composeId && !correction && !directed && look < (params.looks ?? 1); look++) {
     const fixed = await lookAtOwnReel(params.studioId, params.postId, plan, requests.find((r) => r.id === composeId), designed.find((d) => d.id === composeId), (requests) =>
       designMotionScenes(params.studioId, requests, direction, sceneBrand, kit, sceneContext),
     ).catch((error: unknown) => {
@@ -1174,5 +1250,9 @@ export async function designEdit(params: {
     // never a paid animation, never counted in her new animations.
     newScenes: requests.filter((r) => !r.compose && !r.words).length,
     reusedScenes: reused.size,
+    // The director's Reel, composed: its turn and answer for its look (the route gives it its own step).
+    ...(directed && plan.layers?.some((l) => l.compose && l.motion.js)
+      ? { director: { director: true as const, first: directed.first, parts: directed.parts, answer: directed.answer, original: originalLength, ...(directorNotes.length ? { notes: directorNotes } : {}) } }
+      : {}),
   };
 }

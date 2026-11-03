@@ -29,7 +29,8 @@ import {
 import { reviewMontage } from "@/lib/agent/critic";
 import { readContract } from "@/lib/agent/contract";
 import { ensureCopyCharter, ensureEdithModel } from "@/lib/agent/house-pick";
-import { MissedCorrection, designEdit } from "@/lib/agent/editor";
+import { MissedCorrection, designEdit, type DesignedEdit } from "@/lib/agent/editor";
+import { directorPath, readDirector, saveDirector, type SavedDirector } from "@/lib/agent/director";
 import {
   collectEffects,
   effectRoute,
@@ -141,8 +142,19 @@ const bodySchema = z.object({
   route: z.enum(["agent", "chain"]).optional(),
   /** The editor's reasoning effort, set on a montage queued by hand to compare two levels; else its level of care's. */
   editorEffort: z.enum(["medium", "high"]).optional(),
-  /** A job queued before the look at the animations was cut: the file its design saved for it, and the step after it. */
-  look: z.object({ planId: z.uuid(), path: z.string().max(300), then: z.enum(["render", "alternative"]) }).optional(),
+  /**
+   * The director's look at the Reel it made (director: its turn and answer saved in path, the looks still to come in
+   * left), or a job queued before the look at the animations was cut; then: the step after it.
+   */
+  look: z
+    .object({
+      planId: z.uuid(),
+      path: z.string().max(300),
+      then: z.enum(["render", "alternative"]),
+      director: z.boolean().optional(),
+      left: z.number().int().min(0).max(3).optional(),
+    })
+    .optional(),
   /** The agent's session at work: its id, the files it was given, its voice, when it started, her files by the names it knows them. */
   effect: z
     .object({
@@ -238,11 +250,14 @@ async function runStep(job: Job) {
   const target = { studioId: job.studioId, postId: job.postId, waId: job.waId, replyTo: job.replyTo, notify: job.notify, conversationId: job.conversationId };
   const level = job.effort ? EFFORTS[job.effort] : null;
 
-  // A job queued before the look at the animations was cut (Tristan: « la relecture me semble pas utile »; without it,
-  // florist test 10 cost half as much, took 5 minutes less and kept its animations as written): it goes on.
+  // The director looks at the Reel it made, next to the original, and fixes it (directorLook). A job queued before the
+  // look at the animations was cut (Tristan: « la relecture me semble pas utile »; without it, florist test 10 cost half
+  // as much, took 5 minutes less and kept its animations as written) goes on.
   if (job.step === "look") {
+    const saved = job.look?.director ? await readDirector(job.look.path) : null;
     if (job.look) await dropSavedLook(job.look.path);
-    await next(job, { step: job.look?.then ?? "render", look: undefined });
+    if (saved && job.look) await directorLook(job, saved);
+    else await next(job, { step: job.look?.then ?? "render", look: undefined });
     return;
   }
 
@@ -307,16 +322,18 @@ async function runStep(job: Job) {
       await edithModelFirst(job);
       if (await voiceFirst(job)) return;
       const edit = await designEdit({ ...designInput(job), effort: job.editorEffort ?? level?.editorEffort });
-      await queueJob("montage", {
+      const rendering = {
         ...target,
-        step: "render",
+        step: "render" as const,
         rationale: edit.rationale,
         quoteId: job.quoteId,
         newScenes: edit.newScenes,
         effort: job.effort,
         voice: job.voice,
         spokenKept: job.spokenKept,
-      });
+      };
+      // The director's Reel: its look first (its own step, with all of the job: her files, her request, her contract), then the render.
+      if (!(await toDirectorLook(job, edit, "render", { ...job, ...rendering }))) await queueJob("montage", rendering);
     } catch (error) {
       console.error("montage design failed", job.postId, error);
       await reopenQuote(job.quoteId);
@@ -612,7 +629,52 @@ async function design(job: Job) {
   const copied = Boolean(edit.plan.copy);
   const two = !copied && effortVersions(job.effort!, Boolean(job.correction)) > 1;
   const then = two ? "alternative" : "render";
-  await next(job, { step: then, versions, newScenes: edit.newScenes, round: 0, fixes: 0, ...(copied ? { copied } : {}) });
+  const patch = { versions, newScenes: edit.newScenes, round: 0, fixes: 0, ...(copied ? { copied } : {}) };
+  // The director's Reel: its look first (its own step).
+  if (!(await toDirectorLook(job, edit, then, { ...job, ...patch, step: then }))) await next(job, { step: then, ...patch });
+}
+
+/**
+ * The director's look at the Reel it made, queued as its own step (a fresh 800 s: its images, a call that may re-cut
+ * the whole Reel, its check): its turn and answer saved for it, its level of care's looks (1 in Rapide, 2 in Soigné,
+ * 3 in Max). False when there is no look to make (the step goes on as before).
+ */
+async function toDirectorLook(job: Job, edit: DesignedEdit, then: "render" | "alternative", after: Job, left = EFFORTS[job.effort ?? DEFAULT_EFFORT].looks): Promise<boolean> {
+  if (!edit.director || left < 1) return false;
+  try {
+    const path = directorPath(job.studioId, job.postId);
+    await saveDirector(path, edit.director);
+    await next(after, { step: "look", look: { planId: edit.editPlanId, path, then, director: true, left: left - 1 } });
+    return true;
+  } catch (error) {
+    console.warn("director: its look not queued, the Reel goes on as made", job.postId, error);
+    return false;
+  }
+}
+
+/**
+ * The director looks at its Reel as it renders, next to the original at the same instants, and answers it again (cuts,
+ * texts and code) or keeps it: a new version takes the place of the one it looked at. Any failure keeps the Reel as it is.
+ */
+async function directorLook(job: Job, saved: SavedDirector) {
+  await setQuoteStage(job.quoteId, "design");
+  const look = job.look!;
+  let patch: Partial<Job> = { step: look.then, look: undefined };
+  try {
+    const edit = await designEdit({ ...designInput(job), effort: job.editorEffort ?? EFFORTS[job.effort ?? DEFAULT_EFFORT].editorEffort, director: { look: saved } });
+    if (!edit.kept) {
+      console.log("director: its look made a new version", job.postId, edit.editPlanId);
+      patch = job.versions?.length
+        ? { ...patch, versions: job.versions.map((v) => (v.planId === look.planId ? { ...v, planId: edit.editPlanId, rationale: edit.rationale.slice(0, 600) } : v)) }
+        : { ...patch, rationale: edit.rationale };
+      // Animations it had written again count as made (their cost is logged either way).
+      patch.newScenes = Math.max(job.newScenes ?? 0, edit.newScenes);
+      if (await toDirectorLook(job, edit, look.then, { ...job, ...patch, step: look.then }, look.left ?? 0)) return;
+    }
+  } catch (error) {
+    console.warn("director: its look failed, the Reel goes on as made", job.postId, error);
+  }
+  await next(job, patch);
 }
 
 /** What a design saved for the look at its animations, before it was cut. */

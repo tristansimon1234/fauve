@@ -87,7 +87,12 @@ export type SceneRequest = {
   subtitles?: { y: number; h: number };
   /** The colours of the picture under it, read once from `canvas` for the scene check (null: none to read). */
   backdrop?: SceneBackdrop | null;
+  /** Its code already written by the Reel's director (director.ts): checked as any, fixed by the motion designer only if it fails. */
+  draft?: DraftScene;
 };
+
+/** A composition the director wrote with its plan. */
+export type DraftScene = { code: string; notes?: string; name?: string; photos?: string[]; fonts?: string[]; subtitle_y?: number | null };
 
 /** One image of the Reel as it renders, with the instant it shows (and, before writing, which shot or which frame of the animation). */
 export type SceneFrame = { label: string; jpeg: Buffer; shot?: number; frame?: number };
@@ -363,6 +368,11 @@ async function writeScene(
       : isKimiModel(model)
         ? await askKimi(studioId, model, prompt, content)
         : await askGemini(studioId, model, prompt, content);
+  return sceneOf(output, request, brand);
+}
+
+/** A written answer as a scene: its photos among those offered, its fonts those Google serves, its sounds within its length, its code checked and compiled. */
+async function sceneOf(output: SceneOutput | null, request: SceneRequest, brand: SceneBrand): Promise<Omit<SceneResult, "id">> {
   const code = output?.code ?? "";
   // Only photos it was offered, each once, in its order.
   const offered = new Set((request.photos ?? []).map((p) => p.id));
@@ -476,7 +486,7 @@ export async function designMotionScenes(
   const requestOf = (id: string) => requests.find((q) => q.id === id)!;
   // A first draft sees the Reel it is written for, when the step has the time for its images and a call after them;
   // images that take longer than that are not waited for (they reach the drafts still to be written).
-  if (context.show && requests.some((r) => !r.seen && !r.canvas) && timeLeft() >= SHOW_MS + SCENE_CALL_MS + SMOKE_MS) {
+  if (context.show && requests.some((r) => !r.seen && !r.canvas && !r.draft) && timeLeft() >= SHOW_MS + SCENE_CALL_MS + SMOKE_MS) {
     let state: "showing" | "shown" | "failed" = "showing";
     let timer: ReturnType<typeof setTimeout> | undefined;
     const showing = context.show(requests).then(
@@ -503,6 +513,11 @@ export async function designMotionScenes(
       ],
       done: context.done ?? [],
     };
+    // Written by the Reel's director with its plan: checked below like any scene, never written again here.
+    if (r.draft) {
+      results.push({ id: r.id, ...(await sceneOf({ slots: [], sounds: null, notes: "", name: "", photos: [], fonts: [], ...r.draft, subtitle_y: r.draft.subtitle_y ?? null }, r, brand)) });
+      continue;
+    }
     const write = () => writeScene(studioId, model, r, brand, artDirection, kit, existing).catch((e: unknown) => ({ code: null, js: null, error: String(e) }));
     // Not started without the time to finish it: the step would die with nothing (its fixed scene, or none, plays).
     if (timeLeft() < SCENE_CALL_MS) {

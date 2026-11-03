@@ -740,6 +740,43 @@ export async function houseSheetsInSandbox(id: string, url: string, passage: { s
   }
 }
 
+/**
+ * Her files as the director sees them before it cuts (director.ts): one sheet of ten frames per video over its whole
+ * length (five by two, 320 px on the long side, as the original's sheets), each photo at the same size; null for a
+ * file that could not be read.
+ */
+export async function rushSheetsInSandbox(id: string, items: { url: string; seconds: number; photo: boolean }[]): Promise<(Buffer | null)[]> {
+  if (!items.length) return [];
+  const sandbox = await jobSandbox();
+  const dir = `${ROOT}/jobs/${id}`;
+  try {
+    await bash(sandbox, 'rm -rf "$1" && mkdir -p "$1"', [dir]);
+    await bash(
+      sandbox,
+      [
+        'cd "$1" && shift',
+        "i=0",
+        'while [ "$#" -ge 3 ]; do',
+        `  f() { ${FETCH}; }`,
+        '  if f "in_$i" "$1" >> fetch.log 2>&1; then',
+        '    if [ "$3" = photo ]; then',
+        `      ${ROOT}/ffmpeg -v error -i "in_$i" -vf "scale='if(gt(iw,ih),320,-2)':'if(gt(iw,ih),-2,320)'" -frames:v 1 -q:v 4 -y "rush_$i.jpg" || true`,
+        "    else",
+        `      ${ROOT}/ffmpeg -v error -i "in_$i" -an -vf "fps=10/$2,scale='if(gt(iw,ih),320,-2)':'if(gt(iw,ih),-2,320)',tile=5x2" -frames:v 1 -q:v 5 -y "rush_$i.jpg" || true`,
+        "    fi",
+        '    rm -f "in_$i"',
+        "  fi",
+        "  i=$((i+1)); shift 3",
+        "done",
+      ].join("\n"),
+      [dir, ...items.flatMap((item) => [item.url, Math.max(0.5, item.seconds).toFixed(3), item.photo ? "photo" : "video"])],
+    );
+    return await Promise.all(items.map((_, i) => sandbox.readFileToBuffer({ path: `${dir}/rush_${i}.jpg` }).then((b) => (b?.length ? b : null), () => null)));
+  } finally {
+    await bash(sandbox, 'rm -rf "$1"', [dir]).catch(() => {});
+  }
+}
+
 /** One scene's thumbnail in the strip: the Reel at a tenth of its size. */
 const TILE = { width: 108, height: 192 };
 

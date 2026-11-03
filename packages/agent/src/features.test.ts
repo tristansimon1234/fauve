@@ -1265,6 +1265,31 @@ test("each of Edith's models shows its original's frames as a Reel she sends: sh
   assert.ok(houseModel("nike") && HOUSE_PASSAGES.nike!.crop);
 });
 
+test("one director for a Reel that follows a model: its answer, the original at the same point, the frame of its sheets", async () => {
+  const { directorOutputSchema, originalInstant, sheetCell, DIRECTOR_PROMPT, DIRECTOR_LOOK_NOTE } = await import("./director.ts");
+  const { houseSheets } = await import("./house-sheets.ts");
+  // Its answer is the editor's, with a composition and, after a look, keep.
+  const shape = Object.keys(directorOutputSchema.shape).sort();
+  assert.deepEqual(shape, ["composition", "keep", "plan", "rationale"]);
+  assert.ok(directorOutputSchema.shape.composition.safeParse(null).success);
+  assert.ok(directorOutputSchema.shape.composition.safeParse({ code: "function Scene() {}", notes: "", name: "Titre", photos: [], fonts: [] }).success);
+  assert.match(DIRECTOR_PROMPT, /never seconds you wrote/);
+  assert.match(DIRECTOR_LOOK_NOTE, /keep true/);
+  // The same second when the two lengths are close, the same point of it otherwise; never past its end.
+  assert.equal(originalInstant(3, 12, 12.5), 3);
+  assert.equal(originalInstant(6, 12, 24), 12);
+  assert.equal(originalInstant(20, 12, 13), 13);
+  assert.equal(originalInstant(-1, 12, 12), 0);
+  // The nearest of its frames: ten a sheet, five by two; the last sheet ends with the original.
+  const facade = houseSheets("facade");
+  assert.deepEqual(sheetCell(facade, 0), { sheet: 0, col: 0, row: 0 });
+  assert.deepEqual(sheetCell(facade, 1.0), { sheet: 0, col: 0, row: 1 });
+  assert.deepEqual(sheetCell(facade, 2.6), { sheet: 1, col: 3, row: 0 });
+  assert.deepEqual(sheetCell(facade, 9.3), { sheet: 4, col: 1, row: 1 });
+  assert.deepEqual(sheetCell(facade, 50), { sheet: 4, col: 1, row: 1 });
+  assert.equal(sheetCell([], 1), null);
+});
+
 test("the director's look at its own Reel: its first image, each text coming in and read, each shot, its end, sixteen at most", async () => {
   const { lookMoments, LOOK_FRAMES } = await import("./rework.ts");
   const plan = { duration: 10, texts: [{ from: 0, to: 2 }, { from: 4, to: 6 }] } as unknown as Pick<EditPlan, "duration" | "texts">;
