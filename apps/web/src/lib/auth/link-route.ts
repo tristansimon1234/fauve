@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { openSessionForPhone } from "@/lib/auth/server-login";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
-import { FACE_PATH, FRINGE_PATH, GLASSES_PATH, HAIR_PATH } from "@/components/mascot";
+import { EYES, GLASSES_PATH, HAIR_PATH } from "@/components/mascot";
 
 // Opaque one-time links sent by Edith on WhatsApp (15 min, a day for a
 // publication; single use): opening one signs the manager in on that device.
@@ -47,7 +47,7 @@ export function linkPage(action: string): NextResponse {
 </head>
 <body>
 <main>
-  <svg class="orb" viewBox="14 18 72 76" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${[HAIR_PATH, FACE_PATH, FRINGE_PATH, GLASSES_PATH, "M39.2 54 Q42.6 52.2 45.6 53.4 M54.4 52 Q57.8 49.9 61 51.6", "M46.4 76 Q50.5 78 54.4 75.4"].map((d) => `<path d="${d}" vector-effect="non-scaling-stroke"/>`).join("")}<ellipse cx="42.6" cy="59" rx="1.7" ry="2.2" fill="currentColor" stroke="none"/><ellipse cx="57.6" cy="58.4" rx="1.7" ry="2.2" fill="currentColor" stroke="none"/></svg>
+  <svg class="orb" viewBox="13 11 74 74" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${[HAIR_PATH, GLASSES_PATH].map((d) => `<path d="${d}" vector-effect="non-scaling-stroke"/>`).join("")}${EYES.map((e) => `<ellipse cx="${e.cx}" cy="${e.cy}" rx="1.5" ry="1.9" fill="currentColor" stroke="none"/>`).join("")}</svg>
   <p>J’ouvre ta page…</p>
   <form method="post" action="${escape(action)}"><button type="submit">Ouvrir</button></form>
 </main>

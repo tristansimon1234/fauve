@@ -13,10 +13,10 @@ import { Mascot, type MascotMood } from "@/components/mascot";
 // like a real one: the screen is never empty and never resets. The Reel and the grid come from the
 // landing's demo studio (public/landing). Still on its last picture when the device asks for less motion.
 
-const REEL = "/landing/work-pilates.mp4";
-const REEL_POSTER = "/landing/work-pilates.webp";
-const POST = "/landing/post-planche.webp";
-const CLIPS = ["/landing/raw-pilates-0.webp", "/landing/raw-pilates-1.webp", "/landing/raw-pilates-2.webp"];
+const REEL = "/landing/reels/coiffure-360.mp4";
+const REEL_POSTER = "/landing/reels/coiffure.webp";
+const POST = "/landing/carrousels/meche-1.webp";
+const CLIPS = ["/landing/reels/raw-coiffure-0.webp", "/landing/reels/raw-coiffure-1.webp", "/landing/reels/raw-coiffure-2.webp"];
 
 type Msg =
   | { id: string; kind: "day"; text: string }
@@ -49,12 +49,12 @@ const START: Scene = {
   writing: false,
   draft: "",
   tiles: [
-    { id: "p1", src: "/landing/tile-1.webp" },
-    { id: "p2", src: "/landing/tile-2.webp" },
-    { id: "p3", src: "/landing/tile-3.webp" },
-    { id: "p4", src: "/landing/tile-4.webp" },
-    { id: "p5", src: "/landing/tile-5.webp" },
-    { id: "p6", src: "/landing/tile-6.webp" },
+    { id: "p1", src: "/landing/carrousels/meche-4.webp" },
+    { id: "p2", src: "/landing/carrousels/meche-2.webp" },
+    { id: "p3", src: "/landing/carrousels/meche-3.webp" },
+    { id: "p4", src: "/landing/carrousels/meche-5.webp" },
+    { id: "p5", src: "/landing/reels/raw-coiffure-1.webp" },
+    { id: "p6", src: "/landing/reels/raw-coiffure-2.webp" },
   ],
   visits: 0,
   card: false,
@@ -135,7 +135,7 @@ function postStory(n: number): { steps: Step[]; length: number } {
         1400,
         all(
           set({ writing: false, mood: "happy" }),
-          add({ id: `${k}a`, kind: "ask", at: "18:02", text: "Le mercredi soir, tes posts amènent le plus de visites. Je te fais un carrousel « 3 erreurs en planche » avec tes vidéos de mardi ?", options: ["Oui, vas-y", "Pas cette semaine"] }),
+          add({ id: `${k}a`, kind: "ask", at: "18:02", text: "Le mercredi soir, tes posts amènent le plus de visites. Je te fais un carrousel « Le carré de Léa » avec tes photos de mardi ?", options: ["Oui, vas-y", "Pas cette semaine"] }),
         ),
       ],
       [3700, set({ tap: `${k}a` })],
@@ -490,7 +490,7 @@ function AppWindow({ tiles }: { tiles: Tile[] }) {
               L
             </span>
             <span className="flex flex-col leading-tight">
-              <span className="text-[12px] font-bold">studio.lune</span>
+              <span className="text-[12px] font-bold">atelier.meche</span>
               <span className="text-[10px] text-muted">62 publications · 1 284 abonnés</span>
             </span>
           </div>

@@ -5,7 +5,7 @@ import { ImageResponse } from "next/og";
 
 // The picture shown when a link to the landing is shared (WhatsApp, Instagram, iMessage, LinkedIn…), in the site's
 // paper and ink: the line logo, the promise in big type, three of its Reels side by side between hairlines.
-export const alt = "Edith est une IA. Tes Reels n’en ont pas l’air.";
+export const alt = "Tes Reels, jamais pareils. Edith, ton community manager IA.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -25,7 +25,7 @@ const [semi, medium, serif, logo, ...reels] = await Promise.all([
   asset("intertight-500.ttf"),
   asset("instrument-italic.ttf"),
   readFile(join(process.cwd(), "public/icon.svg"), "utf8").then(lineLogo),
-  ...["pilates", "cafe", "cave"].map((reel) => dataUrl(`reel-${reel}.jpg`, "image/jpeg")),
+  ...["coiffure", "bar", "fleuriste"].map((reel) => dataUrl(`reel-${reel}.jpg`, "image/jpeg")),
 ]);
 
 export default function Image() {
@@ -41,9 +41,11 @@ export default function Image() {
         </div>
         <div style={{ display: "flex", flex: 1, alignItems: "flex-end", justifyContent: "space-between", gap: 32 }}>
           <div style={{ display: "flex", flexDirection: "column", paddingBottom: 8 }}>
-            <div style={{ fontSize: 84, fontWeight: 600, letterSpacing: -5, lineHeight: 0.95 }}>Edith est une IA.</div>
-            <div style={{ fontFamily: "Instrument", fontStyle: "italic", fontSize: 88, lineHeight: 0.95, letterSpacing: -2, marginTop: 6 }}>Tes Reels n’en ont</div>
-            <div style={{ fontFamily: "Instrument", fontStyle: "italic", fontSize: 88, lineHeight: 0.95, letterSpacing: -2 }}>pas l’air.</div>
+            <div style={{ fontSize: 112, fontWeight: 600, letterSpacing: -7, lineHeight: 0.9 }}>Tes Reels,</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 22 }}>
+              <div style={{ fontSize: 112, fontWeight: 600, letterSpacing: -7, lineHeight: 0.9 }}>jamais</div>
+              <div style={{ fontFamily: "Instrument", fontStyle: "italic", fontSize: 124, lineHeight: 0.9, letterSpacing: -3 }}>pareils.</div>
+            </div>
             <div style={{ fontSize: 17, fontWeight: 500, letterSpacing: 2, textTransform: "uppercase", marginTop: 26, color: "#6B675F" }}>{`edith-ai.app · dès ${PLANS.decouverte.priceEur} € par mois`}</div>
           </div>
           <div style={{ display: "flex", gap: 10, paddingBottom: 8 }}>

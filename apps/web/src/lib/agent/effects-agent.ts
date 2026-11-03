@@ -131,6 +131,9 @@ export async function effectRoute(studioId: string, input: { postId: string; cor
   const videos = (media ?? []).filter((m) => m.kind === "video").length;
   // The Reel she copies is part of her request: its moments (an effect after another) say what it takes.
   const followed = await postStyle(studioId, input.postId).catch(() => undefined);
+  // One of Edith's own models is a composition the chain makes (its reference code is the motion designer's), cut-outs
+  // at every frame included: never the workshop (a « Titre derrière toi » had gone there, at its price and its 10 to 30 min).
+  if (followed?.house) return "chain";
   // A Reel she sent to remake goes to the workshop's director only when it holds a real effect (routeEffect, below,
   // reads its moments): a simple one (a held message, cuts, cut-outs laid over) is remade by code, in the chain
   // (copyPlan), for the chain's price (Tristan: « réduire le nombre d'agents, améliorer la qualité mais garder les marges »).

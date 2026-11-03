@@ -3,12 +3,16 @@ import { priceTax } from "@/lib/legal";
 import type { Metadata } from "next";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { ChartIcon, CheckIcon, ClockIcon, EyeIcon, LayersIcon, MicIcon, MusicIcon, PenIcon, RepeatIcon, ZapIcon } from "@/components/icons";
+import { CarouselDecks, type Deck } from "@/components/landing/carousel-decks";
 import { HeroScene } from "@/components/landing/hero-scene";
-import { IdeaToPost } from "@/components/landing/idea-to-post";
+import { MorphWord, type MorphItem } from "@/components/landing/morph-word";
+import { ScrollWords, type Token } from "@/components/landing/scroll-words";
+import { Techniques, type Technique } from "@/components/landing/techniques";
 import { Play } from "@/components/landing/play";
-import { ModelWall, ReelStrip, type StripReel } from "@/components/landing/reel-strip";
+import { ReelBelt, type StripReel } from "@/components/landing/reel-strip";
 import { ReelWall } from "@/components/landing/reel-wall";
-import { WORK } from "@/components/landing/work";
+import { WORK, workMedia, type WorkId } from "@/components/landing/work";
+import { landingFonts } from "./landing-fonts";
 import { fr, frNodes } from "@/components/landing/fr";
 import { faqPage, JsonLd, LastCall, SectionTitle, SiteFooter, SiteHeader, Start } from "@/components/landing/site";
 import { CaptionVisual, CopyReelVisual, GestureVisual, LayoutsVisual, MusicVisual, ReminderVisual, ReportVisual, RetouchVisual, VoiceVisual } from "@/components/landing/visuals";
@@ -16,13 +20,13 @@ import { whatsappLink } from "@/lib/public-env";
 import { SITE_URL } from "@/lib/site";
 import "./landing.css";
 
-const description = `Edith monte tes vidéos en Reels qui n’ont pas l’air d’une IA, écrit tes légendes et te fait signe au bon moment pour poster. Sur WhatsApp, dès ${PLANS.decouverte.priceEur} € par mois.`;
+const description = `Edith invente pour chacune de tes vidéos sa forme, sa typo et son rythme, écrit la légende et te fait signe au bon moment pour poster. Sur WhatsApp, dès ${PLANS.decouverte.priceEur} € par mois.`;
 
 export const metadata: Metadata = {
   title: { absolute: "Edith · community manager IA pour commerces et indépendants" },
   description,
   alternates: { canonical: "/" },
-  openGraph: { type: "website", siteName: "Edith", locale: "fr_FR", url: "/", title: "Edith est une IA. Tes Reels n’en ont pas l’air.", description },
+  openGraph: { type: "website", siteName: "Edith", locale: "fr_FR", url: "/", title: "Tes Reels, jamais pareils.", description },
   robots: { index: true, follow: true },
 };
 
@@ -76,6 +80,7 @@ const offers = [
 
 const faq: [string, string][] = [
   ["Ça ne va pas faire « contenu IA » ?", "C’est tout le travail d’Edith : ta meilleure image en premier, des coupes sur le temps, des mots de créateur, ta charte. Et si quelque chose ne te ressemble pas, tu le lui dis d’un mot."],
+  ["Tous mes Reels vont se ressembler ?", "Non. Edith n’a pas de modèle tout fait : il part de tes images, de ton style et de ce que tu demandes, et invente la forme de chaque Reel. Tu peux aussi lui montrer un Reel que tu aimes, il le refait avec tes images."],
   ["C’est pour qui ?", "Les commerces de quartier comme les indépendants : studio, salon, resto, boutique, prof de yoga, coach, photographe, céramiste… Tous ceux qui vivent de leurs clients, avec ou sans site."],
   ["Edith, c’est une vraie personne ?", "Non, c’est un assistant IA, et il le dit. Tu gardes toujours la main."],
   ["Qui publie sur Instagram ?", "Toi, d’un toucher : ton Reel s’ouvre dans Instagram, sa légende déjà copiée, et tu peux y ajouter un son tendance. Edith suit ensuite ses chiffres depuis ton @."],
@@ -97,7 +102,7 @@ const ideas: [string, string][] = [
 ];
 
 /** The manifesto passing under the hero. */
-const NOT = ["pas de modèle tout fait", "pas de voix de robot", "pas de « offre exceptionnelle »", "pas de glitch", "des Reels qui te ressemblent"];
+const NOT = ["pas de modèle tout fait", "pas de voix de robot", "pas de « offre exceptionnelle »", "pas deux Reels pareils", "une infinité de façons"];
 
 /** What search engines and AI assistants read about Edith: the product, its offers and the FAQ. */
 const structuredData = () => ({
@@ -126,72 +131,139 @@ const structuredData = () => ({
 
 const vars = (values: Record<string, string | number>) => values as CSSProperties;
 
-/** A model of Edith's as the site shows it: its loop, its poster, its name and what it does. */
-const model = (key: string): StripReel => {
-  const m = HOUSE_MODELS.find((h) => h.key === key);
-  return { key, src: `/modeles/${key}.mp4`, poster: `/modeles/${key}.jpg`, label: m?.name ?? key, note: m?.pitch };
-};
-const work = (id: (typeof WORK)[number]["id"]): StripReel => {
+const reel = (id: WorkId, small = true): StripReel => {
   const w = WORK.find((x) => x.id === id)!;
-  return { key: `work-${id}`, src: `/landing/work-${id}.mp4`, poster: `/landing/work-${id}.webp`, label: w.trade };
+  const m = workMedia(id);
+  return { key: id, src: small ? m.small : m.video, poster: m.poster, label: `${w.trade} · ${w.brand}` };
 };
+const model = (key: string): StripReel => ({ key, src: `/modeles/${key}.mp4`, poster: `/modeles/${key}.jpg`, label: HOUSE_MODELS.find((h) => h.key === key)?.name ?? key });
 
-/** The hero's strip: the landing's three Reels between models of Edith's, the strongest pictures first. */
-const HERO_STRIP: StripReel[] = [model("aplat"), work("pilates"), model("titre-derriere"), work("cafe"), model("carte-feutre"), work("cave"), model("pile")].map((r) => ({ ...r, note: undefined }));
-
-/** Every model, the most striking first (the rest open on a tap). */
-const WALL_ORDER = [
-  "aplat", "titre-derriere", "mot-cle", "pile", "carte-feutre", "detourages", "journee", "mosaique", "quatre-coins", "coulisses", "cadre", "fenetres",
-  "frappe", "interrupteur", "mots-meles", "pixel", "nike", "eventail", "coups-de-fouet", "tourne", "plans-fixes", "table", "ecran-partage", "facade",
-  "gaufre", "photo-dump", "decode", "silhouette", "vision", "createur", "interface",
+/** The belt under the hero: the site's Reels, then some of Edith's models, endlessly. */
+const BELT: StripReel[] = [
+  reel("coiffure"), model("aplat"), reel("bar"), reel("fleuriste"), model("titre-derriere"), reel("cafe"), reel("tatoueur"), model("pile"),
+  reel("patisserie"), reel("ceramique"), model("carte-feutre"), reel("barbier"), reel("yoga"), model("mot-cle"),
 ];
-const WALL: StripReel[] = [...WALL_ORDER.filter((k) => HOUSE_MODELS.some((m) => m.key === k)), ...HOUSE_MODELS.map((m) => m.key).filter((k) => !WALL_ORDER.includes(k))].map(model);
+
+/** « Tes Reels, jamais pareils. »: the last word changes face, and now and then fills with one of the Reels. */
+const PAREILS: MorphItem[] = [
+  { text: "pareils.", face: "serif" },
+  { text: "pareils.", face: "anton" },
+  { text: "pareils.", face: "pixel", image: workMedia("bar").poster },
+  { text: "pareils.", face: "bodoni" },
+  { text: "pareils.", face: "marker" },
+  { text: "pareils.", face: "unbounded", image: workMedia("fleuriste").poster },
+  { text: "pareils.", face: "fraunces" },
+  { text: "pareils.", face: "dela" },
+  { text: "pareils.", face: "mono" },
+  { text: "pareils.", face: "caveat", image: workMedia("cafe").poster },
+  { text: "pareils.", face: "syne" },
+  { text: "pareils.", face: "archivo" },
+];
+
+const AUCUN: MorphItem[] = [
+  { text: "aucun autre.", face: "serif" },
+  { text: "aucun autre.", face: "archivo" },
+  { text: "aucun autre.", face: "fraunces", image: workMedia("patisserie").poster },
+  { text: "aucun autre.", face: "pixel" },
+  { text: "aucun autre.", face: "bodoni" },
+  { text: "aucun autre.", face: "marker", image: workMedia("barbier").poster },
+  { text: "aucun autre.", face: "unbounded" },
+];
+
+const mini = (id: WorkId, alt: string): Token => ({ video: workMedia(id).mini, poster: workMedia(id).miniPoster, alt });
+
+/** The principle, written as the page scrolls: no model, her images, her Reel. */
+const PRINCIPLE: Token[] = [
+  { text: "Une coiffeuse", face: "serif" },
+  mini("coiffure", "Reel d’un salon de coiffure"),
+  { text: "ne raconte pas son métier" },
+  { text: "comme un tatoueur", face: "archivo" },
+  mini("tatoueur", "Reel d’un tatoueur"),
+  { text: "ni comme" },
+  { text: "une fleuriste.", face: "caveat" },
+  mini("fleuriste", "Reel d’une fleuriste"),
+  { text: "Alors Edith n’a" },
+  { text: "aucun modèle.", face: "anton" },
+  { text: "Il regarde tes images," },
+  mini("cafe", "Reel d’un café"),
+  { text: "ton style, ta demande,", face: "fraunces" },
+  { text: "et il invente", face: "pixel" },
+  { text: "ton Reel.", face: "bodoni" },
+];
+
+/** What it knows how to do, each technique shown by the Reel that uses it. */
+const TECHNIQUES: Technique[] = [
+  { name: "Une typo par mot", face: "anton", line: "Chaque plan a son mot, chaque mot sa police : la coupe prend du rythme.", ...pick("coiffure") },
+  { name: "Des tirages sur la table", face: "caveat", line: "Tes photos tombent une à une comme des tirages, puis une fenêtre s’ouvre sur la vidéo.", ...pick("fleuriste") },
+  { name: "Un mot qu’on traverse", face: "bricolage", line: "La vidéo suivante apparaît dans les lettres, puis on plonge dedans.", ...pick("cafe") },
+  { name: "Une mosaïque qui ne s’arrête jamais", face: "dela", line: "Une case change à chaque temps de la musique.", ...pick("patisserie") },
+  { name: "Le titre derrière toi", face: "bodoni", line: "Tu passes devant les lettres : ta silhouette est détourée à chaque image.", video: "/modeles/titre-derriere.mp4", poster: "/modeles/titre-derriere.jpg", trade: "Modèle d’Edith" },
+  { name: "Une fenêtre qui voyage", face: "unbounded", line: "Un cadre se déplace et change de forme à chaque coupe, des étiquettes se tapent à côté.", ...pick("tatoueur") },
+  { name: "Une lettre par coupe", face: "syne", line: "Un mot lent qui s’écrit à chaque plan.", ...pick("ceramique") },
+  { name: "Noir et blanc, un trait de rouge", face: "marker", line: "Un mot qui claque à chaque coupe, sur le temps.", ...pick("bar") },
+  { name: "Quatre coins, deux écrans", face: "archivo", line: "Une phrase posée aux quatre coins, puis deux plans côte à côte.", ...pick("barbier") },
+  { name: "Une respiration", face: "fraunces", line: "Des plans fixes de cinéma et un seul mot qui respire.", ...pick("yoga") },
+];
+function pick(id: WorkId) {
+  const w = WORK.find((x) => x.id === id)!;
+  return { video: workMedia(id).small, poster: workMedia(id).poster, trade: `${w.trade} · ${w.brand}` };
+}
+
+/** The carousels of the site (public/landing/carrousels), made like the Reels: demo businesses, free stock pictures. */
+const DECKS: Deck[] = [
+  { key: "pivoine", trade: "Fleuriste · Pivoine", title: "Le bouquet de la semaine, en 3 gestes" },
+  { key: "comptoir", trade: "Bar à cocktails · Le Comptoir", title: "3 cocktails pour ce soir" },
+  { key: "meche", trade: "Salon de coiffure · Atelier Mèche", title: "Le carré de Léa, avant / après" },
+].map((d) => ({ ...d, slides: [1, 2, 3, 4, 5].map((n) => `/landing/carrousels/${d.key}-${n}.webp`) }));
 
 export default function LandingPage() {
   const waUrl = whatsappLink();
 
   return (
-    <div className="land-paper min-h-dvh overflow-x-clip bg-white">
+    <div className={`land-paper min-h-dvh overflow-x-clip bg-white ${landingFonts}`}>
       <JsonLd data={structuredData()} />
       <SiteHeader waUrl={waUrl} home />
 
       {/*
-        Hero (lot 6: paper and ink, thin lines, big type; « le site devra être ultra visuel »): the promise across the
-        whole width in the biggest type of the site, then what it is, then a strip of Reels playing: the colour comes
-        from them.
+        Hero (lot 6 bis, Tristan: « super animé, pas comme un site classique, un site qui a un ADN… des typos qui changent »):
+        the promise, its last word never in the same face twice, then an endless belt of Reels: « une infinité de façons ».
       */}
-      <section className="mx-auto flex max-w-[1360px] flex-col gap-10 px-4 pt-8 pb-16 sm:px-8 sm:pt-12 lg:pb-24">
-        <span className="land-intro mono-label flex items-center justify-between gap-4 text-ink" style={vars({ "--i": 0 })}>
-          <span>Community manager IA</span>
-          <span className="hidden sm:inline">Sur WhatsApp et dans l’app</span>
-        </span>
-        <h1 className="land-intro text-[clamp(52px,10.4vw,168px)] leading-[0.88] font-semibold tracking-[-0.065em]" style={vars({ "--i": 1 })}>
-          Edith est une IA.
-          <span className="block font-[family-name:var(--font-serif)] text-[1.04em] leading-[0.92] font-normal tracking-[-0.035em] italic">Tes Reels n’en ont pas l’air.</span>
-        </h1>
-        <div className="land-intro grid gap-6 border-t border-ink pt-6 lg:grid-cols-[1fr_auto] lg:items-end" style={vars({ "--i": 2 })}>
-          <p className="max-w-[620px] text-[19px] leading-[1.5] sm:text-[22px]">
-            Envoie tes vidéos sur WhatsApp, telles quelles. Edith les monte comme un créateur, écrit la légende, et tu postes d’un toucher sur Instagram et TikTok.
-          </p>
-          <div className="flex flex-col gap-3 lg:items-end">
-            <div className="flex flex-wrap items-center gap-3">
-              <Start waUrl={waUrl} size="lg" />
-              <a href="#travail" className="btn btn-secondary h-14 px-6 text-base">
-                Voir ses Reels
-              </a>
+      <section className="flex flex-col gap-10 pt-8 pb-14 sm:pt-12">
+        <div className="mx-auto flex w-full max-w-[1360px] flex-col gap-8 px-4 sm:px-8">
+          <span className="land-intro mono-label flex items-center justify-between gap-4 text-ink" style={vars({ "--i": 0 })}>
+            <span>Edith · community manager IA</span>
+            <span className="hidden sm:inline">Sur WhatsApp et dans l’app</span>
+          </span>
+          <h1 className="land-intro text-[clamp(60px,11.5vw,184px)] leading-[0.86] font-semibold tracking-[-0.065em]" style={vars({ "--i": 1 })}>
+            Tes Reels,
+            <span className="block">
+              jamais <MorphWord items={PAREILS} label="pareils." />
+            </span>
+          </h1>
+          <div className="land-intro grid gap-6 border-t border-ink pt-6 lg:grid-cols-[1fr_auto] lg:items-end" style={vars({ "--i": 2 })}>
+            <p className="max-w-[640px] text-[19px] leading-[1.5] sm:text-[22px]">
+              Tu envoies tes vidéos sur WhatsApp. Edith invente pour chacune sa forme, sa typo et son rythme, écrit la légende, et tu postes d’un toucher. Une infinité de façons de raconter ton commerce.
+            </p>
+            <div className="flex flex-col gap-3 lg:items-end">
+              <div className="flex flex-wrap items-center gap-3">
+                <Start waUrl={waUrl} size="lg" />
+                <a href="#travail" className="btn btn-secondary h-14 px-6 text-base">
+                  Voir les Reels
+                </a>
+              </div>
+              <ul className="mono-label flex flex-wrap gap-x-5 gap-y-1.5 text-muted">
+                {["Rien ne part sans ton oui", "En place en 5 minutes", `Dès ${PLANS.decouverte.priceEur} € par mois`].map((t) => (
+                  <li key={t} className="flex items-center gap-1.5">
+                    <CheckIcon size={13} className="text-ink" />
+                    {t}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="mono-label flex flex-wrap gap-x-5 gap-y-1.5 text-muted">
-              {["Rien ne part sans ton oui", "En place en 5 minutes", `Dès ${PLANS.decouverte.priceEur} € par mois`].map((t) => (
-                <li key={t} className="flex items-center gap-1.5">
-                  <CheckIcon size={13} className="text-ink" />
-                  {t}
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
         <div className="land-intro" style={vars({ "--i": 3 })}>
-          <ReelStrip reels={HERO_STRIP} />
+          <ReelBelt reels={BELT} seconds={90} caption={false} />
         </div>
       </section>
 
@@ -213,41 +285,54 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* N° 01, the work: Reels people watch to the end, never ads. */}
-      <section id="travail" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pt-24 pb-28 sm:px-8">
-        <div className="land-reveal">
-          <SectionTitle n={1} kicker="Le travail">
-            Des Reels qu’on regarde <span className="accent">jusqu’au bout.</span>
-          </SectionTitle>
+      {/* N° 01, the principle: written as the page scrolls, faces and pictures between the words. */}
+      <section className="mx-auto flex max-w-[1360px] flex-col gap-10 px-4 pt-24 pb-28 sm:px-8">
+        <div className="mono-label flex items-center justify-between border-t border-ink pt-4">
+          <span>Le principe</span>
+          <span>N° 01</span>
         </div>
-        <p className="land-reveal -mt-4 max-w-[520px] text-[17px] leading-relaxed text-muted">
-          Pas des pubs&nbsp;: des Reels comme ceux des comptes qu’on suit pour le plaisir.
-          <span className="mono-label mt-2 block text-muted/80">Commerces d’exemple · vidéos libres de droits</span>
-        </p>
-        <div className="land-reveal">
-          <ReelWall />
-        </div>
+        <ScrollWords tokens={PRINCIPLE} className="max-w-[1240px] text-[clamp(40px,6.2vw,100px)] leading-[1.02] font-semibold tracking-[-0.05em]" />
       </section>
 
-      {/* N° 02, Edith's models: every one plays, the colour of the page. */}
-      <section id="modeles" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pb-28 sm:px-8">
+      {/* N° 02, the work: the Reels, what each was asked and made from. */}
+      <section id="travail" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pb-28 sm:px-8">
         <div className="land-reveal">
-          <SectionTitle n={2} kicker="Ses modèles">
-            {HOUSE_MODELS.length} façons de raconter ton commerce. <span className="accent">Avec tes images.</span>
+          <SectionTitle n={2} kicker="Le travail">
+            Neuf commerces, <span className="accent">neuf Reels qui ne se ressemblent pas.</span>
           </SectionTitle>
         </div>
         <p className="land-reveal -mt-4 max-w-[560px] text-[17px] leading-relaxed text-muted">
-          Choisis-en un dans l’app, ou montre-lui un Reel que tu aimes&nbsp;: Edith le refait avec tes photos, tes vidéos et ta charte.
-          <span className="mono-label mt-2 block text-muted/80">Aperçus · vidéos libres de droits</span>
+          Ce qu’ils ont envoyé, ce qu’ils ont demandé, ce qu’Edith en a fait.
+          <span className="mono-label mt-2 block text-muted/80">Commerces d’exemple · vidéos libres de droits · musique d’Edith</span>
         </p>
-        <ModelWall reels={WALL} />
+        <ReelWall />
       </section>
 
-      {/* N° 03, zero cringe: what gives AI content away, and what Edith does instead. */}
+      {/* N° 03, the techniques: each name in the face of its Reel, the Reel playing beside it. */}
+      <section id="techniques" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pb-28 sm:px-8">
+        <div className="land-reveal">
+          <SectionTitle n={3} kicker="Ce qu’il sait faire">
+            Des façons de raconter, <span className="accent">et toutes celles à inventer.</span>
+          </SectionTitle>
+        </div>
+        <Techniques items={TECHNIQUES} />
+      </section>
+
+      {/* N° 04, the carousels: they swipe by themselves. */}
+      <section id="carrousels" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pb-28 sm:px-8">
+        <div className="land-reveal">
+          <SectionTitle n={4} kicker="Les carrousels">
+            Des carrousels qu’on garde, <span className="accent">et qu’on envoie à une amie.</span>
+          </SectionTitle>
+        </div>
+        <CarouselDecks decks={DECKS} />
+      </section>
+
+      {/* N° 05, zero cringe: what gives AI content away, and what Edith does instead. */}
       <section id="cringe" className="mx-auto max-w-[1360px] scroll-mt-6 px-4 pb-28 sm:px-8">
         <div className="land-reveal mb-12">
-          <SectionTitle n={3} kicker="Zéro cringe">
-            Le «&nbsp;contenu IA&nbsp;», tout le monde le repère. <span className="accent">Edith fait l’inverse.</span>
+          <SectionTitle n={5} kicker="Zéro cringe">
+            Edith est une IA. <span className="accent">Tes Reels n’en ont pas l’air.</span>
           </SectionTitle>
         </div>
         <Play threshold={0.2}>
@@ -268,86 +353,11 @@ export default function LandingPage() {
         </Play>
       </section>
 
-      {/* N° 04, ta-da: her ideas, Edith does the rest (the real carousel). */}
-      <section className="mx-auto flex max-w-[1360px] flex-col gap-12 px-4 pb-28 sm:px-8">
-        <div className="land-reveal">
-          <SectionTitle n={4} kicker="Ta-da !">
-            Toi, tu as les idées. <span className="accent">Moi, j’exécute.</span>
-          </SectionTitle>
-        </div>
-        <IdeaToPost />
-        <div className="land-reveal flex flex-col gap-3">
-          <span className="mono-label text-muted">Et toutes tes autres idées</span>
-          <div className="land-marquee-wrap overflow-hidden border-y border-ink/20 py-3">
-            <div className="land-marquee flex w-max gap-8 pr-8" style={vars({ "--dur": "50s" })}>
-              {[...ideas, ...ideas].map(([idea, kind], i) => (
-                <span
-                  key={i}
-                  aria-hidden={i >= ideas.length || undefined}
-                  className={`flex shrink-0 items-baseline gap-3 text-[clamp(20px,2vw,28px)] font-medium tracking-[-0.03em] whitespace-nowrap ${i >= ideas.length ? "land-marquee-dup" : ""}`}
-                >
-                  {fr(`« ${idea} »`)}<span className="mono-label text-muted">{kind}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* N° 05, what she can ask */}
-      <section className="mx-auto flex max-w-[1360px] flex-col gap-12 px-4 pb-28 sm:px-8">
-        <div className="land-reveal">
-          <SectionTitle n={5} kicker="Ce que tu peux lui demander">
-            Une idée, un lien, un vocal&nbsp;: <span className="accent">il s’en occupe.</span>
-          </SectionTitle>
-        </div>
-        <div className="grid gap-px border border-ink/20 bg-ink/20 md:grid-cols-2 lg:grid-cols-3">
-          <Card i={0} icon={RepeatIcon} title="« Refais-moi ce Reel »" className="lg:row-span-2" visual={<CopyReelVisual />} center>
-            Colle le lien d’un Reel que tu aimes : il en reprend la forme, avec tes images.
-          </Card>
-          <Card i={1} icon={MicIcon} title="Une voix off" visual={<VoiceVisual />} loop>
-            Huit voix au choix, ou la tienne en vocal.
-          </Card>
-          <Card i={2} icon={MusicIcon} title="Une musique à lui" visual={<MusicVisual />} loop>
-            Composée pour chaque Reel, calée sur les coupes.
-          </Card>
-          <Card i={3} icon={ZapIcon} title="Des effets qui suivent tes gestes" visual={<GestureVisual />} loop>
-            Un mot qui grandit entre tes doigts, un titre qui passe derrière toi.
-          </Card>
-          <Card i={4} icon={LayersIcon} title="Bien plus qu’un diaporama" visual={<LayoutsVisual />} loop>
-            Écran partagé, collage, carrousels de graphiste.
-          </Card>
-        </div>
-      </section>
-
-      {/* N° 06, what else she does */}
-      <section className="mx-auto flex max-w-[1360px] flex-col gap-12 px-4 pb-28 sm:px-8">
-        <div className="land-reveal">
-          <SectionTitle n={6} kicker="Ce qu’il fait aussi">
-            Tout ce qu’un community manager fait, <span className="accent">à ta façon.</span>
-          </SectionTitle>
-        </div>
-        <div className="grid gap-px border border-ink/20 bg-ink/20 md:grid-cols-2 lg:grid-cols-4">
-          <Card i={0} icon={PenIcon} title="Les légendes" visual={<CaptionVisual />}>
-            Dans ton ton, avec ton lien de réservation.
-          </Card>
-          <Card i={1} icon={ClockIcon} title="Un signe au bon moment" visual={<ReminderVisual />}>
-            Il te prévient quand poster, tout est prêt en un toucher.
-          </Card>
-          <Card i={2} icon={ChartIcon} title="Ce qui marche, chaque dimanche" visual={<ReportVisual />}>
-            Ce qui a marché, et ce qu’on ajuste.
-          </Card>
-          <Card i={3} icon={EyeIcon} title="Des photos plus belles" visual={<RetouchVisual />} loop>
-            Lumière, couleurs, visages floutés si besoin.
-          </Card>
-        </div>
-      </section>
-
-      {/* N° 07, how it works: the product alive (WhatsApp and the app), and the five steps. */}
+      {/* N° 06, how it works: three words, the product alive (WhatsApp and the app), the five steps. */}
       <section id="comment" className="mx-auto flex max-w-[1360px] scroll-mt-6 flex-col gap-12 px-4 pb-28 sm:px-8">
         <div className="land-reveal">
-          <SectionTitle n={7} kicker="Comment ça marche">
-            En place en <span className="accent">5 minutes</span>, sans rien installer.
+          <SectionTitle n={6} kicker="Comment ça marche">
+            Tu envoies. <span className="accent">Il monte.</span> Tu dis oui.
           </SectionTitle>
         </div>
         <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
@@ -365,6 +375,62 @@ export default function LandingPage() {
           <div className="land-reveal min-w-0">
             <HeroScene />
           </div>
+        </div>
+        <div className="land-reveal flex flex-col gap-3">
+          <span className="mono-label text-muted">Ce que tu peux lui écrire</span>
+          <div className="land-marquee-wrap overflow-hidden border-y border-ink/20 py-3">
+            <div className="land-marquee flex w-max gap-8 pr-8" style={vars({ "--dur": "50s" })}>
+              {[...ideas, ...ideas].map(([idea, kind], i) => (
+                <span
+                  key={i}
+                  aria-hidden={i >= ideas.length || undefined}
+                  className={`flex shrink-0 items-baseline gap-3 text-[clamp(20px,2vw,28px)] font-medium tracking-[-0.03em] whitespace-nowrap ${i >= ideas.length ? "land-marquee-dup" : ""}`}
+                >
+                  {fr(`« ${idea} »`)}<span className="mono-label text-muted">{kind}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* N° 07, what she can ask */}
+      <section className="mx-auto flex max-w-[1360px] flex-col gap-12 px-4 pb-28 sm:px-8">
+        <div className="land-reveal">
+          <SectionTitle n={7} kicker="Ce que tu peux lui demander">
+            Une idée, un lien, un vocal&nbsp;: <span className="accent">il s’en occupe.</span>
+          </SectionTitle>
+        </div>
+        <div className="grid border-t border-l border-ink/20 md:grid-cols-2 lg:grid-cols-3">
+          <Card i={0} icon={RepeatIcon} title="« Refais-moi ce Reel »" className="lg:row-span-2" visual={<CopyReelVisual />} center>
+            Colle le lien d’un Reel que tu aimes : il en reprend la forme, avec tes images.
+          </Card>
+          <Card i={1} icon={MicIcon} title="Une voix off" visual={<VoiceVisual />} loop>
+            Huit voix au choix, ou la tienne en vocal.
+          </Card>
+          <Card i={2} icon={MusicIcon} title="Une musique à lui" visual={<MusicVisual />} loop>
+            Composée pour chaque Reel, calée sur les coupes.
+          </Card>
+          <Card i={3} icon={ZapIcon} title="Des effets qui suivent tes gestes" visual={<GestureVisual />} loop>
+            Un mot qui grandit entre tes doigts, un titre qui passe derrière toi.
+          </Card>
+          <Card i={4} icon={LayersIcon} title="Bien plus qu’un diaporama" visual={<LayoutsVisual />} loop>
+            Écran partagé, collage, carrousels de graphiste.
+          </Card>
+        </div>
+        <div className="grid border-t border-l border-ink/20 md:grid-cols-2 lg:grid-cols-4">
+          <Card i={5} icon={PenIcon} title="Les légendes" visual={<CaptionVisual />}>
+            Dans ton ton, avec ton lien de réservation.
+          </Card>
+          <Card i={6} icon={ClockIcon} title="Un signe au bon moment" visual={<ReminderVisual />}>
+            Il te prévient quand poster, tout est prêt en un toucher.
+          </Card>
+          <Card i={7} icon={ChartIcon} title="Ce qui marche, chaque dimanche" visual={<ReportVisual />}>
+            Ce qui a marché, et ce qu’on ajuste.
+          </Card>
+          <Card i={8} icon={EyeIcon} title="Des photos plus belles" visual={<RetouchVisual />} loop>
+            Lumière, couleurs, visages floutés si besoin.
+          </Card>
         </div>
       </section>
 
@@ -425,7 +491,7 @@ export default function LandingPage() {
       </section>
 
       <LastCall waUrl={waUrl} line="Dis-lui ce que tu fais : dans cinq minutes, il te montre ce qu’il ferait pour toi.">
-        Tes vidéos sont déjà là. <span className="font-[family-name:var(--font-serif)] font-normal tracking-[-0.03em] italic">Edith en fait des Reels.</span>
+        Ton prochain Reel ne ressemblera à <MorphWord items={AUCUN} label="aucun autre." />
       </LastCall>
 
       <SiteFooter />
@@ -455,7 +521,7 @@ function Card({
   children: ReactNode;
 }) {
   return (
-    <div className={`land-reveal flex min-w-0 flex-col bg-white p-6 sm:p-7 ${className}`} style={vars({ "--i": i })}>
+    <div className={`land-reveal flex min-w-0 flex-col border-r border-b border-ink/20 p-6 sm:p-7 ${className}`} style={vars({ "--i": i % 5 })}>
       <span className="mb-5 flex items-center justify-between gap-2.5 text-ink">
         <Icon size={20} />
         <span className="font-mono text-[11px] text-muted tabular-nums">{String(i + 1).padStart(2, "0")}</span>

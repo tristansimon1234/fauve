@@ -734,3 +734,27 @@
     transition: none;
   }
 }
+
+/* ── The belt of Reels under the hero: endless, paused on hover, still when asked for less motion ── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .land-belt {
+    animation: land-belt var(--dur, 60s) linear infinite;
+  }
+  .land-belt-reverse {
+    animation-direction: reverse;
+  }
+  .land-belt-wrap:hover .land-belt {
+    animation-play-state: paused;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .land-belt-wrap {
+    overflow-x: auto;
+  }
+}
+@keyframes land-belt {
+  to {
+    transform: translateX(-50%);
+  }
+}

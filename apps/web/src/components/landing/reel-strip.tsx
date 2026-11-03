@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { fr } from "./fr";
 
@@ -25,7 +26,7 @@ function useOnScreen<T extends HTMLElement>(threshold = 0.5) {
   return [ref, on] as const;
 }
 
-function Tile({ reel, index, size }: { reel: StripReel; index: number; size: "hero" | "wall" }) {
+function Tile({ reel, index, size, caption = true }: { reel: StripReel; index: number; size: "hero" | "wall" | "belt"; caption?: boolean }) {
   const [ref, on] = useOnScreen<HTMLElement>();
   const video = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -35,7 +36,10 @@ function Tile({ reel, index, size }: { reel: StripReel; index: number; size: "he
     else v.pause();
   }, [on]);
   return (
-    <figure ref={ref} className={`flex shrink-0 flex-col gap-2.5 ${size === "hero" ? "w-[58vw] snap-start sm:w-[260px] lg:w-auto" : "min-w-0"}`}>
+    <figure
+      ref={ref}
+      className={`flex shrink-0 flex-col gap-2.5 ${size === "hero" ? "w-[58vw] snap-start sm:w-[260px] lg:w-auto" : size === "belt" ? "w-[46vw] sm:w-[250px] lg:w-[270px]" : "min-w-0"}`}
+    >
       <div className="relative aspect-[9/16] overflow-hidden border border-ink/15 bg-ink">
         <video
           ref={video}
@@ -49,13 +53,13 @@ function Tile({ reel, index, size }: { reel: StripReel; index: number; size: "he
           className="absolute inset-0 size-full object-cover"
         />
       </div>
-      <figcaption className="flex flex-col gap-0.5">
+      {caption && <figcaption className="flex flex-col gap-0.5">
         <span className="flex items-baseline gap-2 font-mono text-[11px] font-medium tracking-[0.08em] uppercase">
           <span className="text-muted tabular-nums">{String(index + 1).padStart(2, "0")}</span>
           <span className="truncate">{fr(reel.label)}</span>
         </span>
         {reel.note && <span className="text-[13px] leading-snug text-muted">{fr(reel.note)}</span>}
-      </figcaption>
+      </figcaption>}
     </figure>
   );
 }
@@ -87,6 +91,21 @@ export function ModelWall({ reels, first = 12 }: { reels: StripReel[]; first?: n
           Voir les {reels.length} modèles
         </button>
       )}
+    </div>
+  );
+}
+
+/** An endless belt of Reels across the page (each one playing while on screen): « une infinité de façons ». */
+export function ReelBelt({ reels, seconds = 60, reverse = false, caption = true }: { reels: StripReel[]; seconds?: number; reverse?: boolean; caption?: boolean }) {
+  return (
+    <div className="land-belt-wrap overflow-hidden">
+      <div className={`land-belt flex w-max gap-3 pr-3 ${reverse ? "land-belt-reverse" : ""}`} style={{ "--dur": `${seconds}s` } as React.CSSProperties}>
+        {[...reels, ...reels].map((r, i) => (
+          <div key={`${r.key}-${i}`} aria-hidden={i >= reels.length || undefined}>
+            <Tile reel={r} index={i % reels.length} size="belt" caption={caption} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

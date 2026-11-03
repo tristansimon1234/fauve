@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { VolumeIcon, VolumeOffIcon } from "@/components/icons";
 import { fr } from "./fr";
-import { WORK } from "./work";
+import { WORK, workMedia, type WorkId } from "./work";
 
-// The landing's work, side by side like a contact sheet (Tristan: « les reels présentés trop pub
+// The site's Reels, side by side like a contact sheet (Tristan: « les reels présentés trop pub
 // oriented »): three Reels as accounts people follow for pleasure post them, never an offer nor a
 // « réserve ta table » card. Each with what it was made from: the brief, and the raw videos sent.
 // Demo businesses, from free stock videos (Mixkit), drawn by Edith's Reel composition; the music
@@ -18,8 +18,9 @@ import { WORK } from "./work";
 const COLUMNS = ["", "md:grid-cols-1 md:max-w-[360px]", "md:grid-cols-2 md:max-w-[780px]", "md:grid-cols-3"];
 
 /** The landing's three Reels, or only some of them (a trade's page shows those of its trade). */
-export function ReelWall({ only }: { only?: readonly string[] } = {}) {
+export function ReelWall({ only }: { only?: readonly WorkId[] } = {}) {
   const work = only ? WORK.filter((w) => only.includes(w.id)) : WORK;
+  const columns = COLUMNS[Math.min(3, work.length)];
   const root = useRef<HTMLDivElement>(null);
   const videos = useRef<(HTMLVideoElement | null)[]>([]);
   const [seen, setSeen] = useState<boolean[]>(work.map(() => false));
@@ -64,7 +65,7 @@ export function ReelWall({ only }: { only?: readonly string[] } = {}) {
   return (
     <div
       ref={root}
-      className={`-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:-mx-8 sm:px-8 md:mx-0 md:grid ${COLUMNS[work.length]} md:gap-6 md:overflow-visible md:px-0 lg:gap-10 [&::-webkit-scrollbar]:hidden`}
+      className={`-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:-mx-8 sm:px-8 md:mx-0 md:grid ${columns} md:gap-6 md:gap-y-14 md:overflow-visible md:px-0 lg:gap-10 [&::-webkit-scrollbar]:hidden`}
     >
       {work.map((w, i) => (
         <article key={w.id} data-index={i} className="flex w-[76vw] max-w-[340px] shrink-0 snap-center flex-col md:w-auto md:max-w-none">
@@ -79,15 +80,15 @@ export function ReelWall({ only }: { only?: readonly string[] } = {}) {
               ref={(el) => {
                 videos.current[i] = el;
               }}
-              src={`/landing/work-${w.id}.mp4`}
-              poster={`/landing/work-${w.id}.webp`}
+              src={workMedia(w.id).video}
+              poster={workMedia(w.id).poster}
               muted
               loop
               playsInline
-              preload="metadata"
+              preload="none"
               className="size-full object-cover"
             />
-            <span className="absolute top-3.5 left-3.5 font-[family-name:var(--font-serif)] text-[19px] leading-none text-white/90 italic drop-shadow">N°{String(i + 1).padStart(2, "0")}</span>
+            <span className="mono-label absolute top-3 left-3 text-white/90 drop-shadow">N° {String(i + 1).padStart(2, "0")}</span>
             <span
               className={`absolute right-3 bottom-3 flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-bold text-white backdrop-blur-sm transition-colors ${sound === i ? "bg-black/45" : "bg-white/20 group-hover:bg-white/30"}`}
             >
@@ -96,13 +97,13 @@ export function ReelWall({ only }: { only?: readonly string[] } = {}) {
             </span>
           </button>
           <div className="mt-5 flex flex-col gap-3">
-            <span className="text-[12px] font-bold tracking-[0.14em] text-muted uppercase">{w.trade}</span>
+            <span className="mono-label text-muted">{w.trade} · {w.brand}</span>
             <p className="font-[family-name:var(--font-serif)] text-[23px] leading-[1.18] text-ink italic">{fr(`« ${w.brief} »`)}</p>
             <div className="flex items-center gap-3 border-t border-ink/10 pt-3">
               <span className="flex -space-x-2">
                 {[0, 1, 2].map((k) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={k} src={`/landing/raw-${w.id}-${k}.webp`} alt="" loading="lazy" className="h-[38px] w-[30px] border-2 border-soft object-cover" />
+                  <img key={k} src={`/landing/reels/raw-${w.id}-${k}.webp`} alt="" loading="lazy" className="h-[38px] w-[30px] border-2 border-soft object-cover" />
                 ))}
               </span>
               <span className="text-[13px] leading-snug text-muted">
@@ -111,7 +112,7 @@ export function ReelWall({ only }: { only?: readonly string[] } = {}) {
             </div>
             <ul className="flex flex-wrap gap-1.5">
               {w.made.map((m) => (
-                <li key={m} className="border border-ink/10 px-2.5 py-1 text-[12px] font-semibold text-ink/75">
+                <li key={m} className="border border-ink/20 px-2.5 py-1 text-[12px] font-medium text-ink/80">
                   {m}
                 </li>
               ))}
