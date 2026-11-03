@@ -933,6 +933,11 @@ test("what a composition's code cuts out: her, or the objects it names, shot by 
   assert.equal(drawsSubject(`${objectsOnly} React.createElement(Subject, { shot: 0, rim: 8,} )`), true);
   assert.equal(drawsSubject(undefined), false);
   assert.deepEqual(objectsDrawn(`<Subject shot={i} object="cup" />`), []);
+  // A nested call among its arguments (the Text Brush test's code) is still read as a call for the cup, not for her.
+  const nested = `const b = SubjectBox(shots[0], Math.min(frame, 116), laid, "espresso cup"); React.createElement(Subject, { shot: 0, object: "espresso cup", style: { left: 0 },} )`;
+  assert.equal(drawsSubject(nested), false);
+  assert.deepEqual(objectsDrawn(nested), [{ shot: 0, name: "espresso cup" }]);
+  assert.equal(drawsSubject(`SubjectOutline(shots[1], Math.round(f / 2), { left: 0, top: 0, width: 1080, height: 1920 })`), true);
   // Each object through the passage of its shot (the plan's n-th shot, photos counted), videos at their own pace only.
   const plan = {
     segments: [

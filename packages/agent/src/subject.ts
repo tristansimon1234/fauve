@@ -46,8 +46,50 @@ function toolProps(js: string, tools = "Subject|Outline"): string[] {
   return out;
 }
 
-/** The calls of its functions (`SubjectBox(shots[2], f, box, "the cup")`): the shot, and the object's name when one is given last. */
-const CALLS = /\bSubject(?:Box|Outline)\(\s*([^,)]*)(?:,[^;]*?)?(?:,\s*["'`]([^"'`]+)["'`])?\s*\)/g;
+/**
+ * The calls of its functions (`SubjectBox(shots[2], f, box, "the cup")`), their arguments split at the top level (a
+ * nested call stays one argument: `SubjectBox(shots[0], Math.min(frame, 116), laid, "espresso cup")` had been read as
+ * a call for her, and she was cut out for nothing): the shot, and the object's name when one is given last.
+ */
+function subjectCalls(js: string): { shot: string; name?: string }[] {
+  const out: { shot: string; name?: string }[] = [];
+  for (const m of js.matchAll(/\bSubject(?:Box|Outline)\(/g)) {
+    const args: string[] = [];
+    let arg = "";
+    let depth = 0;
+    let quote: string | null = null;
+    for (let i = m.index + m[0].length; i < js.length; i++) {
+      const c = js[i]!;
+      if (quote) {
+        arg += c;
+        if (c === "\\") arg += js[++i] ?? "";
+        else if (c === quote) quote = null;
+        continue;
+      }
+      if (c === '"' || c === "'" || c === "`") {
+        quote = c;
+        arg += c;
+        continue;
+      }
+      if (c === ")" && depth === 0) {
+        args.push(arg);
+        break;
+      }
+      if (c === "(" || c === "[" || c === "{") depth++;
+      else if (c === ")" || c === "]" || c === "}") depth--;
+      if (c === "," && depth === 0) {
+        args.push(arg);
+        arg = "";
+        continue;
+      }
+      arg += c;
+    }
+    const last = args.length >= 2 ? args[args.length - 1]!.trim() : "";
+    const name = /^["'`]([^"'`]+)["'`]$/.exec(last)?.[1];
+    out.push({ shot: (args[0] ?? "").trim(), ...(name ? { name } : {}) });
+  }
+  return out;
+}
 const OBJECT_PROP = /\bobject\s*[:=]\s*\{?\s*["'`]([^"'`]+)["'`]/;
 const SHOT_PROP = /\bshot\s*[:=]\s*\{?\s*((?:shots\s*\[\s*)?\d+)/;
 
@@ -59,7 +101,7 @@ const SHOT_PROP = /\bshot\s*[:=]\s*\{?\s*((?:shots\s*\[\s*)?\d+)/;
 export function drawsSubject(js: string | undefined): boolean {
   if (!js) return false;
   const mentions = js.match(/\b(?:Subject|SubjectBox|SubjectOutline|Outline)\b/g)?.length ?? 0;
-  const forObjects = toolProps(js).filter((props) => OBJECT_PROP.test(props)).length + [...js.matchAll(CALLS)].filter((m) => m[2]).length;
+  const forObjects = toolProps(js).filter((props) => OBJECT_PROP.test(props)).length + subjectCalls(js).filter((c) => c.name).length;
   return mentions > forObjects;
 }
 
@@ -83,7 +125,7 @@ export function objectsDrawn(js: string | undefined): { shot: number; name: stri
     if (n && named) found.set(`${n[1]}#${named}`, { shot: Number(n[1]), name: named });
   };
   for (const props of toolProps(js)) add(SHOT_PROP.exec(props)?.[1], OBJECT_PROP.exec(props)?.[1]);
-  for (const m of js.matchAll(CALLS)) add(m[1], m[2]);
+  for (const c of subjectCalls(js)) add(c.shot, c.name);
   return [...found.values()];
 }
 

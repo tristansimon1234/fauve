@@ -67,6 +67,21 @@ async function planned(studioId: string, plan: Plan, anticipate = false) {
 
 type Row = { id: string; kind: string; storage_path: string | null; subjects: unknown; tracks: unknown };
 
+/**
+ * Merges each clip's new passages into its cut-outs (media_assets.subjects), one statement a clip
+ * (merge_media_subjects): her cut-out, an object followed and its depth are made at the same time on the same clip,
+ * and a whole record written back by one erased what another had just kept (the cup of the Text Brush test).
+ */
+async function mergeSubjects(studioId: string, updates: Map<string, MediaSubjects>): Promise<void> {
+  const db = supabaseAdmin();
+  await Promise.all(
+    [...updates].map(async ([id, patch]) => {
+      const { error } = await db.rpc("merge_media_subjects", { p_media: id, p_studio: studioId, p_patch: patch });
+      if (error) console.warn("cut-outs not kept", id, error.message);
+    }),
+  );
+}
+
 const kept = (row: Row | undefined): MediaSubjects => mediaSubjectsSchema.safeParse(row?.subjects ?? {}).data ?? {};
 
 /**
@@ -97,11 +112,10 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
   };
   const updates = new Map<string, MediaSubjects>();
   const record = (p: SubjectPassage, value: MediaSubjects[string]) => {
-    const next = updates.get(p.clip_id) ?? { ...kept(rows.get(p.clip_id)) };
+    const next = updates.get(p.clip_id) ?? {};
     next[p.key] = value;
     updates.set(p.clip_id, next);
   };
-  const db = supabaseAdmin();
   let pending = missing;
   if (gpuReady()) {
     const budget = budgetNow() - GPU_START_MS - GPU_LOAD_MS;
@@ -121,7 +135,7 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
     pending = missing.filter((p) => !done.has(p.key));
   }
   if (pending.length) await cutInSandbox(studioId, postId, pending, rows, record, budgetNow());
-  await Promise.all([...updates].map(([id, subjects]) => db.from("media_assets").update({ subjects }).eq("id", id).eq("studio_id", studioId)));
+  await mergeSubjects(studioId, updates);
 }
 
 type Record_ = (p: SubjectPassage, value: MediaSubjects[string]) => void;
@@ -353,7 +367,7 @@ export async function ensureObjects(studioId: string, postId: string, plan: Plan
   const at = new Date().toISOString();
   const updates = new Map<string, MediaSubjects>();
   const record = (p: ObjectPassage, value: MediaSubjects[string]) => {
-    const next = updates.get(p.clip_id) ?? { ...kept(rows.get(p.clip_id)) };
+    const next = updates.get(p.clip_id) ?? {};
     next[p.key] = value;
     updates.set(p.clip_id, next);
   };
@@ -381,7 +395,7 @@ export async function ensureObjects(studioId: string, postId: string, plan: Plan
       ...(contour ? { contour } : {}),
     });
   }
-  await Promise.all([...updates].map(([id, subjects]) => db.from("media_assets").update({ subjects }).eq("id", id).eq("studio_id", studioId)));
+  await mergeSubjects(studioId, updates);
   // The card's time, billed whether or not it followed them (none when no card was allotted).
   if (seconds > 0)
     await db.from("cost_events").insert({
@@ -445,7 +459,7 @@ export async function ensureDepths(studioId: string, postId: string, plan: Plan)
   for (const p of missing) {
     const result = results[p.key];
     if (!result) continue;
-    const next = updates.get(p.clip_id) ?? { ...kept(rows.get(p.clip_id)) };
+    const next = updates.get(p.clip_id) ?? {};
     if (result instanceof Error) {
       console.warn("depth not read", p.key, result.message);
       next[p.key] = { failed_at: at, error: result.message.slice(0, 200) };
@@ -455,7 +469,7 @@ export async function ensureDepths(studioId: string, postId: string, plan: Plan)
     }
     updates.set(p.clip_id, next);
   }
-  await Promise.all([...updates].map(([id, subjects]) => db.from("media_assets").update({ subjects }).eq("id", id).eq("studio_id", studioId)));
+  await mergeSubjects(studioId, updates);
   // The card's time, billed whether or not it read them (none when no card was allotted).
   if (seconds > 0)
     await db.from("cost_events").insert({
