@@ -4,7 +4,7 @@ import { isClipSegment, mediaSubjectsSchema, mediaTracksSchema, subjectPassages,
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { costMeta } from "@/lib/cost-scope";
 import { timeLeft } from "@/lib/step-clock";
-import { gpuCostEur, gpuReady, subjectsOnGpu } from "./gpu";
+import { GPU_START_MS, gpuCostEur, gpuReady, subjectsOnGpu } from "./gpu";
 import { cutoutCostEur, subjectsInSandbox } from "./sandbox";
 
 // Her subject cut out at every image of the passages a composition draws it on (Subject), made in the cut-out
@@ -41,8 +41,12 @@ type Row = { id: string; kind: string; storage_path: string | null; subjects: un
 
 const kept = (row: Row | undefined): MediaSubjects => mediaSubjectsSchema.safeParse(row?.subjects ?? {}).data ?? {};
 
-/** On the card: what its machine takes to start (its image built once by Modal, then seconds), and a second of video (its 30 images read and their edge made). */
-const GPU_START_MS = 90_000;
+/**
+ * On the card: its clip fetched and its model loaded, then a second of video (its 30 images read and their edge
+ * made). The card gets its start, this, and as much again, never the whole step: when it fails, the cut-out sandbox
+ * still has time for the passages.
+ */
+const GPU_LOAD_MS = 60_000;
 const GPU_WORK_PER_SECOND = 12;
 
 /**
@@ -72,7 +76,7 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
   const db = supabaseAdmin();
   let pending = missing;
   if (gpuReady()) {
-    const budget = budgetNow() - GPU_START_MS;
+    const budget = budgetNow() - GPU_START_MS - GPU_LOAD_MS;
     let room = budget;
     const chosen = missing.filter((p) => {
       const need = (p.to - p.from) * GPU_WORK_PER_SECOND * 1000;
@@ -80,7 +84,9 @@ export async function ensureSubjects(studioId: string, postId: string, plan: Pla
       room -= need;
       return true;
     });
-    const done = chosen.length ? await cutOnGpu(studioId, postId, chosen, rows, record, budget + GPU_START_MS).catch((error: unknown) => {
+    const work = budget - room;
+    const deadline = Math.min(budgetNow(), GPU_START_MS + GPU_LOAD_MS + 2 * work);
+    const done = chosen.length ? await cutOnGpu(studioId, postId, chosen, rows, record, deadline).catch((error: unknown) => {
       console.warn("subject cut-outs on the card unavailable, the sandbox takes them", error instanceof Error ? error.message.slice(0, 300) : error);
       return new Set<string>();
     }) : new Set<string>();
@@ -131,14 +137,16 @@ async function cutOnGpu(studioId: string, postId: string, chosen: SubjectPassage
       ...(result.boxes?.length ? { boxes: result.boxes } : {}),
     });
   }
-  await db.from("cost_events").insert({
-    studio_id: studioId,
-    kind: "matting",
-    provider: "modal",
-    units: Math.round(seconds),
-    cost_eur: gpuCostEur(seconds),
-    meta: costMeta({ post_id: postId, passages: jobs.length, gpu: "L4", seconds_of_video: Math.round(chosen.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
-  });
+  // The card's time, billed whether or not it cut out (none when no card was allotted).
+  if (seconds > 0)
+    await db.from("cost_events").insert({
+      studio_id: studioId,
+      kind: "matting",
+      provider: "modal",
+      units: Math.round(seconds),
+      cost_eur: gpuCostEur(seconds),
+      meta: costMeta({ post_id: postId, passages: jobs.length, done: done.size, gpu: "L4", seconds_of_video: Math.round(chosen.reduce((n, p) => n + p.to - p.from, 0) * 10) / 10 }),
+    });
   return done;
 }
 

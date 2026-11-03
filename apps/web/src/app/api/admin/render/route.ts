@@ -58,17 +58,14 @@ export async function POST(request: NextRequest) {
         db.storage.from("media").createSignedUploadUrl(`${base}.png`, { upsert: true }),
       ]);
       if (!clip.data?.signedUrl || !webm.data?.signedUrl || !png.data?.signedUrl) return console.error("gpu subject: links refused");
-      try {
-        const { results, seconds } = await subjectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000);
-        const result = results.lab;
-        const cost = gpuCostEur(seconds);
-        await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "matting", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, gpu: "L4" } });
-        const still = result && !(result instanceof Error) && result.still;
-        const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(`${base}.${still ? "png" : "webm"}`, 86_400)).data?.signedUrl : null;
-        console.log("gpu subject", JSON.stringify({ media, from, to, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result, link }));
-      } catch (error) {
-        console.error("gpu subject failed", error instanceof Error ? error.message.slice(0, 600) : error);
-      }
+      // Its steps are in the logs as they happen (« gpu … »), then its result (« gpu subject »).
+      const { results, seconds } = await subjectsOnGpu([{ key: "lab", url: clip.data.signedUrl, from, to, upload: { webm: webm.data.signedUrl, png: png.data.signedUrl } }], 700_000);
+      const result = results.lab;
+      const cost = gpuCostEur(seconds);
+      if (seconds > 0) await db.from("cost_events").insert({ studio_id: row.studio_id, kind: "matting", provider: "modal", units: Math.round(seconds), cost_eur: cost, meta: { lab: true, media, from, to, gpu: "L4" } });
+      const still = result && !(result instanceof Error) && result.still;
+      const link = result && !(result instanceof Error) ? (await db.storage.from("media").createSignedUrl(`${base}.${still ? "png" : "webm"}`, 86_400)).data?.signedUrl : null;
+      console.log("gpu subject", JSON.stringify({ media, from, to, seconds: Math.round(seconds), cost_eur: Math.round(cost * 1000) / 1000, result: result instanceof Error ? result.message : result, link }));
     });
     return Response.json({ ok: true, started: true }, { status: 202 });
   }

@@ -9,6 +9,8 @@
 # Usage: PORTRAIT_MODEL=… python -I portrait.py jobs.json → prints {"<id>": { still, frames, keys, people, top, boxes,
 # seconds, uploaded } | { error }}. jobs.json: [{ id, url (the clip, signed) or src (a local video), from, to,
 # upload?: { webm, png } (signed upload links: the cut-out is sent there), out? }]. PORTRAIT_CPU=1 runs it on a CPU.
+# Its progress goes to stderr, a line per step with its time (read live by gpu.ts, copied to Vercel's logs), and with
+# PORTRAIT_SECONDS (the time it has) a passage whose pace would not finish in time stops at its third image and says so.
 import json
 import os
 import sys
@@ -21,11 +23,21 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # The size the model reads (it was trained on 1024 × 1024 images).
 SIZE = 1024
 
+T0 = time.time()
+# When it must be done (PORTRAIT_SECONDS from its start), or None.
+DEADLINE = T0 + float(os.environ["PORTRAIT_SECONDS"]) if os.environ.get("PORTRAIT_SECONDS") else None
+
+
+def log(message):
+    """A progress line, with the time since the start."""
+    print(f"[{time.time() - T0:.1f} s] {message}", file=sys.stderr, flush=True)
+
 
 def load(path, gpu=True):
     """The model: on the card (its CUDA libraries come with onnxruntime-gpu's wheels), or on the CPU when asked."""
     import onnxruntime as ort
 
+    started = time.time()
     if gpu:
         # The CUDA and cuDNN libraries installed by pip (onnxruntime-gpu[cuda,cudnn]), loaded before the session.
         ort.preload_dlls()
@@ -33,6 +45,7 @@ def load(path, gpu=True):
         if "CUDAExecutionProvider" not in session.get_providers():
             # On a CPU it would take an hour: the app falls back to its own cut-out sandbox instead.
             raise RuntimeError("pas de carte graphique pour le modèle")
+        log(f"model loaded on the card in {time.time() - started:.1f} s")
         return session
     options = ort.SessionOptions()
     options.intra_op_num_threads = os.cpu_count() or 4
@@ -51,13 +64,27 @@ def reader(session):
 
     def read(images, w, h):
         out = []
-        for img in images:
+        n = len(images)
+        started = time.time()
+        warm = started
+        for i, img in enumerate(images):
             x = cv2.resize(img, (SIZE, SIZE), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
             m = session.run(None, {name: ((x - mean) / std).transpose(2, 0, 1)[None]})[0][0, 0]
             # The export gives its logits: a sigmoid makes them a cut-out (values already in 0..1 are kept).
             if m.min() < 0 or m.max() > 1:
                 m = 1 / (1 + np.exp(-m))
             out.append(cv2.resize(m.astype(np.float32), (w, h), interpolation=cv2.INTER_LINEAR))
+            done = i + 1
+            if done == 1:
+                # The first image also prepares the card (its kernels chosen): the pace is read on the next ones.
+                log(f"first image read in {time.time() - started:.1f} s")
+                warm = time.time()
+            elif done % 15 == 0 or done == n:
+                log(f"{done}/{n} images read, {(time.time() - warm) / (done - 1):.2f} s an image")
+            if DEADLINE and done == 3 and n > 3:
+                pace = (time.time() - warm) / 2
+                if time.time() + pace * (n - done) * 1.2 + 20 > DEADLINE:
+                    raise RuntimeError(f"trop lent sur la carte ({pace:.1f} s par image)")
         return out
 
     return read
@@ -77,12 +104,14 @@ def cut_every_image(job, read):
     ow, oh = max(2, int(round(src_w * scale / 2)) * 2), max(2, int(round(src_h * scale / 2)) * 2)
     frames = matte.decode(job["src"], start, seconds, ow, oh, hdr)
     n = len(frames)
+    log(f"{n} images of {ow}×{oh}{' (HDR)' if hdr else ''} decoded in {time.time() - started:.1f} s")
     # A passage where nothing moves is read once (its cut-out is one image, a PNG), as on the sandbox.
     ww, wh = matte.WORK_WIDE, max(2, int(round(oh * matte.WORK_WIDE / ow / 2)) * 2)
     small = [cv2.resize(cv2.cvtColor(f, cv2.COLOR_RGB2GRAY), (ww // 3, wh // 3), interpolation=cv2.INTER_AREA) for f in frames]
     flow = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_ULTRAFAST)
     total = sum(float(np.percentile(np.linalg.norm(flow.calc(small[i - 1], small[i], None), axis=2) * 3, 95)) for i in range(1, n))
     if total < matte.STILL_MOVE:
+        log("nothing moves: one image read")
         mid = n // 2
         return matte.finish(job, frames, [matte.main_subject(read([frames[mid]], ow, oh)[0])], True, 1, True, started, ow, oh, mid)
     # Read at half the picture's size (finish makes the edge at full size, on the picture itself).
@@ -90,7 +119,10 @@ def cut_every_image(job, read):
     masks = [matte.main_subject(m) for m in read(list(frames), mw, mh)]
     # A light smoothing over time, against a shimmer of the edges (a fast hand keeps most of its own image).
     masks = [masks[0]] + [0.6 * masks[i] + 0.2 * masks[i - 1] + 0.2 * masks[min(n - 1, i + 1)] for i in range(1, n)]
-    return matte.finish(job, frames, masks, False, n, True, started, ow, oh)
+    edged = time.time()
+    r = matte.finish(job, frames, masks, False, n, True, started, ow, oh)
+    log(f"edges made and encoded in {time.time() - edged:.1f} s")
+    return r
 
 
 def fetch(url, path):
@@ -122,13 +154,21 @@ if __name__ == "__main__":
             src = job.get("src")
             if not src:
                 src = os.path.join(work, f"in{i}")
+                fetched = time.time()
                 fetch(job["url"], src)
+                log(f"clip fetched ({os.path.getsize(src) / 1e6:.1f} MB) in {time.time() - fetched:.1f} s")
             r = cut_every_image({**job, "src": src, "out": job.get("out") or os.path.join(work, f"out{i}")}, read)
             if job.get("upload"):
+                sent = time.time()
                 send(r["file"], job["upload"]["png" if r["still"] else "webm"], "image/png" if r["still"] else "video/webm")
+                log(f"cut-out sent ({os.path.getsize(r['file']) / 1e6:.1f} MB) in {time.time() - sent:.1f} s")
                 r = {k: v for k, v in r.items() if k != "file"} | {"uploaded": True}
             results[job["id"]] = r
         except Exception as error:  # noqa: BLE001 — one passage that fails never stops the others
+            log(f"passage {job.get('id')} failed: {str(error)[:200]}")
             results[job["id"]] = {"error": str(error)[:300]}
     print(json.dumps(results))
     sys.stdout.flush()
+    sys.stderr.flush()
+    # As matte.py: out at once, without waiting on the model's threads and the card's libraries to wind down.
+    os._exit(0)
